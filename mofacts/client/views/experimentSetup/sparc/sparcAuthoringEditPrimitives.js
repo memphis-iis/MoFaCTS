@@ -34,7 +34,7 @@ export function replaceObjectContents(target, nextValue) {
 }
 
 export function ensureTarget(target) {
-  target.documentId = target.documentId || '';
+  target.pageKey = target.pageKey || '';
   target.nodeId = target.nodeId || '';
   return target;
 }

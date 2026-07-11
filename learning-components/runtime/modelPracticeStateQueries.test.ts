@@ -196,9 +196,9 @@ describe('modelPracticeStateQueries', function() {
         eventType: 'sparc',
         responseDuration: 450,
         sparc: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'widget-1',
           },
         },
@@ -216,15 +216,15 @@ describe('modelPracticeStateQueries', function() {
         responseDuration: undefined,
         practiceDurationMs: undefined,
         sparc: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'widget-1',
           },
           practiceObservation: {
             observationId: 'obs-1',
             sourceAddress: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'widget-1',
             },
             time: 2000,

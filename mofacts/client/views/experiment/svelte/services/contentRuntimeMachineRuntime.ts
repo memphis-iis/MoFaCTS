@@ -47,14 +47,14 @@ export function createContentRuntimeMachineRuntimeController({
   createActor,
   setState,
   sendStartEvent,
-  startEvent,
+  getStartEvent,
   log,
 }: {
   machine: unknown;
   createActor: (machine: unknown) => ContentRuntimeMachineActor;
   setState: (snapshot: ContentRuntimeMachineSnapshot) => void;
   sendStartEvent: (event: unknown) => void;
-  startEvent: unknown;
+  getStartEvent: () => unknown;
   log: (level: number, message: string, details?: unknown) => void;
 }): ContentRuntimeMachineRuntimeController {
   let actor: ContentRuntimeMachineActor | null = null;
@@ -74,7 +74,7 @@ export function createContentRuntimeMachineRuntimeController({
         setState(snapshot);
         if (!startDispatched && snapshot?.matches?.('idle.ready')) {
           startDispatched = true;
-          sendStartEvent(startEvent);
+          sendStartEvent(getStartEvent());
         }
       });
     }

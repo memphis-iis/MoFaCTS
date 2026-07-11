@@ -38,7 +38,7 @@ const event: SparcInterfaceEvent = {
   eventId: 'score-turn-1',
   type: 'response-submitted',
   source: {
-    documentId: 'score-doc',
+    pageKey: 'score-doc',
     nodeId: 'learner-input',
   },
   time: 1000,

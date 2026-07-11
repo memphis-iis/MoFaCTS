@@ -100,7 +100,7 @@ function assertRuleRoundTrip() {
         pageId: 'roundtrip-page',
         display: {
           type: 'sparc',
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodes: [{
             id: 'node-1',
             nodeType: 'atomic',
@@ -188,7 +188,7 @@ function assertProductionRuleValidation() {
     pageId: 'validation-page',
     display: {
       type: 'sparc',
-      documentId: 'validation-doc',
+      pageKey: 'validation-doc',
       nodes: [{
         id: 'node-1',
         nodeType: 'atomic',
@@ -258,18 +258,18 @@ function assertClusterResolution() {
   };
 
   const resolved = modelTargets.resolveSparcAuthoredModelTarget(document, {
-    documentId: 'doc-1',
+    pageKey: 'doc-1',
     nodeId: 'single-node',
   });
   assert.equal(resolved.stimulusKC, 'kc-a');
   assert.equal(resolved.sparcNodeId, 'single-node');
   assert.equal(modelTargets.resolveSparcAuthoredModelTarget(document, {
-    documentId: 'doc-1',
+    pageKey: 'doc-1',
     nodeId: 'sparc-only-node',
   }), undefined);
   assert.throws(
     () => modelTargets.resolveSparcAuthoredModelTarget(document, {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'ambiguous-node',
     }),
     /ambiguous/,
@@ -278,7 +278,7 @@ function assertClusterResolution() {
     () => modelTargets.resolveSparcProductionRuleModelTarget({
       document,
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'sparc-only-node',
       },
     }),

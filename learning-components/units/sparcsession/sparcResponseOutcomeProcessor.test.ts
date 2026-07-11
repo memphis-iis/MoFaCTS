@@ -12,11 +12,11 @@ import { processSparcResponseOutcome } from './sparcResponseOutcomeProcessor';
 describe('sparcResponseOutcomeProcessor', function() {
   it('records model-linked response outcomes as canonical model history plus replayable SPARC state', function() {
     const sourceAddress = {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'widget-3-input',
     };
     const modelTarget = {
-      sparcDocumentId: 'doc-1',
+      sparcPageKey: 'doc-1',
       sparcNodeId: 'widget-3-input',
       stimuliSetId: 'stim-set-1',
       stimulusKC: 'kc-1',
@@ -96,7 +96,7 @@ describe('sparcResponseOutcomeProcessor', function() {
 
   it('records non-model reactive outcomes without card/model identity fields', function() {
     const sourceAddress = {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'hint-toggle',
     };
     const processed = processSparcResponseOutcome({
@@ -140,7 +140,7 @@ describe('sparcResponseOutcomeProcessor', function() {
       }, {
         observationId: '',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'node-1',
         },
         time: 1000,
@@ -162,11 +162,11 @@ describe('sparcResponseOutcomeProcessor', function() {
       }, {
         observationId: 'obs-cross-doc-model',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'node-1',
         },
         modelTarget: {
-          sparcDocumentId: 'doc-2',
+          sparcPageKey: 'doc-2',
           sparcNodeId: 'node-1',
           stimuliSetId: 'stim-set-1',
           stimulusKC: 'kc-1',
@@ -180,7 +180,7 @@ describe('sparcResponseOutcomeProcessor', function() {
         outcome: 'correct',
         responseValue: 'Answer',
       }),
-      /modelTarget\.sparcDocumentId "doc-2" does not match sourceAddress document "doc-1"/,
+      /modelTarget\.sparcPageKey "doc-2" does not match sourceAddress document "doc-1"/,
     );
   });
 
@@ -194,7 +194,7 @@ describe('sparcResponseOutcomeProcessor', function() {
       }, {
         observationId: 'obs-cross-doc-write',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'node-1',
         },
         time: 1000,
@@ -203,14 +203,14 @@ describe('sparcResponseOutcomeProcessor', function() {
         responseValue: null,
         stateWrites: [{
           target: {
-            documentId: 'doc-2',
+            pageKey: 'doc-2',
             nodeId: 'node-1',
           },
           key: 'visible',
           value: true,
         }],
       }),
-      /stateWrites\[0\] target documentId "doc-2" does not match source document "doc-1"/,
+      /stateWrites\[0\] target pageKey "doc-2" does not match source document "doc-1"/,
     );
   });
 });

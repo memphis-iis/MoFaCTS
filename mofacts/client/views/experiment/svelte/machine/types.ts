@@ -192,7 +192,8 @@
   * @property {string} [errorMessage] - Error message when present
  * @property {string} [source] - Answer source ('keyboard', 'button', etc.)
   * @property {Timestamps} timestamps - Trial timing data
-  * @property {string} [sessionId] - Current session ID
+ * @property {string} [userId] - Authenticated learner ID
+ * @property {string} [attemptId] - Current research/history attempt ID
   * @property {string} [unitId] - Current unit ID
   * @property {string} [tdfId] - Current TDF ID
  * @property {string} [speechHintExclusionList] - SR phrase-hint exclusion list
@@ -206,7 +207,8 @@
 /**
  * @typedef {Object} StartEvent
  * @property {'START'} type
- * @property {string} sessionId - Session ID
+ * @property {string} userId - Authenticated learner ID
+ * @property {string} attemptId - Current research/history attempt ID
  * @property {string} unitId - Unit ID
  * @property {string} tdfId - TDF ID
  */

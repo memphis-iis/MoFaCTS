@@ -6,7 +6,7 @@ import type {
 } from '../../runtime/historyStimulusIdentity';
 
 export type SparcDocumentAddress = {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly nodeId: string;
 };
 
@@ -147,7 +147,7 @@ export type SparcModelUpdateRequest = ModelPracticeUpdateRequest<SparcModelTarge
 };
 
 export type SparcModelTargetIdentity = ModelPracticeHistoryIdentity & {
-  readonly sparcDocumentId: string;
+  readonly sparcPageKey: string;
   readonly sparcNodeId: string;
 };
 
@@ -312,7 +312,7 @@ export type SparcDerivedFactRule = {
 };
 
 export type SparcStateWriteAddressTemplate = {
-  readonly documentId: string | SparcRuleExpression;
+  readonly pageKey: string | SparcRuleExpression;
   readonly nodeId: string | SparcRuleExpression;
 };
 
@@ -404,7 +404,7 @@ export type SparcTraceStep = {
 };
 
 export type SparcCanonicalHistoryExtension = {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly sourceAddress: SparcDocumentAddress;
   readonly practiceObservation?: SparcPracticeObservation;
   readonly stateTransition?: SparcStateTransition;

@@ -10,7 +10,7 @@ import {
 import type { SparcModelTargetIdentity } from './sparcSessionContracts';
 
 const modelTarget: SparcModelTargetIdentity = {
-  sparcDocumentId: 'doc-1',
+  sparcPageKey: 'doc-1',
   sparcNodeId: 'input-node',
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'kc-1',
@@ -87,7 +87,7 @@ describe('sparcModelHistoryExchange', function() {
     }, {
       observationId: 'obs-1',
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'input-node',
       },
       modelTarget,

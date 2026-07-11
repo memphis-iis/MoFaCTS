@@ -33,7 +33,7 @@ function createTargetSelectionTransition(params: {
   readonly selection: SparcLearningTargetSelection;
 }): SparcStateTransition {
   const workingMemoryTarget = {
-    documentId: params.event.source.documentId,
+    pageKey: params.event.source.pageKey,
     nodeId: params.document.root.id,
   };
   return {

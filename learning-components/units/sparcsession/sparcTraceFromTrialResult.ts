@@ -10,7 +10,7 @@ import type {
 } from './sparcSessionContracts';
 
 export type SparcTraceGenerationParams = {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly time?: number;
@@ -63,9 +63,9 @@ function outcomeForNode(nodeId: string, display: SparcTrialDisplay, result: Spar
   return result.submittedNodes[nodeId] === intent.expected ? 'correct' : 'incorrect';
 }
 
-function sourceAddress(documentId: string, nodeId: string): SparcDocumentAddress {
+function sourceAddress(pageKey: string, nodeId: string): SparcDocumentAddress {
   return {
-    documentId,
+    pageKey,
     nodeId,
   };
 }
@@ -98,7 +98,7 @@ function selectTraceMetadata(
 export function createSparcTraceFromTrialResult(
   params: SparcTraceGenerationParams,
 ): SparcTraceStep[] {
-  const documentId = requireNonBlank(params.documentId, 'documentId');
+  const pageKey = requireNonBlank(params.pageKey, 'pageKey');
   const nodes = scoredNodeOrder(params.display);
   const traceMap = traceMetadataByNode(params.display);
   return nodes.map((nodeId, index) => {
@@ -126,8 +126,8 @@ export function createSparcTraceFromTrialResult(
       details.responseKC = traceMetadata.responseKC;
     }
     return {
-      traceId: `${documentId}:${nodeId}:${index}`,
-      sourceAddress: sourceAddress(documentId, nodeId),
+      traceId: `${pageKey}:${nodeId}:${index}`,
+      sourceAddress: sourceAddress(pageKey, nodeId),
       productionRuleId,
       actionId,
       outcome: outcomeForNode(nodeId, params.display, params.result),

@@ -74,14 +74,14 @@ function utteranceNode(params: {
 }
 
 function appendDialogueNodeWrite(params: {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly boxId: string;
   readonly node: Record<string, unknown>;
   readonly afterNodeId?: string;
 }): SparcStateWrite {
   return {
     target: {
-      documentId: params.documentId,
+      pageKey: params.pageKey,
       nodeId: 'root',
     },
     key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
@@ -118,7 +118,7 @@ function dialogueUtteranceFact(params: {
       utteranceId: params.id,
       speaker: params.speaker,
       text: params.text,
-      documentId: params.event.source.documentId,
+      pageKey: params.event.source.pageKey,
       sourceNode: params.event.source.nodeId,
       eventId: params.event.eventId,
       time: params.event.time,
@@ -145,10 +145,10 @@ export function createSparcDialogueTurnTransition(params: {
   readonly tutorText: string;
   readonly options?: SparcDialogueTurnNodeOptions;
 }): SparcStateTransition {
-  const documentId = requireNonBlank(params.document.id, 'SPARC dialogue document id');
-  if (params.event.source.documentId !== documentId) {
+  const pageKey = requireNonBlank(params.document.id, 'SPARC dialogue document id');
+  if (params.event.source.pageKey !== pageKey) {
     throw new Error(
-      `SPARC dialogue event documentId "${params.event.source.documentId}" does not match document "${documentId}"`,
+      `SPARC dialogue event pageKey "${params.event.source.pageKey}" does not match document "${pageKey}"`,
     );
   }
   const eventId = requireNonBlank(params.event.eventId, 'SPARC dialogue eventId');
@@ -189,7 +189,7 @@ export function createSparcDialogueTurnTransition(params: {
     ...moveDefinitionMetadata,
   });
   const rootTarget = {
-    documentId,
+    pageKey,
     nodeId: params.document.root.id,
   };
 
@@ -198,7 +198,7 @@ export function createSparcDialogueTurnTransition(params: {
     event: params.event,
     writes: [
       appendDialogueNodeWrite({
-        documentId,
+        pageKey,
         boxId,
         ...(params.options?.afterNodeId ? { afterNodeId: params.options.afterNodeId } : {}),
         node: utteranceNode({
@@ -209,7 +209,7 @@ export function createSparcDialogueTurnTransition(params: {
         }),
       }),
       appendDialogueNodeWrite({
-        documentId,
+        pageKey,
         boxId,
         afterNodeId: learnerNodeId,
         node: utteranceNode({

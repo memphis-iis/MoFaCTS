@@ -227,13 +227,13 @@ function collectReferencedVariablesFromEffect(effect, variables) {
       }
       break;
     case 'write-state':
-      collectReferencedVariablesFromTemplateValue(effect.write?.target?.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.write?.target?.pageKey, variables);
       collectReferencedVariablesFromTemplateValue(effect.write?.target?.nodeId, variables);
       collectReferencedVariablesFromExpression(effect.write?.value, variables);
       break;
     case 'message':
       addVariablesFromTemplate(effect.template, variables);
-      collectReferencedVariablesFromTemplateValue(effect.target?.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.target?.pageKey, variables);
       collectReferencedVariablesFromTemplateValue(effect.target?.nodeId, variables);
       break;
     case 'credit':
@@ -330,7 +330,7 @@ function validateAddressTemplate(target, label) {
   if (!target || typeof target !== 'object') {
     throw new Error(`${label} target is required.`);
   }
-  for (const fieldName of ['documentId', 'nodeId']) {
+  for (const fieldName of ['pageKey', 'nodeId']) {
     const value = target[fieldName];
     if (value && typeof value === 'object') {
       validateRuleExpression(value, `${label} target ${fieldName}`);

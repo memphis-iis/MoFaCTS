@@ -14,7 +14,7 @@ function authoredDocument(): SparcAuthoredDocument {
     schemaVersion: 1,
     initialState: [{
       target: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'panel-1',
       },
       key: 'visible',
@@ -56,7 +56,7 @@ function makeSparcRecord(
     displayedStimulus: '',
     eventType: 'sparc',
     sparc: {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       sourceAddress: transition.event.source,
       stateTransition: transition,
     },
@@ -71,14 +71,14 @@ describe('sparcDocumentReplay', function() {
         eventId: 'event-1',
         type: 'condition-evaluated',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         time: 2000,
       },
       writes: [{
         target: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'panel-1',
         },
         key: 'visible',
@@ -90,7 +90,7 @@ describe('sparcDocumentReplay', function() {
       makeSparcRecord(transition),
     ]);
     const cellKey = createSparcStateCellKey({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'panel-1',
     }, 'visible');
 
@@ -102,7 +102,7 @@ describe('sparcDocumentReplay', function() {
   it('keeps authored start state when no history records exist', function() {
     const state = replaySparcDocumentHistory(authoredDocument(), []);
     const cellKey = createSparcStateCellKey({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'panel-1',
     }, 'visible');
 

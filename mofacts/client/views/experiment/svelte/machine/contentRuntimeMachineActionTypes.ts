@@ -78,8 +78,9 @@ export type ActionEvent = {
   sparcResult?: SparcControllerResult | null;
   transcript?: string;
   isCorrect?: boolean;
-  sessionId?: string;
-  unitId?: string;
+  userId?: string;
+  attemptId?: string;
+  unitId?: number;
   tdfId?: string;
   display?: unknown;
   answer?: string;

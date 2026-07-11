@@ -102,7 +102,7 @@ const event: SparcInterfaceEvent = {
   eventId: 'event-dialogue-controller',
   type: 'response-submitted',
   source: {
-    documentId: 'sparc-dialogue-controller-doc',
+    pageKey: 'sparc-dialogue-controller-doc',
     nodeId: 'learner-input',
   },
   time: 2000,

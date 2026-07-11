@@ -46,7 +46,6 @@ import {
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { createUnitEngineForUnit } from '../../engineConstructors';
-import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import {
   refreshCurrentDeliverySettingsStore,
   getStimCount,
@@ -70,8 +69,6 @@ import {
   type LearnerTdfConfig,
 } from '../../../../../common/lib/learnerTdfConfig';
 import { ensureCurrentStimuliSetId } from './mediaResolver';
-import { hydrateSparcProductionRuleHistoryCache } from './sparcProductionRuleHistoryCache';
-import { clearSparcControllerRuntimeContextCache } from './sparcControllerRuntimeContextCache';
 import { isVideoResumeSession, resolveVideoResumeSource } from './videoResume';
 import {
   getEngineIndices,
@@ -1004,34 +1001,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     let completedAssessmentTrials = 0;
     let assessmentHasDurableResumeProgress = false;
 
-    if (resumeHistoryRoute.reconstructSparcHistory) {
-      // SPARC replay uses SPARC-specific rows to rebuild document/interface state.
-      // Shared cluster-model hydration happens separately through engine.loadResumeState().
-      clientConsole(2, '[Resume Service] SPARC unit detected; loading durable SPARC history');
-      const userId = Meteor.userId();
-      const currentTdfId = Session.get('currentTdfId');
-      if (!userId || typeof currentTdfId !== 'string' || currentTdfId.trim().length === 0) {
-        throw new Error('[Resume Service] SPARC resume requires authenticated userId and currentTdfId');
-      }
-      const sparcHistoryRows = await meteorCallAsync<CanonicalHistoryRecord[]>(
-        'getSparcHistoryForUnit',
-        userId,
-        currentTdfId,
-        currentUnitNumber,
-        {
-          courseAssignment: getCourseAssignmentLaunchContext(),
-        }
-      );
-
-      clearSparcControllerRuntimeContextCache();
-      hydrateSparcProductionRuleHistoryCache(sparcHistoryRows);
-
-      clientConsole(2, '[Resume Service] SPARC history replay cache hydrated', {
-        trialsReplayed: sparcHistoryRows.length,
-        currentTdfId,
-        currentUnitNumber,
-      });
-    } else if (resumeHistoryRoute.inferAssessmentPosition) {
+    if (resumeHistoryRoute.inferAssessmentPosition) {
       clientConsole(2, '[Resume Service] Assessment unit detected; inferring position from history');
       completedAssessmentTrials = await meteorCallAsync<number>(
         'getAssessmentCompletedTrialCountFromHistory',

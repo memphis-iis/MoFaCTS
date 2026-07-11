@@ -9,6 +9,8 @@ import { Session } from 'meteor/session';
 import { createUnitEngine } from '../../engineConstructors';
 import { getCurrentDeliverySettings } from '../../../../lib/currentTestingHelpers';
 import { clientConsole } from '../../../../lib/clientLogger';
+import { meteorCallAsync } from '../../../../lib/meteorAsync';
+import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { computePracticeTimeMs } from '../../../../../lib/practiceTime';
 import { calculateTrialTimings } from './historyLogging';
@@ -17,6 +19,9 @@ import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/id
 import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import { getPreparedCardDataFromSelection as buildPreparedCardDataFromSelection } from './cardPayloadBuilder';
 import { resolveSessionSurfaceState } from './sessionSurfaceMode';
+import { resolveSparcControllerDisplay } from './sparcController';
+import { ensureSparcRuntimeHistoryHydrated, readSparcResumeSnapshot } from './sparcRuntimeState';
+import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import {
   clearResumeToQuestion,
   getIsVideoSessionFlag,
@@ -73,6 +78,10 @@ interface UnitEngineServiceContext extends Record<string, unknown> {
   videoSession?: {
     pendingQuestionIndex?: number;
   };
+  userId?: string;
+  attemptId?: string;
+  unitId?: number;
+  tdfId?: string;
 }
 
 interface UpdateEngineServiceContext extends UnitEngineServiceContext {
@@ -628,7 +637,7 @@ export function commitPreparedTrialRuntime(
  * 3. Return complete card data to machine
  *
  * @param {UnitEngineServiceContext} context - Machine context
- * @param {SelectCardServiceEvent} event - Event that triggered the service (contains engine, sessionId, etc.)
+ * @param {SelectCardServiceEvent} event - Event that triggered the service (contains engine and learner/runtime identity)
  * @returns {Promise<Record<string, unknown>>} Card data object
  */
 export async function selectCardService(
@@ -732,12 +741,60 @@ export async function selectCardService(
 
     // Now get card data (engine has prepared internal state)
     const cardData = getCardDataFromEngine(engine, clusterIndex, exportedQuestionIndex);
+    const sparcDisplay = resolveSparcControllerDisplay(
+      cardData.currentDisplay,
+      '[Unit Engine] Selected SPARC display',
+    );
+    if (sparcDisplay?.pageKey) {
+      const hydratedScopes = await ensureSparcRuntimeHistoryHydrated({
+        userId: context.userId,
+        TDFId: context.tdfId,
+        levelUnit: context.unitId,
+      }, async () => await meteorCallAsync<CanonicalHistoryRecord[]>(
+        'getSparcHistoryForUnit',
+        context.userId,
+        context.tdfId,
+        Number(context.unitId),
+        { courseAssignment: getCourseAssignmentLaunchContext() },
+      ));
+      if (hydratedScopes.length > 0) {
+        clientConsole(2, '[Unit Engine] Durable SPARC history hydrated', {
+          userId: context.userId,
+          TDFId: context.tdfId,
+          levelUnit: context.unitId,
+          hydratedScopes: JSON.stringify(hydratedScopes),
+        });
+      }
+    }
+    const sparcResumeSnapshot = sparcDisplay?.pageKey
+      ? readSparcResumeSnapshot({
+          userId: context.userId,
+          TDFId: context.tdfId,
+          levelUnit: context.unitId,
+          pageKey: sparcDisplay.pageKey,
+          display: sparcDisplay,
+        })
+      : undefined;
+    const sparcNodeValues = sparcResumeSnapshot?.nodeValues;
+    if (sparcResumeSnapshot) {
+      clientConsole(2, '[Unit Engine] SPARC resume snapshot selected', {
+        userId: sparcResumeSnapshot.userId,
+        TDFId: sparcResumeSnapshot.TDFId,
+        levelUnit: sparcResumeSnapshot.levelUnit,
+        pageKey: sparcResumeSnapshot.pageKey,
+        retainedHistoryCount: sparcResumeSnapshot.retainedHistoryRecords.length,
+        replayCellCount: Object.keys(sparcResumeSnapshot.replayState.cells).length,
+        progressiveNodeOperationCount: sparcResumeSnapshot.progressiveNodeOperations.length,
+        projectedNodeValueCount: Object.keys(sparcResumeSnapshot.nodeValues).length,
+      });
+    }
 
     
 
     // Return complete card data (available as event.output in onDone)
     return {
       ...cardData,
+      ...(sparcNodeValues ? { sparcNodeValues } : {}),
       unitFinished: false,
       engine // Pass engine back to update context
     };

@@ -17,6 +17,8 @@ import { createPerformanceIndexes } from '../migrations/add_performance_indexes'
 import { backfillPackageAssetIds } from '../migrations/backfill_package_asset_ids';
 import { cleanExperimentStateDupesAndAddUniqueIndex } from '../migrations/clean_experiment_state_dupes';
 import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migrations';
+import { migrateSparcHistoryPageIdentity } from '../migrations/migrate_sparc_history_page_identity';
+import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_authored_page_identity';
 import { sendScheduledTurkMessages } from '../turk_methods';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
@@ -60,10 +62,16 @@ type RunServerStartupDeps = {
   };
   Tdfs: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
-    find: (selector?: UnknownRecord) => { countAsync: () => Promise<number> };
+    find: (selector?: UnknownRecord, options?: UnknownRecord) => {
+      countAsync: () => Promise<number>;
+      fetchAsync: () => Promise<any[]>;
+    };
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<number>;
   };
   Histories: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<number>;
   };
   StimulusCrowdStats: {
     rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
@@ -298,6 +306,17 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     usersCollection: deps.usersCollection,
     serverConsole: deps.serverConsole,
     updateActiveThemeDocument: deps.updateActiveThemeDocument,
+  });
+  await migrateSparcAuthoredPageIdentity({
+    Tdfs: deps.Tdfs,
+    DynamicSettings: deps.DynamicSettings,
+    serverConsole: deps.serverConsole,
+  });
+  await migrateSparcHistoryPageIdentity({
+    Histories: deps.Histories,
+    Tdfs: deps.Tdfs,
+    DynamicSettings: deps.DynamicSettings,
+    serverConsole: deps.serverConsole,
   });
 
   try {

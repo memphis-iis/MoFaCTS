@@ -219,16 +219,16 @@ describe('canonical history envelope', function() {
       action: 'response-submitted',
       eventType: 'sparc',
       sparc: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
           path: ['widget-7', 'input'],
         },
         practiceObservation: {
           observationId: 'obs-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
             path: ['widget-7', 'input'],
           },
@@ -248,7 +248,7 @@ describe('canonical history envelope', function() {
     expect(result.wirePayloadBytes).to.be.lessThan(2048);
     expect(compressed['63']).to.equal('sparc');
     expect(compressed['79']).to.be.an('object');
-    expect((decompressed.sparc as Record<string, unknown>).documentId).to.equal('doc-1');
+    expect((decompressed.sparc as Record<string, unknown>).pageKey).to.equal('doc-1');
   });
 
   it('rejects component-specific extension fields that exceed their own budget', function() {

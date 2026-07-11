@@ -781,7 +781,7 @@
                   "timestamp",
                   "sessionId",
                   "learnerId",
-                  "documentId",
+                  "pageKey",
                   "activityId",
                   "componentId",
                   "eventType",

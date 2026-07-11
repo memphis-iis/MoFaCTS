@@ -45,7 +45,7 @@ function result(submittedValue: unknown = '2'): SparcTrialResult {
 describe('sparcTraceFromTrialResult', function() {
   it('creates SPARC trace steps from authored display metadata and submitted nodes', function() {
     const trace = createSparcTraceFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: result(),
     });
@@ -53,7 +53,7 @@ describe('sparcTraceFromTrialResult', function() {
     assert.deepEqual(trace, [{
       traceId: 'doc-1:node-1:0',
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'node-1',
       },
       productionRuleId: 'enter-factor',
@@ -69,7 +69,7 @@ describe('sparcTraceFromTrialResult', function() {
 
   it('marks trace outcomes incorrect when the submitted node does not match its authored intent', function() {
     const trace = createSparcTraceFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: result('3'),
     });
@@ -106,7 +106,7 @@ describe('sparcTraceFromTrialResult', function() {
       },
     }) as SparcTrialDisplay;
     const trace = createSparcTraceFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: multiLinkDisplay,
       result: {
         submittedNodes: {
@@ -134,7 +134,7 @@ describe('sparcTraceFromTrialResult', function() {
 
     assert.throws(
       () => createSparcTraceFromTrialResult({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         display: incompleteDisplay,
         result: result(),
       }),
@@ -160,7 +160,7 @@ describe('sparcTraceFromTrialResult', function() {
 
     assert.throws(
       () => createSparcTraceFromTrialResult({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         display: multiLinkDisplay,
         result: {
           submittedNodes: {

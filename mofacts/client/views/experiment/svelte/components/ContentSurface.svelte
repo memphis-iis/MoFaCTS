@@ -135,10 +135,11 @@
   import VideoSessionSurface from './VideoSessionSurface.svelte';
 
   /** @type {string} Session ID */
-  export let sessionId = '';
+  export let userId = '';
+  export let attemptId = '';
 
-  /** @type {string} Unit ID */
-  export let unitId = '';
+  /** @type {number|undefined} Zero-based TDF unit index */
+  export let unitId = undefined;
 
   /** @type {string} TDF ID */
   export let tdfId = '';
@@ -998,13 +999,6 @@
 
   // Lifecycle: Start machine on mount
   let initializedForRender = false;
-  const startPayload = {
-    type: 'START',
-    sessionId,
-    unitId,
-    tdfId,
-    engineIndices
-  };
   contentRuntimeMachineRuntimeController = createContentRuntimeMachineRuntimeController({
     machine: contentRuntimeMachine,
     createActor: (machine) => createActor(machine),
@@ -1012,7 +1006,14 @@
       state = snapshot;
     },
     sendStartEvent: send,
-    startEvent: startPayload,
+    getStartEvent: () => ({
+      type: 'START',
+      userId,
+      attemptId,
+      unitId,
+      tdfId,
+      engineIndices,
+    }),
     log: clientConsole,
   });
   const cardRuntimeLifecycleController = createCardRuntimeLifecycleController({
@@ -1198,7 +1199,8 @@
       adminDiagnosticMode={adminDiagnosticModeEnabled()}
       engine={context.engine}
       tdfId={context.tdfId}
-      sessionId={context.sessionId}
+      userId={context.userId}
+      attemptId={context.attemptId}
       levelUnit={context.unitId}
       runtimeNodeValues={context.sparcNodeValues}
       {learningProgressSnapshot}

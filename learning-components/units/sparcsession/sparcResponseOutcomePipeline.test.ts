@@ -21,17 +21,17 @@ const core = {
 };
 
 const sourceAddress = {
-  documentId: 'doc-1',
+  pageKey: 'doc-1',
   nodeId: 'region-1',
 };
 
 const feedbackAddress = {
-  documentId: 'doc-1',
+  pageKey: 'doc-1',
   nodeId: 'feedback',
 };
 
 const modelTarget: SparcModelTargetIdentity = {
-  sparcDocumentId: 'doc-1',
+  sparcPageKey: 'doc-1',
   sparcNodeId: 'region-1',
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'kc-1',
@@ -74,7 +74,7 @@ function responseStateRule(): NonNullable<SparcAuthoredDocument['productionRules
     when: [{
       factType: 'interface-state',
       slots: {
-        documentId: { type: 'literal', value: 'doc-1' },
+        pageKey: { type: 'literal', value: 'doc-1' },
         node: { type: 'literal', value: 'region-1' },
         key: { type: 'literal', value: 'lastOutcome' },
         value: { type: 'literal', value: 'correct' },
@@ -97,7 +97,7 @@ function modelStateRule(metric: 'priorCorrect' | 'probability', threshold: numbe
     when: [{
       factType: 'model-state',
       slots: {
-        documentId: { type: 'literal' as const, value: 'doc-1' },
+        pageKey: { type: 'literal' as const, value: 'doc-1' },
         node: { type: 'literal' as const, value: 'region-1' },
         metric: { type: 'literal' as const, value: metric },
         value: { type: 'bind' as const, variable: 'modelValue' },

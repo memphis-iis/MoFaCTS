@@ -120,7 +120,7 @@ export function createSparcProductionRuleTraceHistoryRecords(params: {
       }),
     };
     const extension: SparcCanonicalHistoryExtension = {
-      documentId: params.event.source.documentId,
+      pageKey: params.event.source.pageKey,
       sourceAddress: params.event.source,
       traceStep,
     };
@@ -134,7 +134,7 @@ export function createSparcProductionRuleTraceHistoryRecords(params: {
       levelUnitType: 'sparc',
       time: params.event.time,
       problemStartTime: params.event.time,
-      selection: `${params.event.source.documentId}:${params.event.source.nodeId}`,
+      selection: `${params.event.source.pageKey}:${params.event.source.nodeId}`,
       action: 'sparc-production-rule-trace',
       outcome: traceStep.outcome,
       typeOfResponse: 'sparc',

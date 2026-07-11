@@ -7,16 +7,11 @@ import {
   USER_ADMIN_DEFAULT_FILTER,
 } from './sessionCleanupRegistry';
 import {
-  clearSparcProductionRuleHistoryCache,
-  readSparcProductionRuleHistoryRecords,
-  rememberSparcProductionRuleHistoryRecord,
-} from '../views/experiment/svelte/services/sparcProductionRuleHistoryCache';
-import {
-  clearSparcControllerRuntimeContextCache,
-  getSparcControllerRuntimeContext,
-} from '../views/experiment/svelte/services/sparcControllerRuntimeContextCache';
+  clearSparcRuntimeState,
+  readSparcResumeSnapshot,
+  rememberSparcRuntimeHistoryRecord,
+} from '../views/experiment/svelte/services/sparcRuntimeState';
 import type { SparcControllerDisplay } from '../views/experiment/svelte/services/sparcController';
-import { createEmptySparcReplayState } from '../../../learning-components/units/sparcsession/sparcStateReplay';
 
 describe('sessionUtils mapping cleanup', function() {
   beforeEach(function() {
@@ -37,8 +32,7 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('currentAnswer', undefined);
     Session.set('cardEntryIntent', undefined);
     Session.set('courseAssignmentLaunchContext', null);
-    clearSparcProductionRuleHistoryCache();
-    clearSparcControllerRuntimeContextCache();
+    clearSparcRuntimeState();
   });
 
   it('clears mapping and signature session keys via cleanup helper', function() {
@@ -157,31 +151,27 @@ describe('sessionUtils mapping cleanup', function() {
       eventType: 'sparc',
       TDFId: 'tdf-a',
       sessionID: 'session-a',
+      userId: 'user-a',
+      levelUnit: 2,
       sparc: {
-        documentId: 'doc-a',
+        pageKey: 'doc-a',
         sourceAddress: {
-          documentId: 'doc-a',
+          pageKey: 'doc-a',
           nodeId: 'source-node',
         },
       },
     };
-    rememberSparcProductionRuleHistoryRecord(historyRecord);
+    rememberSparcRuntimeHistoryRecord(historyRecord);
     const display: SparcControllerDisplay = {
-      documentId: 'doc-a',
+      pageKey: 'doc-a',
       nodes: [],
     };
-    const firstContext = getSparcControllerRuntimeContext({
+    const firstContext = readSparcResumeSnapshot({
+      userId: 'user-a',
       TDFId: 'tdf-a',
-      sessionID: 'session-a',
-      documentId: 'doc-a',
+      levelUnit: 2,
+      pageKey: 'doc-a',
       display,
-      replaySession: {
-        TDFId: 'tdf-a',
-        sessionID: 'session-a',
-        documentId: 'doc-a',
-        replayState: createEmptySparcReplayState(),
-        retainedHistoryRecords: [historyRecord],
-      },
     });
     Session.set('fromInstructions', false);
     Object.defineProperty(document, 'location', {
@@ -192,25 +182,14 @@ describe('sessionUtils mapping cleanup', function() {
 
     sessionCleanUp();
 
-    expect(readSparcProductionRuleHistoryRecords({
+    const rebuiltContext = readSparcResumeSnapshot({
+      userId: 'user-a',
       TDFId: 'tdf-a',
-      sessionID: 'session-a',
-      documentId: 'doc-a',
-    })).to.deep.equal([]);
-    const rebuiltContext = getSparcControllerRuntimeContext({
-      TDFId: 'tdf-a',
-      sessionID: 'session-a',
-      documentId: 'doc-a',
+      levelUnit: 2,
+      pageKey: 'doc-a',
       display,
-      replaySession: {
-        TDFId: 'tdf-a',
-        sessionID: 'session-a',
-        documentId: 'doc-a',
-        replayState: createEmptySparcReplayState(),
-        retainedHistoryRecords: [],
-      },
     });
     expect(rebuiltContext.document).not.to.equal(firstContext.document);
-    expect(rebuiltContext.appliedRecordCount).to.equal(0);
+    expect(rebuiltContext.retainedHistoryRecords).to.deep.equal([]);
   });
 });

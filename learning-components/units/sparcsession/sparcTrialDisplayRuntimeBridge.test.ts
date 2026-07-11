@@ -81,7 +81,7 @@ function display(): SparcTrialDisplay {
       }, {
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'literal', value: 'Numerator1Units' },
           action: { type: 'literal', value: 'UpdateComboBox' },
           input: { type: 'bound', variable: 'targetUnit' },
@@ -91,7 +91,7 @@ function display(): SparcTrialDisplay {
         type: 'write-state',
         write: {
           target: {
-            documentId: variable('documentId'),
+            pageKey: variable('pageKey'),
             nodeId: literal('node-feedback'),
           },
           key: 'message',
@@ -114,7 +114,7 @@ function display(): SparcTrialDisplay {
 
 function unsupportedAuthoredRulesDisplay(): SparcTrialDisplay {
   return {
-    documentId: 'sparc-fractions-addition',
+    pageKey: 'sparc-fractions-addition',
     schema: 'tutorscript-sparc/1.0',
     nodes: [{
       id: 'node-known-1-equivalent-bottom',
@@ -164,7 +164,7 @@ const core = {
 describe('sparcTrialDisplayRuntimeBridge', function() {
   it('creates an authored document carrying display production rules and facts', function() {
     const document = createSparcAuthoredDocumentFromTrialDisplay({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
     });
 
@@ -180,7 +180,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('preserves explicit fraction groups with addressable numerator and denominator children', function() {
     const document = createSparcAuthoredDocumentFromTrialDisplay({
-      documentId: 'fraction-doc',
+      pageKey: 'fraction-doc',
       display: {
         schema: 'tutorscript-sparc/1.0',
         nodes: [{
@@ -213,14 +213,14 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('rejects non-executable authored production rules', function() {
     assert.throws(() => createSparcAuthoredDocumentFromTrialDisplay({
-      documentId: 'sparc-fractions-addition',
+      pageKey: 'sparc-fractions-addition',
       display: unsupportedAuthoredRulesDisplay(),
     }), /behavior\.authoredProductionRules is not executable/);
   });
 
   it('turns submitted display nodes into mapped production-rule events', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: {
         submittedNodes: {
@@ -243,7 +243,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('turns mapped SPARC button activations into production-rule events', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: {
         submittedNodes: {
@@ -288,7 +288,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       },
     };
     const [event] = createSparcProductionRuleEventsFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: completionDisplay,
       result: {
         submittedNodes: {
@@ -311,7 +311,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('adds focused node and SAI selection context to mapped button activations', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: {
         submittedNodes: {
@@ -357,7 +357,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       }],
     };
     const [event] = createSparcProductionRuleEventsFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: directDisplay,
       result: {
         submittedNodes: {
@@ -381,7 +381,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('turns direct explicit fraction numerator input into a production-rule event', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
-      documentId: 'fraction-doc',
+      pageKey: 'fraction-doc',
       display: {
         schema: 'tutorscript-sparc/1.0',
         nodes: [{
@@ -424,7 +424,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
   it('rejects malformed cluster attachments instead of dropping them during document normalization', function() {
     assert.throws(
       () => createSparcAuthoredDocumentFromTrialDisplay({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         display: {
           schema: 'tutorscript-sparc/1.0',
           nodes: [{
@@ -441,7 +441,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('turns active-node focus changes into instantaneous production-rule events', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: {
         submittedNodes: {},
@@ -468,7 +468,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
     const result = await commitSparcTrialDisplayProductionRuleEvents({
       core,
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: {
         submittedNodes: {
@@ -510,7 +510,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
     const result = await commitSparcTrialDisplayProductionRuleEvents({
       core,
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: {
         submittedNodes: {
@@ -553,7 +553,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
     const result = await commitSparcTrialDisplayProductionRuleEvents({
       core,
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: controlDisplay,
       result: {
         submittedNodes: {
@@ -577,9 +577,9 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('loads clean SPARC AutoTutor targets with clusterKC-only authored clusterTargets', function() {
     const document = createSparcAuthoredDocumentFromTrialDisplay({
-      documentId: 'sparc-autotutor-clean',
+      pageKey: 'sparc-autotutor-clean',
       display: {
-        documentId: 'sparc-autotutor-clean',
+        pageKey: 'sparc-autotutor-clean',
         unitType: 'sparc-autotutor-dialogue',
         nodes: [{
           id: 'learner-response-input',
@@ -635,9 +635,9 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
   it('rejects deleted SPARC AutoTutor target-source facts', function() {
     assert.throws(
       () => createSparcAuthoredDocumentFromTrialDisplay({
-        documentId: 'sparc-autotutor-legacy',
+        pageKey: 'sparc-autotutor-legacy',
         display: {
-          documentId: 'sparc-autotutor-legacy',
+          pageKey: 'sparc-autotutor-legacy',
           unitType: 'sparc-autotutor-dialogue',
           nodes: [{
             id: 'learner-response-input',
@@ -671,7 +671,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     const modelPracticeRequests: unknown[] = [];
     const writtenRecords: unknown[] = [];
     const lcdDisplay: SparcTrialDisplay = {
-      documentId: 'sparc-fractions-addition',
+      pageKey: 'sparc-fractions-addition',
       schema: 'tutorscript-sparc/1.0',
       nodes: [{
         id: 'node-known-1-equivalent-bottom',
@@ -724,7 +724,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
     const result = await commitSparcTrialDisplayProductionRuleEvents({
       core,
-      documentId: 'sparc-fractions-addition',
+      pageKey: 'sparc-fractions-addition',
       display: lcdDisplay,
       result: {
         submittedNodes: {
@@ -769,14 +769,14 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         KCId: 'fractions.lcd',
         KCDefault: 'fractions.lcd',
         KCCluster: 'fractions.addition',
-        sparcDocumentId: 'sparc-fractions-addition',
+        sparcPageKey: 'sparc-fractions-addition',
         sparcNodeId: 'node-known-1-equivalent-bottom',
       },
       outcome: 'correct',
       responseValue: '12',
       input: '12',
       displayedStimulus: {
-        documentId: 'sparc-fractions-addition',
+        pageKey: 'sparc-fractions-addition',
         nodeId: 'node-known-1-equivalent-bottom',
         clusterIndex: 0,
       },
@@ -787,7 +787,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       typeOfResponse: 'sparc',
       eventType: 'sparc',
       sourceAddress: {
-        documentId: 'sparc-fractions-addition',
+        pageKey: 'sparc-fractions-addition',
         nodeId: 'node-known-1-equivalent-bottom',
       },
     });
@@ -797,7 +797,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('evaluates display production-rule classifications and messages without committing history', function() {
     const result = evaluateSparcTrialDisplayProductionRuleEvents({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: display(),
       result: {
         submittedNodes: {
@@ -819,7 +819,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
   it('rejects non-executable authored rules during production-rule evaluation', function() {
     assert.throws(() => evaluateSparcTrialDisplayProductionRuleEvents({
-      documentId: 'sparc-fractions-addition',
+      pageKey: 'sparc-fractions-addition',
       display: unsupportedAuthoredRulesDisplay(),
       result: {
         submittedNodes: {

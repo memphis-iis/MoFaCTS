@@ -147,7 +147,7 @@ describe('sparcProductionRuleEvaluator', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'interface-event',
       slots: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         selection: 'firstDenConv',
         action: 'UpdateTextArea',
         input: '12',
@@ -165,7 +165,7 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'bind', variable: 'selection' },
           action: { type: 'literal', value: 'UpdateTextArea' },
           input: { type: 'bind', variable: 'input' },
@@ -182,7 +182,7 @@ describe('sparcProductionRuleEvaluator', function() {
         type: 'write-state',
         write: {
           target: {
-            documentId: variable('documentId'),
+            pageKey: variable('pageKey'),
             nodeId: variable('node'),
           },
           key: 'value',
@@ -195,7 +195,7 @@ describe('sparcProductionRuleEvaluator', function() {
 
     assert.deepEqual(firing?.writes, [{
       target: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         nodeId: 'node-known-1-equivalent-bottom',
       },
       key: 'value',
@@ -207,7 +207,7 @@ describe('sparcProductionRuleEvaluator', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'interface-event',
       slots: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         selection: 'HintButton',
         action: 'ButtonPressed',
         input: '?',
@@ -218,7 +218,7 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'literal', value: 'HintButton' },
           action: { type: 'literal', value: 'ButtonPressed' },
         },
@@ -228,7 +228,7 @@ describe('sparcProductionRuleEvaluator', function() {
         messageType: 'hint',
         template: 'Choose a denominator both denominators divide into.',
         target: {
-          documentId: variable('documentId'),
+          pageKey: variable('pageKey'),
           nodeId: literal('node-hint-message'),
         },
       }],
@@ -240,7 +240,7 @@ describe('sparcProductionRuleEvaluator', function() {
       messageType: 'hint',
       text: 'Choose a denominator both denominators divide into.',
       target: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         nodeId: 'node-hint-message',
       },
     }]);
@@ -253,7 +253,7 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'literal', value: 'hint' },
           action: { type: 'literal', value: 'ButtonPressed' },
         },
@@ -262,7 +262,7 @@ describe('sparcProductionRuleEvaluator', function() {
         pattern: {
           factType: 'interface-state',
           slots: {
-            documentId: { type: 'bound', variable: 'documentId' },
+            pageKey: { type: 'bound', variable: 'pageKey' },
             node: { type: 'literal', value: 'root' },
             key: { type: 'literal', value: 'hintStage' },
           },
@@ -273,14 +273,14 @@ describe('sparcProductionRuleEvaluator', function() {
         messageType: 'hint',
         template: 'Choose a denominator both denominators divide into.',
         target: {
-          documentId: variable('documentId'),
+          pageKey: variable('pageKey'),
           nodeId: literal('node-hint-message'),
         },
       }, {
         type: 'write-state',
         write: {
           target: {
-            documentId: variable('documentId'),
+            pageKey: variable('pageKey'),
             nodeId: literal('root'),
           },
           key: 'hintStage',
@@ -293,7 +293,7 @@ describe('sparcProductionRuleEvaluator', function() {
       facts: [{
         factType: 'interface-event',
         slots: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           selection: 'hint',
           action: 'ButtonPressed',
         },
@@ -304,14 +304,14 @@ describe('sparcProductionRuleEvaluator', function() {
       facts: [{
         factType: 'interface-event',
         slots: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           selection: 'hint',
           action: 'ButtonPressed',
         },
       }, {
         factType: 'interface-state',
         slots: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           node: 'root',
           key: 'hintStage',
           value: 1,
@@ -662,7 +662,7 @@ describe('sparcProductionRuleEvaluator', function() {
     }, {
       factType: 'interface-event',
       slots: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         selection: 'answer',
         action: 'UpdateTextArea',
         input: '42',
@@ -681,7 +681,7 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'bind', variable: 'selection' },
           input: { type: 'bind', variable: 'input' },
         },
@@ -706,7 +706,7 @@ describe('sparcProductionRuleEvaluator', function() {
         type: 'write-state',
         write: {
           target: {
-            documentId: variable('documentId'),
+            pageKey: variable('pageKey'),
             nodeId: variable('node'),
           },
           key: 'value',
@@ -746,7 +746,7 @@ describe('sparcProductionRuleEvaluator', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'interface-event',
       slots: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         selection: 'hint',
         action: 'ButtonPressed',
       },
@@ -756,7 +756,7 @@ describe('sparcProductionRuleEvaluator', function() {
       pattern: {
         factType: 'hint-selected',
         slots: {
-          documentId: { type: 'literal' as const, value: 'fractions-doc' },
+          pageKey: { type: 'literal' as const, value: 'fractions-doc' },
         },
       },
     };
@@ -766,7 +766,7 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'literal', value: 'hint' },
           action: { type: 'literal', value: 'ButtonPressed' },
         },
@@ -784,7 +784,7 @@ describe('sparcProductionRuleEvaluator', function() {
         fact: {
           factType: 'hint-selected',
           slots: {
-            documentId: variable('documentId'),
+            pageKey: variable('pageKey'),
           },
         },
       }, {
@@ -798,7 +798,7 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'literal', value: 'hint' },
           action: { type: 'literal', value: 'ButtonPressed' },
         },
@@ -808,7 +808,7 @@ describe('sparcProductionRuleEvaluator', function() {
         fact: {
           factType: 'hint-selected',
           slots: {
-            documentId: variable('documentId'),
+            pageKey: variable('pageKey'),
           },
         },
       }, {
@@ -1300,7 +1300,7 @@ describe('sparcProductionRuleEvaluator', function() {
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'interface-event',
       slots: {
-        documentId: 'chapter-doc',
+        pageKey: 'chapter-doc',
         selection: 'problem-1',
         action: 'Submit',
         input: 'incorrect',
@@ -1311,7 +1311,7 @@ describe('sparcProductionRuleEvaluator', function() {
       when: [{
         factType: 'interface-event',
         slots: {
-          documentId: { type: 'bind', variable: 'documentId' },
+          pageKey: { type: 'bind', variable: 'pageKey' },
           selection: { type: 'literal', value: 'problem-1' },
           action: { type: 'literal', value: 'Submit' },
           input: { type: 'literal', value: 'incorrect' },
@@ -1359,13 +1359,13 @@ describe('sparcProductionRuleEvaluator', function() {
       SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
     ]);
     assert.deepEqual(firing?.writes.map((write) => write.target), [{
-      documentId: 'chapter-doc',
+      pageKey: 'chapter-doc',
       nodeId: 'root',
     }, {
-      documentId: 'chapter-doc',
+      pageKey: 'chapter-doc',
       nodeId: 'root',
     }, {
-      documentId: 'chapter-doc',
+      pageKey: 'chapter-doc',
       nodeId: 'root',
     }]);
     assert.equal((firing?.writes[0]?.value as { type?: string }).type, 'append-node-if-missing');

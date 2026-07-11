@@ -81,7 +81,7 @@ function readDensity(layout: unknown): unknown {
 
 function pushWideContentIssue(params: {
   readonly issues: SparcLayoutIssue[];
-  readonly documentId?: string;
+  readonly pageKey?: string;
   readonly nodeId?: string;
 }): void {
   if (params.nodeId) {
@@ -94,14 +94,14 @@ function pushWideContentIssue(params: {
   }
   params.issues.push({
     kind: 'missing-wide-content-policy',
-    message: `SPARC document "${params.documentId}" with width constraints must declare reflow, shrink, stack, or constrain behavior`,
+    message: `SPARC document "${params.pageKey}" with width constraints must declare reflow, shrink, stack, or constrain behavior`,
   });
 }
 
 function pushResponsiveLayoutIssue(params: {
   readonly issues: SparcLayoutIssue[];
   readonly layoutMode: string;
-  readonly documentId?: string;
+  readonly pageKey?: string;
   readonly nodeId?: string;
 }): void {
   if (params.nodeId) {
@@ -114,14 +114,14 @@ function pushResponsiveLayoutIssue(params: {
   }
   params.issues.push({
     kind: 'missing-responsive-layout-policy',
-    message: `SPARC document "${params.documentId}" layoutMode "${params.layoutMode}" must declare wideContent "reflow" or "stack"`,
+    message: `SPARC document "${params.pageKey}" layoutMode "${params.layoutMode}" must declare wideContent "reflow" or "stack"`,
   });
 }
 
 function validateResponsiveLayoutMode(params: {
   readonly layout: unknown;
   readonly issues: SparcLayoutIssue[];
-  readonly documentId?: string;
+  readonly pageKey?: string;
   readonly nodeId?: string;
 }): void {
   const layoutMode = readLayoutMode(params.layout);
@@ -135,7 +135,7 @@ function validateResponsiveLayoutMode(params: {
     pushResponsiveLayoutIssue({
       issues: params.issues,
       layoutMode: String(layoutMode),
-      ...(params.documentId === undefined ? {} : { documentId: params.documentId }),
+      ...(params.pageKey === undefined ? {} : { pageKey: params.pageKey }),
       ...(params.nodeId === undefined ? {} : { nodeId: params.nodeId }),
     });
   }
@@ -200,7 +200,7 @@ function validateNodeVisualPreset(params: {
 function validateVisualDensity(params: {
   readonly layout: unknown;
   readonly issues: SparcLayoutIssue[];
-  readonly documentId?: string;
+  readonly pageKey?: string;
   readonly nodeId?: string;
 }): void {
   const density = readDensity(params.layout);
@@ -217,7 +217,7 @@ function validateVisualDensity(params: {
   }
   params.issues.push({
     kind: 'invalid-visual-density',
-    message: `SPARC document "${params.documentId}" density "${String(density)}" is not recognized`,
+    message: `SPARC document "${params.pageKey}" density "${String(density)}" is not recognized`,
   });
 }
 
@@ -282,18 +282,18 @@ export function validateSparcVerticalLayout(
     });
   }
   if (hasConstrainedWidth(document.layout) && !hasWideContentPolicy(document.layout)) {
-    pushWideContentIssue({ issues, documentId: document.id });
+    pushWideContentIssue({ issues, pageKey: document.id });
   }
   validateDocumentVisualPreset({ document, issues });
   validateVisualDensity({
     layout: document.layout,
     issues,
-    documentId: document.id,
+    pageKey: document.id,
   });
   validateResponsiveLayoutMode({
     layout: document.layout,
     issues,
-    documentId: document.id,
+    pageKey: document.id,
   });
   validateNodeLayout(document.root, issues);
   return {

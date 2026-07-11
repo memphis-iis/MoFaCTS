@@ -1,368 +1,171 @@
 import { expect } from 'chai';
+import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type { UnitEngineLike } from '../../../../../common/types';
+import { SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import { commitSparcProductionRulesForHistory } from './historyLogging';
 import {
-  clearSparcProductionRuleHistoryCache,
-  hydrateSparcProductionRuleHistoryCache,
-  readSparcProductionRuleHistoryRecords,
-  readSparcProductionRuleReplaySession,
-  rememberSparcProductionRuleHistoryRecord,
-} from './sparcProductionRuleHistoryCache';
-import {
-  createSparcStateCellKey,
-} from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
+  clearSparcRuntimeState,
+  ensureSparcRuntimeHistoryHydrated,
+  hydrateSparcRuntimeHistory,
+  readSparcResumeSnapshot,
+  rememberSparcRuntimeHistoryRecord,
+} from './sparcRuntimeState';
 
-describe('history logging SPARC production-rule bridge', function() {
+const display = {
+  pageKey: 'fractions-addition',
+  nodes: [],
+  productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
+};
+
+function historyRecord(params: {
+  sessionID: string;
+  pageKey?: string;
+  levelUnit?: number;
+  value?: unknown;
+  progressive?: boolean;
+}): CanonicalHistoryRecord {
+  const pageKey = params.pageKey ?? 'fractions-addition';
+  const write = params.progressive
+    ? {
+        target: { pageKey, nodeId: 'dialogue-root' },
+        key: 'progressive-node-operation',
+        value: { operation: 'append', parentNodeId: 'dialogue-root', node: { id: 'turn-1' } },
+      }
+    : {
+        target: { pageKey, nodeId: 'answer-node' },
+        key: 'value',
+        value: params.value,
+      };
+  return {
+    eventType: 'sparc',
+    TDFId: 'tdf-1',
+    sessionID: params.sessionID,
+    userId: 'user-1',
+    levelUnit: params.levelUnit ?? 2,
+    sparc: {
+      pageKey,
+      sourceAddress: { pageKey, nodeId: 'answer-node' },
+      stateTransition: {
+        transitionId: `transition-${params.sessionID}`,
+        event: {
+          eventId: `event-${params.sessionID}`,
+          type: 'value-changed',
+          source: { pageKey, nodeId: 'answer-node' },
+          time: params.sessionID === 'attempt-1' ? 1000 : 2000,
+        },
+        writes: [write],
+      },
+    },
+  };
+}
+
+describe('SPARC runtime history and resume snapshot', function() {
   afterEach(function() {
-    clearSparcProductionRuleHistoryCache();
+    clearSparcRuntimeState();
   });
 
-  it('commits SPARC production-rule display events through the unit engine', async function() {
-    const calls: unknown[] = [];
-    const priorRecord = {
-      eventType: 'sparc',
+  it('replays one durable scope across historical attempt session IDs and projects render state', function() {
+    const firstAttempt = historyRecord({ sessionID: 'attempt-1', value: '12' });
+    const secondAttempt = historyRecord({ sessionID: 'attempt-2', value: '24' });
+    const progressiveAttempt = historyRecord({ sessionID: 'attempt-3', progressive: true });
+
+    hydrateSparcRuntimeHistory([firstAttempt, secondAttempt, progressiveAttempt]);
+    const snapshot = readSparcResumeSnapshot({
+      userId: 'user-1',
       TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'sparc-fractions-addition',
-        sourceAddress: {
-          documentId: 'sparc-fractions-addition',
-          nodeId: 'root',
-        },
-      },
-    };
-    rememberSparcProductionRuleHistoryRecord(priorRecord);
-    const display = {
-      documentId: 'sparc-fractions-addition',
-      nodes: [],
-      productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
-    };
-    const sparcResult = {
-      submittedNodes: { firstDen: '12' },
-      timestamp: 3000,
-    };
-
-    await commitSparcProductionRulesForHistory({
-      engine: {
-        async commitSparcTrialDisplayProductionRuleEvents(params: unknown) {
-          calls.push(params);
-        },
-      } as unknown as UnitEngineLike,
-      currentDisplay: display,
-      sparcResult,
-      record: {
-        TDFId: 'tdf-1',
-        sessionID: 'session-1',
-        levelUnit: 2,
-        anonStudentId: 'student-1',
-      },
-    });
-
-    expect(calls).to.have.length(1);
-    expect(calls[0]).to.include({
-      documentId: 'sparc-fractions-addition',
+      levelUnit: 2,
+      pageKey: 'fractions-addition',
       display,
-      result: sparcResult,
     });
-    expect(calls[0]).to.have.deep.property('priorHistoryRecords', [priorRecord]);
-    expect(calls[0]).to.have.nested.property('core.anonStudentId', 'student-1');
-    expect(calls[0]).to.have.nested.property('core.levelUnit', 2);
+
+    expect(snapshot.retainedHistoryRecords).to.deep.equal([firstAttempt, secondAttempt, progressiveAttempt]);
+    expect(snapshot.nodeValues['answer-node']).to.equal('24');
+    expect(snapshot.progressiveNodeOperations).to.have.length(1);
+    expect(snapshot.nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]).to.deep.equal(
+      snapshot.progressiveNodeOperations,
+    );
   });
 
-  it('remembers canonical SPARC records after successful production-rule history writes', async function() {
-    const display = {
-      documentId: 'sparc-fractions-addition',
-      nodes: [],
-      productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
-    };
-    const writtenRecord = {
-      eventType: 'sparc',
+  it('keeps learner, TDF, unit, and page scopes independent while ignoring attempt identity', function() {
+    hydrateSparcRuntimeHistory([
+      historyRecord({ sessionID: 'attempt-1', value: '12' }),
+      historyRecord({ sessionID: 'attempt-2', levelUnit: 3, value: '99' }),
+      historyRecord({ sessionID: 'attempt-3', pageKey: 'other-page', value: '77' }),
+    ]);
+
+    const snapshot = readSparcResumeSnapshot({
+      userId: 'user-1',
       TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'sparc-fractions-addition',
-        sourceAddress: {
-          documentId: 'sparc-fractions-addition',
-          nodeId: 'node-known-1-equivalent-bottom',
-        },
-      },
+      levelUnit: 2,
+      pageKey: 'fractions-addition',
+      display,
+    });
+
+    expect(snapshot.retainedHistoryRecords).to.have.length(1);
+    expect(snapshot.nodeValues['answer-node']).to.equal('12');
+  });
+
+  it('loads a unit history once and uses the same hydration for every page snapshot', async function() {
+    const records = [historyRecord({ sessionID: 'attempt-1', value: '12' })];
+    let loadCount = 0;
+    const scope = { userId: 'user-1', TDFId: 'tdf-1', levelUnit: 2 };
+    const load = async () => {
+      loadCount += 1;
+      return records;
     };
+
+    await ensureSparcRuntimeHistoryHydrated(scope, load);
+    await ensureSparcRuntimeHistoryHydrated(scope, load);
+
+    expect(loadCount).to.equal(1);
+    expect(readSparcResumeSnapshot({
+      ...scope,
+      pageKey: 'fractions-addition',
+      display,
+    }).retainedHistoryRecords).to.deep.equal(records);
+  });
+
+  it('advances the same snapshot after a successful canonical history write', async function() {
+    const priorRecord = historyRecord({ sessionID: 'attempt-1', value: '12' });
+    const writtenRecord = historyRecord({ sessionID: 'attempt-2', value: '24' });
+    rememberSparcRuntimeHistoryRecord(priorRecord);
 
     await commitSparcProductionRulesForHistory({
       engine: {
         async commitSparcTrialDisplayProductionRuleEvents(params: {
-          history: { writeCanonicalHistory(record: typeof writtenRecord): Promise<void> };
+          priorHistoryRecords: readonly CanonicalHistoryRecord[];
+          history: { writeCanonicalHistory(record: CanonicalHistoryRecord): Promise<void> };
         }) {
+          expect(params.priorHistoryRecords).to.deep.equal([priorRecord]);
           await params.history.writeCanonicalHistory(writtenRecord);
         },
       } as unknown as UnitEngineLike,
       currentDisplay: display,
-      sparcResult: {
-        submittedNodes: { firstDen: '12' },
-        timestamp: 3000,
-      },
+      sparcResult: { submittedNodes: { firstDen: '24' }, timestamp: 3000 },
       record: {
         TDFId: 'tdf-1',
-        sessionID: 'session-1',
+        sessionID: 'attempt-2',
+        userId: 'user-1',
         levelUnit: 2,
-        anonStudentId: 'student-1',
       },
     });
 
-    expect(readSparcProductionRuleHistoryRecords({
+    const snapshot = readSparcResumeSnapshot({
+      userId: 'user-1',
       TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'sparc-fractions-addition',
-    })).to.deep.equal([writtenRecord]);
-  });
-
-  it('hydrates durable SPARC production-rule history by document key', function() {
-    const durableRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'sparc-fractions-addition',
-        sourceAddress: {
-          documentId: 'sparc-fractions-addition',
-          nodeId: 'node-known-1-equivalent-bottom',
-        },
-      },
-    };
-
-    hydrateSparcProductionRuleHistoryCache([durableRecord]);
-
-    expect(readSparcProductionRuleHistoryRecords({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'sparc-fractions-addition',
-    })).to.deep.equal([durableRecord]);
-    expect(() => hydrateSparcProductionRuleHistoryCache([{
-      ...durableRecord,
-      eventType: 'h5p',
-    }])).to.throw('[SPARC] Durable history hydration received a non-SPARC record');
-    expect(() => hydrateSparcProductionRuleHistoryCache([{
-      ...durableRecord,
-      sparc: {},
-    }])).to.throw('[SPARC] Durable history record missing sparc.documentId');
-  });
-
-  it('replaces hydrated document history without clearing unrelated document scopes', function() {
-    const staleDocumentRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'doc-1',
-        sourceAddress: {
-          documentId: 'doc-1',
-          nodeId: 'stale-node',
-        },
-      },
-    };
-    const retainedOtherDocumentRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'doc-2',
-        sourceAddress: {
-          documentId: 'doc-2',
-          nodeId: 'other-node',
-        },
-      },
-    };
-    const hydratedDocumentRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'doc-1',
-        sourceAddress: {
-          documentId: 'doc-1',
-          nodeId: 'fresh-node',
-        },
-      },
-    };
-
-    rememberSparcProductionRuleHistoryRecord(staleDocumentRecord);
-    rememberSparcProductionRuleHistoryRecord(retainedOtherDocumentRecord);
-    hydrateSparcProductionRuleHistoryCache([hydratedDocumentRecord]);
-
-    expect(readSparcProductionRuleHistoryRecords({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-1',
-    })).to.deep.equal([hydratedDocumentRecord]);
-    expect(readSparcProductionRuleHistoryRecords({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-2',
-    })).to.deep.equal([retainedOtherDocumentRecord]);
-  });
-
-  it('hydrates a document replay session from canonical SPARC state-transition history', function() {
-    const stateRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'doc-1',
-        sourceAddress: {
-          documentId: 'doc-1',
-          nodeId: 'source-node',
-        },
-        stateTransition: {
-          transitionId: 'transition-1',
-          event: {
-            eventId: 'event-1',
-            type: 'value-changed',
-            source: {
-              documentId: 'doc-1',
-              nodeId: 'source-node',
-            },
-            time: 2000,
-          },
-          writes: [{
-            target: {
-              documentId: 'doc-1',
-              nodeId: 'answer-node',
-            },
-            key: 'value',
-            value: '42',
-          }],
-        },
-      },
-    };
-
-    hydrateSparcProductionRuleHistoryCache([stateRecord]);
-    const session = readSparcProductionRuleReplaySession({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-1',
+      levelUnit: 2,
+      pageKey: 'fractions-addition',
+      display,
     });
-    const cellKey = createSparcStateCellKey({
-      documentId: 'doc-1',
-      nodeId: 'answer-node',
-    }, 'value');
-
-    expect(session?.retainedHistoryRecords).to.deep.equal([stateRecord]);
-    expect(session?.replayState.cells[cellKey]?.value).to.equal('42');
-    expect(session?.replayState.transitions).to.have.length(1);
+    expect(snapshot.retainedHistoryRecords).to.deep.equal([priorRecord, writtenRecord]);
+    expect(snapshot.nodeValues['answer-node']).to.equal('24');
   });
 
-  it('clears SPARC replay sessions by explicit document scope', function() {
-    const docOneRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'doc-1',
-        sourceAddress: {
-          documentId: 'doc-1',
-          nodeId: 'node-1',
-        },
-      },
-    };
-    const docTwoRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'doc-2',
-        sourceAddress: {
-          documentId: 'doc-2',
-          nodeId: 'node-2',
-        },
-      },
-    };
-
-    hydrateSparcProductionRuleHistoryCache([docOneRecord, docTwoRecord]);
-    clearSparcProductionRuleHistoryCache({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-1',
-    });
-
-    expect(readSparcProductionRuleReplaySession({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-1',
-    })).to.equal(null);
-    expect(readSparcProductionRuleHistoryRecords({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-2',
-    })).to.deep.equal([docTwoRecord]);
-  });
-
-  it('returns immutable snapshots of cached SPARC history records', function() {
-    const cachedRecord = {
-      eventType: 'sparc',
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      sparc: {
-        documentId: 'doc-1',
-        sourceAddress: {
-          documentId: 'doc-1',
-          nodeId: 'node-1',
-        },
-      },
-    };
-
-    rememberSparcProductionRuleHistoryRecord(cachedRecord);
-    const firstRead = readSparcProductionRuleHistoryRecords({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-1',
-    });
-    (firstRead as typeof cachedRecord[]).push({
-      ...cachedRecord,
-      sparc: {
-        documentId: 'doc-1',
-        sourceAddress: {
-          documentId: 'doc-1',
-          nodeId: 'mutated-node',
-        },
-      },
-    });
-
-    expect(readSparcProductionRuleHistoryRecords({
-      TDFId: 'tdf-1',
-      sessionID: 'session-1',
-      documentId: 'doc-1',
-    })).to.deep.equal([cachedRecord]);
-  });
-
-  it('requires authored documentId on SPARC production-rule displays', async function() {
-    let rejectionMessage = '';
-
-    try {
-      await commitSparcProductionRulesForHistory({
-        engine: {
-          async commitSparcTrialDisplayProductionRuleEvents() {
-            throw new Error('engine should not be called');
-          },
-        } as unknown as UnitEngineLike,
-        currentDisplay: {
-          nodes: [],
-          productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
-        },
-        sparcResult: {
-          submittedNodes: { firstDen: '12' },
-          timestamp: 3000,
-        },
-        record: {
-          TDFId: 'tdf-1',
-          sessionID: 'session-1',
-          levelUnit: 2,
-          userId: 'user-1',
-        },
-      });
-    } catch (error) {
-      rejectionMessage = error instanceof Error ? error.message : String(error);
-    }
-
-    expect(rejectionMessage).to.equal('[History Logging] SPARC production-rule display requires documentId');
+  it('rejects history without the canonical durable scope', function() {
+    const valid = historyRecord({ sessionID: 'attempt-1', value: '12' });
+    expect(() => hydrateSparcRuntimeHistory([{ ...valid, eventType: 'h5p' }]))
+      .to.throw('[SPARC] Runtime hydration received a non-SPARC history record');
+    expect(() => hydrateSparcRuntimeHistory([{ ...valid, sparc: {} }]))
+      .to.throw('[SPARC] Runtime state requires userId, TDFId, non-negative levelUnit, and pageKey');
   });
 });

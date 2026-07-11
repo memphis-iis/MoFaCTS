@@ -58,7 +58,7 @@ function collectNodeFacts(params: {
   params.facts.push({
     factType: 'node',
     slots: {
-      documentId: params.document.id,
+      pageKey: params.document.id,
       node: params.node.id,
       kind: params.node.kind,
       ...(params.parentId ? { parent: params.parentId } : {}),
@@ -69,7 +69,7 @@ function collectNodeFacts(params: {
     params.facts.push({
       factType: 'node-reference',
       slots: {
-        documentId: params.document.id,
+        pageKey: params.document.id,
         sourceNode: params.node.id,
         targetNode: reference.target.nodeId,
         relation: reference.relation ?? null,
@@ -83,7 +83,7 @@ function collectNodeFacts(params: {
     params.facts.push({
       factType: 'node-model-target',
       slots: {
-        documentId: params.document.id,
+        pageKey: params.document.id,
         node: params.node.id,
         stimuliSetId: params.node.modelTarget.stimuliSetId,
         stimulusKC: params.node.modelTarget.stimulusKC,
@@ -99,7 +99,7 @@ function collectNodeFacts(params: {
     params.facts.push({
       factType: 'node-cluster-attachment',
       slots: {
-        documentId: params.document.id,
+        pageKey: params.document.id,
         node: params.node.id,
         clusterIndex,
       },
@@ -120,7 +120,7 @@ function replayStateFacts(replayState: SparcReplayState): readonly SparcWorkingM
     const facts: SparcWorkingMemoryFact[] = [{
       factType: 'interface-state',
       slots: {
-        documentId: cell.address.documentId,
+        pageKey: cell.address.pageKey,
         node: cell.address.nodeId,
         key: cell.key,
         value: cell.value,
@@ -149,7 +149,7 @@ function eventFacts(event: SparcInterfaceEvent): readonly SparcWorkingMemoryFact
   const facts: SparcWorkingMemoryFact[] = [{
     factType: 'interface-event',
     slots: {
-      documentId: event.source.documentId,
+      pageKey: event.source.pageKey,
       sourceNode: event.source.nodeId,
       eventId: event.eventId,
       eventType: event.type,
@@ -163,7 +163,7 @@ function eventFacts(event: SparcInterfaceEvent): readonly SparcWorkingMemoryFact
       factType: 'practice-observation',
       slots: {
         observationId: event.practiceObservation.observationId,
-        documentId: event.practiceObservation.sourceAddress.documentId,
+        pageKey: event.practiceObservation.sourceAddress.pageKey,
         sourceNode: event.practiceObservation.sourceAddress.nodeId,
         outcome: event.practiceObservation.outcome,
         responseValue: event.practiceObservation.responseValue,

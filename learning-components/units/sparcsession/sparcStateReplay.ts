@@ -38,7 +38,7 @@ export function createSparcStateCellKey(
   key: string,
 ): string {
   return JSON.stringify([
-    address.documentId,
+    address.pageKey,
     address.nodeId,
     key,
   ]);
@@ -52,8 +52,8 @@ function assertAddress(value: SparcDocumentAddress, label: string): void {
   if (!isRecord(value)) {
     throw new Error(`${label} must be an object`);
   }
-  if (typeof value.documentId !== 'string' || value.documentId.trim().length === 0) {
-    throw new Error(`${label}.documentId is required`);
+  if (typeof value.pageKey !== 'string' || value.pageKey.trim().length === 0) {
+    throw new Error(`${label}.pageKey is required`);
   }
   if (typeof value.nodeId !== 'string' || value.nodeId.trim().length === 0) {
     throw new Error(`${label}.nodeId is required`);
@@ -71,18 +71,18 @@ function assertStateWrite(value: SparcStateWrite, label: string): void {
 }
 
 function assertSameDocument(
-  actualDocumentId: string,
-  expectedDocumentId: string,
+  actualPageKey: string,
+  expectedPageKey: string,
   label: string,
 ): void {
-  if (actualDocumentId !== expectedDocumentId) {
-    throw new Error(`${label}.documentId "${actualDocumentId}" does not match SPARC history document "${expectedDocumentId}"`);
+  if (actualPageKey !== expectedPageKey) {
+    throw new Error(`${label}.pageKey "${actualPageKey}" does not match SPARC history document "${expectedPageKey}"`);
   }
 }
 
 function addressKey(address: SparcDocumentAddress): string {
   return JSON.stringify([
-    address.documentId,
+    address.pageKey,
     address.nodeId,
   ]);
 }
@@ -102,7 +102,7 @@ function assertSameAddress(
 function assertStateTransition(
   value: SparcStateTransition,
   label: string,
-  documentId: string,
+  pageKey: string,
 ): void {
   if (!isRecord(value)) {
     throw new Error(`${label} must be an object`);
@@ -117,7 +117,7 @@ function assertStateTransition(
     throw new Error(`${label}.event.eventId is required`);
   }
   assertAddress(value.event.source, `${label}.event.source`);
-  assertSameDocument(value.event.source.documentId, documentId, `${label}.event.source`);
+  assertSameDocument(value.event.source.pageKey, pageKey, `${label}.event.source`);
   if (!Number.isFinite(Number(value.event.time))) {
     throw new Error(`${label}.event.time must be a finite timestamp`);
   }
@@ -126,14 +126,14 @@ function assertStateTransition(
   }
   value.writes.forEach((write, index) => {
     assertStateWrite(write, `${label}.writes[${index}]`);
-    assertSameDocument(write.target.documentId, documentId, `${label}.writes[${index}].target`);
+    assertSameDocument(write.target.pageKey, pageKey, `${label}.writes[${index}].target`);
   });
 }
 
 function assertPracticeObservation(
   value: SparcPracticeObservation,
   label: string,
-  documentId: string,
+  pageKey: string,
 ): void {
   if (!isRecord(value)) {
     throw new Error(`${label} must be an object`);
@@ -142,13 +142,13 @@ function assertPracticeObservation(
     throw new Error(`${label}.observationId is required`);
   }
   assertAddress(value.sourceAddress, `${label}.sourceAddress`);
-  assertSameDocument(value.sourceAddress.documentId, documentId, `${label}.sourceAddress`);
+  assertSameDocument(value.sourceAddress.pageKey, pageKey, `${label}.sourceAddress`);
 }
 
 function assertTraceStep(
   value: SparcTraceStep,
   label: string,
-  documentId: string,
+  pageKey: string,
 ): void {
   if (!isRecord(value)) {
     throw new Error(`${label} must be an object`);
@@ -157,7 +157,7 @@ function assertTraceStep(
     throw new Error(`${label}.traceId is required`);
   }
   assertAddress(value.sourceAddress, `${label}.sourceAddress`);
-  assertSameDocument(value.sourceAddress.documentId, documentId, `${label}.sourceAddress`);
+  assertSameDocument(value.sourceAddress.pageKey, pageKey, `${label}.sourceAddress`);
 }
 
 function readSparcExtension(record: CanonicalHistoryRecord): SparcCanonicalHistoryExtension | null {
@@ -168,11 +168,11 @@ function readSparcExtension(record: CanonicalHistoryRecord): SparcCanonicalHisto
     throw new Error('SPARC history record missing sparc extension');
   }
   const extension = record.sparc as SparcCanonicalHistoryExtension;
-  if (typeof extension.documentId !== 'string' || extension.documentId.trim().length === 0) {
-    throw new Error('sparc.documentId is required');
+  if (typeof extension.pageKey !== 'string' || extension.pageKey.trim().length === 0) {
+    throw new Error('sparc.pageKey is required');
   }
   assertAddress(extension.sourceAddress, 'sparc.sourceAddress');
-  assertSameDocument(extension.sourceAddress.documentId, extension.documentId, 'sparc.sourceAddress');
+  assertSameDocument(extension.sourceAddress.pageKey, extension.pageKey, 'sparc.sourceAddress');
   return extension;
 }
 
@@ -189,7 +189,7 @@ export function applySparcHistoryRecord(
   let nextTransitions = state.transitions;
 
   if (extension.stateTransition) {
-    assertStateTransition(extension.stateTransition, 'sparc.stateTransition', extension.documentId);
+    assertStateTransition(extension.stateTransition, 'sparc.stateTransition', extension.pageKey);
     assertSameAddress(
       extension.stateTransition.event.source,
       extension.sourceAddress,
@@ -211,7 +211,7 @@ export function applySparcHistoryRecord(
   }
 
   if (extension.practiceObservation) {
-    assertPracticeObservation(extension.practiceObservation, 'sparc.practiceObservation', extension.documentId);
+    assertPracticeObservation(extension.practiceObservation, 'sparc.practiceObservation', extension.pageKey);
     assertSameAddress(
       extension.practiceObservation.sourceAddress,
       extension.sourceAddress,
@@ -219,7 +219,7 @@ export function applySparcHistoryRecord(
     );
   }
   if (extension.traceStep) {
-    assertTraceStep(extension.traceStep, 'sparc.traceStep', extension.documentId);
+    assertTraceStep(extension.traceStep, 'sparc.traceStep', extension.pageKey);
     assertSameAddress(
       extension.traceStep.sourceAddress,
       extension.sourceAddress,
@@ -250,8 +250,8 @@ export function applySparcStateTransition(
   state: SparcReplayState,
   transition: SparcStateTransition,
 ): SparcReplayState {
-  const documentId = transition.event.source.documentId;
-  assertStateTransition(transition, 'sparc.stateTransition', documentId);
+  const pageKey = transition.event.source.pageKey;
+  assertStateTransition(transition, 'sparc.stateTransition', pageKey);
   const nextCells: Record<string, SparcReplayCell> = { ...state.cells };
   for (const write of transition.writes) {
     const cellKey = createSparcStateCellKey(write.target, write.key);

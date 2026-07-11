@@ -35,7 +35,7 @@ const event: SparcInterfaceEvent = {
   eventId: 'turn-3',
   type: 'response-submitted',
   source: {
-    documentId: 'sparc-dialogue-doc',
+    pageKey: 'sparc-dialogue-doc',
     nodeId: 'learner-input',
   },
   time: 3000,
@@ -128,7 +128,7 @@ describe('createSparcDialogueTurnTransition', function() {
           ...event,
           source: {
             ...event.source,
-            documentId: 'other-doc',
+            pageKey: 'other-doc',
           },
         },
         learnerText: 'A response',

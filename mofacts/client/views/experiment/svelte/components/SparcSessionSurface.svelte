@@ -30,7 +30,8 @@
   export let adminDiagnosticMode = false;
   export let engine = null;
   export let tdfId = '';
-  export let sessionId = '';
+  export let userId = '';
+  export let attemptId = '';
   export let levelUnit = null;
   export let runtimeNodeValues = {};
   export let learningProgressSnapshot = null;
@@ -359,10 +360,10 @@
 
   function describeSparcBoundaryContext(candidateDisplay, source) {
     const displayRecord = candidateDisplay && typeof candidateDisplay === 'object' ? candidateDisplay : {};
-    const documentId = typeof displayRecord.documentId === 'string' && displayRecord.documentId.trim()
-      ? displayRecord.documentId.trim()
+    const pageKey = typeof displayRecord.pageKey === 'string' && displayRecord.pageKey.trim()
+      ? displayRecord.pageKey.trim()
       : 'missing';
-    return `${source}; documentId=${documentId}; tdfId=${tdfId || 'missing'}; unit=${levelUnit ?? 'missing'}; hasSessionId=${Boolean(sessionId)}`;
+    return `${source}; pageKey=${pageKey}; tdfId=${tdfId || 'missing'}; unit=${levelUnit ?? 'missing'}; hasUserId=${Boolean(userId)}; hasAttemptId=${Boolean(attemptId)}`;
   }
 
   function currentSparcProgressiveNodeOperations() {
@@ -434,9 +435,9 @@
     if (isSparcControllerDialogueDisplay(currentDisplay)) {
       return;
     }
-    const documentId = typeof currentDisplay.documentId === 'string' ? currentDisplay.documentId.trim() : '';
+    const pageKey = typeof currentDisplay.pageKey === 'string' ? currentDisplay.pageKey.trim() : '';
     const hasProductionRuleSource = Array.isArray(currentDisplay.productionRules);
-    if (!documentId || !hasProductionRuleSource) {
+    if (!pageKey || !hasProductionRuleSource) {
       return;
     }
     const sparcResult = resolveSparcControllerResult(currentDisplay, detail || {}, '[SparcSessionSurface]');
@@ -448,7 +449,8 @@
       currentDisplay,
       sparcResult,
       tdfId,
-      sessionId,
+      userId,
+      attemptId,
       levelUnit,
     });
     dispatch('runtimewatchedstatechanged');
@@ -483,7 +485,8 @@
           currentDisplay,
           sparcResult,
           tdfId,
-          sessionId,
+          userId,
+          attemptId,
           levelUnit,
           scoreLearnerResponse: provider.scoreLearnerResponse,
           generateTutorUtterance: provider.generateTutorUtterance,
@@ -498,9 +501,9 @@
       dispatchSparcNodeValues(result.sparcNodeValues, sparcResult.timestamp);
       return { canSubmit: false, dialogueSubmit: true };
     }
-    const documentId = typeof currentDisplay.documentId === 'string' ? currentDisplay.documentId.trim() : '';
+    const pageKey = typeof currentDisplay.pageKey === 'string' ? currentDisplay.pageKey.trim() : '';
     const hasProductionRuleSource = Array.isArray(currentDisplay.productionRules);
-    if (!documentId || !hasProductionRuleSource) {
+    if (!pageKey || !hasProductionRuleSource) {
       return { canSubmit: true, productionRuleSubmit: false };
     }
     const sparcResult = resolveSparcControllerResult(currentDisplay, detail || {}, '[SparcSessionSurface]');
@@ -519,7 +522,8 @@
         submittedNodes,
       },
       tdfId,
-      sessionId,
+      userId,
+      attemptId,
       levelUnit,
     });
     dispatch('runtimewatchedstatechanged');

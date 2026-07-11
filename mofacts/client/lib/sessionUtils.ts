@@ -17,8 +17,8 @@ import { resetTrialTimingState } from "../views/experiment/svelte/services/trial
 import { deliverySettingsStore } from "./state/deliverySettingsStore";
 import { ExperimentStateStore } from "./state/experimentStateStore";
 import { clearMappingRecordFromSession } from "../views/experiment/svelte/services/mappingRecordService";
-import { clearSparcProductionRuleHistoryCache } from "../views/experiment/svelte/services/sparcProductionRuleHistoryCache";
-import { clearSparcControllerRuntimeContextCache } from "../views/experiment/svelte/services/sparcControllerRuntimeContextCache";
+import { clearSparcRuntimeState } from "../views/experiment/svelte/services/sparcRuntimeState";
+import { clearCurrentLearningAttemptId } from "../views/experiment/svelte/services/attemptIdentity";
 import {
   applySessionCleanupEntries,
   CARD_RUNTIME_SESSION_DEFAULTS,
@@ -67,7 +67,6 @@ declare const GlobalExperimentStates: any;
  * recording
  * runSimulation
  * sampleRate
- * speechAPIKeyIsSetup       - Indicates if we have a *user* provided speech api key (there may be one in the tdf file)
  * speechOutOfGrammarFeedback - What should we display when transcription is ignored when out of grammar
  * testType
  * */
@@ -111,8 +110,7 @@ function resetSharedCardRuntimeState(options: { preserveCardEntryContext?: boole
 }
 
 function clearSparcReplayCachesForCleanup() {
-  clearSparcProductionRuleHistoryCache();
-  clearSparcControllerRuntimeContextCache();
+  clearSparcRuntimeState();
 }
 
 function shouldPreserveUnitStateForCard() {
@@ -139,6 +137,7 @@ function sessionCleanUp() {
 
   resetSharedCardRuntimeState();
   clearSparcReplayCachesForCleanup();
+  clearCurrentLearningAttemptId();
 
   clientConsole(1, '[Session] Clearing currentTdfUnit during session cleanup', {
     path: document?.location?.pathname,

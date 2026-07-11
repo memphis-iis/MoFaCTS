@@ -23,13 +23,9 @@ import type {
 import type { UnitEngineLike } from '../../../../../common/types';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import {
-  createEmptySparcProductionRuleReplaySession,
-  readSparcProductionRuleReplaySession,
-  rememberSparcProductionRuleHistoryRecord,
-} from './sparcProductionRuleHistoryCache';
-import {
-  getSparcControllerRuntimeContext,
-} from './sparcControllerRuntimeContextCache';
+  readSparcResumeSnapshot,
+  rememberSparcRuntimeHistoryRecord,
+} from './sparcRuntimeState';
 import {
   buildSparcWorkingMemoryFacts,
 } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
@@ -42,7 +38,7 @@ import {
 } from './sparcAutoTutorProgress';
 
 type SparcControllerDialogueDisplay = SparcControllerDisplay & {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly unitType: 'sparc-autotutor-dialogue';
 };
 
@@ -86,7 +82,7 @@ export function isSparcControllerDialogueDisplay(display: unknown): display is S
   return Boolean(
     sparcDisplay
       && sparcDisplay.unitType === 'sparc-autotutor-dialogue'
-      && nonBlankString(sparcDisplay.documentId).length > 0
+      && nonBlankString(sparcDisplay.pageKey).length > 0
       && Array.isArray(sparcDisplay.nodes),
   );
 }
@@ -99,9 +95,9 @@ function requireSparcControllerDialogueDisplay(display: unknown): SparcControlle
   if (!sparcDisplay || sparcDisplay.unitType !== 'sparc-autotutor-dialogue') {
     return null;
   }
-  const documentId = nonBlankString(sparcDisplay.documentId);
-  if (!documentId) {
-    throw new Error('[SPARC][Dialogue] Controller dialogue display requires documentId');
+  const pageKey = nonBlankString(sparcDisplay.pageKey);
+  if (!pageKey) {
+    throw new Error('[SPARC][Dialogue] Controller dialogue display requires pageKey');
   }
   if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[SPARC][Dialogue] Controller dialogue display requires nodes array');
@@ -152,7 +148,8 @@ export async function commitSparcControllerDialogueSubmit(params: {
   readonly currentDisplay: unknown;
   readonly sparcResult: SparcControllerResult;
   readonly tdfId: unknown;
-  readonly sessionId: unknown;
+  readonly userId: unknown;
+  readonly attemptId: unknown;
   readonly levelUnit: unknown;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
@@ -167,12 +164,13 @@ export async function commitSparcControllerDialogueSubmit(params: {
   }
 
   const tdfId = nonBlankString(params.tdfId);
-  const sessionId = nonBlankString(params.sessionId);
-  if (!tdfId || !sessionId) {
-    throw new Error('[SPARC][Dialogue] History requires TDFId and sessionID');
+  const userId = nonBlankString(params.userId);
+  const attemptId = nonBlankString(params.attemptId);
+  if (!tdfId || !userId || !attemptId) {
+    throw new Error('[SPARC][Dialogue] History requires TDFId, userId, and attemptId');
   }
-  const userId = params.deps?.getUserId ? params.deps.getUserId() : defaultUserId();
-  if (!userId) {
+  const authenticatedUserId = params.deps?.getUserId ? params.deps.getUserId() : defaultUserId();
+  if (authenticatedUserId !== userId) {
     throw new Error('[SPARC][Dialogue] History requires an authenticated user');
   }
   const levelUnit = Number(params.levelUnit);
@@ -184,38 +182,29 @@ export async function commitSparcControllerDialogueSubmit(params: {
   if (typeof engine?.commitSparcTrialDisplayControllerDialogueTurn !== 'function') {
     throw new Error('[SPARC][Dialogue] Submit requires SPARC session controller-dialogue commit support');
   }
-  const sparcReplaySession = readSparcProductionRuleReplaySession({
+  const sparcRuntime = readSparcResumeSnapshot({
+    userId,
     TDFId: tdfId,
-    sessionID: sessionId,
-    documentId: sparcDisplay.documentId,
-  }) ?? createEmptySparcProductionRuleReplaySession({
-    TDFId: tdfId,
-    sessionID: sessionId,
-    documentId: sparcDisplay.documentId,
-  });
-  const sparcRuntimeContext = getSparcControllerRuntimeContext({
-    TDFId: tdfId,
-    sessionID: sessionId,
-    documentId: sparcDisplay.documentId,
+    levelUnit,
+    pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
-    replaySession: sparcReplaySession,
   });
-  const priorHistoryRecords = sparcReplaySession.retainedHistoryRecords;
+  const priorHistoryRecords = sparcRuntime.retainedHistoryRecords;
   const startedAt = Date.now();
   let writtenHistoryCount = 0;
 
   const result = await engine.commitSparcTrialDisplayControllerDialogueTurn({
     core: {
       TDFId: tdfId,
-      sessionID: sessionId,
+      sessionID: attemptId,
       levelUnit,
       userId,
     },
-    documentId: sparcDisplay.documentId,
+    pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
     result: params.sparcResult,
-    document: sparcRuntimeContext.document,
-    replayState: sparcRuntimeContext.replayState,
+    document: sparcRuntime.document,
+    replayState: sparcRuntime.replayState,
     priorHistoryRecords,
     scoreLearnerResponse: params.scoreLearnerResponse,
     generateTutorUtterance: params.generateTutorUtterance,
@@ -226,13 +215,13 @@ export async function commitSparcControllerDialogueSubmit(params: {
         } else {
           await insertCompressedHistory(historyRecord as Record<string, unknown>);
         }
-        rememberSparcProductionRuleHistoryRecord(historyRecord);
+        rememberSparcRuntimeHistoryRecord(historyRecord);
         writtenHistoryCount += 1;
       },
     },
   });
   clientConsole(2, '[SPARC][Dialogue] committed controller turn', {
-    documentId: sparcDisplay.documentId,
+    pageKey: sparcDisplay.pageKey,
     tdfId,
     levelUnit,
     triggeredBy: nonBlankString(params.sparcResult.triggeredBy) || undefined,

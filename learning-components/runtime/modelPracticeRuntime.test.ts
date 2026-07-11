@@ -48,7 +48,7 @@ describe('modelPracticeRuntime', function() {
       userId: 'user-1',
     }, request, {
       sparc: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
       },
     });
 
@@ -59,7 +59,7 @@ describe('modelPracticeRuntime', function() {
     assert.equal(result.record.levelUnitType, 'model');
     assert.equal(result.record.eventType, 'sparc');
     assert.deepEqual(result.record.sparc, {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
     });
   });
 

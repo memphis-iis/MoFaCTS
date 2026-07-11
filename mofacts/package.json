@@ -155,6 +155,7 @@
     "docs:api": "node scripts/generateApiDocs.js",
     "generate:schemas": "node --experimental-strip-types scripts/generateSchemas.ts",
     "check:sparc-authoring": "node scripts/checkSparcAuthoringEditor.cjs",
+    "check:sparc-page-identity": "node scripts/checkSparcPageIdentity.cjs",
     "check:sparc-rich-html": "node scripts/checkSparcRichHtml.cjs",
     "lint": "cd .. && node mofacts/node_modules/eslint/bin/eslint.js -c eslint.config.mjs mofacts \"learning-components/**/*.ts\" \"examples/**/*.ts\" \"packages/**/*.ts\" --no-error-on-unmatched-pattern",
     "lint:fix": "cd .. && node mofacts/node_modules/eslint/bin/eslint.js -c eslint.config.mjs mofacts \"learning-components/**/*.ts\" \"examples/**/*.ts\" \"packages/**/*.ts\" --no-error-on-unmatched-pattern --fix",

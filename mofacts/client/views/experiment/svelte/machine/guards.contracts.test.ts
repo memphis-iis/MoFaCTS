@@ -133,7 +133,7 @@ describe('machine guard contracts', function() {
     const sparcProductionRuleDisplay = makeArgs({
       context: {
         currentDisplay: {
-          documentId: 'sparc-fractions-addition',
+          pageKey: 'sparc-fractions-addition',
           nodes: [],
           productionRules: [],
         },
@@ -142,7 +142,7 @@ describe('machine guard contracts', function() {
     const sparcPlainDisplay = makeArgs({
       context: {
         currentDisplay: {
-          documentId: 'sparc-static-display',
+          pageKey: 'sparc-static-display',
           nodes: [],
         },
       },

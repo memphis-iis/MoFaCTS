@@ -10,7 +10,8 @@ export function toSelectCardInput({ context, event }: MachineArgs) {
     context,
     event,
     engine: context.engine,
-    sessionId: context.sessionId,
+    userId: context.userId,
+    attemptId: context.attemptId,
     unitId: context.unitId,
     tdfId: context.tdfId,
   };

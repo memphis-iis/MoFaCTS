@@ -109,7 +109,6 @@ export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorO
   const { stimFileName } = getImportFileNames(safeLessonName);
   const lessonSlug = normalizeSparcSlug(safeLessonName, 'sparc-autotutor');
   const pageId = `sparc-session-${lessonSlug}`;
-  const documentId = `sparc-autotutor-${lessonSlug}`;
   const expectationTargets = output.expectations.map((expectation, index) => {
     const targetId = normalizeTargetId(expectation.id, `e${index + 1}`);
     const clusterKC = `autotutor.${lessonSlug}.kc.${targetId}`;
@@ -141,7 +140,6 @@ export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorO
           display: {
             type: 'sparc',
             schema: 'tutorscript-sparc/1.0',
-            documentId,
             unitType: 'sparc-autotutor-dialogue',
             layout: {
               layoutMode: 'document',

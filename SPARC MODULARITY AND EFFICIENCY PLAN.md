@@ -168,7 +168,7 @@ Risks and guardrails: Do not make performance assertions brittle. Prefer semanti
 ## Non-Goals And Rejected Ideas
 
 - Do not move SPARC production-rule evaluation, replay, response classification, model target extraction, or progress calculation to a server method. The current architecture correctly keeps this client/learning-component side.
-- Do not add compatibility fallbacks for missing `documentId`, missing `stimulusRegistry`, ambiguous node attachments, or non-executable `behavior.authoredProductionRules`. Current hard failures are useful invariants.
+- Do not add compatibility fallbacks for missing `pageKey`, missing `stimulusRegistry`, ambiguous node attachments, or non-executable `behavior.authoredProductionRules`. Current hard failures are useful invariants.
 - Do not rewrite the authoring editor and runtime in one change. Modularize the editor completely through staged, behavior-preserving extractions and component splits.
 - Do not replace canonical history with cache-only state. Runtime caches can accelerate active-session replay, but canonical history remains the durable source.
 - Do not design special SPARC history projections or named read shapes as part of the near-term work. Keep the current exact-unit server history read shape unless later measurements prove payload size is the remaining bottleneck.

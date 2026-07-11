@@ -9,7 +9,7 @@ import type {
 } from './sparcSessionContracts';
 
 const regionTarget: SparcModelTargetIdentity = {
-  sparcDocumentId: 'doc-1',
+  sparcPageKey: 'doc-1',
   sparcNodeId: 'region-7',
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'region-kc',
@@ -20,7 +20,7 @@ const regionTarget: SparcModelTargetIdentity = {
 };
 
 const widgetTarget: SparcModelTargetIdentity = {
-  sparcDocumentId: 'doc-1',
+  sparcPageKey: 'doc-1',
   sparcNodeId: 'widget-3',
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'widget-kc',
@@ -72,7 +72,7 @@ function authoredDocument(): SparcAuthoredDocument {
 describe('sparcAuthoredModelTargets', function() {
   it('resolves the authored model target for the addressed node', function() {
     const target = resolveSparcAuthoredModelTarget(authoredDocument(), {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'widget-3',
     });
 
@@ -81,7 +81,7 @@ describe('sparcAuthoredModelTargets', function() {
 
   it('resolves an attached registry target for a region node', function() {
     const target = resolveSparcAuthoredModelTarget(authoredDocument(), {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'region-7',
     });
 
@@ -103,7 +103,7 @@ describe('sparcAuthoredModelTargets', function() {
     };
 
     const target = resolveSparcAuthoredModelTarget(document, {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'region-7',
     });
 
@@ -116,7 +116,7 @@ describe('sparcAuthoredModelTargets', function() {
 
   it('returns undefined for authored content with no model target', function() {
     const target = resolveSparcAuthoredModelTarget(authoredDocument(), {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'hint-region',
     });
 
@@ -126,7 +126,7 @@ describe('sparcAuthoredModelTargets', function() {
   it('fails clearly when the source address is not in the authored document', function() {
     assert.throws(
       () => resolveSparcAuthoredModelTarget(authoredDocument(), {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'missing-widget',
       }),
       /node "missing-widget" not found/,
@@ -152,7 +152,7 @@ describe('sparcAuthoredModelTargets', function() {
       () => resolveSparcProductionRuleModelTarget({
         document: modelTargetOnlyDocument,
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'widget-3',
         },
       }),

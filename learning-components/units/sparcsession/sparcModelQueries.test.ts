@@ -13,7 +13,7 @@ const query: SparcModelQuery = {
     KCId: 'kc-1',
     KCDefault: 'kc-1',
     KCCluster: 'cluster-1',
-    sparcDocumentId: 'doc-1',
+    sparcPageKey: 'doc-1',
     sparcNodeId: 'widget-1',
     response: {
       responseKC: 'response-kc-1',

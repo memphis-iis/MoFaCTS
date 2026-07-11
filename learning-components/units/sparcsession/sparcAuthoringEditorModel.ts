@@ -79,7 +79,7 @@ export function defaultProductionEffect(type = 'classify'): SparcProductionRuleE
         type: 'write-state',
         write: {
           target: {
-            documentId: variableExpression('documentId'),
+            pageKey: variableExpression('pageKey'),
             nodeId: literalExpression('node-id'),
           },
           key: 'value',
@@ -165,10 +165,10 @@ export function defaultProductionRule(index: number): SparcProductionRule {
   };
 }
 
-export function defaultStateWrite(documentId = '', nodeId = ''): SparcStateWrite {
+export function defaultStateWrite(pageKey = '', nodeId = ''): SparcStateWrite {
   return {
     target: {
-      documentId,
+      pageKey,
       nodeId,
     },
     key: 'visible',

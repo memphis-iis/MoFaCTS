@@ -9,13 +9,13 @@ import {
   evaluateAnswerService,
 } from './services';
 import {
-  clearSparcProductionRuleHistoryCache,
-  rememberSparcProductionRuleHistoryRecord,
-} from '../services/sparcProductionRuleHistoryCache';
+  clearSparcRuntimeState,
+  rememberSparcRuntimeHistoryRecord,
+} from '../services/sparcRuntimeState';
 
 describe('machine services contracts', function() {
   afterEach(function() {
-    clearSparcProductionRuleHistoryCache();
+    clearSparcRuntimeState();
   });
 
   it('exposes the expected actor map keys used by contentRuntimeMachine', function() {
@@ -149,22 +149,25 @@ describe('machine services contracts', function() {
       eventType: 'sparc',
       TDFId: 'tdf-1',
       sessionID: 'session-1',
+      userId: 'user-1',
+      levelUnit: 2,
       sparc: {
-        documentId: 'sparc-fractions-addition',
+        pageKey: 'sparc-fractions-addition',
         sourceAddress: {
-          documentId: 'sparc-fractions-addition',
+          pageKey: 'sparc-fractions-addition',
           nodeId: 'root',
         },
       },
     };
-    rememberSparcProductionRuleHistoryRecord(priorRecord);
+    rememberSparcRuntimeHistoryRecord(priorRecord);
 
     const result = await evaluateAnswerService({
       tdfId: 'tdf-1',
-      sessionId: 'session-1',
+      userId: 'user-1',
+      unitId: 2,
       engine: {
         evaluateSparcTrialDisplayProductionRuleEvents(params: unknown) {
-          expect(params).to.have.nested.property('documentId', 'sparc-fractions-addition');
+          expect(params).to.have.nested.property('pageKey', 'sparc-fractions-addition');
           expect(params).to.have.deep.property('priorHistoryRecords', [priorRecord]);
           return {
             document: { id: 'sparc-fractions-addition' },
@@ -174,7 +177,7 @@ describe('machine services contracts', function() {
               transition: {
                 writes: [{
                   target: {
-                    documentId: 'sparc-fractions-addition',
+                    pageKey: 'sparc-fractions-addition',
                     nodeId: 'node-feedback',
                   },
                   key: 'message',
@@ -192,7 +195,7 @@ describe('machine services contracts', function() {
         },
       },
       currentDisplay: {
-        documentId: 'sparc-fractions-addition',
+        pageKey: 'sparc-fractions-addition',
         nodes: [],
         productionRules: [{
           id: 'fractions.buggy-premature-add-numerators',
@@ -227,7 +230,7 @@ describe('machine services contracts', function() {
       await evaluateAnswerService({
         engine: {},
         currentDisplay: {
-          documentId: 'sparc-fractions-addition',
+          pageKey: 'sparc-fractions-addition',
           nodes: [],
           productionRules: [{
             id: 'fractions.complete-reduced-path',

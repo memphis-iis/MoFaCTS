@@ -271,7 +271,7 @@ function normalizeClusterTargets(display: SparcTrialDisplay): readonly SparcClus
 }
 
 export function createSparcAuthoredDocumentFromTrialDisplay(params: {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
 }): SparcAuthoredDocument {
   const display = sparcTrialDisplayAdapter.normalizeDisplay(params.display);
@@ -303,7 +303,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     ? display.initialState as readonly SparcStateWrite[]
     : [];
   return {
-    id: requireNonBlank(params.documentId, 'SPARC document id'),
+    id: requireNonBlank(params.pageKey, 'SPARC document id'),
     schemaVersion: 1,
     layout: {
       scrollAxis: 'vertical',
@@ -509,7 +509,7 @@ function directSparcActionForNode(node: DisplayNodeRecord, submittedValue: unkno
 }
 
 export function createSparcProductionRuleEventsFromTrialResult(params: {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
 }): readonly SparcInterfaceEvent[] {
@@ -524,10 +524,10 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
     const nodeId = typeof params.result.triggeredBy === 'string' ? params.result.triggeredBy.trim() : '';
     if (nodeId) {
       events.push({
-        eventId: `${params.documentId}:${nodeId}:focus:trial-display`,
+        eventId: `${params.pageKey}:${nodeId}:focus:trial-display`,
         type: 'focus-changed',
         source: {
-          documentId: params.documentId,
+          pageKey: params.pageKey,
           nodeId,
         },
         time: params.result.timestamp,
@@ -562,10 +562,10 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
       continue;
     }
     events.push({
-      eventId: `${params.documentId}:${nodeId}:${index}:trial-display`,
+      eventId: `${params.pageKey}:${nodeId}:${index}:trial-display`,
       type: 'response-submitted',
       source: {
-        documentId: params.documentId,
+        pageKey: params.pageKey,
         nodeId,
       },
       time: params.result.timestamp,
@@ -586,7 +586,7 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
 }
 
 function createSparcDialogueEventFromTrialResult(params: {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
 }): { readonly event: SparcInterfaceEvent; readonly learnerText: string } {
@@ -606,10 +606,10 @@ function createSparcDialogueEventFromTrialResult(params: {
   return {
     learnerText: entry.text,
     event: {
-      eventId: `${params.documentId}:${entry.nodeId}:dialogue:${params.result.timestamp}`,
+      eventId: `${params.pageKey}:${entry.nodeId}:dialogue:${params.result.timestamp}`,
       type: 'response-submitted',
       source: {
-        documentId: params.documentId,
+        pageKey: params.pageKey,
         nodeId: entry.nodeId,
       },
       time: params.result.timestamp,
@@ -625,7 +625,7 @@ function createSparcDialogueEventFromTrialResult(params: {
 
 export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
   readonly core: SparcPracticeHistoryCore;
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
@@ -638,12 +638,12 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 }): Promise<SparcTrialDisplayControllerDialogueTurnCommitResult> {
   const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
-    documentId: params.documentId,
+    pageKey: params.pageKey,
     display: params.display,
   });
   const replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
   const { event, learnerText } = createSparcDialogueEventFromTrialResult({
-    documentId: params.documentId,
+    pageKey: params.pageKey,
     display: params.display,
     result: params.result,
   });
@@ -678,7 +678,7 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
 
 export async function commitSparcTrialDisplayProductionRuleEvents(params: {
   readonly core: SparcPracticeHistoryCore;
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
@@ -688,14 +688,14 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
   readonly adaptiveModel?: ModelPracticeRuntime;
 }): Promise<SparcTrialDisplayProductionRuleCommitResult> {
   const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
-    documentId: params.documentId,
+    pageKey: params.pageKey,
     display: params.display,
   });
   let replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
   const commits: SparcTrialDisplayProductionRuleCommit[] = [];
   const evaluations: SparcCommittedProductionRuleEvaluation[] = [];
   for (const event of createSparcProductionRuleEventsFromTrialResult({
-    documentId: params.documentId,
+    pageKey: params.pageKey,
     display: params.display,
     result: params.result,
   })) {
@@ -727,7 +727,7 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
 }
 
 export function evaluateSparcTrialDisplayProductionRuleEvents(params: {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
@@ -735,12 +735,12 @@ export function evaluateSparcTrialDisplayProductionRuleEvents(params: {
   readonly replayState?: SparcReplayState;
 }): SparcTrialDisplayProductionRuleEvaluationResult {
   const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
-    documentId: params.documentId,
+    pageKey: params.pageKey,
     display: params.display,
   });
   let replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
   const events = createSparcProductionRuleEventsFromTrialResult({
-    documentId: params.documentId,
+    pageKey: params.pageKey,
     display: params.display,
     result: params.result,
   });

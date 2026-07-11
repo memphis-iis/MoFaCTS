@@ -19,7 +19,6 @@ function resetTrialResponseState() {
     feedbackSuppressed: false,
     h5pResult: null,
     sparcResult: null,
-    sparcNodeValues: {},
     isCorrect: false,
     isTimeout: false,
     feedbackTimeoutMs: undefined,
@@ -61,6 +60,7 @@ export const loadSelectedTrialIntoActiveContext = assign({
   incomingPreparationComplete: () => false,
   incomingReady: () => false,
   ...resetTrialResponseState(),
+  sparcNodeValues: ({ event }: CardSelectionDoneArgs) => event.output?.sparcNodeValues || {},
 });
 
 export const commitPreparedTrialToActiveContext = assign({
@@ -87,6 +87,7 @@ export const commitPreparedTrialToActiveContext = assign({
   incomingReady: () => false,
   speechHintExclusionList: ({ context }: MachineArgs) => String(getPreparedTrial(context)?.speechHintExclusionList || context.speechHintExclusionList || ''),
   ...resetTrialResponseState(),
+  sparcNodeValues: ({ context }: MachineArgs) => getPreparedTrial(context)?.sparcNodeValues || {},
 });
 
 export const clearIncomingPreparationState = assign({

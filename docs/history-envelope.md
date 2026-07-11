@@ -30,6 +30,11 @@ Every persisted history row must include:
 
 The row must also include either `userId` or `anonStudentId`.
 
+`sessionID` identifies the research/history attempt that produced a row. It is
+not the durable continuation identity. SPARC continuation is scoped by the
+authenticated `userId`, `TDFId`, `levelUnit`, and the canonical page identity,
+so state can replay across multiple attempts.
+
 ## Event Types
 
 Current event-type vocabulary:
@@ -52,6 +57,12 @@ Known component extension fields:
 - `h5p`: compact H5P summary or part-event payload.
 - `sparc`: compact SPARC event payload for document addresses, practice
   observations, state transitions, and runtime trace steps.
+
+SPARC authors declare one identity at `sparcPages[].pageId`. Runtime derives
+`sparc.pageKey` and every nested state address from that page id. Authored
+`display.pageKey` is invalid. Existing history rows that used
+`sparc.documentId` are explicitly migrated to `pageKey` at server startup
+before resume reads are served.
 
 Extension fields are bounded independently from the total wire payload budget. They must contain compact identifiers, outcomes, timestamps, scores, or resume checkpoints. They must not contain full runtime snapshots, global session state, full experiment state, or unbounded dialogue/history dumps.
 

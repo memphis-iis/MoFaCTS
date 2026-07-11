@@ -14,12 +14,12 @@ const core = {
 };
 
 const sourceAddress = {
-  documentId: 'doc-1',
+  pageKey: 'doc-1',
   nodeId: 'widget-1',
 };
 
 const modelTarget: SparcModelTargetIdentity = {
-  sparcDocumentId: 'doc-1',
+  sparcPageKey: 'doc-1',
   sparcNodeId: 'widget-1',
   stimuliSetId: 'stim-set-1',
   stimulusKC: 'kc-1',

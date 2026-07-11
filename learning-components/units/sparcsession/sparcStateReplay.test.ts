@@ -45,7 +45,7 @@ describe('sparcStateReplay', function() {
         eventId: 'event-1',
         type: 'value-changed',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         time: 2000,
@@ -53,7 +53,7 @@ describe('sparcStateReplay', function() {
       writes: [
         {
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'widget-3-input',
           },
           key: 'value',
@@ -67,7 +67,7 @@ describe('sparcStateReplay', function() {
         eventId: 'event-2',
         type: 'outcome-recorded',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'widget-3',
         },
         time: 2500,
@@ -75,7 +75,7 @@ describe('sparcStateReplay', function() {
       writes: [
         {
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'widget-3-input',
           },
           key: 'value',
@@ -83,7 +83,7 @@ describe('sparcStateReplay', function() {
         },
         {
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'widget-3-feedback',
           },
           key: 'visible',
@@ -94,26 +94,26 @@ describe('sparcStateReplay', function() {
 
     const state = replaySparcHistory([
       makeBaseSparcRecord({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         sourceAddress: firstTransition.event.source,
         stateTransition: firstTransition,
       }),
       makeBaseSparcRecord({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         sourceAddress: secondTransition.event.source,
         stateTransition: secondTransition,
       }),
     ]);
     const valueCellKey = createSparcStateCellKey(
       {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'widget-3-input',
       },
       'value',
     );
     const feedbackCellKey = createSparcStateCellKey(
       {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'widget-3-feedback',
       },
       'visible',
@@ -132,14 +132,14 @@ describe('sparcStateReplay', function() {
         eventId: 'event-1',
         type: 'value-changed',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         time: 2000,
       },
       writes: [{
         target: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'answer',
         },
         key: 'value',
@@ -152,7 +152,7 @@ describe('sparcStateReplay', function() {
         eventId: 'event-2',
         type: 'outcome-recorded',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         time: 2500,
@@ -160,7 +160,7 @@ describe('sparcStateReplay', function() {
       writes: [
         {
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'answer',
           },
           key: 'value',
@@ -168,7 +168,7 @@ describe('sparcStateReplay', function() {
         },
         {
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'feedback',
           },
           key: 'visible',
@@ -177,12 +177,12 @@ describe('sparcStateReplay', function() {
       ],
     };
     const firstRecord = makeBaseSparcRecord({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       sourceAddress: firstTransition.event.source,
       stateTransition: firstTransition,
     });
     const secondRecord = makeBaseSparcRecord({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       sourceAddress: secondTransition.event.source,
       stateTransition: secondTransition,
     });
@@ -206,7 +206,7 @@ describe('sparcStateReplay', function() {
     const observation: SparcPracticeObservation = {
       observationId: 'obs-1',
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'widget-1',
       },
       time: 3000,
@@ -226,7 +226,7 @@ describe('sparcStateReplay', function() {
     const state = replaySparcHistory([
       bridge.toCanonicalHistoryRecord(observation),
       makeBaseSparcRecord({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         sourceAddress: observation.sourceAddress,
         traceStep,
       }),
@@ -257,14 +257,14 @@ describe('sparcStateReplay', function() {
         eventId: 'event-1',
         type: 'value-changed',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         time: 2000,
       },
       writes: [{
         target: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         key: 'visible',
@@ -275,12 +275,12 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-2',
+          pageKey: 'doc-2',
           sourceAddress: transition.event.source,
           stateTransition: transition,
         }),
       ]),
-      /sparc\.sourceAddress\.documentId "doc-1" does not match SPARC history document "doc-2"/,
+      /sparc\.sourceAddress\.pageKey "doc-1" does not match SPARC history document "doc-2"/,
     );
   });
 
@@ -288,9 +288,9 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
           },
           stateTransition: {
@@ -299,14 +299,14 @@ describe('sparcStateReplay', function() {
               eventId: 'event-1',
               type: 'value-changed',
               source: {
-                documentId: 'doc-1',
+                pageKey: 'doc-1',
                 nodeId: 'region-1',
               },
               time: 2000,
             },
             writes: [{
               target: {
-                documentId: 'doc-2',
+                pageKey: 'doc-2',
                 nodeId: 'region-1',
               },
               key: 'visible',
@@ -315,7 +315,7 @@ describe('sparcStateReplay', function() {
           },
         }),
       ]),
-      /sparc\.stateTransition\.writes\[0\]\.target\.documentId "doc-2" does not match SPARC history document "doc-1"/,
+      /sparc\.stateTransition\.writes\[0\]\.target\.pageKey "doc-2" does not match SPARC history document "doc-1"/,
     );
   });
 
@@ -323,9 +323,9 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
           },
           stateTransition: {
@@ -334,14 +334,14 @@ describe('sparcStateReplay', function() {
               eventId: 'event-1',
               type: 'value-changed',
               source: {
-                documentId: 'doc-1',
+                pageKey: 'doc-1',
                 nodeId: 'widget-3',
               },
               time: 2000,
             },
             writes: [{
               target: {
-                documentId: 'doc-1',
+                pageKey: 'doc-1',
                 nodeId: 'region-7',
               },
               key: 'visible',
@@ -358,15 +358,15 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
           },
           practiceObservation: {
             observationId: 'obs-1',
             sourceAddress: {
-              documentId: 'doc-2',
+              pageKey: 'doc-2',
               nodeId: 'widget-1',
             },
             time: 2000,
@@ -376,7 +376,7 @@ describe('sparcStateReplay', function() {
           },
         }),
       ]),
-      /sparc\.practiceObservation\.sourceAddress\.documentId "doc-2" does not match SPARC history document "doc-1"/,
+      /sparc\.practiceObservation\.sourceAddress\.pageKey "doc-2" does not match SPARC history document "doc-1"/,
     );
   });
 
@@ -384,15 +384,15 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
           },
           practiceObservation: {
             observationId: 'obs-1',
             sourceAddress: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'widget-3',
             },
             time: 2000,
@@ -410,15 +410,15 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
           },
           traceStep: {
             traceId: 'trace-1',
             sourceAddress: {
-              documentId: 'doc-2',
+              pageKey: 'doc-2',
               nodeId: 'widget-1',
             },
             productionRuleId: 'rule-1',
@@ -428,7 +428,7 @@ describe('sparcStateReplay', function() {
           },
         }),
       ]),
-      /sparc\.traceStep\.sourceAddress\.documentId "doc-2" does not match SPARC history document "doc-1"/,
+      /sparc\.traceStep\.sourceAddress\.pageKey "doc-2" does not match SPARC history document "doc-1"/,
     );
   });
 
@@ -436,15 +436,15 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
           },
           traceStep: {
             traceId: 'trace-1',
             sourceAddress: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'widget-3',
             },
             productionRuleId: 'rule-1',
@@ -462,9 +462,9 @@ describe('sparcStateReplay', function() {
     assert.throws(
       () => replaySparcHistory([
         makeBaseSparcRecord({
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'region-1',
           },
           stateTransition: {
@@ -473,7 +473,7 @@ describe('sparcStateReplay', function() {
               eventId: 'event-1',
               type: 'value-changed',
               source: {
-                documentId: 'doc-1',
+                pageKey: 'doc-1',
                 nodeId: 'region-1',
               },
               time: 2000,
@@ -481,7 +481,7 @@ describe('sparcStateReplay', function() {
             writes: [
               {
                 target: {
-                  documentId: 'doc-1',
+                  pageKey: 'doc-1',
                   nodeId: 'region-1',
                 },
                 key: '',

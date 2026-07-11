@@ -209,11 +209,11 @@ describe('history reconstruction', function() {
         responseDuration: 375,
         responseValue: 'Alpha',
         sparc: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           practiceObservation: {
             observationId: 'obs-1',
             sourceAddress: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'widget-1',
             },
             time: 1000,
@@ -250,7 +250,7 @@ describe('history reconstruction', function() {
         KCCluster: 'fractions.addition',
         responseValue: '12',
         sparc: {
-          documentId: 'sparc-fractions-addition',
+          pageKey: 'sparc-fractions-addition',
           practiceObservation: {
             observationId: 'obs-1',
             practiceDurationMs: 420,
@@ -285,7 +285,7 @@ describe('history reconstruction', function() {
         responseKey: '12',
         responseValue: '12',
         sparc: {
-          documentId: 'sparc-fractions-addition',
+          pageKey: 'sparc-fractions-addition',
           practiceObservation: {
             observationId: 'obs-1',
             practiceDurationMs: 640,

@@ -18,15 +18,15 @@ function requireNonBlank(value: unknown, label: string): string {
 }
 
 function assertTransitionWritesStayInSourceDocument(transition: SparcStateTransition): void {
-  const sourceDocumentId = requireNonBlank(
-    transition.event.source.documentId,
-    'SPARC state-transition source documentId',
+  const sourcePageKey = requireNonBlank(
+    transition.event.source.pageKey,
+    'SPARC state-transition source pageKey',
   );
   transition.writes.forEach((write, index) => {
-    if (write.target.documentId !== sourceDocumentId) {
+    if (write.target.pageKey !== sourcePageKey) {
       throw new Error(
-        `SPARC state-transition write[${index}] target documentId "${write.target.documentId}" `
-          + `does not match source document "${sourceDocumentId}"`,
+        `SPARC state-transition write[${index}] target pageKey "${write.target.pageKey}" `
+          + `does not match source document "${sourcePageKey}"`,
       );
     }
   });
@@ -48,7 +48,7 @@ export function createSparcStateTransitionHistoryRecord(params: {
   assertTransitionWritesStayInSourceDocument(params.transition);
   const sourceAddress = params.transition.event.source;
   const extension: SparcCanonicalHistoryExtension = {
-    documentId: sourceAddress.documentId,
+    pageKey: sourceAddress.pageKey,
     sourceAddress,
     stateTransition: params.transition,
   };
@@ -62,7 +62,7 @@ export function createSparcStateTransitionHistoryRecord(params: {
     levelUnitType: 'sparc',
     time: params.transition.event.time,
     problemStartTime: params.transition.event.time,
-    selection: `${sourceAddress.documentId}:${sourceAddress.nodeId}`,
+    selection: `${sourceAddress.pageKey}:${sourceAddress.nodeId}`,
     action: params.action ?? 'sparc-state-transition',
     outcome: params.outcome ?? 'unknown',
     typeOfResponse: 'sparc',

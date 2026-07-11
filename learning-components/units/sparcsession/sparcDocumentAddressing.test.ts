@@ -19,13 +19,13 @@ function sampleDocument(): SparcAuthoredDocument {
         refs: [{
           relation: 'depends-on',
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'work-node',
           },
         }, {
           relation: 'feedback-for',
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'answer-node',
           },
         }],
@@ -48,7 +48,7 @@ describe('sparcDocumentAddressing', function() {
   it('resolves authored addresses directly to any authored node', function() {
     const document = sampleDocument();
     const resolved = resolveSparcDocumentAddress(document, {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'answer-node',
     });
 
@@ -58,7 +58,7 @@ describe('sparcDocumentAddressing', function() {
   it('resolves contained nodes without requiring their containment path', function() {
     const document = sampleDocument();
     const resolved = resolveSparcDocumentAddress(document, {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'input-node',
     });
 
@@ -86,7 +86,7 @@ describe('sparcDocumentAddressing', function() {
           refs: [{
             relation: 'feedback-for',
             target: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'missing-widget',
             },
           }],
@@ -117,14 +117,14 @@ describe('sparcDocumentAddressing', function() {
           refs: [{
             relation: 'depends-on',
             target: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'target',
             },
             stateKey: ' ',
           }, {
             relation: 'model-target',
             target: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'target',
             },
             modelMetric: 'fluency' as never,
@@ -151,7 +151,7 @@ describe('sparcDocumentAddressing', function() {
       schemaVersion: 1,
       initialState: [{
         target: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'missing',
         },
         key: 'visible',
@@ -180,7 +180,7 @@ describe('sparcDocumentAddressing', function() {
       schemaVersion: 1,
       initialState: [{
         target: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         key: '',
@@ -217,7 +217,7 @@ describe('sparcDocumentAddressing', function() {
             id: 'widget-1',
             kind: 'widget',
             modelTarget: {
-              sparcDocumentId: 'doc-1',
+              sparcPageKey: 'doc-1',
               sparcNodeId: 'other-widget',
               stimuliSetId: 'stim-set-1',
               stimulusKC: 'kc-1',
@@ -250,7 +250,7 @@ describe('sparcDocumentAddressing', function() {
           id: 'widget-1',
           kind: 'widget',
           modelTarget: {
-            sparcDocumentId: 'doc-1',
+            sparcPageKey: 'doc-1',
             sparcNodeId: 'widget-1',
             stimuliSetId: 'stim-set-1',
             stimulusKC: 'kc-1',
@@ -285,7 +285,7 @@ describe('sparcDocumentAddressing', function() {
             id: 'widget-1',
             kind: 'widget',
             modelTarget: {
-              sparcDocumentId: 'doc-1',
+              sparcPageKey: 'doc-1',
               sparcNodeId: 'widget-1',
               stimuliSetId: 'stim-set-1',
               stimulusKC: 'kc-1',
@@ -319,7 +319,7 @@ describe('sparcDocumentAddressing', function() {
             id: 'widget-1',
             kind: 'widget',
             modelTarget: {
-              sparcDocumentId: 'doc-1',
+              sparcPageKey: 'doc-1',
               sparcNodeId: 'other-widget',
               stimuliSetId: 'stim-set-1',
               stimulusKC: 'kc-1',
@@ -343,7 +343,7 @@ describe('sparcDocumentAddressing', function() {
   it('fails clearly when an address points at another document', function() {
     assert.throws(
       () => resolveSparcDocumentAddress(sampleDocument(), {
-        documentId: 'other-doc',
+        pageKey: 'other-doc',
         nodeId: 'conversion-table',
       }),
       /does not match authored document/,
@@ -369,7 +369,7 @@ describe('sparcDocumentAddressing', function() {
 
     assert.throws(
       () => resolveSparcDocumentAddress(document, {
-        documentId: 'dup-doc',
+        pageKey: 'dup-doc',
         nodeId: 'dup',
       }),
       /duplicate node id "dup"/,

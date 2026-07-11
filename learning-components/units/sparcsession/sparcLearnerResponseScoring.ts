@@ -206,7 +206,7 @@ export function createSparcLearnerResponseScoreTransition(params: {
     event: params.event,
     writes: createSparcLearnerResponseScoreStateWrites({
       target: {
-        documentId: params.event.source.documentId,
+        pageKey: params.event.source.pageKey,
         nodeId: params.document.root.id,
       },
       facts: scoredFacts,

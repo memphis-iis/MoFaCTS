@@ -136,15 +136,15 @@ describe('modelPracticeHistoryExchange', function() {
       responseDuration: undefined,
       practiceDurationMs: undefined,
       sparc: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'widget-1',
         },
         practiceObservation: {
           observationId: 'obs-1',
           sourceAddress: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'widget-1',
           },
           time: 2000,

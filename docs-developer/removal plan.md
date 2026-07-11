@@ -29,7 +29,7 @@ Every former reactive rule:
   "when": {
     "type": "state",
     "query": {
-      "target": { "documentId": "page1", "nodeId": "step1" },
+      "target": { "pageKey": "page1", "nodeId": "step1" },
       "key": "correctness"
     },
     "compare": "eq",
@@ -37,7 +37,7 @@ Every former reactive rule:
   },
   "writes": [
     {
-      "target": { "documentId": "page1", "nodeId": "step2" },
+      "target": { "pageKey": "page1", "nodeId": "step2" },
       "key": "visible",
       "value": true
     }
@@ -52,7 +52,7 @@ should become a production rule:
     {
       "factType": "interface-state",
       "slots": {
-        "documentId": { "type": "literal", "value": "page1" },
+        "pageKey": { "type": "literal", "value": "page1" },
         "node": { "type": "literal", "value": "step1" },
         "key": { "type": "literal", "value": "correctness" },
         "value": { "type": "literal", "value": "correct" }
@@ -63,7 +63,7 @@ should become a production rule:
     {
       "type": "write-state",
       "write": {
-        "target": { "documentId": "page1", "nodeId": "step2" },
+        "target": { "pageKey": "page1", "nodeId": "step2" },
         "key": "visible",
         "value": { "type": "literal", "value": true }
       }
@@ -71,7 +71,7 @@ should become a production rule:
   ]
 }
 
-That mapping works because replayed SPARC state is already materialized as interface-state facts with documentId, node, key, value, transitionId, eventId, and time.
+That mapping works because replayed SPARC state is already materialized as interface-state facts with pageKey, node, key, value, transitionId, eventId, and time.
 
 3. Required production-rule support before deleting reactive rules
 
@@ -130,7 +130,7 @@ Replace each with production-rule templates.
 Add a conversion helper, something like:
 function productionRuleFromStateWriteTrigger(params: {
   id: string;
-  sourceDocumentId: string;
+  sourcePageKey: string;
   sourceNodeId: string;
   stateKey: string;
   compare: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'truthy' | 'falsy';
@@ -277,7 +277,7 @@ Before:
       "when": {
         "type": "state",
         "query": {
-          "target": { "documentId": "page1", "nodeId": "answer1" },
+          "target": { "pageKey": "page1", "nodeId": "answer1" },
           "key": "correctness"
         },
         "compare": "eq",
@@ -285,7 +285,7 @@ Before:
       },
       "writes": [
         {
-          "target": { "documentId": "page1", "nodeId": "feedback" },
+          "target": { "pageKey": "page1", "nodeId": "feedback" },
           "key": "visible",
           "value": true
         }
@@ -304,7 +304,7 @@ After:
         {
           "factType": "interface-state",
           "slots": {
-            "documentId": { "type": "literal", "value": "page1" },
+            "pageKey": { "type": "literal", "value": "page1" },
             "node": { "type": "literal", "value": "answer1" },
             "key": { "type": "literal", "value": "correctness" },
             "value": { "type": "literal", "value": "incorrect" }
@@ -315,7 +315,7 @@ After:
         {
           "type": "write-state",
           "write": {
-            "target": { "documentId": "page1", "nodeId": "feedback" },
+            "target": { "pageKey": "page1", "nodeId": "feedback" },
             "key": "visible",
             "value": { "type": "literal", "value": true }
           }
@@ -459,7 +459,7 @@ Example runtime-created fact:
 {
   "factType": "model-state",
   "slots": {
-    "documentId": "page1",
+    "pageKey": "page1",
     "node": "fraction-answer",
     "metric": "probability",
     "value": 0.72

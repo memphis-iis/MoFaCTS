@@ -84,8 +84,9 @@ export interface ContentRuntimeMachineContext {
   srGrammarMatch: boolean | null;
   engine: unknown;
   engineIndices: EngineIndices | null;
-  sessionId: string;
-  unitId: string;
+  userId: string;
+  attemptId: string;
+  unitId: number;
   tdfId: string;
   speechHintExclusionList: string;
   questionIndex: number;
@@ -106,8 +107,9 @@ export interface ContentRuntimeMachineContext {
 
 export interface ContentRuntimeMachineEvent extends Record<string, unknown> {
   type: string;
-  sessionId?: string;
-  unitId?: string;
+  userId?: string;
+  attemptId?: string;
+  unitId?: number;
   tdfId?: string;
   source?: string;
   userAnswer?: string;
@@ -138,6 +140,7 @@ export interface CardSelectionResult extends Record<string, unknown> {
   questionIndex?: number;
   preparedAdvanceMode?: PreparedAdvanceMode;
   speechHintExclusionList?: string;
+  sparcNodeValues?: Record<string, unknown>;
 }
 
 export interface UpdateEngineResult {
@@ -195,8 +198,9 @@ export const initialContext: ContentRuntimeMachineContext = {
   srGrammarMatch: null,
   engine: null,
   engineIndices: null,
-  sessionId: '',
-  unitId: '',
+  userId: '',
+  attemptId: '',
+  unitId: -1,
   tdfId: '',
   speechHintExclusionList: '',
   questionIndex: 1,

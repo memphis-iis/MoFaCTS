@@ -21,16 +21,12 @@ import {
   collectSparcProgressiveNodeOperations,
 } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import {
-  createEmptySparcProductionRuleReplaySession,
-  readSparcProductionRuleReplaySession,
-  rememberSparcProductionRuleHistoryRecord,
-} from './sparcProductionRuleHistoryCache';
-import {
-  getSparcControllerRuntimeContext,
-} from './sparcControllerRuntimeContextCache';
+  readSparcResumeSnapshot,
+  rememberSparcRuntimeHistoryRecord,
+} from './sparcRuntimeState';
 
 type SparcActionDisplay = SparcControllerDisplay & {
-  documentId: string;
+  pageKey: string;
 };
 
 type SparcProductionRuleActionEngine = UnitEngineLike & {
@@ -63,9 +59,9 @@ function resolveSparcActionDisplay(display: unknown): SparcActionDisplay | null 
   if (!sparcDisplay || !hasSparcProductionRuleSource(sparcDisplay)) {
     return null;
   }
-  const documentId = nonBlankString(sparcDisplay.documentId);
-  if (!documentId) {
-    throw new Error('[SPARC] Production-rule action display requires documentId');
+  const pageKey = nonBlankString(sparcDisplay.pageKey);
+  if (!pageKey) {
+    throw new Error('[SPARC] Production-rule action display requires pageKey');
   }
   if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[SPARC] Production-rule action display requires nodes array');
@@ -193,7 +189,8 @@ export async function commitSparcProductionRuleAction(params: {
   readonly currentDisplay: unknown;
   readonly sparcResult: SparcControllerResult;
   readonly tdfId: unknown;
-  readonly sessionId: unknown;
+  readonly userId: unknown;
+  readonly attemptId: unknown;
   readonly levelUnit: unknown;
 }): Promise<{
   readonly classifications: readonly string[];
@@ -206,12 +203,12 @@ export async function commitSparcProductionRuleAction(params: {
   }
 
   const tdfId = nonBlankString(params.tdfId);
-  const sessionId = nonBlankString(params.sessionId);
-  if (!tdfId || !sessionId) {
-    throw new Error('[SPARC] Production-rule action history requires TDFId and sessionID');
+  const userId = nonBlankString(params.userId);
+  const attemptId = nonBlankString(params.attemptId);
+  if (!tdfId || !userId || !attemptId) {
+    throw new Error('[SPARC] Production-rule action requires TDFId, userId, and attemptId');
   }
-  const userId = Meteor.userId();
-  if (!userId) {
+  if (Meteor.userId() !== userId) {
     throw new Error('[SPARC] Production-rule action history requires an authenticated user');
   }
   const levelUnit = Number(params.levelUnit);
@@ -223,50 +220,41 @@ export async function commitSparcProductionRuleAction(params: {
   if (typeof engine?.commitSparcTrialDisplayProductionRuleEvents !== 'function') {
     throw new Error('[SPARC] Production-rule action requires SPARC session engine commit support');
   }
-  const sparcReplaySession = readSparcProductionRuleReplaySession({
+  const sparcRuntime = readSparcResumeSnapshot({
+    userId,
     TDFId: tdfId,
-    sessionID: sessionId,
-    documentId: sparcDisplay.documentId,
-  }) ?? createEmptySparcProductionRuleReplaySession({
-    TDFId: tdfId,
-    sessionID: sessionId,
-    documentId: sparcDisplay.documentId,
-  });
-  const sparcRuntimeContext = getSparcControllerRuntimeContext({
-    TDFId: tdfId,
-    sessionID: sessionId,
-    documentId: sparcDisplay.documentId,
+    levelUnit,
+    pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
-    replaySession: sparcReplaySession,
   });
-  const priorHistoryRecords = sparcReplaySession.retainedHistoryRecords;
+  const priorHistoryRecords = sparcRuntime.retainedHistoryRecords;
   const startedAt = Date.now();
   let writtenHistoryCount = 0;
 
   const result = await engine.commitSparcTrialDisplayProductionRuleEvents({
     core: {
       TDFId: tdfId,
-      sessionID: sessionId,
+      sessionID: attemptId,
       levelUnit,
       userId,
     },
-    documentId: sparcDisplay.documentId,
+    pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
     result: params.sparcResult,
-    document: sparcRuntimeContext.document,
-    replayState: sparcRuntimeContext.replayState,
+    document: sparcRuntime.document,
+    replayState: sparcRuntime.replayState,
     priorHistoryRecords,
     history: {
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         await insertCompressedHistory(historyRecord as Record<string, unknown>);
-        rememberSparcProductionRuleHistoryRecord(historyRecord);
+        rememberSparcRuntimeHistoryRecord(historyRecord);
         writtenHistoryCount += 1;
       },
     },
   });
   const counts = sparcEvaluationCounts(result.evaluations);
   clientConsole(2, '[SPARC][ProductionRules] committed action', {
-    documentId: sparcDisplay.documentId,
+    pageKey: sparcDisplay.pageKey,
     tdfId,
     levelUnit,
     triggeredBy: nonBlankString(params.sparcResult.triggeredBy) || undefined,
@@ -275,6 +263,13 @@ export async function commitSparcProductionRuleAction(params: {
     writtenHistoryCount,
     elapsedMs: Date.now() - startedAt,
     ...counts,
+  });
+  const updatedSparcRuntime = readSparcResumeSnapshot({
+    userId,
+    TDFId: tdfId,
+    levelUnit,
+    pageKey: sparcDisplay.pageKey,
+    display: sparcDisplay,
   });
 
   return {
@@ -288,7 +283,7 @@ export async function commitSparcProductionRuleAction(params: {
       sparcDisplay,
       result.evaluations,
       priorHistoryRecords,
-      sparcRuntimeContext.replayState.cells,
+      updatedSparcRuntime.replayState.cells,
     ),
   };
 }

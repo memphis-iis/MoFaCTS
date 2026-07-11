@@ -70,7 +70,7 @@ function sampleDocument(): SparcAuthoredDocument {
     schemaVersion: 1,
     initialState: [{
       target: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'feedback',
       },
       key: 'visible',
@@ -81,7 +81,7 @@ function sampleDocument(): SparcAuthoredDocument {
       when: [{
         factType: 'interface-state',
         slots: {
-          documentId: { type: 'literal', value: 'doc-1' },
+          pageKey: { type: 'literal', value: 'doc-1' },
           node: { type: 'literal', value: 'region-1' },
           key: { type: 'literal', value: 'lastOutcome' },
           value: { type: 'literal', value: 'correct' },
@@ -91,7 +91,7 @@ function sampleDocument(): SparcAuthoredDocument {
         type: 'write-state',
         write: {
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'feedback',
           },
           key: 'visible',
@@ -153,7 +153,7 @@ function sampleProductionRuleDocument(): SparcAuthoredDocument {
         type: 'write-state',
         write: {
           target: {
-            documentId: 'doc-1',
+            pageKey: 'doc-1',
             nodeId: 'feedback',
           },
           key: 'message',
@@ -315,7 +315,6 @@ function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
           sparcPages: [{
             pageId: 'page-1',
             display: {
-              documentId: 'doc-1',
               clusterTargets: [
                 { clusterIndex: 0 },
                 { clusterIndex: 1 },
@@ -563,7 +562,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     const authoredStartState = engine.replaySparcDocumentHistory(document, []);
     assert.equal(
       authoredStartState.cells[createSparcStateCellKey({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'feedback',
       }, 'visible')]?.value,
       false,
@@ -580,7 +579,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       input: {
         observationId: 'obs-1',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         time: 2000,
@@ -603,7 +602,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
     assert.equal(
       result.finalReplayState.cells[createSparcStateCellKey({
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'feedback',
       }, 'visible')]?.value,
       true,
@@ -616,7 +615,8 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     const preparedState = await engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]);
 
     assert.equal(preparedState.currentDisplay.pageId, 'page-1');
-    assert.equal(preparedState.currentDisplay.documentId, 'doc-1');
+    assert.equal(preparedState.currentDisplay.pageKey, 'page-1');
+    assert.equal(preparedState.currentDisplay.pageKey, 'page-1');
     assert.equal(preparedState.currentAnswer, '__SPARC_COMPLETED__');
     assert.deepEqual(
       preparedState.currentDisplay.clusterTargets.map((target: { clusterIndex: number; stimulusKC: string; clusterKC: string }) => ({
@@ -633,6 +633,52 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         stimulusKC: 'kc-1',
         clusterKC: 'cluster-1',
       }],
+    );
+  });
+
+  it('rejects a redundant authored display pageKey', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'page-1',
+              display: {
+                pageKey: 'other-key',
+                nodes: [{ id: 'first', clusterIndex: 0 }],
+              },
+            }],
+          },
+        },
+      }),
+    }));
+
+    await assert.rejects(
+      () => engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]),
+      /must not author display\.pageKey; runtime state identity is derived from pageId/,
+    );
+  });
+
+  it('rejects duplicate authored pageId values before selecting a page', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'duplicate-page',
+              display: { nodes: [{ id: 'first', clusterIndex: 0 }] },
+            }, {
+              pageId: 'duplicate-page',
+              display: { nodes: [{ id: 'second', clusterIndex: 1 }] },
+            }],
+          },
+        },
+      }),
+    }));
+
+    await assert.rejects(
+      () => engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]),
+      /SPARC pageId "duplicate-page" is duplicated/,
     );
   });
 
@@ -657,7 +703,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             sparcPages: [{
               pageId: 'page-1',
               display: {
-                documentId: 'doc-1',
                 unitType: 'sparc-autotutor-dialogue',
                 clusterTargets: [
                   {
@@ -773,13 +818,11 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             sparcPages: [{
               pageId: 'page-1',
               display: {
-                documentId: 'doc-1',
                 nodes: [{ id: 'first', clusterIndex: 0 }],
               },
             }, {
               pageId: 'page-2',
               display: {
-                documentId: 'doc-2',
                 nodes: [{ id: 'second', clusterIndex: 1 }],
               },
             }],
@@ -838,7 +881,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             sparcPages: [{
               pageId: 'page-1',
               display: {
-                documentId: 'doc-1',
                 nodes: [{
                   id: 'bad-node',
                   nodeType: 'atomic',
@@ -882,7 +924,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         eventId: 'event-production',
         type: 'response-submitted',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'region-1',
         },
         time: 3000,
@@ -921,7 +963,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         eventId: 'event-dialogue',
         type: 'response-submitted',
         source: {
-          documentId: 'dialogue-doc',
+          pageKey: 'dialogue-doc',
           nodeId: 'learner-input',
         },
         time: 5000,
@@ -966,7 +1008,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         levelUnit: 2,
         userId: 'user-1',
       },
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: {
         nodes: [{
           id: 'answer-node',
@@ -1004,7 +1046,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
           }, {
             factType: 'interface-event',
             slots: {
-              documentId: { type: 'bind', variable: 'documentId' },
+              pageKey: { type: 'bind', variable: 'pageKey' },
               selection: { type: 'literal', value: 'answerSelection' },
               action: { type: 'literal', value: 'UpdateTextField' },
               input: { type: 'literal', value: '42' },
@@ -1014,7 +1056,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             type: 'write-state',
             write: {
               target: {
-                documentId: variable('documentId'),
+                pageKey: variable('pageKey'),
                 nodeId: literal('feedback-node'),
               },
               key: 'message',
@@ -1045,7 +1087,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
   it('exposes trial-display production-rule evaluation at the unit-engine boundary', async function() {
     const engine = await createSparcSessionUnitEngine(createMinimalDeps());
     const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       display: {
         nodes: [{
           id: 'answer-node',
@@ -1079,7 +1121,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
           }, {
             factType: 'interface-event',
             slots: {
-              documentId: { type: 'bind', variable: 'documentId' },
+              pageKey: { type: 'bind', variable: 'pageKey' },
               selection: { type: 'literal', value: 'answerSelection' },
               action: { type: 'literal', value: 'UpdateTextField' },
               input: { type: 'literal', value: '42' },

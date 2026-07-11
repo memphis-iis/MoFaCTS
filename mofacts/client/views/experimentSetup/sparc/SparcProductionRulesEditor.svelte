@@ -236,7 +236,7 @@
                 <div class="sparc-expression-grid">
                   <label>
                     {sparcText('sparc.targetDocument')}
-                    <input value={stringifyLooseValue(effect.target?.documentId || '')} on:input={(event) => { effect.target = ensureTarget(effect.target || {}); onUpdateAddressTemplate(effect.target, 'documentId', event.currentTarget.value); }} />
+                    <input value={stringifyLooseValue(effect.target?.pageKey || '')} on:input={(event) => { effect.target = ensureTarget(effect.target || {}); onUpdateAddressTemplate(effect.target, 'pageKey', event.currentTarget.value); }} />
                   </label>
                   <label>
                     {sparcText('sparc.targetNode')}
@@ -247,7 +247,7 @@
                 <div class="sparc-expression-grid">
                   <label>
                     {sparcText('sparc.targetDocument')}
-                    <input value={stringifyLooseValue(effect.write?.target?.documentId || '')} on:input={(event) => onUpdateAddressTemplate(effect.write.target, 'documentId', event.currentTarget.value)} />
+                    <input value={stringifyLooseValue(effect.write?.target?.pageKey || '')} on:input={(event) => onUpdateAddressTemplate(effect.write.target, 'pageKey', event.currentTarget.value)} />
                   </label>
                   <label>
                     {sparcText('sparc.targetNode')}

@@ -52,7 +52,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
   engine?: ServiceRecord | null;
   currentDisplay?: {
     type?: string;
-    documentId?: string;
+    pageKey?: string;
     nodes?: unknown[];
     productionRules?: unknown[];
     behaviorRefs?: Record<string, string>;
@@ -80,7 +80,9 @@ interface AnswerEvaluationContext extends ServiceRecord {
     accentSensitive?: boolean;
   };
   tdfId?: unknown;
-  sessionId?: unknown;
+  userId?: unknown;
+  attemptId?: unknown;
+  unitId?: unknown;
   setspec?: unknown;
   buttonTrial?: boolean;
 }
@@ -121,7 +123,7 @@ async function selectNextCard(context: { deliverySettings?: unknown }, _event: u
     // Legacy placeholder path; current card selection is handled by selectCardService.
     //
     // const result = await window.unitEngine.selectNextCard({
-    //   sessionId: context.sessionId,
+    //   userId: context.userId,
     //   unitId: context.unitId,
     //   tdfId: context.tdfId,
     //   previousIndices: context.engineIndices,

@@ -466,13 +466,13 @@ function collectReferencedVariablesFromEffect(
       }
       break;
     case 'write-state':
-      collectReferencedVariablesFromTemplateValue(effect.write.target.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.write.target.pageKey, variables);
       collectReferencedVariablesFromTemplateValue(effect.write.target.nodeId, variables);
       collectReferencedVariablesFromExpression(effect.write.value, variables);
       break;
     case 'message':
       addVariablesFromTemplate(effect.template, variables);
-      collectReferencedVariablesFromTemplateValue(effect.target?.documentId, variables);
+      collectReferencedVariablesFromTemplateValue(effect.target?.pageKey, variables);
       collectReferencedVariablesFromTemplateValue(effect.target?.nodeId, variables);
       break;
     case 'credit':
@@ -685,10 +685,10 @@ function instantiateWrite(
 ): SparcStateWrite {
   return {
     target: {
-      documentId: evaluateStringTemplateValue(
-        effect.write.target.documentId,
+      pageKey: evaluateStringTemplateValue(
+        effect.write.target.pageKey,
         bindings,
-        'SPARC production rule write target documentId',
+        'SPARC production rule write target pageKey',
       ),
       nodeId: evaluateStringTemplateValue(
         effect.write.target.nodeId,
@@ -734,10 +734,10 @@ function instantiateProgressiveNodeWrite(
   const operation = instantiateTemplateValue(effect, bindings);
   return {
     target: {
-      documentId: evaluateStringTemplateValue(
-        { type: 'variable', name: 'documentId' },
+      pageKey: evaluateStringTemplateValue(
+        { type: 'variable', name: 'pageKey' },
         bindings,
-        'SPARC progressive node operation documentId',
+        'SPARC progressive node operation pageKey',
       ),
       nodeId: 'root',
     },
@@ -791,10 +791,10 @@ function instantiateFiring(
         const text = interpolateTemplate(effect.template, bindings);
         const target = effect.target
           ? {
-              documentId: evaluateStringTemplateValue(
-                effect.target.documentId,
+              pageKey: evaluateStringTemplateValue(
+                effect.target.pageKey,
                 bindings,
-                'SPARC production rule message target documentId',
+                'SPARC production rule message target pageKey',
               ),
               nodeId: evaluateStringTemplateValue(
                 effect.target.nodeId,

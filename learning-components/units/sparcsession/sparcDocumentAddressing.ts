@@ -43,8 +43,8 @@ export function resolveSparcDocumentAddress(
   document: SparcAuthoredDocument,
   address: SparcDocumentAddress,
 ): SparcResolvedAddress {
-  if (address.documentId !== document.id) {
-    throw new Error(`SPARC address document "${address.documentId}" does not match authored document "${document.id}"`);
+  if (address.pageKey !== document.id) {
+    throw new Error(`SPARC address document "${address.pageKey}" does not match authored document "${document.id}"`);
   }
   const nodes = collectNodes(document.root);
   const node = nodes.get(address.nodeId);
@@ -133,7 +133,7 @@ function modelTargetAddressForNode(
   node: SparcAuthoredNode,
 ): SparcDocumentAddress {
   return {
-    documentId: document.id,
+    pageKey: document.id,
     nodeId: node.id,
   };
 }
@@ -142,7 +142,7 @@ function modelTargetReferenceAddress(
   target: SparcModelTargetIdentity,
 ): SparcDocumentAddress {
   return {
-    documentId: target.sparcDocumentId,
+    pageKey: target.sparcPageKey,
     nodeId: target.sparcNodeId,
   };
 }
@@ -173,7 +173,7 @@ function modelTargetMatchesAuthoredAddress(
   target: SparcModelTargetIdentity,
   address: SparcDocumentAddress,
 ): boolean {
-  return target.sparcDocumentId === address.documentId && target.sparcNodeId === address.nodeId;
+  return target.sparcPageKey === address.pageKey && target.sparcNodeId === address.nodeId;
 }
 
 function modelTargetAddressMessage(
@@ -182,7 +182,7 @@ function modelTargetAddressMessage(
 ): string {
   return `SPARC authored modelTarget for node "${address.nodeId}" must match authored address `
     + `${JSON.stringify(address)}; got ${JSON.stringify({
-      sparcDocumentId: target.sparcDocumentId,
+      sparcPageKey: target.sparcPageKey,
       sparcNodeId: target.sparcNodeId,
     })}`;
 }
@@ -228,7 +228,7 @@ function modelTargetFromClusterEntry(
     KCCluster: entry.KCCluster,
     ...(entry.response ? { response: entry.response } : {}),
     ...(entry.stimulusRecordId ? { stimulusRecordId: entry.stimulusRecordId } : {}),
-    sparcDocumentId: document.id,
+    sparcPageKey: document.id,
     sparcNodeId: document.root.id,
   };
 }
@@ -246,7 +246,7 @@ function validateClusterTargets(
         reference: {
           relation: 'model-target',
           target: {
-            documentId: document.id,
+            pageKey: document.id,
             nodeId: document.root.id,
           },
         },
@@ -258,7 +258,7 @@ function validateClusterTargets(
         reference: {
           relation: 'model-target',
           target: {
-            documentId: document.id,
+            pageKey: document.id,
             nodeId: document.root.id,
           },
         },

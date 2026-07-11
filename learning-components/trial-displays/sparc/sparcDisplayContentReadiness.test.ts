@@ -169,7 +169,7 @@ describe('sparcDisplayContentReadiness', function() {
           type: 'write-state',
           write: {
             target: {
-              documentId: { type: 'literal', value: 'doc-1' },
+              pageKey: { type: 'literal', value: 'doc-1' },
               nodeId: { type: 'literal', value: 'node-missing' },
             },
             key: 'value',

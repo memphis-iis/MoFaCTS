@@ -58,7 +58,7 @@ export interface SparcBoxedNodeGroup {
 }
 
 export interface SparcTrialDisplay {
-  documentId?: string;
+  pageKey?: string;
   pageId?: string;
   schema?: string;
   layout?: {

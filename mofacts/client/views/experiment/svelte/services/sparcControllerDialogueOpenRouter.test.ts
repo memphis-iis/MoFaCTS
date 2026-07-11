@@ -6,7 +6,7 @@ import { createSparcDialogueOpenRouterProvider } from './sparcControllerDialogue
 
 function dialogueDisplay(): SparcControllerDisplay {
   return {
-    documentId: 'dialogue-doc',
+    pageKey: 'dialogue-doc',
     nodes: [],
     clusterTargets: [{
       clusterIndex: 0,

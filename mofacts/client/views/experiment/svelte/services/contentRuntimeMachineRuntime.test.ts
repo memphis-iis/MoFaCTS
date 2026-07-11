@@ -84,23 +84,35 @@ describe('card machine runtime controller', function() {
     const actor = new FakeActor(snapshot('idle'));
     const states: unknown[] = [];
     const startEvents: unknown[] = [];
+    let currentUnitId = 0;
     const controller = createContentRuntimeMachineRuntimeController({
       machine: { id: 'card' },
       createActor: () => actor,
       setState: (next) => states.push(next.value),
       sendStartEvent: (event) => startEvents.push(event),
-      startEvent: { type: 'START', sessionId: 'session-a' },
+      getStartEvent: () => ({
+        type: 'START',
+        userId: 'user-a',
+        attemptId: 'attempt-a',
+        unitId: currentUnitId,
+      }),
       log: () => undefined,
     });
 
     controller.start();
+    currentUnitId = 1;
     actor.emit(snapshot('idle.ready'));
     actor.emit(snapshot('idle.ready'));
 
     expect(actor.starts).to.equal(1);
     expect(actor.subscriberCount()).to.equal(1);
     expect(states).to.deep.equal(['idle', 'idle.ready', 'idle.ready']);
-    expect(startEvents).to.deep.equal([{ type: 'START', sessionId: 'session-a' }]);
+    expect(startEvents).to.deep.equal([{
+      type: 'START',
+      userId: 'user-a',
+      attemptId: 'attempt-a',
+      unitId: 1,
+    }]);
   });
 
   it('does not add duplicate subscriptions when start is called repeatedly', function() {
@@ -110,7 +122,7 @@ describe('card machine runtime controller', function() {
       createActor: () => actor,
       setState: () => undefined,
       sendStartEvent: () => undefined,
-      startEvent: { type: 'START' },
+      getStartEvent: () => ({ type: 'START' }),
       log: () => undefined,
     });
 
@@ -128,7 +140,7 @@ describe('card machine runtime controller', function() {
       createActor: () => actor,
       setState: () => undefined,
       sendStartEvent: () => undefined,
-      startEvent: { type: 'START' },
+      getStartEvent: () => ({ type: 'START' }),
       log: () => undefined,
     });
 

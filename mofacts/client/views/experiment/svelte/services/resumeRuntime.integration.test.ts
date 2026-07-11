@@ -34,6 +34,7 @@ function primeMinimalSession(): void {
   Session.set('unitType', 'schedule');
   Session.set('currentTdfId', 'tdf-integration');
   Session.set('currentTdfName', 'integration-tdf');
+  Session.set('currentLearningAttemptId', 'attempt-integration');
   Session.set('currentTdfUnit', {});
   Session.set('schedule', null);
   Session.set('currentTdfFile', {
@@ -64,6 +65,7 @@ describe('resume runtime integration seams', function() {
   });
 
   afterEach(function() {
+    Session.set('currentLearningAttemptId', undefined);
     resetQuestionIndex();
     resetActiveTrialDisplayRuntimeState();
   });

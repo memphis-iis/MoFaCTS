@@ -37,7 +37,7 @@ const document: SparcAuthoredDocument = {
   }],
   initialState: [{
     target: {
-      documentId: 'fractions-doc',
+      pageKey: 'fractions-doc',
       nodeId: 'firstDenConv',
     },
     key: 'status',
@@ -52,7 +52,7 @@ const document: SparcAuthoredDocument = {
       refs: [{
         relation: 'controls',
         target: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           nodeId: 'firstDenConv',
         },
       }],
@@ -103,7 +103,7 @@ describe('sparcWorkingMemoryFacts', function() {
       eventId: 'event-1',
       type: 'value-changed',
       source: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         nodeId: 'firstDenConv',
       },
       time: 1000,
@@ -135,7 +135,7 @@ describe('sparcWorkingMemoryFacts', function() {
       eventId: 'event-branch',
       type: 'value-changed',
       source: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         nodeId: 'firstDenConv',
       },
       time: 1000,
@@ -198,14 +198,14 @@ describe('sparcWorkingMemoryFacts', function() {
       eventId: 'event-2',
       type: 'outcome-recorded',
       source: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         nodeId: 'firstDenConv',
       },
       time: 2000,
       practiceObservation: {
         observationId: 'obs-1',
         sourceAddress: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           nodeId: 'firstDenConv',
         },
         time: 2000,
@@ -231,7 +231,7 @@ describe('sparcWorkingMemoryFacts', function() {
 
   it('projects stable replayed working-memory facts with latest-value semantics', function() {
     const target = {
-      documentId: 'fractions-doc',
+      pageKey: 'fractions-doc',
       nodeId: 'root',
     };
     const replayState = applySparcStateTransition(

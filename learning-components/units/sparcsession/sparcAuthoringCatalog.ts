@@ -114,9 +114,9 @@ const factSlotPatternSchema: SparcAuthoringSchema = {
 
 const documentAddressTemplateSchema: SparcAuthoringSchema = {
   type: 'object',
-  required: ['documentId', 'nodeId'],
+  required: ['pageKey', 'nodeId'],
   properties: {
-    documentId: {
+    pageKey: {
       anyOf: [{ type: 'string' }, ruleExpressionSchema],
       description: 'Document id or expression that evaluates to a document id.',
     },

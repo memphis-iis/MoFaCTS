@@ -446,7 +446,7 @@ Implementation should not invent a second SPARC display schema or a parallel Aut
         "display": {
           "type": "sparc",
           "schema": "tutorscript-sparc/1.0",
-          "documentId": "sparc-session-communication-nvc-001",
+          "pageKey": "sparc-session-communication-nvc-001",
           "nodes": [
             {
               "id": "expectation-clusters",
@@ -497,7 +497,7 @@ function translateAutoTutorPackage(sourcePackagePath: string): TranslationResult
   });
 
   const sparcDraft = translateAutoTutorPackageToSparcDraft({
-    documentId: generatedIds.documentId,
+    pageKey: generatedIds.pageKey,
     openingPrompt: sourceStim.display.text,
     script: sourceScript,
     maxTurns: autoTutorSession.maxTurns,
@@ -544,7 +544,7 @@ function buildSparcDialogueDocument(input: BuildDocumentInput): SparcTrialDispla
   return {
     type: 'sparc',
     schema: 'tutorscript-sparc/1.0',
-    documentId: input.documentId,
+    pageKey: input.pageKey,
     layout: {
       layoutMode: 'document',
       scrollAxis: 'vertical',

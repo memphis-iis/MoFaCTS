@@ -12,7 +12,7 @@ import type {
 } from './sparcSessionContracts';
 
 const sourceAddress = {
-  documentId: 'fractions-doc',
+  pageKey: 'fractions-doc',
   nodeId: 'firstDenConv',
 };
 
@@ -329,7 +329,7 @@ describe('sparcProductionRuleCommit', function() {
         eventId: 'event-controller',
         type: 'condition-evaluated',
         source: {
-          documentId: 'controller-doc',
+          pageKey: 'controller-doc',
           nodeId: 'root',
         },
         time: 2500,
@@ -444,7 +444,7 @@ describe('sparcProductionRuleCommit', function() {
           type: 'write-state',
           write: {
             target: {
-              documentId: 'fractions-doc',
+              pageKey: 'fractions-doc',
               nodeId: 'firstNumConv',
             },
             key: 'value',
@@ -492,7 +492,7 @@ describe('sparcProductionRuleCommit', function() {
         eventId: 'event-numerator',
         type: 'value-changed',
         source: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           nodeId: 'firstNumConv',
         },
         time: 2000,
@@ -675,7 +675,7 @@ describe('sparcProductionRuleCommit', function() {
         eventId: 'event-numerator-stale',
         type: 'response-submitted',
         source: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           nodeId: 'firstNumConv',
         },
         time: 3000,
@@ -693,7 +693,7 @@ describe('sparcProductionRuleCommit', function() {
         eventId: 'event-numerator-lcd',
         type: 'response-submitted',
         source: {
-          documentId: 'fractions-doc',
+          pageKey: 'fractions-doc',
           nodeId: 'firstNumConv',
         },
         time: 4000,
@@ -793,7 +793,7 @@ describe('sparcProductionRuleCommit', function() {
       value: 'correct',
     }, {
       target: {
-        documentId: 'fractions-doc',
+        pageKey: 'fractions-doc',
         nodeId: 'node-hint-message',
       },
       key: 'message',

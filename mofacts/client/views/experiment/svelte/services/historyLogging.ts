@@ -22,6 +22,7 @@ import { SCHEDULE_UNIT } from '../../../../../common/Definitions';
 import { isAudioPromptModeEnabled } from '../../../../../common/lib/audioPromptMode';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
+import { requireCurrentLearningAttemptId } from './attemptIdentity';
 import {
   applyMappingRecordToSession,
   loadMappingRecord,
@@ -37,13 +38,9 @@ import {
   resolveH5PResultForHistory,
 } from './historyH5P';
 import {
-  createEmptySparcProductionRuleReplaySession,
-  readSparcProductionRuleReplaySession,
-  rememberSparcProductionRuleHistoryRecord,
-} from './sparcProductionRuleHistoryCache';
-import {
-  getSparcControllerRuntimeContext,
-} from './sparcControllerRuntimeContextCache';
+  readSparcResumeSnapshot,
+  rememberSparcRuntimeHistoryRecord,
+} from './sparcRuntimeState';
 import type {
   SparcControllerDisplay,
   SparcControllerResult,
@@ -116,7 +113,7 @@ type SparcProductionRuleHistoryEngineLike = UnitEngineLike & {
   ) => Promise<unknown>;
 };
 type SparcDisplayWithProductionRuleSource = SparcControllerDisplay & {
-  documentId: string;
+  pageKey: string;
 };
 type HistoryStimLike = {
   stimuliSetId?: string | number;
@@ -247,9 +244,9 @@ function resolveSparcDisplayWithProductionRuleSource(
   if (!sparcDisplay || !hasSparcProductionRuleSource(sparcDisplay)) {
     return null;
   }
-  const documentId = typeof sparcDisplay.documentId === 'string' ? sparcDisplay.documentId.trim() : '';
-  if (!documentId) {
-    throw new Error('[History Logging] SPARC production-rule display requires documentId');
+  const pageKey = typeof sparcDisplay.pageKey === 'string' ? sparcDisplay.pageKey.trim() : '';
+  if (!pageKey) {
+    throw new Error('[History Logging] SPARC production-rule display requires pageKey');
   }
   if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[History Logging] SPARC production-rule display requires nodes array');
@@ -283,23 +280,14 @@ export async function commitSparcProductionRulesForHistory(params: {
     throw new Error('[History Logging] SPARC production-rule history core requires userId or anonStudentId');
   }
 
-  const sparcReplaySession = readSparcProductionRuleReplaySession({
+  const sparcRuntime = readSparcResumeSnapshot({
+    userId: params.record.userId,
     TDFId: params.record.TDFId,
-    sessionID: params.record.sessionID,
-    documentId: sparcDisplay.documentId,
-  }) ?? createEmptySparcProductionRuleReplaySession({
-    TDFId: params.record.TDFId,
-    sessionID: params.record.sessionID,
-    documentId: sparcDisplay.documentId,
-  });
-  const sparcRuntimeContext = getSparcControllerRuntimeContext({
-    TDFId: String(params.record.TDFId),
-    sessionID: String(params.record.sessionID),
-    documentId: sparcDisplay.documentId,
+    levelUnit: params.record.levelUnit,
+    pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
-    replaySession: sparcReplaySession,
   });
-  const priorHistoryRecords = sparcReplaySession.retainedHistoryRecords;
+  const priorHistoryRecords = sparcRuntime.retainedHistoryRecords;
 
   await engine.commitSparcTrialDisplayProductionRuleEvents({
     core: {
@@ -309,16 +297,16 @@ export async function commitSparcProductionRulesForHistory(params: {
       ...(params.record.userId ? { userId: String(params.record.userId) } : {}),
       ...(params.record.anonStudentId ? { anonStudentId: String(params.record.anonStudentId) } : {}),
     },
-    documentId: sparcDisplay.documentId,
+    pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
     result: params.sparcResult,
-    document: sparcRuntimeContext.document,
-    replayState: sparcRuntimeContext.replayState,
+    document: sparcRuntime.document,
+    replayState: sparcRuntime.replayState,
     priorHistoryRecords,
     history: {
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         await insertHistoryRecord(historyRecord as HistoryRecord);
-        rememberSparcProductionRuleHistoryRecord(historyRecord);
+        rememberSparcRuntimeHistoryRecord(historyRecord);
       },
     },
   });
@@ -710,8 +698,7 @@ export function createHistoryRecord({
     filledInDisplay.clozeText = filledInDisplay.clozeText.replace(/___+/g, correctAnswer);
   }
 
-  // Session ID (date + TDF name)
-  const sessionID = (new Date(trialStartTimeStamp)).toUTCString().substr(0, 16) + ' ' + Session.get('currentTdfName');
+  const sessionID = requireCurrentLearningAttemptId();
 
   const outcome = getTrialOutcome(testType, isCorrect);
   const selection = getTrialSelection(wasButtonTrial);

@@ -51,7 +51,7 @@ describe('sparc semantic nodes', function() {
 
   it('generates multiple-choice response intent, feedback rules, and model-practice effects when modeled', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodes: [{
         id: 'mc-1',
         nodeType: 'semantic',

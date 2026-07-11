@@ -19,7 +19,7 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 
 function dialogueDisplay(): SparcTrialDisplay {
   return {
-    documentId: 'dialogue-doc',
+    pageKey: 'dialogue-doc',
     nodes: [{
       id: 'dialogue-thread',
       nodeType: 'group',
@@ -113,7 +113,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         levelUnit: 2,
         userId: 'user-1',
       },
-      documentId: 'dialogue-doc',
+      pageKey: 'dialogue-doc',
       display,
       result: {
         submittedNodes: {
@@ -179,7 +179,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         levelUnit: 2,
         userId: 'user-1',
       },
-      documentId: 'dialogue-doc',
+      pageKey: 'dialogue-doc',
       display,
       result: {
         submittedNodes: {
@@ -219,7 +219,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         levelUnit: 2,
         userId: 'user-1',
       },
-      documentId: 'dialogue-doc',
+      pageKey: 'dialogue-doc',
       display,
       result: {
         submittedNodes: {
@@ -271,7 +271,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
           levelUnit: 2,
           userId: 'user-1',
         },
-        documentId: 'dialogue-doc',
+        pageKey: 'dialogue-doc',
         display: dialogueDisplay(),
         result: {
           submittedNodes: {

@@ -11,7 +11,7 @@ const event: SparcInterfaceEvent = {
   eventId: 'event-target-selection',
   type: 'response-submitted',
   source: {
-    documentId: 'sparc-doc',
+    pageKey: 'sparc-doc',
     nodeId: 'learner-input',
   },
   time: 1200,

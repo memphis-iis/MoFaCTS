@@ -47,7 +47,7 @@ function modelTargetFromCluster(
     KCCluster: clusterKC,
     ...(cluster.response ? { response: cluster.response } : {}),
     ...(cluster.stimulusRecordId ? { stimulusRecordId: cluster.stimulusRecordId } : {}),
-    sparcDocumentId: address.documentId,
+    sparcPageKey: address.pageKey,
     sparcNodeId: address.nodeId,
   };
 }
@@ -57,9 +57,9 @@ export function resolveSparcClusterTarget(
   clusterIndex: number,
   provenanceAddress: SparcDocumentAddress,
 ): SparcModelTargetIdentity {
-  if (provenanceAddress.documentId !== document.id) {
+  if (provenanceAddress.pageKey !== document.id) {
     throw new Error(
-      `SPARC provenance document "${provenanceAddress.documentId}" does not match authored document "${document.id}"`,
+      `SPARC provenance document "${provenanceAddress.pageKey}" does not match authored document "${document.id}"`,
     );
   }
   return modelTargetFromCluster(findClusterTarget(document, clusterIndex), provenanceAddress);
@@ -95,14 +95,14 @@ export function resolveSparcProductionRuleModelTarget(params: {
   if (params.clusterIndex !== undefined) {
     const clusterIndex = requireClusterIndex(params.clusterIndex, 'SPARC production rule model-practice clusterIndex');
     const provenanceAddress = {
-      documentId: params.sourceAddress.documentId,
+      pageKey: params.sourceAddress.pageKey,
       nodeId: params.nodeId || params.sourceAddress.nodeId,
     };
     resolveSparcDocumentAddress(params.document, provenanceAddress);
     return resolveSparcClusterTarget(params.document, clusterIndex, provenanceAddress);
   }
   const nodeAddress = {
-    documentId: params.sourceAddress.documentId,
+    pageKey: params.sourceAddress.pageKey,
     nodeId: params.nodeId || params.sourceAddress.nodeId,
   };
   const resolved = resolveSparcDocumentAddress(params.document, nodeAddress);

@@ -370,6 +370,12 @@ function renderLayout(controller: any, templateName: any) {
   clientConsole(2, '[ROUTER] Rendered DefaultLayout through the Flow Router controller');
 }
 
+function renderCardSubscriptionWaitOnlyWhenCold(controller: any): void {
+  if (!Session.get('currentTemplate')) {
+    renderLayout(controller, 'customLoading');
+  }
+}
+
 function renderHomeForUser(controller: any, user: any) {
   const loginMode = getUserLoginMode(user);
   clientConsole(2, '[ROUTER] renderHomeForUser - loginMode:', loginMode);
@@ -1245,7 +1251,7 @@ FlowRouter.route('/card', {
           return;
         }
       } else {
-        renderLayout(this, 'customLoading');
+        renderCardSubscriptionWaitOnlyWhenCold(this);
         if (!cardSubsWaitHandle) {
           const controller = this;
           cardSubsWaitHandle = Tracker.autorun(() => {

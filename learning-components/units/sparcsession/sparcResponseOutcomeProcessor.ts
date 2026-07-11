@@ -64,10 +64,10 @@ function assertWritesStayInSourceDocument(
   writes: readonly SparcStateWrite[],
 ): void {
   for (const [index, write] of writes.entries()) {
-    if (write.target.documentId !== sourceAddress.documentId) {
+    if (write.target.pageKey !== sourceAddress.pageKey) {
       throw new Error(
-        `SPARC response outcome stateWrites[${index}] target documentId "${write.target.documentId}" `
-          + `does not match source document "${sourceAddress.documentId}"`,
+        `SPARC response outcome stateWrites[${index}] target pageKey "${write.target.pageKey}" `
+          + `does not match source document "${sourceAddress.pageKey}"`,
       );
     }
   }
@@ -136,7 +136,7 @@ function createModelUpdateRequest(
     ...(observation.displayedStimulus !== undefined ? { displayedStimulus: observation.displayedStimulus } : {}),
     time: observation.time,
     problemStartTime: observation.problemStartTime,
-    selection: `${observation.sourceAddress.documentId}:${observation.sourceAddress.nodeId}`,
+    selection: `${observation.sourceAddress.pageKey}:${observation.sourceAddress.nodeId}`,
     action: 'sparc-response-outcome',
     typeOfResponse: 'sparc',
     eventType: 'sparc',

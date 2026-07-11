@@ -499,7 +499,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
       eventType: 'sparc',
     }, {
       sparc: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
       },
     });
 
@@ -512,7 +512,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
     assert.equal(result.record.eventType, 'sparc');
     assert.equal(result.record.modelEvidenceSource, 'sparc');
     assert.deepEqual(result.record.sparc, {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
     });
     cardProbabilities.cards[0].stims[0].probabilityEstimate = 0.81;
     assert.deepEqual(engine.getModelProgressItems(), [

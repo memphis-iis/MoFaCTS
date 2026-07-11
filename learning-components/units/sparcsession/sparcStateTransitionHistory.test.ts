@@ -9,14 +9,14 @@ const transition: SparcStateTransition = {
     eventId: 'event-1',
     type: 'condition-evaluated',
     source: {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'region-1',
     },
     time: 2000,
   },
   writes: [{
     target: {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'widget-3-feedback',
     },
     key: 'visible',
@@ -43,7 +43,7 @@ describe('sparcStateTransitionHistory', function() {
 
     const replayed = replaySparcHistory([record]);
     const cellKey = createSparcStateCellKey({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'widget-3-feedback',
     }, 'visible');
     assert.equal(replayed.cells[cellKey]?.value, true);
@@ -76,7 +76,7 @@ describe('sparcStateTransitionHistory', function() {
           ...transition,
           writes: [{
             target: {
-              documentId: 'doc-2',
+              pageKey: 'doc-2',
               nodeId: 'region-7',
             },
             key: 'visible',
@@ -84,7 +84,7 @@ describe('sparcStateTransitionHistory', function() {
           }],
         },
       }),
-      /write\[0\] target documentId "doc-2" does not match source document "doc-1"/,
+      /write\[0\] target pageKey "doc-2" does not match source document "doc-1"/,
     );
   });
 });

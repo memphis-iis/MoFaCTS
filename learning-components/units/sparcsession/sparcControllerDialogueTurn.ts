@@ -195,7 +195,7 @@ function createStableControllerStateWrites(params: {
   readonly planning: SparcControllerTurnPlanningResult;
 }): readonly SparcStateWrite[] {
   const target = {
-    documentId: params.event.source.documentId,
+    pageKey: params.event.source.pageKey,
     nodeId: params.document.root.id,
   };
   const selectedActionFacts = params.planning.productionRuleEvaluation.execution.firings
@@ -225,7 +225,7 @@ function createCompletedDialogueControlWrites(params: {
   readonly event: SparcInterfaceEvent;
 }): readonly SparcStateWrite[] {
   const target = {
-    documentId: params.event.source.documentId,
+    pageKey: params.event.source.pageKey,
     nodeId: params.document.root.id,
   };
   return [{
@@ -333,7 +333,7 @@ export async function evaluateSparcControllerDialogueTurn(params: {
       ...dialogueTransition.writes,
       ...createSparcLearnerResponseScoreStateWrites({
         target: {
-          documentId: params.event.source.documentId,
+          pageKey: params.event.source.pageKey,
           nodeId: params.document.root.id,
         },
         facts: learnerResponseScoreFacts,

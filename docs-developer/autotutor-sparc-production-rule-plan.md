@@ -274,7 +274,7 @@ Possible target-selection fact types:
 { factType: 'pedagogy.misconception', slots: { id, current, confidence, repaired } }
 { factType: 'pedagogy.focus', slots: { targetType, targetId, turnCount } }
 { factType: 'pedagogy.learnerQuestion', slots: { current, answerableFromAuthoredContent } }
-{ factType: 'sparc.nodeTarget', slots: { documentId, nodeId, role, visible, completed } }
+{ factType: 'sparc.nodeTarget', slots: { pageKey, nodeId, role, visible, completed } }
 ```
 
 The long-term structure becomes:

@@ -34,7 +34,7 @@ function normalizeAddress(value: unknown, label: string): SparcDocumentAddress {
   }
   const source = value as Record<string, unknown>;
   const address: SparcDocumentAddress = {
-    documentId: requireNonBlank(source.documentId, `${label}.documentId`),
+    pageKey: requireNonBlank(source.pageKey, `${label}.pageKey`),
     nodeId: requireNonBlank(source.nodeId, `${label}.nodeId`),
   };
   return address;
@@ -52,7 +52,7 @@ function normalizeModelTarget(value: unknown): SparcModelTargetIdentity | undefi
     KCId: source.KCId as string | number,
     KCDefault: source.KCDefault as string | number,
     KCCluster: source.KCCluster as string | number,
-    sparcDocumentId: requireNonBlank(source.sparcDocumentId, 'sparc.practiceObservation.modelTarget.sparcDocumentId'),
+    sparcPageKey: requireNonBlank(source.sparcPageKey, 'sparc.practiceObservation.modelTarget.sparcPageKey'),
     sparcNodeId: requireNonBlank(source.sparcNodeId, 'sparc.practiceObservation.modelTarget.sparcNodeId'),
   };
   if (source.response && typeof source.response === 'object' && !Array.isArray(source.response)) {
@@ -83,10 +83,10 @@ function normalizeObservation(value: unknown): SparcPracticeObservation | null {
     responseValue: source.responseValue,
   };
   const modelTarget = normalizeModelTarget(source.modelTarget);
-  if (modelTarget && modelTarget.sparcDocumentId !== sourceAddress.documentId) {
+  if (modelTarget && modelTarget.sparcPageKey !== sourceAddress.pageKey) {
     throw new Error(
-      `sparc.practiceObservation.modelTarget.sparcDocumentId "${modelTarget.sparcDocumentId}" `
-        + `does not match sourceAddress document "${sourceAddress.documentId}"`,
+      `sparc.practiceObservation.modelTarget.sparcPageKey "${modelTarget.sparcPageKey}" `
+        + `does not match sourceAddress document "${sourceAddress.pageKey}"`,
     );
   }
   const observation: SparcPracticeObservation = {
@@ -118,15 +118,15 @@ export function createSparcPracticeHistoryBridge(
       const sourceAddress = normalizeAddress(observation.sourceAddress, 'observation.sourceAddress');
       if (
         observation.modelTarget
-        && observation.modelTarget.sparcDocumentId !== sourceAddress.documentId
+        && observation.modelTarget.sparcPageKey !== sourceAddress.pageKey
       ) {
         throw new Error(
-          `observation.modelTarget.sparcDocumentId "${observation.modelTarget.sparcDocumentId}" `
-            + `does not match sourceAddress document "${sourceAddress.documentId}"`,
+          `observation.modelTarget.sparcPageKey "${observation.modelTarget.sparcPageKey}" `
+            + `does not match sourceAddress document "${sourceAddress.pageKey}"`,
         );
       }
       const extension: SparcCanonicalHistoryExtension = {
-        documentId: sourceAddress.documentId,
+        pageKey: sourceAddress.pageKey,
         sourceAddress,
         practiceObservation: observation,
       };
@@ -141,7 +141,7 @@ export function createSparcPracticeHistoryBridge(
           displayedStimulus: observation.displayedStimulus ?? sourceAddress,
           time: observation.time,
           problemStartTime: observation.problemStartTime,
-          selection: `${sourceAddress.documentId}:${sourceAddress.nodeId}`,
+          selection: `${sourceAddress.pageKey}:${sourceAddress.nodeId}`,
           action: 'sparc-response',
           typeOfResponse: 'sparc',
           eventType: 'sparc',
@@ -161,7 +161,7 @@ export function createSparcPracticeHistoryBridge(
         levelUnitType: observation.modelTarget ? 'model' : 'sparc',
         time: observation.time,
         problemStartTime: observation.problemStartTime,
-        selection: `${sourceAddress.documentId}:${sourceAddress.nodeId}`,
+        selection: `${sourceAddress.pageKey}:${sourceAddress.nodeId}`,
         action: 'sparc-response',
         outcome: observation.outcome,
         typeOfResponse: 'sparc',

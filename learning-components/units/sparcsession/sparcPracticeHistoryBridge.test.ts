@@ -15,11 +15,11 @@ describe('sparcPracticeHistoryBridge', function() {
     const observation: SparcPracticeObservation = {
       observationId: 'obs-1',
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'widget-3-input',
       },
       modelTarget: {
-        sparcDocumentId: 'doc-1',
+        sparcPageKey: 'doc-1',
         sparcNodeId: 'widget-3-input',
         stimuliSetId: 'stim-set-1',
         stimulusKC: 'kc-1',
@@ -71,7 +71,7 @@ describe('sparcPracticeHistoryBridge', function() {
     const observation: SparcPracticeObservation = {
       observationId: 'obs-2',
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'toggle-1',
       },
       time: 3000,
@@ -123,11 +123,11 @@ describe('sparcPracticeHistoryBridge', function() {
       () => bridge.toCanonicalHistoryRecord({
         observationId: 'obs-cross-doc',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'node-1',
         },
         modelTarget: {
-          sparcDocumentId: 'doc-2',
+          sparcPageKey: 'doc-2',
           sparcNodeId: 'node-1',
           stimuliSetId: 'stim-set-1',
           stimulusKC: 'kc-1',
@@ -141,7 +141,7 @@ describe('sparcPracticeHistoryBridge', function() {
         outcome: 'correct',
         responseValue: 'Answer',
       }),
-      /modelTarget\.sparcDocumentId "doc-2" does not match sourceAddress document "doc-1"/,
+      /modelTarget\.sparcPageKey "doc-2" does not match sourceAddress document "doc-1"/,
     );
   });
 
@@ -155,7 +155,7 @@ describe('sparcPracticeHistoryBridge', function() {
     const record = bridge.toCanonicalHistoryRecord({
       observationId: 'obs-1',
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'node-1',
       },
       time: 1000,
@@ -172,7 +172,7 @@ describe('sparcPracticeHistoryBridge', function() {
           practiceObservation: {
             ...record.sparc.practiceObservation,
             modelTarget: {
-              sparcDocumentId: 'doc-2',
+              sparcPageKey: 'doc-2',
               sparcNodeId: 'node-1',
               stimuliSetId: 'stim-set-1',
               stimulusKC: 'kc-1',
@@ -184,7 +184,7 @@ describe('sparcPracticeHistoryBridge', function() {
           },
         },
       }),
-      /modelTarget\.sparcDocumentId "doc-2" does not match sourceAddress document "doc-1"/,
+      /modelTarget\.sparcPageKey "doc-2" does not match sourceAddress document "doc-1"/,
     );
   });
 });

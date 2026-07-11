@@ -57,7 +57,7 @@ type ResolvedModelPracticeObservation = {
 };
 
 type ModelStateFactRequest = {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly nodeId: string;
   readonly metric: ModelPracticeMetric;
 };
@@ -132,14 +132,14 @@ function collectModelStateFactRequestsFromCondition(params: {
   if (!isModelPracticeMetric(metric)) {
     throw new Error('SPARC model-state production-rule condition requires literal metric');
   }
-  const documentId = nonBlankString(literalSlotValue(pattern.slots?.documentId))
-    || params.event.source.documentId;
+  const pageKey = nonBlankString(literalSlotValue(pattern.slots?.pageKey))
+    || params.event.source.pageKey;
   const nodeId = nonBlankString(literalSlotValue(pattern.slots?.node))
     || nonBlankString(literalSlotValue(pattern.slots?.nodeId))
     || params.event.source.nodeId;
-  const key = `${documentId}\u0000${nodeId}\u0000${metric}`;
+  const key = `${pageKey}\u0000${nodeId}\u0000${metric}`;
   params.requests.set(key, {
-    documentId,
+    pageKey,
     nodeId,
     metric,
   });
@@ -172,7 +172,7 @@ function createModelStateFacts(params: {
     event: params.event,
   }).map((request) => {
     const address = {
-      documentId: request.documentId,
+      pageKey: request.pageKey,
       nodeId: request.nodeId,
     };
     const target = resolveSparcAuthoredModelTarget(params.document, address)
@@ -184,7 +184,7 @@ function createModelStateFacts(params: {
     return {
       factType: 'model-state',
       slots: {
-        documentId: request.documentId,
+        pageKey: request.pageKey,
         node: request.nodeId,
         metric: request.metric,
         value: params.provider.queryModelPracticeState({
@@ -210,7 +210,7 @@ function firingWritesCorrectnessForEvent(
 ): boolean {
   return firing.writes.some((write) => (
     write.key === 'correctness'
-    && write.target.documentId === event.source.documentId
+    && write.target.pageKey === event.source.pageKey
     && write.target.nodeId === event.source.nodeId
   ));
 }
@@ -244,7 +244,7 @@ function createUnhandledIncorrectWrites(params: {
     value: 'incorrect',
   }, ...(feedbackNodeId ? [{
     target: {
-      documentId: params.event.source.documentId,
+      pageKey: params.event.source.pageKey,
       nodeId: feedbackNodeId,
     },
     key: 'message',
@@ -254,15 +254,15 @@ function createUnhandledIncorrectWrites(params: {
 
 function firingTargetsMessageNode(
   firing: SparcProductionRuleExecution['firings'][number],
-  documentId: string,
+  pageKey: string,
   nodeId: string,
 ): boolean {
   return firing.messages.some((message) => (
-    message.target?.documentId === documentId
+    message.target?.pageKey === pageKey
     && message.target.nodeId === nodeId
   )) || firing.writes.some((write) => (
     (write.key === 'message' || write.key === 'text' || write.key === 'value')
-    && write.target.documentId === documentId
+    && write.target.pageKey === pageKey
     && write.target.nodeId === nodeId
   ));
 }
@@ -275,7 +275,7 @@ function firingMarksEventCorrect(
     || firing.writes.some((write) => (
       write.key === 'correctness'
       && write.value === 'correct'
-      && write.target.documentId === event.source.documentId
+      && write.target.pageKey === event.source.pageKey
       && write.target.nodeId === event.source.nodeId
     ));
 }
@@ -305,7 +305,7 @@ function createCorrectFeedbackClearWrites(params: {
   }
 
   const authoredMessageForFeedbackNode = params.execution.firings.some((firing) => (
-    firingTargetsMessageNode(firing, params.event.source.documentId, feedbackNodeId)
+    firingTargetsMessageNode(firing, params.event.source.pageKey, feedbackNodeId)
   ));
   if (authoredMessageForFeedbackNode) {
     return [];
@@ -313,7 +313,7 @@ function createCorrectFeedbackClearWrites(params: {
 
   return [{
     target: {
-      documentId: params.event.source.documentId,
+      pageKey: params.event.source.pageKey,
       nodeId: feedbackNodeId,
     },
     key: 'message',
@@ -327,13 +327,13 @@ function createProductionRuleTransition(params: {
   readonly execution: SparcProductionRuleExecution;
 }): SparcStateTransition | undefined {
   const workingMemoryTarget = {
-    documentId: params.event.source.documentId,
+    pageKey: params.event.source.pageKey,
     nodeId: params.document.root.id,
   };
   const correctnessWrites = params.execution.firings.flatMap((firing) => (
     firing.writes.some((write) => (
       write.key === 'correctness'
-      && write.target.documentId === params.event.source.documentId
+      && write.target.pageKey === params.event.source.pageKey
       && write.target.nodeId === params.event.source.nodeId
     ))
       ? []
@@ -535,7 +535,7 @@ async function commitProductionRuleModelPracticeObservations(
     const processed = processSparcResponseOutcome(params.core, {
       observationId: `${params.event.eventId}:model-practice:${index}`,
       sourceAddress: {
-        documentId: params.event.source.documentId,
+        pageKey: params.event.source.pageKey,
         nodeId,
       },
       time: params.event.time,
@@ -544,7 +544,7 @@ async function commitProductionRuleModelPracticeObservations(
       responseValue: observation.responseValue ?? params.event.payload?.input ?? observation.outcome,
       ...(observation.input !== undefined ? { input: observation.input } : {}),
       displayedStimulus: {
-        documentId: params.event.source.documentId,
+        pageKey: params.event.source.pageKey,
         nodeId,
         clusterIndex: observation.clusterIndex ?? null,
       },

@@ -6,13 +6,7 @@ import {
   evaluateSparcControllerResponse,
   resolveSparcControllerDisplay,
 } from './sparcController';
-import {
-  createEmptySparcProductionRuleReplaySession,
-  readSparcProductionRuleReplaySession,
-} from './sparcProductionRuleHistoryCache';
-import {
-  getSparcControllerRuntimeContext,
-} from './sparcControllerRuntimeContextCache';
+import { readSparcResumeSnapshot } from './sparcRuntimeState';
 import {
   SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
   collectSparcProgressiveNodeOperations,
@@ -31,7 +25,7 @@ export interface SparcAnswerEvaluationContext extends ServiceRecord {
   engine?: ServiceRecord | null;
   currentDisplay?: {
     type?: string;
-    documentId?: string;
+    pageKey?: string;
     nodes?: unknown[];
     productionRules?: unknown[];
     behaviorRefs?: Record<string, string>;
@@ -55,7 +49,8 @@ export interface SparcAnswerEvaluationContext extends ServiceRecord {
     };
   };
   tdfId?: unknown;
-  sessionId?: unknown;
+  userId?: unknown;
+  unitId?: unknown;
 }
 
 type SparcProductionRuleEvaluationEngineLike = ServiceRecord & {
@@ -66,7 +61,7 @@ type SparcProductionRuleEvaluationEngineLike = ServiceRecord & {
 
 function hasSparcProductionRuleSource(
   display: SparcAnswerEvaluationContext['currentDisplay'],
-): display is SparcControllerDisplay & { documentId: string } {
+): display is SparcControllerDisplay & { pageKey: string } {
   if (!display || !Array.isArray(display.nodes)) {
     return false;
   }
@@ -75,9 +70,9 @@ function hasSparcProductionRuleSource(
   if (!sparcDisplay || !hasDirectRules) {
     return false;
   }
-  const documentId = typeof sparcDisplay.documentId === 'string' ? sparcDisplay.documentId.trim() : '';
-  if (!documentId) {
-    throw new Error('[SPARC] Production-rule display requires documentId');
+  const pageKey = typeof sparcDisplay.pageKey === 'string' ? sparcDisplay.pageKey.trim() : '';
+  if (!pageKey) {
+    throw new Error('[SPARC] Production-rule display requires pageKey');
   }
   if (!Array.isArray(sparcDisplay.nodes)) {
     throw new Error('[SPARC] Production-rule display requires nodes array');
@@ -178,29 +173,20 @@ export function evaluateSparcProductionRuleOutcome(context: SparcAnswerEvaluatio
   if (typeof engine?.evaluateSparcTrialDisplayProductionRuleEvents !== 'function') {
     throw new Error('[SPARC] Production-rule display requires SPARC session engine evaluation support');
   }
-  const sparcReplaySession = readSparcProductionRuleReplaySession({
+  const sparcRuntime = readSparcResumeSnapshot({
+    userId: context.userId,
     tdfId: context.tdfId,
-    sessionId: context.sessionId,
-    documentId: display.documentId,
-  }) ?? createEmptySparcProductionRuleReplaySession({
-    tdfId: context.tdfId,
-    sessionId: context.sessionId,
-    documentId: display.documentId,
-  });
-  const sparcRuntimeContext = getSparcControllerRuntimeContext({
-    TDFId: String(context.tdfId),
-    sessionID: String(context.sessionId),
-    documentId: display.documentId,
+    levelUnit: context.unitId,
+    pageKey: display.pageKey,
     display,
-    replaySession: sparcReplaySession,
   });
-  const priorHistoryRecords = sparcReplaySession.retainedHistoryRecords;
+  const priorHistoryRecords = sparcRuntime.retainedHistoryRecords;
   const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
-    documentId: display.documentId,
+    pageKey: display.pageKey,
     display,
     result: context.sparcResult,
-    document: sparcRuntimeContext.document,
-    replayState: sparcRuntimeContext.replayState,
+    document: sparcRuntime.document,
+    replayState: sparcRuntime.replayState,
     priorHistoryRecords,
   });
   const lastClassification = result.classifications[result.classifications.length - 1];

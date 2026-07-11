@@ -16,7 +16,8 @@ import { setQuestionIndex } from '../services/trialProgressionState';
 import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
 
 export const initializeSession = assign({
-  sessionId: ({ event }: ActionArgs) => event?.sessionId,
+  userId: ({ event }: ActionArgs) => event?.userId,
+  attemptId: ({ event }: ActionArgs) => event?.attemptId,
   unitId: ({ event }: ActionArgs) => event?.unitId,
   tdfId: ({ event }: ActionArgs) => event?.tdfId,
   consecutiveTimeouts: () => 0,

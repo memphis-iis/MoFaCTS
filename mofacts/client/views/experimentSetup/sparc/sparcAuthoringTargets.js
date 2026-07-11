@@ -10,7 +10,7 @@ export function findSparcTargets(candidatePages) {
       key: page.pageId,
       pageId: page.pageId,
       pageIndex,
-      label: page.display.documentId || page.pageId,
+      label: page.pageId,
     };
   });
 }

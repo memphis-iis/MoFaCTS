@@ -66,7 +66,7 @@ describe('sparcDocumentValidation', function() {
           refs: [{
             relation: 'depends-on',
             target: {
-              documentId: 'doc-1',
+              pageKey: 'doc-1',
               nodeId: 'missing-region',
             },
           }],

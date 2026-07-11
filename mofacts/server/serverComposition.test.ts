@@ -1530,15 +1530,15 @@ describe('learner analytics method authorization', function() {
 
   it('returns exact-unit durable SPARC history with canonical extension fields', async function() {
     const sparcExtension = {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       sourceAddress: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'node-1',
       },
       practiceObservation: {
         observationId: 'obs-1',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'node-1',
         },
         time: 1000,
@@ -1592,9 +1592,9 @@ describe('learner analytics method authorization', function() {
       eventType: 'sparc',
       responseValue: 'next',
       sparc: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         sourceAddress: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'node-2',
         },
       },
@@ -1607,7 +1607,7 @@ describe('learner analytics method authorization', function() {
       levelUnitType: 'sparc',
       time: 900,
       eventType: 'sparc',
-      sparc: { documentId: 'doc-ignored' },
+      sparc: { pageKey: 'doc-ignored' },
     });
     await HistoriesAny.insertAsync({
       _id: 'sparc-history-other-unit',
@@ -1617,7 +1617,7 @@ describe('learner analytics method authorization', function() {
       levelUnitType: 'sparc',
       time: 950,
       eventType: 'sparc',
-      sparc: { documentId: 'doc-ignored' },
+      sparc: { pageKey: 'doc-ignored' },
     });
     await HistoriesAny.insertAsync({
       _id: 'sparc-history-non-sparc-event',
@@ -1627,7 +1627,7 @@ describe('learner analytics method authorization', function() {
       levelUnitType: 'sparc',
       time: 975,
       eventType: 'h5p',
-      sparc: { documentId: 'doc-ignored' },
+      sparc: { pageKey: 'doc-ignored' },
     });
 
     const rows = await (asyncMethods.getSparcHistoryForUnit as any).call(
@@ -1654,7 +1654,7 @@ describe('learner analytics method authorization', function() {
     });
     expect(rows[0].sparc).to.deep.equal(sparcExtension);
     expect(rows[0]).not.to.have.property('serverOnlyLargePayload');
-    expect(rows[1]).to.have.nested.property('sparc.documentId', 'doc-1');
+    expect(rows[1]).to.have.nested.property('sparc.pageKey', 'doc-1');
   });
 
   it('counts one completed assessment trial per H5P summary row on resume', async function() {

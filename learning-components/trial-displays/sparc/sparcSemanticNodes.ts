@@ -250,7 +250,7 @@ function productionRule(params: {
     when: [{
       factType: 'interface-event',
       slots: {
-        documentId: bind('documentId'),
+        pageKey: bind('pageKey'),
         selection: literal(params.part.selection),
         action: literal(params.part.action),
         input: bind('input'),
@@ -262,7 +262,7 @@ function productionRule(params: {
       {
         type: 'write-state',
         write: {
-          target: { documentId: variable('documentId'), nodeId: literal(params.part.nodeId) },
+          target: { pageKey: variable('pageKey'), nodeId: literal(params.part.nodeId) },
           key: 'correctness',
           value: literal(params.response.outcome),
         },
@@ -271,7 +271,7 @@ function productionRule(params: {
         type: 'message',
         messageType: 'feedback',
         template: params.response.message,
-        target: { documentId: variable('documentId'), nodeId: literal(params.part.feedbackNodeId) },
+        target: { pageKey: variable('pageKey'), nodeId: literal(params.part.feedbackNodeId) },
       },
       { type: 'credit', kc: params.part.kc },
       {

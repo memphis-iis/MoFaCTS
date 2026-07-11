@@ -281,7 +281,7 @@ function collectSparcPageClusterIndices(display: SparcTrialDisplay): number[] {
   }
   collectProductionRuleClusterReferences(display, references);
   if (references.size === 0) {
-    throw new Error(`SPARC page "${display.pageId || display.documentId || ''}" does not declare any model cluster references`);
+    throw new Error(`SPARC page "${display.pageId || display.pageKey || ''}" does not declare any model cluster references`);
   }
   return Array.from(references).sort((a, b) => a - b);
 }
@@ -289,7 +289,7 @@ function collectSparcPageClusterIndices(display: SparcTrialDisplay): number[] {
 function resolveSparcPage(
   deps: CreateSparcSessionUnitEngineDeps,
   unit: unknown,
-): { pageId: string; documentId: string; pageDisplay: SparcTrialDisplay } {
+): { pageId: string; pageKey: string; pageDisplay: SparcTrialDisplay } {
   const tdf = deps.findTdfById(deps.getSessionValue('currentTdfId'));
   const sparcPages = tdf?.rawStimuliFile?.setspec?.sparcPages;
   if (!Array.isArray(sparcPages)) {
@@ -297,6 +297,17 @@ function resolveSparcPage(
   }
   if (sparcPages.length === 0) {
     throw new Error('SPARC session requires at least one rawStimuliFile.setspec.sparcPages entry');
+  }
+  const authoredPageIds = sparcPages.map((page: SparcPageRecord, index: number) => {
+    const authoredPageId = typeof page?.pageId === 'string' ? page.pageId.trim() : '';
+    if (!authoredPageId) {
+      throw new Error(`SPARC page at rawStimuliFile.setspec.sparcPages[${index}] requires pageId`);
+    }
+    return authoredPageId;
+  });
+  const duplicatePageId = authoredPageIds.find((pageId, index) => authoredPageIds.indexOf(pageId) !== index);
+  if (duplicatePageId) {
+    throw new Error(`SPARC pageId "${duplicatePageId}" is duplicated in rawStimuliFile.setspec.sparcPages`);
   }
   const configuredPageId = resolveSparcSessionPageId(unit as { sparcsession?: Record<string, unknown> | null });
   if (!configuredPageId && sparcPages.length > 1) {
@@ -320,31 +331,32 @@ function resolveSparcPage(
     throw new Error(`SPARC page "${pageId}" must define a display object`);
   }
   const pageDisplay = cloneRecord(page.display as SparcTrialDisplay);
-  const documentId = typeof pageDisplay.documentId === 'string' && pageDisplay.documentId.trim()
-    ? pageDisplay.documentId.trim()
-    : pageId;
-  return { pageId, documentId, pageDisplay };
+  if (Object.prototype.hasOwnProperty.call(pageDisplay, 'pageKey')) {
+    throw new Error(`SPARC page "${pageId}" must not author display.pageKey; runtime state identity is derived from pageId`);
+  }
+  const pageKey = pageId;
+  return { pageId, pageKey, pageDisplay };
 }
 
 function resolveSparcPageClusterListSource(
   deps: CreateSparcSessionUnitEngineDeps,
   unit: unknown,
 ): string {
-  const { pageId, documentId, pageDisplay } = resolveSparcPage(deps, unit);
-  return collectSparcPageClusterIndices({ ...pageDisplay, pageId, documentId }).join(' ');
+  const { pageId, pageKey, pageDisplay } = resolveSparcPage(deps, unit);
+  return collectSparcPageClusterIndices({ ...pageDisplay, pageId, pageKey }).join(' ');
 }
 
 function resolveSparcPageDisplay(
   deps: CreateSparcSessionUnitEngineDeps,
   unit: unknown,
 ): SparcTrialDisplay {
-  const { pageId, documentId, pageDisplay } = resolveSparcPage(deps, unit);
-  const clusterListIndices = collectSparcPageClusterIndices({ ...pageDisplay, pageId, documentId });
+  const { pageId, pageKey, pageDisplay } = resolveSparcPage(deps, unit);
+  const clusterListIndices = collectSparcPageClusterIndices({ ...pageDisplay, pageId, pageKey });
   const isAutoTutor = pageDisplay.unitType === 'sparc-autotutor-dialogue';
   return {
     ...pageDisplay,
     pageId,
-    documentId,
+    pageKey,
     clusterTargets: clusterListIndices.map((clusterIndex) =>
       isAutoTutor
         ? createCleanAutoTutorClusterTarget({ deps, clusterIndex })
@@ -396,7 +408,7 @@ export type SparcControllerDialogueTurnRuntimeParams = {
 
 export type SparcTrialDisplayProductionRuleRuntimeParams = {
   readonly core: SparcPracticeHistoryCore;
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
@@ -407,7 +419,7 @@ export type SparcTrialDisplayProductionRuleRuntimeParams = {
 
 export type SparcTrialDisplayControllerDialogueTurnRuntimeParams = {
   readonly core: SparcPracticeHistoryCore;
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
@@ -421,7 +433,7 @@ export type SparcTrialDisplayControllerDialogueTurnRuntimeParams = {
 };
 
 export type SparcTrialDisplayProductionRuleEvaluationRuntimeParams = {
-  readonly documentId: string;
+  readonly pageKey: string;
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
@@ -523,7 +535,7 @@ export async function createSparcSessionUnitEngine(
     ) {
       return await commitSparcTrialDisplayProductionRuleEvents({
         core: params.core,
-        documentId: params.documentId,
+        pageKey: params.pageKey,
         display: params.display,
         result: params.result,
         priorHistoryRecords: params.priorHistoryRecords,
@@ -542,7 +554,7 @@ export async function createSparcSessionUnitEngine(
     ) {
       return await commitSparcTrialDisplayControllerDialogueTurn({
         core: params.core,
-        documentId: params.documentId,
+        pageKey: params.pageKey,
         display: params.display,
         result: params.result,
         priorHistoryRecords: params.priorHistoryRecords,
@@ -560,7 +572,7 @@ export async function createSparcSessionUnitEngine(
       params: SparcTrialDisplayProductionRuleEvaluationRuntimeParams,
     ) {
       return evaluateSparcTrialDisplayProductionRuleEvents({
-        documentId: params.documentId,
+        pageKey: params.pageKey,
         display: params.display,
         result: params.result,
         priorHistoryRecords: params.priorHistoryRecords,

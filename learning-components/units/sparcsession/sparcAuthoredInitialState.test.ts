@@ -19,7 +19,7 @@ function authoredDocument(): SparcAuthoredDocument {
     schemaVersion: 1,
     initialState: [{
       target: {
-        documentId: 'doc-1',
+        pageKey: 'doc-1',
         nodeId: 'widget-3-feedback',
       },
       key: 'visible',
@@ -65,7 +65,7 @@ function makeSparcRecord(
     displayedStimulus: '',
     eventType: 'sparc',
     sparc: {
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       sourceAddress: transition.event.source,
       stateTransition: transition,
     },
@@ -76,7 +76,7 @@ describe('sparcAuthoredInitialState', function() {
   it('creates replay cells from authored document initial state without writing history transitions', function() {
     const state = createSparcAuthoredInitialReplayState(authoredDocument());
     const cellKey = createSparcStateCellKey({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'widget-3-feedback',
     }, 'visible');
 
@@ -94,14 +94,14 @@ describe('sparcAuthoredInitialState', function() {
         eventId: 'event-1',
         type: 'condition-evaluated',
         source: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'widget-3',
         },
         time: 2500,
       },
       writes: [{
         target: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'widget-3-feedback',
         },
         key: 'visible',
@@ -111,7 +111,7 @@ describe('sparcAuthoredInitialState', function() {
 
     const state = replaySparcHistory([makeSparcRecord(transition)], initialState);
     const cellKey = createSparcStateCellKey({
-      documentId: 'doc-1',
+      pageKey: 'doc-1',
       nodeId: 'widget-3-feedback',
     }, 'visible');
 
@@ -125,7 +125,7 @@ describe('sparcAuthoredInitialState', function() {
       ...authoredDocument(),
       initialState: [{
         target: {
-          documentId: 'doc-1',
+          pageKey: 'doc-1',
           nodeId: 'missing',
         },
         key: 'visible',
