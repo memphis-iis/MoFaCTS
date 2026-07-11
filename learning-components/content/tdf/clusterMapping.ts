@@ -1,4 +1,12 @@
-import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
+function legacyTrim(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function legacyInt(value: unknown): number {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 
 function extractDelimFields(src: unknown, dest: string[]) {
   if (!src) {

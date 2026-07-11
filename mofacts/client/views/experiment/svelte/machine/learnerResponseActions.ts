@@ -1,6 +1,6 @@
 import type { H5PTrialResult } from '../../../../../common/types';
 import type { SparcControllerResult } from '../services/sparcController';
-import { getStimAnswerDisplayCase } from '../../../../lib/currentTestingHelpers';
+import { getStimAnswerDisplayCase } from '../../../../lib/runtimeStimuli';
 import { assign, type ActionArgs, type ActionEvent } from './contentRuntimeMachineActionTypes';
 
 function getH5PSubmitResult(event?: ActionEvent): H5PTrialResult | null {

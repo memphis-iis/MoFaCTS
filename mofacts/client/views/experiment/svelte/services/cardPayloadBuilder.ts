@@ -1,5 +1,6 @@
 import { Session } from 'meteor/session';
-import { getCurrentDeliverySettings, getStimCluster } from '../../../../lib/currentTestingHelpers';
+import { getCurrentDeliverySettings } from '../../../../lib/currentDeliverySettings';
+import { getStimCluster } from '../../../../lib/runtimeStimuli';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { getIsVideoSessionFlag } from './cardRuntimeState';
 import { sanitizeHTML, nextChar } from '../../../../lib/stringUtils';

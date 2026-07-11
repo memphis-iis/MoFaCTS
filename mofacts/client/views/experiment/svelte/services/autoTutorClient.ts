@@ -10,7 +10,7 @@ import {
 import {
   type AutoTutorPlan,
 } from '../../../../../common/lib/autoTutorPlanner';
-import { getStimCluster } from '../../../../lib/currentTestingHelpers';
+import { getStimCluster } from '../../../../lib/runtimeStimuli';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';

@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { Session } from 'meteor/session';
-import { createStimClusterMapping } from '../../../../lib/clusterMappingUtils';
+import { createStimClusterMapping } from '../../../../../../learning-components/content/tdf/clusterMapping';
 import {
   applyMappingRecordToSession,
   loadMappingRecord,

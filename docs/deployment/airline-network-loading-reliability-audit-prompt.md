@@ -15,7 +15,7 @@ Audit scope:
 - JSONEditor usage in TDF/content/draft editor paths.
 - Bootstrap and Font Awesome usage, especially modal behavior.
 - Plyr and sql.js loading paths.
-- Theme startup readiness in `mofacts/client/lib/currentTestingHelpers.ts`.
+- Theme startup readiness in `mofacts/client/lib/themeRuntime.ts`.
 - Sign-in/home visibility gates in login/home code.
 - Any changed docs or wiki implications.
 

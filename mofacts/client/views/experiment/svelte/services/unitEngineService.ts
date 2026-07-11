@@ -7,7 +7,7 @@
 
 import { Session } from 'meteor/session';
 import { createUnitEngine } from '../../engineConstructors';
-import { getCurrentDeliverySettings } from '../../../../lib/currentTestingHelpers';
+import { getCurrentDeliverySettings } from '../../../../lib/currentDeliverySettings';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';

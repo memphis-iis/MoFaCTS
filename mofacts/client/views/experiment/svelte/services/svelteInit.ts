@@ -10,12 +10,10 @@ import { checkUserSession, clientConsole, startSessionCheckInterval } from '../.
 import { translatePlatformString } from '../../../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { ensureStimDisplayTypeMapReady, startStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
-import {
-  refreshCurrentDeliverySettingsStore,
-  getUserDisplayIdentifier,
-  setStudentPerformance,
-  getStimCount
-} from '../../../../lib/currentTestingHelpers';
+import { setStudentPerformance } from '../../../../lib/studentPerformanceRuntime';
+import { getStimCount } from '../../../../lib/runtimeStimuli';
+import { getUserDisplayIdentifier } from '../../../../lib/userIdentity';
+import { refreshCurrentDeliverySettingsStore } from '../../../../lib/currentDeliverySettings';
 import {
   getAudioInputSensitivity,
   getAudioPromptMode,

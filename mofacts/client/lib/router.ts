@@ -1,5 +1,5 @@
 import {meteorCallAsync} from '..';
-import {haveMeteorUser} from '../lib/currentTestingHelpers';
+import { haveMeteorUser } from './userIdentity';
 import {instructContinue, unitHasLockout} from '../views/experiment/instructions';
 import {Cookie} from './cookies';
 import {displayify} from '../../common/globalHelpers';

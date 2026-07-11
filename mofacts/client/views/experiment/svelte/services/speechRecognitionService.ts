@@ -23,7 +23,7 @@ import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore
 import { getAudioInputSensitivity, setAudioRecorderInitialized } from '../../../../lib/state/audioState';
 import { audioManager } from '../../../../lib/audioContextManager';
 import { getSpeechRecognitionMediaConstraints } from '../../../../lib/audioStartup';
-import { getAllCurrentStimAnswers } from '../../../../lib/currentTestingHelpers';
+import { getAllCurrentStimAnswers } from '../../../../lib/runtimeStimuli';
 import {
   resolveSpeechIgnoreOutOfGrammarResponses,
   resolveSpeechFilterCloseResponses,

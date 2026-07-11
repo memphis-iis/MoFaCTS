@@ -1,15 +1,13 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { currentUserHasRole } from '../../lib/roleUtils';
+import { extractDelimFields, rangeVal } from '../../lib/runtimeValueHelpers';
 import {
-  extractDelimFields,
-  rangeVal,
-  getStimCount,
-  getStimCluster,
-  getTestType,
   updateCurStudentPerformance,
-  updateCurStudedentPracticeTime
-} from '../../lib/currentTestingHelpers';
+  updateCurStudedentPracticeTime,
+} from '../../lib/studentPerformanceRuntime';
+import { getStimCount, getStimCluster } from '../../lib/runtimeStimuli';
+import { getTestType } from '../../lib/currentDeliverySettings';
 import { createExperimentState } from './svelte/services/experimentState';
 import { unitIsFinished } from './svelte/services/unitProgression';
 import {

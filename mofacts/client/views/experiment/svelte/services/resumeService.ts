@@ -46,12 +46,10 @@ import {
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { createUnitEngineForUnit } from '../../engineConstructors';
-import {
-  refreshCurrentDeliverySettingsStore,
-  getStimCount,
-  getUserDisplayIdentifier,
-  setStudentPerformance
-} from '../../../../lib/currentTestingHelpers';
+import { setStudentPerformance } from '../../../../lib/studentPerformanceRuntime';
+import { getStimCount } from '../../../../lib/runtimeStimuli';
+import { getUserDisplayIdentifier } from '../../../../lib/userIdentity';
+import { refreshCurrentDeliverySettingsStore } from '../../../../lib/currentDeliverySettings';
 import { clearPreparedNextRuntimeState } from './unitEngineService';
 import { COMPLETED_LESSON_REDIRECT, resolveCardLaunchProgress } from '../../../../lib/cardEntryIntent';
 import {

@@ -11,7 +11,7 @@ import { getActiveUiLocale, setActiveUiLocale } from '../../lib/interfaceLocaleS
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import type { PlatformStringKey } from '../../lib/interfaceI18nResources';
 import { TARGET_LOCALE_DEFINITIONS, TARGET_UI_LOCALES } from '../../../common/lib/interfaceLocales';
-import { applyThemeCSSProperties } from '../../lib/currentTestingHelpers';
+import { applyThemeCSSProperties } from '../../lib/themeRuntime';
 import {
   clearSavedUserThemeSelection,
   findAvailableUserTheme,

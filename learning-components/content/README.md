@@ -11,6 +11,7 @@ Belongs here:
 - Display transformations.
 - Media semantics.
 - Response normalization.
+- Response assessment policy and authored branched/alternative/regex semantics.
 
 Does not belong here:
 
@@ -19,3 +20,5 @@ Does not belong here:
 - Adaptive selection internals.
 
 Content code should define what lesson data means, not how the application stores or routes it.
+
+`response-assessment/responseAssessment.ts` is the pure learner-response contract. Callers must pass the current authored answer set and matching policy explicitly; localized feedback text remains an application projection. `tdf/runtimeStimulusInterpretation.ts` owns nested stimulus interpretation, and `tdf/clusterMapping.ts` owns shuffle/swap mapping semantics, while the Meteor adapter supplies current Session values and canonical TDF lookup.

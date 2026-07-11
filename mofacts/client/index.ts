@@ -22,7 +22,7 @@ import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { Tracker } from 'meteor/tracker';
 import {
   getCurrentTheme
-} from './lib/currentTestingHelpers';
+} from './lib/themeRuntime';
 import { resolveThemeBrandLabel } from '../common/themeBranding';
 import { translatePlatformString, getPlatformTextDirection } from './lib/interfaceI18n';
 import { applyActiveUiLocaleToDocument, getActiveUiLocale } from './lib/interfaceLocaleState';

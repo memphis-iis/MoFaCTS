@@ -1,6 +1,6 @@
 import {currentUserHasRole} from '../../lib/roleUtils';
 import {secsIntervalString} from '../../../common/globalHelpers';
-import {haveMeteorUser} from '../../lib/currentTestingHelpers';
+import { haveMeteorUser } from '../../lib/userIdentity';
 import './instructions.html';
 import { createExperimentState } from './svelte/services/experimentState';
 import { revisitUnit, unitIsFinished } from './svelte/services/unitProgression';

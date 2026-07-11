@@ -1,5 +1,5 @@
 import { Session } from 'meteor/session';
-import { createStimClusterMapping, isClusterMappingCompatibleWithSetSpec } from '../../../../lib/clusterMappingUtils';
+import { createStimClusterMapping, isClusterMappingCompatibleWithSetSpec } from '../../../../../../learning-components/content/tdf/clusterMapping';
 
 type MappingRecord = {
   mappingTable: number[];

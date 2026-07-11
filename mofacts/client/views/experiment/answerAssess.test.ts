@@ -1,6 +1,28 @@
 import { expect } from 'chai';
 import { Answers } from './answerAssess';
 
+function answerIsCorrect(
+  userInput: string,
+  answer: string,
+  originalAnswer: string,
+  displayedAnswer: string,
+  setspec: Record<string, unknown>,
+  normalization: { caseSensitive?: boolean; accentSensitive?: boolean } = {},
+) {
+  return Answers.answerIsCorrect({
+    userInput,
+    answer,
+    originalAnswer,
+    displayedAnswer,
+    editDistanceThreshold: setspec.lfparameter,
+    branchingEnabled: false,
+    allowPhoneticMatching: false,
+    checkOtherAnswers: false,
+    otherAnswers: [],
+    normalization,
+  });
+}
+
 describe('answerAssess', function() {
   it('accepts exact learner responses for every initial target language', async function() {
     const cases = [
@@ -17,7 +39,7 @@ describe('answerAssess', function() {
     ] as const;
 
     for (const [learnerAnswer, authoredAnswer] of cases) {
-      const result = await Answers.answerIsCorrect(
+      const result = await answerIsCorrect(
         learnerAnswer,
         authoredAnswer,
         authoredAnswer,
@@ -30,7 +52,7 @@ describe('answerAssess', function() {
   });
 
   it('matches answers without caring about accent marks', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       'él',
       'el',
       'el',
@@ -42,7 +64,7 @@ describe('answerAssess', function() {
   });
 
   it('matches composed and decomposed accents through answer assessment', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       'cafe\u0301',
       'café',
       'café',
@@ -54,7 +76,7 @@ describe('answerAssess', function() {
   });
 
   it('can require accent-sensitive matching when requested', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       'corazon',
       'corazón',
       'corazón',
@@ -67,7 +89,7 @@ describe('answerAssess', function() {
   });
 
   it('matches non-Latin responses exactly after Unicode normalization', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       'हृदय',
       'हृदय',
       'हृदय',
@@ -79,7 +101,7 @@ describe('answerAssess', function() {
   });
 
   it('matches Mandarin Chinese pipe-delimited alternatives without whitespace assumptions', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       '汉语',
       '中文|汉语',
       '中文|汉语',
@@ -91,21 +113,21 @@ describe('answerAssess', function() {
   });
 
   it('matches Bengali and right-to-left responses as literal Unicode text', async function() {
-    const bengali = await Answers.answerIsCorrect(
+    const bengali = await answerIsCorrect(
       'বাংলা',
       'বাংলা',
       'বাংলা',
       '',
       { lfparameter: 0 }
     );
-    const arabic = await Answers.answerIsCorrect(
+    const arabic = await answerIsCorrect(
       'قلب',
       'قلب',
       'قلب',
       '',
       { lfparameter: 0 }
     );
-    const urdu = await Answers.answerIsCorrect(
+    const urdu = await answerIsCorrect(
       'دل',
       'دل',
       'دل',
@@ -119,14 +141,14 @@ describe('answerAssess', function() {
   });
 
   it('supports accent policy for Portuguese answers', async function() {
-    const accentInsensitive = await Answers.answerIsCorrect(
+    const accentInsensitive = await answerIsCorrect(
       'acao',
       'ação',
       'ação',
       '',
       { lfparameter: 0 }
     );
-    const accentSensitive = await Answers.answerIsCorrect(
+    const accentSensitive = await answerIsCorrect(
       'acao',
       'ação',
       'ação',
@@ -140,7 +162,7 @@ describe('answerAssess', function() {
   });
 
   it('does not include the correct answer in the default incorrect feedback message', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       'Lyon',
       'Paris',
       'Paris',
@@ -162,7 +184,7 @@ describe('answerAssess', function() {
   });
 
   it('still matches pipe-delimited alternatives during answer evaluation', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       'Choong Moo 1',
       'Choong Moo one|Choong Moo 1',
       'Choong Moo one|Choong Moo 1',
@@ -174,7 +196,7 @@ describe('answerAssess', function() {
   });
 
   it('matches hyphenated pipe-delimited alternatives during answer evaluation', async function() {
-    const result = await Answers.answerIsCorrect(
+    const result = await answerIsCorrect(
       'Hwa-Rang one',
       'Hwa-Rang one|Hwa-Rang 1',
       'Hwa-Rang one|Hwa-Rang 1',

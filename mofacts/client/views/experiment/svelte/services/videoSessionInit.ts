@@ -2,7 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { meteorCallAsync } from '../../../../index';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
-import { extractDelimFields, rangeVal } from '../../../../lib/currentTestingHelpers';
+import { extractDelimFields, rangeVal } from '../../../../lib/runtimeValueHelpers';
 import { resolveDynamicAssetPath } from './mediaResolver';
 import { resolveVideoResumeAnchor } from './videoResume';
 import {

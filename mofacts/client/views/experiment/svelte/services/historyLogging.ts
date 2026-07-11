@@ -14,7 +14,7 @@ type UnderscoreLike = {
 const _ = underscore as unknown as UnderscoreLike;
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { getAudioPromptMode } from '../../../../lib/state/audioState';
-import { getStimCluster, getStimCount } from '../../../../lib/currentTestingHelpers';
+import { getStimCluster, getStimCount } from '../../../../lib/runtimeStimuli';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';

@@ -1,10 +1,8 @@
 import { expect } from 'chai';
-import {
-  getNestedStimulusClustersFromTdfFile,
-  getUserDisplayIdentifier,
-} from './currentTestingHelpers';
+import { getUserDisplayIdentifier } from './userIdentity';
+import { getNestedStimulusClustersFromTdfFile } from './runtimeStimuli';
 
-describe('currentTestingHelpers user identity', function() {
+describe('user identity', function() {
   it('prefers username when present', function() {
     const identifier = getUserDisplayIdentifier({
       username: 'student@example.com',
@@ -38,7 +36,7 @@ describe('currentTestingHelpers user identity', function() {
   });
 });
 
-describe('currentTestingHelpers nested stimulus clusters', function() {
+describe('runtime stimulus adapter', function() {
   it('builds runtime clusters from nested setspec clusters when available', function() {
     const clusters = getNestedStimulusClustersFromTdfFile({
       tdfFile: {

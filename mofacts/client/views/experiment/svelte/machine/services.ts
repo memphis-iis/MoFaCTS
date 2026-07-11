@@ -5,6 +5,7 @@
 
 import { DEFAULT_TIMINGS, LOG_PREFIXES } from './constants';
 import { Answers } from '../../answerAssess';
+import { getAllCurrentStimAnswers } from '../../../../lib/runtimeStimuli';
 import { Session } from 'meteor/session';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
@@ -78,6 +79,9 @@ interface AnswerEvaluationContext extends ServiceRecord {
   deliverySettings?: {
     caseSensitive?: boolean;
     accentSensitive?: boolean;
+    branchingEnabled?: boolean;
+    allowPhoneticMatching?: boolean;
+    checkOtherAnswers?: boolean;
   };
   tdfId?: unknown;
   userId?: unknown;
@@ -511,14 +515,18 @@ export async function evaluateAnswerService(context: AnswerEvaluationContext) {
     ? undefined
     : Session.get('currentTdfFile')?.tdfs?.tutor?.setspec);
 
-  const result = await Answers.answerIsCorrect(
-    userAnswer,
-    currentAnswer,
+  const result = await Answers.answerIsCorrect({
+    userInput: userAnswer,
+    answer: currentAnswer,
     originalAnswer,
-    '',
-    setspec,
-    { caseSensitive, accentSensitive }
-  );
+    displayedAnswer: '',
+    editDistanceThreshold: setspec?.lfparameter,
+    branchingEnabled: context.deliverySettings?.branchingEnabled === true,
+    allowPhoneticMatching: context.deliverySettings?.allowPhoneticMatching === true,
+    checkOtherAnswers: context.deliverySettings?.checkOtherAnswers === true,
+    otherAnswers: getAllCurrentStimAnswers(),
+    normalization: { caseSensitive, accentSensitive },
+  });
 
   return {
     isCorrect: !!result?.isCorrect,
