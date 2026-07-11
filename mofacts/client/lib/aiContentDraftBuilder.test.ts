@@ -95,8 +95,19 @@ describe('aiContentDraftBuilder', function() {
     });
 
     expect(sparcPage.pageId).to.equal('sparc-session-sparc-autotutor-krebs-tutor');
-    expect(display.schema).to.equal('tutorscript-sparc/1.0');
+    expect(display.schema).to.equal('tutorscript-sparc/2.0');
     expect(display.unitType).to.equal('sparc-autotutor-dialogue');
+    expect(display.instructionalController).to.deep.equal({
+      adapterId: 'sparc-autotutor-v1',
+      policyId: 'progressive-scaffolding-v1',
+      policyVersion: 1,
+      parameters: {
+        minimumProgress: 0.05,
+        progressResponse: 'deescalate',
+        nonAddressingResponse: 'hold',
+        postAssertionResponse: 'cycle-to-pump',
+      },
+    });
     expect(display.clusterTargets).to.deep.equal([
       {
         clusterIndex: 0,
@@ -124,17 +135,11 @@ describe('aiContentDraftBuilder', function() {
       },
     ]);
     expect(display.productionRules.map((rule: any) => rule.id)).to.deep.equal([
-      'dialogue.move.paper-rule-08-summary',
-      'dialogue.move.paper-rule-04-splice',
-      'dialogue.move.misconception-repair-splice',
-      'dialogue.move.paper-rule-06-hint',
-      'dialogue.move.paper-rule-07-hint',
-      'dialogue.move.paper-rule-09-elaborate',
-      'dialogue.move.paper-rule-03-positive-pump',
-      'dialogue.move.paper-rule-05-prompt',
-      'dialogue.move.paper-rule-01-pump',
-      'dialogue.move.paper-rule-02-pump',
-      'dialogue.move.generated-completion-summary',
+      'dialogue.completion.summary',
+      'dialogue.scaffold.pump',
+      'dialogue.scaffold.prompt',
+      'dialogue.scaffold.hint',
+      'dialogue.scaffold.assertion',
     ]);
     expect(JSON.stringify(draft.workingCopy)).not.to.contain('autotutorsession');
     expect(JSON.stringify(display.clusterTargets)).not.to.match(/sourceAutoTutor|stimulusKC|KCId|KCDefault|KCCluster/);

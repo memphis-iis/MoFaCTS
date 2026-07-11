@@ -16,7 +16,7 @@ import type {
 function authoredDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     initialState: [{
       target: {
         pageKey: 'doc-1',

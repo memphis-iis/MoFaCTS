@@ -19,7 +19,7 @@ import type { SparcAuthoredDocument, SparcInterfaceEvent } from './sparcSessionC
 function document(): SparcAuthoredDocument {
   return {
     id: 'sparc-dialogue-doc',
-    schemaVersion: 1,
+    schemaVersion: 2,
     root: {
       id: 'root',
       kind: 'document',

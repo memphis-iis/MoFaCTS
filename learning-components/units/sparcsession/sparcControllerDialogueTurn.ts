@@ -136,6 +136,9 @@ function assertCompletedDialogueReplayState(replayState: SparcReplayState | unde
       'learningTarget.score',
       'controller.selectedAction',
       'controller.completionState',
+      'instructionalTarget.active',
+      'instructionalFocus.episode',
+      'scaffold.state',
     ];
     if (!hasTutorUtterance(transition)) {
       throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing generated tutor utterance state`);
@@ -186,6 +189,15 @@ function stableFactIdentitySlots(fact: SparcWorkingMemoryFact): Readonly<Record<
   if (fact.factType === 'dialogue.completionSelected') {
     return {};
   }
+  if (fact.factType === 'instructionalTarget.active') {
+    return {};
+  }
+  if (fact.factType === 'instructionalFocus.episode') {
+    return {};
+  }
+  if (fact.factType === 'scaffold.state') {
+    return { focusEpisodeId: slots.focusEpisodeId };
+  }
   return {};
 }
 
@@ -198,13 +210,18 @@ function createStableControllerStateWrites(params: {
     pageKey: params.event.source.pageKey,
     nodeId: params.document.root.id,
   };
-  const selectedActionFacts = params.planning.productionRuleEvaluation.execution.firings
+  const assertedControllerFacts = params.planning.productionRuleEvaluation.execution.firings
     .flatMap((firing) => firing.persistentAssertedFacts)
-    .filter((fact) => fact.factType === 'controller.selectedAction');
+    .filter((fact) => fact.factType === 'controller.selectedAction' || fact.factType === 'scaffold.state');
+  const instructionalFacts = params.planning.productionRuleFacts.filter((fact) => (
+    fact.factType === 'instructionalTarget.active'
+    || fact.factType === 'instructionalFocus.episode'
+  ));
   const facts = [
     ...params.planning.targetSelection.facts,
     ...params.planning.derivedFacts,
-    ...selectedActionFacts,
+    ...instructionalFacts,
+    ...assertedControllerFacts,
   ];
   return facts.map((fact) => createSparcStableWorkingMemoryFactStateWrite({
     target,
@@ -305,7 +322,7 @@ export async function evaluateSparcControllerDialogueTurn(params: {
     ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
   });
   const moveSelectionAudit = auditSparcMoveSelection({
-    facts: planning.productionRuleEvaluation.execution.facts,
+    facts: planning.productionRuleEvaluation.execution.initialFacts,
     rules: params.document.productionRules ?? [],
   });
   const selectedUtteranceRequest = moveSelectionAudit.utteranceRequest

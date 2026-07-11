@@ -15,6 +15,8 @@ import type {
 import type {
   SparcUtteranceRequest,
 } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
+import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
+import type { SparcWorkingMemoryFact } from '../../../../../../learning-components/units/sparcsession/sparcSessionContracts';
 
 type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -53,10 +55,11 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
         properties: {
           clusterKC: { type: 'string' },
           coverage: { type: 'number' },
+          addressed: { type: 'boolean' },
           evidence: { type: 'string' },
           missingElements: { type: 'array', items: { type: 'string' } },
         },
-        required: ['clusterKC', 'coverage'],
+        required: ['clusterKC', 'coverage', 'addressed'],
       },
     },
     diagnosticMisconceptionScores: {
@@ -67,9 +70,10 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
         properties: {
           id: { type: 'string' },
           confidence: { type: 'number' },
+          addressed: { type: 'boolean' },
           evidence: { type: 'string' },
         },
-        required: ['id', 'confidence'],
+        required: ['id', 'confidence', 'addressed'],
       },
     },
     learnerContribution: {
@@ -122,6 +126,13 @@ function unitScore(value: unknown, label: string): number {
   return numberValue;
 }
 
+function requiredBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${label} must be a boolean`);
+  }
+  return value;
+}
+
 function stringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
@@ -140,9 +151,19 @@ function factSlot(fact: Record<string, unknown>, slotName: string): unknown {
   return isRecord(fact.slots) ? fact.slots[slotName] : undefined;
 }
 
-function priorCoverageByClusterKC(display: SparcControllerDisplay): Map<string, number> {
+function scoreFacts(
+  display: SparcControllerDisplay,
+  runtimeFacts?: readonly SparcWorkingMemoryFact[],
+): readonly Readonly<Record<string, unknown>>[] {
+  return runtimeFacts ?? displayFacts(display);
+}
+
+function priorCoverageByClusterKC(
+  display: SparcControllerDisplay,
+  runtimeFacts?: readonly SparcWorkingMemoryFact[],
+): Map<string, number> {
   const coverage = new Map<string, number>();
-  for (const fact of displayFacts(display)) {
+  for (const fact of scoreFacts(display, runtimeFacts)) {
     if (fact.factType !== 'learningTarget.score') {
       continue;
     }
@@ -158,9 +179,12 @@ function priorCoverageByClusterKC(display: SparcControllerDisplay): Map<string, 
   return coverage;
 }
 
-function priorMisconceptionConfidenceById(display: SparcControllerDisplay): Map<string, number> {
+function priorMisconceptionConfidenceById(
+  display: SparcControllerDisplay,
+  runtimeFacts?: readonly SparcWorkingMemoryFact[],
+): Map<string, number> {
   const confidence = new Map<string, number>();
-  for (const fact of displayFacts(display)) {
+  for (const fact of scoreFacts(display, runtimeFacts)) {
     if (fact.factType !== 'diagnostic.misconceptionScore') {
       continue;
     }
@@ -173,8 +197,11 @@ function priorMisconceptionConfidenceById(display: SparcControllerDisplay): Map<
   return confidence;
 }
 
-function targetSummaries(display: SparcControllerDisplay): readonly Record<string, unknown>[] {
-  const priorCoverage = priorCoverageByClusterKC(display);
+function targetSummaries(
+  display: SparcControllerDisplay,
+  runtimeFacts?: readonly SparcWorkingMemoryFact[],
+): readonly Record<string, unknown>[] {
+  const priorCoverage = priorCoverageByClusterKC(display, runtimeFacts);
   const cleanTargets = isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.expectations)
     ? display.autoTutorTargets.expectations
     : [];
@@ -207,8 +234,11 @@ function cleanMisconceptionEntries(display: SparcControllerDisplay): readonly un
   return [];
 }
 
-function misconceptionSummaries(display: SparcControllerDisplay): readonly Record<string, unknown>[] {
-  const priorConfidence = priorMisconceptionConfidenceById(display);
+function misconceptionSummaries(
+  display: SparcControllerDisplay,
+  runtimeFacts?: readonly SparcWorkingMemoryFact[],
+): readonly Record<string, unknown>[] {
+  const priorConfidence = priorMisconceptionConfidenceById(display, runtimeFacts);
   return cleanMisconceptionEntries(display)
     .filter(isRecord)
     .map((entry) => {
@@ -237,6 +267,7 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
       return {
         clusterKC: nonBlankString(entry.clusterKC),
         coverage: unitScore(entry.coverage, `SPARC dialogue score for "${String(entry.clusterKC)}"`),
+        addressed: requiredBoolean(entry.addressed, `SPARC dialogue addressed flag for "${String(entry.clusterKC)}"`),
         ...(evidence ? { evidence } : {}),
         ...(missingElements ? { missingElements } : {}),
       };
@@ -249,6 +280,7 @@ function parseScoreEnvelope(value: unknown): SparcLearnerResponseScoringResult {
     .map((entry) => ({
       id: nonBlankString(entry.id),
       confidence: unitScore(entry.confidence, `SPARC dialogue misconception confidence for "${String(entry.id)}"`),
+      addressed: requiredBoolean(entry.addressed, `SPARC dialogue misconception addressed flag for "${String(entry.id)}"`),
       ...(nonBlankString(entry.evidence) ? { evidence: nonBlankString(entry.evidence) } : {}),
     }))
     .filter((entry) => entry.id);
@@ -302,7 +334,7 @@ function parseUtteranceEnvelope(value: unknown, request: SparcUtteranceRequest):
 const SPARC_AUTOTUTOR_UTTERANCE_ENVELOPE_SCHEMA = Object.freeze({
   targetType: 'learningTarget | misconception | completion',
   targetId: 'string | null',
-  selectedMove: 'pump | positive_pump | prompt | hint | elaborate | splice | summary',
+  selectedMove: 'pump | prompt | hint | assertion | summary',
   tutorMessage: 'string',
 });
 
@@ -391,7 +423,8 @@ export function createSparcDialogueOpenRouterProvider(
 } {
   const callResolvedOpenRouterJson = options.callResolvedOpenRouterJson ?? defaultCallResolvedOpenRouterJson;
   return {
-    async scoreLearnerResponse({ display, learnerText }) {
+    async scoreLearnerResponse({ display, learnerText, document, replayState }) {
+      const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
       const result = await callResolvedOpenRouterJson({
         tdfId: options.tdfId ?? null,
         temperature: 0,
@@ -403,6 +436,7 @@ export function createSparcDialogueOpenRouterProvider(
             'Return only JSON matching the schema.',
             'For every object in learningTargets, write one object in learningTargetScores, copying learningTargets[i].clusterKC exactly to learningTargetScores[i].clusterKC.',
             'For every object in misconceptions, write one object in diagnosticMisconceptionScores, copying misconceptions[i].id exactly to diagnosticMisconceptionScores[i].id.',
+            'For every score, set addressed true only when the latest learner response substantively refers to that target meaning; otherwise set addressed false and preserve its prior score.',
             'Do not score the latest response from scratch.',
             'Compare meanings, not keyword overlap, and use continuous scores between 0 and 1 only when the latest learner response refers to the target meaning.',
             'Treat priorCoverage and priorConfidence as the current learner model; for each learning target or misconception, return its prior value unchanged unless the learner’s latest response refers to that target’s meaning and provides semantic evidence that the value should change.',
@@ -420,8 +454,8 @@ export function createSparcDialogueOpenRouterProvider(
           role: 'user',
           content: JSON.stringify({
             learnerText,
-            learningTargets: targetSummaries(display),
-            misconceptions: misconceptionSummaries(display),
+            learningTargets: targetSummaries(display, runtimeFacts),
+            misconceptions: misconceptionSummaries(display, runtimeFacts),
           }),
         }],
         intent: {

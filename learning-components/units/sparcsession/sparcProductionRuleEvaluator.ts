@@ -323,6 +323,12 @@ function isAnyCondition(
   return 'type' in pattern && pattern.type === 'any';
 }
 
+function isAllCondition(
+  pattern: SparcProductionRuleCondition,
+): pattern is Extract<SparcProductionRuleCondition, { type: 'all' }> {
+  return 'type' in pattern && pattern.type === 'all';
+}
+
 function collectBoundVariablesFromFactPattern(
   pattern: SparcFactPattern,
   variables: Set<string>,
@@ -346,6 +352,12 @@ function collectBoundVariablesFromCondition(
       for (const variable of collectBoundVariablesFromCondition(branch)) {
         variables.add(variable);
       }
+    }
+    return variables;
+  }
+  if (isAllCondition(condition)) {
+    for (const branch of condition.conditions) {
+      for (const variable of collectBoundVariablesFromCondition(branch)) variables.add(variable);
     }
     return variables;
   }
@@ -443,6 +455,10 @@ function collectReferencedVariablesFromCondition(
     }
     return;
   }
+  if (isAllCondition(condition)) {
+    for (const branch of condition.conditions) collectReferencedVariablesFromCondition(branch, variables);
+    return;
+  }
   collectReferencedVariablesFromFactPattern(condition, variables);
 }
 
@@ -521,6 +537,10 @@ function validateAnyConditionBindings(
   if (isNegatedPattern(condition)) {
     return;
   }
+  if (isAllCondition(condition)) {
+    for (const branch of condition.conditions) validateAnyConditionBindings(branch, ruleId, referencedOutside);
+    return;
+  }
   if (!isAnyCondition(condition)) {
     return;
   }
@@ -596,6 +616,13 @@ function validateConditionShape(
     }
     return;
   }
+  if (isAllCondition(condition)) {
+    if (!Array.isArray(condition.conditions) || condition.conditions.length === 0) {
+      throw new Error(`SPARC production rule "${ruleId}" all condition requires at least one condition`);
+    }
+    for (const branch of condition.conditions) validateConditionShape(branch, ruleId);
+    return;
+  }
   validateRangePatternsInFactPattern(condition, ruleId);
 }
 
@@ -620,6 +647,12 @@ function findPatternMatches(
     return head.conditions.flatMap((condition) => (
       findPatternMatches(factIndex, [condition, ...tail], bindings)
     ));
+  }
+  if (isAllCondition(head)) {
+    if (!Array.isArray(head.conditions) || head.conditions.length === 0) {
+      throw new Error('SPARC all production-rule condition requires at least one condition');
+    }
+    return findPatternMatches(factIndex, [...head.conditions, ...tail], bindings);
   }
   const matches: SparcRuleBindings[] = [];
   for (const fact of candidateFactsForPattern(head, factIndex)) {
@@ -961,6 +994,7 @@ export function runSparcProductionRules(params: {
 
     if (!nextFiring) {
       return {
+        initialFacts: params.facts,
         facts,
         firings,
         cycles: cycle - 1,
@@ -978,6 +1012,7 @@ export function runSparcProductionRules(params: {
     }
     if (nextFiring.terminatesProductionPhase) {
       return {
+        initialFacts: params.facts,
         facts,
         firings,
         cycles: cycle,

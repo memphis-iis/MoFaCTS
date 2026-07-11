@@ -17,7 +17,7 @@ const variable = (name: string): SparcRuleExpression => ({ type: 'variable', nam
 
 const document: SparcAuthoredDocument = {
   id: 'fractions-doc',
-  schemaVersion: 1,
+  schemaVersion: 2,
   workingMemoryFacts: [{
     factType: 'problem',
     slots: {

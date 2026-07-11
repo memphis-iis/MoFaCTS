@@ -14,14 +14,7 @@ import type {
   SparcInterfaceEvent,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
-
-function literal(value: unknown) {
-  return { type: 'literal' as const, value };
-}
-
-function variable(name: string) {
-  return { type: 'variable' as const, name };
-}
+import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 
 function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMemoryFact {
   return { factType, slots };
@@ -30,7 +23,13 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 function document(): SparcAuthoredDocument {
   return {
     id: 'sparc-dialogue-controller-doc',
-    schemaVersion: 1,
+    schemaVersion: 2,
+    instructionalController: {
+      adapterId: 'sparc-autotutor-v1',
+      policyId: 'progressive-scaffolding-v1',
+      policyVersion: 1,
+      parameters: { minimumProgress: 0.05 },
+    },
     workingMemoryFacts: [
       fact('controller.targetSelectionPolicy', {
         policy: 'kc-graph-priority',
@@ -41,8 +40,8 @@ function document(): SparcAuthoredDocument {
       }),
       fact('autotutor.expectation', { clusterKC: 'kc-a', text: 'Return to A.' }),
       fact('autotutor.expectation', { clusterKC: 'kc-b', text: 'Use the relationship between A and B.' }),
-      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
-      fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1 }),
+      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2, addressed: true }),
+      fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1, addressed: true }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.1, description: 'A' }),
       fact('kcGraph.node', { clusterKC: 'kc-b', centrality: 0.8, description: 'B' }),
       fact('kcGraph.relationship', { sourceClusterKC: 'kc-a', targetClusterKC: 'kc-b', strength: 0.9 }),
@@ -50,43 +49,7 @@ function document(): SparcAuthoredDocument {
       fact('dialogue.learnerWordCount', { cumulative: 2 }),
       fact('session.turnState', { turnCount: 1 }),
     ],
-    productionRules: [{
-      id: 'dialogue.move.test-hint',
-      module: 'dialogue.move-selection',
-      salience: 10,
-      when: [{
-        factType: 'learningTarget.selected',
-        slots: {
-          clusterKC: { type: 'bind', variable: 'targetClusterKC' },
-        },
-      }, {
-        factType: 'learningTarget.coverageMean',
-        slots: {
-          scope: { type: 'literal', value: 'required' },
-          value: { type: 'range', min: 0, max: 0.5 },
-        },
-      }, {
-        factType: 'dialogue.learnerWordCount',
-        slots: {
-          cumulative: { type: 'range', min: 5 },
-        },
-      }],
-      then: [{
-        type: 'assert-fact',
-        fact: {
-          factType: 'controller.selectedAction',
-          slots: {
-            targetType: literal('learningTarget'),
-            clusterKC: variable('targetClusterKC'),
-            action: literal('hint'),
-            sourceRuleId: literal('paper-rule-test-hint'),
-          },
-        },
-      }, {
-        type: 'terminate-production-phase',
-        reason: 'move-selected',
-      }],
-    }],
+    productionRules: createSparcProgressiveScaffoldingRules(),
     root: {
       id: 'root',
       kind: 'document',
@@ -119,7 +82,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       learnerResponseScore: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6,
+          coverage: 0.6, addressed: true,
         }],
       },
       targetSelectionOptions: {
@@ -127,22 +90,22 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
       generateTutorUtterance: (request) => {
         assert.equal(request.targetType, 'learningTarget');
-        assert.equal(request.targetId, 'kc-b');
-        assert.equal(request.action, 'hint');
-        assert.deepEqual(request.contentTexts, ['Use the relationship between A and B.']);
+        assert.equal(request.targetId, 'kc-a');
+        assert.equal(request.action, 'pump');
+        assert.deepEqual(request.contentTexts, ['Return to A.']);
         return { text: 'Think about how B depends on A.' };
       },
     });
 
-    assert.equal(result.planning.targetSelection.selectedClusterKC, 'kc-b');
+    assert.equal(result.planning.targetSelection.selectedClusterKC, 'kc-a');
     assert.ok(result.learnerResponseScoreFacts.some((fact) => (
       fact.factType === 'learningTarget.score'
       && fact.slots?.clusterKC === 'kc-b'
       && fact.slots.coverage === 0.6
     )));
-    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.move.test-hint');
-    assert.equal(result.moveSelectionAudit.selected?.action, 'hint');
-    assert.equal(result.utteranceRequest.action, 'hint');
+    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.scaffold.pump');
+    assert.equal(result.moveSelectionAudit.selected?.action, 'pump');
+    assert.equal(result.utteranceRequest.action, 'pump');
     assert.equal(result.tutorText, 'Think about how B depends on A.');
 
     const nodes = applySparcProgressiveNodeOperations(
@@ -151,7 +114,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     );
     assert.deepEqual(nodes.map((node) => (node as { speaker?: string }).speaker), ['learner', 'tutor']);
     assert.equal((nodes[1] as { value?: string }).value, 'Think about how B depends on A.');
-    assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'paper-rule-test-hint');
+    assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'dialogue.scaffold.pump');
   });
 
   it('commits the planned dialogue turn through canonical SPARC history', async function() {
@@ -170,7 +133,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       learnerResponseScore: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6,
+          coverage: 0.6, addressed: true,
         }],
       },
       targetSelectionOptions: {
@@ -198,16 +161,16 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     assert.ok(facts.some((entry) => (
       entry.factType === 'dialogue.utterance'
       && entry.slots?.speaker === 'tutor'
-      && entry.slots?.targetId === 'kc-b'
+      && entry.slots?.targetId === 'kc-a'
     )));
     assert.ok(facts.some((entry) => (
       entry.factType === 'learningTarget.selected'
-      && entry.slots?.clusterKC === 'kc-b'
+      && entry.slots?.clusterKC === 'kc-a'
     )));
     assert.ok(facts.some((entry) => (
       entry.factType === 'controller.selectedAction'
-      && entry.slots?.action === 'hint'
-      && entry.slots.clusterKC === 'kc-b'
+      && entry.slots?.action === 'pump'
+      && entry.slots.targetId === 'kc-a'
     )));
     assert.ok(facts.some((entry) => (
       entry.factType === 'session.turnState'
@@ -245,7 +208,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       learnerResponseScore: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6,
+          coverage: 0.6, addressed: true,
         }],
       },
       targetSelectionOptions: {
@@ -269,8 +232,11 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
       learnerResponseScore: {
         learningTargetScores: [{
+          clusterKC: 'kc-a',
+          coverage: 0.2, addressed: false,
+        }, {
           clusterKC: 'kc-b',
-          coverage: 0.7,
+          coverage: 0.7, addressed: true,
         }],
       },
       targetSelectionOptions: {
@@ -289,8 +255,8 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     assert.ok(secondTurn.transition.writes.some((write) => (
       write.value
       && typeof write.value === 'object'
-      && (write.value as { factType?: string; slots?: { clusterKC?: string } }).factType === 'controller.selectedAction'
-      && (write.value as { slots?: { clusterKC?: string } }).slots?.clusterKC === 'kc-a'
+      && (write.value as { factType?: string; slots?: { targetId?: string } }).factType === 'controller.selectedAction'
+      && (write.value as { slots?: { targetId?: string } }).slots?.targetId === 'kc-a'
     )));
   });
 });

@@ -108,7 +108,7 @@ describe('card payload builder helpers', function() {
     } satisfies UnitEngineLike;
 
     const sparcDisplay = {
-      schema: 'tutorscript-sparc/1.0',
+      schema: 'tutorscript-sparc/2.0',
       nodes: [{ id: 'node-1', nodeType: 'atomic', atomType: 'text-input', value: '' }],
       response: { gradingMode: 'node-intent', scoredNodes: ['node-1'], intentByNode: [{ node: 'node-1', expected: '2' }] },
     };

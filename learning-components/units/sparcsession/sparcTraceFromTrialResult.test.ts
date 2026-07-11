@@ -8,7 +8,7 @@ import { createSparcTraceFromTrialResult } from './sparcTraceFromTrialResult';
 
 function display(): SparcTrialDisplay {
   return sparcTrialDisplayAdapter.normalizeDisplay({
-    schema: 'tutorscript-sparc/1.0',
+    schema: 'tutorscript-sparc/2.0',
     nodes: [{
       id: 'node-1',
       nodeType: 'atomic',
@@ -79,7 +79,7 @@ describe('sparcTraceFromTrialResult', function() {
 
   it('selects among multiple authored trace links for the same node by submitted value', function() {
     const multiLinkDisplay = sparcTrialDisplayAdapter.normalizeDisplay({
-      schema: 'tutorscript-sparc/1.0',
+      schema: 'tutorscript-sparc/2.0',
       nodes: [{
         id: 'OV2',
         nodeType: 'atomic',

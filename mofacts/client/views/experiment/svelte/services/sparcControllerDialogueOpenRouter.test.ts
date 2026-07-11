@@ -3,6 +3,7 @@ import type { SparcControllerDisplay } from './sparcController';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import { createSparcDialogueOpenRouterProvider } from './sparcControllerDialogueOpenRouter.ts';
+import { createEmptySparcReplayState } from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
 
 function dialogueDisplay(): SparcControllerDisplay {
   return {
@@ -38,6 +39,31 @@ function dialogueDisplay(): SparcControllerDisplay {
         confidence: 0.7,
       },
     }],
+  };
+}
+
+function scorerContext() {
+  return {
+    document: {
+      id: 'dialogue-doc',
+      schemaVersion: 2 as const,
+      workingMemoryFacts: [{
+        factType: 'learningTarget.score',
+        slots: { clusterKC: 'kc-a', coverage: 0.4 },
+      }, {
+        factType: 'diagnostic.misconceptionScore',
+        slots: { id: 'mis-1', confidence: 0.7 },
+      }],
+      root: { id: 'root', kind: 'document' as const },
+    },
+    replayState: createEmptySparcReplayState(),
+    result: { submittedNodes: {}, timestamp: 1 },
+    event: {
+      eventId: 'score-event',
+      type: 'response-submitted' as const,
+      source: { pageKey: 'dialogue-doc', nodeId: 'learner-response-input' },
+      time: 1,
+    },
   };
 }
 
@@ -103,6 +129,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
             learningTargetScores: [{
               clusterKC: 'kc-a',
               coverage: 0.6,
+              addressed: true,
               evidence: 'mentions A',
               missingElements: ['detail'],
             }],
@@ -121,11 +148,13 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const score = await provider.scoreLearnerResponse({
       display: dialogueDisplay(),
       learnerText: 'I think A matters.',
+      ...scorerContext(),
     } as Parameters<typeof provider.scoreLearnerResponse>[0]);
 
     expect(score.learningTargetScores).to.deep.equal([{
       clusterKC: 'kc-a',
       coverage: 0.6,
+      addressed: true,
       evidence: 'mentions A',
       missingElements: ['detail'],
     }]);
@@ -186,6 +215,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       await provider.scoreLearnerResponse({
         display: dialogueDisplay(),
         learnerText: 'Can you explain A?',
+        ...scorerContext(),
       } as Parameters<typeof provider.scoreLearnerResponse>[0]);
     } catch (caught) {
       error = caught;

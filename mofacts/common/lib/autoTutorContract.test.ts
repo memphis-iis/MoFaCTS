@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 
 import { parseAutoTutorScoreEnvelope, parseAutoTutorUtteranceEnvelope, validateAutoTutorContent } from './autoTutorContract';
+import { createSparcProgressiveScaffoldingRules } from '../../../learning-components/units/sparcsession/sparcProgressiveScaffoldingRules';
 
 function buildValidTdf() {
   return {
@@ -116,8 +117,14 @@ function buildValidSparcAutoTutorStimuli() {
         {
           pageId: 'sparc-session-demo',
           display: {
-            schema: 'tutorscript-sparc/1.0',
+            schema: 'tutorscript-sparc/2.0',
             unitType: 'sparc-autotutor-dialogue',
+            instructionalController: {
+              adapterId: 'sparc-autotutor-v1',
+              policyId: 'progressive-scaffolding-v1',
+              policyVersion: 1,
+              parameters: { minimumProgress: 0.05 },
+            },
             nodes: [
               {
                 id: 'learner-response-input',
@@ -145,13 +152,7 @@ function buildValidSparcAutoTutorStimuli() {
                 },
               ],
             },
-            productionRules: [
-              {
-                id: 'dialogue.move.generated-completion-summary',
-                when: [{ factType: 'dialogue.completionSelected' }],
-                then: [],
-              },
-            ],
+            productionRules: createSparcProgressiveScaffoldingRules(),
           },
         },
       ],

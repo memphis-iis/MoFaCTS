@@ -47,7 +47,7 @@ const variable = (name: string): SparcRuleExpression => ({ type: 'variable', nam
 function baseDocument(productionRules: NonNullable<SparcAuthoredDocument['productionRules']>): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     initialState: [{
       target: feedbackAddress,
       key: 'visible',

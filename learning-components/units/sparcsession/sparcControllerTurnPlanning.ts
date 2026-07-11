@@ -1,9 +1,6 @@
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
-import { deriveSparcControllerFacts } from './sparcControllerDerivedFacts';
-import { deriveSparcActiveSelectorSignalFacts } from './sparcSelectorSignals';
 import { evaluateSparcAuthoredProductionRules, type SparcCommittedProductionRuleEvaluation } from './sparcProductionRuleCommit';
 import {
-  selectSparcLearningTargetFromFacts,
   type SparcLearningTargetSelection,
   type SparcLearningTargetSelectionOptions,
 } from './sparcTargetSelection';
@@ -13,6 +10,7 @@ import type {
   SparcInterfaceEvent,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { requireSparcInstructionalAdapter } from './sparcInstructionalAdapterRegistry';
 
 export type SparcControllerTurnPlanningResult = {
   readonly targetSelection: SparcLearningTargetSelection;
@@ -28,173 +26,11 @@ const CURRENT_CONTROLLER_FACT_TYPES = new Set([
   'controller.completionState',
   'controller.selectedAction',
   'controller.moveSelectionAudit',
+  'instructionalTarget.active',
+  'instructionalFocus.episode',
+  'learningObservation.targetProgress',
+  'scaffold.state',
 ]);
-
-function stringSlot(fact: SparcWorkingMemoryFact, slotName: string): string | undefined {
-  const value = fact.slots?.[slotName];
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function numericSlot(fact: SparcWorkingMemoryFact, slotName: string): number {
-  const value = Number(fact.slots?.[slotName]);
-  return Number.isFinite(value) ? value : 0;
-}
-
-function optionalNumericSlot(fact: SparcWorkingMemoryFact | undefined, slotName: string): number | undefined {
-  if (!fact) {
-    return undefined;
-  }
-  const rawValue = fact.slots?.[slotName];
-  if (rawValue === undefined || rawValue === null || rawValue === '') {
-    return undefined;
-  }
-  const value = Number(rawValue);
-  if (!Number.isFinite(value)) {
-    throw new Error(`SPARC fact "${fact.factType}" slot "${slotName}" must be a finite number`);
-  }
-  return value;
-}
-
-function nonNegativeIntegerSlot(fact: SparcWorkingMemoryFact, slotName: string, fallback: number): number {
-  const value = Number(fact.slots?.[slotName]);
-  if (!Number.isFinite(value) || value < 0) {
-    return fallback;
-  }
-  return Math.floor(value);
-}
-
-function completionState(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact | undefined {
-  return facts.find((fact) => fact.factType === 'controller.completionState');
-}
-
-function coverageThreshold(facts: readonly SparcWorkingMemoryFact[]): number {
-  return optionalNumericSlot(facts.find((fact) => fact.factType === 'dialogue.thresholds'), 'coverageThreshold')
-    ?? optionalNumericSlot(facts.find((fact) => fact.factType === 'controller.targetSelectionPolicy'), 'coverageThreshold')
-    ?? 0.8;
-}
-
-function hasRepairActiveMisconception(facts: readonly SparcWorkingMemoryFact[]): boolean {
-  const repairThreshold = Math.max(0, Math.min(1, 1 - coverageThreshold(facts)));
-  const authoredIds = new Set(facts
-    .filter((fact) => fact.factType === 'autotutor.misconception')
-    .map((fact) => stringSlot(fact, 'id'))
-    .filter(Boolean) as string[]);
-  if (authoredIds.size === 0) {
-    return false;
-  }
-  const latestConfidence = new Map<string, number>();
-  for (const fact of facts) {
-    if (fact.factType !== 'diagnostic.misconceptionScore') {
-      continue;
-    }
-    const id = stringSlot(fact, 'id');
-    if (id && authoredIds.has(id)) {
-      latestConfidence.set(id, numericSlot(fact, 'confidence'));
-    }
-  }
-  return [...latestConfidence.values()].some((confidence) => confidence >= repairThreshold);
-}
-
-function currentTurnCount(facts: readonly SparcWorkingMemoryFact[]): number {
-  return Math.max(0, ...facts
-    .filter((fact) => fact.factType === 'session.turnState')
-    .map((fact) => nonNegativeIntegerSlot(fact, 'turnCount', 0)));
-}
-
-function previousSelectedTarget(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact | undefined {
-  return facts.filter((fact) => fact.factType === 'learningTarget.selected').at(-1);
-}
-
-function selectedLearningTargetFact(clusterKC: string, facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact {
-  const previous = previousSelectedTarget(facts);
-  const focusContinues = stringSlot(previous ?? { factType: 'none' }, 'clusterKC') === clusterKC;
-  const turnCount = currentTurnCount(facts);
-  const previousFocusTurnCount = previous ? nonNegativeIntegerSlot(previous, 'focusTurnCount', 0) : 0;
-  const previousMoveCycleIndex = previous ? nonNegativeIntegerSlot(previous, 'moveCycleIndex', -1) : -1;
-  return {
-    factType: 'learningTarget.selected',
-    slots: {
-      clusterKC,
-      focusActive: true,
-      focusTurnCount: focusContinues ? previousFocusTurnCount + 1 : 0,
-      firstFocusTurn: focusContinues && previous ? nonNegativeIntegerSlot(previous, 'firstFocusTurn', turnCount) : turnCount,
-      moveCycleIndex: previousMoveCycleIndex + 1,
-    },
-  };
-}
-
-function selectCompletionSummaryTarget(facts: readonly SparcWorkingMemoryFact[]): SparcLearningTargetSelection {
-  const targets = facts
-    .filter((fact) => fact.factType === 'autotutor.expectation')
-    .map((fact) => stringSlot(fact, 'clusterKC'))
-    .filter(Boolean) as string[];
-  const uniqueTargets = [...new Set(targets)];
-  if (uniqueTargets.length === 0) {
-    throw new Error('SPARC completion target selection requires at least one clean autotutor.expectation fact');
-  }
-  const coverageByClusterKC = new Map<string, number>();
-  for (const fact of facts) {
-    if (fact.factType === 'learningTarget.score') {
-      const clusterKC = stringSlot(fact, 'clusterKC');
-      if (clusterKC) coverageByClusterKC.set(clusterKC, numericSlot(fact, 'coverage'));
-    }
-  }
-  const candidates = uniqueTargets
-    .map((clusterKC) => {
-      const coverage = coverageByClusterKC.get(clusterKC) ?? 0;
-      return {
-        clusterKC,
-        coverage,
-        coherenceToAnchor: 0,
-        frontierScore: 0,
-        centralityScore: 0,
-        priorityScore: coverage,
-        eligible: false,
-      };
-    })
-    .sort((left, right) => (
-      right.coverage - left.coverage
-      || left.clusterKC.localeCompare(right.clusterKC)
-    ));
-  const selected = candidates[0]!;
-  return {
-    selectedTargetType: 'learningTarget',
-    selectedClusterKC: selected.clusterKC,
-    misconceptionCandidates: [],
-    candidates,
-    facts: [
-      ...candidates.map((candidate) => ({
-        factType: 'learningTarget.candidate',
-        slots: {
-          clusterKC: candidate.clusterKC,
-          coverage: candidate.coverage,
-          coherenceToAnchor: candidate.coherenceToAnchor,
-          frontierScore: candidate.frontierScore,
-          centralityScore: candidate.centralityScore,
-          priorityScore: candidate.priorityScore,
-          eligible: candidate.eligible,
-        },
-      })),
-      selectedLearningTargetFact(selected.clusterKC, facts),
-      {
-        factType: 'dialogue.completionSelected',
-        slots: {
-          reason: stringSlot(completionState(facts)!, 'reason') ?? 'completed',
-        },
-      },
-    ],
-  };
-}
-
-function selectControllerTarget(params: {
-  readonly facts: readonly SparcWorkingMemoryFact[];
-  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
-}): SparcLearningTargetSelection {
-  if (completionState(params.facts)?.slots?.completed === true && !hasRepairActiveMisconception(params.facts)) {
-    return selectCompletionSummaryTarget(params.facts);
-  }
-  return selectSparcLearningTargetFromFacts(params.facts, params.targetSelectionOptions);
-}
 
 export function evaluateSparcControllerTurnPlanning(params: {
   readonly document: SparcAuthoredDocument;
@@ -210,23 +46,28 @@ export function evaluateSparcControllerTurnPlanning(params: {
     ...(params.replayState ? { replayState: params.replayState } : {}),
     ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
   });
-  const derivedFacts = deriveSparcControllerFacts(baseFacts);
-  const targetSelection = selectControllerTarget({
+  const adapter = requireSparcInstructionalAdapter(params.document.instructionalController);
+  const derivedFacts = adapter.deriveControllerFacts(baseFacts);
+  const targetSelection = adapter.selectTarget({
     facts: [
       ...baseFacts,
       ...derivedFacts,
     ],
-      ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+    ...(params.targetSelectionOptions ? { options: params.targetSelectionOptions } : {}),
   });
-  const selectorSignalFacts = deriveSparcActiveSelectorSignalFacts([
-    ...baseFacts,
-    ...derivedFacts,
-    ...targetSelection.facts,
-  ]);
+  const instructionalFacts = adapter.instantiateInstructionalFacts({
+    selection: targetSelection,
+    facts: [
+      ...baseFacts,
+      ...derivedFacts,
+      ...targetSelection.facts,
+    ],
+    config: params.document.instructionalController!,
+  });
   const productionRuleFacts = [
     ...targetSelection.facts,
     ...derivedFacts,
-    ...selectorSignalFacts,
+    ...instructionalFacts,
   ];
   const productionRuleEvaluation = evaluateSparcAuthoredProductionRules({
     document: params.document,

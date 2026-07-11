@@ -9,7 +9,7 @@ import type { SparcAuthoredDocument } from './sparcSessionContracts';
 function validDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     layout: {
       scrollAxis: 'vertical',
       visualPreset: 'assignment',

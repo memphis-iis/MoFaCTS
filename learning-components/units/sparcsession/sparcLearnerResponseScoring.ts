@@ -10,6 +10,7 @@ import type {
 export type SparcLearningTargetScoreInput = {
   readonly clusterKC: string;
   readonly coverage: number;
+  readonly addressed: boolean;
   readonly evidence?: string;
   readonly missingElements?: readonly string[];
 };
@@ -17,6 +18,7 @@ export type SparcLearningTargetScoreInput = {
 export type SparcDiagnosticMisconceptionScoreInput = {
   readonly id: string;
   readonly confidence: number;
+  readonly addressed: boolean;
   readonly evidence?: string;
 };
 
@@ -47,6 +49,13 @@ function requireUnitScore(value: unknown, label: string): number {
     throw new Error(`${label} must be a number from 0 to 1`);
   }
   return numberValue;
+}
+
+function requireBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${label} must be a boolean`);
+  }
+  return value;
 }
 
 function stringSlot(fact: SparcWorkingMemoryFact, slotName: string): string {
@@ -94,6 +103,7 @@ function learningTargetScoreFact(params: {
     slots: {
       clusterKC,
       coverage,
+      addressed: requireBoolean(params.input.addressed, `SPARC learning target score "${clusterKC}" addressed`),
       ...(params.input.evidence ? { evidence: params.input.evidence } : {}),
       ...(params.input.missingElements ? { missingElements: params.input.missingElements } : {}),
     },
@@ -107,6 +117,7 @@ function misconceptionScoreFact(input: SparcDiagnosticMisconceptionScoreInput): 
     slots: {
       id,
       confidence: requireUnitScore(input.confidence, `SPARC diagnostic misconception score "${id}" confidence`),
+      addressed: requireBoolean(input.addressed, `SPARC diagnostic misconception score "${id}" addressed`),
       ...(input.evidence ? { evidence: input.evidence } : {}),
     },
   };

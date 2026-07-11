@@ -33,10 +33,13 @@ import type {
   SparcClusterModelTarget,
   SparcProductionRule,
   SparcInterfaceEvent,
+  SparcInstructionalControllerConfig,
   SparcStateWrite,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
 import type { SparcLearningTargetSelectionOptions } from './sparcTargetSelection';
+import { assertSparcInstructionalControllerConfig } from './sparcInstructionalControl';
+import { assertCanonicalSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 
 type DisplayNodeRecord = {
   readonly id?: unknown;
@@ -270,12 +273,42 @@ function normalizeClusterTargets(display: SparcTrialDisplay): readonly SparcClus
     });
 }
 
+function normalizeInstructionalController(
+  display: SparcTrialDisplay,
+): SparcInstructionalControllerConfig | undefined {
+  if (!isRecord(display.instructionalController)) {
+    return undefined;
+  }
+  const config: SparcInstructionalControllerConfig = {
+    adapterId: requireNonBlank(
+      display.instructionalController.adapterId,
+      'SPARC instructionalController.adapterId',
+    ),
+    policyId: requireNonBlank(
+      display.instructionalController.policyId,
+      'SPARC instructionalController.policyId',
+    ),
+    policyVersion: requireOptionalClusterIndex(
+      display.instructionalController.policyVersion,
+      'SPARC instructionalController.policyVersion',
+    ),
+    ...(isRecord(display.instructionalController.parameters)
+      ? { parameters: display.instructionalController.parameters }
+      : {}),
+  };
+  return config;
+}
+
 export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   readonly pageKey: string;
   readonly display: SparcTrialDisplay;
 }): SparcAuthoredDocument {
   const display = sparcTrialDisplayAdapter.normalizeDisplay(params.display);
+  if (display.schema !== 'tutorscript-sparc/2.0') {
+    throw new Error('SPARC display.schema must be tutorscript-sparc/2.0');
+  }
   const autoTutorTargets = normalizeCleanAutoTutorTargets(display);
+  const instructionalController = normalizeInstructionalController(display);
   if (display.unitType === 'sparc-autotutor-dialogue' || autoTutorTargets) {
     assertNoForbiddenAutoTutorTargetSchema({
       workingMemoryFacts: display.workingMemoryFacts,
@@ -286,6 +319,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     if (!autoTutorTargets || autoTutorTargets.expectations.length === 0) {
       throw new Error('SPARC AutoTutor content requires clean expectation targets');
     }
+    assertSparcInstructionalControllerConfig(instructionalController);
   }
   const authoredFacts = Array.isArray(display.workingMemoryFacts)
     ? display.workingMemoryFacts as readonly SparcWorkingMemoryFact[]
@@ -299,18 +333,22 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   const directProductionRules = Array.isArray(display.productionRules)
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
+  if (display.unitType === 'sparc-autotutor-dialogue') {
+    assertCanonicalSparcProgressiveScaffoldingRules(directProductionRules);
+  }
   const initialState = Array.isArray(display.initialState)
     ? display.initialState as readonly SparcStateWrite[]
     : [];
   return {
     id: requireNonBlank(params.pageKey, 'SPARC document id'),
-    schemaVersion: 1,
+    schemaVersion: 2,
     layout: {
       scrollAxis: 'vertical',
       layoutMode: 'document',
     },
     clusterTargets: normalizeClusterTargets(display),
     ...(autoTutorTargets ? { autoTutorTargets } : {}),
+    ...(instructionalController ? { instructionalController } : {}),
     ...(initialState.length > 0 ? { initialState } : {}),
     workingMemoryFacts: authoredFacts,
     ...(derivedFacts.length > 0 ? { derivedFacts } : {}),

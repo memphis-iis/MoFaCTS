@@ -40,6 +40,10 @@ function selectedActionFact(firing: SparcProductionRuleFiring | undefined): Spar
 }
 
 function selectedActionTargetId(fact: SparcWorkingMemoryFact | undefined): string | undefined {
+  const generalTargetId = fact ? stringSlot(fact, 'targetId') : undefined;
+  if (generalTargetId) {
+    return generalTargetId;
+  }
   const targetType = fact ? stringSlot(fact, 'targetType') : undefined;
   if (targetType === 'learningTarget') {
     return fact ? stringSlot(fact, 'clusterKC') : undefined;
@@ -114,6 +118,7 @@ export function auditSparcMoveSelection(params: {
         facts: params.facts,
         selectedAction,
       });
+      const rejectionReason = 'reason' in validation ? validation.reason : undefined;
       return {
         ruleId: firing.ruleId,
         salience: salienceById.get(firing.ruleId) ?? 0,
@@ -124,7 +129,7 @@ export function auditSparcMoveSelection(params: {
         terminal: firing.terminatesProductionPhase,
         ...(firing.terminalReason ? { terminalReason: firing.terminalReason } : {}),
         valid: validation.valid,
-        ...(!validation.valid ? { rejectionReason: validation.reason } : {}),
+        ...(rejectionReason ? { rejectionReason } : {}),
       };
     })
     .sort((left, right) => (

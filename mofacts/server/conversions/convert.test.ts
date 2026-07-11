@@ -91,7 +91,7 @@ describe('stimuli response Unicode handling', function() {
                 {
                   display: {
                     type: 'sparc',
-                    schema: 'tutorscript-sparc/1.0',
+                    schema: 'tutorscript-sparc/2.0',
                     nodes: [],
                     response: {
                       gradingMode: 'node-intent',
@@ -111,7 +111,7 @@ describe('stimuli response Unicode handling', function() {
     expect(formatted[0].correctResponse).to.equal('__SPARC_COMPLETED__');
     expect(formatted[0].display).to.deep.equal({
       type: 'sparc',
-      schema: 'tutorscript-sparc/1.0',
+      schema: 'tutorscript-sparc/2.0',
       nodes: [],
       response: {
         gradingMode: 'node-intent',

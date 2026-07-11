@@ -30,7 +30,7 @@ const explicitTarget: SparcModelTargetIdentity = {
 function authoredDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     root: {
       id: 'root',
       kind: 'document',

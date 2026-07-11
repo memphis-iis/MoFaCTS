@@ -12,6 +12,7 @@ import { normalizeAttribution, validateAiOutput, validateAutoTutorOutput } from 
 import {
   buildCanonicalSparcAutoTutorProductionRules,
   SPARC_AUTOTUTOR_CALCULATE_PROBABILITY,
+  SPARC_AUTOTUTOR_INSTRUCTIONAL_CONTROLLER,
 } from './sparcAutoTutorDraftTemplate';
 
 function promptTextFromItem(item: AiItem): string {
@@ -139,8 +140,9 @@ export function buildAutoTutorDraft(output: ReturnType<typeof validateAutoTutorO
           pageId,
           display: {
             type: 'sparc',
-            schema: 'tutorscript-sparc/1.0',
+            schema: 'tutorscript-sparc/2.0',
             unitType: 'sparc-autotutor-dialogue',
+            instructionalController: SPARC_AUTOTUTOR_INSTRUCTIONAL_CONTROLLER,
             layout: {
               layoutMode: 'document',
               scrollAxis: 'vertical',

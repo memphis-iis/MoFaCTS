@@ -23,7 +23,7 @@ export type SparcAuthoringCatalogEntry = {
 };
 
 export type SparcAuthoringCatalog = {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly source: 'sparc-authoring-catalog';
   readonly nodeEntries: readonly SparcAuthoringCatalogEntry[];
   readonly groupEntries: readonly SparcAuthoringCatalogEntry[];
@@ -1105,6 +1105,22 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
     },
   },
 }, {
+  id: 'rule.condition.all',
+  label: 'All condition',
+  category: 'production-rule-condition',
+  description: 'AND condition that matches when every nested production-rule condition matches in sequence.',
+  schema: {
+    type: 'object',
+    required: ['type', 'conditions'],
+    properties: {
+      type: { const: 'all' },
+      conditions: {
+        type: 'array',
+        items: { description: 'Nested fact-pattern, negated fact-pattern, any condition, or all condition.' },
+      },
+    },
+  },
+}, {
   id: 'rule.test.comparison',
   label: 'Bound-variable comparison test',
   category: 'production-rule-test',
@@ -1283,7 +1299,7 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
 }] as const;
 
 export const SPARC_AUTHORING_CATALOG: SparcAuthoringCatalog = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   source: 'sparc-authoring-catalog',
   nodeEntries: SPARC_ATOMIC_NODE_CATALOG,
   groupEntries: SPARC_GROUP_NODE_CATALOG,

@@ -17,12 +17,12 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 
 const document: SparcAuthoredDocument = {
   id: 'score-doc',
-  schemaVersion: 1,
+  schemaVersion: 2,
   workingMemoryFacts: [
     fact('autotutor.expectation', { clusterKC: 'kc-a' }),
     fact('autotutor.expectation', { clusterKC: 'kc-b' }),
-    fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
-    fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1 }),
+    fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4, addressed: true }),
+    fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1, addressed: true }),
   ],
   root: {
     id: 'root',
@@ -54,15 +54,15 @@ describe('sparcLearnerResponseScoring', function() {
       score: {
         learningTargetScores: [{
           clusterKC: 'kc-a',
-          coverage: 0.3,
+          coverage: 0.3, addressed: true,
           evidence: 'Partial evidence.',
         }, {
           clusterKC: 'kc-b',
-          coverage: 0.6,
+          coverage: 0.6, addressed: true,
         }],
         diagnosticMisconceptionScores: [{
           id: 'm1',
-          confidence: 0.7,
+          confidence: 0.7, addressed: true,
         }],
         learnerContribution: {
           type: 'answer',
@@ -135,7 +135,7 @@ describe('sparcLearnerResponseScoring', function() {
       score: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6,
+          coverage: 0.6, addressed: true,
         }],
       },
     });
@@ -159,7 +159,7 @@ describe('sparcLearnerResponseScoring', function() {
         score: {
           learningTargetScores: [{
             clusterKC: 'kc-missing',
-            coverage: 0.5,
+            coverage: 0.5, addressed: true,
           }],
         },
       }),
@@ -174,7 +174,7 @@ describe('sparcLearnerResponseScoring', function() {
         score: {
           diagnosticMisconceptionScores: [{
             id: 'm1',
-            confidence: 1.2,
+            confidence: 1.2, addressed: true,
           }],
         },
       }),

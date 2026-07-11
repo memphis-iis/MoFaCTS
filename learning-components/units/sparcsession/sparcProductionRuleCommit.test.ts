@@ -25,7 +25,7 @@ const fn = (
 
 const document: SparcAuthoredDocument = {
   id: 'fractions-doc',
-  schemaVersion: 1,
+  schemaVersion: 2,
   workingMemoryFacts: [{
     factType: 'problem',
     slots: {
@@ -278,7 +278,7 @@ describe('sparcProductionRuleCommit', function() {
     const writtenRecords: unknown[] = [];
     const controllerDocument: SparcAuthoredDocument = {
       id: 'controller-doc',
-      schemaVersion: 1,
+      schemaVersion: 2,
       workingMemoryFacts: [{
         factType: 'learningTarget.selected',
         slots: {
@@ -367,7 +367,7 @@ describe('sparcProductionRuleCommit', function() {
   it('rehydrates asserted working-memory facts for later production-rule events', async function() {
     const crossEventDocument: SparcAuthoredDocument = {
       id: 'fractions-doc',
-      schemaVersion: 1,
+      schemaVersion: 2,
       workingMemoryFacts: [{
         factType: 'problem',
         slots: {
@@ -514,7 +514,7 @@ describe('sparcProductionRuleCommit', function() {
   it('uses asserted fact identity slots to replace stale branch state before later rules fire', async function() {
     const branchDocument: SparcAuthoredDocument = {
       id: 'fractions-doc',
-      schemaVersion: 1,
+      schemaVersion: 2,
       workingMemoryFacts: [{
         factType: 'problem',
         slots: {
@@ -806,7 +806,7 @@ describe('sparcProductionRuleCommit', function() {
     const writtenRecords: unknown[] = [];
     const modelPracticeDocument: SparcAuthoredDocument = {
       id: 'fractions-doc',
-      schemaVersion: 1,
+      schemaVersion: 2,
       clusterTargets: [{
         clusterIndex: 0,
         stimuliSetId: 'stim-set-1',

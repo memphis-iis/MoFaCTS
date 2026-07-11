@@ -4,14 +4,7 @@ import { commitSparcTrialDisplayControllerDialogueTurn } from './sparcTrialDispl
 import type { SparcTrialDisplay } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
-
-function literal(value: unknown) {
-  return { type: 'literal' as const, value };
-}
-
-function variable(name: string) {
-  return { type: 'variable' as const, name };
-}
+import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 
 function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMemoryFact {
   return { factType, slots };
@@ -20,6 +13,14 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 function dialogueDisplay(): SparcTrialDisplay {
   return {
     pageKey: 'dialogue-doc',
+    schema: 'tutorscript-sparc/2.0',
+    unitType: 'sparc-autotutor-dialogue',
+    instructionalController: {
+      adapterId: 'sparc-autotutor-v1',
+      policyId: 'progressive-scaffolding-v1',
+      policyVersion: 1,
+      parameters: { minimumProgress: 0.05 },
+    },
     nodes: [{
       id: 'dialogue-thread',
       nodeType: 'group',
@@ -63,32 +64,7 @@ function dialogueDisplay(): SparcTrialDisplay {
       }],
       misconceptions: [],
     },
-    productionRules: [{
-      id: 'dialogue.move.test-hint',
-      module: 'dialogue.move-selection',
-      salience: 10,
-      when: [{
-        factType: 'learningTarget.selected',
-        slots: {
-          clusterKC: { type: 'bind', variable: 'targetClusterKC' },
-        },
-      }],
-      then: [{
-        type: 'assert-fact',
-        persist: true,
-        fact: {
-          factType: 'controller.selectedAction',
-          slots: {
-            targetType: literal('learningTarget'),
-            clusterKC: variable('targetClusterKC'),
-            action: literal('hint'),
-          },
-        },
-      }, {
-        type: 'terminate-production-phase',
-        reason: 'move-selected',
-      }],
-    }],
+    productionRules: [...createSparcProgressiveScaffoldingRules()],
     clusterTargets: [{
       clusterIndex: 0,
       clusterKC: 'kc-a',
@@ -132,10 +108,10 @@ describe('SPARC trial display controller dialogue bridge', function() {
         return {
           learningTargetScores: [{
             clusterKC: 'kc-a',
-            coverage: 0.2,
+            coverage: 0.2, addressed: true,
           }, {
             clusterKC: 'kc-b',
-            coverage: 0.1,
+            coverage: 0.1, addressed: true,
           }],
         };
       },
@@ -154,7 +130,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
     assert.equal(result.learnerText, 'Here is my partial answer.');
     assert.equal(result.event.source.nodeId, 'learner-response-input');
     assert.equal(generatorTargetId, 'kc-b');
-    assert.equal(result.dialogueTurn.utteranceRequest.action, 'hint');
+    assert.equal(result.dialogueTurn.utteranceRequest.action, 'pump');
     assert.equal(historyRecords.length, 1);
     assert.equal(historyRecords[0]?.action, 'sparc-dialogue-turn');
 
@@ -196,10 +172,10 @@ describe('SPARC trial display controller dialogue bridge', function() {
       scoreLearnerResponse: () => ({
         learningTargetScores: [{
           clusterKC: 'kc-a',
-          coverage: 0.2,
+          coverage: 0.2, addressed: true,
         }, {
           clusterKC: 'kc-b',
-          coverage: 0.1,
+          coverage: 0.1, addressed: true,
         }],
       }),
       generateTutorUtterance: (request) => request.contentTexts[0]!,
@@ -240,7 +216,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         return {
           learningTargetScores: [{
             clusterKC: 'kc-b',
-            coverage: 0.9,
+            coverage: 0.9, addressed: true,
           }],
         };
       },

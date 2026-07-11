@@ -9,7 +9,7 @@ import type { SparcAuthoredDocument } from './sparcSessionContracts';
 function sampleDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     root: {
       id: 'root',
       kind: 'document',
@@ -107,7 +107,7 @@ describe('sparcDocumentAddressing', function() {
   it('validates authored reference state keys and model metrics', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       root: {
         id: 'root',
         kind: 'document',
@@ -148,7 +148,7 @@ describe('sparcDocumentAddressing', function() {
   it('validates authored initial-state write targets', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       initialState: [{
         target: {
           pageKey: 'doc-1',
@@ -177,7 +177,7 @@ describe('sparcDocumentAddressing', function() {
   it('validates authored initial-state write keys', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       initialState: [{
         target: {
           pageKey: 'doc-1',
@@ -206,7 +206,7 @@ describe('sparcDocumentAddressing', function() {
   it('validates authored model targets against their authored address', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       root: {
         id: 'root',
         kind: 'document',
@@ -242,7 +242,7 @@ describe('sparcDocumentAddressing', function() {
   it('validates authored model target shared identity consistency', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       root: {
         id: 'root',
         kind: 'document',
@@ -274,7 +274,7 @@ describe('sparcDocumentAddressing', function() {
   it('allows authored model targets that name the authored node directly', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       root: {
         id: 'root',
         kind: 'document',
@@ -308,7 +308,7 @@ describe('sparcDocumentAddressing', function() {
   it('rejects authored model targets that name another authored node', function() {
     const document: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       root: {
         id: 'root',
         kind: 'document',
@@ -353,7 +353,7 @@ describe('sparcDocumentAddressing', function() {
   it('fails clearly when authored node ids are duplicated', function() {
     const document: SparcAuthoredDocument = {
       id: 'dup-doc',
-      schemaVersion: 1,
+      schemaVersion: 2,
       root: {
         id: 'root',
         kind: 'document',

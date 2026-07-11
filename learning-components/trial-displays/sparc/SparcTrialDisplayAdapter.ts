@@ -61,6 +61,12 @@ export interface SparcTrialDisplay {
   pageKey?: string;
   pageId?: string;
   schema?: string;
+  instructionalController?: {
+    adapterId?: string;
+    policyId?: string;
+    policyVersion?: number;
+    parameters?: Record<string, unknown>;
+  };
   layout?: {
     zones?: SparcLayoutZone[];
     [key: string]: unknown;

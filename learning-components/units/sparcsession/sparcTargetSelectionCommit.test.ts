@@ -27,7 +27,7 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 function document(): SparcAuthoredDocument {
   return {
     id: 'sparc-doc',
-    schemaVersion: 1,
+    schemaVersion: 2,
     workingMemoryFacts: [
       fact('controller.targetSelectionPolicy', {
         policy: 'kc-graph-priority',

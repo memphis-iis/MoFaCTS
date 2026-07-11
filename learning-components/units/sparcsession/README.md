@@ -115,6 +115,16 @@ cells and rehydrated into facts on later events, so a rule can infer model state
 such as an active common denominator and a later rule can match that inferred
 state without making it a visible document node. Interface effects remain
 explicit addressed node writes.
+SPARC 2.0 is a clean authored/runtime contract cutover. Trial displays must use
+`tutorscript-sparc/2.0`; the runtime does not translate v1 displays or histories.
+AutoTutor pages explicitly select the `sparc-autotutor-v1` adapter and author
+the `progressive-scaffolding-v1` productions. The adapter converts expectations,
+misconceptions, and semantic scores into general `instructionalTarget.active`,
+`learningObservation.targetProgress`, `instructionalFocus.episode`, and
+`scaffold.state` facts. The same four authored Pump, Prompt, Hint, and Assertion
+rules then operate without target-kind branches. Focus and scaffold state are
+stable replayed facts, while progress is turn-scoped and always positive in the
+direction of target resolution.
 Stoichiometry content uses the same mechanism with authored `chemistry-field`
 facts: rules derive accepted conversion values, units, cancellation, and result
 values from problem facts and prior completed-field facts, while BRD-derived

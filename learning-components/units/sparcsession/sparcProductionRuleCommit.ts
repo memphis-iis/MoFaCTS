@@ -100,7 +100,7 @@ function patternForCondition(condition: SparcProductionRuleCondition): SparcFact
   if ('type' in condition && condition.type === 'not') {
     return condition.pattern;
   }
-  if ('type' in condition && condition.type === 'any') {
+  if ('type' in condition && (condition.type === 'any' || condition.type === 'all')) {
     return null;
   }
   return condition as SparcFactPattern;

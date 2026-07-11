@@ -20,8 +20,11 @@ describe('SPARC move definitions', function() {
     assert.ok(hint.promptPolicy.includes('clue'));
   });
 
-  it('keeps feedback-labeled paper moves registered but disabled for active selection', function() {
-    const legacyMoveIds = [
+  it('does not register retired SPARC move primitives', function() {
+    const retiredMoveIds = [
+      'positive_pump',
+      'elaborate',
+      'splice',
       'positive_feedback',
       'neutral_feedback',
       'negative_feedback',
@@ -29,13 +32,19 @@ describe('SPARC move definitions', function() {
       'negative_neutral_feedback',
     ];
 
-    for (const moveId of legacyMoveIds) {
-      assert.equal(getSparcMoveDefinition(moveId)?.status, 'legacy-disabled');
+    for (const moveId of retiredMoveIds) {
+      assert.equal(getSparcMoveDefinition(moveId), undefined);
       assert.throws(
         () => requireActiveSparcMoveDefinition(moveId),
-        new RegExp(`selected move "${moveId}" is registered as legacy-disabled`),
+        new RegExp(`selected move "${moveId}" has no registered move definition`),
       );
     }
+  });
+
+  it('registers assertion as the direct-content scaffold stage', function() {
+    const assertion = requireActiveSparcMoveDefinition('assertion');
+    assert.equal(assertion.status, 'active');
+    assert.ok(assertion.promptPolicy.includes('state the missing expectation content'));
   });
 
   it('uses unique move ids and prompt ids', function() {

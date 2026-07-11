@@ -8,7 +8,7 @@ import {
 describe('sparcDisplayContentReadiness', function() {
   it('accepts a node-authored SPARC display with layout zones and scored intents', function() {
     const display = sparcTrialDisplayAdapter.normalizeDisplay({
-      schema: 'tutorscript-sparc/1.0',
+      schema: 'tutorscript-sparc/2.0',
       layout: {
         zones: [{
           id: 'workspace',

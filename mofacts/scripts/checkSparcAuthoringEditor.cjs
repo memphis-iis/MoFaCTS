@@ -221,7 +221,7 @@ function assertProductionRuleValidation() {
 function assertClusterResolution() {
   const document = {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     clusterTargets: [{
       clusterIndex: 0,
       stimuliSetId: 'set-a',

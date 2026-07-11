@@ -8,13 +8,14 @@ import {
   evaluateSparcTrialDisplayProductionRuleEvents,
 } from './sparcTrialDisplayRuntimeBridge';
 import type { SparcRuleExpression } from './sparcSessionContracts';
+import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 
 const literal = (value: unknown): SparcRuleExpression => ({ type: 'literal', value });
 const variable = (name: string): SparcRuleExpression => ({ type: 'variable', name });
 
 function display(): SparcTrialDisplay {
   return {
-    schema: 'tutorscript-sparc/1.0',
+    schema: 'tutorscript-sparc/2.0',
     nodes: [{
       id: 'node-term-1-num-units',
       nodeType: 'atomic',
@@ -115,7 +116,7 @@ function display(): SparcTrialDisplay {
 function unsupportedAuthoredRulesDisplay(): SparcTrialDisplay {
   return {
     pageKey: 'sparc-fractions-addition',
-    schema: 'tutorscript-sparc/1.0',
+    schema: 'tutorscript-sparc/2.0',
     nodes: [{
       id: 'node-known-1-equivalent-bottom',
       nodeType: 'atomic',
@@ -162,6 +163,19 @@ const core = {
 };
 
 describe('sparcTrialDisplayRuntimeBridge', function() {
+  it('rejects SPARC v1 displays without a runtime migration path', function() {
+    assert.throws(
+      () => createSparcAuthoredDocumentFromTrialDisplay({
+        pageKey: 'v1-page',
+        display: {
+          schema: 'tutorscript-sparc/1.0',
+          nodes: [{ id: 'content', nodeType: 'atomic', atomType: 'text-block' }],
+        },
+      }),
+      /display\.schema must be tutorscript-sparc\/2\.0/,
+    );
+  });
+
   it('creates an authored document carrying display production rules and facts', function() {
     const document = createSparcAuthoredDocumentFromTrialDisplay({
       pageKey: 'doc-1',
@@ -182,7 +196,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     const document = createSparcAuthoredDocumentFromTrialDisplay({
       pageKey: 'fraction-doc',
       display: {
-        schema: 'tutorscript-sparc/1.0',
+        schema: 'tutorscript-sparc/2.0',
         nodes: [{
           id: 'fraction-one',
           nodeType: 'group',
@@ -383,7 +397,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
       pageKey: 'fraction-doc',
       display: {
-        schema: 'tutorscript-sparc/1.0',
+        schema: 'tutorscript-sparc/2.0',
         nodes: [{
           id: 'fraction-one',
           nodeType: 'group',
@@ -426,7 +440,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       () => createSparcAuthoredDocumentFromTrialDisplay({
         pageKey: 'doc-1',
         display: {
-          schema: 'tutorscript-sparc/1.0',
+          schema: 'tutorscript-sparc/2.0',
           nodes: [{
             id: 'node-with-bad-attachment',
             nodeType: 'atomic',
@@ -580,7 +594,14 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       pageKey: 'sparc-autotutor-clean',
       display: {
         pageKey: 'sparc-autotutor-clean',
+        schema: 'tutorscript-sparc/2.0',
         unitType: 'sparc-autotutor-dialogue',
+        instructionalController: {
+          adapterId: 'sparc-autotutor-v1',
+          policyId: 'progressive-scaffolding-v1',
+          policyVersion: 1,
+        },
+        productionRules: [...createSparcProgressiveScaffoldingRules()],
         nodes: [{
           id: 'learner-response-input',
           nodeType: 'atomic',
@@ -638,7 +659,14 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         pageKey: 'sparc-autotutor-legacy',
         display: {
           pageKey: 'sparc-autotutor-legacy',
+          schema: 'tutorscript-sparc/2.0',
           unitType: 'sparc-autotutor-dialogue',
+          instructionalController: {
+            adapterId: 'sparc-autotutor-v1',
+            policyId: 'progressive-scaffolding-v1',
+            policyVersion: 1,
+          },
+          productionRules: [...createSparcProgressiveScaffoldingRules()],
           nodes: [{
             id: 'learner-response-input',
             nodeType: 'atomic',
@@ -667,12 +695,39 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     );
   });
 
+  it('rejects an AutoTutor display whose authored scaffold rules diverge from the policy contract', function() {
+    const rules = [...createSparcProgressiveScaffoldingRules()];
+    rules[1] = { ...rules[1]!, salience: 1 };
+    assert.throws(
+      () => createSparcAuthoredDocumentFromTrialDisplay({
+        pageKey: 'sparc-autotutor-invalid-policy',
+        display: {
+          schema: 'tutorscript-sparc/2.0',
+          unitType: 'sparc-autotutor-dialogue',
+          instructionalController: {
+            adapterId: 'sparc-autotutor-v1',
+            policyId: 'progressive-scaffolding-v1',
+            policyVersion: 1,
+          },
+          nodes: [{ id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' }],
+          clusterTargets: [{ clusterIndex: 0, clusterKC: 'kc-a' }],
+          autoTutorTargets: {
+            expectations: [{ clusterKC: 'kc-a', text: 'Expectation A.' }],
+            misconceptions: [],
+          },
+          productionRules: rules,
+        },
+      }),
+      /must exactly match progressive-scaffolding-v1/,
+    );
+  });
+
   it('commits a correct LCD action as model practice for the fractions LCD stimulus', async function() {
     const modelPracticeRequests: unknown[] = [];
     const writtenRecords: unknown[] = [];
     const lcdDisplay: SparcTrialDisplay = {
       pageKey: 'sparc-fractions-addition',
-      schema: 'tutorscript-sparc/1.0',
+      schema: 'tutorscript-sparc/2.0',
       nodes: [{
         id: 'node-known-1-equivalent-bottom',
         nodeType: 'atomic',

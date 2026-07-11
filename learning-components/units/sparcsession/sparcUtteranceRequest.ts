@@ -40,6 +40,10 @@ function requireSelectedAction(facts: readonly SparcWorkingMemoryFact[]): SparcW
 }
 
 function selectedTargetId(selectedAction: SparcWorkingMemoryFact, targetType: string): string {
+  const generalTargetId = stringSlot(selectedAction, 'targetId');
+  if (generalTargetId) {
+    return generalTargetId;
+  }
   if (targetType === 'learningTarget') {
     const clusterKC = stringSlot(selectedAction, 'clusterKC');
     if (!clusterKC) {
@@ -177,19 +181,19 @@ function pedagogicalState(selectedAction: SparcWorkingMemoryFact): Readonly<Reco
   const slots = selectedAction.slots ?? {};
   return {
     targetType: slots.targetType,
-    targetId: slots.clusterKC ?? slots.id ?? null,
+    targetId: slots.targetId ?? slots.clusterKC ?? slots.id ?? null,
     selectedMove: slots.action,
   };
 }
 
 function transitionMetadata(selectedAction: SparcWorkingMemoryFact, facts: readonly SparcWorkingMemoryFact[]): Readonly<Record<string, unknown>> {
   const currentTargetType = stringSlot(selectedAction, 'targetType') ?? null;
-  const currentTargetId = stringSlot(selectedAction, 'clusterKC') ?? stringSlot(selectedAction, 'id') ?? null;
+  const currentTargetId = stringSlot(selectedAction, 'targetId') ?? stringSlot(selectedAction, 'clusterKC') ?? stringSlot(selectedAction, 'id') ?? null;
   const previous = factsByType(facts, 'controller.selectedAction')
     .filter((fact) => fact !== selectedAction)
     .at(-1);
   const previousTargetType = previous ? stringSlot(previous, 'targetType') ?? null : null;
-  const previousTargetId = previous ? stringSlot(previous, 'clusterKC') ?? stringSlot(previous, 'id') ?? null : null;
+  const previousTargetId = previous ? stringSlot(previous, 'targetId') ?? stringSlot(previous, 'clusterKC') ?? stringSlot(previous, 'id') ?? null : null;
   return {
     previousTargetType,
     previousTargetId,
@@ -203,11 +207,12 @@ export function createSparcUtteranceRequestFromFacts(
   facts: readonly SparcWorkingMemoryFact[],
 ): SparcUtteranceRequest {
   const selectedAction = requireSelectedAction(facts);
-  const targetType = stringSlot(selectedAction, 'targetType');
+  const authoredTargetType = stringSlot(selectedAction, 'targetType');
   const action = stringSlot(selectedAction, 'action');
-  if (!targetType || !action) {
+  if (!authoredTargetType || !action) {
     throw new Error('SPARC selected action requires targetType and action');
   }
+  const targetType = authoredTargetType === 'expectation' ? 'learningTarget' : authoredTargetType;
   if (targetType !== 'learningTarget' && targetType !== 'misconception' && targetType !== 'completion') {
     throw new Error(`SPARC selected action targetType "${targetType}" is not supported for utterance generation`);
   }

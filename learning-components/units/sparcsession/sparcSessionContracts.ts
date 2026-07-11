@@ -108,12 +108,20 @@ export type SparcAutoTutorTargets = {
   readonly misconceptions: readonly SparcAutoTutorMisconception[];
 };
 
+export type SparcInstructionalControllerConfig = {
+  readonly adapterId: string;
+  readonly policyId: string;
+  readonly policyVersion: number;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+};
+
 export type SparcAuthoredDocument = {
   readonly id: string;
-  readonly schemaVersion: number;
+  readonly schemaVersion: 2;
   readonly layout?: SparcLayoutPolicy;
   readonly clusterTargets?: readonly SparcClusterModelTarget[];
   readonly autoTutorTargets?: SparcAutoTutorTargets;
+  readonly instructionalController?: SparcInstructionalControllerConfig;
   readonly initialState?: readonly SparcStateWrite[];
   readonly workingMemoryFacts?: readonly SparcWorkingMemoryFact[];
   readonly derivedFacts?: readonly SparcDerivedFactRule[];
@@ -250,6 +258,10 @@ export type SparcProductionRuleCondition =
     }
   | {
       readonly type: 'any';
+      readonly conditions: readonly SparcProductionRuleCondition[];
+    }
+  | {
+      readonly type: 'all';
       readonly conditions: readonly SparcProductionRuleCondition[];
     };
 
@@ -388,6 +400,7 @@ export type SparcProductionRuleFiring = {
 };
 
 export type SparcProductionRuleExecution = {
+  readonly initialFacts: readonly SparcWorkingMemoryFact[];
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly firings: readonly SparcProductionRuleFiring[];
   readonly cycles: number;

@@ -472,15 +472,15 @@ The final paths should follow the existing module structure found during impleme
 
 ### Phase 0: Resolve design gates
 
-Record explicit decisions for:
+Implemented decisions:
 
-1. Whether meaningful progress de-escalates to Pump or holds the current stage.
-2. How non-addressing, off-task, meta, and clarification responses affect scaffold state.
-3. What happens after an unsuccessful Assertion.
-4. Whether one response may update multiple targets while only the focused target advances scaffold state.
-5. The canonical existing fields reused for controller parameters and thresholds.
+1. Meaningful progress de-escalates to Pump while the target remains active.
+2. Non-addressing, off-task, meta, and clarification responses hold and repeat the current scaffold stage without advancing it.
+3. An addressed no-progress response after Assertion cycles to Pump rather than repeating Assertion indefinitely.
+4. One response may update multiple learner-model targets, but only the target in the active focus episode advances scaffold state.
+5. Existing `dialogue.thresholds.coverageThreshold` remains the canonical expectation threshold; misconception resolution uses its complementary confidence threshold. `instructionalController.parameters.minimumProgress` defines meaningful turn progress.
 
-The first four can be represented as policy extension points before their final strategies are selected, but the pilot cannot ship with ambiguous behavior.
+These choices are encoded in the canonical authored productions and verified as mutually exclusive without salience.
 
 ### Phase 1: Introduce general contracts and registries
 
@@ -562,7 +562,17 @@ The ten migration targets are:
 
 All paths are relative to `C:\dev\mofacts_config`. Migration verification must discover these by `unitType`, not rely only on this fixed list, so a newly added or renamed AutoTutor display cannot escape validation.
 
-### Phase 7: Delete obsolete paths
+### Phase 7: Convert every non-AutoTutor SPARC package
+
+1. Update the OLI converter and verifier to emit and require the new base SPARC contract.
+2. Regenerate the 43 Intro Stats displays from the full OLI source into an isolated review directory.
+3. Reconcile module IDs, page IDs, nodes, rules, and diagnostics against the checked-in package.
+4. Replace `SPARC Intro Stats All Modules Bulk Upload` only after the regenerated output passes verification.
+5. Convert Fractions, American History, and Stoichiometry directly to the new base contract.
+6. Run unit-specific config/runtime tests for all four non-AutoTutor unit types.
+7. Run repository-wide discovery and prove all 56 current SPARC displays satisfy the new contract.
+
+### Phase 8: Delete obsolete paths
 
 Deletion is allowed only after:
 
@@ -638,6 +648,31 @@ Required converter work:
 4. Compare the regenerated module/page inventory with the current inventory so content is neither lost nor duplicated.
 5. Replace the checked-in generated packages with the verified output.
 6. Prove that rerunning the converter produces no obsolete-contract fields.
+
+The currently available full source is:
+
+```text
+C:\Users\ppavl\OneDrive\Active projects\mofacts-private-config\extracted_intro_to_stats_full_l71p6
+```
+
+The checked-in destination is:
+
+```text
+C:\dev\mofacts_config\SPARC Intro Stats All Modules Bulk Upload
+```
+
+Use an isolated review output first; do not point the first conversion run at the checked-in destination. The converter invocation shape is:
+
+```powershell
+node --experimental-strip-types scripts/convert_oli_flat_module_to_sparc.ts `
+  --source-root '<full-OLI-source>' `
+  --all-modules `
+  --output-root '<isolated-review-output>' `
+  --no-zip
+
+node --experimental-strip-types scripts/verify_oli_sparc_conversion_output.ts `
+  --package-root '<isolated-review-output>'
+```
 
 Do not write a general old-SPARC-to-new-SPARC server converter. The OLI tool remains a source-to-current-SPARC build tool. If a small one-time source-rewrite script is useful for the ten structurally identical AutoTutor packages, it may be used during development, but it is not shipped as runtime migration machinery.
 
@@ -750,7 +785,7 @@ The narrowest coherent slice is:
 1. General interfaces and explicit registries.
 2. AutoTutor adapter output in observation-only/parity tests.
 3. Durable focus/scaffold state with continuation coverage.
-4. The registered progressive policy and Assertion realization.
+4. The general facts/effects required by the authored progressive rules and the Assertion realization.
 5. Compound Interest as the single stimulus migration pilot.
 
 That slice proves the architectural boundary and the reported behavioral fix before changing the remaining packages. Once it passes, the rest of the stimulus migration should be primarily validation and deletion rather than new controller design.

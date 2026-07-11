@@ -469,14 +469,40 @@ function validateSparcAutoTutorContent(context: AutoTutorValidationContext, erro
     }
 
     const display = page.display as Record<string, unknown>;
-    if (display.schema !== 'tutorscript-sparc/1.0') {
-      errors.push(`${pagePrefix}.display.schema must be tutorscript-sparc/1.0`);
+    if (display.schema !== 'tutorscript-sparc/2.0') {
+      errors.push(`${pagePrefix}.display.schema must be tutorscript-sparc/2.0`);
     }
     if (!Array.isArray(display.nodes) || display.nodes.length === 0) {
       errors.push(`${pagePrefix}.display.nodes must contain the AutoTutor dialogue nodes`);
     }
     if (!Array.isArray(display.productionRules) || display.productionRules.length === 0) {
       errors.push(`${pagePrefix}.display.productionRules must contain canonical SPARC AutoTutor rules`);
+    } else {
+      const ruleIds = display.productionRules
+        .filter(isRecord)
+        .map((rule) => rule.id)
+        .filter(nonEmptyString);
+      const expectedRuleIds = [
+        'dialogue.completion.summary',
+        'dialogue.scaffold.pump',
+        'dialogue.scaffold.prompt',
+        'dialogue.scaffold.hint',
+        'dialogue.scaffold.assertion',
+      ];
+      if (JSON.stringify(ruleIds) !== JSON.stringify(expectedRuleIds)) {
+        errors.push(`${pagePrefix}.display.productionRules must contain exactly the canonical progressive-scaffolding-v1 rules`);
+      }
+    }
+    const instructionalController = isRecord(display.instructionalController)
+      ? display.instructionalController
+      : undefined;
+    if (
+      !instructionalController
+      || instructionalController.adapterId !== 'sparc-autotutor-v1'
+      || instructionalController.policyId !== 'progressive-scaffolding-v1'
+      || instructionalController.policyVersion !== 1
+    ) {
+      errors.push(`${pagePrefix}.display.instructionalController must select sparc-autotutor-v1 and progressive-scaffolding-v1 version 1`);
     }
     validateSparcAutoTutorTargets(display, clusters, `${pagePrefix}.display`, errors);
   });

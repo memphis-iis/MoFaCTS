@@ -8,7 +8,7 @@ This is the locked acceptance contract for the first-pass SPARC runtime implemen
   - `SPARC Fractions Addition\SPARC_Fractions_Addition_stims.json`
   - `SPARC Stoichiometry\SPARC_Stoichiometry_stims.json`
 - Runtime rule engine is fixed to **json-rules-engine**.
-- Display schema is fixed to `tutorscript-sparc/1.0` (`display.schema`).
+- Display schema is fixed to `tutorscript-sparc/2.0` (`display.schema`).
 - No example-tracing workflow is in this phase.
 - History logging must run for every student/interface action.
 - `readOnly: true` semantics must be preserved.
@@ -24,7 +24,7 @@ Any violation of a required section must fail with explicit diagnostics.
 
 ## 2) TutorScript display contract (hard gates)
 - [ ] `display.type === "sparc"` (required).
-- [ ] `display.schema === "tutorscript-sparc/1.0"` (required).
+- [ ] `display.schema === "tutorscript-sparc/2.0"` (required).
 - [ ] `display.unitType` parsed and retained (e.g., `sparc-fractions-addition`, `sparc-stoichiometry-table`).
 - [ ] Validate `display.layout.zones` structure:
   - `id/region/anchor/flow` present for each zone.

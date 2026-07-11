@@ -11,6 +11,7 @@ import type {
   SparcAuthoredDocument,
   SparcRuleExpression,
 } from './sparcSessionContracts';
+import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 
 function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
   const deps = {
@@ -67,7 +68,7 @@ function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
 function sampleDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     initialState: [{
       target: {
         pageKey: 'doc-1',
@@ -123,7 +124,7 @@ const variable = (name: string): SparcRuleExpression => ({ type: 'variable', nam
 function sampleProductionRuleDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     workingMemoryFacts: [{
       factType: 'problem',
       slots: {
@@ -178,7 +179,12 @@ function sampleProductionRuleDocument(): SparcAuthoredDocument {
 function sampleDialogueControllerDocument(): SparcAuthoredDocument {
   return {
     id: 'dialogue-doc',
-    schemaVersion: 1,
+    schemaVersion: 2,
+    instructionalController: {
+      adapterId: 'sparc-autotutor-v1',
+      policyId: 'progressive-scaffolding-v1',
+      policyVersion: 1,
+    },
     autoTutorTargets: {
       expectations: [{
         clusterKC: 'kc-a',
@@ -223,36 +229,7 @@ function sampleDialogueControllerDocument(): SparcAuthoredDocument {
       factType: 'session.turnState',
       slots: { turnCount: 1 },
     }],
-    productionRules: [{
-      id: 'dialogue.move.hint',
-      module: 'dialogue.move-selection',
-      salience: 10,
-      when: [{
-        factType: 'learningTarget.selected',
-        slots: {
-          clusterKC: { type: 'bind', variable: 'targetClusterKC' },
-        },
-      }, {
-        factType: 'dialogue.learnerWordCount',
-        slots: {
-          cumulative: { type: 'range', min: 5 },
-        },
-      }],
-      then: [{
-        type: 'assert-fact',
-        fact: {
-          factType: 'controller.selectedAction',
-          slots: {
-            targetType: literal('learningTarget'),
-            clusterKC: variable('targetClusterKC'),
-            action: literal('hint'),
-          },
-        },
-      }, {
-        type: 'terminate-production-phase',
-        reason: 'move-selected',
-      }],
-    }],
+    productionRules: createSparcProgressiveScaffoldingRules(),
     root: {
       id: 'root',
       kind: 'document',
@@ -975,7 +952,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         anchorClusterKC: 'kc-a',
       },
       generateTutorUtterance(request: { action: string; targetId: string }) {
-        assert.equal(request.action, 'hint');
+        assert.equal(request.action, 'pump');
         assert.equal(request.targetId, 'kc-b');
         return 'Think about B.';
       },
@@ -989,7 +966,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.equal(result.historyRecord?.action, 'sparc-dialogue-turn');
     assert.equal(writtenRecords.length, 1);
     assert.equal(writtenRecords[0]?.action, 'sparc-dialogue-turn');
-    assert.equal(result.utteranceRequest.action, 'hint');
+    assert.equal(result.utteranceRequest.action, 'pump');
     assert.equal(result.utteranceRequest.targetId, 'kc-b');
     assert.ok(result.transition.writes.some((write: { value?: unknown }) => (
       typeof write.value === 'object'
@@ -1010,6 +987,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       },
       pageKey: 'doc-1',
       display: {
+        schema: 'tutorscript-sparc/2.0',
         nodes: [{
           id: 'answer-node',
           nodeType: 'atomic',
@@ -1089,6 +1067,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     const result = engine.evaluateSparcTrialDisplayProductionRuleEvents({
       pageKey: 'doc-1',
       display: {
+        schema: 'tutorscript-sparc/2.0',
         nodes: [{
           id: 'answer-node',
           nodeType: 'atomic',

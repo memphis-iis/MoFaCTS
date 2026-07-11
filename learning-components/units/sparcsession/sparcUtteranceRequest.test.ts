@@ -58,7 +58,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       fact('controller.selectedAction', {
         targetType: 'misconception',
         id: 'm1',
-        action: 'splice',
+        action: 'assertion',
       }),
     ]);
 
@@ -142,7 +142,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
           action: 'neutral_feedback',
         }),
       ]),
-      /selected move "neutral_feedback" is registered as legacy-disabled/,
+      /selected move "neutral_feedback" has no registered move definition/,
     );
   });
 

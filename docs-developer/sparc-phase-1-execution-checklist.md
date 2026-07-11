@@ -5,7 +5,7 @@ This checklist is the implementation playbook for the two example-first contract
 
 ## 1) Foundation (parser and layout contracts)
 
-- [ ] Parse and validate `display.type === "sparc"` and `display.schema === "tutorscript-sparc/1.0"` for both SPARC packages.
+- [ ] Parse and validate `display.type === "sparc"` and `display.schema === "tutorscript-sparc/2.0"` for both SPARC packages.
 - [ ] Resolve linked `*_stims.json` from both `_TDF.json` packages.
 - [ ] Reject missing required fields with explicit diagnostics:
   - `display.type`, `display.schema`, `display.layout.zones`, `nodes`, `response.scoredNodes`, `response.intentByNode`.

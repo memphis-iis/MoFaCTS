@@ -37,7 +37,7 @@ const widgetTarget: SparcModelTargetIdentity = {
 function authoredDocument(): SparcAuthoredDocument {
   return {
     id: 'doc-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     clusterTargets: [{
       clusterIndex: 0,
       ...regionTarget,
@@ -136,7 +136,7 @@ describe('sparcAuthoredModelTargets', function() {
   it('requires production-rule model-practice effects to resolve through cluster attachments', function() {
     const modelTargetOnlyDocument: SparcAuthoredDocument = {
       id: 'doc-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       root: {
         id: 'root',
         kind: 'document',
