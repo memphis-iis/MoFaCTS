@@ -88,10 +88,30 @@ type AnalyticsMethodsDeps = {
 };
 
 const INSERT_HISTORY_TIMING_ENABLED = process.env.MOFACTS_INSERT_HISTORY_TIMING === '1';
-const INSERT_HISTORY_PAYLOAD_DEBUG_ENABLED = process.env.MOFACTS_INSERT_HISTORY_PAYLOAD_DEBUG === '1';
+const INSERT_HISTORY_DIAGNOSTIC_FIELD_LIMIT = 50;
+const INSERT_HISTORY_EVENT_CATEGORIES = new Set(['model', 'schedule', 'autotutor', 'sparc']);
 
 function elapsedMsSince(startTime: number): number {
   return Date.now() - startTime;
+}
+
+function historyDiagnosticMetadata(record: UnknownRecord) {
+  const levelUnitType = typeof record.levelUnitType === 'string' && INSERT_HISTORY_EVENT_CATEGORIES.has(record.levelUnitType)
+    ? record.levelUnitType
+    : 'other';
+  const h5pEventType = (record.h5p as UnknownRecord | undefined)?.eventType;
+  const eventCategory = h5pEventType === 'part' || h5pEventType === 'summary'
+    ? `h5p-${h5pEventType}`
+    : levelUnitType;
+  const schemaVersion = Number(record.historySchemaVersion);
+  const fieldNames = Object.keys(record).sort().slice(0, INSERT_HISTORY_DIAGNOSTIC_FIELD_LIMIT);
+  return {
+    eventCategory,
+    historySchemaVersion: Number.isFinite(schemaVersion) ? schemaVersion : null,
+    fieldCount: Object.keys(record).length,
+    fieldNames,
+    fieldNamesTruncated: Object.keys(record).length > fieldNames.length,
+  };
 }
 
 function getExperimentStateTimestamp(stateDoc: { experimentState?: { lastActionTimeStamp?: unknown } } | null | undefined): number {
@@ -567,18 +587,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
     let rawPayloadBytes: number | undefined;
     let finalRecordBytes: number | undefined;
-    if (INSERT_HISTORY_TIMING_ENABLED || INSERT_HISTORY_PAYLOAD_DEBUG_ENABLED) {
+    if (INSERT_HISTORY_TIMING_ENABLED) {
       rawPayloadBytes = Buffer.byteLength(JSON.stringify(historyRecord), 'utf8');
       finalRecordBytes = Buffer.byteLength(JSON.stringify(sanitizedHistoryRecord), 'utf8');
-    }
-
-    if (INSERT_HISTORY_PAYLOAD_DEBUG_ENABLED) {
-      deps.serverConsole('[insertHistory payload]', {
-        rawPayloadBytes,
-        finalRecordBytes,
-        rawPayload: historyRecord,
-        persistedRecord: sanitizedHistoryRecord,
-      });
     }
 
     const insertStartTime = Date.now();
@@ -592,17 +603,15 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         await deps.onHistoryInserted(this, sanitizedHistoryRecord);
       } catch (error) {
         deps.serverConsole('[insertHistory] Dashboard cache update failed after history insert', {
-          userId: actingUserId,
-          TDFId: tdfId,
-          error: error instanceof Error ? error.message : String(error),
+          ...historyDiagnosticMetadata(sanitizedHistoryRecord),
+          errorType: error instanceof Error ? error.name : typeof error,
         });
       }
     }
 
     if (INSERT_HISTORY_TIMING_ENABLED) {
       deps.serverConsole('[insertHistory timing]', {
-        userId: actingUserId,
-        TDFId: tdfId,
+        ...historyDiagnosticMetadata(sanitizedHistoryRecord),
         rawPayloadBytes,
         finalRecordBytes,
         decompressMs,

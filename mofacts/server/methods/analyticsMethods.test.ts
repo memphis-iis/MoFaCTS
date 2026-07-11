@@ -219,7 +219,7 @@ describe('analyticsMethods', function() {
   it('insertHistory keeps the durable history write when the dashboard hook fails', async function() {
     const { deps, insertedHistory, logEntries } = createAnalyticsDeps({
       onHistoryInserted: async () => {
-        throw new Error('cache update failed');
+        throw new Error('sensitive cache failure learner-1 answer');
       },
     });
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
@@ -227,7 +227,18 @@ describe('analyticsMethods', function() {
     await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord());
 
     expect(insertedHistory).to.have.length(1);
-    expect(logEntries.some((entry) => String(entry[0]).includes('Dashboard cache update failed'))).to.equal(true);
+    const failureLog = logEntries.find((entry) => String(entry[0]).includes('Dashboard cache update failed'));
+    expect(failureLog).to.not.equal(undefined);
+    expect(failureLog?.[1]).to.deep.include({
+      eventCategory: 'model',
+      historySchemaVersion: 1,
+      errorType: 'Error',
+    });
+    const serializedLog = JSON.stringify(failureLog);
+    expect(serializedLog).to.not.include('learner-1');
+    expect(serializedLog).to.not.include('tdf-1');
+    expect(serializedLog).to.not.include('sensitive cache failure');
+    expect(serializedLog).to.not.include('"answer"');
   });
 
   it('downloadOwnHistoryAcrossTdfs returns a streaming download URL without building the TSV payload', async function() {

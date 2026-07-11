@@ -1188,7 +1188,7 @@ Template.contentUpload.events({
     event.preventDefault();
     loadUploadQuotaStatus(template);
   },
-  'click [data-content-list-retry]'(event: any, template: ContentUploadInstance & any) {
+  'click [data-content-list-retry]'(event: any, _template: ContentUploadInstance & any) {
     event.preventDefault();
     assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
   },

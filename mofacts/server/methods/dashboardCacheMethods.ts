@@ -22,6 +22,23 @@ import {
 
 const DASHBOARD_ADMIN_REFRESH_CONCURRENCY = 4;
 const DASHBOARD_ADMIN_REFRESH_PROGRESS_INTERVAL = 10;
+const DASHBOARD_HISTORY_REBUILD_BATCH_SIZE = 1000;
+const DASHBOARD_HISTORY_REBUILD_PROGRESS_INTERVAL = 10000;
+const DASHBOARD_HISTORY_FIELDS = {
+  _id: 1,
+  outcome: 1,
+  CFEndLatency: 1,
+  CFFeedbackLatency: 1,
+  stimuliSetId: 1,
+  stimulusKC: 1,
+  recordedServerTime: 1,
+  time: 1,
+  TDFId: 1,
+  userId: 1,
+  levelUnitType: 1,
+  modelEvidenceSource: 1,
+  h5p: 1,
+};
 
 type DashboardCacheDeps = {
   Meteor: any;
@@ -53,6 +70,11 @@ function historyRecordTimestamp(record: DashboardHistoryRecord): number {
   }
   const timestamp = new Date(rawTimestamp).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function historyRecordSessionDateKey(record: DashboardHistoryRecord): string | null {
+  const timestamp = historyRecordTimestamp(record);
+  return timestamp > 0 ? new Date(timestamp).toDateString() : null;
 }
 
 function getH5PEventType(record: DashboardHistoryRecord): string {
@@ -133,7 +155,9 @@ export function computeCacheStats(
     totalTimeMinutes: 0,
     itemsPracticedCount: 0,
     itemsPracticedApplies: false,
+    practicedItemKeys: [],
     totalSessions: 0,
+    sessionDateKeys: [],
     overallAccuracy: null,
     accuracyApplies: false,
     firstPracticeDate: null,
@@ -183,8 +207,88 @@ export function computeCacheStats(
   }
 
   stats.itemsPracticedCount = uniqueItems.size;
+  stats.practicedItemKeys = Array.from(uniqueItems);
   stats.totalSessions = sessions.size;
+  stats.sessionDateKeys = Array.from(sessions);
   stats.totalTimeMinutes = Number((stats.totalTimeMs / 60000).toFixed(1));
+
+  const answeredTrials = stats.correctTrials + stats.incorrectTrials;
+  stats.accuracyApplies = answeredTrials > 0;
+  stats.overallAccuracy = stats.accuracyApplies
+    ? Number(((stats.correctTrials / answeredTrials) * 100).toFixed(1))
+    : null;
+
+  return stats;
+}
+
+function createEmptyDashboardTdfStats(displayName: string | null | undefined): DashboardTdfStats {
+  return computeCacheStats([], displayName, () => 0);
+}
+
+export function applyDashboardHistoryRecordToStats(
+  currentStats: DashboardTdfStats | null | undefined,
+  historyRecord: DashboardHistoryRecord,
+  displayName: string | null | undefined,
+  computePracticeTimeMs: ComputePracticeTimeMs
+): DashboardTdfStats {
+  const stats = currentStats
+    ? {
+        ...currentStats,
+        displayName: displayName || currentStats.displayName || 'Unnamed',
+        practicedItemKeys: [...(currentStats.practicedItemKeys || [])],
+        sessionDateKeys: [...(currentStats.sessionDateKeys || [])],
+      }
+    : createEmptyDashboardTdfStats(displayName);
+  const practicedItemKeys = stats.practicedItemKeys ?? [];
+  const sessionDateKeys = stats.sessionDateKeys ?? [];
+  stats.practicedItemKeys = practicedItemKeys;
+  stats.sessionDateKeys = sessionDateKeys;
+
+  if (!shouldCountDashboardHistoryRecord(historyRecord)) {
+    return stats;
+  }
+
+  stats.totalTrials += 1;
+  if (!isAutoTutorRecord(historyRecord)) {
+    if (historyRecord.outcome === 'correct') {
+      stats.correctTrials += 1;
+    } else if (historyRecord.outcome === 'incorrect') {
+      stats.incorrectTrials += 1;
+    }
+  }
+
+  stats.totalTimeMs += getHistoryPracticeTimeMs(historyRecord, computePracticeTimeMs);
+  stats.totalTimeMinutes = Number((stats.totalTimeMs / 60000).toFixed(1));
+
+  const stimulusKey = resolveDashboardModelStimulusKey(historyRecord);
+  if (stimulusKey !== null) {
+    stats.itemsPracticedApplies = true;
+    if (!practicedItemKeys.includes(stimulusKey)) {
+      practicedItemKeys.push(stimulusKey);
+    }
+  }
+  stats.itemsPracticedCount = practicedItemKeys.length;
+
+  const timestamp = historyRecordTimestamp(historyRecord);
+  const sessionDateKey = historyRecordSessionDateKey(historyRecord);
+  if (sessionDateKey && !sessionDateKeys.includes(sessionDateKey)) {
+    sessionDateKeys.push(sessionDateKey);
+  }
+  stats.totalSessions = sessionDateKeys.length;
+
+  if (timestamp > 0) {
+    const date = new Date(timestamp);
+    if (!stats.firstPracticeDate || date < new Date(stats.firstPracticeDate)) {
+      stats.firstPracticeDate = date;
+    }
+    if (timestamp > stats.lastPracticeTimestamp) {
+      stats.lastPracticeDate = date;
+      stats.lastPracticeTimestamp = timestamp;
+    }
+  }
+
+  stats.lastProcessedHistoryId = historyRecord._id ?? null;
+  stats.lastProcessedTimestamp = historyRecord.recordedServerTime ?? historyRecord.time ?? null;
 
   const answeredTrials = stats.correctTrials + stats.incorrectTrials;
   stats.accuracyApplies = answeredTrials > 0;
@@ -505,45 +609,60 @@ export function createDashboardCacheMethods({
         rootTdfMap.set(rootTdf._id, rootTdf);
       }
 
-      const allHistory: DashboardHistoryRecord[] = await Histories.find({
-        userId: targetUserId,
-        TDFId: { $in: attemptedTdfIds },
-        ...dashboardHistorySelector()
-      }, {
-        sort: { recordedServerTime: 1 }
-      }).fetchAsync();
-
-      const historyByTargetTdf: Map<string, DashboardHistoryRecord[]> = new Map();
       const tdfMap: Map<any, any> = new Map((attemptedTdfs as any[]).map((t: any) => [t._id, t]));
-
-      for (const record of allHistory) {
-        const tdf = tdfMap.get(record.TDFId);
-        if (!tdf) continue;
-
-        const fileName = tdf.content?.fileName as string | undefined;
-        const rootTdfId =
-          (fileName ? childToRootMap.get(fileName) : undefined) ||
-          (record.TDFId ? childToRootMap.get(record.TDFId) : undefined);
-        const targetTdfId = rootTdfId || record.TDFId;
-        if (!targetTdfId) continue;
-
-        if (!historyByTargetTdf.has(targetTdfId)) {
-          historyByTargetTdf.set(targetTdfId, []);
-        }
-        const targetHistory = historyByTargetTdf.get(targetTdfId);
-        if (targetHistory) {
-          targetHistory.push(record);
-        }
-      }
-
       const tdfStats: Record<string, any> = {};
-      for (const [targetTdfId, history] of historyByTargetTdf.entries()) {
-        const rootTdf = rootTdfMap.get(targetTdfId);
-        const displayName = rootTdf?.content?.tdfs?.tutor?.setspec?.lessonname ||
-          tdfMap.get(targetTdfId)?.content?.tdfs?.tutor?.setspec?.lessonname ||
-          'Unnamed';
+      let lastHistoryId: unknown = null;
+      let processedHistoryCount = 0;
+      while (true) {
+        const historySelector = {
+          userId: targetUserId,
+          TDFId: { $in: attemptedTdfIds },
+          ...dashboardHistorySelector(),
+          ...(lastHistoryId === null ? {} : { _id: { $gt: lastHistoryId } }),
+        };
+        const historyBatch: DashboardHistoryRecord[] = await Histories.find(historySelector, {
+          fields: DASHBOARD_HISTORY_FIELDS,
+          sort: { _id: 1 },
+          limit: DASHBOARD_HISTORY_REBUILD_BATCH_SIZE,
+        }).fetchAsync();
+        if (historyBatch.length === 0) {
+          break;
+        }
 
-        tdfStats[targetTdfId] = computeCacheStats(history, displayName, computePracticeTimeMs);
+        for (const record of historyBatch) {
+          const tdf = tdfMap.get(record.TDFId);
+          if (!tdf) continue;
+
+          const fileName = tdf.content?.fileName as string | undefined;
+          const rootTdfId =
+            (fileName ? childToRootMap.get(fileName) : undefined) ||
+            (record.TDFId ? childToRootMap.get(record.TDFId) : undefined);
+          const targetTdfId = rootTdfId || record.TDFId;
+          if (!targetTdfId) continue;
+
+          const rootTdf = rootTdfMap.get(targetTdfId);
+          const displayName = rootTdf?.content?.tdfs?.tutor?.setspec?.lessonname ||
+            tdfMap.get(targetTdfId)?.content?.tdfs?.tutor?.setspec?.lessonname ||
+            'Unnamed';
+          tdfStats[targetTdfId] = applyDashboardHistoryRecordToStats(
+            tdfStats[targetTdfId],
+            record,
+            displayName,
+            computePracticeTimeMs
+          );
+        }
+
+        processedHistoryCount += historyBatch.length;
+        lastHistoryId = historyBatch[historyBatch.length - 1]?._id ?? null;
+        if (lastHistoryId === null) {
+          throw new Error('Dashboard history rebuild encountered a row without an _id');
+        }
+        if (processedHistoryCount % DASHBOARD_HISTORY_REBUILD_PROGRESS_INTERVAL === 0) {
+          serverConsole(`[Cache] Processed ${processedHistoryCount} history rows for user ${targetUserId}`);
+        }
+        if (historyBatch.length < DASHBOARD_HISTORY_REBUILD_BATCH_SIZE) {
+          break;
+        }
       }
 
       const summary = computeSummaryStats(tdfStats);
@@ -636,133 +755,83 @@ export function createDashboardCacheMethods({
       );
     },
 
-    updateDashboardCacheForTdf: async function(this: any, TDFId: string) {
-      serverConsole(`[Cache] updateDashboardCacheForTdf called with TDFId: ${TDFId}`);
-
-      if (!this.userId) {
+    applyDashboardHistoryRecord: async function(this: any, historyRecord: DashboardHistoryRecord) {
+      const userId = this.userId;
+      if (!userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
+      if (historyRecord.userId !== userId) {
+        throw new Meteor.Error('not-authorized', 'Dashboard history must belong to the current user');
+      }
+      const TDFId = normalizeOptionalId(historyRecord.TDFId);
+      if (!TDFId) {
+        throw new Meteor.Error('invalid-args', 'Dashboard history requires a TDFId');
+      }
+      if (!shouldCountDashboardHistoryRecord(historyRecord)) {
+        return { success: true, action: 'ignored', newRecords: 0 };
+      }
 
-      const userId = this.userId;
-      serverConsole(`[Cache] User: ${userId}`);
-      return await redisBoundary.withLock(
-        `dashboard-cache:update:${userId}:${TDFId}`,
-        120000,
-        async () => {
-
-      const tdf = await Tdfs.findOneAsync(
-        { _id: TDFId },
-        { fields: {
-          'content.fileName': 1,
-          'content.tdfs.tutor.setspec.lessonname': 1
-        } }
-      );
-
-      if (!tdf) {
-        serverConsole(`[Cache] TDF ${TDFId} not found`);
+      const family = await lessonFamilies.resolveLessonFamilyForTdf(TDFId, {
+        _id: 1,
+        'content.fileName': 1,
+        'content.tdfs.tutor.setspec.lessonname': 1,
+        'content.tdfs.tutor.setspec.condition': 1,
+        'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+      });
+      if (!family) {
         return { success: false, error: 'TDF not found' };
       }
 
-      const fileName = tdf.content?.fileName;
-      const childKeyCandidates = [fileName, TDFId].filter(Boolean);
+      const parentRoot = family.roots.find((root: any) => String(root?._id || '') !== TDFId);
+      const targetTdf = parentRoot || family.target;
+      const targetTdfId = String(targetTdf?._id || TDFId);
+      const displayName = targetTdf?.content?.tdfs?.tutor?.setspec?.lessonname
+        || family.target?.content?.tdfs?.tutor?.setspec?.lessonname
+        || 'Unnamed';
 
-      const rootTdf = childKeyCandidates.length ? await Tdfs.findOneAsync({
-        'content.tdfs.tutor.setspec.condition': { $in: childKeyCandidates }
-      }, {
-        fields: {
-          _id: 1,
-          'content.tdfs.tutor.setspec.lessonname': 1,
-          'content.tdfs.tutor.setspec.condition': 1
-        }
-      }) : null;
-
-      let targetTdfId = TDFId;
-      let displayName = tdf.content?.tdfs?.tutor?.setspec?.lessonname || 'Unnamed';
-      let allHistory: any[] = [];
-
-      if (rootTdf) {
-        serverConsole(`[Cache] Child TDF detected, aggregating under root: ${rootTdf._id}`);
-        targetTdfId = rootTdf._id;
-        displayName = rootTdf.content?.tdfs?.tutor?.setspec?.lessonname || displayName;
-
-        const childRefs: string[] = rootTdf.content?.tdfs?.tutor?.setspec?.condition || [];
-        const normalizedChildRefs = [...new Set(childRefs.filter(Boolean))];
-
-        const childTdfs = normalizedChildRefs.length ? await Tdfs.find({
-          $or: [
-            { 'content.fileName': { $in: normalizedChildRefs } },
-            { _id: { $in: normalizedChildRefs } }
-          ]
-        }, {
-          fields: { _id: 1 }
-        }).fetchAsync() : [];
-
-        const childTdfIds = childTdfs.map((t: any) => t._id);
-        if (!childTdfIds.includes(TDFId)) {
-          childTdfIds.push(TDFId);
-        }
-
-        allHistory = await Histories.find({
-          userId,
-          TDFId: { $in: childTdfIds },
-          ...dashboardHistorySelector()
-        }, {
-          sort: { recordedServerTime: 1 }
-        }).fetchAsync();
-
-        serverConsole(`[Cache] Retrieved ${allHistory.length} history records from ${childTdfIds.length} child TDFs`);
-      } else {
-        allHistory = await Histories.find({
-          userId,
-          TDFId,
-          ...dashboardHistorySelector()
-        }, {
-          sort: { recordedServerTime: 1 }
-        }).fetchAsync();
-
-        serverConsole(`[Cache] Retrieved ${allHistory.length} history records for regular TDF`);
-      }
-
-      if (allHistory.length === 0) {
-        serverConsole('[Cache] No history records, skipping update');
-        return { success: true, action: 'no_history' };
-      }
-
-      const stats = computeCacheStats(allHistory, displayName, computePracticeTimeMs);
-
-      const cache = await UserDashboardCache.findOneAsync({ userId }) || {
-        userId,
-        tdfStats: {},
-        version: DASHBOARD_CACHE_VERSION
-      };
-
-      const updatedTdfStats = {
-        ...(cache.tdfStats || {}),
-        [targetTdfId]: stats
-      };
-
-      const summary = computeSummaryStats(updatedTdfStats);
-      const usageSummary = computeUsageSummary(updatedTdfStats);
-
-      await UserDashboardCache.upsertAsync(
-        { userId },
-        {
-          $set: {
-            userId,
-            tdfStats: updatedTdfStats,
-            summary,
-            usageSummary,
-            lastUpdated: new Date(),
-            version: DASHBOARD_CACHE_VERSION
-          },
-          $setOnInsert: {
-            createdAt: new Date()
+      return await redisBoundary.withLock(
+        `dashboard-cache:increment:${userId}`,
+        120000,
+        async () => {
+          let cache = await UserDashboardCache.findOneAsync({ userId });
+          if (!cache || cache.version !== DASHBOARD_CACHE_VERSION) {
+            const rebuilt = await methods.initializeDashboardCache.call(this);
+            return { success: true, action: 'rebuilt', newRecords: rebuilt.tdfCount };
           }
-        }
-      );
 
-      serverConsole(`[Cache] Recomputed stats stored for ${rootTdf ? 'root' : 'regular'} TDF ${targetTdfId}`);
-      return { success: true, action: 'updated', newRecords: allHistory.length };
+          const currentStats = cache.tdfStats?.[targetTdfId] as DashboardTdfStats | undefined;
+          if (historyRecord._id && currentStats?.lastProcessedHistoryId === historyRecord._id) {
+            return { success: true, action: 'duplicate', newRecords: 0 };
+          }
+          const stats = applyDashboardHistoryRecordToStats(
+            currentStats,
+            historyRecord,
+            displayName,
+            computePracticeTimeMs
+          );
+          const updatedTdfStats = {
+            ...(cache.tdfStats || {}),
+            [targetTdfId]: stats
+          };
+
+          await UserDashboardCache.upsertAsync(
+            { userId },
+            {
+              $set: {
+                userId,
+                tdfStats: updatedTdfStats,
+                summary: computeSummaryStats(updatedTdfStats),
+                usageSummary: computeUsageSummary(updatedTdfStats),
+                lastUpdated: new Date(),
+                version: DASHBOARD_CACHE_VERSION
+              },
+              $setOnInsert: {
+                createdAt: new Date()
+              }
+            }
+          );
+
+          return { success: true, action: 'updated', newRecords: 1 };
         }
       );
     },

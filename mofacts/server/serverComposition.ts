@@ -459,6 +459,10 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   canViewDashboardTdf,
   redisBoundary
 });
+const {
+  applyDashboardHistoryRecord,
+  ...publicDashboardCacheMethods
+} = dashboardCacheMethods;
 
 const analyticsMethods = createAnalyticsMethods({
   serverConsole,
@@ -497,11 +501,7 @@ const analyticsMethods = createAnalyticsMethods({
     if (!tdfId) {
       throw new Error('History insert completed without a TDFId for dashboard cache update');
     }
-    const updateDashboardCacheForTdf = (dashboardCacheMethods as Record<string, any>).updateDashboardCacheForTdf;
-    if (typeof updateDashboardCacheForTdf !== 'function') {
-      throw new Error('Dashboard cache update method is not registered');
-    }
-    await updateDashboardCacheForTdf.call(context, tdfId);
+    await applyDashboardHistoryRecord.call(context, historyRecord);
     if (historyRecord?.userId) {
       await refreshCourseSnapshotAfterPractice(String(historyRecord.userId), tdfId);
     }
@@ -1055,7 +1055,7 @@ export const asyncMethods: Record<string, unknown> = {
     getApiKeyResolutionDeps,
   }),
 
-  ...dashboardCacheMethods,
+  ...publicDashboardCacheMethods,
 
   ...createDeploymentReadinessMethods({
     Roles,

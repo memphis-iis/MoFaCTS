@@ -11,6 +11,28 @@ function message(key: string, values?: Record<string, unknown>): string {
   return `${key}:${String(values?.title || '')}`;
 }
 
+function assignmentRow(
+  overrides: Partial<AssignmentEditorRow> & Pick<AssignmentEditorRow, 'TDFId'>,
+): AssignmentEditorRow {
+  const { TDFId, ...rest } = overrides;
+  return {
+    assignmentId: `assignment-${TDFId}`,
+    courseId: 'course-1',
+    TDFId,
+    title: 'Lesson',
+    order: 0,
+    releaseAt: null,
+    dueAt: null,
+    required: true,
+    availability: 'available',
+    createdAt: null,
+    updatedAt: null,
+    fileName: '',
+    tags: [],
+    ...rest,
+  };
+}
+
 describe('tdfAssignmentEditState', function() {
   it('shapes assignment snapshots into editable rows', function() {
     const rows = rowsFromAssignmentSnapshot({
@@ -41,7 +63,7 @@ describe('tdfAssignmentEditState', function() {
   });
 
   it('filters assignable TDFs by selected rows and query', function() {
-    const rows = [{ TDFId: 'tdf-selected' }] as AssignmentEditorRow[];
+    const rows = [assignmentRow({ TDFId: 'tdf-selected' })];
     const result = filterAssignableTdfs([
       { TDFId: 'tdf-selected', displayName: 'Selected', fileName: 'selected.xml', tags: [] },
       { TDFId: 'tdf-match', displayName: 'Algebra', fileName: 'lesson.xml', tags: ['fractions'] },
@@ -53,20 +75,20 @@ describe('tdfAssignmentEditState', function() {
 
   it('renumbers rows and validates duplicate/date errors', function() {
     const rows = orderedRows([
-      {
+      assignmentRow({
         TDFId: 'tdf-1',
         title: 'Lesson',
-        releaseAt: '2026-01-02T10:00',
-        dueAt: '2026-01-01T10:00',
-      },
-    ] as AssignmentEditorRow[]);
+        releaseAt: new Date('2026-01-02T10:00:00.000Z'),
+        dueAt: new Date('2026-01-01T10:00:00.000Z'),
+      }),
+    ]);
     expect(rows[0]?.order).to.equal(0);
     expect(validateAssignmentRows(rows, message)).to.equal('courseAssignments.dueAfterVisibleDate:Lesson');
 
     const duplicateRows = [
-      { TDFId: 'tdf-1', title: 'A' },
-      { TDFId: 'tdf-1', title: 'B' },
-    ] as AssignmentEditorRow[];
+      assignmentRow({ TDFId: 'tdf-1', title: 'A' }),
+      assignmentRow({ TDFId: 'tdf-1', title: 'B' }),
+    ];
     expect(validateAssignmentRows(duplicateRows, message)).to.equal('courseAssignments.duplicateLesson:B');
   });
 });

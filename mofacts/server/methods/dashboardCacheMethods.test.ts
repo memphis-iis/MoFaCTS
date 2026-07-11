@@ -1,5 +1,11 @@
 import { expect } from 'chai';
-import { computeCacheStats, computeSummaryStats, computeUsageSummary, createDashboardCacheMethods } from './dashboardCacheMethods';
+import {
+  applyDashboardHistoryRecordToStats,
+  computeCacheStats,
+  computeSummaryStats,
+  computeUsageSummary,
+  createDashboardCacheMethods,
+} from './dashboardCacheMethods';
 import { DASHBOARD_CACHE_VERSION } from './dashboardCacheShared';
 
 const disabledRedisBoundary = {
@@ -740,11 +746,11 @@ describe('dashboardCacheMethods', function() {
     expect(new Date(usageSummary.lastActivityDate!).toISOString()).to.equal('2026-02-13T00:00:00.000Z');
   });
 
-  it('updateDashboardCacheForTdf preserves learner TDF configs', async function() {
+  it('applyDashboardHistoryRecord incrementally updates stats without reading history and preserves learner TDF configs', async function() {
     const userId = 'learner-1';
     let cacheDoc: any = {
       userId,
-      version: 1,
+      version: DASHBOARD_CACHE_VERSION,
       tdfStats: {},
       learnerTdfConfigs: {
         tdfA: {
@@ -755,6 +761,7 @@ describe('dashboardCacheMethods', function() {
     };
     let lastModifier: any = null;
     const lockKeys: string[] = [];
+    let historyFindCount = 0;
 
     const methods = createDashboardCacheMethods({
       Meteor: {
@@ -768,23 +775,10 @@ describe('dashboardCacheMethods', function() {
       },
       Roles: { userIsInRoleAsync: async () => false },
       Histories: {
-        find: () => ({
-          fetchAsync: async () => [
-            {
-              _id: 'h1',
-              userId,
-              TDFId: 'tdfA',
-              outcome: 'correct',
-              CFEndLatency: 1000,
-              CFFeedbackLatency: 500,
-              stimuliSetId: 'set-a',
-              stimulusKC: 'stim-a',
-              clusterKC: 'cluster-a',
-              recordedServerTime: new Date('2026-05-01T00:00:00.000Z'),
-              levelUnitType: 'model'
-            }
-          ]
-        }),
+        find: () => {
+          historyFindCount++;
+          return { fetchAsync: async () => [] };
+        },
         rawCollection: () => ({ distinct: async () => [] })
       },
       Tdfs: {
@@ -826,12 +820,71 @@ describe('dashboardCacheMethods', function() {
       }
     });
 
-    const result = await methods.updateDashboardCacheForTdf.call({ userId }, 'tdfA');
+    const result = await methods.applyDashboardHistoryRecord.call({ userId }, {
+      _id: 'h1',
+      userId,
+      TDFId: 'tdfA',
+      outcome: 'correct',
+      CFEndLatency: 1000,
+      CFFeedbackLatency: 500,
+      stimuliSetId: 'set-a',
+      stimulusKC: 'stim-a',
+      clusterKC: 'cluster-a',
+      recordedServerTime: new Date('2026-05-01T00:00:00.000Z'),
+      levelUnitType: 'model'
+    });
 
     expect(result.success).to.equal(true);
-    expect(lockKeys).to.deep.equal(['dashboard-cache:update:learner-1:tdfA']);
+    expect(result.action).to.equal('updated');
+    expect(historyFindCount).to.equal(0);
+    expect(lockKeys).to.deep.equal(['dashboard-cache:increment:learner-1']);
     expect(lastModifier.$set).to.not.have.property('learnerTdfConfigs');
     expect(cacheDoc.learnerTdfConfigs.tdfA.overrides.setspec.audioPromptMode).to.equal('feedback');
+    expect(cacheDoc.tdfStats.tdfA).to.include({
+      totalTrials: 1,
+      correctTrials: 1,
+      totalTimeMs: 1500,
+      itemsPracticedCount: 1,
+      totalSessions: 1,
+      lastProcessedHistoryId: 'h1'
+    });
+  });
+
+  it('incremental history application preserves distinct item and session-day aggregates', function() {
+    const history = [
+      {
+        _id: 'h1',
+        outcome: 'correct',
+        levelUnitType: 'model',
+        CFEndLatency: 1000,
+        CFFeedbackLatency: 250,
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
+      },
+      {
+        _id: 'h2',
+        outcome: 'incorrect',
+        levelUnitType: 'model',
+        CFEndLatency: 2000,
+        CFFeedbackLatency: 500,
+        stimuliSetId: 'set-a',
+        stimulusKC: 'stim-a',
+        recordedServerTime: new Date('2026-02-10T12:00:00.000Z')
+      }
+    ];
+    const practiceTime = (endLatency: number | null | undefined, feedbackLatency: number | null | undefined) =>
+      (endLatency ?? 0) + (feedbackLatency ?? 0);
+
+    const incremental = history.reduce(
+      (stats, record) => applyDashboardHistoryRecordToStats(stats, record, 'Demo', practiceTime),
+      undefined as ReturnType<typeof computeCacheStats> | undefined
+    );
+    const rebuilt = computeCacheStats(history, 'Demo', practiceTime);
+
+    expect(incremental).to.deep.equal(rebuilt);
+    expect(incremental?.itemsPracticedCount).to.equal(1);
+    expect(incremental?.totalSessions).to.equal(1);
   });
 
   it('ensureDashboardCacheCurrent does not rebuild when the cache is current', async function() {

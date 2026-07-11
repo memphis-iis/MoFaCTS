@@ -12,6 +12,7 @@ import {
   setSrWarmedUp,
   setAudioInputSensitivity,
   setAudioInputSensitivityView,
+  setAudioPromptMode,
   setAudioPromptFeedbackView,
   setAudioPromptQuestionVolume,
   setAudioPromptFeedbackVolume,
@@ -120,7 +121,8 @@ function applyRuntimeAudioSettings(settings: AudioSettingsForm): void {
   const volume = sharedVolume(settings);
   const speakingRate = sharedSpeakingRate(settings);
   const voice = sharedVoice(settings);
-  setAudioPromptFeedbackView(settings.audioPromptMode);
+  setAudioPromptMode(settings.audioPromptMode);
+  setAudioPromptFeedbackView(promptFeedbackEnabled(settings));
   setAudioPromptQuestionVolume(volume);
   setAudioPromptFeedbackVolume(volume);
   setAudioPromptQuestionSpeakingRate(speakingRate);
@@ -201,7 +203,7 @@ function loadAudioSettings(instance: AudioSettingsInstance): void {
   instance.subscribe('userAudioSettings', {
     onReady: () => {
       if (!instance.settingsLifetime.isCurrent(generation)) return;
-      const user = Meteor.user() as { audioSettings?: unknown } | null;
+      const user = Meteor.user() as { speechAPIKey?: string; audioSettings?: unknown } | null;
       let settings: AudioSettingsForm;
       try {
         settings = parsePublishedAudioSettings(user?.audioSettings);
@@ -227,7 +229,10 @@ function loadAudioSettings(instance: AudioSettingsInstance): void {
       applyRuntimeAudioSettings(settings);
 
       const srAvailability = evaluateSrAvailability({
-        user,
+        user: {
+          ...(user?.speechAPIKey ? { speechAPIKey: user.speechAPIKey } : {}),
+          audioSettings: { audioInputMode: settings.audioInputMode },
+        },
         tdfFile: Session.get('currentTdfFile'),
         sessionSpeechApiKey: Session.get('speechAPIKey'),
         serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),

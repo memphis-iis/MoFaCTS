@@ -1653,7 +1653,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   }
 
   setAudioPromptMode(audioPromptMode);
-  setAudioPromptFeedbackView(audioPromptMode);
+  setAudioPromptFeedbackView(audioPromptMode === 'feedback' || audioPromptMode === 'all');
   setAudioEnabledView(audioInputEnabled);
   setAudioPromptFeedbackSpeakingRateView(audioPromptFeedbackSpeakingRate);
   setAudioPromptQuestionSpeakingRateView(audioPromptQuestionSpeakingRate);

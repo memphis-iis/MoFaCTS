@@ -53,7 +53,7 @@ This inventory classifies the self-hosted configuration surface used by applicat
 | `MOFACTS_REQUIRE_REDIS` | optional, private-server | env override for Redis requirement | settings validation and Redis boundary |
 | `HOME` | optional runtime path input | local storage defaults | dynamic assets and H5P default paths |
 | `MOFACTS_DEFAULT_THEME_DIR`, `MOFACTS_THEME_DIR` | optional, private-server | theme customization | theme registry |
-| `MOFACTS_INSERT_HISTORY_TIMING`, `MOFACTS_INSERT_HISTORY_PAYLOAD_DEBUG` | development-only/private-server | server diagnostics | analytics method debug logging |
+| `MOFACTS_INSERT_HISTORY_TIMING` | development-only/private-server | server diagnostics | bounded history-write timing, size, schema, field-presence, and event-category metadata; never raw learner-history values |
 | `RUN_CONVERT_SCRIPT` | development-only | direct conversion script runs | conversion helper |
 | `DOCKER_REGISTRY`, `IMAGE_NAME`, `IMAGE_TAG` | deployment file | image build/pull paths | Compose image naming |
 | `READINESS_COMMAND`, `REQUIRE_READINESS` | release/deploy validation | deployment validation helper | `server-deploy-validate.sh` |

@@ -620,10 +620,11 @@ function applyThemeFontStylesheet(rawValue: unknown, template?: any) {
 
     if (link.getAttribute('href') === href) {
         const status = link.dataset.themeFontLoadState === 'error' ? 'error' : 'ready';
+        const error = link.dataset.themeFontLoadError;
         setThemeFontLoadState(template, {
             status,
             href,
-            error: link.dataset.themeFontLoadError,
+            ...(error ? { error } : {}),
         });
         return;
     }

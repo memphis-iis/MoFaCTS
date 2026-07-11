@@ -565,45 +565,6 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     }
   }
 
-  async function getAssignedTdfIdsForSection(sectionId: string) {
-    const section = await deps.Sections.findOneAsync({ _id: sectionId });
-    if (!section) {
-      return [];
-    }
-    const courseId = section.courseId;
-    const course = await deps.Courses.findOneAsync({ _id: courseId });
-    if (!course || course.semester !== curSemester) {
-      return [];
-    }
-    const rows = await deps.Assignments.find(
-      { courseId },
-      { fields: { TDFId: 1 } }
-    ).fetchAsync();
-    return rows
-      .map((row: any) => String(row?.TDFId || '').trim())
-      .filter((id: string) => id.length > 0);
-  }
-
-  async function updateUserAssignments(courseId: string) {
-    deps.serverConsole('updateUserAssignments', courseId);
-    const sections = await deps.Sections.find({ courseId }).fetchAsync();
-    const students = [];
-    for (const section of sections) {
-      const studentsInSection = await deps.SectionUserMap.find({ sectionId: section._id }).fetchAsync();
-      for (const student of studentsInSection) {
-        students.push({ studentId: student.userId, sectionId: section._id });
-      }
-    }
-    deps.serverConsole('updateUserAssignments: Processing', students.length, 'students');
-    for (const student of students) {
-      const assignedTDFs = await getAssignedTdfIdsForSection(student.sectionId);
-      const user = await deps.usersCollection.findOneAsync({ _id: student.studentId });
-      const loginParams = user?.loginParams || {};
-      loginParams.assignedTDFs = assignedTDFs;
-      await deps.usersCollection.updateAsync({ _id: student.studentId }, { $set: { loginParams } });
-    }
-  }
-
   async function sendCourseAssignmentEmail(userId: string, course: any, section: any) {
     const student = await deps.usersCollection.findOneAsync(
       { _id: userId },
@@ -754,7 +715,6 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const existingByTdfId = new Map(existingRows.map((row: any) => [String(row.TDFId), row]));
     const keepIds = new Set<string>();
     const now = new Date();
-    let membershipChanged = false;
     const changedAssignmentIds = new Set<string>();
 
     for (const row of normalizedRows) {
@@ -782,7 +742,6 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           }
         );
       } else {
-        membershipChanged = true;
         const insertedId = await deps.Assignments.insertAsync({
           courseId: String(course._id),
           TDFId: row.TDFId,
@@ -799,15 +758,11 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
 
     for (const existing of existingRows) {
       if (!keepIds.has(String(existing._id))) {
-        membershipChanged = true;
         changedAssignmentIds.add(String(existing._id));
         await deps.Assignments.removeAsync({ _id: existing._id, courseId: String(course._id) });
       }
     }
 
-    if (membershipChanged) {
-      await updateUserAssignments(String(course._id));
-    }
     await invalidateCourseSnapshotsForCourse(String(course._id), 'assignment-updated');
     for (const assignmentId of changedAssignmentIds) {
       await invalidateCourseSnapshotsForAssignment(assignmentId, 'assignment-updated');
@@ -1278,7 +1233,6 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     if (existingMappingCount === 0) {
       deps.serverConsole('new user, inserting into section_user_mapping', [sectionId, userId]);
       await deps.SectionUserMap.insertAsync({ sectionId, userId });
-      await updateUserAssignments(String(course._id));
       await invalidateCourseSnapshotForUser(userId, 'membership-updated');
       await invalidateCourseSnapshotsForCourse(String(course._id), 'membership-updated');
       await sendCourseAssignmentEmail(userId, course, section);

@@ -24,7 +24,6 @@ import {
   type AsyncCommandState,
 } from '../../lib/adminUi/asyncCommandState';
 import {
-  assignmentToEditorRow,
   filterAssignableTdfs,
   orderedRows,
   rowsFromAssignmentSnapshot,

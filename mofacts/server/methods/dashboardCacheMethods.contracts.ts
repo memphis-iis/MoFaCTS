@@ -39,7 +39,9 @@ export interface DashboardTdfStats {
   totalTimeMinutes: number;
   itemsPracticedCount: number;
   itemsPracticedApplies?: boolean;
+  practicedItemKeys?: string[];
   totalSessions: number;
+  sessionDateKeys?: string[];
   overallAccuracy: number | null;
   accuracyApplies: boolean;
   accuracyWeightedCorrect?: number;
@@ -79,13 +81,6 @@ export type ComputePracticeTimeMs = (
 export interface InitializeDashboardCacheResult {
   success: true;
   tdfCount: number;
-}
-
-export interface UpdateDashboardCacheResult {
-  success: boolean;
-  action?: 'updated' | 'no_history';
-  error?: string;
-  newRecords?: number;
 }
 
 export interface EnsureDashboardCacheCurrentResult {

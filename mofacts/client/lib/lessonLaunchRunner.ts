@@ -157,7 +157,7 @@ export async function selectTdf(
   }
 
   setAudioPromptMode(audioPromptMode);
-  setAudioPromptFeedbackView(audioPromptMode);
+  setAudioPromptFeedbackView(audioPromptMode === 'feedback' || audioPromptMode === 'all');
   setAudioEnabledView(audioInputEnabled);
   setAudioPromptFeedbackSpeakingRateView(audioPromptFeedbackSpeakingRate);
   setAudioPromptQuestionSpeakingRateView(audioPromptQuestionSpeakingRate);

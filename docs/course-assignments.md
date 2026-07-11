@@ -445,7 +445,7 @@ Write behavior:
 - Remove rows omitted from the save payload.
 - Set `createdAt` only on inserted rows.
 - Set `updatedAt` on every inserted or modified row.
-- Call existing `updateUserAssignments(courseId)` after changes that add/remove TDFs so enrolled learner login assignment lists remain current.
+- Keep `Assignments` and `SectionUserMap` authoritative; do not copy assigned TDF ids into learner `loginParams`.
 - Invalidate course learner snapshot caches for enrolled learners and relevant public-course cache cohorts after any assignment metadata, course date, course timezone, course visibility, or assignment membership change.
 - Metadata-only changes do not require dashboard practice cache rebuilds. History-derived progress changes are handled through the practice history/dashboard-cache path.
 

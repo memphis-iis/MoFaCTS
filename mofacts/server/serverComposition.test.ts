@@ -941,6 +941,7 @@ describe('public TDF and stimulus method authorization', function() {
     expect(asyncMethods.checkForTDFData).to.equal(undefined);
     expect(asyncMethods.getTdfNamesByOwnerId).to.equal(undefined);
     expect(asyncMethods.resolveAssignedRootTdfIdsForUser).to.equal(undefined);
+    expect(asyncMethods.applyDashboardHistoryRecord).to.equal(undefined);
   });
 
   it('projects public experiment-target lookup instead of returning the full TDF anonymously', async function() {

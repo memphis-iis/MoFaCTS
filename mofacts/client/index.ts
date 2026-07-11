@@ -371,7 +371,6 @@ Template.registerHelper('isInRole', function(role: string) {
 });
 
 import { meteorCallAsync } from './lib/meteorAsync';
-/** @typedef {import('../server/methods/dashboardCacheMethods.contracts').UpdateDashboardCacheResult} UpdateDashboardCacheResult */
 
 import { legacyDisplay } from '../common/underscoreCompat';
 

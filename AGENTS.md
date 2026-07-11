@@ -2,7 +2,18 @@
 
 This repository contains MoFaCTS, the Mobile Fact and Concept Training System. MoFaCTS is a web-based adaptive learning system. The executable application source tree lives under `mofacts/`.
 
-This file is intentionally root-level and self-contained. Do not rely on nested agent files for critical behavior unless the user explicitly asks to introduce them.
+This file is intentionally root-level and self-contained for critical behavior. Longer operational procedures may live in the public documentation linked here; do not rely on nested agent files for critical rules unless the user explicitly asks to introduce them.
+
+## Decision Priority
+
+When instructions compete, use this order:
+
+1. The user's explicit scope, intent, and permissions.
+2. Data integrity, security, privacy, and repository invariants.
+3. Verified runtime behavior and clear architectural ownership.
+4. The narrowest coherent change that does not leave broken wiring.
+5. Required verification and honest reporting of its result.
+6. Documentation, cleanup, and maintainability improvements within scope.
 
 ## Critical Invariants
 
@@ -14,14 +25,16 @@ This file is intentionally root-level and self-contained. Do not rely on nested 
 - Treat the config/content repo and wiki repo as critical MoFaCTS project components. Do not clone, create, copy, or substitute replacements unless explicitly instructed.
 - If user-facing behavior changes in `mofacts/`, check whether the wiki needs an update.
 - If code changes alter required TDF fields, config names, structures, schemas, payloads, interfaces, or field names, verify compatibility with dependent repositories.
-- Silent fallbacks are not allowed. Fail clearly when invariants break.
+- Do not silently substitute data, identity, repositories, configuration, runtime paths, or behavior when a required invariant fails. Fail clearly at the owning boundary.
+- Explicit, observable recovery behavior is allowed only when it has a named owner and contract and does not mask a broken invariant.
 - Do not add compatibility fallback paths unless explicitly requested.
 - Do not run Docker build, push, deploy, or production-affecting commands unless explicitly requested.
 - Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
 
 ## User Intent And Permissions
 
-- When the user asks a question, answer it directly. Do not infer permission to edit files, run commands, test, commit, or push.
+- When the user asks a conceptual question whose answer is already available from the prompt, answer it directly without workspace inspection.
+- A repository diagnosis, review, audit, or status question authorizes bounded read-only inspection of the named workspace, including source searches, diffs, status checks, and non-mutating diagnostics. It does not authorize edits, service startup, tests with side effects, external actions, commits, or pushes.
 - If a change seems needed after a question, recommend it separately and wait for explicit approval.
 - When the user asks for a change, implement it end to end when feasible, then report what changed and what was verified.
 - Stay on the current branch unless the user explicitly asks to create or switch branches.
@@ -64,7 +77,7 @@ This file is intentionally root-level and self-contained. Do not rely on nested 
 - MoFaCTS does not yet have a large user base that requires preserving every historical behavior. Prefer maintainable, coherent code over keeping obsolete paths alive by default.
 - "Legacy" means code, configuration, data paths, or behavior kept only to support past approaches that are not intended for the final system.
 - Do not call something legacy merely because it is older, unfamiliar, or different from another path. If it is an intentional current alternative path, name the domain behavior it provides.
-- When apparently unnecessary legacy code is discovered, pause before building on it or deleting it. Ask the user whether it is still needed, describe what depends on it, and recommend whether to remove, replace, or preserve it.
+- When the requested work would build on, change, delete, or add a compatibility layer around apparently unnecessary legacy code, pause and ask whether it is still needed. Describe what depends on it and recommend whether to remove, replace, or preserve it. Incidental legacy code that does not affect the task may be reported at handoff without interrupting the work.
 - Usually delete or collapse confirmed legacy paths instead of adding compatibility layers around them.
 - If preserving a legacy path is explicitly chosen, document the invariant, owner, expected lifetime, and verification needed to keep it from becoming hidden maintenance debt.
 
@@ -109,19 +122,39 @@ Run it from `mofacts/`. Do not substitute per-file checks or targeted `tsc` invo
 
 - When a required check fails, report the failing command, the relevant error summary, and whether the failure appears related to the change.
 - When a required check cannot run locally, report the reason and the next-best supported verification path.
+- Required verification failures block staging, commit, and push. Proceed only if the user explicitly accepts the identified failure after being told its relevance and risk.
+
+## Persistence And Migration Safety
+
+- Treat learner histories, model state, course assignments, TDF content, and resume identity as durable data contracts.
+- Do not run destructive or irreversible data migrations without explicit approval.
+- Migration code must be restartable or idempotent, bounded for production-scale data, and observable through progress and failure logging.
+- Before implementing a migration, define the forward transformation, validation, failure recovery or rollback approach, and the readers and writers affected.
+- Do not reinterpret an existing stored field until all active writers, readers, indexes, publications, methods, analytics, and dependent repositories have been traced.
+- Verify migration logic against representative existing records as well as newly created data. Never treat a clean-install-only test as sufficient migration evidence.
+
+## Security And Privacy
+
+- Never expose credentials, tokens, connection strings, local settings, learner data, or raw database records in logs, screenshots, generated artifacts, commits, or handoff text.
+- Treat learner history and exported usage data as sensitive. Minimize fields and record counts during diagnosis and redact identifiers from retained artifacts.
+- Enforce authentication and authorization at Meteor method, publication, route, and server boundaries. Client-side visibility controls are not authorization.
+- Do not copy production data locally or broaden database access without explicit approval. Prefer representative synthetic or minimized records when possible.
+- Keep secrets in approved ignored settings or environment mechanisms; never add them to source-controlled defaults or examples.
 
 ## UI, Logging, And Client Behavior
 
 - Never add raw client `console.*` for routine logging; use `mofacts/client/lib/clientLogger.ts`.
 - Preserve admin-controlled client verbosity behavior.
 - Use inline UI patterns instead of modal popups unless explicitly requested.
+- Preserve keyboard operation, visible focus, semantic labels, screen-reader announcements, readable contrast, and reduced-motion behavior where applicable.
+- Keep interface locale, authored content language, learner response language, speech-recognition language, and text-to-speech language as distinct contracts. Do not infer one silently from another.
 - For UI work, use the native hotfix dev loop first and the MoFaCTS Playwright sidecar for browser smoke testing.
 - Do not use the hotfix dev service as release confidence, deploy confidence, or a substitute for `npm run typecheck`.
 - For UI smoke tests, report the route tested, browser-visible result, and any console/network errors observed through the sidecar.
 
 ## Native Hotfix Dev Loop
 
-For fast UI/application hot fixes on Windows, use the native local hotfix dev server. This is the intended observe/edit/reload loop after startup has warmed caches.
+For fast UI/application hot fixes on Windows, use the native local hotfix dev server. This is the intended observe/edit/reload loop after startup has warmed caches. Detailed helper ownership and setup guidance lives in `deploy/hotfix-dev/README.md`.
 
 - Start the dev service from `deploy/` with `.\hotfix-dev.ps1 start -SettingsPath <local-settings-json>`.
 - On this setup, the settings path is defined by `C:\dev\mofacts_config\deploy and build.txt`: `$LocalSettingsPath = "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"`.
@@ -135,7 +168,7 @@ For fast UI/application hot fixes on Windows, use the native local hotfix dev se
 
 ## MoFaCTS Playwright Sidecar
 
-For UI work, use the MoFaCTS sidecar Playwright MCP server from `mofacts-mcp-sidecar/`, not the bundled Browser or Chrome extension registry.
+For UI work, use the MoFaCTS sidecar Playwright MCP server from `mofacts-mcp-sidecar/`, not the bundled Browser or Chrome extension registry. Detailed startup and troubleshooting guidance lives in `mofacts-mcp-sidecar/README.md`.
 
 - Correct MCP namespace in this environment: `mcp__mofacts_playwright__`.
 - Sidecar endpoint: `http://localhost:8931/mcp`.
@@ -148,7 +181,7 @@ For UI work, use the MoFaCTS sidecar Playwright MCP server from `mofacts-mcp-sid
 
 ## Local Hotfix Bundle Loop
 
-The local-only bundle loop under `deploy/` is for production-shaped app-code verification without creating a deployable Docker image. It is slower than the native hotfix dev loop.
+The local-only bundle loop under `deploy/` is for production-shaped app-code verification without creating a deployable Docker image. It is slower than the native hotfix dev loop. Helper ownership is documented in `deploy/hotfix/README.md`.
 
 - Code hot fixes still require a Meteor bundle rebuild. Do not monkey-patch compiled files inside a running container.
 - Use `docker-compose.hotfix-local.yml` together with `docker-compose.yml` and `docker-compose.local.yml`.
@@ -190,19 +223,20 @@ The local-only bundle loop under `deploy/` is for production-shaped app-code ver
 - Do not generate, edit, or keep side-by-side emitted `.js` files next to `.ts` source files in `mofacts/client/`, `mofacts/server/`, or `mofacts/common/`.
 - Treat untracked `.js` twins beside `.ts` files in `mofacts/` as build spill unless proven otherwise.
 
-## Never Without Explicit Request
-
-- Do not clone, create, copy, or substitute replacement config or wiki repositories.
-- Do not create or switch branches.
-- Do not run Docker build, push, deploy, or release workflows.
-- Do not run production-affecting commands.
-- Do not add compatibility fallback paths.
-- Do not add new npm, Meteor, Docker, or system dependencies.
-- Do not modify unrelated working behavior to fix a new behavior.
-- Do not commit generated local artifacts or one-off analysis outputs.
-
 ## Maintenance Rule
 
 - Treat this file as part of the codebase. When build, test, dev, deployment, documentation, architecture, or verification workflows change, update `AGENTS.md` or the appropriate public documentation in the same change.
 - Keep this file lean enough that critical instructions remain visible. Prefer root-level concise guidance over nested agent files when the rule is essential.
 - When a rule becomes long, procedural, or rare, move the detail to public docs and keep only the decision rule here.
+
+## Required Handoff
+
+At the end of repository work, report concisely:
+
+- What changed or what was concluded.
+- The evidence supporting the result.
+- Verification performed and its outcome.
+- Required verification not performed and why.
+- Any unrelated working-tree changes that were preserved.
+- Compatibility, migration, security, privacy, accessibility, localization, or documentation impact when relevant.
+- Remaining risks or decisions that require the user.

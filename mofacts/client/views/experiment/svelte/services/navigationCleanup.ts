@@ -3,8 +3,6 @@
  * Performs comprehensive cleanup before navigating away from card screen
  */
 
-import { Session } from 'meteor/session';
-import { meteorCallAsync } from '../../../../index';
 import { sessionCleanUp } from '../../../../lib/sessionUtils';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import { clientConsole } from '../../../../lib/clientLogger';
@@ -12,7 +10,6 @@ import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTy
 import { cleanupAudioRecorder } from './speechRecognitionService';
 import { stopTtsPlayback } from './ttsService';
 import { completeCleanup } from '../utils/lifecycleCleanup';
-import type { UpdateDashboardCacheResult } from '../../../../../server/methods/dashboardCacheMethods.contracts';
 import type { NavigationDestination } from '../../../../../common/types/svelteServices';
 
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
@@ -46,24 +43,12 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
 
     // Full cleanup when leaving practice (not /card or /instructions)
     if (dest !== '/card' && dest !== '/instructions' && document.location.pathname !== '/instructions') {
-      // Capture TDF ID before sessionCleanUp clears it
-      const currentTdfId = Session.get('currentTdfId');
-
       // Clear experiment state
       ExperimentStateStore.clear();
 
       // Session state cleanup (clears 50+ session variables)
       sessionCleanUp();
 
-      // **CRITICAL**: Update dashboard cache with latest performance data
-      if (currentTdfId && (dest === '/home' || dest === '/profile')) {
-        try {
-          const _updateResult = await meteorCallAsync<UpdateDashboardCacheResult>('updateDashboardCacheForTdf', currentTdfId);
-        } catch (err) {
-          clientConsole(1, '[Navigation] Dashboard cache update failed:', err);
-          // Continue navigation even if cache update fails
-        }
-      }
     }
 
     // Universal cleanup (all destinations)

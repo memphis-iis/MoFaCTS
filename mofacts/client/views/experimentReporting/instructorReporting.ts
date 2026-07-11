@@ -142,7 +142,7 @@ function waitForTdfListing(instance: InstructorReportingInstance, sub: { ready()
       if (sub.ready()) {
         computation.stop();
         if (instance.tdfReadyComputation === computation) {
-          instance.tdfReadyComputation = undefined;
+          delete instance.tdfReadyComputation;
         }
         resolve();
       }

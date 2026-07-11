@@ -335,6 +335,7 @@ describe('course assignment metadata methods', function() {
     expect(sentEmails[0].subject).to.contain('Course One');
     expect(sentEmails[0].text).to.contain('https://mofacts.example.test/courses');
     expect(sentEmails[0].text).to.contain('choose Courses from the Learn menu');
+    expect(users.rows.find((user) => user._id === 'student-user')?.loginParams).to.deep.equal({});
   });
 
   it('shows public courses as joinable but unavailable until section membership exists', async function() {
