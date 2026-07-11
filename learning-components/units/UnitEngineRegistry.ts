@@ -1,7 +1,7 @@
-import type { UnitEngine } from './UnitEngine';
+import type { UnitEngineExtension } from './UnitEngine';
 
-export type UnitEngineFactory = () => Promise<Partial<UnitEngine>> | Partial<UnitEngine>;
-export type UnitEngineFactoryWithDeps<TDeps> = (deps: TDeps) => Promise<Partial<UnitEngine>> | Partial<UnitEngine>;
+export type UnitEngineFactory = () => Promise<UnitEngineExtension> | UnitEngineExtension;
+export type UnitEngineFactoryWithDeps<TDeps> = (deps: TDeps) => Promise<UnitEngineExtension> | UnitEngineExtension;
 
 const unitEngineFactories = new Map<string, UnitEngineFactory>();
 const unitEngineFactoriesWithDeps = new Map<string, UnitEngineFactoryWithDeps<unknown>>();
@@ -42,7 +42,7 @@ export function hasRegisteredUnitEngine(unitType: string): boolean {
 export async function createRegisteredUnitEngine<TDeps>(
   unitType: string,
   deps?: TDeps,
-): Promise<Partial<UnitEngine>> {
+): Promise<UnitEngineExtension> {
   const normalizedUnitType = String(unitType || '').trim();
   const factory = unitEngineFactories.get(normalizedUnitType);
   if (factory) {

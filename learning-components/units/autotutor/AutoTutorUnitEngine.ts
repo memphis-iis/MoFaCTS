@@ -1,4 +1,4 @@
-import type { UnitEngine } from '../UnitEngine';
+import type { UnitEngineExtension } from '../UnitEngine';
 import {
   createInitialAutoTutorState,
   scoreAndPlanAutoTutorTurn,
@@ -7,7 +7,7 @@ import {
 
 export const AUTO_TUTOR_SESSION_UNIT_TYPE = 'autotutor';
 
-export type AutoTutorUnitEngine = Partial<UnitEngine> & {
+export type AutoTutorUnitEngine = UnitEngineExtension & {
   createInitialState: typeof createInitialAutoTutorState;
   scoreAndPlanTurn: typeof scoreAndPlanAutoTutorTurn;
   validateLearnerInput: typeof validateAutoTutorLearnerInput;
@@ -35,5 +35,17 @@ export function createAutoTutorUnitEngine(): AutoTutorUnitEngine {
     unitFinished() {
       unsupportedGenericCardEngineMethod('unitFinished');
     },
+    async prepareNextTrial() {
+      return { selection: null, preparedAdvanceMode: 'none' };
+    },
+    commitPreparedTrial() { return false; },
+    async advanceAfterAnswer() {
+      unsupportedGenericCardEngineMethod('advanceAfterAnswer');
+    },
+    isFinished() {
+      unsupportedGenericCardEngineMethod('isFinished');
+    },
+    getDisplayQuestionIndex(machineQuestionIndex) { return machineQuestionIndex; },
+    clearPreparedTrial() { },
   };
 }

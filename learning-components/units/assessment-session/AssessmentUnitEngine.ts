@@ -2,6 +2,7 @@ import { ASSESSMENT_SESSION_UNIT_TYPE } from '../unitTypes';
 import { createAssessmentSchedule } from './createAssessmentSchedule';
 
 import type { UnitEngineSessionReadKey, UnitEngineSessionWriteKey } from '../UnitEngineSessionKeys';
+import type { UnitEngineExtension } from '../UnitEngine';
 
 export interface CreateAssessmentUnitEngineDeps {
   readonly getSessionValue: (key: UnitEngineSessionReadKey) => any;
@@ -15,10 +16,10 @@ export interface CreateAssessmentUnitEngineDeps {
   readonly log: (level: number, ...args: unknown[]) => void;
 }
 
-export function createAssessmentUnitEngine(deps: CreateAssessmentUnitEngineDeps): any {
+export function createAssessmentUnitEngine(deps: CreateAssessmentUnitEngineDeps): UnitEngineExtension {
   let schedule: any;
   let scheduleCursor = 0;
-  return {
+  const engine: any = {
     unitType: ASSESSMENT_SESSION_UNIT_TYPE,
 
     initImpl: async function() {
@@ -221,5 +222,23 @@ export function createAssessmentUnitEngine(deps: CreateAssessmentUnitEngineDeps)
         return true;
       }
     },
+    async prepareNextTrial() {
+      const selection = await this.prepareNextScheduledCard();
+      return {
+        selection,
+        preparedAdvanceMode: selection ? 'direct' : 'none',
+        ...(selection ? { questionIndex: Number(selection.scheduleIndex) + 1 } : {}),
+      };
+    },
+    commitPreparedTrial(selection: Record<string, unknown> | null) {
+      return this.commitPreparedScheduledCard(selection);
+    },
+    async advanceAfterAnswer() {
+      await this.cardAnswered();
+    },
+    isFinished() { return this.unitFinished(); },
+    getDisplayQuestionIndex() { return scheduleCursor; },
+    clearPreparedTrial() { },
   };
+  return engine as UnitEngineExtension;
 }

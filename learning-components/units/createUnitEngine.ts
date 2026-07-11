@@ -54,7 +54,7 @@ export interface UnitEngineStimuliRuntime {
 }
 
 export interface UnitEngineAdaptiveModelRuntime {
-  readonly createAdaptiveQuestionLogic: () => any;
+  readonly createAdaptiveCoordinator: (currentUnit: unknown) => any;
   readonly getHiddenItems: () => unknown[];
   readonly setNumVisibleCards: (numVisibleCards: number) => void;
   readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
@@ -181,7 +181,7 @@ export function getCreateUnitEngineCapabilitySet(
   }
   if (hasRuntimeFunctions(
     deps.adaptiveModel,
-    'createAdaptiveQuestionLogic',
+    'createAdaptiveCoordinator',
     'getHiddenItems',
     'setNumVisibleCards',
     'updateCurStudentPerformance',
@@ -226,7 +226,7 @@ export function createDefaultUnitEngine(deps: CreateUnitEngineDeps, curExperimen
   }
   const engine = createBaseUnitEngine({
     experimentState: curExperimentData.experimentState,
-    adaptiveQuestionLogic: deps.adaptiveModel.createAdaptiveQuestionLogic(),
+    adaptiveCoordinator: deps.adaptiveModel.createAdaptiveCoordinator(deps.session.getSessionValue('currentTdfUnit')),
     stimClusters,
     getCurrentTestType: () => deps.session.getSessionValue('testType'),
     getDeliverySettings: deps.deliverySettings.getDeliverySettings,

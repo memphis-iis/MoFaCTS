@@ -43,7 +43,6 @@ import {
   setButtonTrial,
 } from './activeTrialDisplayRuntimeState';
 import {
-  getQuestionIndex,
   setQuestionIndex,
 } from './trialProgressionState';
 import type {
@@ -146,12 +145,6 @@ interface PreparedTrialContent extends Record<string, unknown> {
 }
 
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
-type PreparedIncomingTrialRoute =
-  | { kind: 'video-noop'; preparedAdvanceMode: 'none' }
-  | { kind: 'model-lock'; preparedAdvanceMode: 'seamless' }
-  | { kind: 'schedule-prepare'; preparedAdvanceMode: 'direct' }
-  | { kind: 'finish-check'; preparedAdvanceMode: 'seamless' | 'direct' };
-type PreparedTrialCommitRoute = 'model-locked-card' | 'schedule-prepared-card' | 'unsupported';
 
 function isUnitEngineVideoSurfaceActive(): boolean {
   return resolveSessionSurfaceState({
@@ -159,30 +152,47 @@ function isUnitEngineVideoSurfaceActive(): boolean {
   }).isVideoSession;
 }
 
-function requireScheduleDisplayQuestionIndex(selection: Record<string, unknown>): number {
-  const scheduleIndex = Number(selection.scheduleIndex);
-  if (!Number.isFinite(scheduleIndex) || scheduleIndex < 0) {
-    throw new Error('Schedule selection must include a valid non-negative scheduleIndex');
-  }
-  return Math.floor(scheduleIndex) + 1;
-}
+type RuntimeLifecycleEngine = UnitEngineLike & Required<Pick<
+  UnitEngineLike,
+  | 'selectNextCard'
+  | 'findCurrentCardInfo'
+  | 'prepareNextTrial'
+  | 'commitPreparedTrial'
+  | 'advanceAfterAnswer'
+  | 'isFinished'
+  | 'getDisplayQuestionIndex'
+  | 'clearPreparedTrial'
+>>;
 
-function requireLiveScheduleDisplayQuestionIndex(): number {
-  const questionIndex = Number(getQuestionIndex());
-  if (!Number.isFinite(questionIndex) || questionIndex < 1) {
-    throw new Error('Schedule selection must publish a live display question index');
+function requireRuntimeLifecycleEngine(
+  engine: UnitEngineLike | null | undefined,
+): asserts engine is RuntimeLifecycleEngine {
+  if (!engine) {
+    throw new Error('Unit engine is required');
   }
-  return Math.floor(questionIndex);
+  const requiredMethods: ReadonlyArray<keyof RuntimeLifecycleEngine> = [
+    'selectNextCard',
+    'findCurrentCardInfo',
+    'prepareNextTrial',
+    'commitPreparedTrial',
+    'advanceAfterAnswer',
+    'isFinished',
+    'getDisplayQuestionIndex',
+    'clearPreparedTrial',
+  ];
+  for (const method of requiredMethods) {
+    if (typeof engine[method] !== 'function') {
+      throw new Error(`Unit engine is missing required lifecycle method "${method}"`);
+    }
+  }
 }
 
 export function resolveSelectedCardExportQuestionIndex(
   engine: UnitEngineLike,
   machineQuestionIndex: number,
-  getLiveScheduleQuestionIndex: () => number = requireLiveScheduleDisplayQuestionIndex,
 ): number {
-  return engine.unitType === 'schedule'
-    ? getLiveScheduleQuestionIndex()
-    : machineQuestionIndex;
+  requireRuntimeLifecycleEngine(engine);
+  return engine.getDisplayQuestionIndex(machineQuestionIndex);
 }
 
 function getErrorMessage(error: unknown): string {
@@ -193,46 +203,11 @@ function getFiniteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
-export function resolvePreparedIncomingTrialRoute(engine: UnitEngineLike): PreparedIncomingTrialRoute {
-  if (engine.unitType === 'video') {
-    return {
-      kind: 'video-noop',
-      preparedAdvanceMode: 'none',
-    };
-  }
-  if (engine.unitType === 'model') {
-    return {
-      kind: 'model-lock',
-      preparedAdvanceMode: 'seamless',
-    };
-  }
-  if (engine.unitType === 'schedule') {
-    return {
-      kind: 'schedule-prepare',
-      preparedAdvanceMode: 'direct',
-    };
-  }
-  return {
-    kind: 'finish-check',
-    preparedAdvanceMode: 'direct',
-  };
-}
-
-export function resolvePreparedTrialCommitRoute(engine: UnitEngineLike | null | undefined): PreparedTrialCommitRoute {
-  if (engine?.unitType === 'model') {
-    return 'model-locked-card';
-  }
-  if (engine?.unitType === 'schedule') {
-    return 'schedule-prepared-card';
-  }
-  return 'unsupported';
-}
-
 export function canEngineUseSeamlessPreparedAdvance(engine: UnitEngineLike | null | undefined): boolean {
-  return resolvePreparedTrialCommitRoute(engine) === 'model-locked-card';
+  return engine?.supportsEarlyTrialPreparation === true;
 }
 
-export function resolveModelEngineCardRef(
+export function resolvePreparedAdvanceCardRef(
   engine: UnitEngineLike | null | undefined,
 ): Record<string, unknown> | null {
   return canEngineUseSeamlessPreparedAdvance(engine) && engine?.currentCardRef
@@ -280,89 +255,14 @@ function buildPreparedTrialPayload(params: {
   preparedAdvanceMode: Exclude<PreparedAdvanceMode, 'none'>;
 }): PreparedTrialContent {
   const { engine, selection, questionIndex, preparedAdvanceMode } = params;
-  const resolvedQuestionIndex = engine.unitType === 'schedule'
-    ? requireScheduleDisplayQuestionIndex(selection)
-    : questionIndex;
   return {
-    ...buildPreparedCardDataFromSelection(engine, selection, resolvedQuestionIndex),
+    ...buildPreparedCardDataFromSelection(engine, selection, questionIndex),
     engine,
     unitFinished: false,
     preparedAdvanceMode,
-    questionIndex: resolvedQuestionIndex,
+    questionIndex,
     preparedSelection: selection,
   };
-}
-
-async function prepareLockedNextTrial(
-  engine: UnitEngineLike,
-  context: UnitEngineServiceContext,
-  curExperimentState: ExperimentState,
-  questionIndex: number,
-): Promise<PreparedTrialContent | null> {
-  const existingPrepared = typeof engine.getPreparedNextTrialContent === 'function'
-    ? engine.getPreparedNextTrialContent()
-    : (engine.nextTrialContent || null);
-  if (existingPrepared) {
-    return {
-      ...existingPrepared,
-      engine,
-      unitFinished: false,
-      preparedAdvanceMode: 'seamless',
-      questionIndex,
-      preparedSelection: (existingPrepared as PreparedTrialContent).preparedSelection || engine._lockedNextSelection || null,
-    };
-  }
-
-  if (typeof engine.lockNextCardEarly !== 'function') {
-    return null;
-  }
-
-  const currentCardRef = engine.currentCardRef || {
-    clusterIndex: context.engineIndices?.clusterIndex,
-    stimIndex: context.engineIndices?.stimIndex,
-  };
-  const ownerToken = engine.currentCardOwnerToken || null;
-  const selection = await engine.lockNextCardEarly(undefined, curExperimentState, {
-    currentCardRef,
-    ownerToken,
-  });
-  if (!selection) {
-    return null;
-  }
-
-  const preparedPayload = buildPreparedTrialPayload({
-    engine,
-    selection,
-    questionIndex,
-    preparedAdvanceMode: 'seamless',
-  });
-  if (typeof engine.setPreparedNextTrialContent === 'function') {
-    engine.setPreparedNextTrialContent(preparedPayload);
-  } else {
-    engine.nextTrialContent = preparedPayload;
-  }
-  return preparedPayload;
-}
-
-async function prepareNextScheduledTrial(
-  engine: UnitEngineLike,
-  questionIndex: number,
-): Promise<PreparedTrialContent | null> {
-  if (typeof engine.prepareNextScheduledCard !== 'function') {
-    return null;
-  }
-
-  const selection = await engine.prepareNextScheduledCard();
-  if (!selection) {
-    return null;
-  }
-
-  return buildPreparedTrialPayload({
-    engine,
-    selection,
-    questionIndex,
-    preparedAdvanceMode: 'direct',
-  });
 }
 
 /**
@@ -375,6 +275,7 @@ async function prepareNextScheduledTrial(
  * @returns {Record<string, unknown>} Card data for machine context
  */
 export function getCardDataFromEngine(engine: UnitEngineLike, clusterIndex: number, questionIndex: number) {
+  requireRuntimeLifecycleEngine(engine);
   // Get current card info from engine
   const { whichStim, probabilityEstimate, clusterIndex: engineClusterIndex, forceButtonTrial } =
     engine.findCurrentCardInfo?.() as EngineCardInfo;
@@ -400,48 +301,8 @@ export function getCardDataFromEngine(engine: UnitEngineLike, clusterIndex: numb
  * @returns {boolean} True if unit is finished
  */
 async function isUnitFinished(engine: UnitEngineLike | null | undefined) {
-  if (!engine) {
-    clientConsole(1, '[Unit Engine] No engine - assuming unit finished');
-    return true;
-  }
-
-  // Check if engine has unitFinished method/property
-  if (typeof engine.unitFinished === 'function') {
-    return await engine.unitFinished();
-  } else if (typeof engine.unitFinished === 'boolean') {
-    return engine.unitFinished;
-  }
-
-  // Fallback: check if current index is beyond bounds
-  const currentIndex = engine.currentIndex || 0;
-  const totalCards = engine.totalCards || 0;
-
-  return currentIndex >= totalCards;
-}
-
-/**
- * Advance engine to next card.
- * Updates engine state based on performance.
- *
- * @param {UnitEngineLike | null | undefined} engine - Unit engine instance
- * @param {boolean} isCorrect - Was last answer correct
- * @param {number} responseTime - Response time in ms
- * @returns {void}
- */
-function advanceEngine(engine: UnitEngineLike | null | undefined, isCorrect: boolean, responseTime: number): void {
-  if (!engine) {
-    clientConsole(1, '[Unit Engine] No engine - cannot advance');
-    return;
-  }
-
-  // Call engine's advance method (varies by engine type)
-  if (typeof engine.advance === 'function') {
-    engine.advance(isCorrect, responseTime);
-  } else if (typeof engine.next === 'function') {
-    engine.next();
-  } else {
-    clientConsole(1, '[Unit Engine] Engine has no advance/next method');
-  }
+  requireRuntimeLifecycleEngine(engine);
+  return await engine.isFinished();
 }
 
 function isPreparedAdvanceEligible(
@@ -470,14 +331,8 @@ export function clearPreparedNextRuntimeState(
   if (!engine) {
     return;
   }
-  if (typeof engine.clearRuntimeNextCardState === 'function') {
-    engine.clearRuntimeNextCardState(reason);
-    return;
-  }
-  if (typeof engine.clearLockedNextCard === 'function') {
-    engine.clearLockedNextCard(reason);
-  }
-  engine.nextTrialContent = null;
+  requireRuntimeLifecycleEngine(engine);
+  engine.clearPreparedTrial(reason);
 }
 
 export function startEarlyLockForCurrentTrial(
@@ -539,43 +394,46 @@ export async function prepareIncomingTrialService(
   if (!engine) {
     throw new Error('No engine available for prepared incoming trial');
   }
+  requireRuntimeLifecycleEngine(engine);
 
   const nextQuestionIndex = Number.isFinite(context.questionIndex) ? Number(context.questionIndex) + 1 : 1;
-  const route = resolvePreparedIncomingTrialRoute(engine);
-  if (route.kind === 'video-noop') {
+  const curExperimentState = getRuntimeExperimentState() as ExperimentState;
+  const plan = await engine.prepareNextTrial({
+    experimentState: curExperimentState,
+    currentCardRef: engine.currentCardRef || {
+      clusterIndex: context.engineIndices?.clusterIndex,
+      stimIndex: context.engineIndices?.stimIndex,
+    },
+    ownerToken: engine.currentCardOwnerToken || null,
+  });
+  const questionIndex = plan.questionIndex ?? nextQuestionIndex;
+  if (plan.preparedContent) {
     return {
-      unitFinished: false,
-      preparedAdvanceMode: route.preparedAdvanceMode,
+      ...plan.preparedContent,
       engine,
-      questionIndex: nextQuestionIndex,
+      unitFinished: false,
+      preparedAdvanceMode: plan.preparedAdvanceMode,
+      questionIndex,
+      preparedSelection: plan.selection,
     };
   }
-
-  const curExperimentState = getRuntimeExperimentState() as ExperimentState;
-  if (route.kind === 'model-lock') {
-    const preparedTrial = await prepareLockedNextTrial(engine, context, curExperimentState, nextQuestionIndex);
-    if (preparedTrial) {
-      return preparedTrial;
-    }
-  }
-
-  if (route.kind === 'schedule-prepare') {
-    const preparedTrial = await prepareNextScheduledTrial(engine, nextQuestionIndex);
-    if (preparedTrial) {
-      return preparedTrial;
-    }
+  if (plan.selection) {
+    const preparedTrial = buildPreparedTrialPayload({
+      engine,
+      selection: plan.selection,
+      questionIndex,
+      preparedAdvanceMode: plan.preparedAdvanceMode === 'none' ? 'direct' : plan.preparedAdvanceMode,
+    });
+    engine.setPreparedNextTrialContent?.(preparedTrial);
+    return preparedTrial;
   }
 
   const unitFinished = await isUnitFinished(engine);
-  const fallbackAdvanceMode = route.kind === 'schedule-prepare' && !unitFinished
-    ? 'none'
-    : route.preparedAdvanceMode;
-
   return {
     unitFinished,
-    preparedAdvanceMode: fallbackAdvanceMode,
+    preparedAdvanceMode: plan.preparedAdvanceMode,
     engine,
-    questionIndex: nextQuestionIndex,
+    questionIndex,
   };
 }
 
@@ -593,14 +451,11 @@ export function commitPreparedTrialRuntime(
   }) as UnitEngineLike | null | undefined;
   const curExperimentState = getRuntimeExperimentState() as ExperimentState;
   const preparedSelection = preparedTrial.preparedSelection || null;
-  const commitRoute = resolvePreparedTrialCommitRoute(engine);
-  let committed = false;
-
-  if (commitRoute === 'model-locked-card' && typeof engine?.commitLockedNextCard === 'function') {
-    committed = engine.commitLockedNextCard(curExperimentState);
-  } else if (commitRoute === 'schedule-prepared-card' && typeof engine?.commitPreparedScheduledCard === 'function') {
-    committed = engine.commitPreparedScheduledCard(preparedSelection || preparedTrial);
+  if (!engine) {
+    throw new Error('Prepared trial commit requires a unit engine');
   }
+  requireRuntimeLifecycleEngine(engine);
+  const committed = engine.commitPreparedTrial(preparedSelection, curExperimentState);
 
   if (!committed) {
     throw new Error(`Prepared trial commit failed for unit type "${engine?.unitType || 'unknown'}"`);
@@ -620,11 +475,7 @@ export function commitPreparedTrialRuntime(
   }
   setCurrentAnswer(preparedTrial.currentAnswer);
 
-  if (typeof engine?.setPreparedNextTrialContent === 'function') {
-    engine.setPreparedNextTrialContent(null);
-  } else if (engine) {
-    engine.nextTrialContent = null;
-  }
+  engine.clearPreparedTrial('prepared-trial-committed');
 }
 
 /**
@@ -694,12 +545,7 @@ export async function selectCardService(
     if (!engine) {
       throw new Error('No engine available for card selection (check engineManager)');
     }
-    if (typeof engine.selectNextCard !== 'function') {
-      throw new Error('Engine is missing selectNextCard');
-    }
-
-    
-
+    requireRuntimeLifecycleEngine(engine);
     // Check if unit is finished
     if (await isUnitFinished(engine)) {
       
@@ -836,7 +682,6 @@ export async function updateEngineService(
 
     const engine = (event.engine || context.engine) as UnitEngineLike | null | undefined;
     const isCorrect = event.isCorrect !== undefined ? event.isCorrect : Boolean(context.isCorrect);
-    const responseTime = event.responseTime || 0;
     const testType = context.testType || 'd';
 
     
@@ -844,9 +689,9 @@ export async function updateEngineService(
     if (!engine) {
       throw new Error('No engine available for engine update');
     }
+    requireRuntimeLifecycleEngine(engine);
 
-    if (typeof engine.cardAnswered === 'function') {
-      const timings = calculateTrialTimings(
+    const timings = calculateTrialTimings(
         context.timestamps.trialEnd,
         context.timestamps.trialStart,
         context.timestamps.firstKeypress,
@@ -854,12 +699,12 @@ export async function updateEngineService(
         context.timestamps.feedbackEnd,
         testType
       );
-      const practiceTime = computePracticeTimeMs(timings.endLatency, timings.feedbackLatency);
-      const h5pOutcomes = context.h5pResult
+    const practiceTime = computePracticeTimeMs(timings.endLatency, timings.feedbackLatency);
+    const h5pOutcomes = context.h5pResult
         ? resolveH5PModelOutcomes(context.h5pResult)
         : null;
 
-      if (h5pOutcomes) {
+    if (h5pOutcomes) {
         clientConsole(2, '[Unit Engine] H5P model outcome batch', {
           contentId: context.h5pResult?.contentId,
           batchId: context.h5pResult?.batchId,
@@ -867,15 +712,15 @@ export async function updateEngineService(
           practiceTime,
         });
 
-        for (const outcome of h5pOutcomes) {
-          await engine.cardAnswered(outcome.correct, practiceTime, testType);
-        }
-      } else {
-        await engine.cardAnswered(isCorrect, practiceTime, testType);
-      }
+    }
+    await engine.advanceAfterAnswer(
+      h5pOutcomes || [{ correct: isCorrect }],
+      practiceTime,
+      testType,
+    );
 
-      if (!isUnitEngineVideoSurfaceActive()) {
-        const modelCardRef = resolveModelEngineCardRef(engine);
+    if (!isUnitEngineVideoSurfaceActive()) {
+        const modelCardRef = resolvePreparedAdvanceCardRef(engine);
         const modelClusterIndex = getFiniteNumber(modelCardRef?.clusterIndex);
         const modelStimIndex = getFiniteNumber(modelCardRef?.stimIndex);
         if (modelClusterIndex !== undefined && modelStimIndex !== undefined) {
@@ -886,9 +731,6 @@ export async function updateEngineService(
         } else {
           setEngineIndices(undefined);
         }
-      }
-    } else {
-      advanceEngine(engine, isCorrect, responseTime);
     }
 
     // MEDIUM FIX #1: Check if unit is finished after updating engine

@@ -11,7 +11,7 @@ import {
   updateCurStudedentPracticeTime
 } from '../../lib/currentTestingHelpers';
 import { createExperimentState } from './svelte/services/experimentState';
-import { unitIsFinished } from './unitProgression';
+import { unitIsFinished } from './svelte/services/unitProgression';
 import {
   getHiddenItems,
   setNumVisibleCards,
@@ -22,7 +22,8 @@ import { meteorCallAsync } from '../../index';
 import { clientConsole } from '../../lib/userSessionHelpers';
 import { displayify } from '../../../common/globalHelpers';
 import { Answers } from './answerAssess';
-import { AdaptiveQuestionLogic } from './adaptiveQuestionLogic';
+import { KC_MULTIPLE } from '../../../common/Definitions';
+import { AdaptiveUnitCoordinator } from '../../../../learning-components/units/shared/AdaptiveUnitCoordinator';
 import { reconstructLearningStateFromHistory } from '../../lib/history/historyReconstruction';
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 import { createUnitEngineServerMethods } from './unitEngineServerMethods';
@@ -41,6 +42,8 @@ import {
   type UnitEngineSessionWriteKey,
 } from '../../../../learning-components/units/UnitEngineSessionKeys';
 import { legacyFloat, legacyInt } from '../../../common/underscoreCompat';
+import { translatePlatformString } from '../../lib/interfaceI18n';
+import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 
 export { UNIT_ENGINE_SESSION_READ_KEYS, UNIT_ENGINE_SESSION_WRITE_KEYS };
 export type { UnitEngineSessionReadKey, UnitEngineSessionWriteKey };
@@ -131,7 +134,17 @@ export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext
       findTdfById,
     },
     adaptiveModel: {
-      createAdaptiveQuestionLogic: () => new AdaptiveQuestionLogic(),
+      createAdaptiveCoordinator: (currentUnit) => new AdaptiveUnitCoordinator(currentUnit, {
+        loadOutcomeRows: async () => await meteorCallAsync(
+          'getAdaptiveOutcomeRows',
+          Meteor.userId(),
+          Session.get('currentTdfId'),
+        ),
+        getCurrentStimuliSet: () => Session.get('currentStimuliSet'),
+        kcMultiple: KC_MULTIPLE,
+        reportUnitBuildFailure: () => alert(translatePlatformString(getActiveUiLocale(), 'lesson.unitBuildFailed')),
+        log: (level, ...args) => clientConsole(level, ...args),
+      }),
       getHiddenItems,
       setNumVisibleCards,
       updateCurStudentPerformance,

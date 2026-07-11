@@ -5,9 +5,7 @@ import {
   canEngineUseSeamlessPreparedAdvance,
   commitPreparedTrialRuntime,
   prepareIncomingTrialService,
-  resolveModelEngineCardRef,
-  resolvePreparedIncomingTrialRoute,
-  resolvePreparedTrialCommitRoute,
+  resolvePreparedAdvanceCardRef,
 } from './unitEngineService';
 import {
   getQuestionIndex,
@@ -93,6 +91,16 @@ describe('prepared advance integration seams', function() {
         selectNextCardCalls += 1;
         return selection;
       },
+      findCurrentCardInfo: () => selection,
+      prepareNextTrial: async () => {
+        const preparedSelection = await engine.lockNextCardEarly();
+        return { selection: preparedSelection, preparedAdvanceMode: 'seamless' as const };
+      },
+      commitPreparedTrial: () => true,
+      advanceAfterAnswer: async () => undefined,
+      isFinished: async () => false,
+      getDisplayQuestionIndex: (index: number) => index,
+      clearPreparedTrial: () => undefined,
     };
 
     const result = await prepareIncomingTrialService(
@@ -107,25 +115,6 @@ describe('prepared advance integration seams', function() {
     expect(result.currentAnswer).to.equal('alpha');
     expect(result.questionIndex).to.equal(2);
     expect(engine.getPreparedNextTrialContent()).to.not.equal(null);
-  });
-
-  it('names prepared incoming trial routes by behavior', function() {
-    expect(resolvePreparedIncomingTrialRoute({ unitType: 'video' })).to.deep.equal({
-      kind: 'video-noop',
-      preparedAdvanceMode: 'none',
-    });
-    expect(resolvePreparedIncomingTrialRoute({ unitType: 'model' })).to.deep.equal({
-      kind: 'model-lock',
-      preparedAdvanceMode: 'seamless',
-    });
-    expect(resolvePreparedIncomingTrialRoute({ unitType: 'schedule' })).to.deep.equal({
-      kind: 'schedule-prepare',
-      preparedAdvanceMode: 'direct',
-    });
-    expect(resolvePreparedIncomingTrialRoute({ unitType: 'custom' })).to.deep.equal({
-      kind: 'finish-check',
-      preparedAdvanceMode: 'direct',
-    });
   });
 
   it('prepareIncomingTrialService peeks schedule next card without advancing live selection', async function() {
@@ -154,6 +143,17 @@ describe('prepared advance integration seams', function() {
         return selection;
       },
       unitFinished: async () => false,
+      findCurrentCardInfo: () => selection,
+      prepareNextTrial: async () => ({
+        selection: await engine.prepareNextScheduledCard(),
+        preparedAdvanceMode: 'direct' as const,
+        questionIndex: 4,
+      }),
+      commitPreparedTrial: () => true,
+      advanceAfterAnswer: async () => undefined,
+      isFinished: async () => false,
+      getDisplayQuestionIndex: (index: number) => index,
+      clearPreparedTrial: () => undefined,
     };
 
     const result = await prepareIncomingTrialService(
@@ -175,6 +175,13 @@ describe('prepared advance integration seams', function() {
       selectNextCard: async () => {
         selectNextCardCalls += 1;
       },
+      findCurrentCardInfo: () => ({ whichStim: 0 }),
+      prepareNextTrial: async () => ({ selection: null, preparedAdvanceMode: 'none' as const }),
+      commitPreparedTrial: () => true,
+      advanceAfterAnswer: async () => undefined,
+      isFinished: async () => false,
+      getDisplayQuestionIndex: (index: number) => index,
+      clearPreparedTrial: () => undefined,
     };
 
     const result = await prepareIncomingTrialService(
@@ -202,22 +209,16 @@ describe('prepared advance integration seams', function() {
     }
   });
 
-  it('names prepared trial commit routes by behavior', function() {
-    expect(resolvePreparedTrialCommitRoute({ unitType: 'model' })).to.equal('model-locked-card');
-    expect(resolvePreparedTrialCommitRoute({ unitType: 'schedule' })).to.equal('schedule-prepared-card');
-    expect(resolvePreparedTrialCommitRoute({ unitType: 'video' })).to.equal('unsupported');
-    expect(resolvePreparedTrialCommitRoute(null)).to.equal('unsupported');
-  });
-
-  it('names seamless prepared-advance and model card-ref ownership', function() {
+  it('uses explicit seamless capability and current-card ownership', function() {
     const modelEngine = {
       unitType: 'model',
+      supportsEarlyTrialPreparation: true,
       currentCardRef: { clusterIndex: 2, stimIndex: 3 },
     };
     expect(canEngineUseSeamlessPreparedAdvance(modelEngine)).to.equal(true);
-    expect(resolveModelEngineCardRef(modelEngine)).to.deep.equal({ clusterIndex: 2, stimIndex: 3 });
+    expect(resolvePreparedAdvanceCardRef(modelEngine)).to.deep.equal({ clusterIndex: 2, stimIndex: 3 });
     expect(canEngineUseSeamlessPreparedAdvance({ unitType: 'schedule' })).to.equal(false);
-    expect(resolveModelEngineCardRef({ unitType: 'schedule', currentCardRef: { clusterIndex: 2 } })).to.equal(null);
+    expect(resolvePreparedAdvanceCardRef({ unitType: 'schedule', currentCardRef: { clusterIndex: 2 } })).to.equal(null);
   });
 
   it('commitPreparedTrialRuntime applies schedule mirrors only at commit', function() {
@@ -235,6 +236,18 @@ describe('prepared advance integration seams', function() {
         return true;
       },
       setPreparedNextTrialContent: () => undefined,
+      selectNextCard: async () => selection,
+      findCurrentCardInfo: () => selection,
+      prepareNextTrial: async () => ({ selection, preparedAdvanceMode: 'direct' as const }),
+      commitPreparedTrial: (preparedSelection: Record<string, unknown> | null) => {
+        commitPreparedScheduledCardCalls += 1;
+        expect(preparedSelection).to.equal(selection);
+        return true;
+      },
+      advanceAfterAnswer: async () => undefined,
+      isFinished: async () => false,
+      getDisplayQuestionIndex: (index: number) => index,
+      clearPreparedTrial: () => undefined,
     };
 
     commitPreparedTrialRuntime({

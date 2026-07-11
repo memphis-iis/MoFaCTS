@@ -169,19 +169,24 @@ describe('resume runtime integration seams', function() {
     expect(getQuestionIndex()).to.equal(6);
   });
 
-  it('resolves selected-card export index from the live schedule pointer only for schedule units', function() {
+  it('delegates selected-card export index to the engine lifecycle', function() {
+    const lifecycle = {
+      selectNextCard: async () => undefined,
+      findCurrentCardInfo: () => ({}),
+      prepareNextTrial: async () => ({ selection: null, preparedAdvanceMode: 'none' as const }),
+      commitPreparedTrial: () => true,
+      advanceAfterAnswer: async () => undefined,
+      isFinished: async () => false,
+      clearPreparedTrial: () => undefined,
+    };
     expect(resolveSelectedCardExportQuestionIndex(
-      { unitType: 'schedule' },
+      { ...lifecycle, unitType: 'schedule', getDisplayQuestionIndex: () => 8 },
       2,
-      () => 8,
     )).to.equal(8);
 
     expect(resolveSelectedCardExportQuestionIndex(
-      { unitType: 'model' },
+      { ...lifecycle, unitType: 'model', getDisplayQuestionIndex: (index) => index },
       2,
-      () => {
-        throw new Error('model should not read schedule pointer');
-      },
     )).to.equal(2);
   });
 

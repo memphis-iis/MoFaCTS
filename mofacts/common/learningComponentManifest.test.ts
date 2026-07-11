@@ -211,7 +211,18 @@ describe('Learning component manifests', function() {
       unitTypes: ['sample'],
       requiredCapabilities: ['session'],
       register(context) {
-        context.registerUnitEngine('sample', () => ({}));
+        context.registerUnitEngine('sample', () => ({
+          unitType: 'sample',
+          selectNextCard: async () => undefined,
+          cardAnswered: async () => undefined,
+          unitFinished: async () => false,
+          prepareNextTrial: async () => ({ selection: null, preparedAdvanceMode: 'none' }),
+          commitPreparedTrial: () => true,
+          advanceAfterAnswer: async () => undefined,
+          isFinished: async () => false,
+          getDisplayQuestionIndex: (index) => index,
+          clearPreparedTrial: () => undefined,
+        }));
         registered = true;
       },
     };

@@ -24,4 +24,6 @@ Use deliberate, behavior-preserving import facades when moving code from legacy 
 
 New unit families should register through a `LearningComponentManifest` and name every required runtime capability. Missing capabilities must fail during component registration instead of being handled through silent fallback behavior.
 
+Every registered unit engine implements the lifecycle in `UnitEngine.ts`: prepare and commit the next trial, advance after an answer, report completion, project the display question index, and clear prepared state. The app runtime dispatches only through that contract; unit-specific routing belongs in the owning engine rather than in the Meteor-facing service.
+
 `defaultUnitComponents.ts` should remain a catalog aggregator only. New unit component logic and manifest wiring belong in the owning unit folder.

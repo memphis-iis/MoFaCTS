@@ -53,6 +53,13 @@ import {
 } from '../../runtime/modelPracticeUpdates';
 import { buildAdaptiveLogisticModelProgressItems } from './modelProgressProvider';
 import type { LearningHistoryReadOptions } from '../../units/UnitEngineServerMethods';
+import type { UnitEngineExtension } from '../../units/UnitEngine';
+
+export type AdaptiveLogisticUnitEngine = UnitEngineExtension & {
+  buildPreparedCardQuestionAndAnswerGlobals: (...args: any[]) => Promise<any>;
+  applyModelPracticeUpdate: (...args: any[]) => any;
+  queryModelPracticeState: (...args: any[]) => any;
+};
 
 type StimClusterLike = {
   clusterKC?: unknown;
@@ -130,7 +137,7 @@ export interface CreateAdaptiveLogisticUnitEngineDeps {
 export async function createAdaptiveLogisticUnitEngine(
   deps: CreateAdaptiveLogisticUnitEngineDeps,
   config: AdaptiveLogisticUnitEngineConfig,
-): Promise<any> {
+): Promise<AdaptiveLogisticUnitEngine> {
   deps.log(1, 'model unit engine created!!!');
   const unitStartTimestamp = Date.now();
 
@@ -226,7 +233,7 @@ export async function createAdaptiveLogisticUnitEngine(
     deps.setSessionValue('overallStudyHistory', overallStudyHistory);
   }
 
-  return {
+  const engine: any = {
     calculateCardProbabilities: function calculateCardProbabilities() {
       calculateLearningSessionCardProbabilities({
         cardProbabilities,
@@ -303,7 +310,7 @@ export async function createAdaptiveLogisticUnitEngine(
       core: ModelPracticeHistoryCore,
       request: ModelPracticeUpdateRequest,
       extensionFields?: Record<string, unknown>,
-    ) {
+) {
       const modelEvidenceSource = extensionFields?.sparc ? 'sparc' : 'learning';
       const runtime = createModelPracticeRuntime({
         applyUpdate: (currentRequest) => applyModelPracticeUpdateToAdaptiveLogistic({
@@ -342,6 +349,7 @@ export async function createAdaptiveLogisticUnitEngine(
     },
 
     unitType: config.unitType,
+    supportsEarlyTrialPreparation: true,
 
     curUnit: (() => JSON.parse(JSON.stringify(deps.getSessionValue('currentTdfUnit'))))(),
 
@@ -595,6 +603,49 @@ export async function createAdaptiveLogisticUnitEngine(
       });
     },
 
+    async prepareNextTrial(context: any) {
+      const preparedContent = this.getPreparedNextTrialContent();
+      if (preparedContent?.preparedSelection) {
+        return {
+          selection: preparedContent.preparedSelection,
+          preparedAdvanceMode: 'seamless',
+          preparedContent,
+        };
+      }
+      const currentCardRef = context.currentCardRef || this.currentCardRef;
+      const ownerToken = context.ownerToken || this.currentCardOwnerToken;
+      const selection = await this.lockNextCardEarly(undefined, context.experimentState, {
+        currentCardRef,
+        ownerToken,
+      });
+      return {
+        selection,
+        preparedAdvanceMode: selection ? 'seamless' : 'none',
+      };
+    },
+
+    commitPreparedTrial(_selection: Record<string, unknown> | null, experimentState: unknown) {
+      return this.commitLockedNextCard(experimentState);
+    },
+
+    async advanceAfterAnswer(outcomes: readonly { correct: boolean }[], practiceTime: number) {
+      for (const outcome of outcomes) {
+        await this.cardAnswered(outcome.correct, practiceTime);
+      }
+    },
+
+    isFinished() {
+      return this.unitFinished();
+    },
+
+    getDisplayQuestionIndex(machineQuestionIndex: number) {
+      return machineQuestionIndex;
+    },
+
+    clearPreparedTrial(reason: string) {
+      this.clearRuntimeNextCardState(reason);
+    },
+
     unitFinished: async function() {
       const session = config.resolveRuntimeConfig(this.curUnit);
       return learningUnitFinished({
@@ -607,4 +658,5 @@ export async function createAdaptiveLogisticUnitEngine(
       });
     },
   };
+  return engine as AdaptiveLogisticUnitEngine;
 }

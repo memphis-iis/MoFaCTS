@@ -44,5 +44,17 @@ export function createMinimalFlashcardUnit(deps: MinimalFlashcardUnitDeps): Unit
     unitFinished() {
       return index >= deps.cards.length - 1;
     },
+    async prepareNextTrial() {
+      return { selection: null, preparedAdvanceMode: 'direct' };
+    },
+    commitPreparedTrial() { return false; },
+    async advanceAfterAnswer(outcomes, practiceTime) {
+      for (const outcome of outcomes) {
+        await this.cardAnswered(outcome.correct, practiceTime);
+      }
+    },
+    isFinished() { return this.unitFinished(); },
+    getDisplayQuestionIndex(machineQuestionIndex) { return machineQuestionIndex; },
+    clearPreparedTrial() { },
   };
 }

@@ -54,24 +54,13 @@ type TdfUnitState = Record<string, unknown> & {
   deliverySettings?: Record<string, unknown>;
 };
 
-type AdaptiveLogicOutput = {
-  conditionResult?: boolean;
-  when?: unknown;
-  questions?: unknown[];
-  checkpoints?: unknown[];
-};
-
-type AdaptiveQuestionLogic = {
-  curUnit?: { adaptiveLogic?: unknown };
-  evaluate: (rule: unknown, adaptiveOutcomes?: Record<string, boolean>) => Promise<AdaptiveLogicOutput | undefined>;
-  getAdaptiveOutcomes?: () => Promise<Record<string, boolean>>;
-  unitBuilder: (template: unknown, adaptiveQuestionTimes: unknown[], adaptiveQuestions: unknown[], adaptiveCheckpoints?: unknown[]) => unknown;
-  modifyUnit: (logic: unknown, unit: unknown) => Promise<unknown>;
-  when?: unknown;
-};
-
 type UnitProgressionEngine = {
-  adaptiveQuestionLogic?: AdaptiveQuestionLogic;
+  adaptiveCoordinator?: {
+    applyUnitTransitions: (
+      tdfFile: TdfFileState,
+      currentUnitNumber: number,
+    ) => Promise<{ tdfFile: TdfFileState; countCompletion?: unknown }>;
+  };
 };
 
 type RootTdfBoxed = {
@@ -138,7 +127,6 @@ export async function unitIsFinished(_reason: string): Promise<void> {
 
   const currentUnitNumber = Session.get('currentUnitNumber') as number;
   const adaptive = curTdf.tdfs.tutor.unit[currentUnitNumber]?.adaptive;
-  const adaptiveLogic = curTdf.tdfs.tutor.unit[currentUnitNumber]?.adaptiveLogic;
   const curUnitNum = currentUnitNumber;
   const prevUnit = curTdf.tdfs.tutor.unit[curUnitNum] || ({} as TdfUnitState);
   const newUnitNum = curUnitNum + 1;
@@ -147,64 +135,12 @@ export async function unitIsFinished(_reason: string): Promise<void> {
 
   if (adaptive) {
     const engine = resolveRuntimeEngine() as unknown as UnitProgressionEngine;
-    if (engine.adaptiveQuestionLogic) {
-      const logic = engine.adaptiveQuestionLogic.curUnit?.adaptiveLogic;
-      if (logic !== '' && logic !== undefined) {
-        clientConsole(2, 'adaptive schedule');
-        const adaptiveOutcomes = typeof engine.adaptiveQuestionLogic.getAdaptiveOutcomes === 'function'
-          ? await engine.adaptiveQuestionLogic.getAdaptiveOutcomes()
-          : undefined;
-        for (const adaptiveUnitIndex in adaptive) {
-          const adaptiveEntry = String(adaptive[adaptiveUnitIndex]);
-          const newUnitIndex = Number(adaptiveEntry.split(',')[0]);
-          const targetUnitIndex = newUnitIndex - 1;
-          const isTemplate = adaptiveEntry.split(',')[1] === 't';
-          const adaptiveQuestionTimes: unknown[] = [];
-          const adaptiveQuestions: unknown[] = [];
-          const adaptiveCheckpoints: unknown[] = [];
-
-          for (const logicRule of (adaptiveLogic?.[newUnitIndex] || [])) {
-            const logicOutput = await engine.adaptiveQuestionLogic.evaluate(logicRule, adaptiveOutcomes);
-            if (logicOutput?.conditionResult) {
-              if (logicOutput.questions) {
-                for (const adaptiveQuestion of logicOutput.questions) {
-                  adaptiveQuestions.push(adaptiveQuestion);
-                  adaptiveQuestionTimes.push(logicOutput.when);
-                }
-              }
-              if (logicOutput.checkpoints) {
-                adaptiveCheckpoints.push(...logicOutput.checkpoints);
-              }
-            }
-          }
-
-          if (isTemplate) {
-            const adaptiveTemplates = curTdf.tdfs.tutor.setspec.unitTemplate || [];
-            const templateIndex = Number(prevUnit.adaptiveUnitTemplate?.[Number(adaptiveUnitIndex)] ?? adaptiveUnitIndex);
-            const adaptiveTemplate = adaptiveTemplates[templateIndex];
-            if (!adaptiveTemplate) {
-              throw new Error(`Adaptive template index ${templateIndex} not found for adaptive target ${adaptiveEntry}.`);
-            }
-            const unit = engine.adaptiveQuestionLogic.unitBuilder(
-              adaptiveTemplate,
-              adaptiveQuestionTimes,
-              adaptiveQuestions,
-              adaptiveCheckpoints
-            );
-            countCompletion = prevUnit.countcompletion;
-            curTdf.tdfs.tutor.unit.splice(newUnitIndex - 1, 0, unit as TdfUnitState);
-          } else {
-            const unit = await engine.adaptiveQuestionLogic.modifyUnit(
-              adaptiveLogic?.[newUnitIndex],
-              curTdf.tdfs.tutor.unit[targetUnitIndex]
-            );
-            curTdf.tdfs.tutor.unit[targetUnitIndex] = unit as TdfUnitState;
-          }
-        }
-      }
+    if (!engine.adaptiveCoordinator) {
+      throw new Error('Adaptive unit progression requires an adaptive coordinator');
     }
-
-    Session.set('currentTdfFile', curTdf);
+    const transition = await engine.adaptiveCoordinator.applyUnitTransitions(curTdf, currentUnitNumber);
+    countCompletion = transition.countCompletion;
+    Session.set('currentTdfFile', transition.tdfFile);
   }
 
   const currentTdfFileState = Session.get('currentTdfFile') as TdfFileState | null | undefined;
@@ -339,4 +275,52 @@ export async function checkUnitCompletion(engine: UnitCompletionEngine | null | 
     clientConsole(1, '[Unit Progression] Error checking unit completion:', error);
     return false;
   }
+}
+
+export async function revisitUnit(unitNumber: string | number): Promise<void> {
+  const curTdf = Session.get('currentTdfFile') as TdfFileState | null;
+  if (!curTdf?.tdfs?.tutor?.unit) {
+    throw new Error('Cannot revisit a unit without an active TDF unit list');
+  }
+
+  const currentUnitNumber = Number(Session.get('currentUnitNumber') || 0);
+  const furthestUnit = Math.max(currentUnitNumber, Number(Session.get('furthestUnit') || 0));
+  Session.set('furthestUnit', furthestUnit);
+
+  const newUnitNumber = Number.parseInt(String(unitNumber), 10);
+  if (!Number.isInteger(newUnitNumber) || newUnitNumber < 0) {
+    throw new Error(`Cannot revisit invalid unit index ${String(unitNumber)}`);
+  }
+  const revisitedUnit = curTdf.tdfs.tutor.unit[newUnitNumber];
+  if (!revisitedUnit) {
+    throw new Error(`Cannot revisit missing unit ${newUnitNumber}`);
+  }
+
+  resetQuestionIndex();
+  Session.set('clusterIndex', undefined);
+  Session.set('currentUnitNumber', newUnitNumber);
+  Session.set('currentTdfUnit', revisitedUnit);
+  Session.set('resetSchedule', true);
+  refreshCurrentDeliverySettingsStore();
+  Session.set('currentUnitStartTime', Date.now());
+  setFeedbackUnset(true);
+  setFeedbackTypeFromHistory(undefined);
+  Session.set('curUnitInstructionsSeen', false);
+
+  const previousExperimentState = await getExperimentState();
+  await createExperimentState({
+    ...previousExperimentState,
+    questionIndex: 0,
+    clusterIndex: 0,
+    shufIndex: 0,
+    whichStim: 0,
+    currentUnitNumber: newUnitNumber,
+    schedule: null,
+    scheduleUnitNumber: null,
+    videoCheckpointAnchorIndex: null,
+    videoCheckpointAnchorTime: null,
+    videoPendingQuestionIndex: null,
+  });
+
+  FlowRouter.go('/instructions');
 }

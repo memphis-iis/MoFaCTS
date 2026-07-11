@@ -3,7 +3,7 @@ import {secsIntervalString} from '../../../common/globalHelpers';
 import {haveMeteorUser} from '../../lib/currentTestingHelpers';
 import './instructions.html';
 import { createExperimentState } from './svelte/services/experimentState';
-import { revisitUnit, unitIsFinished } from './unitProgression';
+import { revisitUnit, unitIsFinished } from './svelte/services/unitProgression';
 import {routeToSignin} from '../../lib/router';
 import { meteorCallAsync } from '../../index';
 import { clientConsole } from '../../lib/userSessionHelpers';

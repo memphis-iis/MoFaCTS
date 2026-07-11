@@ -1,14 +1,15 @@
 import type { UnitEngineSessionWriteKey } from '../UnitEngineSessionKeys';
+import type { UnitEngineExtension } from '../UnitEngine';
 
 export interface CreateVideoSessionUnitEngineDeps {
   readonly setSessionValue: (key: UnitEngineSessionWriteKey, value: any) => void;
   readonly log: (level: number, ...args: unknown[]) => void;
 }
 
-export function createVideoSessionUnitEngine(deps: CreateVideoSessionUnitEngineDeps): any {
+export function createVideoSessionUnitEngine(deps: CreateVideoSessionUnitEngineDeps): UnitEngineExtension {
   let currentVideoCardInfo: any = { clusterIndex: -1, whichStim: 0 };
 
-  return {
+  const engine: any = {
     unitType: "video",
 
     initImpl: function() {
@@ -55,5 +56,14 @@ export function createVideoSessionUnitEngine(deps: CreateVideoSessionUnitEngineD
     clearPrefetchedNextCard: function() { },
     updatePracticeTime: function() { },
     loadResumeState: async function() { },
+    async prepareNextTrial() {
+      return { selection: null, preparedAdvanceMode: 'none' };
+    },
+    commitPreparedTrial() { return false; },
+    async advanceAfterAnswer() { },
+    isFinished() { return this.unitFinished(); },
+    getDisplayQuestionIndex(machineQuestionIndex: number) { return machineQuestionIndex; },
+    clearPreparedTrial() { },
   };
+  return engine as UnitEngineExtension;
 }

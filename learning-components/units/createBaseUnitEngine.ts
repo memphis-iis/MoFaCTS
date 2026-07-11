@@ -6,7 +6,7 @@ import type { UnitEngineSessionWriteKey } from './UnitEngineSessionKeys';
 
 export interface CreateBaseUnitEngineParams {
   readonly experimentState: any;
-  readonly adaptiveQuestionLogic: any;
+  readonly adaptiveCoordinator: any;
   readonly stimClusters: any[];
   readonly getCurrentTestType: () => string | undefined;
   readonly getDeliverySettings: () => Record<string, unknown> | null | undefined;
@@ -22,7 +22,7 @@ export function createBaseUnitEngine(params: CreateBaseUnitEngineParams): any {
   const engine: any = {
     unitType: 'DEFAULT',
 
-    adaptiveQuestionLogic: params.adaptiveQuestionLogic,
+    adaptiveCoordinator: params.adaptiveCoordinator,
     selectNextCard: function() {
       throw new Error('Missing Implementation');
     },

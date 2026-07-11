@@ -38,7 +38,7 @@ describe('Learning component catalog', function() {
         findTdfById: () => ({}),
       },
       adaptiveModel: {
-        createAdaptiveQuestionLogic: () => ({}),
+        createAdaptiveCoordinator: () => ({}),
         getHiddenItems: () => [],
         setNumVisibleCards() {},
         updateCurStudentPerformance() {},

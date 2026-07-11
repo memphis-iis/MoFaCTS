@@ -147,8 +147,6 @@ export interface UnitEngineLike {
   getScheduleCursor?: () => number;
   setScheduleCursor?: (cursor: number) => void;
   cardAnswered?: (isCorrect: boolean, responseTime: number, testType: string) => void;
-  advance?: (isCorrect: boolean, responseTime: number) => void;
-  next?: () => void;
   calculateIndices?: (options?: Record<string, unknown>) => Promise<Record<string, unknown>>;
   prefetchNextCard?: (engineIndices: unknown, experimentState: unknown) => void;
   clearPrefetchedNextCard?: () => void;
@@ -158,6 +156,26 @@ export interface UnitEngineLike {
     experimentState: unknown
   ) => Promise<Record<string, unknown> | void>;
   findCurrentCardInfo?: () => Record<string, unknown>;
+  prepareNextTrial?: (context: {
+    experimentState: unknown;
+    currentCardRef?: Record<string, unknown> | null;
+    ownerToken?: string | null;
+  }) => Promise<{
+    selection: Record<string, unknown> | null;
+    preparedAdvanceMode: 'none' | 'seamless' | 'direct';
+    questionIndex?: number;
+    preparedContent?: Record<string, unknown> | null;
+  }>;
+  commitPreparedTrial?: (selection: Record<string, unknown> | null, experimentState: unknown) => boolean;
+  advanceAfterAnswer?: (
+    outcomes: ReadonlyArray<{ correct: boolean }>,
+    practiceTime: number,
+    testType: string,
+  ) => Promise<void>;
+  isFinished?: () => Promise<boolean> | boolean;
+  getDisplayQuestionIndex?: (machineQuestionIndex: number) => number;
+  clearPreparedTrial?: (reason: string) => void;
+  supportsEarlyTrialPreparation?: boolean;
   clearLockedNextCard?: (reason?: string) => void;
   clearRuntimeNextCardState?: (reason?: string) => void;
   prepareNextScheduledCard?: () => Promise<Record<string, unknown> | null>;
