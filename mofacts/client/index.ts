@@ -99,7 +99,7 @@ const PRACTICE_SHELL_TEMPLATES = new Set([
   'instructions',
 ]);
 
-const APP_SHELL_TEMPLATES = new Set([
+const HOME_SHELL_TEMPLATES = new Set([
   'home',
 ]);
 
@@ -143,7 +143,7 @@ function getAuthenticatedChromeMode(): AuthenticatedChromeMode {
   ) {
     return 'practice';
   }
-  if (APP_SHELL_TEMPLATES.has(currentTemplate)) {
+  if (HOME_SHELL_TEMPLATES.has(currentTemplate)) {
     return 'app';
   }
   const routePresentation = managementRoutePresentation.get();

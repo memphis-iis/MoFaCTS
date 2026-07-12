@@ -144,6 +144,7 @@ describe('learning-session crowd stats integration', function() {
           allTimeIncorrect: 0,
           priorIncorrect: 0,
           outcomeStack: [],
+          timeHistory: [],
         },
       },
       cards: [{
