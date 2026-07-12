@@ -102,6 +102,8 @@ function createServerHistoryRecord(overrides: Record<string, unknown> = {}) {
 describe('server auth and session methods', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
+    await Roles.createRoleAsync('admin', { unlessExists: true });
+    await Roles.createRoleAsync('teacher', { unlessExists: true });
   });
 
   it('writes auth.signupCompleted for native signup', async function() {

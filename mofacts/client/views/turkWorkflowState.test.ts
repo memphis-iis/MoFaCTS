@@ -8,7 +8,7 @@ describe('turkWorkflowState', function() {
   it('normalizes only experiment-target TDFs into workflow options', function() {
     const experiments = normalizeTurkWorkflowExperiments([
       {
-        _id: 'tdf-123456789',
+        _id: 'test',
         content: {
           fileName: 'lesson.xml',
           tdfs: { tutor: { setspec: { lessonname: 'Lesson', experimentTarget: 'mturk' } } },
@@ -25,11 +25,11 @@ describe('turkWorkflowState', function() {
     ]);
 
     expect(experiments).to.deep.equal([{
-      _id: 'tdf-123456789',
-      selectorKey: 'tdf-123456789',
+      _id: 'test',
+      selectorKey: 'test',
       fileName: 'lesson.xml',
       lessonName: 'Lesson',
-      displayLabel: 'lesson.xml (tdf-1234)',
+      displayLabel: 'lesson.xml (test)',
     }]);
   });
 
