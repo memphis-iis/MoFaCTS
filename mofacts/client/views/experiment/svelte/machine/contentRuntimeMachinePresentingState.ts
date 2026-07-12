@@ -182,13 +182,28 @@ export const contentRuntimeMachinePresentingState = {
     },
 
     [STATES.AWAITING]: {
-      entry: ['enableInput', 'markInputEnabled', 'focusInput', 'maybeSpeakQuestion', 'startRecording', 'logStateTransition'],
+      entry: ['logStateTransition'],
       exit: ['disableInput', 'stopRecording', 'logStateTransition'],
       type: 'parallel',
       states: {
         inputMode: {
-          initial: 'ready',
+          initial: 'waitingForReveal',
           states: {
+            waitingForReveal: {
+              on: {
+                [EVENTS.TRIAL_REVEAL_STARTED]: {
+                  target: 'ready',
+                  actions: ['enableInput', 'markInputEnabled', 'focusInput', 'maybeSpeakQuestion', 'logStateTransition'],
+                },
+              },
+              always: [
+                {
+                  target: 'ready',
+                  guard: 'trialRevealStarted',
+                  actions: ['enableInput', 'markInputEnabled', 'focusInput', 'maybeSpeakQuestion', 'logStateTransition'],
+                },
+              ],
+            },
             ready: {
               on: {
                 [EVENTS.FIRST_KEYPRESS]: {
@@ -208,8 +223,23 @@ export const contentRuntimeMachinePresentingState = {
         },
 
         speechRecognition: {
-          initial: 'checking',
+          initial: 'waitingForReveal',
           states: {
+            waitingForReveal: {
+              on: {
+                [EVENTS.TRIAL_REVEAL_STARTED]: {
+                  target: 'checking',
+                  actions: ['startRecording', 'logStateTransition'],
+                },
+              },
+              always: [
+                {
+                  target: 'checking',
+                  guard: 'trialRevealStarted',
+                  actions: ['startRecording', 'logStateTransition'],
+                },
+              ],
+            },
             checking: {
               always: [
                 {

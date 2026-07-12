@@ -24,7 +24,6 @@ import { ensureSparcRuntimeHistoryHydrated, readSparcResumeSnapshot } from './sp
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import {
   clearResumeToQuestion,
-  getIsVideoSessionFlag,
   getEngineIndices,
   getRuntimeExperimentState,
   getSessionClusterIndex,
@@ -148,7 +147,7 @@ type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
 
 function isUnitEngineVideoSurfaceActive(): boolean {
   return resolveSessionSurfaceState({
-    sessionIsVideoSession: getIsVideoSessionFlag(),
+    currentTdfUnit: Session.get('currentTdfUnit'),
   }).isVideoSession;
 }
 

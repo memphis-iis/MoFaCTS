@@ -13,7 +13,7 @@ type TdfContentLike = {
 };
 
 export type LessonLaunchEntryRoute =
-  | { route: '/card' }
+  | { route: '/content' }
   | {
       route: '/instructions';
       currentUnitNumber: number;
@@ -21,7 +21,7 @@ export type LessonLaunchEntryRoute =
       curUnitInstructionsSeen: boolean;
     };
 
-type UnitEntrySurface = 'instructions' | 'card';
+type UnitEntrySurface = 'instructions' | 'content';
 
 function resolveUnitEntrySurface(unit: TdfUnitLike, unitType: UnitType): UnitEntrySurface {
   const instructionSurfaceIsPresent = Boolean(
@@ -32,7 +32,7 @@ function resolveUnitEntrySurface(unit: TdfUnitLike, unitType: UnitType): UnitEnt
 
   return unitType === 'instruction-only' || instructionSurfaceIsPresent
     ? 'instructions'
-    : 'card';
+    : 'content';
 }
 
 export function resolveLessonLaunchEntryRoute(params: {
@@ -40,7 +40,7 @@ export function resolveLessonLaunchEntryRoute(params: {
   intent: CardEntryIntent;
 }): LessonLaunchEntryRoute {
   if (params.intent !== CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY) {
-    return { route: '/card' };
+    return { route: '/content' };
   }
 
   const unitList = params.content?.tdfs?.tutor?.unit;
@@ -63,5 +63,5 @@ export function resolveLessonLaunchEntryRoute(params: {
         currentTdfUnit: firstUnit,
         curUnitInstructionsSeen: false,
       }
-    : { route: '/card' };
+    : { route: '/content' };
 }

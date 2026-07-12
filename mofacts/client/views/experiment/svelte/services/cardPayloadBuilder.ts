@@ -2,7 +2,6 @@ import { Session } from 'meteor/session';
 import { getCurrentDeliverySettings } from '../../../../lib/currentDeliverySettings';
 import { getStimCluster } from '../../../../lib/runtimeStimuli';
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
-import { getIsVideoSessionFlag } from './cardRuntimeState';
 import { sanitizeHTML, nextChar } from '../../../../lib/stringUtils';
 import { getDisplayAnswerText } from '../../learnerResponseAssessment';
 import { resolveDynamicAssetPath } from './mediaResolver';
@@ -90,14 +89,13 @@ export function shouldUseScheduleButtonTrial(params: {
 export function resolveCardPayloadDeliverySettings(params: {
   baseDeliverySettings: RuntimeDeliverySettings;
   existingDeliverySettings?: RuntimeDeliverySettings | null | undefined;
-  sessionIsVideoSession?: unknown;
+  currentTdfUnit?: Record<string, unknown> | null | undefined;
 }): RuntimeDeliverySettings {
   const deliverySettings = {
     ...params.baseDeliverySettings,
   };
   const contentSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
-    deliverySettings,
-    sessionIsVideoSession: params.sessionIsVideoSession,
+    currentTdfUnit: params.currentTdfUnit,
   }));
 
   if (!contentSurface.showVideoSession) {
@@ -412,7 +410,7 @@ export function buildCardDataFromResolvedTrial(params: {
   const deliverySettings = resolveCardPayloadDeliverySettings({
     baseDeliverySettings,
     existingDeliverySettings,
-    sessionIsVideoSession: getIsVideoSessionFlag(),
+    currentTdfUnit: curUnit,
   });
   const currentTdfFile = Session.get('currentTdfFile') as TdfFileLike | null | undefined;
   const setspec = currentTdfFile?.tdfs?.tutor?.setspec || {};

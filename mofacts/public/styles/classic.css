@@ -2981,17 +2981,16 @@ tfoot th {
 
 /* ===== SVELTE CARD CONTAINER ===== */
 /* When svelte card is present, use flex layout to fill remaining space after app chrome */
-body:has(.svelte-card-container) {
+body:has(.content-container) {
     display: flex;
     flex-direction: column;
-    height: 100vh; /* Fallback for older browsers */
-    height: 100dvh; /* Modern browsers use dynamic viewport height */
+    height: 100dvh;
     overflow: hidden;
     background-color: var(--app-background-color);
 }
 
-/* Container for Svelte CardScreen - fills remaining viewport after app chrome */
-.svelte-card-container {
+/* Container for Svelte ContentSurface - fills remaining viewport after app chrome */
+.content-container {
     display: flex;
     flex-direction: column;
     width: 100%;

@@ -41,8 +41,8 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
   try {
     cleanupAudioRecorder();
 
-    // Full cleanup when leaving practice (not /card or /instructions)
-    if (dest !== '/card' && dest !== '/instructions' && document.location.pathname !== '/instructions') {
+    // Full cleanup when leaving the learner flow (not /content or /instructions).
+    if (dest !== '/content' && dest !== '/instructions' && document.location.pathname !== '/instructions') {
       // Clear experiment state
       ExperimentStateStore.clear();
 

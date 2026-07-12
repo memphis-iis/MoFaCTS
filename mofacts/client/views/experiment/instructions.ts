@@ -149,9 +149,9 @@ function leavePage(dest: any) {
   if (typeof dest === 'function') {
     dest();
   } else {
-    if (dest == '/card' && document.location.pathname == '/card') {
-      // Force a same-route refresh when already on /card
-      FlowRouter.go('/card', {}, {refreshCard: Date.now()});
+    if (dest == '/content' && document.location.pathname == '/content') {
+      // Force a same-route refresh when already on /content.
+      FlowRouter.go('/content', {}, { refreshContent: Date.now() });
     } else {
       FlowRouter.go(dest);
     }
@@ -532,7 +532,7 @@ async function instructContinue() {
       await createExperimentState(continuePolicy.experimentStatePatch as any);
     }
 
-    if (navigationTarget === '/card') {
+    if (navigationTarget === '/content') {
       setCardEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE, {
         source: 'instructions.instructContinue',
       });

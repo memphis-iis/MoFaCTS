@@ -117,7 +117,9 @@ function normalizeSubmittedNodes(value: unknown): Record<string, unknown> {
 }
 
 function isSparcDisplayShape(display: unknown): display is Record<string, unknown> {
-  return isPlainObject(display) && Array.isArray(display.nodes);
+  return isPlainObject(display) &&
+    display.schema === 'tutorscript-sparc/2.0' &&
+    Array.isArray(display.nodes);
 }
 
 export function normalizeSparcProgressReporter(value: unknown): SparcProgressReporterConfig | null {

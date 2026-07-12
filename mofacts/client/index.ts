@@ -95,7 +95,7 @@ function sanitizeHTML(dirty: string | null | undefined) {
 export { clientConsole };
 
 const PRACTICE_SHELL_TEMPLATES = new Set([
-  'card',
+  'content',
   'instructions',
 ]);
 
@@ -107,7 +107,7 @@ type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
 
 async function leavePracticeForHome(): Promise<boolean> {
   const currentPath = document.location.pathname;
-  if (currentPath !== '/card' && currentPath !== '/instructions') {
+  if (currentPath !== '/content' && currentPath !== '/instructions') {
     return false;
   }
 
@@ -171,22 +171,7 @@ Meteor.startup(() => {
     applyActiveUiLocaleToDocument();
   });
 
-  // Modern browsers (Safari 15.4+, Chrome 108+, Firefox 101+) use native dvh/svh units
-  // CSS has been updated to use modern viewport units (see classic.css)
-  // This code remains active for backwards compatibility with older browsers
-  setDynamicViewportHeight();
 });
-
-
-// MO9: Modern CSS now uses dvh/svh units which handle this natively
-// This function still runs to support:
-//   1. Older browsers without dvh/svh support (pre-2022)
-function setDynamicViewportHeight() {
-  const vh = window.innerHeight * 0.01;
-  document.documentElement.style.setProperty('--vh', `${vh}px`);
-
-  clientConsole(2, `[MO9] Set dynamic viewport height (legacy fallback): ${vh}px per 1vh`);
-}
 
 let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let mobilePracticeReturnInProgress = false;
@@ -196,7 +181,7 @@ function isMobilePracticeDisplay(): boolean {
 }
 
 function isPracticeRoutePath(path: string): boolean {
-  return path === '/card' || path === '/instructions';
+  return path === '/content' || path === '/instructions';
 }
 
 async function returnMobilePracticeDisplayToMenu(reason: string): Promise<void> {
@@ -242,7 +227,6 @@ function scheduleResizeWork(source: string) {
   resizeDebounceTimer = setTimeout(() => {
     resizeDebounceTimer = null;
     clientConsole(2, `[RESIZE DEBUG] Coalesced resize (${source}) at ${Date.now()} | ${window.innerWidth}x${window.innerHeight} | sensitive=${resizeSensitive}`);
-    setDynamicViewportHeight();
     // Skip image layout thrash while SR/trial input is active.
     if (!resizeSensitive) {
       redoCardImage();
@@ -735,8 +719,8 @@ Template.DefaultLayout.onRendered(function(this: any) {
             e.preventDefault();
             instructContinue();
             break;
-          case '/card':
-            // Enter key on card page handled by card.js event handlers
+          case '/content':
+            // Enter key on the content route is handled by the content runtime.
             break;
         }
       }
@@ -970,7 +954,7 @@ Template.registerHelper('curStudentPerformance', function() {
   return Session.get('curStudentPerformance');
 });
 Template.registerHelper('isInTrial', function() {
-  return Session.get('curModule') == 'card' || Session.get('curModule') == 'instructions';
+  return Session.get('curModule') == 'content' || Session.get('curModule') == 'instructions';
 });
 Template.registerHelper('isInInstructions', function() {
   return Session.get('curModule') == 'instructions';

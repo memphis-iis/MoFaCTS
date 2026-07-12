@@ -80,7 +80,7 @@ As an example of XCond defaults, the following URL's are ALL equivalent:
     * https://mofacts.optimallearning.org/experiment/learning/abc
 
 A major issue is that once a user enters in experiment mode, the routes (like
-instructions and card) look the same. If the user uses the browser's refresh
+instructions and content) look the same. If the user uses the browser's refresh
 function, our logic will take them to the "normal" sign in screen. Since we
 allow login via Gmail account this could be confusing. As a result, we now use
 a cookie scheme to insure experimental participants stay in experiment mode:
@@ -107,7 +107,7 @@ Session.set('experimentXCond', '');
 clearMappingRecordFromSession();
 
 // Flow Router doesn't need configure() - this.render() specifies layout per-route
-let cardSubsWaitHandle: any = null;
+let contentSubsWaitHandle: any = null;
 let rootUserWaitHandle: any = null;
 const pendingAuthRouteHandles: Record<string, any> = {};
 let homeUserHydrationHandle: any = null;
@@ -271,7 +271,7 @@ function consumePendingClassInvite(controller: any = null): boolean {
 
 // Load infrequently-used route modules on demand to keep the initial client bundle smaller.
 const lazyTemplateLoaders: Record<string, any> = {
-  card: () => import('../views/experiment/card'),
+  content: () => import('../views/experiment/contentRoute'),
   experimentError: () => import('../views/experimentError'),
   sparcEdit: () => import('../views/experimentSetup/sparcEdit'),
 };
@@ -370,7 +370,7 @@ function renderLayout(controller: any, templateName: any) {
   clientConsole(2, '[ROUTER] Rendered DefaultLayout through the Flow Router controller');
 }
 
-function renderCardSubscriptionWaitOnlyWhenCold(controller: any): void {
+function renderContentSubscriptionWaitOnlyWhenCold(controller: any): void {
   if (!Session.get('currentTemplate')) {
     renderLayout(controller, 'customLoading');
   }
@@ -1150,22 +1150,23 @@ FlowRouter.route('/classEdit', {
     }, getRouteAccessPolicy('client.classEdit'));
   }
 });
-FlowRouter.route('/card', {
-  name: 'client.card',
-  action: async function() {
+FlowRouter.route('/content', {
+  name: 'client.content',
+  action: async function contentRouteAction() {
     const userId = Meteor.userId();
     const user = Meteor.user();
     if (!userId || !user) {
-      waitForAuthenticatedRoute(this, 'client.card', async () => {
-        FlowRouter.go('/card');
+      const controller = this;
+      waitForAuthenticatedRoute(this, 'client.content', async () => {
+        await contentRouteAction.call(controller);
       });
       return;
     }
-    assertIdInvariants('router.card.entry', { requireCurrentTdfId: false, requireStimuliSetId: false });
+    assertIdInvariants('router.content.entry', { requireCurrentTdfId: false, requireStimuliSetId: false });
     ensureStimuliSetIdSessionInvariant();
     Session.set('suppressAuthenticatedChrome', false);
     clearAppLoadingUnlessLaunch();
-    const refreshCardRequested = Boolean(FlowRouter.current()?.queryParams?.refreshCard);
+    const refreshContentRequested = Boolean(FlowRouter.current()?.queryParams?.refreshContent);
     if(!Session.get('currentTdfId')){
       const userId = Meteor.userId();
       const tdfId =  await meteorCallAsync('getLastTDFAccessed', userId);
@@ -1179,7 +1180,7 @@ FlowRouter.route('/card', {
       } catch (error: unknown) {
         const message = (error as { reason?: string })?.reason || getErrorMessage(error);
         if (message === COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON) {
-          clientConsole(2, '[Router] Card reload lost course launch context; redirecting to Courses', { tdfId });
+          clientConsole(2, '[Router] Content reload lost course launch context; redirecting to Courses', { tdfId });
           FlowRouter.go('/courses');
           return;
         }
@@ -1194,7 +1195,7 @@ FlowRouter.route('/card', {
         // Render a loading template while selectTdf processes
         renderLayout(this, 'customLoading');
 
-        Session.set('cardBootstrapInProgress', true);
+        Session.set('contentBootstrapInProgress', true);
         try {
           await selectTdf(
             tdfId,
@@ -1208,14 +1209,14 @@ FlowRouter.route('/card', {
             false,
             true);
         } finally {
-          Session.set('cardBootstrapInProgress', false);
+          Session.set('contentBootstrapInProgress', false);
         }
         setCardEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD, {
-          source: 'router.card.bootstrapMissingCurrentTdfId',
+          source: 'router.content.bootstrapMissingCurrentTdfId',
         });
-        // After selectTdf completes with isRefresh=true, show the card
-        Session.set('curModule', 'card');
-        await renderRouteTemplate(this, 'card');
+        // Re-enter the authenticated content action so the canonical content and
+        // asset subscriptions reach readiness before the surface is mounted.
+        await contentRouteAction.call(this);
         return;
       } else {
         // No TDF found, redirect to home
@@ -1239,42 +1240,42 @@ FlowRouter.route('/card', {
             setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
             clientConsole(2, '[Router] Restored ignoreOutOfGrammarResponses from TDF:', ignoreOutOfGrammarResponses);
           }
-          if (refreshCardRequested) {
+          if (refreshContentRequested) {
             setCardEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD, {
-              source: 'router.card.refreshQuery',
+              source: 'router.content.refreshQuery',
             });
           }
-          Session.set('curModule', 'card');
-          await renderRouteTemplate(this, 'card');
+          Session.set('curModule', 'content');
+          await renderRouteTemplate(this, 'content');
         } else {
           FlowRouter.go('/');
           return;
         }
       } else {
-        renderCardSubscriptionWaitOnlyWhenCold(this);
-        if (!cardSubsWaitHandle) {
+        renderContentSubscriptionWaitOnlyWhenCold(this);
+        if (!contentSubsWaitHandle) {
           const controller = this;
-          cardSubsWaitHandle = Tracker.autorun(() => {
+          contentSubsWaitHandle = Tracker.autorun(() => {
             const ready = subs.every((handle) => handle && handle.ready());
             const user = Meteor.user();
-            const isCardRoute = FlowRouter.current()?.route?.name === 'client.card';
-            if (ready && user && isCardRoute) {
-              cardSubsWaitHandle.stop();
-              cardSubsWaitHandle = null;
-              if (refreshCardRequested) {
+            const isContentRoute = FlowRouter.current()?.route?.name === 'client.content';
+            if (ready && user && isContentRoute) {
+              contentSubsWaitHandle.stop();
+              contentSubsWaitHandle = null;
+              if (refreshContentRequested) {
                 setCardEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD, {
-                  source: 'router.card.refreshQuery.waited',
+                  source: 'router.content.refreshQuery.waited',
                 });
               }
-              Session.set('curModule', 'card');
-              // card.js was already requested by lazyTemplateLoaders when this
+              Session.set('curModule', 'content');
+              // contentRoute.js was already requested by lazyTemplateLoaders when this
               // route first fired, so the module should be cached by now.
-              ensureTemplateModuleLoaded('card').then(() => {
-                renderLayout(controller, 'card');
+              ensureTemplateModuleLoaded('content').then(() => {
+                renderLayout(controller, 'content');
               });
-            } else if (!isCardRoute) {
-              cardSubsWaitHandle.stop();
-              cardSubsWaitHandle = null;
+            } else if (!isContentRoute) {
+              contentSubsWaitHandle.stop();
+              contentSubsWaitHandle = null;
             }
           });
         }

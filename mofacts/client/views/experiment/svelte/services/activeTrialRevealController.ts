@@ -17,8 +17,8 @@ export interface ActiveTrialFadeContext {
 }
 
 export interface ActiveTrialRevealRuntimeState {
-  readonly allBlockingAssetsReady: boolean;
   readonly isFadingOut: boolean;
+  readonly isOutgoingFreezeState: boolean;
   readonly isTestMode: boolean;
   readonly subsetKind: string;
 }
@@ -30,6 +30,7 @@ export interface ActiveTrialRevealControllerDependencies {
   readonly now: () => number;
   readonly onFadeContext: (context: ActiveTrialFadeContext) => void;
   readonly onRevealStarted: (subsetKind: string) => void;
+  readonly onTrialStaged: (params: { key: string; subsetKind: string }) => void;
   readonly onUpdate: (snapshot: ActiveTrialRevealSnapshot) => void;
   readonly primeFadeStart: () => void;
   readonly readTransitionDurationMs: () => number;
@@ -132,16 +133,20 @@ export function createActiveTrialRevealController(
     if (
       sequence !== revealSequence ||
       key !== snapshot.stagedTrialSubsetKey ||
+      runtime.isOutgoingFreezeState ||
       runtime.isFadingOut ||
-      !runtime.allBlockingAssetsReady
+      !snapshot.stimulusBlockingAssetReady ||
+      !snapshot.feedbackBlockingAssetReady
     ) {
       deps.log(2, '[ContentSurface][Reveal] queued reveal skipped', {
         key,
         stagedTrialSubsetKey: snapshot.stagedTrialSubsetKey,
         sequence,
         revealSequence,
+        isOutgoingFreezeState: runtime.isOutgoingFreezeState,
         isFadingOut: runtime.isFadingOut,
-        allBlockingAssetsReady: runtime.allBlockingAssetsReady,
+        stimulusBlockingAssetReady: snapshot.stimulusBlockingAssetReady,
+        feedbackBlockingAssetReady: snapshot.feedbackBlockingAssetReady,
         subsetKind: runtime.subsetKind,
       });
       return;
@@ -152,7 +157,8 @@ export function createActiveTrialRevealController(
       sequence,
       subsetKind: runtime.subsetKind,
       isFadingOut: runtime.isFadingOut,
-      allBlockingAssetsReady: runtime.allBlockingAssetsReady,
+      stimulusBlockingAssetReady: snapshot.stimulusBlockingAssetReady,
+      feedbackBlockingAssetReady: snapshot.feedbackBlockingAssetReady,
     });
     const fadeContext = markVisible(key, runtime.subsetKind);
     deps.log(2, '[ContentSurface][FadeTiming] reveal-trigger', {
@@ -165,6 +171,31 @@ export function createActiveTrialRevealController(
     if (!runtime.isTestMode) {
       deps.onRevealStarted(runtime.subsetKind);
     }
+  }
+
+  function queueRevealIfReady() {
+    const runtime = deps.getRuntimeState();
+    if (
+      runtime.isOutgoingFreezeState ||
+      runtime.isFadingOut ||
+      !snapshot.activeSlotMounted ||
+      snapshot.trialSubsetVisible ||
+      !snapshot.stimulusBlockingAssetReady ||
+      !snapshot.feedbackBlockingAssetReady
+    ) {
+      return;
+    }
+    const key = snapshot.stagedTrialSubsetKey;
+    if (!key || key === 'none') {
+      return;
+    }
+    if (queuedRevealKey === key && queuedRevealSequence === revealSequence) {
+      return;
+    }
+
+    queuedRevealKey = key;
+    queuedRevealSequence = revealSequence;
+    void revealQueued(key, revealSequence);
   }
 
   return {
@@ -197,30 +228,10 @@ export function createActiveTrialRevealController(
       }
       snapshot = nextSnapshot;
       publish();
+      queueRevealIfReady();
     },
-    queueRevealIfReady(params: {
-      allBlockingAssetsReady: boolean;
-      isOutgoingFreezeState: boolean;
-    }) {
-      if (
-        params.isOutgoingFreezeState ||
-        !snapshot.activeSlotMounted ||
-        snapshot.trialSubsetVisible ||
-        !params.allBlockingAssetsReady
-      ) {
-        return;
-      }
-      const key = snapshot.stagedTrialSubsetKey;
-      if (!key || key === 'none') {
-        return;
-      }
-      if (queuedRevealKey === key && queuedRevealSequence === revealSequence) {
-        return;
-      }
-
-      queuedRevealKey = key;
-      queuedRevealSequence = revealSequence;
-      void revealQueued(key, revealSequence);
+    queueRevealIfReady() {
+      queueRevealIfReady();
     },
     revealMountedNowIfReady(params: {
       allBlockingAssetsReady: boolean;
@@ -328,12 +339,18 @@ export function createActiveTrialRevealController(
         trialSubsetVisible: false,
       };
       publish();
+      deps.onTrialStaged({
+        key: input.trialSubsetKey,
+        subsetKind: input.trialSubsetKind,
+      });
 
       if (preservePreparedHandoff) {
         preservePreparedHandoffOnNextReveal = false;
         preparedHandoffStimulusReady = false;
         preparedHandoffFeedbackReady = false;
         void revealPreparedHandoff(input.trialSubsetKey, revealSequence);
+      } else {
+        queueRevealIfReady();
       }
       return true;
     },

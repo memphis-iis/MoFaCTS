@@ -1,5 +1,5 @@
 // Owner: Learning Runtime Team
-// Shared service contracts for Svelte card initialization/resume flows.
+// Shared service contracts for content-surface initialization and resume flows.
 
 import type { H5PTrialResult } from './h5p';
 import type { SparcTrialResult } from '../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
@@ -15,7 +15,7 @@ export interface RewindCheckpointData {
   rewindCheckpoints: number[];
 }
 
-export interface SvelteCardInitResult {
+export interface ContentSurfaceInitResult {
   redirected: boolean;
   redirectTo?: string;
   resumeToQuestion?: boolean;

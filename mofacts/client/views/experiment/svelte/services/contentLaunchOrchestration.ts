@@ -1,13 +1,10 @@
 import type {
-  CardReadinessDependencies,
-  CardReadinessDiagnostic,
-} from './cardReadiness';
-import type {
-  SessionSurfaceDiagnostic,
-  SessionSurfaceLaunchCompletion,
-} from './sessionSurfaceMode';
+  ContentReadinessDependencies,
+  ContentReadinessDiagnostic,
+} from './contentReadiness';
+import type { SessionSurfaceDiagnostic } from './sessionSurfaceMode';
 
-type CardInitResult = {
+type ContentInitResult = {
   redirected?: boolean;
 } | null | undefined;
 
@@ -23,7 +20,7 @@ type InitializeFailureDiagnosticInput = {
   sessionSurfaceDiagnostic: SessionSurfaceDiagnostic;
 };
 
-export type CardInitializeFailureDiagnostic = {
+export type ContentInitializeFailureDiagnostic = {
   error: unknown;
   currentTdfName: unknown;
   currentTdfId: unknown;
@@ -35,22 +32,21 @@ export type CardInitializeFailureDiagnostic = {
   stimuliCount: number | null;
 };
 
-export type CardLaunchFailureStage = 'initializeSvelteCard' | 'cardReadinessTimeout';
+export type ContentLaunchFailureStage = 'initializeContentSurface' | 'contentReadinessTimeout';
 
-export type CardLaunchRunResult =
+export type ContentLaunchRunResult =
   | { status: 'redirected' }
-  | { status: 'failed'; stage: CardLaunchFailureStage }
-  | { status: 'stoppedAfterLaunchCompletion' }
+  | { status: 'failed'; stage: ContentLaunchFailureStage }
   | { status: 'ready' };
 
-export type CardLaunchOrchestrationDeps = {
-  initializeCard: () => Promise<CardInitResult>;
-  waitForCardReadiness: (deps: CardReadinessDependencies) => Promise<boolean>;
-  getReadinessDependencies: () => CardReadinessDependencies;
-  buildReadinessDiagnostic: () => CardReadinessDiagnostic;
-  buildInitializeFailureDiagnostic: (error: unknown) => CardInitializeFailureDiagnostic;
+export type ContentLaunchOrchestrationDeps = {
+  initializeContent: () => Promise<ContentInitResult>;
+  waitForContentReadiness: (deps: ContentReadinessDependencies) => Promise<boolean>;
+  getReadinessDependencies: () => ContentReadinessDependencies;
+  buildReadinessDiagnostic: () => ContentReadinessDiagnostic;
+  buildInitializeFailureDiagnostic: (error: unknown) => ContentInitializeFailureDiagnostic;
   setFailureDiagnostic: (
-    stage: CardLaunchFailureStage,
+    stage: ContentLaunchFailureStage,
     diagnostic: object
   ) => void;
   log: (level: number, message: string, details?: unknown) => void;
@@ -59,9 +55,6 @@ export type CardLaunchOrchestrationDeps = {
   loadingContentMessage: string;
   markLaunchLoadingTiming: (name: string, details?: Record<string, unknown>) => void;
   prepareRender: () => Promise<void>;
-  resolveLaunchCompletion: () => SessionSurfaceLaunchCompletion | null;
-  waitForBrowserPaint: () => Promise<void>;
-  finishLaunchLoading: (reason: SessionSurfaceLaunchCompletion['finishReason']) => void;
 };
 
 function errorMessage(error: unknown): string {
@@ -72,9 +65,9 @@ function errorStack(error: unknown): string | null {
   return error instanceof Error ? error.stack || null : null;
 }
 
-export function buildCardInitializeFailureDiagnostic(
+export function buildContentInitializeFailureDiagnostic(
   input: InitializeFailureDiagnosticInput
-): CardInitializeFailureDiagnostic {
+): ContentInitializeFailureDiagnostic {
   return {
     error: input.error,
     currentTdfName: input.currentTdfFile?.name || input.currentTdfFile?.fileName || null,
@@ -90,54 +83,44 @@ export function buildCardInitializeFailureDiagnostic(
   };
 }
 
-export async function runCardLaunchOrchestration(
-  deps: CardLaunchOrchestrationDeps
-): Promise<CardLaunchRunResult> {
-  let initResult: CardInitResult;
+export async function runContentLaunchOrchestration(
+  deps: ContentLaunchOrchestrationDeps
+): Promise<ContentLaunchRunResult> {
+  let initResult: ContentInitResult;
   try {
     deps.setLaunchLoadingMessage(deps.loadingContentMessage);
-    deps.markLaunchLoadingTiming('initializeSvelteCard:start');
-    initResult = await deps.initializeCard();
-    deps.markLaunchLoadingTiming('initializeSvelteCard:complete', {
+    deps.markLaunchLoadingTiming('initializeContentSurface:start');
+    initResult = await deps.initializeContent();
+    deps.markLaunchLoadingTiming('initializeContentSurface:complete', {
       redirected: !!initResult?.redirected,
     });
   } catch (error) {
     const diagnostic = deps.buildInitializeFailureDiagnostic(error);
-    deps.setFailureDiagnostic('initializeSvelteCard', {
+    deps.setFailureDiagnostic('initializeContentSurface', {
       ...diagnostic,
       errorMessage: errorMessage(error),
       errorStack: errorStack(error),
     });
-    deps.log(1, '[ContentSurface] initializeSvelteCard failed', diagnostic);
+    deps.log(1, '[ContentSurface] initialization failed', diagnostic);
     deps.routeInitializationFailure();
-    return { status: 'failed', stage: 'initializeSvelteCard' };
+    return { status: 'failed', stage: 'initializeContentSurface' };
   }
 
   if (initResult?.redirected) {
     return { status: 'redirected' };
   }
 
-  deps.markLaunchLoadingTiming('cardReadinessWait:start');
-  const ready = await deps.waitForCardReadiness(deps.getReadinessDependencies());
-  deps.markLaunchLoadingTiming('cardReadinessWait:complete', { ready });
+  deps.markLaunchLoadingTiming('contentReadinessWait:start');
+  const ready = await deps.waitForContentReadiness(deps.getReadinessDependencies());
+  deps.markLaunchLoadingTiming('contentReadinessWait:complete', { ready });
   if (!ready) {
     const diagnostic = deps.buildReadinessDiagnostic();
-    deps.setFailureDiagnostic('cardReadinessTimeout', diagnostic);
+    deps.setFailureDiagnostic('contentReadinessTimeout', diagnostic);
     deps.log(1, '[ContentSurface] Readiness timeout before machine start', diagnostic);
     deps.routeInitializationFailure();
-    return { status: 'failed', stage: 'cardReadinessTimeout' };
+    return { status: 'failed', stage: 'contentReadinessTimeout' };
   }
 
   await deps.prepareRender();
-  const launchCompletion = deps.resolveLaunchCompletion();
-  if (launchCompletion) {
-    await deps.waitForBrowserPaint();
-    deps.markLaunchLoadingTiming(launchCompletion.timingName, launchCompletion.timingData);
-    deps.finishLaunchLoading(launchCompletion.finishReason);
-    if (launchCompletion.stopInitialization) {
-      return { status: 'stoppedAfterLaunchCompletion' };
-    }
-  }
-
   return { status: 'ready' };
 }

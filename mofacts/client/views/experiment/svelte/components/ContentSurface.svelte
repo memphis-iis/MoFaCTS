@@ -27,17 +27,20 @@
   import { getDisplayAnswerText } from '../../learnerResponseAssessment';
   import { contentRuntimeMachine } from '../machine/contentRuntimeMachine';
   import { DEFAULT_DELIVERY_SETTINGS, EVENTS } from '../machine/constants';
-  import { initializeSvelteCard } from '../services/svelteInit';
+  import { initializeContentSurface } from '../services/contentSurfaceInit';
   import { createExperimentState } from '../services/experimentState';
   import {
-    waitForCardReadiness as waitForCardReadinessService,
-  } from '../services/cardReadiness';
-  import { runCardLaunchOrchestration } from '../services/cardLaunchOrchestration';
-  import { createCardLaunchEnvironment } from '../services/cardLaunchEnvironment';
+    waitForContentReadiness as waitForContentReadinessService,
+  } from '../services/contentReadiness';
+  import { runContentLaunchOrchestration } from '../services/contentLaunchOrchestration';
+  import { beginLearningAttempt } from '../services/attemptIdentity';
   import {
-    createFirstTrialRevealController,
-    getElementTransitionDurationMs,
-  } from '../services/firstTrialReveal';
+    canActivateContentInput,
+    createContentLaunchCoordinator,
+    resolveContentLaunchSurfaceKind,
+  } from '../services/contentLaunchCoordinator';
+  import { createContentLaunchEnvironment } from '../services/contentLaunchEnvironment';
+  import { getElementTransitionDurationMs } from '../services/trialTransitionTiming';
   import {
     buildTrialSubset,
     buildTrialSubsetKey,
@@ -79,8 +82,9 @@
     notifyLearningProgressLayoutChange,
   } from '../services/learningProgressPanelViewport';
   import {
-    resolveSessionSurfaceLaunchCompletion,
-  } from '../services/sessionSurfaceMode';
+    getContentSurfaceAdapter,
+    isSpecializedSurfaceReadyToCommit,
+  } from '../services/contentSurfaceActivation';
   import {
     buildContentSurfaceRuntimeSnapshot,
     startVideoInstructionTimer,
@@ -95,7 +99,6 @@
   } from '../services/cardUnitContinuation';
   import { createCardRuntimeWindowEventController } from '../services/cardRuntimeWindowEvents';
   import {
-    getIsVideoSessionFlag,
     getVideoCheckpoints,
     getVideoResumeAnchor,
     resolveRuntimeEngine,
@@ -136,7 +139,7 @@
 
   /** @type {string} Session ID */
   export let userId = '';
-  export let attemptId = '';
+  let attemptId = '';
 
   /** @type {number|undefined} Zero-based TDF unit index */
   export let unitId = undefined;
@@ -246,9 +249,6 @@
   $: audioState = context.audio || { waitingForTranscription: false, srAttempts: 0, maxSrAttempts: 0 };
   $: contentSurfaceRuntimeSnapshot = (sessionUnitModeVersion, buildContentSurfaceRuntimeSnapshot({
     currentTdfUnit: Session.get('currentTdfUnit'),
-    deliverySettings,
-    sessionIsVideoSession: getIsVideoSessionFlag(),
-    sessionUnitType: Session.get('unitType'),
     curUnitInstructionsSeen: Session.get('curUnitInstructionsSeen'),
     videoInstructionDismissed,
     sanitizeInstructionHtml: sanitizeCardInstructionHtml,
@@ -296,6 +296,17 @@
   }
 
   const activeTrialDisplayStateController = createActiveTrialDisplayStateController();
+  const contentLaunchCoordinator = createContentLaunchCoordinator();
+  let contentLaunchPhase = contentLaunchCoordinator.getSnapshot().phase;
+  const unsubscribeContentLaunch = contentLaunchCoordinator.subscribe((snapshot) => {
+    contentLaunchPhase = snapshot.phase;
+    if (snapshot.phase === 'active' && isLaunchLoadingActive()) {
+      markLaunchLoadingTiming('contentLaunch:active', {
+        surface: snapshot.surface || 'unknown',
+      });
+      finishLaunchLoading('initial-content-visible');
+    }
+  });
   let trialContentFadeElement;
   let lastFadeLogContext = {
     key: 'none',
@@ -303,31 +314,6 @@
     visibleSetAt: 0,
     configuredDurationMs: 0,
   };
-  function isFirstTrialRevealStable({ key, subsetKind }) {
-    return initializedForRender &&
-      activeSlotMounted &&
-      activeSlotVisible &&
-      trialContentVisible &&
-      allBlockingAssetsReady &&
-      !isFadingOut &&
-      trialSubset.showOverlay &&
-      trialSubsetKind === subsetKind &&
-      trialSubsetKey === key &&
-      (!trialContentFadeElement || getComputedStyle(trialContentFadeElement).opacity === '1');
-  }
-  const firstTrialReveal = createFirstTrialRevealController({
-    finishLaunchLoading,
-    getFadeContext: () => lastFadeLogContext,
-    isLaunchLoadingActive,
-    isRevealStable: isFirstTrialRevealStable,
-    markLaunchLoadingTiming,
-    now: () => performance.now(),
-    scheduleTimeout: (callback, delayMs) => {
-      setTimeout(callback, delayMs);
-    },
-    waitForBrowserPaint,
-    waitForDomUpdate: tick,
-  });
   let stimulusBlockingAssetReady = true;
   let feedbackBlockingAssetReady = true;
   let incomingBlockingAssetVersion = 0;
@@ -352,23 +338,32 @@
   });
   const activeTrialRevealController = createActiveTrialRevealController({
     getRuntimeState: () => ({
-      allBlockingAssetsReady,
       isFadingOut,
+      isOutgoingFreezeState,
       isTestMode: testMode,
       subsetKind: trialSubset.kind,
     }),
     log: clientConsole,
-    markFirstRevealClassSet: firstTrialReveal.markRevealClassSet,
+    markFirstRevealClassSet: () => undefined,
     now: () => performance.now(),
     onFadeContext: (context) => {
       lastFadeLogContext = context;
     },
     onRevealStarted: (subsetKind) => {
+      if (contentLaunchCoordinator.getSnapshot().phase === 'committing-first-render') {
+        contentLaunchCoordinator.markInitialRenderVisible();
+      }
       send({
         type: EVENTS.TRIAL_REVEAL_STARTED,
         timestamp: Date.now(),
         subsetKind,
       });
+    },
+    onTrialStaged: () => {
+      if (contentLaunchCoordinator.getSnapshot().phase === 'initializing-engine') {
+        contentLaunchCoordinator.markFirstTrialPreparing();
+        contentLaunchCoordinator.markFirstRenderCommitting();
+      }
     },
     onUpdate: (snapshot) => {
       activeSlotMounted = snapshot.activeSlotMounted;
@@ -387,7 +382,6 @@
     waitForDomUpdate: tick,
   });
   const trialFadeTransitionController = createTrialFadeTransitionController({
-    finishFirstRevealFromTransitionEvent: firstTrialReveal.finishFromTransitionEvent,
     getComputedOpacity: () => trialContentFadeElement
       ? getComputedStyle(trialContentFadeElement).opacity
       : 'unknown',
@@ -444,7 +438,10 @@
   $: if (!isStudyState && studyInteractionText) {
     studyInteractionText = '';
   }
-  $: inputEnabled = state.matches('presenting.awaiting') || state.matches('feedback.forceCorrecting');
+  $: inputEnabled = canActivateContentInput(
+    contentLaunchPhase,
+    state.matches('presenting.awaiting') || state.matches('feedback.forceCorrecting'),
+  );
   $: isOutgoingFreezeState = isOutgoingFreezeSnapshot(state);
   $: isPreparedAdvanceWaitState = isPreparedAdvanceWaitSnapshot(state);
   $: isFadingOut = state.matches('transition.fadingOut');
@@ -542,37 +539,31 @@
   };
   $: showSparcSessionSurface = sessionContentSurface.showSparcSession &&
     flashcardControllerProps.subsetKind !== 'none';
-  $: videoEnded = state.matches('videoEnded');
-  $: videoEndOverlayController.syncVideoEnded(videoEnded);
-
-  let flashcardLaunchFinishKey = '';
+  let specializedSurfaceActivationScheduled = false;
   $: if (
-    !testMode &&
-    initializedForRender &&
-    (sessionContentSurface.showFlashcardSession ? trialContentVisible : sessionContentSurface.showSparcSession) &&
-    isLaunchLoadingActive() &&
-    trialSubsetKey &&
-    trialSubsetKey !== 'none' &&
-    flashcardLaunchFinishKey !== trialSubsetKey
+    !specializedSurfaceActivationScheduled &&
+    contentLaunchPhase === 'initializing-engine' &&
+    isSpecializedSurfaceReadyToCommit({
+      surface: contentLaunchCoordinator.getSnapshot().surface || 'flashcard',
+      initializedForRender,
+      sparcContentReady: showSparcSessionSurface,
+      videoInstructionVisible: showVideoInstructionOverlay,
+      videoPlayerReady,
+    })
   ) {
-    flashcardLaunchFinishKey = trialSubsetKey;
-    const timingName = sessionContentSurface.showSparcSession ? 'sparc:firstTrialVisible' : 'flashcard:firstTrialVisible';
-    const finishReason = sessionContentSurface.showSparcSession ? 'sparc-first-trial-visible' : 'standard-card-first-trial-visible';
-    void (async (key, subsetKind, launchTimingName, launchFinishReason) => {
+    specializedSurfaceActivationScheduled = true;
+    contentLaunchCoordinator.markFirstTrialPreparing();
+    contentLaunchCoordinator.markFirstRenderCommitting();
+    void (async () => {
       await tick();
       await waitForBrowserPaint();
-      if (
-        isLaunchLoadingActive() &&
-        isFirstTrialRevealStable({ key, subsetKind })
-      ) {
-        markLaunchLoadingTiming(launchTimingName, {
-          key,
-          subsetKind,
-        });
-        finishLaunchLoading(launchFinishReason);
+      if (contentLaunchCoordinator.getSnapshot().phase === 'committing-first-render') {
+        contentLaunchCoordinator.markInitialRenderVisible();
       }
-    })(trialSubsetKey, trialSubsetKind, timingName, finishReason);
+    })();
   }
+  $: videoEnded = state.matches('videoEnded');
+  $: videoEndOverlayController.syncVideoEnded(videoEnded);
 
   $: activeTrialRevealController.syncStage({
     expectedFeedbackBlockerSrc,
@@ -584,17 +575,9 @@
     trialSubsetKind,
   });
 
-  $: {
-    activeSlotMounted;
-    activeTrialRevealController.queueRevealIfReady({
-      allBlockingAssetsReady,
-      isOutgoingFreezeState,
-    });
-  }
-
   $: if (
     sessionContentSurface.showFlashcardSession &&
-    state.matches('presenting.awaiting') &&
+    initializedForRender &&
     activeSlotMounted &&
     !activeSlotVisible &&
     trialSubset.showOverlay
@@ -954,7 +937,7 @@
     stateMatches: (path) => state.matches(path),
   });
 
-  const cardLaunchEnvironment = createCardLaunchEnvironment({
+  const contentLaunchEnvironment = createContentLaunchEnvironment({
     getSessionValue: (key) => Session.get(key),
     setSessionValue: (key, value) => {
       Session.set(key, value);
@@ -1045,28 +1028,54 @@
     clearLearningProgressViewport: learningProgressRuntimeController.closeViewport,
     clearTimeoutCountdown: timeoutCountdownSyncController.stopInterval,
     completeCleanup,
-    launch: runCardLaunchOrchestration,
+    failLaunch: (failure) => {
+      if (contentLaunchCoordinator.getSnapshot().phase !== 'failed') {
+        contentLaunchCoordinator.fail(failure);
+      }
+    },
+    launch: runContentLaunchOrchestration,
     launchDeps: {
-      initializeCard: initializeSvelteCard,
-      waitForCardReadiness: waitForCardReadinessService,
-      getReadinessDependencies: cardLaunchEnvironment.getReadinessDependencies,
-      buildReadinessDiagnostic: cardLaunchEnvironment.buildReadinessDiagnostic,
-      buildInitializeFailureDiagnostic: cardLaunchEnvironment.buildInitializeFailureDiagnostic,
-      setFailureDiagnostic: cardLaunchEnvironment.setFailureDiagnostic,
+      initializeContent: async () => {
+        contentLaunchCoordinator.begin();
+        try {
+          const result = await initializeContentSurface();
+          if (!result?.redirected) {
+            const activeTdfId = String(Session.get('currentTdfId') || '').trim();
+            const rootTdfId = String(Session.get('currentRootTdfId') || '').trim();
+            const resolvedUnitIndex = Number(Session.get('currentUnitNumber'));
+            const resolvedUnit = Session.get('currentTdfUnit');
+            attemptId = beginLearningAttempt(activeTdfId);
+            contentLaunchCoordinator.markProgressRestoring(
+              resolveContentLaunchSurfaceKind({
+                currentTdfUnit: resolvedUnit,
+              }),
+              {
+                userId,
+                rootTdfId,
+                activeTdfId,
+                unitIndex: resolvedUnitIndex,
+                attemptId,
+              },
+            );
+            contentLaunchCoordinator.markEngineInitializing();
+          }
+          return result;
+        } catch (error) {
+          contentLaunchCoordinator.fail(error);
+          throw error;
+        }
+      },
+      waitForContentReadiness: waitForContentReadinessService,
+      getReadinessDependencies: contentLaunchEnvironment.getReadinessDependencies,
+      buildReadinessDiagnostic: contentLaunchEnvironment.buildReadinessDiagnostic,
+      buildInitializeFailureDiagnostic: contentLaunchEnvironment.buildInitializeFailureDiagnostic,
+      setFailureDiagnostic: contentLaunchEnvironment.setFailureDiagnostic,
       log: clientConsole,
-      routeInitializationFailure: cardLaunchEnvironment.routeInitializationFailure,
+      routeInitializationFailure: contentLaunchEnvironment.routeInitializationFailure,
       setLaunchLoadingMessage,
       loadingContentMessage: translatePlatformString(getActiveUiLocale(), 'common.loadingContent'),
       markLaunchLoadingTiming,
       prepareRender: async () => undefined,
-      resolveLaunchCompletion: () => resolveSessionSurfaceLaunchCompletion({
-        contentSurface: sessionContentSurface,
-        isLaunchLoadingActive: isLaunchLoadingActive(),
-        showVideoInstructionOverlay,
-        videoPlayerReady,
-      }),
-      waitForBrowserPaint,
-      finishLaunchLoading,
     },
     lifecycle: cardRuntimeLifecycleController,
     normalizeTestSnapshot,
@@ -1079,6 +1088,10 @@
     },
     setState: (nextState) => {
       state = nextState;
+    },
+    shouldStartReadyRuntime: () => {
+      const surface = contentLaunchCoordinator.getSnapshot().surface;
+      return surface ? getContentSurfaceAdapter(surface).runtimeOwner === 'shared-machine' : false;
     },
     startDisplayTimeoutClock: displayTimeoutController.startClock,
     stopStimDisplayTypeMapVersionSync,
@@ -1094,6 +1107,7 @@
 
   // Lifecycle: Cleanup on unmount
   onDestroy(() => {
+    unsubscribeContentLaunch();
     contentSurfaceLifecycleRuntime.unmount();
   });
 

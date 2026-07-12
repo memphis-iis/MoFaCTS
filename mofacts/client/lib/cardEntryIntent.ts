@@ -1,6 +1,6 @@
 import { Session } from 'meteor/session';
 
-// Entry intent is about how the learner reached /card, not about which trial appears next.
+// Entry intent is about how the learner reached /content, not about which trial appears next.
 // There are three product-level meanings we care about:
 // - initial_tdf_entry: first-ever entry for this TDF family, with no persisted progress
 // - persisted_progress_resume: re-entry driven by stored experiment state

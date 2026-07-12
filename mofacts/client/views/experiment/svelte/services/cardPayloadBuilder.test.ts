@@ -51,7 +51,7 @@ describe('card payload builder helpers', function() {
     expect(resolveCardPayloadDeliverySettings({
       baseDeliverySettings: { displayQuestionNumber: true },
       existingDeliverySettings: { videoUrl: '/video.mp4' },
-      sessionIsVideoSession: true,
+      currentTdfUnit: { videosession: {} },
     })).to.deep.equal({
       displayQuestionNumber: true,
       isVideoSession: true,
@@ -60,6 +60,7 @@ describe('card payload builder helpers', function() {
     expect(resolveCardPayloadDeliverySettings({
       baseDeliverySettings: { isVideoSession: true, videoUrl: '/tdf-video.mp4' },
       existingDeliverySettings: { videoUrl: '/store-video.mp4' },
+      currentTdfUnit: { videosession: {} },
     })).to.deep.equal({
       isVideoSession: true,
       videoUrl: '/tdf-video.mp4',
@@ -67,7 +68,7 @@ describe('card payload builder helpers', function() {
     expect(resolveCardPayloadDeliverySettings({
       baseDeliverySettings: { displayQuestionNumber: true },
       existingDeliverySettings: { videoUrl: '/video.mp4' },
-      sessionIsVideoSession: false,
+      currentTdfUnit: { learningsession: {} },
     })).to.deep.equal({
       displayQuestionNumber: true,
     });

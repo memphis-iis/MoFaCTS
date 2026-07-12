@@ -1,23 +1,22 @@
 import { expect } from 'chai';
 import {
-  buildCardInitializeFailureDiagnostic,
-  runCardLaunchOrchestration,
-  type CardLaunchOrchestrationDeps,
-} from './cardLaunchOrchestration';
-import type { CardReadinessDependencies } from './cardReadiness';
-import type { SessionSurfaceLaunchCompletion } from './sessionSurfaceMode';
+  buildContentInitializeFailureDiagnostic,
+  runContentLaunchOrchestration,
+  type ContentLaunchOrchestrationDeps,
+} from './contentLaunchOrchestration';
+import type { ContentReadinessDependencies } from './contentReadiness';
 
-function createDeps(overrides: Partial<CardLaunchOrchestrationDeps> = {}) {
+function createDeps(overrides: Partial<ContentLaunchOrchestrationDeps> = {}) {
   const events: string[] = [];
-  const readinessDeps: CardReadinessDependencies = {
+  const readinessDeps: ContentReadinessDependencies = {
     getCurrentTdfUnit: () => ({ unitname: 'Unit' }),
     getDeliverySettings: () => ({ displayQuestionNumber: true }),
     getVideoCheckpoints: () => null,
   };
   const failures: Array<{ stage: string; diagnostic: Record<string, unknown> }> = [];
-  const base: CardLaunchOrchestrationDeps = {
-    initializeCard: async () => undefined,
-    waitForCardReadiness: async () => true,
+  const base: ContentLaunchOrchestrationDeps = {
+    initializeContent: async () => undefined,
+    waitForContentReadiness: async () => true,
     getReadinessDependencies: () => readinessDeps,
     buildReadinessDiagnostic: () => ({
       hasCurrentTdfUnit: false,
@@ -62,23 +61,16 @@ function createDeps(overrides: Partial<CardLaunchOrchestrationDeps> = {}) {
     prepareRender: async () => {
       events.push('prepare-render');
     },
-    resolveLaunchCompletion: () => null,
-    waitForBrowserPaint: async () => {
-      events.push('paint');
-    },
-    finishLaunchLoading: (reason) => {
-      events.push(`finish:${reason}`);
-    },
     ...overrides,
   };
   return { deps: base, events, failures };
 }
 
-describe('card launch orchestration', function() {
+describe('content launch orchestration', function() {
   it('builds initialize failure diagnostics from explicit inputs', function() {
     const error = new Error('boom');
 
-    expect(buildCardInitializeFailureDiagnostic({
+    expect(buildContentInitializeFailureDiagnostic({
       error,
       currentTdfFile: { fileName: 'lesson.tdf' },
       currentTdfId: 'tdf-1',
@@ -104,51 +96,51 @@ describe('card launch orchestration', function() {
   it('returns redirected without starting readiness wait', async function() {
     let readinessWaited = false;
     const harness = createDeps({
-      initializeCard: async () => ({ redirected: true }),
-      waitForCardReadiness: async () => {
+      initializeContent: async () => ({ redirected: true }),
+      waitForContentReadiness: async () => {
         readinessWaited = true;
         return true;
       },
     });
 
-    const result = await runCardLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps);
 
     expect(result).to.deep.equal({ status: 'redirected' });
     expect(readinessWaited).to.equal(false);
     expect(harness.events).to.deep.equal([
       'message:Loading content...',
-      'timing:initializeSvelteCard:start:{}',
-      'timing:initializeSvelteCard:complete:{"redirected":true}',
+      'timing:initializeContentSurface:start:{}',
+      'timing:initializeContentSurface:complete:{"redirected":true}',
     ]);
   });
 
   it('records diagnostics and routes when initialization throws', async function() {
     const error = new Error('init failed');
     const harness = createDeps({
-      initializeCard: async () => {
+      initializeContent: async () => {
         throw error;
       },
     });
 
-    const result = await runCardLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps);
 
-    expect(result).to.deep.equal({ status: 'failed', stage: 'initializeSvelteCard' });
+    expect(result).to.deep.equal({ status: 'failed', stage: 'initializeContentSurface' });
     expect(harness.failures).to.have.length(1);
-    expect(harness.failures[0]!.stage).to.equal('initializeSvelteCard');
+    expect(harness.failures[0]!.stage).to.equal('initializeContentSurface');
     expect(harness.failures[0]!.diagnostic.errorMessage).to.equal('init failed');
     expect(harness.events).to.include('route-failure');
   });
 
   it('records readiness diagnostics and routes when readiness times out', async function() {
     const harness = createDeps({
-      waitForCardReadiness: async () => false,
+      waitForContentReadiness: async () => false,
     });
 
-    const result = await runCardLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps);
 
-    expect(result).to.deep.equal({ status: 'failed', stage: 'cardReadinessTimeout' });
+    expect(result).to.deep.equal({ status: 'failed', stage: 'contentReadinessTimeout' });
     expect(harness.failures).to.deep.equal([{
-      stage: 'cardReadinessTimeout',
+      stage: 'contentReadinessTimeout',
       diagnostic: {
         hasCurrentTdfUnit: false,
         hasDeliverySettings: false,
@@ -159,45 +151,19 @@ describe('card launch orchestration', function() {
         currentStimuliSetId: null,
         currentUnitNumber: 0,
         currentUnitName: 'Unit',
+        currentContentLanguage: null,
         deliveryParamKeys: [],
       },
     }]);
     expect(harness.events).to.include('route-failure');
   });
 
-  it('prepares render and stops when launch completion owns initialization', async function() {
-    const launchCompletion: SessionSurfaceLaunchCompletion = {
-      timingName: 'autoTutorUnit:rendered',
-      finishReason: 'autotutor-unit-rendered',
-      stopInitialization: true,
-    };
-    const harness = createDeps({
-      resolveLaunchCompletion: () => launchCompletion,
-    });
+  it('returns ready after successful content, readiness, and render-preparation gates', async function() {
+    const harness = createDeps();
 
-    const result = await runCardLaunchOrchestration(harness.deps);
-
-    expect(result).to.deep.equal({ status: 'stoppedAfterLaunchCompletion' });
-    expect(harness.events).to.include('prepare-render');
-    expect(harness.events).to.include('paint');
-    expect(harness.events).to.include('timing:autoTutorUnit:rendered:{}');
-    expect(harness.events).to.include('finish:autotutor-unit-rendered');
-  });
-
-  it('returns ready after successful launch gates without a stopping completion', async function() {
-    const launchCompletion: SessionSurfaceLaunchCompletion = {
-      timingName: 'videoUnit:rendered',
-      finishReason: 'video-unit-rendered',
-      timingData: { videoPlayerReady: false },
-      stopInitialization: false,
-    };
-    const harness = createDeps({
-      resolveLaunchCompletion: () => launchCompletion,
-    });
-
-    const result = await runCardLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps);
 
     expect(result).to.deep.equal({ status: 'ready' });
-    expect(harness.events).to.include('finish:video-unit-rendered');
+    expect(harness.events).to.include('prepare-render');
   });
 });

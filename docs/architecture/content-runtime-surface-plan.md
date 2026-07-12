@@ -91,12 +91,53 @@ Timer policy owns:
 
 Timer policy must not be inferred from vague display ownership names.
 
+## Launch And Resume Lifecycle Contract
+
+`ContentSurface` uses one `contentLaunchCoordinator` for initial entry and persisted-progress resume. Content modes do not dismiss the route loading state independently.
+
+The ordered phases are:
+
+```text
+resolving-content
+  -> restoring-progress
+  -> initializing-engine
+  -> preparing-first-trial
+  -> committing-first-render
+  -> active
+```
+
+The coordinator enters `failed` when an owning launch boundary rejects. Skipping phases, activating input before `active`, or finishing route loading before the first meaningful render is visible is invalid.
+
+Canonical launch identity contains:
+
+- authenticated `userId`
+- durable `rootTdfId`
+- active `activeTdfId`
+- zero-based `unitIndex`
+- persisted learning `attemptId`
+
+Display names such as `currentTdfName` are not identity and must not gate attempt creation or resume.
+
+Each content mode exposes an activation adapter:
+
+| Surface | Runtime owner | First meaningful render |
+| --- | --- | --- |
+| Flashcard learning | Shared content runtime | The staged question has passed blocking-asset readiness and is visibly revealed. |
+| Flashcard assessment | Shared content runtime | The staged assessment question has passed blocking-asset readiness and is visibly revealed. |
+| SPARC | Shared content runtime | The SPARC session surface has renderable authored content. |
+| Video | Shared content runtime | The video player or visible video instructions are ready. |
+| AutoTutor | AutoTutor runtime | The initialized AutoTutor session has committed its render. |
+
+The active flashcard reveal controller owns staging, blocking-asset readiness, DOM commit, browser-paint confirmation, and the visible-reveal event. Svelte reactivity may project its state, but it must not be a second owner that independently decides whether the first reveal is ready. The coordinator subscriber is the only owner that dismisses launch loading after the phase becomes `active`.
+
+The content runtime machine keeps text input, question TTS, speech-recognition recording, and the response timeout in reveal-waiting states until `TRIAL_REVEAL_STARTED`. Entering the machine's `awaiting` state is not proof that the learner can see or answer the content. The visible-reveal event activates all learner-input paths through the same boundary that activates the coordinator.
+
 ## Naming Targets
 
 Rename the runtime shell:
 
 - `CardScreen.svelte` -> `ContentSurface.svelte`
-- `cardRoute:*` launch timing labels may remain temporarily if they refer to the legacy route, but new runtime labels should use `contentRuntime:*`.
+- Route-entry launch timing labels use `contentRoute:*`; runtime-internal labels use `contentRuntime:*`.
 - `cardMachine` was renamed after the session surfaces were stable. The app-owned state-machine core is now `contentRuntimeMachine`.
 
 Clarify session surfaces:
@@ -162,7 +203,7 @@ This table is the source-to-target audit for the learner-runtime surface pass. R
 
 | Current name/path | Current role | Target owner/name | Action | Removal condition |
 | --- | --- | --- | --- | --- |
-| `mofacts/client/views/experiment/svelte/components/CardScreen.svelte` | Route-mounted learner runtime shell. | `ContentSurface.svelte` | Rename. | All imports/mounts use `ContentSurface`; route can remain `/card` temporarily. |
+| `mofacts/client/views/experiment/svelte/components/CardScreen.svelte` | Route-mounted learner runtime shell. | `ContentSurface.svelte` | Renamed. | All imports and mounts use `ContentSurface`; the external route boundary is `/content`. |
 | `mofacts/client/views/experiment/svelte/services/cardSessionRuntime.ts` | Builds current session-surface snapshot and video instruction state under card naming. | `ContentSurface` runtime helper or renamed content/session runtime helper. | Rename/classify after `ContentSurface` exists. | No session-surface selection helper remains card-specific unless it truly refers to the legacy route. |
 | `mofacts/client/views/experiment/svelte/services/cardMachineRuntime.ts` | XState actor lifecycle controller under card naming. | `ContentSurface` / `contentRuntimeMachine` controller. | Rename in the machine-name phase. | Machine actor lifecycle no longer uses `cardMachine*` names unless preserved as temporary route compatibility. |
 | `mofacts/client/views/experiment/svelte/components/StandardCardSessionSurface.svelte` | Learning/assessment flashcard session layout. | `FlashcardSessionSurface.svelte` | Rename. | Learning and assessment sessions render through `FlashcardSessionSurface`. |
@@ -239,7 +280,7 @@ Use this glossary as the source of truth for planned names.
 | --- | --- | --- | --- |
 | 0 | `trialDisplayOwnsInteraction` used as timer policy | `trialDisplaySuppressesStandardTimeout` or equivalent timer-specific name | Submission ownership and timer policy stay separate. |
 | 1 | `CardScreen.svelte` | `ContentSurface.svelte` | Route-mounted runtime shell. |
-| 1 | `cardRoute:*` log labels | keep temporarily | Only rename labels when they describe runtime internals rather than the legacy route. |
+| 1 | `contentRoute:*` log labels | current route boundary | Keep route-entry timing distinct from `contentRuntime:*` internals. |
 | 1/5 | `cardMachine*` state-machine core | `contentRuntimeMachine*` | Completed after the session surfaces were stable. |
 | 2 | `TrialContent.svelte` and `trial*` flashcard helpers | `FlashcardController`-owned runtime pieces | Normal stimulus/response/feedback behavior. Must not route to SPARC. |
 | 3 | `StandardCardSessionSurface.svelte` | `FlashcardSessionSurface.svelte` | Used by learning and assessment unit types that share `FlashcardController`. |
@@ -308,7 +349,7 @@ Goal: make the top-level ownership visible without changing behavior.
 Current files likely touched:
 
 - `mofacts/client/views/experiment/svelte/components/CardScreen.svelte`
-- `mofacts/client/views/experiment/card.ts`
+- `mofacts/client/views/experiment/contentRoute.ts`
 - tests or references returned by `rg "CardScreen"`
 
 Steps:
@@ -596,7 +637,7 @@ Use this checklist in the PR or commit notes for each phase:
 ## Implementation Evidence
 
 - `ContentSurface.svelte`, `FlashcardSessionSurface.svelte`, `VideoSessionSurface.svelte`, and `SparcSessionSurface.svelte` are the learner-runtime surface components.
-- `sessionSurfaceMode.ts` resolves session mode as `autotutor | video | sparc | flashcard`; the legacy `/card` route remains only as the route entrypoint.
+- `sessionSurfaceMode.ts` resolves session mode as `autotutor | video | sparc | flashcard`; the mode-neutral `/content` route is the learner content entrypoint.
 - `SparcSessionSurface` is selected from `currentTdfUnit.sparcsession`.
 - App-owned learner runtime no longer carries the former SPARC display discriminator.
 - App-owned learner runtime no longer has `CardScreen`, `TrialContent`, `StandardCardSessionSurface`, `VideoCardSessionSurface`, `SparcTrialSurface`, `cardMachine*`, `videoCard*`, or `cardVideo*` source files.

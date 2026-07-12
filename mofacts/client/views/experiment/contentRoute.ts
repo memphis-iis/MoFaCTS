@@ -6,8 +6,7 @@ import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage }
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { createBlazeMount } from './svelte/meteorIntegration';
-import { beginLearningAttempt } from './svelte/services/attemptIdentity';
-import './card.html';
+import './content.html';
 
 let ContentSurfaceModule: unknown = null;
 
@@ -19,23 +18,21 @@ async function loadContentSurface() {
   return ContentSurfaceModule;
 }
 
-type CardTemplateInstance = {
+type ContentTemplateInstance = {
   svelteMount?: { cleanup(): void } | null;
   isDestroyed?: boolean;
   $(selector: string): HTMLElement[];
 };
 
-Template.card.onRendered(function (this: CardTemplateInstance) {
+Template.content.onRendered(function (this: ContentTemplateInstance) {
   const template = this;
   template.isDestroyed = false;
   setLaunchLoadingMessage(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'));
-  markLaunchLoadingTiming('cardRoute:entered');
-  const attemptId = beginLearningAttempt(Session.get('currentTdfName'));
-
+  markLaunchLoadingTiming('contentRoute:entered');
   const mountContentSurface = () => {
-    const target = template.$('#svelte-card-root')[0];
+    const target = template.$('#content-root')[0];
     if (!target) {
-      clientConsole(1, '[Card Router] Could not find #svelte-card-root element');
+      clientConsole(1, '[Content Route] Could not find #content-root element');
       return;
     }
 
@@ -44,41 +41,39 @@ Template.card.onRendered(function (this: CardTemplateInstance) {
         tdfId: Session.get('currentRootTdfId') || Session.get('currentTdfId'),
         unitId: Session.get('currentUnitNumber'),
         userId: Meteor.userId(),
-        attemptId,
         engineIndices: Session.get('engineIndices'),
         experimentTarget: Session.get('experimentTarget'),
         experimentXCond: Session.get('experimentXCond'),
       };
     };
-    clientConsole(2, '[Card Router] Mounting content surface identity', {
+    clientConsole(2, '[Content Route] Mounting content surface identity', {
       userId: Meteor.userId(),
-      attemptId,
       unitId: Session.get('currentUnitNumber'),
       tdfId: Session.get('currentRootTdfId') || Session.get('currentTdfId'),
     });
 
-    // The card route mounts the app-owned content runtime surface.
-    markLaunchLoadingTiming('cardRoute:loadContentSurface:start');
+    // The content route mounts the app-owned content runtime surface.
+    markLaunchLoadingTiming('contentRoute:loadContentSurface:start');
     loadContentSurface().then((ContentSurface) => {
-      markLaunchLoadingTiming('cardRoute:loadContentSurface:complete');
+      markLaunchLoadingTiming('contentRoute:loadContentSurface:complete');
       if (template.isDestroyed || template.svelteMount || !target.isConnected) return;
       try {
         template.svelteMount = createBlazeMount(target, ContentSurface, {}, getReactiveProps);
       } catch (error) {
-        markLaunchLoadingTiming('cardRoute:mount:failed');
-        finishLaunchLoading('card-mount-failed');
-        clientConsole(1, '[Card Router] Error mounting Svelte component:', error);
+        markLaunchLoadingTiming('contentRoute:mount:failed');
+        finishLaunchLoading('content-mount-failed');
+        clientConsole(1, '[Content Route] Error mounting Svelte component:', error);
       }
     }).catch((error) => {
-      markLaunchLoadingTiming('cardRoute:loadContentSurface:failed');
-      finishLaunchLoading('card-chunk-load-failed');
-      clientConsole(1, '[Card Router] Error loading ContentSurface chunk:', error);
+      markLaunchLoadingTiming('contentRoute:loadContentSurface:failed');
+      finishLaunchLoading('content-chunk-load-failed');
+      clientConsole(1, '[Content Route] Error loading ContentSurface chunk:', error);
     });
   };
   mountContentSurface();
 });
 
-Template.card.onDestroyed(function (this: CardTemplateInstance) {
+Template.content.onDestroyed(function (this: ContentTemplateInstance) {
   this.isDestroyed = true;
   if (this.svelteMount) {
     this.svelteMount.cleanup();

@@ -68,13 +68,21 @@ describe('card machine presenting state', function() {
 
   it('keeps awaiting input submit and response timeout routed to validation after reveal', function() {
     const awaiting = states[STATES.AWAITING]!;
+    const inputMode = awaiting.states!.inputMode!;
+    const inputWaitingForReveal = inputMode.states!.waitingForReveal!;
     const inputReady = awaiting.states!.inputMode!.states!.ready!;
     const mainTimeout = awaiting.states!.mainTimeout!;
     const mainTimeoutWaitingForReveal = mainTimeout.states!.waitingForReveal!;
     const mainTimeoutRunning = mainTimeout.states!.running!;
 
     expect(awaiting.type).to.equal('parallel');
-    expect(awaiting.entry).to.include('enableInput');
+    expect(awaiting.entry).not.to.include('enableInput');
+    expect(awaiting.entry).not.to.include('startRecording');
+    expect(inputMode.initial).to.equal('waitingForReveal');
+    expect(inputWaitingForReveal.on![EVENTS.TRIAL_REVEAL_STARTED]).to.deep.equal({
+      target: 'ready',
+      actions: ['enableInput', 'markInputEnabled', 'focusInput', 'maybeSpeakQuestion', 'logStateTransition'],
+    });
     expect(mainTimeout.initial).to.equal('waitingForReveal');
     expect(mainTimeoutWaitingForReveal.on![EVENTS.TRIAL_REVEAL_STARTED]).to.deep.equal({
       target: 'running',
@@ -107,9 +115,15 @@ describe('card machine presenting state', function() {
   });
 
   it('keeps speech recognition success and exhaustion auto-submitting to validation', function() {
-    const speechStates = states[STATES.AWAITING]!.states!.speechRecognition!.states!;
+    const speechRegion = states[STATES.AWAITING]!.states!.speechRecognition!;
+    const speechStates = speechRegion.states!;
     const activeStates = speechStates.active!.states!;
 
+    expect(speechRegion.initial).to.equal('waitingForReveal');
+    expect(speechStates.waitingForReveal!.on![EVENTS.TRIAL_REVEAL_STARTED]).to.deep.equal({
+      target: 'checking',
+      actions: ['startRecording', 'logStateTransition'],
+    });
     expect(speechStates.checking!.always).to.deep.equal([
       {
         target: 'active',

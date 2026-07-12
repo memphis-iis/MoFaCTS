@@ -4,10 +4,13 @@ This directory contains side-effectful runtime services and pure helpers used by
 
 ## Ownership
 
-- `svelteInit.ts`: launch bootstrap orchestration, including entry intent resolution, TDF/unit preconditions, stimuli loading, shared unit-engine type resolution, engine initialization, resume dispatch, instruction redirects, audio startup, and launch-time diagnostics.
-- `cardEntryBootstrap.ts`: card-entry intent classification before initialization dispatch.
-- `cardReadiness.ts`: card display readiness predicates and diagnostics.
-- `cardLaunchFailure.ts`: launch failure reporting and diagnostic state.
+- `contentSurfaceInit.ts`: launch bootstrap orchestration, including entry intent resolution, TDF/unit preconditions, stimuli loading, shared unit-engine type resolution, engine initialization, resume dispatch, instruction redirects, audio startup, and launch-time diagnostics.
+- `contentEntryBootstrap.ts`: content-entry intent classification before initialization dispatch.
+- `contentReadiness.ts`: card display readiness predicates and diagnostics.
+- `contentLaunchCoordinator.ts`: canonical content entry and first-visible-render lifecycle.
+- `contentLaunchOrchestration.ts`: content initialization and readiness sequencing.
+- `contentLaunchEnvironment.ts`: Meteor/session dependencies for content launch diagnostics.
+- `contentLaunchFailure.ts`: launch failure reporting, loading cleanup, and failure routing.
 - `unitEngineService.ts`: unit-engine construction and integration with standard card, assessment, video, H5P, and AutoTutor unit behavior.
 - `resumeService.ts`, `assessmentResume.ts`, `videoResume.ts`, `resumeIntegrity.ts`, and `historyReconstruction.ts`: resume and reconstruction behavior.
 - `historyLogging.ts`, `historyH5P.ts`, and `mappingRecordService.ts`: canonical history envelope construction, H5P extension row shaping, and mapping persistence.
@@ -20,7 +23,7 @@ This directory contains side-effectful runtime services and pure helpers used by
 
 - Keep Meteor database calls, subscriptions, Session access, browser APIs, media APIs, and engine integration in services rather than machine files.
 - Keep pure predicates and payload builders small enough to test directly.
-- Keep `svelteInit.ts` as the launch bootstrap coordinator, but extract new domain-specific logic into a named service before it becomes another launch concern.
+- Keep `contentSurfaceInit.ts` as the launch bootstrap coordinator, but extract new domain-specific logic into a named service before it becomes another launch concern.
 - Keep shared AutoTutor/video/card surface decisions in `sessionSurfaceMode.ts`; `ContentSurface.svelte` should compose the selected surface and keep DOM/event wiring local.
 - Keep video-session bridge behavior in the video service/component files until the unit-runtime adapter design is implemented.
 - Keep AutoTutor integration in `autoTutorClient.ts` and `components/AutoTutorSession.svelte`; shared launch or machine changes should only cover behavior common to all unit kinds.

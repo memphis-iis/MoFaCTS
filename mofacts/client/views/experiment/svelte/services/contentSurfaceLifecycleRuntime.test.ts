@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { createContentSurfaceLifecycleRuntime } from './contentSurfaceLifecycleRuntime';
-import type { CardLaunchOrchestrationDeps } from './cardLaunchOrchestration';
+import type { ContentLaunchOrchestrationDeps } from './contentLaunchOrchestration';
 import type { ContentRuntimeMachineSnapshot } from './contentRuntimeMachineRuntime';
 
 function machineSnapshot(value: unknown): ContentRuntimeMachineSnapshot {
@@ -11,10 +11,16 @@ function machineSnapshot(value: unknown): ContentRuntimeMachineSnapshot {
   };
 }
 
-function launchDeps(events: string[]): CardLaunchOrchestrationDeps {
+async function flushLaunchLifecycle(): Promise<void> {
+  for (let index = 0; index < 6; index += 1) {
+    await Promise.resolve();
+  }
+}
+
+function launchDeps(events: string[]): ContentLaunchOrchestrationDeps {
   return {
-    initializeCard: async () => undefined,
-    waitForCardReadiness: async () => true,
+    initializeContent: async () => undefined,
+    waitForContentReadiness: async () => true,
     getReadinessDependencies: () => ({
       getCurrentTdfUnit: () => ({}),
       getDeliverySettings: () => ({}),
@@ -53,9 +59,6 @@ function launchDeps(events: string[]): CardLaunchOrchestrationDeps {
     prepareRender: async () => {
       events.push('old-prepare-render');
     },
-    resolveLaunchCompletion: () => null,
-    waitForBrowserPaint: async () => undefined,
-    finishLaunchLoading: () => undefined,
   };
 }
 
@@ -63,6 +66,7 @@ function createHarness(overrides: Partial<{
   launchStatus: string;
   testMode: boolean;
   testPerformance: unknown;
+  shouldStartReadyRuntime: boolean;
 }> = {}) {
   const events: string[] = [];
   let sessionUnitModeVersion = 0;
@@ -73,7 +77,8 @@ function createHarness(overrides: Partial<{
     clearLearningProgressViewport: () => events.push('learning-progress:close'),
     clearTimeoutCountdown: () => events.push('timeout:stop'),
     completeCleanup: () => events.push('complete-cleanup'),
-    launch: async (deps: CardLaunchOrchestrationDeps) => {
+    failLaunch: (failure: unknown) => events.push(`launch:failed:${JSON.stringify(failure)}`),
+    launch: async (deps: ContentLaunchOrchestrationDeps) => {
       events.push('launch');
       await deps.prepareRender();
       return { status: overrides.launchStatus || 'ready' };
@@ -90,6 +95,7 @@ function createHarness(overrides: Partial<{
       events.push(`mode-version:${sessionUnitModeVersion}`);
     },
     setState: (snapshot: ContentRuntimeMachineSnapshot) => events.push(`state:${String(snapshot.value)}`),
+    shouldStartReadyRuntime: () => overrides.shouldStartReadyRuntime !== false,
     startDisplayTimeoutClock: () => events.push('display-clock:start'),
     stopStimDisplayTypeMapVersionSync: (reason: string) => events.push(`stim-sync:stop:${reason}`),
     testMode: () => overrides.testMode === true,
@@ -106,7 +112,7 @@ function createHarness(overrides: Partial<{
   };
 }
 
-describe('card screen lifecycle runtime', function() {
+describe('content surface lifecycle runtime', function() {
   it('seeds static tester state without launching the runtime', function() {
     const { controller, events } = createHarness({
       testMode: true,
@@ -126,12 +132,12 @@ describe('card screen lifecycle runtime', function() {
     const { controller, events } = createHarness();
 
     controller.mount();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushLaunchLifecycle();
 
     expect(events).to.deep.equal([
       'display-clock:start',
       'launch',
+      'old-prepare-render',
       'mode-version:1',
       'initialized:true',
       'tick',
@@ -139,20 +145,40 @@ describe('card screen lifecycle runtime', function() {
     ]);
   });
 
+  it('prepares a surface that owns its runtime without starting the shared machine', async function() {
+    const harness = createHarness({ shouldStartReadyRuntime: false });
+
+    harness.controller.mount();
+    await flushLaunchLifecycle();
+
+    expect(harness.events).to.include('initialized:true');
+    expect(harness.events).not.to.include('runtime:start');
+  });
+
   it('does not start runtime when launch does not reach ready', async function() {
     const { controller, events } = createHarness({ launchStatus: 'redirected' });
 
     controller.mount();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushLaunchLifecycle();
 
     expect(events).to.deep.equal([
       'display-clock:start',
       'launch',
+      'old-prepare-render',
       'mode-version:1',
       'initialized:true',
       'tick',
     ]);
+  });
+
+  it('projects an orchestration failure into the owning launch coordinator', async function() {
+    const { controller, events } = createHarness({ launchStatus: 'failed' });
+
+    controller.mount();
+    await flushLaunchLifecycle();
+
+    expect(events).to.include('launch:failed:{"status":"failed"}');
+    expect(events).not.to.include('runtime:start');
   });
 
   it('stops runtime and non-test cleanup on unmount', function() {

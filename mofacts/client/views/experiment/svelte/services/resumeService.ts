@@ -58,7 +58,7 @@ import {
 } from '../../../../lib/courseAssignmentLaunchContext';
 import type {
   ExperimentState,
-  SvelteCardInitResult,
+  ContentSurfaceInitResult,
   UnitEngineLike,
 } from '../../../../../common/types';
 import { repairFormattedStimuliResponsesFromRaw } from '../../../../../common/lib/stimuliResponseRepair';
@@ -328,9 +328,9 @@ function setUiMessage(text: string, variant = 'danger'): void {
 /**
  * @param {string} message
  * @param {{redirectTo?: string, variant?: string}} [options={}]
- * @returns {SvelteCardInitResult}
+ * @returns {ContentSurfaceInitResult}
  */
-function handleResumeFailure(message: string, options: { redirectTo?: string; variant?: string } = {}): SvelteCardInitResult {
+function handleResumeFailure(message: string, options: { redirectTo?: string; variant?: string } = {}): ContentSurfaceInitResult {
   const { redirectTo = '/home', variant = 'danger' } = options;
   setUiMessage(message, variant);
   Session.set('appLoading', false);
@@ -456,14 +456,14 @@ function preloadVideos(): void {
  * This function restores ALL session state from the server when a user returns.
  *
  * @param {Object} initialTdfFile - The current TDF file (may be root or condition TDF)
- * @returns {Promise<SvelteCardInitResult>} Result object for svelteInit to handle
+ * @returns {Promise<ContentSurfaceInitResult>} Result object for contentSurfaceInit to handle
  */
-export async function resumeFromExperimentState(_initialTdfFile: unknown): Promise<SvelteCardInitResult> {
+export async function resumeFromExperimentState(_initialTdfFile: unknown): Promise<ContentSurfaceInitResult> {
   let resolvedUnitList: TdfUnitLike[] | null = null;
   let resolvedTdfFile: TdfFileLike | null = null;
   if (isResumeInProgress()) {
     clientConsole(2, 'RESUME DENIED - already running in resumeInProgress');
-    return { redirected: true, redirectTo: '/card' };
+    return { redirected: true, redirectTo: '/content' };
   }
   setResumeInProgress(true);
   Session.set('uiMessage', null);
@@ -471,7 +471,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
   if (isInResume()) {
     clientConsole(2, 'RESUME DENIED - already running in resume');
     setResumeInProgress(false);
-    return { redirected: true, redirectTo: '/card' };
+    return { redirected: true, redirectTo: '/content' };
   }
   setInResume(true);
   assertIdInvariants('resume.start', { requireCurrentTdfId: false, requireStimuliSetId: false });

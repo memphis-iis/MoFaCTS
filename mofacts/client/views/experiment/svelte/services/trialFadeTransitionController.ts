@@ -18,7 +18,6 @@ export interface TrialFadeTransitionRuntimeState {
 }
 
 export interface TrialFadeTransitionControllerDependencies {
-  readonly finishFirstRevealFromTransitionEvent: (params: { eventType: string }) => void;
   readonly getComputedOpacity: () => string;
   readonly getFadeContext: () => ActiveTrialFadeContext;
   readonly getRuntimeState: () => TrialFadeTransitionRuntimeState;
@@ -56,8 +55,6 @@ export function createTrialFadeTransitionController(
       opacity: deps.getComputedOpacity(),
       pseudoElement: event.pseudoElement || '',
     });
-
-    deps.finishFirstRevealFromTransitionEvent({ eventType });
 
     if (
       runtime.isTestMode ||

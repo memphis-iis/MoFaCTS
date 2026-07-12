@@ -185,7 +185,7 @@ async function _runTrialOldCard(_fixture) {
 }
 
 /**
- * Run trial with new card (Svelte CardScreen).
+ * Run a trial through the Svelte ContentSurface.
  * TODO: Implement trial execution with Svelte card.
  *
  * @param {Object} fixture - Test fixture
@@ -195,7 +195,7 @@ async function _runTrialNewCard(_fixture) {
   // TODO: Set up test environment
   // TODO: Load TDF
   // TODO: Initialize engine
-  // TODO: Mount Svelte CardScreen
+  // TODO: Mount Svelte ContentSurface
   // TODO: Simulate user interaction
   // TODO: Capture history record
   // TODO: Clean up
@@ -302,7 +302,7 @@ Manual Spot Check Procedure:
 
 1. Admin Login:
    - Log in as admin user
-   - Navigate to /card?newCard=1 to use new card
+   - Navigate to /content?newCard=1 to use the content route
 
 2. Run Trial:
    - Complete a drill trial (correct answer)

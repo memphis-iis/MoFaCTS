@@ -8,7 +8,6 @@ function createHarness(options: {
   isTestMode?: boolean;
   transitionCompleteSent?: boolean;
 } = {}) {
-  const firstRevealEvents: Array<{ eventType: string }> = [];
   const logs: Array<{ level: number; message: string; details?: unknown }> = [];
   const preparedHandoffs: Array<{ feedbackReady: boolean; stimulusReady: boolean }> = [];
   let transitionMarked = false;
@@ -20,9 +19,6 @@ function createHarness(options: {
     configuredDurationMs: 160,
   };
   const controller = createTrialFadeTransitionController({
-    finishFirstRevealFromTransitionEvent: (params) => {
-      firstRevealEvents.push(params);
-    },
     getComputedOpacity: () => '0.5',
     getFadeContext: () => fadeContext,
     getRuntimeState: () => ({
@@ -55,7 +51,6 @@ function createHarness(options: {
 
   return {
     controller,
-    firstRevealEvents,
     logs,
     preparedHandoffs,
     get transitionMarked() {
@@ -83,10 +78,9 @@ describe('trial fade transition controller', function() {
     })).to.equal(false);
 
     expect(harness.logs).to.deep.equal([]);
-    expect(harness.firstRevealEvents).to.deep.equal([]);
   });
 
-  it('logs fade timing and finishes first reveal for opacity transition events', function() {
+  it('logs fade timing for opacity transition events without owning launch completion', function() {
     const harness = createHarness();
 
     expect(harness.controller.handleTransitionEvent({
@@ -96,7 +90,6 @@ describe('trial fade transition controller', function() {
       pseudoElement: '',
     })).to.equal(true);
 
-    expect(harness.firstRevealEvents).to.deep.equal([{ eventType: 'transitionstart' }]);
     expect(harness.logs[0]).to.deep.equal({
       level: 2,
       message: '[ContentSurface][FadeTiming]',

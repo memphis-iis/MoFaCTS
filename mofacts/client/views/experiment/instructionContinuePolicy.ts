@@ -1,6 +1,6 @@
 import type { UnitType } from '../../../common/types';
 
-export type InstructionContinueNavigationTarget = '/card' | '/home';
+export type InstructionContinueNavigationTarget = '/content' | '/home';
 
 export type InstructionContinuePolicy = {
   navigationTarget: InstructionContinueNavigationTarget;
@@ -24,7 +24,7 @@ export function resolveInstructionContinuePolicy(params: {
 
   if (params.unitType !== 'instruction-only') {
     return {
-      navigationTarget: '/card',
+      navigationTarget: '/content',
       sessionPatch: {
         currentUnitNumber: params.currentUnitNumber,
         currentTdfUnitIndex: params.currentUnitNumber,
@@ -33,7 +33,7 @@ export function resolveInstructionContinuePolicy(params: {
     };
   }
 
-  const navigationTarget = nextUnitNumber < params.unitCount ? '/card' : '/home';
+  const navigationTarget = nextUnitNumber < params.unitCount ? '/content' : '/home';
   const policy: InstructionContinuePolicy = {
     navigationTarget,
     experimentStatePatch: {
@@ -41,7 +41,7 @@ export function resolveInstructionContinuePolicy(params: {
       lastUnitCompleted: params.currentUnitNumber,
     },
   };
-  if (navigationTarget === '/card') {
+  if (navigationTarget === '/content') {
     policy.sessionPatch = {
       currentUnitNumber: nextUnitNumber,
       currentTdfUnitIndex: nextUnitNumber,

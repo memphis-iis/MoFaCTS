@@ -212,7 +212,7 @@ function scrollHomeToTop(): void {
 }
 
 async function leavePracticeFor(route: string): Promise<void> {
-  if (document.location.pathname === '/card' || document.location.pathname === '/instructions') {
+  if (document.location.pathname === '/content' || document.location.pathname === '/instructions') {
     const { leavePage } = await import('../experiment/svelte/services/navigationCleanup');
     await leavePage(route);
     return;

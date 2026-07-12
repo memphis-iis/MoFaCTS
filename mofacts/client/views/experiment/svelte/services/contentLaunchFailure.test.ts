@@ -1,18 +1,18 @@
 import { expect } from 'chai';
 import {
   isExperimentParticipantSession,
-  routeCardInitializationFailure,
-  type CardLaunchFailureUser,
-} from './cardLaunchFailure';
+  routeContentInitializationFailure,
+  type ContentLaunchFailureUser,
+} from './contentLaunchFailure';
 
-function createDeps(user: CardLaunchFailureUser | null, loginMode: unknown) {
+function createDeps(user: ContentLaunchFailureUser | null, loginMode: unknown) {
   const sessionValues = new Map<string, unknown>();
   const routes: string[] = [];
   const launchReasons: string[] = [];
 
   return {
     deps: {
-      finishLaunchLoading: (reason: 'card-initialization-failed') => {
+      finishLaunchLoading: (reason: 'content-initialization-failed') => {
         launchReasons.push(reason);
       },
       getLoginMode: () => loginMode,
@@ -49,9 +49,9 @@ describe('card launch failure routing', function() {
   it('routes experiment participants to the experiment error page', function() {
     const harness = createDeps({ loginParams: { loginMode: 'experiment' } }, 'normal');
 
-    routeCardInitializationFailure(harness.deps);
+    routeContentInitializationFailure(harness.deps);
 
-    expect(harness.launchReasons).to.deep.equal(['card-initialization-failed']);
+    expect(harness.launchReasons).to.deep.equal(['content-initialization-failed']);
     expect(harness.routes).to.deep.equal(['/experimentError']);
     expect(harness.sessionValues.get('appLoading')).to.equal(false);
     expect(harness.sessionValues.get('uiMessage')).to.equal(null);
@@ -66,9 +66,9 @@ describe('card launch failure routing', function() {
   it('routes ordinary learners back to the practice menu with the existing message', function() {
     const harness = createDeps(null, 'normal');
 
-    routeCardInitializationFailure(harness.deps);
+    routeContentInitializationFailure(harness.deps);
 
-    expect(harness.launchReasons).to.deep.equal(['card-initialization-failed']);
+    expect(harness.launchReasons).to.deep.equal(['content-initialization-failed']);
     expect(harness.routes).to.deep.equal(['/home']);
     expect(harness.sessionValues.get('appLoading')).to.equal(false);
     expect(harness.sessionValues.get('uiMessage')).to.deep.equal({

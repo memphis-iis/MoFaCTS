@@ -4,28 +4,28 @@ import {
   shouldRequireSessionVideoReadiness,
 } from './sessionSurfaceMode';
 
-type CardReadinessDeliverySettings = Record<string, unknown> & {
+type ContentReadinessDeliverySettings = Record<string, unknown> & {
   isVideoSession?: boolean;
   videoUrl?: unknown;
 };
 
-export interface CardReadinessDependencies {
+export interface ContentReadinessDependencies {
   readonly getCurrentTdfUnit: () => Record<string, unknown> | null | undefined;
-  readonly getDeliverySettings: () => CardReadinessDeliverySettings | null | undefined;
+  readonly getDeliverySettings: () => ContentReadinessDeliverySettings | null | undefined;
   readonly getVideoCheckpoints: () => {
     times?: unknown;
     questions?: unknown;
   } | null | undefined;
 }
 
-export interface CardReadinessState {
+export interface ContentReadinessState {
   readonly hasCurrentTdfUnit: boolean;
   readonly hasDeliverySettings: boolean;
   readonly hasVideoReadiness: boolean;
   readonly isVideoUnit: boolean;
 }
 
-export interface CardReadinessDiagnostic extends CardReadinessState {
+export interface ContentReadinessDiagnostic extends ContentReadinessState {
   readonly currentTdfId: unknown;
   readonly currentRootTdfId: unknown;
   readonly currentStimuliSetId: unknown;
@@ -40,22 +40,20 @@ export function hasDeliverySettingsReady(deliverySettingsState: unknown): boolea
     Object.keys(deliverySettingsState as Record<string, unknown>).length > 0;
 }
 
-function resolveCardReadinessContentSurface(
+function resolveContentReadinessSurface(
   unit: Record<string, unknown> | null | undefined,
-  deliverySettingsState: CardReadinessDeliverySettings | null | undefined,
 ) {
   return resolveSessionContentSurface(resolveSessionSurfaceState({
     currentTdfUnit: unit,
-    deliverySettings: deliverySettingsState ?? undefined,
   }));
 }
 
 export function hasVideoSessionReadiness(
   unit: Record<string, unknown> | null | undefined,
   checkpoints: { times?: unknown; questions?: unknown } | null | undefined,
-  deliverySettingsState: CardReadinessDeliverySettings | null | undefined,
+  deliverySettingsState: ContentReadinessDeliverySettings | null | undefined,
 ): boolean {
-  const contentSurface = resolveCardReadinessContentSurface(unit, deliverySettingsState);
+  const contentSurface = resolveContentReadinessSurface(unit);
 
   if (!shouldRequireSessionVideoReadiness(contentSurface)) {
     return true;
@@ -73,7 +71,7 @@ export function hasVideoSessionReadiness(
     hasVideoUrl;
 }
 
-export function getCardReadinessState(deps: CardReadinessDependencies): CardReadinessState {
+export function getContentReadinessState(deps: ContentReadinessDependencies): ContentReadinessState {
   const currentTdfUnit = deps.getCurrentTdfUnit();
   const deliverySettingsState = deps.getDeliverySettings();
   return {
@@ -84,22 +82,21 @@ export function getCardReadinessState(deps: CardReadinessDependencies): CardRead
       deps.getVideoCheckpoints(),
       deliverySettingsState,
     ),
-    isVideoUnit: shouldRequireSessionVideoReadiness(resolveCardReadinessContentSurface(
+    isVideoUnit: shouldRequireSessionVideoReadiness(resolveContentReadinessSurface(
       currentTdfUnit,
-      deliverySettingsState,
     )),
   };
 }
 
-export function hasCardReadiness(deps: CardReadinessDependencies): boolean {
-  const readiness = getCardReadinessState(deps);
+export function hasContentReadiness(deps: ContentReadinessDependencies): boolean {
+  const readiness = getContentReadinessState(deps);
   return readiness.hasCurrentTdfUnit &&
     readiness.hasDeliverySettings &&
     readiness.hasVideoReadiness;
 }
 
-export async function waitForCardReadiness(
-  deps: CardReadinessDependencies,
+export async function waitForContentReadiness(
+  deps: ContentReadinessDependencies,
   timeoutMs = 4000,
   pollMs = 50,
   now: () => number = Date.now,
@@ -107,7 +104,7 @@ export async function waitForCardReadiness(
 ): Promise<boolean> {
   const start = now();
   while ((now() - start) < timeoutMs) {
-    if (hasCardReadiness(deps)) {
+    if (hasContentReadiness(deps)) {
       return true;
     }
     await sleep(pollMs);
@@ -115,15 +112,15 @@ export async function waitForCardReadiness(
   return false;
 }
 
-export function buildCardReadinessDiagnostic(params: {
-  readonly readiness: CardReadinessState;
+export function buildContentReadinessDiagnostic(params: {
+  readonly readiness: ContentReadinessState;
   readonly currentTdfId: unknown;
   readonly currentRootTdfId: unknown;
   readonly currentStimuliSetId: unknown;
   readonly currentUnitNumber: unknown;
   readonly currentUnitName: unknown;
-  readonly deliverySettingsState: CardReadinessDeliverySettings | null | undefined;
-}): CardReadinessDiagnostic {
+  readonly deliverySettingsState: ContentReadinessDeliverySettings | null | undefined;
+}): ContentReadinessDiagnostic {
   return {
     ...params.readiness,
     currentTdfId: params.currentTdfId ?? null,

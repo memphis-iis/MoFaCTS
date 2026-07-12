@@ -4,7 +4,7 @@ import { clientConsole } from './clientLogger';
 type LaunchLoadingSource =
   | 'practiceMenu'
   | 'instructions'
-  | 'card'
+  | 'content'
   | 'audio'
   | string;
 

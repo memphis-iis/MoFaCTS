@@ -113,19 +113,19 @@ function clearSparcReplayCachesForCleanup() {
   clearSparcRuntimeState();
 }
 
-function shouldPreserveUnitStateForCard() {
+function shouldPreserveUnitStateForContent() {
   const fromInstructions = Session.get('fromInstructions');
-  const cardBootstrapInProgress = Session.get('cardBootstrapInProgress') === true;
+  const contentBootstrapInProgress = Session.get('contentBootstrapInProgress') === true;
   const targetPath = document?.location?.pathname;
-  return targetPath === '/card' && (fromInstructions || cardBootstrapInProgress);
+  return targetPath === '/content' && (fromInstructions || contentBootstrapInProgress);
 }
 
 function sessionCleanUp() {
   const fromInstructions = Session.get('fromInstructions');
 
-  if (shouldPreserveUnitStateForCard()) {
-    clientConsole(1, '[Session] Skipping unit state cleanup on /card to avoid init race', {
-      reason: fromInstructions ? 'instructions-transition' : 'card-bootstrap',
+  if (shouldPreserveUnitStateForContent()) {
+    clientConsole(1, '[Session] Skipping unit state cleanup on /content to avoid init race', {
+      reason: fromInstructions ? 'instructions-transition' : 'content-bootstrap',
       currentUnitNumber: Session.get('currentUnitNumber'),
       currentTdfUnit: Session.get('currentTdfUnit')?.unitname,
     });

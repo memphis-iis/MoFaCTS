@@ -41,7 +41,7 @@ describe('lessonLaunchEntryRoute', function() {
       },
     });
 
-    expect(result).to.deep.equal({ route: '/card' });
+    expect(result).to.deep.equal({ route: '/content' });
   });
 
   for (const unit of [
@@ -91,7 +91,7 @@ describe('lessonLaunchEntryRoute', function() {
       },
     });
 
-    expect(result).to.deep.equal({ route: '/card' });
+    expect(result).to.deep.equal({ route: '/content' });
   });
 
   it('fails clearly when an initial launch has no unit sequence', function() {

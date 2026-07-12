@@ -1,27 +1,27 @@
-export interface CardLaunchFailureUser {
+export interface ContentLaunchFailureUser {
   readonly loginParams?: {
     readonly loginMode?: string;
   };
 }
 
-export interface CardLaunchFailureDependencies {
-  readonly finishLaunchLoading: (reason: 'card-initialization-failed') => void;
+export interface ContentLaunchFailureDependencies {
+  readonly finishLaunchLoading: (reason: 'content-initialization-failed') => void;
   readonly getLoginMode: () => unknown;
-  readonly getUser: () => CardLaunchFailureUser | null | undefined;
+  readonly getUser: () => ContentLaunchFailureUser | null | undefined;
   readonly routeTo: (path: '/experimentError' | '/home') => void;
   readonly setSessionValue: (key: string, value: unknown) => void;
 }
 
 export function isExperimentParticipantSession(params: {
-  readonly user: CardLaunchFailureUser | null | undefined;
+  readonly user: ContentLaunchFailureUser | null | undefined;
   readonly loginMode: unknown;
 }): boolean {
   return params.user?.loginParams?.loginMode === 'experiment' ||
     params.loginMode === 'experiment';
 }
 
-export function routeCardInitializationFailure(deps: CardLaunchFailureDependencies): void {
-  deps.finishLaunchLoading('card-initialization-failed');
+export function routeContentInitializationFailure(deps: ContentLaunchFailureDependencies): void {
+  deps.finishLaunchLoading('content-initialization-failed');
   deps.setSessionValue('appLoading', false);
 
   if (isExperimentParticipantSession({

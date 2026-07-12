@@ -1760,7 +1760,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
     setCardEntryIntent(entryIntent, {
       source: 'practiceMenu.navigateForMultiTdf',
     });
-    FlowRouter.go('/card');
+    FlowRouter.go('/content');
   } else {
     finishLaunchLoading('multi-tdf-select');
     FlowRouter.go('/multiTdfSelect');

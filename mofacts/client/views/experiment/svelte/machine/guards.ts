@@ -16,7 +16,6 @@ import {
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
 import {
-  getIsVideoSessionFlag,
   getVideoCheckpoints,
   isResumeInProgress,
   isResumeRequested,
@@ -553,10 +552,9 @@ export function isSoftError({ event }: ContentRuntimeMachineActorArgs): boolean 
  * @param {ContentRuntimeMachineEvent} event
  * @returns {boolean}
  */
-export function isVideoSession({ context }: ContentRuntimeMachineActorArgs): boolean {
+export function isVideoSession(_args: ContentRuntimeMachineActorArgs): boolean {
   return resolveSessionSurfaceState({
-    deliverySettings: context.deliverySettings,
-    sessionIsVideoSession: getIsVideoSessionFlag(),
+    currentTdfUnit: Session.get('currentTdfUnit'),
   }).isVideoSession;
 }
 

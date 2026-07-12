@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { createCardLaunchEnvironment } from './cardLaunchEnvironment';
+import { createContentLaunchEnvironment } from './contentLaunchEnvironment';
 
 function createHarness(overrides: {
   user?: { loginParams?: { loginMode?: string } } | null;
@@ -18,7 +18,7 @@ function createHarness(overrides: {
   ]);
   const routes: string[] = [];
   const finishReasons: string[] = [];
-  const environment = createCardLaunchEnvironment({
+  const environment = createContentLaunchEnvironment({
     getSessionValue: (key) => session.get(key),
     setSessionValue: (key, value) => {
       session.set(key, value);
@@ -86,10 +86,10 @@ describe('card launch environment', function() {
   it('stores timestamped failure diagnostics', function() {
     const harness = createHarness();
 
-    harness.environment.setFailureDiagnostic('cardReadinessTimeout', { ready: false });
+    harness.environment.setFailureDiagnostic('contentReadinessTimeout', { ready: false });
 
-    expect(harness.session.get('cardInitFailureDiagnostic')).to.deep.equal({
-      stage: 'cardReadinessTimeout',
+    expect(harness.session.get('contentInitFailureDiagnostic')).to.deep.equal({
+      stage: 'contentReadinessTimeout',
       capturedAt: 12345,
       ready: false,
     });
@@ -100,7 +100,7 @@ describe('card launch environment', function() {
 
     harness.environment.routeInitializationFailure();
 
-    expect(harness.finishReasons).to.deep.equal(['card-initialization-failed']);
+    expect(harness.finishReasons).to.deep.equal(['content-initialization-failed']);
     expect(harness.routes).to.deep.equal(['/experimentError']);
     expect(harness.session.get('experimentError')).to.deep.include({
       title: 'Experiment paused',

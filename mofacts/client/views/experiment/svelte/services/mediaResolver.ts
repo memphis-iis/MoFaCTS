@@ -4,11 +4,14 @@ import {
   logIdInvariantBreachOnce,
   setActiveTdfContext,
 } from '../../../../lib/idContext';
+import {
+  buildCanonicalDynamicAssetPath,
+  isExternalMediaPath,
+} from './dynamicAssetPath';
 
 type DynamicAssetRecord = Record<string, unknown>;
 type DynamicAssetsLike = {
   findOne: (query: Record<string, unknown>) => DynamicAssetRecord | null | undefined;
-  link: (asset: DynamicAssetRecord) => string;
 };
 
 type TdfDocumentLike = {
@@ -179,6 +182,7 @@ export function resolveDynamicAssetPath(
 
   const maybeUrl = toAppRelativePath(src);
   if (/^(?:data:|blob:|\/\/|#)/i.test(maybeUrl)) return maybeUrl;
+  if (isExternalMediaPath(maybeUrl)) return maybeUrl;
   const localMediaCandidate = isLikelyLocalMediaPath(maybeUrl);
   if (maybeUrl.startsWith('/') && !/^\/cdn\/storage\/Assets\//i.test(maybeUrl) && !/^\/dynamic-assets\//i.test(maybeUrl)) {
     if (localMediaCandidate) {
@@ -244,7 +248,7 @@ export function resolveDynamicAssetPath(
           currentTdfId: Session.get('currentTdfId') || Session.get('currentRootTdfId'),
           currentStimuliSetId: canonicalStimuliSetId,
         }, 'mediaResolver.resolveDynamicAssetPath.retryCanonical');
-        return toAppRelativePath(String(DynamicAssets?.link({ ...retryFound }) || normalized).trim());
+        return buildCanonicalDynamicAssetPath(retryFound, fileName);
       }
     }
   }
@@ -279,8 +283,5 @@ export function resolveDynamicAssetPath(
     return toAppRelativePath(normalized);
   }
 
-  if (!DynamicAssets?.link) {
-    return normalized;
-  }
-  return toAppRelativePath(String(DynamicAssets.link({ ...found }) || normalized).trim());
+  return buildCanonicalDynamicAssetPath(found, fileName);
 }

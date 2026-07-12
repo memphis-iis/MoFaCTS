@@ -12,10 +12,10 @@ describe('learning attempt identity', function() {
   });
 
   it('creates one explicit attempt id and retains it across card remounts', function() {
-    const first = beginLearningAttempt('Lesson A', Date.UTC(2026, 0, 2, 3, 4, 5));
-    const second = beginLearningAttempt('Lesson A', Date.UTC(2026, 0, 2, 4, 5, 6));
+    const first = beginLearningAttempt('tdf-a', Date.UTC(2026, 0, 2, 3, 4, 5));
+    const second = beginLearningAttempt('tdf-a', Date.UTC(2026, 0, 2, 4, 5, 6));
 
-    expect(first).to.equal('2026-01-02T03:04:05.000Z Lesson A');
+    expect(first).to.equal('2026-01-02T03:04:05.000Z tdf-a');
     expect(second).to.equal(first);
     expect(requireCurrentLearningAttemptId()).to.equal(first);
   });

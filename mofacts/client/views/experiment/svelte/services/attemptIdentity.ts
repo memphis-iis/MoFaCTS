@@ -6,16 +6,16 @@ function nonBlankString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-export function beginLearningAttempt(tdfName: unknown, startedAt = Date.now()): string {
+export function beginLearningAttempt(tdfId: unknown, startedAt = Date.now()): string {
   const existing = nonBlankString(Session.get(CURRENT_ATTEMPT_ID_KEY));
   if (existing) {
     return existing;
   }
-  const normalizedTdfName = nonBlankString(tdfName);
-  if (!normalizedTdfName) {
-    throw new Error('[Learning Attempt] Cannot begin attempt without currentTdfName');
+  const normalizedTdfId = nonBlankString(tdfId);
+  if (!normalizedTdfId) {
+    throw new Error('[Learning Attempt] Cannot begin attempt without a TDF id');
   }
-  const attemptId = `${new Date(startedAt).toISOString()} ${normalizedTdfName}`;
+  const attemptId = `${new Date(startedAt).toISOString()} ${normalizedTdfId}`;
   Session.set(CURRENT_ATTEMPT_ID_KEY, attemptId);
   return attemptId;
 }

@@ -26,6 +26,9 @@ export function resolveSparcControllerDisplay(
   }
 
   const adapter = getSparcControllerDisplayAdapter();
+  if (!adapter.ownsInteraction(display)) {
+    return null;
+  }
   try {
     return adapter.normalizeDisplay(display) as SparcControllerDisplay;
   } catch (error) {

@@ -9,27 +9,27 @@ import {
 } from '../../../../lib/cardEntryIntent';
 import { isConditionRootWithoutUnitArray } from '../../../../lib/tdfUtils';
 import { markLaunchLoadingTiming } from '../../../../lib/launchLoading';
-import type { ExperimentState, SvelteCardInitResult } from '../../../../../common/types';
+import type { ContentSurfaceInitResult, ExperimentState } from '../../../../../common/types';
 
-export type CardEntryIntentValue = ReturnType<typeof getCardEntryContext>['intent'];
+export type ContentEntryIntentValue = ReturnType<typeof getCardEntryContext>['intent'];
 
-export type CardRefreshRebuildClassification = ReturnType<typeof classifyCardRefreshRebuild>;
+export type ContentRefreshRebuildClassification = ReturnType<typeof classifyCardRefreshRebuild>;
 
-export type CardEntryBootstrapResolution = {
-  effectiveCardEntryIntent: CardEntryIntentValue;
+export type ContentEntryBootstrapResolution = {
+  effectiveCardEntryIntent: ContentEntryIntentValue;
   prefetchedExperimentState: ExperimentState | null;
-  refreshRebuildClassification: CardRefreshRebuildClassification | null;
+  refreshRebuildClassification: ContentRefreshRebuildClassification | null;
   requiresConditionResolution: boolean;
   shouldUseProgressBootstrap: boolean;
 };
 
-export type CardEntryBootstrapRedirect = SvelteCardInitResult & {
+export type ContentEntryBootstrapRedirect = ContentSurfaceInitResult & {
   redirected: true;
 };
 
-export type CardEntryBootstrapResult =
-  | { kind: 'ready'; resolution: CardEntryBootstrapResolution }
-  | { kind: 'redirected'; result: CardEntryBootstrapRedirect };
+export type ContentEntryBootstrapResult =
+  | { kind: 'ready'; resolution: ContentEntryBootstrapResolution }
+  | { kind: 'redirected'; result: ContentEntryBootstrapRedirect };
 
 export type TdfFileWithUnits = {
   tdfs?: {
@@ -39,7 +39,7 @@ export type TdfFileWithUnits = {
   };
 };
 
-export function describeCardEntryBootstrapMode(
+export function describeContentEntryBootstrapMode(
   shouldUseProgressBootstrap: boolean,
   requiresConditionResolution: boolean,
 ): 'standard' | 'persisted-progress' | 'condition-resolve' {
@@ -52,15 +52,15 @@ export function describeCardEntryBootstrapMode(
   return 'persisted-progress';
 }
 
-export async function resolveCardEntryBootstrap(params: {
-  requestedCardEntryIntent: CardEntryIntentValue;
+export async function resolveContentEntryBootstrap(params: {
+  requestedCardEntryIntent: ContentEntryIntentValue;
   tdfFile: TdfFileWithUnits;
-  shouldUseProgressBootstrapForEntryIntent: (intent: CardEntryIntentValue) => boolean;
-}): Promise<CardEntryBootstrapResult> {
+  shouldUseProgressBootstrapForEntryIntent: (intent: ContentEntryIntentValue) => boolean;
+}): Promise<ContentEntryBootstrapResult> {
   const { requestedCardEntryIntent, tdfFile, shouldUseProgressBootstrapForEntryIntent } = params;
   let effectiveCardEntryIntent = requestedCardEntryIntent;
   let prefetchedExperimentState: ExperimentState | null = null;
-  let refreshRebuildClassification: CardRefreshRebuildClassification | null = null;
+  let refreshRebuildClassification: ContentRefreshRebuildClassification | null = null;
   const unitCount = Array.isArray(tdfFile.tdfs?.tutor?.unit) ? tdfFile.tdfs.tutor.unit.length : 0;
 
   if (requestedCardEntryIntent === CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD) {

@@ -1,13 +1,13 @@
 import { expect } from 'chai';
 import {
-  buildCardReadinessDiagnostic,
-  getCardReadinessState,
-  hasCardReadiness,
+  buildContentReadinessDiagnostic,
+  getContentReadinessState,
+  hasContentReadiness,
   hasDeliverySettingsReady,
   hasVideoSessionReadiness,
-  waitForCardReadiness,
-  type CardReadinessDependencies,
-} from './cardReadiness';
+  waitForContentReadiness,
+  type ContentReadinessDependencies,
+} from './contentReadiness';
 
 describe('card readiness service', function() {
   it('requires non-empty delivery settings', function() {
@@ -29,9 +29,9 @@ describe('card readiness service', function() {
       { unitname: 'Practice', learningsession: {} },
       null,
       { isVideoSession: true, videoUrl: '/video.mp4' },
-    )).to.equal(false);
+    )).to.equal(true);
     expect(hasVideoSessionReadiness(
-      { unitname: 'AutoTutor', autotutorsession: {}, videosession: {} },
+      { unitname: 'AutoTutor', autotutorsession: {} },
       null,
       { videoUrl: '' },
     )).to.equal(true);
@@ -58,29 +58,29 @@ describe('card readiness service', function() {
   });
 
   it('summarizes card readiness state from injected runtime dependencies', function() {
-    const deps: CardReadinessDependencies = {
+    const deps: ContentReadinessDependencies = {
       getCurrentTdfUnit: () => ({ unitname: 'Practice', learningsession: {} }),
       getDeliverySettings: () => ({ displayQuestionNumber: true }),
       getVideoCheckpoints: () => null,
     };
 
-    expect(getCardReadinessState(deps)).to.deep.equal({
+    expect(getContentReadinessState(deps)).to.deep.equal({
       hasCurrentTdfUnit: true,
       hasDeliverySettings: true,
       hasVideoReadiness: true,
       isVideoUnit: false,
     });
-    expect(hasCardReadiness(deps)).to.equal(true);
+    expect(hasContentReadiness(deps)).to.equal(true);
   });
 
   it('reports video state from the session surface adapter', function() {
-    const deps: CardReadinessDependencies = {
-      getCurrentTdfUnit: () => ({ unitname: 'Practice', learningsession: {} }),
+    const deps: ContentReadinessDependencies = {
+      getCurrentTdfUnit: () => ({ unitname: 'Video', videosession: {} }),
       getDeliverySettings: () => ({ isVideoSession: true, videoUrl: '/video.mp4' }),
       getVideoCheckpoints: () => ({ times: [10], questions: [0] }),
     };
 
-    expect(getCardReadinessState(deps)).to.deep.equal({
+    expect(getContentReadinessState(deps)).to.deep.equal({
       hasCurrentTdfUnit: true,
       hasDeliverySettings: true,
       hasVideoReadiness: true,
@@ -91,7 +91,7 @@ describe('card readiness service', function() {
   it('polls until readiness is available', async function() {
     let attempts = 0;
     let currentTime = 0;
-    const deps: CardReadinessDependencies = {
+    const deps: ContentReadinessDependencies = {
       getCurrentTdfUnit: () => ({ unitname: 'Practice', learningsession: {} }),
       getDeliverySettings: () => {
         attempts += 1;
@@ -100,7 +100,7 @@ describe('card readiness service', function() {
       getVideoCheckpoints: () => null,
     };
 
-    const ready = await waitForCardReadiness(
+    const ready = await waitForContentReadiness(
       deps,
       100,
       10,
@@ -114,7 +114,7 @@ describe('card readiness service', function() {
   });
 
   it('builds launch diagnostics without reading global state', function() {
-    const diagnostic = buildCardReadinessDiagnostic({
+    const diagnostic = buildContentReadinessDiagnostic({
       readiness: {
         hasCurrentTdfUnit: true,
         hasDeliverySettings: false,

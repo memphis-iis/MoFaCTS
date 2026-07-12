@@ -26,12 +26,13 @@ function createHarness(options: Partial<ActiveTrialRevealRuntimeState> = {}) {
   const firstRevealMarks: Array<{ key: string; subsetKind: string }> = [];
   const logs: Array<{ level: number; message: string; details?: unknown }> = [];
   const revealStarted: string[] = [];
+  const stagedTrials: Array<{ key: string; subsetKind: string }> = [];
   const snapshots: ActiveTrialRevealSnapshot[] = [];
   let now = 1000;
   let transitionDuration = 240;
   let runtime: ActiveTrialRevealRuntimeState = {
-    allBlockingAssetsReady: true,
     isFadingOut: false,
+    isOutgoingFreezeState: false,
     isTestMode: false,
     subsetKind: 'question',
     ...options,
@@ -54,6 +55,9 @@ function createHarness(options: Partial<ActiveTrialRevealRuntimeState> = {}) {
     },
     onRevealStarted: (subsetKind) => {
       revealStarted.push(subsetKind);
+    },
+    onTrialStaged: (params) => {
+      stagedTrials.push(params);
     },
     onUpdate: (snapshot) => {
       snapshots.push(snapshot);
@@ -82,6 +86,7 @@ function createHarness(options: Partial<ActiveTrialRevealRuntimeState> = {}) {
       transitionDuration = value;
     },
     snapshots,
+    stagedTrials,
   };
 }
 
@@ -108,6 +113,7 @@ describe('active trial reveal controller', function() {
       feedbackBlockingAssetReady: true,
       trialSubsetVisible: false,
     });
+    expect(harness.stagedTrials).to.deep.equal([{ key: 'trial-a', subsetKind: 'question' }]);
     expect(harness.controller.syncStage({
       expectedFeedbackBlockerSrc: '',
       expectedStimulusBlockerSrc: '/a.png',
@@ -133,14 +139,8 @@ describe('active trial reveal controller', function() {
 
     harness.setNow(1400);
     harness.setTransitionDuration(180);
-    harness.controller.queueRevealIfReady({
-      allBlockingAssetsReady: true,
-      isOutgoingFreezeState: false,
-    });
-    harness.controller.queueRevealIfReady({
-      allBlockingAssetsReady: true,
-      isOutgoingFreezeState: false,
-    });
+    harness.controller.queueRevealIfReady();
+    harness.controller.queueRevealIfReady();
     harness.domUpdate.resolve();
     harness.paint.resolve();
     await flushMicrotasks();
@@ -160,7 +160,7 @@ describe('active trial reveal controller', function() {
     });
   });
 
-  it('skips queued reveal when runtime blockers are no longer ready', async function() {
+  it('skips a queued reveal when a staged blocker becomes unready', async function() {
     const harness = createHarness();
     harness.controller.syncStage({
       expectedFeedbackBlockerSrc: '',
@@ -171,17 +171,41 @@ describe('active trial reveal controller', function() {
       trialSubsetKey: 'trial-a',
       trialSubsetKind: 'question',
     });
-    harness.controller.queueRevealIfReady({
-      allBlockingAssetsReady: true,
-      isOutgoingFreezeState: false,
-    });
-    harness.setRuntime({ allBlockingAssetsReady: false });
+    harness.controller.queueRevealIfReady();
+    harness.controller.setBlockingAssetReady({ owner: 'stimulus', ready: false });
     harness.domUpdate.resolve();
     harness.paint.resolve();
     await flushMicrotasks();
 
     expect(harness.fadeContexts).to.deep.equal([]);
     expect(harness.logs.some((entry) => entry.message === '[ContentSurface][Reveal] queued reveal skipped')).to.equal(true);
+  });
+
+  it('reveals an image-backed first trial when its delayed blocker becomes ready', async function() {
+    const harness = createHarness();
+    harness.controller.syncStage({
+      expectedFeedbackBlockerSrc: '',
+      expectedStimulusBlockerSrc: '/map.png',
+      isFadingOut: false,
+      isOutgoingFreezeState: false,
+      showOverlay: true,
+      trialSubsetKey: 'map-trial',
+      trialSubsetKind: 'question',
+    });
+
+    expect(harness.revealStarted).to.deep.equal([]);
+    harness.controller.setBlockingAssetReady({ owner: 'stimulus', ready: true });
+    harness.domUpdate.resolve();
+    harness.paint.resolve();
+    await flushMicrotasks();
+
+    expect(harness.revealStarted).to.deep.equal(['question']);
+    expect(harness.controller.getSnapshot()).to.deep.include({
+      activeSlotVisible: true,
+      stagedTrialSubsetKey: 'map-trial',
+      stimulusBlockingAssetReady: true,
+      trialSubsetVisible: true,
+    });
   });
 
   it('reveals a mounted ready trial when the async reveal was missed', function() {

@@ -23,7 +23,7 @@ describe('sessionUtils mapping cleanup', function() {
     Session.set('clusterMapping', '');
     Session.set('mappingSignature', null);
     Session.set('fromInstructions', false);
-    Session.set('cardBootstrapInProgress', false);
+    Session.set('contentBootstrapInProgress', false);
     Session.set('currentTdfName', undefined);
     Session.set('currentTdfId', undefined);
     Session.set('currentUnitNumber', undefined);
@@ -53,9 +53,9 @@ describe('sessionUtils mapping cleanup', function() {
 
   it('clears mapping and signature in the fromInstructions guard branch', function() {
     Session.set('fromInstructions', true);
-    // Simulate navigating to /card so the guard branch executes
+    // Simulate navigating to /content so the guard branch executes
     Object.defineProperty(document, 'location', {
-      value: { pathname: '/card' },
+      value: { pathname: '/content' },
       writable: true,
       configurable: true,
     });
@@ -68,9 +68,9 @@ describe('sessionUtils mapping cleanup', function() {
 
   it('clears mapping and signature in the card bootstrap guard branch', function() {
     Session.set('fromInstructions', false);
-    Session.set('cardBootstrapInProgress', true);
+    Session.set('contentBootstrapInProgress', true);
     Object.defineProperty(document, 'location', {
-      value: { pathname: '/card' },
+      value: { pathname: '/content' },
       writable: true,
       configurable: true,
     });
@@ -81,7 +81,7 @@ describe('sessionUtils mapping cleanup', function() {
     expect(Session.get('mappingSignature')).to.equal(null);
   });
 
-  it('preserves documented unit launch keys when moving from instructions to /card', function() {
+  it('preserves documented unit launch keys when moving from instructions to /content', function() {
     Session.set('fromInstructions', true);
     Session.set('currentTdfName', 'Lesson A');
     Session.set('currentTdfId', 'tdf-a');
@@ -96,7 +96,7 @@ describe('sessionUtils mapping cleanup', function() {
       unitNumber: 2,
     });
     Object.defineProperty(document, 'location', {
-      value: { pathname: '/card' },
+      value: { pathname: '/content' },
       writable: true,
       configurable: true,
     });

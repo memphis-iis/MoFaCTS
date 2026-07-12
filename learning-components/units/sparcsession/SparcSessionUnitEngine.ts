@@ -331,6 +331,11 @@ function resolveSparcPage(
     throw new Error(`SPARC page "${pageId}" must define a display object`);
   }
   const pageDisplay = cloneRecord(page.display as SparcTrialDisplay);
+  if (pageDisplay.schema !== undefined && pageDisplay.schema !== 'tutorscript-sparc/2.0') {
+    throw new Error(
+      `SPARC page "${pageId}" display.schema must be tutorscript-sparc/2.0; received ${JSON.stringify(pageDisplay.schema)}`,
+    );
+  }
   if (Object.prototype.hasOwnProperty.call(pageDisplay, 'pageKey')) {
     throw new Error(`SPARC page "${pageId}" must not author display.pageKey; runtime state identity is derived from pageId`);
   }
@@ -355,6 +360,7 @@ function resolveSparcPageDisplay(
   const isAutoTutor = pageDisplay.unitType === 'sparc-autotutor-dialogue';
   return {
     ...pageDisplay,
+    schema: 'tutorscript-sparc/2.0',
     pageId,
     pageKey,
     clusterTargets: clusterListIndices.map((clusterIndex) =>

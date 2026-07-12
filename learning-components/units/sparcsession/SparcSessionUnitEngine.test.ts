@@ -279,6 +279,16 @@ function createPageRuntimeDeps(overrides: Record<string, unknown> = {}): any {
       if (key === 'currentStimuliSetId') {
         return 'stim-set-1';
       }
+      if (key === 'currentTdfFile') {
+        return {
+          isMultiTdf: false,
+          tdfs: {
+            tutor: {
+              unit: [{ sparcsession: { pageId: 'page-1' } }],
+            },
+          },
+        };
+      }
       if (key === 'curStudentPerformance') {
         return { totalTime: 0 };
       }
@@ -335,7 +345,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         params: '0,0',
       }],
     };
-    const engine = await createSparcSessionUnitEngine(createMinimalDeps({
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
       getSessionValue(key: UnitEngineSessionReadKey) {
         if (key === 'currentTdfUnit') {
           return { sparcsession: {} };
@@ -344,7 +354,20 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
           return 'tdf-1';
         }
         if (key === 'currentUnitNumber') {
-          return 2;
+          return 0;
+        }
+        if (key === 'currentStimuliSetId') {
+          return 'stim-set-1';
+        }
+        if (key === 'currentTdfFile') {
+          return {
+            isMultiTdf: false,
+            tdfs: {
+              tutor: {
+                unit: [{ sparcsession: { pageId: 'page-1' } }],
+              },
+            },
+          };
         }
         if (key === 'curStudentPerformance') {
           return { totalTime: 0 };
@@ -353,6 +376,18 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       },
       getStimCount: () => 1,
       getStimCluster: () => cluster,
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'page-1',
+              display: {
+                nodes: [{ id: 'answer', clusterIndex: 0 }],
+              },
+            }],
+          },
+        },
+      }),
     }));
 
     await engine.initializeLogisticModelState();
@@ -442,6 +477,18 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       },
       getStimCount: () => clusters.length,
       getStimCluster: (clusterIndex: number) => clusters[clusterIndex],
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'page-1',
+              display: {
+                nodes: [{ id: 'answer', clusterIndex: 0 }],
+              },
+            }],
+          },
+        },
+      }),
       serverMethods: {
         getResponseKCMapForTdf: async () => ({ determinelcd: 'response-sparc' }),
         getStimulusCrowdStatsForDeck: async () => [],
@@ -533,7 +580,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.equal(engine.validateSparcAuthoredDocument(document).valid, false);
     assert.deepEqual(
       engine.validateSparcAuthoredDocument(document).layoutIssues.map((issue: { kind: string }) => issue.kind),
-      ['missing-document-layout'],
+      ['missing-document-layout', 'missing-panel-visual-preset', 'missing-panel-visual-preset'],
     );
 
     const authoredStartState = engine.replaySparcDocumentHistory(document, []);
@@ -573,10 +620,13 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     });
 
     assert.equal(result.responseCommit.usedAdaptiveModel, false);
-    assert.equal(writtenRecords.length, 2);
+    assert.equal(writtenRecords.length, 3);
     assert.equal(result.responseCommit.historyRecord.eventType, 'sparc');
     assert.equal(result.responseCommit.historyRecord.levelUnitType, 'sparc');
-    assert.deepEqual(result.reactiveCommit.evaluation.matchedRuleIds, ['show-feedback']);
+    assert.deepEqual(
+      result.productionCommit.execution.firings.map((firing: { ruleId: string }) => firing.ruleId),
+      ['show-feedback'],
+    );
     assert.equal(
       result.finalReplayState.cells[createSparcStateCellKey({
         pageKey: 'doc-1',
@@ -593,7 +643,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
 
     assert.equal(preparedState.currentDisplay.pageId, 'page-1');
     assert.equal(preparedState.currentDisplay.pageKey, 'page-1');
-    assert.equal(preparedState.currentDisplay.pageKey, 'page-1');
+    assert.equal(preparedState.currentDisplay.schema, 'tutorscript-sparc/2.0');
     assert.equal(preparedState.currentAnswer, '__SPARC_COMPLETED__');
     assert.deepEqual(
       preparedState.currentDisplay.clusterTargets.map((target: { clusterIndex: number; stimulusKC: string; clusterKC: string }) => ({
@@ -610,6 +660,29 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         stimulusKC: 'kc-1',
         clusterKC: 'cluster-1',
       }],
+    );
+  });
+
+  it('rejects an explicitly incompatible authored SPARC display schema', async function() {
+    const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
+      findTdfById: () => ({
+        rawStimuliFile: {
+          setspec: {
+            sparcPages: [{
+              pageId: 'page-1',
+              display: {
+                schema: 'tutorscript-sparc/1.0',
+                nodes: [{ id: 'first', clusterIndex: 0 }],
+              },
+            }],
+          },
+        },
+      }),
+    }));
+
+    await assert.rejects(
+      () => engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]),
+      /display\.schema must be tutorscript-sparc\/2\.0/,
     );
   });
 

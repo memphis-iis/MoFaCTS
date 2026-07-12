@@ -24,7 +24,7 @@ test('audio-enabled lesson launch reaches card and accepts a response', async ({
   await expect(continueButton).toBeVisible({ timeout: 30000 });
   await continueButton.click();
 
-  await expect(page).toHaveURL(/\/card$/);
+  await expect(page).toHaveURL(/\/content$/);
   await expect(page.locator('body')).not.toContainText('Audio features require a secure connection');
 
   await expect(page.locator('body')).toContainText('Say skip or answer', { timeout: 15000 });

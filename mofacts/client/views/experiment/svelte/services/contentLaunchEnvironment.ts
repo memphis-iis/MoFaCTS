@@ -1,22 +1,22 @@
 import {
-  buildCardReadinessDiagnostic,
-  getCardReadinessState,
-  type CardReadinessDependencies,
-  type CardReadinessDiagnostic,
-} from './cardReadiness';
-import { routeCardInitializationFailure } from './cardLaunchFailure';
+  buildContentReadinessDiagnostic,
+  getContentReadinessState,
+  type ContentReadinessDependencies,
+  type ContentReadinessDiagnostic,
+} from './contentReadiness';
+import { routeContentInitializationFailure } from './contentLaunchFailure';
 import {
-  buildCardInitializeFailureDiagnostic,
-  type CardInitializeFailureDiagnostic,
-  type CardLaunchFailureStage,
-} from './cardLaunchOrchestration';
+  buildContentInitializeFailureDiagnostic,
+  type ContentInitializeFailureDiagnostic,
+  type ContentLaunchFailureStage,
+} from './contentLaunchOrchestration';
 import { resolveSessionSurfaceDiagnostic } from './sessionSurfaceMode';
 
-export type CardLaunchEnvironment = {
-  getReadinessDependencies: () => CardReadinessDependencies;
-  buildReadinessDiagnostic: () => CardReadinessDiagnostic;
-  buildInitializeFailureDiagnostic: (error: unknown) => CardInitializeFailureDiagnostic;
-  setFailureDiagnostic: (stage: CardLaunchFailureStage, diagnostic: object) => void;
+export type ContentLaunchEnvironment = {
+  getReadinessDependencies: () => ContentReadinessDependencies;
+  buildReadinessDiagnostic: () => ContentReadinessDiagnostic;
+  buildInitializeFailureDiagnostic: (error: unknown) => ContentInitializeFailureDiagnostic;
+  setFailureDiagnostic: (stage: ContentLaunchFailureStage, diagnostic: object) => void;
   routeInitializationFailure: () => void;
 };
 
@@ -28,7 +28,7 @@ type LaunchSessionUnit = Record<string, unknown> & {
   autotutorsession?: unknown;
 };
 
-export function createCardLaunchEnvironment({
+export function createContentLaunchEnvironment({
   getSessionValue,
   setSessionValue,
   getDeliverySettings,
@@ -44,10 +44,10 @@ export function createCardLaunchEnvironment({
   getVideoCheckpoints: () => { times?: unknown; questions?: unknown } | null | undefined;
   getUser: () => { loginParams?: { loginMode?: string } } | null | undefined;
   routeTo: (path: '/experimentError' | '/home') => void;
-  finishLaunchLoading: (reason: 'card-initialization-failed') => void;
+  finishLaunchLoading: (reason: 'content-initialization-failed') => void;
   now: () => number;
-}): CardLaunchEnvironment {
-  function getReadinessDependencies(): CardReadinessDependencies {
+}): ContentLaunchEnvironment {
+  function getReadinessDependencies(): ContentReadinessDependencies {
     return {
       getCurrentTdfUnit: () => getSessionValue('currentTdfUnit') as Record<string, unknown> | null | undefined,
       getDeliverySettings,
@@ -55,11 +55,11 @@ export function createCardLaunchEnvironment({
     };
   }
 
-  function buildReadinessDiagnostic(): CardReadinessDiagnostic {
+  function buildReadinessDiagnostic(): ContentReadinessDiagnostic {
     const unit = getSessionValue('currentTdfUnit') as LaunchSessionUnit | null | undefined;
     const deliverySettingsState = getDeliverySettings();
-    return buildCardReadinessDiagnostic({
-      readiness: getCardReadinessState(getReadinessDependencies()),
+    return buildContentReadinessDiagnostic({
+      readiness: getContentReadinessState(getReadinessDependencies()),
       currentTdfId: getSessionValue('currentTdfId') || null,
       currentRootTdfId: getSessionValue('currentRootTdfId') || null,
       currentStimuliSetId: getSessionValue('currentStimuliSetId') || null,
@@ -69,9 +69,9 @@ export function createCardLaunchEnvironment({
     });
   }
 
-  function buildInitializeFailureDiagnostic(error: unknown): CardInitializeFailureDiagnostic {
+  function buildInitializeFailureDiagnostic(error: unknown): ContentInitializeFailureDiagnostic {
     const currentTdfUnit = getSessionValue('currentTdfUnit') as LaunchSessionUnit | null | undefined;
-    return buildCardInitializeFailureDiagnostic({
+    return buildContentInitializeFailureDiagnostic({
       error,
       currentTdfFile: getSessionValue('currentTdfFile') as { name?: unknown; fileName?: unknown } | null | undefined,
       currentTdfId: getSessionValue('currentTdfId'),
@@ -84,8 +84,8 @@ export function createCardLaunchEnvironment({
     });
   }
 
-  function setFailureDiagnostic(stage: CardLaunchFailureStage, diagnostic: object): void {
-    setSessionValue('cardInitFailureDiagnostic', {
+  function setFailureDiagnostic(stage: ContentLaunchFailureStage, diagnostic: object): void {
+    setSessionValue('contentInitFailureDiagnostic', {
       stage,
       capturedAt: now(),
       ...diagnostic,
@@ -93,7 +93,7 @@ export function createCardLaunchEnvironment({
   }
 
   function routeInitializationFailure(): void {
-    routeCardInitializationFailure({
+    routeContentInitializationFailure({
       finishLaunchLoading,
       getLoginMode: () => getSessionValue('loginMode'),
       getUser,

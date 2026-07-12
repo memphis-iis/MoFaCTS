@@ -26,18 +26,12 @@ export interface ContentSurfaceRuntimeSnapshot {
 
 export function buildContentSurfaceRuntimeSnapshot(params: {
   currentTdfUnit: UnitWithInstructions | null | undefined;
-  deliverySettings: { isVideoSession?: boolean | undefined };
-  sessionIsVideoSession: unknown;
-  sessionUnitType: unknown;
   curUnitInstructionsSeen: unknown;
   videoInstructionDismissed: boolean;
   sanitizeInstructionHtml: (dirty: string) => string;
 }): ContentSurfaceRuntimeSnapshot {
   const currentTdfUnit = params.currentTdfUnit || {};
   const sessionSurfaceState = resolveSessionSurfaceState({
-    deliverySettings: params.deliverySettings,
-    sessionIsVideoSession: params.sessionIsVideoSession,
-    sessionUnitType: params.sessionUnitType,
     currentTdfUnit,
   });
   const sessionContentSurface = resolveSessionContentSurface(sessionSurfaceState);

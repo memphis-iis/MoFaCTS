@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { stampAndValidateStandardStimuliIdentity } from './svelteInit';
+import { stampAndValidateStandardStimuliIdentity } from './contentSurfaceInit';
 
 describe('svelte init stimulus identity preparation', function() {
   it('stamps canonical stimuliSetId onto otherwise valid standard stimuli', function() {

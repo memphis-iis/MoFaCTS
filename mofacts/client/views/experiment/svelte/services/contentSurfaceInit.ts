@@ -62,11 +62,11 @@ import {
 } from '../../../../lib/cardEntryIntent';
 import { restoreCourseAssignmentLaunchContextFromState } from '../../../../lib/courseAssignmentLaunchContext';
 import {
-  describeCardEntryBootstrapMode,
-  resolveCardEntryBootstrap,
-  type CardEntryIntentValue,
-  type CardRefreshRebuildClassification,
-} from './cardEntryBootstrap';
+  describeContentEntryBootstrapMode,
+  resolveContentEntryBootstrap,
+  type ContentEntryIntentValue,
+  type ContentRefreshRebuildClassification,
+} from './contentEntryBootstrap';
 import { resolveSvelteEngineInitPolicy } from './svelteEngineInitPolicy';
 import {
   markRuntimeResumeInactive,
@@ -80,7 +80,7 @@ import {
 } from '../../../../lib/idContext';
 import type {
   ExperimentState,
-  SvelteCardInitResult,
+  ContentSurfaceInitResult,
   UnitEngineLike,
 } from '../../../../../common/types';
 import { repairFormattedStimuliResponsesFromRaw } from '../../../../../common/lib/stimuliResponseRepair';
@@ -182,7 +182,7 @@ async function restoreHiddenItemsFromHistory(): Promise<void> {
       count: Array.isArray(hiddenItems) ? hiddenItems.length : 0,
     });
   } catch (error) {
-    clientConsole(1, '[Svelte Init] Failed to restore hidden items from history:', error);
+    clientConsole(1, '[Content Surface Init] Failed to restore hidden items from history:', error);
     resetHiddenItems();
   }
 }
@@ -195,7 +195,7 @@ function restoreCanonicalTdfFileForStandardInit(
 
   const resolvedUnits = tdfFile.tdfs?.tutor?.unit;
   if (!Array.isArray(resolvedUnits) || resolvedUnits.length === 0) {
-    throw new Error('[Svelte Init] Standard init requires currentTdfFile with a populated tutor.unit array');
+    throw new Error('[Content Surface Init] Standard init requires currentTdfFile with a populated tutor.unit array');
   }
 
   return { tdfFile, tutor };
@@ -208,12 +208,12 @@ function resolveCardUnitNumberForStandardInit(dispatchContext: CardEntryDispatch
       unitNumber = 0;
       Session.set('currentUnitNumber', unitNumber);
     } else {
-      throw new Error(`[Svelte Init] Missing currentUnitNumber for ${String(dispatchContext.requestedIntent || dispatchContext.effectiveIntent || 'unknown')} standard init`);
+      throw new Error(`[Content Surface Init] Missing currentUnitNumber for ${String(dispatchContext.requestedIntent || dispatchContext.effectiveIntent || 'unknown')} standard init`);
     }
   }
   const normalizedUnitNumber = Number(unitNumber);
   if (!Number.isFinite(normalizedUnitNumber) || !Number.isInteger(normalizedUnitNumber) || normalizedUnitNumber < 0) {
-    throw new Error(`[Svelte Init] Invalid currentUnitNumber for standard init: ${String(unitNumber)}`);
+    throw new Error(`[Content Surface Init] Invalid currentUnitNumber for standard init: ${String(unitNumber)}`);
   }
   return normalizedUnitNumber;
 }
@@ -224,24 +224,24 @@ function assertStandardCardPreconditions(
   unitNumber: number
 ): TdfUnitLike {
   if (!tdfFile?.tdfs?.tutor) {
-    throw new Error('[Svelte Init] Standard card init requires currentTdfFile.tdfs.tutor');
+    throw new Error('[Content Surface Init] Standard card init requires currentTdfFile.tdfs.tutor');
   }
   if (!tutor.setspec) {
-    throw new Error('[Svelte Init] Standard card init requires currentTdfFile.tdfs.tutor.setspec');
+    throw new Error('[Content Surface Init] Standard card init requires currentTdfFile.tdfs.tutor.setspec');
   }
   if (!Array.isArray(tutor.unit) || tutor.unit.length === 0) {
-    throw new Error('[Svelte Init] Standard card init requires a full tutor.unit array; dashboard listing projections are not runnable card content');
+    throw new Error('[Content Surface Init] Standard card init requires a full tutor.unit array; dashboard listing projections are not runnable card content');
   }
   if (unitNumber >= tutor.unit.length) {
-    throw new Error(`[Svelte Init] Unit number ${unitNumber} is out of bounds (0-${tutor.unit.length - 1})`);
+    throw new Error(`[Content Surface Init] Unit number ${unitNumber} is out of bounds (0-${tutor.unit.length - 1})`);
   }
   const unit = tutor.unit[unitNumber];
   if (!unit) {
-    throw new Error(`[Svelte Init] Cannot retrieve unit at index ${unitNumber}; currentTdfFile unit list is incomplete`);
+    throw new Error(`[Content Surface Init] Cannot retrieve unit at index ${unitNumber}; currentTdfFile unit list is incomplete`);
   }
   const sessionUnit = Session.get('currentTdfUnit');
   if (sessionUnit && sessionUnit !== unit) {
-    clientConsole(1, '[Svelte Init] currentTdfUnit disagrees with currentTdfFile/currentUnitNumber; replacing with canonical unit', {
+    clientConsole(1, '[Content Surface Init] currentTdfUnit disagrees with currentTdfFile/currentUnitNumber; replacing with canonical unit', {
       unitNumber,
       sessionUnitName: sessionUnit?.unitname || null,
       canonicalUnitName: unit.unitname || null,
@@ -298,25 +298,25 @@ export function stampAndValidateStandardStimuliIdentity(
 ): Array<Record<string, unknown>> {
   const normalizedExpectedStimuliSetId = normalizeStimuliScopeId(expectedStimuliSetId);
   if (!normalizedExpectedStimuliSetId) {
-    throw new Error('[Svelte Init] Standard init requires a canonical stimuliSetId before preparing stimuli');
+    throw new Error('[Content Surface Init] Standard init requires a canonical stimuliSetId before preparing stimuli');
   }
 
   return stimuliSet.map((stim, index) => {
     if (!stim || typeof stim !== 'object' || Array.isArray(stim)) {
-      throw new Error(`[Svelte Init] Standard stimulus ${index} must be an object`);
+      throw new Error(`[Content Surface Init] Standard stimulus ${index} must be an object`);
     }
     const stimulus = stim as Record<string, unknown>;
     const observedStimuliSetId = normalizeStimuliScopeId(stimulus.stimuliSetId);
     if (observedStimuliSetId && observedStimuliSetId !== normalizedExpectedStimuliSetId) {
       throw new Error(
-        `[Svelte Init] Standard stimulus ${index} has stimuliSetId ${observedStimuliSetId}; expected ${normalizedExpectedStimuliSetId}`,
+        `[Content Surface Init] Standard stimulus ${index} has stimuliSetId ${observedStimuliSetId}; expected ${normalizedExpectedStimuliSetId}`,
       );
     }
     if (isBlankIdentityValue(stimulus.stimulusKC)) {
-      throw new Error(`[Svelte Init] Standard stimulus ${index} is missing stimulusKC`);
+      throw new Error(`[Content Surface Init] Standard stimulus ${index} is missing stimulusKC`);
     }
     if (isBlankIdentityValue(stimulus.clusterKC)) {
-      throw new Error(`[Svelte Init] Standard stimulus ${index} is missing clusterKC`);
+      throw new Error(`[Content Surface Init] Standard stimulus ${index} is missing clusterKC`);
     }
     if (observedStimuliSetId) {
       return stimulus;
@@ -337,7 +337,7 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
       currentRootTdfId: Session.get('currentRootTdfId'),
       currentTdfId: Session.get('currentTdfId') || Session.get('currentRootTdfId'),
       currentStimuliSetId: tdfFile.stimuliSetId,
-    }, 'svelteInit.stimuli-scope-align');
+    }, 'contentSurfaceInit.stimuli-scope-align');
   }
 
   const sessionStimuliSet = Session.get('currentStimuliSet');
@@ -351,7 +351,7 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
       expectedScopeId
     );
     if (!scopedToExpectedId) {
-      clientConsole(1, '[Svelte Init] Discarding stale session stimuli set before mapping validation', {
+      clientConsole(1, '[Content Surface Init] Discarding stale session stimuli set before mapping validation', {
         expectedStimuliSetId: expectedScopeId,
         observedStimuliSetIds: collectObservedStimuliSetIds(repairedSessionStimuliSet as unknown[]),
         currentTdfId: Session.get('currentTdfId') || null,
@@ -371,7 +371,7 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
           currentRootTdfId: Session.get('currentRootTdfId'),
           currentTdfId: Session.get('currentTdfId') || Session.get('currentRootTdfId'),
           currentStimuliSetId: tdfFile.stimuliSetId,
-        }, 'svelteInit.stimuli-restore');
+        }, 'contentSurfaceInit.stimuli-restore');
       }
       ensureCurrentStimuliSetId(tdfFile.stimuliSetId);
       return;
@@ -391,11 +391,11 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
   } else {
     const stimuliSetId = Session.get('currentStimuliSetId') || tdfFile.stimuliSetId;
     if (!stimuliSetId) {
-      throw new Error('[Svelte Init] Standard init requires current stimuli or a canonical stimuliSetId');
+      throw new Error('[Content Surface Init] Standard init requires current stimuli or a canonical stimuliSetId');
     }
     const fetchedSet = await meteorCallAsync('getStimuliSetById', stimuliSetId);
     if (!Array.isArray(fetchedSet) || fetchedSet.length === 0) {
-      throw new Error(`[Svelte Init] Stimuli set ${String(stimuliSetId)} could not be loaded for standard initialization`);
+      throw new Error(`[Content Surface Init] Stimuli set ${String(stimuliSetId)} could not be loaded for standard initialization`);
     }
     Session.set(
       'currentStimuliSet',
@@ -408,25 +408,25 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
       currentRootTdfId: Session.get('currentRootTdfId'),
       currentTdfId: Session.get('currentTdfId') || Session.get('currentRootTdfId'),
       currentStimuliSetId: tdfFile.stimuliSetId,
-    }, 'svelteInit.stimuli-restore');
+    }, 'contentSurfaceInit.stimuli-restore');
   }
   ensureCurrentStimuliSetId(tdfFile.stimuliSetId);
 }
 
 type CardEntryDispatchContext = {
-  requestedIntent: CardEntryIntentValue;
-  effectiveIntent: CardEntryIntentValue;
+  requestedIntent: ContentEntryIntentValue;
+  effectiveIntent: ContentEntryIntentValue;
   prefetchedExperimentState: ExperimentState | null;
-  refreshRebuildClassification: CardRefreshRebuildClassification | null;
+  refreshRebuildClassification: ContentRefreshRebuildClassification | null;
   requiresConditionResolution: boolean;
   shouldUseProgressBootstrap: boolean;
 };
 
 async function initializePersistedProgressResumeCard(
   tdfFile: TdfFileLike,
-  effectiveIntent: CardEntryIntentValue
-): Promise<SvelteCardInitResult> {
-  const resumeResult = await resumeFromExperimentState(tdfFile) as SvelteCardInitResult;
+  effectiveIntent: ContentEntryIntentValue
+): Promise<ContentSurfaceInitResult> {
+  const resumeResult = await resumeFromExperimentState(tdfFile) as ContentSurfaceInitResult;
 
   setResumeToQuestion(!!resumeResult?.resumeToQuestion);
 
@@ -458,9 +458,9 @@ async function initializePersistedProgressResumeCard(
 async function initializeInitialEntryCard(
   tdfFile: TdfFileLike,
   dispatchContext: CardEntryDispatchContext
-): Promise<SvelteCardInitResult> {
-  clientConsole(2, '[Svelte Init] initializeInitialEntryCard', {
-    bootstrapMode: describeCardEntryBootstrapMode(
+): Promise<ContentSurfaceInitResult> {
+  clientConsole(2, '[Content Surface Init] initializeInitialEntryCard', {
+    bootstrapMode: describeContentEntryBootstrapMode(
       dispatchContext.shouldUseProgressBootstrap,
       dispatchContext.requiresConditionResolution
     ),
@@ -474,22 +474,22 @@ async function initializeInitialEntryCard(
 async function initializeInstructionContinueCard(
   tdfFile: TdfFileLike,
   dispatchContext: CardEntryDispatchContext
-): Promise<SvelteCardInitResult> {
-  clientConsole(2, '[Svelte Init] initializeInstructionContinueCard');
+): Promise<ContentSurfaceInitResult> {
+  clientConsole(2, '[Content Surface Init] initializeInstructionContinueCard');
   return initializeStandardCardEntry(tdfFile, dispatchContext);
 }
 
-async function initializeCardRefreshRebuild(
+async function initializeContentRefreshRebuild(
   _tdfFile: TdfFileLike,
   _dispatchContext: CardEntryDispatchContext
-): Promise<SvelteCardInitResult> {
-  throw new Error(`[Svelte Init] ${CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD} must be resolved before card initialization dispatch`);
+): Promise<ContentSurfaceInitResult> {
+  throw new Error(`[Content Surface Init] ${CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD} must be resolved before card initialization dispatch`);
 }
 
 async function initializeStandardCardEntry(
   initialTdfFile: TdfFileLike,
   dispatchContext: CardEntryDispatchContext
-): Promise<SvelteCardInitResult> {
+): Promise<ContentSurfaceInitResult> {
   const { prefetchedExperimentState } = dispatchContext;
 
   setResumeToQuestion(false);
@@ -512,9 +512,9 @@ async function initializeStandardCardEntry(
 
   const currentUnitNumber = resolveCardUnitNumberForStandardInit(dispatchContext);
   const unit = assertStandardCardPreconditions(tdfFile, tutor, currentUnitNumber);
-  const unitType = resolveUnitEngineTypeForUnit(unit, '[Svelte Init]');
+  const unitType = resolveUnitEngineTypeForUnit(unit, '[Content Surface Init]');
   Session.set('unitType', unitType);
-  clientConsole(2, '[Svelte Init] Resolved unitType:', unitType);
+  clientConsole(2, '[Content Surface Init] Resolved unitType:', unitType);
 
   await checkUserSession();
 
@@ -542,7 +542,7 @@ async function initializeStandardCardEntry(
 
     if (mappingNeedsIntervention) {
       if (hasMeaningfulMappingProgress(experimentState)) {
-        clientConsole(1, '[Svelte Init] Cluster mapping missing/incompatible with current setSpec; blocking initialization (resume compatibility policy)', {
+        clientConsole(1, '[Content Surface Init] Cluster mapping missing/incompatible with current setSpec; blocking initialization (resume compatibility policy)', {
           eventType: 'mapping-hard-stop',
           reason: mappingMissing ? 'missing-mapping-with-progress' : 'invalid-mapping-with-progress',
           hardStop: true,
@@ -565,7 +565,7 @@ async function initializeStandardCardEntry(
         };
       }
 
-      clientConsole(1, '[Svelte Init] No meaningful progress detected; creating initial cluster mapping');
+      clientConsole(1, '[Content Surface Init] No meaningful progress detected; creating initial cluster mapping');
       mappingRecord = createMappingRecord({
         stimCount,
         shuffles,
@@ -612,7 +612,7 @@ async function initializeStandardCardEntry(
         conditionTdfId: experimentState?.conditionTdfId || null,
         stimuliSetId: Session.get('currentStimuliSetId') || tdfFile.stimuliSetId || null,
       };
-      clientConsole(1, '[Svelte Init] Mapping signature mismatch detected', mismatchPayload);
+      clientConsole(1, '[Content Surface Init] Mapping signature mismatch detected', mismatchPayload);
       if (hardStop) {
         Session.set('uiMessage', {
           text: mismatchPayload.userMessage,
@@ -655,14 +655,14 @@ async function initializeStandardCardEntry(
       pendingMappingStateUpdate = stateUpdate;
     }
   } else {
-    clientConsole(1, '[Svelte Init] Cannot create cluster mapping - stimCount is 0');
+    clientConsole(1, '[Content Surface Init] Cannot create cluster mapping - stimCount is 0');
   }
 
   window.AudioContext = window.webkitAudioContext || window.AudioContext;
   window.URL = window.URL || window.webkitURL;
   const recorderCtx = audioManager.getRecorderContext();
   if (recorderCtx) {
-    clientConsole(2, '[Svelte Init] Using pre-initialized audio context from warmup');
+    clientConsole(2, '[Content Surface Init] Using pre-initialized audio context from warmup');
   } else {
     audioManager.createRecorderContext({ sampleRate: 16000 });
   }
@@ -685,7 +685,7 @@ async function initializeStandardCardEntry(
   });
 
   if (shouldInitEngine) {
-    assertIdInvariants('svelteInit.before-engine-init', {
+    assertIdInvariants('contentSurfaceInit.before-engine-init', {
       requireCurrentTdfId: true,
       requireStimuliSetId: true,
     });
@@ -709,7 +709,7 @@ async function initializeStandardCardEntry(
   }
 
   if (pendingMappingStateUpdate && Object.keys(pendingMappingStateUpdate).length > 0) {
-    clientConsole(2, '[Svelte Init] Persisting validated mapping state:', Object.keys(pendingMappingStateUpdate));
+    clientConsole(2, '[Content Surface Init] Persisting validated mapping state:', Object.keys(pendingMappingStateUpdate));
     await createExperimentState(pendingMappingStateUpdate);
   }
 
@@ -719,18 +719,18 @@ async function initializeStandardCardEntry(
   const userDisplayIdentifier = getUserDisplayIdentifier(currentUser);
 
   if (currentUser?._id && userDisplayIdentifier && currentTdfId) {
-    clientConsole(2, '[Svelte Init] Subscribing to dashboardCache for performance totals');
+    clientConsole(2, '[Content Surface Init] Subscribing to dashboardCache for performance totals');
     markLaunchLoadingTiming('dashboardCacheSubscription:start', { currentTdfId });
     await new Promise<void>((resolve) => {
       Meteor.subscribe('dashboardCache', {
         onReady: () => {
-          clientConsole(2, '[Svelte Init] dashboardCache subscription ready');
+          clientConsole(2, '[Content Surface Init] dashboardCache subscription ready');
           markLaunchLoadingTiming('dashboardCacheSubscription:ready', { currentTdfId });
           resolve();
         },
         onStop: (error: unknown) => {
           if (error) {
-            clientConsole(1, '[Svelte Init] dashboardCache subscription error:', error);
+            clientConsole(1, '[Content Surface Init] dashboardCache subscription error:', error);
           }
           markLaunchLoadingTiming('dashboardCacheSubscription:stopped', {
             currentTdfId,
@@ -744,7 +744,7 @@ async function initializeStandardCardEntry(
     await setStudentPerformance(currentUser._id, userDisplayIdentifier, currentTdfId);
     markLaunchLoadingTiming('setStudentPerformance:complete', { currentTdfId });
   } else {
-    clientConsole(1, '[Svelte Init] Missing user or tdfId - cannot set student performance', {
+    clientConsole(1, '[Content Surface Init] Missing user or tdfId - cannot set student performance', {
       hasUserId: !!currentUser?._id,
       hasUserDisplayIdentifier: !!userDisplayIdentifier,
       currentTdfId,
@@ -762,7 +762,6 @@ async function initializeStandardCardEntry(
   const shouldShowInstructions = ((!instructionsSeen) && (hasUnitText || hasUnitImage || hasUnitQuestion)) ||
     lockoutMinutes > 0;
   const sessionContentSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
-    sessionUnitType: unitType,
     currentTdfUnit: currentUnit,
   }));
   const canInlineVideoInstructions = shouldInlineSessionVideoInstructions({
@@ -784,25 +783,25 @@ async function initializeStandardCardEntry(
   return { redirected: false };
 }
 
-async function initializeCardEntryByIntent(
+async function initializeContentEntryByIntent(
   tdfFile: TdfFileLike,
   dispatchContext: CardEntryDispatchContext
-): Promise<SvelteCardInitResult> {
+): Promise<ContentSurfaceInitResult> {
   switch (dispatchContext.requestedIntent) {
   case CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY:
     return initializeInitialEntryCard(tdfFile, dispatchContext);
   case CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME:
-    clientConsole(2, '[Svelte Init] initializePersistedProgressResumeCard');
+    clientConsole(2, '[Content Surface Init] initializePersistedProgressResumeCard');
     return initializePersistedProgressResumeCard(tdfFile, dispatchContext.effectiveIntent);
   case CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE:
     return initializeInstructionContinueCard(tdfFile, dispatchContext);
   case CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD:
-    return initializeCardRefreshRebuild(tdfFile, dispatchContext);
+    return initializeContentRefreshRebuild(tdfFile, dispatchContext);
   default:
-    clientConsole(2, '[Svelte Init] initializeCardEntryByIntent default path', {
+    clientConsole(2, '[Content Surface Init] initializeContentEntryByIntent default path', {
       requestedIntent: dispatchContext.requestedIntent,
       effectiveIntent: dispatchContext.effectiveIntent,
-      bootstrapMode: describeCardEntryBootstrapMode(
+      bootstrapMode: describeContentEntryBootstrapMode(
         dispatchContext.shouldUseProgressBootstrap,
         dispatchContext.requiresConditionResolution
       ),
@@ -815,9 +814,9 @@ async function initializeCardEntryByIntent(
 }
 
 /**
- * @returns {Promise<SvelteCardInitResult>}
+ * @returns {Promise<ContentSurfaceInitResult>}
  */
-export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
+export async function initializeContentSurface(): Promise<ContentSurfaceInitResult> {
   const runtimeInitSnapshot = resetCardRuntimeForInitialization();
 
   const cardEntryContext = getCardEntryContext();
@@ -825,18 +824,18 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
 
   let tdfFile = runtimeInitSnapshot.currentTdfFile as TdfFileLike | null | undefined;
   if (!tdfFile || !tdfFile.tdfs || !tdfFile.tdfs.tutor) {
-    clientConsole(1, '[Svelte Init] No currentTdfFile - skipping init');
+    clientConsole(1, '[Content Surface Init] No currentTdfFile - skipping init');
     return { redirected: false };
   }
   tdfFile = tdfFile as TdfFileLike;
   let tutor = tdfFile.tdfs!.tutor!;
-  const bootstrapResult = await resolveCardEntryBootstrap({
+  const bootstrapResult = await resolveContentEntryBootstrap({
     requestedCardEntryIntent,
     tdfFile,
     shouldUseProgressBootstrapForEntryIntent,
   });
   if (bootstrapResult.kind === 'redirected') {
-    clientConsole(2, '[Svelte Init] card_refresh_rebuild resolved to completed lesson');
+    clientConsole(2, '[Content Surface Init] card_refresh_rebuild resolved to completed lesson');
     clearCardEntryContext();
     return bootstrapResult.result;
   }
@@ -847,12 +846,12 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
     requiresConditionResolution,
     shouldUseProgressBootstrap,
   } = bootstrapResult.resolution;
-  clientConsole(2, '[Svelte Init] card entry context', {
+  clientConsole(2, '[Content Surface Init] card entry context', {
     ...cardEntryContext,
     requestedIntent: requestedCardEntryIntent,
     resolvedIntent: effectiveCardEntryIntent,
     refreshRebuildClassification,
-    bootstrapMode: describeCardEntryBootstrapMode(
+    bootstrapMode: describeContentEntryBootstrapMode(
       shouldUseProgressBootstrap,
       requiresConditionResolution
     ),
@@ -867,7 +866,7 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   resetHiddenItems();
   setLaunchLoadingMessage(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'));
   await restoreHiddenItemsFromHistory();
-  assertIdInvariants('svelteInit.before-media-resolution', {
+  assertIdInvariants('contentSurfaceInit.before-media-resolution', {
     requireCurrentTdfId: true,
     requireStimuliSetId: false,
   });
@@ -881,11 +880,11 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   });
   let audioInputEnabled = srAvailability.status === 'available';
   setAudioInputModeEnabled(audioInputEnabled);
-  clientConsole(2, '[Svelte Init] canonical SR availability', srAvailability);
+  clientConsole(2, '[Content Surface Init] canonical SR availability', srAvailability);
 
   if (audioInputEnabled) {
     if (typeof getAudioInputSensitivity() === 'undefined') {
-      clientConsole(1, '[Svelte Init] Missing authoritative audio input sensitivity; refusing fallback');
+      clientConsole(1, '[Content Surface Init] Missing authoritative audio input sensitivity; refusing fallback');
     }
   }
 
@@ -896,17 +895,17 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
 
   if (!cardPopstateHandler) {
     cardPopstateHandler = function(_event: PopStateEvent) {
-      if (document.location.pathname === '/card') {
+      if (document.location.pathname === '/content') {
         setCardEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD, {
-          source: 'svelteInit.popstate',
+          source: 'contentSurfaceInit.popstate',
         });
-        leavePage('/card');
+        leavePage('/content');
       }
     };
   }
   window.addEventListener('popstate', cardPopstateHandler);
 
-  const initResult = await initializeCardEntryByIntent(tdfFile, {
+  const initResult = await initializeContentEntryByIntent(tdfFile, {
     requestedIntent: effectiveCardEntryIntent,
     effectiveIntent: effectiveCardEntryIntent,
     prefetchedExperimentState,
@@ -916,9 +915,9 @@ export async function initializeSvelteCard(): Promise<SvelteCardInitResult> {
   });
 
   if (!initResult?.redirected && audioInputEnabled) {
-    clientConsole(2, '[Svelte Init] Initializing audio recorder for SR after card entry confirmation...');
+    clientConsole(2, '[Content Surface Init] Initializing audio recorder for SR after card entry confirmation...');
     await withStartupTimeout(initializeAudioRecorder(), 'startup audio recorder initialization');
-    clientConsole(2, '[Svelte Init] Audio recorder initialized successfully');
+    clientConsole(2, '[Content Surface Init] Audio recorder initialized successfully');
   }
 
   return initResult;

@@ -75,6 +75,6 @@ async function selectSubTdf(lessonName: string, clusterList: unknown, subTdfInde
   setCardEntryIntent(CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY, {
     source: 'multiTdfSelect.selectSubTdf',
   });
-  FlowRouter.go('/card');
+  FlowRouter.go('/content');
 }
 

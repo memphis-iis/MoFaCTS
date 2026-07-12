@@ -9,7 +9,7 @@ describe('instructionContinuePolicy', function() {
       currentUnitNumber: 2,
       unitCount: 5,
     })).to.deep.equal({
-      navigationTarget: '/card',
+      navigationTarget: '/content',
       sessionPatch: {
         currentUnitNumber: 2,
         currentTdfUnitIndex: 2,
@@ -18,13 +18,13 @@ describe('instructionContinuePolicy', function() {
     });
   });
 
-  it('advances instruction-only units to the next unit instructions/card entry', function() {
+  it('advances instruction-only units to the next unit instructions/content entry', function() {
     expect(resolveInstructionContinuePolicy({
       unitType: 'instruction-only',
       currentUnitNumber: 2,
       unitCount: 5,
     })).to.deep.equal({
-      navigationTarget: '/card',
+      navigationTarget: '/content',
       sessionPatch: {
         currentUnitNumber: 3,
         currentTdfUnitIndex: 3,

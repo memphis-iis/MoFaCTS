@@ -1,4 +1,4 @@
-import type { CardLaunchOrchestrationDeps } from './cardLaunchOrchestration';
+import type { ContentLaunchOrchestrationDeps } from './contentLaunchOrchestration';
 import type { ContentRuntimeMachineSnapshot } from './contentRuntimeMachineRuntime';
 import type { CardRuntimeLifecycleController } from './cardRuntimeLifecycle';
 
@@ -9,13 +9,15 @@ export interface ContentSurfaceLifecycleRuntimeOptions {
   readonly clearLearningProgressViewport: () => void;
   readonly clearTimeoutCountdown: () => void;
   readonly completeCleanup: () => void;
-  readonly launch: (deps: CardLaunchOrchestrationDeps) => Promise<{ status: string }>;
-  readonly launchDeps: CardLaunchOrchestrationDeps;
+  readonly failLaunch: (failure: unknown) => void;
+  readonly launch: (deps: ContentLaunchOrchestrationDeps) => Promise<{ status: string }>;
+  readonly launchDeps: ContentLaunchOrchestrationDeps;
   readonly lifecycle: CardRuntimeLifecycleController;
   readonly normalizeTestSnapshot: (snapshot: unknown) => ContentRuntimeMachineSnapshot;
   readonly setInitializedForRender: (value: boolean) => void;
   readonly setSessionUnitModeVersion: (updater: (current: number) => number) => void;
   readonly setState: (snapshot: ContentRuntimeMachineSnapshot) => void;
+  readonly shouldStartReadyRuntime: () => boolean;
   readonly startDisplayTimeoutClock: () => void;
   readonly stopStimDisplayTypeMapVersionSync: (reason: string) => void;
   readonly testMode: () => boolean;
@@ -26,6 +28,7 @@ export interface ContentSurfaceLifecycleRuntimeOptions {
 
 export function createContentSurfaceLifecycleRuntime(options: ContentSurfaceLifecycleRuntimeOptions) {
   async function prepareRender(): Promise<void> {
+    await options.launchDeps.prepareRender();
     options.setSessionUnitModeVersion((current) => current + 1);
     options.setInitializedForRender(true);
     await options.waitForDomUpdate();
@@ -48,11 +51,17 @@ export function createContentSurfaceLifecycleRuntime(options: ContentSurfaceLife
           ...options.launchDeps,
           prepareRender,
         });
+        if (launchResult.status === 'failed') {
+          options.failLaunch(launchResult);
+          return;
+        }
         if (launchResult.status !== 'ready') {
           return;
         }
 
-        options.lifecycle.startReadyRuntime();
+        if (options.shouldStartReadyRuntime()) {
+          options.lifecycle.startReadyRuntime();
+        }
       })();
     },
     unmount(): void {

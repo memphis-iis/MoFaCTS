@@ -235,19 +235,24 @@ describe('machine guard contracts', function() {
   });
 
   it('uses the session surface adapter for machine video-session guards', function() {
-    expect(isVideoSession(makeArgs({ context: { deliverySettings: { isVideoSession: true } } }))).to.equal(true);
+    Session.set('currentTdfUnit', { learningsession: {} });
+    expect(isVideoSession(makeArgs({ context: { deliverySettings: { isVideoSession: true } } }))).to.equal(false);
     expect(canUsePreparedAdvance(makeArgs({
       context: {
         engine: { unitType: 'model' },
         deliverySettings: { isVideoSession: true },
       },
-    }))).to.equal(false);
+    }))).to.equal(true);
 
     Session.set('isVideoSession', true);
+    expect(isVideoSession(makeArgs())).to.equal(false);
+
+    Session.set('currentTdfUnit', { videosession: {} });
     expect(isVideoSession(makeArgs())).to.equal(true);
   });
 
   it('accepts only configured video checkpoint mappings', function() {
+    Session.set('currentTdfUnit', { videosession: {} });
     Session.set('isVideoSession', true);
     Session.set('videoCheckpoints', {
       times: [69, 115],
