@@ -38,7 +38,6 @@ export const CARD_RUNTIME_SESSION_DEFAULTS: readonly SessionCleanupEntry[] = [
   { key: 'testType', value: undefined, domain: 'card-display', reason: 'Trial type belongs to the selected card.' },
   { key: 'scoringEnabled', value: undefined, domain: 'scoring', reason: 'Scoring policy is unit scoped.' },
   { key: 'feedbackParamsSet', value: undefined, domain: 'feedback', reason: 'Feedback parameters are recomputed per unit/card.' },
-  { key: 'instructionQuestionResult', value: undefined, domain: 'instructions', reason: 'Instruction question result is per instruction screen.' },
   { key: 'curTdfTips', value: undefined, domain: 'content', reason: 'Tips are reloaded from the active TDF.' },
   { key: 'recordingLocked', value: false, domain: 'speech', reason: 'Clear recording lock after stopping audio/SR.' },
   { key: 'selectedTdfDueDate', value: undefined, domain: 'reporting', reason: 'Due-date selection is page scoped.' },

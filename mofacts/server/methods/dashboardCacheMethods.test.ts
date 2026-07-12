@@ -319,7 +319,7 @@ describe('dashboardCacheMethods', function() {
               audioPromptMode: 'silent'
             },
             unit: [
-              { unitinstructionsquestion: { text: 'Warmup' } },
+              { unitinstructions: 'Warmup' },
               { sparcsession: {} }
             ],
           }

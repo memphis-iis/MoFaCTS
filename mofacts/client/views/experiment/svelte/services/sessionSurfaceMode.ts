@@ -72,7 +72,6 @@ type SessionInlineVideoInstructionInput = {
   lockoutMinutes: number;
   hasUnitText: boolean;
   hasUnitImage: boolean;
-  hasUnitQuestion: boolean;
 };
 
 export function resolveSessionSurfaceState(input: SessionSurfaceStateInput): SessionSurfaceState {
@@ -195,8 +194,7 @@ export function shouldInlineSessionVideoInstructions(input: SessionInlineVideoIn
   return input.contentSurface.showVideoSession &&
     input.lockoutMinutes <= 0 &&
     input.hasUnitText &&
-    !input.hasUnitImage &&
-    !input.hasUnitQuestion;
+    !input.hasUnitImage;
 }
 
 export function shouldRequireSessionVideoReadiness(contentSurface: SessionContentSurface): boolean {

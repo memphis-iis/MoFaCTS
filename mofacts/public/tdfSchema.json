@@ -906,16 +906,6 @@
                       "grid_columns": 12
                     }
                   },
-                  "unitinstructionsquestion": {
-                    "title": "Question shown with instructions.",
-                    "description": "Supplemental instructions question/prompt text.",
-                    "type": "string",
-                    "default": "",
-                    "format": "textarea",
-                    "options": {
-                      "grid_columns": 12
-                    }
-                  },
                   "buttonorder": {
                     "title": "Button arrangement order.",
                     "description": "Controls fixed vs randomized button order.",
@@ -3289,16 +3279,6 @@
               "unitinstructions": {
                 "title": "Instructions shown before the unit.",
                 "description": "HTML or text instructions shown before the unit begins.",
-                "type": "string",
-                "default": "",
-                "format": "textarea",
-                "options": {
-                  "grid_columns": 12
-                }
-              },
-              "unitinstructionsquestion": {
-                "title": "Question shown with instructions.",
-                "description": "Supplemental instructions question/prompt text.",
                 "type": "string",
                 "default": "",
                 "format": "textarea",

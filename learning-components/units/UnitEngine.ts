@@ -32,7 +32,6 @@ export interface UnitEngine {
   selectNextCard(indices?: unknown, curExperimentState?: unknown): Promise<UnitSelection | void> | UnitSelection | void;
   findCurrentCardInfo?(): unknown;
   cardAnswered(wasCorrect?: boolean, practiceTime?: number): Promise<void>;
-  updatePracticeTime?(practiceTime?: number): void;
   unitFinished(): boolean | Promise<boolean>;
   prefetchNextCard?(indices?: unknown, curExperimentState?: unknown): Promise<void> | void;
   applyPrefetchedNextCard?(curExperimentState?: unknown): Promise<boolean> | boolean;

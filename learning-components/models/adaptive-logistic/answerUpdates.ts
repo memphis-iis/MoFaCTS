@@ -5,6 +5,7 @@ export interface ApplyAnswerUpdateParams {
   readonly currentStimIndex: number;
   readonly whichStim: number;
   readonly practiceTime: number;
+  readonly timestamp: number;
   readonly wasCorrect: boolean;
   readonly testType: string;
   readonly answerText: string;
@@ -12,10 +13,37 @@ export interface ApplyAnswerUpdateParams {
 }
 
 export function applyAnswerUpdate(params: ApplyAnswerUpdateParams): void {
+  if (!Number.isFinite(params.timestamp) || params.timestamp < 1) {
+    throw new Error('Adaptive logistic answer update requires a valid event timestamp');
+  }
   const card = params.cards[params.selectedClusterIndex];
+  const stim = card.stims[params.whichStim];
+  const response = params.answerText
+    ? params.cardProbabilities.responses?.[params.answerText]
+    : undefined;
+
+  for (const target of [card, stim, response]) {
+    if (!target) {
+      continue;
+    }
+    target.lastSeen = params.timestamp;
+    if (!Number.isFinite(Number(target.firstSeen)) || Number(target.firstSeen) < 1) {
+      target.firstSeen = params.timestamp;
+    }
+    if (!Array.isArray(target.timeHistory)) {
+      throw new Error('Adaptive logistic answer update requires initialized timeHistory');
+    }
+    target.timeHistory.push(params.timestamp);
+  }
+  card.hasBeenIntroduced = true;
+  stim.hasBeenIntroduced = true;
+  card.trialsSinceLastSeen = 0;
 
   for (let i = 0; i < params.cards.length; i++) {
     const otherCard = params.cards[i];
+    if (i !== params.selectedClusterIndex && otherCard.hasBeenIntroduced) {
+      otherCard.trialsSinceLastSeen += 1;
+    }
     if (otherCard.firstSeen > 0) {
       if (i != params.selectedClusterIndex) {
         otherCard.otherPracticeTime += params.practiceTime;
@@ -33,12 +61,16 @@ export function applyAnswerUpdate(params: ApplyAnswerUpdateParams): void {
     }
   }
 
-  const stim = card.stims[params.whichStim];
   stim.totalPracticeDuration += params.practiceTime;
   stim.allTimeTotalPracticeDuration += params.practiceTime;
   stim.timesSeen += 1;
 
   if (params.testType === "s") {
+    card.priorStudy += 1;
+    stim.priorStudy += 1;
+    if (response) {
+      response.priorStudy += 1;
+    }
     return;
   }
 
@@ -72,18 +104,16 @@ export function applyAnswerUpdate(params: ApplyAnswerUpdateParams): void {
     return;
   }
 
-  let resp;
-  if (params.answerText in params.cardProbabilities.responses) {
-    resp = params.cardProbabilities.responses[params.answerText];
+  if (response) {
     if (params.wasCorrect) {
-      resp.priorCorrect += 1;
-      resp.allTimeCorrect += 1;
+      response.priorCorrect += 1;
+      response.allTimeCorrect += 1;
     } else {
-      resp.priorIncorrect += 1;
-      resp.allTimeIncorrect += 1;
+      response.priorIncorrect += 1;
+      response.allTimeIncorrect += 1;
     }
 
-    resp.outcomeStack.push(params.wasCorrect ? 1 : 0);
+    response.outcomeStack.push(params.wasCorrect ? 1 : 0);
   } else {
     params.onMissingResponseMetrics();
   }

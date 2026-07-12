@@ -9,7 +9,6 @@ type LaunchUnitLike = {
   autotutorsession?: unknown;
   unitinstructions?: unknown;
   picture?: unknown;
-  unitinstructionsquestion?: unknown;
   deliverySettings?: Record<string, unknown>;
   displayMinSeconds?: unknown;
   displayMaxSeconds?: unknown;

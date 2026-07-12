@@ -45,13 +45,13 @@ function createInitialCardStim(params: {
     outcomeStack: [],
     lastSeen: 0,
     firstSeen: 0,
+    timeHistory: [],
     totalPracticeDuration: 0,
     allTimeTotalPracticeDuration: 0,
     otherPracticeTime: 0,
     previousCalculatedProbabilities: [],
     priorStudy: 0,
     parameter: params.parameter,
-    instructionQuestionResult: null,
     timesSeen: 0,
     canUse: true,
     probabilityEstimate: 0.5,
@@ -80,6 +80,7 @@ export function createInitialModelState(
       outcomeStack: [],
       lastSeen: 0,
       firstSeen: 0,
+      timeHistory: [],
       totalPracticeDuration: 0,
       allTimeTotalPracticeDuration: 0,
       otherPracticeTime: 0,
@@ -88,7 +89,6 @@ export function createInitialModelState(
       trialsSinceLastSeen: 3,
       canUse: false,
       stims: [],
-      instructionQuestionResult: null,
     };
 
     const numStims = cluster.stims.length;
@@ -126,11 +126,11 @@ export function createInitialModelState(
           priorIncorrect: 0,
           firstSeen: 0,
           lastSeen: 0,
+          timeHistory: [],
           totalPracticeDuration: 0,
           allTimeTotalPracticeDuration: 0,
           priorStudy: 0,
           outcomeStack: [],
-          instructionQuestionResult: null,
         };
       }
     }

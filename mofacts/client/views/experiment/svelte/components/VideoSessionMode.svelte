@@ -662,7 +662,6 @@
       CFVideoIsPlaying: player.playing,
       feedbackText: document.getElementById('UserInteraction')?.textContent || '',
       feedbackType: '',
-      instructionQuestionResult: Session.get('instructionQuestionResult') || false,
       entryPoint: Meteor.user()?.loginParams?.entryPoint,
       eventType: 'video',
     };

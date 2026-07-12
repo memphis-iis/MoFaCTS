@@ -1017,7 +1017,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!autoTutorValidation.valid) {
       throw new Meteor.Error('invalid-autotutor-content', autoTutorValidation.errors.join('; '));
     }
-    const tutor = tdfContentToSave.tdfs?.tutor as { unit?: Array<{ unitinstructions?: string; unitinstructionsquestion?: string }> } | undefined;
+    const tutor = tdfContentToSave.tdfs?.tutor as { unit?: Array<{ unitinstructions?: string }> } | undefined;
     if (tutor?.unit && Array.isArray(tutor.unit)) {
       await deps.processAudioFilesForTDF({ tutor: { unit: tutor.unit } }, tdf.stimuliSetId, {
         rejectUnresolved: true,

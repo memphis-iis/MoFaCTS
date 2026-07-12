@@ -17,7 +17,6 @@ function createAggregate(overrides: Record<string, unknown> = {}) {
     trialsSinceLastSeen: 0,
     hasBeenIntroduced: true,
     otherPracticeTime: 0,
-    instructionQuestionResult: null,
     ...overrides,
   };
 }

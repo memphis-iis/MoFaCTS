@@ -3,7 +3,6 @@ import {
 } from '../../content/response-normalization/historyResponseKey';
 import { stripSpacesAndLowerCase } from '../../content/response-normalization/responseKey';
 import { createLearningComponentAdapterContext } from '../../runtime/LearningComponentAdapterContext';
-import { applyPracticeTimeUpdate } from './practiceTimeUpdates';
 import { createTdfProbabilityFunction } from './tdfProbabilityFunction';
 import { resolveSelectionTestType } from './testTypePolicy';
 import { buildNextCardSelection } from './learningSessionRuntime';
@@ -15,7 +14,6 @@ import { hydrateLearningSessionModelState } from './hydrateLearningSessionModelS
 import {
   createCurrentLearningCardInfoTracker,
   recordLearningCardAdminMetrics,
-  updateCardAndStimExposure,
 } from './learningSessionCardState';
 import { applyLearningSessionAnswer } from './learningSessionAnswerCoordinator';
 import type { UnitEngineSessionReadKey, UnitEngineSessionWriteKey } from '../../units/UnitEngineSessionKeys';
@@ -115,7 +113,6 @@ export interface CreateAdaptiveLogisticUnitEngineDeps {
   readonly setQuestionIndex: (questionIndex: number) => void;
   readonly getDisplayAnswerText: (answer: any) => string;
   readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
-  readonly updateCurStudedentPracticeTime: (practiceTime: any) => void;
   readonly serverMethods: AdaptiveLogisticServerMethods;
   readonly getCurrentUserId: () => any;
   readonly reconstructLearningStateFromHistory: (
@@ -196,18 +193,6 @@ export async function createAdaptiveLogisticUnitEngine(
     resolveUnitClusterListSource: config.resolveUnitClusterListSource,
     resolveModelPreparationClusterListSource: config.resolveModelPreparationClusterListSource,
   };
-
-  function updateCardAndStimData(cardIndex: any, whichStim: any) {
-    updateCardAndStimExposure({
-      cardProbabilities,
-      cardIndex,
-      whichStim,
-      instructionQuestionResults: deps.getSessionValue('instructionQuestionResults'),
-      testType: deps.getTestType(),
-      correctAnswer: getStimAnswer(cardIndex, whichStim),
-      getDisplayAnswerText: deps.getDisplayAnswerText,
-    });
-  }
 
   function recordModelPracticeRuntimeHistories(outcome: string) {
     const overallOutcomeHistory = deps.getSessionValue('overallOutcomeHistory');
@@ -460,7 +445,6 @@ export async function createAdaptiveLogisticUnitEngine(
         setRuntimeCurrentCardOwnerToken: (ownerToken) => {
           this.currentCardOwnerToken = ownerToken;
         },
-        updateCardAndStimData,
         recordAdminMetrics: (cardIndex, whichStim, card, stim) => {
           if (!deps.currentUserHasRole('admin,teacher')) {
             return;
@@ -573,16 +557,6 @@ export async function createAdaptiveLogisticUnitEngine(
       runClearPrefetchedNextCard(this);
     },
 
-    updatePracticeTime: function(practiceTime: any) {
-      applyPracticeTimeUpdate({
-        cardProbabilities,
-        clusterIndex: deps.getSessionValue('clusterIndex'),
-        whichStim: currentCardTracker.currentCardInfo.whichStim,
-        practiceTime,
-      });
-      deps.updateCurStudedentPracticeTime(practiceTime);
-    },
-
     cardAnswered: async function(wasCorrect: any, practiceTime: any) {
       const selectedClusterIndex = deps.getSessionValue('clusterIndex');
       const testType = deps.getTestType();
@@ -595,6 +569,7 @@ export async function createAdaptiveLogisticUnitEngine(
         currentStimIndex: currentCardTracker.currentCardInfo.whichStim,
         wasCorrect,
         practiceTime,
+        timestamp: Date.now(),
         testType,
         getDisplayAnswerText: deps.getDisplayAnswerText,
         updateCurStudentPerformance: deps.updateCurStudentPerformance,

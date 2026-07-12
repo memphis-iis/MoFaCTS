@@ -55,7 +55,6 @@ function createHistoryRecord(overrides: Record<string, unknown> = {}): Record<st
     CFFeedbackLatency: 250,
     feedbackText: 'Correct',
     feedbackType: 'correct',
-    instructionQuestionResult: false,
     entryPoint: 'direct',
     eventType: '',
     ...overrides,
@@ -83,13 +82,21 @@ describe('canonical history envelope', function() {
     expect(new Set(fields).size).to.equal(fields.length);
     expect(codes.every((code) => /^[0-9]{2}$/.test(code))).to.equal(true);
     expect(Math.min(...numericCodes)).to.equal(1);
-    expect(Math.max(...numericCodes)).to.equal(codes.length);
+    expect(HISTORY_KEY_MAP['60']).to.equal('feedbackType');
+    expect(HISTORY_KEY_MAP['61']).to.equal(undefined);
+    expect(HISTORY_KEY_MAP['62']).to.equal('entryPoint');
+  });
 
-    for (let expectedCode = 1; expectedCode <= codes.length; expectedCode += 1) {
-      expect(HISTORY_KEY_MAP[String(expectedCode).padStart(2, '0')])
-        .to.be.a('string')
-        .and.not.equal('');
-    }
+  it('leaves retired key 61 isolated without affecting neighboring history fields', function() {
+    const decompressed = decompressHistoryRecord({
+      '60': 'correct',
+      '61': false,
+      '62': 'direct',
+    });
+
+    expect(decompressed.feedbackType).to.equal('correct');
+    expect(decompressed['61']).to.equal(false);
+    expect(decompressed.entryPoint).to.equal('direct');
   });
 
   it('accepts compact trial records with the shared core fields', function() {

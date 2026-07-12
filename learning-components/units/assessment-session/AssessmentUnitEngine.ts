@@ -202,9 +202,6 @@ export function createAssessmentUnitEngine(deps: CreateAssessmentUnitEngineDeps)
       return this.getSchedule().q[questionIndex];
     },
 
-    updatePracticeTime: function() {
-    },
-
     cardAnswered: async function() {
       // Nothing currently
     },

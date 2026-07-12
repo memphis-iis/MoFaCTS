@@ -315,7 +315,7 @@ export function createMediaReferenceHelpers(deps: MediaReferenceDeps) {
   }
 
   async function processAudioFilesForTDF(
-    TDF: { tutor: { unit: Array<{ unitinstructions?: string; unitinstructionsquestion?: string }> } },
+    TDF: { tutor: { unit: Array<{ unitinstructions?: string }> } },
     stimuliSetId?: string | number | null,
     options: {
       rejectUnresolved?: boolean;
@@ -328,7 +328,7 @@ export function createMediaReferenceHelpers(deps: MediaReferenceDeps) {
       const unit = TDF.tutor.unit[Number(unitIdx)];
       if (!unit) continue;
 
-      const fields: Array<'unitinstructions' | 'unitinstructionsquestion'> = ['unitinstructions', 'unitinstructionsquestion'];
+      const fields: Array<'unitinstructions'> = ['unitinstructions'];
       for (const fieldName of fields) {
         const fieldValue = unit[fieldName];
         if (!fieldValue) continue;

@@ -39,7 +39,6 @@ describe('history reconstruction', function() {
         CFCorrectAnswer: 'Alpha',
         CFEndLatency: 400,
         CFFeedbackLatency: 100,
-        instructionQuestionResult: true,
       },
     ]);
 
@@ -73,7 +72,6 @@ describe('history reconstruction', function() {
       trialsSinceLastSeen: 1,
       hasBeenIntroduced: true,
       otherPracticeTime: 350,
-      instructionQuestionResult: true,
     });
     expect(cluster1000!.outcomeStack).to.deep.equal([1]);
 
@@ -108,7 +106,6 @@ describe('history reconstruction', function() {
       allTimeTotalPracticeDuration: 800,
       hasBeenIntroduced: true,
       otherPracticeTime: 350,
-      instructionQuestionResult: true,
     });
     expect(stimulusKC1!.outcomeStack).to.deep.equal([1]);
 
@@ -122,7 +119,6 @@ describe('history reconstruction', function() {
       allTimeIncorrect: 0,
       totalPracticeDuration: 800,
       allTimeTotalPracticeDuration: 800,
-      instructionQuestionResult: true,
     });
     expect(responseAlpha!.outcomeStack).to.deep.equal([1]);
   });

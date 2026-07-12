@@ -137,7 +137,6 @@ describe('session surface mode', function() {
       lockoutMinutes: 0,
       hasUnitText: true,
       hasUnitImage: false,
-      hasUnitQuestion: false,
     })).to.throw('shouldInlineSessionVideoInstructions received an invalid session content surface');
     expect(() => resolveSessionSurfaceUnitEntryRoute(invalidContentSurface))
       .to.throw('resolveSessionSurfaceUnitEntryRoute received an invalid session content surface');
@@ -194,35 +193,24 @@ describe('session surface mode', function() {
       lockoutMinutes: 0,
       hasUnitText: true,
       hasUnitImage: false,
-      hasUnitQuestion: false,
     })).to.equal(true);
     expect(shouldInlineSessionVideoInstructions({
       contentSurface: videoSurface,
       lockoutMinutes: 1,
       hasUnitText: true,
       hasUnitImage: false,
-      hasUnitQuestion: false,
     })).to.equal(false);
     expect(shouldInlineSessionVideoInstructions({
       contentSurface: videoSurface,
       lockoutMinutes: 0,
       hasUnitText: true,
       hasUnitImage: true,
-      hasUnitQuestion: false,
-    })).to.equal(false);
-    expect(shouldInlineSessionVideoInstructions({
-      contentSurface: videoSurface,
-      lockoutMinutes: 0,
-      hasUnitText: true,
-      hasUnitImage: false,
-      hasUnitQuestion: true,
     })).to.equal(false);
     expect(shouldInlineSessionVideoInstructions({
       contentSurface: flashcardSurface,
       lockoutMinutes: 0,
       hasUnitText: true,
       hasUnitImage: false,
-      hasUnitQuestion: false,
     })).to.equal(false);
   });
 

@@ -34,7 +34,6 @@ function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
     setQuestionIndex() {},
     getDisplayAnswerText: (answer: unknown) => String(answer || ''),
     updateCurStudentPerformance() {},
-    updateCurStudedentPracticeTime() {},
     serverMethods: {
       getResponseKCMapForTdf: async () => ({}),
       getStimulusCrowdStatsForDeck: async () => [],
@@ -522,7 +521,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
               trialsSinceLastSeen: 0,
               hasBeenIntroduced: true,
               otherPracticeTime: 0,
-              instructionQuestionResult: null,
             },
           },
           stimulusState: {
@@ -543,7 +541,6 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
               hasBeenIntroduced: true,
               timesSeen: 1,
               otherPracticeTime: 0,
-              instructionQuestionResult: null,
             },
           },
           responseState: {},

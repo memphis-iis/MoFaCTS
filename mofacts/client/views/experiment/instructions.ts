@@ -579,10 +579,6 @@ Template.instructions.helpers({
     return checkForFileImage(Session.get('currentTdfUnit')?.unitinstructions);
   },
 
-  instructionQuestion: function(){
-    return checkForFileImage(Session.get('currentTdfUnit')?.unitinstructionsquestion);
-  },
-
   islockout: function() {
     const lockoutMs = currLockOut();
     if (lockoutMs > 0) {
@@ -852,7 +848,6 @@ function gatherInstructionLogRecord(trialEndTimeStamp: any, trialStartTimeStamp:
   const unitName = trimText(currentUnit?.unitname);
   const displayedStimulus = {
     text: trimText(currentUnit?.unitinstructions),
-    question: trimText(currentUnit?.unitinstructionsquestion),
   };
   if (!currentTdfId) {
     logIdInvariantBreachOnce('instructions.gatherInstructionLogRecord:missing-currentTdfId');
@@ -992,14 +987,6 @@ Template.instructions.events({
     let newUnitNumber = curUnit - 1;
     await revisitUnit(newUnitNumber);
   },
-  'click #instructionQuestionAffrimative': function() {
-    Session.set('instructionQuestionResults',true);
-    $('#instructionQuestion').hide();
-  },
-  'click #instructionQuestionNegative': function() {
-    Session.set('instructionQuestionResults',false);
-    $('#instructionQuestion').hide();
-  }
 });
 
 

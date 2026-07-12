@@ -139,7 +139,6 @@ export const HISTORY_KEY_MAP: Record<string, string> = {
   '58': 'CFNote',
   '59': 'feedbackText',
   '60': 'feedbackType',
-  '61': 'instructionQuestionResult',
   '62': 'entryPoint',
   '63': 'eventType',
   '64': 'CFVideoTimeStamp',

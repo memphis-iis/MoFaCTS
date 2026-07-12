@@ -744,7 +744,6 @@ async function insertAutoTutorHistoryTurn(config: AutoTutorConfig, state: AutoTu
     CFNote: JSON.stringify(note),
     feedbackText: legacyTrim(args.tutorMessage),
     feedbackType: state.mastered ? 'correct' : (state.completed ? 'incorrect' : 'autotutor'),
-    instructionQuestionResult: false,
     entryPoint: snapshot.entryPoint || '',
     eventType: 'autotutor-turn',
   };

@@ -9,6 +9,7 @@ export async function applyLearningSessionAnswer(params: {
   readonly currentStimIndex: any;
   readonly wasCorrect: any;
   readonly practiceTime: any;
+  readonly timestamp: number;
   readonly testType: string;
   readonly getDisplayAnswerText: (answer: any) => string;
   readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
@@ -38,6 +39,7 @@ export async function applyLearningSessionAnswer(params: {
     currentStimIndex: params.currentStimIndex,
     whichStim: params.whichStim,
     practiceTime: params.practiceTime,
+    timestamp: params.timestamp,
     wasCorrect: params.wasCorrect,
     testType: params.testType,
     answerText,

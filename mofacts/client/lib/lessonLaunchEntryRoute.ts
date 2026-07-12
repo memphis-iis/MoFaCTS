@@ -26,8 +26,7 @@ type UnitEntrySurface = 'instructions' | 'content';
 function resolveUnitEntrySurface(unit: TdfUnitLike, unitType: UnitType): UnitEntrySurface {
   const instructionSurfaceIsPresent = Boolean(
     unit.unitinstructions ||
-    unit.picture ||
-    unit.unitinstructionsquestion
+    unit.picture
   );
 
   return unitType === 'instruction-only' || instructionSurfaceIsPresent

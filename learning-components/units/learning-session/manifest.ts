@@ -40,7 +40,6 @@ export const learningSessionUnitComponentManifest: LearningComponentManifest<Cre
         setQuestionIndex: currentDeps.cardState.setQuestionIndex,
         getDisplayAnswerText: currentDeps.stimuli.getDisplayAnswerText,
         updateCurStudentPerformance: currentDeps.adaptiveModel.updateCurStudentPerformance,
-        updateCurStudedentPracticeTime: currentDeps.adaptiveModel.updateCurStudedentPracticeTime,
         serverMethods: currentDeps.serverMethods,
         getCurrentUserId: currentDeps.user.getCurrentUserId,
         reconstructLearningStateFromHistory: currentDeps.history.reconstructLearningStateFromHistory,

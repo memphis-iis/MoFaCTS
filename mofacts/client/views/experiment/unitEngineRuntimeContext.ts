@@ -2,10 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { extractDelimFields, rangeVal } from '../../lib/runtimeValueHelpers';
-import {
-  updateCurStudentPerformance,
-  updateCurStudedentPracticeTime,
-} from '../../lib/studentPerformanceRuntime';
+import { updateCurStudentPerformance } from '../../lib/studentPerformanceRuntime';
 import { getStimCount, getStimCluster } from '../../lib/runtimeStimuli';
 import { getTestType } from '../../lib/currentDeliverySettings';
 import { createExperimentState } from './svelte/services/experimentState';
@@ -146,7 +143,6 @@ export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext
       getHiddenItems,
       setNumVisibleCards,
       updateCurStudentPerformance,
-      updateCurStudedentPracticeTime,
     },
     history: {
       reconstructLearningStateFromHistory,

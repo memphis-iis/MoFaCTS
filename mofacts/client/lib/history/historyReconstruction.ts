@@ -23,7 +23,6 @@ export type LearningHistoryRecord = {
   responseValue?: unknown;
   CFEndLatency?: number | string | null;
   CFFeedbackLatency?: number | string | null;
-  instructionQuestionResult?: unknown;
   sparc?: unknown;
 };
 
@@ -45,7 +44,6 @@ type ClusterAggregate = AggregateEntry & {
   trialsSinceLastSeen: number;
   hasBeenIntroduced: boolean;
   otherPracticeTime: number;
-  instructionQuestionResult: unknown;
 };
 
 type StimulusAggregate = AggregateEntry & {
@@ -54,11 +52,9 @@ type StimulusAggregate = AggregateEntry & {
   hasBeenIntroduced: boolean;
   timesSeen: number;
   otherPracticeTime: number;
-  instructionQuestionResult: unknown;
 };
 
 type ResponseAggregate = AggregateEntry & {
-  instructionQuestionResult: unknown;
 };
 
 type LearningReconstructionResult = {
@@ -253,7 +249,6 @@ function createClusterAggregate(): ClusterAggregate {
     trialsSinceLastSeen: 3,
     hasBeenIntroduced: false,
     otherPracticeTime: 0,
-    instructionQuestionResult: null,
   };
 }
 
@@ -265,14 +260,12 @@ function createStimulusAggregate(): StimulusAggregate {
     hasBeenIntroduced: false,
     timesSeen: 0,
     otherPracticeTime: 0,
-    instructionQuestionResult: null,
   };
 }
 
 function createResponseAggregate(): ResponseAggregate {
   return {
     ...createAggregateEntry(),
-    instructionQuestionResult: null,
   };
 }
 
@@ -382,14 +375,6 @@ export function reconstructLearningStateFromHistory(
       overallOutcomeHistory.push(0);
     }
     updateOverallStudyHistory(overallStudyHistory, row, outcome);
-
-    if (row.instructionQuestionResult !== undefined) {
-      cluster.instructionQuestionResult = row.instructionQuestionResult;
-      stimulus.instructionQuestionResult = row.instructionQuestionResult;
-      if (response) {
-        response.instructionQuestionResult = row.instructionQuestionResult;
-      }
-    }
 
     for (const [otherClusterKey, otherCluster] of Object.entries(clusterState)) {
       if (otherClusterKey !== clusterKey && otherCluster.firstSeen > 0) {

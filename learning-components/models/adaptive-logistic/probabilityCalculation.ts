@@ -46,9 +46,6 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.userTotalResponses = params.cardProbabilities.numQuestionsAnswered;
   p.userCorrectResponses = params.cardProbabilities.numCorrectAnswers;
 
-  // Instruction metrics
-  p.instructionQuestionResult = card.instructionQuestionResult;
-
   // Card/cluster metrics
   p.questionSuccessCount = card.priorCorrect;
   p.questionFailureCount = card.priorIncorrect;

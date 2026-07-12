@@ -17,7 +17,6 @@ export interface CommitPreparedSelectionParams {
   readonly setRuntimeCurrentPreparedState: (preparedState: any) => void;
   readonly setRuntimeCurrentCardRef: (cardRef: any) => void;
   readonly setRuntimeCurrentCardOwnerToken: (ownerToken: any) => void;
-  readonly updateCardAndStimData: (cardIndex: any, whichStim: any) => void;
   readonly recordAdminMetrics: (cardIndex: any, whichStim: any, card: any, stim: any) => void;
 }
 
@@ -68,15 +67,7 @@ export function commitPreparedSelection(params: CommitPreparedSelectionParams): 
   params.setRuntimeCurrentCardOwnerToken(params.selection?.ownerToken || params.buildCurrentOwnerToken(currentCardRef));
 
   params.context.setQuestionIndex(0);
-  params.updateCardAndStimData(cardIndex, whichStim);
   params.recordAdminMetrics(cardIndex, whichStim, card, stim);
-
-  for (let index = 0; index < params.cardProbabilities.cards.length; index++) {
-    const otherCard = params.cardProbabilities.cards[index];
-    if (index != cardIndex && otherCard.hasBeenIntroduced) {
-      otherCard.trialsSinceLastSeen += 1;
-    }
-  }
 
   return newExperimentState;
 }

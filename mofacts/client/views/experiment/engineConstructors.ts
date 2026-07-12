@@ -13,7 +13,6 @@ interface EngineUnitLike {
   autotutorsession?: unknown;
   unitinstructions?: unknown;
   picture?: unknown;
-  unitinstructionsquestion?: unknown;
 }
 
 interface EngineCreationContext {
@@ -35,12 +34,11 @@ function getAvailableUnitShapes(unit: EngineUnitLike | null | undefined): string
   if (unit.autotutorsession) shapes.push('autotutorsession');
   if (unit.unitinstructions) shapes.push('unitinstructions');
   if (unit.picture) shapes.push('picture');
-  if (unit.unitinstructionsquestion) shapes.push('unitinstructionsquestion');
   return shapes;
 }
 
 function hasInstructionContent(unit: EngineUnitLike): boolean {
-  return Boolean(unit.unitinstructions || unit.picture || unit.unitinstructionsquestion);
+  return Boolean(unit.unitinstructions || unit.picture);
 }
 
 export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undefined, source: string): UnitType {

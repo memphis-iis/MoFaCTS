@@ -54,7 +54,6 @@ export function createVideoSessionUnitEngine(deps: CreateVideoSessionUnitEngineD
     prefetchNextCard: function() { },
     applyPrefetchedNextCard: async function() { return false; },
     clearPrefetchedNextCard: function() { },
-    updatePracticeTime: function() { },
     loadResumeState: async function() { },
     async prepareNextTrial() {
       return { selection: null, preparedAdvanceMode: 'none' };

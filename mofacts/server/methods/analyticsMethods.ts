@@ -1163,7 +1163,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         CFFeedbackLatency: 1,
         responseValue: 1,
         sparc: 1,
-        instructionQuestionResult: 1,
       },
       sort: { time: 1 },
     }).fetchAsync();

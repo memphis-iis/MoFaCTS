@@ -349,10 +349,6 @@ export const UNIT_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Instructions shown before the unit.',
     verbose: 'HTML or text instructions shown before the unit begins.'
   }),
-  unitinstructionsquestion: simpleField(textareaField(''), {
-    brief: 'Question shown with instructions.',
-    verbose: 'Supplemental instructions question/prompt text.'
-  }),
   buttonorder: simpleField(enumStringField(['fixed', 'random'], 'fixed', 4), {
     brief: 'Button arrangement order.',
     verbose: 'Controls fixed vs randomized button order.'
@@ -713,7 +709,6 @@ export const UNIT_DIRECT_RUNTIME_KEYS = Object.freeze([
   'turkemail',
   'turkemailsubject',
   'unitinstructions',
-  'unitinstructionsquestion',
   'unitname',
 ]);
 

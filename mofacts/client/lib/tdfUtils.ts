@@ -69,8 +69,7 @@ export function hasLaunchReadyTutorUnits(tdfContent: any): boolean {
       unit.videosession ||
       unit.autotutorsession ||
       unit.unitinstructions ||
-      unit.picture ||
-      unit.unitinstructionsquestion
+      unit.picture
     );
   });
 }

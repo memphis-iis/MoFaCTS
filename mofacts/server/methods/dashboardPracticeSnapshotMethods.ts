@@ -121,7 +121,6 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
     'content.tdfs.tutor.unit.videosession': 1,
     'content.tdfs.tutor.unit.sparcsession': 1,
     'content.tdfs.tutor.unit.unitinstructions': 1,
-    'content.tdfs.tutor.unit.unitinstructionsquestion': 1
   };
 
   const accessibleRoots = await deps.Tdfs.find(

@@ -50,51 +50,6 @@ export function createCurrentLearningCardInfoTracker(params: {
   };
 }
 
-export function updateCardAndStimExposure(params: {
-  readonly cardProbabilities: any;
-  readonly cardIndex: any;
-  readonly whichStim: any;
-  readonly instructionQuestionResults: any;
-  readonly testType: string;
-  readonly correctAnswer: any;
-  readonly getDisplayAnswerText: (answer: any) => string;
-}) {
-  const card = params.cardProbabilities.cards[params.cardIndex];
-  const stim = card.stims[params.whichStim];
-  const responseText = stripSpacesAndLowerCase(params.getDisplayAnswerText(params.correctAnswer));
-
-  params.cardProbabilities.instructionQuestionResult = params.instructionQuestionResults;
-
-  card.lastSeen = Date.now();
-  if (card.firstSeen < 1) {
-    card.firstSeen = card.lastSeen;
-  }
-
-  stim.lastSeen = Date.now();
-  if (stim.firstSeen < 1) {
-    stim.firstSeen = stim.lastSeen;
-  }
-
-  if (responseText && responseText in params.cardProbabilities.responses) {
-    const resp = params.cardProbabilities.responses[responseText];
-    resp.lastSeen = Date.now();
-    if (resp.firstSeen < 1) {
-      resp.firstSeen = resp.lastSeen;
-    }
-    if (params.testType === 's') {
-      resp.priorStudy += 1;
-    }
-  }
-
-  card.trialsSinceLastSeen = 0;
-  card.hasBeenIntroduced = true;
-  stim.hasBeenIntroduced = true;
-  if (params.testType === 's') {
-    card.priorStudy += 1;
-    stim.priorStudy += 1;
-  }
-}
-
 export function recordLearningCardAdminMetrics(params: {
   readonly cardProbabilities: any;
   readonly cardIndex: any;

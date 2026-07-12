@@ -105,7 +105,6 @@ function createRuntimeDeps(tdfFile, stimFile) {
     setQuestionIndex() {},
     getDisplayAnswerText: (answer) => String(answer || ''),
     updateCurStudentPerformance() {},
-    updateCurStudedentPracticeTime() {},
     serverMethods: {
       getResponseKCMapForTdf: async () => ({}),
       getStimulusCrowdStatsForDeck: async () => [],

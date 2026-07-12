@@ -111,7 +111,6 @@ interface TdfUnitLike extends UnknownRecord {
   autotutorsession?: unknown;
   unitinstructions?: unknown;
   picture?: unknown;
-  unitinstructionsquestion?: unknown;
   unitname?: string;
   deliverySettings?: UnknownRecord;
 }
@@ -755,11 +754,9 @@ async function initializeStandardCardEntry(
   const currentUnit = Session.get('currentTdfUnit');
   const hasUnitText = typeof currentUnit?.unitinstructions === 'string' && currentUnit.unitinstructions.trim().length > 0;
   const hasUnitImage = typeof currentUnit?.picture === 'string' && currentUnit.picture.trim().length > 0;
-  const hasUnitQuestion = typeof currentUnit?.unitinstructionsquestion === 'string' &&
-    currentUnit.unitinstructionsquestion.trim().length > 0;
   const lockoutMinutes = Number(unitHasLockout() || 0);
   const instructionsSeen = Session.get('curUnitInstructionsSeen');
-  const shouldShowInstructions = ((!instructionsSeen) && (hasUnitText || hasUnitImage || hasUnitQuestion)) ||
+  const shouldShowInstructions = ((!instructionsSeen) && (hasUnitText || hasUnitImage)) ||
     lockoutMinutes > 0;
   const sessionContentSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
     currentTdfUnit: currentUnit,
@@ -769,7 +766,6 @@ async function initializeStandardCardEntry(
     lockoutMinutes,
     hasUnitText,
     hasUnitImage,
-    hasUnitQuestion,
   });
 
   if (shouldShowInstructions && !canInlineVideoInstructions) {

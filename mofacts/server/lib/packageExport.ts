@@ -139,7 +139,7 @@ function rewriteInstructionHtmlForPackageExport(htmlString: string, deps: BuildA
   return updated;
 }
 
-const PACKAGE_EXPORT_HTML_FIELDS = new Set(['unitinstructions', 'unitinstructionsquestion']);
+const PACKAGE_EXPORT_HTML_FIELDS = new Set(['unitinstructions']);
 const PACKAGE_EXPORT_MEDIA_FIELDS = new Set([
   'audioSrc',
   'imgSrc',

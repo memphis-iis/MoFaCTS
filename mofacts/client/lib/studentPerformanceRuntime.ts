@@ -8,10 +8,7 @@ import { resolveLearningSessionClusterListSource } from '../../../learning-compo
 import { resolveSparcSessionPageId } from '../../../learning-components/units/sparcsession/sparcSessionRuntimeConfig';
 import { getNestedStimulusClustersFromTdfFile } from './runtimeStimuli';
 import { extractDelimFields, rangeVal } from './runtimeValueHelpers';
-import {
-  applyAnswerToStudentPerformance,
-  applyPracticeTimeToStudentPerformance,
-} from '../../../learning-components/models/adaptive-logistic/studentPerformance';
+import { applyAnswerToStudentPerformance } from '../../../learning-components/models/adaptive-logistic/studentPerformance';
 
 declare const UserDashboardCache: {
   findOne: (query: { userId: string }) =>
@@ -53,17 +50,6 @@ export function updateCurStudentPerformance(isCorrect: boolean, practiceTime: nu
   clientConsole(2, 'updateCurStudentPerformance', isCorrect, practiceTime,
       'count:', curUserPerformance.count + 1);
   const updated = applyAnswerToStudentPerformance(curUserPerformance, isCorrect, practiceTime, testType);
-  Session.set('constantTotalTime', updated.totalTimeDisplay);
-  Session.set('curStudentPerformance', updated);
-}
-
-export function updateCurStudedentPracticeTime(practiceTime: number) {
-  // Update running user metrics total,
-  // note this assumes curStudentPerformance has already been initialized on initial page entry
-  const curUserPerformance = Session.get('curStudentPerformance') as CurrentStudentPerformance;
-  clientConsole(2, 'updateCurStudentPerformance', practiceTime,
-      'totalTime:', curUserPerformance.totalTime);
-  const updated = applyPracticeTimeToStudentPerformance(curUserPerformance, practiceTime);
   Session.set('constantTotalTime', updated.totalTimeDisplay);
   Session.set('curStudentPerformance', updated);
 }

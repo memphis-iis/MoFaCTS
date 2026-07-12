@@ -37,10 +37,3 @@ export function applyAnswerToStudentPerformance(
     totalStimCount: Number(state.totalStimCount),
   };
 }
-
-export function applyPracticeTimeToStudentPerformance(
-  state: StudentPerformanceState,
-  practiceTime: number,
-): StudentPerformanceState {
-  return withPracticeTime(state, practiceTime);
-}

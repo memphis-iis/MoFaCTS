@@ -48,40 +48,6 @@ function resolveModelPracticeTimestamp(request: ModelPracticeUpdateRequest): num
   return Date.now();
 }
 
-function markTargetExposure(params: {
-  readonly card: any;
-  readonly stim: any;
-  readonly response: any;
-  readonly timestamp: number;
-  readonly testType: string;
-}): void {
-  params.card.lastSeen = params.timestamp;
-  if (!Number.isFinite(Number(params.card.firstSeen)) || Number(params.card.firstSeen) < 1) {
-    params.card.firstSeen = params.timestamp;
-  }
-  params.card.hasBeenIntroduced = true;
-
-  params.stim.lastSeen = params.timestamp;
-  if (!Number.isFinite(Number(params.stim.firstSeen)) || Number(params.stim.firstSeen) < 1) {
-    params.stim.firstSeen = params.timestamp;
-  }
-  params.stim.hasBeenIntroduced = true;
-
-  if (params.response) {
-    params.response.lastSeen = params.timestamp;
-    if (!Number.isFinite(Number(params.response.firstSeen)) || Number(params.response.firstSeen) < 1) {
-      params.response.firstSeen = params.timestamp;
-    }
-    if (params.testType === 's') {
-      params.response.priorStudy += 1;
-    }
-  }
-  if (params.testType === 's') {
-    params.card.priorStudy += 1;
-    params.stim.priorStudy += 1;
-  }
-}
-
 export function findAdaptiveLogisticModelTarget(params: {
   readonly cardProbabilities: any;
   readonly target: ModelPracticeUpdateRequest['target'];
@@ -150,17 +116,6 @@ export function applyModelPracticeUpdateToAdaptiveLogistic(
   const score = (params.scoreOutcome ?? defaultScoreOutcome)(params.request.outcome);
   const responseKey = params.request.target.response?.responseKey;
   const practiceTime = params.request.practiceDurationMs ?? 0;
-  const card = params.cardProbabilities.cards[target.cardIndex];
-  const stim = card.stims[target.stimIndex];
-  const response = responseKey ? params.cardProbabilities.responses?.[responseKey] : undefined;
-
-  markTargetExposure({
-    card,
-    stim,
-    response,
-    timestamp: resolveModelPracticeTimestamp(params.request),
-    testType: score.testType,
-  });
 
   applyAnswerUpdate({
     cardProbabilities: params.cardProbabilities,
@@ -169,6 +124,7 @@ export function applyModelPracticeUpdateToAdaptiveLogistic(
     currentStimIndex: target.stimIndex,
     whichStim: target.stimIndex,
     practiceTime,
+    timestamp: resolveModelPracticeTimestamp(params.request),
     wasCorrect: score.wasCorrect,
     testType: score.testType,
     answerText: responseKey ?? '',

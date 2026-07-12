@@ -14,9 +14,10 @@ function createCardProbabilities(): any {
       answer: {
         priorCorrect: 0,
         allTimeCorrect: 0,
-        priorIncorrect: 0,
-        allTimeIncorrect: 0,
-        outcomeStack: [],
+      priorIncorrect: 0,
+      allTimeIncorrect: 0,
+      outcomeStack: [],
+      timeHistory: [],
       },
     },
     cards: [{
@@ -27,6 +28,7 @@ function createCardProbabilities(): any {
       allTimeIncorrect: 0,
       otherPracticeTime: 0,
       outcomeStack: [],
+      timeHistory: [],
       stims: [{
         stimulusKC: 'kc-1',
         priorCorrect: 0,
@@ -40,6 +42,7 @@ function createCardProbabilities(): any {
         otherPracticeTime: 0,
         timesSeen: 0,
         outcomeStack: [],
+        timeHistory: [],
       }],
     }],
   };
@@ -94,15 +97,18 @@ describe('modelPracticeUpdateApplication', function() {
     assert.equal(cardProbabilities.cards[0].firstSeen, 2000);
     assert.equal(cardProbabilities.cards[0].lastSeen, 2000);
     assert.equal(cardProbabilities.cards[0].hasBeenIntroduced, true);
+    assert.deepEqual(cardProbabilities.cards[0].timeHistory, [2000]);
     assert.equal(cardProbabilities.cards[0].stims[0].priorCorrect, 1);
     assert.equal(cardProbabilities.cards[0].stims[0].firstSeen, 2000);
     assert.equal(cardProbabilities.cards[0].stims[0].lastSeen, 2000);
     assert.equal(cardProbabilities.cards[0].stims[0].hasBeenIntroduced, true);
+    assert.deepEqual(cardProbabilities.cards[0].stims[0].timeHistory, [2000]);
     assert.equal(cardProbabilities.cards[0].stims[0].timesSeen, 1);
     assert.equal(cardProbabilities.cards[0].stims[0].totalPracticeDuration, 250);
     assert.deepEqual(cardProbabilities.cards[0].outcomeStack, [1]);
     assert.equal(cardProbabilities.responses.answer.firstSeen, 2000);
     assert.equal(cardProbabilities.responses.answer.lastSeen, 2000);
+    assert.deepEqual(cardProbabilities.responses.answer.timeHistory, [2000]);
     assert.deepEqual(cardProbabilities.responses.answer.outcomeStack, [1]);
   });
 

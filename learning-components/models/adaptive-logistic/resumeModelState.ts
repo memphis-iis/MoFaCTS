@@ -31,7 +31,6 @@ function createStimulusStateFromSharedCluster(clusterState: any) {
     hasBeenIntroduced: clusterState.hasBeenIntroduced === true || Number(clusterState.firstSeen || 0) > 0,
     timesSeen: priorCorrect + priorIncorrect + priorStudy,
     otherPracticeTime: clusterState.otherPracticeTime,
-    instructionQuestionResult: clusterState.instructionQuestionResult,
   };
 }
 

@@ -58,7 +58,6 @@ export interface UnitEngineAdaptiveModelRuntime {
   readonly getHiddenItems: () => unknown[];
   readonly setNumVisibleCards: (numVisibleCards: number) => void;
   readonly updateCurStudentPerformance: (wasCorrect: any, practiceTime: any, testType: any) => void;
-  readonly updateCurStudedentPracticeTime: (practiceTime: any) => void;
 }
 
 export interface UnitEngineHistoryRuntime {
@@ -185,7 +184,6 @@ export function getCreateUnitEngineCapabilitySet(
     'getHiddenItems',
     'setNumVisibleCards',
     'updateCurStudentPerformance',
-    'updateCurStudedentPracticeTime',
   )) {
     capabilities.add('adaptive-card-model');
   }

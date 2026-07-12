@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import {
   applyAnswerToStudentPerformance,
-  applyPracticeTimeToStudentPerformance,
   type StudentPerformanceState,
 } from './studentPerformance';
 
@@ -32,10 +31,10 @@ describe('student performance arithmetic', function() {
     assert.equal(initial.count, 0);
   });
 
-  it('adds study and supplemental practice time without scoring it', function() {
+  it('adds study practice time without scoring it', function() {
     const study = applyAnswerToStudentPerformance(initial, false, 15000, 's');
     assert.equal(study.count, 1);
     assert.equal(study.numIncorrect, 0);
-    assert.equal(applyPracticeTimeToStudentPerformance(study, 15000).totalTimeDisplay, '0.5');
+    assert.equal(study.totalTimeDisplay, '0.3');
   });
 });

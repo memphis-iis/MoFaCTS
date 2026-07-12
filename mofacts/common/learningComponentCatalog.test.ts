@@ -42,7 +42,6 @@ describe('Learning component catalog', function() {
         getHiddenItems: () => [],
         setNumVisibleCards() {},
         updateCurStudentPerformance() {},
-        updateCurStudedentPracticeTime() {},
       },
       assessmentState: {
         getExperimentState: () => ({}),

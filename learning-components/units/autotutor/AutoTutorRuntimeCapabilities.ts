@@ -101,7 +101,6 @@ export type AutoTutorCanonicalHistoryRecord = CanonicalHistoryRecord & {
   CFNote: string;
   feedbackText: string;
   feedbackType: 'correct' | 'incorrect' | 'autotutor';
-  instructionQuestionResult: false;
   entryPoint: unknown;
   eventType: 'autotutor-turn';
 };

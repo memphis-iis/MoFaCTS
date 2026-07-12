@@ -148,12 +148,17 @@ describe('learning-session crowd stats integration', function() {
       },
       cards: [{
         firstSeen: 0,
+        lastSeen: 0,
+        timeHistory: [],
         priorCorrect: 0,
         allTimeCorrect: 0,
         allTimeIncorrect: 0,
         priorIncorrect: 0,
         outcomeStack: [],
         stims: [{
+          firstSeen: 0,
+          lastSeen: 0,
+          timeHistory: [],
           priorCorrect: 0,
           priorIncorrect: 0,
           curSessionPriorCorrect: 0,
@@ -178,6 +183,7 @@ describe('learning-session crowd stats integration', function() {
       currentStimIndex: 0,
       whichStim: 0,
       practiceTime: 1000,
+      timestamp: 2000,
       wasCorrect: true,
       testType: 'd',
       answerText: 'answer',
@@ -191,6 +197,8 @@ describe('learning-session crowd stats integration', function() {
       curSessionPriorCorrect: 1,
     });
     expect(cardProbabilities.numQuestionsAnsweredCurrentSession).to.equal(1);
+    expect(cardProbabilities.cards[0]!.lastSeen).to.equal(2000);
+    expect(cardProbabilities.cards[0]!.stims[0]!.lastSeen).to.equal(2000);
   });
 
   it('does not add study trials to transient crowd counts', function() {
@@ -201,7 +209,12 @@ describe('learning-session crowd stats integration', function() {
       responses: {},
       cards: [{
         firstSeen: 0,
+        lastSeen: 0,
+        timeHistory: [],
         stims: [{
+          firstSeen: 0,
+          lastSeen: 0,
+          timeHistory: [],
           totalPracticeDuration: 0,
           allTimeTotalPracticeDuration: 0,
           timesSeen: 0,
@@ -219,6 +232,7 @@ describe('learning-session crowd stats integration', function() {
       currentStimIndex: 0,
       whichStim: 0,
       practiceTime: 1000,
+      timestamp: 2000,
       wasCorrect: true,
       testType: 's',
       answerText: 'answer',

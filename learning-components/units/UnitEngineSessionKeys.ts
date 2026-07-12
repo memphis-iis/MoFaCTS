@@ -10,7 +10,6 @@ export const UNIT_ENGINE_SESSION_READ_KEYS = [
   'currentTdfName',
   'currentTdfUnit',
   'currentUnitNumber',
-  'instructionQuestionResults',
   'isVideoSession',
   'overallOutcomeHistory',
   'overallStudyHistory',

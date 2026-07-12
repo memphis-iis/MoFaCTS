@@ -1330,8 +1330,7 @@ FlowRouter.route('/instructions', {
     const lockout = Number(unitHasLockout()) > 0;
     const txt = unit.unitinstructions ? unit.unitinstructions.trim() : undefined;
     const pic = unit.picture ? unit.picture.trim() : undefined;
-    const instructionsq = unit.unitinstructionsquestion ? unit.unitinstructionsquestion.trim() : undefined;
-    if (!txt && !pic && !instructionsq && !lockout) {
+    if (!txt && !pic && !lockout) {
       clientConsole(2, 'Instructions empty: skipping', displayify(unit));
       Session.set('instructionClientStart', Date.now());
       instructContinue();

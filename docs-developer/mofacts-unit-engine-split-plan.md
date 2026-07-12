@@ -137,8 +137,6 @@ export interface UnitEngine {
     practiceTime?: number
   ): Promise<void>;
 
-  updatePracticeTime?(practiceTime: number): void;
-
   unitFinished(): boolean | Promise<boolean>;
 
   prefetchNextCard?(

@@ -33,7 +33,6 @@ function createMinimalDeps(overrides: Record<string, unknown> = {}): any {
     setQuestionIndex() {},
     getDisplayAnswerText: (answer: unknown) => String(answer || ''),
     updateCurStudentPerformance() {},
-    updateCurStudedentPracticeTime() {},
     serverMethods: {
       getResponseKCMapForTdf: async () => ({}),
       getStimulusCrowdStatsForDeck: async () => [],
@@ -200,7 +199,6 @@ describe('LearningSessionUnitEngine model practice updates', function() {
               trialsSinceLastSeen: 0,
               hasBeenIntroduced: true,
               otherPracticeTime: 0,
-              instructionQuestionResult: null,
             },
           },
           stimulusState: {
@@ -221,7 +219,6 @@ describe('LearningSessionUnitEngine model practice updates', function() {
               hasBeenIntroduced: true,
               timesSeen: 1,
               otherPracticeTime: 0,
-              instructionQuestionResult: null,
             },
           },
           responseState: {
@@ -237,7 +234,6 @@ describe('LearningSessionUnitEngine model practice updates', function() {
               timeHistory: [1000],
               totalPracticeDuration: 250,
               allTimeTotalPracticeDuration: 250,
-              instructionQuestionResult: null,
             },
           },
           numQuestionsAnswered: 1,
@@ -368,7 +364,6 @@ describe('LearningSessionUnitEngine model practice updates', function() {
               trialsSinceLastSeen: 0,
               hasBeenIntroduced: true,
               otherPracticeTime: 0,
-              instructionQuestionResult: null,
             },
           },
           stimulusState: {
@@ -389,7 +384,6 @@ describe('LearningSessionUnitEngine model practice updates', function() {
               hasBeenIntroduced: true,
               timesSeen: 1,
               otherPracticeTime: 0,
-              instructionQuestionResult: null,
             },
           },
           responseState: {},

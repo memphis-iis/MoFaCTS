@@ -796,8 +796,6 @@ export function createHistoryRecord({
     'feedbackText': legacyTrim(feedbackText || ''),
     'feedbackType': getLoggedFeedbackType(testType, isCorrect, feedbackSuppressed),
 
-    'instructionQuestionResult': Session.get('instructionQuestionResult') || false,
-
     // Entry point
     'entryPoint': meteorUser?.loginParams?.entryPoint || '',
     'eventType': ''

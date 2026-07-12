@@ -28,7 +28,7 @@ export function detectTdfUnitType(unit: unknown): TdfUnitType | null {
   if (record.sparcsession && typeof record.sparcsession === 'object') {
     return 'sparc';
   }
-  if (record.unitinstructions || record.unitinstructionsquestion) {
+  if (record.unitinstructions) {
     return 'instructions';
   }
   return null;
