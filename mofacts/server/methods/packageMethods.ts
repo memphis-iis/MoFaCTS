@@ -8,6 +8,7 @@ import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
 import { mergeEditorContentPreservingSourceShape } from '../../common/lib/editorSaveShape';
 import { createPackageGeneratedContentMethods } from './packageGeneratedContentMethods';
 import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
+import { validateAndEncryptUploadedApiKey } from '../lib/uploadedApiKeyValidation';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -479,14 +480,26 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
           return results;
         }
         const setspec = jsonContents.tutor?.setspec;
-        if (setspec?.textToSpeechAPIKey) {
-          setspec.textToSpeechAPIKey = deps.encryptData(setspec.textToSpeechAPIKey);
+        if (setspec && Object.prototype.hasOwnProperty.call(setspec, 'textToSpeechAPIKey')) {
+          setspec.textToSpeechAPIKey = validateAndEncryptUploadedApiKey({
+            encryptData: deps.encryptData,
+            field: 'textToSpeechAPIKey',
+            value: setspec.textToSpeechAPIKey,
+          });
         }
-        if (setspec?.speechAPIKey) {
-          setspec.speechAPIKey = deps.encryptData(setspec.speechAPIKey);
+        if (setspec && Object.prototype.hasOwnProperty.call(setspec, 'speechAPIKey')) {
+          setspec.speechAPIKey = validateAndEncryptUploadedApiKey({
+            encryptData: deps.encryptData,
+            field: 'speechAPIKey',
+            value: setspec.speechAPIKey,
+          });
         }
-        if (setspec?.openRouterApiKey) {
-          setspec.openRouterApiKey = deps.encryptData(setspec.openRouterApiKey);
+        if (setspec && Object.prototype.hasOwnProperty.call(setspec, 'openRouterApiKey')) {
+          setspec.openRouterApiKey = validateAndEncryptUploadedApiKey({
+            encryptData: deps.encryptData,
+            field: 'openRouterApiKey',
+            value: setspec.openRouterApiKey,
+          });
         }
         const upsertResult = await upsertTDFFile(
           filename,
@@ -968,15 +981,27 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     const setspec = tdfContentToSave.tdfs?.tutor?.setspec;
     if (setspec) {
       if (apiKeyUpdates.speechAPIKey && setspec.speechAPIKey) {
-        setspec.speechAPIKey = deps.encryptData(setspec.speechAPIKey);
+        setspec.speechAPIKey = validateAndEncryptUploadedApiKey({
+          encryptData: deps.encryptData,
+          field: 'speechAPIKey',
+          value: setspec.speechAPIKey,
+        });
         deps.serverConsole('saveTdfContent: Encrypted new speechAPIKey');
       }
       if (apiKeyUpdates.textToSpeechAPIKey && setspec.textToSpeechAPIKey) {
-        setspec.textToSpeechAPIKey = deps.encryptData(setspec.textToSpeechAPIKey);
+        setspec.textToSpeechAPIKey = validateAndEncryptUploadedApiKey({
+          encryptData: deps.encryptData,
+          field: 'textToSpeechAPIKey',
+          value: setspec.textToSpeechAPIKey,
+        });
         deps.serverConsole('saveTdfContent: Encrypted new textToSpeechAPIKey');
       }
       if (apiKeyUpdates.openRouterApiKey && setspec.openRouterApiKey) {
-        setspec.openRouterApiKey = deps.encryptData(setspec.openRouterApiKey);
+        setspec.openRouterApiKey = validateAndEncryptUploadedApiKey({
+          encryptData: deps.encryptData,
+          field: 'openRouterApiKey',
+          value: setspec.openRouterApiKey,
+        });
         deps.serverConsole('saveTdfContent: Encrypted new openRouterApiKey');
       }
       if (Array.isArray(setspec.condition) && setspec.condition.length > 0) {

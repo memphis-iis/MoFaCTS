@@ -135,6 +135,15 @@ function resolveImageUrl(src: unknown, fallbackStimuliSetId: unknown = null): st
   });
 }
 
+export function resolvePreparedMediaPath(
+  preparedSource: unknown,
+  authoredSource: unknown,
+  stimuliSetId: unknown,
+  resolver: (source: unknown, scopedStimuliSetId: unknown) => string = resolveImageUrl,
+): string {
+  return resolver(firstNonEmptyString(preparedSource, authoredSource), stimuliSetId);
+}
+
 export function firstNonEmptyString(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === 'string') {
@@ -510,15 +519,9 @@ export function getPreparedCardDataFromSelection(
   const resolvedDisplay = {
     text: h5pOwnsPrompt ? '' : String(preparedDisplay.text ?? stim.display?.text ?? stim.text ?? stim.textStimulus ?? ''),
     clozeText: h5pOwnsPrompt ? '' : String(preparedDisplay.clozeText ?? stim.display?.clozeText ?? stim.clozeText ?? stim.clozeStimulus ?? ''),
-    imgSrc: typeof preparedDisplay.imgSrc === 'string' && preparedDisplay.imgSrc.trim().length > 0
-      ? preparedDisplay.imgSrc
-      : resolveImageUrl(rawImgSrc, stimScopedSetId),
-    videoSrc: typeof preparedDisplay.videoSrc === 'string' && preparedDisplay.videoSrc.trim().length > 0
-      ? preparedDisplay.videoSrc
-      : resolveImageUrl(rawVideoSrc, stimScopedSetId),
-    audioSrc: typeof preparedDisplay.audioSrc === 'string' && preparedDisplay.audioSrc.trim().length > 0
-      ? preparedDisplay.audioSrc
-      : resolveImageUrl(rawAudioSrc, stimScopedSetId),
+    imgSrc: resolvePreparedMediaPath(preparedDisplay.imgSrc, rawImgSrc, stimScopedSetId),
+    videoSrc: resolvePreparedMediaPath(preparedDisplay.videoSrc, rawVideoSrc, stimScopedSetId),
+    audioSrc: resolvePreparedMediaPath(preparedDisplay.audioSrc, rawAudioSrc, stimScopedSetId),
     ...(h5pDisplay ? { h5p: h5pDisplay } : {}),
     ...(displayAttribution ? { attribution: displayAttribution } : {}),
   };

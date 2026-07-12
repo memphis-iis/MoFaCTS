@@ -1,5 +1,6 @@
 import type { UploadedPackageFile } from './packageParser';
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
+import { validateAndEncryptUploadedApiKey } from './uploadedApiKeyValidation';
 import {
   failPackageUpload,
   getStimuliSetIdFromPackageResult,
@@ -93,14 +94,26 @@ export async function processParsedPackageTdfs(args: {
       );
       tdf.packageFile = packageFile;
 
-      if (tdfContents.tutor.setspec.textToSpeechAPIKey) {
-        tdfContents.tutor.setspec.textToSpeechAPIKey = deps.encryptData(tdfContents.tutor.setspec.textToSpeechAPIKey);
+      if (Object.prototype.hasOwnProperty.call(tdfContents.tutor.setspec, 'textToSpeechAPIKey')) {
+        tdfContents.tutor.setspec.textToSpeechAPIKey = validateAndEncryptUploadedApiKey({
+          encryptData: deps.encryptData,
+          field: 'textToSpeechAPIKey',
+          value: tdfContents.tutor.setspec.textToSpeechAPIKey,
+        });
       }
-      if (tdfContents.tutor.setspec.speechAPIKey) {
-        tdfContents.tutor.setspec.speechAPIKey = deps.encryptData(tdfContents.tutor.setspec.speechAPIKey);
+      if (Object.prototype.hasOwnProperty.call(tdfContents.tutor.setspec, 'speechAPIKey')) {
+        tdfContents.tutor.setspec.speechAPIKey = validateAndEncryptUploadedApiKey({
+          encryptData: deps.encryptData,
+          field: 'speechAPIKey',
+          value: tdfContents.tutor.setspec.speechAPIKey,
+        });
       }
-      if (tdfContents.tutor.setspec.openRouterApiKey) {
-        tdfContents.tutor.setspec.openRouterApiKey = deps.encryptData(tdfContents.tutor.setspec.openRouterApiKey);
+      if (Object.prototype.hasOwnProperty.call(tdfContents.tutor.setspec, 'openRouterApiKey')) {
+        tdfContents.tutor.setspec.openRouterApiKey = validateAndEncryptUploadedApiKey({
+          encryptData: deps.encryptData,
+          field: 'openRouterApiKey',
+          value: tdfContents.tutor.setspec.openRouterApiKey,
+        });
       }
       if (!isTeacherOrAdmin) {
         tdfContents.tutor.setspec.userselect = 'false';

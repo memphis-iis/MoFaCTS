@@ -16,6 +16,7 @@ type TdfLookupOptions = {
 };
 type TdfAccessDoc = {
   _id?: string;
+  tdfFileName?: string;
   ownerId?: string;
   accessors?: Array<{ userId?: string }>;
   content?: {
@@ -76,6 +77,7 @@ const TDF_ACCESS_FIELDS = {
   _id: 1,
   ownerId: 1,
   accessors: 1,
+  tdfFileName: 1,
   'content.fileName': 1,
   'content.tdfs.tutor.setspec.userselect': 1,
   'content.tdfs.tutor.setspec.experimentTarget': 1,
@@ -104,7 +106,8 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       {
         $or: [
           { _id: { $in: normalizedKeys } },
-          { 'content.fileName': { $in: normalizedKeys } }
+          { 'content.fileName': { $in: normalizedKeys } },
+          { tdfFileName: { $in: normalizedKeys } },
         ]
       },
       {
@@ -112,6 +115,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
           _id: 1,
           ownerId: 1,
           accessors: 1,
+          tdfFileName: 1,
           'content.fileName': 1
         }
       }
@@ -355,23 +359,46 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
   }
 
   async function getTdfByFileName(filename: string) {
-    try {
-      const tdf = await deps.Tdfs.findOneAsync({ 'content.fileName': filename });
-      if (!tdf) {
-        return null;
-      }
-      return tdf;
-    } catch (e: unknown) {
-      deps.serverConsole('getTdfByFileName ERROR,', filename, ',', e);
+    const normalizedFilename = typeof filename === 'string' ? filename.trim() : '';
+    if (!normalizedFilename) {
       return null;
     }
+    const matches = await deps.Tdfs.find({
+      $or: [
+        { 'content.fileName': normalizedFilename },
+        { tdfFileName: normalizedFilename },
+      ],
+    }).fetchAsync();
+    if (matches.length > 1) {
+      throw new Meteor.Error(
+        'duplicate-tdf-filename',
+        `More than one TDF uses the filename "${normalizedFilename}"; resolve the duplicate records before updating content.`,
+      );
+    }
+    return matches[0] ?? null;
   }
 
   async function getTdfAccessByFileName(filename: string) {
-    return await deps.Tdfs.findOneAsync(
-      { 'content.fileName': filename },
-      { fields: TDF_ACCESS_FIELDS }
-    );
+    const normalizedFilename = typeof filename === 'string' ? filename.trim() : '';
+    if (!normalizedFilename) {
+      return null;
+    }
+    const matches = await deps.Tdfs.find(
+      {
+        $or: [
+          { 'content.fileName': normalizedFilename },
+          { tdfFileName: normalizedFilename },
+        ],
+      },
+      { fields: TDF_ACCESS_FIELDS },
+    ).fetchAsync();
+    if (matches.length > 1) {
+      throw new Meteor.Error(
+        'duplicate-tdf-filename',
+        `More than one TDF uses the filename "${normalizedFilename}"; resolve the duplicate records before loading content.`,
+      );
+    }
+    return matches[0] ?? null;
   }
 
   async function userCanAccessContentUploadTdf(userId: string, tdf: TdfAccessDoc | null | undefined) {
@@ -404,6 +431,9 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       const fileName = tdf?.content?.fileName;
       if (fileName) {
         tdfByKey.set(fileName, tdf);
+      }
+      if (tdf?.tdfFileName) {
+        tdfByKey.set(tdf.tdfFileName, tdf);
       }
     }
 

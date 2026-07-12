@@ -620,6 +620,58 @@ describe('public TDF and stimulus method authorization', function() {
     }
   });
 
+  it('loads pre-canonical TDF records by their durable top-level filename', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'legacy-filename-tdf',
+      ownerId: 'owner-user',
+      stimuliSetId: 104,
+      tdfFileName: 'legacy-filename.json',
+      content: {
+        tdfs: { tutor: { setspec: { lessonname: 'Legacy Filename', userselect: 'true' } } },
+      },
+    });
+
+    const tdf = await (asyncMethods.getTdfByFileName as any).call(
+      { userId: 'owner-user' },
+      'legacy-filename.json',
+    );
+
+    expect(tdf._id).to.equal('legacy-filename-tdf');
+    expect(tdf.stimuliSetId).to.equal(104);
+  });
+
+  it('rejects ambiguous canonical and pre-canonical filename matches', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'legacy-duplicate-filename-tdf',
+      ownerId: 'owner-user',
+      stimuliSetId: 105,
+      tdfFileName: 'duplicate-filename.json',
+      content: {
+        tdfs: { tutor: { setspec: { lessonname: 'Legacy Duplicate', userselect: 'true' } } },
+      },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'canonical-duplicate-filename-tdf',
+      ownerId: 'owner-user',
+      stimuliSetId: 106,
+      tdfFileName: 'duplicate-filename.json',
+      content: {
+        fileName: 'duplicate-filename.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Canonical Duplicate', userselect: 'true' } } },
+      },
+    });
+
+    try {
+      await (asyncMethods.getTdfByFileName as any).call(
+        { userId: 'owner-user' },
+        'duplicate-filename.json',
+      );
+      expect.fail('Expected duplicate filename lookup to be rejected');
+    } catch (error: any) {
+      expect(error.error).to.equal('duplicate-tdf-filename');
+    }
+  });
+
   it('requires course context when an enrolled student loads condition children of an assigned root', async function() {
     await CoursesAny.insertAsync({
       _id: 'assigned-course',

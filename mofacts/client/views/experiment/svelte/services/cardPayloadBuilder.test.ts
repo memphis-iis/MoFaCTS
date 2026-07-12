@@ -7,6 +7,7 @@ import {
   getStimIncorrectResponses,
   normalizeButtonOptions,
   normalizeDisplayAttribution,
+  resolvePreparedMediaPath,
   resolveCardPayloadDeliverySettings,
   resolveStimMediaSource,
   shouldUseScheduleButtonTrial,
@@ -26,6 +27,25 @@ describe('card payload builder helpers', function() {
     expect(resolveStimMediaSource({
       audioStimulus: 'legacy.mp3',
     }, 'audio')).to.equal('legacy.mp3');
+  });
+
+  it('resolves prepared local media through the scoped asset boundary', function() {
+    const calls: Array<{ source: unknown; stimuliSetId: unknown }> = [];
+    const result = resolvePreparedMediaPath(
+      '_cotw-map-gd-1.webp',
+      'authored-map.webp',
+      3,
+      (source, stimuliSetId) => {
+        calls.push({ source, stimuliSetId });
+        return '/cdn/storage/Assets/map-asset/original/_cotw-map-gd-1.webp';
+      },
+    );
+
+    expect(calls).to.deep.equal([{
+      source: '_cotw-map-gd-1.webp',
+      stimuliSetId: 3,
+    }]);
+    expect(result).to.equal('/cdn/storage/Assets/map-asset/original/_cotw-map-gd-1.webp');
   });
 
   it('normalizes button options and incorrect responses', function() {
