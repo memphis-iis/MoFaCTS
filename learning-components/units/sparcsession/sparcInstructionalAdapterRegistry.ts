@@ -40,34 +40,6 @@ function numericSlot(fact: SparcWorkingMemoryFact, slot: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-function optionalNumericSlot(fact: SparcWorkingMemoryFact | undefined, slot: string): number | undefined {
-  const raw = fact?.slots?.[slot];
-  if (raw === undefined || raw === null || raw === '') return undefined;
-  const value = Number(raw);
-  if (!Number.isFinite(value)) throw new Error(`SPARC fact "${fact?.factType}" slot "${slot}" must be finite`);
-  return value;
-}
-
-function coverageThreshold(facts: readonly SparcWorkingMemoryFact[]): number {
-  return optionalNumericSlot(facts.find((fact) => fact.factType === 'dialogue.thresholds'), 'coverageThreshold')
-    ?? optionalNumericSlot(facts.find((fact) => fact.factType === 'controller.targetSelectionPolicy'), 'coverageThreshold')
-    ?? 0.8;
-}
-
-function repairActive(facts: readonly SparcWorkingMemoryFact[]): boolean {
-  const repairThreshold = 1 - coverageThreshold(facts);
-  const ids = new Set(facts
-    .filter((fact) => fact.factType === 'autotutor.misconception')
-    .map((fact) => stringSlot(fact, 'id'))
-    .filter((id): id is string => Boolean(id)));
-  const confidence = new Map<string, number>();
-  for (const fact of facts) {
-    const id = fact.factType === 'diagnostic.misconceptionScore' ? stringSlot(fact, 'id') : undefined;
-    if (id && ids.has(id)) confidence.set(id, numericSlot(fact, 'confidence'));
-  }
-  return [...confidence.values()].some((value) => value >= repairThreshold);
-}
-
 function selectedExpectationFact(clusterKC: string, facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact {
   const previous = facts.filter((fact) => fact.factType === 'learningTarget.selected').at(-1);
   const continues = stringSlot(previous, 'clusterKC') === clusterKC;
@@ -132,7 +104,7 @@ const autoTutorAdapter: SparcInstructionalAdapter = {
   deriveControllerFacts: deriveSparcControllerFacts,
   selectTarget({ facts, options }) {
     const completion = facts.find((fact) => fact.factType === 'controller.completionState');
-    if (completion?.slots?.completed === true && !repairActive(facts)) return completionSelection(facts);
+    if (completion?.slots?.completed === true) return completionSelection(facts);
     return selectSparcLearningTargetFromFacts(facts, options);
   },
   instantiateInstructionalFacts: instantiateSparcAutoTutorInstructionalFacts,

@@ -230,11 +230,8 @@ function createStableControllerStateWrites(params: {
   }));
 }
 
-function completedState(planning: SparcControllerTurnPlanningResult): boolean {
-  return planning.derivedFacts.some((fact) => (
-    fact.factType === 'controller.completionState'
-    && fact.slots?.completed === true
-  ));
+function terminalSummarySelected(request: SparcUtteranceRequest): boolean {
+  return request.targetType === 'completion' && request.action === 'summary';
 }
 
 function createCompletedDialogueControlWrites(params: {
@@ -301,6 +298,7 @@ export async function evaluateSparcControllerDialogueTurn(params: {
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
   readonly event: SparcInterfaceEvent;
+  readonly problemStatement: string;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
   readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
@@ -309,13 +307,24 @@ export async function evaluateSparcControllerDialogueTurn(params: {
   readonly dialogueNodeOptions?: SparcDialogueTurnNodeOptions;
 }): Promise<SparcControllerDialogueTurnResult> {
   assertCompletedDialogueReplayState(params.replayState);
-  const learnerResponseScoreFacts = createLearnerResponseScoreFacts(params);
+  const problemStatement = requireNonBlank(params.problemStatement, 'SPARC dialogue problem statement');
+  const turnFacts = [
+    ...(params.extraFacts ?? []),
+    {
+      factType: 'dialogue.problemStatement',
+      slots: { text: problemStatement },
+    },
+  ];
+  const learnerResponseScoreFacts = createLearnerResponseScoreFacts({
+    ...params,
+    extraFacts: turnFacts,
+  });
   const planning = evaluateSparcControllerTurnPlanning({
     document: params.document,
     ...(params.replayState ? { replayState: params.replayState } : {}),
     event: params.event,
     extraFacts: [
-      ...(params.extraFacts ?? []),
+      ...turnFacts,
       ...learnerResponseScoreFacts,
     ],
     ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
@@ -360,7 +369,7 @@ export async function evaluateSparcControllerDialogueTurn(params: {
         event: params.event,
         planning,
       }),
-      ...(completedState(planning)
+      ...(terminalSummarySelected(utteranceRequest)
         ? createCompletedDialogueControlWrites({
             document: params.document,
             event: params.event,
@@ -384,6 +393,7 @@ export async function commitSparcControllerDialogueTurn(params: {
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
   readonly event: SparcInterfaceEvent;
+  readonly problemStatement: string;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
   readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;

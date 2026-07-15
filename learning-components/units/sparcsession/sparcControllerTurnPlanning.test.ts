@@ -85,4 +85,19 @@ describe('evaluateSparcControllerTurnPlanning', function() {
     assert.equal(selectedAction(result)?.slots?.action, 'summary');
     assert.equal(selectedAction(result)?.slots?.targetType, 'completion');
   });
+
+  it('selects the terminal summary at the total turn limit even with an active misconception', function() {
+    const result = evaluateSparcControllerTurnPlanning({
+      document: document([
+        fact('dialogue.graduation', { requiredTargetCount: 1, maxActiveMisconceptions: 0, maxTurns: 1 }),
+        fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+      ]),
+      event,
+    });
+
+    assert.equal(selectedAction(result)?.slots?.action, 'summary');
+    assert.equal(selectedAction(result)?.slots?.targetType, 'completion');
+    assert.equal(result.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.reason, 'max-turns');
+  });
 });

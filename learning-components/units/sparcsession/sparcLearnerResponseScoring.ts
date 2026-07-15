@@ -10,16 +10,11 @@ import type {
 export type SparcLearningTargetScoreInput = {
   readonly clusterKC: string;
   readonly coverage: number;
-  readonly addressed: boolean;
-  readonly evidence?: string;
-  readonly missingElements?: readonly string[];
 };
 
 export type SparcDiagnosticMisconceptionScoreInput = {
   readonly id: string;
   readonly confidence: number;
-  readonly addressed: boolean;
-  readonly evidence?: string;
 };
 
 export type SparcLearnerResponseScoringResult = {
@@ -31,7 +26,7 @@ export type SparcLearnerResponseScoringResult = {
     readonly streakCount?: number;
   };
   readonly learnerQuestion?: {
-    readonly answerableFromAuthoredContent: boolean;
+    readonly contentFocused: boolean;
   };
 };
 
@@ -51,13 +46,6 @@ function requireUnitScore(value: unknown, label: string): number {
   return numberValue;
 }
 
-function requireBoolean(value: unknown, label: string): boolean {
-  if (typeof value !== 'boolean') {
-    throw new Error(`${label} must be a boolean`);
-  }
-  return value;
-}
-
 function stringSlot(fact: SparcWorkingMemoryFact, slotName: string): string {
   const value = fact.slots?.[slotName];
   return typeof value === 'string' && value.trim() ? value.trim() : '';
@@ -65,11 +53,21 @@ function stringSlot(fact: SparcWorkingMemoryFact, slotName: string): string {
 
 function knownLearningTargetClusterKcs(facts: readonly SparcWorkingMemoryFact[]): Set<string> {
   return new Set(facts.flatMap((fact) => {
-    if (fact.factType !== 'autotutor.expectation' && fact.factType !== 'learningTarget.score') {
+    if (fact.factType !== 'autotutor.expectation') {
       return [];
     }
     const clusterKC = stringSlot(fact, 'clusterKC');
     return clusterKC ? [clusterKC] : [];
+  }));
+}
+
+function knownMisconceptionIds(facts: readonly SparcWorkingMemoryFact[]): Set<string> {
+  return new Set(facts.flatMap((fact) => {
+    if (fact.factType !== 'autotutor.misconception') {
+      return [];
+    }
+    const id = stringSlot(fact, 'id');
+    return id ? [id] : [];
   }));
 }
 
@@ -89,6 +87,24 @@ function previousLearningTargetCoverage(facts: readonly SparcWorkingMemoryFact[]
   return scores;
 }
 
+function previousMisconceptionConfidence(facts: readonly SparcWorkingMemoryFact[]): Map<string, number> {
+  const scores = new Map<string, number>();
+  for (const fact of facts) {
+    if (fact.factType !== 'diagnostic.misconceptionScore') {
+      continue;
+    }
+    const id = stringSlot(fact, 'id');
+    if (!id) {
+      continue;
+    }
+    scores.set(id, requireUnitScore(
+      fact.slots?.confidence,
+      `SPARC prior diagnostic.misconceptionScore "${id}" confidence`,
+    ));
+  }
+  return scores;
+}
+
 function learningTargetScoreFact(params: {
   readonly input: SparcLearningTargetScoreInput;
   readonly priorCoverage: number;
@@ -103,9 +119,6 @@ function learningTargetScoreFact(params: {
     slots: {
       clusterKC,
       coverage,
-      addressed: requireBoolean(params.input.addressed, `SPARC learning target score "${clusterKC}" addressed`),
-      ...(params.input.evidence ? { evidence: params.input.evidence } : {}),
-      ...(params.input.missingElements ? { missingElements: params.input.missingElements } : {}),
     },
   };
 }
@@ -117,10 +130,28 @@ function misconceptionScoreFact(input: SparcDiagnosticMisconceptionScoreInput): 
     slots: {
       id,
       confidence: requireUnitScore(input.confidence, `SPARC diagnostic misconception score "${id}" confidence`),
-      addressed: requireBoolean(input.addressed, `SPARC diagnostic misconception score "${id}" addressed`),
-      ...(input.evidence ? { evidence: input.evidence } : {}),
     },
   };
+}
+
+function uniqueUpdatesById<T>(params: {
+  readonly inputs: readonly T[];
+  readonly identity: (input: T) => string;
+  readonly knownIds: ReadonlySet<string>;
+  readonly label: string;
+}): Map<string, T> {
+  const updates = new Map<string, T>();
+  for (const input of params.inputs) {
+    const id = requireNonBlank(params.identity(input), `${params.label} id`);
+    if (!params.knownIds.has(id)) {
+      throw new Error(`SPARC learner-response score references unknown ${params.label} "${id}"`);
+    }
+    if (updates.has(id)) {
+      throw new Error(`SPARC learner-response score contains duplicate ${params.label} "${id}"`);
+    }
+    updates.set(id, input);
+  }
+  return updates;
 }
 
 export function createSparcLearnerResponseScoreFacts(params: {
@@ -128,20 +159,38 @@ export function createSparcLearnerResponseScoreFacts(params: {
   readonly score: SparcLearnerResponseScoringResult;
 }): readonly SparcWorkingMemoryFact[] {
   const knownClusterKcs = knownLearningTargetClusterKcs(params.facts);
+  const knownMisconceptions = knownMisconceptionIds(params.facts);
   const previousCoverage = previousLearningTargetCoverage(params.facts);
+  const previousConfidence = previousMisconceptionConfidence(params.facts);
   const scoredFacts: SparcWorkingMemoryFact[] = [];
   const contributionType = params.score.learnerContribution?.type;
-  for (const input of params.score.learningTargetScores ?? []) {
-    const clusterKC = requireNonBlank(input.clusterKC, 'SPARC learning target score clusterKC');
-    if (!knownClusterKcs.has(clusterKC)) {
-      throw new Error(`SPARC learner-response score references unknown learning target clusterKC "${clusterKC}"`);
-    }
+  const learningTargetUpdates = uniqueUpdatesById({
+    inputs: params.score.learningTargetScores ?? [],
+    identity: (input) => input.clusterKC,
+    knownIds: knownClusterKcs,
+    label: 'learning target clusterKC',
+  });
+  const misconceptionUpdates = uniqueUpdatesById({
+    inputs: params.score.diagnosticMisconceptionScores ?? [],
+    identity: (input) => input.id,
+    knownIds: knownMisconceptions,
+    label: 'diagnostic misconception id',
+  });
+  for (const clusterKC of knownClusterKcs) {
+    const input = learningTargetUpdates.get(clusterKC) ?? {
+      clusterKC,
+      coverage: previousCoverage.get(clusterKC) ?? 0,
+    };
     scoredFacts.push(learningTargetScoreFact({
       input,
       priorCoverage: previousCoverage.get(clusterKC) ?? 0,
     }));
   }
-  for (const input of params.score.diagnosticMisconceptionScores ?? []) {
+  for (const id of knownMisconceptions) {
+    const input = misconceptionUpdates.get(id) ?? {
+      id,
+      confidence: previousConfidence.get(id) ?? 0,
+    };
     scoredFacts.push(misconceptionScoreFact(input));
   }
   if (params.score.learnerContribution) {
@@ -170,7 +219,7 @@ export function createSparcLearnerResponseScoreFacts(params: {
     scoredFacts.push({
       factType: 'dialogue.learnerQuestion',
       slots: {
-        answerableFromAuthoredContent: params.score.learnerQuestion.answerableFromAuthoredContent,
+        contentFocused: params.score.learnerQuestion.contentFocused,
       },
     });
   }
@@ -195,11 +244,13 @@ export function createSparcLearnerResponseScoreStateWrites(params: {
   readonly target: SparcStateWrite['target'];
   readonly facts: readonly SparcWorkingMemoryFact[];
 }): readonly SparcStateWrite[] {
-  return params.facts.map((fact) => createSparcStableWorkingMemoryFactStateWrite({
-    target: params.target,
-    fact,
-    identitySlots: stableIdentitySlots(fact),
-  }));
+  return params.facts
+    .filter((fact) => fact.factType !== 'dialogue.learnerQuestion')
+    .map((fact) => createSparcStableWorkingMemoryFactStateWrite({
+      target: params.target,
+      fact,
+      identitySlots: stableIdentitySlots(fact),
+    }));
 }
 
 export function createSparcLearnerResponseScoreTransition(params: {

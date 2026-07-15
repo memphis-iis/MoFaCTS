@@ -43,6 +43,7 @@ import { assertCanonicalSparcProgressiveScaffoldingRules } from './sparcProgress
 
 type DisplayNodeRecord = {
   readonly id?: unknown;
+  readonly value?: unknown;
   readonly nodeType?: unknown;
   readonly atomType?: unknown;
   readonly children?: unknown;
@@ -86,6 +87,7 @@ export type SparcTrialDisplayDialogueTurnScorer = (params: {
   readonly display: SparcTrialDisplay;
   readonly result: SparcTrialResult;
   readonly event: SparcInterfaceEvent;
+  readonly problemStatement: string;
   readonly learnerText: string;
   readonly replayState: SparcReplayState;
 }) => Promise<SparcLearnerResponseScoringResult> | SparcLearnerResponseScoringResult;
@@ -450,6 +452,14 @@ function collectDisplayNodesById(nodes: readonly unknown[] | undefined, nodesByI
   return nodesById;
 }
 
+function requireSparcDialogueProblemStatement(display: SparcTrialDisplay): string {
+  const opening = collectDisplayNodesById(display.nodes).get('opening-tutor-message');
+  return requireNonBlank(
+    opening?.value,
+    'SPARC AutoTutor opening-tutor-message.value problem statement',
+  );
+}
+
 function nodeIsAnswerable(node: DisplayNodeRecord | undefined): boolean {
   switch (node?.atomType) {
     case 'text-input':
@@ -685,11 +695,13 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
     display: params.display,
     result: params.result,
   });
+  const problemStatement = requireSparcDialogueProblemStatement(params.display);
   const learnerResponseScore = await params.scoreLearnerResponse({
     document,
     display: params.display,
     result: params.result,
     event,
+    problemStatement,
     learnerText,
     replayState,
   });
@@ -698,6 +710,7 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
     document,
     replayState,
     event,
+    problemStatement,
     learnerResponseScore,
     ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
     ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),

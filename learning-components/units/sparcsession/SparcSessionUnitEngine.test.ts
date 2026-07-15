@@ -1006,6 +1006,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
         userId: 'user-1',
       },
       document: sampleDialogueControllerDocument(),
+      problemStatement: 'Explain how A and B are related.',
       event: {
         eventId: 'event-dialogue',
         type: 'response-submitted',

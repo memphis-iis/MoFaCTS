@@ -20,6 +20,78 @@ describe('SPARC move definitions', function() {
     assert.ok(hint.promptPolicy.includes('clue'));
   });
 
+  it('preserves the seven active move identities and metadata', function() {
+    const expectedMoveIds = [
+      'question-deferral',
+      'question-scope-refusal',
+      'pump',
+      'prompt',
+      'hint',
+      'assertion',
+      'summary',
+    ];
+
+    assert.deepEqual(
+      SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS.map((definition) => definition.moveId),
+      expectedMoveIds,
+    );
+    for (const definition of SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS) {
+      assert.equal(definition.version, 'v1');
+      assert.equal(definition.family, 'autotutor-dialogue');
+      assert.equal(definition.status, 'active');
+      assert.equal(definition.promptId, `autotutor.${definition.moveId}`);
+      assert.equal(definition.promptVersion, 'v1');
+      assert.equal(definition.outputSchemaId, 'autotutor.chat_utterance');
+      assert.equal(definition.outputSchemaVersion, 'v1');
+      assert.equal(definition.renderer, 'sparc.dialogue_utterance');
+      assert.equal(definition.historyAction, 'sparc-dialogue-turn');
+    }
+  });
+
+  it('uses ordered plain-text prompt policies with the learner-language boundary', function() {
+    for (const definition of SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS) {
+      const lines = definition.promptPolicy.split('\n');
+      lines.forEach((line, index) => {
+        assert.match(line, new RegExp(`^${index + 1}\\. `));
+      });
+      assert.ok(definition.promptPolicy.includes(
+        'Do not present rubric language as something the learner said, meant, believed, or knew.',
+      ));
+      assert.doesNotMatch(definition.promptPolicy, /\*\*|`|<br>|\|/i);
+    }
+  });
+
+  it('defines target-specific execution in every scaffold move', function() {
+    for (const moveId of ['pump', 'prompt', 'hint', 'assertion']) {
+      const policy = requireActiveSparcMoveDefinition(moveId).promptPolicy;
+      assert.ok(policy.includes('If targetType is learningTarget'));
+      assert.ok(policy.includes('If targetType is misconception'));
+      assert.ok(policy.includes(
+        'Do not describe repetition or endorsement of an active misconception as progress, closeness, or a good start.',
+      ));
+    }
+  });
+
+  it('defines separate legitimate-question and scope-boundary moves', function() {
+    const deferral = requireActiveSparcMoveDefinition('question-deferral').promptPolicy;
+    const refusal = requireActiveSparcMoveDefinition('question-scope-refusal').promptPolicy;
+
+    assert.ok(deferral.includes('Do not answer the question or reveal the target content'));
+    assert.ok(deferral.includes('work with the problem a little longer'));
+    assert.ok(refusal.includes('cannot discuss that subject'));
+    assert.ok(refusal.includes('rude, lewd, illicit'));
+  });
+
+  it('gives summary completion-specific trajectory instructions', function() {
+    const policy = requireActiveSparcMoveDefinition('summary').promptPolicy;
+
+    assert.ok(policy.includes('Because targetType is completion'));
+    assert.ok(policy.includes('correct expectations the learner established'));
+    assert.ok(policy.includes('misconception repairs the learner completed'));
+    assert.ok(policy.includes('repaired misconceptions from unresolved misconceptions'));
+    assert.ok(policy.includes('If the reason is max-turns'));
+  });
+
   it('does not register retired SPARC move primitives', function() {
     const retiredMoveIds = [
       'positive_pump',

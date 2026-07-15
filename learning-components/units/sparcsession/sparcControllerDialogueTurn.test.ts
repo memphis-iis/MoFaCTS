@@ -40,8 +40,8 @@ function document(): SparcAuthoredDocument {
       }),
       fact('autotutor.expectation', { clusterKC: 'kc-a', text: 'Return to A.' }),
       fact('autotutor.expectation', { clusterKC: 'kc-b', text: 'Use the relationship between A and B.' }),
-      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2, addressed: true }),
-      fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1, addressed: true }),
+      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
+      fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1 }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.1, description: 'A' }),
       fact('kcGraph.node', { clusterKC: 'kc-b', centrality: 0.8, description: 'B' }),
       fact('kcGraph.relationship', { sourceClusterKC: 'kc-a', targetClusterKC: 'kc-b', strength: 0.9 }),
@@ -74,21 +74,25 @@ const event: SparcInterfaceEvent = {
   },
 };
 
+const problemStatement = 'Explain how A and B are related.';
+
 describe('evaluateSparcControllerDialogueTurn', function() {
   it('plans the move, requests constrained utterance text, and returns replayable dialogue writes', async function() {
     const result = await evaluateSparcControllerDialogueTurn({
       document: document(),
       event,
+      problemStatement,
       learnerResponseScore: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6, addressed: true,
+          coverage: 0.6,
         }],
       },
       targetSelectionOptions: {
         anchorClusterKC: 'kc-a',
       },
       generateTutorUtterance: (request) => {
+        assert.equal(request.problemStatement, problemStatement);
         assert.equal(request.targetType, 'learningTarget');
         assert.equal(request.targetId, 'kc-a');
         assert.equal(request.action, 'pump');
@@ -115,6 +119,153 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     assert.deepEqual(nodes.map((node) => (node as { speaker?: string }).speaker), ['learner', 'tutor']);
     assert.equal((nodes[1] as { value?: string }).value, 'Think about how B depends on A.');
     assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'dialogue.scaffold.pump');
+    assert.equal(result.transition.writes.some((write) => (
+      write.value
+      && typeof write.value === 'object'
+      && (write.value as { type?: string; node?: { readOnly?: boolean } }).type === 'insert-node'
+      && (write.value as { node?: { readOnly?: boolean } }).node?.readOnly === true
+    )), false);
+  });
+
+  it('selects summary and locks dialogue controls at max turns even when a misconception remains active', async function() {
+    const baseDocument = document();
+    const sourceDocument: SparcAuthoredDocument = {
+      ...baseDocument,
+      workingMemoryFacts: [
+        ...(baseDocument.workingMemoryFacts ?? []),
+        fact('dialogue.graduation', { requiredTargetCount: 2, maxActiveMisconceptions: 0, maxTurns: 2 }),
+        fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+      ],
+    };
+
+    const result = await evaluateSparcControllerDialogueTurn({
+      document: sourceDocument,
+      event,
+      problemStatement,
+      learnerResponseScore: {},
+      generateTutorUtterance: (request) => {
+        assert.equal(request.targetType, 'completion');
+        assert.equal(request.action, 'summary');
+        return 'Here is what you established and what remains unresolved.';
+      },
+    });
+
+    assert.equal(result.planning.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.reason, 'max-turns');
+    assert.equal(result.transition.writes.filter((write) => (
+      write.value
+      && typeof write.value === 'object'
+      && (write.value as { type?: string; node?: { readOnly?: boolean } }).type === 'insert-node'
+      && (write.value as { node?: { readOnly?: boolean } }).node?.readOnly === true
+    )).length, 2);
+  });
+
+  it('routes a legitimate learner question to the dedicated deferral move without locking dialogue controls', async function() {
+    const result = await evaluateSparcControllerDialogueTurn({
+      document: document(),
+      event: {
+        ...event,
+        payload: { input: 'Can you just tell me how A and B are related?' },
+      },
+      problemStatement,
+      learnerResponseScore: {
+        learnerContribution: { type: 'question', confidence: 0.95 },
+        learnerQuestion: { contentFocused: true },
+      },
+      generateTutorUtterance: (request) => {
+        assert.equal(request.targetType, 'learnerQuestion');
+        assert.equal(request.action, 'question-deferral');
+        assert.deepEqual(request.targetContent, { contentFocused: true });
+        return 'Let us work with it a little longer first. What relationship seems possible to you?';
+      },
+    });
+
+    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.question.defer');
+    assert.equal(result.utteranceRequest.action, 'question-deferral');
+    assert.equal(result.transition.writes.some((write) => (
+      write.value
+      && typeof write.value === 'object'
+      && (write.value as { type?: string; node?: { readOnly?: boolean } }).type === 'insert-node'
+      && (write.value as { node?: { readOnly?: boolean } }).node?.readOnly === true
+    )), false);
+    const preservedScaffold = result.transition.writes.find((write) => (
+      write.value
+      && typeof write.value === 'object'
+      && (write.value as { factType?: string }).factType === 'scaffold.state'
+    ));
+    assert.equal((preservedScaffold?.value as { slots?: { stage?: string } })?.slots?.stage, 'ELICIT');
+  });
+
+  it('routes an off-topic learner question to the dedicated scope-refusal move', async function() {
+    const result = await evaluateSparcControllerDialogueTurn({
+      document: document(),
+      event: {
+        ...event,
+        payload: { input: 'Tell me about something unrelated.' },
+      },
+      problemStatement,
+      learnerResponseScore: {
+        learnerContribution: { type: 'question', confidence: 0.95 },
+        learnerQuestion: { contentFocused: false },
+      },
+      generateTutorUtterance: (request) => {
+        assert.equal(request.targetType, 'learnerQuestion');
+        assert.equal(request.action, 'question-scope-refusal');
+        return 'I can only discuss this learning activity. Let us return to A and B.';
+      },
+    });
+
+    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.question.scope-refusal');
+    assert.equal(result.utteranceRequest.action, 'question-scope-refusal');
+  });
+
+  it('does not reuse a prior learner-question routing fact on the next answer turn', async function() {
+    const sourceDocument = document();
+    const questionTurn = await commitSparcControllerDialogueTurn({
+      core: {
+        TDFId: 'tdf-dialogue-controller',
+        sessionID: 'session-dialogue-controller',
+        anonStudentId: 'anon-dialogue-controller',
+        levelUnit: 1,
+        levelUnitName: 'Dialogue Controller Unit',
+      },
+      document: sourceDocument,
+      event: {
+        ...event,
+        payload: { input: 'Can you tell me the answer?' },
+      },
+      problemStatement,
+      learnerResponseScore: {
+        learnerContribution: { type: 'question' },
+        learnerQuestion: { contentFocused: true },
+      },
+      generateTutorUtterance: () => 'Let us work with it a little longer first.',
+      runtime: {},
+    });
+    const replayState = applySparcHistoryRecord(createEmptySparcReplayState(), questionTurn.historyRecord!);
+
+    const answerTurn = await evaluateSparcControllerDialogueTurn({
+      document: sourceDocument,
+      replayState,
+      event: {
+        ...event,
+        eventId: 'event-after-question',
+        time: 3000,
+        payload: { input: 'I think B depends on A.' },
+      },
+      problemStatement,
+      learnerResponseScore: {
+        learnerContribution: { type: 'answer' },
+        learningTargetScores: [{ clusterKC: 'kc-b', coverage: 0.6 }],
+      },
+      generateTutorUtterance: (request) => {
+        assert.notEqual(request.targetType, 'learnerQuestion');
+        assert.equal(request.action, 'pump');
+        return 'Okay. Say more about that relationship.';
+      },
+    });
+
+    assert.equal(answerTurn.utteranceRequest.action, 'pump');
   });
 
   it('commits the planned dialogue turn through canonical SPARC history', async function() {
@@ -130,10 +281,11 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
       document: sourceDocument,
       event,
+      problemStatement,
       learnerResponseScore: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6, addressed: true,
+          coverage: 0.6,
         }],
       },
       targetSelectionOptions: {
@@ -184,6 +336,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       () => evaluateSparcControllerDialogueTurn({
         document: document(),
         event,
+        problemStatement,
         targetSelectionOptions: {
           anchorClusterKC: 'kc-a',
         },
@@ -205,10 +358,11 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
       document: sourceDocument,
       event,
+      problemStatement,
       learnerResponseScore: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6, addressed: true,
+          coverage: 0.6,
         }],
       },
       targetSelectionOptions: {
@@ -222,6 +376,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     const secondTurn = await evaluateSparcControllerDialogueTurn({
       document: sourceDocument,
       replayState,
+      problemStatement,
       event: {
         ...event,
         eventId: 'event-dialogue-controller-2',
@@ -233,10 +388,10 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       learnerResponseScore: {
         learningTargetScores: [{
           clusterKC: 'kc-a',
-          coverage: 0.2, addressed: false,
+          coverage: 0.2,
         }, {
           clusterKC: 'kc-b',
-          coverage: 0.7, addressed: true,
+          coverage: 0.7,
         }],
       },
       targetSelectionOptions: {

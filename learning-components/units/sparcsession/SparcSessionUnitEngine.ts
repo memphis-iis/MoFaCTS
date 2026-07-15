@@ -404,6 +404,7 @@ export type SparcControllerDialogueTurnRuntimeParams = {
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
   readonly event: SparcInterfaceEvent;
+  readonly problemStatement: string;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
   readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
@@ -525,6 +526,7 @@ export async function createSparcSessionUnitEngine(
         document: params.document,
         ...(params.replayState ? { replayState: params.replayState } : {}),
         event: params.event,
+        problemStatement: params.problemStatement,
         ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
         ...(params.learnerResponseScore ? { learnerResponseScore: params.learnerResponseScore } : {}),
         ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),

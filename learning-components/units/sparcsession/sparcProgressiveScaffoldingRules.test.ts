@@ -10,7 +10,6 @@ function fact(factType: string, slots: Record<string, unknown> = {}): SparcWorki
 
 function facts(params: {
   stage: string;
-  addressed?: boolean;
   madeProgress?: boolean;
   completed?: boolean;
 }): SparcWorkingMemoryFact[] {
@@ -26,13 +25,13 @@ function facts(params: {
       targetKey: 'expectation:kc-a',
       focusEpisodeId: 'episode-1',
       stage: params.stage,
+      lastAction: params.stage.toLowerCase(),
     }),
     fact('controller.completionState', { completed: params.completed === true }),
   ];
-  if (params.addressed !== undefined && params.madeProgress !== undefined) {
+  if (params.madeProgress !== undefined) {
     result.push(fact('learningObservation.targetProgress', {
       targetKey: 'expectation:kc-a',
-      addressed: params.addressed,
       madeProgress: params.madeProgress,
       newlyResolved: false,
     }));
@@ -55,24 +54,38 @@ function selectedAction(inputFacts: readonly SparcWorkingMemoryFact[]): string {
 describe('SPARC progressive scaffolding productions', function() {
   it('selects the four no-progress stages without relying on salience', function() {
     assert.equal(selectedAction(facts({ stage: 'ELICIT' })), 'pump');
-    assert.equal(selectedAction(facts({ stage: 'PUMP', addressed: true, madeProgress: false })), 'prompt');
-    assert.equal(selectedAction(facts({ stage: 'PROMPT', addressed: true, madeProgress: false })), 'hint');
-    assert.equal(selectedAction(facts({ stage: 'HINT', addressed: true, madeProgress: false })), 'assertion');
+    assert.equal(selectedAction(facts({ stage: 'PUMP', madeProgress: false })), 'prompt');
+    assert.equal(selectedAction(facts({ stage: 'PROMPT', madeProgress: false })), 'hint');
+    assert.equal(selectedAction(facts({ stage: 'HINT', madeProgress: false })), 'assertion');
   });
 
   it('de-escalates progress and cycles post-assertion failure to pump', function() {
-    assert.equal(selectedAction(facts({ stage: 'HINT', addressed: true, madeProgress: true })), 'pump');
-    assert.equal(selectedAction(facts({ stage: 'ASSERTION', addressed: true, madeProgress: false })), 'pump');
-  });
-
-  it('holds the current scaffold on a non-addressing response', function() {
-    assert.equal(selectedAction(facts({ stage: 'PUMP', addressed: false, madeProgress: false })), 'pump');
-    assert.equal(selectedAction(facts({ stage: 'PROMPT', addressed: false, madeProgress: false })), 'prompt');
-    assert.equal(selectedAction(facts({ stage: 'HINT', addressed: false, madeProgress: false })), 'hint');
-    assert.equal(selectedAction(facts({ stage: 'ASSERTION', addressed: false, madeProgress: false })), 'assertion');
+    assert.equal(selectedAction(facts({ stage: 'HINT', madeProgress: true })), 'pump');
+    assert.equal(selectedAction(facts({ stage: 'ASSERTION', madeProgress: false })), 'pump');
   });
 
   it('selects summary independently at completion', function() {
     assert.equal(selectedAction(facts({ stage: 'ASSERTION', completed: true })), 'summary');
+  });
+
+  it('defers legitimate content questions without advancing the scaffold', function() {
+    assert.equal(selectedAction([
+      ...facts({ stage: 'PROMPT', madeProgress: false }),
+      fact('dialogue.learnerQuestion', { contentFocused: true }),
+    ]), 'question-deferral');
+  });
+
+  it('declines off-topic or inappropriate questions without advancing the scaffold', function() {
+    assert.equal(selectedAction([
+      ...facts({ stage: 'PROMPT', madeProgress: false }),
+      fact('dialogue.learnerQuestion', { contentFocused: false }),
+    ]), 'question-scope-refusal');
+  });
+
+  it('keeps terminal completion ahead of learner-question handling', function() {
+    assert.equal(selectedAction([
+      ...facts({ stage: 'ASSERTION', completed: true }),
+      fact('dialogue.learnerQuestion', { contentFocused: true }),
+    ]), 'summary');
   });
 });

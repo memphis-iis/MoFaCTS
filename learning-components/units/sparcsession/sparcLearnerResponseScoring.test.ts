@@ -21,8 +21,10 @@ const document: SparcAuthoredDocument = {
   workingMemoryFacts: [
     fact('autotutor.expectation', { clusterKC: 'kc-a' }),
     fact('autotutor.expectation', { clusterKC: 'kc-b' }),
-    fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4, addressed: true }),
-    fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1, addressed: true }),
+    fact('autotutor.misconception', { id: 'm1' }),
+    fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
+    fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1 }),
+    fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.2 }),
   ],
   root: {
     id: 'root',
@@ -54,15 +56,14 @@ describe('sparcLearnerResponseScoring', function() {
       score: {
         learningTargetScores: [{
           clusterKC: 'kc-a',
-          coverage: 0.3, addressed: true,
-          evidence: 'Partial evidence.',
+          coverage: 0.3,
         }, {
           clusterKC: 'kc-b',
-          coverage: 0.6, addressed: true,
+          coverage: 0.6,
         }],
         diagnosticMisconceptionScores: [{
           id: 'm1',
-          confidence: 0.7, addressed: true,
+          confidence: 0.7,
         }],
         learnerContribution: {
           type: 'answer',
@@ -70,7 +71,7 @@ describe('sparcLearnerResponseScoring', function() {
           streakCount: 1,
         },
         learnerQuestion: {
-          answerableFromAuthoredContent: false,
+          contentFocused: false,
         },
       },
     });
@@ -93,6 +94,22 @@ describe('sparcLearnerResponseScoring', function() {
     assert.equal(facts.some((entry) => entry.factType === 'dialogue.learnerQuestion'), false);
   });
 
+  it('preserves durable target scores when the scorer omits an update', function() {
+    const facts = createSparcLearnerResponseScoreFacts({
+      facts: document.workingMemoryFacts ?? [],
+      score: {
+        learningTargetScores: [{
+          clusterKC: 'kc-b',
+          coverage: 0.2,
+        }],
+      },
+    });
+
+    assert.equal(facts.find((entry) => entry.slots?.clusterKC === 'kc-a')?.slots?.coverage, 0.4);
+    assert.equal(facts.find((entry) => entry.slots?.clusterKC === 'kc-b')?.slots?.coverage, 0.2);
+    assert.equal(facts.find((entry) => entry.slots?.id === 'm1')?.slots?.confidence, 0.2);
+  });
+
   it('stores learner question metadata only for question contributions', function() {
     const facts = createSparcLearnerResponseScoreFacts({
       facts: document.workingMemoryFacts ?? [],
@@ -102,14 +119,14 @@ describe('sparcLearnerResponseScoring', function() {
           confidence: 0.9,
         },
         learnerQuestion: {
-          answerableFromAuthoredContent: true,
+          contentFocused: true,
         },
       },
     });
 
     assert.ok(facts.some((entry) => (
       entry.factType === 'dialogue.learnerQuestion'
-      && entry.slots?.answerableFromAuthoredContent === true
+      && entry.slots?.contentFocused === true
     )));
   });
 
@@ -135,7 +152,7 @@ describe('sparcLearnerResponseScoring', function() {
       score: {
         learningTargetScores: [{
           clusterKC: 'kc-b',
-          coverage: 0.6, addressed: true,
+          coverage: 0.6,
         }],
       },
     });
@@ -159,11 +176,70 @@ describe('sparcLearnerResponseScoring', function() {
         score: {
           learningTargetScores: [{
             clusterKC: 'kc-missing',
-            coverage: 0.5, addressed: true,
+            coverage: 0.5,
           }],
         },
       }),
       /unknown learning target clusterKC "kc-missing"/,
+    );
+  });
+
+  it('uses learner question metadata only as a current-turn routing fact', function() {
+    const scoredFacts = createSparcLearnerResponseScoreFacts({
+      facts: document.workingMemoryFacts ?? [],
+      score: {
+        learnerContribution: { type: 'question' },
+        learnerQuestion: { contentFocused: true },
+      },
+    });
+    const transition = createSparcLearnerResponseScoreTransition({
+      document,
+      event,
+      facts: document.workingMemoryFacts ?? [],
+      score: {
+        learnerContribution: { type: 'question' },
+        learnerQuestion: { contentFocused: true },
+      },
+    });
+
+    assert.ok(scoredFacts.some((entry) => entry.factType === 'dialogue.learnerQuestion'));
+    assert.equal(transition.writes.some((write) => (
+      write.value
+      && typeof write.value === 'object'
+      && (write.value as { factType?: string }).factType === 'dialogue.learnerQuestion'
+    )), false);
+  });
+
+  it('rejects duplicate score updates for the same target', function() {
+    assert.throws(
+      () => createSparcLearnerResponseScoreFacts({
+        facts: document.workingMemoryFacts ?? [],
+        score: {
+          learningTargetScores: [{
+            clusterKC: 'kc-a',
+            coverage: 0.5,
+          }, {
+            clusterKC: 'kc-a',
+            coverage: 0.6,
+          }],
+        },
+      }),
+      /duplicate learning target clusterKC "kc-a"/,
+    );
+  });
+
+  it('rejects unknown misconception ids clearly', function() {
+    assert.throws(
+      () => createSparcLearnerResponseScoreFacts({
+        facts: document.workingMemoryFacts ?? [],
+        score: {
+          diagnosticMisconceptionScores: [{
+            id: 'm-missing',
+            confidence: 0.5,
+          }],
+        },
+      }),
+      /unknown diagnostic misconception id "m-missing"/,
     );
   });
 
@@ -174,7 +250,7 @@ describe('sparcLearnerResponseScoring', function() {
         score: {
           diagnosticMisconceptionScores: [{
             id: 'm1',
-            confidence: 1.2, addressed: true,
+            confidence: 1.2,
           }],
         },
       }),

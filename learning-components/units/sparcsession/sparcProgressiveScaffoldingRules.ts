@@ -35,15 +35,25 @@ function statePattern(stage?: string): SparcFactPattern {
   };
 }
 
+function preservedQuestionStatePattern(): SparcFactPattern {
+  return {
+    factType: 'scaffold.state',
+    slots: {
+      targetKey: bound('targetKey'),
+      focusEpisodeId: bound('focusEpisodeId'),
+      stage: bind('questionStage'),
+      lastAction: bind('questionLastAction'),
+    },
+  };
+}
+
 function observationPattern(params: {
-  readonly addressed: boolean;
   readonly madeProgress: boolean;
 }): SparcFactPattern {
   return {
     factType: 'learningObservation.targetProgress',
     slots: {
       targetKey: bound('targetKey'),
-      addressed: literalPattern(params.addressed),
       madeProgress: literalPattern(params.madeProgress),
       newlyResolved: literalPattern(false),
     },
@@ -113,6 +123,55 @@ function moveRule(params: {
   };
 }
 
+function learnerQuestionRule(params: {
+  readonly id: string;
+  readonly action: string;
+  readonly contentFocused: boolean;
+}): SparcProductionRule {
+  return {
+    id: params.id,
+    module: 'dialogue.move-selection',
+    salience: 90,
+    when: [targetPattern(), preservedQuestionStatePattern(), {
+      factType: 'dialogue.learnerQuestion',
+      slots: {
+        contentFocused: literalPattern(params.contentFocused),
+      },
+    }],
+    then: [{
+      type: 'assert-fact',
+      persist: true,
+      fact: {
+        factType: 'controller.selectedAction',
+        slots: {
+          targetType: literal('learnerQuestion'),
+          targetId: literal('learner-question'),
+          action: literal(params.action),
+          sourceRuleId: literal(params.id),
+        },
+      },
+    }, {
+      type: 'assert-fact',
+      persist: true,
+      identitySlots: ['focusEpisodeId'],
+      fact: {
+        factType: 'scaffold.state',
+        slots: {
+          focusEpisodeId: variable('focusEpisodeId'),
+          targetKey: variable('targetKey'),
+          stage: variable('questionStage'),
+          lastAction: variable('questionLastAction'),
+          policyId: literal('progressive-scaffolding-v1'),
+          policyVersion: literal(1),
+        },
+      },
+    }, {
+      type: 'terminate-production-phase',
+      reason: 'move-selected',
+    }],
+  };
+}
+
 export function createSparcProgressiveScaffoldingRules(): readonly SparcProductionRule[] {
   return [{
     id: 'dialogue.completion.summary',
@@ -138,45 +197,51 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
       type: 'terminate-production-phase',
       reason: 'move-selected',
     }],
-  }, moveRule({
+  }, learnerQuestionRule({
+    id: 'dialogue.question.defer',
+    action: 'question-deferral',
+    contentFocused: true,
+  }), learnerQuestionRule({
+    id: 'dialogue.question.scope-refusal',
+    action: 'question-scope-refusal',
+    contentFocused: false,
+  }), moveRule({
     id: 'dialogue.scaffold.pump',
     action: 'pump',
     stage: 'PUMP',
     eligible: any(
       statePattern('ELICIT'),
-      all(statePattern('PUMP'), observationPattern({ addressed: false, madeProgress: false })),
-      all(statePattern(), observationPattern({ addressed: true, madeProgress: true })),
-      all(statePattern('ASSERTION'), observationPattern({ addressed: true, madeProgress: false })),
+      all(statePattern(), observationPattern({ madeProgress: true })),
+      all(statePattern('ASSERTION'), observationPattern({ madeProgress: false })),
     ),
   }), moveRule({
     id: 'dialogue.scaffold.prompt',
     action: 'prompt',
     stage: 'PROMPT',
     eligible: any(
-      all(statePattern('PUMP'), observationPattern({ addressed: true, madeProgress: false })),
-      all(statePattern('PROMPT'), observationPattern({ addressed: false, madeProgress: false })),
+      all(statePattern('PUMP'), observationPattern({ madeProgress: false })),
     ),
   }), moveRule({
     id: 'dialogue.scaffold.hint',
     action: 'hint',
     stage: 'HINT',
     eligible: any(
-      all(statePattern('PROMPT'), observationPattern({ addressed: true, madeProgress: false })),
-      all(statePattern('HINT'), observationPattern({ addressed: false, madeProgress: false })),
+      all(statePattern('PROMPT'), observationPattern({ madeProgress: false })),
     ),
   }), moveRule({
     id: 'dialogue.scaffold.assertion',
     action: 'assertion',
     stage: 'ASSERTION',
     eligible: any(
-      all(statePattern('HINT'), observationPattern({ addressed: true, madeProgress: false })),
-      all(statePattern('ASSERTION'), observationPattern({ addressed: false, madeProgress: false })),
+      all(statePattern('HINT'), observationPattern({ madeProgress: false })),
     ),
   })];
 }
 
 export const SPARC_PROGRESSIVE_SCAFFOLDING_RULE_IDS = Object.freeze([
   'dialogue.completion.summary',
+  'dialogue.question.defer',
+  'dialogue.question.scope-refusal',
   'dialogue.scaffold.pump',
   'dialogue.scaffold.prompt',
   'dialogue.scaffold.hint',

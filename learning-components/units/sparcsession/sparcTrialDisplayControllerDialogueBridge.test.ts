@@ -26,7 +26,7 @@ function dialogueDisplay(): SparcTrialDisplay {
       nodeType: 'group',
       groupType: 'dialogue-thread',
       children: [{
-        id: 'opening-message',
+        id: 'opening-tutor-message',
         nodeType: 'atomic',
         atomType: 'dialogue-utterance',
         speaker: 'tutor',
@@ -80,7 +80,9 @@ describe('SPARC trial display controller dialogue bridge', function() {
     const historyRecords: CanonicalHistoryRecord[] = [];
     const display = dialogueDisplay();
     let scorerLearnerText = '';
+    let scorerProblemStatement = '';
     let generatorTargetId = '';
+    let generatorProblemStatement = '';
 
     const result = await commitSparcTrialDisplayControllerDialogueTurn({
       core: {
@@ -103,20 +105,22 @@ describe('SPARC trial display controller dialogue bridge', function() {
       targetSelectionOptions: {
         anchorClusterKC: 'kc-a',
       },
-      scoreLearnerResponse: ({ learnerText }) => {
+      scoreLearnerResponse: ({ learnerText, problemStatement }) => {
         scorerLearnerText = learnerText;
+        scorerProblemStatement = problemStatement;
         return {
           learningTargetScores: [{
             clusterKC: 'kc-a',
-            coverage: 0.2, addressed: true,
+            coverage: 0.2,
           }, {
             clusterKC: 'kc-b',
-            coverage: 0.1, addressed: true,
+            coverage: 0.1,
           }],
         };
       },
       generateTutorUtterance: (request) => {
         generatorTargetId = request.targetId;
+        generatorProblemStatement = request.problemStatement;
         return request.contentTexts[0]!;
       },
       history: {
@@ -127,6 +131,8 @@ describe('SPARC trial display controller dialogue bridge', function() {
     });
 
     assert.equal(scorerLearnerText, 'Here is my partial answer.');
+    assert.equal(scorerProblemStatement, 'Tell me about the topic.');
+    assert.equal(generatorProblemStatement, scorerProblemStatement);
     assert.equal(result.learnerText, 'Here is my partial answer.');
     assert.equal(result.event.source.nodeId, 'learner-response-input');
     assert.equal(generatorTargetId, 'kc-b');
@@ -172,10 +178,10 @@ describe('SPARC trial display controller dialogue bridge', function() {
       scoreLearnerResponse: () => ({
         learningTargetScores: [{
           clusterKC: 'kc-a',
-          coverage: 0.2, addressed: true,
+          coverage: 0.2,
         }, {
           clusterKC: 'kc-b',
-          coverage: 0.1, addressed: true,
+          coverage: 0.1,
         }],
       }),
       generateTutorUtterance: (request) => request.contentTexts[0]!,
@@ -216,7 +222,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         return {
           learningTargetScores: [{
             clusterKC: 'kc-b',
-            coverage: 0.9, addressed: true,
+            coverage: 0.9,
           }],
         };
       },
@@ -265,5 +271,44 @@ describe('SPARC trial display controller dialogue bridge', function() {
       }),
       /SPARC dialogue submit requires exactly one answerable submitted node; found 0/,
     );
+  });
+
+  it('rejects a dialogue display without an authored problem statement before scoring', async function() {
+    const display = dialogueDisplay();
+    const opening = (display.nodes?.[0] as { children?: Array<{ value?: unknown }> }).children?.[0];
+    if (opening) opening.value = '   ';
+    let scorerCalls = 0;
+
+    await assert.rejects(
+      () => commitSparcTrialDisplayControllerDialogueTurn({
+        core: {
+          TDFId: 'tdf-1',
+          sessionID: 'session-1',
+          levelUnit: 2,
+          userId: 'user-1',
+        },
+        pageKey: 'dialogue-doc',
+        display,
+        result: {
+          submittedNodes: {
+            'learner-response-input': 'A learner answer.',
+            'learner-response-submit': 'submit',
+          },
+          triggeredBy: 'learner-response-submit',
+          timestamp: 1234,
+        },
+        priorHistoryRecords: [],
+        scoreLearnerResponse: () => {
+          scorerCalls += 1;
+          return {};
+        },
+        generateTutorUtterance: () => 'Tutor message.',
+        history: {
+          async writeCanonicalHistory() {},
+        },
+      }),
+      /opening-tutor-message\.value problem statement/,
+    );
+    assert.equal(scorerCalls, 0);
   });
 });

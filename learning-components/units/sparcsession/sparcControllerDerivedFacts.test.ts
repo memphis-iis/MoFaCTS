@@ -46,7 +46,10 @@ describe('deriveSparcControllerFacts', function() {
         requiredTargetCount: 2,
         totalTargetCount: 2,
         coverageThreshold: 0.8,
+        activeMisconceptionCount: 0,
+        maxActiveMisconceptions: 0,
         turnCount: 3,
+        maxTurns: 50,
       },
     }]);
   });
@@ -100,8 +103,33 @@ describe('deriveSparcControllerFacts', function() {
       requiredTargetCount: 2,
       totalTargetCount: 3,
       coverageThreshold: 0.75,
+      activeMisconceptionCount: 0,
+      maxActiveMisconceptions: 0,
       turnCount: 0,
+      maxTurns: 50,
     });
+  });
+
+  it('requires active misconceptions to be within the authored graduation limit', function() {
+    const baseFacts = [
+      fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
+      fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),
+      fact('autotutor.misconception', { id: 'm1' }),
+      fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+    ];
+    const blocked = deriveSparcControllerFacts([
+      fact('dialogue.graduation', { requiredTargetCount: 1, maxActiveMisconceptions: 0 }),
+      ...baseFacts,
+    ], { includeCurrentTurn: false });
+    const allowed = deriveSparcControllerFacts([
+      fact('dialogue.graduation', { requiredTargetCount: 1, maxActiveMisconceptions: 1 }),
+      ...baseFacts,
+    ], { includeCurrentTurn: false });
+
+    assert.equal(blocked.find((entry) => entry.factType === 'controller.completionState')?.slots?.completed, false);
+    assert.equal(blocked.find((entry) => entry.factType === 'controller.completionState')?.slots?.activeMisconceptionCount, 1);
+    assert.equal(allowed.find((entry) => entry.factType === 'controller.completionState')?.slots?.completed, true);
   });
 
   it('marks completion when the max turn policy is reached', function() {
@@ -124,7 +152,7 @@ describe('deriveSparcControllerFacts', function() {
   it('fails clearly without generated learning targets', function() {
     assert.throws(
       () => deriveSparcControllerFacts([]),
-      /requires at least one learningTarget\.source fact/,
+      /requires at least one clean autotutor\.expectation fact/,
     );
   });
 });

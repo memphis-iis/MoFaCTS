@@ -4,6 +4,8 @@ export type SparcControllerDerivedFactOptions = {
   readonly includeCurrentTurn?: boolean;
 };
 
+export const DEFAULT_SPARC_AUTOTUTOR_MAX_TURNS = 50;
+
 function stringSlot(fact: SparcWorkingMemoryFact, slotName: string): string | undefined {
   const value = fact.slots?.[slotName];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -67,16 +69,29 @@ function completionCoverageThreshold(facts: readonly SparcWorkingMemoryFact[]): 
 
 function graduationPolicy(facts: readonly SparcWorkingMemoryFact[], targetCount: number): {
   readonly requiredTargetCount: number;
-  readonly maxTurns?: number;
+  readonly maxActiveMisconceptions: number;
+  readonly maxTurns: number;
 } {
   const graduation = facts.find((fact) => fact.factType === 'dialogue.graduation');
   const requiredTargetCount = graduation
     ? optionalFiniteSlot(graduation, 'requiredTargetCount') ?? targetCount
     : targetCount;
-  const maxTurns = graduation ? optionalFiniteSlot(graduation, 'maxTurns') : undefined;
+  const maxActiveMisconceptions = graduation
+    ? optionalFiniteSlot(graduation, 'maxActiveMisconceptions') ?? 0
+    : 0;
+  const maxTurns = graduation
+    ? optionalFiniteSlot(graduation, 'maxTurns') ?? DEFAULT_SPARC_AUTOTUTOR_MAX_TURNS
+    : DEFAULT_SPARC_AUTOTUTOR_MAX_TURNS;
+  if (!Number.isInteger(maxActiveMisconceptions) || maxActiveMisconceptions < 0) {
+    throw new Error('SPARC dialogue.graduation maxActiveMisconceptions must be a non-negative integer');
+  }
+  if (!Number.isInteger(maxTurns) || maxTurns < 1) {
+    throw new Error('SPARC dialogue.graduation maxTurns must be a positive integer');
+  }
   return {
     requiredTargetCount: Math.max(0, Math.min(targetCount, Math.ceil(requiredTargetCount))),
-    ...(maxTurns !== undefined ? { maxTurns } : {}),
+    maxActiveMisconceptions,
+    maxTurns,
   };
 }
 
@@ -122,6 +137,26 @@ function meanRequiredCoverage(facts: readonly SparcWorkingMemoryFact[]): number 
   return Math.round((sum / clusterKCs.length) * 1_000_000) / 1_000_000;
 }
 
+function activeMisconceptionCount(
+  facts: readonly SparcWorkingMemoryFact[],
+  coverageThreshold: number,
+): number {
+  const authoredIds = new Set(facts
+    .filter((fact) => fact.factType === 'autotutor.misconception')
+    .map((fact) => stringSlot(fact, 'id'))
+    .filter((id): id is string => Boolean(id)));
+  const confidenceById = new Map<string, number>();
+  for (const fact of facts) {
+    if (fact.factType !== 'diagnostic.misconceptionScore') continue;
+    const id = stringSlot(fact, 'id');
+    if (id && authoredIds.has(id)) {
+      confidenceById.set(id, optionalFiniteSlot(fact, 'confidence') ?? 0);
+    }
+  }
+  const activationThreshold = 1 - coverageThreshold;
+  return [...confidenceById.values()].filter((confidence) => confidence >= activationThreshold).length;
+}
+
 export function deriveSparcControllerFacts(
   facts: readonly SparcWorkingMemoryFact[],
   options: SparcControllerDerivedFactOptions = {},
@@ -136,9 +171,12 @@ export function deriveSparcControllerFacts(
     .length;
   const policy = graduationPolicy(facts, clusterKCs.length);
   const turnCount = previousTurnCount(facts) + (currentTurn ? 1 : 0);
-  const maxTurnsReached = policy.maxTurns !== undefined && turnCount >= policy.maxTurns;
+  const activeMisconceptions = activeMisconceptionCount(facts, coverageThreshold);
+  const misconceptionsWithinLimit = activeMisconceptions <= policy.maxActiveMisconceptions;
+  const maxTurnsReached = turnCount >= policy.maxTurns;
   const requiredCoverageReached = coveredTargetCount >= policy.requiredTargetCount;
-  const completed = requiredCoverageReached || maxTurnsReached;
+  const graduationReached = requiredCoverageReached && misconceptionsWithinLimit;
+  const completed = graduationReached || maxTurnsReached;
   return [{
     factType: 'dialogue.learnerWordCount',
     slots: {
@@ -159,13 +197,15 @@ export function deriveSparcControllerFacts(
     factType: 'controller.completionState',
     slots: {
       completed,
-      reason: requiredCoverageReached ? 'required-coverage' : (maxTurnsReached ? 'max-turns' : 'in-progress'),
+      reason: graduationReached ? 'required-coverage' : (maxTurnsReached ? 'max-turns' : 'in-progress'),
       coveredTargetCount,
       requiredTargetCount: policy.requiredTargetCount,
       totalTargetCount: clusterKCs.length,
       coverageThreshold,
+      activeMisconceptionCount: activeMisconceptions,
+      maxActiveMisconceptions: policy.maxActiveMisconceptions,
       turnCount,
-      ...(policy.maxTurns !== undefined ? { maxTurns: policy.maxTurns } : {}),
+      maxTurns: policy.maxTurns,
     },
   }];
 }

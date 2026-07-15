@@ -19,6 +19,7 @@
   } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
   import SparcNode from './SparcNode.svelte';
   import SparcAutoTutorProgress from './SparcAutoTutorProgress.svelte';
+  import { buildSparcAutoTutorProgressSnapshot } from '../services/sparcAutoTutorProgress';
   import TrialInteractionPane from './TrialInteractionPane.svelte';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
@@ -556,6 +557,10 @@
     });
   }
 
+  function handleAutoTutorContinue() {
+    dispatch('forceadvance', { reason: 'SPARC AutoTutor Complete' });
+  }
+
   function isVerticallyScrollable(element) {
     if (!element) {
       return false;
@@ -626,6 +631,11 @@
   );
   $: nodeValues = mergeRuntimeNodeValues(authoredNodeValues, runtimeNodeValues);
   $: autoTutorDialogueMode = isAutoTutorDialogueDisplay(sparcDisplay);
+  $: autoTutorProgressSnapshot = buildSparcAutoTutorProgressSnapshot({
+    display: sparcDisplay,
+    runtimeNodeValues: nodeValues,
+  });
+  $: autoTutorDialogueCompleted = autoTutorDialogueMode && autoTutorProgressSnapshot.completed;
   $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
   $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes) : [];
   $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
@@ -670,7 +680,15 @@
     </section>
 
     <footer class="sparc-auto-tutor-input-bar">
-      {#if autoTutorDialogueInputNode}
+      {#if autoTutorDialogueCompleted}
+        <button
+          type="button"
+          class="btn btn-primary sparc-auto-tutor-continue"
+          on:click={handleAutoTutorContinue}
+        >
+          {platformText('common.continue')}
+        </button>
+      {:else if autoTutorDialogueInputNode}
         <div class="sparc-auto-tutor-input">
           {#key `${autoTutorDialogueInputNode.id}:${dialogueInputResetVersion}`}
           <SparcNode
@@ -691,7 +709,7 @@
           {/key}
         </div>
       {/if}
-      {#if autoTutorDialogueSubmitNode}
+      {#if !autoTutorDialogueCompleted && autoTutorDialogueSubmitNode}
         <div class="sparc-auto-tutor-submit">
           <SparcNode
             node={autoTutorDialogueSubmitNode}
@@ -1017,6 +1035,16 @@
 
   .sparc-auto-tutor-submit :global(.sparc-button) {
     text-align: center;
+  }
+
+  .sparc-auto-tutor-continue {
+    grid-column: 1 / -1;
+    justify-self: end;
+    min-width: 8rem;
+    border-color: var(--learning-card-primary-action-surface-color);
+    background: var(--learning-card-primary-action-surface-color);
+    color: var(--learning-card-primary-action-text-color);
+    font-weight: 600;
   }
 
   @media (max-width: 768px) {

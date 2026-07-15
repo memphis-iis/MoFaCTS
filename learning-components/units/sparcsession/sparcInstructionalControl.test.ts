@@ -56,21 +56,19 @@ describe('SPARC AutoTutor instructional adapter', function() {
           focusEpisodeId: 'episode-1', targetKey: 'expectation:kc-a', startedAtTurn: 1, status: 'active',
         }),
         fact('scaffold.state', { focusEpisodeId: 'episode-1', targetKey: 'expectation:kc-a', stage: 'PUMP' }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2, addressed: false }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4, addressed: true, evidence: 'matched' }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
       ],
     });
     assert.deepEqual(result.find((entry) => entry.factType === 'learningObservation.targetProgress')?.slots, {
       targetKey: 'expectation:kc-a',
       targetKind: 'expectation',
       targetId: 'kc-a',
-      addressed: true,
       progressBefore: 0.2,
       progressAfter: 0.4,
       progressDelta: 0.2,
       madeProgress: true,
       newlyResolved: false,
-      evidence: 'matched',
     });
   });
 
@@ -91,8 +89,8 @@ describe('SPARC AutoTutor instructional adapter', function() {
         fact('instructionalFocus.episode', {
           focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
         }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.8, addressed: false }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.6, addressed: true }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.8 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.6 }),
       ],
     });
     const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');

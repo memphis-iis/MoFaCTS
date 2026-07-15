@@ -24,6 +24,8 @@ export type SparcAutoTutorProgressMisconception = {
 
 export type SparcAutoTutorProgressSnapshot = {
   readonly available: boolean;
+  readonly completed: boolean;
+  readonly completionReason: string;
   readonly coverageThreshold: number;
   readonly coveredExpectations: number;
   readonly requiredExpectations: number;
@@ -184,6 +186,8 @@ export function buildSparcAutoTutorProgressSnapshot(params: {
   const turnState = factsByType(currentFacts, 'session.turnState').at(-1);
   return {
     available: targets.length > 0 || misconceptions.length > 0,
+    completed: completionState?.slots?.completed === true,
+    completionReason: stringSlot(completionState ?? {}, 'reason'),
     coverageThreshold: policy.coverageThreshold,
     coveredExpectations: targets.reduce(
       (sum, target) => sum + expectationCredit(target.coverage, policy.coverageThreshold),

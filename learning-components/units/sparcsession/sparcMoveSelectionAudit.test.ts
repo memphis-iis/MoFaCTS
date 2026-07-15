@@ -19,6 +19,7 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 }
 
 const facts: readonly SparcWorkingMemoryFact[] = [
+  fact('dialogue.problemStatement', { text: 'Explain the clean target.' }),
   fact('autotutor.expectation', {
     clusterKC: 'kc-a',
     text: 'Use a clean target.',

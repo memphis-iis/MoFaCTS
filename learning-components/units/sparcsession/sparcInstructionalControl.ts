@@ -136,7 +136,6 @@ function observationForPreviousTarget(params: {
   const progressBefore = targetKind === 'expectation' ? beforeScore : 1 - beforeScore;
   const progressAfter = targetKind === 'expectation' ? afterScore : 1 - afterScore;
   const progressDelta = Math.round((progressAfter - progressBefore) * 1_000_000) / 1_000_000;
-  const addressed = afterFact.slots?.addressed === true;
   const resolutionThreshold = optionalNumber(target?.slots?.resolutionThreshold) ?? 0.8;
   return {
     factType: 'learningObservation.targetProgress',
@@ -144,15 +143,13 @@ function observationForPreviousTarget(params: {
       targetKey,
       targetKind,
       targetId,
-      addressed,
       progressBefore,
       progressAfter,
       progressDelta,
-      madeProgress: addressed && progressDelta >= minimumProgress(params.config),
+      madeProgress: progressDelta >= minimumProgress(params.config),
       newlyResolved: targetKind === 'expectation'
         ? progressAfter >= resolutionThreshold
         : progressAfter > resolutionThreshold,
-      ...(stringSlot(afterFact, 'evidence') ? { evidence: stringSlot(afterFact, 'evidence') } : {}),
     },
   };
 }

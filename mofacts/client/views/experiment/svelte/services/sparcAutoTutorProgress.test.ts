@@ -92,4 +92,24 @@ describe('sparcAutoTutorProgress', function() {
 
     expect(snapshot.misconceptionScore).to.equal(0);
   });
+
+  it('projects terminal completion state for the dialogue continuation control', function() {
+    const snapshot = buildSparcAutoTutorProgressSnapshot({
+      display: displayWithMisconceptions(),
+      runtimeNodeValues: {
+        [SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY]: [{
+          factType: 'controller.completionState',
+          slots: {
+            completed: true,
+            reason: 'max-turns',
+            turnCount: 25,
+          },
+        }],
+      },
+    });
+
+    expect(snapshot.completed).to.equal(true);
+    expect(snapshot.completionReason).to.equal('max-turns');
+    expect(snapshot.turnCount).to.equal(25);
+  });
 });

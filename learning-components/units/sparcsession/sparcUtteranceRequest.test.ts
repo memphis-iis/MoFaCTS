@@ -7,8 +7,26 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
 }
 
 describe('createSparcUtteranceRequestFromFacts', function() {
+  it('fails clearly when the problem statement is missing', function() {
+    assert.throws(
+      () => createSparcUtteranceRequestFromFacts([
+        fact('autotutor.expectation', {
+          clusterKC: 'kc-a',
+          text: 'Target text.',
+        }),
+        fact('controller.selectedAction', {
+          targetType: 'learningTarget',
+          clusterKC: 'kc-a',
+          action: 'hint',
+        }),
+      ]),
+      /requires dialogue\.problemStatement\.text/,
+    );
+  });
+
   it('creates an utterance request from the selected learning-target action and clean target text', function() {
     const request = createSparcUtteranceRequestFromFacts([
+      fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
       fact('autotutor.expectation', {
         clusterKC: 'kc-a',
         text: 'Think about the first idea.',
@@ -38,6 +56,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
 
   it('matches clean misconception text by misconception id', function() {
     const request = createSparcUtteranceRequestFromFacts([
+      fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
       fact('autotutor.expectation', {
         clusterKC: 'kc-a',
         text: 'Interest is calculated from the updated balance.',
@@ -49,7 +68,6 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       fact('diagnostic.misconceptionScore', {
         id: 'm1',
         confidence: 0.95,
-        evidence: 'The learner repeated the fixed-dollar claim.',
       }),
       fact('learnerResponse.contribution', {
         type: 'answer',
@@ -74,24 +92,37 @@ describe('createSparcUtteranceRequestFromFacts', function() {
         text: 'Interest is calculated from the updated balance.',
       }],
     });
-    assert.deepEqual(request.feedbackEvidence, {
-      targetType: 'misconception',
-      targetId: 'm1',
-      selectedTargetScore: {
-        id: 'm1',
-        confidence: 0.95,
-        evidence: 'The learner repeated the fixed-dollar claim.',
-      },
-      learnerContribution: {
-        type: 'answer',
-        confidence: 0.9,
-      },
-    });
+    assert.deepEqual((request.plannerState as { misconceptions: unknown[] }).misconceptions, [{
+      id: 'm1',
+      confidence: 0.95,
+    }]);
+  });
+
+  it('creates a dedicated utterance request for a legitimate learner question', function() {
+    const request = createSparcUtteranceRequestFromFacts([
+      fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
+      fact('dialogue.learnerQuestion', { contentFocused: true }),
+      fact('learnerResponse.contribution', { type: 'question', confidence: 0.95 }),
+      fact('controller.selectedAction', {
+        targetType: 'learnerQuestion',
+        targetId: 'learner-question',
+        action: 'question-deferral',
+        sourceRuleId: 'dialogue.question.defer',
+      }),
+    ]);
+
+    assert.equal(request.targetType, 'learnerQuestion');
+    assert.equal(request.targetId, 'learner-question');
+    assert.equal(request.action, 'question-deferral');
+    assert.deepEqual(request.contentTexts, []);
+    assert.deepEqual(request.targetContent, { contentFocused: true });
+    assert.equal(request.moveDefinition.moveId, 'question-deferral');
   });
 
   it('fails clearly when selected clean target text is missing', function() {
     assert.throws(
       () => createSparcUtteranceRequestFromFacts([
+        fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
         fact('controller.selectedAction', {
           targetType: 'learningTarget',
           clusterKC: 'kc-a',
@@ -104,6 +135,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
 
   it('creates a completion utterance request from clean expectation text', function() {
     const request = createSparcUtteranceRequestFromFacts([
+      fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
       fact('autotutor.expectation', {
         clusterKC: 'kc-a',
         text: 'Summarize the first target.',
@@ -111,6 +143,17 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       fact('autotutor.expectation', {
         clusterKC: 'kc-b',
         text: 'Summarize the second target.',
+      }),
+      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),
+      fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.4 }),
+      fact('autotutor.misconception', { id: 'm1', text: 'An unresolved misconception.' }),
+      fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+      fact('controller.completionState', {
+        completed: true,
+        reason: 'max-turns',
+        coverageThreshold: 0.8,
+        turnCount: 25,
+        maxTurns: 25,
       }),
       fact('controller.selectedAction', {
         targetType: 'completion',
@@ -127,11 +170,38 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       action: 'summary',
     });
     assert.equal(request.moveDefinition.moveId, 'summary');
+    assert.deepEqual(request.targetContent, {
+      completion: {
+        completed: true,
+        reason: 'max-turns',
+        coverageThreshold: 0.8,
+        turnCount: 25,
+        maxTurns: 25,
+      },
+      expectations: [{
+        clusterKC: 'kc-a',
+        text: 'Summarize the first target.',
+        coverage: 0.9,
+        status: 'covered',
+      }, {
+        clusterKC: 'kc-b',
+        text: 'Summarize the second target.',
+        coverage: 0.4,
+        status: 'uncovered',
+      }],
+      misconceptions: [{
+        id: 'm1',
+        text: 'An unresolved misconception.',
+        confidence: 0.7,
+        status: 'active',
+      }],
+    });
   });
 
   it('fails clearly when the selected move has no active registered definition', function() {
     assert.throws(
       () => createSparcUtteranceRequestFromFacts([
+        fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
         fact('autotutor.expectation', {
           clusterKC: 'kc-a',
           text: 'Target text.',
@@ -149,6 +219,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
   it('fails clearly when completion selected action content is missing', function() {
     assert.throws(
       () => createSparcUtteranceRequestFromFacts([
+        fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
         fact('controller.selectedAction', {
           targetType: 'completion',
           action: 'summary',
@@ -161,6 +232,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
   it('requires exactly one selected action fact', function() {
     assert.throws(
       () => createSparcUtteranceRequestFromFacts([
+        fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
         fact('controller.selectedAction', {
           targetType: 'learningTarget',
           clusterKC: 'kc-a',

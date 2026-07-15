@@ -484,6 +484,8 @@ function validateSparcAutoTutorContent(context: AutoTutorValidationContext, erro
         .filter(nonEmptyString);
       const expectedRuleIds = [
         'dialogue.completion.summary',
+        'dialogue.question.defer',
+        'dialogue.question.scope-refusal',
         'dialogue.scaffold.pump',
         'dialogue.scaffold.prompt',
         'dialogue.scaffold.hint',

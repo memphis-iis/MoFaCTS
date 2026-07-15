@@ -45,6 +45,7 @@ const event: SparcInterfaceEvent = {
 };
 
 const utteranceRequest = {
+  problemStatement: 'Explain what happens before condensation.',
   targetType: 'learningTarget' as const,
   action: 'hint',
   targetId: 'kc-evaporation',
