@@ -76,8 +76,9 @@ describe('SPARC move definitions', function() {
     const deferral = requireActiveSparcMoveDefinition('question-deferral').promptPolicy;
     const refusal = requireActiveSparcMoveDefinition('question-scope-refusal').promptPolicy;
 
-    assert.ok(deferral.includes('Do not answer the question or reveal the target content'));
+    assert.ok(deferral.includes('Do not answer the learner\'s question'));
     assert.ok(deferral.includes('work with the problem a little longer'));
+    assert.ok(deferral.includes('ask the learner for a response as part of this modifier'));
     assert.ok(refusal.includes('cannot discuss that subject'));
     assert.ok(refusal.includes('rude, lewd, illicit'));
   });

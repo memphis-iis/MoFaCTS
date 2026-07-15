@@ -98,25 +98,35 @@ describe('createSparcUtteranceRequestFromFacts', function() {
     }]);
   });
 
-  it('creates a dedicated utterance request for a legitimate learner question', function() {
+  it('composes a legitimate learner-question deferral with the selected scaffold move', function() {
     const request = createSparcUtteranceRequestFromFacts([
       fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),
+      fact('autotutor.expectation', {
+        clusterKC: 'kc-a',
+        text: 'A depends on B.',
+      }),
       fact('dialogue.learnerQuestion', { contentFocused: true }),
       fact('learnerResponse.contribution', { type: 'question', confidence: 0.95 }),
-      fact('controller.selectedAction', {
-        targetType: 'learnerQuestion',
-        targetId: 'learner-question',
+      fact('dialogue.responseModifier', {
         action: 'question-deferral',
         sourceRuleId: 'dialogue.question.defer',
       }),
+      fact('controller.selectedAction', {
+        targetType: 'expectation',
+        targetId: 'kc-a',
+        action: 'prompt',
+        sourceRuleId: 'dialogue.scaffold.prompt',
+      }),
     ]);
 
-    assert.equal(request.targetType, 'learnerQuestion');
-    assert.equal(request.targetId, 'learner-question');
-    assert.equal(request.action, 'question-deferral');
-    assert.deepEqual(request.contentTexts, []);
-    assert.deepEqual(request.targetContent, { contentFocused: true });
-    assert.equal(request.moveDefinition.moveId, 'question-deferral');
+    assert.equal(request.targetType, 'learningTarget');
+    assert.equal(request.targetId, 'kc-a');
+    assert.equal(request.action, 'prompt');
+    assert.deepEqual(request.contentTexts, ['A depends on B.']);
+    assert.equal(request.moveDefinition.moveId, 'prompt');
+    assert.equal(request.responseModifiers[0]?.action, 'question-deferral');
+    assert.equal(request.responseModifiers[0]?.sourceRuleId, 'dialogue.question.defer');
+    assert.equal(request.responseModifiers[0]?.moveDefinition.moveId, 'question-deferral');
   });
 
   it('fails clearly when selected clean target text is missing', function() {

@@ -156,7 +156,12 @@ export function createSparcDialogueTurnTransition(params: {
   const tutorText = requireNonBlank(params.tutorText, 'SPARC tutor dialogue text');
   const boxId = requireNonBlank(params.options?.boxId ?? 'dialogue-flow', 'SPARC dialogue boxId');
   const productionRuleId = params.utteranceRequest.sourceRuleId;
-  const productionRuleName = params.utteranceRequest.sourceRuleId;
+  const productionRuleName = [
+    ...params.utteranceRequest.responseModifiers
+      .map((modifier) => modifier.sourceRuleId)
+      .filter((sourceRuleId): sourceRuleId is string => Boolean(sourceRuleId)),
+    ...(params.utteranceRequest.sourceRuleId ? [params.utteranceRequest.sourceRuleId] : []),
+  ].join(' → ');
   const moveDefinitionMetadata = {
     promptId: params.utteranceRequest.moveDefinition.promptId,
     promptVersion: params.utteranceRequest.moveDefinition.promptVersion,

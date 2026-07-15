@@ -12,6 +12,11 @@ export type SparcUtteranceRequest = {
   readonly contentTexts: readonly string[];
   readonly selectedAction: Readonly<Record<string, unknown>>;
   readonly moveDefinition: SparcMoveDefinition;
+  readonly responseModifiers: readonly {
+    readonly action: string;
+    readonly sourceRuleId?: string;
+    readonly moveDefinition: SparcMoveDefinition;
+  }[];
   readonly sourceRuleId?: string;
   readonly learnerText?: string;
   readonly learnerContribution?: Readonly<Record<string, unknown>>;
@@ -100,6 +105,23 @@ function misconceptionContent(facts: readonly SparcWorkingMemoryFact[], id: stri
       .map((fact) => fact.slots ?? {})
       .filter((slots) => stringSlot({ factType: 'autotutor.expectation', slots }, 'text')),
   };
+}
+
+function responseModifiers(facts: readonly SparcWorkingMemoryFact[]): SparcUtteranceRequest['responseModifiers'] {
+  return facts
+    .filter((fact) => fact.factType === 'dialogue.responseModifier')
+    .map((fact) => {
+      const action = stringSlot(fact, 'action');
+      if (!action) {
+        throw new Error('SPARC dialogue.responseModifier requires action');
+      }
+      const sourceRuleId = stringSlot(fact, 'sourceRuleId');
+      return {
+        action,
+        ...(sourceRuleId ? { sourceRuleId } : {}),
+        moveDefinition: requireActiveSparcMoveDefinition(action),
+      };
+    });
 }
 
 function targetContent(params: {
@@ -247,6 +269,7 @@ export function createSparcUtteranceRequestFromFacts(
   });
   const sourceRuleId = stringSlot(selectedAction, 'sourceRuleId');
   const contribution = latestFact(facts, 'learnerResponse.contribution')?.slots;
+  const selectedResponseModifiers = responseModifiers(facts);
 
   return {
     problemStatement,
@@ -256,6 +279,7 @@ export function createSparcUtteranceRequestFromFacts(
     contentTexts,
     selectedAction: selectedAction.slots ?? {},
     moveDefinition,
+    responseModifiers: selectedResponseModifiers,
     ...(contribution ? { learnerContribution: contribution } : {}),
     pedagogicalState: pedagogicalState(selectedAction),
     targetContent: targetContent({ facts, targetType, targetId, contentTexts }),

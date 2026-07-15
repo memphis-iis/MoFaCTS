@@ -66,8 +66,10 @@
   let feedbackFadeElement;
   let dialogueInputResetVersion = 0;
   let surfaceElement;
+  let autoTutorChatElement;
   let lastFeedbackRevealSignature = '';
   let observedProgressiveNodeOperationCount = 0;
+  let observedAutoTutorDialogueSignature = '';
 
   function handleFeedbackContent(event) {
     dispatch('feedbackcontent', event.detail);
@@ -594,6 +596,26 @@
     });
   }
 
+  function buildAutoTutorDialogueSignature(messages = []) {
+    return messages.map((message) => [
+      message?.id || '',
+      message?.speaker || '',
+      message?.value || '',
+    ].join(':')).join('|');
+  }
+
+  async function scrollAutoTutorChatToLatest() {
+    await tick();
+    if (!autoTutorChatElement || typeof window === 'undefined') {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      if (autoTutorChatElement) {
+        autoTutorChatElement.scrollTop = autoTutorChatElement.scrollHeight;
+      }
+    });
+  }
+
   $: sparcDisplay = resolveSparcControllerDisplay(display, '[SparcSessionSurface]');
   $: feedbackRevealSignature = [
     subsetKind,
@@ -638,6 +660,14 @@
   $: autoTutorDialogueCompleted = autoTutorDialogueMode && autoTutorProgressSnapshot.completed;
   $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
   $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes) : [];
+  $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
+  $: if (
+    autoTutorDialogueMode
+    && autoTutorDialogueSignature !== observedAutoTutorDialogueSignature
+  ) {
+    observedAutoTutorDialogueSignature = autoTutorDialogueSignature;
+    scrollAutoTutorChatToLatest();
+  }
   $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
   $: autoTutorDialogueSubmitNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-submit') : null;
   $: progressiveNodeOperationCount = progressiveNodeOperations.length;
@@ -660,7 +690,11 @@
       <SparcAutoTutorProgress display={sparcDisplay} runtimeNodeValues={nodeValues} />
     </header>
 
-    <section class="sparc-auto-tutor-chat" aria-label={platformText('autoTutor.conversation')}>
+    <section
+      bind:this={autoTutorChatElement}
+      class="sparc-auto-tutor-chat"
+      aria-label={platformText('autoTutor.conversation')}
+    >
       {#each autoTutorDialogueMessages as node (node.id)}
         <SparcNode
           {node}

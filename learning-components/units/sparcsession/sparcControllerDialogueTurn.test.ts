@@ -160,7 +160,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     )).length, 2);
   });
 
-  it('routes a legitimate learner question to the dedicated deferral move without locking dialogue controls', async function() {
+  it('chains a legitimate learner-question deferral into the current scaffold move without locking dialogue controls', async function() {
     const result = await evaluateSparcControllerDialogueTurn({
       document: document(),
       event: {
@@ -173,15 +173,19 @@ describe('evaluateSparcControllerDialogueTurn', function() {
         learnerQuestion: { contentFocused: true },
       },
       generateTutorUtterance: (request) => {
-        assert.equal(request.targetType, 'learnerQuestion');
-        assert.equal(request.action, 'question-deferral');
-        assert.deepEqual(request.targetContent, { contentFocused: true });
+        assert.equal(request.targetType, 'learningTarget');
+        assert.equal(request.action, 'pump');
+        assert.equal(request.responseModifiers[0]?.action, 'question-deferral');
         return 'Let us work with it a little longer first. What relationship seems possible to you?';
       },
     });
 
-    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.question.defer');
-    assert.equal(result.utteranceRequest.action, 'question-deferral');
+    assert.deepEqual(result.planning.productionRuleEvaluation.execution.firings.map((firing) => firing.ruleId), [
+      'dialogue.question.defer',
+      'dialogue.scaffold.pump',
+    ]);
+    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.scaffold.pump');
+    assert.equal(result.utteranceRequest.action, 'pump');
     assert.equal(result.transition.writes.some((write) => (
       write.value
       && typeof write.value === 'object'
@@ -193,7 +197,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       && typeof write.value === 'object'
       && (write.value as { factType?: string }).factType === 'scaffold.state'
     ));
-    assert.equal((preservedScaffold?.value as { slots?: { stage?: string } })?.slots?.stage, 'ELICIT');
+    assert.equal((preservedScaffold?.value as { slots?: { stage?: string } })?.slots?.stage, 'PUMP');
   });
 
   it('routes an off-topic learner question to the dedicated scope-refusal move', async function() {

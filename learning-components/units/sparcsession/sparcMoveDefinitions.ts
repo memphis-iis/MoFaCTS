@@ -39,6 +39,7 @@ function autotutorDialogueMove(params: {
   readonly paperRuleIds?: readonly string[];
   readonly paperMoveName: string;
   readonly promptPolicy: string;
+  readonly requiredFacts?: readonly string[];
 }): SparcMoveDefinition {
   return {
     moveId: params.moveId,
@@ -49,9 +50,7 @@ function autotutorDialogueMove(params: {
       paperRuleIds: params.paperRuleIds ?? [],
       paperMoveName: params.paperMoveName,
     },
-    requiredFacts: [
-      'controller.selectedAction',
-    ],
+    requiredFacts: params.requiredFacts ?? ['controller.selectedAction'],
     promptId: `autotutor.${params.moveId}`,
     promptVersion: 'v1',
     outputSchemaId: AUTOTUTOR_DIALOGUE_OUTPUT_SCHEMA_ID,
@@ -66,10 +65,11 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
   autotutorDialogueMove({
     moveId: 'question-deferral',
     paperMoveName: 'Deferring a legitimate learner question',
+    requiredFacts: ['dialogue.responseModifier'],
     promptPolicy: promptPolicy(
-      '1. Conversational receipt: Briefly acknowledge that the learner asked a question, using only the learner\'s own language when referring to it. Do not present rubric language as something the learner said, meant, believed, or knew.',
-      '2. Move execution: Do not answer the question or reveal the target content. Explain politely that the learner should work with the problem a little longer before the answer is revealed so they have time to reflect on the possibilities.',
-      '3. Return to reasoning: Invite the learner to state their current thought, prediction, or possible answer to the course-content question. Keep the invitation connected to the current problem without embedding the answer.',
+      '1. Deferral statement: After the selected scaffold move\'s conversational receipt, briefly explain that the learner should work with the problem a little longer before the answer is revealed so they have time to reflect on the possibilities.',
+      '2. Boundary: Do not answer the learner\'s question, reveal target content, or ask the learner for a response as part of this modifier. The selected scaffold move supplies the single instructional question that follows.',
+      '3. Learner-language boundary: When referring to the learner\'s question, use only phrases and constructions the learner actually used. Do not present rubric language as something the learner said, meant, believed, or knew.',
     ),
   }),
   autotutorDialogueMove({

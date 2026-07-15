@@ -331,8 +331,8 @@ export async function evaluateSparcControllerDialogueTurn(params: {
     ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
   });
   const moveSelectionAudit = auditSparcMoveSelection({
-    facts: planning.productionRuleEvaluation.execution.initialFacts,
     rules: params.document.productionRules ?? [],
+    execution: planning.productionRuleEvaluation.execution,
   });
   const selectedUtteranceRequest = moveSelectionAudit.utteranceRequest
     ?? createSparcUtteranceRequestFromFacts(

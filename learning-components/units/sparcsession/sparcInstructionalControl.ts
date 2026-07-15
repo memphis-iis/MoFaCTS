@@ -59,7 +59,7 @@ function threshold(facts: readonly SparcWorkingMemoryFact[]): number {
 }
 
 function minimumProgress(config: SparcInstructionalControllerConfig): number {
-  const value = optionalNumber(config.parameters?.minimumProgress) ?? 0.05;
+  const value = optionalNumber(config.parameters?.minimumProgress) ?? 0.3;
   if (value < 0 || value > 1) {
     throw new Error('SPARC instructionalController.parameters.minimumProgress must be from 0 to 1');
   }

@@ -123,7 +123,7 @@ function moveRule(params: {
   };
 }
 
-function learnerQuestionRule(params: {
+function terminalLearnerQuestionRule(params: {
   readonly id: string;
   readonly action: string;
   readonly contentFocused: boolean;
@@ -197,11 +197,42 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
       type: 'terminate-production-phase',
       reason: 'move-selected',
     }],
-  }, learnerQuestionRule({
+  }, {
     id: 'dialogue.question.defer',
-    action: 'question-deferral',
-    contentFocused: true,
-  }), learnerQuestionRule({
+    module: 'dialogue.move-selection',
+    salience: 90,
+    when: [targetPattern(), preservedQuestionStatePattern(), {
+      factType: 'dialogue.learnerQuestion',
+      slots: {
+        contentFocused: literalPattern(true),
+      },
+    }],
+    then: [{
+      type: 'assert-fact',
+      persist: false,
+      fact: {
+        factType: 'dialogue.responseModifier',
+        slots: {
+          action: literal('question-deferral'),
+          sourceRuleId: literal('dialogue.question.defer'),
+        },
+      },
+    }, {
+      type: 'assert-fact',
+      persist: false,
+      fact: {
+        factType: 'learningObservation.targetProgress',
+        slots: {
+          targetKey: variable('targetKey'),
+          targetKind: variable('targetKind'),
+          targetId: variable('targetId'),
+          madeProgress: literal(false),
+          newlyResolved: literal(false),
+          observationKind: literal('learner-question-no-progress'),
+        },
+      },
+    }],
+  }, terminalLearnerQuestionRule({
     id: 'dialogue.question.scope-refusal',
     action: 'question-scope-refusal',
     contentFocused: false,

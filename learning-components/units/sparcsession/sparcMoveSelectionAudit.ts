@@ -1,12 +1,10 @@
 import {
-  evaluateSparcProductionRules,
-} from './sparcProductionRuleEvaluator';
-import {
   createSparcUtteranceRequestFromFacts,
   type SparcUtteranceRequest,
 } from './sparcUtteranceRequest';
 import type {
   SparcProductionRule,
+  SparcProductionRuleExecution,
   SparcProductionRuleFiring,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
@@ -54,13 +52,10 @@ function selectedActionTargetId(fact: SparcWorkingMemoryFact | undefined): strin
   return undefined;
 }
 
-function ruleSalienceById(
-  rules: readonly SparcProductionRule[],
-  overrides: Readonly<Record<string, number>> | undefined,
-): ReadonlyMap<string, number> {
+function ruleSalienceById(rules: readonly SparcProductionRule[]): ReadonlyMap<string, number> {
   const salience = new Map<string, number>();
   for (const rule of rules) {
-    salience.set(rule.id, overrides?.[rule.id] ?? rule.salience ?? 0);
+    salience.set(rule.id, rule.salience ?? 0);
   }
   return salience;
 }
@@ -92,21 +87,12 @@ function validateSelectedAction(params: {
 }
 
 export function auditSparcMoveSelection(params: {
-  readonly facts: readonly SparcWorkingMemoryFact[];
   readonly rules: readonly SparcProductionRule[];
-  readonly salienceOverrides?: Readonly<Record<string, number>>;
+  readonly execution: SparcProductionRuleExecution;
 }): SparcMoveSelectionAudit {
-  const salienceById = ruleSalienceById(params.rules, params.salienceOverrides);
-  const overriddenRules = params.salienceOverrides
-    ? params.rules.map((rule) => ({
-        ...rule,
-        salience: salienceById.get(rule.id) ?? 0,
-      }))
-    : params.rules;
-  const firings = evaluateSparcProductionRules({
-    facts: params.facts,
-    rules: overriddenRules,
-  });
+  const salienceById = ruleSalienceById(params.rules);
+  const firings = params.execution.firings;
+  const requestFacts = params.execution.facts;
   const candidates = firings
     .filter((firing) => firing.terminatesProductionPhase || selectedActionFact(firing))
     .map((firing) => {
@@ -115,7 +101,7 @@ export function auditSparcMoveSelection(params: {
       const targetType = selectedAction ? stringSlot(selectedAction, 'targetType') : undefined;
       const targetId = selectedActionTargetId(selectedAction);
       const validation = validateSelectedAction({
-        facts: params.facts,
+        facts: requestFacts,
         selectedAction,
       });
       const rejectionReason = 'reason' in validation ? validation.reason : undefined;
@@ -143,7 +129,7 @@ export function auditSparcMoveSelection(params: {
   const selectedActionFactForRequest = selectedActionFact(selectedAction);
   const utteranceRequest = selectedActionFactForRequest
     ? validateSelectedAction({
-        facts: params.facts,
+        facts: requestFacts,
         selectedAction: selectedActionFactForRequest,
       })
     : undefined;

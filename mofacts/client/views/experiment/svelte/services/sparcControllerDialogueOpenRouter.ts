@@ -306,18 +306,26 @@ function parseUtteranceEnvelope(value: unknown, request: SparcUtteranceRequest):
 const SPARC_AUTOTUTOR_UTTERANCE_ENVELOPE_SCHEMA = Object.freeze({
   targetType: 'learningTarget | misconception | learnerQuestion | completion',
   targetId: 'string | null',
-  selectedMove: 'pump | prompt | hint | assertion | question-deferral | question-scope-refusal | summary',
+  selectedMove: 'pump | prompt | hint | assertion | question-scope-refusal | summary',
   tutorMessage: 'string',
 });
 
 function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string {
   const moveDefinition = request.moveDefinition;
+  const responseModifierPrompt = request.responseModifiers.flatMap((modifier) => [
+    `Response modifier: ${modifier.moveDefinition.moveId}.`,
+    modifier.moveDefinition.promptPolicy,
+  ]);
   return [
     'Return JSON only. Do not wrap it in Markdown.',
     'Echo targetType, targetId, and selectedMove exactly as provided by the application.',
     'Do not expose internal ids, rule ids, rubric labels, scoring fields, or planner metadata in tutorMessage.',
     'Use only the authored lesson content and dialogue context supplied in the user message.',
     'Follow the selected runtime move policy.',
+    ...(responseModifierPrompt.length > 0 ? [
+      'Apply the response modifiers within the selected move. Use the selected move\'s conversational receipt once at the beginning, then apply each modifier, then complete the remainder of the selected move. Produce one coherent tutorMessage with one instructional question.',
+      ...responseModifierPrompt,
+    ] : []),
     `Selected move: ${moveDefinition.moveId}.`,
     'Move prompt:',
     moveDefinition.promptPolicy,
@@ -361,6 +369,14 @@ function buildSparcUtteranceUserPrompt(request: SparcUtteranceRequest): string {
       renderer: request.moveDefinition.renderer,
       historyAction: request.moveDefinition.historyAction,
     }, null, 2),
+    '',
+    'Response modifiers:',
+    JSON.stringify(request.responseModifiers.map((modifier) => ({
+      action: modifier.action,
+      sourceRuleId: modifier.sourceRuleId ?? null,
+      promptId: modifier.moveDefinition.promptId,
+      promptVersion: modifier.moveDefinition.promptVersion,
+    })), null, 2),
     '',
     'App-selected pedagogical state:',
     JSON.stringify(request.pedagogicalState ?? null, null, 2),

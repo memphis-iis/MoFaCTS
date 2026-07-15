@@ -51,6 +51,7 @@ const utteranceRequest = {
   targetId: 'kc-evaporation',
   contentTexts: ['Evaporation is the target.'],
   moveDefinition: requireActiveSparcMoveDefinition('hint'),
+  responseModifiers: [],
   selectedAction: {
     targetType: 'learningTarget',
     clusterKC: 'kc-evaporation',

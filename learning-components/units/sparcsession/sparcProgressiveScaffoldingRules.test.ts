@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { evaluateSparcProductionRules } from './sparcProductionRuleEvaluator';
+import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 
@@ -41,11 +41,11 @@ function facts(params: {
 }
 
 function selectedAction(inputFacts: readonly SparcWorkingMemoryFact[]): string {
-  const firings = evaluateSparcProductionRules({
+  const execution = runSparcProductionRules({
     facts: inputFacts,
     rules: createSparcProgressiveScaffoldingRules(),
   });
-  const selected = firings.flatMap((firing) => firing.assertedFacts)
+  const selected = execution.facts
     .filter((entry) => entry.factType === 'controller.selectedAction');
   assert.equal(selected.length, 1);
   return String(selected[0]!.slots?.action);
@@ -68,11 +68,24 @@ describe('SPARC progressive scaffolding productions', function() {
     assert.equal(selectedAction(facts({ stage: 'ASSERTION', completed: true })), 'summary');
   });
 
-  it('defers legitimate content questions without advancing the scaffold', function() {
-    assert.equal(selectedAction([
-      ...facts({ stage: 'PROMPT', madeProgress: false }),
+  it('defers legitimate content questions and then advances through the no-progress scaffold branch', function() {
+    const execution = runSparcProductionRules({
+      facts: [
+      ...facts({ stage: 'PUMP' }),
       fact('dialogue.learnerQuestion', { contentFocused: true }),
-    ]), 'question-deferral');
+      ],
+      rules: createSparcProgressiveScaffoldingRules(),
+    });
+
+    assert.deepEqual(execution.firings.map((firing) => firing.ruleId), [
+      'dialogue.question.defer',
+      'dialogue.scaffold.prompt',
+    ]);
+    assert.equal(selectedAction(execution.initialFacts), 'prompt');
+    assert.equal(
+      execution.facts.find((entry) => entry.factType === 'dialogue.responseModifier')?.slots?.action,
+      'question-deferral',
+    );
   });
 
   it('declines off-topic or inappropriate questions without advancing the scaffold', function() {

@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { auditSparcMoveSelection } from './sparcMoveSelectionAudit';
+import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import type {
   SparcProductionRule,
   SparcRuleExpression,
@@ -77,40 +78,42 @@ const rules: readonly SparcProductionRule[] = [{
 }];
 
 describe('auditSparcMoveSelection', function() {
-  it('audits matched terminal move rules and selects the highest-salience valid action', function() {
-    const audit = auditSparcMoveSelection({ facts, rules });
+  it('audits the terminal move that actually fired', function() {
+    const execution = runSparcProductionRules({ facts, rules });
+    const audit = auditSparcMoveSelection({ execution, rules });
 
     assert.deepEqual(audit.candidates.map((candidate) => candidate.ruleId), [
       'dialogue.move.hint',
-      'dialogue.move.prompt',
     ]);
     assert.equal(audit.selected?.ruleId, 'dialogue.move.hint');
     assert.equal(audit.selected?.action, 'hint');
     assert.equal(audit.selected?.targetId, 'kc-a');
     assert.equal(audit.utteranceRequest?.action, 'hint');
-    assert.deepEqual(audit.candidates.map((candidate) => candidate.valid), [true, true]);
+    assert.deepEqual(audit.candidates.map((candidate) => candidate.valid), [true]);
   });
 
-  it('simulates alternate salience sets without changing facts or rules', function() {
+  it('audits a different terminal move when the executed rule salience changes', function() {
+    const promptFirstRules = rules.map((rule) => (
+      rule.id === 'dialogue.move.prompt' ? { ...rule, salience: 95 } : rule
+    ));
+    const execution = runSparcProductionRules({ facts, rules: promptFirstRules });
     const audit = auditSparcMoveSelection({
-      facts,
-      rules,
-      salienceOverrides: {
-        'dialogue.move.prompt': 95,
-      },
+      execution,
+      rules: promptFirstRules,
     });
 
     assert.deepEqual(audit.candidates.map((candidate) => candidate.ruleId), [
       'dialogue.move.prompt',
-      'dialogue.move.hint',
     ]);
     assert.equal(audit.selected?.ruleId, 'dialogue.move.prompt');
     assert.equal(audit.utteranceRequest?.action, 'prompt');
   });
 
   it('rejects matched selected actions that have no clean target text', function() {
+    const incompleteFacts = facts.filter((entry) => entry.factType !== 'autotutor.expectation');
+    const execution = runSparcProductionRules({ facts: incompleteFacts, rules });
     const audit = auditSparcMoveSelection({
-      facts: facts.filter((entry) => entry.factType !== 'autotutor.expectation'),
+      execution,
       rules,
     });
 

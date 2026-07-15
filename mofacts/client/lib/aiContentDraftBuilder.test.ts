@@ -102,7 +102,7 @@ describe('aiContentDraftBuilder', function() {
       policyId: 'progressive-scaffolding-v1',
       policyVersion: 1,
       parameters: {
-        minimumProgress: 0.05,
+        minimumProgress: 0.3,
         progressResponse: 'deescalate',
         nonAddressingResponse: 'hold',
         postAssertionResponse: 'cycle-to-pump',

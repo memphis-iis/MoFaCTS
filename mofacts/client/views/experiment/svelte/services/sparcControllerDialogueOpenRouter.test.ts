@@ -91,6 +91,7 @@ const utteranceRequest: SparcUtteranceRequest = {
   action: 'hint',
   contentTexts: ['Use the authored hint.'],
   moveDefinition: requireActiveSparcMoveDefinition('hint'),
+  responseModifiers: [],
   selectedAction: {
     targetType: 'learningTarget',
     clusterKC: 'kc-a',
@@ -157,6 +158,7 @@ function utteranceRequestFor(
       ? ['A fixed annual rate means the same dollar amount is added every year.']
       : ['A target text'],
     moveDefinition: requireActiveSparcMoveDefinition(action),
+    responseModifiers: [],
     selectedAction: { targetType, targetId, action },
     learnerText: targetType === 'learnerQuestion'
       ? 'Can you just tell me the answer?'
@@ -351,6 +353,41 @@ describe('SPARC dialogue OpenRouter provider', function() {
       .to.equal('Try using the authored hint.');
   });
 
+  it('orders a question-deferral modifier before the terminal scaffold move', async function() {
+    const provider = createSparcDialogueOpenRouterProvider({
+      async callResolvedOpenRouterJson(params) {
+        const systemPrompt = params.messages[0]?.content ?? '';
+        const modifierIndex = systemPrompt.indexOf('Response modifier: question-deferral.');
+        const selectedMoveIndex = systemPrompt.indexOf('Selected move: prompt.');
+        expect(modifierIndex).to.be.greaterThan(-1);
+        expect(selectedMoveIndex).to.be.greaterThan(modifierIndex);
+        expect(systemPrompt).to.contain('Produce one coherent tutorMessage with one instructional question.');
+        expect(systemPrompt).to.contain('Do not answer the learner\'s question');
+        return {
+          parsedContent: {
+            targetType: 'learningTarget',
+            targetId: 'kc-a',
+            selectedMove: 'prompt',
+            tutorMessage: 'Let us work with that question a little longer. What relationship should you examine next?',
+          },
+        };
+      },
+    });
+    const request: SparcUtteranceRequest = {
+      ...utteranceRequest,
+      action: 'prompt',
+      moveDefinition: requireActiveSparcMoveDefinition('prompt'),
+      responseModifiers: [{
+        action: 'question-deferral',
+        sourceRuleId: 'dialogue.question.defer',
+        moveDefinition: requireActiveSparcMoveDefinition('question-deferral'),
+      }],
+    };
+
+    expect(await provider.generateTutorUtterance(request))
+      .to.equal('Let us work with that question a little longer. What relationship should you examine next?');
+  });
+
   it('supplies the Compound Interest problem and history without evidence control fields', async function() {
     const display: SparcControllerDisplay = {
       ...dialogueDisplay(),
@@ -501,7 +538,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(systemPrompt).to.contain('Because targetType is completion');
       }
       if (move === 'question-deferral') {
-        expect(systemPrompt).to.contain('Do not answer the question or reveal the target content');
+        expect(systemPrompt).to.contain('Do not answer the learner\'s question');
         expect(userPrompt).to.contain('Learner-question routing context (application classification):');
       }
       if (move === 'question-scope-refusal') {
