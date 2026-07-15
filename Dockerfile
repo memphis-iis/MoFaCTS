@@ -1,5 +1,5 @@
 # The tag here should match the Meteor version of your app, per .meteor/release
-FROM geoffreybooth/meteor-base:3.4.1 AS meteor_builder
+FROM geoffreybooth/meteor-base:3.5 AS meteor_builder
 ENV METEOR_ALLOW_SUPERUSER=1
 ENV APP_SOURCE_FOLDER=/opt/mofacts
 
