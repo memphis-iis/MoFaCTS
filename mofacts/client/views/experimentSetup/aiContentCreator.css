@@ -17,7 +17,7 @@
 .ai-char-count { flex-shrink: 0; padding: 2px var(--app-space-1); border-radius: var(--app-border-radius-sm); background: color-mix(in srgb, var(--learning-card-surface-color) 84%, transparent); color: var(--app-secondary-text-color); font-size: calc(var(--app-font-size-base) * 0.75); }
 .ai-mode-label { margin: 0 0 var(--app-space-1) var(--app-space-1); color: var(--app-secondary-text-color); font-size: calc(var(--app-font-size-base) * 0.8125); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .ai-mode-fieldset { margin: 0; padding: 0; border: 0; }
-.ai-mode-selector { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--app-space-1); }
+.ai-mode-selector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--app-space-1); }
 .ai-mode-card { min-height: calc(var(--app-button-height) * 0.9); display: flex; align-items: center; gap: var(--app-space-1); padding: calc(0.45rem * var(--app-density-scale)) calc(0.6rem * var(--app-density-scale)); background: var(--learning-card-surface-color); border: 1.5px solid var(--border-color); border-radius: var(--app-border-radius-sm); color: var(--app-text-color); text-align: left; transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
 .ai-mode-card:hover { background: color-mix(in srgb, var(--learning-card-surface-color) 92%, var(--app-muted-surface-color)); border-color: color-mix(in srgb, var(--app-accent-color) 36%, var(--border-color)); transform: translateY(-1px); }
 .ai-mode-card.is-selected { background: var(--app-info-surface-color); border-color: var(--app-info-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-info-color) 16%, transparent); }

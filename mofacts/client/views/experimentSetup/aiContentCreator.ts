@@ -138,13 +138,6 @@ const CREATION_MODULES: Array<{
     descriptionKey: 'aiCreator.assessmentDescription',
     icon: 'fa-check-square-o',
   },
-  {
-    id: 'autoTutor',
-    labelKey: 'aiCreator.autoTutorLabel',
-    shortLabelKey: 'aiCreator.autoTutorShortLabel',
-    descriptionKey: 'aiCreator.autoTutorDescription',
-    icon: 'fa-star-o',
-  },
 ];
 
 const CREATION_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.records';
