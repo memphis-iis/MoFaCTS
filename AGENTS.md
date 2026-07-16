@@ -112,6 +112,8 @@ Use the verification path that matches the change. Say clearly when a check coul
 | Meteor integration or client contract coverage | Use CI or another supported Meteor test environment. Do not run `npm run test:ci` routinely on local Windows. |
 | Docker build, push, deploy, or release confidence | Run only when explicitly requested. |
 
+Every invocation of `npm run test:ci` requires fresh, explicit user authorization. Authorization is single-use and does not carry forward to a later invocation, even within the same conversation or task.
+
 For TypeScript-bearing app changes, the full app check is:
 
 ```bash
