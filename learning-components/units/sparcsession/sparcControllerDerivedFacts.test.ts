@@ -116,7 +116,7 @@ describe('deriveSparcControllerFacts', function() {
       fact('autotutor.expectation', { clusterKC: 'kc-a' }),
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),
       fact('autotutor.misconception', { id: 'm1' }),
-      fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+      fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.7 }),
     ];
     const blocked = deriveSparcControllerFacts([
       fact('dialogue.graduation', { requiredTargetCount: 1, maxActiveMisconceptions: 0 }),

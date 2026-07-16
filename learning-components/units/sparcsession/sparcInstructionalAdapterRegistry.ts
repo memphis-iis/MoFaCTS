@@ -103,7 +103,9 @@ const autoTutorAdapter: SparcInstructionalAdapter = {
   adapterId: SPARC_AUTOTUTOR_ADAPTER_ID,
   deriveControllerFacts: deriveSparcControllerFacts,
   selectTarget({ facts, options }) {
-    const completion = facts.find((fact) => fact.factType === 'controller.completionState');
+    const completion = facts
+      .filter((fact) => fact.factType === 'controller.completionState')
+      .at(-1);
     if (completion?.slots?.completed === true) return completionSelection(facts);
     return selectSparcLearningTargetFromFacts(facts, options);
   },

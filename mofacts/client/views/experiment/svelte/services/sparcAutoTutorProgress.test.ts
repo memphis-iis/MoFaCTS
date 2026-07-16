@@ -12,20 +12,20 @@ function displayWithMisconceptions(): SparcControllerDisplay {
       expectations: [],
       misconceptions: [{
         id: 'm-low',
-        text: 'Low-confidence misconception.',
+        text: 'Low-support misconception.',
       }, {
         id: 'm-high-a',
-        text: 'High-confidence misconception A.',
+        text: 'High-support misconception A.',
       }, {
         id: 'm-high-b',
-        text: 'High-confidence misconception B.',
+        text: 'High-support misconception B.',
       }],
     },
   } as unknown as SparcControllerDisplay;
 }
 
 describe('sparcAutoTutorProgress', function() {
-  it('sums misconception confidence values at or above the threshold', function() {
+  it('sums misconception support strengths at or above the threshold', function() {
     const snapshot = buildSparcAutoTutorProgressSnapshot({
       display: displayWithMisconceptions(),
       runtimeNodeValues: {
@@ -38,19 +38,19 @@ describe('sparcAutoTutorProgress', function() {
           factType: 'diagnostic.misconceptionScore',
           slots: {
             id: 'm-low',
-            confidence: 0.1,
+            supportStrength: 0.1,
           },
         }, {
           factType: 'diagnostic.misconceptionScore',
           slots: {
             id: 'm-high-a',
-            confidence: 0.9,
+            supportStrength: 0.9,
           },
         }, {
           factType: 'diagnostic.misconceptionScore',
           slots: {
             id: 'm-high-b',
-            confidence: 0.7,
+            supportStrength: 0.7,
           },
         }],
       },
@@ -72,19 +72,19 @@ describe('sparcAutoTutorProgress', function() {
           factType: 'diagnostic.misconceptionScore',
           slots: {
             id: 'm-low',
-            confidence: 0.1,
+            supportStrength: 0.1,
           },
         }, {
           factType: 'diagnostic.misconceptionScore',
           slots: {
             id: 'm-high-a',
-            confidence: 0.19,
+            supportStrength: 0.19,
           },
         }, {
           factType: 'diagnostic.misconceptionScore',
           slots: {
             id: 'm-high-b',
-            confidence: 0,
+            supportStrength: 0,
           },
         }],
       },

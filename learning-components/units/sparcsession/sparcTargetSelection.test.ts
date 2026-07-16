@@ -30,12 +30,12 @@ function misconceptionSource(id: string): SparcWorkingMemoryFact {
   };
 }
 
-function misconceptionScore(id: string, confidence: number): SparcWorkingMemoryFact {
+function misconceptionScore(id: string, supportStrength: number): SparcWorkingMemoryFact {
   return {
     factType: 'diagnostic.misconceptionScore',
     slots: {
       id,
-      confidence,
+      supportStrength,
     },
   };
 }
@@ -242,7 +242,7 @@ describe('selectSparcLearningTargetFromFacts', function() {
     });
   });
 
-  it('keeps a repair-active selected misconception focused until confidence drops below threshold', function() {
+  it('keeps a repair-active selected misconception focused until support strength drops below threshold', function() {
     const result = selectSparcLearningTargetFromFacts([
       ...baseFacts(),
       misconceptionSource('m-prior'),

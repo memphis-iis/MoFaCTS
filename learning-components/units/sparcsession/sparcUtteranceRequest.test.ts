@@ -67,7 +67,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       }),
       fact('diagnostic.misconceptionScore', {
         id: 'm1',
-        confidence: 0.95,
+        supportStrength: 0.95,
       }),
       fact('learnerResponse.contribution', {
         type: 'answer',
@@ -157,7 +157,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),
       fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.4 }),
       fact('autotutor.misconception', { id: 'm1', text: 'An unresolved misconception.' }),
-      fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+      fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.7 }),
       fact('controller.completionState', {
         completed: true,
         reason: 'max-turns',
@@ -202,7 +202,7 @@ describe('createSparcUtteranceRequestFromFacts', function() {
       misconceptions: [{
         id: 'm1',
         text: 'An unresolved misconception.',
-        confidence: 0.7,
+        supportStrength: 0.7,
         status: 'active',
       }],
     });

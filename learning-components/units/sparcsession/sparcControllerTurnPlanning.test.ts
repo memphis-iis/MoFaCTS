@@ -61,7 +61,7 @@ describe('evaluateSparcControllerTurnPlanning', function() {
     const result = evaluateSparcControllerTurnPlanning({
       document: document([
         fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7, addressed: true }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.7, addressed: true }),
       ]),
       event,
     });
@@ -86,12 +86,37 @@ describe('evaluateSparcControllerTurnPlanning', function() {
     assert.equal(selectedAction(result)?.slots?.targetType, 'completion');
   });
 
+  it('uses current completion after replayed in-progress state when the learner succeeds', function() {
+    const result = evaluateSparcControllerTurnPlanning({
+      document: document([
+        fact('dialogue.graduation', { requiredTargetCount: 1 }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),
+      ]),
+      event,
+      extraFacts: [
+        fact('controller.completionState', {
+          completed: false,
+          reason: 'in-progress',
+          coveredTargetCount: 0,
+          requiredTargetCount: 1,
+        }),
+      ],
+    });
+
+    assert.equal(
+      result.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.completed,
+      true,
+    );
+    assert.equal(selectedAction(result)?.slots?.action, 'summary');
+    assert.equal(selectedAction(result)?.slots?.targetType, 'completion');
+  });
+
   it('selects the terminal summary at the total turn limit even with an active misconception', function() {
     const result = evaluateSparcControllerTurnPlanning({
       document: document([
         fact('dialogue.graduation', { requiredTargetCount: 1, maxActiveMisconceptions: 0, maxTurns: 1 }),
         fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.7 }),
       ]),
       event,
     });

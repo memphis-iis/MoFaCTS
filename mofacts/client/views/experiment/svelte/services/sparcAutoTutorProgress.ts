@@ -18,7 +18,7 @@ export type SparcAutoTutorProgressTarget = {
 export type SparcAutoTutorProgressMisconception = {
   readonly id: string;
   readonly label: string;
-  readonly confidence: number;
+  readonly supportStrength: number;
   readonly active: boolean;
 };
 
@@ -137,8 +137,8 @@ function expectationCredit(coverage: number, coverageThreshold: number): number 
   return coverage >= coverageThreshold ? 1 : coverage;
 }
 
-function misconceptionCredit(confidence: number, misconceptionThreshold: number): number {
-  return confidence >= misconceptionThreshold ? confidence : 0;
+function misconceptionCredit(supportStrength: number, misconceptionThreshold: number): number {
+  return supportStrength >= misconceptionThreshold ? supportStrength : 0;
 }
 
 export function buildSparcAutoTutorProgressSnapshot(params: {
@@ -172,14 +172,14 @@ export function buildSparcAutoTutorProgressSnapshot(params: {
       ? misconception.id.trim()
       : `misconception-${index + 1}`;
     const score = misconceptionScoreById.get(id);
-    const confidence = score ? unitSlot(score, 'confidence') : 0;
+    const supportStrength = score ? unitSlot(score, 'supportStrength') : 0;
     return {
       id,
       label: typeof misconception.text === 'string' && misconception.text.trim()
         ? misconception.text.trim()
         : `Misconception ${index + 1}`,
-      confidence,
-      active: confidence >= policy.misconceptionThreshold,
+      supportStrength,
+      active: supportStrength >= policy.misconceptionThreshold,
     };
   });
   const completionState = factsByType(currentFacts, 'controller.completionState').at(-1);
@@ -196,7 +196,7 @@ export function buildSparcAutoTutorProgressSnapshot(params: {
     requiredExpectations: targets.length,
     neededExpectations: policy.requiredTargetCount,
     misconceptionScore: misconceptions.reduce(
-      (sum, misconception) => sum + misconceptionCredit(misconception.confidence, policy.misconceptionThreshold),
+      (sum, misconception) => sum + misconceptionCredit(misconception.supportStrength, policy.misconceptionThreshold),
       0,
     ),
     totalMisconceptions: misconceptions.length,

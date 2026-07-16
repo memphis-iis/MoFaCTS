@@ -1053,6 +1053,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...createOpenRouterMethods({
     serverConsole,
     getApiKeyResolutionDeps,
+    getMethodAuthorizationDeps,
   }),
 
   ...publicDashboardCacheMethods,

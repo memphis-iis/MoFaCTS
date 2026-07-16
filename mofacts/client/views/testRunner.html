@@ -34,6 +34,50 @@
         </div>
       </div>
     </div>
+
+    <div class="admin-section">
+      <div class="card admin-card">
+        <div class="card-body">
+          <div class="admin-header-action-row">
+            <div>
+              <div class="admin-section-heading admin-section-heading-compact">
+                <i class="fa fa-comments admin-section-icon"></i>
+                <h5>{{testText 'adminTests.sparcLiveEvaluation'}}</h5>
+              </div>
+              <div class="text-muted small">
+                {{testText 'adminTests.sparcLiveDescription'}}
+              </div>
+            </div>
+            <div class="admin-actions">
+              {{#if sparcLiveHasSavedJson}}
+                <button type="button" class="btn btn-outline-primary download-sparc-live-evaluation">
+                  <i class="fa fa-download" aria-hidden="true"></i>
+                  {{testText 'adminTests.downloadSparcLiveLog'}}
+                </button>
+              {{/if}}
+              {{#if sparcLivePending}}
+                <button type="button" class="btn btn-primary run-sparc-live-evaluation" disabled aria-busy="true">
+                  <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                  {{testText 'adminTests.runSparcLiveEvaluation'}}
+                </button>
+              {{else}}
+                <button type="button" class="btn btn-primary run-sparc-live-evaluation" aria-busy="false">
+                  <i class="fa fa-comments" aria-hidden="true"></i>
+                  {{testText 'adminTests.runSparcLiveEvaluation'}}
+                </button>
+              {{/if}}
+            </div>
+          </div>
+
+          <div id="sparc-live-evaluation-output" class="admin-output-region" aria-live="polite">
+            {{#with sparcLiveOutput}}
+              {{> Template.dynamic template=template data=data}}
+            {{/with}}
+          </div>
+          <pre id="sparc-live-evaluation-saved-json" hidden>{{sparcLiveSavedJson}}</pre>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -47,6 +91,37 @@
   {{else}}
     {{> adminEmptyState text=emptyText icon="fa-list-alt"}}
   {{/if}}
+</template>
+
+<template name="testRunnerSparcLiveResult">
+  {{> adminStatus variant=summaryVariant text=summaryText urgent=summaryUrgent}}
+  {{> adminTableShell
+    label=tableLabel
+    tableTemplate="testRunnerSparcLiveTable"
+    tableData=this}}
+</template>
+
+<template name="testRunnerSparcLiveTable">
+  <table class="table table-sm table-bordered admin-readiness-table">
+    <thead>
+      <tr>
+        <th scope="col">{{checkLabel}}</th>
+        <th scope="col">{{graduationLabel}}</th>
+        <th scope="col">{{robustnessLabel}}</th>
+        <th scope="col">{{messageLabel}}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each runs}}
+        <tr class="{{rowClass}}">
+          <td>{{run}}</td>
+          <td>{{displayStudentOutcome}}</td>
+          <td>{{displayRobustnessOutcome}}</td>
+          <td>{{message}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
 </template>
 
 <template name="testRunnerReadinessTable">

@@ -14,7 +14,7 @@ export type SparcLearningTargetScoreInput = {
 
 export type SparcDiagnosticMisconceptionScoreInput = {
   readonly id: string;
-  readonly confidence: number;
+  readonly supportStrength: number;
 };
 
 export type SparcLearnerResponseScoringResult = {
@@ -87,7 +87,7 @@ function previousLearningTargetCoverage(facts: readonly SparcWorkingMemoryFact[]
   return scores;
 }
 
-function previousMisconceptionConfidence(facts: readonly SparcWorkingMemoryFact[]): Map<string, number> {
+function previousMisconceptionSupportStrength(facts: readonly SparcWorkingMemoryFact[]): Map<string, number> {
   const scores = new Map<string, number>();
   for (const fact of facts) {
     if (fact.factType !== 'diagnostic.misconceptionScore') {
@@ -98,8 +98,8 @@ function previousMisconceptionConfidence(facts: readonly SparcWorkingMemoryFact[
       continue;
     }
     scores.set(id, requireUnitScore(
-      fact.slots?.confidence,
-      `SPARC prior diagnostic.misconceptionScore "${id}" confidence`,
+      fact.slots?.supportStrength,
+      `SPARC prior diagnostic.misconceptionScore "${id}" supportStrength`,
     ));
   }
   return scores;
@@ -129,7 +129,7 @@ function misconceptionScoreFact(input: SparcDiagnosticMisconceptionScoreInput): 
     factType: 'diagnostic.misconceptionScore',
     slots: {
       id,
-      confidence: requireUnitScore(input.confidence, `SPARC diagnostic misconception score "${id}" confidence`),
+      supportStrength: requireUnitScore(input.supportStrength, `SPARC diagnostic misconception score "${id}" supportStrength`),
     },
   };
 }
@@ -161,7 +161,7 @@ export function createSparcLearnerResponseScoreFacts(params: {
   const knownClusterKcs = knownLearningTargetClusterKcs(params.facts);
   const knownMisconceptions = knownMisconceptionIds(params.facts);
   const previousCoverage = previousLearningTargetCoverage(params.facts);
-  const previousConfidence = previousMisconceptionConfidence(params.facts);
+  const previousSupportStrength = previousMisconceptionSupportStrength(params.facts);
   const scoredFacts: SparcWorkingMemoryFact[] = [];
   const contributionType = params.score.learnerContribution?.type;
   const learningTargetUpdates = uniqueUpdatesById({
@@ -189,7 +189,7 @@ export function createSparcLearnerResponseScoreFacts(params: {
   for (const id of knownMisconceptions) {
     const input = misconceptionUpdates.get(id) ?? {
       id,
-      confidence: previousConfidence.get(id) ?? 0,
+      supportStrength: previousSupportStrength.get(id) ?? 0,
     };
     scoredFacts.push(misconceptionScoreFact(input));
   }

@@ -253,6 +253,15 @@ describe('interfaceI18n', function() {
     'adminTests.message',
     'adminTests.pass',
     'adminTests.fail',
+    'adminTests.notRun',
+    'adminTests.sparcLiveEvaluation',
+    'adminTests.sparcLiveDescription',
+    'adminTests.runSparcLiveEvaluation',
+    'adminTests.downloadSparcLiveLog',
+    'adminTests.runningSparcLiveEvaluation',
+    'adminTests.sparcLivePassed',
+    'adminTests.sparcLiveFailed',
+    'adminTests.run',
   ] as const;
   const aiCreatorModeKeys = [
     'aiCreator.sourceAriaLabel',

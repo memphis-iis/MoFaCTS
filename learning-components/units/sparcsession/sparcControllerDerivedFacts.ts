@@ -145,16 +145,16 @@ function activeMisconceptionCount(
     .filter((fact) => fact.factType === 'autotutor.misconception')
     .map((fact) => stringSlot(fact, 'id'))
     .filter((id): id is string => Boolean(id)));
-  const confidenceById = new Map<string, number>();
+  const supportStrengthById = new Map<string, number>();
   for (const fact of facts) {
     if (fact.factType !== 'diagnostic.misconceptionScore') continue;
     const id = stringSlot(fact, 'id');
     if (id && authoredIds.has(id)) {
-      confidenceById.set(id, optionalFiniteSlot(fact, 'confidence') ?? 0);
+      supportStrengthById.set(id, optionalFiniteSlot(fact, 'supportStrength') ?? 0);
     }
   }
   const activationThreshold = 1 - coverageThreshold;
-  return [...confidenceById.values()].filter((confidence) => confidence >= activationThreshold).length;
+  return [...supportStrengthById.values()].filter((supportStrength) => supportStrength >= activationThreshold).length;
 }
 
 export function deriveSparcControllerFacts(

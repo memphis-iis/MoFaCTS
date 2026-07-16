@@ -91,14 +91,14 @@ function selectedTarget(params: {
   if (params.selection.selectedTargetType === 'misconception') {
     const targetId = requireNonBlank(params.selection.selectedMisconceptionId, 'SPARC selected misconception id');
     const scores = matchingFacts(params.facts, 'diagnostic.misconceptionScore', 'id', targetId);
-    const confidence = optionalNumber(scores.at(-1)?.slots?.confidence) ?? 0;
-    const repairConfidence = 1 - threshold(params.facts);
+    const supportStrength = optionalNumber(scores.at(-1)?.slots?.supportStrength) ?? 0;
+    const repairSupportStrength = 1 - threshold(params.facts);
     return {
       targetKey: `misconception:${targetId}`,
       targetKind: 'misconception' as const,
       targetId,
-      currentProgress: 1 - confidence,
-      resolutionThreshold: 1 - repairConfidence,
+      currentProgress: 1 - supportStrength,
+      resolutionThreshold: 1 - repairSupportStrength,
       resolutionInclusive: false,
     };
   }
@@ -126,7 +126,7 @@ function observationForPreviousTarget(params: {
 
   const scoreFactType = targetKind === 'expectation' ? 'learningTarget.score' : 'diagnostic.misconceptionScore';
   const identitySlot = targetKind === 'expectation' ? 'clusterKC' : 'id';
-  const scoreSlot = targetKind === 'expectation' ? 'coverage' : 'confidence';
+  const scoreSlot = targetKind === 'expectation' ? 'coverage' : 'supportStrength';
   const scores = matchingFacts(params.facts, scoreFactType, identitySlot, targetId);
   const beforeFact = scores.at(-2);
   const afterFact = scores.at(-1);

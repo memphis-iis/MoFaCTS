@@ -15,7 +15,11 @@ import {
   resolvePreferredApiKey,
   type ApiKeyResolutionDeps,
 } from '../lib/apiKeyResolution';
-import { requireAuthenticatedUser } from '../lib/methodAuthorization';
+import {
+  requireAuthenticatedUser,
+  requireUserWithRoles,
+  type MethodAuthorizationDeps,
+} from '../lib/methodAuthorization';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -25,6 +29,7 @@ type MethodContext = {
 
 type OpenRouterMethodsDeps = {
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
+  getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   serverConsole: (...args: unknown[]) => void;
 };
 
@@ -140,97 +145,135 @@ function redactProviderError(deps: OpenRouterMethodsDeps, operation: string, err
   return new Meteor.Error('openrouter-request-failed', reason);
 }
 
+async function resolveOpenRouterCapability(
+  deps: OpenRouterMethodsDeps,
+  userId: string,
+  tdfIdValue?: string | null,
+) {
+  const resolverDeps = deps.getApiKeyResolutionDeps();
+  const tdfId = normalizeString(tdfIdValue) || null;
+  const keyResolution = await resolvePreferredApiKey(resolverDeps, {
+    userId,
+    tdfId,
+    kind: 'openrouter',
+  });
+  const model = await resolveOpenRouterModel(resolverDeps, {
+    userId,
+    tdfId,
+    keySource: keyResolution.source,
+  });
+  return {
+    configured: Boolean(keyResolution.apiKey && model),
+    source: keyResolution.source,
+    model,
+  };
+}
+
+async function executeResolvedOpenRouterJson(
+  deps: OpenRouterMethodsDeps,
+  userId: string,
+  params: unknown,
+  operation: string,
+) {
+  check(params, Match.ObjectIncluding({
+    messages: Array,
+    intent: Object,
+  }));
+  const data = params as UnknownRecord;
+  const resolverDeps = deps.getApiKeyResolutionDeps();
+  const tdfId = normalizeString(data.tdfId) || null;
+  const keyResolution = await resolvePreferredApiKey(resolverDeps, {
+    userId,
+    tdfId,
+    kind: 'openrouter',
+  });
+  if (!keyResolution.apiKey) {
+    throw new Meteor.Error('no-api-key', 'No configured OpenRouter API key alternative is available');
+  }
+  const model = await resolveOpenRouterModel(resolverDeps, {
+    userId,
+    tdfId,
+    requestedModel: data.model,
+    keySource: keyResolution.source,
+  });
+  if (!model) {
+    throw new Meteor.Error('no-openrouter-model', 'No configured OpenRouter model is available');
+  }
+  const intent = isRecord(data.intent) ? data.intent : {};
+  const title = normalizeString(intent.title) || 'MoFaCTS OpenRouter';
+  const schemaName = normalizeString(intent.schemaName);
+  const missingContentMessage = normalizeString(intent.missingContentMessage) || 'OpenRouter response did not include message content.';
+  try {
+    const openRouterIntent: Parameters<typeof callOpenRouterJson>[0]['intent'] = {
+      title,
+      ...(schemaName ? { schemaName } : {}),
+      ...(isRecord(intent.schema) ? { schema: intent.schema } : {}),
+      strictSchema: intent.strictSchema === true,
+      missingContentMessage,
+      parse(value) {
+        return value;
+      },
+    };
+    const callOptions: Parameters<typeof callOpenRouterJson>[0] = {
+      apiKey: keyResolution.apiKey,
+      model,
+      messages: normalizeMessages(data.messages),
+      requireUsageCost: data.requireUsageCost === true,
+      intent: openRouterIntent,
+    };
+    if (typeof data.temperature === 'number') {
+      callOptions.temperature = data.temperature;
+    }
+    if (typeof data.maxTokens === 'number') {
+      callOptions.maxTokens = data.maxTokens;
+    }
+    if (isRecord(data.telemetry)) {
+      callOptions.telemetry = data.telemetry;
+    }
+    const result = await callOpenRouterJson(callOptions);
+    return {
+      rawContent: result.rawContent,
+      parsedContent: extractJsonObject(result.rawContent),
+      responseBody: result.responseBody,
+      costUsd: result.costUsd,
+      source: keyResolution.source,
+      model,
+    };
+  } catch (error) {
+    throw redactProviderError(deps, operation, error);
+  }
+}
+
 export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
   return {
     getOpenRouterCapability: async function(this: MethodContext, tdfId?: string | null) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to read OpenRouter capability', 401);
-      const resolverDeps = deps.getApiKeyResolutionDeps();
-      const keyResolution = await resolvePreferredApiKey(resolverDeps, {
-        userId,
-        tdfId: normalizeString(tdfId) || null,
-        kind: 'openrouter',
+      return resolveOpenRouterCapability(deps, userId, tdfId);
+    },
+
+    getAdminTestOpenRouterCapability: async function(this: MethodContext) {
+      const userId = await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
+        userId: this.userId,
+        roles: ['admin'],
+        notLoggedInMessage: 'Must be logged in to run Admin Tests OpenRouter evaluations',
+        forbiddenMessage: 'Only admins can run Admin Tests OpenRouter evaluations',
       });
-      const model = await resolveOpenRouterModel(resolverDeps, {
-        userId,
-        tdfId: normalizeString(tdfId) || null,
-        keySource: keyResolution.source,
-      });
-      return {
-        configured: Boolean(keyResolution.apiKey && model),
-        source: keyResolution.source,
-        model,
-      };
+      return resolveOpenRouterCapability(deps, userId);
     },
 
     callResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter', 401);
-      check(params, Match.ObjectIncluding({
-        messages: Array,
-        intent: Object,
-      }));
-      const data = params as UnknownRecord;
-      const resolverDeps = deps.getApiKeyResolutionDeps();
-      const tdfId = normalizeString(data.tdfId) || null;
-      const keyResolution = await resolvePreferredApiKey(resolverDeps, {
-        userId,
-        tdfId,
-        kind: 'openrouter',
+      return executeResolvedOpenRouterJson(deps, userId, params, 'json');
+    },
+
+    callAdminTestResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
+      const userId = await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
+        userId: this.userId,
+        roles: ['admin'],
+        notLoggedInMessage: 'Must be logged in to run Admin Tests OpenRouter evaluations',
+        forbiddenMessage: 'Only admins can run Admin Tests OpenRouter evaluations',
       });
-      if (!keyResolution.apiKey) {
-        throw new Meteor.Error('no-api-key', 'No configured OpenRouter API key alternative is available');
-      }
-      const model = await resolveOpenRouterModel(resolverDeps, {
-        userId,
-        tdfId,
-        requestedModel: data.model,
-        keySource: keyResolution.source,
-      });
-      if (!model) {
-        throw new Meteor.Error('no-openrouter-model', 'No configured OpenRouter model is available');
-      }
-      const intent = isRecord(data.intent) ? data.intent : {};
-      const title = normalizeString(intent.title) || 'MoFaCTS OpenRouter';
-      const schemaName = normalizeString(intent.schemaName);
-      const missingContentMessage = normalizeString(intent.missingContentMessage) || 'OpenRouter response did not include message content.';
-      try {
-        const openRouterIntent: Parameters<typeof callOpenRouterJson>[0]['intent'] = {
-          title,
-          ...(schemaName ? { schemaName } : {}),
-          ...(isRecord(intent.schema) ? { schema: intent.schema } : {}),
-          strictSchema: intent.strictSchema === true,
-          missingContentMessage,
-          parse(value) {
-            return value;
-          },
-        };
-        const callOptions: Parameters<typeof callOpenRouterJson>[0] = {
-          apiKey: keyResolution.apiKey,
-          model,
-          messages: normalizeMessages(data.messages),
-          requireUsageCost: data.requireUsageCost === true,
-          intent: openRouterIntent,
-        };
-        if (typeof data.temperature === 'number') {
-          callOptions.temperature = data.temperature;
-        }
-        if (typeof data.maxTokens === 'number') {
-          callOptions.maxTokens = data.maxTokens;
-        }
-        if (isRecord(data.telemetry)) {
-          callOptions.telemetry = data.telemetry;
-        }
-        const result = await callOpenRouterJson(callOptions);
-        return {
-          rawContent: result.rawContent,
-          parsedContent: extractJsonObject(result.rawContent),
-          responseBody: result.responseBody,
-          costUsd: result.costUsd,
-          source: keyResolution.source,
-          model,
-        };
-      } catch (error) {
-        throw redactProviderError(deps, 'json', error);
-      }
+      return executeResolvedOpenRouterJson(deps, userId, params, 'admin-test-json');
     },
 
     callResolvedOpenRouterEmbeddings: async function(this: MethodContext, params: unknown) {

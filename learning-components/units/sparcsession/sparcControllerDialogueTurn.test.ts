@@ -135,7 +135,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
         ...(baseDocument.workingMemoryFacts ?? []),
         fact('dialogue.graduation', { requiredTargetCount: 2, maxActiveMisconceptions: 0, maxTurns: 2 }),
         fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.7 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.7 }),
       ],
     };
 
@@ -153,6 +153,65 @@ describe('evaluateSparcControllerDialogueTurn', function() {
 
     assert.equal(result.planning.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.reason, 'max-turns');
     assert.equal(result.transition.writes.filter((write) => (
+      write.value
+      && typeof write.value === 'object'
+      && (write.value as { type?: string; node?: { readOnly?: boolean } }).type === 'insert-node'
+      && (write.value as { node?: { readOnly?: boolean } }).node?.readOnly === true
+    )).length, 2);
+  });
+
+  it('summarizes successful completion after replayed in-progress state instead of selecting another target', async function() {
+    const sourceDocument = document();
+    const firstTurn = await commitSparcControllerDialogueTurn({
+      core: {
+        TDFId: 'tdf-dialogue-controller',
+        sessionID: 'session-dialogue-controller',
+        anonStudentId: 'anon-dialogue-controller',
+        levelUnit: 1,
+        levelUnitName: 'Dialogue Controller Unit',
+      },
+      document: sourceDocument,
+      event,
+      problemStatement,
+      learnerResponseScore: {},
+      generateTutorUtterance: () => 'Keep working with A and B.',
+      runtime: {},
+    });
+    const replayState = applySparcHistoryRecord(createEmptySparcReplayState(), firstTurn.historyRecord!);
+
+    const completedTurn = await evaluateSparcControllerDialogueTurn({
+      document: sourceDocument,
+      replayState,
+      event: {
+        ...event,
+        eventId: 'event-dialogue-controller-success',
+        time: 3000,
+        payload: { input: 'A and B are now fully explained.' },
+      },
+      problemStatement,
+      learnerResponseScore: {
+        learningTargetScores: [{
+          clusterKC: 'kc-a',
+          coverage: 0.9,
+        }, {
+          clusterKC: 'kc-b',
+          coverage: 0.9,
+        }],
+      },
+      generateTutorUtterance: (request) => {
+        assert.equal(request.targetType, 'completion');
+        assert.equal(request.action, 'summary');
+        return 'You successfully explained how A and B are related.';
+      },
+    });
+
+    assert.equal(
+      completedTurn.planning.derivedFacts
+        .find((entry) => entry.factType === 'controller.completionState')?.slots?.completed,
+      true,
+    );
+    assert.equal(completedTurn.moveSelectionAudit.selected?.ruleId, 'dialogue.completion.summary');
+    assert.equal(completedTurn.transition.writes.filter((write) => (
       write.value
       && typeof write.value === 'object'
       && (write.value as { type?: string; node?: { readOnly?: boolean } }).type === 'insert-node'

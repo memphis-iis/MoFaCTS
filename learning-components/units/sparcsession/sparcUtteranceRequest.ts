@@ -149,8 +149,8 @@ function targetContent(params: {
   }));
   const misconceptionScores = new Map(factsByType(params.facts, 'diagnostic.misconceptionScore').flatMap((fact) => {
     const id = stringSlot(fact, 'id');
-    const confidence = Number(fact.slots?.confidence);
-    return id && Number.isFinite(confidence) ? [[id, confidence] as const] : [];
+    const supportStrength = Number(fact.slots?.supportStrength);
+    return id && Number.isFinite(supportStrength) ? [[id, supportStrength] as const] : [];
   }));
   return {
     completion: completionState,
@@ -166,12 +166,12 @@ function targetContent(params: {
     }),
     misconceptions: factsByType(params.facts, 'autotutor.misconception').map((fact) => {
       const id = stringSlot(fact, 'id') ?? '';
-      const confidence = misconceptionScores.get(id) ?? 0;
+      const supportStrength = misconceptionScores.get(id) ?? 0;
       return {
         id,
         text: stringSlot(fact, 'text') ?? '',
-        confidence,
-        status: confidence >= 1 - coverageThreshold ? 'active' : 'inactive',
+        supportStrength,
+        status: supportStrength >= 1 - coverageThreshold ? 'active' : 'inactive',
       };
     }),
   };

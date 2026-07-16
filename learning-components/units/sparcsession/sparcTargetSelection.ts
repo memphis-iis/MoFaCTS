@@ -13,7 +13,7 @@ export type SparcLearningTargetCandidate = {
 
 export type SparcMisconceptionCandidate = {
   readonly id: string;
-  readonly confidence: number;
+  readonly supportStrength: number;
   readonly eligible: boolean;
 };
 
@@ -266,8 +266,8 @@ function misconceptionIds(facts: readonly SparcWorkingMemoryFact[]): readonly st
     .filter(Boolean) as string[])];
 }
 
-function collectMisconceptionConfidenceById(facts: readonly SparcWorkingMemoryFact[]): Map<string, number> {
-  const confidenceById = new Map<string, number>();
+function collectMisconceptionSupportStrengthById(facts: readonly SparcWorkingMemoryFact[]): Map<string, number> {
+  const supportStrengthById = new Map<string, number>();
   for (const fact of facts) {
     if (fact.factType !== 'diagnostic.misconceptionScore') {
       continue;
@@ -276,9 +276,9 @@ function collectMisconceptionConfidenceById(facts: readonly SparcWorkingMemoryFa
     if (!id) {
       throw new Error('SPARC diagnostic.misconceptionScore fact requires id');
     }
-    confidenceById.set(id, numberSlot(fact, 'confidence', `SPARC diagnostic.misconceptionScore "${id}" confidence`));
+    supportStrengthById.set(id, numberSlot(fact, 'supportStrength', `SPARC diagnostic.misconceptionScore "${id}" supportStrength`));
   }
-  return confidenceById;
+  return supportStrengthById;
 }
 
 function selectedMisconceptionFact(id: string): SparcWorkingMemoryFact {
@@ -307,7 +307,7 @@ function selectMisconceptionCandidate(
   return active
     .map((candidate, index) => ({ candidate, index }))
     .sort((left, right) => (
-      right.candidate.confidence - left.candidate.confidence
+      right.candidate.supportStrength - left.candidate.supportStrength
       || left.index - right.index
     ))[0]?.candidate;
 }
@@ -367,13 +367,13 @@ export function selectSparcLearningTargetFromFacts(
       eligible: clusterKC !== excludeClusterKC && coverage < coverageThreshold,
     };
   });
-  const confidenceById = collectMisconceptionConfidenceById(facts);
+  const supportStrengthById = collectMisconceptionSupportStrengthById(facts);
   const misconceptionCandidates = misconceptionIds(facts).map((id) => {
-    const confidence = confidenceById.get(id) ?? 0;
+    const supportStrength = supportStrengthById.get(id) ?? 0;
     return {
       id,
-      confidence,
-      eligible: confidence >= repairThreshold,
+      supportStrength,
+      eligible: supportStrength >= repairThreshold,
     };
   });
   const selectedMisconception = selectMisconceptionCandidate(

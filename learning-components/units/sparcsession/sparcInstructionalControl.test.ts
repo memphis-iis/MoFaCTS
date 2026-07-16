@@ -89,8 +89,8 @@ describe('SPARC AutoTutor instructional adapter', function() {
         fact('instructionalFocus.episode', {
           focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
         }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.8 }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.6 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.6 }),
       ],
     });
     const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');
@@ -132,8 +132,8 @@ describe('SPARC AutoTutor instructional adapter', function() {
         fact('instructionalFocus.episode', {
           focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
         }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.8 }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.5 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.5 }),
       ],
     });
 

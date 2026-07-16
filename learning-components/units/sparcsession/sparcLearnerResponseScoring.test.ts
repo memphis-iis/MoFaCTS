@@ -24,7 +24,7 @@ const document: SparcAuthoredDocument = {
     fact('autotutor.misconception', { id: 'm1' }),
     fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
     fact('learningTarget.score', { clusterKC: 'kc-b', coverage: 0.1 }),
-    fact('diagnostic.misconceptionScore', { id: 'm1', confidence: 0.2 }),
+    fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.2 }),
   ],
   root: {
     id: 'root',
@@ -63,7 +63,7 @@ describe('sparcLearnerResponseScoring', function() {
         }],
         diagnosticMisconceptionScores: [{
           id: 'm1',
-          confidence: 0.7,
+          supportStrength: 0.7,
         }],
         learnerContribution: {
           type: 'answer',
@@ -87,7 +87,7 @@ describe('sparcLearnerResponseScoring', function() {
     assert.ok(facts.some((entry) => (
       entry.factType === 'diagnostic.misconceptionScore'
       && entry.slots?.id === 'm1'
-      && entry.slots.confidence === 0.7
+      && entry.slots.supportStrength === 0.7
     )));
     assert.ok(facts.some((entry) => entry.factType === 'learnerResponse.contribution'));
     assert.equal(facts.some((entry) => entry.factType.startsWith('selector.')), false);
@@ -107,7 +107,7 @@ describe('sparcLearnerResponseScoring', function() {
 
     assert.equal(facts.find((entry) => entry.slots?.clusterKC === 'kc-a')?.slots?.coverage, 0.4);
     assert.equal(facts.find((entry) => entry.slots?.clusterKC === 'kc-b')?.slots?.coverage, 0.2);
-    assert.equal(facts.find((entry) => entry.slots?.id === 'm1')?.slots?.confidence, 0.2);
+    assert.equal(facts.find((entry) => entry.slots?.id === 'm1')?.slots?.supportStrength, 0.2);
   });
 
   it('stores learner question metadata only for question contributions', function() {
@@ -235,7 +235,7 @@ describe('sparcLearnerResponseScoring', function() {
         score: {
           diagnosticMisconceptionScores: [{
             id: 'm-missing',
-            confidence: 0.5,
+            supportStrength: 0.5,
           }],
         },
       }),
@@ -243,18 +243,18 @@ describe('sparcLearnerResponseScoring', function() {
     );
   });
 
-  it('rejects scorer confidence values outside 0..1', function() {
+  it('rejects scorer support-strength values outside 0..1', function() {
     assert.throws(
       () => createSparcLearnerResponseScoreFacts({
         facts: document.workingMemoryFacts ?? [],
         score: {
           diagnosticMisconceptionScores: [{
             id: 'm1',
-            confidence: 1.2,
+            supportStrength: 1.2,
           }],
         },
       }),
-      /confidence must be a number from 0 to 1/,
+      /supportStrength must be a number from 0 to 1/,
     );
   });
 });

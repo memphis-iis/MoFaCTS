@@ -49,7 +49,7 @@ function dialogueDisplay(): SparcControllerDisplay {
       factType: 'diagnostic.misconceptionScore',
       slots: {
         id: 'mis-1',
-        confidence: 0.7,
+        supportStrength: 0.5,
       },
     }],
   };
@@ -65,7 +65,7 @@ function scorerContext() {
         slots: { clusterKC: 'kc-a', coverage: 0.4 },
       }, {
         factType: 'diagnostic.misconceptionScore',
-        slots: { id: 'mis-1', confidence: 0.7 },
+        slots: { id: 'mis-1', supportStrength: 0.5 },
       }, {
         factType: 'dialogue.utterance',
         slots: { speaker: 'tutor', text: 'What happens after the first year?' },
@@ -210,12 +210,36 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.learnerQuestion).to.equal(undefined);
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_score');
+    expect(calls[0]).to.have.property('temperature', 0);
     expect(calls[0]).to.not.have.nested.property('intent.strictSchema', true);
     expect(calls[0]).to.have.property('tdfId', 'tdf-1');
     const systemMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[0];
     expect(systemMessage?.content).to.contain('coverage is cumulative evidence');
-    expect(systemMessage?.content).to.contain('Later shorthand, omission, or context-dependent restatement must not reduce it');
-    expect(systemMessage?.content).to.contain('legitimate question about the current problem or lesson content');
+    expect(systemMessage?.content).to.contain('never reduce it because of later shorthand, omission, or context-dependent restatement');
+    expect(systemMessage?.content).to.contain('primary conversational action genuinely requests information or confirmation');
+    expect(systemMessage?.content).to.contain('may be either a question or an answer');
+    expect(systemMessage?.content).to.contain('score its instructional meaning the same either way');
+    expect(systemMessage?.content).to.contain('decide whether the latest response endorses it, is neutral toward it, or repairs it');
+    expect(systemMessage?.content).to.contain('using 0 when the repair is unambiguous');
+    expect(systemMessage?.content).to.contain('"Unlike X, the correct rule is Y" rejects X');
+    expect(systemMessage?.content).to.contain('A response that addresses the problem or answers the tutor cannot be off-task');
+    expect(systemMessage?.content).to.contain('0.8 or above means sufficient understanding to count as covered');
+    expect(systemMessage?.content).to.contain('A concise but correct semantic paraphrase of a target deserves at least 0.8');
+    expect(systemMessage?.content).to.contain('repeated multiplication for a multiplicative-growth target');
+    expect(systemMessage?.content).to.contain('score the learner’s expressed stance, not the probability');
+    expect(systemMessage?.content).to.contain('Learning-target coverage is continuous from 0 to 1');
+    expect(systemMessage?.content).to.contain('0 means the response demonstrates none of the target proposition');
+    expect(systemMessage?.content).to.contain('0.75 means the relationship and most essential elements are correct');
+    expect(systemMessage?.content).to.contain('expressed stance on a continuous scale from 0 to 1');
+    expect(systemMessage?.content).to.contain('0 means no expressed endorsement or explicit rejection');
+    expect(systemMessage?.content).to.contain('0.25 means weak or tentative expressed endorsement');
+    expect(systemMessage?.content).to.contain('1 means unequivocal endorsement or repeated reliance despite correction');
+    expect(systemMessage?.content).to.contain('For misconceptions, decide whether the latest response directly supports');
+    expect(systemMessage?.content).to.contain('Do not speculate about what the learner is thinking. This is an evidentiary evaluation');
+    expect(systemMessage?.content).to.contain('merely possible, topically related, shares words or numbers');
+    expect(systemMessage?.content).to.contain('weak but affirmative semantic support');
+    expect(systemMessage?.content).to.contain('A bare number or calculation supports a misconception only when');
+    expect(systemMessage?.content).to.contain('preserve consistency with an earlier answer');
     const userMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[1];
     expect(userMessage).to.not.equal(undefined);
     if (!userMessage) {
@@ -229,6 +253,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
       role: 'tutor',
       text: 'What happens after the first year?',
     }]);
+    expect(userMessage.content.indexOf('"learnerText"')).to.be.greaterThan(
+      userMessage.content.indexOf('"dialogueHistory"'),
+    );
     expect(JSON.parse(userMessage.content).learningTargets[0]).to.deep.include({
       clusterKC: 'kc-a',
       text: 'A target text',
@@ -237,20 +264,18 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(JSON.parse(userMessage.content).misconceptions[0]).to.deep.include({
       id: 'mis-1',
       text: 'The learner thinks the wrong thing.',
-      priorConfidence: 0.7,
+      priorSupportStrength: 0.5,
     });
     expect(userMessage.content).to.not.contain('assertion');
     expect(userMessage.content).to.not.contain('proposition');
     expect(userMessage.content).to.not.contain('repairCriteria');
     expect(userMessage.content).to.not.contain('dialogue.moveContent');
     expect(calls[0]).to.have.nested.property('messages[0].content')
-      .that.contains('Do not score the latest response from scratch');
+      .that.contains('Return only values changed by the latest response');
     expect(calls[0]).to.have.nested.property('messages[0].content')
-      .that.contains('Include a learningTargetScores row only when the latest response changes');
+      .that.contains('Resolve references using the problem statement and dialogue history');
     expect(calls[0]).to.have.nested.property('messages[0].content')
-      .that.contains('Resolve learner references using the current problem statement and dialogue context');
-    expect(calls[0]).to.have.nested.property('messages[0].content')
-      .that.contains('A high misconception confidence is not a good score');
+      .that.contains('A high value means stronger support for the incorrect belief, not a better answer');
   });
 
   it('requires learner question metadata for question contributions', async function() {
@@ -282,6 +307,74 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect((error as Error).message).to.equal(
       'SPARC dialogue scoring learnerQuestion is required when learnerContribution.type is question',
     );
+  });
+
+  it('rejects internally inconsistent and unknown score updates at the provider boundary', async function() {
+    const invalidEnvelopes = [{
+      learningTargetScores: [{ clusterKC: 'kc-a', coverage: 0.6 }],
+      diagnosticMisconceptionScores: [],
+      learnerContribution: { type: 'off-task' },
+    }, {
+      learningTargetScores: [{ clusterKC: 'unknown-kc', coverage: 0.6 }],
+      diagnosticMisconceptionScores: [],
+      learnerContribution: { type: 'answer' },
+    }, {
+      learningTargetScores: [],
+      diagnosticMisconceptionScores: [
+        { id: 'mis-1', supportStrength: 0.5 },
+        { id: 'mis-1', supportStrength: 0.8 },
+      ],
+      learnerContribution: { type: 'answer' },
+    }];
+    const expectedMessages = [
+      'off-task contribution cannot update instructional targets',
+      'unknown learning target id "unknown-kc"',
+      'duplicate misconception id "mis-1"',
+    ];
+
+    for (const [index, parsedContent] of invalidEnvelopes.entries()) {
+      const provider = createSparcDialogueOpenRouterProvider({
+        async callResolvedOpenRouterJson() {
+          return { parsedContent };
+        },
+      });
+      let error: unknown;
+      try {
+        await provider.scoreLearnerResponse({
+          display: dialogueDisplay(),
+          learnerText: 'I am responding to the current problem.',
+          ...scorerContext(),
+        } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).to.be.instanceOf(Error);
+      expect((error as Error).message).to.contain(expectedMessages[index]);
+    }
+  });
+
+  it('normalizes non-increasing cumulative scores out of otherwise valid model envelopes', async function() {
+    const provider = createSparcDialogueOpenRouterProvider({
+      async callResolvedOpenRouterJson() {
+        return {
+          parsedContent: {
+            learningTargetScores: [{ clusterKC: 'kc-a', coverage: 0.2 }],
+            diagnosticMisconceptionScores: [{ id: 'mis-1', supportStrength: 0.5 }],
+            learnerContribution: { type: 'answer' },
+          },
+        };
+      },
+    });
+
+    const score = await provider.scoreLearnerResponse({
+      display: dialogueDisplay(),
+      learnerText: 'I am responding to the current problem.',
+      ...scorerContext(),
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+
+    expect(score.learningTargetScores).to.deep.equal([]);
+    expect(score.diagnosticMisconceptionScores).to.equal(undefined);
+    expect(score.learnerContribution?.type).to.equal('answer');
   });
 
   it('fails clearly when the model echoes tutor metadata that does not match the selected action', async function() {
@@ -323,13 +416,20 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.contain('Selected move: hint.');
         expect(params.messages[0]?.content).to.contain('Move prompt:');
         expect(params.messages[0]?.content).to.contain('Follow the selected runtime move policy.');
+        expect(params.messages[0]?.content).to.contain('must acknowledge only the latest student answer');
+        expect(params.messages[0]?.content).to.contain('Ground its first clause in a phrase or construction from Latest student answer');
+        expect(params.messages[0]?.content).to.contain('never mention content found only in an earlier response');
+        expect(params).to.have.property('temperature', 0.15);
         expect(params.messages[0]?.content).to.not.contain('Begin tutorMessage with one brief immediate-feedback statement');
         expect(params.messages[0]?.content).to.not.contain('selectedMisconception is an incorrect learner belief');
         expect(params.messages[0]?.content).to.not.contain('Use correctExpectations as the authoritative positive content');
         expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
         expect(userMessage.content).to.contain('Problem statement:');
         expect(userMessage.content).to.contain(problemStatement);
-        expect(userMessage.content).to.contain('Latest student answer:');
+        expect(userMessage.content).to.contain('Latest student answer (the only source for the conversational receipt):');
+        expect(userMessage.content.indexOf('Latest student answer')).to.be.greaterThan(
+          userMessage.content.indexOf('Full dialogue history'),
+        );
         expect(userMessage.content).to.contain('App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response.');
         expect(userMessage.content).to.contain('Registered move definition:');
         expect(userMessage.content).to.not.contain('Immediate-feedback evidence:');
@@ -427,7 +527,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(userMessage.misconceptions).to.deep.include({
           id: 'M1',
           text: 'A fixed annual rate means the same dollar amount is added every year.',
-          priorConfidence: 0,
+          priorSupportStrength: 0,
         });
         expect(scoreSchema.properties?.learningTargetScores?.items?.properties).to.not.have.property('addressed');
         expect(scoreSchema.properties?.diagnosticMisconceptionScores?.items?.properties).to.not.have.property('addressed');
@@ -443,7 +543,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
             }],
             diagnosticMisconceptionScores: [{
               id: 'M1',
-              confidence: 0.45,
+              supportStrength: 0.5,
             }],
             learnerContribution: { type: 'answer', confidence: 0.45 },
           },
@@ -463,7 +563,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     });
     expect(score.diagnosticMisconceptionScores?.[0]).to.deep.include({
       id: 'M1',
-      confidence: 0.45,
+      supportStrength: 0.5,
     });
   });
 

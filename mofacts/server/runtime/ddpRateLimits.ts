@@ -107,14 +107,23 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
         'updateOwnOpenRouterSettings',
         'getOwnOpenRouterSettings',
         'getOpenRouterCapability',
-        'callResolvedOpenRouterJson',
-        'callResolvedOpenRouterEmbeddings',
         'deleteOwnOpenRouterKey',
         'testOwnOpenRouterSettings'
       ].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }
   }, 30, 3600000);
+
+  DDPRateLimiter.addRule({
+    type: 'method',
+    name(name: string) {
+      return [
+        'callResolvedOpenRouterJson',
+        'callResolvedOpenRouterEmbeddings'
+      ].includes(name);
+    },
+    userId(userId: string | null | undefined) { return !!userId; }
+  }, 120, 3600000);
 
   DDPRateLimiter.addRule({
     type: 'method',
