@@ -132,6 +132,15 @@ function getEncryptedAdminApiKey(settings: AdminApiKeySettingsDoc, kind: ApiKeyK
   return normalizeString(settings?.value?.[provider]?.keyEncrypted) || null;
 }
 
+export function getAdminApiKeyFromSettings(
+  deps: Pick<ApiKeyResolutionDeps, 'decryptData'>,
+  settings: AdminApiKeySettingsDoc,
+  kind: ApiKeyKind,
+): string | null {
+  const encryptedKey = getEncryptedAdminApiKey(settings, kind);
+  return encryptedKey ? deps.decryptData(encryptedKey) : null;
+}
+
 function looksLikePlaintextProviderKey(value: string, kind: ApiKeyKind) {
   if (kind === 'openrouter') {
     return value.startsWith('sk-');
@@ -304,10 +313,10 @@ export async function resolvePreferredApiKey(
   if (deps.getAdminApiKeySettings) {
     try {
       const settings = await deps.getAdminApiKeySettings();
-      const encryptedKey = getEncryptedAdminApiKey(settings, params.kind);
-      if (encryptedKey) {
+      const apiKey = getAdminApiKeyFromSettings(deps, settings, params.kind);
+      if (apiKey) {
         return {
-          apiKey: deps.decryptData(encryptedKey),
+          apiKey,
           source: 'admin',
           errors,
         };

@@ -17,6 +17,7 @@ import {
 import type { OpenRouterModelCatalogService } from './openRouterCatalogMethods';
 import {
   type ApiKeySource,
+  getAdminApiKeyFromSettings,
   getAdminOpenRouterModel,
   getAdminOpenRouterReasoningLevel,
   getTdfOpenRouterModel,
@@ -44,6 +45,8 @@ type OpenRouterMethodsDeps = {
   openRouterModelCatalogService: OpenRouterModelCatalogService;
   serverConsole: (...args: unknown[]) => void;
 };
+
+type OpenRouterResolutionMode = 'preferred' | 'admin';
 
 function isRecord(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -171,6 +174,52 @@ async function validateResolvedOpenRouterConfiguration(
   }
 }
 
+async function resolveOpenRouterCredentials(
+  deps: OpenRouterMethodsDeps,
+  userId: string,
+  tdfId: string | null,
+  mode: OpenRouterResolutionMode,
+) {
+  const resolverDeps = deps.getApiKeyResolutionDeps();
+  if (mode === 'admin') {
+    if (!resolverDeps.getAdminApiKeySettings) {
+      throw new Meteor.Error(
+        'admin-api-key-settings-unavailable',
+        'Admin OpenRouter settings are unavailable',
+      );
+    }
+    const settings = await resolverDeps.getAdminApiKeySettings();
+    const configuration = await validateResolvedOpenRouterConfiguration(deps, {
+      model: getAdminOpenRouterModel(settings),
+      reasoningLevel: getAdminOpenRouterReasoningLevel(settings),
+    });
+    return {
+      apiKey: getAdminApiKeyFromSettings(resolverDeps, settings, 'openrouter'),
+      source: 'admin' as const,
+      ...configuration,
+    };
+  }
+
+  const keyResolution = await resolvePreferredApiKey(resolverDeps, {
+    userId,
+    tdfId,
+    kind: 'openrouter',
+  });
+  const configuration = await validateResolvedOpenRouterConfiguration(
+    deps,
+    await resolveOpenRouterConfiguration(resolverDeps, {
+      userId,
+      tdfId,
+      keySource: keyResolution.source,
+    }),
+  );
+  return {
+    apiKey: keyResolution.apiKey,
+    source: keyResolution.source,
+    ...configuration,
+  };
+}
+
 function sanitizeProviderText(value: unknown): string {
   return redactOpenRouterSecretText(String(value || '').trim());
 }
@@ -226,23 +275,15 @@ async function resolveOpenRouterCapability(
   deps: OpenRouterMethodsDeps,
   userId: string,
   tdfIdValue?: string | null,
+  mode: OpenRouterResolutionMode = 'preferred',
 ) {
-  const resolverDeps = deps.getApiKeyResolutionDeps();
   const tdfId = normalizeString(tdfIdValue) || null;
-  const keyResolution = await resolvePreferredApiKey(resolverDeps, {
-    userId,
-    tdfId,
-    kind: 'openrouter',
-  });
-  const configuration = await validateResolvedOpenRouterConfiguration(deps, await resolveOpenRouterConfiguration(resolverDeps, {
-    userId,
-    tdfId,
-    keySource: keyResolution.source,
-  }));
+  const credentials = await resolveOpenRouterCredentials(deps, userId, tdfId, mode);
   return {
-    configured: Boolean(keyResolution.apiKey && configuration.model),
-    source: keyResolution.source,
-    ...configuration,
+    configured: Boolean(credentials.apiKey && credentials.model),
+    source: credentials.source,
+    model: credentials.model,
+    reasoningLevel: credentials.reasoningLevel,
   };
 }
 
@@ -251,28 +292,19 @@ async function executeResolvedOpenRouterJson(
   userId: string,
   params: unknown,
   operation: string,
+  mode: OpenRouterResolutionMode = 'preferred',
 ) {
   check(params, Match.ObjectIncluding({
     messages: Array,
     intent: Object,
   }));
   const data = params as UnknownRecord;
-  const resolverDeps = deps.getApiKeyResolutionDeps();
   const tdfId = normalizeString(data.tdfId) || null;
-  const keyResolution = await resolvePreferredApiKey(resolverDeps, {
-    userId,
-    tdfId,
-    kind: 'openrouter',
-  });
-  if (!keyResolution.apiKey) {
+  const credentials = await resolveOpenRouterCredentials(deps, userId, tdfId, mode);
+  if (!credentials.apiKey) {
     throw new Meteor.Error('no-api-key', 'No configured OpenRouter API key alternative is available');
   }
-  const configuration = await validateResolvedOpenRouterConfiguration(deps, await resolveOpenRouterConfiguration(resolverDeps, {
-    userId,
-    tdfId,
-    keySource: keyResolution.source,
-  }));
-  const { model, reasoningLevel } = configuration;
+  const { model, reasoningLevel } = credentials;
   if (!model) {
     throw new Meteor.Error('no-openrouter-model', 'No configured OpenRouter model is available');
   }
@@ -292,7 +324,7 @@ async function executeResolvedOpenRouterJson(
       },
     };
     const callOptions: Parameters<typeof callOpenRouterJson>[0] = {
-      apiKey: keyResolution.apiKey,
+      apiKey: credentials.apiKey,
       model,
       reasoningLevel,
       messages: normalizeMessages(data.messages),
@@ -314,7 +346,7 @@ async function executeResolvedOpenRouterJson(
       parsedContent: extractJsonObject(result.rawContent),
       responseBody: result.responseBody,
       costUsd: result.costUsd,
-      source: keyResolution.source,
+      source: credentials.source,
       model,
       reasoningLevel,
     };
@@ -337,7 +369,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
         notLoggedInMessage: 'Must be logged in to run Admin Tests OpenRouter evaluations',
         forbiddenMessage: 'Only admins can run Admin Tests OpenRouter evaluations',
       });
-      return resolveOpenRouterCapability(deps, userId);
+      return resolveOpenRouterCapability(deps, userId, null, 'admin');
     },
 
     callResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
@@ -352,7 +384,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
         notLoggedInMessage: 'Must be logged in to run Admin Tests OpenRouter evaluations',
         forbiddenMessage: 'Only admins can run Admin Tests OpenRouter evaluations',
       });
-      return executeResolvedOpenRouterJson(deps, userId, params, 'admin-test-json');
+      return executeResolvedOpenRouterJson(deps, userId, params, 'admin-test-json', 'admin');
     },
 
     callResolvedOpenRouterEmbeddings: async function(this: MethodContext, params: unknown) {
