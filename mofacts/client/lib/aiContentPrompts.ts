@@ -1,12 +1,27 @@
 import type { CreationModuleId } from './aiContentTypes';
 import type { CueLeak } from './aiContentCueValidation';
 
-export function buildItemAuthoringPrompt(sourceText: string, selectedModules: CreationModuleId[]) {
+export type AiContentPromptImage = {
+  packageFileName: string;
+  originalName: string;
+};
+
+export function buildItemAuthoringPrompt(
+  sourceText: string,
+  selectedModules: CreationModuleId[],
+  uploadedImages: AiContentPromptImage[] = [],
+) {
+  const uploadedImageNames = uploadedImages.map((image) => ({
+    assetFileName: image.packageFileName,
+    originalFileName: image.originalName,
+  }));
   return [
     'Return compact normalized import-ready JSON, not raw TDF.',
     'Create a shared item pool usable for the selected MoFaCTS modules.',
     `Selected modules: ${selectedModules.join(', ')}`,
-    'If the user specifies what should be stimulus and response, follow that instruction.',
+    'If the user specifies what should be stimulus and response, follow that instruction exactly.',
+    'Treat the requested stimulus modality as a constraint. If the user requests a text stimulus and does not explicitly request images, set promptType to "text" and omit prompt.imgSrc and image attribution.',
+    'Do not add images merely because a topic could be illustrated. Images are allowed only when the user explicitly requests images or supplies uploaded image assets with this request.',
     'If the user asks for a specific number of items, use that number when the source can support it.',
     'If no item count is specified, aim for about 50 flash-card/practice items for learning sessions and about 20 quiz items for assessment sessions. Use fewer when the source has fewer atomic facts, and more only when the source clearly supports more.',
     'Split the material into atomic knowledge components: each item should practice one discrete fact, concept, distinction, procedure step, vocabulary mapping, or application.',
@@ -23,9 +38,15 @@ export function buildItemAuthoringPrompt(sourceText: string, selectedModules: Cr
     'Do not duplicate items or create near-duplicate prompts that practice the same atomic knowledge component in the same way.',
     'Do not refuse sparse but coherent educational requests; expand from ordinary domain knowledge when the request is a general topic such as the Krebs cycle, multiplication tables, or common vocabulary.',
     'If the source is abusive, sexual, incoherent, or not an educational topic, return an empty items array and explain the issue in creationSummary.',
-    'When the requested learning topic is naturally visual, such as birds, animals, plants, landmarks, artwork, tools, body parts, or diagrams, set promptType to "text-image" or "image" and include prompt.imgSrc for each item when a public, educational image URL is available.',
-    'For visual identification images, prefer Wikimedia Commons or Wikipedia lead-image URLs. Use direct HTTPS image URLs that can render in a browser, and include evidence-backed attribution with sourceUrl, licenseName, and licenseUrl.',
-    'If you cannot provide an image URL with attribution evidence for a visual identification item, still create the item when educationally useful, but omit imgSrc for that item.',
+    'When the user explicitly requests external visual-identification images, prefer Wikimedia Commons or Wikipedia lead-image URLs. Use direct HTTPS image URLs that can render in a browser, and include evidence-backed attribution with sourceUrl, licenseName, and licenseUrl.',
+    ...(uploadedImages.length > 0 ? [
+      'The user supplied the uploaded image assets listed below. Treat these uploads as explicit image intent and use the images as source material for the lesson.',
+      'Create at least one item for every uploaded image unless the user explicitly requests a different mapping.',
+      'For an item that uses an uploaded image, copy its assetFileName exactly into prompt.imgSrc. Never replace an uploaded asset with an external image URL and never invent an asset filename.',
+      'Use promptType "text-image" when learner-visible text accompanies uploaded images, or "image" when the uploaded image is the entire stimulus.',
+      'Uploaded images are user-provided media. Do not invent creator, source, or license attribution for them.',
+      `Uploaded image asset manifest: ${JSON.stringify(uploadedImageNames)}`,
+    ] : []),
     'Set visibility to "public" only for general knowledge, original generated wording, public-domain/openly licensed material, or user-provided material that is clearly shareable. Set visibility to "private" when copied source wording, images, audio, or other media may be copyrighted or the license is unclear.',
     'When attribution is warranted for copied or closely adapted licensed/public-domain source material, put attribution on prompt.attribution using creatorName, sourceName, sourceUrl, licenseName, and licenseUrl. Do not add attribution for ordinary general knowledge, arithmetic facts, or dictionary-like facts.',
     'Return JSON only with this shape:',
@@ -43,7 +64,7 @@ export function buildItemAuthoringPrompt(sourceText: string, selectedModules: Cr
       items: [{
         prompt: {
           text: 'learner-visible question, definition, description, or content clue that does not name or give away the correctResponse',
-          imgSrc: 'optional direct HTTPS image URL for visual identification items',
+          imgSrc: 'omit unless images were explicitly requested; for an uploaded image, use its exact assetFileName',
           attribution: {
             creatorName: '',
             sourceName: '',

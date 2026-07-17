@@ -144,4 +144,26 @@ describe('aiContentDraftBuilder', function() {
     expect(JSON.stringify(draft.workingCopy)).not.to.contain('autotutorsession');
     expect(JSON.stringify(display.clusterTargets)).not.to.match(/sourceAutoTutor|stimulusKC|KCId|KCDefault|KCCluster/);
   });
+
+  it('packages referenced uploaded WebP assets under the exact generated stimulus filename', function() {
+    const validation = validateAiOutput({
+      lessonName: 'Bird Photos',
+      promptType: 'text-image',
+      items: [{ prompt: { text: 'Identify this bird.', imgSrc: 'bird.webp' }, response: { correctResponse: 'warbler' } }],
+    });
+    const bytes = new Uint8Array([1, 2, 3]);
+    const drafts = buildDrafts(validation.output, ['learningSession'], [{
+      id: 'image-1',
+      originalName: 'bird.jpg',
+      sourcePath: 'birds/bird.jpg',
+      packageFileName: 'bird.webp',
+      bytes,
+      width: 1280,
+      height: 720,
+    }]);
+
+    expect(drafts[0]!.generatedBaseline.mediaFiles['bird.webp']).to.deep.equal(bytes);
+    expect(drafts[0]!.stats?.mediaCount).to.equal(1);
+    expect((drafts[0]!.workingCopy.stimuli.setspec.clusters[0] as any).stims[0].display.imgSrc).to.equal('bird.webp');
+  });
 });

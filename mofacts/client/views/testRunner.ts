@@ -25,6 +25,7 @@ type TestRunnerInstance = Blaze.TemplateInstance & {
   readinessCommand: AsyncCommandController<DeploymentReadinessResult>;
   sparcLiveState: ReactiveVar<AsyncCommandState<SparcCompoundInterestLiveEvaluationResult>>;
   sparcLiveCommand: AsyncCommandController<SparcCompoundInterestLiveEvaluationResult>;
+  sparcLiveSavedJson: ReactiveVar<string>;
 };
 
 function testText(
@@ -92,6 +93,7 @@ Template.testRunner.onCreated(function(this: TestRunnerInstance) {
   this.sparcLiveCommand = createAsyncCommandController((state) => {
     this.sparcLiveState.set(state);
   });
+  this.sparcLiveSavedJson = new ReactiveVar<string>(savedSparcLiveResultJson());
 });
 
 Template.testRunner.onDestroyed(function(this: TestRunnerInstance) {
@@ -159,10 +161,10 @@ Template.testRunner.helpers({
     return sparcLiveState().status === 'pending';
   },
   sparcLiveSavedJson() {
-    return savedSparcLiveResultJson();
+    return (Template.instance() as TestRunnerInstance).sparcLiveSavedJson.get();
   },
   sparcLiveHasSavedJson() {
-    return Boolean(savedSparcLiveResultJson());
+    return Boolean((Template.instance() as TestRunnerInstance).sparcLiveSavedJson.get());
   },
   sparcLiveOutput() {
     const state = sparcLiveState();
@@ -196,11 +198,14 @@ Template.testRunner.helpers({
             {
               robustnessPassedRuns: state.result.robustnessPassedRuns,
               graduationPassedRuns: state.result.graduationPassedRuns,
-              completedRuns: state.result.completedRuns,
+              evaluatedRuns: state.result.evaluatedRuns,
+              evaluationErrorRuns: state.result.evaluationErrorRuns,
               notRunRuns: state.result.notRunRuns,
               totalRuns: state.result.totalRuns,
-              passRate: Math.round(state.result.passRate * 100),
-              requiredPassRate: Math.round(state.result.requiredPassRate * 100),
+              passRate: state.result.passRate === null
+                ? testText('adminTests.notEvaluated')
+                : `${Math.round(state.result.passRate * 100)}%`,
+              requiredGraduationRuns: state.result.requiredGraduationRuns,
             },
           ),
           summaryUrgent: !state.result.ok,
@@ -211,18 +216,24 @@ Template.testRunner.helpers({
           messageLabel: testText('adminTests.message'),
           runs: state.result.runs.map((run) => ({
             ...run,
-            rowClass: run.studentOutcome === 'not-run'
+            rowClass: run.overallOutcome === 'evaluation-error'
+              ? 'table-danger'
+              : (run.overallOutcome === 'not-run'
               ? 'table-warning'
               : (run.studentOutcome === 'not-graduated'
                 ? 'table-danger'
-                : (run.robustnessOutcome === 'passed' ? 'table-success' : 'table-warning')),
-            displayStudentOutcome: run.studentOutcome === 'not-run'
+                : (run.robustnessOutcome === 'passed' ? 'table-success' : 'table-warning'))),
+            displayStudentOutcome: run.overallOutcome === 'not-run'
               ? testText('adminTests.notRun')
+              : (run.studentOutcome === 'not-evaluated'
+                ? testText('adminTests.notEvaluated')
               : (run.studentOutcome === 'graduated'
                 ? testText('adminTests.pass')
-                : testText('adminTests.fail')),
+                : testText('adminTests.fail'))),
             displayRobustnessOutcome: run.robustnessOutcome === 'not-evaluated'
-              ? testText('adminTests.notRun')
+              ? (run.overallOutcome === 'not-run'
+                ? testText('adminTests.notRun')
+                : testText('adminTests.notEvaluated'))
               : (run.robustnessOutcome === 'passed'
                 ? testText('adminTests.pass')
                 : testText('adminTests.fail')),
@@ -245,6 +256,9 @@ Template.testRunner.events({
     event.preventDefault();
     await instance.sparcLiveCommand.run(runSparcCompoundInterestLiveEvaluation, {
       getErrorMessage,
+      onSuccess: () => {
+        instance.sparcLiveSavedJson.set(savedSparcLiveResultJson());
+      },
     });
   },
   'click .download-sparc-live-evaluation'(event: Event) {

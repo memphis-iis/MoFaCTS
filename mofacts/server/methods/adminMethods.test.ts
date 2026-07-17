@@ -2,7 +2,14 @@ import { Meteor } from 'meteor/meteor';
 import { expect } from 'chai';
 import { createAdminMethods } from './adminMethods';
 
-function createAdminDeps() {
+function createAdminDeps(
+  auditCalls: Array<{ action: string; details: any }> = [],
+  catalog: any[] = [{
+    id: 'openai/test-model',
+    name: 'Test model',
+    reasoning: { mandatory: false, supportedLevels: null, defaultLevel: 'medium' },
+  }],
+) {
   let dynamicSettingsDoc: any = null;
   return {
     serverConsole: () => undefined,
@@ -72,7 +79,9 @@ function createAdminDeps() {
     findNormalAccountUserByCanonicalEmail: async () => null,
     createUserWithRetry: async () => 'created-user',
     enforceCanonicalEmailIdentity: async () => undefined,
-    writeAuditLog: async () => undefined,
+    writeAuditLog: async (action: string, _actorUserId: string | null, _targetUserId: string | null, details: any) => {
+      auditCalls.push({ action, details });
+    },
     syncUserAuthState: async () => undefined,
     isEmailVerificationRequired: () => false,
     sendVerificationEmailForUser: async () => false,
@@ -81,6 +90,10 @@ function createAdminDeps() {
     deleteTdfRuntimeData: async () => undefined,
     clearStimDisplayTypeMap: () => undefined,
     encryptData: (value: string) => `encrypted:${value}`,
+    openRouterModelCatalogService: {
+      getCatalog: async () => catalog,
+    },
+    getDynamicSettingsDoc: () => dynamicSettingsDoc,
   };
 }
 
@@ -104,19 +117,107 @@ describe('adminMethods', function() {
   });
 
   it('stores admin API key alternatives encrypted and returns metadata only', async function() {
+    const auditCalls: Array<{ action: string; details: any }> = [];
+    const deps = createAdminDeps(auditCalls);
+    const methods = createAdminMethods(deps);
+
+    const result = await methods.saveAdminApiKeyAlternative.call(
+      { userId: 'admin-user' },
+      'openrouter',
+      { apiKey: 'sk-or-v1-test', model: 'openai/test-model', reasoningLevel: 'high' }
+    );
+
+    expect(result.openRouter.configured).to.equal(true);
+    expect(result.openRouter.model).to.equal('openai/test-model');
+    expect(result.openRouter.reasoningLevel).to.equal('high');
+    expect((deps as any).getDynamicSettingsDoc().value.openRouter.reasoningLevel).to.equal('high');
+    expect(JSON.stringify(result)).to.not.contain('sk-or-v1-test');
+    expect(JSON.stringify(result)).to.not.contain('encrypted:');
+    expect(auditCalls).to.deep.include({
+      action: 'admin.apiKeyAlternativeSaved',
+      details: {
+        provider: 'openrouter',
+        keyUpdated: true,
+        modelUpdated: true,
+        reasoningLevelUpdated: true,
+        reasoningLevel: 'high',
+      },
+    });
+  });
+
+  it('normalizes an absent admin OpenRouter reasoning level to none', async function() {
     const deps = createAdminDeps();
     const methods = createAdminMethods(deps);
 
     const result = await methods.saveAdminApiKeyAlternative.call(
       { userId: 'admin-user' },
       'openrouter',
-      { apiKey: 'sk-or-v1-test', model: 'openai/test-model' }
+      { model: 'openai/test-model' },
     );
 
-    expect(result.openRouter.configured).to.equal(true);
-    expect(result.openRouter.model).to.equal('openai/test-model');
-    expect(JSON.stringify(result)).to.not.contain('sk-or-v1-test');
-    expect(JSON.stringify(result)).to.not.contain('encrypted:');
+    expect(result.openRouter.reasoningLevel).to.equal('none');
+    expect((deps as any).getDynamicSettingsDoc().value.openRouter.reasoningLevel).to.equal('none');
+  });
+
+  it('rejects unsupported admin OpenRouter reasoning levels without writing settings', async function() {
+    const deps = createAdminDeps();
+    const methods = createAdminMethods(deps);
+
+    let thrown: unknown;
+    try {
+      await methods.saveAdminApiKeyAlternative.call(
+        { userId: 'admin-user' },
+        'openrouter',
+        { model: 'openai/test-model', reasoningLevel: 'extreme' },
+      );
+    } catch (error: unknown) {
+      thrown = error;
+    }
+
+    expect(thrown).to.be.instanceOf(Error);
+    expect((deps as any).getDynamicSettingsDoc()).to.equal(null);
+  });
+
+  it('does not persist none for an admin model whose live catalog requires reasoning', async function() {
+    const deps = createAdminDeps([], [{
+      id: 'openai/required-reasoning',
+      name: 'Required reasoning',
+      reasoning: { mandatory: true, supportedLevels: ['low', 'medium'], defaultLevel: 'medium' },
+    }]);
+    const methods = createAdminMethods(deps);
+
+    let thrown: unknown;
+    try {
+      await methods.saveAdminApiKeyAlternative.call(
+        { userId: 'admin-user' },
+        'openrouter',
+        { model: 'openai/required-reasoning', reasoningLevel: 'none' },
+      );
+    } catch (error: unknown) {
+      thrown = error;
+    }
+
+    expect(thrown).to.be.instanceOf(Error);
+    expect((deps as any).getDynamicSettingsDoc()).to.equal(null);
+  });
+
+  it('rejects a submitted admin model that is unavailable in the live catalog', async function() {
+    const deps = createAdminDeps();
+    const methods = createAdminMethods(deps);
+
+    let thrown: unknown;
+    try {
+      await methods.saveAdminApiKeyAlternative.call(
+        { userId: 'admin-user' },
+        'openrouter',
+        { model: 'openai/unavailable-model', reasoningLevel: 'none' },
+      );
+    } catch (error: unknown) {
+      thrown = error;
+    }
+
+    expect(thrown).to.be.instanceOf(Error);
+    expect((deps as any).getDynamicSettingsDoc()).to.equal(null);
   });
 
   it('denies admin API key metadata to non-admin callers', async function() {

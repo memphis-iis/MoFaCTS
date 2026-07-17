@@ -4,7 +4,10 @@ import type {
 } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 import { evaluateSparcControllerDialogueTurn } from '../../../../../../learning-components/units/sparcsession/sparcControllerDialogueTurn';
 import { createSparcProgressiveScaffoldingRules } from '../../../../../../learning-components/units/sparcsession/sparcProgressiveScaffoldingRules';
-import type { SparcLearnerResponseScoringResult } from '../../../../../../learning-components/units/sparcsession/sparcLearnerResponseScoring';
+import type {
+  SparcLearnerResponseEvidenceEnvelope,
+  SparcLearnerResponseScoringResult,
+} from '../../../../../../learning-components/units/sparcsession/sparcLearnerResponseScoring';
 import {
   applySparcStateTransition,
   createEmptySparcReplayState,
@@ -17,14 +20,19 @@ import type {
 import {
   createSparcDialogueOpenRouterProvider,
   type CallResolvedOpenRouterJson,
+  type SparcDialogueLearnerResponseEvaluation,
+  type SparcDialogueLearnerResponseScoringTraceEvent,
 } from './sparcControllerDialogueOpenRouter';
 import type { OpenRouterCapability } from '../../../../lib/openRouterClientProfile';
 
 const PAGE_KEY = 'sparc-session-compound-interest-live-evaluation';
 const INPUT_NODE_ID = 'learner-response-input';
 type MisconceptionId = 'M1' | 'M2' | 'M3';
+const COVERAGE_THRESHOLD = 0.8;
+const MISCONCEPTION_ACTIVATION_THRESHOLD = 0.2;
+const E4_ID = 'autotutor.compound-interest-001.kc.e4';
 const PROBLEM_STATEMENT = 'Suppose $1,000 earns 5% interest each year and the interest is left in the account. In your own words, how does compound interest make the balance grow over time?';
-const GRADUATION_SYNTHESIS = 'Each year the current balance is multiplied by 1.05. Unlike calculating interest only from the original $1,000, compound interest uses the updated balance, so the dollar amount of interest increases over time.';
+const GRADUATION_SYNTHESIS = 'After each year, the earned interest is added to the account balance. The next year’s 5% is calculated on that updated balance—the original $1,000 plus previously earned interest. This repeatedly multiplies the current balance by 1.05, so growth is multiplicative and the dollar amount of interest increases rather than remaining fixed as it would if interest were calculated only from the original principal.';
 
 export const SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS = [
   'Well it means you gain $50 each year.',
@@ -39,7 +47,18 @@ export type SparcCompoundInterestLiveEvaluationTurn = Readonly<{
   turn: number;
   phase: 'exact-transcript' | 'graduation-synthesis';
   learnerText: string;
+  evidenceEnvelope: SparcLearnerResponseEvidenceEnvelope;
   learnerResponseScore: SparcLearnerResponseScoringResult;
+  effectiveScoringState: Readonly<{
+    learningTargetScores: readonly Readonly<{
+      clusterKC: string;
+      coverage: number;
+    }>[];
+    diagnosticMisconceptionScores: readonly Readonly<{
+      id: string;
+      supportStrength: number;
+    }>[];
+  }>;
   tutorText: string;
   productionRuleId?: string;
   action?: string;
@@ -54,11 +73,27 @@ export type SparcCompoundInterestLiveEvaluationCheck = Readonly<{
   message: string;
 }>;
 
+export type SparcCompoundInterestLiveEvaluationDiagnostic = Readonly<{
+  stage: 'scoring-provider'
+    | 'scoring-response-parse'
+    | 'scoring-evidence-validation'
+    | 'dialogue-turn'
+    | 'evaluation-run';
+  message: string;
+  attemptedTurn?: Readonly<{
+    turn: number;
+    phase: SparcCompoundInterestLiveEvaluationTurn['phase'];
+    learnerText: string;
+    providerParsedContent?: unknown;
+    evidenceEnvelope?: SparcLearnerResponseEvidenceEnvelope;
+  }>;
+}>;
+
 export type SparcCompoundInterestLiveEvaluationRun = Readonly<{
   run: number;
-  overallOutcome: 'all-requirements-passed' | 'requirements-failed' | 'not-run';
+  overallOutcome: 'all-requirements-passed' | 'requirements-failed' | 'evaluation-error' | 'not-run';
   allRequirementsPassed: boolean;
-  studentOutcome: 'graduated' | 'not-graduated' | 'not-run';
+  studentOutcome: 'graduated' | 'not-graduated' | 'not-evaluated';
   robustnessOutcome: 'passed' | 'failed' | 'not-evaluated';
   robustnessPassed: boolean;
   graduationPassed: boolean;
@@ -67,6 +102,7 @@ export type SparcCompoundInterestLiveEvaluationRun = Readonly<{
   exactTranscriptCompleted: boolean;
   checks: readonly SparcCompoundInterestLiveEvaluationCheck[];
   turns: readonly SparcCompoundInterestLiveEvaluationTurn[];
+  evaluationDiagnostic?: SparcCompoundInterestLiveEvaluationDiagnostic;
   message: string;
 }>;
 
@@ -75,15 +111,19 @@ export type SparcCompoundInterestLiveEvaluationResult = Readonly<{
   generatedAt: string;
   model: string;
   modelSource: 'tdf' | 'user' | 'admin' | null;
+  reasoningLevel: OpenRouterCapability['reasoningLevel'];
   problemStatement: string;
   requiredPassRate: number;
-  passRate: number;
+  requiredGraduationRuns: number;
+  passRate: number | null;
   allRequirementsPassedRuns: number;
   robustnessPassedRuns: number;
   graduationPassedRuns: number;
-  completedRuns: number;
+  evaluatedRuns: number;
+  evaluationErrorRuns: number;
   notRunRuns: number;
   totalRuns: number;
+  evaluationRequirementMet: boolean;
   robustnessRequirementMet: boolean;
   graduationRequirementMet: boolean;
   runs: readonly SparcCompoundInterestLiveEvaluationRun[];
@@ -122,11 +162,11 @@ function createFixture(): { display: SparcTrialDisplay; document: SparcAuthoredD
       lowCoverageMax: 0.33,
       mediumCoverageMax: 0.67,
       highCoverageMin: 0.67,
-      coverageThreshold: 0.8,
+      coverageThreshold: COVERAGE_THRESHOLD,
     }),
     fact('controller.targetSelectionPolicy', {
       policy: 'kc-graph-priority',
-      coverageThreshold: 0.8,
+      coverageThreshold: COVERAGE_THRESHOLD,
       frontierWeight: 0.5,
       coherenceWeight: 0.3,
       centralityWeight: 0.2,
@@ -208,28 +248,57 @@ function traceText(turns: readonly SparcCompoundInterestLiveEvaluationTurn[]): s
   )).join(' -> ');
 }
 
-function effectiveMisconceptionSupportStrength(
-  turns: readonly SparcCompoundInterestLiveEvaluationTurn[],
-  misconceptionId: string,
-): number {
-  let supportStrength = 0;
-  for (const turn of turns) {
-    const update = turn.learnerResponseScore.diagnosticMisconceptionScores
-      ?.find((score) => score.id === misconceptionId);
-    if (update) {
-      supportStrength = update.supportStrength;
-    }
+function requiredStringSlot(fact: SparcWorkingMemoryFact, slot: string): string {
+  const value = fact.slots?.[slot];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`SPARC live evaluation ${fact.factType}.${slot} must be a non-blank string`);
   }
-  return supportStrength;
+  return value;
+}
+
+function requiredUnitScoreSlot(fact: SparcWorkingMemoryFact, slot: string): number {
+  const value = fact.slots?.[slot];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`SPARC live evaluation ${fact.factType}.${slot} must be a number from 0 to 1`);
+  }
+  return value;
+}
+
+function effectiveScoringStateFromFacts(
+  facts: readonly SparcWorkingMemoryFact[],
+): SparcCompoundInterestLiveEvaluationTurn['effectiveScoringState'] {
+  return {
+    learningTargetScores: facts
+      .filter((entry) => entry.factType === 'learningTarget.score')
+      .map((entry) => ({
+        clusterKC: requiredStringSlot(entry, 'clusterKC'),
+        coverage: requiredUnitScoreSlot(entry, 'coverage'),
+      })),
+    diagnosticMisconceptionScores: facts
+      .filter((entry) => entry.factType === 'diagnostic.misconceptionScore')
+      .map((entry) => ({
+        id: requiredStringSlot(entry, 'id'),
+        supportStrength: requiredUnitScoreSlot(entry, 'supportStrength'),
+      })),
+  };
+}
+
+function misconceptionSupportStrengthFromTurn(
+  turn: SparcCompoundInterestLiveEvaluationTurn,
+  misconceptionId: string,
+): number | undefined {
+  return turn.effectiveScoringState.diagnosticMisconceptionScores
+    .find((score) => score.id === misconceptionId)?.supportStrength;
 }
 
 function finalMisconceptionSupportStrengths(
   turns: readonly SparcCompoundInterestLiveEvaluationTurn[],
 ): Readonly<Record<MisconceptionId, number>> {
+  const finalTurn = turns.at(-1);
   return {
-    M1: effectiveMisconceptionSupportStrength(turns, 'M1'),
-    M2: effectiveMisconceptionSupportStrength(turns, 'M2'),
-    M3: effectiveMisconceptionSupportStrength(turns, 'M3'),
+    M1: finalTurn ? misconceptionSupportStrengthFromTurn(finalTurn, 'M1') ?? 0 : 0,
+    M2: finalTurn ? misconceptionSupportStrengthFromTurn(finalTurn, 'M2') ?? 0 : 0,
+    M3: finalTurn ? misconceptionSupportStrengthFromTurn(finalTurn, 'M3') ?? 0 : 0,
   };
 }
 
@@ -238,23 +307,61 @@ function runRobustnessChecks(
 ): readonly SparcCompoundInterestLiveEvaluationCheck[] {
   const turn2 = turns.find((turn) => turn.turn === 2);
   const turn4 = turns.find((turn) => turn.turn === 4);
-  const turn2M2SupportStrength = effectiveMisconceptionSupportStrength(
-    turns.filter((turn) => turn.turn <= 2),
-    'M2',
-  );
+  const exactTranscriptTurns = turns.filter((turn) => turn.phase === 'exact-transcript');
+  const turn6OrEarlierCompletion = exactTranscriptTurns.find((turn) => turn.turn === 6)
+    ?? exactTranscriptTurns.at(-1);
+  const turn6M1SupportStrength = turn6OrEarlierCompletion
+    ? misconceptionSupportStrengthFromTurn(turn6OrEarlierCompletion, 'M1')
+    : undefined;
+  const synthesisTurn = turns.find((turn) => turn.phase === 'graduation-synthesis');
+  const synthesisE4Evidence = synthesisTurn?.evidenceEnvelope.learningTargetEvaluations
+    .find((evaluation) => evaluation.clusterKC === E4_ID);
+  const turn2M2SupportStrength = turn2
+    ? misconceptionSupportStrengthFromTurn(turn2, 'M2')
+    : undefined;
   const unsupportedM3Turns = turns
-    .filter((turn) => turn.learnerResponseScore.diagnosticMisconceptionScores
-      ?.some((score) => score.id === 'M3' && score.supportStrength > 0))
+    .filter((turn) => turn.evidenceEnvelope.diagnosticMisconceptionEvaluations
+      .some((evaluation) => evaluation.id === 'M3'
+        && evaluation.evidenceDirection === 'supports'
+        && evaluation.evidenceStrength > 0))
     .map((turn) => turn.turn);
+  const earlyE4FalseSupport = turns
+    .filter((turn) => turn.phase === 'exact-transcript' && turn.turn <= 3)
+    .flatMap((turn) => turn.evidenceEnvelope.learningTargetEvaluations
+      .filter((evaluation) => evaluation.clusterKC === E4_ID
+        && evaluation.evidenceDirection === 'supports'
+        && evaluation.evidenceStrength > 0)
+      .map((evaluation) => ({ turn: turn.turn, strength: evaluation.evidenceStrength })));
   return [{
     id: 'turn-2-on-task',
     passed: turn2 !== undefined
       && turn2.learnerResponseScore.learnerContribution?.type !== 'off-task',
     message: `Turn 2 contribution type was ${turn2?.learnerResponseScore.learnerContribution?.type ?? 'missing'}.`,
   }, {
+    id: 'early-incorrect-responses-do-not-support-e4',
+    passed: earlyE4FalseSupport.length === 0,
+    message: earlyE4FalseSupport.length === 0
+      ? 'The incorrect fixed-dollar and original-principal responses on turns 1-3 did not support E4.'
+      : `E4 received false support from incorrect early response(s): ${earlyE4FalseSupport.map((entry) => `turn ${entry.turn} at strength ${entry.strength}`).join(', ')}.`,
+  }, {
+    id: 'turn-6-m1-inactive',
+    passed: turn6M1SupportStrength !== undefined
+      && turn6M1SupportStrength < MISCONCEPTION_ACTIVATION_THRESHOLD,
+    message: turn6M1SupportStrength === undefined
+      ? 'Effective M1 support strength was unavailable at the end of the exact transcript.'
+      : `Effective M1 support strength after exact-transcript turn ${turn6OrEarlierCompletion?.turn ?? 'missing'} was ${turn6M1SupportStrength}; inactive requires less than ${MISCONCEPTION_ACTIVATION_THRESHOLD}.`,
+  }, {
     id: 'turn-2-m2-remains-active',
-    passed: turn2M2SupportStrength >= 0.2,
-    message: `Effective M2 support strength after turn 2 was ${turn2M2SupportStrength}.`,
+    passed: turn2M2SupportStrength !== undefined && turn2M2SupportStrength >= 0.2,
+    message: `Effective M2 support strength after turn 2 was ${turn2M2SupportStrength ?? 'missing'}.`,
+  }, {
+    id: 'synthesis-e4-recognized',
+    passed: synthesisTurn === undefined
+      || (synthesisE4Evidence?.evidenceDirection === 'supports'
+        && synthesisE4Evidence.evidenceStrength >= COVERAGE_THRESHOLD),
+    message: synthesisTurn === undefined
+      ? 'The exact transcript completed, so no graduation synthesis required E4 evaluation.'
+      : `Graduation-synthesis E4 evidence was ${synthesisE4Evidence?.evidenceDirection ?? 'missing'} at strength ${synthesisE4Evidence?.evidenceStrength ?? 'missing'}; recognition requires supports at strength ${COVERAGE_THRESHOLD} or greater.`,
   }, {
     id: 'turn-4-coherent-contribution',
     passed: turn4?.learnerResponseScore.learnerContribution?.type === 'answer'
@@ -286,7 +393,13 @@ function rateLimitError(error: unknown): boolean {
     || (typeof candidate.message === 'string' && candidate.message.includes('Too many requests'));
 }
 
-type SparcLiveEvaluationProvider = ReturnType<typeof createSparcDialogueOpenRouterProvider>;
+type SparcLiveEvaluationProvider = Pick<
+  ReturnType<typeof createSparcDialogueOpenRouterProvider>,
+  'scoreLearnerResponse' | 'generateTutorUtterance'
+>;
+type SparcLearnerResponseScoringTraceObserver = (
+  event: SparcDialogueLearnerResponseScoringTraceEvent,
+) => void;
 
 async function getConfiguredOpenRouterCapability(): Promise<OpenRouterCapability> {
   const { Meteor } = await import('meteor/meteor');
@@ -306,14 +419,42 @@ const callAdminTestResolvedOpenRouterJson: CallResolvedOpenRouterJson = async (p
 
 async function runOnce(
   run: number,
-  createProvider: () => SparcLiveEvaluationProvider,
+  createProvider: (
+    onLearnerResponseScoringTrace: SparcLearnerResponseScoringTraceObserver,
+  ) => SparcLiveEvaluationProvider,
 ): Promise<SparcCompoundInterestLiveEvaluationRun> {
-  const { display, document } = createFixture();
-  const provider = createProvider();
+  let currentProviderResponseRecorded = false;
+  let currentProviderParsedContent: unknown;
+  let currentEvidenceEnvelope: SparcLearnerResponseEvidenceEnvelope | undefined;
+  let currentResponseEvaluation: SparcDialogueLearnerResponseEvaluation | undefined;
+  const onLearnerResponseScoringTrace = (traceEvent: SparcDialogueLearnerResponseScoringTraceEvent) => {
+    if (traceEvent.stage === 'provider-response') {
+      if (currentProviderResponseRecorded) {
+        throw new Error('SPARC live evaluation provider recorded more than one provider response for a learner turn');
+      }
+      currentProviderResponseRecorded = true;
+      currentProviderParsedContent = traceEvent.parsedContent;
+      return;
+    }
+    if (traceEvent.stage === 'evidence-parsed') {
+      if (currentEvidenceEnvelope) {
+        throw new Error('SPARC live evaluation provider parsed more than one evidence envelope for a learner turn');
+      }
+      currentEvidenceEnvelope = traceEvent.evidenceEnvelope;
+      return;
+    }
+    if (currentResponseEvaluation) {
+      throw new Error('SPARC live evaluation provider completed more than one learner-response evaluation for a learner turn');
+    }
+    currentResponseEvaluation = traceEvent.evaluation;
+  };
   let replayState = createEmptySparcReplayState();
   const turns: SparcCompoundInterestLiveEvaluationTurn[] = [];
+  let evaluationDiagnostic: SparcCompoundInterestLiveEvaluationDiagnostic | undefined;
 
   try {
+    const { display, document } = createFixture();
+    const provider = createProvider(onLearnerResponseScoringTrace);
     async function evaluateLearnerTurn(
       learnerText: string,
       phase: SparcCompoundInterestLiveEvaluationTurn['phase'],
@@ -331,29 +472,83 @@ async function runOnce(
         submittedNodes: { [INPUT_NODE_ID]: learnerText },
         timestamp,
       };
-      const learnerResponseScore = await provider.scoreLearnerResponse({
-        document,
-        display,
-        result,
-        event,
-        problemStatement: PROBLEM_STATEMENT,
-        learnerText,
-        replayState,
-      });
-      const dialogueTurn = await evaluateSparcControllerDialogueTurn({
-        document,
-        replayState,
-        event,
-        problemStatement: PROBLEM_STATEMENT,
-        learnerResponseScore,
-        generateTutorUtterance: provider.generateTutorUtterance,
-      });
+      currentProviderResponseRecorded = false;
+      currentProviderParsedContent = undefined;
+      currentEvidenceEnvelope = undefined;
+      currentResponseEvaluation = undefined;
+      let learnerResponseScore: SparcLearnerResponseScoringResult;
+      try {
+        learnerResponseScore = await provider.scoreLearnerResponse({
+          document,
+          display,
+          result,
+          event,
+          problemStatement: PROBLEM_STATEMENT,
+          learnerText,
+          replayState,
+        });
+        if (!currentResponseEvaluation) {
+          throw new Error('SPARC live evaluation provider did not record the completed learner-response evaluation');
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        evaluationDiagnostic = {
+          stage: currentEvidenceEnvelope
+            ? 'scoring-evidence-validation'
+            : currentProviderResponseRecorded
+              ? 'scoring-response-parse'
+              : 'scoring-provider',
+          message,
+          attemptedTurn: {
+            turn,
+            phase,
+            learnerText,
+            ...(currentProviderResponseRecorded
+              ? { providerParsedContent: currentProviderParsedContent }
+              : {}),
+            ...(currentEvidenceEnvelope ? { evidenceEnvelope: currentEvidenceEnvelope } : {}),
+          },
+        };
+        throw error;
+      }
+      const { evidenceEnvelope } = currentResponseEvaluation;
+      let dialogueTurn: Awaited<ReturnType<typeof evaluateSparcControllerDialogueTurn>>;
+      try {
+        dialogueTurn = await evaluateSparcControllerDialogueTurn({
+          document,
+          replayState,
+          event,
+          problemStatement: PROBLEM_STATEMENT,
+          learnerResponseScore,
+          generateTutorUtterance: provider.generateTutorUtterance,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        evaluationDiagnostic = {
+          stage: 'dialogue-turn',
+          message,
+          attemptedTurn: {
+            turn,
+            phase,
+            learnerText,
+            ...(currentProviderResponseRecorded
+              ? { providerParsedContent: currentProviderParsedContent }
+              : {}),
+            evidenceEnvelope,
+          },
+        };
+        throw error;
+      }
       const completed = completionFromFacts(dialogueTurn.planning.derivedFacts);
       turns.push({
         turn,
         phase,
         learnerText,
+        evidenceEnvelope,
         learnerResponseScore,
+        effectiveScoringState: effectiveScoringStateFromFacts(
+          dialogueTurn.learnerResponseScoreFacts,
+        ),
         tutorText: dialogueTurn.tutorText,
         ...(dialogueTurn.moveSelectionAudit.selected?.ruleId
           ? { productionRuleId: dialogueTurn.moveSelectionAudit.selected.ruleId }
@@ -406,11 +601,16 @@ async function runOnce(
     };
   } catch (error) {
     const notRun = rateLimitError(error);
+    const message = error instanceof Error ? error.message : String(error);
+    const recordedEvaluationDiagnostic = evaluationDiagnostic ?? {
+      stage: 'evaluation-run' as const,
+      message,
+    };
     return {
       run,
-      overallOutcome: notRun ? 'not-run' : 'requirements-failed',
+      overallOutcome: notRun ? 'not-run' : 'evaluation-error',
       allRequirementsPassed: false,
-      studentOutcome: notRun ? 'not-run' : 'not-graduated',
+      studentOutcome: 'not-evaluated',
       robustnessOutcome: 'not-evaluated',
       robustnessPassed: false,
       graduationPassed: false,
@@ -419,7 +619,8 @@ async function runOnce(
       exactTranscriptCompleted: false,
       checks: [],
       turns,
-      message: `${error instanceof Error ? error.message : String(error)}${turns.length > 0 ? ` Trace: ${traceText(turns)}` : ''}`,
+      evaluationDiagnostic: recordedEvaluationDiagnostic,
+      message: `${notRun ? `Evaluation not run during ${recordedEvaluationDiagnostic.stage}` : `Evaluation error during ${recordedEvaluationDiagnostic.stage}`}: ${message}${turns.length > 0 ? ` Trace: ${traceText(turns)}` : ''}`,
     };
   }
 }
@@ -427,7 +628,9 @@ async function runOnce(
 export async function runSparcCompoundInterestLiveEvaluation(options: {
   readonly totalRuns?: number;
   readonly requiredPassRate?: number;
-  readonly createProvider?: () => SparcLiveEvaluationProvider;
+  readonly createProvider?: (
+    onLearnerResponseScoringTrace: SparcLearnerResponseScoringTraceObserver,
+  ) => SparcLiveEvaluationProvider;
   readonly getCapability?: () => Promise<OpenRouterCapability>;
 } = {}): Promise<SparcCompoundInterestLiveEvaluationResult> {
   const totalRuns = options.totalRuns ?? 5;
@@ -447,8 +650,9 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
   for (let run = 1; run <= totalRuns; run += 1) {
     const result = await runOnce(
       run,
-      options.createProvider ?? (() => createSparcDialogueOpenRouterProvider({
+      options.createProvider ?? ((onLearnerResponseScoringTrace) => createSparcDialogueOpenRouterProvider({
         callResolvedOpenRouterJson: callAdminTestResolvedOpenRouterJson,
+        onLearnerResponseScoringTrace,
       })),
     );
     runs.push(result);
@@ -458,7 +662,7 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
           run: skippedRun,
           overallOutcome: 'not-run',
           allRequirementsPassed: false,
-          studentOutcome: 'not-run',
+          studentOutcome: 'not-evaluated',
           robustnessOutcome: 'not-evaluated',
           robustnessPassed: false,
           graduationPassed: false,
@@ -476,27 +680,34 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
   const allRequirementsPassedRuns = runs.filter((run) => run.allRequirementsPassed).length;
   const robustnessPassedRuns = runs.filter((run) => run.robustnessPassed).length;
   const graduationPassedRuns = runs.filter((run) => run.graduationPassed).length;
-  const completedRuns = runs.filter((run) => run.overallOutcome !== 'not-run').length;
-  const notRunRuns = totalRuns - completedRuns;
-  const passRate = completedRuns > 0 ? graduationPassedRuns / completedRuns : 0;
-  const robustnessRequirementMet = completedRuns === totalRuns
-    && robustnessPassedRuns === totalRuns;
-  const graduationRequirementMet = completedRuns === totalRuns
-    && passRate >= requiredPassRate;
+  const evaluatedRuns = runs.filter((run) => run.overallOutcome === 'all-requirements-passed'
+    || run.overallOutcome === 'requirements-failed').length;
+  const evaluationErrorRuns = runs.filter((run) => run.overallOutcome === 'evaluation-error').length;
+  const notRunRuns = runs.filter((run) => run.overallOutcome === 'not-run').length;
+  const passRate = evaluatedRuns > 0 ? graduationPassedRuns / evaluatedRuns : null;
+  const evaluationRequirementMet = evaluatedRuns === totalRuns;
+  const robustnessRequirementMet = evaluatedRuns > 0
+    && robustnessPassedRuns === evaluatedRuns;
+  const requiredGraduationRuns = Math.ceil(totalRuns * requiredPassRate);
+  const graduationRequirementMet = graduationPassedRuns >= requiredGraduationRuns;
   const result: SparcCompoundInterestLiveEvaluationResult = {
-    ok: robustnessRequirementMet && graduationRequirementMet,
+    ok: evaluationRequirementMet && robustnessRequirementMet && graduationRequirementMet,
     generatedAt: new Date().toISOString(),
     model: capability.model,
     modelSource: capability.source,
+    reasoningLevel: capability.reasoningLevel,
     problemStatement: PROBLEM_STATEMENT,
     requiredPassRate,
+    requiredGraduationRuns,
     passRate,
     allRequirementsPassedRuns,
     robustnessPassedRuns,
     graduationPassedRuns,
-    completedRuns,
+    evaluatedRuns,
+    evaluationErrorRuns,
     notRunRuns,
     totalRuns,
+    evaluationRequirementMet,
     robustnessRequirementMet,
     graduationRequirementMet,
     runs,

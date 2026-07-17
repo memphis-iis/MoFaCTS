@@ -1,6 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import { expect } from 'chai';
 import {
+  getAdminOpenRouterReasoningLevel,
+  getTdfOpenRouterReasoningLevel,
+  getUserOpenRouterReasoningLevel,
   resolvePreferredApiKey,
   type ApiKeyResolutionDeps,
 } from './apiKeyResolution';
@@ -42,6 +45,19 @@ function createDeps(overrides: Partial<ApiKeyResolutionDeps> = {}): ApiKeyResolu
 }
 
 describe('apiKeyResolution', function() {
+  it('reads reasoning from the same TDF, user, and admin configuration shapes as their models', function() {
+    expect(getTdfOpenRouterReasoningLevel({
+      content: { tdfs: { tutor: { setspec: { openRouterReasoningLevel: 'high' } } } },
+    })).to.equal('high');
+    expect(getUserOpenRouterReasoningLevel({
+      profile: { openRouterReasoningLevel: 'medium' },
+    })).to.equal('medium');
+    expect(getAdminOpenRouterReasoningLevel({
+      value: { openRouter: { reasoningLevel: 'low' } },
+    })).to.equal('low');
+    expect(getUserOpenRouterReasoningLevel({ profile: {} })).to.equal('none');
+  });
+
   it('prefers TDF keys over user and admin alternatives for all providers', async function() {
     for (const kind of ['speech', 'tts', 'openrouter'] as const) {
       const result = await resolvePreferredApiKey(createDeps(), {

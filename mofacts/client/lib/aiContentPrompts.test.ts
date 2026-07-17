@@ -14,7 +14,19 @@ describe('aiContentPrompts', function() {
     expect(prompt).to.contain('prefer multiple choice or create an AutoTutor expectation');
     expect(prompt).to.contain('Set visibility to "public" only');
     expect(prompt).to.contain('prompt.attribution');
+    expect(prompt).to.contain('Do not add images merely because a topic could be illustrated');
     expect(prompt).to.contain('Source content:\nKrebs cycle source text');
+  });
+
+  it('binds uploaded visual inputs to exact package asset names', function() {
+    const prompt = buildItemAuthoringPrompt('Identify each uploaded bird.', ['learningSession'], [{
+      packageFileName: 'yellow_warbler.webp',
+      originalName: 'IMG_1001.JPG',
+    }]);
+
+    expect(prompt).to.contain('Treat these uploads as explicit image intent');
+    expect(prompt).to.contain('"assetFileName":"yellow_warbler.webp"');
+    expect(prompt).to.contain('Never replace an uploaded asset with an external image URL');
   });
 
   it('assembles AutoTutor guidance with expectation counts and misconception quality criteria', function() {

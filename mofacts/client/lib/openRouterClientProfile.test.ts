@@ -46,6 +46,7 @@ describe('openRouterClientProfile', function() {
   it('reads saved OpenRouter settings from the server', async function() {
     const callAsyncStub = sinon.stub(Meteor as any, 'callAsync').resolves({
       model: ' openai/test-model ',
+      reasoningLevel: 'high',
       hasOpenRouterKey: true,
     });
 
@@ -54,7 +55,19 @@ describe('openRouterClientProfile', function() {
     expect(callAsyncStub.calledWith('getOwnOpenRouterSettings')).to.equal(true);
     expect(settings).to.deep.equal({
       model: 'openai/test-model',
+      reasoningLevel: 'high',
       hasOpenRouterKey: true,
     });
+  });
+
+  it('normalizes a missing stored reasoning level to none', async function() {
+    sinon.stub(Meteor as any, 'callAsync').resolves({
+      model: 'openai/test-model',
+      hasOpenRouterKey: false,
+    });
+
+    const settings = await getOwnOpenRouterSettings();
+
+    expect(settings.reasoningLevel).to.equal('none');
   });
 });

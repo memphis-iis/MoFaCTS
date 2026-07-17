@@ -8,6 +8,7 @@ import {
 import { getImportFileNames, sanitizeImportName } from './importCompositionBuilder';
 import type { ImportDraftLesson } from './normalizedImportTypes';
 import type { AiItem, CreationModuleId } from './aiContentTypes';
+import type { PreparedAiImageAsset } from './aiContentImageAssets';
 import { normalizeAttribution, validateAiOutput, validateAutoTutorOutput } from './aiContentValidation';
 import {
   buildCanonicalSparcAutoTutorProductionRules,
@@ -75,10 +76,50 @@ function applyVisibilityLock(draft: ImportDraftLesson, output: ReturnType<typeof
   return draft;
 }
 
-export function buildDrafts(output: ReturnType<typeof validateAiOutput>['output'], selectedModules: CreationModuleId[]): ImportDraftLesson[] {
-  return selectedModules
+function attachUploadedImages(
+  drafts: ImportDraftLesson[],
+  output: ReturnType<typeof validateAiOutput>['output'],
+  uploadedImages: PreparedAiImageAsset[],
+): ImportDraftLesson[] {
+  if (uploadedImages.length === 0) {
+    return drafts;
+  }
+  const assetsByName = new Map(uploadedImages.map((asset) => [asset.packageFileName, asset]));
+  const referencedNames = new Set(
+    output.items
+      .map((item) => String(item.prompt?.imgSrc || '').trim())
+      .filter((source) => source && !/^https?:\/\//i.test(source))
+  );
+  for (const name of referencedNames) {
+    if (!assetsByName.has(name)) {
+      throw new Error(`Generated content referenced unknown uploaded image asset "${name}".`);
+    }
+  }
+  const unusedImages = uploadedImages.filter((asset) => !referencedNames.has(asset.packageFileName));
+  if (unusedImages.length > 0) {
+    throw new Error(`Generated content did not use uploaded image asset${unusedImages.length === 1 ? '' : 's'}: ${unusedImages.map((asset) => asset.packageFileName).join(', ')}.`);
+  }
+  const mediaFiles = Object.fromEntries(
+    Array.from(referencedNames).map((name) => [name, assetsByName.get(name)!.bytes])
+  );
+  for (const draft of drafts) {
+    draft.generatedBaseline.mediaFiles = { ...mediaFiles };
+    if (draft.stats) {
+      draft.stats.mediaCount = Object.keys(mediaFiles).length;
+    }
+  }
+  return drafts;
+}
+
+export function buildDrafts(
+  output: ReturnType<typeof validateAiOutput>['output'],
+  selectedModules: CreationModuleId[],
+  uploadedImages: PreparedAiImageAsset[] = [],
+): ImportDraftLesson[] {
+  const drafts = selectedModules
     .filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession')
     .map((moduleId) => applyVisibilityLock(buildManualDraftLesson(buildStateFromAi(output, moduleId)), output));
+  return attachUploadedImages(drafts, output, uploadedImages);
 }
 
 function normalizeSparcSlug(value: string, fallback: string): string {

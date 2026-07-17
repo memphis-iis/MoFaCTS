@@ -17,16 +17,26 @@ import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
 import { buildAutoTutorDraft, buildDrafts } from '../../lib/aiContentDraftBuilder';
 import { findCueLeaks, type CueLeak } from '../../lib/aiContentCueValidation';
 import { callOpenRouterForAutoTutor, callOpenRouterForItemCueRepair, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
+import type { AiContentRequestImage } from '../../lib/aiContentOpenRouterClient';
 import {
   generateAutoTutorExpectationRelationships,
 } from '../../lib/autoTutorRelationshipEngine';
 import { enrichAiContentMedia } from '../../lib/aiContentMediaEnrichment';
 import { extractJsonObject, validateAiOutput, validateAutoTutorOutput } from '../../lib/aiContentValidation';
+import { enforceAiImageAuthorization } from '../../lib/aiContentImagePolicy';
 import {
   buildUploadWithNameConflictRetry,
   suggestedReplacementName,
   type GeneratedNameConflict,
 } from '../../lib/aiContentPackageSave';
+import {
+  aiImageAssetDataUrl,
+  collectAiImageDropSources,
+  prepareAiImageAssets,
+  sourcesFromFileList,
+  type AiImageSourceFile,
+  type PreparedAiImageAsset,
+} from '../../lib/aiContentImageAssets';
 
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 const FlowRouter = (globalThis as any).FlowRouter;
@@ -35,6 +45,7 @@ declare const DynamicAssets: any;
 type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
 
 type StatusKind = 'info' | 'success' | 'warning' | 'error';
+type BlazeDragEvent = DragEvent & { originalEvent?: DragEvent };
 
 type DebugRecord = {
   id?: string;
@@ -108,6 +119,8 @@ type AiCreatorInstance = Blaze.TemplateInstance & {
   };
   creating: ReactiveVar<boolean>;
   sourceText: ReactiveVar<string>;
+  uploadedImages: ReactiveVar<Array<PreparedAiImageAsset & { previewUrl: string }>>;
+  processingImages: ReactiveVar<boolean>;
   selectedModules: ReactiveVar<CreationModuleId[]>;
   statusMessage: ReactiveVar<string>;
   statusKind: ReactiveVar<StatusKind>;
@@ -143,7 +156,7 @@ const CREATION_MODULES: Array<{
 const CREATION_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.records';
 const DEBUG_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.debugRecords';
 const AI_CREATION_HANDOFF_STORAGE_KEY = 'mofacts.aiContentCreation.pendingRequest';
-const PROMPT_TEMPLATE_VERSION = 'ai-content-creator-v1';
+const PROMPT_TEMPLATE_VERSION = 'ai-content-creator-v2';
 const COMPACT_SCHEMA_VERSION = 'ai-normalized-v1';
 const MAX_STORED_RECORDS = 50;
 const MAX_DEBUG_PAYLOAD_LENGTH = 20000;
@@ -266,6 +279,14 @@ function orderedModules(moduleIds: CreationModuleId[]): CreationModuleId[] {
   return CREATION_MODULES.map((module) => module.id).filter((moduleId) => selected.has(moduleId));
 }
 
+async function hashCreationSource(sourceText: string, images: PreparedAiImageAsset[]): Promise<string> {
+  const imageHashes = await Promise.all(images.map(async (image) => {
+    const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(image.bytes).buffer);
+    return `${image.packageFileName}:${Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  }));
+  return hashSourceText(`${sourceText}\n${imageHashes.join('\n')}`);
+}
+
 async function generateAutoTutorFromAi(
   sourceText: string,
   apiKey: string,
@@ -337,19 +358,25 @@ function applyCueRepairResponse(parsedRepair: unknown, validation: ReturnType<ty
   return repairedItemIndexes;
 }
 
-async function generateItemsFromAi(sourceText: string, selectedModules: CreationModuleId[], apiKey: string, model: string): Promise<ItemGenerationResult> {
-  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, apiKey, model);
+async function generateItemsFromAi(
+  sourceText: string,
+  selectedModules: CreationModuleId[],
+  apiKey: string,
+  model: string,
+  uploadedImages: AiContentRequestImage[],
+): Promise<ItemGenerationResult> {
+  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, apiKey, model, uploadedImages);
   const parsedJson = extractJsonObject(rawAiResponse);
   const repairs: ItemGenerationResult['repairs'] = [];
   const repairWarnings: string[] = [];
-  let validation = validateAiOutput(parsedJson);
+  let validation = enforceAiImageAuthorization(validateAiOutput(parsedJson), sourceText, uploadedImages.length);
   for (let pass = 0; pass < MAX_ITEM_CUE_REPAIR_PASSES; pass += 1) {
     const leaks = findCueLeaks(validation.output);
     if (leaks.length === 0) {
       break;
     }
     try {
-      const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, apiKey, model);
+      const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, apiKey, model, uploadedImages);
       const parsedRepairJson = extractJsonObject(rawRepairResponse);
       const repairedItemIndexes = applyCueRepairResponse(parsedRepairJson, validation);
       repairs.push({
@@ -357,7 +384,9 @@ async function generateItemsFromAi(sourceText: string, selectedModules: Creation
         parsedJson: parsedRepairJson,
         repairedItemIndexes,
       });
-      validation = validateAiOutput(validation.output);
+      const priorWarnings = validation.warnings;
+      validation = enforceAiImageAuthorization(validateAiOutput(validation.output), sourceText, uploadedImages.length);
+      validation.warnings = priorWarnings.concat(validation.warnings);
     } catch (error) {
       repairWarnings.push(`Cue repair pass ${pass + 1} did not return usable replacements: ${getErrorMessage(error)}`);
       break;
@@ -384,6 +413,39 @@ async function generateItemsFromAi(sourceText: string, selectedModules: Creation
   };
 }
 
+async function prepareRequestImages(images: PreparedAiImageAsset[]): Promise<AiContentRequestImage[]> {
+  return Promise.all(images.map(async (image) => ({
+    packageFileName: image.packageFileName,
+    originalName: image.originalName,
+    dataUrl: await aiImageAssetDataUrl(image),
+  })));
+}
+
+async function addImageSources(instance: AiCreatorInstance, sources: AiImageSourceFile[]): Promise<void> {
+  if (sources.length === 0 || instance.processingImages.get()) {
+    return;
+  }
+  instance.processingImages.set(true);
+  setStatus(instance, 'info', aiText('aiCreator.processingImages'));
+  try {
+    const current = instance.uploadedImages.get();
+    const prepared = await prepareAiImageAssets(sources, current);
+    const withPreviews = prepared.map((asset) => ({
+      ...asset,
+      previewUrl: URL.createObjectURL(new Blob([new Uint8Array(asset.bytes).buffer], { type: 'image/webp' })),
+    }));
+    instance.uploadedImages.set(current.concat(withPreviews));
+    setStatus(instance, 'success', aiText('aiCreator.imagesReady', {
+      count: withPreviews.length,
+      total: current.length + withPreviews.length,
+    }));
+  } catch (error) {
+    setStatus(instance, 'error', getErrorMessage(error));
+  } finally {
+    instance.processingImages.set(false);
+  }
+}
+
 function promptForReplacementName(conflict: GeneratedNameConflict): string | null {
   const suggested = suggestedReplacementName(conflict);
   const response = window.prompt(
@@ -396,6 +458,7 @@ function promptForReplacementName(conflict: GeneratedNameConflict): string | nul
 
 async function runCreation(instance: AiCreatorInstance): Promise<void> {
   const sourceText = instance.sourceText.get().trim();
+  const uploadedImages = instance.uploadedImages.get();
   const selectedModules = instance.selectedModules.get();
   await refreshOpenRouterCapability(instance);
   const model = effectiveOpenRouterModel(instance);
@@ -411,7 +474,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     warnings: [],
   };
 
-  if (!sourceText) {
+  if (!sourceText && uploadedImages.length === 0) {
     setStatus(instance, 'warning', aiText('aiCreator.addSourceContent'));
     return;
   }
@@ -434,11 +497,12 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
       : aiText('aiCreator.creatingContent'),
   );
   try {
-    const sourceTextHash = await hashSourceText(sourceText);
+    const sourceTextHash = await hashCreationSource(sourceText, uploadedImages);
     const apiKey = '__server_resolved_openrouter__';
+    const requestImages = await prepareRequestImages(uploadedImages);
     const itemModules = selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
     const itemGenerationPromise = itemModules.length > 0
-      ? generateItemsFromAi(sourceText, itemModules, apiKey, model)
+      ? generateItemsFromAi(sourceText, itemModules, apiKey, model, requestImages)
       : null;
     const autoTutorGenerationPromise = selectedModules.includes('autoTutor')
       ? generateAutoTutorFromAi(sourceText, apiKey, model, instance.openRouterCapability.get()?.source || 'user')
@@ -465,7 +529,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
       if (itemGeneration.repairs.length > 0) {
         llmCalls.itemCueRepairs = itemGeneration.repairs;
       }
-      drafts.push(...buildDrafts(itemGeneration.result.output, itemModules));
+      drafts.push(...buildDrafts(itemGeneration.result.output, itemModules, uploadedImages));
       warnings = warnings.concat(itemGeneration.result.warnings);
       rejectedItems = rejectedItems.concat(itemGeneration.result.rejectedItems);
       creationSummary = itemGeneration.result.output.creationSummary;
@@ -544,6 +608,8 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     Session.set('assetsRefreshTrigger', Date.now());
     if (isEmbedded(instance)) {
       instance.sourceText.set('');
+      instance.uploadedImages.get().forEach((image) => URL.revokeObjectURL(image.previewUrl));
+      instance.uploadedImages.set([]);
       instance.statusMessage.set('');
       const textarea = instance.find('#ai-source-text') as HTMLTextAreaElement | null;
       if (textarea) {
@@ -554,7 +620,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     FlowRouter.go('/contentUpload');
   } catch (error: unknown) {
     clientConsole(1, '[AI CONTENT CREATOR] Creation failed:', error);
-    const sourceTextHash = await hashSourceText(sourceText);
+    const sourceTextHash = await hashCreationSource(sourceText, uploadedImages);
     const debugRecord: DebugRecord = {
       ...debugBase,
       status: 'failed',
@@ -588,12 +654,18 @@ Template.aiContentCreator.onCreated(function(this: AiCreatorInstance) {
   const pendingHandoff = readPendingCreationHandoff();
   this.creating = new ReactiveVar(false);
   this.sourceText = new ReactiveVar(pendingHandoff?.sourceText || '');
+  this.uploadedImages = new ReactiveVar([]);
+  this.processingImages = new ReactiveVar(false);
   this.selectedModules = new ReactiveVar(pendingHandoff?.selectedModules || ['learningSession']);
   this.statusMessage = new ReactiveVar('');
   this.statusKind = new ReactiveVar('info');
   this.debugRecord = new ReactiveVar(null);
   this.openRouterCapability = new ReactiveVar(null);
   this.autoStartFromHandoff = pendingHandoff?.autoStart === true;
+});
+
+Template.aiContentCreator.onDestroyed(function(this: AiCreatorInstance) {
+  this.uploadedImages.get().forEach((image) => URL.revokeObjectURL(image.previewUrl));
 });
 
 Template.aiContentCreator.onRendered(function(this: AiCreatorInstance) {
@@ -625,6 +697,19 @@ Template.aiContentCreator.helpers({
     const length = (Template.instance() as AiCreatorInstance).sourceText.get().length;
     return aiText('aiCreator.characterCount', { count: length, plural: length === 1 ? '' : 's' });
   },
+  uploadedImages() {
+    return (Template.instance() as AiCreatorInstance).uploadedImages.get();
+  },
+  hasUploadedImages() {
+    return (Template.instance() as AiCreatorInstance).uploadedImages.get().length > 0;
+  },
+  uploadedImageSummary() {
+    const count = (Template.instance() as AiCreatorInstance).uploadedImages.get().length;
+    return aiText('aiCreator.uploadedImageSummary', { count });
+  },
+  processingImages() {
+    return (Template.instance() as AiCreatorInstance).processingImages.get();
+  },
   modules() {
     const selected = new Set((Template.instance() as AiCreatorInstance).selectedModules.get());
     return CREATION_MODULES.map((module) => ({
@@ -643,7 +728,8 @@ Template.aiContentCreator.helpers({
   createAttrs() {
     const instance = Template.instance() as AiCreatorInstance;
     const disabled = instance.creating.get() ||
-      !instance.sourceText.get().trim() ||
+      instance.processingImages.get() ||
+      (!instance.sourceText.get().trim() && instance.uploadedImages.get().length === 0) ||
       instance.selectedModules.get().length === 0 ||
       !hasOpenRouterCapability(instance) ||
       !effectiveOpenRouterModel(instance);
@@ -660,6 +746,56 @@ Template.aiContentCreator.helpers({
 Template.aiContentCreator.events({
   'input #ai-source-text'(event: Event, instance: AiCreatorInstance) {
     instance.sourceText.set((event.currentTarget as HTMLTextAreaElement).value);
+  },
+  'dragenter .ai-image-drop-zone, dragover .ai-image-drop-zone'(event: BlazeDragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dataTransfer = event.originalEvent?.dataTransfer || event.dataTransfer;
+    if (dataTransfer) {
+      dataTransfer.dropEffect = 'copy';
+    }
+    (event.currentTarget as HTMLElement).classList.add('is-drag-over');
+  },
+  'dragleave .ai-image-drop-zone'(event: BlazeDragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.currentTarget as HTMLElement;
+    if (!event.relatedTarget || !target.contains(event.relatedTarget as Node)) {
+      target.classList.remove('is-drag-over');
+    }
+  },
+  'drop .ai-image-drop-zone'(event: BlazeDragEvent, instance: AiCreatorInstance) {
+    event.preventDefault();
+    event.stopPropagation();
+    (event.currentTarget as HTMLElement).classList.remove('is-drag-over');
+    const dataTransfer = event.originalEvent?.dataTransfer || event.dataTransfer;
+    if (dataTransfer) {
+      void (async () => {
+        try {
+          await addImageSources(instance, await collectAiImageDropSources(dataTransfer));
+        } catch (error) {
+          setStatus(instance, 'error', getErrorMessage(error));
+        }
+      })();
+    }
+  },
+  'change #ai-image-files, change #ai-image-folder'(event: Event, instance: AiCreatorInstance) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (input.files?.length) {
+      void addImageSources(instance, sourcesFromFileList(input.files));
+    }
+    input.value = '';
+  },
+  'click .ai-remove-image'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    event.stopPropagation();
+    const id = (event.currentTarget as HTMLButtonElement).dataset.imageId;
+    const current = instance.uploadedImages.get();
+    const removed = current.find((image) => image.id === id);
+    if (removed) {
+      URL.revokeObjectURL(removed.previewUrl);
+      instance.uploadedImages.set(current.filter((image) => image.id !== id));
+    }
   },
   'click .ai-mode-card'(event: Event, instance: AiCreatorInstance) {
     event.preventDefault();

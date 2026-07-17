@@ -17,6 +17,33 @@ export type SparcDiagnosticMisconceptionScoreInput = {
   readonly supportStrength: number;
 };
 
+export type SparcEvidenceDirection = 'supports' | 'contradicts' | 'unaddressed';
+
+export type SparcLearningTargetEvidence = {
+  readonly clusterKC: string;
+  readonly evidenceDirection: SparcEvidenceDirection;
+  readonly evidenceStrength: number;
+};
+
+export type SparcDiagnosticMisconceptionEvidence = {
+  readonly id: string;
+  readonly evidenceDirection: SparcEvidenceDirection;
+  readonly evidenceStrength: number;
+};
+
+export type SparcLearnerResponseEvidenceEnvelope = {
+  readonly learningTargetEvaluations: readonly SparcLearningTargetEvidence[];
+  readonly diagnosticMisconceptionEvaluations: readonly SparcDiagnosticMisconceptionEvidence[];
+  readonly learnerContribution: {
+    readonly type: 'answer' | 'question' | 'off-task' | 'other';
+    readonly confidence?: number;
+    readonly streakCount?: number;
+  };
+  readonly learnerQuestion?: {
+    readonly contentFocused: boolean;
+  };
+};
+
 export type SparcLearnerResponseScoringResult = {
   readonly learningTargetScores?: readonly SparcLearningTargetScoreInput[];
   readonly diagnosticMisconceptionScores?: readonly SparcDiagnosticMisconceptionScoreInput[];
@@ -103,6 +130,174 @@ function previousMisconceptionSupportStrength(facts: readonly SparcWorkingMemory
     ));
   }
   return scores;
+}
+
+function requireEvidenceDirection(value: unknown, label: string): SparcEvidenceDirection {
+  if (value !== 'supports' && value !== 'contradicts' && value !== 'unaddressed') {
+    throw new Error(`${label} must be supports, contradicts, or unaddressed`);
+  }
+  return value;
+}
+
+function requireEvidenceStrength(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${label} must be a number from 0 to 1`);
+  }
+  return value;
+}
+
+function requireExactEvidenceId(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${label} is required`);
+  }
+  return value;
+}
+
+function completeEvidenceById<T>(params: {
+  readonly evaluations: readonly T[];
+  readonly identity: (evaluation: T) => unknown;
+  readonly knownIds: ReadonlySet<string>;
+  readonly label: string;
+}): Map<string, T> {
+  if (!Array.isArray(params.evaluations)) {
+    throw new Error(`SPARC learner-response evidence ${params.label} evaluations must be an array`);
+  }
+  const evaluationsById = new Map<string, T>();
+  for (const evaluation of params.evaluations) {
+    const id = requireExactEvidenceId(params.identity(evaluation), `SPARC learner-response evidence ${params.label} id`);
+    if (!params.knownIds.has(id)) {
+      throw new Error(`SPARC learner-response evidence references unknown ${params.label} "${id}"`);
+    }
+    if (evaluationsById.has(id)) {
+      throw new Error(`SPARC learner-response evidence contains duplicate ${params.label} "${id}"`);
+    }
+    evaluationsById.set(id, evaluation);
+  }
+  for (const id of params.knownIds) {
+    if (!evaluationsById.has(id)) {
+      throw new Error(`SPARC learner-response evidence is missing ${params.label} "${id}"`);
+    }
+  }
+  return evaluationsById;
+}
+
+function validatedEvidence(params: {
+  readonly direction: unknown;
+  readonly strength: unknown;
+  readonly label: string;
+}): {
+  readonly direction: SparcEvidenceDirection;
+  readonly strength: number;
+} {
+  const direction = requireEvidenceDirection(params.direction, `${params.label} evidenceDirection`);
+  const strength = requireEvidenceStrength(params.strength, `${params.label} evidenceStrength`);
+  if (direction !== 'unaddressed' && strength === 0) {
+    throw new Error(`${params.label} evidenceStrength must be greater than 0 when evidenceDirection is ${direction}`);
+  }
+  if (direction === 'unaddressed' && strength !== 0) {
+    throw new Error(`${params.label} evidenceStrength must be 0 when evidenceDirection is unaddressed`);
+  }
+  return { direction, strength };
+}
+
+export function reduceSparcLearnerResponseEvidence(params: {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly evidence: SparcLearnerResponseEvidenceEnvelope;
+}): SparcLearnerResponseScoringResult {
+  const knownClusterKcs = knownLearningTargetClusterKcs(params.facts);
+  const knownMisconceptions = knownMisconceptionIds(params.facts);
+  const previousCoverage = previousLearningTargetCoverage(params.facts);
+  const previousSupportStrength = previousMisconceptionSupportStrength(params.facts);
+  const learningTargetEvaluations = completeEvidenceById({
+    evaluations: params.evidence.learningTargetEvaluations,
+    identity: (evaluation) => evaluation.clusterKC,
+    knownIds: knownClusterKcs,
+    label: 'learning target clusterKC',
+  });
+  const misconceptionEvaluations = completeEvidenceById({
+    evaluations: params.evidence.diagnosticMisconceptionEvaluations,
+    identity: (evaluation) => evaluation.id,
+    knownIds: knownMisconceptions,
+    label: 'diagnostic misconception id',
+  });
+  const learningTargetScores: SparcLearningTargetScoreInput[] = [];
+  const diagnosticMisconceptionScores: SparcDiagnosticMisconceptionScoreInput[] = [];
+  const validatedLearningTargetEvidence = new Map<string, ReturnType<typeof validatedEvidence>>();
+  const validatedMisconceptionEvidence = new Map<string, ReturnType<typeof validatedEvidence>>();
+
+  for (const clusterKC of knownClusterKcs) {
+    const evaluation = learningTargetEvaluations.get(clusterKC)!;
+    const evidence = validatedEvidence({
+      direction: evaluation.evidenceDirection,
+      strength: evaluation.evidenceStrength,
+      label: `SPARC learning target evidence "${clusterKC}"`,
+    });
+    validatedLearningTargetEvidence.set(clusterKC, evidence);
+    if (evidence.direction === 'supports' && evidence.strength > (previousCoverage.get(clusterKC) ?? 0)) {
+      learningTargetScores.push({ clusterKC, coverage: evidence.strength });
+    }
+  }
+
+  for (const id of knownMisconceptions) {
+    const evaluation = misconceptionEvaluations.get(id)!;
+    const evidence = validatedEvidence({
+      direction: evaluation.evidenceDirection,
+      strength: evaluation.evidenceStrength,
+      label: `SPARC diagnostic misconception evidence "${id}"`,
+    });
+    validatedMisconceptionEvidence.set(id, evidence);
+    const priorStrength = previousSupportStrength.get(id) ?? 0;
+    if (evidence.direction === 'supports' && evidence.strength !== priorStrength) {
+      diagnosticMisconceptionScores.push({ id, supportStrength: evidence.strength });
+    } else if (evidence.direction === 'contradicts' && priorStrength !== 0) {
+      diagnosticMisconceptionScores.push({ id, supportStrength: 0 });
+    }
+  }
+
+  const contributionType = params.evidence.learnerContribution?.type;
+  if (contributionType !== 'answer' && contributionType !== 'question' && contributionType !== 'off-task' && contributionType !== 'other') {
+    throw new Error('SPARC learner-response evidence learnerContribution.type is invalid');
+  }
+  if (contributionType === 'off-task') {
+    const inconsistentInstructionalEvidence = [
+      ...validatedLearningTargetEvidence.values(),
+      ...validatedMisconceptionEvidence.values(),
+    ].some((evidence) => evidence.direction !== 'unaddressed' || evidence.strength !== 0);
+    if (inconsistentInstructionalEvidence) {
+      throw new Error('SPARC learner-response evidence off-task contribution must leave every instructional proposition unaddressed');
+    }
+  }
+  if (contributionType === 'question' && !params.evidence.learnerQuestion) {
+    throw new Error('SPARC learner question metadata is required when learnerContribution.type is question');
+  }
+  if (
+    contributionType === 'question'
+    && typeof params.evidence.learnerQuestion?.contentFocused !== 'boolean'
+  ) {
+    throw new Error('SPARC learner question contentFocused must be boolean');
+  }
+
+  return {
+    learningTargetScores,
+    ...(diagnosticMisconceptionScores.length > 0 ? { diagnosticMisconceptionScores } : {}),
+    learnerContribution: {
+      type: contributionType,
+      ...(params.evidence.learnerContribution.confidence !== undefined
+        ? {
+            confidence: requireUnitScore(
+              params.evidence.learnerContribution.confidence,
+              'SPARC dialogue learner contribution confidence',
+            ),
+          }
+        : {}),
+      ...(params.evidence.learnerContribution.streakCount !== undefined
+        ? { streakCount: params.evidence.learnerContribution.streakCount }
+        : {}),
+    },
+    ...(contributionType === 'question' && params.evidence.learnerQuestion
+      ? { learnerQuestion: { contentFocused: params.evidence.learnerQuestion.contentFocused } }
+      : {}),
+  };
 }
 
 function learningTargetScoreFact(params: {

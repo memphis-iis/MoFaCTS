@@ -1,4 +1,8 @@
 import { Meteor } from 'meteor/meteor';
+import {
+  normalizeOpenRouterReasoningLevel,
+  type OpenRouterReasoningLevel,
+} from '../../common/lib/openRouterModelCatalog';
 
 export type ApiKeyKind = 'openrouter' | 'speech' | 'tts';
 export type ApiKeySource = 'provided' | 'tdf' | 'user' | 'admin' | null;
@@ -9,6 +13,7 @@ type UserApiKeyDoc = {
   textToSpeechAPIKey?: unknown;
   profile?: {
     openRouterDefaultModel?: unknown;
+    openRouterReasoningLevel?: unknown;
     openRouterHasKey?: unknown;
   };
   services?: {
@@ -27,6 +32,7 @@ type TdfApiKeyDoc = {
           userselect?: unknown;
           openRouterApiKey?: unknown;
           openRouterModel?: unknown;
+          openRouterReasoningLevel?: unknown;
           speechAPIKey?: unknown;
           textToSpeechAPIKey?: unknown;
         };
@@ -59,8 +65,10 @@ export type AdminApiKeyProvider = 'openrouter' | 'googleTts' | 'googleSpeech';
 export type AdminApiKeyProviderSettings = {
   keyEncrypted?: unknown;
   model?: unknown;
+  reasoningLevel?: unknown;
   keyUpdatedAt?: unknown;
   modelUpdatedAt?: unknown;
+  reasoningLevelUpdatedAt?: unknown;
   updatedBy?: unknown;
 };
 
@@ -153,12 +161,33 @@ export function getAdminOpenRouterModel(settings: AdminApiKeySettingsDoc) {
   return normalizeString(settings?.value?.openRouter?.model);
 }
 
+export function getAdminOpenRouterReasoningLevel(settings: AdminApiKeySettingsDoc): OpenRouterReasoningLevel {
+  return normalizeOpenRouterReasoningLevel(
+    settings?.value?.openRouter?.reasoningLevel,
+    'Stored admin OpenRouter reasoning level',
+  );
+}
+
 export function getTdfOpenRouterModel(tdf: TdfApiKeyDoc) {
   return normalizeString(tdf?.content?.tdfs?.tutor?.setspec?.openRouterModel);
 }
 
+export function getTdfOpenRouterReasoningLevel(tdf: TdfApiKeyDoc): OpenRouterReasoningLevel {
+  return normalizeOpenRouterReasoningLevel(
+    tdf?.content?.tdfs?.tutor?.setspec?.openRouterReasoningLevel,
+    'TDF OpenRouter reasoning level',
+  );
+}
+
 export function getUserOpenRouterModel(user: UserApiKeyDoc) {
   return normalizeString(user?.profile?.openRouterDefaultModel);
+}
+
+export function getUserOpenRouterReasoningLevel(user: UserApiKeyDoc): OpenRouterReasoningLevel {
+  return normalizeOpenRouterReasoningLevel(
+    user?.profile?.openRouterReasoningLevel,
+    'Stored user OpenRouter reasoning level',
+  );
 }
 
 export async function getUserPersonalApiKey(

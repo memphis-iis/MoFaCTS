@@ -254,6 +254,7 @@ describe('interfaceI18n', function() {
     'adminTests.pass',
     'adminTests.fail',
     'adminTests.notRun',
+    'adminTests.notEvaluated',
     'adminTests.sparcLiveEvaluation',
     'adminTests.sparcLiveDescription',
     'adminTests.runSparcLiveEvaluation',
@@ -581,6 +582,33 @@ describe('interfaceI18n', function() {
       const resource = PLATFORM_LOCALE_RESOURCES[locale];
       for (const key of adminTestsKeys) {
         expect(resource[key], `${locale} ${key}`).to.not.equal(english[key]);
+      }
+    }
+  });
+
+  it('keeps SPARC live-evaluation summary interpolation tokens aligned in every locale', function() {
+    const expectedTokens = [
+      'evaluatedRuns',
+      'evaluationErrorRuns',
+      'graduationPassedRuns',
+      'notRunRuns',
+      'passRate',
+      'requiredGraduationRuns',
+      'robustnessPassedRuns',
+      'totalRuns',
+    ];
+    const summaryKeys = [
+      'adminTests.sparcLivePassed',
+      'adminTests.sparcLiveFailed',
+    ] as const;
+    for (const [locale, resource] of Object.entries(PLATFORM_LOCALE_RESOURCES)) {
+      for (const key of summaryKeys) {
+        const value = requireResourceString(resource, key, `${locale} ${key}`);
+        const tokens = Array.from(new Set(
+          Array.from(value.matchAll(/\{([^{}]+)\}/g))
+            .map((match) => match[1]),
+        )).sort();
+        expect(tokens, `${locale} ${key}`).to.deep.equal(expectedTokens);
       }
     }
   });

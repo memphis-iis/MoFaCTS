@@ -128,6 +128,29 @@
     min-width: 200px;
 }
 
+.learning-dashboard-practice-area {
+    display: grid;
+    gap: var(--app-space-3-px);
+}
+
+.learning-dashboard-toolbar-card {
+    width: fit-content;
+    max-width: 100%;
+    justify-self: center;
+    overflow: visible;
+}
+
+.learning-dashboard-toolbar-card .table-toolbar {
+    gap: 100px;
+    flex-wrap: nowrap;
+    border-bottom: 0;
+}
+
+.learning-dashboard-toolbar-card .toolbar-search {
+    width: 320px;
+    flex: 0 0 320px;
+}
+
 .toolbar-search input {
     width: 100%;
     height: var(--app-text-input-height);
@@ -358,12 +381,8 @@
 
 .learning-dashboard-sections {
     display: grid;
-    gap: 0;
+    gap: var(--app-space-3-px);
     min-width: 0;
-}
-
-.practice-section + .practice-section {
-    border-top: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
 }
 
 .practice-section-heading {
@@ -410,6 +429,14 @@
 
 .practice-col-icon {
     width: 68px;
+}
+
+.learning-dashboard-table.is-statistics-collapsed {
+    min-width: 520px;
+}
+
+.learning-dashboard-table.is-statistics-expanded {
+    min-width: 920px;
 }
 
 .learning-dashboard-col-lesson {
@@ -473,6 +500,68 @@
 .features-heading,
 .study-set-heading {
     text-align: center !important;
+}
+
+.learning-dashboard-study-set-heading-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-space-2-px);
+}
+
+.learning-dashboard-study-set-heading-content > span:first-child {
+    flex: 1;
+    text-align: center;
+}
+
+.learning-dashboard-statistics-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: var(--app-space-1-px);
+    min-height: var(--app-button-height);
+    padding: calc(4px * var(--app-density-scale)) calc(8px * var(--app-density-scale));
+    border: 1px solid color-mix(in srgb, var(--app-accent-color) 32%, transparent);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
+    color: var(--app-page-header-text-color);
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: normal;
+    line-height: 1;
+    text-transform: none;
+}
+
+.learning-dashboard-statistics-toggle:hover,
+.learning-dashboard-statistics-toggle:focus-visible {
+    border-color: color-mix(in srgb, var(--app-accent-color) 58%, transparent);
+    background: color-mix(in srgb, var(--app-accent-color) 8%, var(--learning-card-surface-color));
+    outline: none;
+}
+
+.learning-dashboard-statistics-toggle:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent-color) 20%, transparent);
+}
+
+.learning-dashboard-statistics-cell {
+    animation: learning-dashboard-statistics-reveal 160ms ease-out both;
+}
+
+.practice-table thead th.learning-dashboard-statistics-cell--first,
+.practice-table tbody td.learning-dashboard-statistics-cell--first {
+    border-left: 2px solid color-mix(in srgb, var(--app-accent-color) 24%, transparent);
+}
+
+.practice-table tbody td.learning-dashboard-statistics-cell {
+    background: color-mix(in srgb, var(--app-accent-color) 2%, var(--learning-card-surface-color));
+}
+
+@keyframes learning-dashboard-statistics-reveal {
+    from {
+        opacity: 0;
+        transform: translateX(-5px);
+    }
 }
 
 .features-heading {
@@ -1114,6 +1203,20 @@
         flex-direction: column;
     }
 
+    .learning-dashboard-toolbar-card {
+        width: 100%;
+    }
+
+    .learning-dashboard-toolbar-card .table-toolbar {
+        gap: var(--app-space-3-px);
+        flex-wrap: wrap;
+    }
+
+    .learning-dashboard-toolbar-card .toolbar-search {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+
     .toolbar-search {
         width: 100%;
         max-width: none;
@@ -1161,7 +1264,8 @@
 
 @media (prefers-reduced-motion: reduce) {
     .learning-dashboard-skeleton::after,
-    .learner-config-panel {
+    .learner-config-panel,
+    .learning-dashboard-statistics-cell {
         transition: none;
         animation: none;
     }

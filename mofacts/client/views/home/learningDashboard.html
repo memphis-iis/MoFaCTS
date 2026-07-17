@@ -44,7 +44,8 @@
       </section>
     {{/with}}
 
-    <section class="table-card">
+    <div class="learning-dashboard-practice-area">
+      <section class="table-card learning-dashboard-toolbar-card">
       <div class="table-toolbar">
         <div class="toolbar-search">
           <span class="fa fa-search" aria-hidden="true"></span>
@@ -59,9 +60,11 @@
           <button type="button" class="filter">{{lessonSummaryText}}</button>
         </div>
       </div>
+      </section>
 
       <div class="learning-dashboard-content-shell {{#if loadingShellBusy}}is-loading{{else}}is-ready{{/if}}" aria-busy="{{#if loadingShellBusy}}true{{else}}false{{/if}}">
         {{#if showLoadingFeedback}}
+          <section class="table-card learning-dashboard-loading-card-shell">
           {{#if showSlowLoading}}
           <div class="learning-dashboard-slow-loading" role="status" aria-live="polite">
             <span class="fa fa-wifi" aria-hidden="true"></span>
@@ -129,63 +132,81 @@
           </div>
           <div class="sr-only" role="status" aria-live="polite">{{t 'dashboard.loadingLessons'}}</div>
           {{/if}}
+          </section>
         {{else}}
           {{#unless isLoading}}
           {{#if hasTdfs}}
             <div class="learning-dashboard-sections learning-dashboard-content-ready">
               {{#if hasUsedTdfs}}
-                <div class="practice-section">
+                <section class="table-card practice-section">
                   <div class="practice-section-heading">{{t 'dashboard.continuePracticing'}}</div>
-                  {{> learningDashboardLessonTable tdfs=usedTdfsList learnerConfigState=learnerConfigState}}
+                  {{> learningDashboardLessonTable tdfs=usedTdfsList learnerConfigState=learnerConfigState allowStatistics=true statisticsExpanded=statisticsExpanded}}
                   {{> learningDashboardLessonCards tdfs=usedTdfsList learnerConfigState=learnerConfigState}}
-                </div>
+                </section>
               {{/if}}
               {{#if hasUnusedTdfs}}
-                <div class="practice-section">
+                <section class="table-card practice-section">
                   <div class="practice-section-heading">{{t 'dashboard.newLessons'}}</div>
-                  {{> learningDashboardLessonTable tdfs=unusedTdfsList learnerConfigState=learnerConfigState}}
+                  {{> learningDashboardLessonTable tdfs=unusedTdfsList learnerConfigState=learnerConfigState allowStatistics=false statisticsExpanded=false}}
                   {{> learningDashboardLessonCards tdfs=unusedTdfsList learnerConfigState=learnerConfigState}}
-                </div>
+                </section>
               {{/if}}
             </div>
           {{else}}
-            <div class="practice-empty-state">
+            <div class="table-card practice-empty-state">
               <p class="learning-dashboard-flush">{{t 'dashboard.noLessonsFound'}}</p>
             </div>
           {{/if}}
           {{/unless}}
         {{/if}}
       </div>
-    </section>
+    </div>
   </div>
 </template>
 
 <template name="learningDashboardLessonTable">
   <div class="learning-dashboard-table-shell">
     <div class="table-wrap">
-      <table class="practice-table learning-dashboard-table">
+      <table class="practice-table learning-dashboard-table {{statisticsTableClass}}">
         <colgroup>
           <col class="learning-dashboard-col-action">
           <col class="practice-col-icon">
           <col class="learning-dashboard-col-lesson">
-          <col class="learning-dashboard-col-stat">
-          <col class="learning-dashboard-col-stat">
-          <col class="learning-dashboard-col-stat">
-          <col class="learning-dashboard-col-stat">
-          <col class="learning-dashboard-col-stat">
-          <col class="learning-dashboard-col-last-practice">
+          {{#if statisticsExpanded}}
+            <col class="learning-dashboard-col-stat">
+            <col class="learning-dashboard-col-stat">
+            <col class="learning-dashboard-col-stat">
+            <col class="learning-dashboard-col-stat">
+            <col class="learning-dashboard-col-stat">
+            <col class="learning-dashboard-col-last-practice">
+          {{/if}}
         </colgroup>
         <thead>
           <tr>
             <th scope="col" class="actions-heading">{{t 'dashboard.actions'}}</th>
             <th scope="col" class="features-heading">{{t 'dashboard.features'}}</th>
-            <th scope="col" class="study-set-heading">{{t 'dashboard.studySet'}}</th>
-            <th scope="col" class="num">{{t 'dashboard.totalTrials'}}</th>
-            <th scope="col">{{t 'dashboard.overallAccuracy'}}</th>
-            <th scope="col" class="num">{{t 'dashboard.itemsPracticed'}}</th>
-            <th scope="col" class="num">{{t 'dashboard.daysWithSessions'}}</th>
-            <th scope="col" class="num">{{t 'dashboard.timeMinutes'}}</th>
-            <th scope="col">{{t 'courses.lastPractice'}}</th>
+            <th scope="col" class="study-set-heading">
+              <div class="learning-dashboard-study-set-heading-content">
+                <span>{{t 'dashboard.studySet'}}</span>
+                {{#if statisticsAvailable}}
+                  <button type="button"
+                    class="learning-dashboard-statistics-toggle"
+                    aria-expanded="{{#if statisticsExpanded}}true{{else}}false{{/if}}"
+                    title="{{statisticsToggleLabel}}">
+                    <span>{{statisticsToggleLabel}}</span>
+                    <span class="fa {{statisticsToggleIconClass}}" aria-hidden="true"></span>
+                  </button>
+                {{/if}}
+              </div>
+            </th>
+            {{#if statisticsExpanded}}
+              <th scope="col" class="num learning-dashboard-statistics-cell learning-dashboard-statistics-cell--first">{{t 'dashboard.totalTrials'}}</th>
+              <th scope="col" class="learning-dashboard-statistics-cell">{{t 'dashboard.overallAccuracy'}}</th>
+              <th scope="col" class="num learning-dashboard-statistics-cell">{{t 'dashboard.itemsPracticed'}}</th>
+              <th scope="col" class="num learning-dashboard-statistics-cell">{{t 'dashboard.daysWithSessions'}}</th>
+              <th scope="col" class="num learning-dashboard-statistics-cell">{{t 'dashboard.timeMinutes'}}</th>
+              <th scope="col" class="learning-dashboard-statistics-cell">{{t 'courses.lastPractice'}}</th>
+            {{/if}}
           </tr>
         </thead>
         <tbody>
@@ -261,31 +282,33 @@
                   {{/if}}
                 </div>
               </th>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.totalTrials'}}">
-                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTrials}}{{else}}-{{/if}}</span>
-              </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell" data-label="{{t 'dashboard.overallAccuracy'}}">
-                <div class="accuracy-pct">{{accuracyDisplay}}</div>
-                {{#if this.isUsed}}
-                  <div class="accuracy-bar"><div class="accuracy-fill" style="width:{{accuracyBarWidth}}"></div></div>
-                {{/if}}
-              </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.itemsPracticed'}}">
-                <span class="learning-dashboard-cell__value">{{itemsPracticedDisplay}}</span>
-              </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.daysWithSessions'}}">
-                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalSessions}}{{else}}-{{/if}}</span>
-              </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--stat num" data-label="{{t 'dashboard.timeMinutes'}}">
-                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTimeMinutes}}{{else}}-{{/if}}</span>
-              </td>
-              <td class="learning-dashboard-cell learning-dashboard-cell--last-practice" data-label="{{t 'courses.lastPractice'}}">
-                <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.lastPracticeDate}}{{else}}-{{/if}}</span>
-              </td>
+              {{#if statisticsExpanded}}
+                <td class="learning-dashboard-cell learning-dashboard-cell--stat num learning-dashboard-statistics-cell learning-dashboard-statistics-cell--first" data-label="{{t 'dashboard.totalTrials'}}">
+                  <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTrials}}{{else}}-{{/if}}</span>
+                </td>
+                <td class="learning-dashboard-cell learning-dashboard-cell--stat accuracy-cell learning-dashboard-statistics-cell" data-label="{{t 'dashboard.overallAccuracy'}}">
+                  <div class="accuracy-pct">{{accuracyDisplay}}</div>
+                  {{#if this.isUsed}}
+                    <div class="accuracy-bar"><div class="accuracy-fill" style="width:{{accuracyBarWidth}}"></div></div>
+                  {{/if}}
+                </td>
+                <td class="learning-dashboard-cell learning-dashboard-cell--stat num learning-dashboard-statistics-cell" data-label="{{t 'dashboard.itemsPracticed'}}">
+                  <span class="learning-dashboard-cell__value">{{itemsPracticedDisplay}}</span>
+                </td>
+                <td class="learning-dashboard-cell learning-dashboard-cell--stat num learning-dashboard-statistics-cell" data-label="{{t 'dashboard.daysWithSessions'}}">
+                  <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalSessions}}{{else}}-{{/if}}</span>
+                </td>
+                <td class="learning-dashboard-cell learning-dashboard-cell--stat num learning-dashboard-statistics-cell" data-label="{{t 'dashboard.timeMinutes'}}">
+                  <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.totalTimeMinutes}}{{else}}-{{/if}}</span>
+                </td>
+                <td class="learning-dashboard-cell learning-dashboard-cell--last-practice learning-dashboard-statistics-cell" data-label="{{t 'courses.lastPractice'}}">
+                  <span class="learning-dashboard-cell__value">{{#if this.isUsed}}{{this.lastPracticeDate}}{{else}}-{{/if}}</span>
+                </td>
+              {{/if}}
             </tr>
             {{#with configForTableRow}}
               <tr class="learner-config-row">
-                <td colspan="9">
+                <td colspan="{{tableColumnCount}}">
                   {{> learnerTdfConfigPanel}}
                 </td>
               </tr>

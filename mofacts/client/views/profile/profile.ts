@@ -18,6 +18,15 @@ import {
 import { TARGET_LOCALE_DEFINITIONS, TARGET_UI_LOCALES } from '../../../common/lib/interfaceLocales';
 import { getActiveUiLocale, setActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import { loadOpenRouterModelCatalog } from '../../lib/openRouterModelCatalogClient';
+import {
+  getAllowedOpenRouterReasoningLevels,
+  getDefaultOpenRouterReasoningLevel,
+  normalizeOpenRouterReasoningLevel,
+  validateOpenRouterReasoningLevelForModel,
+  type OpenRouterModelCatalogEntry,
+  type OpenRouterReasoningLevel,
+} from '../../../common/lib/openRouterModelCatalog';
 import {
   createInlineConfirmationController,
   type InlineConfirmationController,
@@ -36,6 +45,12 @@ type ProfileTemplateInstance = Blaze.TemplateInstance & {
   avatarIconId: ReactiveVar<string>;
   avatarImageData: ReactiveVar<string>;
   openRouterHasServerKey: ReactiveVar<boolean>;
+  openRouterModelCatalog: ReactiveVar<OpenRouterModelCatalogEntry[]>;
+  openRouterModelCatalogState: ReactiveVar<'loading' | 'ready' | 'error'>;
+  openRouterModelCatalogError: ReactiveVar<string>;
+  openRouterSelectedModel: ReactiveVar<string>;
+  openRouterSelectedReasoningLevel: ReactiveVar<OpenRouterReasoningLevel>;
+  lastSyncedOpenRouterSettings: string;
   confirmationState: ReactiveVar<InlineConfirmationView>;
   confirmationController: InlineConfirmationController<'delete-openrouter-key'>;
 };
@@ -72,6 +87,89 @@ function getPreviewDisplayName(): string {
 
 function profileText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
+function findCatalogModel(
+  template: ProfileTemplateInstance,
+  modelId = template.openRouterSelectedModel.get(),
+): OpenRouterModelCatalogEntry | undefined {
+  return template.openRouterModelCatalog.get().find((model) => model.id === modelId);
+}
+
+function syncReasoningSelectionForModel(template: ProfileTemplateInstance): void {
+  if (!template.openRouterSelectedModel.get()) {
+    template.openRouterSelectedReasoningLevel.set('none');
+    return;
+  }
+  const model = findCatalogModel(template);
+  if (!model) {
+    return;
+  }
+  const currentLevel = template.openRouterSelectedReasoningLevel.get();
+  const allowedLevels = getAllowedOpenRouterReasoningLevels(model);
+  if (!allowedLevels.includes(currentLevel)) {
+    template.openRouterSelectedReasoningLevel.set(getDefaultOpenRouterReasoningLevel(model));
+  }
+}
+
+function syncOpenRouterSettingsFromCurrentUser(template: ProfileTemplateInstance): void {
+  const profile = currentProfile();
+  const model = String(profile.openRouterDefaultModel || '').trim();
+  const reasoningLevel = normalizeOpenRouterReasoningLevel(
+    profile.openRouterReasoningLevel,
+    'Stored OpenRouter reasoning level',
+  );
+  const signature = `${model}\u0000${reasoningLevel}`;
+  if (template.lastSyncedOpenRouterSettings === signature) {
+    return;
+  }
+  template.lastSyncedOpenRouterSettings = signature;
+  template.openRouterSelectedModel.set(model);
+  template.openRouterSelectedReasoningLevel.set(reasoningLevel);
+  if (template.openRouterModelCatalogState.get() === 'ready') {
+    syncReasoningSelectionForModel(template);
+  }
+}
+
+async function loadProfileOpenRouterModelCatalog(template: ProfileTemplateInstance): Promise<void> {
+  template.openRouterModelCatalogState.set('loading');
+  template.openRouterModelCatalogError.set('');
+  try {
+    template.openRouterModelCatalog.set(await loadOpenRouterModelCatalog());
+    template.openRouterModelCatalogState.set('ready');
+    syncReasoningSelectionForModel(template);
+  } catch (error: unknown) {
+    template.openRouterModelCatalogState.set('error');
+    template.openRouterModelCatalogError.set(getErrorMessage(error));
+  }
+}
+
+function reasoningLevelLabel(level: OpenRouterReasoningLevel): string {
+  return profileText(`profile.reasoningLevel.${level}` as Parameters<typeof translatePlatformString>[1]);
+}
+
+function validateChangedOpenRouterSelection(template: ProfileTemplateInstance): void {
+  const modelId = template.openRouterSelectedModel.get();
+  const reasoningLevel = template.openRouterSelectedReasoningLevel.get();
+  if (!modelId) {
+    if (reasoningLevel !== 'none') {
+      throw new Error(profileText('profile.openRouterModelUnavailableForSave'));
+    }
+    return;
+  }
+  if (template.openRouterModelCatalogState.get() !== 'ready') {
+    if (template.openRouterModelCatalogState.get() === 'loading') {
+      throw new Error(profileText('profile.loadingOpenRouterModels'));
+    }
+    throw new Error(profileText('profile.openRouterModelsLoadFailed', {
+      error: template.openRouterModelCatalogError.get(),
+    }));
+  }
+  const model = findCatalogModel(template, modelId);
+  if (!model) {
+    throw new Error(profileText('profile.openRouterModelUnavailableForSave'));
+  }
+  validateOpenRouterReasoningLevelForModel(reasoningLevel, model);
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -140,7 +238,14 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
   template.statusMessage.set('');
   try {
     const apiKey = inputValue('openRouterApiKey');
-    const model = inputValue('openRouterDefaultModel');
+    const model = template.openRouterSelectedModel.get();
+    const reasoningLevel = template.openRouterSelectedReasoningLevel.get();
+    const settingsSignature = `${model}\u0000${reasoningLevel}`;
+    const openRouterSettingsChanged = Boolean(apiKey.trim())
+      || settingsSignature !== template.lastSyncedOpenRouterSettings;
+    if (openRouterSettingsChanged) {
+      validateChangedOpenRouterSelection(template);
+    }
     await MeteorAny.callAsync('updateOwnProfile', {
       name: inputValue('profileName'),
       displayName: inputValue('profileDisplayName'),
@@ -149,11 +254,14 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
       avatarIconId: template.avatarIconId.get(),
       avatarImageData: template.avatarImageData.get() || null,
     });
-    const result = await MeteorAny.callAsync('updateOwnOpenRouterSettings', { apiKey, model });
-    template.openRouterHasServerKey.set(Boolean(result?.hasOpenRouterKey || apiKey.trim()));
-    const apiKeyInput = document.getElementById('openRouterApiKey') as HTMLInputElement | null;
-    if (apiKeyInput) {
-      apiKeyInput.value = '';
+    if (openRouterSettingsChanged) {
+      const result = await MeteorAny.callAsync('updateOwnOpenRouterSettings', { apiKey, model, reasoningLevel });
+      template.openRouterHasServerKey.set(Boolean(result?.hasOpenRouterKey || apiKey.trim()));
+      template.lastSyncedOpenRouterSettings = settingsSignature;
+      const apiKeyInput = document.getElementById('openRouterApiKey') as HTMLInputElement | null;
+      if (apiKeyInput) {
+        apiKeyInput.value = '';
+      }
     }
     setStatus(template, 'success', profileText('profile.profileSaved'));
   } catch (error: unknown) {
@@ -172,6 +280,12 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.avatarIconId = new ReactiveVar(PROFILE_AVATAR_DEFAULT_ICON_ID);
   this.avatarImageData = new ReactiveVar('');
   this.openRouterHasServerKey = new ReactiveVar(userHasServerOpenRouterKey(Meteor.user()));
+  this.openRouterModelCatalog = new ReactiveVar([]);
+  this.openRouterModelCatalogState = new ReactiveVar('loading');
+  this.openRouterModelCatalogError = new ReactiveVar('');
+  this.openRouterSelectedModel = new ReactiveVar('');
+  this.openRouterSelectedReasoningLevel = new ReactiveVar('none');
+  this.lastSyncedOpenRouterSettings = '';
   this.confirmationController = createInlineConfirmationController<'delete-openrouter-key'>(
     (view) => this.confirmationState.set(view),
     () => document.getElementById('profileSave'),
@@ -181,8 +295,10 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
     if (Meteor.user()) {
       syncAvatarFromCurrentUser(this);
       this.openRouterHasServerKey.set(userHasServerOpenRouterKey(Meteor.user()));
+      syncOpenRouterSettingsFromCurrentUser(this);
     }
   });
+  void loadProfileOpenRouterModelCatalog(this);
 });
 
 Template.profile.onDestroyed(function(this: ProfileTemplateInstance) {
@@ -273,7 +389,89 @@ Template.profile.helpers({
   },
 
   openRouterDefaultModel(): string {
-    return String(currentProfile().openRouterDefaultModel || '');
+    return (Template.instance() as ProfileTemplateInstance).openRouterSelectedModel.get();
+  },
+
+  openRouterModelOptions(): Array<{ value: string; label: string; selectedAttrs: Record<string, boolean> }> {
+    const template = Template.instance() as ProfileTemplateInstance;
+    const selectedModel = template.openRouterSelectedModel.get();
+    const catalog = template.openRouterModelCatalog.get();
+    const options: Array<{ value: string; label: string; selectedAttrs: Record<string, boolean> }> = [{
+      value: '',
+      label: profileText('profile.selectOpenRouterModel'),
+      selectedAttrs: selectedModel ? {} : { selected: true },
+    }];
+    if (selectedModel && !catalog.some((model) => model.id === selectedModel)) {
+      options.push({
+        value: selectedModel,
+        label: profileText('profile.savedModelUnavailable', { model: selectedModel }),
+        selectedAttrs: { selected: true },
+      });
+    }
+    for (const model of catalog) {
+      options.push({
+        value: model.id,
+        label: model.name === model.id ? model.id : `${model.name} (${model.id})`,
+        selectedAttrs: model.id === selectedModel ? { selected: true } : {},
+      });
+    }
+    return options;
+  },
+
+  openRouterModelSelectAttrs(): Record<string, boolean> {
+    return (Template.instance() as ProfileTemplateInstance).openRouterModelCatalogState.get() === 'ready'
+      ? {}
+      : { disabled: true };
+  },
+
+  openRouterModelCatalogMessage(): string {
+    const template = Template.instance() as ProfileTemplateInstance;
+    const state = template.openRouterModelCatalogState.get();
+    if (state === 'loading') {
+      return profileText('profile.loadingOpenRouterModels');
+    }
+    if (state === 'error') {
+      return profileText('profile.openRouterModelsLoadFailed', {
+        error: template.openRouterModelCatalogError.get(),
+      });
+    }
+    return '';
+  },
+
+  openRouterModelCatalogMessageClass(): string {
+    return (Template.instance() as ProfileTemplateInstance).openRouterModelCatalogState.get() === 'error'
+      ? 'profile-alert-error'
+      : 'profile-alert-info';
+  },
+
+  showOpenRouterReasoningLevel(): boolean {
+    const template = Template.instance() as ProfileTemplateInstance;
+    const model = findCatalogModel(template);
+    if (model) {
+      return model.reasoning !== null;
+    }
+    return Boolean(template.openRouterSelectedModel.get());
+  },
+
+  openRouterReasoningLevelOptions(): Array<{ value: string; label: string; selectedAttrs: Record<string, boolean> }> {
+    const template = Template.instance() as ProfileTemplateInstance;
+    const selectedLevel = template.openRouterSelectedReasoningLevel.get();
+    const model = findCatalogModel(template);
+    const levels = model
+      ? getAllowedOpenRouterReasoningLevels(model)
+      : [selectedLevel];
+    return levels.map((level) => ({
+      value: level,
+      label: reasoningLevelLabel(level),
+      selectedAttrs: level === selectedLevel ? { selected: true } : {},
+    }));
+  },
+
+  openRouterReasoningSelectAttrs(): Record<string, boolean> {
+    const template = Template.instance() as ProfileTemplateInstance;
+    return template.openRouterModelCatalogState.get() === 'ready' && Boolean(findCatalogModel(template))
+      ? {}
+      : { disabled: true };
   },
 
   openRouterStatusMessage(): string {
@@ -323,6 +521,18 @@ Template.profile.events({
     } catch (error: unknown) {
       setStatus(template, 'error', getErrorMessage(error));
     }
+  },
+
+  'change #openRouterDefaultModel'(event: Event, template: ProfileTemplateInstance) {
+    template.openRouterSelectedModel.set((event.currentTarget as HTMLSelectElement).value);
+    syncReasoningSelectionForModel(template);
+  },
+
+  'change #openRouterReasoningLevel'(event: Event, template: ProfileTemplateInstance) {
+    template.openRouterSelectedReasoningLevel.set(normalizeOpenRouterReasoningLevel(
+      (event.currentTarget as HTMLSelectElement).value,
+      'OpenRouter reasoning level',
+    ));
   },
 
   'click [data-avatar-type]'(event: Event, template: ProfileTemplateInstance) {
@@ -389,7 +599,8 @@ Template.profile.events({
       const inputKey = inputValue('openRouterApiKey');
       const result = await MeteorAny.callAsync('testOwnOpenRouterSettings', {
         apiKey: inputKey,
-        model: inputValue('openRouterDefaultModel'),
+        model: template.openRouterSelectedModel.get(),
+        reasoningLevel: template.openRouterSelectedReasoningLevel.get(),
       });
       if (inputKey.trim()) {
         template.openRouterHasServerKey.set(true);

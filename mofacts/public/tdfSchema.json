@@ -212,7 +212,7 @@
             },
             "openRouterApiKey": {
               "title": "Alternate OpenRouter API key.",
-              "description": "Provider-supplied OpenRouter key available to AutoTutor lessons when the current user has no saved profile OpenRouter key. User profile keys take precedence over this TDF key.",
+              "description": "Provider-supplied OpenRouter key for this lesson. An accessible TDF key takes precedence over profile and global admin OpenRouter settings.",
               "type": "string",
               "default": "",
               "options": {
@@ -221,11 +221,30 @@
             },
             "openRouterModel": {
               "title": "OpenRouter model.",
-              "description": "Explicit OpenRouter model identifier used by AutoTutor units unless a unit overrides it.",
+              "description": "OpenRouter model paired with this TDF OpenRouter key.",
               "type": "string",
               "default": "",
               "options": {
                 "grid_columns": 12
+              }
+            },
+            "openRouterReasoningLevel": {
+              "title": "OpenRouter reasoning level.",
+              "description": "Reasoning level paired with this TDF OpenRouter model. The default is none; reasoning can increase latency, token use, and cost.",
+              "type": "string",
+              "enum": [
+                "none",
+                "default",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "default": "none",
+              "options": {
+                "grid_columns": 4
               }
             },
             "audioInputEnabled": {

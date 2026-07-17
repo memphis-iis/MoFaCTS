@@ -1,5 +1,6 @@
 import type { AiItem } from './aiContentTypes';
 import type { validateAiOutput } from './aiContentValidation';
+import { sourceExplicitlyRequestsImages } from './aiContentImagePolicy';
 
 type ValidatedAiLessonOutput = ReturnType<typeof validateAiOutput>['output'];
 
@@ -36,22 +37,8 @@ function normalizeLicenseUrl(licenseName: string, licenseUrl: string): string {
   return '';
 }
 
-function hasImageIntent(sourceText: string, output: ValidatedAiLessonOutput): boolean {
-  const promptType = String(output.promptType || '').trim();
-  if (promptType === 'image' || promptType === 'text-image') {
-    return true;
-  }
-  const source = sourceText.toLowerCase();
-  if (/\b(image|images|picture|pictures|photo|photos|identify|visual|what .*this)\b/.test(source)) {
-    return true;
-  }
-  if (/\b(bird|birds|animal|animals|plant|plants|tree|trees|flower|flowers|insect|insects|fish|mushroom|mushrooms|species|landmark|landmarks|artwork|tools?)\b/.test(source)) {
-    return true;
-  }
-  const prompts = (output.items || [])
-    .map((item) => String(item?.prompt?.text || '').toLowerCase())
-    .join(' ');
-  return /\bwhat (?:bird|animal|plant|tree|flower|species|organism) is this\b/.test(prompts);
+function hasImageIntent(sourceText: string): boolean {
+  return sourceExplicitlyRequestsImages(sourceText);
 }
 
 function hasAttribution(item: AiItem): boolean {
@@ -139,10 +126,11 @@ async function fetchWikimediaImageAttribution(title: string): Promise<WikimediaI
 export async function enrichAiContentMedia(output: ValidatedAiLessonOutput, sourceText: string): Promise<AiMediaEnrichmentResult> {
   const warnings: string[] = [];
   const items = Array.isArray(output.items) ? output.items : [];
-  if (!hasImageIntent(sourceText, output) || items.length === 0) {
+  if (!hasImageIntent(sourceText) || items.length === 0) {
     return { output, warnings };
   }
 
+  const requestedImageCount = items.filter((item) => needsImage(item)).length;
   const enrichedItems = await Promise.all(items.map(async (item) => {
     const title = String(item?.response?.correctResponse || item?.prompt?.text || '').trim();
     if (!title || !needsImage(item)) {
@@ -167,8 +155,11 @@ export async function enrichAiContentMedia(output: ValidatedAiLessonOutput, sour
   }));
 
   const missingImageCount = enrichedItems.filter((item) => needsImage(item)).length;
-  const missingAttributionCount = enrichedItems.filter((item) => String(item.prompt?.imgSrc || '').trim() && !hasAttribution(item)).length;
-  const enrichedCount = enrichedItems.length - missingImageCount;
+  const missingAttributionCount = enrichedItems.filter((item) => {
+    const imageSource = String(item.prompt?.imgSrc || '').trim();
+    return /^https?:\/\//i.test(imageSource) && !hasAttribution(item);
+  }).length;
+  const enrichedCount = requestedImageCount - missingImageCount;
   if (enrichedCount > 0) {
     warnings.push(`Added Wikimedia image attribution for ${enrichedCount} generated item${enrichedCount === 1 ? '' : 's'}.`);
   }

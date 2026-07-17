@@ -17,6 +17,15 @@ import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { getErrorMessage } from '../../lib/errorUtils';
+import { loadOpenRouterModelCatalog } from '../../lib/openRouterModelCatalogClient';
+import {
+    OPENROUTER_REASONING_LEVELS,
+    getAllowedOpenRouterReasoningLevels,
+    getDefaultOpenRouterReasoningLevel,
+    normalizeOpenRouterReasoningLevel,
+    type OpenRouterModelCatalogEntry,
+    type OpenRouterReasoningLevel,
+} from '../../../common/lib/openRouterModelCatalog';
 import {
     rejectLoad,
     resolveLoad,
@@ -45,6 +54,10 @@ function tdfEditorText(key: PlatformStringKey, values?: Parameters<typeof transl
 // Cache the schema after first load
 let cachedSchema: any = null;
 const SAVE_SUCCESS_REDIRECT_DELAY_MS = 1000;
+
+type OpenRouterCatalogLoadResult =
+    | { catalog: OpenRouterModelCatalogEntry[]; error: null }
+    | { catalog: null; error: string };
 
 type TdfEditorLoadValue = Readonly<{ tdf: any | null }>;
 
@@ -359,6 +372,125 @@ async function loadSchema(): Promise<any> {
     }
 }
 
+async function loadTdfEditorOpenRouterCatalog(): Promise<OpenRouterCatalogLoadResult> {
+    try {
+        return { catalog: await loadOpenRouterModelCatalog(), error: null };
+    } catch (error: unknown) {
+        return { catalog: null, error: getErrorMessage(error) };
+    }
+}
+
+function getOpenRouterCatalogModelLabel(model: OpenRouterModelCatalogEntry): string {
+    return model.name && model.name !== model.id
+        ? `${model.name} (${model.id})`
+        : model.id;
+}
+
+function configureOpenRouterEditorSchema(
+    schema: any,
+    catalog: OpenRouterModelCatalogEntry[] | null,
+    currentModel: string,
+): void {
+    const fields = schema?.properties?.setspec?.properties;
+    const modelField = fields?.openRouterModel;
+    const reasoningField = fields?.openRouterReasoningLevel;
+    if (!modelField || !reasoningField) return;
+
+    if (!catalog) {
+        modelField.readOnly = true;
+        reasoningField.readOnly = true;
+        return;
+    }
+
+    const catalogIds = new Set(catalog.map((model) => model.id));
+    const modelValues = ['', ...catalog.map((model) => model.id)];
+    const modelTitles = [
+        tdfEditorText('profile.selectOpenRouterModel'),
+        ...catalog.map(getOpenRouterCatalogModelLabel),
+    ];
+    if (currentModel && !catalogIds.has(currentModel)) {
+        modelValues.push(currentModel);
+        modelTitles.push(tdfEditorText('profile.savedModelUnavailable', { model: currentModel }));
+    }
+    modelField.enum = modelValues;
+    modelField.options = {
+        ...(modelField.options || {}),
+        enum_titles: modelTitles,
+    };
+}
+
+function prepareOpenRouterEditorValue(
+    tutorData: any,
+    catalog: OpenRouterModelCatalogEntry[] | null,
+): void {
+    const setspec = tutorData?.setspec;
+    const modelId = typeof setspec?.openRouterModel === 'string'
+        ? setspec.openRouterModel.trim()
+        : '';
+    if (!setspec || !modelId || !catalog) return;
+    const model = catalog.find((entry) => entry.id === modelId);
+    if (!model || !model.reasoning?.mandatory || setspec.openRouterReasoningLevel !== undefined) return;
+    setspec.openRouterReasoningLevel = getDefaultOpenRouterReasoningLevel(model);
+}
+
+function reasoningLevelText(level: OpenRouterReasoningLevel): string {
+    return tdfEditorText(`profile.reasoningLevel.${level}` as PlatformStringKey);
+}
+
+function syncOpenRouterEditorControls(instance: any): void {
+    const catalog = instance.openRouterModelCatalog as OpenRouterModelCatalogEntry[] | null;
+    if (!catalog || !instance.editor) return;
+
+    const modelEditor = instance.editor.getEditor('root.setspec.openRouterModel');
+    if (!modelEditor) return;
+    const modelId = String(modelEditor.getValue() || '').trim();
+    const model = catalog.find((entry) => entry.id === modelId);
+    let reasoningEditor = instance.editor.getEditor('root.setspec.openRouterReasoningLevel');
+
+    if (model?.reasoning?.mandatory && !reasoningEditor) {
+        const setspecEditor = instance.editor.getEditor('root.setspec');
+        if (typeof setspecEditor?.addObjectProperty === 'function') {
+            setspecEditor.addObjectProperty('openRouterReasoningLevel');
+            reasoningEditor = instance.editor.getEditor('root.setspec.openRouterReasoningLevel');
+        }
+    }
+    if (!reasoningEditor) return;
+
+    const input = reasoningEditor.input as HTMLSelectElement | undefined;
+    if (!model) {
+        if (input) input.disabled = Boolean(modelId);
+        return;
+    }
+
+    const allowed = getAllowedOpenRouterReasoningLevels(model);
+    let current: OpenRouterReasoningLevel;
+    try {
+        current = normalizeOpenRouterReasoningLevel(
+            reasoningEditor.getValue(),
+            'TDF OpenRouter reasoning level',
+        );
+    } catch {
+        current = getDefaultOpenRouterReasoningLevel(model);
+    }
+    if (!allowed.includes(current)) {
+        current = getDefaultOpenRouterReasoningLevel(model);
+        reasoningEditor.setValue(current);
+    }
+
+    if (input?.options) {
+        const editorValues = Array.isArray(reasoningEditor.enum_values)
+            ? reasoningEditor.enum_values
+            : OPENROUTER_REASONING_LEVELS;
+        Array.from(input.options).forEach((option, index) => {
+            const level = editorValues[index] as OpenRouterReasoningLevel | undefined;
+            if (!level) return;
+            option.disabled = !allowed.includes(level);
+            option.textContent = reasoningLevelText(level);
+        });
+        input.disabled = false;
+    }
+}
+
 function waitForTdfSubscription(instance: any): Promise<void> {
     return new Promise((resolve, reject) => {
         let settled = false;
@@ -387,7 +519,13 @@ async function initializeTdfEditor(instance: any): Promise<void> {
     const requestId = instance.lifetime.begin();
     instance.loadState.set(startLoad(instance.loadState.get(), requestId));
     try {
-        await Promise.all([loadSchema(), waitForTdfSubscription(instance)]);
+        const [, , catalogResult] = await Promise.all([
+            loadSchema(),
+            waitForTdfSubscription(instance),
+            loadTdfEditorOpenRouterCatalog(),
+        ]);
+        instance.openRouterModelCatalog = catalogResult.catalog;
+        instance.openRouterCatalogError = catalogResult.error;
         if (!instance.lifetime.isCurrent(requestId)) return;
         const tdf = TdfsCollection.findOne(instance.tdfId) || null;
         if (!tdf) {
@@ -403,6 +541,16 @@ async function initializeTdfEditor(instance: any): Promise<void> {
         if (!instance.lifetime.isCurrent(requestId)) return;
         await initEditor(instance, tdf);
         if (!instance.lifetime.isCurrent(requestId)) return;
+        if (instance.openRouterCatalogError) {
+            setEditorMessage(
+                instance,
+                'warning',
+                tdfEditorText('profile.openRouterModel'),
+                tdfEditorText('profile.openRouterModelsLoadFailed', {
+                    error: instance.openRouterCatalogError,
+                }),
+            );
+        }
         instance.loadState.set(resolveLoad(
             instance.loadState.get(),
             requestId,
@@ -793,6 +941,7 @@ async function initEditor(instance: any, tdf: any) {
             tutorData.setspec[field] = ''; // Clear for display - user can re-enter
         }
     });
+    prepareOpenRouterEditorValue(tutorData, instance.openRouterModelCatalog);
 
     // Remove empty properties so json-editor only shows populated fields
     // Users can add new fields via the Properties button
@@ -803,6 +952,11 @@ async function initEditor(instance: any, tdf: any) {
 
     // Inject tooltip descriptions based on current mode (brief or verbose)
     const schemaWithDescriptions = injectDescriptions(tutorSchema, TDF_TOOLTIPS, tooltipMode);
+    configureOpenRouterEditorSchema(
+        schemaWithDescriptions,
+        instance.openRouterModelCatalog,
+        String(tutorData.setspec?.openRouterModel || '').trim(),
+    );
 
     // Configure json-editor options
     // Key: use startval to populate existing data (pre-filtered to remove empty values)
@@ -876,6 +1030,8 @@ async function initEditor(instance: any, tdf: any) {
             }
         });
 
+        syncOpenRouterEditorControls(instance);
+
         // Use editor's normalized value as the baseline for change detection
         // This prevents false "unsaved changes" due to json-editor normalizing data
         instance.originalTdf.tutor = instance.editor.getValue();
@@ -921,6 +1077,8 @@ async function initEditor(instance: any, tdf: any) {
     instance.editor.on('change', () => {
         // Skip change detection during initialization
         if (isInitializing) return;
+
+        syncOpenRouterEditorControls(instance);
 
         updateChangeState(instance, instance.editor.getValue());
 
@@ -971,6 +1129,7 @@ async function initEditor(instance: any, tdf: any) {
             if (node.nodeType !== 1) return;
             convertLongInputsToTextareas(container, instance.editor, node);
             injectLabelsForInputs(container, instance.editor, node);
+            syncOpenRouterEditorControls(instance);
         });
     };
     const fieldObserver = new MutationObserver((mutations) => {

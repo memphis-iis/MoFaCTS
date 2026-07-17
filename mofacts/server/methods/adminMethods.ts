@@ -1,7 +1,13 @@
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
-import { check } from 'meteor/check';
+import { check, Match } from 'meteor/check';
 import { Roles } from 'meteor/alanning:roles';
+import {
+  normalizeOpenRouterReasoningLevel,
+  validateOpenRouterReasoningLevelForModel,
+  type OpenRouterReasoningLevel,
+} from '../../common/lib/openRouterModelCatalog';
+import type { OpenRouterModelCatalogService } from './openRouterCatalogMethods';
 import {
   ADMIN_API_KEY_SETTINGS_KEY,
   type AdminApiKeyProvider,
@@ -98,6 +104,7 @@ type AdminMethodsDeps = {
   clearStimDisplayTypeMap: () => void;
   encryptData?: (value: string) => string;
   decryptData?: (value: string) => string;
+  openRouterModelCatalogService: OpenRouterModelCatalogService;
 };
 
 const OPENROUTER_MODEL_MAX_LENGTH = 160;
@@ -151,6 +158,38 @@ function normalizeAdminOpenRouterModel(value: unknown): string {
   return trimmed;
 }
 
+async function validateAdminOpenRouterModelReasoningSelection(
+  deps: Pick<AdminMethodsDeps, 'openRouterModelCatalogService'>,
+  model: string,
+  reasoningLevel: OpenRouterReasoningLevel,
+): Promise<void> {
+  if (!model) {
+    if (reasoningLevel !== 'none') {
+      throw new Meteor.Error(
+        'invalid-openrouter-reasoning-level',
+        'Admin OpenRouter reasoning must be none when no model is selected',
+      );
+    }
+    return;
+  }
+  const catalog = await deps.openRouterModelCatalogService.getCatalog();
+  const catalogModel = catalog.find((entry) => entry.id === model);
+  if (!catalogModel) {
+    throw new Meteor.Error(
+      'openrouter-model-unavailable',
+      `OpenRouter model ${JSON.stringify(model)} is not available in the current catalog`,
+    );
+  }
+  try {
+    validateOpenRouterReasoningLevelForModel(reasoningLevel, catalogModel);
+  } catch (error: unknown) {
+    throw new Meteor.Error(
+      'invalid-openrouter-reasoning-level',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
 function adminApiKeyUsability(
   encryptedKey: unknown,
   decryptData?: (value: string) => string
@@ -181,8 +220,15 @@ function summarizeAdminApiKeySettings(
       ...usability,
       keyUpdatedAt: entry.keyUpdatedAt || null,
       modelUpdatedAt: provider === 'openRouter' ? entry.modelUpdatedAt || null : null,
+      reasoningLevelUpdatedAt: provider === 'openRouter' ? entry.reasoningLevelUpdatedAt || null : null,
       updatedBy: entry.updatedBy || null,
-      ...(provider === 'openRouter' ? { model: trimString(entry.model) } : {}),
+      ...(provider === 'openRouter' ? {
+        model: trimString(entry.model),
+        reasoningLevel: normalizeOpenRouterReasoningLevel(
+          entry.reasoningLevel,
+          'Stored admin OpenRouter reasoning level',
+        ),
+      } : {}),
     };
   };
   return {
@@ -344,9 +390,14 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
     saveAdminApiKeyAlternative: async function(
       this: MethodContext,
       provider: AdminApiKeyProvider,
-      params: { apiKey?: unknown; model?: unknown } = {},
+      params: { apiKey?: unknown; model?: unknown; reasoningLevel?: unknown } = {},
     ) {
       check(provider, String);
+      check(params, {
+        apiKey: Match.Maybe(String),
+        model: Match.Maybe(String),
+        reasoningLevel: Match.Maybe(String),
+      });
       await deps.requireAdminUser(this.userId, 'Only admins can save API key alternatives');
       if (!deps.encryptData) {
         throw new Meteor.Error('encryption-unavailable', 'API key encryption is unavailable');
@@ -361,6 +412,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         updatedAt: now,
         [`value.${providerField}.updatedBy`]: this.userId || null,
       };
+      let openRouterReasoningLevel: OpenRouterReasoningLevel | null = null;
       const apiKey = normalizeAdminApiKey(params?.apiKey, provider);
       if (apiKey) {
         setFields[`value.${providerField}.keyEncrypted`] = deps.encryptData(apiKey);
@@ -368,8 +420,15 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       }
       if (provider === 'openrouter') {
         const model = normalizeAdminOpenRouterModel(params?.model);
+        openRouterReasoningLevel = normalizeOpenRouterReasoningLevel(
+          params?.reasoningLevel as OpenRouterReasoningLevel | undefined,
+          'Admin OpenRouter reasoning level',
+        );
+        await validateAdminOpenRouterModelReasoningSelection(deps, model, openRouterReasoningLevel);
         setFields['value.openRouter.model'] = model;
         setFields['value.openRouter.modelUpdatedAt'] = now;
+        setFields['value.openRouter.reasoningLevel'] = openRouterReasoningLevel;
+        setFields['value.openRouter.reasoningLevelUpdatedAt'] = now;
       }
       if (!apiKey && provider !== 'openrouter') {
         throw new Meteor.Error('missing-api-key', 'API key is required');
@@ -380,6 +439,12 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         provider,
         keyUpdated: Boolean(apiKey),
         modelUpdated: provider === 'openrouter',
+        reasoningLevelUpdated: provider === 'openrouter',
+        ...(provider === 'openrouter'
+          ? {
+            reasoningLevel: openRouterReasoningLevel,
+          }
+          : {}),
       });
       const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });
       return summarizeAdminApiKeySettings(doc, deps.decryptData);

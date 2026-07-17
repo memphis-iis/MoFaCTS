@@ -12,6 +12,7 @@ import {
   withGrid,
   type SectionFieldRegistry,
 } from './fieldRegistrySectionCore.ts';
+import { OPENROUTER_REASONING_LEVELS } from './lib/openRouterModelCatalog.ts';
 
 export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
   lessonname: simpleField(stringField('', 12), {
@@ -133,11 +134,15 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
   }),
   openRouterApiKey: simpleField(stringField('', 12), {
     brief: 'Alternate OpenRouter API key.',
-    verbose: 'Provider-supplied OpenRouter key available to AutoTutor lessons when the current user has no saved profile OpenRouter key. User profile keys take precedence over this TDF key.'
+    verbose: 'Provider-supplied OpenRouter key for this lesson. An accessible TDF key takes precedence over profile and global admin OpenRouter settings.'
   }),
   openRouterModel: simpleField(stringField('', 12), {
     brief: 'OpenRouter model.',
-    verbose: 'Explicit OpenRouter model identifier used by AutoTutor units unless a unit overrides it.'
+    verbose: 'OpenRouter model paired with this TDF OpenRouter key.'
+  }),
+  openRouterReasoningLevel: simpleField(enumStringField([...OPENROUTER_REASONING_LEVELS], 'none', 4), {
+    brief: 'OpenRouter reasoning level.',
+    verbose: 'Reasoning level paired with this TDF OpenRouter model. The default is none; reasoning can increase latency, token use, and cost.'
   }),
   audioInputEnabled: simpleField(legacyBooleanField('false'), {
     brief: 'Enable speech recognition.',

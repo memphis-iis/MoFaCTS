@@ -11,6 +11,14 @@ import { getErrorMessage } from '../lib/errorUtils';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
 import { formatActiveInterfaceDateTime, formatActiveInterfaceNumber } from '../lib/interfaceFormatting';
+import { loadOpenRouterModelCatalog } from '../lib/openRouterModelCatalogClient';
+import {
+  getAllowedOpenRouterReasoningLevels,
+  getDefaultOpenRouterReasoningLevel,
+  normalizeOpenRouterReasoningLevel,
+  type OpenRouterModelCatalogEntry,
+  type OpenRouterReasoningLevel,
+} from '../../common/lib/openRouterModelCatalog';
 
 import { legacyTrim } from '../../common/underscoreCompat';
 
@@ -38,7 +46,16 @@ type RoleName = 'admin' | 'teacher';
 type RoleFlags = Record<RoleName, boolean>;
 type RoleStateOverrides = Record<string, Partial<RoleFlags>>;
 type AdminApiKeyMetadata = {
-  openRouter?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; modelUpdatedAt?: unknown; updatedBy?: unknown; model?: string };
+  openRouter?: {
+    configured?: boolean;
+    unusable?: boolean;
+    keyUpdatedAt?: unknown;
+    modelUpdatedAt?: unknown;
+    reasoningLevelUpdatedAt?: unknown;
+    updatedBy?: unknown;
+    model?: string;
+    reasoningLevel?: OpenRouterReasoningLevel;
+  };
   googleTts?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
   googleSpeech?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
 };
@@ -207,11 +224,62 @@ function clearSyncedRoleStateOverrides(instance: any): void {
 
 async function refreshAdminApiKeyMetadata(instance: any): Promise<void> {
   try {
-    instance.apiKeyMetadata.set(await MeteorCompat.callAsync('getAdminApiKeyAlternativeMetadata'));
+    const metadata = await MeteorCompat.callAsync('getAdminApiKeyAlternativeMetadata');
+    instance.apiKeyMetadata.set(metadata);
+    instance.openRouterSelectedModel.set(String(metadata?.openRouter?.model || '').trim());
+    instance.openRouterSelectedReasoningLevel.set(normalizeOpenRouterReasoningLevel(
+      metadata?.openRouter?.reasoningLevel,
+      'Stored admin OpenRouter reasoning level',
+    ));
+    syncAdminReasoningSelectionForModel(instance);
+    instance.apiKeyMetadataLoaded.set(true);
   } catch (error: unknown) {
+    instance.apiKeyMetadataLoaded.set(false);
     instance.apiKeyMessageType.set('danger');
     instance.apiKeyMessage.set(userAdminText('admin.apiKeysLoadFailed', { error: getErrorMessage(error) }));
   }
+}
+
+function findAdminCatalogModel(instance: any): OpenRouterModelCatalogEntry | undefined {
+  const modelId = String(instance.openRouterSelectedModel.get() || '').trim();
+  return (instance.openRouterModelCatalog.get() as OpenRouterModelCatalogEntry[])
+    .find((model) => model.id === modelId);
+}
+
+function syncAdminReasoningSelectionForModel(instance: any): void {
+  if (!String(instance.openRouterSelectedModel.get() || '').trim()) {
+    instance.openRouterSelectedReasoningLevel.set('none');
+    return;
+  }
+  const model = findAdminCatalogModel(instance);
+  if (!model) {
+    return;
+  }
+  const currentLevel = normalizeOpenRouterReasoningLevel(
+    instance.openRouterSelectedReasoningLevel.get(),
+    'Admin OpenRouter reasoning level',
+  );
+  const allowedLevels = getAllowedOpenRouterReasoningLevels(model);
+  if (!allowedLevels.includes(currentLevel)) {
+    instance.openRouterSelectedReasoningLevel.set(getDefaultOpenRouterReasoningLevel(model));
+  }
+}
+
+async function loadAdminOpenRouterModelCatalog(instance: any): Promise<void> {
+  instance.openRouterModelCatalogState.set('loading');
+  instance.openRouterModelCatalogError.set('');
+  try {
+    instance.openRouterModelCatalog.set(await loadOpenRouterModelCatalog());
+    instance.openRouterModelCatalogState.set('ready');
+    syncAdminReasoningSelectionForModel(instance);
+  } catch (error: unknown) {
+    instance.openRouterModelCatalogState.set('error');
+    instance.openRouterModelCatalogError.set(getErrorMessage(error));
+  }
+}
+
+function adminReasoningLevelLabel(level: OpenRouterReasoningLevel): string {
+  return userAdminText(`profile.reasoningLevel.${level}` as Parameters<typeof translatePlatformString>[1]);
 }
 
 function getTimeValue(value: unknown): number {
@@ -309,9 +377,15 @@ Template.userAdmin.onCreated(function(this: any) {
   this.adminMessageType = new ReactiveVar('info');
   this.selectedDeleteUser = new ReactiveVar(null);
   this.apiKeyMetadata = new ReactiveVar(null);
+  this.apiKeyMetadataLoaded = new ReactiveVar(false);
   this.apiKeyBusy = new ReactiveVar(false);
   this.apiKeyMessage = new ReactiveVar('');
   this.apiKeyMessageType = new ReactiveVar('info');
+  this.openRouterModelCatalog = new ReactiveVar([] as OpenRouterModelCatalogEntry[]);
+  this.openRouterModelCatalogState = new ReactiveVar('loading');
+  this.openRouterModelCatalogError = new ReactiveVar('');
+  this.openRouterSelectedModel = new ReactiveVar('');
+  this.openRouterSelectedReasoningLevel = new ReactiveVar('none' as OpenRouterReasoningLevel);
   this.sortField = new ReactiveVar('identifier');
   this.sortDirection = new ReactiveVar('asc' as SortDirection);
   this.roleStateOverrides = new ReactiveVar({} as RoleStateOverrides);
@@ -324,6 +398,7 @@ Template.userAdmin.onCreated(function(this: any) {
 Template.userAdmin.onRendered(function(this: any) {
   const instance = this;
   void refreshAdminApiKeyMetadata(instance);
+  void loadAdminOpenRouterModelCatalog(instance);
 
   // Autorun to reactively subscribe when filter or page changes
   const autorun = this.autorun(() => {
@@ -540,11 +615,105 @@ Template.userAdmin.helpers({
   },
 
   apiKeyActionAttrs: function() {
-    return (Template.instance() as any).apiKeyBusy.get() ? { disabled: true } : {};
+    const instance = Template.instance() as any;
+    return instance.apiKeyBusy.get() || !instance.apiKeyMetadataLoaded.get()
+      ? { disabled: true }
+      : {};
   },
 
   adminOpenRouterModel: function() {
-    return String(apiKeyMetadata(Template.instance()).openRouter?.model || '');
+    return String((Template.instance() as any).openRouterSelectedModel.get() || '');
+  },
+
+  adminOpenRouterModelOptions: function() {
+    const instance = Template.instance() as any;
+    const selectedModel = String(instance.openRouterSelectedModel.get() || '');
+    const catalog = instance.openRouterModelCatalog.get() as OpenRouterModelCatalogEntry[];
+    const options: Array<{ value: string; label: string; selectedAttrs: Record<string, boolean> }> = [{
+      value: '',
+      label: userAdminText('profile.selectOpenRouterModel'),
+      selectedAttrs: selectedModel ? {} : { selected: true },
+    }];
+    if (selectedModel && !catalog.some((model) => model.id === selectedModel)) {
+      options.push({
+        value: selectedModel,
+        label: userAdminText('profile.savedModelUnavailable', { model: selectedModel }),
+        selectedAttrs: { selected: true },
+      });
+    }
+    for (const model of catalog) {
+      options.push({
+        value: model.id,
+        label: model.name === model.id ? model.id : `${model.name} (${model.id})`,
+        selectedAttrs: model.id === selectedModel ? { selected: true } : {},
+      });
+    }
+    return options;
+  },
+
+  adminOpenRouterModelSelectAttrs: function() {
+    return (Template.instance() as any).openRouterModelCatalogState.get() === 'ready'
+      ? {}
+      : { disabled: true };
+  },
+
+  openRouterModelCatalogMessage: function() {
+    const instance = Template.instance() as any;
+    const state = instance.openRouterModelCatalogState.get();
+    if (state === 'loading') {
+      return userAdminText('profile.loadingOpenRouterModels');
+    }
+    if (state === 'error') {
+      return userAdminText('profile.openRouterModelsLoadFailed', {
+        error: instance.openRouterModelCatalogError.get(),
+      });
+    }
+    return '';
+  },
+
+  openRouterModelCatalogAlertClass: function() {
+    return (Template.instance() as any).openRouterModelCatalogState.get() === 'error'
+      ? 'danger'
+      : 'info';
+  },
+
+  openRouterModelCatalogIcon: function() {
+    return (Template.instance() as any).openRouterModelCatalogState.get() === 'error'
+      ? 'fa-times-circle'
+      : 'fa-info-circle';
+  },
+
+  showAdminOpenRouterReasoningLevel: function() {
+    const instance = Template.instance() as any;
+    const model = findAdminCatalogModel(instance);
+    if (model) {
+      return model.reasoning !== null;
+    }
+    return Boolean(instance.openRouterSelectedModel.get());
+  },
+
+  adminOpenRouterReasoningLevelOptions: function() {
+    const instance = Template.instance() as any;
+    const selectedLevel = normalizeOpenRouterReasoningLevel(
+      instance.openRouterSelectedReasoningLevel.get(),
+      'Admin OpenRouter reasoning level',
+    );
+    const model = findAdminCatalogModel(instance);
+    const levels = model
+      ? getAllowedOpenRouterReasoningLevels(model)
+      : [selectedLevel];
+    return levels.map((level) => ({
+      value: level,
+      label: adminReasoningLevelLabel(level),
+      selectedAttrs: level === selectedLevel ? { selected: true } : {},
+    }));
+  },
+
+  adminOpenRouterReasoningSelectAttrs: function() {
+    const instance = Template.instance() as any;
+    return instance.openRouterModelCatalogState.get() === 'ready' && Boolean(findAdminCatalogModel(instance))
+      ? {}
+      : { disabled: true };
   },
 
   openRouterKeyPlaceholder: function() {
@@ -867,10 +1036,10 @@ Template.userAdmin.events({
     instance.apiKeyMessage.set(userAdminText('admin.savingOpenRouterAlternative'));
     try {
       const apiKeyInput = document.getElementById('adminOpenRouterKey') as HTMLInputElement | null;
-      const modelInput = document.getElementById('adminOpenRouterModel') as HTMLInputElement | null;
       const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', 'openrouter', {
         apiKey: apiKeyInput?.value || '',
-        model: modelInput?.value || '',
+        model: String(instance.openRouterSelectedModel.get() || ''),
+        reasoningLevel: instance.openRouterSelectedReasoningLevel.get(),
       });
       instance.apiKeyMetadata.set(result);
       if (apiKeyInput) apiKeyInput.value = '';
@@ -882,6 +1051,18 @@ Template.userAdmin.events({
     } finally {
       instance.apiKeyBusy.set(false);
     }
+  },
+
+  'change #adminOpenRouterModel': function(event: any, instance: any) {
+    instance.openRouterSelectedModel.set(String((event.currentTarget as HTMLSelectElement).value || ''));
+    syncAdminReasoningSelectionForModel(instance);
+  },
+
+  'change #adminOpenRouterReasoningLevel': function(event: any, instance: any) {
+    instance.openRouterSelectedReasoningLevel.set(normalizeOpenRouterReasoningLevel(
+      (event.currentTarget as HTMLSelectElement).value,
+      'Admin OpenRouter reasoning level',
+    ));
   },
 
   'click .btn-admin-api-key-save': async function(event: any, instance: any) {

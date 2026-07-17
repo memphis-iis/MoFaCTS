@@ -46,6 +46,28 @@ describe('aiContentOpenRouterClient', function() {
     }
   });
 
+  it('posts uploaded WebP images as named multimodal source parts', async function() {
+    fetchStub.resolves(new Response(JSON.stringify({
+      choices: [{ message: { content: '{"lessonName":"Images","items":[]}' } }],
+    }), { status: 200 }));
+
+    await callOpenRouterForItems('Identify each photo.', ['learningSession'], 'test-openrouter-key', 'openai/test-model', [{
+      packageFileName: 'bird.webp',
+      originalName: 'bird.jpg',
+      dataUrl: 'data:image/webp;base64,AAAA',
+    }]);
+
+    const [, request] = fetchStub.firstCall.args as [string, RequestInit];
+    const body = JSON.parse(String(request.body));
+    expect(body.messages[1].content).to.be.an('array');
+    expect(body.messages[1].content[0].text).to.contain('"assetFileName":"bird.webp"');
+    expect(body.messages[1].content[1].text).to.contain('bird.webp');
+    expect(body.messages[1].content[2]).to.deep.equal({
+      type: 'image_url',
+      image_url: { url: 'data:image/webp;base64,AAAA' },
+    });
+  });
+
   it('posts item cue repair as a continuation of the original item chat', async function() {
     fetchStub.resolves(new Response(JSON.stringify({
       choices: [{ message: { content: '{"repairs":[{"itemIndex":0,"prompt":{"text":"replacement"}}]}' } }],

@@ -5,13 +5,22 @@ import {
   callOpenRouterEmbeddings,
   callOpenRouterJson,
   redactOpenRouterSecretText,
+  type OpenRouterContentPart,
   type OpenRouterMessage,
+  type OpenRouterRequestMessage,
 } from '../../common/lib/openRouterClient';
+import {
+  expandOpenRouterCompletionBudget,
+  type OpenRouterReasoningLevel,
+} from '../../common/lib/openRouterModelCatalog';
 import {
   type ApiKeySource,
   getAdminOpenRouterModel,
+  getAdminOpenRouterReasoningLevel,
   getTdfOpenRouterModel,
+  getTdfOpenRouterReasoningLevel,
   getUserOpenRouterModel,
+  getUserOpenRouterReasoningLevel,
   resolvePreferredApiKey,
   type ApiKeyResolutionDeps,
 } from '../lib/apiKeyResolution';
@@ -41,7 +50,34 @@ function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function normalizeMessages(value: unknown): OpenRouterMessage[] {
+function normalizeMultimodalContent(value: unknown): OpenRouterContentPart[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Meteor.Error(400, 'OpenRouter multimodal message content is required');
+  }
+  return value.map((part) => {
+    if (!isRecord(part)) {
+      throw new Meteor.Error(400, 'OpenRouter message content part must be an object');
+    }
+    const type = normalizeString(part.type);
+    if (type === 'text') {
+      const text = normalizeString(part.text);
+      if (!text) {
+        throw new Meteor.Error(400, 'OpenRouter text content is required');
+      }
+      return { type: 'text' as const, text };
+    }
+    if (type === 'image_url' && isRecord(part.image_url)) {
+      const url = normalizeString(part.image_url.url);
+      if (!/^data:image\/(?:avif|bmp|gif|jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(url)) {
+        throw new Meteor.Error(400, 'OpenRouter image content must be a base64 image data URL');
+      }
+      return { type: 'image_url' as const, image_url: { url } };
+    }
+    throw new Meteor.Error(400, 'OpenRouter message content part type is invalid');
+  });
+}
+
+function normalizeMessages(value: unknown): OpenRouterRequestMessage[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new Meteor.Error(400, 'OpenRouter messages are required');
   }
@@ -53,6 +89,12 @@ function normalizeMessages(value: unknown): OpenRouterMessage[] {
     if (!['system', 'user', 'assistant'].includes(role)) {
       throw new Meteor.Error(400, 'OpenRouter message role is invalid');
     }
+    if (Array.isArray(entry.content)) {
+      if (role !== 'user') {
+        throw new Meteor.Error(400, 'Only OpenRouter user messages may contain images');
+      }
+      return { role: 'user' as const, content: normalizeMultimodalContent(entry.content) };
+    }
     const content = normalizeString(entry.content);
     if (!content) {
       throw new Meteor.Error(400, 'OpenRouter message content is required');
@@ -61,37 +103,39 @@ function normalizeMessages(value: unknown): OpenRouterMessage[] {
   });
 }
 
-async function resolveOpenRouterModel(deps: ApiKeyResolutionDeps, params: {
+async function resolveOpenRouterConfiguration(deps: ApiKeyResolutionDeps, params: {
   userId: string;
   tdfId?: string | null;
-  requestedModel?: unknown;
   keySource?: ApiKeySource;
-}) {
+}): Promise<{ model: string; reasoningLevel: OpenRouterReasoningLevel }> {
   if (params.keySource === 'tdf') {
     if (params.tdfId) {
       const tdf = await deps.getTdfById(params.tdfId);
-      return getTdfOpenRouterModel(tdf);
+      return {
+        model: getTdfOpenRouterModel(tdf),
+        reasoningLevel: getTdfOpenRouterReasoningLevel(tdf),
+      };
     }
-    return '';
+    return { model: '', reasoningLevel: 'none' };
   }
 
   if (params.keySource === 'user') {
     const user = await deps.getUserById(params.userId);
-    return getUserOpenRouterModel(user);
+    return {
+      model: getUserOpenRouterModel(user),
+      reasoningLevel: getUserOpenRouterReasoningLevel(user),
+    };
   }
 
   if (params.keySource === 'admin' && deps.getAdminApiKeySettings) {
-    const adminModel = getAdminOpenRouterModel(await deps.getAdminApiKeySettings());
-    if (adminModel) {
-      return adminModel;
-    }
+    const settings = await deps.getAdminApiKeySettings();
+    return {
+      model: getAdminOpenRouterModel(settings),
+      reasoningLevel: getAdminOpenRouterReasoningLevel(settings),
+    };
   }
 
-  if (params.keySource === 'provided') {
-    return normalizeString(params.requestedModel);
-  }
-
-  return '';
+  return { model: '', reasoningLevel: 'none' };
 }
 
 function sanitizeProviderText(value: unknown): string {
@@ -157,15 +201,15 @@ async function resolveOpenRouterCapability(
     tdfId,
     kind: 'openrouter',
   });
-  const model = await resolveOpenRouterModel(resolverDeps, {
+  const configuration = await resolveOpenRouterConfiguration(resolverDeps, {
     userId,
     tdfId,
     keySource: keyResolution.source,
   });
   return {
-    configured: Boolean(keyResolution.apiKey && model),
+    configured: Boolean(keyResolution.apiKey && configuration.model),
     source: keyResolution.source,
-    model,
+    ...configuration,
   };
 }
 
@@ -190,12 +234,12 @@ async function executeResolvedOpenRouterJson(
   if (!keyResolution.apiKey) {
     throw new Meteor.Error('no-api-key', 'No configured OpenRouter API key alternative is available');
   }
-  const model = await resolveOpenRouterModel(resolverDeps, {
+  const configuration = await resolveOpenRouterConfiguration(resolverDeps, {
     userId,
     tdfId,
-    requestedModel: data.model,
     keySource: keyResolution.source,
   });
+  const { model, reasoningLevel } = configuration;
   if (!model) {
     throw new Meteor.Error('no-openrouter-model', 'No configured OpenRouter model is available');
   }
@@ -217,6 +261,7 @@ async function executeResolvedOpenRouterJson(
     const callOptions: Parameters<typeof callOpenRouterJson>[0] = {
       apiKey: keyResolution.apiKey,
       model,
+      reasoningLevel,
       messages: normalizeMessages(data.messages),
       requireUsageCost: data.requireUsageCost === true,
       intent: openRouterIntent,
@@ -225,7 +270,7 @@ async function executeResolvedOpenRouterJson(
       callOptions.temperature = data.temperature;
     }
     if (typeof data.maxTokens === 'number') {
-      callOptions.maxTokens = data.maxTokens;
+      callOptions.maxTokens = expandOpenRouterCompletionBudget(data.maxTokens, reasoningLevel);
     }
     if (isRecord(data.telemetry)) {
       callOptions.telemetry = data.telemetry;
@@ -238,6 +283,7 @@ async function executeResolvedOpenRouterJson(
       costUsd: result.costUsd,
       source: keyResolution.source,
       model,
+      reasoningLevel,
     };
   } catch (error) {
     throw redactProviderError(deps, operation, error);

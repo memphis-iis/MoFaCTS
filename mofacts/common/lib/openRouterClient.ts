@@ -4,6 +4,10 @@ import {
   type AiFlowTelemetry,
 } from './aiFlowLogger';
 import { extractJsonObject } from './jsonExtraction';
+import {
+  normalizeOpenRouterReasoningLevel,
+  type OpenRouterReasoningLevel,
+} from './openRouterModelCatalog';
 
 export const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 export const OPENROUTER_EMBEDDINGS_URL = 'https://openrouter.ai/api/v1/embeddings';
@@ -12,6 +16,17 @@ export type OpenRouterMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
 };
+
+export type OpenRouterContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
+export type OpenRouterMultimodalMessage = {
+  role: 'user';
+  content: OpenRouterContentPart[];
+};
+
+export type OpenRouterRequestMessage = OpenRouterMessage | OpenRouterMultimodalMessage;
 
 export type OpenRouterJsonSchema = Record<string, unknown>;
 
@@ -26,8 +41,9 @@ export type OpenRouterIntent<T> = {
 
 export type OpenRouterCallOptions<T> = {
   intent: OpenRouterIntent<T>;
-  messages: OpenRouterMessage[];
+  messages: OpenRouterRequestMessage[];
   model: string;
+  reasoningLevel?: OpenRouterReasoningLevel;
   temperature?: number;
   maxTokens?: number;
   apiKey: string;
@@ -202,6 +218,10 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
     if (!apiKey) {
       throw new Error('OpenRouter API key is required');
     }
+    const reasoningLevel = normalizeOpenRouterReasoningLevel(
+      options.reasoningLevel,
+      'OpenRouter request reasoning level',
+    );
     const responseFormat = buildResponseFormat(options.intent);
     const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
@@ -214,6 +234,9 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       body: JSON.stringify({
         model: trimmedModel,
         messages: options.messages,
+        reasoning: reasoningLevel === 'default'
+          ? { enabled: true }
+          : { effort: reasoningLevel },
         temperature: options.temperature ?? 0,
         ...(options.maxTokens !== undefined ? { max_tokens: options.maxTokens } : {}),
         ...(responseFormat ? { response_format: responseFormat } : {}),
@@ -382,7 +405,11 @@ export async function callOpenRouterEmbeddings(options: OpenRouterEmbeddingOptio
   }
 }
 
-export async function testOpenRouterConnection(apiKey: string, model: string): Promise<OpenRouterConnectionTestResult> {
+export async function testOpenRouterConnection(
+  apiKey: string,
+  model: string,
+  reasoningLevel: OpenRouterReasoningLevel = 'none',
+): Promise<OpenRouterConnectionTestResult> {
   const trimmedKey = String(apiKey || '').trim();
   const trimmedModel = String(model || '').trim();
   if (!trimmedKey) {
@@ -396,6 +423,7 @@ export async function testOpenRouterConnection(apiKey: string, model: string): P
     await callOpenRouterJson({
       apiKey: trimmedKey,
       model: trimmedModel,
+      reasoningLevel,
       maxTokens: 16,
       temperature: 0,
       telemetry: {

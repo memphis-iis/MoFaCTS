@@ -2,9 +2,10 @@ import { Meteor } from 'meteor/meteor';
 import type { CreationModuleId } from './aiContentTypes';
 import {
   type OpenRouterJsonSchema,
-  type OpenRouterMessage,
+  type OpenRouterRequestMessage,
 } from './openRouterClient';
 import {
+  type AiContentPromptImage,
   buildAutoTutorAuthoringPrompt,
   buildItemCueRepairPrompt,
   buildItemAuthoringPrompt,
@@ -19,7 +20,7 @@ const AI_CONTENT_OBJECT_SCHEMA: OpenRouterJsonSchema = {
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 
 async function callOpenRouterJson(
-  messages: OpenRouterMessage[],
+  messages: OpenRouterRequestMessage[],
   apiKey: string,
   model: string,
   title: string,
@@ -55,15 +56,41 @@ async function callOpenRouterJson(
   }
 }
 
+export type AiContentRequestImage = AiContentPromptImage & {
+  dataUrl: string;
+};
+
+function buildItemUserMessage(
+  sourceText: string,
+  selectedModules: CreationModuleId[],
+  uploadedImages: AiContentRequestImage[],
+): OpenRouterRequestMessage {
+  const prompt = buildItemAuthoringPrompt(sourceText, selectedModules, uploadedImages);
+  if (uploadedImages.length === 0) {
+    return { role: 'user', content: prompt };
+  }
+  return {
+    role: 'user',
+    content: [
+      { type: 'text', text: prompt },
+      ...uploadedImages.flatMap((image) => [
+        { type: 'text' as const, text: `Uploaded image assetFileName: ${image.packageFileName}; originalFileName: ${image.originalName}` },
+        { type: 'image_url' as const, image_url: { url: image.dataUrl } },
+      ]),
+    ],
+  };
+}
+
 export async function callOpenRouterForItems(
   sourceText: string,
   selectedModules: CreationModuleId[],
   apiKey: string,
   model: string,
+  uploadedImages: AiContentRequestImage[] = [],
 ) {
   return callOpenRouterJson([
     { role: 'system', content: 'You create compact import-ready MoFaCTS authoring JSON. Return JSON only.' },
-    { role: 'user', content: buildItemAuthoringPrompt(sourceText, selectedModules) },
+    buildItemUserMessage(sourceText, selectedModules, uploadedImages),
   ], apiKey, model, 'MoFaCTS AI Content Creator', 'OpenRouter request', 'OpenRouter response did not include message content.', 0.3, 'item-generation');
 }
 
@@ -74,10 +101,11 @@ export async function callOpenRouterForItemCueRepair(
   leaks: CueLeak[],
   apiKey: string,
   model: string,
+  uploadedImages: AiContentRequestImage[] = [],
 ) {
   return callOpenRouterJson([
     { role: 'system', content: 'You create compact import-ready MoFaCTS authoring JSON. Return JSON only.' },
-    { role: 'user', content: buildItemAuthoringPrompt(sourceText, selectedModules) },
+    buildItemUserMessage(sourceText, selectedModules, uploadedImages),
     { role: 'assistant', content: originalAiResponse },
     { role: 'user', content: buildItemCueRepairPrompt(leaks) },
   ], apiKey, model, 'MoFaCTS AI Content Repair', 'OpenRouter item repair request', 'OpenRouter item repair response did not include message content.', 0.1, 'item-cue-repair');

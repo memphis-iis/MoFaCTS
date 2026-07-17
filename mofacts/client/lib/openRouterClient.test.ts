@@ -67,6 +67,7 @@ describe('openRouterClient', function() {
     expect(url).to.equal(OPENROUTER_CHAT_COMPLETIONS_URL);
     expect((request.headers as Record<string, string>).Authorization).to.equal('Bearer sk-or-v1-test');
     const body = JSON.parse(String(request.body));
+    expect(body.reasoning).to.deep.equal({ effort: 'none' });
     expect(body.response_format).to.deep.equal({
       type: 'json_schema',
       json_schema: {
@@ -80,6 +81,33 @@ describe('openRouterClient', function() {
         },
       },
     });
+  });
+
+  it('serializes enabled-default and explicit reasoning efforts', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch');
+    fetchStub.resolves(new Response(JSON.stringify({
+      choices: [{ message: { content: '{"ok":true}' } }],
+    }), { status: 200 }));
+
+    const baseOptions = {
+      apiKey: 'sk-or-v1-test',
+      model: 'openai/test-model',
+      messages: [{ role: 'user' as const, content: 'Return ok.' }],
+      intent: {
+        title: 'MoFaCTS Reasoning Test',
+        parse(value: unknown) {
+          return value;
+        },
+      },
+    };
+
+    await callOpenRouterJson({ ...baseOptions, reasoningLevel: 'default' });
+    await callOpenRouterJson({ ...baseOptions, reasoningLevel: 'high' });
+
+    const defaultBody = JSON.parse(String((fetchStub.firstCall.args[1] as RequestInit).body));
+    const highBody = JSON.parse(String((fetchStub.secondCall.args[1] as RequestInit).body));
+    expect(defaultBody.reasoning).to.deep.equal({ enabled: true });
+    expect(highBody.reasoning).to.deep.equal({ effort: 'high' });
   });
 
   it('redacts OpenRouter keys from provider failures', async function() {

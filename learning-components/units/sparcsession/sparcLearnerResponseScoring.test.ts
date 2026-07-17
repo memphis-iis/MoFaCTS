@@ -4,7 +4,9 @@ import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import {
   createSparcLearnerResponseScoreFacts,
   createSparcLearnerResponseScoreTransition,
+  reduceSparcLearnerResponseEvidence,
 } from './sparcLearnerResponseScoring';
+import type { SparcLearnerResponseEvidenceEnvelope } from './sparcLearnerResponseScoring';
 import type {
   SparcAuthoredDocument,
   SparcInterfaceEvent,
@@ -50,6 +52,287 @@ const event: SparcInterfaceEvent = {
 };
 
 describe('sparcLearnerResponseScoring', function() {
+  it('reduces complete overlapping E1-E4 evidence and clears only contradicted misconceptions', function() {
+    const facts = [
+      ...['e1', 'e2', 'e3', 'e4'].map((clusterKC) => fact('autotutor.expectation', { clusterKC })),
+      ...['M1', 'M2', 'M3'].map((id) => fact('autotutor.misconception', { id })),
+      fact('learningTarget.score', { clusterKC: 'e1', coverage: 0.25 }),
+      fact('learningTarget.score', { clusterKC: 'e2', coverage: 0.5 }),
+      fact('learningTarget.score', { clusterKC: 'e3', coverage: 0.75 }),
+      fact('diagnostic.misconceptionScore', { id: 'M1', supportStrength: 0.8 }),
+      fact('diagnostic.misconceptionScore', { id: 'M2', supportStrength: 0.4 }),
+      fact('diagnostic.misconceptionScore', { id: 'M3', supportStrength: 0.25 }),
+    ];
+    const score = reduceSparcLearnerResponseEvidence({
+      facts,
+      evidence: {
+        learningTargetEvaluations: ['e4', 'e3', 'e2', 'e1'].map((clusterKC) => ({
+          clusterKC,
+          evidenceDirection: 'supports' as const,
+          evidenceStrength: 1,
+        })),
+        diagnosticMisconceptionEvaluations: [{
+          id: 'M1', evidenceDirection: 'contradicts', evidenceStrength: 1,
+        }, {
+          id: 'M2', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        }, {
+          id: 'M3', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        }],
+        learnerContribution: { type: 'answer' },
+      },
+    });
+
+    assert.deepEqual(score.learningTargetScores, [
+      { clusterKC: 'e1', coverage: 1 },
+      { clusterKC: 'e2', coverage: 1 },
+      { clusterKC: 'e3', coverage: 1 },
+      { clusterKC: 'e4', coverage: 1 },
+    ]);
+    assert.deepEqual(score.diagnosticMisconceptionScores, [{ id: 'M1', supportStrength: 0 }]);
+    assert.equal(score.learnerContribution?.type, 'answer');
+  });
+
+  it('uses contradiction direction without reducing expectations and clears contradicted misconceptions', function() {
+    const score = reduceSparcLearnerResponseEvidence({
+      facts: document.workingMemoryFacts ?? [],
+      evidence: {
+        learningTargetEvaluations: [{
+          clusterKC: 'kc-a', evidenceDirection: 'contradicts', evidenceStrength: 0.6,
+        }, {
+          clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        }],
+        diagnosticMisconceptionEvaluations: [{
+          id: 'm1', evidenceDirection: 'contradicts', evidenceStrength: 0.4,
+        }],
+        learnerContribution: { type: 'answer' },
+      },
+    });
+
+    assert.deepEqual(score.learningTargetScores, []);
+    assert.deepEqual(score.diagnosticMisconceptionScores, [{ id: 'm1', supportStrength: 0 }]);
+  });
+
+  it('keeps expectation coverage cumulative while replacing changed supported misconception strength', function() {
+    const score = reduceSparcLearnerResponseEvidence({
+      facts: document.workingMemoryFacts ?? [],
+      evidence: {
+        learningTargetEvaluations: [{
+          clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.3,
+        }, {
+          clusterKC: 'kc-b', evidenceDirection: 'supports', evidenceStrength: 0.1,
+        }],
+        diagnosticMisconceptionEvaluations: [{
+          id: 'm1', evidenceDirection: 'supports', evidenceStrength: 0.1,
+        }],
+        learnerContribution: { type: 'answer' },
+      },
+    });
+
+    assert.deepEqual(score.learningTargetScores, []);
+    assert.deepEqual(score.diagnosticMisconceptionScores, [{ id: 'm1', supportStrength: 0.1 }]);
+  });
+
+  it('preserves an active compounding-frequency misconception when a calculation leaves it unaddressed', function() {
+    const score = reduceSparcLearnerResponseEvidence({
+      facts: [
+        fact('autotutor.expectation', { clusterKC: 'compound.e1' }),
+        fact('autotutor.misconception', { id: 'M3' }),
+        fact('diagnostic.misconceptionScore', { id: 'M3', supportStrength: 0.25 }),
+      ],
+      evidence: {
+        learningTargetEvaluations: [{
+          clusterKC: 'compound.e1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        }],
+        diagnosticMisconceptionEvaluations: [{
+          id: 'M3', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        }],
+        learnerContribution: { type: 'answer' },
+      },
+    });
+
+    assert.deepEqual(score.learningTargetScores, []);
+    assert.equal(score.diagnosticMisconceptionScores, undefined);
+  });
+
+  it('requires a complete exact set of authored evidence identifiers', function() {
+    const completeEvidence: SparcLearnerResponseEvidenceEnvelope = {
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }, {
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      learnerContribution: { type: 'answer' },
+    };
+    const invalidEvidence: Array<{
+      readonly evidence: SparcLearnerResponseEvidenceEnvelope;
+      readonly message: RegExp;
+    }> = [{
+      evidence: { ...completeEvidence, learningTargetEvaluations: completeEvidence.learningTargetEvaluations.slice(0, 1) },
+      message: /missing learning target clusterKC "kc-b"/,
+    }, {
+      evidence: {
+        ...completeEvidence,
+        learningTargetEvaluations: [{
+          clusterKC: 'kc-a ', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        }, completeEvidence.learningTargetEvaluations[1]!],
+      },
+      message: /unknown learning target clusterKC "kc-a "/,
+    }, {
+      evidence: {
+        ...completeEvidence,
+        diagnosticMisconceptionEvaluations: [
+          completeEvidence.diagnosticMisconceptionEvaluations[0]!,
+          completeEvidence.diagnosticMisconceptionEvaluations[0]!,
+        ],
+      },
+      message: /duplicate diagnostic misconception id "m1"/,
+    }];
+
+    for (const invalid of invalidEvidence) {
+      assert.throws(
+        () => reduceSparcLearnerResponseEvidence({
+          facts: document.workingMemoryFacts ?? [],
+          evidence: invalid.evidence,
+        }),
+        invalid.message,
+      );
+    }
+  });
+
+  it('rejects inconsistent evidence directions, strengths, and off-task classifications', function() {
+    const invalidEvidence = [{
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0,
+      }, {
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      learnerContribution: { type: 'answer' },
+    }, {
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'contradicts', evidenceStrength: 0,
+      }, {
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      learnerContribution: { type: 'answer' },
+    }, {
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0.2,
+      }, {
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      learnerContribution: { type: 'answer' },
+    }, {
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.5,
+      }, {
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      learnerContribution: { type: 'off-task' },
+    }] as SparcLearnerResponseEvidenceEnvelope[];
+    const messages = [
+      /evidenceStrength must be greater than 0 when evidenceDirection is supports/,
+      /evidenceStrength must be greater than 0 when evidenceDirection is contradicts/,
+      /evidenceStrength must be 0 when evidenceDirection is unaddressed/,
+      /off-task contribution must leave every instructional proposition unaddressed/,
+    ];
+
+    invalidEvidence.forEach((evidence, index) => {
+      assert.throws(
+        () => reduceSparcLearnerResponseEvidence({
+          facts: document.workingMemoryFacts ?? [],
+          evidence,
+        }),
+        messages[index]!,
+      );
+    });
+  });
+
+  it('rejects invalid evidence directions and nonnumeric strengths', function() {
+    const baseEvidence = {
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }, {
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+      }],
+      learnerContribution: { type: 'answer' },
+    };
+    const invalidDirection = {
+      ...baseEvidence,
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'maybe', evidenceStrength: 0,
+      }, baseEvidence.learningTargetEvaluations[1]],
+    } as unknown as SparcLearnerResponseEvidenceEnvelope;
+    const nonnumericStrength = {
+      ...baseEvidence,
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'supports', evidenceStrength: '0.5',
+      }],
+    } as unknown as SparcLearnerResponseEvidenceEnvelope;
+
+    assert.throws(
+      () => reduceSparcLearnerResponseEvidence({
+        facts: document.workingMemoryFacts ?? [],
+        evidence: invalidDirection,
+      }),
+      /evidenceDirection must be supports, contradicts, or unaddressed/,
+    );
+    assert.throws(
+      () => reduceSparcLearnerResponseEvidence({
+        facts: document.workingMemoryFacts ?? [],
+        evidence: nonnumericStrength,
+      }),
+      /evidenceStrength must be a number from 0 to 1/,
+    );
+  });
+
+  it('requires question metadata and ignores it for non-question contributions', function() {
+    const baseEvidence = {
+      learningTargetEvaluations: [{
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0,
+      }, {
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0,
+      }],
+      diagnosticMisconceptionEvaluations: [{
+        id: 'm1', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0,
+      }],
+    };
+    assert.throws(
+      () => reduceSparcLearnerResponseEvidence({
+        facts: document.workingMemoryFacts ?? [],
+        evidence: { ...baseEvidence, learnerContribution: { type: 'question' } },
+      }),
+      /learner question metadata is required/,
+    );
+
+    const score = reduceSparcLearnerResponseEvidence({
+      facts: document.workingMemoryFacts ?? [],
+      evidence: {
+        ...baseEvidence,
+        learnerContribution: { type: 'answer' },
+        learnerQuestion: { contentFocused: true },
+      },
+    });
+    assert.equal(score.learnerQuestion, undefined);
+  });
+
   it('normalizes scorer output into canonical SPARC learner and score facts', function() {
     const facts = createSparcLearnerResponseScoreFacts({
       facts: document.workingMemoryFacts ?? [],

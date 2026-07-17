@@ -33,6 +33,49 @@
         </div>
       </div>
 
+      <section class="ai-image-input" aria-labelledby="ai-image-source-label">
+        <div class="ai-image-input-heading">
+          <span id="ai-image-source-label" class="ai-source-label">{{aiText 'aiCreator.imageSourceLabel'}}</span>
+          {{#if hasUploadedImages}}<span class="ai-image-count">{{uploadedImageSummary}}</span>{{/if}}
+        </div>
+        <div class="ai-image-drop-zone {{#if processingImages}}is-processing{{/if}}">
+          <div class="ai-image-drop-copy">
+            <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+            <strong>{{aiText 'aiCreator.imageDropPrompt'}}</strong>
+            <span>{{aiText 'aiCreator.imageDropHelp'}}</span>
+          </div>
+          <div class="ai-image-picker-actions">
+            <label class="btn btn-outline-primary btn-sm" for="ai-image-files">
+              <i class="fa fa-picture-o" aria-hidden="true"></i>
+              {{aiText 'aiCreator.chooseImages'}}
+            </label>
+            <label class="btn btn-outline-primary btn-sm" for="ai-image-folder">
+              <i class="fa fa-folder-open" aria-hidden="true"></i>
+              {{aiText 'aiCreator.chooseFolder'}}
+            </label>
+          </div>
+          <input id="ai-image-files" class="ai-image-file-input" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,.zip,application/zip">
+          <input id="ai-image-folder" class="ai-image-file-input" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif" webkitdirectory directory>
+        </div>
+
+        {{#if hasUploadedImages}}
+        <div class="ai-image-grid" role="list">
+          {{#each uploadedImages}}
+          <article class="ai-image-item" role="listitem">
+            <img src="{{previewUrl}}" alt="{{originalName}}">
+            <div class="ai-image-item-copy">
+              <strong title="{{sourcePath}}">{{originalName}}</strong>
+              <span>{{width}} × {{height}} · WebP</span>
+            </div>
+            <button type="button" class="ai-remove-image" data-image-id="{{id}}" aria-label="{{aiText 'aiCreator.removeImage' filename=originalName}}">
+              <i class="fa fa-times" aria-hidden="true"></i>
+            </button>
+          </article>
+          {{/each}}
+        </div>
+        {{/if}}
+      </section>
+
       <fieldset class="ai-mode-fieldset">
         <legend class="ai-mode-label">{{aiText 'aiCreator.modeLabel'}}</legend>
         <div class="ai-mode-selector" role="group" aria-label="{{aiText 'aiCreator.modeGroupLabel'}}">

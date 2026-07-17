@@ -33,10 +33,31 @@
                                 </div>
                                 <div>
                                     <label for="adminOpenRouterModel" class="form-label">{{userAdminText 'profile.openRouterModel'}}</label>
-                                    <input id="adminOpenRouterModel" type="text" class="form-control" maxlength="160" value="{{adminOpenRouterModel}}" placeholder="provider/model" aria-describedby="adminOpenRouterModelStatus">
+                                    <select id="adminOpenRouterModel" class="form-control" value="{{adminOpenRouterModel}}" aria-describedby="adminOpenRouterModelStatus adminOpenRouterCatalogStatus" {{adminOpenRouterModelSelectAttrs}}>
+                                        {{#each adminOpenRouterModelOptions}}
+                                        <option value="{{value}}" {{selectedAttrs}}>{{label}}</option>
+                                        {{/each}}
+                                    </select>
                                     <small id="adminOpenRouterModelStatus" class="text-muted d-block admin-form-row-top">{{openRouterModelStatus}}</small>
                                 </div>
+                                {{#if showAdminOpenRouterReasoningLevel}}
+                                <div>
+                                    <label for="adminOpenRouterReasoningLevel" class="form-label">{{userAdminText 'profile.openRouterReasoningLevel'}}</label>
+                                    <select id="adminOpenRouterReasoningLevel" class="form-control" aria-describedby="adminOpenRouterReasoningLevelHelp" {{adminOpenRouterReasoningSelectAttrs}}>
+                                        {{#each adminOpenRouterReasoningLevelOptions}}
+                                        <option value="{{value}}" {{selectedAttrs}}>{{label}}</option>
+                                        {{/each}}
+                                    </select>
+                                    <small id="adminOpenRouterReasoningLevelHelp" class="text-muted d-block admin-form-row-top">{{userAdminText 'profile.openRouterReasoningLevelHelp'}}</small>
+                                </div>
+                                {{/if}}
                             </div>
+                            {{#if openRouterModelCatalogMessage}}
+                            <div id="adminOpenRouterCatalogStatus" class="admin-status admin-status-{{openRouterModelCatalogAlertClass}} admin-status-small admin-form-row-sm" role="status" aria-live="polite">
+                                <i class="fa {{openRouterModelCatalogIcon}}" aria-hidden="true"></i>
+                                <div class="admin-status-text">{{openRouterModelCatalogMessage}}</div>
+                            </div>
+                            {{/if}}
                             <div class="admin-api-key-actions">
                                 <button type="button" id="saveAdminOpenRouterAlternative" class="btn btn-sm btn-primary" {{apiKeyActionAttrs}}>
                                     <i class="fa fa-save"></i> {{userAdminText 'admin.saveOpenRouter'}}

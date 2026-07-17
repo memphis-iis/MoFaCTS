@@ -10,6 +10,12 @@ import {
   type ProfileAvatarType,
 } from '../../common/profileAvatar';
 import { requireTargetUiLocale } from '../../common/lib/interfaceLocales';
+import {
+  normalizeOpenRouterReasoningLevel,
+  validateOpenRouterReasoningLevelForModel,
+  type OpenRouterReasoningLevel,
+} from '../../common/lib/openRouterModelCatalog';
+import type { OpenRouterModelCatalogService } from './openRouterCatalogMethods';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -24,6 +30,7 @@ type ProfileMethodsDeps = {
   };
   encryptData: (value: string) => string;
   decryptData: (value: string) => string;
+  openRouterModelCatalogService: OpenRouterModelCatalogService;
 };
 
 const PROFILE_NAME_MAX_LENGTH = 100;
@@ -97,6 +104,38 @@ function normalizeOpenRouterKey(value: unknown): string {
     throw new Meteor.Error('invalid-openrouter-key', 'OpenRouter API key contains unsupported whitespace or control characters');
   }
   return trimmed;
+}
+
+async function validateOpenRouterModelReasoningSelection(
+  deps: Pick<ProfileMethodsDeps, 'openRouterModelCatalogService'>,
+  model: string,
+  reasoningLevel: OpenRouterReasoningLevel,
+): Promise<void> {
+  if (!model) {
+    if (reasoningLevel !== 'none') {
+      throw new Meteor.Error(
+        'invalid-openrouter-reasoning-level',
+        'OpenRouter reasoning must be none when no model is selected',
+      );
+    }
+    return;
+  }
+  const catalog = await deps.openRouterModelCatalogService.getCatalog();
+  const catalogModel = catalog.find((entry) => entry.id === model);
+  if (!catalogModel) {
+    throw new Meteor.Error(
+      'openrouter-model-unavailable',
+      `OpenRouter model ${JSON.stringify(model)} is not available in the current catalog`,
+    );
+  }
+  try {
+    validateOpenRouterReasoningLevelForModel(reasoningLevel, catalogModel);
+  } catch (error: unknown) {
+    throw new Meteor.Error(
+      'invalid-openrouter-reasoning-level',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 function validateAvatarImageData(value: unknown): string {
@@ -205,14 +244,18 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       check(params, {
         apiKey: Match.Maybe(String),
         model: Match.Maybe(String),
+        reasoningLevel: Match.Maybe(String),
       });
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update OpenRouter settings', 401);
-      const data = params as { apiKey?: string; model?: string };
+      const data = params as { apiKey?: string; model?: string; reasoningLevel?: OpenRouterReasoningLevel };
       const apiKey = normalizeOpenRouterKey(data.apiKey);
       const model = normalizeOpenRouterModel(data.model);
+      const reasoningLevel = normalizeOpenRouterReasoningLevel(data.reasoningLevel, 'OpenRouter reasoning level');
+      await validateOpenRouterModelReasoningSelection(deps, model, reasoningLevel);
       const now = new Date();
       const setFields: UnknownRecord = {
         'profile.openRouterDefaultModel': model,
+        'profile.openRouterReasoningLevel': reasoningLevel,
         'profile.openRouterUpdatedAt': now,
       };
       const unsetFields: UnknownRecord = {};
@@ -243,12 +286,17 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       const user = await deps.usersCollection.findOneAsync({ _id: userId }, {
         fields: {
           'profile.openRouterDefaultModel': 1,
+          'profile.openRouterReasoningLevel': 1,
           'profile.openRouterHasKey': 1,
           'services.openRouter.keyEncrypted': 1,
         },
       });
       return {
         model: String(user?.profile?.openRouterDefaultModel || '').trim(),
+        reasoningLevel: normalizeOpenRouterReasoningLevel(
+          user?.profile?.openRouterReasoningLevel,
+          'Stored OpenRouter reasoning level',
+        ),
         hasOpenRouterKey: Boolean(user?.services?.openRouter?.keyEncrypted || user?.profile?.openRouterHasKey),
       };
     },
@@ -273,12 +321,15 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       check(params, {
         apiKey: Match.Maybe(String),
         model: Match.Maybe(String),
+        reasoningLevel: Match.Maybe(String),
       });
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to test OpenRouter settings', 401);
       void userId;
-      const data = params as { apiKey?: string; model?: string };
+      const data = params as { apiKey?: string; model?: string; reasoningLevel?: OpenRouterReasoningLevel };
       const apiKey = normalizeOpenRouterKey(data.apiKey);
-      normalizeOpenRouterModel(data.model);
+      const model = normalizeOpenRouterModel(data.model);
+      const reasoningLevel = normalizeOpenRouterReasoningLevel(data.reasoningLevel, 'OpenRouter reasoning level');
+      await validateOpenRouterModelReasoningSelection(deps, model, reasoningLevel);
       if (apiKey) {
         await deps.usersCollection.updateAsync({ _id: userId }, {
           $set: {

@@ -82,6 +82,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
 
 const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 1;
 const PRACTICE_DASHBOARD_SEARCH_VERSION = 1;
+const PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY = 'practiceTableStatisticsExpanded';
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
 const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
@@ -930,6 +931,8 @@ Template.learningDashboard.onCreated(function(this: any) {
   this.filteredTdfsList = new ReactiveVar(false);
   this.searching = new ReactiveVar(false);
   this.searchQuery = new ReactiveVar('');
+  this.statisticsExpanded = new ReactiveVar(false);
+  this.statisticsPreferenceRevision = 0;
   this.isLoading = new ReactiveVar(true);
   this.showLoadingFeedback = new ReactiveVar(false);
   this.showSlowLoading = new ReactiveVar(false);
@@ -971,6 +974,10 @@ Template.learningDashboard.helpers({
 
   hasSearchQuery: () => {
     return Template.instance().searchQuery.get().length > 0;
+  },
+
+  statisticsExpanded: () => {
+    return Template.instance().statisticsExpanded.get();
   },
 
   recentUsedTdf: () => {
@@ -1043,6 +1050,41 @@ Template.learningDashboard.helpers({
 
 Template.learningDashboardLessonTable.helpers({
   ...lessonRowHelpers,
+
+  statisticsAvailable() {
+    return Template.instance().data.allowStatistics === true;
+  },
+
+  statisticsExpanded() {
+    const data = Template.instance().data;
+    return data.allowStatistics === true && data.statisticsExpanded === true;
+  },
+
+  statisticsTableClass() {
+    const data = Template.instance().data;
+    return data.allowStatistics === true && data.statisticsExpanded === true
+      ? 'is-statistics-expanded'
+      : 'is-statistics-collapsed';
+  },
+
+  statisticsToggleLabel() {
+    const data = Template.instance().data;
+    return dashboardText(data.allowStatistics === true && data.statisticsExpanded === true
+      ? 'dashboard.hideStatistics'
+      : 'dashboard.showStatistics');
+  },
+
+  statisticsToggleIconClass() {
+    const data = Template.instance().data;
+    return data.allowStatistics === true && data.statisticsExpanded === true
+      ? 'fa-chevron-left'
+      : 'fa-chevron-right';
+  },
+
+  tableColumnCount() {
+    const data = Template.instance().data;
+    return data.allowStatistics === true && data.statisticsExpanded === true ? 9 : 3;
+  },
 
   configForTableRow() {
     return configForLessonTable(this);
@@ -1174,6 +1216,25 @@ Template.learningDashboard.events({
     }
     applyLearningDashboardSearch(instance, '');
     instance.$('#learningDashboardSearch').trigger('focus');
+  },
+
+  'click .learning-dashboard-statistics-toggle': async function(event: any, instance: any) {
+    event.preventDefault();
+    instance.statisticsPreferenceRevision += 1;
+    const wasExpanded = instance.statisticsExpanded.get();
+    const isExpanded = !wasExpanded;
+    instance.statisticsExpanded.set(isExpanded);
+
+    try {
+      await meteorCallAsync(
+        'setUserPreference',
+        PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY,
+        isExpanded,
+      );
+    } catch (error) {
+      instance.statisticsExpanded.set(wasExpanded);
+      clientConsole(1, '[Dashboard] Practice table statistics preference could not be saved:', error);
+    }
   },
 
   'click .continue-lesson': async function(event: any) {
@@ -1444,6 +1505,17 @@ Template.learningDashboard.rendered = async function(this: any) {
 
   tryRestoreSearch(studentID);
   tryRenderLocalSnapshot(studentID);
+
+  const statisticsPreferenceRevision = instance.statisticsPreferenceRevision;
+  meteorCallAsync('getUserPreference', PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY)
+    .then((preference) => {
+      if (instance.statisticsPreferenceRevision === statisticsPreferenceRevision) {
+        instance.statisticsExpanded.set(preference === true);
+      }
+    })
+    .catch((error) => {
+      clientConsole(1, '[Dashboard] Practice table statistics preference could not be loaded:', error);
+    });
 
   // sessionCleanUp() removed - it's already called in selectTdf() at the right time
   // Calling it here causes problems because rendered() can fire multiple times

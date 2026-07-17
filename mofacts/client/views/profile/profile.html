@@ -108,9 +108,29 @@
 
         <div class="profile-field">
           <label for="openRouterDefaultModel">{{t 'profile.openRouterModel'}}</label>
-          <input id="openRouterDefaultModel" type="text" maxlength="160" value="{{openRouterDefaultModel}}" placeholder="openai/gpt-4o-mini">
-          <p>{{t 'profile.openRouterModelHelp'}}</p>
+          <select id="openRouterDefaultModel" value="{{openRouterDefaultModel}}" aria-describedby="openRouterModelHelp openRouterModelCatalogStatus" {{openRouterModelSelectAttrs}}>
+            {{#each openRouterModelOptions}}
+              <option value="{{value}}" {{selectedAttrs}}>{{label}}</option>
+            {{/each}}
+          </select>
+          <p id="openRouterModelHelp">{{t 'profile.openRouterModelHelp'}}</p>
         </div>
+
+        {{#if openRouterModelCatalogMessage}}
+          <div id="openRouterModelCatalogStatus" class="profile-alert {{openRouterModelCatalogMessageClass}}" role="status">{{openRouterModelCatalogMessage}}</div>
+        {{/if}}
+
+        {{#if showOpenRouterReasoningLevel}}
+        <div class="profile-field">
+          <label for="openRouterReasoningLevel">{{t 'profile.openRouterReasoningLevel'}}</label>
+          <select id="openRouterReasoningLevel" aria-describedby="openRouterReasoningLevelHelp" {{openRouterReasoningSelectAttrs}}>
+            {{#each openRouterReasoningLevelOptions}}
+              <option value="{{value}}" {{selectedAttrs}}>{{label}}</option>
+            {{/each}}
+          </select>
+          <p id="openRouterReasoningLevelHelp">{{t 'profile.openRouterReasoningLevelHelp'}}</p>
+        </div>
+        {{/if}}
 
         {{#if openRouterStatusMessage}}
           <div class="profile-alert {{openRouterStatusClass}}" role="status">{{openRouterStatusMessage}}</div>

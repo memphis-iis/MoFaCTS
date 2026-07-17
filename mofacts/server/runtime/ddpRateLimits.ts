@@ -107,6 +107,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
         'updateOwnOpenRouterSettings',
         'getOwnOpenRouterSettings',
         'getOpenRouterCapability',
+        'getOpenRouterModelCatalog',
         'deleteOwnOpenRouterKey',
         'testOwnOpenRouterSettings'
       ].includes(name);

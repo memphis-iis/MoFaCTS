@@ -3,8 +3,11 @@ import type {
   OpenRouterMessage,
 } from '../../../../lib/openRouterClient';
 import type { SparcControllerDisplay } from './sparcController';
-import type {
-  SparcLearnerResponseScoringResult,
+import {
+  reduceSparcLearnerResponseEvidence,
+  type SparcEvidenceDirection,
+  type SparcLearnerResponseEvidenceEnvelope,
+  type SparcLearnerResponseScoringResult,
 } from '../../../../../../learning-components/units/sparcsession/sparcLearnerResponseScoring';
 import type {
   SparcTrialDisplayDialogueTurnScorer,
@@ -17,7 +20,6 @@ import {
   type SparcUtteranceRequest,
 } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
-import type { SparcWorkingMemoryFact } from '../../../../../../learning-components/units/sparcsession/sparcSessionContracts';
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -39,37 +41,61 @@ export type CallResolvedOpenRouterJson = (params: {
   readonly costUsd?: number;
 }>;
 
+export type SparcDialogueLearnerResponseEvaluation = Readonly<{
+  evidenceEnvelope: SparcLearnerResponseEvidenceEnvelope;
+  learnerResponseScore: SparcLearnerResponseScoringResult;
+}>;
+
+export type SparcDialogueLearnerResponseScoringTraceEvent =
+  | Readonly<{
+      stage: 'provider-response';
+      parsedContent: unknown;
+    }>
+  | Readonly<{
+      stage: 'evidence-parsed';
+      evidenceEnvelope: SparcLearnerResponseEvidenceEnvelope;
+    }>
+  | Readonly<{
+      stage: 'evaluation-completed';
+      evaluation: SparcDialogueLearnerResponseEvaluation;
+    }>;
+
 export type SparcDialogueOpenRouterProviderOptions = {
   readonly tdfId?: string | null;
   readonly callResolvedOpenRouterJson?: CallResolvedOpenRouterJson;
+  readonly onLearnerResponseScoringTrace?: (
+    event: SparcDialogueLearnerResponseScoringTraceEvent,
+  ) => void;
 };
 
 const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    learningTargetScores: {
+    learningTargetEvaluations: {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
         properties: {
           clusterKC: { type: 'string' },
-          coverage: { type: 'number' },
+          evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
+          evidenceStrength: { type: 'number' },
         },
-        required: ['clusterKC', 'coverage'],
+        required: ['clusterKC', 'evidenceDirection', 'evidenceStrength'],
       },
     },
-    diagnosticMisconceptionScores: {
+    diagnosticMisconceptionEvaluations: {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
         properties: {
           id: { type: 'string' },
-          supportStrength: { type: 'number' },
+          evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
+          evidenceStrength: { type: 'number' },
         },
-        required: ['id', 'supportStrength'],
+        required: ['id', 'evidenceDirection', 'evidenceStrength'],
       },
     },
     learnerContribution: {
@@ -91,7 +117,7 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
       required: ['contentFocused'],
     },
   },
-  required: ['learningTargetScores', 'diagnosticMisconceptionScores', 'learnerContribution'],
+  required: ['learningTargetEvaluations', 'diagnosticMisconceptionEvaluations', 'learnerContribution'],
 };
 
 const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
@@ -122,67 +148,16 @@ function unitScore(value: unknown, label: string): number {
   return numberValue;
 }
 
-function displayFacts(display: SparcControllerDisplay): readonly Record<string, unknown>[] {
-  return Array.isArray(display.workingMemoryFacts)
-    ? display.workingMemoryFacts.filter(isRecord)
-    : [];
-}
-
-function factSlot(fact: Record<string, unknown>, slotName: string): unknown {
-  return isRecord(fact.slots) ? fact.slots[slotName] : undefined;
-}
-
-function scoreFacts(
-  display: SparcControllerDisplay,
-  runtimeFacts?: readonly SparcWorkingMemoryFact[],
-): readonly Readonly<Record<string, unknown>>[] {
-  return runtimeFacts ?? displayFacts(display);
-}
-
-function priorCoverageByClusterKC(
-  display: SparcControllerDisplay,
-  runtimeFacts?: readonly SparcWorkingMemoryFact[],
-): Map<string, number> {
-  const coverage = new Map<string, number>();
-  for (const fact of scoreFacts(display, runtimeFacts)) {
-    if (fact.factType !== 'learningTarget.score') {
-      continue;
-    }
-    const clusterKC = nonBlankString(factSlot(fact, 'clusterKC'));
-    if (!clusterKC) {
-      continue;
-    }
-    coverage.set(clusterKC, Math.max(
-      coverage.get(clusterKC) ?? 0,
-      unitScore(factSlot(fact, 'coverage'), `SPARC prior learning target coverage for "${clusterKC}"`),
-    ));
+function evidenceStrength(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${label} must be a number from 0 to 1`);
   }
-  return coverage;
-}
-
-function priorMisconceptionSupportStrengthById(
-  display: SparcControllerDisplay,
-  runtimeFacts?: readonly SparcWorkingMemoryFact[],
-): Map<string, number> {
-  const supportStrength = new Map<string, number>();
-  for (const fact of scoreFacts(display, runtimeFacts)) {
-    if (fact.factType !== 'diagnostic.misconceptionScore') {
-      continue;
-    }
-    const id = nonBlankString(factSlot(fact, 'id'));
-    if (!id) {
-      continue;
-    }
-    supportStrength.set(id, unitScore(factSlot(fact, 'supportStrength'), `SPARC prior misconception supportStrength for "${id}"`));
-  }
-  return supportStrength;
+  return value;
 }
 
 function targetSummaries(
   display: SparcControllerDisplay,
-  runtimeFacts?: readonly SparcWorkingMemoryFact[],
 ): readonly Record<string, unknown>[] {
-  const priorCoverage = priorCoverageByClusterKC(display, runtimeFacts);
   const cleanTargets = isRecord(display.autoTutorTargets) && Array.isArray(display.autoTutorTargets.expectations)
     ? display.autoTutorTargets.expectations
     : [];
@@ -200,7 +175,6 @@ function targetSummaries(
       return {
         clusterKC,
         text,
-        priorCoverage: priorCoverage.get(clusterKC) ?? 0,
       };
     });
 }
@@ -217,9 +191,7 @@ function cleanMisconceptionEntries(display: SparcControllerDisplay): readonly un
 
 function misconceptionSummaries(
   display: SparcControllerDisplay,
-  runtimeFacts?: readonly SparcWorkingMemoryFact[],
 ): readonly Record<string, unknown>[] {
-  const priorSupportStrength = priorMisconceptionSupportStrengthById(display, runtimeFacts);
   return cleanMisconceptionEntries(display)
     .filter(isRecord)
     .map((entry) => {
@@ -231,53 +203,68 @@ function misconceptionSummaries(
       return {
         id,
         text,
-        priorSupportStrength: priorSupportStrength.get(id) ?? 0,
       };
     });
 }
 
-function assertUniqueKnownScoreIds(params: {
-  readonly values: readonly string[];
-  readonly allowedValues: ReadonlySet<string>;
-  readonly label: string;
-}): void {
-  const seen = new Set<string>();
-  for (const value of params.values) {
-    if (!params.allowedValues.has(value)) {
-      throw new Error(`SPARC dialogue scoring returned unknown ${params.label} "${value}"`);
-    }
-    if (seen.has(value)) {
-      throw new Error(`SPARC dialogue scoring returned duplicate ${params.label} "${value}"`);
-    }
-    seen.add(value);
+function exactEvidenceId(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${label} is required`);
   }
+  return value;
 }
 
-function parseScoreEnvelope(value: unknown, context: {
-  readonly learningTargetIds: ReadonlySet<string>;
-  readonly misconceptionIds: ReadonlySet<string>;
-  readonly priorCoverageById: ReadonlyMap<string, number>;
-  readonly priorSupportStrengthById: ReadonlyMap<string, number>;
-}): SparcLearnerResponseScoringResult {
+function evidenceDirection(value: unknown, label: string): SparcEvidenceDirection {
+  if (value !== 'supports' && value !== 'contradicts' && value !== 'unaddressed') {
+    throw new Error(`${label} must be supports, contradicts, or unaddressed`);
+  }
+  return value;
+}
+
+function evidenceObjects(value: unknown, label: string): readonly Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array`);
+  }
+  return value.map((entry, index) => {
+    if (!isRecord(entry)) {
+      throw new Error(`${label}[${index}] must be an object`);
+    }
+    return entry;
+  });
+}
+
+function parseEvidenceEnvelope(value: unknown): SparcLearnerResponseEvidenceEnvelope {
   if (!isRecord(value)) {
     throw new Error('SPARC dialogue scoring response must be an object');
   }
-  const suppliedLearningTargetScores = (Array.isArray(value.learningTargetScores) ? value.learningTargetScores : [])
-    .filter(isRecord)
-    .map((entry) => ({
-      clusterKC: nonBlankString(entry.clusterKC),
-      coverage: unitScore(entry.coverage, `SPARC dialogue score for "${String(entry.clusterKC)}"`),
-    }))
-    .filter((entry) => entry.clusterKC);
-  const suppliedDiagnosticMisconceptionScores = (Array.isArray(value.diagnosticMisconceptionScores)
-    ? value.diagnosticMisconceptionScores
-    : [])
-    .filter(isRecord)
-    .map((entry) => ({
-      id: nonBlankString(entry.id),
-      supportStrength: unitScore(entry.supportStrength, `SPARC dialogue misconception supportStrength for "${String(entry.id)}"`),
-    }))
-    .filter((entry) => entry.id);
+  const learningTargetEvaluations = evidenceObjects(
+    value.learningTargetEvaluations,
+    'SPARC dialogue scoring learningTargetEvaluations',
+  ).map((entry) => ({
+    clusterKC: exactEvidenceId(entry.clusterKC, 'SPARC dialogue scoring learning target clusterKC'),
+    evidenceDirection: evidenceDirection(
+      entry.evidenceDirection,
+      `SPARC dialogue scoring learning target "${String(entry.clusterKC)}" evidenceDirection`,
+    ),
+    evidenceStrength: evidenceStrength(
+      entry.evidenceStrength,
+      `SPARC dialogue scoring learning target "${String(entry.clusterKC)}" evidenceStrength`,
+    ),
+  }));
+  const diagnosticMisconceptionEvaluations = evidenceObjects(
+    value.diagnosticMisconceptionEvaluations,
+    'SPARC dialogue scoring diagnosticMisconceptionEvaluations',
+  ).map((entry) => ({
+    id: exactEvidenceId(entry.id, 'SPARC dialogue scoring diagnostic misconception id'),
+    evidenceDirection: evidenceDirection(
+      entry.evidenceDirection,
+      `SPARC dialogue scoring diagnostic misconception "${String(entry.id)}" evidenceDirection`,
+    ),
+    evidenceStrength: evidenceStrength(
+      entry.evidenceStrength,
+      `SPARC dialogue scoring diagnostic misconception "${String(entry.id)}" evidenceStrength`,
+    ),
+  }));
   const contribution = isRecord(value.learnerContribution) ? value.learnerContribution : {};
   const contributionType = nonBlankString(contribution.type);
   if (!['answer', 'question', 'off-task', 'other'].includes(contributionType)) {
@@ -286,32 +273,9 @@ function parseScoreEnvelope(value: unknown, context: {
   const learnerQuestion = isRecord(value.learnerQuestion) && typeof value.learnerQuestion.contentFocused === 'boolean'
     ? { contentFocused: value.learnerQuestion.contentFocused }
     : undefined;
-  if (contributionType === 'question' && !learnerQuestion) {
-    throw new Error('SPARC dialogue scoring learnerQuestion is required when learnerContribution.type is question');
-  }
-  assertUniqueKnownScoreIds({
-    values: suppliedLearningTargetScores.map((score) => score.clusterKC),
-    allowedValues: context.learningTargetIds,
-    label: 'learning target id',
-  });
-  assertUniqueKnownScoreIds({
-    values: suppliedDiagnosticMisconceptionScores.map((score) => score.id),
-    allowedValues: context.misconceptionIds,
-    label: 'misconception id',
-  });
-  const learningTargetScores = suppliedLearningTargetScores
-    .filter((score) => score.coverage > (context.priorCoverageById.get(score.clusterKC) ?? 0));
-  const diagnosticMisconceptionScores = suppliedDiagnosticMisconceptionScores
-    .filter((score) => context.priorSupportStrengthById.get(score.id) !== score.supportStrength);
-  if (
-    contributionType === 'off-task'
-    && (learningTargetScores.length > 0 || diagnosticMisconceptionScores.length > 0)
-  ) {
-    throw new Error('SPARC dialogue scoring off-task contribution cannot update instructional targets');
-  }
   return {
-    learningTargetScores,
-    ...(diagnosticMisconceptionScores.length > 0 ? { diagnosticMisconceptionScores } : {}),
+    learningTargetEvaluations,
+    diagnosticMisconceptionEvaluations,
     learnerContribution: {
       type: contributionType as 'answer' | 'question' | 'off-task' | 'other',
       ...(contribution.confidence !== undefined ? { confidence: unitScore(contribution.confidence, 'SPARC dialogue learner contribution confidence') } : {}),
@@ -364,7 +328,9 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
     'Do not expose internal ids, rule ids, rubric labels, scoring fields, or planner metadata in tutorMessage.',
     'Use only the authored lesson content and dialogue context supplied in the user message.',
     'Follow the selected runtime move policy.',
-    'The conversational receipt must acknowledge only the latest student answer. Ground its first clause in a phrase or construction from Latest student answer, or use a generic receipt when none is suitable. Use earlier dialogue only as context; never mention content found only in an earlier response as though it were the latest contribution.',
+    'Receipt boundary for every move: A conversational receipt confirms that the latest student answer was received; it does not agree with the answer or adopt the learner\'s claim as the tutor\'s own position. If you refer to learner content, explicitly attribute it to the learner, for example, "You said ..." or "I hear that you think ..."; otherwise use a neutral generic receipt such as "Okay" or "I hear you."',
+    'Misconception boundary for every move: If the latest answer states or relies on a misconception, do not praise, endorse, validate, or describe that claim as correct, useful progress, close, or a good start. Acknowledge it neutrally, or give accurate corrective feedback when the selected move calls for feedback.',
+    'Use earlier dialogue only as context; never mention content found only in an earlier response as though it were the latest contribution.',
     ...(responseModifierPrompt.length > 0 ? [
       'Apply the response modifiers within the selected move. Use the selected move\'s conversational receipt once at the beginning, then apply each modifier, then complete the remainder of the selected move. Produce one coherent tutorMessage with one instructional question.',
       ...responseModifierPrompt,
@@ -452,41 +418,54 @@ export function createSparcDialogueOpenRouterProvider(
   readonly generateTutorUtterance: SparcUtteranceGenerator;
 } {
   const callResolvedOpenRouterJson = options.callResolvedOpenRouterJson ?? defaultCallResolvedOpenRouterJson;
-  return {
-    async scoreLearnerResponse({ display, learnerText, problemStatement, document, replayState }) {
-      const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
-      const learningTargets = targetSummaries(display, runtimeFacts);
-      const misconceptions = misconceptionSummaries(display, runtimeFacts);
-      const result = await callResolvedOpenRouterJson({
+  const scoreLearnerResponseWithEvidence = async ({
+    display,
+    learnerText,
+    problemStatement,
+    document,
+    replayState,
+  }: Parameters<SparcTrialDisplayDialogueTurnScorer>[0]): Promise<SparcDialogueLearnerResponseEvaluation> => {
+    const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
+    const learningTargets = targetSummaries(display);
+    const misconceptions = misconceptionSummaries(display);
+    const result = await callResolvedOpenRouterJson({
         tdfId: options.tdfId ?? null,
         temperature: 0,
         maxTokens: 1200,
         messages: [{
           role: 'system',
           content: [
-            'You update a cumulative learner model from the latest learner response.',
+            'You evaluate the instructional meaning expressed in the latest learner response.',
             'Return only JSON matching the schema. Compare meanings, not keyword overlap.',
             '',
             'Apply these steps in order:',
             '1. Classify the latest contribution. Use "answer" for an ordinary answer or explanation. Use "off-task" only when the response is unrelated to both the problem and the immediately preceding tutor message. A response that addresses the problem or answers the tutor cannot be off-task. Use "other" only when no other type fits.',
             '2. Use "question" when the learner’s primary conversational action genuinely requests information or confirmation. Use "answer" when the learner primarily offers an interpretation or attempted answer, even if it is hesitant or phrased with question-like intonation. A confirmation-shaped contribution such as "Are you saying Y?" or "Do we compute Y?" may be either a question or an answer; classify its function in context and score its instructional meaning the same either way. Include learnerQuestion with contentFocused true for a substantive content question; use contentFocused false only for an off-topic, rude, lewd, illicit, or otherwise inappropriate question.',
-            '3. Update learning-target coverage cumulatively. Treat priorCoverage as the highest coverage already demonstrated; never reduce it because of later shorthand, omission, or context-dependent restatement.',
-            '4. For misconceptions, decide whether the latest response directly supports, is neutral toward, or repairs a misconception. Score only misconceptions whose propositions the learner explicitly states or uses. Do not treat every authored misconception as a required candidate, and do not infer support from topical similarity, shared vocabulary, or what the learner might privately believe. Omission and neutral content leave support strength unchanged. Explicitly rejecting, correcting, contrasting, or replacing the misconception with the correct opposite must lower support strength, using 0 when the repair is unambiguous.',
-            'Do not speculate about what the learner is thinking. This is an evidentiary evaluation of what the learner expressed.',
-            '5. Return only values changed by the latest response. Omit unchanged learning targets and misconceptions. Return an empty array when none changed. Copy every clusterKC and id exactly.',
+            '3. Return exactly one learningTargetEvaluations entry for every supplied learning target and exactly one diagnosticMisconceptionEvaluations entry for every supplied misconception. Evaluate every proposition independently and copy every clusterKC and id exactly.',
+            '4. Score only meaning expressed in the latest learner response. Dialogue history may resolve references, ellipsis, confirmation-shaped contributions, and the object under discussion, but earlier learner or tutor statements are not new evidence by themselves.',
+            '5. Requiring an entry for every misconception does not make every misconception a candidate for support. Use unaddressed with evidenceStrength 0 whenever the latest response takes no current stance on that proposition.',
             '',
-            'Learning-target coverage is continuous from 0 to 1. Use these figurative anchors to locate the best value between them:',
-            '0 means the response demonstrates none of the target proposition or explicitly contradicts it; 0.25 means the response identifies a relevant element but does not express the target relationship; 0.5 means it expresses the central relationship while an important element remains missing, ambiguous, or incorrect; 0.75 means the relationship and most essential elements are correct while a meaningful omission or ambiguity remains; 1 means the complete target proposition is expressed correctly with no essential element missing.',
-            'Score each learning target independently. A concise but correct semantic paraphrase of a target deserves at least 0.8 even when the learner does not restate other already established ideas.',
-            'When the learner explicitly describes the defining operation named by a target, such as repeated multiplication for a multiplicative-growth target, score that target at least 0.8.',
-            'One response may update multiple learning targets and misconceptions. Resolve references using the problem statement and dialogue history, but do not silently switch the object the learner is discussing.',
-            'For learning targets, compare the learner’s meaning with learningTargets[i].text and return the updated cumulative value in coverage.',
-            'Misconception support strength is continuous from 0 to 1. Use these figurative anchors to locate the best value between them. If the latest response does not address a misconception, omit it and preserve its prior support strength.',
-            '0 means the learner explicitly rejects, corrects, or replaces the misconception; 0.25 means the learner explicitly states an element associated with the misconception but does not state or rely on its central incorrect relationship; 0.5 means the learner explicitly states the central incorrect relationship but hedges, qualifies, or otherwise makes their commitment unclear; 0.75 means the learner clearly states or relies on the complete misconception once; 1 means the learner clearly states or relies on the complete misconception and repeats, defends, or continues using it after challenge or correction.',
-            'When the learner explicitly states a rule that matches a misconception, treat it as direct endorsement even when they state it hesitantly or to defend, explain, or preserve consistency with an earlier answer. A surrounding comment about what would otherwise make sense does not negate the explicitly stated rule.',
-            'A bare number or calculation supports a misconception only when the calculation itself unambiguously instantiates that misconception.',
-            'Judge the learner’s stance toward the misconception, not whether its words appear. Mentioning an incorrect idea while negating or contrasting it is evidence against that misconception. Example: "Unlike X, the correct rule is Y" rejects X and should set an unambiguously repaired X to support strength 0.',
-            'Never return target updates for an off-task contribution.',
+            'Set evidenceDirection independently for each proposition:',
+            '- supports: the learner presents some of the proposition’s defining meaning as part of the learner’s current account, including a tentative current account.',
+            '- contradicts: the learner explicitly rejects, corrects, contrasts, or replaces the proposition with its correct opposite.',
+            '- unaddressed: the learner takes no current stance on the proposition.',
+            'Quoting, recalling, or asking about a proposition without adopting or rejecting it does not by itself support or contradict it. When the learner self-corrects, use the resolved final/current stance. If no current stance is resolved, use unaddressed rather than speculating about belief.',
+            'For a proposition whose defining meaning is a relation, comparison, contrast, or direction, naming only one side or participant is not support. Use supports only when the learner represents the stated relation with the stated roles and direction; use contradicts when the learner represents the opposite relation or reverses the roles; otherwise use unaddressed.',
+            '',
+            'Use one continuous semantic-coverage rubric for evidenceStrength for both learning targets and misconceptions.',
+            'evidenceStrength measures how much of the proposition’s defining meaning the learner explicitly represents in the selected evidenceDirection.',
+            '0 means the response represents none of the proposition in that direction; 0.25 means it represents a significant portion; 0.5 means it represents more than half; 0.75 means it represents most; 1 means it represents the entire defining meaning.',
+            'These values are anchors on a continuous scale, not discrete categories. Select any value from 0 to 1 according to the proportion represented in the selected direction.',
+            'supports and contradicts require evidenceStrength greater than 0. unaddressed requires evidenceStrength 0.',
+            'For supports, larger strength means more of the proposition is endorsed. For contradicts, larger strength means more of the proposition is explicitly rejected or replaced.',
+            'evidenceDirection determines whether the evidence supports or contradicts the proposition. evidenceStrength does not measure confidence, correctness, prior state, or state change.',
+            '',
+            'Resolve references using the problem statement and dialogue history, but do not silently switch the object the learner is discussing.',
+            'For misconceptions, count only defining meaning the learner presents as part of the current account. Do not infer support from topical similarity, shared vocabulary, shared numbers, or what the learner might privately believe.',
+            'Do not speculate about what the learner is thinking. This is an evidentiary evaluation of what the learner expressed.',
+            'A bare number or calculation supports a misconception only when it unambiguously instantiates that misconception in context. A bare number or calculation contradicts a misconception when it unambiguously instantiates the correct alternative in context; otherwise it leaves that misconception unaddressed.',
+            'Judge the learner’s stance toward a misconception, not whether its words appear. Mentioning an incorrect idea while negating or contrasting it is contradiction, not support. Example: "Unlike X, the correct rule is Y" contradicts X; use a larger evidenceStrength when more of X is explicitly rejected or replaced.',
+            'For an off-task contribution, return every proposition as unaddressed with evidenceStrength 0.',
           ].join('\n'),
         }, {
           role: 'user',
@@ -510,19 +489,33 @@ export function createSparcDialogueOpenRouterProvider(
           componentId: 'mofacts.sparc-session-unit',
           unitType: 'sparcsession',
         },
-      });
-      return parseScoreEnvelope(result.parsedContent, {
-        learningTargetIds: new Set(learningTargets.map((target) => String(target.clusterKC))),
-        misconceptionIds: new Set(misconceptions.map((misconception) => String(misconception.id))),
-        priorCoverageById: new Map(learningTargets.map((target) => [
-          String(target.clusterKC),
-          Number(target.priorCoverage),
-        ])),
-        priorSupportStrengthById: new Map(misconceptions.map((misconception) => [
-          String(misconception.id),
-          Number(misconception.priorSupportStrength),
-        ])),
-      });
+    });
+    options.onLearnerResponseScoringTrace?.({
+      stage: 'provider-response',
+      parsedContent: result.parsedContent,
+    });
+    const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent);
+    options.onLearnerResponseScoringTrace?.({
+      stage: 'evidence-parsed',
+      evidenceEnvelope,
+    });
+    const evaluation = {
+      evidenceEnvelope,
+      learnerResponseScore: reduceSparcLearnerResponseEvidence({
+        facts: runtimeFacts,
+        evidence: evidenceEnvelope,
+      }),
+    };
+    options.onLearnerResponseScoringTrace?.({
+      stage: 'evaluation-completed',
+      evaluation,
+    });
+    return evaluation;
+  };
+  return {
+    async scoreLearnerResponse(params) {
+      const evaluation = await scoreLearnerResponseWithEvidence(params);
+      return evaluation.learnerResponseScore;
     },
 
     async generateTutorUtterance(request) {

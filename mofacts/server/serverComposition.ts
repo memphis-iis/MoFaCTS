@@ -53,6 +53,10 @@ import { createBackupMethods, createBackupRegistry } from './methods/backupMetho
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
 import { createExperimentMethods } from './methods/experimentMethods';
 import { createPackageMethods } from './methods/packageMethods';
+import {
+  createOpenRouterCatalogMethods,
+  createOpenRouterModelCatalogService,
+} from './methods/openRouterCatalogMethods';
 import { createOpenRouterMethods } from './methods/openRouterMethods';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
@@ -522,6 +526,10 @@ const speechMethods = createSpeechMethods({
   getApiKeyResolutionErrorMessage,
 });
 
+const openRouterModelCatalogService = createOpenRouterModelCatalogService({
+  serverConsole,
+});
+
 const experimentMethods = createExperimentMethods({
   serverConsole,
   Tdfs,
@@ -661,6 +669,7 @@ export const methods: any = {
     clearStimDisplayTypeMap,
     encryptData,
     decryptData,
+    openRouterModelCatalogService,
   }),
   ...createAuthMethods({
     serverConsole,
@@ -743,6 +752,7 @@ export const methods: any = {
     usersCollection: MeteorAny.users,
     encryptData,
     decryptData,
+    openRouterModelCatalogService,
   }),
 }
 
@@ -1055,6 +1065,8 @@ export const asyncMethods: Record<string, unknown> = {
     getApiKeyResolutionDeps,
     getMethodAuthorizationDeps,
   }),
+
+  ...createOpenRouterCatalogMethods(openRouterModelCatalogService),
 
   ...publicDashboardCacheMethods,
 
