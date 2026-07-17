@@ -1064,6 +1064,7 @@ export const asyncMethods: Record<string, unknown> = {
     serverConsole,
     getApiKeyResolutionDeps,
     getMethodAuthorizationDeps,
+    openRouterModelCatalogService,
   }),
 
   ...createOpenRouterCatalogMethods(openRouterModelCatalogService),

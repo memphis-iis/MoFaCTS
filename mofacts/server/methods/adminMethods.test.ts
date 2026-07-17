@@ -159,6 +159,21 @@ describe('adminMethods', function() {
     expect((deps as any).getDynamicSettingsDoc().value.openRouter.reasoningLevel).to.equal('none');
   });
 
+  it('returns the persisted admin OpenRouter reasoning level after settings are reloaded', async function() {
+    const deps = createAdminDeps();
+    const methods = createAdminMethods(deps);
+
+    await methods.saveAdminApiKeyAlternative.call(
+      { userId: 'admin-user' },
+      'openrouter',
+      { model: 'openai/test-model', reasoningLevel: 'high' },
+    );
+    const reloaded = await methods.getAdminApiKeyAlternativeMetadata.call({ userId: 'admin-user' });
+
+    expect((deps as any).getDynamicSettingsDoc().value.openRouter.reasoningLevel).to.equal('high');
+    expect(reloaded.openRouter.reasoningLevel).to.equal('high');
+  });
+
   it('rejects unsupported admin OpenRouter reasoning levels without writing settings', async function() {
     const deps = createAdminDeps();
     const methods = createAdminMethods(deps);

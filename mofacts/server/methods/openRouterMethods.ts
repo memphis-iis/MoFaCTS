@@ -11,8 +11,10 @@ import {
 } from '../../common/lib/openRouterClient';
 import {
   expandOpenRouterCompletionBudget,
+  validateOpenRouterReasoningLevelForModel,
   type OpenRouterReasoningLevel,
 } from '../../common/lib/openRouterModelCatalog';
+import type { OpenRouterModelCatalogService } from './openRouterCatalogMethods';
 import {
   type ApiKeySource,
   getAdminOpenRouterModel,
@@ -39,6 +41,7 @@ type MethodContext = {
 type OpenRouterMethodsDeps = {
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
+  openRouterModelCatalogService: OpenRouterModelCatalogService;
   serverConsole: (...args: unknown[]) => void;
 };
 
@@ -138,6 +141,36 @@ async function resolveOpenRouterConfiguration(deps: ApiKeyResolutionDeps, params
   return { model: '', reasoningLevel: 'none' };
 }
 
+async function validateResolvedOpenRouterConfiguration(
+  deps: OpenRouterMethodsDeps,
+  configuration: { model: string; reasoningLevel: OpenRouterReasoningLevel },
+): Promise<{ model: string; reasoningLevel: OpenRouterReasoningLevel }> {
+  if (!configuration.model) return configuration;
+  const catalog = await deps.openRouterModelCatalogService.getCatalog();
+  const catalogModel = catalog.find((entry) => entry.id === configuration.model);
+  if (!catalogModel) {
+    throw new Meteor.Error(
+      'openrouter-model-unavailable',
+      `Configured OpenRouter model ${JSON.stringify(configuration.model)} is not available in the current model catalog`,
+    );
+  }
+  try {
+    return {
+      model: configuration.model,
+      reasoningLevel: validateOpenRouterReasoningLevelForModel(
+        configuration.reasoningLevel,
+        catalogModel,
+        'Configured OpenRouter reasoning level',
+      ),
+    };
+  } catch (error) {
+    throw new Meteor.Error(
+      'invalid-openrouter-reasoning-level',
+      error instanceof Error ? error.message : 'Configured OpenRouter reasoning level is invalid',
+    );
+  }
+}
+
 function sanitizeProviderText(value: unknown): string {
   return redactOpenRouterSecretText(String(value || '').trim());
 }
@@ -201,11 +234,11 @@ async function resolveOpenRouterCapability(
     tdfId,
     kind: 'openrouter',
   });
-  const configuration = await resolveOpenRouterConfiguration(resolverDeps, {
+  const configuration = await validateResolvedOpenRouterConfiguration(deps, await resolveOpenRouterConfiguration(resolverDeps, {
     userId,
     tdfId,
     keySource: keyResolution.source,
-  });
+  }));
   return {
     configured: Boolean(keyResolution.apiKey && configuration.model),
     source: keyResolution.source,
@@ -234,11 +267,11 @@ async function executeResolvedOpenRouterJson(
   if (!keyResolution.apiKey) {
     throw new Meteor.Error('no-api-key', 'No configured OpenRouter API key alternative is available');
   }
-  const configuration = await resolveOpenRouterConfiguration(resolverDeps, {
+  const configuration = await validateResolvedOpenRouterConfiguration(deps, await resolveOpenRouterConfiguration(resolverDeps, {
     userId,
     tdfId,
     keySource: keyResolution.source,
-  });
+  }));
   const { model, reasoningLevel } = configuration;
   if (!model) {
     throw new Meteor.Error('no-openrouter-model', 'No configured OpenRouter model is available');

@@ -43,7 +43,7 @@
                                 {{#if showAdminOpenRouterReasoningLevel}}
                                 <div>
                                     <label for="adminOpenRouterReasoningLevel" class="form-label">{{userAdminText 'profile.openRouterReasoningLevel'}}</label>
-                                    <select id="adminOpenRouterReasoningLevel" class="form-control" aria-describedby="adminOpenRouterReasoningLevelHelp" {{adminOpenRouterReasoningSelectAttrs}}>
+                                    <select id="adminOpenRouterReasoningLevel" class="form-control" value="{{adminOpenRouterReasoningLevel}}" aria-describedby="adminOpenRouterReasoningLevelHelp" {{adminOpenRouterReasoningSelectAttrs}}>
                                         {{#each adminOpenRouterReasoningLevelOptions}}
                                         <option value="{{value}}" {{selectedAttrs}}>{{label}}</option>
                                         {{/each}}

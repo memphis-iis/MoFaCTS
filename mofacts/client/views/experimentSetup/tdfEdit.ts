@@ -419,20 +419,6 @@ function configureOpenRouterEditorSchema(
     };
 }
 
-function prepareOpenRouterEditorValue(
-    tutorData: any,
-    catalog: OpenRouterModelCatalogEntry[] | null,
-): void {
-    const setspec = tutorData?.setspec;
-    const modelId = typeof setspec?.openRouterModel === 'string'
-        ? setspec.openRouterModel.trim()
-        : '';
-    if (!setspec || !modelId || !catalog) return;
-    const model = catalog.find((entry) => entry.id === modelId);
-    if (!model || !model.reasoning?.mandatory || setspec.openRouterReasoningLevel !== undefined) return;
-    setspec.openRouterReasoningLevel = getDefaultOpenRouterReasoningLevel(model);
-}
-
 function reasoningLevelText(level: OpenRouterReasoningLevel): string {
     return tdfEditorText(`profile.reasoningLevel.${level}` as PlatformStringKey);
 }
@@ -457,8 +443,27 @@ function syncOpenRouterEditorControls(instance: any): void {
     if (!reasoningEditor) return;
 
     const input = reasoningEditor.input as HTMLSelectElement | undefined;
+    if (!modelId) {
+        if (reasoningEditor.getValue() !== 'none') {
+            reasoningEditor.setValue('none');
+        }
+        if (input?.options) {
+            const editorValues = Array.isArray(reasoningEditor.enum_values)
+                ? reasoningEditor.enum_values
+                : OPENROUTER_REASONING_LEVELS;
+            Array.from(input.options).forEach((option, index) => {
+                const level = editorValues[index] as OpenRouterReasoningLevel | undefined;
+                if (!level) return;
+                option.hidden = level !== 'none';
+                option.disabled = level !== 'none';
+                option.textContent = reasoningLevelText(level);
+            });
+            input.disabled = true;
+        }
+        return;
+    }
     if (!model) {
-        if (input) input.disabled = Boolean(modelId);
+        if (input) input.disabled = true;
         return;
     }
 
@@ -484,7 +489,9 @@ function syncOpenRouterEditorControls(instance: any): void {
         Array.from(input.options).forEach((option, index) => {
             const level = editorValues[index] as OpenRouterReasoningLevel | undefined;
             if (!level) return;
-            option.disabled = !allowed.includes(level);
+            const isAllowed = allowed.includes(level);
+            option.hidden = !isAllowed;
+            option.disabled = !isAllowed;
             option.textContent = reasoningLevelText(level);
         });
         input.disabled = false;
@@ -941,8 +948,6 @@ async function initEditor(instance: any, tdf: any) {
             tutorData.setspec[field] = ''; // Clear for display - user can re-enter
         }
     });
-    prepareOpenRouterEditorValue(tutorData, instance.openRouterModelCatalog);
-
     // Remove empty properties so json-editor only shows populated fields
     // Users can add new fields via the Properties button
     tutorData = removeEmptyProperties(tutorData);
@@ -1030,8 +1035,6 @@ async function initEditor(instance: any, tdf: any) {
             }
         });
 
-        syncOpenRouterEditorControls(instance);
-
         // Use editor's normalized value as the baseline for change detection
         // This prevents false "unsaved changes" due to json-editor normalizing data
         instance.originalTdf.tutor = instance.editor.getValue();
@@ -1066,6 +1069,12 @@ async function initEditor(instance: any, tdf: any) {
 
         // Done initializing - now track real changes
         isInitializing = false;
+        // Apply catalog requirements only after capturing the persisted baseline.
+        // A mandatory reasoning default is therefore a real unsaved change that
+        // the user must save, rather than a value that merely looks persisted.
+        syncOpenRouterEditorControls(instance);
+        updateChangeState(instance, instance.editor.getValue());
+        instance.validator.validate();
         resolve();
       } catch (error: unknown) {
         reject(error);

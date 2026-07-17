@@ -222,16 +222,20 @@ function clearSyncedRoleStateOverrides(instance: any): void {
   }
 }
 
+function applyAdminOpenRouterMetadata(instance: any, metadata: any): void {
+  instance.apiKeyMetadata.set(metadata);
+  instance.openRouterSelectedModel.set(String(metadata?.openRouter?.model || '').trim());
+  instance.openRouterSelectedReasoningLevel.set(normalizeOpenRouterReasoningLevel(
+    metadata?.openRouter?.reasoningLevel,
+    'Stored admin OpenRouter reasoning level',
+  ));
+  syncAdminReasoningSelectionForModel(instance);
+}
+
 async function refreshAdminApiKeyMetadata(instance: any): Promise<void> {
   try {
     const metadata = await MeteorCompat.callAsync('getAdminApiKeyAlternativeMetadata');
-    instance.apiKeyMetadata.set(metadata);
-    instance.openRouterSelectedModel.set(String(metadata?.openRouter?.model || '').trim());
-    instance.openRouterSelectedReasoningLevel.set(normalizeOpenRouterReasoningLevel(
-      metadata?.openRouter?.reasoningLevel,
-      'Stored admin OpenRouter reasoning level',
-    ));
-    syncAdminReasoningSelectionForModel(instance);
+    applyAdminOpenRouterMetadata(instance, metadata);
     instance.apiKeyMetadataLoaded.set(true);
   } catch (error: unknown) {
     instance.apiKeyMetadataLoaded.set(false);
@@ -275,6 +279,31 @@ async function loadAdminOpenRouterModelCatalog(instance: any): Promise<void> {
   } catch (error: unknown) {
     instance.openRouterModelCatalogState.set('error');
     instance.openRouterModelCatalogError.set(getErrorMessage(error));
+  }
+}
+
+async function saveAdminOpenRouterSelection(
+  instance: any,
+  apiKeyInput?: HTMLInputElement | null,
+): Promise<void> {
+  instance.apiKeyBusy.set(true);
+  instance.apiKeyMessageType.set('info');
+  instance.apiKeyMessage.set(userAdminText('admin.savingOpenRouterAlternative'));
+  try {
+    const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', 'openrouter', {
+      apiKey: apiKeyInput?.value || '',
+      model: String(instance.openRouterSelectedModel.get() || ''),
+      reasoningLevel: instance.openRouterSelectedReasoningLevel.get(),
+    });
+    applyAdminOpenRouterMetadata(instance, result);
+    if (apiKeyInput) apiKeyInput.value = '';
+    instance.apiKeyMessageType.set('success');
+    instance.apiKeyMessage.set(userAdminText('admin.savedOpenRouterAlternative'));
+  } catch (error: unknown) {
+    instance.apiKeyMessageType.set('danger');
+    instance.apiKeyMessage.set(userAdminText('admin.saveOpenRouterAlternativeFailed', { error: getErrorMessage(error) }));
+  } finally {
+    instance.apiKeyBusy.set(false);
   }
 }
 
@@ -625,6 +654,13 @@ Template.userAdmin.helpers({
     return String((Template.instance() as any).openRouterSelectedModel.get() || '');
   },
 
+  adminOpenRouterReasoningLevel: function() {
+    return normalizeOpenRouterReasoningLevel(
+      (Template.instance() as any).openRouterSelectedReasoningLevel.get(),
+      'Admin OpenRouter reasoning level',
+    );
+  },
+
   adminOpenRouterModelOptions: function() {
     const instance = Template.instance() as any;
     const selectedModel = String(instance.openRouterSelectedModel.get() || '');
@@ -652,7 +688,8 @@ Template.userAdmin.helpers({
   },
 
   adminOpenRouterModelSelectAttrs: function() {
-    return (Template.instance() as any).openRouterModelCatalogState.get() === 'ready'
+    const instance = Template.instance() as any;
+    return instance.openRouterModelCatalogState.get() === 'ready' && !instance.apiKeyBusy.get()
       ? {}
       : { disabled: true };
   },
@@ -711,7 +748,9 @@ Template.userAdmin.helpers({
 
   adminOpenRouterReasoningSelectAttrs: function() {
     const instance = Template.instance() as any;
-    return instance.openRouterModelCatalogState.get() === 'ready' && Boolean(findAdminCatalogModel(instance))
+    return instance.openRouterModelCatalogState.get() === 'ready'
+      && Boolean(findAdminCatalogModel(instance))
+      && !instance.apiKeyBusy.get()
       ? {}
       : { disabled: true };
   },
@@ -1031,38 +1070,22 @@ Template.userAdmin.events({
 
   'click #saveAdminOpenRouterAlternative': async function(event: any, instance: any) {
     event.preventDefault();
-    instance.apiKeyBusy.set(true);
-    instance.apiKeyMessageType.set('info');
-    instance.apiKeyMessage.set(userAdminText('admin.savingOpenRouterAlternative'));
-    try {
-      const apiKeyInput = document.getElementById('adminOpenRouterKey') as HTMLInputElement | null;
-      const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', 'openrouter', {
-        apiKey: apiKeyInput?.value || '',
-        model: String(instance.openRouterSelectedModel.get() || ''),
-        reasoningLevel: instance.openRouterSelectedReasoningLevel.get(),
-      });
-      instance.apiKeyMetadata.set(result);
-      if (apiKeyInput) apiKeyInput.value = '';
-      instance.apiKeyMessageType.set('success');
-      instance.apiKeyMessage.set(userAdminText('admin.savedOpenRouterAlternative'));
-    } catch (error: unknown) {
-      instance.apiKeyMessageType.set('danger');
-      instance.apiKeyMessage.set(userAdminText('admin.saveOpenRouterAlternativeFailed', { error: getErrorMessage(error) }));
-    } finally {
-      instance.apiKeyBusy.set(false);
-    }
+    const apiKeyInput = document.getElementById('adminOpenRouterKey') as HTMLInputElement | null;
+    await saveAdminOpenRouterSelection(instance, apiKeyInput);
   },
 
-  'change #adminOpenRouterModel': function(event: any, instance: any) {
+  'change #adminOpenRouterModel': async function(event: any, instance: any) {
     instance.openRouterSelectedModel.set(String((event.currentTarget as HTMLSelectElement).value || ''));
     syncAdminReasoningSelectionForModel(instance);
+    await saveAdminOpenRouterSelection(instance);
   },
 
-  'change #adminOpenRouterReasoningLevel': function(event: any, instance: any) {
+  'change #adminOpenRouterReasoningLevel': async function(event: any, instance: any) {
     instance.openRouterSelectedReasoningLevel.set(normalizeOpenRouterReasoningLevel(
       (event.currentTarget as HTMLSelectElement).value,
       'Admin OpenRouter reasoning level',
     ));
+    await saveAdminOpenRouterSelection(instance);
   },
 
   'click .btn-admin-api-key-save': async function(event: any, instance: any) {
