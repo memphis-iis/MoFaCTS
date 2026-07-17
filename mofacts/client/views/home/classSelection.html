@@ -13,10 +13,6 @@
           <p class="class-selection-current">{{t 'classSelection.noCourseSelected'}}</p>
         {{/if}}
 
-        {{#if classSelectionMessage}}
-          {{> adminStatus variant=classSelectionMessage.variant text=classSelectionMessage.text}}
-        {{/if}}
-
         {{#if classSelectionError}}
           {{> adminStatus variant="error" text=classSelectionError urgent=true}}
           <button type="button" class="btn btn-outline-danger class-selection-retry">{{t 'common.tryAgain'}}</button>
@@ -54,6 +50,11 @@
           <div class="class-selection-actions">
             <button type="button" id="backToHomeButton" class="btn btn-outline-secondary">{{t 'classSelection.backToPracticeMenu'}}</button>
           </div>
+          {{#if classSelectionMessage}}
+            <div class="admin-inline-feedback class-selection-command-feedback">
+              {{> adminStatus variant=classSelectionMessage.variant text=classSelectionMessage.text urgent=(equals classSelectionMessage.variant "error")}}
+            </div>
+          {{/if}}
         {{/if}}
       </div>
     </div>

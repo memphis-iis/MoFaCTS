@@ -146,6 +146,11 @@
             {{/if}}
           </button>
         {{/each}}
+        {{#if localeFeedback}}
+          <div class="admin-inline-feedback account-menu-feedback">
+            {{> adminStatus variant="error" text=localeFeedback urgent=true}}
+          </div>
+        {{/if}}
       </div>
       <button type="button" class="dropdown-item" data-home-action="audioSettings">{{t 'home.audioSettings'}}</button>
       <button type="button" class="dropdown-item dropdown-item-with-caret" data-home-action="toggleTheme" aria-expanded="{{#if themeMenuOpen}}true{{else}}false{{/if}}" aria-controls="themeSelectionMenu">
@@ -172,6 +177,11 @@
               <div class="theme-selection-empty">{{t 'home.noThemesConfigured'}}</div>
             {{/if}}
           {{/if}}
+        {{/if}}
+        {{#if themeFeedback}}
+          <div class="admin-inline-feedback account-menu-feedback">
+            {{> adminStatus variant="error" text=themeFeedback urgent=true}}
+          </div>
         {{/if}}
       </div>
       <div class="dropdown-divider"></div>

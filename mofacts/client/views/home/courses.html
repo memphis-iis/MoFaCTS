@@ -206,6 +206,13 @@
       <span class="learning-dashboard-cell__value">-</span>
     </td>
   </tr>
+  {{#if joinFeedback}}
+  <tr class="admin-feedback-row course-command-feedback-row">
+    <td colspan="11"><div class="admin-table-feedback">
+      {{#with joinFeedback}}{{> adminStatus id=id variant=variant text=text urgent=urgent}}{{/with}}
+    </div></td>
+  </tr>
+  {{/if}}
 </template>
 
 <template name="courseAssignmentTableRow">
@@ -268,6 +275,13 @@
       <span class="learning-dashboard-cell__value">{{lastPracticeValue}}</span>
     </td>
   </tr>
+  {{#if launchFeedback}}
+  <tr class="admin-feedback-row course-command-feedback-row">
+    <td colspan="11"><div class="admin-table-feedback">
+      {{#with launchFeedback}}{{> adminStatus id=id variant=variant text=text urgent=urgent}}{{/with}}
+    </div></td>
+  </tr>
+  {{/if}}
 </template>
 
 <template name="courseAssignmentCards">
@@ -309,6 +323,11 @@
             {{joinLabel}}
           </button>
         {{/if}}
+      </div>
+    {{/if}}
+    {{#if joinFeedback}}
+      <div class="admin-inline-feedback course-command-feedback">
+        {{#with joinFeedback}}{{> adminStatus id=id variant=variant text=text urgent=urgent}}{{/with}}
       </div>
     {{/if}}
     {{#if expanded}}
@@ -373,5 +392,10 @@
         {{actionLabel}}
       </button>
     </div>
+    {{#if launchFeedback}}
+      <div class="admin-inline-feedback course-command-feedback">
+        {{#with launchFeedback}}{{> adminStatus id=id variant=variant text=text urgent=urgent}}{{/with}}
+      </div>
+    {{/if}}
   </div>
 </template>

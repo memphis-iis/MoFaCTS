@@ -1,6 +1,7 @@
 import {ReactiveVar} from 'meteor/reactive-var';
 import './learningDashboard.html';
 import './learningDashboard.css';
+import '../shared/adminUi/adminUi';
 import {getExperimentState} from '../experiment/svelte/services/experimentState';
 import {meteorCallAsync, clientConsole} from '../..';
 import {sessionCleanUp} from '../../lib/sessionUtils';
@@ -62,6 +63,7 @@ type LearnerConfigState = {
   dirty: boolean;
   resetConfirming: boolean;
   resettingProgress: boolean;
+  resultMessage: string | null;
 };
 
 const EMPTY_CONFIG_STATE: LearnerConfigState = {
@@ -78,6 +80,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   dirty: false,
   resetConfirming: false,
   resettingProgress: false,
+  resultMessage: null,
 };
 
 const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 1;
@@ -86,6 +89,40 @@ const PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY = 'practiceTableStatisticsExpande
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
 const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
+const LESSON_COMMAND_FEEDBACK_SESSION_KEY = 'learningDashboardLessonCommandFeedback';
+
+type LessonCommandFeedback = Readonly<{
+  text: string;
+  variant: 'info' | 'success' | 'warning' | 'error';
+  urgent: boolean;
+}>;
+
+function lessonCommandFeedbackMap(): Record<string, LessonCommandFeedback> {
+  const value = Session.get(LESSON_COMMAND_FEEDBACK_SESSION_KEY);
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function setLessonCommandFeedback(
+  tdfId: string,
+  text: string,
+  variant: LessonCommandFeedback['variant'] = 'error',
+): void {
+  Session.set(LESSON_COMMAND_FEEDBACK_SESSION_KEY, {
+    ...lessonCommandFeedbackMap(),
+    [tdfId]: { text, variant, urgent: variant === 'error' },
+  });
+}
+
+function clearLessonCommandFeedback(tdfId: string): void {
+  const next = { ...lessonCommandFeedbackMap() };
+  delete next[tdfId];
+  Session.set(LESSON_COMMAND_FEEDBACK_SESSION_KEY, next);
+}
+
+function withLessonCommandFeedback(tdfs: any[]): any[] {
+  const feedback = lessonCommandFeedbackMap();
+  return tdfs.map((tdf) => ({ ...tdf, launchFeedback: feedback[String(tdf.TDFId)] || null }));
+}
 
 type PracticeDashboardSnapshot = {
   version: number;
@@ -423,10 +460,7 @@ function applyDashboardLearnerConfig(content: any, tdfId: string) {
   const result = applyLearnerTdfConfig(content, learnerConfig);
   if (result.warnings.length) {
     clientConsole(1, '[Dashboard Config] Learner TDF config warning:', result.warnings.join('; '));
-    Session.set('uiMessage', {
-      text: result.warnings.join(' '),
-      variant: 'warning',
-    });
+    setLessonCommandFeedback(tdfId, result.warnings.join(' '), 'warning');
   }
   return result.tdf;
 }
@@ -716,10 +750,6 @@ function applyProgressResetToDashboardList(list: any[] | false, cacheTdfIds: str
 }
 
 function displayLabelForTdf(tdf: any) {
-  if (currentUserHasRole('admin,teacher')) {
-    const fileName = tdf.fileName || 'unknown';
-    return `${tdf.displayName} (${fileName} - ${tdf.TDFId})`;
-  }
   return tdf.displayName;
 }
 
@@ -948,6 +978,7 @@ Template.learningDashboard.onCreated(function(this: any) {
   this.learnerConfigAutosaveTimer = null;
   this.learnerConfigSaveRevision = 0;
   this.learnerConfigState = new ReactiveVar(EMPTY_CONFIG_STATE);
+  Session.set(LESSON_COMMAND_FEEDBACK_SESSION_KEY, {});
 });
 
 Template.learningDashboard.helpers({
@@ -981,7 +1012,7 @@ Template.learningDashboard.helpers({
   },
 
   recentUsedTdf: () => {
-    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).used[0] || null;
+    return withLessonCommandFeedback(splitTdfsByUsage(getVisibleTdfs(Template.instance())).used)[0] || null;
   },
 
   lessonSummaryText: () => {
@@ -1003,11 +1034,11 @@ Template.learningDashboard.helpers({
   },
 
   usedTdfsList: () => {
-    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).used;
+    return withLessonCommandFeedback(splitTdfsByUsage(getVisibleTdfs(Template.instance())).used);
   },
 
   unusedTdfsList: () => {
-    return splitTdfsByUsage(getVisibleTdfs(Template.instance())).unused;
+    return withLessonCommandFeedback(splitTdfsByUsage(getVisibleTdfs(Template.instance())).unused);
   },
 
   hasUsedTdfs: () => {
@@ -1429,9 +1460,9 @@ Template.learningDashboard.events({
         resettingProgress: false,
         error: null
       });
-      Session.set('uiMessage', {
-        text: dashboardText('dashboard.progressResetComplete'),
-        variant: 'success',
+      instance.learnerConfigState.set({
+        ...(instance.learnerConfigState.get() as LearnerConfigState),
+        resultMessage: dashboardText('dashboard.progressResetComplete'),
       });
     } catch (error: any) {
       clientConsole(1, '[Dashboard Config] Failed to reset admin lesson progress:', error);
@@ -1595,10 +1626,8 @@ function handleLaunchAudioStartupFailure(error: unknown) {
   const userMessage = diagnoseAudioStartupFailure(error);
   clientConsole(1, '[LearningDashboard] Audio startup failed before lesson launch:', error);
   finishLaunchLoading('audio-startup-failed');
-  Session.set('uiMessage', {
-    text: userMessage,
-    variant: 'danger',
-  });
+  const tdfId = String(Session.get('currentTdfId') || '');
+  if (tdfId) setLessonCommandFeedback(tdfId, userMessage, 'error');
 }
 
 // Scenario 2: Warmup audio if TDF has embedded keys (before navigating to card)
@@ -1645,15 +1674,18 @@ async function checkAndWarmupAudioIfNeeded() {
 
 // Actual logic for selecting and starting a TDF
 async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
+  const tdfId = String(args[0] || '');
+  clearLessonCommandFeedback(tdfId);
   try {
     await selectTdf(...args);
   } catch (error) {
     finishLaunchLoading('practice-launch-failed');
     clientConsole(1, '[LearningDashboard] Lesson launch failed:', error);
-    Session.set('uiMessage', {
-      text: dashboardText('dashboard.lessonStartFailed'),
-      variant: 'danger',
-    });
+    setLessonCommandFeedback(
+      tdfId,
+      error instanceof Error && error.message ? error.message : dashboardText('dashboard.lessonStartFailed'),
+      'error',
+    );
   }
 }
 
@@ -1666,7 +1698,6 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   // make sure session variables are cleared from previous tests
   sessionCleanUp();
   if (isOwnerLaunch) Session.set('ownerDashboardLaunch', true);
-  Session.set('uiMessage', null);
 
   let preparedLaunch;
   try {
@@ -1683,8 +1714,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   } catch (error) {
     clientConsole(1, '[LearningDashboard] Failed to load launch-ready TDF:', currentTdfId, error);
     finishLaunchLoading('tdf-subscription-missing-content');
-    alert(dashboardText('dashboard.unableToLoadSelectedLesson'));
-    return;
+    throw new Error(dashboardText('dashboard.unableToLoadSelectedLesson'));
   }
 
   const curTdfContent = preparedLaunch.content;
@@ -1699,10 +1729,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       persistedUnitNumber: launchProgress.persistedUnitNumber,
       lastUnitCompleted: launchProgress.lastUnitCompleted,
     });
-    Session.set('uiMessage', {
-      text: dashboardText('dashboard.lessonAlreadyCompleted'),
-      variant: 'warning',
-    });
+    setLessonCommandFeedback(String(currentTdfId), dashboardText('dashboard.lessonAlreadyCompleted'), 'warning');
     finishLaunchLoading('module-completed');
     return;
   }

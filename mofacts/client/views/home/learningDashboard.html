@@ -41,6 +41,11 @@
           data-ismultitdf="{{this.isMultiTdf}}">
           {{t 'dashboard.continue'}}
         </button>
+        {{#if launchFeedback}}
+          <div class="admin-inline-feedback learning-dashboard-command-feedback">
+            {{> adminStatus variant=launchFeedback.variant text=launchFeedback.text urgent=launchFeedback.urgent}}
+          </div>
+        {{/if}}
       </section>
     {{/with}}
 
@@ -306,6 +311,13 @@
                 </td>
               {{/if}}
             </tr>
+            {{#if launchFeedback}}
+              <tr class="admin-feedback-row learning-dashboard-command-feedback-row">
+                <td colspan="{{tableColumnCount}}"><div class="admin-table-feedback">
+                  {{> adminStatus variant=launchFeedback.variant text=launchFeedback.text urgent=launchFeedback.urgent}}
+                </div></td>
+              </tr>
+            {{/if}}
             {{#with configForTableRow}}
               <tr class="learner-config-row">
                 <td colspan="{{tableColumnCount}}">
@@ -419,6 +431,12 @@
         </div>
       {{/if}}
 
+      {{#if launchFeedback}}
+        <div class="admin-inline-feedback learning-dashboard-command-feedback">
+          {{> adminStatus variant=launchFeedback.variant text=launchFeedback.text urgent=launchFeedback.urgent}}
+        </div>
+      {{/if}}
+
       {{#with configForCardRow}}
         {{> learnerTdfConfigPanel}}
       {{/with}}
@@ -462,6 +480,11 @@
         {{else}}
           {{#if this.error}}
             <div class="alert alert-warning learner-config-alert">{{this.error}}</div>
+          {{/if}}
+          {{#if this.resultMessage}}
+            <div class="admin-inline-feedback learner-config-alert">
+              {{> adminStatus variant="success" text=this.resultMessage}}
+            </div>
           {{/if}}
 
           {{#if isConfigStep "settings"}}

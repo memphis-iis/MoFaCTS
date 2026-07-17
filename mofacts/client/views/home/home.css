@@ -12,7 +12,8 @@
     display: flex;
     min-height: 100vh;
     min-height: 100dvh;
-    overflow-x: hidden;
+    /* Keep the viewport as the scroll owner so the shared header can remain sticky. */
+    overflow-x: clip;
     background: var(--app-background-color);
     color: var(--app-text-color);
     font-family: var(--app-font-family);
@@ -1069,4 +1070,8 @@ html.learning-progress-panel-viewport-open .practice-top-header {
     .user-info {
         display: none;
     }
+}
+.account-menu-feedback {
+  padding: 0.5rem;
+  white-space: normal;
 }

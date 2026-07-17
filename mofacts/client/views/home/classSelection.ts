@@ -149,7 +149,9 @@ Template.classSelection.onCreated(function(this: ClassSelectionInstance) {
   this.loadState = new ReactiveVar<LoadableState<ClassSelectionSnapshot>>({ status: 'idle' });
   this.selectedTeacherId = new ReactiveVar('');
   this.selectedSectionId = new ReactiveVar('');
-  this.message = new ReactiveVar<ClassSelectionMessage | null>(null);
+  const routeMessage = Session.get('classSelectionRouteMessage') as ClassSelectionMessage | null;
+  Session.set('classSelectionRouteMessage', null);
+  this.message = new ReactiveVar<ClassSelectionMessage | null>(routeMessage);
   this.lifetime = createTemplateLifetime();
   this.commandController = createAsyncCommandController<SaveSelectionResult>(
     (state) => this.commandState.set(state),

@@ -30,6 +30,7 @@ import {
 } from '../../lib/adminUi/disclosureController';
 import './home.html';
 import './home.css';
+import '../shared/adminUi/adminUi';
 
 declare const Template: any;
 declare const Session: any;
@@ -53,6 +54,8 @@ type AppAccountMenuInstance = Blaze.TemplateInstance & {
   localeMenuOpen: ReactiveVar<boolean>;
   themeMenuOpen: ReactiveVar<boolean>;
   themeLibraryPresentation: ReactiveVar<ThemeLibraryPresentation>;
+  localeFeedback: ReactiveVar<string>;
+  themeFeedback: ReactiveVar<string>;
   accountDisclosure: DisclosureController;
   localeDisclosure: DisclosureController;
   themeDisclosure: DisclosureController;
@@ -268,13 +271,10 @@ function restoreUserSelectedTheme(): void {
   applyThemeCSSProperties(serializeThemeSelection(selectedTheme));
 }
 
-function reportThemeToggleError(error: unknown): void {
+function reportThemeToggleError(instance: AppAccountMenuInstance, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   clientConsole(1, '[ThemeToggle] Failed to select theme:', message);
-  Session.set('uiMessage', {
-    variant: 'danger',
-    text: message,
-  });
+  instance.themeFeedback.set(message);
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -405,6 +405,12 @@ Template.appAccountMenu.helpers({
   themeLibraryError(): string {
     const state = (Template.instance() as AppAccountMenuInstance).themeLibraryPresentation.get();
     return state.status === 'error' ? state.message : '';
+  },
+  localeFeedback(): string {
+    return (Template.instance() as AppAccountMenuInstance).localeFeedback.get();
+  },
+  themeFeedback(): string {
+    return (Template.instance() as AppAccountMenuInstance).themeFeedback.get();
   },
 
   themeSelectionName(theme: ThemeLibraryEntry): string {
@@ -620,9 +626,10 @@ Template.appAccountMenu.events({
         throw new Error(`Theme "${themeId || ''}" is not configured for selection.`);
       }
       applyUserSelectedTheme(selectedTheme);
+      instance.themeFeedback.set('');
       closeAccountMenu(instance, true);
     } catch (error: unknown) {
-      reportThemeToggleError(error);
+      reportThemeToggleError(instance, error);
     }
   },
 
@@ -633,14 +640,12 @@ Template.appAccountMenu.events({
     try {
       await MeteorAny.callAsync('updateOwnUiLocale', { uiLocale: nextLocale });
       setActiveUiLocale(nextLocale);
+      instance.localeFeedback.set('');
       closeAccountMenu(instance, true);
     } catch (error: unknown) {
       const message = getErrorMessage(error);
       clientConsole(1, '[LocaleMenu] Failed to select language:', message);
-      Session.set('uiMessage', {
-        variant: 'danger',
-        text: message,
-      });
+      instance.localeFeedback.set(message);
     }
   },
 });
@@ -902,6 +907,8 @@ Template.appAccountMenu.onCreated(function(this: AppAccountMenuInstance) {
   this.localeMenuOpen = new ReactiveVar(false);
   this.themeMenuOpen = new ReactiveVar(false);
   this.themeLibraryPresentation = new ReactiveVar<ThemeLibraryPresentation>({ status: 'loading' });
+  this.localeFeedback = new ReactiveVar('');
+  this.themeFeedback = new ReactiveVar('');
   this.accountDisclosure = createDisclosureController(({ open }) => {
     this.accountMenuOpen.set(open);
     if (!open) {
@@ -939,7 +946,7 @@ Template.appAccountMenu.onRendered(function(this: AppAccountMenuInstance) {
     try {
       restoreUserSelectedTheme();
     } catch (error: unknown) {
-      reportThemeToggleError(error);
+      reportThemeToggleError(this, error);
     }
   });
   this._appAccountDocumentClickHandler = (event: Event) => {

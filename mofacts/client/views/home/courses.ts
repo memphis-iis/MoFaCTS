@@ -11,6 +11,8 @@ import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecogn
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { DelayedLoadingVisibility } from '../../lib/delayedLoadingVisibility';
+import type { AsyncCommandState } from '../../lib/adminUi/asyncCommandState';
+import { createScopedAsyncCommandRegistry, type ScopedAsyncCommandRegistry } from '../../lib/adminUi/scopedAsyncCommandRegistry';
 import type {
   LearnerCourseSnapshotAssignment,
   LearnerCourseSnapshotCourse,
@@ -35,7 +37,9 @@ type CoursesTemplateInstance = Blaze.TemplateInstance & {
   showLoadingFeedback: ReactiveVar<boolean>;
   showSlowLoading: ReactiveVar<boolean>;
   loadingVisibility: DelayedLoadingVisibility;
-  error: ReactiveVar<string | null>;
+  loadError: ReactiveVar<string | null>;
+  commandStates: ReactiveVar<Record<string, AsyncCommandState<{ message: string }>>>;
+  commandRegistry: ScopedAsyncCommandRegistry<{ message: string }>;
   search: ReactiveVar<string>;
   sort: ReactiveVar<CourseTreeSort>;
 };
@@ -119,11 +123,39 @@ function setJoinSectionSelection(courseId: string, sectionId: string) {
 }
 
 function getCourseRows(snapshot: LearnerCoursesSnapshot | null, section: CourseTreeSection, instance: CoursesTemplateInstance) {
-  return buildCourseTreeRows(snapshot, section, {
+  const rows = buildCourseTreeRows(snapshot, section, {
     query: instance.search.get(),
     sort: instance.sort.get(),
     expandedCourseIds: getExpandedCourseIds(),
   });
+  const states = instance.commandStates.get();
+  return rows.map((course) => ({
+    ...course,
+    joinFeedback: courseCommandPresentation(states[`course:join:${course.courseId}`], `course-join-feedback-${course.courseId}`),
+    assignments: course.assignments.map((assignment) => ({
+      ...assignment,
+      launchFeedback: courseCommandPresentation(
+        states[`course:launch:${assignment.assignmentId}`],
+        `course-launch-feedback-${assignment.assignmentId}`,
+      ),
+    })),
+  }));
+}
+
+function courseCommandPresentation(
+  state: AsyncCommandState<{ message: string }> | undefined,
+  id: string,
+) {
+  if (!state || state.status === 'idle') return null;
+  if (state.status === 'pending') return { id, text: courseText('common.loading'), variant: 'info', urgent: false };
+  if (state.status === 'error') return { id, text: state.message, variant: 'error', urgent: true };
+  return state.result.message
+    ? { id, text: state.result.message, variant: 'success', urgent: false }
+    : null;
+}
+
+function setCourseCommandError(instance: CoursesTemplateInstance, scope: string, message: string): void {
+  instance.commandStates.set({ ...instance.commandStates.get(), [scope]: { status: 'error', message } });
 }
 
 function currentCourseFromAssignment(instance: CoursesTemplateInstance, assignment: LearnerCourseSnapshotAssignment): LearnerCourseSnapshotCourse | null {
@@ -148,7 +180,11 @@ Template.courses.onCreated(function(this: CoursesTemplateInstance) {
     onSlowChange: (slow) => this.showSlowLoading.set(slow),
   });
   this.loadingVisibility.setPending(true);
-  this.error = new ReactiveVar(null);
+  this.loadError = new ReactiveVar(null);
+  this.commandStates = new ReactiveVar({});
+  this.commandRegistry = createScopedAsyncCommandRegistry((scope, state) => {
+    this.commandStates.set({ ...this.commandStates.get(), [scope]: state });
+  });
   this.search = new ReactiveVar('');
   this.sort = new ReactiveVar('course');
   if (!Array.isArray(Session.get(EXPANDED_COURSES_SESSION_KEY))) {
@@ -162,12 +198,12 @@ Template.courses.onCreated(function(this: CoursesTemplateInstance) {
 
 Template.courses.onRendered(async function(this: CoursesTemplateInstance) {
   this.loading.set(true);
-  this.error.set(null);
+  this.loadError.set(null);
   try {
     await reloadCoursesSnapshot(this);
   } catch (error: any) {
     clientConsole(1, '[Courses] Failed to load learner course snapshot:', error);
-    this.error.set(error?.reason || error?.message || String(error));
+    this.loadError.set(error?.reason || error?.message || String(error));
   } finally {
     this.loading.set(false);
     this.loadingVisibility.setPending(false);
@@ -189,7 +225,7 @@ Template.courses.helpers({
     return instance.loading.get() || instance.showLoadingFeedback.get();
   },
   errorMessage() {
-    return (Template.instance() as CoursesTemplateInstance).error.get();
+    return (Template.instance() as CoursesTemplateInstance).loadError.get();
   },
   loadingRows() {
     return [1, 2, 3, 4];
@@ -214,6 +250,7 @@ Template.courses.helpers({
 
 Template.courses.onDestroyed(function(this: CoursesTemplateInstance) {
   this.loadingVisibility.destroy();
+  this.commandRegistry.destroy();
 });
 
 const courseAssignmentDisplayHelpers = {
@@ -341,6 +378,9 @@ const courseTreeCourseRowHelpers = {
     if (sections.length > 1 && !getJoinSectionSelections()[this.courseId]) return true;
     return false;
   },
+  joinFeedback(this: CourseTreeCourseRow & { joinFeedback?: unknown }) {
+    return this.joinFeedback;
+  },
 };
 
 Template.courseTreeCourseRow.helpers({
@@ -380,10 +420,10 @@ Template.courses.events({
     if (assignment.availability !== 'available') return;
     const course = currentCourseFromAssignment(instance, assignment);
     if (!course) {
-      instance.error.set('Course context was not found for this assignment.');
+      setCourseCommandError(instance, `course:launch:${assignment.assignmentId}`, 'Course context was not found for this assignment.');
       return;
     }
-    try {
+    await instance.commandRegistry.run(`course:launch:${assignment.assignmentId}`, async () => {
       const launchContext = {
         assignmentId: assignment.assignmentId,
         courseId: assignment.courseId,
@@ -407,28 +447,29 @@ Template.courses.events({
         false,
         { courseAssignment: launchContext },
       );
-    } catch (error: any) {
-      setCourseAssignmentLaunchContext(null);
-      instance.error.set(error?.reason || error?.message || String(error));
-    }
+      return { message: '' };
+    }, {
+      getErrorMessage: (error: any) => error?.reason || error?.message || String(error),
+      onFailure: () => setCourseAssignmentLaunchContext(null),
+    });
   },
   'click .join-public-course': async function(event: Event, instance: CoursesTemplateInstance) {
     const course = this as CourseTreeCourseRow;
     if (course.membership !== 'public') return;
     const button = event.currentTarget as HTMLElement;
+    const scope = `course:join:${course.courseId}`;
     const sectionId = String(button.dataset.sectionid || getJoinSectionSelections()[course.courseId] || '');
     if (!sectionId) {
-      instance.error.set(courseText('courses.selectSectionToJoin'));
+      setCourseCommandError(instance, scope, courseText('courses.selectSectionToJoin'));
       return;
     }
     const section = (course.joinableSections || []).find((row) => row.sectionId === sectionId);
     if (!section) {
-      instance.error.set(courseText('courses.selectSectionToJoin'));
+      setCourseCommandError(instance, scope, courseText('courses.selectSectionToJoin'));
       return;
     }
     Session.set(JOINING_COURSE_SESSION_KEY, course.courseId);
-    instance.error.set(null);
-    try {
+    await instance.commandRegistry.run(scope, async () => {
       await meteorCallAsync('addUserToTeachersClass', course.teacherUserId, sectionId);
       const assignedTdfIds = await meteorCallAsync('getTdfsAssignedToStudent', Meteor.userId(), sectionId);
       const teacher = {
@@ -458,9 +499,14 @@ Template.courses.events({
       expandedIds.add(course.courseId);
       setExpandedCourseIds(expandedIds);
       await reloadCoursesSnapshot(instance);
-    } catch (error: any) {
-      instance.error.set(error?.reason || error?.message || String(error));
-    } finally {
+      return { message: '' };
+    }, {
+      getErrorMessage: (error: any) => error?.reason || error?.message || String(error),
+      onSuccess: () => {
+        instance.commandRegistry.remove(scope);
+      },
+    });
+    {
       Session.set(JOINING_COURSE_SESSION_KEY, null);
     }
   },
