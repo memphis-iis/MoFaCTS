@@ -37,6 +37,7 @@ import {
   type AsyncCommandController,
   type AsyncCommandState,
 } from '../lib/adminUi/asyncCommandState';
+import { createScopedAsyncCommandRegistry, type ScopedAsyncCommandRegistry } from '../lib/adminUi/scopedAsyncCommandRegistry';
 import {
   rejectLoad,
   resolveLoad,
@@ -67,17 +68,19 @@ type AudioSettingsMessage = Readonly<{
   level: 'success' | 'error';
   text: string;
 }>;
+type AudioSettingsScope = 'tts' | 'speech-input' | 'speech-api-key';
+type AudioSettingsCommandScope = Exclude<AudioSettingsScope, 'speech-api-key'>;
 
 type AudioSettingsInstance = Blaze.TemplateInstance & {
   settingsPresentation: ReactiveVar<LoadableState<AudioSettingsForm>>;
   keyPresentation: ReactiveVar<LoadableState<boolean>>;
-  settingsCommandState: ReactiveVar<AsyncCommandState<void>>;
+  settingsCommandStates: ReactiveVar<Partial<Record<AudioSettingsCommandScope, AsyncCommandState<void>>>>;
   keyCommandState: ReactiveVar<AsyncCommandState<void>>;
-  audioSettingsMessage: ReactiveVar<AudioSettingsMessage | null>;
+  audioSettingsMessages: ReactiveVar<Partial<Record<AudioSettingsScope, AudioSettingsMessage>>>;
   volumeDraft: ReactiveVar<number>;
   sensitivityDraft: ReactiveVar<number>;
   speechApiDraft: ReactiveVar<string>;
-  settingsCommand: AsyncCommandController<void>;
+  settingsCommandRegistry: ScopedAsyncCommandRegistry<void>;
   keyCommand: AsyncCommandController<void>;
   confirmationState: ReactiveVar<InlineConfirmationView>;
   confirmationController: InlineConfirmationController<'delete-speech-api-key'>;
@@ -141,16 +144,28 @@ function settingSaveError(error: unknown): string {
   return audioText('audio.failedSaveAudioSettings', { error: getErrorMessage(error) });
 }
 
+function setAudioSettingsMessage(
+  instance: AudioSettingsInstance,
+  scope: AudioSettingsScope,
+  message: AudioSettingsMessage | null,
+): void {
+  const messages = { ...instance.audioSettingsMessages.get() };
+  if (message) messages[scope] = message;
+  else delete messages[scope];
+  instance.audioSettingsMessages.set(messages);
+}
+
 async function saveSettings(
   instance: AudioSettingsInstance,
   nextSettings: AudioSettingsForm,
+  scope: 'tts' | 'speech-input',
   onActivated?: () => void,
 ): Promise<void> {
   const previousSettings = readySettings(instance);
   if (!previousSettings) return;
 
-  instance.audioSettingsMessage.set(null);
-  await instance.settingsCommand.run(async () => {
+  setAudioSettingsMessage(instance, scope, null);
+  await instance.settingsCommandRegistry.run(scope, async () => {
     publishReadySettings(instance, nextSettings);
     applyRuntimeAudioSettings(nextSettings);
     onActivated?.();
@@ -163,7 +178,7 @@ async function saveSettings(
       instance.volumeDraft.set(sharedVolume(previousSettings));
       instance.sensitivityDraft.set(previousSettings.audioInputSensitivity);
       applyRuntimeAudioSettings(previousSettings);
-      instance.audioSettingsMessage.set({ level: 'error', text: settingSaveError(error) });
+      setAudioSettingsMessage(instance, scope, { level: 'error', text: settingSaveError(error) });
     },
   });
 }
@@ -263,9 +278,9 @@ function setRangeProgress(element: HTMLInputElement, value: number, minimum: num
 Template.audioSettings.onCreated(function(this: AudioSettingsInstance) {
   this.settingsPresentation = new ReactiveVar<LoadableState<AudioSettingsForm>>({ status: 'idle' });
   this.keyPresentation = new ReactiveVar<LoadableState<boolean>>({ status: 'idle' });
-  this.settingsCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
+  this.settingsCommandStates = new ReactiveVar({});
   this.keyCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
-  this.audioSettingsMessage = new ReactiveVar<AudioSettingsMessage | null>(null);
+  this.audioSettingsMessages = new ReactiveVar({});
   this.volumeDraft = new ReactiveVar(0);
   this.sensitivityDraft = new ReactiveVar(60);
   this.speechApiDraft = new ReactiveVar('');
@@ -273,7 +288,9 @@ Template.audioSettings.onCreated(function(this: AudioSettingsInstance) {
   this.keyLifetime = createTemplateLifetime();
   this.nextSettingsRequestId = 0;
   this.nextKeyRequestId = 0;
-  this.settingsCommand = createAsyncCommandController((state) => this.settingsCommandState.set(state));
+  this.settingsCommandRegistry = createScopedAsyncCommandRegistry((scope, state) => {
+    this.settingsCommandStates.set({ ...this.settingsCommandStates.get(), [scope]: state });
+  });
   this.keyCommand = createAsyncCommandController((state) => this.keyCommandState.set(state));
   this.confirmationController = createInlineConfirmationController<'delete-speech-api-key'>(
     (view) => this.confirmationState.set(view),
@@ -286,7 +303,7 @@ Template.audioSettings.onCreated(function(this: AudioSettingsInstance) {
 Template.audioSettings.onDestroyed(function(this: AudioSettingsInstance) {
   this.settingsLifetime.destroy();
   this.keyLifetime.destroy();
-  this.settingsCommand.destroy();
+  this.settingsCommandRegistry.destroy();
   this.keyCommand.destroy();
   this.confirmationController.destroy();
 });
@@ -297,7 +314,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const nextMode = promptModeFromToggles(!promptQuestionEnabled(current), promptFeedbackEnabled(current));
-    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, () => {
+    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, 'tts', () => {
       if (nextMode !== 'silent') void warmupGoogleTTS();
     });
   },
@@ -307,7 +324,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const nextMode = promptModeFromToggles(promptQuestionEnabled(current), !promptFeedbackEnabled(current));
-    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, () => {
+    void saveSettings(instance, { ...current, audioPromptMode: nextMode }, 'tts', () => {
       if (nextMode !== 'silent') void warmupGoogleTTS();
     });
   },
@@ -317,7 +334,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const audioInputMode = !current.audioInputMode;
-    void saveSettings(instance, { ...current, audioInputMode }, () => {
+    void saveSettings(instance, { ...current, audioInputMode }, 'speech-input', () => {
       if (audioInputMode) void warmupGoogleSpeechRecognition();
     });
   },
@@ -337,7 +354,7 @@ Template.audioSettings.events({
       ...current,
       audioPromptQuestionVolume: value,
       audioPromptFeedbackVolume: value,
-    });
+    }, 'tts');
   },
 
   'change #audioPromptSpeakingRate'(event: Event, instance: AudioSettingsInstance) {
@@ -348,7 +365,7 @@ Template.audioSettings.events({
       ...current,
       audioPromptQuestionSpeakingRate: value,
       audioPromptFeedbackSpeakingRate: value,
-    });
+    }, 'tts');
   },
 
   'change #audioPromptVoice'(event: Event, instance: AudioSettingsInstance) {
@@ -359,7 +376,7 @@ Template.audioSettings.events({
       ...current,
       audioPromptVoice: value,
       audioPromptFeedbackVoice: value,
-    });
+    }, 'tts');
   },
 
   'input #audioInputSensitivity'(event: Event, instance: AudioSettingsInstance) {
@@ -373,7 +390,7 @@ Template.audioSettings.events({
     const current = readySettings(instance);
     if (!current) return;
     const value = normalizeAudioInputSensitivity((event.currentTarget as HTMLInputElement).value);
-    void saveSettings(instance, { ...current, audioInputSensitivity: value });
+    void saveSettings(instance, { ...current, audioInputSensitivity: value }, 'speech-input');
   },
 
   'input #speechAPIKey'(event: Event, instance: AudioSettingsInstance) {
@@ -383,7 +400,7 @@ Template.audioSettings.events({
   'click #speechAPISubmit'(event: Event, instance: AudioSettingsInstance) {
     event.preventDefault();
     const key = instance.speechApiDraft.get();
-    instance.audioSettingsMessage.set(null);
+    setAudioSettingsMessage(instance, 'speech-api-key', null);
     void instance.keyCommand.run(async () => {
       await (Meteor as typeof Meteor & {
         callAsync: (name: string, key: string) => Promise<void>;
@@ -393,10 +410,10 @@ Template.audioSettings.events({
       onSuccess: () => {
         instance.keyPresentation.set({ status: 'ready', value: true });
         instance.speechApiDraft.set('');
-        instance.audioSettingsMessage.set({ level: 'success', text: audioText('audio.speechApiKeySaved') });
+        setAudioSettingsMessage(instance, 'speech-api-key', { level: 'success', text: audioText('audio.speechApiKeySaved') });
       },
       onFailure: (error: unknown) => {
-        instance.audioSettingsMessage.set({
+        setAudioSettingsMessage(instance, 'speech-api-key', {
           level: 'error',
           text: audioText('audio.changesNotSaved', { error: getErrorMessage(error) }),
         });
@@ -437,7 +454,7 @@ Template.audioSettings.events({
       return;
     }
     instance.confirmationController.setPending(true);
-    instance.audioSettingsMessage.set(null);
+    setAudioSettingsMessage(instance, 'speech-api-key', null);
     void instance.keyCommand.run(async () => {
       await (Meteor as typeof Meteor & { callAsync: (name: string) => Promise<void> })
         .callAsync('deleteUserSpeechAPIKey');
@@ -447,11 +464,11 @@ Template.audioSettings.events({
         instance.keyPresentation.set({ status: 'ready', value: false });
         instance.speechApiDraft.set('');
         instance.confirmationController.complete();
-        instance.audioSettingsMessage.set({ level: 'success', text: audioText('audio.speechApiKeyDeleted') });
+        setAudioSettingsMessage(instance, 'speech-api-key', { level: 'success', text: audioText('audio.speechApiKeyDeleted') });
       },
       onFailure: (error: unknown) => {
         instance.confirmationController.setPending(false);
-        instance.audioSettingsMessage.set({
+        setAudioSettingsMessage(instance, 'speech-api-key', {
           level: 'error',
           text: audioText('audio.changesNotSaved', { error: getErrorMessage(error) }),
         });
@@ -494,21 +511,31 @@ Template.audioSettings.helpers({
     return readySettings(Template.instance() as AudioSettingsInstance) !== null;
   },
 
-  audioSettingsMessage(): AudioSettingsMessage | null {
-    return (Template.instance() as AudioSettingsInstance).audioSettingsMessage.get();
+  ttsSettingsMessage(): AudioSettingsMessage | null {
+    return (Template.instance() as AudioSettingsInstance).audioSettingsMessages.get().tts || null;
   },
 
-  audioSettingsMessageUrgent(): boolean {
-    return (Template.instance() as AudioSettingsInstance).audioSettingsMessage.get()?.level === 'error';
+  speechInputSettingsMessage(): AudioSettingsMessage | null {
+    return (Template.instance() as AudioSettingsInstance).audioSettingsMessages.get()['speech-input'] || null;
+  },
+
+  speechApiKeyMessage(): AudioSettingsMessage | null {
+    return (Template.instance() as AudioSettingsInstance).audioSettingsMessages.get()['speech-api-key'] || null;
   },
 
   settingsBusy(): boolean {
-    return (Template.instance() as AudioSettingsInstance).settingsCommandState.get().status === 'pending';
+    return Object.values((Template.instance() as AudioSettingsInstance).settingsCommandStates.get())
+      .some((state) => state?.status === 'pending');
   },
 
-  settingsDisabled(): boolean {
+  ttsSettingsDisabled(): boolean {
     const instance = Template.instance() as AudioSettingsInstance;
-    return readySettings(instance) === null || instance.settingsCommandState.get().status === 'pending';
+    return readySettings(instance) === null || instance.settingsCommandStates.get().tts?.status === 'pending';
+  },
+
+  speechInputSettingsDisabled(): boolean {
+    const instance = Template.instance() as AudioSettingsInstance;
+    return readySettings(instance) === null || instance.settingsCommandStates.get()['speech-input']?.status === 'pending';
   },
 
   audioPromptQuestionOn(): boolean {

@@ -17,29 +17,28 @@
                         <p class="auth-description auth-description-secondary">{{signUpInstructionCopy}}</p>
                     </div>
 
-                    <p id="serverErrors" class="auth-message" role="alert" aria-live="polite" hidden></p>
-
                     <form class="auth-form" novalidate>
                         <div class="auth-field">
                             <label class="form-label auth-label" for="signUpUsername">{{t 'auth.email'}}</label>
                             <input type="text" id="signUpUsername" value="" placeholder="name@example.com" class="form-control" autocomplete="username email">
-                            <span id="usernameInvalid" class="auth-field-message" hidden>{{t 'auth.enterValidEmail'}}</span>
+                            <span id="usernameInvalid" class="auth-field-message" role="alert" hidden>{{t 'auth.enterValidEmail'}}</span>
                         </div>
 
                         <div class="auth-field">
                             <label class="form-label auth-label" for="password1">{{t 'auth.password'}}</label>
                             <input type="password" id="password1" value="" placeholder="{{t 'auth.createPassword'}}" class="form-control" autocomplete="new-password">
                             <div class="auth-helper-text">{{t 'auth.passwordMinLength' min=minPasswordLength}}</div>
-                            <span id="passwordTooShort" class="auth-field-message" hidden>{{t 'auth.passwordTooShort' min=minPasswordLength}}</span>
+                            <span id="passwordTooShort" class="auth-field-message" role="alert" hidden>{{t 'auth.passwordTooShort' min=minPasswordLength}}</span>
                         </div>
 
                         <div class="auth-field">
                             <label class="form-label auth-label" for="password2">{{t 'auth.confirmPassword'}}</label>
                             <input type="password" id="password2" value="" placeholder="{{t 'auth.reenterPassword'}}" class="form-control" autocomplete="new-password">
-                            <span id="passwordMustMatch" class="auth-field-message" hidden>{{t 'auth.passwordsMustMatch'}}</span>
+                            <span id="passwordMustMatch" class="auth-field-message" role="alert" hidden>{{t 'auth.passwordsMustMatch'}}</span>
                         </div>
 
                         <button type="button" id="signUpButton" class="btn auth-primary-btn w-100">{{t 'auth.createAccount'}}</button>
+                        <p id="serverErrors" class="auth-message" role="alert" aria-live="assertive" hidden></p>
                     </form>
 
                     <div class="auth-supporting-action">

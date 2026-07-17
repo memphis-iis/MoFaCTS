@@ -1,9 +1,5 @@
 <template name="audioSettings">
   <div>
-    {{#if audioSettingsMessage}}
-      {{> adminStatus variant=audioSettingsMessage.level text=audioSettingsMessage.text urgent=audioSettingsMessageUrgent}}
-    {{/if}}
-
     {{#if audioSettingsReady}}
     <div aria-busy="{{#if settingsBusy}}true{{else}}false{{/if}}">
     <!-- Text-to-Speech Section -->
@@ -18,7 +14,7 @@
           <div class="card border">
             <div class="card-body">
               <div class="form-check form-switch admin-form-row">
-                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptQuestionOn" checked="{{#if audioPromptQuestionOn}}checked{{/if}}" disabled="{{settingsDisabled}}">
+                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptQuestionOn" checked="{{#if audioPromptQuestionOn}}checked{{/if}}" disabled="{{ttsSettingsDisabled}}">
                 <label class="form-check-label admin-inline-action" for="audioPromptQuestionOn">
                   <strong>{{audioText 'audio.readQuestions'}}</strong>
                   <br><small class="text-muted">{{audioText 'audio.readQuestionsHelp'}}</small>
@@ -26,7 +22,7 @@
               </div>
 
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptFeedbackOn" checked="{{#if audioPromptFeedbackOn}}checked{{/if}}" disabled="{{settingsDisabled}}">
+                <input class="form-check-input" type="checkbox" role="switch" id="audioPromptFeedbackOn" checked="{{#if audioPromptFeedbackOn}}checked{{/if}}" disabled="{{ttsSettingsDisabled}}">
                 <label class="form-check-label admin-inline-action" for="audioPromptFeedbackOn">
                   <strong>{{audioText 'audio.readFeedback'}}</strong>
                   <br><small class="text-muted">{{audioText 'audio.readFeedbackHelp'}}</small>
@@ -45,7 +41,7 @@
                     <label for="audioPromptVolume" class="form-label fw-semibold">
                       <i class="fa fa-volume-up admin-section-icon"></i>{{audioText 'audio.volume'}}
                     </label>
-                    <input type="range" class="form-range audio-settings-range" id="audioPromptVolume" min="-6" max="6" step=".5" value="{{audioPromptVolume}}" style="--audio-range-progress: {{audioPromptVolumeProgress}}%;" disabled="{{settingsDisabled}}">
+                    <input type="range" class="form-range audio-settings-range" id="audioPromptVolume" min="-6" max="6" step=".5" value="{{audioPromptVolume}}" style="--audio-range-progress: {{audioPromptVolumeProgress}}%;" disabled="{{ttsSettingsDisabled}}">
                     <div class="d-flex justify-content-between">
                       <small class="text-muted">{{audioText 'audio.quieter'}}</small>
                       <small class="text-muted">{{audioText 'audio.louder'}}</small>
@@ -56,7 +52,7 @@
                     <label for="audioPromptSpeakingRate" class="form-label fw-semibold">
                       <i class="fa fa-gauge admin-section-icon"></i>{{audioText 'audio.speed'}}
                     </label>
-                    <select class="form-select" id="audioPromptSpeakingRate" disabled="{{settingsDisabled}}">
+                    <select class="form-select" id="audioPromptSpeakingRate" disabled="{{ttsSettingsDisabled}}">
                       <option value=".25" selected="{{audioPromptSpeakingRateSelected '.25'}}">0.25x</option>
                       <option value=".5" selected="{{audioPromptSpeakingRateSelected '.5'}}">0.50x</option>
                       <option value=".75" selected="{{audioPromptSpeakingRateSelected '.75'}}">0.75x</option>
@@ -73,7 +69,7 @@
                       <i class="fa fa-user admin-section-icon"></i>{{audioText 'audio.voice'}}
                     </label>
                     <div class="input-group">
-                      <select class="form-select" id="audioPromptVoice" disabled="{{settingsDisabled}}">
+                      <select class="form-select" id="audioPromptVoice" disabled="{{ttsSettingsDisabled}}">
                         <option value="en-US-Standard-A" selected="{{audioPromptVoiceSelected 'en-US-Standard-A'}}">{{audioVoiceLabel 'male' 1}}</option>
                         <option value="en-US-Standard-B" selected="{{audioPromptVoiceSelected 'en-US-Standard-B'}}">{{audioVoiceLabel 'male' 2}}</option>
                         <option value="en-US-Standard-C" selected="{{audioPromptVoiceSelected 'en-US-Standard-C'}}">{{audioVoiceLabel 'female' 1}}</option>
@@ -85,7 +81,7 @@
                         <option value="en-US-Standard-I" selected="{{audioPromptVoiceSelected 'en-US-Standard-I'}}">{{audioVoiceLabel 'male' 4}}</option>
                         <option value="en-US-Standard-J" selected="{{audioPromptVoiceSelected 'en-US-Standard-J'}}">{{audioVoiceLabel 'male' 5}}</option>
                       </select>
-                      <button class="btn btn-outline-secondary" type="button" id="audioPromptVoiceTest" title="{{audioText 'audio.testVoice'}}" aria-label="{{audioText 'audio.testVoice'}}" disabled="{{settingsDisabled}}">
+                      <button class="btn btn-outline-secondary" type="button" id="audioPromptVoiceTest" title="{{audioText 'audio.testVoice'}}" aria-label="{{audioText 'audio.testVoice'}}" disabled="{{ttsSettingsDisabled}}">
                         <i class="fa fa-play" aria-hidden="true"></i>
                       </button>
                     </div>
@@ -94,6 +90,11 @@
               </div>
             </div>
           </div>
+          {{/if}}
+          {{#if ttsSettingsMessage}}
+            <div class="admin-inline-feedback admin-form-row-top">
+              {{> adminStatus variant=ttsSettingsMessage.level text=ttsSettingsMessage.text urgent=(equals ttsSettingsMessage.level "error")}}
+            </div>
           {{/if}}
         </div>
       </div>
@@ -113,7 +114,7 @@
               <div class="row align-items-start admin-form-row">
                 <div class="col-12 col-md-6">
                   <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="audioInputOn" checked="{{#if audioInputOn}}checked{{/if}}" disabled="{{settingsDisabled}}">
+                    <input class="form-check-input" type="checkbox" role="switch" id="audioInputOn" checked="{{#if audioInputOn}}checked{{/if}}" disabled="{{speechInputSettingsDisabled}}">
                     <label class="form-check-label admin-inline-action" for="audioInputOn">
                       <strong>{{audioText 'audio.enableVoiceInput'}}</strong>
                       <br><small class="text-muted">{{audioText 'audio.enableVoiceInputHelp'}}</small>
@@ -131,7 +132,7 @@
                       <span id="audioInputSensitivityLabel">{{audioInputSensitivity}}</span> dB
                     </span>
                   </div>
-                  <input type="range" class="form-range audio-settings-range" id="audioInputSensitivity" value="{{audioInputSensitivity}}" step="1" min="20" max="80" style="--audio-range-progress: {{audioInputSensitivityProgress}}%;" disabled="{{settingsDisabled}}">
+                  <input type="range" class="form-range audio-settings-range" id="audioInputSensitivity" value="{{audioInputSensitivity}}" step="1" min="20" max="80" style="--audio-range-progress: {{audioInputSensitivityProgress}}%;" disabled="{{speechInputSettingsDisabled}}">
                   <div class="d-flex justify-content-between">
                     <small class="text-muted">20 dB<br>{{audioText 'audio.veryEasyToTrigger'}}</small>
                     <small class="text-muted text-end">80 dB<br>{{audioText 'audio.needsLoudSpeech'}}</small>
@@ -225,6 +226,11 @@
                       </button>
                     {{/if}}
                     {{> adminInlineConfirmation confirmation=audioConfirmationView}}
+                    {{#if speechApiKeyMessage}}
+                      <div class="admin-inline-feedback admin-form-row-top">
+                        {{> adminStatus variant=speechApiKeyMessage.level text=speechApiKeyMessage.text urgent=(equals speechApiKeyMessage.level "error")}}
+                      </div>
+                    {{/if}}
                     {{/if}}
                   </div>
                 {{/if}}
@@ -232,6 +238,11 @@
               {{/if}}
             </div>
           </div>
+          {{#if speechInputSettingsMessage}}
+            <div class="admin-inline-feedback admin-form-row-top">
+              {{> adminStatus variant=speechInputSettingsMessage.level text=speechInputSettingsMessage.text urgent=(equals speechInputSettingsMessage.level "error")}}
+            </div>
+          {{/if}}
         </div>
       </div>
     </div>

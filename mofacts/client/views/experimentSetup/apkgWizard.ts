@@ -46,6 +46,7 @@ async function getApkgProcessor() {
 }
 
 function setWizardMessage(template: any, type: string, title: string, text: string) {
+  template.wizardMessageStep.set(template.wizardStep.get());
   template.wizardMessage.set({
     type,
     title,
@@ -99,6 +100,7 @@ Template.apkgWizard.onCreated(function(this: any) {
   this.wizardStep = new ReactiveVar(1);
   this.completedSteps = new ReactiveVar([]);
   this.wizardMessage = new ReactiveVar(null);
+  this.wizardMessageStep = new ReactiveVar(1);
   this.inlineConfirmation = new ReactiveVar(null);
   this.inlineConfirmationController = createInlineConfirmationController<ApkgConfirmationContext>(
     (view) => this.inlineConfirmation.set(view.status === 'open' ? view : null),
@@ -460,6 +462,16 @@ Template.apkgWizard.helpers({
 
   inlineConfirmation() {
     return (Template.instance() as any).inlineConfirmation.get();
+  },
+
+  stepWizardMessage(step: number) {
+    const instance = Template.instance() as any;
+    return instance.wizardMessageStep.get() === Number(step) ? instance.wizardMessage.get() : null;
+  },
+
+  stepInlineConfirmation(step: number) {
+    const instance = Template.instance() as any;
+    return instance.wizardStep.get() === Number(step) ? instance.inlineConfirmation.get() : null;
   },
 
   analyzeDisabled() {
@@ -870,7 +882,6 @@ Template.apkgWizard.events({
       template.uploadError.set(apkgText('apkg.uploadingError', { error: getErrorMessage(error) }));
     }
   },
-
   'click #close-wizard': async function(event: any, template: any) {
     event.preventDefault();
     // Reset wizard and close

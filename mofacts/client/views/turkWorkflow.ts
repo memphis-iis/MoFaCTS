@@ -31,6 +31,7 @@ import {
   type AsyncCommandController,
   type AsyncCommandState,
 } from '../lib/adminUi/asyncCommandState';
+import { createScopedAsyncCommandRegistry, type ScopedAsyncCommandRegistry } from '../lib/adminUi/scopedAsyncCommandRegistry';
 import {
   createInlineConfirmationController,
   type InlineConfirmationController,
@@ -50,7 +51,6 @@ const turkExperimentLog = new Mongo.Collection(null); // local-only - no databas
 const TURK_LOG_SELECTED_EXPERIMENT_KEY = 'turkLogSelectedExperiment';
 const PROFILE_INLINE_STATUS_KEY = 'profileInlineStatus';
 const PROFILE_INLINE_STATUS_CLASS_KEY = 'profileInlineStatusClass';
-const TURK_WORKFLOW_MESSAGE_KEY = 'turkWorkflowMessage';
 
 type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
 type TurkWorkflowMessage = Readonly<{
@@ -64,7 +64,8 @@ type TurkRemovalUser = Readonly<{
 type TurkWorkflowInstance = Blaze.TemplateInstance & {
   experimentsPresentation: ReactiveVar<LoadableState<TurkWorkflowExperiment[]>>;
   removalUsersPresentation: ReactiveVar<LoadableState<TurkRemovalUser[]>>;
-  workflowMessage: ReactiveVar<TurkWorkflowMessage | null>;
+  workflowMessages: ReactiveVar<Record<string, TurkWorkflowMessage>>;
+  rowCommandRegistry: ScopedAsyncCommandRegistry<TurkWorkflowMessage>;
   selectedRemovalExperimentId: ReactiveVar<string>;
   selectedRemovalUserId: ReactiveVar<string>;
   removalConfirmationState: ReactiveVar<InlineConfirmationView>;
@@ -76,6 +77,8 @@ type TurkWorkflowInstance = Blaze.TemplateInstance & {
   nextExperimentsRequestId: number;
   nextRemovalUsersRequestId: number;
 };
+
+let currentTurkWorkflowInstance: TurkWorkflowInstance | null = null;
 
 function turkText(key: PlatformStringKey, values?: TranslationValues): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
@@ -89,14 +92,13 @@ function messageIcon(level: string) {
 }
 
 function activeTurkWorkflowInstance(): TurkWorkflowInstance | null {
-  return Template.instance() as TurkWorkflowInstance | null;
+  return currentTurkWorkflowInstance;
 }
 
-function setTurkWorkflowMessage(level: TurkWorkflowMessage['level'], text: string) {
-  Session.set(TURK_WORKFLOW_MESSAGE_KEY, { level, text, icon: messageIcon(level) });
+function setTurkWorkflowMessage(level: TurkWorkflowMessage['level'], text: string, scope = 'log') {
   const instance = activeTurkWorkflowInstance();
-  if (instance?.workflowMessage) {
-    instance.workflowMessage.set({ level, text });
+  if (instance?.workflowMessages) {
+    instance.workflowMessages.set({ ...instance.workflowMessages.get(), [scope]: { level, text } });
   }
 }
 
@@ -281,7 +283,7 @@ function turkLogInsert(newRec: any) {
   turkExperimentLog.insert(newRec);
 }
 
-function dismissTurkModalThenAlert(message: string, level: TurkWorkflowMessage['level'] = 'info') {
+function dismissTurkModal() {
   const el = document.getElementById('turkModal');
   if (el) {
     const instance = getBootstrapModal(el);
@@ -296,7 +298,6 @@ function dismissTurkModalThenAlert(message: string, level: TurkWorkflowMessage['
     el.style.display = 'none';
   }
   cleanupBootstrapModalState();
-  setTurkWorkflowMessage(level, message);
 }
 
 async function turkLogRefresh(exp: any) {
@@ -408,14 +409,29 @@ Template.turkWorkflow.helpers({
     return messageIcon(String(Session.get(PROFILE_INLINE_STATUS_CLASS_KEY) || 'info'));
   },
   turkWorkflowMessage: function() {
-    const message = Session.get(TURK_WORKFLOW_MESSAGE_KEY)
-      || (Template.instance() as TurkWorkflowInstance).workflowMessage?.get();
+    const message = (Template.instance() as TurkWorkflowInstance).workflowMessages.get().log;
     return message ? { ...message, icon: messageIcon(message.level) } : null;
   },
   turkWorkflowMessageUrgent: function() {
-    const message = Session.get(TURK_WORKFLOW_MESSAGE_KEY)
-      || (Template.instance() as TurkWorkflowInstance).workflowMessage?.get();
+    const message = (Template.instance() as TurkWorkflowInstance).workflowMessages.get().log;
     return message?.level === 'error';
+  },
+  turkScopedMessage: function(scope: string) {
+    const message = (Template.instance() as TurkWorkflowInstance).workflowMessages.get()[scope];
+    return message ? { ...message, icon: messageIcon(message.level) } : null;
+  },
+  turkRowMessage: function(idx: number) {
+    return (Template.instance() as TurkWorkflowInstance).workflowMessages.get()[`row:${idx}`] || null;
+  },
+  turkCommandAttrs: function(scope: string) {
+    return (Template.instance() as TurkWorkflowInstance).rowCommandRegistry.getState(scope).status === 'pending'
+      ? { disabled: true, 'aria-busy': 'true' }
+      : {};
+  },
+  turkRowCommandAttrs: function(idx: number) {
+    return (Template.instance() as TurkWorkflowInstance).rowCommandRegistry.getState(`row:${idx}`).status === 'pending'
+      ? { disabled: true, 'aria-busy': 'true' }
+      : {};
   },
   turkIds: function() {
     return readyLoadValue((Template.instance() as TurkWorkflowInstance).removalUsersPresentation.get()) || [];
@@ -449,9 +465,19 @@ Template.turkWorkflow.helpers({
 // Template Events
 
 Template.turkWorkflow.onCreated(function(this: TurkWorkflowInstance) {
+  currentTurkWorkflowInstance = this;
   this.experimentsPresentation = new ReactiveVar<LoadableState<TurkWorkflowExperiment[]>>({ status: 'idle' });
   this.removalUsersPresentation = new ReactiveVar<LoadableState<TurkRemovalUser[]>>({ status: 'idle' });
-  this.workflowMessage = new ReactiveVar<TurkWorkflowMessage | null>(null);
+  this.workflowMessages = new ReactiveVar<Record<string, TurkWorkflowMessage>>({});
+  this.rowCommandRegistry = createScopedAsyncCommandRegistry<TurkWorkflowMessage>((scope, state) => {
+    if (state.status === 'pending') {
+      setTurkWorkflowMessage('info', turkText('common.loading'), scope);
+    } else if (state.status === 'error') {
+      setTurkWorkflowMessage('error', state.message, scope);
+    } else if (state.status === 'success') {
+      setTurkWorkflowMessage(state.result.level, state.result.text, scope);
+    }
+  });
   this.selectedRemovalExperimentId = new ReactiveVar('');
   this.selectedRemovalUserId = new ReactiveVar('');
   this.removalCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
@@ -468,7 +494,6 @@ Template.turkWorkflow.onCreated(function(this: TurkWorkflowInstance) {
   Session.setDefault(TURK_LOG_SELECTED_EXPERIMENT_KEY, '');
   Session.setDefault(PROFILE_INLINE_STATUS_KEY, '');
   Session.setDefault(PROFILE_INLINE_STATUS_CLASS_KEY, 'info');
-  Session.set(TURK_WORKFLOW_MESSAGE_KEY, null);
   loadTurkExperiments(this);
 });
 
@@ -483,7 +508,9 @@ Template.turkWorkflow.onDestroyed(function(this: TurkWorkflowInstance) {
   this.experimentsLifetime.destroy();
   this.removalUsersLifetime.destroy();
   this.removalCommand.destroy();
+  this.rowCommandRegistry.destroy();
   this.removalConfirmationController.destroy();
+  if (currentTurkWorkflowInstance === this) currentTurkWorkflowInstance = null;
 });
 
 Template.turkWorkflow.events({
@@ -597,34 +624,32 @@ Template.turkWorkflow.events({
       getErrorMessage: (error) => turkText('turk.serverFailure', { error: getErrorMessage(error) }),
       onSuccess: () => {
         instance.removalConfirmationController.complete();
-        setTurkWorkflowMessage('success', turkText('turk.complete'));
+        setTurkWorkflowMessage('success', turkText('turk.complete'), 'removal');
         loadRemovalUsers(instance, selectedExperimentId);
       },
       onFailure: (error) => {
         instance.removalConfirmationController.setPending(false);
-        setTurkWorkflowMessage('error', turkText('turk.serverFailure', { error: getErrorMessage(error) }));
+        setTurkWorkflowMessage('error', turkText('turk.serverFailure', { error: getErrorMessage(error) }), 'removal');
       },
     });
   },
 
   // Admin/Teachers - send Turk message
-  'click #turk-send-msg': async function(event: any) {
+  'click #turk-send-msg': async function(event: any, instance: TurkWorkflowInstance) {
     event.preventDefault();
     const workerid = $('#turk-workerid').val();
     const msgtext = $('#turk-msg').val();
     
     $('#turkModalMessage').text(turkText('turk.sendingMessage'));
     showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
-    try {
+    await instance.rowCommandRegistry.run('send-message', async () => {
       const result = await (Meteor as any).callAsync('turkSendMessage', workerid, msgtext);
       hideBootstrapModal('turkModal');
-      const disp = turkText('turk.serverReturned', { result: JSON.stringify(result, null, 2) });
-      setTurkWorkflowMessage('success', disp);
-    } catch (error: unknown) {
-      hideBootstrapModal('turkModal');
-      const disp = turkText('turk.failedHandleTurkApproval', { error: getErrorMessage(error) });
-      setTurkWorkflowMessage('error', disp);
-    }
+      return { level: 'success', text: turkText('turk.serverReturned', { result: JSON.stringify(result, null, 2) }) };
+    }, {
+      getErrorMessage: (error) => turkText('turk.failedHandleTurkApproval', { error: getErrorMessage(error) }),
+      onFailure: () => hideBootstrapModal('turkModal'),
+    });
   },
 
   // Admin/Teachers - show user log for a particular experiment
@@ -655,7 +680,7 @@ Template.turkWorkflow.events({
   },
 
   // Admin/Teachers - approve/pay a user in the Turk log view
-  'click .btn-pay-action': async function(event: any) {
+  'click .btn-pay-action': async function(event: any, instance: TurkWorkflowInstance) {
     event.preventDefault();
 
     const rec: any = turkLogButtonToRec(event.currentTarget);
@@ -663,60 +688,37 @@ Template.turkWorkflow.events({
       setTurkWorkflowMessage('error', turkText('turk.cannotFindRecord'));
       return;
     }
-    const experimentFileName = rec.experimentFileName || rec.experiment;
-    const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName)
-    if (!exp || !exp._id) {
-      setTurkWorkflowMessage('error', turkText('turk.cannotDetermineExperiment'));
-      return;
-    }
-    const expId = exp._id
-
-    const msg = turkText('turk.approvalWorkerMessage');
-
-    $('#turkModalMessage').text(turkText('turk.approvingAssignment'));
-    showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
-    try {
-      const result = await (Meteor as any).callAsync('turkPay', rec.userId, expId, msg);
-
-      rec.turkpayDetails = {
-        msg: turkText('turk.refreshViewDetailsServer'),
-        details: '',
-      };
-
-      if (result) {
+    const scope = `row:${rec.idx}`;
+    await instance.rowCommandRegistry.run(scope, async () => {
+      try {
+        const experimentFileName = rec.experimentFileName || rec.experiment;
+        const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName);
+        if (!exp?._id) throw new Error(turkText('turk.cannotDetermineExperiment'));
+        $('#turkModalMessage').text(turkText('turk.approvingAssignment'));
+        showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
+        const result = await (Meteor as any).callAsync('turkPay', rec.userId, exp._id, turkText('turk.approvalWorkerMessage'));
+        rec.turkpayDetails = { msg: turkText('turk.refreshViewDetailsServer'), details: result || turkText('turk.noneAvailable') };
+        rec.turkpay = result ? turkText('turk.failed') : turkText('turk.complete');
+        turkExperimentLog.remove({'idx': rec.idx});
+        turkLogInsert(rec);
+        dismissTurkModal();
+        return {
+          level: result ? 'error' : 'success',
+          text: result ? turkText('turk.problemApprovalPayment', { result }) : turkText('turk.approvalSucceeded'),
+        };
+      } catch (error: unknown) {
+        rec.turkpayDetails = { msg: turkText('turk.refreshViewDetailsServer'), details: error };
         rec.turkpay = turkText('turk.failed');
-        rec.turkpayDetails.details = result;
-      } else {
-        rec.turkpay = turkText('turk.complete');
-        rec.turkpayDetails.details = turkText('turk.noneAvailable');
+        turkExperimentLog.remove({'idx': rec.idx});
+        turkLogInsert(rec);
+        dismissTurkModal();
+        throw error;
       }
-
-      const payMsg = result
-        ? turkText('turk.problemApprovalPayment', { result })
-        : turkText('turk.approvalSucceeded');
-
-      turkExperimentLog.remove({'idx': rec.idx});
-      turkLogInsert(rec);
-
-      dismissTurkModalThenAlert(payMsg, result ? 'error' : 'success');
-    } catch (error: unknown) {
-      rec.turkpayDetails = {
-        msg: turkText('turk.refreshViewDetailsServer'),
-        details: error,
-      };
-      rec.turkpay = turkText('turk.failed');
-
-      const errMsg = turkText('turk.serverFailure', { error: getErrorMessage(error) });
-
-      turkExperimentLog.remove({'idx': rec.idx});
-      turkLogInsert(rec);
-
-      dismissTurkModalThenAlert(errMsg, 'error');
-    }
+    }, { getErrorMessage: (error) => turkText('turk.serverFailure', { error: getErrorMessage(error) }) });
   },
 
   // Admin/Teachers - pay bonus to a user in the Turk log view
-  'click .btn-bonus-action': async function(event: any) {
+  'click .btn-bonus-action': async function(event: any, instance: TurkWorkflowInstance) {
     event.preventDefault();
 
     const rec: any = turkLogButtonToRec(event.currentTarget);
@@ -725,56 +727,34 @@ Template.turkWorkflow.events({
       return;
     }
 
-    const experimentFileName = rec.experimentFileName || rec.experiment;
-    const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName)
-    if (!exp || !exp._id) {
-      setTurkWorkflowMessage('error', turkText('turk.cannotDetermineExperiment'));
-      return;
-    }
-    const expId = exp._id
-    const expFile =  legacyTrim(experimentFileName).replace(/\./g, '_');
-
-    $('#turkModalMessage').text(turkText('turk.sendingBonus'));
-    showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
-
-    try {
-      const result = await (Meteor as any).callAsync('turkBonus', rec.userId, expFile, expId);
-
-      rec.turkbonusDetails = {
-        msg: turkText('turk.refreshViewDetailsServer'),
-        details: '',
-      };
-
-      if (result) {
+    const scope = `row:${rec.idx}`;
+    await instance.rowCommandRegistry.run(scope, async () => {
+      try {
+        const experimentFileName = rec.experimentFileName || rec.experiment;
+        const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName);
+        if (!exp?._id) throw new Error(turkText('turk.cannotDetermineExperiment'));
+        const expFile = legacyTrim(experimentFileName).replace(/\./g, '_');
+        $('#turkModalMessage').text(turkText('turk.sendingBonus'));
+        showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
+        const result = await (Meteor as any).callAsync('turkBonus', rec.userId, expFile, exp._id);
+        rec.turkbonusDetails = { msg: turkText('turk.refreshViewDetailsServer'), details: result || turkText('turk.noneAvailable') };
+        rec.turkbonus = result ? turkText('turk.failed') : turkText('turk.complete');
+        turkExperimentLog.remove({'idx': rec.idx});
+        turkLogInsert(rec);
+        dismissTurkModal();
+        return {
+          level: result ? 'error' : 'success',
+          text: result ? turkText('turk.problemBonus', { result }) : turkText('turk.bonusSucceeded'),
+        };
+      } catch (error: unknown) {
+        rec.turkbonusDetails = { msg: turkText('turk.refreshViewDetailsServer'), details: error };
         rec.turkbonus = turkText('turk.failed');
-        rec.turkbonusDetails.details = result;
-      } else {
-        rec.turkbonus = turkText('turk.complete');
-        rec.turkbonusDetails.details = turkText('turk.noneAvailable');
+        turkExperimentLog.remove({'idx': rec.idx});
+        turkLogInsert(rec);
+        dismissTurkModal();
+        throw error;
       }
-
-      const bonusMsg = result
-        ? turkText('turk.problemBonus', { result })
-        : turkText('turk.bonusSucceeded');
-
-      turkExperimentLog.remove({'idx': rec.idx});
-      turkLogInsert(rec);
-
-      dismissTurkModalThenAlert(bonusMsg, result ? 'error' : 'success');
-    } catch (error: unknown) {
-      rec.turkbonusDetails = {
-        msg: turkText('turk.refreshViewDetailsServer'),
-        details: error,
-      };
-      rec.turkbonus = turkText('turk.failed');
-
-      const errMsg = turkText('turk.serverFailure', { error: getErrorMessage(error) });
-
-      turkExperimentLog.remove({'idx': rec.idx});
-      turkLogInsert(rec);
-
-      dismissTurkModalThenAlert(errMsg, 'error');
-    }
+    }, { getErrorMessage: (error) => turkText('turk.serverFailure', { error: getErrorMessage(error) }) });
   },
 
   // Admin/Teachers - show previous approve/pay for a user in the Turk log view

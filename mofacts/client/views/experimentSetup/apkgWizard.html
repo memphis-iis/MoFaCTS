@@ -29,25 +29,11 @@
 
     <!-- Wizard Content -->
     <div class="wizard-content">
-      {{#if wizardMessage}}
-      <div class="admin-status admin-status-{{wizardMessage.type}} wizard-card">
-        <i class="fa {{wizardMessage.icon}}"></i>
-        <div class="admin-status-text">
-          <div class="admin-status-title">{{wizardMessage.title}}</div>
-          <div>{{wizardMessage.text}}</div>
-        </div>
-      </div>
-      {{/if}}
-
-      {{#if inlineConfirmation}}
-      <div class="wizard-card">
-        {{> adminInlineConfirmation confirmation=inlineConfirmation}}
-      </div>
-      {{/if}}
-
       <!-- Step 1: Upload & Analyze -->
       {{#if isStep 1}}
       <div class="wizard-step step-upload">
+        {{#with stepWizardMessage 1}}<div class="admin-inline-feedback wizard-card">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>{{/with}}
+        {{#with stepInlineConfirmation 1}}<div class="wizard-card">{{> adminInlineConfirmation confirmation=this}}</div>{{/with}}
         <h4>{{apkgText 'apkg.step1Title'}}</h4>
 
         <div class="form-group">
@@ -101,6 +87,8 @@
       <!-- Step 2: Source Setup -->
       {{#if isStep 2}}
       <div class="wizard-step step-preview">
+        {{#with stepWizardMessage 2}}<div class="admin-inline-feedback wizard-card">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>{{/with}}
+        {{#with stepInlineConfirmation 2}}<div class="wizard-card">{{> adminInlineConfirmation confirmation=this}}</div>{{/with}}
         <h4>{{apkgText 'apkg.step2Title'}}</h4>
 
         {{#if deckMetadata}}
@@ -295,6 +283,8 @@
       <!-- Step 3: Draft Editor Workspace -->
       {{#if isStep 3}}
       <div class="wizard-step step-draft-editor">
+        {{#with stepWizardMessage 3}}<div class="admin-inline-feedback wizard-card">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>{{/with}}
+        {{#with stepInlineConfirmation 3}}<div class="wizard-card">{{> adminInlineConfirmation confirmation=this}}</div>{{/with}}
         {{#if generateError}}
         <div class="admin-status admin-status-error">
           <i class="fa fa-exclamation-circle"></i>
@@ -316,6 +306,8 @@
       <!-- Step 4: Generate & Upload -->
       {{#if isStep 4}}
       <div class="wizard-step step-generate">
+        {{#with stepWizardMessage 4}}<div class="admin-inline-feedback wizard-card">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>{{/with}}
+        {{#with stepInlineConfirmation 4}}<div class="wizard-card">{{> adminInlineConfirmation confirmation=this}}</div>{{/with}}
         <h4>{{step4Title}}</h4>
 
         {{#if generating}}

@@ -1,14 +1,6 @@
 <template name="instructorReporting">
 {{#if isInRole 'admin, teacher'}}
   <div>
-    {{#if reportingMessage}}
-      {{> adminStatus variant=messageVariant text=reportingMessage.text urgent=false}}
-    {{/if}}
-
-    {{#if loadError}}
-      {{> adminStatus variant="error" text=loadError urgent=true}}
-    {{/if}}
-
     <div id="mainContent">
       <!-- Class Selection Section -->
       <div class="admin-section">
@@ -18,6 +10,11 @@
               <i class="fa fa-users admin-section-icon"></i>
               <h5>{{reportingText 'reporting.classSelection'}}</h5>
             </div>
+            {{#if initialLoadError}}
+              <div class="admin-inline-feedback admin-form-row-sm">
+                {{> adminStatus variant="error" text=initialLoadError urgent=true}}
+              </div>
+            {{/if}}
             <label for="class-select" class="form-label">{{reportingText 'reporting.selectClass'}}</label>
             <select id="class-select" class="form-select" disabled="{{initialLoading}}">
               <option selected="selected" value="{{INVALID}}" disabled="true">{{reportingText 'reporting.selectClass'}}</option>
@@ -85,7 +82,12 @@
               </div>
               <div class="col-12">
                 <label for="exception-date" class="form-label">{{reportingText 'reporting.exceptionDate'}}</label>
-                <input type="date" id="exception-date" name="exception-date-select" value="{{exceptionDateValue}}" class="form-control" disabled="{{exceptionBusy}}">
+                <input type="date" id="exception-date" name="exception-date-select" value="{{exceptionDateValue}}" class="form-control" disabled="{{exceptionBusy}}" {{exceptionDateAttrs}}>
+                {{#if exceptionDateError}}
+                  <div id="reporting-exception-date-error" class="admin-inline-feedback admin-form-row-xs">
+                    {{> adminStatus variant="error" text=exceptionDateError urgent=true}}
+                  </div>
+                {{/if}}
               </div>
             </div>
           </div>
@@ -134,7 +136,7 @@
       {{else}}
         {{#if loadError}}
           <tr>
-            <td colspan="6" class="text-center text-danger admin-table-status-cell">{{loadError}}</td>
+            <td colspan="6" class="admin-table-status-cell"><div class="admin-table-feedback text-danger">{{loadError}}</div></td>
           </tr>
         {{else}}
           {{#if dueDateFilter}}
@@ -146,7 +148,7 @@
           {{/if}}
           {{#if hasMetRows}}
             {{#each metRows}}
-              {{> instructorReportingStudentRow row=this exceptionBusy=../exceptionBusy allowAddException=false}}
+              {{> instructorReportingStudentRow row=this commandStates=../commandStates exceptionDateError=../exceptionDateError exceptionDateValidationUserId=../exceptionDateValidationUserId allowAddException=false}}
             {{/each}}
           {{else}}
             <tr><td colspan="6" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
@@ -159,7 +161,7 @@
           </tr>
           {{#if hasNotMetRows}}
             {{#each notMetRows}}
-              {{> instructorReportingStudentRow row=this exceptionBusy=../exceptionBusy allowAddException=true}}
+              {{> instructorReportingStudentRow row=this commandStates=../commandStates exceptionDateError=../exceptionDateError exceptionDateValidationUserId=../exceptionDateValidationUserId allowAddException=true}}
             {{/each}}
           {{else}}
             <tr><td colspan="6" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataAvailable'}}</td></tr>
@@ -184,7 +186,7 @@
 <template name="instructorReportingStudentRow">
   <tr id="{{row.userId}}">
     <th scope="row">
-      <button type="button" class="btn btn-sm btn-link instructor-reporting-student-link" data-username="{{row.username}}">
+      <button type="button" class="btn btn-sm btn-link instructor-reporting-student-link" data-username="{{row.username}}" data-userid="{{row.userId}}" {{rowActionAttrs row.userId}}>
         {{row.username}}
       </button>
     </th>
@@ -198,12 +200,21 @@
     </td>
     <td>
       {{#if row.exception}}
-        <button type="button" class="btn btn-sm btn-link remove-exception" data-userid="{{row.userId}}" aria-label="{{exceptionActionLabel 'reporting.removeException' row}}" disabled="{{exceptionBusy}}">{{reportingText 'reporting.removeException'}}</button>
+        <button type="button" class="btn btn-sm btn-link remove-exception" data-userid="{{row.userId}}" aria-label="{{exceptionActionLabel 'reporting.removeException' row}}" {{rowActionAttrs row.userId}}>{{reportingText 'reporting.removeException'}}</button>
       {{else}}
         {{#if allowAddException}}
-          <button type="button" class="btn btn-sm btn-link add-exception" data-userid="{{row.userId}}" aria-label="{{exceptionActionLabel 'reporting.addException' row}}" disabled="{{exceptionBusy}}">{{reportingText 'reporting.addException'}}</button>
+          <button type="button" class="btn btn-sm btn-link add-exception" data-userid="{{row.userId}}" aria-label="{{exceptionActionLabel 'reporting.addException' row}}" {{rowActionAttrs row.userId}}>{{reportingText 'reporting.addException'}}</button>
         {{/if}}
       {{/if}}
     </td>
   </tr>
+  {{#if hasRowCommandFeedback row.userId}}
+  <tr class="admin-feedback-row">
+    <td colspan="6"><div class="admin-table-feedback">
+      {{#with rowCommandFeedback row.userId}}
+        {{> adminStatus id=id variant=variant text=text urgent=urgent}}
+      {{/with}}
+    </div></td>
+  </tr>
+  {{/if}}
 </template>

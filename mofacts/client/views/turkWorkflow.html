@@ -2,15 +2,6 @@
 
 <template name="turkWorkflow">
     <div>
-        {{#if turkWorkflowMessage}}
-        <div class="admin-status admin-status-{{turkWorkflowMessage.level}} admin-message" role="status" aria-live="polite">
-            <i class="fa {{turkWorkflowMessage.icon}}"></i>
-            <div class="admin-status-text">
-                <pre class="admin-scroll-output admin-empty-text">{{turkWorkflowMessage.text}}</pre>
-            </div>
-        </div>
-        {{/if}}
-
     <!-- AWS Login Data -->
     <div class="admin-section">
         <div class="card admin-card">
@@ -169,6 +160,7 @@
                                         <button type="button"
                                             class="btn btn-fix btn-success btn-xs btn-pay-action"
                                             data-idx="{{idx}}"
+                                            {{turkRowCommandAttrs idx}}
                                             aria-label="{{turkText 'turk.approvePay'}}: {{turk_username}}"
                                         ><span class="fa fa-usd" aria-hidden="true"></span>&nbsp;{{turkText 'turk.approvePay'}}
                                         </button>
@@ -213,7 +205,7 @@
                                 <td class="text-center">{{posttestCorrect}}</td>
                                 <td>
                                     {{#if needBonus}}
-                                        <button type="button" class="btn btn-fix btn-warning btn-xs btn-bonus-action" data-idx="{{idx}}" aria-label="{{turkText 'turk.sendBonus'}}: {{turk_username}}">
+                                        <button type="button" class="btn btn-fix btn-warning btn-xs btn-bonus-action" data-idx="{{idx}}" aria-label="{{turkText 'turk.sendBonus'}}: {{turk_username}}" {{turkRowCommandAttrs idx}}>
                                             <span class="fa fa-usd" aria-hidden="true"></span>&nbsp;{{turkText 'turk.sendBonus'}}
                                         </button>
                                     {{else}}
@@ -223,6 +215,13 @@
                                     {{/if}}
                                     </td>
                                 </tr>
+                                {{#if turkRowMessage idx}}
+                                <tr class="admin-feedback-row">
+                                    <td colspan="12"><div class="admin-table-feedback">
+                                        {{#with turkRowMessage idx}}{{> adminStatus variant=level text=text urgent=(equals level "error")}}{{/with}}
+                                    </div></td>
+                                </tr>
+                                {{/if}}
                             {{/each}}
                             </tbody>
                             </table>
@@ -232,6 +231,9 @@
             </div>
         </div> <!-- /turkLogAll -->
         {{/if}}
+        {{#with turkScopedMessage 'log'}}
+        <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=level text=text urgent=(equals level "error")}}</div>
+        {{/with}}
     </div>
 
             </div>
@@ -279,10 +281,13 @@
                             <textarea name="turk-msg" id="turk-msg" class="form-control" rows="8" placeholder="{{turkText 'turk.messagePlaceholder'}}"></textarea>
                         </div>
                         <div class="text-center">
-                            <button type="button" id="turk-send-msg" class="btn btn-fix btn-primary">
+                            <button type="button" id="turk-send-msg" class="btn btn-fix btn-primary" {{turkCommandAttrs 'send-message'}}>
                                 <i class="fa fa-paper-plane admin-button-icon"></i>{{turkText 'turk.sendMessage'}}
                             </button>
                         </div>
+                        {{#with turkScopedMessage 'send-message'}}
+                        <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=level text=text urgent=(equals level "error")}}</div>
+                        {{/with}}
                     </div>
                 </div>
             </div>
@@ -334,6 +339,9 @@
                             <i class="fa fa-trash admin-button-icon"></i>{{turkText 'turk.removeTurkUser'}}
                         </button>
                         {{> adminInlineConfirmation confirmation=turkRemovalConfirmationView}}
+                        {{#with turkScopedMessage 'removal'}}
+                        <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=level text=text urgent=(equals level "error")}}</div>
+                        {{/with}}
                     </div>
                 </div>
             </div>

@@ -16,34 +16,18 @@
                 </button>
                 {{/if}}
             </div>
-        </div>
-
-        {{#if draftPersistenceMessage}}
-        <div class="admin-status admin-status-{{draftPersistenceMessageClass}} admin-form-row" role="status" aria-live="polite">
-            {{#if draftPersistenceBusy}}
-            <i class="fa fa-refresh fa-spin"></i>
-            {{else}}
-            <i class="fa {{draftPersistenceMessageIcon}}"></i>
-            {{/if}}
-            <div class="admin-status-text">{{draftPersistenceMessage}}</div>
-        </div>
-        {{/if}}
-
-        {{#if manualConfirmation}}
-        <div class="admin-inline-confirmation admin-form-row" role="alert">
-            <i class="fa {{manualConfirmation.icon}}" aria-hidden="true"></i>
-            <div>
-                <div class="admin-inline-confirmation-title">{{manualConfirmation.title}}</div>
-                <div class="admin-inline-confirmation-message">{{manualConfirmation.message}}</div>
+            {{#with draftPersistenceStatus}}
+            <div class="admin-form-row">
+                {{> adminStatus variant=variant text=text urgent=urgent}}
             </div>
-            <div class="admin-inline-confirmation-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-manual-confirmation">{{manualText 'manualCreator.cancel'}}</button>
-                <button type="button" class="btn btn-sm {{manualConfirmation.confirmClass}}" id="confirm-manual-confirmation">
-                    {{manualConfirmation.confirmLabel}}
-                </button>
+            {{/with}}
+
+            {{#with headerManualConfirmation}}
+            <div class="admin-form-row">
+                {{> adminInlineConfirmation confirmation=this}}
             </div>
+            {{/with}}
         </div>
-        {{/if}}
 
         <div class="manual-stepper">
             {{#each stepItems}}
@@ -448,6 +432,11 @@
                                     {{/if}}
                                 </div>
                             </div>
+                            {{#with uploadManualConfirmation}}
+                            <div class="admin-form-row-top">
+                                {{> adminInlineConfirmation confirmation=this}}
+                            </div>
+                            {{/with}}
                             {{else}}
                             <div class="manual-step-intro">
                                 <h4>{{manualText 'manualCreator.editDraft'}}</h4>

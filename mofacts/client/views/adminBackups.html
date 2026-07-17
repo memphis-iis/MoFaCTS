@@ -1,9 +1,5 @@
 <template name="adminBackups">
   <div class="admin-backups-page">
-    {{#if backupMessage}}
-      {{> adminStatus variant=backupMessage.level text=backupMessage.text}}
-    {{/if}}
-
     {{#if isInRole 'admin'}}
       <div class="admin-section">
         <div class="card admin-card backup-warning-card">
@@ -34,9 +30,12 @@
               <i class="fa fa-archive admin-section-icon"></i>
               <h5>{{backupText 'admin.createBackup'}}</h5>
             </div>
-            <button type="button" id="createBackupButton" class="btn btn-primary" disabled="{{isBusy}}">
+            <button type="button" id="createBackupButton" class="btn btn-primary" {{backupCommandAttrs 'create'}}>
               <i class="fa fa-plus-circle"></i> {{backupText 'admin.createBackup'}}
             </button>
+            {{#with (backupMessage 'create')}}
+              {{> adminStatus variant=level text=text}}
+            {{/with}}
           </div>
         </div>
       </div>
@@ -50,6 +49,7 @@
             </div>
 
             {{> adminAsyncRegion busy=backupAsyncBusy contentTemplate="adminBackupsAsyncContent"}}
+            {{#with backupHistoryMessage}}{{> adminStatus variant=level text=text}}{{/with}}
             <div class="{{backupParentReadyClass}}">
               <div class="backup-history-list">
                 {{#each parentBackupJobs}}
@@ -66,28 +66,36 @@
                       {{/if}}
                     </div>
                     <div class="backup-history-actions">
-                      <button type="button" class="btn btn-secondary btn-sm viewManifestButton" data-job-id="{{_id}}">
+                      <button type="button" class="btn btn-secondary btn-sm viewManifestButton" data-job-id="{{_id}}" {{backupCommandAttrs 'manifest' _id}}>
                         <i class="fa fa-file-text-o" aria-hidden="true"></i> {{backupText 'admin.manifest'}}
                       </button>
                       {{#if canVerify jobType status}}
-                        <button type="button" class="btn btn-secondary btn-sm verifyBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
+                        <button type="button" class="btn btn-secondary btn-sm verifyBackupButton" data-job-id="{{_id}}" {{backupCommandAttrs 'verify' _id}}>
                           <i class="fa fa-check-circle-o" aria-hidden="true"></i> {{backupText 'admin.verifyBackup'}}
                         </button>
                       {{/if}}
                       {{#if canRestore jobType status}}
-                        <button type="button" class="btn btn-secondary btn-sm downloadBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
+                        <button type="button" class="btn btn-secondary btn-sm downloadBackupButton" data-job-id="{{_id}}" {{backupCommandAttrs 'download' _id}}>
                           <i class="fa fa-download" aria-hidden="true"></i> {{backupText 'admin.download'}}
                         </button>
-                        <button type="button" class="btn btn-danger btn-sm restoreBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
+                        <button type="button" class="btn btn-danger btn-sm restoreBackupButton" data-job-id="{{_id}}" {{backupCommandAttrs 'restore' _id}}>
                           <i class="fa fa-warning" aria-hidden="true"></i> {{backupText 'admin.restore'}}
                         </button>
                       {{/if}}
                       {{#if canDelete jobType status archiveFileName}}
-                        <button type="button" class="btn btn-danger btn-sm deleteBackupButton" data-job-id="{{_id}}" disabled="{{../isBusy}}">
+                        <button type="button" class="btn btn-danger btn-sm deleteBackupButton" data-job-id="{{_id}}" {{backupCommandAttrs 'delete' _id}}>
                           <i class="fa fa-trash" aria-hidden="true"></i> {{backupText 'admin.delete'}}
                         </button>
                       {{/if}}
                     </div>
+                    {{#each (backupRowMessages _id)}}{{> adminStatus variant=level text=text}}{{/each}}
+                    {{> adminInlineConfirmation confirmation=(backupRowConfirmation _id)}}
+                    {{#with (backupRowManifest _id)}}
+                      <div class="backup-history-detail">
+                        <h6>{{backupText 'admin.selectedManifest'}}</h6>
+                        <pre class="backup-manifest-view">{{this}}</pre>
+                      </div>
+                    {{/with}}
                   </div>
                 {{/each}}
               </div>
@@ -96,21 +104,6 @@
         </div>
       </div>
 
-      {{#if selectedManifest}}
-        <div class="admin-section">
-          <div class="card admin-card">
-            <div class="card-body">
-              <div class="admin-section-heading">
-                <i class="fa fa-list-alt admin-section-icon"></i>
-                <h5>{{backupText 'admin.selectedManifest'}}</h5>
-              </div>
-              <pre class="backup-manifest-view">{{selectedManifest}}</pre>
-            </div>
-          </div>
-        </div>
-      {{/if}}
-
-      {{> adminInlineConfirmation confirmation=backupConfirmationView}}
     {{else}}
       <div class="admin-status admin-status-error" role="alert">
         <i class="fa fa-times-circle" aria-hidden="true"></i>

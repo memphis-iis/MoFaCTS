@@ -23,6 +23,7 @@ import {
   type LoadableState,
 } from '../../lib/adminUi/loadableState';
 import { createTemplateLifetime, type TemplateLifetime } from '../../lib/adminUi/templateLifetime';
+import { createScopedAsyncCommandRegistry, type ScopedAsyncCommandRegistry } from '../../lib/adminUi/scopedAsyncCommandRegistry';
 import {
   createInlineConfirmationController,
   type InlineConfirmationController,
@@ -68,6 +69,7 @@ const CDN_ASSET_REF_REGEX = /^\/?cdn\/storage\/Assets\/([^/]+)\/original\/([^/?#
 const DYNAMIC_ASSET_REF_REGEX = /^\/?dynamic-assets\/([A-Za-z0-9_-]+)(?:\/|$)/i;
 
 type UploadMessageLevel = 'info' | 'success' | 'warning' | 'error';
+type ContentCommandResult = Readonly<{ text: string; level?: UploadMessageLevel }>;
 type InlineConfirmation = {
   placement: string;
   title: string;
@@ -96,6 +98,7 @@ type ContentUploadInstance = Blaze.TemplateInstance & {
   nextListRequestId: number;
   nextSummaryRequestId: number;
   nextQuotaRequestId: number;
+  commandRegistry: ScopedAsyncCommandRegistry<ContentCommandResult>;
 };
 
 function contentText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
@@ -214,44 +217,47 @@ function mediaReferenceExistsInAssets(reference: unknown, assetNameSet: Set<stri
   return false;
 }
 
-function buildAccessMessageClass(level: any) {
-  if (level === 'success') return 'alert-success';
-  if (level === 'warning') return 'alert-warning';
-  if (level === 'error') return 'alert-danger';
-  return 'alert-info';
-}
-
-function setUploadMessage(template: any, text: string, level: UploadMessageLevel = 'info') {
-  if (!template?.uploadMessage) {
+function setUploadMessage(template: any, text: string, level: UploadMessageLevel = 'info', scope = 'package') {
+  if (!template?.uploadMessages) {
     return;
   }
   const message = {
     text,
     level,
-    icon: uploadMessageIcon(level)
+    icon: uploadMessageIcon(level),
+    scope,
   };
-  template.uploadMessage.set(message);
-  if (template.uploadMessageTimer) {
-    Meteor.clearTimeout(template.uploadMessageTimer);
+  template.uploadMessages.set({ ...template.uploadMessages.get(), [scope]: message });
+  const existingTimer = template.uploadMessageTimers.get(scope);
+  if (existingTimer) {
+    Meteor.clearTimeout(existingTimer);
   }
-  template.uploadMessageTimer = Meteor.setTimeout(() => {
-    const latest = template.uploadMessage.get();
-    if (latest?.text === text && latest?.level === level) {
-      template.uploadMessage.set(null);
+  template.uploadMessageTimers.delete(scope);
+  if (level !== 'success') return;
+  const timer = Meteor.setTimeout(() => {
+    const latest = template.uploadMessages.get()[scope];
+    if (latest?.text === text && latest?.level === level && latest?.scope === scope) {
+      const messages = { ...template.uploadMessages.get() };
+      delete messages[scope];
+      template.uploadMessages.set(messages);
     }
-    template.uploadMessageTimer = null;
+    template.uploadMessageTimers.delete(scope);
   }, UPLOAD_MESSAGE_TIMEOUT_MS);
+  template.uploadMessageTimers.set(scope, timer);
 }
 
-function clearUploadMessage(template: any) {
-  if (!template?.uploadMessage) {
+function clearUploadMessage(template: any, scope = 'package') {
+  if (!template?.uploadMessages) {
     return;
   }
-  if (template.uploadMessageTimer) {
-    Meteor.clearTimeout(template.uploadMessageTimer);
-    template.uploadMessageTimer = null;
+  const timer = template.uploadMessageTimers.get(scope);
+  if (timer) {
+    Meteor.clearTimeout(timer);
+    template.uploadMessageTimers.delete(scope);
   }
-  template.uploadMessage.set(null);
+  const messages = { ...template.uploadMessages.get() };
+  delete messages[scope];
+  template.uploadMessages.set(messages);
 }
 
 function getPackageUploadFiles(fileList: any): File[] {
@@ -332,6 +338,10 @@ function mediaPlacement(tdfId: string) {
   return `media:${tdfId}`;
 }
 
+function accessCommandScope(tdfId: string): string {
+  return `access:${tdfId}`;
+}
+
 function isSparcPageDisplay(display: any) {
   return display
     && typeof display === 'object'
@@ -355,13 +365,15 @@ function setAccessMessage(template: any, tdfId: any, text: any, level: any = 'in
   next[tdfId] = {
     text,
     level,
-    className: buildAccessMessageClass(level)
   };
   template.accessMessages.set(next);
   assetsHelperLastRun = 0;
   assetsHelperCachedResult = [];
 
-  Meteor.setTimeout(() => {
+  const existingTimer = template.accessMessageTimers?.get?.(tdfId);
+  if (existingTimer) Meteor.clearTimeout(existingTimer);
+  if (level !== 'success') return;
+  const timer = Meteor.setTimeout(() => {
     const latest = template.accessMessages.get() || {};
     if (!latest[tdfId] || latest[tdfId].text !== text) {
       return;
@@ -371,23 +383,12 @@ function setAccessMessage(template: any, tdfId: any, text: any, level: any = 'in
     template.accessMessages.set(cleaned);
     assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
+    template.accessMessageTimers?.delete?.(tdfId);
   }, ACCESS_MESSAGE_TIMEOUT_MS);
+  template.accessMessageTimers?.set?.(tdfId, timer);
 }
 
 async function addAccessorsForTdf(template: any, tdfId: any) {
-  const tdf = TdfsCollection.findOne({ _id: tdfId });
-  let currentAccessors = Array.isArray(tdf?.accessors) ? tdf.accessors : null;
-  if (!currentAccessors) {
-    template?.ensureTdfDetails?.(tdfId);
-    try {
-      currentAccessors = await MeteorAny.callAsync('getAccessorsTDFID', tdfId);
-    } catch (error: any) {
-      clientConsole(1, '[ACCESS] Failed to fetch current accessors:', error);
-      setAccessMessage(template, tdfId, contentText('content.accessListLoading'), 'warning');
-      return;
-    }
-  }
-
   const rawInput = String($("#add-access-" + tdfId).val() || "");
   const usernames = rawInput.split(',')
     .map(name => name.trim())
@@ -399,12 +400,16 @@ async function addAccessorsForTdf(template: any, tdfId: any) {
   }
 
   const uniqueUsernames = [...new Set(usernames)];
-
-  try {
+  await template.commandRegistry.run(accessCommandScope(String(tdfId)), async () => {
+    const tdf = TdfsCollection.findOne({ _id: tdfId });
+    let currentAccessors = Array.isArray(tdf?.accessors) ? tdf.accessors : null;
+    if (!currentAccessors) {
+      template?.ensureTdfDetails?.(tdfId);
+      currentAccessors = await MeteorAny.callAsync('getAccessorsTDFID', tdfId);
+    }
     const lookup = await MeteorAny.callAsync('resolveUsersForTdf', tdfId, uniqueUsernames);
     if (lookup.missing && lookup.missing.length > 0) {
-      setAccessMessage(template, tdfId, contentText('content.userNotFound', { users: lookup.missing.join(', ') }), 'error');
-      return;
+      throw new Error(contentText('content.userNotFound', { users: lookup.missing.join(', ') }));
     }
 
     const newAccessors = lookup.users.map((user: any) => ({
@@ -423,19 +428,16 @@ async function addAccessorsForTdf(template: any, tdfId: any) {
     await MeteorAny.callAsync('assignAccessors', tdfId, mergedAccessors, []);
     $('#add-access-' + tdfId).val('');
     const addedCount = Math.max(mergedAccessors.length - currentAccessors.length, 0);
-    setAccessMessage(
-      template,
-      tdfId,
-      addedCount > 0 ? contentText('content.sharedWithUsers', { count: addedCount }) : contentText('content.noNewUsersAdded'),
-      'success'
-    );
     assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
     assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-  } catch (error: any) {
-    clientConsole(1, '[ACCESS] Add access failed:', error);
-    setAccessMessage(template, tdfId, contentText('content.addAccessError', { error: uploadErrorText(error) }), 'error');
-  }
+    return {
+      text: addedCount > 0 ? contentText('content.sharedWithUsers', { count: addedCount }) : contentText('content.noNewUsersAdded'),
+    };
+  }, {
+    getErrorMessage: (error: any) => contentText('content.addAccessError', { error: uploadErrorText(error) }),
+    onFailure: (error: any) => clientConsole(1, '[ACCESS] Add access failed:', error),
+  });
 }
 
 function invalidateAssetsRows(): void {
@@ -555,14 +557,25 @@ Template.contentUpload.helpers({
   currentUpload() {
     return (Template.instance() as any).currentUpload.get();
   },
-  uploadMessageText() {
-    return (Template.instance() as any).uploadMessage?.get()?.text || '';
+  packageUploadMessage() {
+    return (Template.instance() as any).uploadMessages?.get()?.package || null;
   },
-  uploadMessageLevel() {
-    return (Template.instance() as any).uploadMessage?.get()?.level || 'info';
+  assetUploadMessage(tdfId: any) {
+    return (Template.instance() as any).uploadMessages?.get()?.[`asset:${String(tdfId || '')}`] || null;
   },
-  uploadMessageIcon() {
-    return (Template.instance() as any).uploadMessage?.get()?.icon || 'fa-info-circle';
+  mediaUploadMessage(tdfId: any) {
+    return (Template.instance() as any).uploadMessages?.get()?.[`media:${String(tdfId || '')}`] || null;
+  },
+  contentCommandAttrs(scopeType: string, tdfId: any) {
+    const scope = `${String(scopeType || 'asset')}:${String(tdfId || '')}`;
+    const pending = (Template.instance() as ContentUploadInstance).commandRegistry.getState(scope).status === 'pending';
+    return pending ? { disabled: true, 'aria-busy': 'true' } : {};
+  },
+  adminUploadMessage() {
+    return (Template.instance() as any).uploadMessages?.get()?.admin || null;
+  },
+  contentListUploadMessage() {
+    return (Template.instance() as any).uploadMessages?.get()?.['content-list'] || null;
   },
   inlineConfirmationView() {
     return ((Template.instance() as any).inlineConfirmation?.get() as ContentUploadConfirmationPresentation | null)?.view || null;
@@ -712,7 +725,7 @@ Template.contentUpload.helpers({
               : {};
             thisTdf.summaryLoading = summaryPresentation.summaryLoading;
             thisTdf.accessMessageText = accessMessages?.[tdfId]?.text || null;
-            thisTdf.accessMessageClass = accessMessages?.[tdfId]?.className || 'alert-info';
+            thisTdf.accessMessageLevel = accessMessages?.[tdfId]?.level || 'info';
 
             const packageFileName = thisTdf.packageFile ? thisTdf.packageFile.split('/').pop() : null;
             const isPendingDelete = pendingDeletePackageIds.has(thisTdf.packageAssetId) ||
@@ -955,8 +968,25 @@ Template.contentUpload.helpers({
   Template.contentUpload.onCreated(function(this: ContentUploadInstance & any) {
     this.currentUpload = new ReactiveVar(false);
     this.curFilesToUpload = new ReactiveVar([]);
-    this.uploadMessage = new ReactiveVar(null);
-    this.uploadMessageTimer = null;
+    this.uploadMessages = new ReactiveVar({});
+    this.uploadMessageTimers = new Map();
+    this.commandRegistry = createScopedAsyncCommandRegistry<ContentCommandResult>((scope, state) => {
+      if (scope.startsWith('access:')) {
+        const tdfId = scope.slice('access:'.length);
+        if (state.status === 'pending') setAccessMessage(this, tdfId, contentText('common.loading'), 'info');
+        else if (state.status === 'error') setAccessMessage(this, tdfId, state.message, 'error');
+        else if (state.status === 'success' && state.result.text) {
+          setAccessMessage(this, tdfId, state.result.text, state.result.level || 'success');
+        }
+        return;
+      }
+      if (state.status === 'pending') setUploadMessage(this, contentText('common.loading'), 'info', scope);
+      else if (state.status === 'error') setUploadMessage(this, state.message, 'error', scope);
+      else if (state.status === 'success') {
+        if (state.result.text) setUploadMessage(this, state.result.text, state.result.level || 'success', scope);
+        else clearUploadMessage(this, scope);
+      }
+    });
     this.packageUploadQueue = Promise.resolve();
     this.inlineConfirmation = new ReactiveVar<ContentUploadConfirmationPresentation | null>(null);
     this.inlineConfirmationPlacement = '';
@@ -989,6 +1019,7 @@ Template.contentUpload.helpers({
     this.listLimit = new ReactiveVar(CONTENT_UPLOAD_LIST_LIMIT);
     this.lastDdpStatus = null;
     this.accessMessages = new ReactiveVar({});
+    this.accessMessageTimers = new Map();
   this.initialPaintDone = new ReactiveVar(false);
   this.listDisplayReady = new ReactiveVar(false);
   this.overlayVisible = new ReactiveVar(false);
@@ -1132,18 +1163,13 @@ Template.contentUpload.helpers({
 
 });
 
-Template.contentUpload.onRendered(function(this: any) {
-  // Template rendered - log subscription status
-  
-  
-});
-
 Template.contentUpload.onDestroyed(function(this: ContentUploadInstance & any) {
   // Clean up autoruns
   this.autoruns.forEach((ar: any) => ar.stop());
   this.listLifetime.destroy();
   this.summaryLifetime.destroy();
   this.quotaLifetime.destroy();
+  this.commandRegistry.destroy();
   if (this.overlayTimer) {
     clearTimeout(this.overlayTimer);
     this.overlayTimer = null;
@@ -1152,10 +1178,10 @@ Template.contentUpload.onDestroyed(function(this: ContentUploadInstance & any) {
     clearInterval(this.pendingUploadTickInterval);
     this.pendingUploadTickInterval = null;
   }
-  if (this.uploadMessageTimer) {
-    Meteor.clearTimeout(this.uploadMessageTimer);
-    this.uploadMessageTimer = null;
-  }
+  for (const timer of this.uploadMessageTimers.values()) Meteor.clearTimeout(timer);
+  this.uploadMessageTimers.clear();
+  for (const timer of this.accessMessageTimers.values()) Meteor.clearTimeout(timer);
+  this.accessMessageTimers.clear();
   const confirmationContext = this.inlineConfirmationController.getContext() as ContentUploadConfirmationContext | undefined;
   this.inlineConfirmationController.destroy();
   confirmationContext?.resolve(false);
@@ -1218,19 +1244,21 @@ Template.contentUpload.events({
   'change .public-private-toggle': async function(event: any, template: any) {
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     const isPublic = event.currentTarget.checked;
-
-    try {
+    const scope = `asset:${tdfId}`;
+    await template.commandRegistry.run(scope, async () => {
       await MeteorAny.callAsync('setTdfUserSelect', tdfId, isPublic);
       // Refresh the assets list
       assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-    } catch (err: any) {
-      clientConsole(1, '[PUBLIC/PRIVATE] Error toggling public/private setting:', err);
-      setUploadMessage(template, contentText('content.visibilityChangeError', { error: uploadErrorText(err) }), 'error');
-      // Revert the checkbox state
-      event.currentTarget.checked = !isPublic;
-    }
+      return { text: '' };
+    }, {
+      getErrorMessage: (err: any) => contentText('content.visibilityChangeError', { error: uploadErrorText(err) }),
+      onFailure: (err: any) => {
+        clientConsole(1, '[PUBLIC/PRIVATE] Error toggling public/private setting:', err);
+        event.currentTarget.checked = !isPublic;
+      },
+    });
   },
 
   // Open content editor for TDF (stimuli editing)
@@ -1294,7 +1322,7 @@ Template.contentUpload.events({
         run.stop();
         button.disabled = false;
         button.removeAttribute('aria-busy');
-        setUploadMessage(template, contentText('content.contentDetailsLoadFailed'), 'error');
+        setUploadMessage(template, contentText('content.contentDetailsLoadFailed'), 'error', `asset:${tdfId}`);
       }
     });
 
@@ -1303,7 +1331,7 @@ Template.contentUpload.events({
         computation.stop();
         button.disabled = false;
         button.removeAttribute('aria-busy');
-        setUploadMessage(template, contentText('content.contentDetailsStillLoading'), 'warning');
+        setUploadMessage(template, contentText('content.contentDetailsStillLoading'), 'warning', `asset:${tdfId}`);
       }
     }, 10000);
   },
@@ -1370,14 +1398,15 @@ Template.contentUpload.events({
       return;
     }
 
-    try {
+    const scope = `asset:${tdfId}`;
+    await template.commandRegistry.run(scope, async () => {
       const result = await MeteorAny.callAsync('copyTdf', tdfId);
-      setUploadMessage(template, contentText('content.copyCreated', { name: result.newName }), 'success');
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-    } catch (error: any) {
-      clientConsole(1, 'Error copying TDF:', error);
-      setUploadMessage(template, contentText('content.copyError', { error: uploadErrorText(error) }), 'error');
-    }
+      return { text: contentText('content.copyCreated', { name: result.newName }) };
+    }, {
+      getErrorMessage: (error: any) => contentText('content.copyError', { error: uploadErrorText(error) }),
+      onFailure: (error: any) => clientConsole(1, 'Error copying TDF:', error),
+    });
   },
 
   // Open Anki Import Wizard
@@ -1593,21 +1622,21 @@ Template.contentUpload.events({
       event.preventDefault();
       const tdfId = event.currentTarget.getAttribute('data-tdfid');
       if (!tdfId) {
-        setUploadMessage(template, contentText('content.packageDownloadMissingLesson'), 'error');
+        setUploadMessage(template, contentText('content.packageDownloadMissingLesson'), 'error', `asset:${tdfId || ''}`);
         return;
       }
 
-      try {
+      await template.commandRegistry.run(`asset:${tdfId}`, async () => {
         const result = await MeteorAny.callAsync('getPackageDownloadLink', tdfId);
         if (!result || !result.link) {
-          setUploadMessage(template, contentText('content.packageDownloadMissingLink'), 'error');
-          return;
+          throw new Error(contentText('content.packageDownloadMissingLink'));
         }
         window.open(result.link);
-      } catch (error: any) {
-        clientConsole(1, '[DOWNLOAD] Package download failed:', error);
-        setUploadMessage(template, contentText('content.packageDownloadError', { error: uploadErrorText(error) }), 'error');
-      }
+        return { text: '' };
+      }, {
+        getErrorMessage: (error: any) => contentText('content.packageDownloadError', { error: uploadErrorText(error) }),
+        onFailure: (error: any) => clientConsole(1, '[DOWNLOAD] Package download failed:', error),
+      });
     },
   'click #package-delete-btn': async function(event: any, template: any){
       event.preventDefault();
@@ -1640,7 +1669,7 @@ Template.contentUpload.events({
       assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-      (async () => {
+      await template.commandRegistry.run(`asset:${tdfId}`, async () => {
         try {
           await MeteorAny.callAsync('deletePackageFile', packageAssetId);
           
@@ -1648,14 +1677,15 @@ Template.contentUpload.events({
           assetsHelperLastRun = 0;
           assetsHelperCachedResult = [];
           assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-          setUploadMessage(template, contentText('content.deletedPackage', { filename: fileName }), 'success');
-        } catch (error: any) {
-          clientConsole(1, 'Delete error:', error);
-          setUploadMessage(template, contentText('content.deletePackageError', { error: uploadErrorText(error) }), 'error');
+          setUploadMessage(template, contentText('content.deletedPackage', { filename: fileName }), 'success', 'content-list');
+          return { text: contentText('content.deletedPackage', { filename: fileName }) };
         } finally {
           pendingPackageDeletes.set(pendingKey, undefined);
         }
-      })();
+      }, {
+        getErrorMessage: (error: any) => contentText('content.deletePackageError', { error: uploadErrorText(error) }),
+        onFailure: (error: any) => clientConsole(1, 'Delete error:', error),
+      });
     },
   'click #reset-conditions-btn': function(event: any){
     const tdfId = event.currentTarget.getAttribute('value')
@@ -1671,15 +1701,14 @@ Template.contentUpload.events({
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
     if (!tdfId) {
-      setUploadMessage(template, contentText('content.stimulusDownloadMissingLesson'), 'error');
+      setUploadMessage(template, contentText('content.stimulusDownloadMissingLesson'), 'error', `asset:${tdfId || ''}`);
       return;
     }
 
-    try {
+    await template.commandRegistry.run(`asset:${tdfId}`, async () => {
       const result = await MeteorAny.callAsync('getStimuliFileForTdf', tdfId);
       if (!result || !result.stimFile) {
-        setUploadMessage(template, contentText('content.stimulusDownloadMissingFile'), 'error');
-        return;
+        throw new Error(contentText('content.stimulusDownloadMissingFile'));
       }
 
       const rawName = result.fileName || 'stimuli.json';
@@ -1693,10 +1722,11 @@ Template.contentUpload.events({
       link.download = safeName;
       link.click();
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      clientConsole(1, '[DOWNLOAD] Stimulus download failed:', error);
-      setUploadMessage(template, contentText('content.stimulusDownloadError', { error: uploadErrorText(error) }), 'error');
-    }
+      return { text: '' };
+    }, {
+      getErrorMessage: (error: any) => contentText('content.stimulusDownloadError', { error: uploadErrorText(error) }),
+      onFailure: (error: any) => clientConsole(1, '[DOWNLOAD] Stimulus download failed:', error),
+    });
   },
   'click #deleteAllAssetsConfirm': async function(e: any, template: any) {
     e.preventDefault();
@@ -1715,9 +1745,9 @@ Template.contentUpload.events({
     MeteorAny.callAsync('deleteAllFiles',
       function(error: any, result: any) {
         if (error) {
-          setUploadMessage(template, contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }), 'error');
+          setUploadMessage(template, contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }), 'error', 'admin');
         } else {
-          setUploadMessage(template, contentText('content.deletedFiles', { count: result }), 'success');
+          setUploadMessage(template, contentText('content.deletedFiles', { count: result }), 'success', 'admin');
         }
       }
     );
@@ -1759,32 +1789,24 @@ Template.contentUpload.events({
   },
   'click .remove-access-btn': async function(event: any, template: any){
     const tdfId = event.currentTarget.getAttribute('value');
-    const tdf = TdfsCollection.findOne({ _id: tdfId });
-    let currentAccessors = Array.isArray(tdf?.accessors) ? tdf.accessors : null;
-    if (!currentAccessors) {
-      template?.ensureTdfDetails?.(tdfId);
-      try {
-        currentAccessors = await MeteorAny.callAsync('getAccessorsTDFID', tdfId);
-      } catch (error: any) {
-        clientConsole(1, '[ACCESS] Failed to fetch current accessors:', error);
-        setAccessMessage(template, tdfId, contentText('content.accessListLoading'), 'warning');
-        return;
-      }
-    }
-
     const revokedAccessorId = event.currentTarget.getAttribute('data-user');
-    const remainingAccessors = currentAccessors.filter((accessor: any) => accessor.userId !== revokedAccessorId);
-
-    try {
+    await template.commandRegistry.run(accessCommandScope(String(tdfId)), async () => {
+      const tdf = TdfsCollection.findOne({ _id: tdfId });
+      let currentAccessors = Array.isArray(tdf?.accessors) ? tdf.accessors : null;
+      if (!currentAccessors) {
+        template?.ensureTdfDetails?.(tdfId);
+        currentAccessors = await MeteorAny.callAsync('getAccessorsTDFID', tdfId);
+      }
+      const remainingAccessors = currentAccessors.filter((accessor: any) => accessor.userId !== revokedAccessorId);
       await MeteorAny.callAsync('assignAccessors', tdfId, remainingAccessors, [revokedAccessorId]);
-      setAccessMessage(template, tdfId, contentText('content.userAccessRemoved'), 'success');
       assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-    } catch (error: any) {
-      clientConsole(1, '[ACCESS] Remove access failed:', error);
-      setAccessMessage(template, tdfId, contentText('content.removeAccessError', { error: uploadErrorText(error) }), 'error');
-    }
+      return { text: contentText('content.userAccessRemoved') };
+    }, {
+      getErrorMessage: (error: any) => contentText('content.removeAccessError', { error: uploadErrorText(error) }),
+      onFailure: (error: any) => clientConsole(1, '[ACCESS] Remove access failed:', error),
+    });
   },
   'click .transfer-btn': async function(event: any, template: any){
     const tdfId = event.currentTarget.getAttribute('value');
@@ -1794,29 +1816,25 @@ Template.contentUpload.events({
       return;
     }
 
-    try {
+    await template.commandRegistry.run(accessCommandScope(String(tdfId)), async () => {
       const lookup = await MeteorAny.callAsync('resolveUsersForTdf', tdfId, [newOwnerUsername]);
       if (lookup.missing && lookup.missing.length > 0) {
-        setAccessMessage(template, tdfId, contentText('content.userNotFound', { users: lookup.missing.join(', ') }), 'error');
-        return;
+        throw new Error(contentText('content.userNotFound', { users: lookup.missing.join(', ') }));
       }
 
       const newOwner = lookup.users[0];
       await MeteorAny.callAsync('transferDataOwnership', tdfId, newOwner);
       $('#transfer-' + tdfId).val('');
-      setAccessMessage(
-        template,
-        tdfId,
-        contentText('content.ownershipTransferred', { owner: newOwner.displayIdentifier || newOwner.username || 'new owner' }),
-        'success'
-      );
       assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-    } catch (error: any) {
-      clientConsole(1, '[ACCESS] Transfer ownership failed:', error);
-      setAccessMessage(template, tdfId, contentText('content.transferOwnershipError', { error: uploadErrorText(error) }), 'error');
-    }
+      return {
+        text: contentText('content.ownershipTransferred', { owner: newOwner.displayIdentifier || newOwner.username || 'new owner' }),
+      };
+    }, {
+      getErrorMessage: (error: any) => contentText('content.transferOwnershipError', { error: uploadErrorText(error) }),
+      onFailure: (error: any) => clientConsole(1, '[ACCESS] Transfer ownership failed:', error),
+    });
   },
   'click #load-more-tdfs': function(event: any, template: any){
     event.preventDefault();
@@ -1939,7 +1957,7 @@ Template.contentUpload.events({
     const tdfId = (panel.attr('id') || '').replace('media-manager-', '');
 
     if (!assetId) {
-      setUploadMessage(template, contentText('content.cannotDeleteAssetMissing'), 'error');
+      setUploadMessage(template, contentText('content.cannotDeleteAssetMissing'), 'error', `media:${tdfId}`);
       return;
     }
 
@@ -1955,16 +1973,17 @@ Template.contentUpload.events({
       return;
     }
 
-    try {
+    await template.commandRegistry.run(`media:${tdfId}`, async () => {
       await MeteorAny.callAsync('removeAssetById', assetId);
       // Refresh the assets list
       assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-    } catch (error: any) {
-      clientConsole(1, '[MEDIA] Delete error:', error);
-      setUploadMessage(template, contentText('content.errorDeletingFile', { error: uploadErrorText(error) }), 'error');
-    }
+      return { text: '' };
+    }, {
+      getErrorMessage: (error: any) => contentText('content.errorDeletingFile', { error: uploadErrorText(error) }),
+      onFailure: (error: any) => clientConsole(1, '[MEDIA] Delete error:', error),
+    });
   },
 
   // Delete selected files (batch delete)
@@ -1975,7 +1994,7 @@ Template.contentUpload.events({
     const selectedCheckboxes = panel.find('.media-select-checkbox:checked');
 
     if (selectedCheckboxes.length === 0) {
-      setUploadMessage(template, contentText('content.noFilesSelected'), 'warning');
+      setUploadMessage(template, contentText('content.noFilesSelected'), 'warning', `media:${tdfId}`);
       return;
     }
 
@@ -1992,7 +2011,7 @@ Template.contentUpload.events({
     });
 
     if (assetIds.length === 0) {
-      setUploadMessage(template, contentText('content.noValidFilesSelected'), 'warning');
+      setUploadMessage(template, contentText('content.noValidFilesSelected'), 'warning', `media:${tdfId}`);
       return;
     }
 
@@ -2013,17 +2032,18 @@ Template.contentUpload.events({
       return;
     }
 
-    try {
+    await template.commandRegistry.run(`media:${tdfId}`, async () => {
       await MeteorAny.callAsync('removeMultipleAssets', assetIds);
       
       // Refresh the assets list
       assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
-    } catch (error: any) {
-      clientConsole(1, '[MEDIA] Batch delete error:', error);
-      setUploadMessage(template, contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }), 'error');
-    }
+      return { text: '' };
+    }, {
+      getErrorMessage: (error: any) => contentText('content.errorDeletingFiles', { error: uploadErrorText(error) }),
+      onFailure: (error: any) => clientConsole(1, '[MEDIA] Batch delete error:', error),
+    });
   }
 });
 
@@ -2047,7 +2067,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
 
   const assetSub = template.assetSubs ? template.assetSubs.get(tdfId) : null;
   if (!assetSub || !assetSub.ready()) {
-    setUploadMessage(template, contentText('content.mediaListLoading'), 'warning');
+    setUploadMessage(template, contentText('content.mediaListLoading'), 'warning', `media:${tdfId}`);
     return;
   }
 
@@ -2058,13 +2078,13 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
   );
 
   if (validFiles.length === 0) {
-    setUploadMessage(template, contentText('content.noValidMediaFiles'), 'warning');
+    setUploadMessage(template, contentText('content.noValidMediaFiles'), 'warning', `media:${tdfId}`);
     return;
   }
 
   if (validFiles.length !== files.length) {
     const skipped = files.length - validFiles.length;
-    setUploadMessage(template, contentText('content.mediaFilesSkipped', { count: skipped }), 'warning');
+    setUploadMessage(template, contentText('content.mediaFilesSkipped', { count: skipped }), 'warning', `media:${tdfId}`);
   }
 
   progressContainer.show();
@@ -2126,7 +2146,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
       progressBar.css('width', (completed / total) * 100 + '%');
     } catch (error: any) {
       clientConsole(1, '[MEDIA] Upload error for', file.name, ':', error);
-      setUploadMessage(template, contentText('content.uploadMediaError', { filename: file.name, error: uploadErrorText(error) }), 'error');
+      setUploadMessage(template, contentText('content.uploadMediaError', { filename: file.name, error: uploadErrorText(error) }), 'error', `media:${tdfId}`);
     }
   }
 
@@ -2135,7 +2155,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
   progressBar.css('width', '0%');
   statusText.text('Upload complete!');
   if (completed === total) {
-    setUploadMessage(template, contentText('content.uploadedMediaFiles', { count: completed }), 'success');
+    setUploadMessage(template, contentText('content.uploadedMediaFiles', { count: completed }), 'success', `media:${tdfId}`);
   }
 
   // Refresh the assets list after a short delay to ensure UI updates

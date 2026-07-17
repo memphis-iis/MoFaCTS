@@ -3,28 +3,6 @@
 <template name="theme">
     {{#if isInRole 'admin'}}
         <div class="theme-settings-container">
-            {{#if themeMessage}}
-                <div class="admin-status admin-status-{{themeMessage.level}} admin-message" role="status" aria-live="polite">
-                    <i class="fa {{themeMessage.icon}}"></i>
-                    <div class="admin-status-text">{{themeMessage.text}}</div>
-                </div>
-            {{/if}}
-
-            {{#if themeConfirmation}}
-                <div class="admin-inline-confirmation admin-form-row" role="alert">
-                    <div>
-                        <div class="admin-inline-confirmation-title">{{themeConfirmation.title}}</div>
-                        <div class="admin-inline-confirmation-message">{{themeConfirmation.message}}</div>
-                    </div>
-                    <div class="admin-inline-confirmation-actions">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-theme-confirmation">{{themeText 'theme.cancel'}}</button>
-                        <button type="button" class="btn btn-sm {{themeConfirmation.confirmClass}}" id="confirm-theme-confirmation">
-                            {{themeConfirmation.confirmLabel}}
-                        </button>
-                    </div>
-                </div>
-            {{/if}}
-
             {{#if themeLoading}}
                 <section class="theme-loading-placeholder admin-async-region" role="status" aria-live="polite" aria-busy="true">
                     <span>{{themeText 'common.loading'}}</span>
@@ -59,14 +37,16 @@
                                             <span class="badge bg-light text-dark theme-origin-badge">{{themeOrigin metadata.origin}}</span>
                                         </div>
                                         <div class="btn-group btn-group-sm flex-wrap">
-                                            <button type="button" class="btn set-active-theme {{themeActivateButtonClass id}}" data-id="{{id}}" {{themeActivationAttrs id}}>{{themeActivateButtonLabel id}}</button>
-                                            <button type="button" class="btn btn-secondary duplicate-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.duplicate'}}</button>
+                                            <button type="button" class="btn set-active-theme {{themeActivateButtonClass id}}" data-id="{{id}}" {{themeActivationAttrs id}} {{themeRowCommandAttrs id}}>{{themeActivateButtonLabel id}}</button>
+                                            <button type="button" class="btn btn-secondary duplicate-theme" data-id="{{id}}" data-name="{{metadata.name}}" {{themeRowCommandAttrs id}}>{{themeText 'theme.duplicate'}}</button>
                                             {{#unless (isSystemTheme metadata.origin)}}
-                                                <button type="button" class="btn btn-secondary rename-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.rename'}}</button>
-                                                <button type="button" class="btn btn-secondary delete-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.delete'}}</button>
+                                                <button type="button" class="btn btn-secondary rename-theme" data-id="{{id}}" data-name="{{metadata.name}}" {{themeRowCommandAttrs id}}>{{themeText 'theme.rename'}}</button>
+                                                <button type="button" class="btn btn-secondary delete-theme" data-id="{{id}}" data-name="{{metadata.name}}" {{themeRowCommandAttrs id}}>{{themeText 'theme.delete'}}</button>
                                             {{/unless}}
-                                            <button type="button" class="btn btn-secondary export-theme" data-id="{{id}}" data-name="{{metadata.name}}">{{themeText 'theme.export'}}</button>
+                                            <button type="button" class="btn btn-secondary export-theme" data-id="{{id}}" data-name="{{metadata.name}}" {{themeRowCommandAttrs id}}>{{themeText 'theme.export'}}</button>
                                         </div>
+                                        {{#with (themeMessage (themeScope id))}}{{> adminStatus variant=level text=text}}{{/with}}
+                                        {{> adminInlineConfirmation confirmation=(themeConfirmationFor (themeScope id))}}
                                     </div>
                                 {{/each}}
                             {{else}}
@@ -82,6 +62,7 @@
                             <input type="file" class="form-control theme-import-input" id="themeImportInput" accept=".json,application/json" aria-label="{{themeText 'theme.importThemeJson'}}">
                             <button type="button" class="btn" id="themeImportButton">{{themeText 'theme.import'}}</button>
                         </div>
+                        {{#with (themeMessage 'library')}}{{> adminStatus variant=level text=text}}{{/with}}
 
                         {{> themeGenerationWizard}}
                     </div>
@@ -95,6 +76,7 @@
                         <input type="text" id="themeName" class="currentThemeProp form-control theme-name-input" value="{{currentTheme.properties.themeName}}" data-id="themeName">
                     </div>
                 </div>
+                {{#with (themeMessage 'property')}}{{> adminStatus variant=level text=text}}{{/with}}
 
                 <!-- Main Layout & Text -->
                 <div class="theme-section">
@@ -557,6 +539,7 @@
                             <small class="form-text text-muted">
                                 {{themeText 'theme.homeUnderlayHelp'}}
                             </small>
+                            {{#with (themeMessage 'underlay')}}{{> adminStatus variant=level text=text}}{{/with}}
                             {{#if currentTheme.properties.practice_menu_underlay_image_url}}
                             <div class="theme-preview-stack">
                                 <button type="button" id="clearHomeUnderlay" class="btn btn-secondary btn-sm">{{themeText 'theme.clearUnderlayImage'}}</button>
@@ -596,6 +579,8 @@
                             <small class="form-text text-muted">
                                 {{themeText 'theme.logoHelp'}}
                             </small>
+                            {{#with (themeMessage 'logo')}}{{> adminStatus variant=level text=text}}{{/with}}
+                            {{> adminInlineConfirmation confirmation=(themeConfirmationFor 'logo')}}
                             {{#if currentTheme.properties.brand_logo_url}}
                             <button type="button" id="clearLogo" class="btn btn-secondary btn-sm admin-form-row-top">{{themeText 'theme.clearLogo'}}</button>
                             <div class="admin-form-row-top">
@@ -659,6 +644,7 @@
                             {{#if themeHelpStatus}}
                                 {{> adminStatus variant=themeHelpStatus.level text=themeHelpStatus.text}}
                             {{/if}}
+                            {{> adminInlineConfirmation confirmation=(themeConfirmationFor 'help')}}
                         </div>
                     </div>
                 </div>

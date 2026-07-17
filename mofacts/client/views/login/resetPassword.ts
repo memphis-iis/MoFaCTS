@@ -6,7 +6,7 @@ declare const Template: {
   resetPassword: {
     onRendered(callback: () => void): void;
     events(map: Record<string, (event: Event) => void | Promise<void>>): void;
-    helpers(map: Record<string, () => unknown>): void;
+    helpers(map: Record<string, (...args: any[]) => unknown>): void;
   };
 };
 declare const Session: {
@@ -37,6 +37,7 @@ const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
 const MIN_PASSWORD_LENGTH = 8;
 const RESET_STATUS_KEY = 'resetPasswordStatusMessage';
 const RESET_ERROR_KEY = 'resetPasswordErrorMessage';
+const RESET_ERROR_FIELD_KEY = 'resetPasswordErrorField';
 const RESET_TOKEN_KEY = 'resetPasswordLinkToken';
 const RESET_EMAIL_KEY = 'resetPasswordLinkEmail';
 
@@ -66,13 +67,18 @@ function setResetStatus(message: string) {
   Session.set(RESET_STATUS_KEY, message);
 }
 
-function setResetError(message: string) {
+function setResetError(message: string, field = 'form') {
   Session.set(RESET_ERROR_KEY, message);
+  Session.set(RESET_ERROR_FIELD_KEY, message ? field : '');
 }
 
 function clearResetMessages() {
   setResetStatus('');
   setResetError('');
+}
+
+function focusResetField(fieldId: string): void {
+  document.getElementById(fieldId)?.focus();
 }
 
 Template.resetPassword.onRendered(function() {
@@ -125,7 +131,8 @@ Template.resetPassword.events({
       clearResetMessages();
       const email = normalizeEmailForReset($('#email').val());
       if (!email) {
-        setResetError(authText('auth.resetEnterEmailForLink'));
+        setResetError(authText('auth.resetEnterEmailForLink'), 'request-email');
+        focusResetField('email');
         return;
       }
       try {
@@ -151,7 +158,8 @@ Template.resetPassword.events({
 
     if (!email) {
       if (token) {
-        setResetError(authText('auth.resetEnterAccountEmail'));
+        setResetError(authText('auth.resetEnterAccountEmail'), 'reset-email');
+        focusResetField('email2');
       } else {
         setResetError(authText('auth.resetOpenEmailLink'));
       }
@@ -162,12 +170,14 @@ Template.resetPassword.events({
       return;
     }
     if (newPassword !== confirmPassword) {
-      setResetError(authText('auth.passwordsMustMatch'));
+      setResetError(authText('auth.passwordsMustMatch'), 'password-verify');
+      focusResetField('passwordVerify');
       return;
     }
     const minPasswordLength = Number(Session.get('minPasswordLength')) || MIN_PASSWORD_LENGTH;
     if (newPassword.length < minPasswordLength) {
-      setResetError(authText('auth.passwordTooShort', { min: minPasswordLength }));
+      setResetError(authText('auth.passwordTooShort', { min: minPasswordLength }), 'password');
+      focusResetField('password');
       return;
     }
 
@@ -183,7 +193,7 @@ Template.resetPassword.events({
       if (errorCode === 'invalid-token') {
         setResetError(authText('auth.resetLinkInvalidExpired'));
       } else if (errorCode === 'weak-password') {
-        setResetError(authText('auth.passwordTooWeak'));
+        setResetError(authText('auth.passwordTooWeak'), 'password');
       } else {
         setResetError(authText('auth.genericTryAgain'));
       }
@@ -203,6 +213,26 @@ Template.resetPassword.helpers({
   },
   resetPasswordErrorMessage() {
     return Session.get(RESET_ERROR_KEY);
+  },
+  resetFieldErrorAttrs(field: string, errorId: string) {
+    return Session.get(RESET_ERROR_FIELD_KEY) === field
+      ? { 'aria-invalid': 'true', 'aria-describedby': errorId }
+      : { 'aria-invalid': 'false' };
+  },
+  requestEmailErrorMessage() {
+    return Session.get(RESET_ERROR_FIELD_KEY) === 'request-email' ? Session.get(RESET_ERROR_KEY) : '';
+  },
+  resetEmailErrorMessage() {
+    return Session.get(RESET_ERROR_FIELD_KEY) === 'reset-email' ? Session.get(RESET_ERROR_KEY) : '';
+  },
+  resetPasswordFieldErrorMessage() {
+    return Session.get(RESET_ERROR_FIELD_KEY) === 'password' ? Session.get(RESET_ERROR_KEY) : '';
+  },
+  resetPasswordVerifyErrorMessage() {
+    return Session.get(RESET_ERROR_FIELD_KEY) === 'password-verify' ? Session.get(RESET_ERROR_KEY) : '';
+  },
+  resetFormErrorMessage() {
+    return Session.get(RESET_ERROR_FIELD_KEY) === 'form' ? Session.get(RESET_ERROR_KEY) : '';
   },
   resetPasswordLinkReady() {
     return !!Session.get(RESET_TOKEN_KEY);

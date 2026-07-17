@@ -99,8 +99,7 @@ export async function selectTdf(
   } catch (error) {
     clientConsole(1, '[LessonLaunch] Failed to load launch-ready TDF:', currentTdfId, error);
     setCourseAssignmentLaunchContext(null);
-    alert(translatePlatformString(getActiveUiLocale(), 'dashboard.unableToLoadSelectedLesson'));
-    return;
+    throw new Error(translatePlatformString(getActiveUiLocale(), 'dashboard.unableToLoadSelectedLesson'), { cause: error });
   }
 
   const curTdfContent = preparedLaunch.content;

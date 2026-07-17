@@ -25,6 +25,8 @@ import {
     createTemplateLifetime,
     type TemplateLifetime,
 } from '../../lib/adminUi/templateLifetime';
+import { createInlineConfirmationController } from '../../lib/adminUi/inlineConfirmationController';
+import '../shared/adminUi/adminUi';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const TdfsCollection = (globalThis as any).Tdfs || (globalThis as any).TdfsCollection;
@@ -54,17 +56,19 @@ let cachedStimSchema: any = null;
 const SAVE_SUCCESS_REDIRECT_DELAY_MS = 1000;
 type ContentEditorLoadValue = Readonly<{ tdf: any | null }>;
 
-function setEditorMessage(instance: any, type: string, title: string, text: string) {
-    instance.editorMessage.set({
+function setEditorMessage(instance: any, type: string, title: string, text: string, scope = 'save') {
+    instance.editorMessages.set({ ...instance.editorMessages.get(), [scope]: {
         type,
         title,
         text,
         icon: type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
-    });
+    } });
 }
 
-function clearEditorMessage(instance: any) {
-    instance.editorMessage.set(null);
+function clearEditorMessage(instance: any, scope: string) {
+    const messages = { ...instance.editorMessages.get() };
+    delete messages[scope];
+    instance.editorMessages.set(messages);
 }
 
 function showSaveFeedbackAndRedirect(instance: any, message: string) {
@@ -91,8 +95,12 @@ Template.contentEdit.onCreated(function(this: any) {
     instance.hasChanges = new ReactiveVar(false);
     instance.saving = new ReactiveVar(false);
     instance.saveFeedback = new ReactiveVar('');
-    instance.editorMessage = new ReactiveVar(null);
-    instance.removeIncorrectConfirmation = new ReactiveVar(false);
+    instance.editorMessages = new ReactiveVar({});
+    instance.removeIncorrectConfirmation = new ReactiveVar(null);
+    instance.removeIncorrectConfirmationController = createInlineConfirmationController(
+        (view) => instance.removeIncorrectConfirmation.set(view.status === 'open' ? view : null),
+        () => document.getElementById('removeIncorrectBtn'),
+    );
     instance.tooltipMode = new ReactiveVar(getTooltipMode());
     instance.currentClusterIndex = new ReactiveVar(0); // window start index
     instance.clusterWindowSize = new ReactiveVar(1);   // how many clusters shown at once
@@ -158,6 +166,7 @@ Template.contentEdit.onDestroyed(function(this: any) {
     if (this.clustersCount) {
         this.clustersCount.set(0);
     }
+    this.removeIncorrectConfirmationController.destroy();
 });
 
 Template.contentEdit.helpers({
@@ -245,8 +254,20 @@ Template.contentEdit.helpers({
         return (Template.instance() as any).saveFeedback.get();
     },
 
-    editorMessage() {
-        return (Template.instance() as any).editorMessage.get();
+    toolbarEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().toolbar || null;
+    },
+    validationEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().validation || null;
+    },
+    fieldEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().field || null;
+    },
+    saveEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().save || null;
+    },
+    initializationEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().initialization || null;
     },
 
     removeIncorrectConfirmation() {
@@ -399,7 +420,7 @@ Template.contentEdit.events({
         const modal = (globalThis as any).bootstrap.Modal.getInstance(document.getElementById('generateIncorrectModal') as any);
         if (modal) modal.hide();
 
-        instance.removeIncorrectConfirmation.set(false);
+        instance.removeIncorrectConfirmationController.cancel();
         setEditorMessage(
             instance,
             'success',
@@ -408,7 +429,8 @@ Template.contentEdit.events({
                 count,
                 generated: result.generated,
                 totalStims: result.totalStims
-            })
+            }),
+            'toolbar'
         );
     },
 
@@ -417,22 +439,35 @@ Template.contentEdit.events({
         event.preventDefault();
         if (!instance.editor) return;
 
-        instance.removeIncorrectConfirmation.set(true);
-        clearEditorMessage(instance);
+        instance.removeIncorrectConfirmationController.open({
+            confirmationId: 'content-remove-incorrect-confirmation',
+            title: contentEditorText('contentEditor.removeIncorrectTitle'),
+            message: contentEditorText('contentEditor.removeIncorrectMessage'),
+            confirmLabel: contentEditorText('contentEditor.remove'),
+            cancelLabel: contentEditorText('content.cancel'),
+            severity: 'danger',
+            context: undefined,
+        }, event.currentTarget as HTMLElement);
+        Tracker.afterFlush(() => instance.removeIncorrectConfirmationController.focusInitial());
+        clearEditorMessage(instance, 'toolbar');
     },
 
-    'click #cancelRemoveIncorrectBtn'(event: any, instance: any) {
+    'click .admin-confirmation-cancel'(event: any, instance: any) {
         event.preventDefault();
-        instance.removeIncorrectConfirmation.set(false);
+        instance.removeIncorrectConfirmationController.cancel();
     },
 
-    'click #confirmRemoveIncorrectBtn'(event: any, instance: any) {
+    'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: any) {
+        instance.removeIncorrectConfirmationController.handleKeydown(event);
+    },
+
+    'click .admin-confirmation-confirm'(event: any, instance: any) {
         event.preventDefault();
         if (!instance.editor) return;
 
         const result = removeAllIncorrectResponses(instance);
-        instance.removeIncorrectConfirmation.set(false);
-        setEditorMessage(instance, 'success', contentEditorText('contentEditor.incorrectRemovedTitle'), contentEditorText('contentEditor.incorrectRemovedText', { removed: result.removed }));
+        instance.removeIncorrectConfirmationController.complete();
+        setEditorMessage(instance, 'success', contentEditorText('contentEditor.incorrectRemovedTitle'), contentEditorText('contentEditor.incorrectRemovedText', { removed: result.removed }), 'toolbar');
     },
 
     async 'click .save-btn'(event: any, instance: any) {
@@ -450,7 +485,7 @@ Template.contentEdit.events({
         const schemaErrors = instance.editor.validate();
         if (schemaErrors.length > 0) {
             const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('; ');
-            setEditorMessage(instance, 'error', contentEditorText('tdfEditor.schemaValidationErrors'), errorMessages);
+            setEditorMessage(instance, 'error', contentEditorText('tdfEditor.schemaValidationErrors'), errorMessages, 'validation');
             return;
         }
 
@@ -463,12 +498,13 @@ Template.contentEdit.events({
                 if (summaryEl) {
                     summaryEl.scrollIntoView({ behavior: 'smooth' });
                 }
-                setEditorMessage(instance, 'warning', contentEditorText('tdfEditor.validationAttentionTitle'), contentEditorText('tdfEditor.validationAttentionText'));
+                setEditorMessage(instance, 'warning', contentEditorText('tdfEditor.validationAttentionTitle'), contentEditorText('tdfEditor.validationAttentionText'), 'validation');
                 return;
             }
         }
 
-        clearEditorMessage(instance);
+        clearEditorMessage(instance, 'validation');
+        clearEditorMessage(instance, 'save');
         instance.saving.set(true);
 
         try {
@@ -492,7 +528,7 @@ Template.contentEdit.events({
 
         } catch (error: any) {
             clientConsole(1, '[Content Edit] Error saving stimuli:', error);
-            setEditorMessage(instance, 'error', contentEditorText('contentEditor.errorSavingStimuli'), error.reason || error.message);
+            setEditorMessage(instance, 'error', contentEditorText('contentEditor.errorSavingStimuli'), error.reason || error.message, 'save');
         } finally {
             instance.saving.set(false);
         }
@@ -1148,8 +1184,8 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
     };
 
     if (!validTypes[mediaType]?.some(type => file.type.startsWith(type.split('/')[0]))) {
-        if (instance?.editorMessage) {
-            setEditorMessage(instance, 'warning', contentEditorText('contentEditor.invalidMediaFile'), contentEditorText('contentEditor.invalidMediaFileText', { mediaType }));
+        if (instance?.editorMessages) {
+            setEditorMessage(instance, 'warning', contentEditorText('contentEditor.invalidMediaFile'), contentEditorText('contentEditor.invalidMediaFileText', { mediaType }), 'field');
         }
         return;
     }
@@ -1277,7 +1313,7 @@ async function initStimEditor(instance: any, tdf: any) {
         await ensureJsonEditor();
     } catch (error: any) {
         clientConsole(1, '[Content Edit] JSONEditor failed to load:', error);
-        setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshContactSupport'));
+        setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshContactSupport'), 'initialization');
         throw error;
     }
 
@@ -1375,7 +1411,7 @@ function renderClusterEditor(instance: any, clusterIndex: any) {
     const JSONEditorAny = (globalThis as any).JSONEditor;
     if (typeof JSONEditorAny === 'undefined') {
         clientConsole(1, '[Content Edit] JSONEditor not loaded after route asset initialization.');
-        setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshPage'));
+        setEditorMessage(instance, 'error', contentEditorText('tdfEditor.editorLibraryNotLoaded'), contentEditorText('tdfEditor.refreshPage'), 'initialization');
         instance._rejectInitialEditor?.(new Error('JSONEditor is not loaded.'));
         return;
     }

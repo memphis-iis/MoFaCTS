@@ -1,5 +1,4 @@
 import { Template } from 'meteor/templating';
-import { Session } from 'meteor/session';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Tracker } from 'meteor/tracker';
 import './adminBackups.html';
@@ -10,6 +9,13 @@ import { clientConsole } from '../lib/userSessionHelpers';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
 import { formatActiveInterfaceDateTime } from '../lib/interfaceFormatting';
+import {
+  createScopedAsyncCommandRegistry,
+  type ScopedAsyncCommandRegistry,
+} from '../lib/adminUi/scopedAsyncCommandRegistry';
+import {
+  type AsyncCommandState,
+} from '../lib/adminUi/asyncCommandState';
 import {
   rejectLoad,
   resolveLoad,
@@ -34,20 +40,24 @@ import {
   type BackupSnapshot,
 } from './adminBackupsState';
 
-const BACKUP_MESSAGE_KEY = 'adminBackupsMessage';
-const BACKUP_BUSY_KEY = 'adminBackupsBusy';
-const BACKUP_SELECTED_MANIFEST_KEY = 'adminBackupsSelectedManifest';
-
 type BackupConfirmationContext = Readonly<{
   action: 'restore' | 'delete';
   job: BackupJob;
 }>;
+
+type BackupCommandResult = Readonly<{ message: string; level?: 'info' | 'success' }>;
+type BackupMessage = Readonly<{ text: string; level: 'info' | 'success' | 'warning' | 'error' }>;
+type SelectedManifest = Readonly<{ jobId: string; text: string }>;
 
 type AdminBackupsInstance = Blaze.TemplateInstance & {
   loadState: ReactiveVar<LoadableState<BackupSnapshot>>;
   lifetime: TemplateLifetime;
   confirmationState: ReactiveVar<InlineConfirmationView>;
   confirmationController: InlineConfirmationController<BackupConfirmationContext>;
+  commandStates: ReactiveVar<Record<string, AsyncCommandState<BackupCommandResult>>>;
+  commandRegistry: ScopedAsyncCommandRegistry<BackupCommandResult>;
+  localMessages: ReactiveVar<Record<string, BackupMessage>>;
+  selectedManifest: ReactiveVar<SelectedManifest | null>;
 };
 
 let activeAdminBackupsInstance: AdminBackupsInstance | null = null;
@@ -70,15 +80,36 @@ function formatError(err: unknown): string {
   return err ? String(err) : backupText('admin.unknownError');
 }
 
-function setBackupMessage(text: string | null, level = 'info'): void {
-  if (!text) {
-    Session.set(BACKUP_MESSAGE_KEY, null);
-    return;
-  }
-  Session.set(BACKUP_MESSAGE_KEY, {
-    text,
-    level,
-  });
+function backupScope(action: string, jobId?: string): string {
+  return `backup:${action}${jobId ? `:${jobId}` : ''}`;
+}
+
+function setBackupLocalMessage(instance: AdminBackupsInstance, scope: string, message: BackupMessage | null): void {
+  const messages = { ...instance.localMessages.get() };
+  if (message) messages[scope] = message;
+  else delete messages[scope];
+  instance.localMessages.set(messages);
+}
+
+function pendingBackupMessage(scope: string): string {
+  if (scope === backupScope('create')) return backupText('admin.creatingBackup');
+  if (scope.startsWith(`${backupScope('verify')}:`)) return backupText('admin.verifyingBackupArchive');
+  if (scope.startsWith(`${backupScope('manifest')}:`)) return backupText('common.loading');
+  if (scope.startsWith(`${backupScope('download')}:`)) return backupText('admin.preparingDownloadLink');
+  if (scope.startsWith(`${backupScope('restore')}:`)) return backupText('admin.restoringBackup');
+  if (scope.startsWith(`${backupScope('delete')}:`)) return backupText('admin.deletingBackupArchive');
+  return backupText('common.loading');
+}
+
+function commandMessage(instance: AdminBackupsInstance, scope: string): BackupMessage | null {
+  const local = instance.localMessages.get()[scope];
+  if (local) return local;
+  const state = instance.commandStates.get()[scope];
+  if (!state || state.status === 'idle') return null;
+  if (state.status === 'pending') return { text: pendingBackupMessage(scope), level: 'info' };
+  if (state.status === 'error') return { text: state.message, level: 'error' };
+  if (!state.result.message) return null;
+  return { text: state.result.message, level: state.result.level ?? 'success' };
 }
 
 function backupSnapshotFromState(
@@ -135,26 +166,36 @@ Template.adminBackups.onCreated(function(this: AdminBackupsInstance) {
     () => this.find('[data-confirmation-return-fallback]') as HTMLElement | null,
   );
   this.confirmationState = new ReactiveVar(this.confirmationController.getView());
-  Session.set(BACKUP_BUSY_KEY, false);
-  Session.set(BACKUP_SELECTED_MANIFEST_KEY, null);
-  setBackupMessage(null);
+  this.commandStates = new ReactiveVar({});
+  this.commandRegistry = createScopedAsyncCommandRegistry<BackupCommandResult>((scope, state) => {
+    this.commandStates.set({ ...this.commandStates.get(), [scope]: state });
+  });
+  this.localMessages = new ReactiveVar({});
+  this.selectedManifest = new ReactiveVar<SelectedManifest | null>(null);
   void refreshBackups(this);
 });
 
 Template.adminBackups.onDestroyed(function(this: AdminBackupsInstance) {
   this.lifetime.destroy();
   this.confirmationController.destroy();
+  this.commandRegistry.destroy();
   if (activeAdminBackupsInstance === this) {
     activeAdminBackupsInstance = null;
   }
-  Session.set(BACKUP_BUSY_KEY, false);
-  Session.set(BACKUP_SELECTED_MANIFEST_KEY, null);
-  setBackupMessage(null);
 });
 
 Template.adminBackups.helpers({
-  backupMessage() {
-    return Session.get(BACKUP_MESSAGE_KEY);
+  backupMessage(scope = 'create') {
+    return commandMessage(currentAdminBackupsInstance(), backupScope(scope));
+  },
+  backupRowMessages(jobId: string) {
+    const instance = currentAdminBackupsInstance();
+    return ['manifest', 'verify', 'download', 'restore', 'delete']
+      .map((action) => commandMessage(instance, backupScope(action, jobId)))
+      .filter((message): message is BackupMessage => Boolean(message));
+  },
+  backupHistoryMessage() {
+    return commandMessage(currentAdminBackupsInstance(), backupScope('history'));
   },
   backupConfig() {
     const state = currentAdminBackupsInstance().loadState.get();
@@ -170,15 +211,30 @@ Template.adminBackups.helpers({
   backupAsyncBusy() {
     return currentBackupPresentation().busy ? 'true' : 'false';
   },
-  isBusy() {
+  backupUnavailable() {
     const state = currentAdminBackupsInstance().loadState.get();
-    return Session.get(BACKUP_BUSY_KEY) === true || !backupSnapshotFromState(state);
+    return !backupSnapshotFromState(state);
   },
-  selectedManifest() {
-    return Session.get(BACKUP_SELECTED_MANIFEST_KEY);
+  backupCommandAttrs(action: string, jobId?: string) {
+    const scope = backupScope(action, jobId);
+    const pending = currentAdminBackupsInstance().commandStates.get()[scope]?.status === 'pending';
+    const unavailable = !backupSnapshotFromState(currentAdminBackupsInstance().loadState.get());
+    return pending || unavailable
+      ? { disabled: true, ...(pending ? { 'aria-busy': 'true' } : {}) }
+      : {};
+  },
+  backupRowManifest(jobId: string) {
+    const selected = currentAdminBackupsInstance().selectedManifest.get();
+    return selected?.jobId === jobId ? selected.text : null;
   },
   backupConfirmationView() {
     return currentAdminBackupsInstance().confirmationState.get();
+  },
+  backupRowConfirmation(jobId: string) {
+    const instance = currentAdminBackupsInstance();
+    return instance.confirmationController.getContext()?.job._id === jobId
+      ? instance.confirmationState.get()
+      : null;
   },
   backupText(key: Parameters<typeof translatePlatformString>[1]) {
     return backupText(key);
@@ -277,69 +333,68 @@ Template.adminBackups.events({
     void refreshBackups(instance);
   },
   'click #createBackupButton': async function(_event: Event, instance: AdminBackupsInstance) {
-    Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage(backupText('admin.creatingBackup'), 'info');
-    try {
+    const scope = backupScope('create');
+    setBackupLocalMessage(instance, scope, null);
+    await instance.commandRegistry.run(scope, async () => {
       await meteorCallAsync('admin.backups.create');
       await refreshBackups(instance);
-      setBackupMessage(backupText('admin.backupCompleted'), 'success');
-    } catch (error) {
-      clientConsole(1, '[Backups] Create failed:', error);
-      await refreshBackups(instance);
-      setBackupMessage(backupText('admin.backupFailed', { error: formatError(error) }), 'error');
-    } finally {
-      Session.set(BACKUP_BUSY_KEY, false);
-    }
+      return { message: backupText('admin.backupCompleted') };
+    }, {
+      getErrorMessage: (error) => backupText('admin.backupFailed', { error: formatError(error) }),
+      onFailure: (error) => {
+        clientConsole(1, '[Backups] Create failed:', error);
+        void refreshBackups(instance);
+      },
+    });
   },
   'click .verifyBackupButton': async function(event: Event, instance: AdminBackupsInstance) {
     const jobId = (event.currentTarget as HTMLElement | null)?.getAttribute('data-job-id') || '';
     if (!jobId) {
       return;
     }
-    Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage(backupText('admin.verifyingBackupArchive'), 'info');
-    try {
+    const scope = backupScope('verify', jobId);
+    setBackupLocalMessage(instance, scope, null);
+    await instance.commandRegistry.run(scope, async () => {
       await meteorCallAsync('admin.backups.verify', jobId);
       await refreshBackups(instance);
-      setBackupMessage(backupText('admin.backupVerificationFinished'), 'success');
-    } catch (error) {
-      await refreshBackups(instance);
-      setBackupMessage(backupText('admin.verificationFailed', { error: formatError(error) }), 'error');
-    } finally {
-      Session.set(BACKUP_BUSY_KEY, false);
-    }
+      return { message: backupText('admin.backupVerificationFinished') };
+    }, {
+      getErrorMessage: (error) => backupText('admin.verificationFailed', { error: formatError(error) }),
+      onFailure: () => void refreshBackups(instance),
+    });
   },
-  'click .viewManifestButton': async function(event: Event) {
+  'click .viewManifestButton': async function(event: Event, instance: AdminBackupsInstance) {
     const jobId = (event.currentTarget as HTMLElement | null)?.getAttribute('data-job-id') || '';
     if (!jobId) {
       return;
     }
-    try {
+    const scope = backupScope('manifest', jobId);
+    setBackupLocalMessage(instance, scope, null);
+    await instance.commandRegistry.run(scope, async () => {
       const job = await meteorCallAsync('admin.backups.get', jobId) as BackupJob;
-      Session.set(BACKUP_SELECTED_MANIFEST_KEY, JSON.stringify(job.manifest || {}, null, 2));
-    } catch (error) {
-      setBackupMessage(backupText('admin.manifestLoadFailed', { error: formatError(error) }), 'error');
-    }
+      instance.selectedManifest.set({ jobId, text: JSON.stringify(job.manifest || {}, null, 2) });
+      return { message: '' };
+    }, {
+      getErrorMessage: (error) => backupText('admin.manifestLoadFailed', { error: formatError(error) }),
+    });
   },
-  'click .downloadBackupButton': async function(event: Event) {
+  'click .downloadBackupButton': async function(event: Event, instance: AdminBackupsInstance) {
     const jobId = (event.currentTarget as HTMLElement | null)?.getAttribute('data-job-id') || '';
     if (!jobId) {
       return;
     }
-    Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage(backupText('admin.preparingDownloadLink'), 'info');
-    try {
+    const scope = backupScope('download', jobId);
+    setBackupLocalMessage(instance, scope, null);
+    await instance.commandRegistry.run(scope, async () => {
       const result = await meteorCallAsync('admin.backups.downloadToken', jobId) as { url?: string };
       if (!result.url) {
         throw new Error(backupText('admin.downloadUrlMissing'));
       }
-      setBackupMessage(backupText('admin.downloadStartingSensitive'), 'success');
       window.location.assign(result.url);
-    } catch (error) {
-      setBackupMessage(backupText('admin.downloadFailed', { error: formatError(error) }), 'error');
-    } finally {
-      Session.set(BACKUP_BUSY_KEY, false);
-    }
+      return { message: backupText('admin.downloadStartingSensitive') };
+    }, {
+      getErrorMessage: (error) => backupText('admin.downloadFailed', { error: formatError(error) }),
+    });
   },
   'click .restoreBackupButton': function(event: Event, instance: AdminBackupsInstance) {
     const trigger = event.currentTarget as HTMLElement | null;
@@ -350,9 +405,10 @@ Template.adminBackups.events({
     const job = backupSnapshotFromState(instance.loadState.get())?.jobs
       .find((candidate) => candidate._id === jobId);
     if (!job) {
-      setBackupMessage(backupText('admin.failedLoadBackups', {
-        error: `Backup job ${jobId} is no longer available.`,
-      }), 'error');
+      setBackupLocalMessage(instance, backupScope('restore', jobId), {
+        text: backupText('admin.failedLoadBackups', { error: `Backup job ${jobId} is no longer available.` }),
+        level: 'error',
+      });
       return;
     }
     instance.confirmationController.open({
@@ -366,7 +422,9 @@ Template.adminBackups.events({
       inputLabel: backupText('admin.restoreConfirmationPhrase'),
       inputValueRequired: true,
     }, trigger);
-    setBackupMessage(backupText('admin.typeRestoreToRun'), 'info');
+    setBackupLocalMessage(instance, backupScope('restore', jobId), {
+      text: backupText('admin.typeRestoreToRun'), level: 'info',
+    });
     Tracker.afterFlush(() => instance.confirmationController.focusInitial());
   },
   'click .deleteBackupButton': function(event: Event, instance: AdminBackupsInstance) {
@@ -378,9 +436,10 @@ Template.adminBackups.events({
     const job = backupSnapshotFromState(instance.loadState.get())?.jobs
       .find((candidate) => candidate._id === jobId);
     if (!job) {
-      setBackupMessage(backupText('admin.failedLoadBackups', {
-        error: `Backup job ${jobId} is no longer available.`,
-      }), 'error');
+      setBackupLocalMessage(instance, backupScope('delete', jobId), {
+        text: backupText('admin.failedLoadBackups', { error: `Backup job ${jobId} is no longer available.` }),
+        level: 'error',
+      });
       return;
     }
     instance.confirmationController.open({
@@ -394,18 +453,23 @@ Template.adminBackups.events({
       inputLabel: backupText('admin.deleteConfirmationPhrase'),
       inputValueRequired: true,
     }, trigger);
-    setBackupMessage(backupText('admin.typeDeleteToRemove'), 'info');
+    setBackupLocalMessage(instance, backupScope('delete', jobId), {
+      text: backupText('admin.typeDeleteToRemove'), level: 'info',
+    });
     Tracker.afterFlush(() => instance.confirmationController.focusInitial());
   },
   'click .admin-confirmation-cancel': function(_event: Event, instance: AdminBackupsInstance) {
-    const action = instance.confirmationController.getContext()?.action;
+    const context = instance.confirmationController.getContext();
+    const action = context?.action;
     if (!instance.confirmationController.cancel()) {
       return;
     }
-    setBackupMessage(
-      backupText(action === 'restore' ? 'admin.restoreCancelled' : 'admin.deleteCancelled'),
-      'info',
-    );
+    if (context) {
+      setBackupLocalMessage(instance, backupScope(context.action, context.job._id), {
+        text: backupText(action === 'restore' ? 'admin.restoreCancelled' : 'admin.deleteCancelled'),
+        level: 'info',
+      });
+    }
   },
   'keydown .admin-inline-confirmation': function(event: KeyboardEvent, instance: AdminBackupsInstance) {
     instance.confirmationController.handleKeydown(event);
@@ -421,42 +485,40 @@ Template.adminBackups.events({
     const expectedPhrase = context.action === 'restore' ? 'RESTORE' : 'DELETE';
     if (confirmation !== expectedPhrase) {
       instance.confirmationController.cancel();
-      setBackupMessage(backupText(
-        context.action === 'restore'
-          ? 'admin.restorePhraseMismatch'
-          : 'admin.deletePhraseMismatch',
-      ), 'info');
+      setBackupLocalMessage(instance, backupScope(context.action, context.job._id), {
+        text: backupText(context.action === 'restore' ? 'admin.restorePhraseMismatch' : 'admin.deletePhraseMismatch'),
+        level: 'warning',
+      });
       return;
     }
     instance.confirmationController.setPending(true);
-    Session.set(BACKUP_BUSY_KEY, true);
-    setBackupMessage(backupText(
-      context.action === 'restore'
-        ? 'admin.restoringBackup'
-        : 'admin.deletingBackupArchive',
-    ), 'info');
-    try {
+    const scope = backupScope(context.action, context.job._id);
+    setBackupLocalMessage(instance, scope, null);
+    await instance.commandRegistry.run(scope, async () => {
       await meteorCallAsync(
         context.action === 'restore' ? 'admin.backups.restore' : 'admin.backups.delete',
         context.job._id,
         confirmation,
       );
       await refreshBackups(instance);
-      instance.confirmationController.complete();
-      setBackupMessage(backupText(
-        context.action === 'restore'
-          ? 'admin.restoreCompleted'
-          : 'admin.backupArchiveDeleted',
-      ), 'success');
-    } catch (error) {
-      await refreshBackups(instance);
-      instance.confirmationController.setPending(false);
-      setBackupMessage(backupText(
+      return {
+        message: backupText(context.action === 'restore' ? 'admin.restoreCompleted' : 'admin.backupArchiveDeleted'),
+      };
+    }, {
+      getErrorMessage: (error) => backupText(
         context.action === 'restore' ? 'admin.restoreFailed' : 'admin.deleteFailed',
         { error: formatError(error) },
-      ), 'error');
-    } finally {
-      Session.set(BACKUP_BUSY_KEY, false);
-    }
+      ),
+      onSuccess: (result) => {
+        instance.confirmationController.complete();
+        if (context.action === 'delete') {
+          setBackupLocalMessage(instance, backupScope('history'), { text: result.message, level: 'success' });
+        }
+      },
+      onFailure: () => {
+        instance.confirmationController.setPending(false);
+        void refreshBackups(instance);
+      },
+    });
   },
 });

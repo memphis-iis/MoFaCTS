@@ -263,7 +263,10 @@ function consumePendingClassInvite(controller: any = null): boolean {
     })
     .catch((error: unknown) => {
       clientConsole(1, '[ROUTER] Failed to accept class invitation:', getErrorMessage(error));
-      alert(translatePlatformString(getActiveUiLocale(), 'route.classJoinFailed'));
+      Session.set('classSelectionRouteMessage', {
+        variant: 'error',
+        text: translatePlatformString(getActiveUiLocale(), 'route.classJoinFailed'),
+      });
       FlowRouter.go('/classSelection');
     });
   return true;
@@ -869,8 +872,11 @@ FlowRouter.route('/classes/:teacherId/:sectionId', {
     const teacherId = normalizeRouteParam(params.teacherId);
     const sectionId = normalizeRouteParam(params.sectionId);
     if (!teacherId || !sectionId) {
-      alert(translatePlatformString(getActiveUiLocale(), 'route.classLinkMissingInfo'));
-      FlowRouter.go('/home');
+      Session.set('classSelectionRouteMessage', {
+        variant: 'error',
+        text: translatePlatformString(getActiveUiLocale(), 'route.classLinkMissingInfo'),
+      });
+      FlowRouter.go('/classSelection');
       return;
     }
 

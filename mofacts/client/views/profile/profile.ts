@@ -39,8 +39,7 @@ const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args:
 type ProfileTemplateInstance = Blaze.TemplateInstance & {
   saving: ReactiveVar<boolean>;
   testing: ReactiveVar<boolean>;
-  statusMessage: ReactiveVar<string>;
-  statusKind: ReactiveVar<'success' | 'error' | 'info'>;
+  statuses: ReactiveVar<Partial<Record<ProfileStatusScope, ProfileStatus>>>;
   avatarType: ReactiveVar<ProfileAvatarType>;
   avatarIconId: ReactiveVar<string>;
   avatarImageData: ReactiveVar<string>;
@@ -54,6 +53,9 @@ type ProfileTemplateInstance = Blaze.TemplateInstance & {
   confirmationState: ReactiveVar<InlineConfirmationView>;
   confirmationController: InlineConfirmationController<'delete-openrouter-key'>;
 };
+
+type ProfileStatusScope = 'save' | 'avatar' | 'locale' | 'openrouter';
+type ProfileStatus = Readonly<{ kind: 'success' | 'error' | 'info'; message: string }>;
 
 const AVATAR_IMAGE_SIZE = 256;
 const AVATAR_IMAGE_QUALITY = 0.86;
@@ -220,9 +222,23 @@ async function resizeAvatarImage(file: File): Promise<string> {
   return canvas.toDataURL('image/jpeg', AVATAR_IMAGE_QUALITY);
 }
 
-function setStatus(template: ProfileTemplateInstance, kind: 'success' | 'error' | 'info', message: string): void {
-  template.statusKind.set(kind);
-  template.statusMessage.set(message);
+function setStatus(
+  template: ProfileTemplateInstance,
+  kind: 'success' | 'error' | 'info',
+  message: string,
+  scope: ProfileStatusScope = 'save',
+): void {
+  template.statuses.set({ ...template.statuses.get(), [scope]: { kind, message } });
+}
+
+function clearStatus(template: ProfileTemplateInstance, scope: ProfileStatusScope): void {
+  const statuses = { ...template.statuses.get() };
+  delete statuses[scope];
+  template.statuses.set(statuses);
+}
+
+function statusFor(template: ProfileTemplateInstance, scope: ProfileStatusScope): ProfileStatus | null {
+  return template.statuses.get()[scope] || null;
 }
 
 function syncAvatarFromCurrentUser(template: ProfileTemplateInstance): void {
@@ -235,7 +251,7 @@ function syncAvatarFromCurrentUser(template: ProfileTemplateInstance): void {
 
 async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
   template.saving.set(true);
-  template.statusMessage.set('');
+  clearStatus(template, 'save');
   try {
     const apiKey = inputValue('openRouterApiKey');
     const model = template.openRouterSelectedModel.get();
@@ -274,8 +290,7 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
 Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.saving = new ReactiveVar(false);
   this.testing = new ReactiveVar(false);
-  this.statusMessage = new ReactiveVar('');
-  this.statusKind = new ReactiveVar('info');
+  this.statuses = new ReactiveVar({});
   this.avatarType = new ReactiveVar('initials');
   this.avatarIconId = new ReactiveVar(PROFILE_AVATAR_DEFAULT_ICON_ID);
   this.avatarImageData = new ReactiveVar('');
@@ -438,6 +453,12 @@ Template.profile.helpers({
     return '';
   },
 
+  openRouterModelDescribedBy(): string {
+    return (Template.instance() as ProfileTemplateInstance).openRouterModelCatalogState.get() === 'ready'
+      ? 'openRouterModelHelp'
+      : 'openRouterModelHelp openRouterModelCatalogStatus';
+  },
+
   openRouterModelCatalogMessageClass(): string {
     return (Template.instance() as ProfileTemplateInstance).openRouterModelCatalogState.get() === 'error'
       ? 'profile-alert-error'
@@ -476,15 +497,34 @@ Template.profile.helpers({
 
   openRouterStatusMessage(): string {
     const template = Template.instance() as ProfileTemplateInstance;
-    return template.statusMessage.get() || String(currentProfile().openRouterLastTestStatus || '');
+    return statusFor(template, 'openrouter')?.message
+      || String(currentProfile().openRouterLastTestStatus || '');
   },
 
-  openRouterStatusClass(): string {
+  profileSaveStatusMessage(): string {
+    return statusFor(Template.instance() as ProfileTemplateInstance, 'save')?.message || '';
+  },
+
+  profileAvatarStatusMessage(): string {
+    return statusFor(Template.instance() as ProfileTemplateInstance, 'avatar')?.message || '';
+  },
+
+  profileLocaleStatusMessage(): string {
+    return statusFor(Template.instance() as ProfileTemplateInstance, 'locale')?.message || '';
+  },
+
+  profileSaveStatusVariant(): string {
+    return statusFor(Template.instance() as ProfileTemplateInstance, 'save')?.kind || 'info';
+  },
+
+  profileAvatarStatusVariant(): string {
+    return statusFor(Template.instance() as ProfileTemplateInstance, 'avatar')?.kind || 'info';
+  },
+
+  openRouterStatusVariant(): string {
     const template = Template.instance() as ProfileTemplateInstance;
-    const kind = template.statusKind.get();
-    if (kind === 'success') return 'profile-alert-success';
-    if (kind === 'error') return 'profile-alert-error';
-    return 'profile-alert-info';
+    const kind = statusFor(template, 'openrouter')?.kind || 'info';
+    return kind;
   },
 
   saving(): boolean {
@@ -517,9 +557,9 @@ Template.profile.events({
     try {
       const nextLocale = (event.currentTarget as HTMLSelectElement).value;
       setActiveUiLocale(nextLocale);
-      template.statusMessage.set('');
+      clearStatus(template, 'locale');
     } catch (error: unknown) {
-      setStatus(template, 'error', getErrorMessage(error));
+      setStatus(template, 'error', getErrorMessage(error), 'locale');
     }
   },
 
@@ -551,7 +591,7 @@ Template.profile.events({
     const iconId = (event.currentTarget as HTMLElement).getAttribute('data-avatar-icon') || '';
     const icon = findProfileAvatarIcon(iconId);
     if (!icon) {
-      setStatus(template, 'error', profileText('profile.chooseSupportedAvatarIcon'));
+      setStatus(template, 'error', profileText('profile.chooseSupportedAvatarIcon'), 'avatar');
       return;
     }
     template.avatarIconId.set(icon.id);
@@ -573,9 +613,9 @@ Template.profile.events({
       const resizedImage = await resizeAvatarImage(file);
       template.avatarImageData.set(resizedImage);
       template.avatarType.set('image');
-      setStatus(template, 'info', profileText('profile.avatarPictureReady'));
+      setStatus(template, 'info', profileText('profile.avatarPictureReady'), 'avatar');
     } catch (error: unknown) {
-      setStatus(template, 'error', getErrorMessage(error));
+      setStatus(template, 'error', getErrorMessage(error), 'avatar');
     } finally {
       input.value = '';
     }
@@ -585,7 +625,7 @@ Template.profile.events({
     event.preventDefault();
     template.avatarImageData.set('');
     template.avatarType.set('initials');
-    setStatus(template, 'info', profileText('profile.avatarPictureRemoved'));
+    setStatus(template, 'info', profileText('profile.avatarPictureRemoved'), 'avatar');
   },
 
   'click #profileSave': async function(_event: Event, template: ProfileTemplateInstance) {
@@ -594,7 +634,7 @@ Template.profile.events({
 
   'click #openRouterTest': async function(_event: Event, template: ProfileTemplateInstance) {
     template.testing.set(true);
-    template.statusMessage.set('');
+    clearStatus(template, 'openrouter');
     try {
       const inputKey = inputValue('openRouterApiKey');
       const result = await MeteorAny.callAsync('testOwnOpenRouterSettings', {
@@ -609,9 +649,9 @@ Template.profile.events({
           apiKeyInput.value = '';
         }
       }
-      setStatus(template, result?.success ? 'success' : 'error', result?.message || profileText('profile.unknownError'));
+      setStatus(template, result?.success ? 'success' : 'error', result?.message || profileText('profile.unknownError'), 'openrouter');
     } catch (error: unknown) {
-      setStatus(template, 'error', getErrorMessage(error));
+      setStatus(template, 'error', getErrorMessage(error), 'openrouter');
     } finally {
       template.testing.set(false);
     }
@@ -657,10 +697,10 @@ Template.profile.events({
         apiKeyInput.value = '';
       }
       template.confirmationController.complete();
-      setStatus(template, 'success', profileText('profile.openRouterKeyDeleted'));
+      setStatus(template, 'success', profileText('profile.openRouterKeyDeleted'), 'openrouter');
     } catch (error: unknown) {
       template.confirmationController.setPending(false);
-      setStatus(template, 'error', getErrorMessage(error));
+      setStatus(template, 'error', getErrorMessage(error), 'openrouter');
     } finally {
       template.saving.set(false);
     }

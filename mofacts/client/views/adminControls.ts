@@ -37,7 +37,7 @@ type AdminControlsInstance = Blaze.TemplateInstance & {
     serverStatusPresentation: ReactiveVar<LoadableState<AdminServerStatus>>;
     serverVerbosityPresentation: ReactiveVar<LoadableState<AdminVerbosityLevel>>;
     clientVerbosityPresentation: ReactiveVar<LoadableState<AdminVerbosityLevel>>;
-    adminMessage: ReactiveVar<AdminMessage | null>;
+    adminMessages: ReactiveVar<Partial<Record<'load' | 'cache' | 'server-verbosity' | 'client-verbosity', AdminMessage>>>;
     serverVerbosityCommandState: ReactiveVar<AsyncCommandState<void>>;
     clientVerbosityCommandState: ReactiveVar<AsyncCommandState<void>>;
     cacheCommandState: ReactiveVar<AsyncCommandState<void>>;
@@ -83,8 +83,16 @@ function loadPending<T>(state: LoadableState<T>): boolean {
     return state.status === 'idle' || state.status === 'loading' || state.status === 'refreshing';
 }
 
-function setAdminMessage(instance: AdminControlsInstance, text: string | null, level: AdminMessage['level'] = 'info'): void {
-    instance.adminMessage.set(text ? { text, level } : null);
+function setAdminMessage(
+    instance: AdminControlsInstance,
+    text: string | null,
+    level: AdminMessage['level'] = 'info',
+    scope: 'load' | 'cache' | 'server-verbosity' | 'client-verbosity' = 'load',
+): void {
+    const messages = { ...instance.adminMessages.get() };
+    if (text) messages[scope] = { text, level };
+    else delete messages[scope];
+    instance.adminMessages.set(messages);
 }
 
 function currentServerVerbosity(instance: AdminControlsInstance): AdminVerbosityLevel | null {
@@ -110,9 +118,6 @@ function loadServerStatus(instance: AdminControlsInstance): void {
                 status,
                 () => false,
             ));
-            if (status.error) {
-                setAdminMessage(instance, adminText('admin.storageStatusUnavailable', { error: status.error }), 'error');
-            }
         })
         .catch((err) => {
             if (!instance.serverStatusLifetime.isCurrent(generation)) return;
@@ -219,7 +224,7 @@ Template.adminControls.onCreated(function (this: AdminControlsInstance) {
     this.serverStatusPresentation = new ReactiveVar<LoadableState<AdminServerStatus>>({ status: 'idle' });
     this.serverVerbosityPresentation = new ReactiveVar<LoadableState<AdminVerbosityLevel>>({ status: 'idle' });
     this.clientVerbosityPresentation = new ReactiveVar<LoadableState<AdminVerbosityLevel>>({ status: 'idle' });
-    this.adminMessage = new ReactiveVar<AdminMessage | null>(null);
+    this.adminMessages = new ReactiveVar({});
     this.serverVerbosityCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
     this.clientVerbosityCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
     this.cacheCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
@@ -253,11 +258,14 @@ Template.adminControls.onDestroyed(function (this: AdminControlsInstance) {
 });
 
 Template.adminControls.helpers({
-    adminMessage(): AdminMessage | null {
-        return (Template.instance() as AdminControlsInstance).adminMessage.get();
+    cacheMessage(): AdminMessage | null {
+        return (Template.instance() as AdminControlsInstance).adminMessages.get().cache || null;
     },
-    adminMessageUrgent(): boolean {
-        return (Template.instance() as AdminControlsInstance).adminMessage.get()?.level === 'error';
+    serverVerbosityMessage(): AdminMessage | null {
+        return (Template.instance() as AdminControlsInstance).adminMessages.get()['server-verbosity'] || null;
+    },
+    clientVerbosityMessage(): AdminMessage | null {
+        return (Template.instance() as AdminControlsInstance).adminMessages.get()['client-verbosity'] || null;
     },
     loadErrorText(): string {
         const instance = Template.instance() as AdminControlsInstance;
@@ -306,7 +314,7 @@ Template.adminControls.helpers({
 Template.adminControls.events({
     'click [data-admin-load-retry]'(event: Event, instance: AdminControlsInstance) {
         event.preventDefault();
-        setAdminMessage(instance, null);
+        setAdminMessage(instance, null, 'info', 'server-verbosity');
         loadServerStatus(instance);
         loadServerVerbosity(instance);
         loadClientVerbosityFromSettings(instance);
@@ -320,7 +328,7 @@ Template.adminControls.events({
         if (previous === next) return;
 
         instance.serverVerbosityPresentation.set({ status: 'ready', value: next });
-        setAdminMessage(instance, null);
+        setAdminMessage(instance, null, 'info', 'server-verbosity');
         void instance.serverVerbosityCommand.run(async () => {
             await meteorCallAsync('setVerbosity', next);
         }, {
@@ -329,7 +337,7 @@ Template.adminControls.events({
                 if (previous) {
                     instance.serverVerbosityPresentation.set({ status: 'ready', value: previous });
                 }
-                setAdminMessage(instance, adminText('admin.loadControlsFailed', { error: formatError(err) }), 'error');
+                setAdminMessage(instance, adminText('admin.loadControlsFailed', { error: formatError(err) }), 'error', 'server-verbosity');
             },
         });
     },
@@ -342,7 +350,7 @@ Template.adminControls.events({
         if (previous === next) return;
 
         instance.clientVerbosityPresentation.set({ status: 'ready', value: next });
-        setAdminMessage(instance, null);
+        setAdminMessage(instance, null, 'info', 'client-verbosity');
         void instance.clientVerbosityCommand.run(async () => {
             await meteorCallAsync('setClientVerbosity', next);
         }, {
@@ -352,22 +360,22 @@ Template.adminControls.events({
                 if (previous) {
                     instance.clientVerbosityPresentation.set({ status: 'ready', value: previous });
                 }
-                setAdminMessage(instance, adminText('admin.updateClientVerbosityFailed', { error: formatError(err) }), 'error');
+                setAdminMessage(instance, adminText('admin.updateClientVerbosityFailed', { error: formatError(err) }), 'error', 'client-verbosity');
             },
         });
     },
     'click #updateStimDisplayTypeMap'(event: Event, instance: AdminControlsInstance) {
         event.preventDefault();
-        setAdminMessage(instance, null);
+        setAdminMessage(instance, null, 'info', 'cache');
         void instance.cacheCommand.run(async () => {
             await meteorCallAsync('updateStimDisplayTypeMap');
         }, {
             getErrorMessage: (err) => adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }),
             onSuccess: () => {
-                setAdminMessage(instance, adminText('admin.displayCacheRebuilt'), 'success');
+                setAdminMessage(instance, adminText('admin.displayCacheRebuilt'), 'success', 'cache');
             },
             onFailure: (err) => {
-                setAdminMessage(instance, adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }), 'error');
+                setAdminMessage(instance, adminText('admin.displayCacheRebuildFailed', { error: formatError(err) }), 'error', 'cache');
             },
         });
     },

@@ -16,11 +16,11 @@ import {
   type LoadableState,
 } from '../../lib/adminUi/loadableState';
 import { createTemplateLifetime, type TemplateLifetime } from '../../lib/adminUi/templateLifetime';
+import type { AsyncCommandState } from '../../lib/adminUi/asyncCommandState';
 import {
-  createAsyncCommandController,
-  type AsyncCommandController,
-  type AsyncCommandState,
-} from '../../lib/adminUi/asyncCommandState';
+  createScopedAsyncCommandRegistry,
+  type ScopedAsyncCommandRegistry,
+} from '../../lib/adminUi/scopedAsyncCommandRegistry';
 import {
   findAssignmentForTdf,
   findTdfSummary,
@@ -43,10 +43,8 @@ declare const Tdfs: {
   find(): { fetch(): ReportingTdfSummary[] };
 };
 
-type ReportingMessage = Readonly<{
-  text: string;
-  level: 'info' | 'success' | 'warning' | 'error';
-}>;
+type ReportingCommandResult = Readonly<{ message: string }>;
+type ReportingCommandStates = Record<string, AsyncCommandState<ReportingCommandResult>>;
 
 type InstructorReportingInitialData = Readonly<{
   courses: ReportingCourse[];
@@ -57,8 +55,8 @@ type InstructorReportingInitialData = Readonly<{
 type InstructorReportingInstance = Blaze.TemplateInstance & {
   initialPresentation: ReactiveVar<LoadableState<InstructorReportingInitialData>>;
   performancePresentation: ReactiveVar<LoadableState<ReportingPerformanceBuckets>>;
-  exceptionCommandState: ReactiveVar<AsyncCommandState<void>>;
-  exceptionCommand: AsyncCommandController<void>;
+  commandStates: ReactiveVar<ReportingCommandStates>;
+  commandRegistry: ScopedAsyncCommandRegistry<ReportingCommandResult>;
   initialLifetime: TemplateLifetime;
   performanceLifetime: TemplateLifetime;
   nextInitialRequestId: number;
@@ -70,7 +68,8 @@ type InstructorReportingInstance = Blaze.TemplateInstance & {
   deadlineDate: ReactiveVar<string>;
   exceptionDate: ReactiveVar<string>;
   dueDateFilter: ReactiveVar<boolean>;
-  reportingMessage: ReactiveVar<ReportingMessage | null>;
+  exceptionDateError: ReactiveVar<string>;
+  exceptionDateValidationUserId: ReactiveVar<string>;
   tdfListingSub?: { stop(): void };
   tdfReadyComputation?: { stop(): void };
 };
@@ -127,12 +126,26 @@ function getPerformanceBuckets(instance: InstructorReportingInstance): Reporting
   };
 }
 
-function setReportingMessage(
-  instance: InstructorReportingInstance,
-  text: string,
-  level: ReportingMessage['level'] = 'info',
-): void {
-  instance.reportingMessage.set({ text, level });
+function exceptionScope(userId: string): string {
+  return `reporting:exception:${userId}`;
+}
+
+function navigationScope(userId: string): string {
+  return `reporting:navigate:${userId}`;
+}
+
+function commandPresentation(
+  state: AsyncCommandState<ReportingCommandResult> | undefined,
+  id: string,
+): { id: string; text: string; variant: 'info' | 'success' | 'error'; urgent: boolean } | null {
+  if (!state || state.status === 'idle') return null;
+  if (state.status === 'pending') {
+    return { id, text: reportingText('common.loading'), variant: 'info', urgent: false };
+  }
+  if (state.status === 'success') {
+    return { id, text: state.result.message, variant: 'success', urgent: false };
+  }
+  return { id, text: state.message, variant: 'error', urgent: true };
 }
 
 function waitForTdfListing(instance: InstructorReportingInstance, sub: { ready(): boolean }): Promise<void> {
@@ -155,7 +168,6 @@ async function loadInitialReportingData(instance: InstructorReportingInstance): 
   const generation = instance.initialLifetime.begin();
   instance.initialPresentation.set(startLoad(instance.initialPresentation.get(), requestId));
   instance.performancePresentation.set({ status: 'idle' });
-  instance.reportingMessage.set(null);
 
   instance.tdfListingSub?.stop();
   const tdfListingSub = Meteor.subscribe('allTdfsListing');
@@ -188,7 +200,6 @@ async function loadInitialReportingData(instance: InstructorReportingInstance): 
       requestId,
       { message, retryable: true },
     ));
-    setReportingMessage(instance, message, 'error');
   }
 }
 
@@ -198,18 +209,18 @@ function clearTdfSelection(instance: InstructorReportingInstance): void {
   instance.selectedDueDate.set('');
   instance.deadlineDate.set('');
   instance.exceptionDate.set('');
+  instance.exceptionDateError.set('');
+  instance.exceptionDateValidationUserId.set('');
   instance.dueDateFilter.set(false);
   instance.performancePresentation.set({ status: 'idle' });
 }
 
 function selectClass(instance: InstructorReportingInstance, courseId: string): void {
-  instance.reportingMessage.set(null);
   instance.selectedCourseId.set(courseId);
   clearTdfSelection(instance);
 }
 
 function selectTdf(instance: InstructorReportingInstance, tdfId: string): void {
-  instance.reportingMessage.set(null);
   const data = getInitialData(instance);
   const courseId = instance.selectedCourseId.get();
   const assignment = findAssignmentForTdf(data.assignmentsByCourseId, courseId, tdfId);
@@ -220,6 +231,8 @@ function selectTdf(instance: InstructorReportingInstance, tdfId: string): void {
   instance.selectedDueDate.set(dueDate);
   instance.deadlineDate.set('');
   instance.exceptionDate.set('');
+  instance.exceptionDateError.set('');
+  instance.exceptionDateValidationUserId.set('');
   instance.dueDateFilter.set(false);
 }
 
@@ -261,7 +274,6 @@ function reloadPerformance(instance: InstructorReportingInstance, date: number |
         requestId,
         { message, retryable: true },
       ));
-      setReportingMessage(instance, message, 'error');
     });
 }
 
@@ -271,17 +283,17 @@ function exceptionRefreshDate(instance: InstructorReportingInstance): number | f
 
 function runExceptionCommand(
   instance: InstructorReportingInstance,
+  userId: string,
   work: () => Promise<void>,
   successMessage: string,
 ): void {
-  void instance.exceptionCommand.run(work, {
-    getErrorMessage: errorMessage,
+  void instance.commandRegistry.run(exceptionScope(userId), async () => {
+    await work();
+    return { message: successMessage };
+  }, {
+    getErrorMessage: (error) => errorMessage(error),
     onSuccess: () => {
-      setReportingMessage(instance, successMessage, 'success');
       reloadPerformance(instance, exceptionRefreshDate(instance));
-    },
-    onFailure: (error) => {
-      setReportingMessage(instance, errorMessage(error), 'error');
     },
   });
 }
@@ -289,8 +301,10 @@ function runExceptionCommand(
 Template.instructorReporting.onCreated(function(this: InstructorReportingInstance) {
   this.initialPresentation = new ReactiveVar<LoadableState<InstructorReportingInitialData>>({ status: 'idle' });
   this.performancePresentation = new ReactiveVar<LoadableState<ReportingPerformanceBuckets>>({ status: 'idle' });
-  this.exceptionCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
-  this.exceptionCommand = createAsyncCommandController((state) => this.exceptionCommandState.set(state));
+  this.commandStates = new ReactiveVar<ReportingCommandStates>({});
+  this.commandRegistry = createScopedAsyncCommandRegistry<ReportingCommandResult>((scope, state) => {
+    this.commandStates.set({ ...this.commandStates.get(), [scope]: state });
+  });
   this.initialLifetime = createTemplateLifetime();
   this.performanceLifetime = createTemplateLifetime();
   this.nextInitialRequestId = 0;
@@ -302,14 +316,15 @@ Template.instructorReporting.onCreated(function(this: InstructorReportingInstanc
   this.deadlineDate = new ReactiveVar('');
   this.exceptionDate = new ReactiveVar('');
   this.dueDateFilter = new ReactiveVar(false);
-  this.reportingMessage = new ReactiveVar<ReportingMessage | null>(null);
+  this.exceptionDateError = new ReactiveVar('');
+  this.exceptionDateValidationUserId = new ReactiveVar('');
   void loadInitialReportingData(this);
 });
 
 Template.instructorReporting.onDestroyed(function(this: InstructorReportingInstance) {
   this.initialLifetime.destroy();
   this.performanceLifetime.destroy();
-  this.exceptionCommand.destroy();
+  this.commandRegistry.destroy();
   this.tdfReadyComputation?.stop();
   this.tdfListingSub?.stop();
 });
@@ -336,6 +351,9 @@ Template.instructorReporting.helpers({
   initialLoading(): boolean {
     return loadPending((Template.instance() as InstructorReportingInstance).initialPresentation.get());
   },
+  initialLoadError(): string {
+    return loadErrorMessage((Template.instance() as InstructorReportingInstance).initialPresentation.get());
+  },
   performanceLoading(): boolean {
     return loadBusy((Template.instance() as InstructorReportingInstance).performancePresentation.get());
   },
@@ -343,12 +361,6 @@ Template.instructorReporting.helpers({
     const instance = Template.instance() as InstructorReportingInstance;
     return loadErrorMessage(instance.initialPresentation.get())
       || loadErrorMessage(instance.performancePresentation.get());
-  },
-  reportingMessage(): ReportingMessage | null {
-    return (Template.instance() as InstructorReportingInstance).reportingMessage.get();
-  },
-  messageVariant(): string {
-    return (Template.instance() as InstructorReportingInstance).reportingMessage.get()?.level || 'info';
   },
   reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
     return reportingText(key, options?.hash);
@@ -368,7 +380,9 @@ Template.instructorReporting.helpers({
       dueDateFilter: instance.dueDateFilter.get(),
       performanceLoading: loadBusy(instance.performancePresentation.get()),
       loadError: performanceLoadError(instance),
-      exceptionBusy: instance.exceptionCommandState.get().status === 'pending',
+      commandStates: instance.commandStates.get(),
+      exceptionDateError: instance.exceptionDateError.get(),
+      exceptionDateValidationUserId: instance.exceptionDateValidationUserId.get(),
     };
   },
   selectedTdfDueDate(): string {
@@ -397,8 +411,17 @@ Template.instructorReporting.helpers({
       || instance.dueDateFilter.get()
       || loadBusy(instance.performancePresentation.get());
   },
+  exceptionDateError(): string {
+    return (Template.instance() as InstructorReportingInstance).exceptionDateError.get();
+  },
+  exceptionDateAttrs() {
+    return (Template.instance() as InstructorReportingInstance).exceptionDateError.get()
+      ? { 'aria-invalid': 'true', 'aria-describedby': 'reporting-exception-date-error' }
+      : { 'aria-invalid': 'false' };
+  },
   exceptionBusy(): boolean {
-    return (Template.instance() as InstructorReportingInstance).exceptionCommandState.get().status === 'pending';
+    return Object.values((Template.instance() as InstructorReportingInstance).commandStates.get())
+      .some((state) => state.status === 'pending');
   },
 });
 
@@ -414,6 +437,34 @@ Template.instructorReportingStudentRow.helpers({
   },
   exceptionActionLabel(key: Parameters<typeof translatePlatformString>[1], row: ReportingPerformanceRow): string {
     return reportingActionLabel(key, row);
+  },
+  rowCommandFeedback(userId: string) {
+    const states = Template.instance().data?.commandStates as ReportingCommandStates | undefined;
+    return commandPresentation(
+      states?.[exceptionScope(userId)] ?? states?.[navigationScope(userId)],
+      `reporting-row-feedback-${userId}`,
+    );
+  },
+  hasRowCommandFeedback(userId: string): boolean {
+    const states = Template.instance().data?.commandStates as ReportingCommandStates | undefined;
+    return Boolean(commandPresentation(
+      states?.[exceptionScope(userId)] ?? states?.[navigationScope(userId)],
+      `reporting-row-feedback-${userId}`,
+    ));
+  },
+  rowActionAttrs(userId: string) {
+    const states = Template.instance().data?.commandStates as ReportingCommandStates | undefined;
+    const state = states?.[exceptionScope(userId)] ?? states?.[navigationScope(userId)];
+    const describesDateError = Template.instance().data?.exceptionDateError
+      && Template.instance().data?.exceptionDateValidationUserId === userId;
+    return {
+      ...(state?.status === 'pending' ? { disabled: true } : {}),
+      'aria-busy': state?.status === 'pending' ? 'true' : 'false',
+      ...(state && state.status !== 'idle' ? { 'aria-describedby': `reporting-row-feedback-${userId}` } : {}),
+      ...(!state || state.status === 'idle'
+        ? (describesDateError ? { 'aria-describedby': 'reporting-exception-date-error' } : {})
+        : {}),
+    };
   },
 });
 
@@ -440,6 +491,8 @@ Template.instructorReporting.events({
 
   'change #exception-date'(event: Event, instance: InstructorReportingInstance) {
     instance.exceptionDate.set(String((event.currentTarget as HTMLInputElement).value || ''));
+    instance.exceptionDateError.set('');
+    instance.exceptionDateValidationUserId.set('');
   },
 
   'change #due-date-filter'(event: Event, instance: InstructorReportingInstance) {
@@ -461,11 +514,11 @@ Template.instructorReporting.events({
     event.preventDefault();
     const username = String((event.currentTarget as HTMLElement).dataset.username || '');
     const navigateToStudentReporting = (globalThis as any).navigateToStudentReporting;
-    try {
+    const userId = String((event.currentTarget as HTMLElement).dataset.userid || username);
+    void instance.commandRegistry.run(navigationScope(userId), async () => {
       navigateToStudentReporting(username);
-    } catch (error) {
-      setReportingMessage(instance, errorMessage(error), 'error');
-    }
+      return { message: '' };
+    }, { getErrorMessage: (error) => errorMessage(error) });
   },
 
   'click .add-exception'(event: Event, instance: InstructorReportingInstance) {
@@ -473,14 +526,19 @@ Template.instructorReporting.events({
     const userId = String((event.currentTarget as HTMLElement).dataset.userid || '');
     const dateInt = toDateMillis(instance.exceptionDate.get());
     if (!dateInt) {
-      setReportingMessage(instance, reportingText('reporting.exceptionDate'), 'warning');
+      instance.exceptionDateError.set(reportingText('reporting.exceptionDate'));
+      instance.exceptionDateValidationUserId.set(userId);
+      document.getElementById('exception-date')?.focus();
       return;
     }
+    instance.exceptionDateError.set('');
+    instance.exceptionDateValidationUserId.set('');
     const courseId = instance.selectedCourseId.get();
     const tdfId = instance.selectedTdfId.get();
     const assignmentId = instance.selectedAssignmentId.get() || undefined;
     runExceptionCommand(
       instance,
+      userId,
       async () => {
         await meteorCallAsync('addUserDueDateException', userId, tdfId, courseId, dateInt, assignmentId);
       },
@@ -496,6 +554,7 @@ Template.instructorReporting.events({
     const assignmentId = instance.selectedAssignmentId.get() || undefined;
     runExceptionCommand(
       instance,
+      userId,
       async () => {
         await meteorCallAsync('removeUserDueDateException', userId, tdfId, courseId, assignmentId);
       },

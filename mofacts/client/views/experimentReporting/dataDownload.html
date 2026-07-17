@@ -1,15 +1,5 @@
 <template name="dataDownload">
     <div>
-    {{#if downloadMessage}}
-    {{> adminStatus variant=downloadMessage.level text=downloadMessage.text urgent=downloadMessageUrgent}}
-    {{/if}}
-    {{#if loadErrorText}}
-    {{> adminStatus variant="error" text=loadErrorText urgent=true}}
-    <button type="button" class="btn btn-outline-secondary btn-sm admin-form-row-sm" data-download-load-retry="true">
-        {{reportingText 'common.tryAgain'}}
-    </button>
-    {{/if}}
-
     <div class="admin-section">
         <div class="card admin-card">
             <div class="card-body">
@@ -18,10 +8,13 @@
                     <h5>{{reportingText 'reporting.yourLearningHistory'}}</h5>
                 </div>
                 <div class="admin-form-row text-center">
-                    <button class="btn btn-primary" id="ownHistoryDownloadButton" type="button" disabled="{{downloadBusy}}" aria-busy="{{#if downloadBusy}}true{{else}}false{{/if}}">
+                    <button class="btn btn-primary" id="ownHistoryDownloadButton" type="button" disabled="{{historyDownloadBusy}}" aria-busy="{{#if historyDownloadBusy}}true{{else}}false{{/if}}">
                         <i class="fa fa-download"></i> {{reportingText 'reporting.downloadYourHistory'}}
                     </button>
                 </div>
+                {{#if historyDownloadMessage}}
+                <div class="admin-inline-feedback">{{> adminStatus variant=historyDownloadMessage.level text=historyDownloadMessage.text urgent=(equals historyDownloadMessage.level "error")}}</div>
+                {{/if}}
             </div>
         </div>
     </div>
@@ -34,11 +27,21 @@
                     <h5>{{reportingText 'reporting.dataFromOwnedTdfs'}}</h5>
                 </div>
                 <div class="admin-form-row text-center">
-                    <button class="btn btn-primary" id="userDataDownloadLink" type="button" disabled="{{downloadBusy}}" aria-busy="{{#if downloadBusy}}true{{else}}false{{/if}}">
+                    <button class="btn btn-primary" id="userDataDownloadLink" type="button" disabled="{{ownedDownloadBusy}}" aria-busy="{{#if ownedDownloadBusy}}true{{else}}false{{/if}}">
                         <i class="fa fa-download"></i> {{reportingText 'reporting.downloadOwnedTdfData'}}
                     </button>
                 </div>
-                {{> adminTableShell label=downloadFilesTableLabel tableTemplate="dataDownloadFilesTable" tableData=downloadFilesTableData}}
+                {{#if ownedDownloadMessage}}
+                <div class="admin-inline-feedback">{{> adminStatus variant=ownedDownloadMessage.level text=ownedDownloadMessage.text urgent=(equals ownedDownloadMessage.level "error")}}</div>
+                {{/if}}
+                {{#if loadErrorText}}
+                  <div class="admin-inline-feedback">
+                    {{> adminStatus variant="error" text=loadErrorText urgent=true}}
+                    <button type="button" class="btn btn-outline-secondary btn-sm admin-form-row-sm" data-download-load-retry="true">{{reportingText 'common.tryAgain'}}</button>
+                  </div>
+                {{else}}
+                  {{> adminTableShell label=downloadFilesTableLabel tableTemplate="dataDownloadFilesTable" tableData=downloadFilesTableData}}
+                {{/if}}
             </div>
         </div>
     </div>
@@ -75,7 +78,8 @@
                               data-fileId="{{this._id}}"
                               aria-label="{{downloadFileAriaLabel this}}"
                               title="{{reportingText 'reporting.downloadDataFile'}}"
-                              disabled="{{#if ../downloadBusy}}disabled{{/if}}">
+                              disabled="{{#if this.downloadBusy}}disabled{{/if}}"
+                              aria-busy="{{#if this.downloadBusy}}true{{else}}false{{/if}}">
                                 <span class="fa fa-download" aria-hidden="true"></span>
                             </button>
                             {{#if this.hasConditionChildren}}
@@ -83,9 +87,11 @@
                               class="btn-icon root-omnibus-download-link"
                               type="button"
                               data-fileName="{{this.content.fileName}}"
+                              data-fileId="{{this._id}}"
                               aria-label="{{rootOmnibusAriaLabel this}}"
                               title="{{reportingText 'reporting.downloadRootOmnibus'}}"
-                              disabled="{{#if ../downloadBusy}}disabled{{/if}}">
+                              disabled="{{#if this.downloadBusy}}disabled{{/if}}"
+                              aria-busy="{{#if this.downloadBusy}}true{{else}}false{{/if}}">
                                 <span class="fa fa-sitemap" aria-hidden="true"></span>
                             </button>
                             {{/if}}
@@ -102,6 +108,11 @@
                             {{/if}}
                         </td>
                     </tr>
+                    {{#if this.downloadMessage}}
+                    <tr class="admin-feedback-row">
+                        <td colspan="3"><div class="admin-table-feedback">{{> adminStatus variant=this.downloadMessage.level text=this.downloadMessage.text urgent=(equals this.downloadMessage.level "error")}}</div></td>
+                    </tr>
+                    {{/if}}
                     {{else}}
                     <tr>
                         <td colspan="3" class="text-center text-muted admin-table-status-cell">{{reportingText 'reporting.noDataFiles'}}</td>

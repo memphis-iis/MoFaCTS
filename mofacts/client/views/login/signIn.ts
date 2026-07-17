@@ -29,6 +29,7 @@ function authText(key: Parameters<typeof translatePlatformString>[1], values?: T
 
 type SignInState = {
   serverErrorMessage: string;
+  serverErrorScope: 'primary' | 'provider';
   normalEmailError: string;
   normalPasswordError: string;
   experimentUsernameError: string;
@@ -39,6 +40,7 @@ type SignInState = {
 function createEmptySignInState(): SignInState {
   return {
     serverErrorMessage: '',
+    serverErrorScope: 'primary',
     normalEmailError: '',
     normalPasswordError: '',
     experimentUsernameError: '',
@@ -174,6 +176,7 @@ function beginExperimentLaunchTransition(template?: any) {
 function showInlineSignInError(message: string, options: Partial<SignInState> = {}, template?: any) {
   setSignInState({
     serverErrorMessage: message,
+    serverErrorScope: 'primary',
     normalEmailError: '',
     normalPasswordError: '',
     experimentUsernameError: '',
@@ -361,7 +364,7 @@ Template.signIn.events({
 
   'click #signUpButton': function(event: any) {
     if (!Session.get('allowPublicSignup')) {
-      showInlineSignInError(authText('auth.publicSignupDisabled'));
+      showInlineSignInError(authText('auth.publicSignupDisabled'), { serverErrorScope: 'provider' });
       return;
     }
     clearInlineSignInError();
@@ -459,7 +462,7 @@ Template.signIn.events({
       clientConsole(1, '[MS-LOGIN] Error details:', JSON.stringify(error, null, 2));
       restoreVisibleSignInScreen(template);
       Session.set('loginMode', 'password');
-      showInlineSignInError(getOAuthDuplicateAccountMessage(error, 'Microsoft'), {}, template);
+      showInlineSignInError(getOAuthDuplicateAccountMessage(error, 'Microsoft'), { serverErrorScope: 'provider' }, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
     }
@@ -534,7 +537,7 @@ Template.signIn.events({
       clientConsole(1, '[MEMPHIS-SAML] Error details:', JSON.stringify(error, null, 2));
       restoreVisibleSignInScreen(template);
       Session.set('loginMode', 'password');
-      showInlineSignInError(getOAuthDuplicateAccountMessage(error, 'University of Memphis'), {}, template);
+      showInlineSignInError(getOAuthDuplicateAccountMessage(error, 'University of Memphis'), { serverErrorScope: 'provider' }, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
     }
@@ -660,7 +663,7 @@ Template.signIn.events({
       clientConsole(1, '[GOOGLE-LOGIN] Error details:', JSON.stringify(error, null, 2));
       restoreVisibleSignInScreen(template);
       Session.set('loginMode', 'password');
-      showInlineSignInError(getOAuthDuplicateAccountMessage(error, 'Google'), {}, template);
+      showInlineSignInError(getOAuthDuplicateAccountMessage(error, 'Google'), { serverErrorScope: 'provider' }, template);
       $('#signInButton').prop('disabled', false);
       focusFirstSignInError(template);
     }
@@ -725,6 +728,16 @@ Template.signIn.helpers({
 
   serverErrorMessage: function() {
     return getSignInState().serverErrorMessage;
+  },
+
+  primaryServerErrorMessage: function() {
+    const state = getSignInState();
+    return state.serverErrorScope === 'primary' ? state.serverErrorMessage : '';
+  },
+
+  providerServerErrorMessage: function() {
+    const state = getSignInState();
+    return state.serverErrorScope === 'provider' ? state.serverErrorMessage : '';
   },
 
   showVerificationHelp: function() {

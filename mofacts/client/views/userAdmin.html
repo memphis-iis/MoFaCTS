@@ -3,13 +3,6 @@
 <template name="userAdmin">
 {{#if isInRole 'admin'}}
     <div>
-        {{#if adminMessage}}
-        <div class="admin-status admin-status-{{adminMessageClass}} admin-message" role="status" aria-live="polite">
-            <i class="fa {{adminMessageIcon}}" aria-hidden="true"></i>
-            <div class="admin-status-text">{{adminMessage}}</div>
-        </div>
-        {{/if}}
-
         <div class="admin-section">
             <div class="card admin-card">
                 <div class="card-body">
@@ -17,12 +10,6 @@
                         <i class="fa fa-key admin-section-icon"></i>
                         <h5>{{userAdminText 'admin.apiKeyAlternatives'}}</h5>
                     </div>
-                    {{#if apiKeyMessage}}
-                    <div class="admin-status admin-status-{{apiKeyAlertClass}} admin-status-small admin-form-row-sm" role="status" aria-live="polite">
-                        <i class="fa {{apiKeyIcon}}" aria-hidden="true"></i>
-                        <div class="admin-status-text">{{apiKeyMessage}}</div>
-                    </div>
-                    {{/if}}
                     <div class="admin-api-key-grid">
                         <div class="admin-api-key-group">
                             <div class="admin-api-key-fields">
@@ -33,7 +20,7 @@
                                 </div>
                                 <div>
                                     <label for="adminOpenRouterModel" class="form-label">{{userAdminText 'profile.openRouterModel'}}</label>
-                                    <select id="adminOpenRouterModel" class="form-control" value="{{adminOpenRouterModel}}" aria-describedby="adminOpenRouterModelStatus adminOpenRouterCatalogStatus" {{adminOpenRouterModelSelectAttrs}}>
+                                    <select id="adminOpenRouterModel" class="form-control" value="{{adminOpenRouterModel}}" aria-describedby="{{adminOpenRouterModelDescribedBy}}" {{adminOpenRouterModelSelectAttrs}}>
                                         {{#each adminOpenRouterModelOptions}}
                                         <option value="{{value}}" {{selectedAttrs}}>{{label}}</option>
                                         {{/each}}
@@ -59,13 +46,18 @@
                             </div>
                             {{/if}}
                             <div class="admin-api-key-actions">
-                                <button type="button" id="saveAdminOpenRouterAlternative" class="btn btn-sm btn-primary" {{apiKeyActionAttrs}}>
+                                <button type="button" id="saveAdminOpenRouterAlternative" class="btn btn-sm btn-primary" {{apiKeyActionAttrs 'openrouter'}}>
                                     <i class="fa fa-save"></i> {{userAdminText 'admin.saveOpenRouter'}}
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="openrouter" {{apiKeyActionAttrs}}>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="openrouter" {{apiKeyActionAttrs 'openrouter'}}>
                                     <i class="fa fa-trash"></i> {{userAdminText 'admin.deleteKey'}}
                                 </button>
                             </div>
+                            {{#with (providerApiKeyFeedback 'openrouter')}}
+                            <div class="admin-inline-feedback admin-form-row-sm">
+                                {{> adminStatus variant=variant text=text urgent=(equals variant "error")}}
+                            </div>
+                            {{/with}}
                         </div>
                         <div class="admin-api-key-group">
                             <div class="admin-api-key-fields">
@@ -76,13 +68,18 @@
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
-                                <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleTts" data-input="#adminGoogleTtsKey" {{apiKeyActionAttrs}}>
+                                <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleTts" data-input="#adminGoogleTtsKey" {{apiKeyActionAttrs 'googleTts'}}>
                                     <i class="fa fa-save"></i> {{userAdminText 'admin.saveTts'}}
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleTts" {{apiKeyActionAttrs}}>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleTts" {{apiKeyActionAttrs 'googleTts'}}>
                                     <i class="fa fa-trash"></i> {{userAdminText 'admin.deleteTts'}}
                                 </button>
                             </div>
+                            {{#with (providerApiKeyFeedback 'googleTts')}}
+                            <div class="admin-inline-feedback admin-form-row-sm">
+                                {{> adminStatus variant=variant text=text urgent=(equals variant "error")}}
+                            </div>
+                            {{/with}}
                         </div>
                         <div class="admin-api-key-group">
                             <div class="admin-api-key-fields">
@@ -93,13 +90,18 @@
                                 </div>
                             </div>
                             <div class="admin-api-key-actions">
-                                <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleSpeech" data-input="#adminGoogleSpeechKey" {{apiKeyActionAttrs}}>
+                                <button type="button" class="btn btn-sm btn-primary btn-admin-api-key-save" data-provider="googleSpeech" data-input="#adminGoogleSpeechKey" {{apiKeyActionAttrs 'googleSpeech'}}>
                                     <i class="fa fa-save"></i> {{userAdminText 'admin.saveSr'}}
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleSpeech" {{apiKeyActionAttrs}}>
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-admin-api-key-delete" data-provider="googleSpeech" {{apiKeyActionAttrs 'googleSpeech'}}>
                                     <i class="fa fa-trash"></i> {{userAdminText 'admin.deleteSr'}}
                                 </button>
                             </div>
+                            {{#with (providerApiKeyFeedback 'googleSpeech')}}
+                            <div class="admin-inline-feedback admin-form-row-sm">
+                                {{> adminStatus variant=variant text=text urgent=(equals variant "error")}}
+                            </div>
+                            {{/with}}
                         </div>
                     </div>
                 </div>
@@ -157,6 +159,11 @@
                     {{/if}}
                     {{> adminTableShell label=userAdminTableLabel tableTemplate="userAdminTable" tableData=userAdminTableData}}
                     </div>
+                    {{#if userListMessage}}
+                    <div class="admin-inline-feedback admin-form-row-sm">
+                        {{> adminStatus variant=userListMessageVariant text=userListMessage urgent=userListMessageUrgent}}
+                    </div>
+                    {{/if}}
                 </div>
             </div>
         </div>
@@ -170,6 +177,11 @@
                         <h5>{{userAdminText 'admin.importUserFile'}}</h5>
                     </div>
                     <p class="text-muted small admin-form-row">{{userAdminText 'admin.importUserFileDescription'}}</p>
+                    {{#if importMessage}}
+                    <div class="admin-inline-feedback admin-form-row-sm">
+                        {{> adminStatus variant=importMessageVariant text=importMessage urgent=importMessageUrgent}}
+                    </div>
+                    {{/if}}
                     <div class="row g-3">
                         <div class="col-12">
                             <label for="upload-users" class="form-label">{{userAdminText 'admin.usersFile'}}</label>
@@ -239,6 +251,7 @@
                             data-rolename="admin"
                             data-roleaction="{{#if admin}}remove{{else}}add{{/if}}"
                             aria-label="{{roleToggleLabel 'admin.adminRole' this}}"
+                            {{roleActionAttrs _id}}
                         >
                             <i class="fa {{#if admin}}fa-check{{else}}fa-minus{{/if}}" aria-hidden="true"></i>
                             {{userAdminText 'admin.adminRole'}}
@@ -250,6 +263,7 @@
                             data-rolename="teacher"
                             data-roleaction="{{#if teacher}}remove{{else}}add{{/if}}"
                             aria-label="{{roleToggleLabel 'admin.teacherRole' this}}"
+                            {{roleActionAttrs _id}}
                         >
                             <i class="fa {{#if teacher}}fa-check{{else}}fa-minus{{/if}}" aria-hidden="true"></i>
                             {{userAdminText 'admin.teacherRole'}}
@@ -264,25 +278,31 @@
                         data-userid="{{_id}}"
                         data-displayidentifier="{{displayIdentifier}}"
                         aria-label="{{deleteUserActionLabel this}}"
+                        {{deleteActionAttrs _id}}
                     >
                         <i class="fa fa-trash" aria-hidden="true"></i>
                         {{userAdminText 'admin.delete'}}
                     </button>
-                    {{#if deleteUserConfirmationOpen _id}}
-                    <div class="admin-inline-confirmation admin-form-row-top" role="alert">
-                        <div class="admin-inline-confirmation-title">{{userAdminText 'admin.deleteUser'}}</div>
-                        <div class="admin-inline-confirmation-message">
-                            {{deleteUserMessageText displayIdentifier}}
-                        </div>
-                        <div class="admin-inline-confirmation-actions">
-                            <button type="button" class="btn btn-danger btn-sm btn-user-delete-confirm" data-userid="{{_id}}" aria-label="{{deleteUserActionLabel this}}">{{userAdminText 'admin.deleteUser'}}</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm btn-user-delete-cancel">{{userAdminText 'content.cancel'}}</button>
-                        </div>
-                    </div>
-                    {{/if}}
                 </td>
                 {{/if}}
             </tr>
+            {{#if hasUserRowFeedback _id}}
+            <tr class="admin-feedback-row">
+                <td colspan="{{userAdminTableColumnCount ../canManageUsers}}">
+                    <div class="admin-table-feedback">
+                        {{#if deleteUserConfirmationOpen _id}}
+                        {{> adminInlineConfirmation confirmation=(deleteUserConfirmationView _id)}}
+                        {{/if}}
+                        {{#with roleCommandFeedback _id}}
+                            {{> adminStatus id=id variant=variant text=text urgent=urgent}}
+                        {{/with}}
+                        {{#with deleteCommandFeedback _id}}
+                            {{> adminStatus id=id variant=variant text=text urgent=urgent}}
+                        {{/with}}
+                    </div>
+                </td>
+            </tr>
+            {{/if}}
             {{else}}
             <tr>
                 <td colspan="{{userAdminTableColumnCount canManageUsers}}" class="text-center text-muted admin-table-status-cell">{{userAdminText 'reporting.noDataAvailable'}}</td>

@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import { _ as underscore } from 'meteor/underscore';
 const _ = underscore as any;
 import './userAdmin.html';
@@ -12,6 +13,12 @@ import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
 import { formatActiveInterfaceDateTime, formatActiveInterfaceNumber } from '../lib/interfaceFormatting';
 import { loadOpenRouterModelCatalog } from '../lib/openRouterModelCatalogClient';
+import {
+  createScopedAsyncCommandRegistry,
+  type ScopedAsyncCommandRegistry,
+} from '../lib/adminUi/scopedAsyncCommandRegistry';
+import type { AsyncCommandState } from '../lib/adminUi/asyncCommandState';
+import { createInlineConfirmationController } from '../lib/adminUi/inlineConfirmationController';
 import {
   getAllowedOpenRouterReasoningLevels,
   getDefaultOpenRouterReasoningLevel,
@@ -63,6 +70,43 @@ type UserAdminRoleChangeResult = {
   targetUserId?: unknown;
   targetRoles?: Partial<Record<RoleName, unknown>>;
 };
+type UserRowCommandResult = Readonly<{ message: string }>;
+type UserRowCommandStates = Record<string, AsyncCommandState<UserRowCommandResult>>;
+type ApiKeyFeedback = Readonly<{ text: string; variant: 'info' | 'success' | 'error' }>;
+
+function apiKeyCommandScope(provider: string): string {
+  return `api-key:${provider}`;
+}
+
+function setApiKeyFeedback(instance: any, provider: string, feedback: ApiKeyFeedback | null): void {
+  const messages = { ...instance.apiKeyMessages.get() };
+  if (feedback) messages[provider] = feedback;
+  else delete messages[provider];
+  instance.apiKeyMessages.set(messages);
+}
+
+function providerApiKeyBusy(instance: any, provider: string): boolean {
+  return instance.apiKeyCommandStates.get()[apiKeyCommandScope(provider)]?.status === 'pending';
+}
+
+function roleCommandScope(userId: string): string {
+  return `user:role:${userId}`;
+}
+
+function deleteCommandScope(userId: string): string {
+  return `user:delete:${userId}`;
+}
+
+function rowCommandPresentation(
+  state: AsyncCommandState<UserRowCommandResult> | undefined,
+  pendingText: string,
+  id = '',
+): { id: string; text: string; variant: 'info' | 'success' | 'error'; urgent: boolean } | null {
+  if (!state || state.status === 'idle') return null;
+  if (state.status === 'pending') return { id, text: pendingText, variant: 'info', urgent: false };
+  if (state.status === 'success') return { id, text: state.result.message, variant: 'success', urgent: false };
+  return { id, text: state.message, variant: 'error', urgent: true };
+}
 
 function userAdminText(key: Parameters<typeof translatePlatformString>[1], values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
@@ -239,8 +283,10 @@ async function refreshAdminApiKeyMetadata(instance: any): Promise<void> {
     instance.apiKeyMetadataLoaded.set(true);
   } catch (error: unknown) {
     instance.apiKeyMetadataLoaded.set(false);
-    instance.apiKeyMessageType.set('danger');
-    instance.apiKeyMessage.set(userAdminText('admin.apiKeysLoadFailed', { error: getErrorMessage(error) }));
+    setApiKeyFeedback(instance, 'openrouter', {
+      variant: 'error',
+      text: userAdminText('admin.apiKeysLoadFailed', { error: getErrorMessage(error) }),
+    });
   }
 }
 
@@ -286,10 +332,10 @@ async function saveAdminOpenRouterSelection(
   instance: any,
   apiKeyInput?: HTMLInputElement | null,
 ): Promise<void> {
-  instance.apiKeyBusy.set(true);
-  instance.apiKeyMessageType.set('info');
-  instance.apiKeyMessage.set(userAdminText('admin.savingOpenRouterAlternative'));
-  try {
+  setApiKeyFeedback(instance, 'openrouter', {
+    variant: 'info', text: userAdminText('admin.savingOpenRouterAlternative'),
+  });
+  await instance.apiKeyCommandRegistry.run(apiKeyCommandScope('openrouter'), async () => {
     const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', 'openrouter', {
       apiKey: apiKeyInput?.value || '',
       model: String(instance.openRouterSelectedModel.get() || ''),
@@ -297,14 +343,16 @@ async function saveAdminOpenRouterSelection(
     });
     applyAdminOpenRouterMetadata(instance, result);
     if (apiKeyInput) apiKeyInput.value = '';
-    instance.apiKeyMessageType.set('success');
-    instance.apiKeyMessage.set(userAdminText('admin.savedOpenRouterAlternative'));
-  } catch (error: unknown) {
-    instance.apiKeyMessageType.set('danger');
-    instance.apiKeyMessage.set(userAdminText('admin.saveOpenRouterAlternativeFailed', { error: getErrorMessage(error) }));
-  } finally {
-    instance.apiKeyBusy.set(false);
-  }
+  }, {
+    getErrorMessage: (error: unknown) => userAdminText('admin.saveOpenRouterAlternativeFailed', { error: getErrorMessage(error) }),
+    onSuccess: () => setApiKeyFeedback(instance, 'openrouter', {
+      variant: 'success', text: userAdminText('admin.savedOpenRouterAlternative'),
+    }),
+    onFailure: (error: unknown) => setApiKeyFeedback(instance, 'openrouter', {
+      variant: 'error',
+      text: userAdminText('admin.saveOpenRouterAlternativeFailed', { error: getErrorMessage(error) }),
+    }),
+  });
 }
 
 function adminReasoningLevelLabel(level: OpenRouterReasoningLevel): string {
@@ -402,14 +450,31 @@ Template.userAdmin.onCreated(function(this: any) {
   this.isPreparingNewsEmail = new ReactiveVar(false);
   this.newsEmailMessage = new ReactiveVar('');
   this.newsEmailMessageType = new ReactiveVar('info');
-  this.adminMessage = new ReactiveVar('');
-  this.adminMessageType = new ReactiveVar('info');
+  this.importMessage = new ReactiveVar('');
+  this.importMessageType = new ReactiveVar('info');
+  this.userListMessage = new ReactiveVar('');
+  this.userListMessageType = new ReactiveVar('info');
+  this.rowCommandStates = new ReactiveVar({} as UserRowCommandStates);
+  this.rowCommandRegistry = createScopedAsyncCommandRegistry<UserRowCommandResult>((scope, state) => {
+    const current = this.rowCommandStates.get() as UserRowCommandStates;
+    this.rowCommandStates.set({ ...current, [scope]: state });
+  }) as ScopedAsyncCommandRegistry<UserRowCommandResult>;
   this.selectedDeleteUser = new ReactiveVar(null);
+  this.deleteConfirmationState = new ReactiveVar(null);
+  this.deleteConfirmationController = createInlineConfirmationController(
+    (view) => {
+      this.deleteConfirmationState.set(view);
+      if (view.status === 'closed') this.selectedDeleteUser.set(null);
+    },
+    () => document.querySelector<HTMLElement>('.user-admin-sort-button, #prevPage, #nextPage'),
+  );
   this.apiKeyMetadata = new ReactiveVar(null);
   this.apiKeyMetadataLoaded = new ReactiveVar(false);
-  this.apiKeyBusy = new ReactiveVar(false);
-  this.apiKeyMessage = new ReactiveVar('');
-  this.apiKeyMessageType = new ReactiveVar('info');
+  this.apiKeyMessages = new ReactiveVar({});
+  this.apiKeyCommandStates = new ReactiveVar({});
+  this.apiKeyCommandRegistry = createScopedAsyncCommandRegistry((scope, state) => {
+    this.apiKeyCommandStates.set({ ...this.apiKeyCommandStates.get(), [scope]: state });
+  });
   this.openRouterModelCatalog = new ReactiveVar([] as OpenRouterModelCatalogEntry[]);
   this.openRouterModelCatalogState = new ReactiveVar('loading');
   this.openRouterModelCatalogError = new ReactiveVar('');
@@ -454,6 +519,9 @@ Template.userAdmin.onRendered(function(this: any) {
 });
 
 Template.userAdmin.onDestroyed(function(this: any) {
+  this.rowCommandRegistry.destroy();
+  this.apiKeyCommandRegistry.destroy();
+  this.deleteConfirmationController.destroy();
   // Clean up autoruns
   this.autoruns.forEach((ar: any) => ar.stop());
 
@@ -615,38 +683,45 @@ Template.userAdmin.helpers({
     return isPreparing ? { disabled: true } : {};
   },
 
-  apiKeyMessage: function() {
-    return (Template.instance() as any).apiKeyMessage.get();
+  providerApiKeyFeedback: function(provider: string) {
+    return (Template.instance() as any).apiKeyMessages.get()[provider] || null;
   },
 
-  apiKeyAlertClass: function() {
-    return (Template.instance() as any).apiKeyMessageType.get();
+  importMessage: function() {
+    return (Template.instance() as any).importMessage.get();
   },
 
-  apiKeyIcon: function() {
-    return messageIcon((Template.instance() as any).apiKeyMessageType.get());
+  importMessageVariant: function() {
+    const type = (Template.instance() as any).importMessageType.get();
+    return type === 'danger' ? 'error' : type;
   },
 
-  adminMessage: function() {
-    return (Template.instance() as any).adminMessage.get();
+  importMessageUrgent: function() {
+    return (Template.instance() as any).importMessageType.get() === 'danger';
   },
 
-  adminMessageClass: function() {
-    return (Template.instance() as any).adminMessageType.get();
+  userListMessage: function() {
+    return (Template.instance() as any).userListMessage.get();
   },
 
-  adminMessageIcon: function() {
-    return messageIcon((Template.instance() as any).adminMessageType.get());
+  userListMessageVariant: function() {
+    const type = (Template.instance() as any).userListMessageType.get();
+    return type === 'danger' ? 'error' : type;
+  },
+
+  userListMessageUrgent: function() {
+    return (Template.instance() as any).userListMessageType.get() === 'danger';
   },
 
   selectedDeleteUser: function() {
     return (Template.instance() as any).selectedDeleteUser.get();
   },
 
-  apiKeyActionAttrs: function() {
+  apiKeyActionAttrs: function(provider: string) {
     const instance = Template.instance() as any;
-    return instance.apiKeyBusy.get() || !instance.apiKeyMetadataLoaded.get()
-      ? { disabled: true }
+    const pending = providerApiKeyBusy(instance, provider);
+    return pending || !instance.apiKeyMetadataLoaded.get()
+      ? { disabled: true, ...(pending ? { 'aria-busy': 'true' } : {}) }
       : {};
   },
 
@@ -689,7 +764,7 @@ Template.userAdmin.helpers({
 
   adminOpenRouterModelSelectAttrs: function() {
     const instance = Template.instance() as any;
-    return instance.openRouterModelCatalogState.get() === 'ready' && !instance.apiKeyBusy.get()
+    return instance.openRouterModelCatalogState.get() === 'ready' && !providerApiKeyBusy(instance, 'openrouter')
       ? {}
       : { disabled: true };
   },
@@ -706,6 +781,12 @@ Template.userAdmin.helpers({
       });
     }
     return '';
+  },
+
+  adminOpenRouterModelDescribedBy: function() {
+    return (Template.instance() as any).openRouterModelCatalogState.get() === 'ready'
+      ? 'adminOpenRouterModelStatus'
+      : 'adminOpenRouterModelStatus adminOpenRouterCatalogStatus';
   },
 
   openRouterModelCatalogAlertClass: function() {
@@ -750,7 +831,7 @@ Template.userAdmin.helpers({
     const instance = Template.instance() as any;
     return instance.openRouterModelCatalogState.get() === 'ready'
       && Boolean(findAdminCatalogModel(instance))
-      && !instance.apiKeyBusy.get()
+      && !providerApiKeyBusy(instance, 'openrouter')
       ? {}
       : { disabled: true };
   },
@@ -822,6 +903,8 @@ Template.userAdmin.helpers({
       canManageUsers: userHasRole(Meteor.user(), 'admin'),
       isLoading: instance.isLoading.get(),
       selectedDeleteUser: instance.selectedDeleteUser.get(),
+      deleteConfirmationView: instance.deleteConfirmationState.get(),
+      rowCommandStates: instance.rowCommandStates.get(),
       sortField: String(instance.sortField.get() || 'identifier'),
       sortDirection: instance.sortDirection.get() as SortDirection,
     };
@@ -892,9 +975,6 @@ Template.userAdmin.helpers({
     return userAdminText('admin.pageOf', { page: instance.currentPage.get() + 1, total: totalPages });
   },
 
-  deleteUserMessageText: function(identifier: string) {
-    return userAdminText('admin.deleteUserMessage', { identifier });
-  }
 });
 
 Template.userAdminTable.helpers({
@@ -924,9 +1004,70 @@ Template.userAdminTable.helpers({
     return Template.instance().data?.selectedDeleteUser?.userId === userId;
   },
 
-  deleteUserMessageText: function(identifier: string) {
-    return userAdminText('admin.deleteUserMessage', { identifier });
+  deleteUserConfirmationView: function(userId: string) {
+    const data = Template.instance().data;
+    return data?.selectedDeleteUser?.userId === userId ? data.deleteConfirmationView : null;
   },
+
+  hasUserRowFeedback: function(userId: string) {
+    const data = Template.instance().data;
+    const states = data?.rowCommandStates as UserRowCommandStates | undefined;
+    return Boolean(
+      data?.selectedDeleteUser?.userId === userId
+      || rowCommandPresentation(states?.[roleCommandScope(userId)], userAdminText('common.loading'))
+      || rowCommandPresentation(states?.[deleteCommandScope(userId)], userAdminText('common.loading'))
+    );
+  },
+
+  roleCommandFeedback: function(userId: string) {
+    const states = Template.instance().data?.rowCommandStates as UserRowCommandStates | undefined;
+    return rowCommandPresentation(
+      states?.[roleCommandScope(userId)],
+      userAdminText('common.loading'),
+      `user-role-feedback-${userId}`,
+    );
+  },
+
+  deleteCommandFeedback: function(userId: string) {
+    const states = Template.instance().data?.rowCommandStates as UserRowCommandStates | undefined;
+    return rowCommandPresentation(
+      states?.[deleteCommandScope(userId)],
+      userAdminText('common.loading'),
+      `user-delete-feedback-${userId}`,
+    );
+  },
+
+  roleActionAttrs: function(userId: string) {
+    const states = Template.instance().data?.rowCommandStates as UserRowCommandStates | undefined;
+    const pending = states?.[roleCommandScope(userId)]?.status === 'pending';
+    const hasFeedback = states?.[roleCommandScope(userId)]?.status !== undefined
+      && states?.[roleCommandScope(userId)]?.status !== 'idle';
+    return {
+      ...(pending ? { disabled: true } : {}),
+      'aria-busy': pending ? 'true' : 'false',
+      ...(hasFeedback ? { 'aria-describedby': `user-role-feedback-${userId}` } : {}),
+    };
+  },
+
+  deleteActionAttrs: function(userId: string) {
+    const data = Template.instance().data;
+    const states = data?.rowCommandStates as UserRowCommandStates | undefined;
+    const state = states?.[deleteCommandScope(userId)];
+    const pending = state?.status === 'pending';
+    const expanded = data?.selectedDeleteUser?.userId === userId;
+    return {
+      ...(pending ? { disabled: true } : {}),
+      'aria-busy': pending ? 'true' : 'false',
+      ...(expanded ? {
+        'aria-controls': `user-delete-confirmation-${userId}`,
+        'aria-expanded': 'true',
+      } : {}),
+      ...(state?.status && state.status !== 'idle'
+        ? { 'aria-describedby': `user-delete-feedback-${userId}` }
+        : {}),
+    };
+  },
+
 });
 
 Template.userAdminSortableHeader.helpers({
@@ -1093,46 +1234,51 @@ Template.userAdmin.events({
     const provider = legacyTrim($(event.currentTarget).data('provider'));
     const inputSelector = legacyTrim($(event.currentTarget).data('input'));
     const input = inputSelector ? document.querySelector(inputSelector) as HTMLInputElement | null : null;
-    instance.apiKeyBusy.set(true);
-    instance.apiKeyMessageType.set('info');
-    instance.apiKeyMessage.set(userAdminText('admin.savingApiKeyAlternative'));
-    try {
+    setApiKeyFeedback(instance, provider, {
+      variant: 'info', text: userAdminText('admin.savingApiKeyAlternative'),
+    });
+    await instance.apiKeyCommandRegistry.run(apiKeyCommandScope(provider), async () => {
       const result = await MeteorCompat.callAsync('saveAdminApiKeyAlternative', provider, {
         apiKey: input?.value || '',
       });
       instance.apiKeyMetadata.set(result);
       if (input) input.value = '';
-      instance.apiKeyMessageType.set('success');
-      instance.apiKeyMessage.set(userAdminText('admin.savedApiKeyAlternative'));
-    } catch (error: unknown) {
-      instance.apiKeyMessageType.set('danger');
-      instance.apiKeyMessage.set(userAdminText('admin.saveApiKeyAlternativeFailed', { error: getErrorMessage(error) }));
-    } finally {
-      instance.apiKeyBusy.set(false);
-    }
+    }, {
+      getErrorMessage: (error: unknown) => userAdminText('admin.saveApiKeyAlternativeFailed', { error: getErrorMessage(error) }),
+      onSuccess: () => setApiKeyFeedback(instance, provider, {
+        variant: 'success', text: userAdminText('admin.savedApiKeyAlternative'),
+      }),
+      onFailure: (error: unknown) => setApiKeyFeedback(instance, provider, {
+        variant: 'error', text: userAdminText('admin.saveApiKeyAlternativeFailed', { error: getErrorMessage(error) }),
+      }),
+    });
   },
 
   'click .btn-admin-api-key-delete': async function(event: any, instance: any) {
     event.preventDefault();
     const provider = legacyTrim($(event.currentTarget).data('provider'));
-    instance.apiKeyBusy.set(true);
-    instance.apiKeyMessageType.set('info');
-    instance.apiKeyMessage.set(userAdminText('admin.deletingApiKeyAlternative'));
-    try {
+    setApiKeyFeedback(instance, provider, {
+      variant: 'info', text: userAdminText('admin.deletingApiKeyAlternative'),
+    });
+    await instance.apiKeyCommandRegistry.run(apiKeyCommandScope(provider), async () => {
       const result = await MeteorCompat.callAsync('deleteAdminApiKeyAlternative', provider);
       instance.apiKeyMetadata.set(result);
-      ['adminOpenRouterKey', 'adminGoogleTtsKey', 'adminGoogleSpeechKey'].forEach((id) => {
-        const input = document.getElementById(id) as HTMLInputElement | null;
-        if (input) input.value = '';
-      });
-      instance.apiKeyMessageType.set('success');
-      instance.apiKeyMessage.set(userAdminText('admin.deletedApiKeyAlternative'));
-    } catch (error: unknown) {
-      instance.apiKeyMessageType.set('danger');
-      instance.apiKeyMessage.set(userAdminText('admin.deleteApiKeyAlternativeFailed', { error: getErrorMessage(error) }));
-    } finally {
-      instance.apiKeyBusy.set(false);
-    }
+      const inputId = provider === 'openrouter'
+        ? 'adminOpenRouterKey'
+        : provider === 'googleTts'
+          ? 'adminGoogleTtsKey'
+          : 'adminGoogleSpeechKey';
+      const input = document.getElementById(inputId) as HTMLInputElement | null;
+      if (input) input.value = '';
+    }, {
+      getErrorMessage: (error: unknown) => userAdminText('admin.deleteApiKeyAlternativeFailed', { error: getErrorMessage(error) }),
+      onSuccess: () => setApiKeyFeedback(instance, provider, {
+        variant: 'success', text: userAdminText('admin.deletedApiKeyAlternative'),
+      }),
+      onFailure: (error: unknown) => setApiKeyFeedback(instance, provider, {
+        variant: 'error', text: userAdminText('admin.deleteApiKeyAlternativeFailed', { error: getErrorMessage(error) }),
+      }),
+    });
   },
 
   'click #doUploadUsers': function(event: any) {
@@ -1146,7 +1292,7 @@ Template.userAdmin.events({
   },
 
   // Need admin and teacher buttons
-  'click .btn-user-change': async function(event: any) {
+  'click .btn-user-change': async function(event: any, instance: any) {
     event.preventDefault();
 
     const btnTarget = $(event.currentTarget);
@@ -1156,17 +1302,15 @@ Template.userAdmin.events({
 
     
 
-    try {
-      const result = await MeteorCompat.callAsync('userAdminRoleChange', userId, roleAction, roleName);
-      applyConfirmedRoleState(Template.instance(), result as UserAdminRoleChangeResult);
-      const instance = Template.instance() as any;
-      instance.adminMessageType.set('success');
-      instance.adminMessage.set(userAdminText('admin.updatedRoleForUser', { role: roleName }));
-    } catch (error: unknown) {
-      const instance = Template.instance() as any;
-      instance.adminMessageType.set('danger');
-      instance.adminMessage.set(userAdminText('admin.requestFailed', { error: getErrorMessage(error) }));
-    }
+    await instance.rowCommandRegistry.run(
+      roleCommandScope(userId),
+      async () => {
+        const result = await MeteorCompat.callAsync('userAdminRoleChange', userId, roleAction, roleName);
+        applyConfirmedRoleState(instance, result as UserAdminRoleChangeResult);
+        return { message: userAdminText('admin.updatedRoleForUser', { role: roleName }) };
+      },
+      { getErrorMessage: (error: unknown) => userAdminText('admin.requestFailed', { error: getErrorMessage(error) }) },
+    );
   },
 
   'click .btn-user-delete': function(event: any, instance: any) {
@@ -1176,28 +1320,53 @@ Template.userAdmin.events({
     const userId = legacyTrim(btnTarget.data('userid'));
     const displayIdentifier = legacyTrim(btnTarget.data('displayidentifier'));
     instance.selectedDeleteUser.set({ userId, displayIdentifier });
+    instance.deleteConfirmationController.open({
+      confirmationId: `user-delete-confirmation-${userId}`,
+      title: userAdminText('admin.deleteUser'),
+      message: userAdminText('admin.deleteUserMessage', { identifier: displayIdentifier }),
+      confirmLabel: userAdminText('admin.deleteUser'),
+      cancelLabel: userAdminText('content.cancel'),
+      severity: 'danger',
+      context: { userId, displayIdentifier },
+    }, event.currentTarget as HTMLElement);
+    Tracker.afterFlush(() => instance.deleteConfirmationController.focusInitial());
   },
 
-  'click .btn-user-delete-cancel': function(event: any, instance: any) {
+  'click .admin-confirmation-cancel': function(event: any, instance: any) {
     event.preventDefault();
-    instance.selectedDeleteUser.set(null);
+    instance.deleteConfirmationController.cancel();
   },
 
-  'click .btn-user-delete-confirm': async function(event: any, instance: any) {
+  'keydown .admin-inline-confirmation': function(event: KeyboardEvent, instance: any) {
+    instance.deleteConfirmationController.handleKeydown(event);
+  },
+
+  'click .admin-confirmation-confirm': async function(event: any, instance: any) {
     event.preventDefault();
+    const context = instance.deleteConfirmationController.getContext();
+    const userId = legacyTrim(context?.userId);
+    if (!userId || instance.deleteConfirmationController.getView().pending) return;
+    instance.deleteConfirmationController.setPending(true);
 
-    const btnTarget = $(event.currentTarget);
-    const userId = legacyTrim(btnTarget.data('userid'));
-
-    try {
-      await MeteorCompat.callAsync('userAdminDeleteUser', userId);
-      instance.selectedDeleteUser.set(null);
-      instance.adminMessageType.set('success');
-      instance.adminMessage.set(userAdminText('admin.userDeleted'));
-    } catch (error: unknown) {
-      instance.adminMessageType.set('danger');
-      instance.adminMessage.set(userAdminText('admin.deleteUserFailed', { error: getErrorMessage(error) }));
-    }
+    await instance.rowCommandRegistry.run(
+      deleteCommandScope(userId),
+      async () => {
+        await MeteorCompat.callAsync('userAdminDeleteUser', userId);
+        return { message: userAdminText('admin.userDeleted') };
+      },
+      {
+        getErrorMessage: (error: unknown) => userAdminText('admin.deleteUserFailed', { error: getErrorMessage(error) }),
+        onSuccess: () => {
+          instance.deleteConfirmationController.complete();
+          instance.userListMessageType.set('success');
+          instance.userListMessage.set(userAdminText('admin.userDeleted'));
+          instance.rowCommandRegistry.remove(deleteCommandScope(userId));
+          instance.rowCommandRegistry.remove(roleCommandScope(userId));
+          Tracker.afterFlush(() => document.querySelector<HTMLElement>('.user-admin-sort-button, #prevPage, #nextPage')?.focus());
+        },
+        onFailure: () => instance.deleteConfirmationController.setPending(false),
+      },
+    );
   },
 
     
@@ -1215,19 +1384,19 @@ async function doFileUpload(fileElementSelector: string, fileDescrip: string, in
         const result = await MeteorCompat.callAsync('insertNewUsers', name, fileReader.result);
         
         if (result.length > 0) {
-          instance.adminMessageType.set('danger');
-          instance.adminMessage.set(userAdminText('admin.userFileNotSaved', { fileDescription: fileDescrip, error: JSON.stringify(result) }));
+          instance.importMessageType.set('danger');
+          instance.importMessage.set(userAdminText('admin.userFileNotSaved', { fileDescription: fileDescrip, error: JSON.stringify(result) }));
         } else {
-          instance.adminMessageType.set('success');
-          instance.adminMessage.set(userAdminText('admin.userFileSaved', { fileDescription: fileDescrip }));
+          instance.importMessageType.set('success');
+          instance.importMessage.set(userAdminText('admin.userFileSaved', { fileDescription: fileDescrip }));
           // Now we can clear the selected file
           $(fileElementSelector).val('');
           $(fileElementSelector).parent().find('.file-info').html('');
           // No need to manually refresh - Meteor reactivity handles it automatically!
         }
       } catch (error: unknown) {
-        instance.adminMessageType.set('danger');
-        instance.adminMessage.set(userAdminText('admin.userFileCriticalSaveFailed', { fileDescription: fileDescrip, error: getErrorMessage(error) }));
+        instance.importMessageType.set('danger');
+        instance.importMessage.set(userAdminText('admin.userFileCriticalSaveFailed', { fileDescription: fileDescrip, error: getErrorMessage(error) }));
       }
     };
 

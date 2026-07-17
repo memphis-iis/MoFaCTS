@@ -59,6 +59,7 @@ type AssignmentEditorInstance = Blaze.TemplateInstance & {
   assignmentSearch: ReactiveVar<string>;
   dirty: ReactiveVar<boolean>;
   editorError: ReactiveVar<string | null>;
+  saveError: ReactiveVar<string | null>;
   timezone: ReactiveVar<string>;
 };
 
@@ -242,6 +243,7 @@ Template.tdfAssignmentEdit.onCreated(function(this: AssignmentEditorInstance) {
   this.assignmentSearch = new ReactiveVar('');
   this.dirty = new ReactiveVar(false);
   this.editorError = new ReactiveVar<string | null>(null);
+  this.saveError = new ReactiveVar<string | null>(null);
   this.timezone = new ReactiveVar('');
   loadCourses(this);
 });
@@ -279,6 +281,9 @@ Template.tdfAssignmentEdit.helpers({
     return instance.editorError.get()
       || loadErrorMessage(instance.coursesPresentation.get())
       || loadErrorMessage(instance.snapshotPresentation.get());
+  },
+  saveError(): string {
+    return (Template.instance() as AssignmentEditorInstance).saveError.get() || '';
   },
   saveBusy(): boolean {
     return (Template.instance() as AssignmentEditorInstance).saveCommandState.get().status === 'pending';
@@ -410,13 +415,13 @@ Template.tdfAssignmentEdit.events({
     event.preventDefault();
     const courseId = instance.selectedCourseId.get();
     if (!courseId) {
-      instance.editorError.set(assignmentText('courseAssignments.pleaseSelectCourse'));
+      instance.saveError.set(assignmentText('courseAssignments.pleaseSelectCourse'));
       return;
     }
     const rows = readRows(instance);
     const validationError = validateAssignmentRows(rows, (key, values) => assignmentText(key as Parameters<typeof translatePlatformString>[1], values as Parameters<typeof translatePlatformString>[2]));
     if (validationError) {
-      instance.editorError.set(validationError);
+      instance.saveError.set(validationError);
       return;
     }
     const payload: SaveCourseAssignmentsInput = {
@@ -430,14 +435,14 @@ Template.tdfAssignmentEdit.events({
         required: row.required,
       })),
     };
-    instance.editorError.set(null);
+    instance.saveError.set(null);
     void instance.saveCommand.run(async () => {
       const snapshot = await meteorCallAsync('saveCourseAssignments', payload) as CourseAssignmentEditorSnapshot;
       applySnapshot(instance, courseId, snapshot);
     }, {
       getErrorMessage: errorMessage,
       onFailure: (error) => {
-        instance.editorError.set(errorMessage(error));
+        instance.saveError.set(errorMessage(error));
       },
     });
   },

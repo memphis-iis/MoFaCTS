@@ -33,6 +33,9 @@
   export let clusterChoices = [];
   export let dropTarget = null;
   export let dropMarkerStyle = '';
+  export let errorText = '';
+  export let ruleErrorText = '';
+  export let deleteConfirmation = null;
   export let flatNodes = [];
   export let visualEditorValueBridge = () => {};
   export let activeVisualRuleTemplateId = 'rule.effect.classify';
@@ -67,6 +70,8 @@
   export let onNodeAuthoredValueChange = () => {};
   export let onNodeFocus = () => {};
   export let onRemoveActiveNode = () => {};
+  export let onCancelDeleteConfirmation = () => {};
+  export let onConfirmDeleteNode = () => {};
   export let onUpdateField = () => {};
   export let onUpdateFirstImageAttribute = () => {};
   export let onUpdateFirstHtmlMediaAttribute = () => {};
@@ -98,6 +103,7 @@
   />
 
   <main class="sparc-canvas" class:sparc-canvas-hierarchy-visible={showNodeHierarchy}>
+    {#if errorText}<div class="alert alert-danger" role="alert">{errorText}</div>{/if}
     <SparcRichTextToolbar
       colors={SPARC_RICH_TEXT_COLORS}
       {isRichTextSelected}
@@ -144,6 +150,9 @@
         {selectedHtmlMedia}
         onSelectParentNode={(parentNode) => activeNodeId = parentNode.id}
         onRemoveActiveNode={onRemoveActiveNode}
+        {deleteConfirmation}
+        {onCancelDeleteConfirmation}
+        {onConfirmDeleteNode}
         onUpdateField={onUpdateField}
         onUpdateFirstImageAttribute={onUpdateFirstImageAttribute}
         onUpdateFirstHtmlMediaAttribute={onUpdateFirstHtmlMediaAttribute}
@@ -160,6 +169,7 @@
       {/if}
 
       <SparcScopedProductionRulesCard
+        errorText={ruleErrorText}
         bind:activeVisualRuleTemplateId
         {activeProductionRuleIndex}
         {activeNodeProductionRuleEntries}

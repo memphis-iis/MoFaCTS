@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import { getActiveUiLocale } from '../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../lib/interfaceI18n';
 
@@ -13,6 +14,9 @@
   export let selectedHtmlMedia = null;
   export let onSelectParentNode = () => {};
   export let onRemoveActiveNode = () => {};
+  export let deleteConfirmation = null;
+  export let onCancelDeleteConfirmation = () => {};
+  export let onConfirmDeleteNode = () => {};
   export let onUpdateField = () => {};
   export let onUpdateFirstImageAttribute = () => {};
   export let onUpdateFirstHtmlMediaAttribute = () => {};
@@ -20,6 +24,33 @@
   export let onUpdateOptions = () => {};
 
   const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
+  const deleteConfirmationId = 'sparc-delete-node-confirmation';
+  let deleteButton;
+  let cancelDeleteButton;
+
+  async function openDeleteConfirmation() {
+    onRemoveActiveNode();
+    await tick();
+    cancelDeleteButton?.focus();
+  }
+
+  async function cancelDelete() {
+    onCancelDeleteConfirmation();
+    await tick();
+    deleteButton?.focus();
+  }
+
+  async function confirmDelete() {
+    onConfirmDeleteNode();
+    await tick();
+    deleteButton?.focus();
+  }
+
+  function handleDeleteConfirmationKeydown(event) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    cancelDelete();
+  }
 </script>
 
 <div class="sparc-context-card">
@@ -33,10 +64,37 @@
         {sparcText('sparc.selectParentNode')}
       </button>
     {/if}
-    <button type="button" class="btn btn-outline-danger btn-sm" on:click={onRemoveActiveNode}>
+    <button
+      bind:this={deleteButton}
+      type="button"
+      class="btn btn-outline-danger btn-sm"
+      aria-controls={deleteConfirmation ? deleteConfirmationId : undefined}
+      aria-expanded={deleteConfirmation ? 'true' : undefined}
+      on:click={openDeleteConfirmation}>
       {sparcText('sparc.deleteNode')}
     </button>
   </div>
+  {#if deleteConfirmation}
+    <div
+      id={deleteConfirmationId}
+      class="admin-inline-confirmation admin-form-row"
+      role="group"
+      aria-labelledby={`${deleteConfirmationId}-title`}
+      aria-describedby={`${deleteConfirmationId}-message`}
+      on:keydown={handleDeleteConfirmationKeydown}>
+      <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+      <div>
+        <div id={`${deleteConfirmationId}-title`} class="admin-inline-confirmation-title">{deleteConfirmation.title}</div>
+        <div id={`${deleteConfirmationId}-message`} class="admin-inline-confirmation-message">{deleteConfirmation.message}</div>
+      </div>
+      <div class="admin-inline-confirmation-actions">
+        <button bind:this={cancelDeleteButton} type="button" class="btn btn-sm btn-outline-secondary" on:click={cancelDelete}>{sparcText('apkg.cancel')}</button>
+        <button type="button" class="btn btn-sm btn-danger" on:click={confirmDelete}>
+          <i class="fa fa-trash" aria-hidden="true"></i> {sparcText('admin.delete')}
+        </button>
+      </div>
+    </div>
+  {/if}
   <label>
     {sparcText('sparc.nodeId')}
     <input value={activeNode.id || ''} on:input={(event) => onUpdateField('id', event.currentTarget.value)} />

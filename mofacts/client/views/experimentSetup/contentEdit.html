@@ -35,15 +35,9 @@
         </div>
         {{else}}
 
-        {{#if editorMessage}}
-        <div class="admin-status admin-status-{{editorMessage.type}} admin-form-row">
-            <i class="fa {{editorMessage.icon}}"></i>
-            <div class="admin-status-text">
-                <div class="admin-status-title">{{editorMessage.title}}</div>
-                <div>{{editorMessage.text}}</div>
-            </div>
-        </div>
-        {{/if}}
+        {{#with initializationEditorMessage}}
+        <div class="admin-inline-feedback admin-form-row-sm">{{> adminStatus variant=type title=title text=text urgent=true}}</div>
+        {{/with}}
 
         {{#if editorReady}}
         <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
@@ -69,6 +63,9 @@
                 </div>
             </div>
         </div>
+        {{#with toolbarEditorMessage}}
+        <div class="admin-inline-feedback admin-form-row-sm">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>
+        {{/with}}
 
         <!-- MC Conversion Toolbar -->
         <div class="mc-toolbar admin-form-row">
@@ -80,18 +77,7 @@
             </button>
         </div>
         {{#if removeIncorrectConfirmation}}
-        <div class="admin-inline-confirmation admin-form-row-sm">
-            <div>
-                <div class="admin-inline-confirmation-title">{{contentEditorText 'contentEditor.removeIncorrectTitle'}}</div>
-                <div class="admin-inline-confirmation-message">{{contentEditorText 'contentEditor.removeIncorrectMessage'}}</div>
-            </div>
-            <div class="admin-inline-confirmation-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelRemoveIncorrectBtn">{{contentEditorText 'content.cancel'}}</button>
-                <button type="button" class="btn btn-sm btn-danger" id="confirmRemoveIncorrectBtn">
-                    <i class="fa fa-trash"></i> {{contentEditorText 'contentEditor.remove'}}
-                </button>
-            </div>
-        </div>
+        <div class="admin-form-row-sm">{{> adminInlineConfirmation confirmation=removeIncorrectConfirmation}}</div>
         {{/if}}
 
         <!-- Generate Incorrect Responses Modal -->
@@ -149,17 +135,26 @@
 
         <!-- Validation Summary Panel -->
         <div id="stim-validation-summary"></div>
+        {{#with validationEditorMessage}}
+        <div class="admin-inline-feedback admin-form-row-sm">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>
+        {{/with}}
 
         <!-- JSON Editor container -->
         <div class="card admin-card editor-initial-surface" aria-busy="{{#if editorReady}}false{{else}}true{{/if}}">
             <div class="card-body admin-alert-compact">
                 <div id="stim-editor-container"></div>
+                {{#with fieldEditorMessage}}
+                <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>
+                {{/with}}
             </div>
         </div>
 
         {{#if editorReady}}
         <!-- Action buttons -->
         <div class="content-edit-actions">
+            {{#with saveEditorMessage}}
+            <div class="admin-inline-feedback">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>
+            {{/with}}
             <div class="save-feedback {{#if saveFeedbackText}}is-visible{{/if}}" role="status" aria-live="polite" aria-atomic="true">
                 {{#if saveFeedbackText}}
                 <i class="fa fa-check-circle" aria-hidden="true"></i>
@@ -179,4 +174,3 @@
         {{/if}}
     </div>
 </template>
-

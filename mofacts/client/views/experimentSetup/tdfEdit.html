@@ -30,15 +30,9 @@
         </div>
         {{else}}
 
-        {{#if editorMessage}}
-        <div class="admin-status admin-status-{{editorMessage.type}} admin-form-row">
-            <i class="fa {{editorMessage.icon}}"></i>
-            <div class="admin-status-text">
-                <div class="admin-status-title">{{editorMessage.title}}</div>
-                <div>{{editorMessage.text}}</div>
-            </div>
-        </div>
-        {{/if}}
+        {{#with initializationEditorMessage}}
+        <div class="admin-inline-feedback admin-form-row-sm">{{> adminStatus variant=type title=title text=text urgent=true}}</div>
+        {{/with}}
 
         {{#if editorReady}}
         <!-- Tooltip toggle + unsaved state (mobile-friendly) -->
@@ -68,10 +62,16 @@
 
         <!-- Validation Summary Panel -->
         <div id="tdf-validation-summary"></div>
+        {{#with validationEditorMessage}}
+        <div class="admin-inline-feedback admin-form-row-sm">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>
+        {{/with}}
 
         <!-- JSON Editor container -->
         <div class="card admin-card editor-initial-surface" aria-busy="{{#if editorReady}}false{{else}}true{{/if}}">
             <div class="card-body admin-alert-compact">
+                {{#with catalogEditorMessage}}
+                <div class="admin-inline-feedback admin-form-row-sm">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>
+                {{/with}}
                 <div id="tdf-editor-container"></div>
             </div>
         </div>
@@ -79,6 +79,9 @@
         {{#if editorReady}}
         <!-- Action buttons -->
         <div class="content-edit-actions">
+            {{#with saveEditorMessage}}
+            <div class="admin-inline-feedback">{{> adminStatus variant=type title=title text=text urgent=(equals type "error")}}</div>
+            {{/with}}
             <div class="save-feedback {{#if saveFeedbackText}}is-visible{{/if}}" role="status" aria-live="polite" aria-atomic="true">
                 {{#if saveFeedbackText}}
                 <i class="fa fa-check-circle" aria-hidden="true"></i>
@@ -98,4 +101,3 @@
         {{/if}}
     </div>
 </template>
-

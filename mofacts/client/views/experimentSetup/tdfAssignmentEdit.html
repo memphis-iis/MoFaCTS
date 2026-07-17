@@ -100,6 +100,11 @@
               <button id="saveAssignment" type="button" class="btn btn-primary" disabled="{{editorBusy}}" aria-busy="{{#if saveBusy}}true{{else}}false{{/if}}">
                 <i class="fa fa-save"></i> {{assignmentText 'courseAssignments.saveAssignments'}}
               </button>
+              {{#if saveError}}
+                <div class="admin-inline-feedback assignment-save-feedback">
+                  {{> adminStatus variant="error" text=saveError urgent=true}}
+                </div>
+              {{/if}}
             </div>
           </div>
         </div>

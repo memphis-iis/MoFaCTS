@@ -5,6 +5,7 @@
   import SparcRuleExpressionEditor from './SparcRuleExpressionEditor.svelte';
 
   export let activeVisualRuleTemplateId = 'rule.effect.classify';
+  export let errorText = '';
   export let activeProductionRuleIndex = 0;
   export let activeNodeProductionRuleEntries = [];
   export let activeNodeProductionRule = null;
@@ -113,6 +114,7 @@
         on:change={(event) => onUpdateScopedProductionRuleJson(event.currentTarget.value)}
       ></textarea>
     </label>
+    {#if errorText}<div class="alert alert-danger" role="alert">{errorText}</div>{/if}
     {#if activeNodeRuleEffect}
       <div class="sparc-rule-card">
         <div class="sparc-inline-actions">

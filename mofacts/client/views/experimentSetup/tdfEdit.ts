@@ -61,17 +61,19 @@ type OpenRouterCatalogLoadResult =
 
 type TdfEditorLoadValue = Readonly<{ tdf: any | null }>;
 
-function setEditorMessage(instance: any, type: string, title: string, text: string) {
-    instance.editorMessage.set({
+function setEditorMessage(instance: any, type: string, title: string, text: string, scope = 'save') {
+    instance.editorMessages.set({ ...instance.editorMessages.get(), [scope]: {
         type,
         title,
         text,
         icon: type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
-    });
+    } });
 }
 
-function clearEditorMessage(instance: any) {
-    instance.editorMessage.set(null);
+function clearEditorMessage(instance: any, scope: string) {
+    const messages = { ...instance.editorMessages.get() };
+    delete messages[scope];
+    instance.editorMessages.set(messages);
 }
 
 function showSaveFeedbackAndRedirect(instance: any, message: string) {
@@ -99,7 +101,7 @@ Template.tdfEdit.onCreated(function(this: any) {
     instance.hasChanges = new ReactiveVar(false);
     instance.saving = new ReactiveVar(false);
     instance.saveFeedback = new ReactiveVar('');
-    instance.editorMessage = new ReactiveVar(null);
+    instance.editorMessages = new ReactiveVar({});
     instance.tooltipMode = new ReactiveVar(getTooltipMode());
     instance.editor = null;
     instance.originalTdf = null;
@@ -228,8 +230,17 @@ Template.tdfEdit.helpers({
         return (Template.instance() as any).saveFeedback.get();
     },
 
-    editorMessage() {
-        return (Template.instance() as any).editorMessage.get();
+    validationEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().validation || null;
+    },
+    catalogEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().catalog || null;
+    },
+    saveEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().save || null;
+    },
+    initializationEditorMessage() {
+        return (Template.instance() as any).editorMessages.get().initialization || null;
     },
 
     saveDisabled() {
@@ -289,7 +300,7 @@ Template.tdfEdit.events({
         const schemaErrors = instance.editor.validate();
         if (schemaErrors.length > 0) {
             const errorMessages = schemaErrors.map((e: any) => `${e.path}: ${e.message}`).join('; ');
-            setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.schemaValidationErrors'), errorMessages);
+            setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.schemaValidationErrors'), errorMessages, 'validation');
             return;
         }
 
@@ -302,12 +313,13 @@ Template.tdfEdit.events({
                 if (summaryEl) {
                     summaryEl.scrollIntoView({ behavior: 'smooth' });
                 }
-                setEditorMessage(instance, 'warning', tdfEditorText('tdfEditor.validationAttentionTitle'), tdfEditorText('tdfEditor.validationAttentionText'));
+                setEditorMessage(instance, 'warning', tdfEditorText('tdfEditor.validationAttentionTitle'), tdfEditorText('tdfEditor.validationAttentionText'), 'validation');
                 return;
             }
         }
 
-        clearEditorMessage(instance);
+        clearEditorMessage(instance, 'validation');
+        clearEditorMessage(instance, 'save');
         instance.saving.set(true);
 
         try {
@@ -343,7 +355,7 @@ Template.tdfEdit.events({
 
         } catch (error: any) {
             clientConsole(1, '[TDF Edit] Error saving TDF:', error);
-            setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.errorSavingTdf'), error.reason || error.message);
+            setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.errorSavingTdf'), error.reason || error.message, 'save');
         } finally {
             instance.saving.set(false);
         }
@@ -556,6 +568,7 @@ async function initializeTdfEditor(instance: any): Promise<void> {
                 tdfEditorText('profile.openRouterModelsLoadFailed', {
                     error: instance.openRouterCatalogError,
                 }),
+                'catalog',
             );
         }
         instance.loadState.set(resolveLoad(
@@ -994,7 +1007,7 @@ async function initEditor(instance: any, tdf: any) {
         JSONEditorAny = await ensureJsonEditor();
     } catch (error: any) {
         clientConsole(1, '[TDF Edit] JSONEditor failed to load:', error);
-        setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.editorLibraryNotLoaded'), tdfEditorText('tdfEditor.refreshContactSupport'));
+        setEditorMessage(instance, 'error', tdfEditorText('tdfEditor.editorLibraryNotLoaded'), tdfEditorText('tdfEditor.refreshContactSupport'), 'initialization');
         throw error;
     }
 

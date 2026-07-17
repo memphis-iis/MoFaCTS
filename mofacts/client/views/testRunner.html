@@ -108,7 +108,7 @@
         <th scope="col">{{checkLabel}}</th>
         <th scope="col">{{graduationLabel}}</th>
         <th scope="col">{{robustnessLabel}}</th>
-        <th scope="col">{{messageLabel}}</th>
+        <th scope="col" class="admin-table-message-column">{{messageLabel}}</th>
       </tr>
     </thead>
     <tbody>
@@ -117,7 +117,7 @@
           <td>{{run}}</td>
           <td>{{displayStudentOutcome}}</td>
           <td>{{displayRobustnessOutcome}}</td>
-          <td>{{message}}</td>
+          <td><div class="admin-table-feedback">{{message}}</div></td>
         </tr>
       {{/each}}
     </tbody>
@@ -130,7 +130,7 @@
       <tr>
         <th scope="col">{{checkLabel}}</th>
         <th scope="col">{{statusLabel}}</th>
-        <th scope="col">{{messageLabel}}</th>
+        <th scope="col" class="admin-table-message-column">{{messageLabel}}</th>
       </tr>
     </thead>
     <tbody>
@@ -138,7 +138,7 @@
         <tr class="{{rowClass}}">
           <td>{{name}}</td>
           <td>{{displayStatus}}</td>
-          <td>{{message}}</td>
+          <td><div class="admin-table-feedback">{{message}}</div></td>
         </tr>
       {{/each}}
     </tbody>

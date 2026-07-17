@@ -18,7 +18,10 @@ import {
 } from '../../common/themePropertyNormalization';
 import { clientConsole } from '../lib/clientLogger';
 import { createTemplateLifetime } from '../lib/adminUi/templateLifetime';
+import { createScopedAsyncCommandRegistry } from '../lib/adminUi/scopedAsyncCommandRegistry';
+import { createInlineConfirmationController } from '../lib/adminUi/inlineConfirmationController';
 import './themeGenerationWizard';
+import './shared/adminUi/adminUi';
 import './theme.html';
 import './theme.css';
 
@@ -251,28 +254,29 @@ function themeExportFilename(themeName: unknown, fallbackId: unknown) {
     return `${safeName || 'theme'}.json`;
 }
 
-function setThemeMessage(template: any, level: string, text: string) {
-    template?.themeMessage?.set?.({
+function setThemeMessage(template: any, level: string, text: string, scope = 'library') {
+    const messages = { ...(template?.themeMessages?.get?.() || {}) };
+    messages[scope] = {
         level,
         text,
-        icon: level === 'success' ? 'fa-check-circle' : level === 'warning' ? 'fa-exclamation-triangle' : level === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'
-    });
+        icon: level === 'success' ? 'fa-check-circle' : level === 'warning' ? 'fa-exclamation-triangle' : level === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle',
+        scope,
+    };
+    template?.themeMessages?.set?.(messages);
 }
 
-function clearThemeMessage(template: any) {
-    template?.themeMessage?.set?.(null);
+function clearThemeMessage(template: any, scope?: string) {
+    if (!scope) {
+        template?.themeMessages?.set?.({});
+        return;
+    }
+    const messages = { ...(template?.themeMessages?.get?.() || {}) };
+    delete messages[scope];
+    template?.themeMessages?.set?.(messages);
 }
 
 function setThemeHelpStatus(template: any, level: 'info' | 'success' | 'error', text: string) {
     template.themeHelpStatus.set({ level, text });
-}
-
-function clearThemeConfirmation(template: any) {
-    const pending = template?.themeConfirmation?.get?.();
-    if (pending?.resolve) {
-        pending.resolve(false);
-    }
-    template?.themeConfirmation?.set?.(null);
 }
 
 function loadThemePublications(template: any) {
@@ -298,36 +302,39 @@ function loadThemePublications(template: any) {
     template.subscribe('themeLibrary', { onReady: () => markReady('libraryReady'), onStop: markError });
 }
 
-function requestThemeConfirmation(template: any, options: any): Promise<boolean> {
-    clearThemeConfirmation(template);
-    clearThemeMessage(template);
+function requestThemeConfirmation(template: any, trigger: HTMLElement, options: any): Promise<boolean> {
+    const existing = template.themeConfirmationController.getContext();
+    if (existing?.resolve) existing.resolve(false);
+    template.themeConfirmationController.cancel();
+    clearThemeMessage(template, options.scope || 'library');
 
     return new Promise(resolve => {
-        template.themeConfirmation.set({
+        const scope = options.scope || 'library';
+        const confirmationId = `theme-confirmation-${scope.replace(/[^A-Za-z0-9_-]/g, '-')}`;
+        template.themeConfirmationController.open({
+            confirmationId,
             title: options.title,
             message: options.message,
             confirmLabel: options.confirmLabel || 'Continue',
-            confirmClass: options.confirmClass || 'btn-danger',
-            resolve
-        });
+            cancelLabel: options.cancelLabel || themeText('theme.cancel'),
+            severity: options.confirmClass === 'btn-warning' ? 'warning' : 'danger',
+            context: { scope, resolve },
+        }, trigger);
+        Tracker.afterFlush(() => template.themeConfirmationController.focusInitial());
     });
 }
 
-async function downloadThemeJson(template: any, themeId: any, filenameFallback = 'theme.json') {
-    try {
-        const json = await (Meteor as any).callAsync('exportThemeFile', themeId);
-        const blob = new Blob([json], {type: 'application/json'});
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filenameFallback;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    } catch (err: any) {
-        setThemeMessage(template, 'error', themeText('theme.errorExportingTheme', { error: err?.message || err }));
-    }
+async function downloadThemeJson(themeId: any, filenameFallback = 'theme.json') {
+    const json = await (Meteor as any).callAsync('exportThemeFile', themeId);
+    const blob = new Blob([json], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filenameFallback;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 
 Template.theme.onCreated(function(this: any) {
@@ -336,8 +343,16 @@ Template.theme.onCreated(function(this: any) {
     // Memoization cache for contrast calculations
     // Key: "fg-bg", Value: result object
     this.contrastCache = new Map();
-    this.themeMessage = new ReactiveVar(null);
-    this.themeConfirmation = new ReactiveVar(null);
+    this.themeMessages = new ReactiveVar({});
+    this.themeCommandStates = new ReactiveVar({});
+    this.themeCommandRegistry = createScopedAsyncCommandRegistry((scope, state) => {
+        this.themeCommandStates.set({ ...this.themeCommandStates.get(), [scope]: state });
+    });
+    this.themeConfirmationView = new ReactiveVar(null);
+    this.themeConfirmationController = createInlineConfirmationController(
+        (view) => this.themeConfirmationView.set(view),
+        () => this.find('[data-theme-confirmation-return-fallback]'),
+    );
     this.themeHelpStatus = new ReactiveVar(null);
     this.themePublicationState = new ReactiveVar({ themeReady: false, libraryReady: false, error: null });
     this.themePublicationLifetime = createTemplateLifetime();
@@ -371,6 +386,10 @@ Template.theme.onDestroyed(function(this: any) {
     this.contrastCache.clear();
     this.themePropertyRevisions.clear();
     this.themePublicationLifetime.destroy();
+    this.themeCommandRegistry.destroy();
+    const confirmationContext = this.themeConfirmationController.getContext();
+    confirmationContext?.resolve?.(false);
+    this.themeConfirmationController.destroy();
 });
 
 
@@ -466,11 +485,32 @@ Template.theme.helpers({
 
         return result;
     },
-    'themeMessage': function() {
-        return (Template.instance() as any).themeMessage.get();
+    'themeMessage': function(scope = 'library') {
+        const instance = Template.instance() as any;
+        const commandState = instance.themeCommandStates.get()[scope];
+        if (commandState?.status === 'pending') {
+            return { level: 'info', text: themeText('common.loading') };
+        }
+        if (commandState?.status === 'error') {
+            return { level: 'error', text: commandState.message };
+        }
+        if (commandState?.status === 'success' && commandState.result?.message) {
+            return { level: commandState.result.level || 'success', text: commandState.result.message };
+        }
+        return instance.themeMessages.get()[scope] || null;
     },
-    'themeConfirmation': function() {
-        return (Template.instance() as any).themeConfirmation.get();
+    'themeConfirmationFor': function(scope: string) {
+        const instance = Template.instance() as any;
+        return instance.themeConfirmationController.getContext()?.scope === scope
+            ? instance.themeConfirmationView.get()
+            : null;
+    },
+    'themeScope': function(themeId: string) {
+        return `theme:${themeId}`;
+    },
+    'themeRowCommandAttrs': function(themeId: string) {
+        const state = (Template.instance() as any).themeCommandStates.get()[`theme:${themeId}`];
+        return state?.status === 'pending' ? { disabled: true, 'aria-busy': 'true' } : {};
     },
     'themeHelpStatus': function() {
         return (Template.instance() as any).themeHelpStatus.get();
@@ -718,7 +758,7 @@ function stageThemePropertyDraft(template: any, property: string, value: unknown
     return revision;
 }
 
-async function persistThemePropertyDraft(template: any, property: string, value: unknown, revision: number): Promise<boolean> {
+async function persistThemePropertyDraft(template: any, property: string, value: unknown, revision: number, messageScope = 'property'): Promise<boolean> {
     try {
         const response = await saveThemeProperty(property, value);
         if (template.themePropertyRevisions.get(property) !== revision) {
@@ -746,7 +786,7 @@ async function persistThemePropertyDraft(template: any, property: string, value:
         }
         applyThemeEditorDraftPreview(template);
         clientConsole(1, `[Theme] Error auto-saving ${property}:`, err);
-        setThemeMessage(template, 'error', themeText('theme.errorSavingField', { field: property, error: err }));
+        setThemeMessage(template, 'error', themeText('theme.errorSavingField', { field: property, error: err }), messageScope);
         return false;
     }
 }
@@ -839,13 +879,14 @@ Template.theme.events({
         if (!themeId) {
             return;
         }
-        try {
+        const scope = `theme:${themeId}`;
+        clearThemeMessage(template, scope);
+        await template.themeCommandRegistry.run(scope, async () => {
             const activeTheme = await (Meteor as any).callAsync('setActiveTheme', themeId);
             clearThemeEditorDraft(template);
             applyThemeState(activeTheme, template);
-        } catch (err: any) {
-            setThemeMessage(template, 'error', themeText('theme.errorActivatingTheme', { error: err?.message || err }));
-        }
+            return { message: '' };
+        }, { getErrorMessage: (err: any) => themeText('theme.errorActivatingTheme', { error: err?.message || err }) });
     },
     'click .duplicate-theme': async function(event: any, template: any) {
         event.preventDefault();
@@ -856,14 +897,15 @@ Template.theme.events({
         if (!newName) {
             return;
         }
-        try {
+        const scope = `theme:${themeId}`;
+        clearThemeMessage(template, scope);
+        await template.themeCommandRegistry.run(scope, async () => {
             await (Meteor as any).callAsync('duplicateTheme', {
                 sourceThemeId: themeId,
                 name: newName
             });
-        } catch (err: any) {
-            setThemeMessage(template, 'error', themeText('theme.errorDuplicatingTheme', { error: err?.message || err }));
-        }
+            return { message: '' };
+        }, { getErrorMessage: (err: any) => themeText('theme.errorDuplicatingTheme', { error: err?.message || err }) });
     },
     'click .rename-theme': async function(event: any, template: any) {
         event.preventDefault();
@@ -876,14 +918,15 @@ Template.theme.events({
         if (!newName || newName === currentName) {
             return;
         }
-        try {
+        const scope = `theme:${themeId}`;
+        clearThemeMessage(template, scope);
+        await template.themeCommandRegistry.run(scope, async () => {
             await (Meteor as any).callAsync('renameTheme', {
                 themeId: themeId,
                 newName: newName
             });
-        } catch (err: any) {
-            setThemeMessage(template, 'error', themeText('theme.errorRenamingTheme', { error: err?.message || err }));
-        }
+            return { message: '' };
+        }, { getErrorMessage: (err: any) => themeText('theme.errorRenamingTheme', { error: err?.message || err }) });
     },
     'click .delete-theme': async function(event: any, template: any) {
         event.preventDefault();
@@ -892,20 +935,24 @@ Template.theme.events({
         if (!themeId) {
             return;
         }
-        const confirmed = await requestThemeConfirmation(template, {
+        const confirmed = await requestThemeConfirmation(template, event.currentTarget as HTMLElement, {
             title: themeText('theme.deleteThemeTitle', { themeName }),
             message: themeText('theme.deleteThemeMessage'),
-            confirmLabel: themeText('theme.deleteTheme')
+            confirmLabel: themeText('theme.deleteTheme'),
+            scope: `theme:${themeId}`,
         });
         if (!confirmed) {
             return;
         }
-        try {
+        const scope = `theme:${themeId}`;
+        clearThemeMessage(template, scope);
+        await template.themeCommandRegistry.run(scope, async () => {
             await (Meteor as any).callAsync('deleteTheme', themeId);
-            setThemeMessage(template, 'success', themeText('theme.deleted', { name: themeName }));
-        } catch (err: any) {
-            setThemeMessage(template, 'error', themeText('theme.errorDeletingTheme', { error: err?.message || err }));
-        }
+            return { message: themeText('theme.deleted', { name: themeName }) };
+        }, {
+            getErrorMessage: (err: any) => themeText('theme.errorDeletingTheme', { error: err?.message || err }),
+            onSuccess: (result: any) => setThemeMessage(template, 'success', result.message, 'library'),
+        });
     },
     'click .export-theme': async function(event: any, template: any) {
         event.preventDefault();
@@ -914,7 +961,12 @@ Template.theme.events({
         if (!themeId) {
             return;
         }
-        await downloadThemeJson(template, themeId, themeExportFilename(themeName, themeId));
+        const scope = `theme:${themeId}`;
+        clearThemeMessage(template, scope);
+        await template.themeCommandRegistry.run(scope, async () => {
+            await downloadThemeJson(themeId, themeExportFilename(themeName, themeId));
+            return { message: '' };
+        }, { getErrorMessage: (err: any) => themeText('theme.errorExportingTheme', { error: err?.message || err }) });
     },
     'click #exportActiveTheme': async function(event: any, template: any) {
         const activeId = getActiveThemeId();
@@ -924,7 +976,11 @@ Template.theme.events({
         }
         const theme = getServerActiveTheme();
         const filename = themeExportFilename(theme?.metadata?.name || theme?.properties?.themeName, activeId);
-        await downloadThemeJson(template, activeId, filename);
+        try {
+            await downloadThemeJson(activeId, filename);
+        } catch (err: any) {
+            setThemeMessage(template, 'error', themeText('theme.errorExportingTheme', { error: err?.message || err }));
+        }
     },
     'click #themeImportButton': async function(event: any, template: any) {
         event.preventDefault();
@@ -1024,13 +1080,13 @@ Template.theme.events({
         }
 
         if (!file.type.startsWith('image/')) {
-            setThemeMessage(template, 'warning', themeText('theme.selectImageFile'));
+            setThemeMessage(template, 'warning', themeText('theme.selectImageFile'), 'underlay');
             fileInput.value = '';
             return;
         }
 
         if (file.size > HOME_UNDERLAY_MAX_FILE_BYTES) {
-            setThemeMessage(template, 'warning', themeText('theme.underlayFileSizeLessThanFiveMb'));
+            setThemeMessage(template, 'warning', themeText('theme.underlayFileSizeLessThanFiveMb'), 'underlay');
             fileInput.value = '';
             return;
         }
@@ -1039,27 +1095,27 @@ Template.theme.events({
         reader.onload = async function(e: any) {
             const base64Data = e.target.result;
             const revision = stageThemePropertyDraft(template, 'practice_menu_underlay_image_url', base64Data);
-            const saved = await persistThemePropertyDraft(template, 'practice_menu_underlay_image_url', base64Data, revision);
+            const saved = await persistThemePropertyDraft(template, 'practice_menu_underlay_image_url', base64Data, revision, 'underlay');
             if (saved) {
                 fileInput.value = '';
-                setThemeMessage(template, 'success', themeText('theme.homeUnderlayUploaded'));
+                setThemeMessage(template, 'success', themeText('theme.homeUnderlayUploaded'), 'underlay');
             }
         };
         reader.onerror = function() {
-            setThemeMessage(template, 'error', themeText('theme.homeUnderlayReadError'));
+            setThemeMessage(template, 'error', themeText('theme.homeUnderlayReadError'), 'underlay');
             fileInput.value = '';
         };
         reader.readAsDataURL(file);
     },
     'click #clearHomeUnderlay': async function(event: any, template: any) {
         const revision = stageThemePropertyDraft(template, 'practice_menu_underlay_image_url', '');
-        const saved = await persistThemePropertyDraft(template, 'practice_menu_underlay_image_url', '', revision);
+        const saved = await persistThemePropertyDraft(template, 'practice_menu_underlay_image_url', '', revision, 'underlay');
         if (saved) {
             const fileInput = template.find('#homeUnderlayUpload') as HTMLInputElement | null;
             const urlInput = template.find('.currentThemeProp[data-id="practice_menu_underlay_image_url"]') as HTMLInputElement | null;
             if (fileInput) fileInput.value = '';
             if (urlInput) urlInput.value = '';
-            setThemeMessage(template, 'success', themeText('theme.homeUnderlayCleared'));
+            setThemeMessage(template, 'success', themeText('theme.homeUnderlayCleared'), 'underlay');
         }
     },
     'change #logoUpload': function(event: any, template: any) {
@@ -1067,12 +1123,12 @@ Template.theme.events({
         if (file) {
             // Validate file type
             if (!file.type.startsWith('image/')) {
-                setThemeMessage(template, 'warning', themeText('theme.selectImageFile'));
+                setThemeMessage(template, 'warning', themeText('theme.selectImageFile'), 'logo');
                 return;
             }
             // Validate file size (max 2MB)
             if (file.size > 2 * 1024 * 1024) {
-                setThemeMessage(template, 'warning', themeText('theme.fileSizeLessThanTwoMb'));
+                setThemeMessage(template, 'warning', themeText('theme.fileSizeLessThanTwoMb'), 'logo');
                 return;
             }
 
@@ -1090,7 +1146,7 @@ Template.theme.events({
                         );
 
                         const logoRevision = stageThemePropertyDraft(template, 'brand_logo_url', base64Data);
-                        const logoSaved = await persistThemePropertyDraft(template, 'brand_logo_url', base64Data, logoRevision);
+                        const logoSaved = await persistThemePropertyDraft(template, 'brand_logo_url', base64Data, logoRevision, 'logo');
                         if (!logoSaved) {
                             return;
                         }
@@ -1129,9 +1185,9 @@ Template.theme.events({
 
                         
                         // PHASE 1.5: No need to call getCurrentTheme() - reactive subscription handles it
-                        setThemeMessage(template, 'success', themeText('theme.logoUploaded'));
+                        setThemeMessage(template, 'success', themeText('theme.logoUploaded'), 'logo');
                     } catch (err: any) {
-                        setThemeMessage(template, 'error', themeText('theme.logoUploadError', { error: err }));
+                        setThemeMessage(template, 'error', themeText('theme.logoUploadError', { error: err }), 'logo');
                     }
                 };
                 img.src = base64Data;
@@ -1140,18 +1196,19 @@ Template.theme.events({
         }
     },
     'click #clearLogo': async function(event: any, template: any) {
-        const confirmed = await requestThemeConfirmation(template, {
+        const confirmed = await requestThemeConfirmation(template, event.currentTarget as HTMLElement, {
             title: themeText('theme.clearLogoTitle'),
             message: themeText('theme.clearLogoMessage'),
-            confirmLabel: themeText('theme.clearLogo')
+            confirmLabel: themeText('theme.clearLogo'),
+            scope: 'logo',
         });
         if (confirmed) {
             const revision = stageThemePropertyDraft(template, 'brand_logo_url', '');
-            const saved = await persistThemePropertyDraft(template, 'brand_logo_url', '', revision);
+            const saved = await persistThemePropertyDraft(template, 'brand_logo_url', '', revision, 'logo');
             if (saved) {
                 const fileInput = template.find('#logoUpload') as HTMLInputElement | null;
                 if (fileInput) fileInput.value = '';
-                setThemeMessage(template, 'success', themeText('theme.logoCleared'));
+                setThemeMessage(template, 'success', themeText('theme.logoCleared'), 'logo');
             }
         }
     },
@@ -1202,10 +1259,11 @@ Template.theme.events({
     },
 
     'click #removeHelpFileButton': async function(event: any, template: any) {
-        const confirmed = await requestThemeConfirmation(template, {
+        const confirmed = await requestThemeConfirmation(template, event.currentTarget as HTMLElement, {
             title: themeText('theme.removeCustomHelpTitle'),
             message: themeText('theme.removeCustomHelpMessage'),
-            confirmLabel: themeText('theme.removeHelpPage')
+            confirmLabel: themeText('theme.removeHelpPage'),
+            scope: 'help',
         });
         if (confirmed) {
             setThemeHelpStatus(template, 'info', themeText('theme.removing'));
@@ -1219,18 +1277,21 @@ Template.theme.events({
         }
     },
 
-    'click #cancel-theme-confirmation': function(event: any, template: any) {
+    'click .admin-confirmation-cancel': function(event: any, template: any) {
         event.preventDefault();
-        clearThemeConfirmation(template);
+        const context = template.themeConfirmationController.getContext();
+        if (template.themeConfirmationController.cancel()) context?.resolve?.(false);
     },
 
-    'click #confirm-theme-confirmation': function(event: any, template: any) {
+    'click .admin-confirmation-confirm': function(event: any, template: any) {
         event.preventDefault();
-        const pending = template.themeConfirmation.get();
-        if (pending?.resolve) {
-            pending.resolve(true);
-        }
-        template.themeConfirmation.set(null);
+        const context = template.themeConfirmationController.getContext();
+        if (template.themeConfirmationController.complete()) context?.resolve?.(true);
+    },
+
+    'keydown .admin-inline-confirmation': function(event: KeyboardEvent, template: any) {
+        const context = template.themeConfirmationController.getContext();
+        if (template.themeConfirmationController.handleKeydown(event)) context?.resolve?.(false);
     }
 });
 

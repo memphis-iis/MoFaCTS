@@ -13,11 +13,7 @@ import {
   type LoadableState,
 } from '../../lib/adminUi/loadableState';
 import { createTemplateLifetime, type TemplateLifetime } from '../../lib/adminUi/templateLifetime';
-import {
-  createAsyncCommandController,
-  type AsyncCommandController,
-  type AsyncCommandState,
-} from '../../lib/adminUi/asyncCommandState';
+import { createScopedAsyncCommandRegistry, type ScopedAsyncCommandRegistry } from '../../lib/adminUi/scopedAsyncCommandRegistry';
 import { normalizeDataDownloadRows, type DataDownloadRow } from './dataDownloadState';
 
 const MeteorCompat = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
@@ -29,9 +25,8 @@ type DownloadMessage = Readonly<{
 
 type DataDownloadInstance = Blaze.TemplateInstance & {
   filesPresentation: ReactiveVar<LoadableState<DataDownloadRow[]>>;
-  downloadMessage: ReactiveVar<DownloadMessage | null>;
-  downloadCommandState: ReactiveVar<AsyncCommandState<void>>;
-  downloadCommand: AsyncCommandController<void>;
+  downloadMessages: ReactiveVar<Record<string, DownloadMessage>>;
+  downloadCommandRegistry: ScopedAsyncCommandRegistry<DownloadMessage>;
   filesLifetime: TemplateLifetime;
   nextFilesRequestId: number;
 };
@@ -62,8 +57,15 @@ function rowAccessibleName(row: DataDownloadRow): string {
   return String(row?.disp || row?.content?.fileName || row?._id || '').trim();
 }
 
-function setDownloadMessage(instance: DataDownloadInstance, text: string | null, level: DownloadMessage['level'] = 'info'): void {
-  instance.downloadMessage.set(text ? { text, level } : null);
+function setDownloadMessage(instance: DataDownloadInstance, scope: string, text: string | null, level: DownloadMessage['level'] = 'info'): void {
+  const messages = { ...instance.downloadMessages.get() };
+  if (text) messages[scope] = { text, level };
+  else delete messages[scope];
+  instance.downloadMessages.set(messages);
+}
+
+function downloadMessageFor(instance: DataDownloadInstance, scope: string): DownloadMessage | null {
+  return instance.downloadMessages.get()[scope] || null;
 }
 
 function loadDownloadableFiles(instance: DataDownloadInstance): void {
@@ -95,9 +97,12 @@ function loadDownloadableFiles(instance: DataDownloadInstance): void {
 
 Template.dataDownload.onCreated(function(this: DataDownloadInstance) {
   this.filesPresentation = new ReactiveVar<LoadableState<DataDownloadRow[]>>({ status: 'idle' });
-  this.downloadMessage = new ReactiveVar<DownloadMessage | null>(null);
-  this.downloadCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
-  this.downloadCommand = createAsyncCommandController((state) => this.downloadCommandState.set(state));
+  this.downloadMessages = new ReactiveVar<Record<string, DownloadMessage>>({});
+  this.downloadCommandRegistry = createScopedAsyncCommandRegistry<DownloadMessage>((scope, state) => {
+    if (state.status === 'pending') setDownloadMessage(this, scope, reportingText('reporting.preparingDownload'), 'info');
+    else if (state.status === 'success') setDownloadMessage(this, scope, state.result.text, state.result.level);
+    else if (state.status === 'error') setDownloadMessage(this, scope, state.message, 'error');
+  });
   this.filesLifetime = createTemplateLifetime();
   this.nextFilesRequestId = 0;
   loadDownloadableFiles(this);
@@ -105,7 +110,7 @@ Template.dataDownload.onCreated(function(this: DataDownloadInstance) {
 
 Template.dataDownload.onDestroyed(function(this: DataDownloadInstance) {
   this.filesLifetime.destroy();
-  this.downloadCommand.destroy();
+  this.downloadCommandRegistry.destroy();
 });
 
 Template.dataDownload.helpers({
@@ -122,20 +127,28 @@ Template.dataDownload.helpers({
     const instance = Template.instance() as DataDownloadInstance;
     const filesPresentation = instance.filesPresentation.get();
     return {
-      rows: readyLoadValue(filesPresentation) || [],
+      rows: (readyLoadValue(filesPresentation) || []).map((row) => ({
+        ...row,
+        downloadMessage: downloadMessageFor(instance, `tdf:${row._id}`),
+        downloadBusy: instance.downloadCommandRegistry.getState(`tdf:${row._id}`).status === 'pending',
+      })),
       isLoading: loadPending(filesPresentation),
       loadErrorText: loadErrorMessage(filesPresentation),
-      downloadBusy: instance.downloadCommandState.get().status === 'pending',
     };
   },
-  downloadMessage(): DownloadMessage | null {
-    return (Template.instance() as DataDownloadInstance).downloadMessage.get();
+  historyDownloadMessage(): DownloadMessage | null {
+    const instance = Template.instance() as DataDownloadInstance;
+    return downloadMessageFor(instance, 'history');
   },
-  downloadMessageUrgent(): boolean {
-    return (Template.instance() as DataDownloadInstance).downloadMessage.get()?.level === 'error';
+  ownedDownloadMessage(): DownloadMessage | null {
+    const instance = Template.instance() as DataDownloadInstance;
+    return downloadMessageFor(instance, 'owned');
   },
-  downloadBusy(): boolean {
-    return (Template.instance() as DataDownloadInstance).downloadCommandState.get().status === 'pending';
+  historyDownloadBusy(): boolean {
+    return (Template.instance() as DataDownloadInstance).downloadCommandRegistry.getState('history').status === 'pending';
+  },
+  ownedDownloadBusy(): boolean {
+    return (Template.instance() as DataDownloadInstance).downloadCommandRegistry.getState('owned').status === 'pending';
   },
   reportingText(key: Parameters<typeof translatePlatformString>[1], options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
     return reportingText(key, options?.hash);
@@ -168,47 +181,44 @@ Template.dataDownload.events({
     const fileName = event.currentTarget.getAttribute('data-fileName');
     const fileId = event.currentTarget.getAttribute('data-fileId');
     if (fileName) {
-      makeDataDownloadMethodCall(instance, 'downloadDataByFile', fileName);
+      makeDataDownloadMethodCall(instance, `tdf:${fileId}`, 'downloadDataByFile', fileName);
     } else {
-      makeDataDownloadMethodCall(instance, 'downloadDataById', fileId);
+      makeDataDownloadMethodCall(instance, `tdf:${fileId}`, 'downloadDataById', fileId);
     }
   },
   'click .root-omnibus-download-link'(event: any, instance: DataDownloadInstance) {
     event.preventDefault();
     const fileName = event.currentTarget.getAttribute('data-fileName');
+    const fileId = event.currentTarget.getAttribute('data-fileId');
     if (!fileName) {
       return;
     }
-    makeDataDownloadMethodCall(instance, 'downloadDataByFile', fileName);
+    makeDataDownloadMethodCall(instance, `tdf:${fileId}`, 'downloadDataByFile', fileName);
   },
   'click #userDataDownloadLink'(event: any, instance: DataDownloadInstance) {
     event.preventDefault();
-    makeDataDownloadMethodCall(instance, 'downloadDataByTeacher', Meteor.userId());
+    makeDataDownloadMethodCall(instance, 'owned', 'downloadDataByTeacher', Meteor.userId());
   },
   'click #ownHistoryDownloadButton'(event: any, instance: DataDownloadInstance) {
     event.preventDefault();
-    makeDataDownloadMethodCall(instance, 'downloadOwnHistoryAcrossTdfs');
+    makeDataDownloadMethodCall(instance, 'history', 'downloadOwnHistoryAcrossTdfs');
   },
 });
 
-function makeDataDownloadMethodCall(instance: DataDownloadInstance, methodName: string, ...args: any[]): void {
-  setDownloadMessage(instance, reportingText('reporting.preparingDownload'), 'info');
-  void instance.downloadCommand.run(async () => {
+function makeDataDownloadMethodCall(instance: DataDownloadInstance, scope: string, methodName: string, ...args: any[]): void {
+  void instance.downloadCommandRegistry.run(scope, async () => {
     const response = await MeteorCompat.callAsync(methodName, ...args);
     if (response?.downloadUrl) {
       startDownloadFromUrl(response.downloadUrl);
     } else {
       createData(response);
     }
+    return { text: reportingText('reporting.downloadStarted'), level: 'success' };
   }, {
     getErrorMessage: (error) => reportingText('reporting.downloadFailed', { error: errorMessage(error) }),
-    onSuccess: () => {
-      setDownloadMessage(instance, reportingText('reporting.downloadStarted'), 'success');
-    },
     onFailure: (error) => {
       const message = errorMessage(error);
       clientConsole(1, '[DataDownload] Download failed:', message);
-      setDownloadMessage(instance, reportingText('reporting.downloadFailed', { error: message }), 'error');
     },
   });
 }

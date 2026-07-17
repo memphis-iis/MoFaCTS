@@ -30,9 +30,12 @@ type WizardState = {
   expansion: PaletteExpansionOptions;
   error: string;
   status: string;
+  feedbackScope: WizardFeedbackScope;
   skippedCssValues: string[];
   generated: GeneratedTheme | null;
 };
+
+type WizardFeedbackScope = 'palette' | 'paste' | 'json' | 'preview' | 'create';
 
 const DEFAULT_EXPANSION: PaletteExpansionOptions = {
   allowTints: true,
@@ -89,6 +92,7 @@ function initialState(): WizardState {
     expansion: { ...DEFAULT_EXPANSION },
     error: '',
     status: '',
+    feedbackScope: 'palette',
     skippedCssValues: [],
     generated: null,
   };
@@ -303,11 +307,12 @@ Template.themeGenerationWizard.helpers({
       return null;
     }
   },
-  wizardError() {
-    return getState(Template.instance() as ThemeWizardTemplateInstance).error;
-  },
-  wizardStatus() {
-    return getState(Template.instance() as ThemeWizardTemplateInstance).status;
+  wizardFeedback(scope: WizardFeedbackScope) {
+    const state = getState(Template.instance() as ThemeWizardTemplateInstance);
+    if (state.feedbackScope !== scope) return null;
+    if (state.error) return { variant: 'error', text: state.error, urgent: true };
+    if (state.status) return { variant: 'info', text: state.status };
+    return null;
   },
   generatedPreview() {
     const state = getState(Template.instance() as ThemeWizardTemplateInstance);
@@ -352,6 +357,8 @@ Template.themeGenerationWizard.events({
       slots: [...state.slots, { value: '#FFFFFF', label: '' }],
       generated: null,
       status: state.slots.length >= 8 ? themeWizardText('themeWizard.moreThanEightColors') : '',
+      error: '',
+      feedbackScope: 'palette',
     }));
   },
   'change .theme-wizard-base-theme'(event: Event, instance: ThemeWizardTemplateInstance) {
@@ -363,7 +370,7 @@ Template.themeGenerationWizard.events({
     const index = Number((event.currentTarget as HTMLElement).dataset.index);
     setState(instance, (state) => {
       if (state.slots.length <= 2) {
-        return { ...state, error: themeWizardText('themeWizard.needsTwoColors') };
+        return { ...state, error: themeWizardText('themeWizard.needsTwoColors'), status: '', feedbackScope: 'palette' };
       }
       return { ...state, slots: state.slots.filter((_slot, slotIndex) => slotIndex !== index), generated: null, error: '' };
     });
@@ -372,7 +379,7 @@ Template.themeGenerationWizard.events({
     event.preventDefault();
     const activeTheme = getServerActiveTheme();
     if (!activeTheme?.properties) {
-      setState(instance, (state) => ({ ...state, error: themeWizardText('themeWizard.noActiveTheme') }));
+      setState(instance, (state) => ({ ...state, error: themeWizardText('themeWizard.noActiveTheme'), status: '', feedbackScope: 'palette' }));
       return;
     }
     setState(instance, (state) => ({ ...state, slots: slotsFromProperties(activeTheme.properties), error: '', generated: null }));
@@ -383,7 +390,7 @@ Template.themeGenerationWizard.events({
       const slots = defaultThemeSlots();
       setState(instance, (state) => ({ ...state, slots, error: '', generated: null }));
     } catch (error: unknown) {
-      setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error) }));
+      setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error), status: '', feedbackScope: 'palette' }));
     }
   },
   'change .theme-wizard-json-upload'(event: Event, instance: ThemeWizardTemplateInstance) {
@@ -393,7 +400,7 @@ Template.themeGenerationWizard.events({
       return;
     }
     if (file.size > 1024 * 1024) {
-      setState(instance, (state) => ({ ...state, error: themeWizardText('themeWizard.paletteJsonTooLarge') }));
+      setState(instance, (state) => ({ ...state, error: themeWizardText('themeWizard.paletteJsonTooLarge'), status: '', feedbackScope: 'json' }));
       input.value = '';
       return;
     }
@@ -406,11 +413,12 @@ Template.themeGenerationWizard.events({
           skippedCssValues: [],
           error: '',
           status: themeWizardText('themeWizard.loadedPaletteColors', { count: slots.length }),
+          feedbackScope: 'json',
           generated: null,
         }));
       })
       .catch((error: unknown) => {
-        setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error), status: '' }));
+        setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error), status: '', feedbackScope: 'json' }));
       })
       .finally(() => {
         input.value = '';
@@ -426,6 +434,7 @@ Template.themeGenerationWizard.events({
       skippedCssValues: parsed.skipped,
       error: parsed.colors.length < 2 ? themeWizardText('themeWizard.pasteNeedsTwo') : '',
       status: parsed.skipped.length ? themeWizardText('themeWizard.skippedUnsupportedCss', { values: parsed.skipped.join(', ') }) : '',
+      feedbackScope: 'paste',
       generated: null,
     }));
   },
@@ -459,9 +468,9 @@ Template.themeGenerationWizard.events({
     event.preventDefault();
     try {
       const generated = buildGeneratedTheme(instance);
-      setState(instance, (state) => ({ ...state, generated, error: '', status: themeWizardText('themeWizard.previewGenerated') }));
+      setState(instance, (state) => ({ ...state, generated, error: '', status: themeWizardText('themeWizard.previewGenerated'), feedbackScope: 'preview' }));
     } catch (error: unknown) {
-      setState(instance, (state) => ({ ...state, generated: null, error: error instanceof Error ? error.message : String(error), status: '' }));
+      setState(instance, (state) => ({ ...state, generated: null, error: error instanceof Error ? error.message : String(error), status: '', feedbackScope: 'preview' }));
     }
   },
   'click .theme-wizard-create-activate': async function(event: Event, instance: ThemeWizardTemplateInstance) {
@@ -481,9 +490,10 @@ Template.themeGenerationWizard.events({
         generated,
         error: '',
         status: themeWizardText('themeWizard.generatedAndActivated', { name: activatedTheme?.metadata?.name || generated.properties.themeName }),
+        feedbackScope: 'create',
       }));
     } catch (error: unknown) {
-      setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error), status: '' }));
+      setState(instance, (state) => ({ ...state, error: error instanceof Error ? error.message : String(error), status: '', feedbackScope: 'create' }));
     }
   },
 });

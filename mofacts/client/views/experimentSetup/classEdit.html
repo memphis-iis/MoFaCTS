@@ -1,10 +1,6 @@
 <template name="classEdit">
 {{#if isInRole 'admin, teacher'}}
     <div aria-busy="{{#if isLoading}}true{{else}}false{{/if}}">
-      {{#if classEditMessage}}
-        {{> adminStatus variant=messageVariant text=classEditMessage.text urgent=false}}
-      {{/if}}
-
       {{#if loadError}}
         {{> adminStatus variant="error" text=loadError urgent=true}}
       {{/if}}
@@ -61,18 +57,12 @@
               </div>
               {{#if classEditConfirmation}}
                 <div class="col-12">
-                  <div class="admin-inline-confirmation" role="alert">
-                    <div>
-                      <div class="admin-inline-confirmation-title">{{classEditConfirmation.title}}</div>
-                      <div class="admin-inline-confirmation-message">{{classEditConfirmation.message}}</div>
-                    </div>
-                    <div class="admin-inline-confirmation-actions">
-                      <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelCourseDelete" disabled="{{#if deleteBusy}}disabled{{/if}}">{{courseText 'courseManagement.cancel'}}</button>
-                      <button type="button" class="btn btn-sm btn-danger" id="confirmCourseDelete" aria-busy="{{#if deleteBusy}}true{{else}}false{{/if}}" disabled="{{#if deleteBusy}}disabled{{/if}}">
-                        <i class="fa fa-trash"></i> {{courseText 'courseManagement.delete'}}
-                      </button>
-                    </div>
-                  </div>
+                  {{> adminInlineConfirmation confirmation=classEditConfirmation}}
+                </div>
+              {{/if}}
+              {{#if classEditMessage}}
+                <div class="col-12 admin-inline-feedback">
+                  {{> adminStatus variant=messageVariant text=classEditMessage.text urgent=(equals messageVariant "error")}}
                 </div>
               {{/if}}
               <div class="col-12 text-center">
@@ -80,7 +70,7 @@
                   <i class="fa fa-save"></i> {{courseText 'courseManagement.saveCourse'}}
                 </button>
                 {{#if isEditingCourse}}
-                  <button type='button' id='deleteCourse' class='btn btn-outline-danger' aria-busy="{{#if deleteBusy}}true{{else}}false{{/if}}">
+                  <button type='button' id='deleteCourse' class='btn btn-outline-danger' {{classEditDeleteAttrs}}>
                     <i class="fa fa-trash"></i> {{courseText 'courseManagement.deleteCourse'}}
                   </button>
                 {{/if}}

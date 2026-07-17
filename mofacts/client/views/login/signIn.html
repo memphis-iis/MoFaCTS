@@ -20,15 +20,6 @@
                         <p class="auth-description">{{auth_sign_in_description}}</p>
                     </div>
 
-                    {{#if serverErrorMessage}}
-                    <p id="serverErrors" class="auth-message auth-message-error" role="alert" aria-live="polite">{{serverErrorMessage}}</p>
-                    {{#if showVerificationHelp}}
-                    <div class="auth-helper-text">
-                        <a href="/auth/verify-email" class="auth-link">{{t 'auth.goToEmailVerification'}}</a>
-                    </div>
-                    {{/if}}
-                    {{/if}}
-
                     {{#if isExperiment}}
                     <form class="auth-form" novalidate>
                         <div class="auth-field">
@@ -46,6 +37,9 @@
                             <span id="experimentPasswordError" class="auth-field-message" role="alert">{{experimentPasswordError}}</span>
                             {{/if}}
                         </div>
+                        {{/if}}
+                        {{#if primaryServerErrorMessage}}
+                        <p id="serverErrors" class="auth-message auth-message-error" role="alert" aria-live="polite">{{primaryServerErrorMessage}}</p>
                         {{/if}}
                         <button type="submit" id="experimentSignin" class="btn auth-primary-btn w-100">{{t 'auth.continue'}}</button>
                     </form>
@@ -72,6 +66,12 @@
                                 </div>
                             </div>
                         </div>
+                        {{#if primaryServerErrorMessage}}
+                        <p id="serverErrors" class="auth-message auth-message-error" role="alert" aria-live="polite">{{primaryServerErrorMessage}}</p>
+                        {{#if showVerificationHelp}}
+                        <div class="auth-helper-text"><a href="/auth/verify-email" class="auth-link">{{t 'auth.goToEmailVerification'}}</a></div>
+                        {{/if}}
+                        {{/if}}
                         <button type="submit" id="signInButton" class="btn auth-primary-btn w-100">{{t 'auth.logIn'}}</button>
                     </form>
 
@@ -93,6 +93,9 @@
                             <img width="20" height="20" class="auth-provider-icon" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="low" src="/images/microsoft-logo.svg" />
                             <span>{{memphisSamlButtonLabel}}</span>
                         </button>
+                        {{/if}}
+                        {{#if providerServerErrorMessage}}
+                        <p id="serverErrors" class="auth-message auth-message-error" role="alert" aria-live="polite">{{providerServerErrorMessage}}</p>
                         {{/if}}
                     </div>
 

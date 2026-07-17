@@ -43,6 +43,14 @@ function setVerificationError(message: string) {
   Session.set('verificationErrorMessage', message);
 }
 
+function setVerificationResendStatus(message: string) {
+  Session.set('verificationResendStatusMessage', message);
+}
+
+function setVerificationResendError(message: string) {
+  Session.set('verificationResendErrorMessage', message);
+}
+
 async function verifyEmailTokenOnClient(token: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     Accounts.verifyEmail(token, (error?: unknown) => {
@@ -60,6 +68,8 @@ Template.verifyEmail.onRendered(function() {
   Session.setDefault('verificationStatusTone', 'muted');
   Session.setDefault('verificationErrorMessage', '');
   Session.setDefault('showVerificationResend', true);
+  Session.set('verificationResendStatusMessage', '');
+  Session.set('verificationResendErrorMessage', '');
 
   const queryParams = FlowRouter.current()?.queryParams || {};
   const token = String(queryParams.token || '').trim();
@@ -100,22 +110,27 @@ Template.verifyEmail.events({
     event.preventDefault();
     const email = String($('#verificationEmailAddress').val() || '').trim().toLowerCase();
     if (!email) {
-      setVerificationError(authText('auth.enterVerificationEmail'));
+      setVerificationResendError(authText('auth.enterVerificationEmail'));
+      document.getElementById('verificationEmailAddress')?.focus();
       return;
     }
-    setVerificationError('');
+    setVerificationResendError('');
+    setVerificationResendStatus('');
     try {
       await meteorCallAsync('resendVerificationEmail', email);
-      setVerificationStatus(authText('auth.verificationEmailSentIfNeeded'), 'success');
-      setVerificationError('');
+      setVerificationResendStatus(authText('auth.verificationEmailSentIfNeeded'));
+      setVerificationResendError('');
     } catch (error: any) {
       if (error?.error === 'verification-rate-limit') {
-        setVerificationError(authText('auth.verificationEmailRateLimit'));
+        setVerificationResendError(authText('auth.verificationEmailRateLimit'));
         return;
       }
-      setVerificationError(authText('auth.verificationEmailSendFailed'));
+      setVerificationResendError(authText('auth.verificationEmailSendFailed'));
     }
-  }
+  },
+  'input #verificationEmailAddress': function() {
+    setVerificationResendError('');
+  },
 });
 
 Template.verifyEmail.helpers({
@@ -127,6 +142,17 @@ Template.verifyEmail.helpers({
   },
   verificationErrorMessage() {
     return Session.get('verificationErrorMessage');
+  },
+  verificationResendStatusMessage() {
+    return Session.get('verificationResendStatusMessage');
+  },
+  verificationResendErrorMessage() {
+    return Session.get('verificationResendErrorMessage');
+  },
+  verificationEmailErrorAttrs() {
+    return Session.get('verificationResendErrorMessage')
+      ? { 'aria-invalid': 'true', 'aria-describedby': 'verification-email-error' }
+      : { 'aria-invalid': 'false' };
   },
   showVerificationResend() {
     return Session.get('showVerificationResend');

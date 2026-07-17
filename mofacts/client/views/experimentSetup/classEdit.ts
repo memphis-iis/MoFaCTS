@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import './classEdit.html';
 import './classEdit.css';
 import '../shared/adminUi/adminUi';
@@ -21,6 +22,11 @@ import {
   type AsyncCommandController,
   type AsyncCommandState,
 } from '../../lib/adminUi/asyncCommandState';
+import {
+  createInlineConfirmationController,
+  type InlineConfirmationController,
+  type InlineConfirmationView,
+} from '../../lib/adminUi/inlineConfirmationController';
 import {
   buildCourseManagementData,
   coursePayloadFromDraft,
@@ -62,7 +68,8 @@ type ClassEditInstance = Blaze.TemplateInstance & {
   selectedCourseId: ReactiveVar<string>;
   draftCourse: ReactiveVar<EditableCourse>;
   message: ReactiveVar<ClassEditMessage | null>;
-  confirmation: ReactiveVar<ClassEditConfirmation | null>;
+  confirmation: ReactiveVar<InlineConfirmationView>;
+  confirmationController: InlineConfirmationController<ClassEditConfirmation>;
 };
 
 const COURSE_TIMEZONE_OPTIONS: TimezoneOption[] = [
@@ -131,7 +138,7 @@ function setClassEditMessage(
 
 function clearClassEditFeedback(instance: ClassEditInstance): void {
   instance.message.set(null);
-  instance.confirmation.set(null);
+  instance.confirmationController.cancel();
 }
 
 function selectNoCourse(instance: ClassEditInstance, options: { preserveFeedback?: boolean } = {}): void {
@@ -243,18 +250,20 @@ function runSaveCourse(instance: ClassEditInstance): void {
 }
 
 function runDeleteCourse(instance: ClassEditInstance, courseId: string): void {
-  instance.confirmation.set(null);
+  instance.confirmationController.setPending(true);
   void instance.deleteCommand.run(async () => {
     await meteorCallAsync('deleteCourse', courseId);
   }, {
     getErrorMessage,
     onSuccess: () => {
+      instance.confirmationController.complete();
       setClassEditMessage(instance, 'success', courseText('courseManagement.courseDeleted'));
       instance.selectedCourseId.set('');
       instance.draftCourse.set(newCourseDraft());
       loadCourseManagementData(instance, undefined, { preserveFeedback: true });
     },
     onFailure: (error) => {
+      instance.confirmationController.setPending(false);
       setClassEditMessage(instance, 'error', courseText('courseManagement.errorDeletingCourse', { error: getErrorMessage(error) }));
     },
   });
@@ -271,7 +280,12 @@ Template.classEdit.onCreated(function(this: ClassEditInstance) {
   this.selectedCourseId = new ReactiveVar('');
   this.draftCourse = new ReactiveVar<EditableCourse>(newCourseDraft());
   this.message = new ReactiveVar<ClassEditMessage | null>(null);
-  this.confirmation = new ReactiveVar<ClassEditConfirmation | null>(null);
+  this.confirmation = new ReactiveVar({} as InlineConfirmationView);
+  this.confirmationController = createInlineConfirmationController<ClassEditConfirmation>(
+    (view) => this.confirmation.set(view),
+    () => document.getElementById('saveClass'),
+  );
+  this.confirmation.set(this.confirmationController.getView());
   loadCourseManagementData(this);
 });
 
@@ -279,6 +293,7 @@ Template.classEdit.onDestroyed(function(this: ClassEditInstance) {
   this.lifetime.destroy();
   this.saveCommand.destroy();
   this.deleteCommand.destroy();
+  this.confirmationController.destroy();
 });
 
 Template.classEdit.helpers({
@@ -300,8 +315,17 @@ Template.classEdit.helpers({
   loadError(): string {
     return loadErrorMessage((Template.instance() as ClassEditInstance).coursesPresentation.get());
   },
-  classEditConfirmation(): ClassEditConfirmation | null {
-    return (Template.instance() as ClassEditInstance).confirmation.get();
+  classEditConfirmation(): InlineConfirmationView | null {
+    const view = (Template.instance() as ClassEditInstance).confirmation.get();
+    return view.status === 'open' ? view : null;
+  },
+  classEditDeleteAttrs() {
+    const instance = Template.instance() as ClassEditInstance;
+    const view = instance.confirmation.get();
+    return {
+      ...(instance.deleteCommandState.get().status === 'pending' ? { disabled: true, 'aria-busy': 'true' } : {}),
+      ...(view.status === 'open' ? { 'aria-controls': view.confirmationId, 'aria-expanded': 'true' } : {}),
+    };
   },
   isEditingCourse(): boolean {
     return Boolean((Template.instance() as ClassEditInstance).selectedCourseId.get());
@@ -422,24 +446,37 @@ Template.classEdit.events({
       return;
     }
     instance.message.set(null);
-    instance.confirmation.set({
-      courseId,
+    instance.confirmationController.open({
+      confirmationId: `class-delete-confirmation-${courseId}`,
       title: courseText('courseManagement.deleteCourseTitle', { courseName: foundClass.courseName }),
       message: courseText('courseManagement.deleteCourseMessage'),
-    });
+      confirmLabel: courseText('courseManagement.delete'),
+      cancelLabel: courseText('courseManagement.cancel'),
+      severity: 'danger',
+      context: {
+        courseId,
+        title: courseText('courseManagement.deleteCourseTitle', { courseName: foundClass.courseName }),
+        message: courseText('courseManagement.deleteCourseMessage'),
+      },
+    }, event.currentTarget as HTMLElement);
+    Tracker.afterFlush(() => instance.confirmationController.focusInitial());
   },
 
-  'click #cancelCourseDelete'(event: Event, instance: ClassEditInstance) {
+  'click .admin-confirmation-cancel'(event: Event, instance: ClassEditInstance) {
     event.preventDefault();
-    instance.confirmation.set(null);
+    instance.confirmationController.cancel();
   },
 
-  'click #confirmCourseDelete'(event: Event, instance: ClassEditInstance) {
+  'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: ClassEditInstance) {
+    instance.confirmationController.handleKeydown(event);
+  },
+
+  'click .admin-confirmation-confirm'(event: Event, instance: ClassEditInstance) {
     event.preventDefault();
-    const courseId = instance.confirmation.get()?.courseId || '';
+    const courseId = instance.confirmationController.getContext()?.courseId || '';
     if (!courseId) {
       setClassEditMessage(instance, 'warning', courseText('courseManagement.selectCourseToDelete'));
-      instance.confirmation.set(null);
+      instance.confirmationController.cancel();
       return;
     }
     runDeleteCourse(instance, courseId);

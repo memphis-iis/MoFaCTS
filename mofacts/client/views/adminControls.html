@@ -2,9 +2,6 @@
 
 <template name="adminControls">
     <div>
-        {{#if adminMessage}}
-        {{> adminStatus variant=adminMessage.level text=adminMessage.text urgent=adminMessageUrgent}}
-        {{/if}}
         {{#if loadErrorText}}
         {{> adminStatus variant="error" text=loadErrorText urgent=true}}
         <button type="button" class="btn btn-outline-secondary btn-sm admin-form-row-sm" data-admin-load-retry="true">
@@ -61,6 +58,9 @@
                             </button>
                         </div>
                     </div>
+                    {{#if cacheMessage}}
+                    <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=cacheMessage.level text=cacheMessage.text urgent=(equals cacheMessage.level "error")}}</div>
+                    {{/if}}
                 </div>
             </div>
         </div>
@@ -110,6 +110,9 @@
                             </label>
                         </div>
                     </fieldset>
+                    {{#if serverVerbosityMessage}}
+                    <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=serverVerbosityMessage.level text=serverVerbosityMessage.text urgent=(equals serverVerbosityMessage.level "error")}}</div>
+                    {{/if}}
                 </div>
             </div>
         </div>
@@ -160,6 +163,9 @@
                             </label>
                         </div>
                     </fieldset>
+                    {{#if clientVerbosityMessage}}
+                    <div class="admin-inline-feedback admin-form-row-top">{{> adminStatus variant=clientVerbosityMessage.level text=clientVerbosityMessage.text urgent=(equals clientVerbosityMessage.level "error")}}</div>
+                    {{/if}}
                 </div>
             </div>
         </div>

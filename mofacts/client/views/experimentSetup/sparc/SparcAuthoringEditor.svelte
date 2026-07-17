@@ -142,7 +142,9 @@
   let showRichTextSource = false;
   let activeVisualRuleTemplateId = 'rule.effect.classify';
   let saving = false;
-  let errorText = '';
+  let visualErrorText = '';
+  let ruleErrorText = '';
+  let saveErrorText = '';
   let saveMessage = '';
   let activeEditorTab = 'visual';
   let showAdvancedEditors = false;
@@ -207,7 +209,7 @@
     getActiveProductionRule: () => activeProductionRule,
     getFlatNodes: () => flatNodes,
     setActiveProductionRuleIndex: (index) => { activeProductionRuleIndex = index; },
-    setErrorText: (value) => { errorText = value; },
+    setErrorText: (value) => { ruleErrorText = value; },
     markChanged,
     ensureProductionRules,
     getClusterChoices: () => clusterChoices,
@@ -243,7 +245,7 @@
       embedHttpsRequired: sparcText('sparc.embedHttpsRequired'),
     },
     setErrorText: (value) => {
-      errorText = value;
+      visualErrorText = value;
     },
     onRevision: () => {
       htmlToolbarRevision += 1;
@@ -276,7 +278,7 @@
       activeNodeId = node.id;
       markChanged();
     } catch (error) {
-      errorText = error.message || String(error);
+      visualErrorText = error.message || String(error);
     }
   }
 
@@ -340,7 +342,7 @@
       const computed = computeDropTarget(event);
       insertPaletteNode(entry, computed.target || dropTarget);
     } catch (error) {
-      errorText = error.message || String(error);
+      visualErrorText = error.message || String(error);
     } finally {
       clearDropState();
     }
@@ -473,10 +475,10 @@
   function updateScopedProductionRuleJson(value) {
     const result = updateScopedProductionRuleJsonAction(activeNodeProductionRule, value);
     if (result.changed) {
-      errorText = '';
+      ruleErrorText = '';
       markChanged();
     } else if (result.error) {
-      errorText = result.error;
+      ruleErrorText = result.error;
     }
   }
 
@@ -628,6 +630,8 @@
 
   function markChanged() {
     deleteConfirmation = null;
+    visualErrorText = '';
+    ruleErrorText = '';
     rawStimuliFile = rawStimuliFile;
     clusters = clusters;
     sparcPages = rawStimuliFile?.setspec?.sparcPages || [];
@@ -638,14 +642,14 @@
 
   async function handleSave() {
     saving = true;
-    errorText = '';
+    saveErrorText = '';
     saveMessage = '';
     try {
       validateBeforeSave();
       await onSave(clone(rawStimuliFile));
       saveMessage = sparcText('sparc.saved');
     } catch (error) {
-      errorText = error.reason || error.message || String(error);
+      saveErrorText = error.reason || error.message || String(error);
     } finally {
       saving = false;
     }
@@ -680,26 +684,10 @@
     bind:activeEditorTab
     {saveMessage}
     {saving}
-    {errorText}
+    errorText={saveErrorText}
     {onCancel}
     onSave={handleSave}
   />
-
-  {#if deleteConfirmation}
-    <div class="admin-inline-confirmation admin-form-row" role="alert">
-      <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
-      <div>
-        <div class="admin-inline-confirmation-title">{deleteConfirmation.title}</div>
-        <div class="admin-inline-confirmation-message">{deleteConfirmation.message}</div>
-      </div>
-      <div class="admin-inline-confirmation-actions">
-        <button type="button" class="btn btn-sm btn-outline-secondary" on:click={cancelDeleteConfirmation}>{sparcText('apkg.cancel')}</button>
-        <button type="button" class="btn btn-sm btn-danger" on:click={confirmDeleteNode}>
-          <i class="fa fa-trash" aria-hidden="true"></i> {sparcText('admin.delete')}
-        </button>
-      </div>
-    </div>
-  {/if}
 
   {#if activeEditorTab === 'visual'}
     <SparcVisualEditorTab
@@ -725,6 +713,9 @@
       {clusterChoices}
       {dropTarget}
       {dropMarkerStyle}
+      errorText={visualErrorText}
+      {ruleErrorText}
+      {deleteConfirmation}
       {flatNodes}
       {visualEditorValueBridge}
       bind:activeVisualRuleTemplateId
@@ -765,6 +756,8 @@
       onNodeAuthoredValueChange={updateNodeAuthoredValue}
       onNodeFocus={selectVisualNode}
       onRemoveActiveNode={removeActiveNode}
+      onCancelDeleteConfirmation={cancelDeleteConfirmation}
+      onConfirmDeleteNode={confirmDeleteNode}
       onUpdateField={updateField}
       onUpdateFirstImageAttribute={updateFirstImageAttribute}
       onUpdateFirstHtmlMediaAttribute={updateFirstHtmlMediaAttribute}
@@ -785,6 +778,7 @@
     />
   {:else if activeEditorTab === 'production'}
     <SparcProductionRulesEditor
+      errorText={ruleErrorText}
       {productionRules}
       bind:activeProductionRuleIndex
       {activeProductionRule}

@@ -122,4 +122,51 @@ describe('management interface baseline', function() {
 
     expect(shellMarkup.match(/<h1\b/g) ?? []).to.have.length(1);
   });
+
+  it('keeps the 25rem feedback limit scoped to table feedback', function() {
+    const appRoot = findAppRoot();
+    const sharedMarkup = fs.readFileSync(
+      path.join(appRoot, 'client', 'views', 'shared', 'adminUi', 'adminUi.html'),
+      'utf8',
+    );
+    const sharedStyles = fs.readFileSync(
+      path.join(appRoot, 'client', 'views', 'shared', 'adminUi', 'adminUi.css'),
+      'utf8',
+    );
+    const inlineFeedback = sourceBlock(sharedStyles, '.admin-inline-feedback {', '}');
+    const inlineConfirmation = sourceBlock(sharedStyles, '.admin-inline-confirmation {', '}');
+    const tableFeedback = sourceBlock(sharedStyles, '.admin-table-feedback {', '}');
+
+    expect(sharedMarkup).to.include('{{statusIdAttrs}}');
+    expect(sharedMarkup).to.include('{{statusClassName}}');
+    expect(sharedMarkup).to.include('aria-atomic="true"');
+    expect(inlineFeedback).to.include('max-inline-size: 100%');
+    expect(inlineFeedback).not.to.include('25rem');
+    expect(inlineConfirmation).to.include('max-inline-size: 100%');
+    expect(inlineConfirmation).not.to.include('25rem');
+    expect(tableFeedback).to.include('max-inline-size: min(100%, 25rem)');
+    expect(tableFeedback).to.include('overflow-wrap: anywhere');
+  });
+
+  it('registers APKG step presentation functions as Blaze helpers', function() {
+    const apkgSource = fs.readFileSync(
+      path.join(findAppRoot(), 'client', 'views', 'experimentSetup', 'apkgWizard.ts'),
+      'utf8',
+    );
+    const helperBlock = sourceBlock(
+      apkgSource,
+      'Template.apkgWizard.helpers({',
+      '// Event handlers',
+    );
+    const eventBlock = sourceBlock(
+      apkgSource,
+      'Template.apkgWizard.events({',
+      '// Helper function to validate a config',
+    );
+
+    expect(helperBlock).to.include('stepWizardMessage(step: number)');
+    expect(helperBlock).to.include('stepInlineConfirmation(step: number)');
+    expect(eventBlock).not.to.include('stepWizardMessage(step: number)');
+    expect(eventBlock).not.to.include('stepInlineConfirmation(step: number)');
+  });
 });

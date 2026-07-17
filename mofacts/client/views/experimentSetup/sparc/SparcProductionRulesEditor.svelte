@@ -5,6 +5,7 @@
   import SparcRuleExpressionEditor from './SparcRuleExpressionEditor.svelte';
 
   export let productionRules = [];
+  export let errorText = '';
   export let activeProductionRuleIndex = 0;
   export let activeProductionRule = null;
   export let productionConditionTypes = [];
@@ -64,6 +65,7 @@
     <h2>{sparcText('sparc.advancedProductionRules')}</h2>
     <button type="button" class="btn btn-primary btn-sm" on:click={onAddProductionRule}>{sparcText('sparc.addRule')}</button>
   </div>
+  {#if errorText}<div class="alert alert-danger" role="alert">{errorText}</div>{/if}
   <div class="sparc-rule-layout">
     <div class="sparc-rule-list">
       {#each productionRules as rule, index}

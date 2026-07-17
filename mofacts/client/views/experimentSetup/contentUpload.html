@@ -39,12 +39,9 @@
                             </label>
                         </div>
 
-                        {{#if uploadMessageText}}
-                        <div class="admin-status admin-status-{{uploadMessageLevel}} admin-status-inline" role="status" aria-live="polite">
-                            <i class="fa {{uploadMessageIcon}}" aria-hidden="true"></i>
-                            <div class="admin-status-text">{{uploadMessageText}}</div>
-                        </div>
-                        {{/if}}
+                        {{#with packageUploadMessage}}
+                          {{> adminStatus variant=level text=text}}
+                        {{/with}}
                         {{#if uploadConfirmationOpen}}
                         <div class="admin-form-row-top">
                             {{> adminInlineConfirmation confirmation=inlineConfirmationView}}
@@ -70,6 +67,10 @@
                         <i class="fa fa-folder-open admin-section-icon"></i>
                         <h5>{{t 'content.uploadedContent'}}</h5>
                     </div>
+
+            {{#with contentListUploadMessage}}
+            {{> adminStatus className="admin-inline-feedback" variant=level text=text}}
+            {{/with}}
 
             {{#if listErrorText}}
             {{> adminStatus variant="error" text=listErrorText urgent=true}}
@@ -176,13 +177,13 @@
                                         <!-- Error message display -->
                                         {{#if isPending}}
                                             {{#if pendingError}}
-                                            <div class="asset-info-block asset-error">
+                                            <div class="asset-info-block asset-error admin-table-feedback">
                                                 <b>{{t 'content.errorLabel'}}:</b> {{pendingError}}
                                             </div>
                                             {{/if}}
                                         {{else}}
                                             {{#if errors}}
-                                            <div class="asset-info-block asset-error">
+                                            <div class="asset-info-block asset-error admin-table-feedback">
                                                 <b>{{t 'content.errorLabel'}}:</b>
                                                 {{#each errors}}
                                                     {{{this}}}
@@ -265,7 +266,7 @@
                                             {{#if detailsReady}}
                                                 {{#if stimFileInfo.length}}
                                                     {{#each this.stimFileInfo}}
-                                                        <button type="button" data-tdfid="{{../_id}}" class="stim-download-btn btn-icon"><span class="fa fa-download" aria-hidden="true"></span> {{this.fileName}} </button>
+                                                        <button type="button" data-tdfid="{{../_id}}" class="stim-download-btn btn-icon" {{contentCommandAttrs 'asset' ../_id}}><span class="fa fa-download" aria-hidden="true"></span> {{this.fileName}} </button>
                                                     {{/each}}
                                                 {{else}}
                                                     <span class="text-muted small">{{t 'content.noStimulusFiles'}}</span>
@@ -300,8 +301,11 @@
                                                         <i class="fa fa-trash"></i> {{t 'content.deleteSelected'}} (<span class="selected-count">0</span>)
                                                     </button>
                                                 </div>
+                                                {{#with (mediaUploadMessage _id)}}
+                                                  <div class="admin-table-feedback">{{> adminStatus variant=level text=text}}</div>
+                                                {{/with}}
                                                 {{#if mediaConfirmationOpen _id}}
-                                                <div class="admin-form-row-sm">
+                                                <div class="admin-form-row-sm admin-table-feedback">
                                                     {{> adminInlineConfirmation confirmation=inlineConfirmationView}}
                                                 </div>
                                                 {{/if}}
@@ -344,7 +348,7 @@
                                                                     <a href="{{this.link}}" target="_blank" title="{{t 'content.openInNewTab'}}">{{this.filename}}</a>
                                                                 </th>
                                                                 <td class="col-actions">
-                                                                    <button class="btn btn-outline-danger btn-sm btn-delete-media" data-assetid="{{this._id}}" data-filename="{{this.filename}}" title="{{t 'content.deleteThisFile'}}" aria-label="{{t 'content.deleteThisFile'}}: {{this.filename}}">
+                                                                    <button class="btn btn-outline-danger btn-sm btn-delete-media" data-assetid="{{this._id}}" data-filename="{{this.filename}}" title="{{t 'content.deleteThisFile'}}" aria-label="{{t 'content.deleteThisFile'}}: {{this.filename}}" {{contentCommandAttrs 'media' ../_id}}>
                                                                         <i class="fa fa-times" aria-hidden="true"></i>
                                                                     </button>
                                                                 </td>
@@ -378,8 +382,8 @@
                                                             <i class="fa fa-exchange"></i> {{t 'content.transferOwnership'}}
                                                         </label>
                                                         <div class="input-group input-group-sm">
-                                                            <input type="text" id="transfer-{{_id}}" class="form-control" placeholder="{{t 'content.enterNewOwnerEmail'}}">
-                                                            <button type="button" value="{{_id}}" class="transfer-btn btn btn-outline-secondary">
+                                                            <input type="text" id="transfer-{{_id}}" class="form-control" placeholder="{{t 'content.enterNewOwnerEmail'}}" {{contentCommandAttrs 'access' _id}}>
+                                                            <button type="button" value="{{_id}}" class="transfer-btn btn btn-outline-secondary" {{contentCommandAttrs 'access' _id}}>
                                                                 <i class="fa fa-exchange"></i> {{t 'content.transfer'}}
                                                             </button>
                                                         </div>
@@ -391,8 +395,8 @@
                                                             <i class="fa fa-plus"></i> {{t 'content.shareWithUsers'}}
                                                         </label>
                                                         <div class="input-group input-group-sm">
-                                                            <input type="text" id="add-access-{{_id}}" data-id="{{_id}}" class="form-control js-accessor-input" placeholder="{{t 'content.enterUserEmails'}}">
-                                                            <button type="button" value="{{_id}}" class="add-access-btn btn btn-outline-secondary">
+                                                            <input type="text" id="add-access-{{_id}}" data-id="{{_id}}" class="form-control js-accessor-input" placeholder="{{t 'content.enterUserEmails'}}" {{contentCommandAttrs 'access' _id}}>
+                                                            <button type="button" value="{{_id}}" class="add-access-btn btn btn-outline-secondary" {{contentCommandAttrs 'access' _id}}>
                                                                 <i class="fa fa-plus"></i> {{t 'content.add'}}
                                                             </button>
                                                         </div>
@@ -409,7 +413,7 @@
                                                         {{#each accessors}}
                                                             <li>
                                                             {{this.username}}
-                                                            <button type="button" value="{{../_id}}" data-user="{{this.userId}}" class="remove-access-btn btn-icon" aria-label="{{t 'content.manageAccessOwnership'}}: {{this.username}}"><span class="fa fa-minus" aria-hidden="true"></span></button>
+                                                            <button type="button" value="{{../_id}}" data-user="{{this.userId}}" class="remove-access-btn btn-icon" aria-label="{{t 'content.manageAccessOwnership'}}: {{this.username}}" {{contentCommandAttrs 'access' ../_id}}><span class="fa fa-minus" aria-hidden="true"></span></button>
                                                             </li>
                                                         {{/each}}
                                                         </ul>
@@ -421,8 +425,8 @@
                                                     {{/if}}
                                                 </div>
                                                 {{#if accessMessageText}}
-                                                <div class="alert {{accessMessageClass}} admin-alert-tiny small" role="status" aria-live="polite">
-                                                    {{accessMessageText}}
+                                                <div class="admin-table-feedback">
+                                                    {{> adminStatus variant=accessMessageLevel text=accessMessageText urgent=(equals accessMessageLevel "error")}}
                                                 </div>
                                                 {{/if}}
                                             </div>
@@ -494,22 +498,31 @@
                                                     aria-label="{{t 'content.editTdfSettings'}}: {{lessonName}}">
                                                 <span class="fa fa-cog" aria-hidden="true"></span>
                                             </button>
-                                            <button id="copy-tdf-btn" value="{{_id}}" class="btn-icon" title="{{t 'content.makePrivateCopy'}}" aria-label="{{t 'content.makePrivateCopy'}}: {{lessonName}}"><span class="fa fa-copy" aria-hidden="true"></span></button>
-                                            <button id="tdf-download-btn" data-tdfid="{{_id}}" class="btn-icon" title="{{t 'content.downloadCurrentPackage'}}" aria-label="{{t 'content.downloadCurrentPackage'}}: {{lessonName}}"><span class="fa fa-download" aria-hidden="true"></span></button>
-                                            <button id="package-delete-btn" value="{{packageAssetId}}" data-package-file="{{packageFile}}" data-filename="{{fileName}}" class="btn-icon" title="{{t 'content.deletePackage'}}" aria-label="{{t 'content.deletePackage'}}: {{lessonName}}"><span class="fa fa-trash" aria-hidden="true"></span></button>
+                                            <button id="copy-tdf-btn" value="{{_id}}" class="btn-icon" title="{{t 'content.makePrivateCopy'}}" aria-label="{{t 'content.makePrivateCopy'}}: {{lessonName}}" {{contentCommandAttrs 'asset' _id}}><span class="fa fa-copy" aria-hidden="true"></span></button>
+                                            <button id="tdf-download-btn" data-tdfid="{{_id}}" class="btn-icon" title="{{t 'content.downloadCurrentPackage'}}" aria-label="{{t 'content.downloadCurrentPackage'}}: {{lessonName}}" {{contentCommandAttrs 'asset' _id}}><span class="fa fa-download" aria-hidden="true"></span></button>
+                                            <button id="package-delete-btn" value="{{packageAssetId}}" data-package-file="{{packageFile}}" data-filename="{{fileName}}" class="btn-icon" title="{{t 'content.deletePackage'}}" aria-label="{{t 'content.deletePackage'}}: {{lessonName}}" {{contentCommandAttrs 'asset' _id}}><span class="fa fa-trash" aria-hidden="true"></span></button>
                                             {{#if conditions}}
                                                 <button id="reset-conditions-btn" value="{{_id}}" class="btn-icon" title="{{t 'content.resetConditions'}}" aria-label="{{t 'content.resetConditions'}}: {{lessonName}}"><span class="fa fa-refresh" aria-hidden="true"></span></button>
                                             {{/if}}
                                         </div>
-                                        {{#if assetActionConfirmationOpen _id}}
-                                        <div class="admin-form-row-top">
-                                            {{> adminInlineConfirmation confirmation=inlineConfirmationView}}
-                                        </div>
-                                        {{/if}}
                                     </div>
                                     {{/unless}}
                                 </td>
                             </tr>
+                            {{#if assetActionConfirmationOpen _id}}
+                            <tr class="admin-feedback-row">
+                                <td colspan="2">
+                                    <div class="admin-table-feedback">
+                                        {{> adminInlineConfirmation confirmation=inlineConfirmationView}}
+                                    </div>
+                                </td>
+                            </tr>
+                            {{/if}}
+                            {{#with (assetUploadMessage _id)}}
+                            <tr class="admin-feedback-row">
+                                <td colspan="2"><div class="admin-table-feedback">{{> adminStatus variant=level text=text}}</div></td>
+                            </tr>
+                            {{/with}}
                         {{/each}}
                         {{#if listDisplayReady}}
                             {{#if showEmptyState}}
@@ -612,6 +625,7 @@
                         {{> adminInlineConfirmation confirmation=inlineConfirmationView}}
                     </div>
                     {{/if}}
+                    {{#with adminUploadMessage}}{{> adminStatus variant=level text=text}}{{/with}}
                 </div>
             </div>
         </div>

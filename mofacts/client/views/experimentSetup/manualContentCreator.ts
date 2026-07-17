@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import { Random } from 'meteor/random';
 import './manualContentCreator.html';
 import './manualContentCreator.css';
@@ -35,6 +36,8 @@ import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { createInlineConfirmationController } from '../../lib/adminUi/inlineConfirmationController';
+import '../shared/adminUi/adminUi';
 
 const FlowRouter = (globalThis as any).FlowRouter;
 declare const DynamicAssets: any;
@@ -126,33 +129,26 @@ function getDraftMessageClass(level: DraftMessageLevel) {
   return 'info';
 }
 
-function getDraftMessageIcon(level: DraftMessageLevel) {
-  if (level === 'success') return 'fa-check-circle';
-  if (level === 'warning') return 'fa-exclamation-triangle';
-  if (level === 'error') return 'fa-exclamation-circle';
-  return 'fa-info-circle';
-}
-
 function clearManualConfirmation(instance: any) {
-  const pending = instance.manualConfirmation?.get?.();
-  if (pending?.resolve) {
-    pending.resolve(false);
-  }
-  instance.manualConfirmation?.set?.(null);
+  const context = instance.manualConfirmationController?.getContext?.();
+  if (instance.manualConfirmationController?.cancel?.()) context?.resolve?.(false);
 }
 
-function requestManualConfirmation(instance: any, options: any): Promise<boolean> {
+function requestManualConfirmation(instance: any, trigger: HTMLElement, options: any): Promise<boolean> {
   clearManualConfirmation(instance);
 
   return new Promise((resolve) => {
-    instance.manualConfirmation.set({
+    const placement = options.placement || 'header';
+    instance.manualConfirmationController.open({
+      confirmationId: `manual-confirmation-${placement}`,
       title: options.title,
       message: options.message,
       confirmLabel: options.confirmLabel || manualText('common.continue'),
-      confirmClass: options.confirmClass || 'btn-danger',
-      icon: options.icon || 'fa-exclamation-triangle',
-      resolve
-    });
+      cancelLabel: manualText('manualCreator.cancel'),
+      severity: options.confirmClass === 'btn-warning' ? 'warning' : 'danger',
+      context: { placement, resolve },
+    }, trigger);
+    Tracker.afterFlush(() => instance.manualConfirmationController.focusInitial());
   });
 }
 
@@ -361,6 +357,10 @@ Template.manualContentCreator.onCreated(function(this: any) {
   this.draftPersistenceLevel = new ReactiveVar('info');
   this.draftPersistenceBusy = new ReactiveVar(false);
   this.manualConfirmation = new ReactiveVar(null);
+  this.manualConfirmationController = createInlineConfirmationController(
+    (view) => this.manualConfirmation.set(view.status === 'open' ? view : null),
+    () => document.getElementById('manual-save-draft'),
+  );
 
   const routeDraftId = this.currentDraftId.get();
   if (routeDraftId) {
@@ -431,16 +431,6 @@ Template.manualContentCreator.helpers({
     return (Template.instance() as any).draftPersistenceMessage.get();
   },
 
-  draftPersistenceMessageClass() {
-    const instance = Template.instance() as any;
-    return getDraftMessageClass(instance.draftPersistenceLevel.get());
-  },
-
-  draftPersistenceMessageIcon() {
-    const instance = Template.instance() as any;
-    return getDraftMessageIcon(instance.draftPersistenceLevel.get());
-  },
-
   draftPersistenceBusy() {
     return !!(Template.instance() as any).draftPersistenceBusy.get();
   },
@@ -470,6 +460,14 @@ Template.manualContentCreator.helpers({
     const currentStep = (Template.instance() as any).wizardStep.get();
     if (currentStep === 4) return manualText('manualCreator.openDraft');
     return manualText('manualCreator.next');
+  },
+
+  draftPersistenceStatus() {
+    const instance = Template.instance() as any;
+    const text = instance.draftPersistenceMessage.get();
+    if (!text) return null;
+    const variant = getDraftMessageClass(instance.draftPersistenceLevel.get());
+    return { text, variant, urgent: variant === 'error' };
   },
 
   draftWorkspaceHeading() {
@@ -660,6 +658,16 @@ Template.manualContentCreator.helpers({
   uploadComplete() {
     return (Template.instance() as any).uploadComplete.get();
   },
+  headerManualConfirmation() {
+    const instance = Template.instance() as any;
+    const confirmation = instance.manualConfirmation.get();
+    return instance.manualConfirmationController.getContext()?.placement === 'header' ? confirmation : null;
+  },
+  uploadManualConfirmation() {
+    const instance = Template.instance() as any;
+    const confirmation = instance.manualConfirmation.get();
+    return instance.manualConfirmationController.getContext()?.placement === 'upload' ? confirmation : null;
+  },
 
   statusSummary() {
     const instance = Template.instance() as any;
@@ -676,6 +684,12 @@ Template.manualContentCreator.helpers({
   }
 });
 
+Template.manualContentCreator.onDestroyed(function(this: any) {
+  const context = this.manualConfirmationController.getContext();
+  context?.resolve?.(false);
+  this.manualConfirmationController.destroy();
+});
+
 Template.manualContentCreator.events({
   'click #manual-save-draft'(event: any, instance: any) {
     event.preventDefault();
@@ -685,7 +699,7 @@ Template.manualContentCreator.events({
   async 'click #manual-delete-draft'(event: any, instance: any) {
     event.preventDefault();
     const lessonName = String(instance.state.get()?.lessonName || manualText('manualCreator.untitled')).trim() || manualText('manualCreator.untitled');
-    const confirmed = await requestManualConfirmation(instance, {
+    const confirmed = await requestManualConfirmation(instance, event.currentTarget as HTMLElement, {
       title: manualText('manualCreator.deleteDraftTitle', { lessonName }),
       message: manualText('manualCreator.deleteDraftMessage'),
       confirmLabel: manualText('manualCreator.deleteDraftConfirm')
@@ -916,6 +930,7 @@ Template.manualContentCreator.events({
 
   'click #manual-upload-package'(event: any, instance: any) {
     event.preventDefault();
+    const uploadTrigger = event.currentTarget as HTMLElement;
     const result = instance.generationResult.get();
     if (!result?.zipBlob || instance.uploadStatus.get()) {
       return;
@@ -932,10 +947,11 @@ Template.manualContentCreator.events({
       try {
         const existingFile = await (Meteor as any).callAsync('getUserAssetByName', fileName);
         if (existingFile) {
-          const confirmed = await requestManualConfirmation(instance, {
+          const confirmed = await requestManualConfirmation(instance, uploadTrigger, {
             title: manualText('content.overwriteExistingPackage'),
             message: manualText('content.packageOverwriteMessage', { filename: fileName }),
-            confirmLabel: manualText('content.overwritePackage')
+            confirmLabel: manualText('content.overwritePackage'),
+            placement: 'upload',
           });
           if (!confirmed) {
             return;
@@ -998,10 +1014,11 @@ Template.manualContentCreator.events({
                   prompts.push(manualText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
                 }
 
-                const confirmed = prompts.length === 0 || await requestManualConfirmation(instance, {
+                const confirmed = prompts.length === 0 || await requestManualConfirmation(instance, uploadTrigger, {
                   title: manualText('content.overwriteExistingContent'),
                   message: prompts.join(' '),
-                  confirmLabel: manualText('content.overwriteContent')
+                  confirmLabel: manualText('content.overwriteContent'),
+                  placement: 'upload',
                 });
                 if (confirmed) {
                   instance.uploadStatus.set({
@@ -1050,17 +1067,22 @@ Template.manualContentCreator.events({
     FlowRouter.go('/contentUpload');
   },
 
-  'click #cancel-manual-confirmation'(event: any, instance: any) {
+  'click .admin-confirmation-cancel'(event: any, instance: any) {
     event.preventDefault();
     clearManualConfirmation(instance);
   },
 
-  'click #confirm-manual-confirmation'(event: any, instance: any) {
-    event.preventDefault();
-    const pending = instance.manualConfirmation.get();
-    if (pending?.resolve) {
-      pending.resolve(true);
+  'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: any) {
+    const context = instance.manualConfirmationController.getContext();
+    if (instance.manualConfirmationController.handleKeydown(event)) {
+      context?.resolve?.(false);
     }
-    instance.manualConfirmation.set(null);
+  },
+
+  'click .admin-confirmation-confirm'(event: any, instance: any) {
+    event.preventDefault();
+    const context = instance.manualConfirmationController.getContext();
+    context?.resolve?.(true);
+    instance.manualConfirmationController.complete();
   }
 });

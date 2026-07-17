@@ -41,17 +41,20 @@
                         <button type="button" class="btn btn-secondary btn-sm theme-wizard-from-active">{{themeWizardText 'themeWizard.extractActiveTheme'}}</button>
                         <button type="button" class="btn btn-secondary btn-sm theme-wizard-from-default">{{themeWizardText 'themeWizard.startDefault'}}</button>
                     </div>
+                    {{#with wizardFeedback 'palette'}}{{> adminStatus}}{{/with}}
                 </div>
 
                 <div class="theme-wizard-control-group">
                     <label class="form-label">{{themeWizardText 'themeWizard.pasteColors'}}</label>
                     <textarea class="form-control theme-wizard-paste" rows="3" placeholder="#7ed957&#10;rgb(0, 0, 0)"></textarea>
                     <button type="button" class="btn btn-secondary btn-sm admin-form-row-top theme-wizard-apply-paste">{{themeWizardText 'themeWizard.fillPalette'}}</button>
+                    {{#with wizardFeedback 'paste'}}{{> adminStatus}}{{/with}}
                 </div>
 
                 <div class="theme-wizard-control-group">
                     <label class="form-label">{{themeWizardText 'themeWizard.uploadPaletteJson'}}</label>
                     <input type="file" class="form-control theme-wizard-json-upload" accept=".json,application/json">
+                    {{#with wizardFeedback 'json'}}{{> adminStatus}}{{/with}}
                 </div>
 
                 <div class="theme-wizard-control-group">
@@ -90,10 +93,6 @@
                     <span>{{themeWizardText 'themeWizard.chromatic' value=paletteStats.chromaticColorCount}}</span>
                     <span>{{themeWizardText 'themeWizard.neutral' value=paletteStats.neutralColorCount}}</span>
                 </div>
-            {{/if}}
-
-            {{#if wizardError}}
-                <div class="alert alert-danger admin-form-row">{{wizardError}}</div>
             {{/if}}
 
             {{#if generatedPreview}}
@@ -171,9 +170,14 @@
             {{/if}}
 
             <div class="theme-action-row admin-form-row-top">
-                <button type="button" class="btn theme-wizard-preview-generate">{{themeWizardText 'themeWizard.previewGeneratedTheme'}}</button>
-                <button type="button" class="btn theme-wizard-create-activate">{{themeWizardText 'themeWizard.generateTheme'}}</button>
-                <span class="text-muted small">{{wizardStatus}}</span>
+                <div class="admin-command-region">
+                    <button type="button" class="btn theme-wizard-preview-generate">{{themeWizardText 'themeWizard.previewGeneratedTheme'}}</button>
+                    {{#with wizardFeedback 'preview'}}{{> adminStatus}}{{/with}}
+                </div>
+                <div class="admin-command-region">
+                    <button type="button" class="btn theme-wizard-create-activate">{{themeWizardText 'themeWizard.generateTheme'}}</button>
+                    {{#with wizardFeedback 'create'}}{{> adminStatus}}{{/with}}
+                </div>
             </div>
         {{/if}}
     </div>

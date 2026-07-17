@@ -27,6 +27,9 @@
             {{/each}}
           </select>
           <p>{{t 'profile.interfaceLanguageHelp'}}</p>
+          {{#if profileLocaleStatusMessage}}
+            <div class="admin-inline-feedback">{{> adminStatus variant="error" text=profileLocaleStatusMessage urgent=true}}</div>
+          {{/if}}
         </div>
       </section>
 
@@ -83,6 +86,9 @@
                 </button>
               {{/if}}
             </div>
+            {{#if profileAvatarStatusMessage}}
+              <div class="admin-inline-feedback">{{> adminStatus variant=profileAvatarStatusVariant text=profileAvatarStatusMessage}}</div>
+            {{/if}}
           </div>
         </div>
       </section>
@@ -108,7 +114,7 @@
 
         <div class="profile-field">
           <label for="openRouterDefaultModel">{{t 'profile.openRouterModel'}}</label>
-          <select id="openRouterDefaultModel" value="{{openRouterDefaultModel}}" aria-describedby="openRouterModelHelp openRouterModelCatalogStatus" {{openRouterModelSelectAttrs}}>
+          <select id="openRouterDefaultModel" value="{{openRouterDefaultModel}}" aria-describedby="{{openRouterModelDescribedBy}}" {{openRouterModelSelectAttrs}}>
             {{#each openRouterModelOptions}}
               <option value="{{value}}" {{selectedAttrs}}>{{label}}</option>
             {{/each}}
@@ -133,8 +139,21 @@
         {{/if}}
 
         {{#if openRouterStatusMessage}}
-          <div class="profile-alert {{openRouterStatusClass}}" role="status">{{openRouterStatusMessage}}</div>
+          {{> adminStatus className="profile-alert" variant=openRouterStatusVariant text=openRouterStatusMessage urgent=(equals openRouterStatusVariant "error")}}
         {{/if}}
+        <div class="profile-actions profile-openrouter-actions">
+          <button id="openRouterTest" type="button" {{testingAttrs}}>
+            <span class="fa fa-flask" aria-hidden="true"></span>
+            {{#if testing}}{{t 'profile.checking'}}{{else}}{{t 'profile.checkConfiguration'}}{{/if}}
+          </button>
+          {{#if hasOpenRouterKey}}
+            <button id="openRouterDeleteKey" type="button" class="profile-danger-action" {{savingAttrs}}>
+              <span class="fa fa-trash" aria-hidden="true"></span>
+              {{t 'profile.deleteKey'}}
+            </button>
+          {{/if}}
+        </div>
+        {{> adminInlineConfirmation confirmation=profileConfirmationView}}
       </section>
 
       <div class="profile-actions">
@@ -142,18 +161,10 @@
           <span class="fa fa-save" aria-hidden="true"></span>
           {{#if saving}}{{t 'profile.saving'}}{{else}}{{t 'profile.saveProfile'}}{{/if}}
         </button>
-        <button id="openRouterTest" type="button" {{testingAttrs}}>
-          <span class="fa fa-flask" aria-hidden="true"></span>
-          {{#if testing}}{{t 'profile.checking'}}{{else}}{{t 'profile.checkConfiguration'}}{{/if}}
-        </button>
-        {{#if hasOpenRouterKey}}
-          <button id="openRouterDeleteKey" type="button" class="profile-danger-action" {{savingAttrs}}>
-            <span class="fa fa-trash" aria-hidden="true"></span>
-            {{t 'profile.deleteKey'}}
-          </button>
+        {{#if profileSaveStatusMessage}}
+          <div class="admin-inline-feedback">{{> adminStatus variant=profileSaveStatusVariant text=profileSaveStatusMessage urgent=(equals profileSaveStatusVariant "error")}}</div>
         {{/if}}
       </div>
-      {{> adminInlineConfirmation confirmation=profileConfirmationView}}
     </div>
   </div>
 </template>

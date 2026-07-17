@@ -54,12 +54,26 @@ function showServerSuccess(message: string) {
     .show();
 }
 
+function fieldMessageInputId(selector: string): string {
+  const messageId = selector.replace(/^#/, '');
+  if (messageId === 'usernameInvalid') return 'signUpUsername';
+  if (messageId === 'passwordTooShort') return 'password1';
+  return 'password2';
+}
+
 function showFieldMessage(selector: string) {
   $(selector).prop('hidden', false).show();
+  const messageId = selector.replace(/^#/, '');
+  const input = document.getElementById(fieldMessageInputId(selector));
+  input?.setAttribute('aria-invalid', 'true');
+  input?.setAttribute('aria-describedby', messageId);
 }
 
 function hideFieldMessage(selector: string) {
   $(selector).prop('hidden', true).hide();
+  const input = document.getElementById(fieldMessageInputId(selector));
+  input?.setAttribute('aria-invalid', 'false');
+  input?.removeAttribute('aria-describedby');
 }
 
 Template.signUp.events({
@@ -83,7 +97,7 @@ Template.signUp.events({
     hideFieldMessage('#passwordMustMatch');
     clearServerMessage();
 
-    const checks = [];
+    const checks: string[] = [];
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formUsername)) {
       checks.push('#usernameInvalid');
@@ -104,6 +118,8 @@ Template.signUp.events({
       _.each(checks, function(ele) {
         showFieldMessage(ele);
       });
+      const firstCheck = checks[0];
+      if (firstCheck) document.getElementById(fieldMessageInputId(firstCheck))?.focus();
       return;
     }
 
