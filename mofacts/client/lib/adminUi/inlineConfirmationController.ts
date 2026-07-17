@@ -57,6 +57,8 @@ export function createInlineConfirmationController<TContext>(
   let view = CLOSED_VIEW;
   let context: TContext | undefined;
   let trigger: HTMLElement | null = null;
+  let triggerAriaControls: string | null = null;
+  let triggerAriaExpanded: string | null = null;
   let destroyed = false;
 
   function publish(nextView: InlineConfirmationView): void {
@@ -71,12 +73,23 @@ export function createInlineConfirmationController<TContext>(
     target?.focus();
   }
 
+  function restoreTriggerAttributes(): void {
+    if (!trigger) return;
+    if (triggerAriaControls === null) trigger.removeAttribute('aria-controls');
+    else trigger.setAttribute('aria-controls', triggerAriaControls);
+    if (triggerAriaExpanded === null) trigger.removeAttribute('aria-expanded');
+    else trigger.setAttribute('aria-expanded', triggerAriaExpanded);
+    triggerAriaControls = null;
+    triggerAriaExpanded = null;
+  }
+
   function close(restore: boolean): boolean {
     if (view.status !== 'open') {
       return false;
     }
     publish(CLOSED_VIEW);
     context = undefined;
+    restoreTriggerAttributes();
     if (restore) {
       restoreFocus();
     }
@@ -105,6 +118,10 @@ export function createInlineConfirmationController<TContext>(
         close(true);
       }
       trigger = nextTrigger;
+      triggerAriaControls = nextTrigger.getAttribute('aria-controls');
+      triggerAriaExpanded = nextTrigger.getAttribute('aria-expanded');
+      nextTrigger.setAttribute('aria-controls', options.confirmationId);
+      nextTrigger.setAttribute('aria-expanded', 'true');
       context = options.context;
       publish({
         status: 'open',
@@ -153,6 +170,7 @@ export function createInlineConfirmationController<TContext>(
       return close(true);
     },
     destroy(): void {
+      restoreTriggerAttributes();
       destroyed = true;
       view = CLOSED_VIEW;
       context = undefined;

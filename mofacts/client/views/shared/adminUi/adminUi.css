@@ -32,6 +32,42 @@
   overflow-x: auto;
 }
 
+.admin-command-region,
+.admin-inline-feedback,
+.admin-inline-confirmation {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.admin-inline-feedback,
+.admin-inline-confirmation {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* The 25rem cap is intentionally table-only. Ordinary card/form feedback uses its container. */
+.admin-table-feedback {
+  display: block;
+  inline-size: fit-content;
+  max-inline-size: min(100%, 25rem);
+  min-inline-size: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.admin-table-feedback > .admin-status,
+.admin-table-feedback > .admin-inline-confirmation {
+  max-inline-size: 100%;
+}
+
+.admin-feedback-row > td {
+  white-space: normal;
+}
+
+.admin-table-message-column {
+  inline-size: 25rem;
+}
+
 .admin-table-shell:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;

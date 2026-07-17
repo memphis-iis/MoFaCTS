@@ -5,6 +5,15 @@ import './adminUi.css';
 
 type StatusVariant = 'info' | 'success' | 'warning' | 'error';
 
+export type AdminStatusTemplateData = Readonly<{
+  id?: string;
+  className?: string;
+  variant?: StatusVariant;
+  title?: string;
+  text: string;
+  urgent?: boolean;
+}>;
+
 const STATUS_ICONS: Readonly<Record<StatusVariant, string>> = {
   info: 'fa-info-circle',
   success: 'fa-check-circle',
@@ -19,18 +28,36 @@ function statusVariant(value: unknown): StatusVariant {
   return 'info';
 }
 
+function statusIsUrgent(data: AdminStatusTemplateData | undefined): boolean {
+  return data?.urgent === true || statusVariant(data?.variant) === 'error';
+}
+
 Template.adminStatus.helpers({
+  statusIdAttrs() {
+    const id = (Template.currentData() as AdminStatusTemplateData | undefined)?.id;
+    return typeof id === 'string' && id.trim() ? { id: id.trim() } : {};
+  },
+  statusClassName() {
+    const className = (Template.currentData() as AdminStatusTemplateData | undefined)?.className;
+    return typeof className === 'string' ? className.trim() : '';
+  },
   statusVariant() {
-    return statusVariant((Template.currentData() as { variant?: unknown } | undefined)?.variant);
+    return statusVariant((Template.currentData() as AdminStatusTemplateData | undefined)?.variant);
   },
   statusIcon() {
-    return STATUS_ICONS[statusVariant((Template.currentData() as { variant?: unknown } | undefined)?.variant)];
+    return STATUS_ICONS[statusVariant(
+      (Template.currentData() as AdminStatusTemplateData | undefined)?.variant,
+    )];
   },
   statusRole() {
-    return (Template.currentData() as { urgent?: boolean } | undefined)?.urgent ? 'alert' : 'status';
+    return statusIsUrgent(Template.currentData() as AdminStatusTemplateData | undefined)
+      ? 'alert'
+      : 'status';
   },
   statusLive() {
-    return (Template.currentData() as { urgent?: boolean } | undefined)?.urgent ? 'assertive' : 'polite';
+    return statusIsUrgent(Template.currentData() as AdminStatusTemplateData | undefined)
+      ? 'assertive'
+      : 'polite';
   },
 });
 

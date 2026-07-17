@@ -1,5 +1,10 @@
 <template name="adminStatus">
-  <div class="admin-status admin-status-{{statusVariant}}" role="{{statusRole}}" aria-live="{{statusLive}}">
+  <div
+    {{statusIdAttrs}}
+    class="admin-status admin-status-{{statusVariant}} {{statusClassName}}"
+    role="{{statusRole}}"
+    aria-live="{{statusLive}}"
+    aria-atomic="true">
     <i class="fa {{statusIcon}}" aria-hidden="true"></i>
     <div class="admin-status-text">
       {{#if title}}<strong>{{title}}</strong>{{/if}}

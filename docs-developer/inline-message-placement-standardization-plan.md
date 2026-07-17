@@ -1,7 +1,7 @@
 # Inline Message Placement and Width Standardization Plan
 
-Status: Implementation-ready proposal
-Implementation status: Not started
+Status: Implementation ledger
+Implementation status: Planned source migration implemented; final verification waived by the user
 Date: 2026-07-17
 Scope: Non-practice user, teacher, content-management, reporting, and system-administration interfaces
 
@@ -34,6 +34,19 @@ This plan covers the current working-tree implementation. Practice screens and t
 6. `Session.uiMessage` is reserved for genuinely application-wide conditions.
 7. Table feedback uses a bounded inner wrapper or a companion detail row. It must not rely on `max-width` applied only to a table cell.
 8. Feedback remains keyboard accessible, screen-reader announced, localized, and associated with its trigger using stable IDs and `aria-describedby` where appropriate.
+
+### Width decision: the 400px limit is table-only
+
+The approximate 400px/25rem maximum is not a general inline-message width. It applies only when feedback is rendered inside table markup and could influence a table cell or column's intrinsic width. This includes:
+
+- feedback inside an ordinary data cell or Actions cell;
+- feedback inside a companion detail row's spanning cell;
+- result/error text in an intentional Message column; and
+- an inline confirmation rendered within any of those table locations.
+
+Use `.admin-table-feedback` for those cases. Ordinary messages and confirmations in forms, cards, toolbars, page headers, dropdowns, editor panels, and wizard steps use their owning container's natural width. They must remain within `max-inline-size: 100%`, but they must not receive the special 25rem/400px maximum.
+
+If the responsive implementation has separate mobile card markup, render its feedback with `.admin-inline-feedback`, not `.admin-table-feedback`. If the same table DOM is visually transformed into cards, `min(100%, 25rem)` remains safe because the feedback cannot exceed the narrower card; a page may explicitly restore `max-inline-size: 100%` at its card breakpoint if the card is wider than 25rem and full-width feedback is intended.
 
 ## Audit Findings
 
@@ -301,12 +314,25 @@ This keeps the message associated with its record without forcing it into a narr
 
 Where a Message column is intentional, give the column an explicit width contract and still wrap the message in `.admin-table-feedback`.
 
-### Shared width utilities
+### General containment and table-only width utility
 
-Add scoped utilities to the shared admin UI stylesheet:
+Add general containment for normal inline feedback, plus a separate table-only maximum:
 
 ```css
-.admin-inline-feedback,
+.admin-inline-feedback {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.admin-inline-confirmation {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .admin-table-feedback {
   display: block;
   inline-size: fit-content;
@@ -316,11 +342,9 @@ Add scoped utilities to the shared admin UI stylesheet:
   overflow-wrap: anywhere;
 }
 
-.admin-inline-confirmation {
-  max-inline-size: min(100%, 25rem);
-  min-inline-size: 0;
-  white-space: normal;
-  overflow-wrap: anywhere;
+.admin-table-feedback > .admin-status,
+.admin-table-feedback > .admin-inline-confirmation {
+  max-inline-size: 100%;
 }
 
 .admin-feedback-row > td {
@@ -332,13 +356,13 @@ Add scoped utilities to the shared admin UI stylesheet:
 }
 ```
 
-The table-specific utility must override inherited nowrap behavior where necessary. Keep `adminTableShell` horizontal scrolling as a final safety boundary, not as the primary width policy.
+The 25rem declaration belongs only to `.admin-table-feedback` and the intentional table Message-column contract. The table-specific utility must override inherited nowrap behavior where necessary. Keep `adminTableShell` horizontal scrolling as a final safety boundary, not as the primary width policy.
 
-Use the shared 25rem variable consistently rather than retaining page-specific 220px/320px/34rem confirmation limits without a documented reason. If a narrower action region legitimately needs a smaller value, apply both the shared class and a page-specific modifier.
+Use the shared 25rem value consistently for feedback that remains inside table markup rather than retaining page-specific 220px/320px/34rem table-feedback limits without a documented reason. Do not replace legitimate non-table card/form widths with 25rem. If a table region legitimately needs a smaller value, apply both `.admin-table-feedback` and a page-specific modifier.
 
 ### Confirmation placement
 
-Use the existing confirmation controller's context to carry a scope/placement key. Render `adminInlineConfirmation` only at the matching local slot. Content Upload's placement-aware confirmation helpers are the closest current example, though its action-cell width selector must be corrected.
+Use the existing confirmation controller's context to carry a scope/placement key. Render `adminInlineConfirmation` only at the matching local slot. When that slot is in a table, wrap the confirmation in `.admin-table-feedback`; outside tables, do not apply the 25rem limit. Content Upload's placement-aware confirmation helpers are the closest current example, though its action-cell width selector must be corrected.
 
 The controller remains single-open-confirmation per page unless the page already supports multiple simultaneous independent confirmations. The context shape should include the information needed to locate the render slot without parsing the confirmation ID:
 
@@ -408,9 +432,9 @@ Paths in this matrix are relative to `mofacts/` unless prefixed otherwise.
 ### Content Upload
 
 - Pending/asset errors and access feedback remain in the TDF summary region but gain the bounded feedback wrapper.
-- Media confirmation remains inside the expanded media region and gains the shared confirmation bound.
+- Media confirmation remains inside the expanded table-cell media region and is wrapped by `.admin-table-feedback` to gain the table-only bound.
 - Asset-row destructive confirmation moves to a companion row on desktop and directly below actions in the mobile card layout.
-- Replace `.content-upload-actions > .admin-inline-confirmation` with a class applied to the actual confirmation wrapper; do not depend on Blaze expansion producing a direct child.
+- Replace `.content-upload-actions > .admin-inline-confirmation` with `.admin-table-feedback` on the actual table confirmation wrapper; do not depend on Blaze expansion producing a direct child. Package-upload and administration-card confirmations outside the table do not receive the 25rem limit.
 - Verify the intermediate 769–1100px range, where table layout becomes auto and the action-cell maximum is removed.
 
 ### Instructor Reporting
@@ -449,59 +473,59 @@ Additional rules:
 
 Files: shared `adminUi.*`, `asyncCommandState.ts`, `inlineConfirmationController.*`, new scoped registry and tests, management-interface baseline test.
 
-- [ ] Extend `adminStatus` with optional `id` and `className` inputs without changing existing callers.
-- [ ] Add `.admin-command-region`, `.admin-inline-feedback`, `.admin-feedback-row`, `.admin-table-feedback`, `.admin-table-message-column`, and shared confirmation containment.
-- [ ] Implement and unit-test `ScopedAsyncCommandRegistry` using `AsyncCommandController` internally.
-- [ ] Add characterization coverage for status roles/live regions, optional IDs/classes, confirmation focus behavior, and the shared width-class contract.
-- [ ] Add comments at the owning modules describing the page-load versus command-feedback boundary.
+- [x] Extend `adminStatus` with optional `id` and `className` inputs without changing existing callers.
+- [x] Add `.admin-command-region`, general `.admin-inline-feedback`/confirmation containment, and the table-only `.admin-feedback-row`, `.admin-table-feedback`, and `.admin-table-message-column` rules.
+- [x] Implement and unit-test `ScopedAsyncCommandRegistry` using `AsyncCommandController` internally.
+- [x] Add characterization coverage for status roles/live regions, optional IDs/classes, confirmation focus behavior, and the shared width-class contract.
+- [x] Add comments at the owning modules describing the page-load versus command-feedback boundary.
 
 Phase exit gate: shared APIs typecheck and lint; existing status/confirmation markup remains source-compatible; registry tests cover concurrent scopes and destruction.
 
 ### Phase 2: Highest-risk tables and detached confirmations
 
-- [ ] User Administration Delete User confirmation, role/delete results, and nowrap overrides.
-- [ ] Administration Tests Message columns.
-- [ ] Content Upload row/media/access feedback and action confirmations, including 769–1100px behavior.
-- [ ] Instructor Reporting row feedback and bounded table-load error.
-- [ ] Backups row confirmations and manifest detail placement.
-- [ ] Theme row/branding/help confirmations.
+- [x] User Administration Delete User confirmation, role/delete results, and nowrap overrides.
+- [x] Administration Tests Message columns.
+- [x] Content Upload row/media/access feedback and action confirmations. Browser measurement at 769–1100px remains pending.
+- [x] Instructor Reporting row feedback and bounded table-load error.
+- [x] Backups row confirmations and manifest detail placement.
+- [x] Theme row/branding/help confirmations.
 
 Phase exit gate: synthetic 200-character unbroken messages and long localized text do not expand action columns; every destructive confirmation returns focus correctly.
 
 ### Phase 3: Page-global command messages
 
-- [ ] Narrow Content Manager's upload status to package upload only.
-- [ ] Split Profile and Audio Settings state by command owner.
-- [ ] Split Courses load state from keyed Join/Launch feedback.
-- [ ] Replace learning-dashboard shell messages/native alert with lesson/config scopes.
-- [ ] Split Admin Control Panel, Mechanical Turk, and User Administration import/provider feedback.
-- [ ] Split Data Download command regions while preserving fixed table layout.
-- [ ] Move course-editor command feedback into its action region.
+- [x] Narrow Content Manager's upload status to package upload only.
+- [x] Split Profile and Audio Settings state by command owner.
+- [x] Split Courses load state from keyed Join/Launch feedback.
+- [x] Replace learning-dashboard shell messages/native alert with lesson/config scopes.
+- [x] Split Admin Control Panel, Mechanical Turk, and User Administration import/provider feedback.
+- [x] Split Data Download command regions while preserving fixed table layout.
+- [x] Move course-editor command feedback into its action region.
 
 Phase exit gate: none of the migrated command handlers writes the old page-global variable; concurrent actions on two records display independent feedback.
 
 ### Phase 4: Editors and wizards
 
-- [ ] Content Editor toolbar, field, validation-summary, and Save regions.
-- [ ] TDF Editor initialization, OpenRouter field, validation-summary, and Save regions.
-- [ ] SPARC header, selected-node, visual/rich-text, and rule-card error ownership.
-- [ ] Manual Content Creator draft and upload confirmation regions.
-- [ ] APKG wizard step/action ownership.
-- [ ] Theme Generation Wizard control-group ownership.
+- [x] Content Editor toolbar, field, validation-summary, and Save regions.
+- [x] TDF Editor initialization, OpenRouter field, validation-summary, and Save regions.
+- [x] SPARC header, selected-node, visual/rich-text, and rule-card error ownership.
+- [x] Manual Content Creator draft and upload confirmation regions.
+- [x] APKG wizard step/action ownership.
+- [x] Theme Generation Wizard control-group ownership.
 
 Phase exit gate: editor initialization errors remain distinguishable from field and Save errors; changing tabs/steps cannot leave feedback visible in the wrong region.
 
 ### Phase 5: Authentication and borderline cases
 
-- [ ] Provider sign-in and disabled-signup feedback inside secondary actions.
-- [ ] Forgot/reset-password field and form feedback.
-- [ ] Verify-email resend feedback.
-- [ ] Class Selection feedback inside its selector/action row.
-- [ ] TDF Assignment load/Save state split.
-- [ ] Profile OpenRouter actions and feedback consolidated inside the AI card.
-- [ ] Sign-up and primary sign-in summaries moved inside their forms.
-- [ ] User Administration Usage/News actions receive separate local scopes.
-- [ ] Direct class-invitation errors replace native alerts with an explicit destination-owned route result.
+- [x] Provider sign-in and disabled-signup feedback inside secondary actions.
+- [x] Forgot/reset-password field and form feedback.
+- [x] Verify-email resend feedback.
+- [x] Class Selection feedback inside its selector/action row.
+- [x] TDF Assignment load/Save state split.
+- [x] Profile OpenRouter actions and feedback consolidated inside the AI card.
+- [x] Sign-up and primary sign-in summaries moved inside their forms.
+- [x] User Administration Usage/News actions receive separate local scopes.
+- [x] Direct class-invitation errors replace native alerts with an explicit destination-owned route result.
 
 Phase exit gate: no remaining native alert or strict-borderline case violates the placement contract.
 
@@ -554,7 +578,7 @@ For every migrated surface:
 4. Confirm focus returns to the originating button after confirmation cancellation/completion.
 5. Confirm `aria-live`, `role`, `aria-describedby`, keyboard operation, and localized text remain correct.
 6. Test long unbroken messages, URLs, identifiers, and localized strings in affected tables at desktop, intermediate, and mobile widths.
-7. Confirm no message wrapper exceeds approximately 25rem/400px unless the container itself is narrower.
+7. For feedback inside table markup, confirm `.admin-table-feedback` does not exceed approximately 25rem/400px or its narrower container. For non-table feedback, confirm only that it remains within its owning container.
 8. Run `npm run typecheck` and `npm run lint` from `mofacts/`.
 9. Use the native hotfix development server and MoFaCTS Playwright sidecar for browser-visible verification of each affected route.
 
@@ -587,7 +611,8 @@ Add the following pure/unit coverage:
 - Existing `adminStatus` callers remain valid when no ID/class is supplied.
 - Optional status ID is rendered and can be referenced by `aria-describedby`.
 - Error and non-error variants retain their correct live-region behavior.
-- Shared feedback and confirmation selectors contain `max-inline-size`, `min-inline-size`, normal whitespace, and `overflow-wrap: anywhere`.
+- General inline feedback and confirmation selectors contain `max-inline-size: 100%`, `min-inline-size: 0`, normal whitespace, and `overflow-wrap: anywhere`, with no 25rem limit.
+- `.admin-table-feedback` alone contains the special 25rem maximum plus the wrapping/containment rules.
 - User Administration no longer renders confirmation inside the normal Actions cell.
 - Administration Tests wraps both Message fields.
 - Content Upload's confirmation selector matches the actual wrapper.
@@ -626,7 +651,8 @@ For each route, report the browser-visible result plus console/network errors ob
 
 At 1440px, 1024px, 900px, 768px, and 390px viewports where the surface supports them:
 
-- Measure each `.admin-inline-feedback`, `.admin-table-feedback`, and open `.admin-inline-confirmation`; its width must be at most `min(container width, 400px)` allowing a 1px rounding tolerance.
+- Measure each `.admin-table-feedback`, including any status or confirmation it wraps; its width must be at most `min(container width, 400px)` allowing a 1px rounding tolerance.
+- For `.admin-inline-feedback` and confirmations outside table markup, verify only that their width does not exceed the owning container. They may legitimately be wider than 400px.
 - Use a synthetic string of at least 200 characters with no whitespace and a long localized sentence with normal whitespace.
 - For companion-row designs, record the Actions column width before and after feedback opens; it must remain unchanged within a 1px rounding tolerance.
 - For intentional Message columns, verify the column does not exceed 25rem and content remains fully readable through wrapping, not clipping or ellipsis.
@@ -643,6 +669,33 @@ At 1440px, 1024px, 900px, 768px, and 390px viewports where the surface supports 
 - Escape/cancel and confirmation completion return focus according to the controller contract.
 - When a successful deletion removes the trigger, focus moves to the documented nearest surviving row action or card action, not the document body.
 
+## Current Implementation and Verification Record
+
+Implemented in the working tree on 2026-07-17:
+
+- The shared status template accepts stable IDs/classes and retains assertive error versus polite non-error live-region semantics.
+- A shared scoped async-command registry now owns repeated command state in Courses, Backups, User Administration, Content Upload, Instructor Reporting, Data Download, Mechanical Turk, and Theme. Each surface maps stable scopes to its own localized presentation.
+- The 25rem/approximately 400px rule exists only on `.admin-table-feedback` and `.admin-table-message-column`. General form/card feedback and confirmations are limited only by their owning container.
+- User, teacher, reporting, content, administration, authentication, editor, SPARC, and wizard surfaces in the file-level matrix have local feedback slots. Class-invitation and lesson-launch errors no longer use native alerts.
+- Backup manifests and destructive confirmations render in their affected row; SPARC node deletion renders in the selected-node card; theme confirmations render in the affected theme/branding/help region.
+- Shared confirmation lifecycle/markup now owns trigger ARIA state, Escape/cancel behavior, focus return, pending state, and localized presentation across Theme, User Administration, Course Edit, Content Edit, and Manual Content Creator instead of retaining page-specific confirmation markup.
+- Profile, Audio Settings, Admin Controls, Content/TDF editors, provider API-key controls, and Content Upload access operations keep independent scoped messages so unrelated concurrent commands do not overwrite one another.
+- Sign-up, verify-email, Profile, User Administration provider metadata, Instructor Reporting dates, and other field-level failures expose local assertive error semantics and field associations.
+
+Verification completed before the final source-cleanup pass:
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm run check:sparc-authoring`: passed with 30 palette entries and 14 rule-catalog entries.
+- Native hotfix server: running and reachable at `http://localhost:3200`; app port 3200 and HMR port 8082 are reachable. The current templates hot reload. Existing historical dev-log entries include a SPARC unused-export warning and transient missing-module/server-socket errors; the current public routes remained reachable.
+- Playwright sidecar tools are exposed. Public smoke checks passed for sign-in empty-field validation and forgot-password empty-email validation at 900px: each error rendered in the owning field region, the invalid field received focus, and `aria-invalid`/`aria-describedby` referenced the visible error. A fresh navigation produced no console warnings or errors.
+- A browser computed-style probe using the shipped shared classes confirmed the table-only distinction: inside a 700px owner, `.admin-table-feedback` measured 400px with `max-inline-size: min(100%, 400px)` and `overflow-wrap: anywhere`, while `.admin-inline-feedback` used the full 700px with only `max-inline-size: 100%`. In a 300px table owner, table feedback stayed below the container width and introduced no page-level horizontal overflow.
+- Authenticated administration, teacher, user-menu, responsive table-width, confirmation-focus, and network smoke checks were not run. The user explicitly removed browser verification from scope; no credential bypass or secret transfer was used.
+- Meteor test suites were not invoked because `npm test` is not the supported local verification path and `npm run test:ci` requires fresh explicit authorization.
+- After the final confirmation and command-scope cleanup, the user explicitly waived all further verification. Typecheck, lint, tests, browser checks, and hot-reload validation were therefore not rerun against the final working tree.
+
+The implementation is complete as a source migration. The verification-dependent criteria below remain acceptance checks for any later verification pass, not prerequisites for this user-waived handoff.
+
 ## Completion Criteria
 
 - No command-specific result/error uses a page-global message unless the event is genuinely application-wide.
@@ -650,12 +703,12 @@ At 1440px, 1024px, 900px, 768px, and 390px viewports where the surface supports 
 - Every confirmation is rendered in the triggering command's logical region.
 - Every table feedback message has an explicit bounded inner wrapper or bounded Message column.
 - No affected table becomes wider because of an inserted message or confirmation.
-- Accessibility, localization, focus behavior, and responsive layouts are verified.
-- Required typecheck, lint, and UI smoke checks pass.
+- Accessibility, localization, focus behavior, and responsive layouts follow the shared source contracts; final runtime verification was waived.
+- Typecheck, lint, and UI smoke checks remain recommended for a later verification pass; they were waived for the final working tree.
 - Searches of migrated files show no obsolete page-global setter for command-specific feedback.
 - No new dependency, server contract, persistence field, or compatibility path was introduced.
 - The implementation matrix is checked off or updated with an explicit reason for any intentionally deferred surface.
 
 ## Audit Notes
 
-This document was created from a read-only static audit of the current, already-modified working tree. The audit did not run application services or tests and did not change application code. Existing unrelated modifications were preserved.
+This document began as a static audit and now serves as the implementation ledger. The migration changed application code, and earlier iterations ran local static checks and exercised public authentication routes through the supported hotfix/sidecar loop. The final cleanup was handed off without additional static or browser verification at the user's explicit request. Existing unrelated modifications were preserved.

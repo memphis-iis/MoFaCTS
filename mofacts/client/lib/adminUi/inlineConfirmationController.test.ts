@@ -74,4 +74,100 @@ describe('admin UI inline confirmation controller', function() {
     expect(controller.complete()).to.equal(true);
     expect(document.activeElement).to.equal(fallback);
   });
+
+  it('retains scoped placement context and restores trigger focus on completion', function() {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    const views: string[] = [];
+    const controller = createInlineConfirmationController<{
+      placement: 'row';
+      action: 'delete';
+      recordId: string;
+    }>((view) => views.push(view.status));
+    controller.open({
+      confirmationId: 'user-delete-confirmation',
+      title: 'Delete user',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      severity: 'danger',
+      context: { placement: 'row', action: 'delete', recordId: 'user-1' },
+    }, trigger);
+
+    expect(controller.getContext()).to.deep.equal({
+      placement: 'row',
+      action: 'delete',
+      recordId: 'user-1',
+    });
+    expect(controller.complete()).to.equal(true);
+    expect(document.activeElement).to.equal(trigger);
+    expect(views).to.deep.equal(['open', 'closed']);
+  });
+
+  it('does not publish state after destruction', function() {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    const views: string[] = [];
+    const controller = createInlineConfirmationController(
+      (view) => views.push(view.status),
+    );
+    controller.open({
+      confirmationId: 'delete-confirmation',
+      title: 'Delete',
+      message: 'Delete record.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      severity: 'danger',
+      context: { recordId: 'record-1' },
+    }, trigger);
+
+    controller.destroy();
+    expect(controller.setPending(true)).to.equal(false);
+    expect(controller.complete()).to.equal(false);
+    expect(views).to.deep.equal(['open']);
+  });
+
+  it('owns trigger confirmation attributes only while open', function() {
+    const trigger = document.createElement('button');
+    trigger.setAttribute('aria-controls', 'existing-region');
+    document.body.appendChild(trigger);
+    const controller = createInlineConfirmationController(() => undefined);
+    controller.open({
+      confirmationId: 'attribute-confirmation',
+      title: 'Confirm',
+      message: 'Confirm action.',
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+      severity: 'warning',
+      context: undefined,
+    }, trigger);
+
+    expect(trigger.getAttribute('aria-controls')).to.equal('attribute-confirmation');
+    expect(trigger.getAttribute('aria-expanded')).to.equal('true');
+
+    controller.cancel();
+    expect(trigger.getAttribute('aria-controls')).to.equal('existing-region');
+    expect(trigger.hasAttribute('aria-expanded')).to.equal(false);
+  });
+
+  it('removes owned trigger attributes when destroyed without restoring focus', function() {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    const controller = createInlineConfirmationController(() => undefined);
+    controller.open({
+      confirmationId: 'destroyed-confirmation',
+      title: 'Confirm',
+      message: 'Confirm action.',
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+      severity: 'warning',
+      context: undefined,
+    }, trigger);
+
+    controller.destroy();
+
+    expect(trigger.hasAttribute('aria-controls')).to.equal(false);
+    expect(trigger.hasAttribute('aria-expanded')).to.equal(false);
+    expect(document.activeElement).not.to.equal(trigger);
+  });
 });
