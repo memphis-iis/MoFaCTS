@@ -1,6 +1,7 @@
 // Owner: Dashboard Platform Team
 // Contracts for dashboard cache method payloads and computed aggregates.
 import type { LearnerTdfConfig } from '../../common/lib/learnerTdfConfig';
+import type { ProfileAvatarType } from '../../common/profileAvatar';
 
 export type DashboardOutcome = 'correct' | 'incorrect' | string;
 
@@ -103,9 +104,17 @@ export interface PracticeDashboardProgressStats {
   lastPracticedTimestamp: number;
 }
 
+export interface PracticeDashboardCreator {
+  displayName: string;
+  avatarType: ProfileAvatarType;
+  avatarIconId: string | null;
+  avatarImageData: string | null;
+}
+
 export interface PracticeDashboardSnapshotLesson {
   TDFId: string;
   displayName: string;
+  creatorIndex: number | null;
   fileName?: string;
   tags: string[];
   contentLanguage?: string;
@@ -133,8 +142,9 @@ export interface PracticeDashboardSnapshotLesson {
 }
 
 export interface PracticeDashboardSnapshot {
-  version: 1;
+  version: 3;
   userId: string;
   generatedAt: number;
+  creators: PracticeDashboardCreator[];
   lessons: PracticeDashboardSnapshotLesson[];
 }

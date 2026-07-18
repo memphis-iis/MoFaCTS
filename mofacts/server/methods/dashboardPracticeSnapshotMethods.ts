@@ -5,8 +5,13 @@ import {
   type LearnerTdfConfig,
 } from '../../common/lib/learnerTdfConfig';
 import { detectTdfUnitType } from '../../common/fieldApplicability';
+import {
+  findProfileAvatarIcon,
+  normalizeProfileAvatarType,
+} from '../../common/profileAvatar';
 import type {
   DashboardTdfStats,
+  PracticeDashboardCreator,
   PracticeDashboardSnapshotLesson,
 } from './dashboardCacheMethods.contracts';
 import {
@@ -24,7 +29,13 @@ type DashboardPracticeSnapshotDeps = {
   Sections?: any;
   SectionUserMap?: any;
   UserDashboardCache: any;
-  usersCollection: any;
+  usersCollection: {
+    findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>;
+    find: (
+      selector: Record<string, unknown>,
+      options?: Record<string, unknown>,
+    ) => { fetchAsync: () => Promise<any[]> };
+  };
   DynamicSettings: any;
   decryptData?: (value: string) => string;
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
@@ -159,8 +170,63 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
   }
 
   const tdfs = await deps.Tdfs.find({ $or: visibilityTerms }, { fields: projection }).fetchAsync();
+  const ownerIds: string[] = [...new Set<string>(
+    tdfs
+      .map((tdf: any) => normalizeOptionalString(tdf?.ownerId))
+      .filter((ownerId: string | null): ownerId is string => !!ownerId)
+  )];
+  const owners = ownerIds.length > 0
+    ? await deps.usersCollection.find(
+        { _id: { $in: ownerIds } },
+        {
+          fields: {
+            'profile.displayName': 1,
+            'profile.avatarType': 1,
+            'profile.avatarIconId': 1,
+            'profile.avatarImageData': 1,
+          },
+        }
+      ).fetchAsync()
+    : [];
+  const ownerById = new Map<string, any>();
+  for (const owner of owners) {
+    const ownerId = normalizeOptionalString(owner?._id);
+    if (ownerId) {
+      ownerById.set(ownerId, owner);
+    }
+  }
+  const creators: PracticeDashboardCreator[] = [];
+  const creatorIndexByOwnerId = new Map<string, number>();
+  for (const ownerId of ownerIds) {
+    const owner = ownerById.get(ownerId);
+    const displayName = normalizeOptionalString(owner?.profile?.displayName);
+    if (!displayName) continue;
+
+    const requestedAvatarType = normalizeProfileAvatarType(owner?.profile?.avatarType);
+    const avatarIcon = requestedAvatarType === 'icon'
+      ? findProfileAvatarIcon(owner?.profile?.avatarIconId)
+      : null;
+    const avatarImageData = requestedAvatarType === 'image'
+      ? normalizeOptionalString(owner?.profile?.avatarImageData)
+      : null;
+    const avatarType = requestedAvatarType === 'icon' && avatarIcon
+      ? 'icon'
+      : requestedAvatarType === 'image' && avatarImageData
+        ? 'image'
+        : 'initials';
+
+    creatorIndexByOwnerId.set(ownerId, creators.length);
+    creators.push({
+      displayName,
+      avatarType,
+      avatarIconId: avatarType === 'icon' ? avatarIcon?.id || null : null,
+      avatarImageData: avatarType === 'image' ? avatarImageData : null,
+    });
+  }
   return {
     tdfs,
+    creators,
+    creatorIndexByOwnerId,
     hasSpeechAPIKey: Boolean(user?.speechAPIKey && String(user.speechAPIKey).trim()),
     hasTTSAPIKey: Boolean(
       (user?.ttsAPIKey && String(user.ttsAPIKey).trim()) ||
@@ -242,6 +308,7 @@ function unitHasLearnerConfigurableFields(unit: any): boolean {
 function buildPracticeDashboardLesson(
   userId: string,
   tdf: any,
+  creatorIndex: number | null,
   stats: DashboardTdfStats | undefined,
   learnerConfig: LearnerTdfConfig | null,
   hasSpeechAPIKey: boolean,
@@ -279,6 +346,7 @@ function buildPracticeDashboardLesson(
   return {
     TDFId,
     displayName,
+    creatorIndex,
     fileName: fileName || '',
     tags: Array.isArray(setspec.tags) ? setspec.tags : [],
     contentLanguage,
@@ -312,7 +380,15 @@ export function createDashboardPracticeSnapshotMethods(deps: DashboardPracticeSn
       }
 
       const userId = this.userId;
-      const [{ tdfs, hasSpeechAPIKey, hasTTSAPIKey, hasAdminSpeechAPIKey, hasAdminTTSAPIKey }, cache] = await Promise.all([
+      const [{
+        tdfs,
+        creators,
+        creatorIndexByOwnerId,
+        hasSpeechAPIKey,
+        hasTTSAPIKey,
+        hasAdminSpeechAPIKey,
+        hasAdminTTSAPIKey,
+      }, cache] = await Promise.all([
         getDashboardVisibleTdfs(deps, userId),
         deps.UserDashboardCache.findOneAsync({ userId })
       ]);
@@ -344,6 +420,7 @@ export function createDashboardPracticeSnapshotMethods(deps: DashboardPracticeSn
         const lesson = buildPracticeDashboardLesson(
           userId,
           tdf,
+          creatorIndexByOwnerId.get(normalizeOptionalString(tdf?.ownerId) || '') ?? null,
           cache?.tdfStats?.[TDFId],
           cache?.learnerTdfConfigs?.[TDFId] || null,
           hasSpeechAPIKey,
@@ -360,6 +437,7 @@ export function createDashboardPracticeSnapshotMethods(deps: DashboardPracticeSn
         version: PRACTICE_DASHBOARD_SNAPSHOT_VERSION,
         userId,
         generatedAt: Date.now(),
+        creators,
         lessons
       };
     }

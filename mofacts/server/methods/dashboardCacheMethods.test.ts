@@ -85,6 +85,7 @@ describe('dashboardCacheMethods', function() {
     const queryCounts = {
       tdfsFind: 0,
       usersFindOne: 0,
+      usersFind: 0,
       cacheFindOne: 0,
       sectionUserMapFind: 0,
       sectionsFind: 0,
@@ -155,7 +156,20 @@ describe('dashboardCacheMethods', function() {
         findOneAsync: async () => {
           queryCounts.usersFindOne++;
           return { _id: userId, accessedTDFs: [], speechAPIKey: 'sr', textToSpeechAPIKey: 'tts' };
-        }
+        },
+        find: () => {
+          queryCounts.usersFind++;
+          return {
+            fetchAsync: async () => [{
+              _id: 'teacher-1',
+              profile: {
+                displayName: 'Professor Ada',
+                avatarType: 'icon',
+                avatarIconId: 'graduate',
+              },
+            }],
+          };
+        },
       },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => {},
@@ -166,11 +180,18 @@ describe('dashboardCacheMethods', function() {
 
     const snapshot = await (methods as any).getPracticeDashboardSnapshot.call({ userId });
 
-    expect(snapshot.version).to.equal(1);
+    expect(snapshot.version).to.equal(3);
+    expect(snapshot.creators).to.deep.equal([{
+      displayName: 'Professor Ada',
+      avatarType: 'icon',
+      avatarIconId: 'graduate',
+      avatarImageData: null,
+    }]);
     expect(snapshot.lessons).to.have.length(1);
     expect(snapshot.lessons[0]).to.include({
       TDFId: 'tdfA',
       displayName: 'Lesson A',
+      creatorIndex: 0,
       currentStimuliSetId: 'stim-set-a',
       hasConfigurableSettings: true,
       hasLearnerConfigurableSettings: true,
@@ -192,6 +213,7 @@ describe('dashboardCacheMethods', function() {
     expect(queryCounts).to.deep.equal({
       tdfsFind: 2,
       usersFindOne: 1,
+      usersFind: 1,
       cacheFindOne: 1,
       sectionUserMapFind: 1,
       sectionsFind: 0,
@@ -255,7 +277,13 @@ describe('dashboardCacheMethods', function() {
         })
       },
       usersCollection: {
-        findOneAsync: async () => ({ _id: userId, accessedTDFs: [] })
+        findOneAsync: async () => ({ _id: userId, accessedTDFs: [] }),
+        find: () => ({
+          fetchAsync: async () => [{
+            _id: 'teacher-1',
+            profile: { displayName: 'Professor Ada', avatarType: 'initials' },
+          }],
+        }),
       },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => {},
@@ -395,7 +423,13 @@ describe('dashboardCacheMethods', function() {
         findOneAsync: async () => {
           queryCounts.usersFindOne++;
           return { _id: userId, accessedTDFs: [] };
-        }
+        },
+        find: () => ({
+          fetchAsync: async () => [{
+            _id: 'teacher-1',
+            profile: { displayName: 'Professor Ada', avatarType: 'initials' },
+          }],
+        }),
       },
       DynamicSettings: {
         findOneAsync: async () => {

@@ -6,6 +6,7 @@ import {
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import type { createStorageBoundary } from '../lib/storageBoundary';
+import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
 import { createContentAssetMaintenanceMethods } from './contentAssetMaintenanceMethods';
 
 type UnknownRecord = Record<string, unknown>;
@@ -589,6 +590,7 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         };
       }
 
+      await requireContentCreatorDisplayName(deps.usersCollection, this.userId);
       const insertedId = await deps.ManualContentDrafts.insertAsync({
         ownerId: this.userId,
         draftType: 'manual-content-creator',

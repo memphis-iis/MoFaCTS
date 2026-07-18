@@ -102,6 +102,12 @@ import {
   type MethodAuthorizationDeps,
 } from './lib/methodAuthorization';
 import { encryptData, decryptData } from './lib/encryption';
+import {
+  SERVER_VERBOSITY_SETTING,
+  type LoggingVerbosityLevel,
+  parseLoggingVerbosityLevel,
+  shouldEmitLogMessage,
+} from '../common/loggingSettings';
 
 const MeteorAny = Meteor as any;
 
@@ -120,7 +126,11 @@ export { getTdfByFileName, getTdfById, getHistoryByTDFID, getStimuliSetById, ser
 // The jshint inline option above suppresses a warning about using sqaure
 // brackets instead of dot notation - that's because we prefer square brackets
 // for creating some MongoDB queries
-let verbosityLevel = 0; //0 = only output serverConsole logs, 1 = only output function times, 2 = output serverConsole and function times
+let serverVerbosityLevel: LoggingVerbosityLevel = SERVER_VERBOSITY_SETTING.defaultValue;
+
+function setServerVerbosityLevel(value: unknown): void {
+  serverVerbosityLevel = parseLoggingVerbosityLevel(value);
+}
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -392,6 +402,7 @@ const {
 
 const packageMethods = createPackageMethods({
   Tdfs,
+  usersCollection: MeteorAny.users,
   DynamicAssets,
   H5PContents,
   storageBoundary,
@@ -583,10 +594,17 @@ Meteor.publish(null, function() {
 });
 
 function serverConsole(...args: unknown[]) {
-  if(verbosityLevel == 1) return;
+  const pendingArgs = [...args];
+  let messageLevel: LoggingVerbosityLevel = 1;
+  const requestedLevel = pendingArgs[0];
+  if (requestedLevel === 0 || requestedLevel === 1 || requestedLevel === 2) {
+    messageLevel = requestedLevel;
+    pendingArgs.shift();
+  }
+  if (!shouldEmitLogMessage(serverVerbosityLevel, messageLevel)) return;
   const disp: unknown[] = [(new Date()).toString()];
-  for (let i = 0; i < args.length; ++i) {
-    disp.push(args[i]);
+  for (let i = 0; i < pendingArgs.length; ++i) {
+    disp.push(pendingArgs[i]);
   }
   console.log(...disp);
 }
@@ -615,10 +633,7 @@ export const methods: any = {
     sendErrorReportSummaries,
     sendEmail,
     getCurrentUser: () => MeteorAny.userAsync(),
-    getVerbosityLevel: () => verbosityLevel,
-    setVerbosityLevel: (level: number) => {
-      verbosityLevel = level;
-    },
+    setVerbosityLevel: setServerVerbosityLevel,
   }),
 
   ...publicExperimentMethods,
@@ -750,6 +765,7 @@ export const methods: any = {
 
   ...createProfileMethods({
     usersCollection: MeteorAny.users,
+    Tdfs,
     encryptData,
     decryptData,
     openRouterModelCatalogService,
@@ -1147,9 +1163,27 @@ Meteor.startup(async function() {
     syncUsernameCaches,
     isArgon2Enabled,
     getPasswordHashRuntimeInfo,
+    setServerVerbosityLevel,
     setRuntimeCounters: ({ nextStimuliSetId: nextStimuliSetIdValue, nextEventId: nextEventIdValue }) => {
       nextStimuliSetId = nextStimuliSetIdValue;
       nextEventId = nextEventIdValue;
     }
+  });
+
+  DynamicSettings.find(
+    { _id: SERVER_VERBOSITY_SETTING.id },
+    { fields: { value: 1 } },
+  ).observeChanges({
+    added(_id: string, fields: { value?: unknown }) {
+      setServerVerbosityLevel(fields.value);
+    },
+    changed(_id: string, fields: { value?: unknown }) {
+      if (Object.prototype.hasOwnProperty.call(fields, 'value')) {
+        setServerVerbosityLevel(fields.value);
+      }
+    },
+    removed() {
+      throw new Error('Server verbosity setting was removed after initialization');
+    },
   });
 });

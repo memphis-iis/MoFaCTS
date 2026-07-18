@@ -16,6 +16,7 @@ import {
   type OpenRouterReasoningLevel,
 } from '../../common/lib/openRouterModelCatalog';
 import type { OpenRouterModelCatalogService } from './openRouterCatalogMethods';
+import { CONTENT_CREATOR_DISPLAY_NAME_REQUIRED } from '../lib/contentCreatorIdentity';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -27,6 +28,9 @@ type ProfileMethodsDeps = {
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
+  };
+  Tdfs: {
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   encryptData: (value: string) => string;
   decryptData: (value: string) => string;
@@ -188,6 +192,18 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
       };
       const name = normalizeProfileText(data.name, PROFILE_NAME_MAX_LENGTH, 'Name');
       const displayName = normalizeProfileText(data.displayName, DISPLAY_NAME_MAX_LENGTH, 'Display name');
+      if (!displayName) {
+        const ownedContent = await deps.Tdfs.findOneAsync(
+          { ownerId: userId },
+          { fields: { _id: 1 } },
+        );
+        if (ownedContent) {
+          throw new Meteor.Error(
+            CONTENT_CREATOR_DISPLAY_NAME_REQUIRED,
+            'Content creators must keep a public display name. It may be anonymous.',
+          );
+        }
+      }
       const avatarType = normalizeProfileAvatarType(data.avatarType);
       const setFields: UnknownRecord = {
         'profile.name': name,

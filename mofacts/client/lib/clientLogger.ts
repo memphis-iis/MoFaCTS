@@ -1,7 +1,12 @@
 import { Tracker } from 'meteor/tracker';
+import {
+  CLIENT_VERBOSITY_SETTING,
+  type LoggingVerbosityLevel,
+  parseLoggingVerbosityLevel,
+} from '../../common/loggingSettings';
 
 // Default to silent until the admin-controlled setting is loaded.
-let verbosityLevel = 0;
+let verbosityLevel: LoggingVerbosityLevel = CLIENT_VERBOSITY_SETTING.defaultValue;
 
 declare const Meteor: any;
 declare const DynamicSettings: any;
@@ -12,16 +17,21 @@ declare global {
   }
 }
 
-export function loadClientSettings() {
+export function loadClientSettings(): () => void {
   const handle = Meteor.subscribe('clientRuntimeSettings');
-  Tracker.autorun(function () {
+  const computation = Tracker.autorun(function () {
     if (handle.ready()) {
-      const setting = DynamicSettings.findOne({ key: 'clientVerbosityLevel' });
-      if (setting) {
-        verbosityLevel = setting.value;
-      }
+      const setting = DynamicSettings.findOne({ _id: CLIENT_VERBOSITY_SETTING.id });
+      verbosityLevel = setting
+        ? parseLoggingVerbosityLevel(setting.value)
+        : CLIENT_VERBOSITY_SETTING.defaultValue;
     }
   });
+  return () => {
+    computation.stop();
+    handle.stop();
+    verbosityLevel = CLIENT_VERBOSITY_SETTING.defaultValue;
+  };
 }
 
 export function clientConsole(...args: unknown[]): void {

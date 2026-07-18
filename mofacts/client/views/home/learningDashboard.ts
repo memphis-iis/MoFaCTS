@@ -42,6 +42,11 @@ import {
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { formatActiveInterfaceDateTime } from '../../lib/interfaceFormatting';
+import { getUserInitials } from '../../lib/userIdentity';
+import {
+  findProfileAvatarIcon,
+  type ProfileAvatarType,
+} from '../../../common/profileAvatar';
 
 declare const Template: any;
 declare const Meteor: any;
@@ -83,7 +88,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   resultMessage: null,
 };
 
-const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 1;
+const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 3;
 const PRACTICE_DASHBOARD_SEARCH_VERSION = 1;
 const PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY = 'practiceTableStatisticsExpanded';
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
@@ -124,10 +129,18 @@ function withLessonCommandFeedback(tdfs: any[]): any[] {
   return tdfs.map((tdf) => ({ ...tdf, launchFeedback: feedback[String(tdf.TDFId)] || null }));
 }
 
+type PracticeDashboardCreator = {
+  displayName: string;
+  avatarType: ProfileAvatarType;
+  avatarIconId: string | null;
+  avatarImageData: string | null;
+};
+
 type PracticeDashboardSnapshot = {
   version: number;
   userId: string;
   generatedAt: number;
+  creators: PracticeDashboardCreator[];
   lessons: any[];
 };
 
@@ -179,6 +192,9 @@ function applyLearningDashboardSearch(instance: any, search: string) {
     if (tdf.displayName.toLowerCase().includes(searchLower)) {
       return true;
     }
+    if (String(tdf.creatorDisplayName || '').toLowerCase().includes(searchLower)) {
+      return true;
+    }
     return Boolean(tdf.tags && tdf.tags.some((tag: any) => tag.toLowerCase().includes(searchLower)));
   });
 
@@ -195,7 +211,12 @@ function loadLocalPracticeDashboardSnapshot(userId: string): PracticeDashboardSn
     return null;
   }
   const snapshot = JSON.parse(raw) as PracticeDashboardSnapshot;
-  if (snapshot?.version !== PRACTICE_DASHBOARD_SNAPSHOT_VERSION || snapshot.userId !== userId || !Array.isArray(snapshot.lessons)) {
+  if (
+    snapshot?.version !== PRACTICE_DASHBOARD_SNAPSHOT_VERSION ||
+    snapshot.userId !== userId ||
+    !Array.isArray(snapshot.creators) ||
+    !Array.isArray(snapshot.lessons)
+  ) {
     throw new Error('[LearningDashboard] Local practice dashboard snapshot has an invalid shape');
   }
   return snapshot;
@@ -205,14 +226,42 @@ function saveLocalPracticeDashboardSnapshot(snapshot: PracticeDashboardSnapshot)
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }
-  window.localStorage.setItem(dashboardSnapshotStorageKey(snapshot.userId), JSON.stringify(snapshot));
+  const localSnapshot: PracticeDashboardSnapshot = {
+    ...snapshot,
+    creators: snapshot.creators.map((creator) => ({
+      ...creator,
+      avatarType: creator.avatarType === 'image' ? 'initials' : creator.avatarType,
+      avatarImageData: null,
+    })),
+  };
+  window.localStorage.setItem(dashboardSnapshotStorageKey(snapshot.userId), JSON.stringify(localSnapshot));
 }
 
-function formatSnapshotLesson(lesson: any) {
+function formatSnapshotLesson(lesson: any, creators: PracticeDashboardCreator[]) {
   const lastPracticeTimestamp = Number(lesson.lastPracticeTimestamp || lesson.progress?.lastPracticedTimestamp || 0);
   const isUsed = Boolean(lesson.isUsed || Number(lesson.progress?.attempts || 0) > 0);
+  const creator = Number.isInteger(lesson.creatorIndex)
+    ? creators[lesson.creatorIndex]
+    : null;
+  const creatorDisplayName = typeof creator?.displayName === 'string'
+    ? creator.displayName.trim() || null
+    : null;
+  const creatorAvatarIcon = creator?.avatarType === 'icon'
+    ? findProfileAvatarIcon(creator.avatarIconId)
+    : null;
+  const creatorAvatarImageData = creator?.avatarType === 'image' && typeof creator.avatarImageData === 'string'
+    ? creator.avatarImageData
+    : null;
   return {
     ...lesson,
+    creatorDisplayName,
+    creatorAvatarImageData,
+    creatorAvatarIsImage: Boolean(creatorAvatarImageData),
+    creatorAvatarIsIcon: Boolean(creatorAvatarIcon),
+    creatorAvatarIconClass: creatorAvatarIcon?.className || null,
+    creatorAvatarInitials: creatorDisplayName
+      ? getUserInitials({ profile: { displayName: creatorDisplayName } }, '?')
+      : '',
     isUsed,
     hasBeenAttempted: Boolean(lesson.hasBeenAttempted || isUsed),
     totalTrials: lesson.totalTrials ?? lesson.progress?.attempts,
@@ -275,7 +324,7 @@ function applyPracticeDashboardSnapshot(instance: any, snapshot: PracticeDashboa
     }
     Session.set('learnerTdfConfigOverrides', learnerConfigs);
   }
-  const rows = (snapshot.lessons || []).map(formatSnapshotLesson);
+  const rows = (snapshot.lessons || []).map((lesson) => formatSnapshotLesson(lesson, snapshot.creators || []));
   const { used, unused } = splitTdfsByUsage(rows);
   const combinedTdfs = [...used, ...unused];
   Session.set('homeHasPracticeRecords', used.length > 0);
@@ -1082,10 +1131,6 @@ Template.learningDashboard.helpers({
 Template.learningDashboardLessonTable.helpers({
   ...lessonRowHelpers,
 
-  statisticsAvailable() {
-    return Template.instance().data.allowStatistics === true;
-  },
-
   statisticsExpanded() {
     const data = Template.instance().data;
     return data.allowStatistics === true && data.statisticsExpanded === true;
@@ -1098,23 +1143,9 @@ Template.learningDashboardLessonTable.helpers({
       : 'is-statistics-collapsed';
   },
 
-  statisticsToggleLabel() {
-    const data = Template.instance().data;
-    return dashboardText(data.allowStatistics === true && data.statisticsExpanded === true
-      ? 'dashboard.hideStatistics'
-      : 'dashboard.showStatistics');
-  },
-
-  statisticsToggleIconClass() {
-    const data = Template.instance().data;
-    return data.allowStatistics === true && data.statisticsExpanded === true
-      ? 'fa-chevron-left'
-      : 'fa-chevron-right';
-  },
-
   tableColumnCount() {
     const data = Template.instance().data;
-    return data.allowStatistics === true && data.statisticsExpanded === true ? 9 : 3;
+    return data.allowStatistics === true && data.statisticsExpanded === true ? 10 : 4;
   },
 
   configForTableRow() {
@@ -1568,8 +1599,12 @@ Template.learningDashboard.rendered = async function(this: any) {
       if (practiceSnapshot.userId !== studentID) {
         throw new Error('[LearningDashboard] Practice dashboard snapshot was returned for a different user');
       }
-      saveLocalPracticeDashboardSnapshot(practiceSnapshot);
       applyPracticeDashboardSnapshot(instance, practiceSnapshot);
+      try {
+        saveLocalPracticeDashboardSnapshot(practiceSnapshot);
+      } catch (error) {
+        clientConsole(1, '[Dashboard] Local practice snapshot could not be refreshed:', error);
+      }
       const backgroundSyncBytes = JSON.stringify(practiceSnapshot).length;
       (window as any).__mofactsDashboardSyncBytes = backgroundSyncBytes;
       (window as any).__mofactsDashboardSyncLessonCount = practiceSnapshot.lessons.length;

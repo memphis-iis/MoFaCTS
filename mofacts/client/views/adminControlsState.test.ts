@@ -10,7 +10,8 @@ describe('adminControlsState', function() {
     expect(normalizeVerbosityLevel(0)).to.equal('0');
     expect(normalizeVerbosityLevel('1')).to.equal('1');
     expect(normalizeVerbosityLevel(2)).to.equal('2');
-    expect(() => normalizeVerbosityLevel(3)).to.throw('Unsupported verbosity level');
+    expect(() => normalizeVerbosityLevel(3)).to.throw('Unsupported logging verbosity level');
+    expect(() => normalizeVerbosityLevel('1-extra')).to.throw('Unsupported logging verbosity level');
   });
 
   it('normalizes server storage status without inventing display values', function() {
@@ -41,4 +42,5 @@ describe('adminControlsState', function() {
     expect(radioChecked('1', '2')).to.equal('');
     expect(radioChecked(null, '1')).to.equal('');
   });
+
 });

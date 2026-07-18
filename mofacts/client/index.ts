@@ -665,7 +665,7 @@ Meteor.startup(function() {
 });
 
 Template.DefaultLayout.onRendered(function(this: any) {
-  loadClientSettings();
+  this._stopClientSettings = loadClientSettings();
   const instance = this;
   if (!instance._appShellDocumentClickHandler) {
     instance._appShellDocumentClickHandler = (event: Event) => {
@@ -730,6 +730,7 @@ Template.DefaultLayout.onRendered(function(this: any) {
 });
 
 Template.DefaultLayout.onDestroyed(function(this: any) {
+  this._stopClientSettings?.();
   if (this._appShellDocumentClickHandler) {
     document.removeEventListener('click', this._appShellDocumentClickHandler);
   }

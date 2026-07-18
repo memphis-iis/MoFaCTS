@@ -37,6 +37,7 @@ import {
   type AiImageSourceFile,
   type PreparedAiImageAsset,
 } from '../../lib/aiContentImageAssets';
+import { hasPublicCreatorDisplayName } from '../../lib/contentCreatorIdentity';
 
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
 const FlowRouter = (globalThis as any).FlowRouter;
@@ -817,6 +818,10 @@ Template.aiContentCreator.events({
   },
   'click #ai-create-submit'(event: Event, instance: AiCreatorInstance) {
     event.preventDefault();
+    if (!hasPublicCreatorDisplayName(Meteor.user())) {
+      FlowRouter.go('/profile?contentCreator=required');
+      return;
+    }
     void runCreation(instance);
   },
   'click #ai-open-manual-creator'(event: Event) {

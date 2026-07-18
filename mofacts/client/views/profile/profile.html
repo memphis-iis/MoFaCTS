@@ -57,6 +57,9 @@
               <label for="profileDisplayName">{{t 'profile.displayName'}}</label>
               <input id="profileDisplayName" type="text" maxlength="60" value="{{displayName}}">
               <p>{{t 'profile.displayNameHelp'}}</p>
+              {{#if contentCreatorDisplayNameRequired}}
+                {{> adminStatus variant="warning" text=(t 'profile.displayNameRequiredForContent') urgent=true}}
+              {{/if}}
             </div>
 
             <div class="profile-segmented-control" role="group" aria-label="{{t 'profile.avatarType'}}">
@@ -153,7 +156,6 @@
             </button>
           {{/if}}
         </div>
-        {{> adminInlineConfirmation confirmation=profileConfirmationView}}
       </section>
 
       <div class="profile-actions">
@@ -165,6 +167,7 @@
           <div class="admin-inline-feedback">{{> adminStatus variant=profileSaveStatusVariant text=profileSaveStatusMessage urgent=(equals profileSaveStatusVariant "error")}}</div>
         {{/if}}
       </div>
+      {{> adminInlineConfirmation confirmation=profileConfirmationView}}
     </div>
   </div>
 </template>

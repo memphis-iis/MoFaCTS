@@ -23,6 +23,9 @@ function createDeps(
         return 1;
       },
     },
+    Tdfs: {
+      findOneAsync: async (): Promise<any> => null,
+    },
     encryptData: (value: string) => `encrypted:${value}`,
     decryptData: (value: string) => value.replace(/^encrypted:/, ''),
     openRouterModelCatalogService: {
@@ -45,6 +48,27 @@ describe('profile methods', function() {
     expect(updateCalls).to.have.length(1);
     expect(updateCalls[0]?.selector).to.deep.equal({ _id: 'user-1' });
     expect(updateCalls[0]?.modifier.$set['profile.uiLocale']).to.equal('es');
+  });
+
+  it('requires content owners to keep a public display name', async function() {
+    const updateCalls: UpdateCall[] = [];
+    const deps = createDeps(updateCalls);
+    deps.Tdfs.findOneAsync = async () => ({ _id: 'tdf-1' });
+    const methods = createProfileMethods(deps);
+
+    let thrown: any;
+    try {
+      await methods.updateOwnProfile.call({ userId: 'user-1' }, {
+        name: 'Ada',
+        displayName: '',
+        uiLocale: 'en',
+      });
+    } catch (error: unknown) {
+      thrown = error;
+    }
+
+    expect(thrown?.error).to.equal('content-creator-display-name-required');
+    expect(updateCalls).to.have.length(0);
   });
 
   it('rejects unsupported UI locale preferences without substituting another locale', async function() {

@@ -16,6 +16,7 @@ import { getUploadIntegrity } from '../../lib/uploadIntegrity';
 import { ensureSqlJs } from '../../lib/sqlJsLoader';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
+import { hasPublicCreatorDisplayName } from '../../lib/contentCreatorIdentity';
 import {
   rejectLoad,
   resolveLoad,
@@ -270,6 +271,11 @@ function resetPackageFileInput() {
 }
 
 function queuePackageUploads(fileList: any, template: any) {
+  if (!hasPublicCreatorDisplayName(Meteor.user())) {
+    resetPackageFileInput();
+    FlowRouter.go('/profile?contentCreator=required');
+    return;
+  }
   const files = getPackageUploadFiles(fileList);
   if (files.length === 0) {
     setUploadMessage(template, contentText('content.noFilesSelected'), 'warning');
@@ -1384,6 +1390,10 @@ Template.contentUpload.events({
   // Copy TDF to create a private copy
   'click #copy-tdf-btn': async function(event: any, template: any) {
     event.preventDefault();
+    if (!hasPublicCreatorDisplayName(Meteor.user())) {
+      FlowRouter.go('/profile?contentCreator=required');
+      return;
+    }
     const tdfId = event.currentTarget.value;
 
     const confirmed = await requestContentConfirmation(template, {

@@ -29,6 +29,7 @@ import { managementRoutePresentation } from './adminUi/routePresentationState';
 import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionConfig';
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
+import { hasPublicCreatorDisplayName } from './contentCreatorIdentity';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const Tdfs: any = (globalThis as any).Tdfs;
 const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
@@ -992,7 +993,11 @@ FlowRouter.route('/contentUpload', {
 FlowRouter.route('/contentCreate', {
   name: 'client.manualContentCreator',
   action: async function(this: any) {
-    waitForAuthenticatedRoute(this, 'client.manualContentCreator', async () => {
+    waitForAuthenticatedRoute(this, 'client.manualContentCreator', async (readyUser) => {
+      if (!hasPublicCreatorDisplayName(readyUser)) {
+        FlowRouter.go('/profile?contentCreator=required');
+        return;
+      }
       await renderRouteTemplate(this, 'manualContentCreator');
     }, getRouteAccessPolicy('client.manualContentCreator'));
   }
@@ -1001,7 +1006,11 @@ FlowRouter.route('/contentCreate', {
 FlowRouter.route('/aiContentCreate', {
   name: 'client.aiContentCreator',
   action: async function(this: any) {
-    waitForAuthenticatedRoute(this, 'client.aiContentCreator', async () => {
+    waitForAuthenticatedRoute(this, 'client.aiContentCreator', async (readyUser) => {
+      if (!hasPublicCreatorDisplayName(readyUser)) {
+        FlowRouter.go('/profile?contentCreator=required');
+        return;
+      }
       await renderRouteTemplate(this, 'aiContentCreator');
     }, getRouteAccessPolicy('client.aiContentCreator'));
   }

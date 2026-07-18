@@ -35,10 +35,16 @@ import {
 import '../shared/adminUi/adminUi';
 
 const MeteorAny = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
+const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
+
+type ProfileConfirmationContext =
+  | Readonly<{ kind: 'delete-openrouter-key' }>
+  | Readonly<{ kind: 'leave-profile'; destination: string }>;
 
 type ProfileTemplateInstance = Blaze.TemplateInstance & {
   saving: ReactiveVar<boolean>;
   testing: ReactiveVar<boolean>;
+  dirty: ReactiveVar<boolean>;
   statuses: ReactiveVar<Partial<Record<ProfileStatusScope, ProfileStatus>>>;
   avatarType: ReactiveVar<ProfileAvatarType>;
   avatarIconId: ReactiveVar<string>;
@@ -51,7 +57,10 @@ type ProfileTemplateInstance = Blaze.TemplateInstance & {
   openRouterSelectedReasoningLevel: ReactiveVar<OpenRouterReasoningLevel>;
   lastSyncedOpenRouterSettings: string;
   confirmationState: ReactiveVar<InlineConfirmationView>;
-  confirmationController: InlineConfirmationController<'delete-openrouter-key'>;
+  confirmationController: InlineConfirmationController<ProfileConfirmationContext>;
+  profileRoutePath: string;
+  savedUiLocale: string;
+  beforeUnloadHandler: (event: BeforeUnloadEvent) => void;
 };
 
 type ProfileStatusScope = 'save' | 'avatar' | 'locale' | 'openrouter';
@@ -59,6 +68,63 @@ type ProfileStatus = Readonly<{ kind: 'success' | 'error' | 'info'; message: str
 
 const AVATAR_IMAGE_SIZE = 256;
 const AVATAR_IMAGE_QUALITY = 0.86;
+let activeProfileTemplate: ProfileTemplateInstance | null = null;
+let profileNavigationBypass = false;
+let profileNavigationGuardRegistered = false;
+
+function markProfileDirty(template: ProfileTemplateInstance): void {
+  template.dirty.set(true);
+  clearStatus(template, 'save');
+}
+
+function navigateFromProfile(destination: string): void {
+  profileNavigationBypass = true;
+  FlowRouter.go(destination);
+}
+
+function requestUnsavedChangesDecision(
+  template: ProfileTemplateInstance,
+  destination: string,
+): void {
+  const trigger = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : document.getElementById('profileSave');
+  if (!trigger) {
+    throw new Error('Profile navigation confirmation requires an available focus target');
+  }
+  template.confirmationController.open({
+    confirmationId: 'profile-unsaved-changes',
+    title: profileText('profile.unsavedChangesTitle'),
+    message: profileText('profile.unsavedChangesMessage'),
+    confirmLabel: profileText('profile.discardChanges'),
+    cancelLabel: profileText('profile.saveChanges'),
+    severity: 'warning',
+    context: { kind: 'leave-profile', destination },
+  }, trigger);
+  Tracker.afterFlush(() => template.confirmationController.focusInitial());
+}
+
+function registerProfileNavigationGuard(): void {
+  if (profileNavigationGuardRegistered) return;
+  profileNavigationGuardRegistered = true;
+  FlowRouter.triggers.enter([function(context: any, redirect: (path: string) => void) {
+    const template = activeProfileTemplate;
+    if (!template || context?.route?.name === 'client.profile') return;
+    if (profileNavigationBypass) {
+      profileNavigationBypass = false;
+      return;
+    }
+    if (!template.dirty.get()) return;
+
+    const destination = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    redirect(template.profileRoutePath);
+    Tracker.afterFlush(() => {
+      if (activeProfileTemplate === template) {
+        requestUnsavedChangesDecision(template, destination);
+      }
+    });
+  }]);
+}
 
 function currentUser(): any {
   return Meteor.user() || {};
@@ -249,7 +315,7 @@ function syncAvatarFromCurrentUser(template: ProfileTemplateInstance): void {
   template.avatarImageData.set(typeof profile.avatarImageData === 'string' ? profile.avatarImageData : '');
 }
 
-async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
+async function saveProfile(template: ProfileTemplateInstance): Promise<boolean> {
   template.saving.set(true);
   clearStatus(template, 'save');
   try {
@@ -279,9 +345,13 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
         apiKeyInput.value = '';
       }
     }
+    template.savedUiLocale = getActiveUiLocale();
+    template.dirty.set(false);
     setStatus(template, 'success', profileText('profile.profileSaved'));
+    return true;
   } catch (error: unknown) {
     setStatus(template, 'error', getErrorMessage(error));
+    return false;
   } finally {
     template.saving.set(false);
   }
@@ -290,6 +360,7 @@ async function saveProfile(template: ProfileTemplateInstance): Promise<void> {
 Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.saving = new ReactiveVar(false);
   this.testing = new ReactiveVar(false);
+  this.dirty = new ReactiveVar(false);
   this.statuses = new ReactiveVar({});
   this.avatarType = new ReactiveVar('initials');
   this.avatarIconId = new ReactiveVar(PROFILE_AVATAR_DEFAULT_ICON_ID);
@@ -301,11 +372,21 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
   this.openRouterSelectedModel = new ReactiveVar('');
   this.openRouterSelectedReasoningLevel = new ReactiveVar('none');
   this.lastSyncedOpenRouterSettings = '';
-  this.confirmationController = createInlineConfirmationController<'delete-openrouter-key'>(
+  this.confirmationController = createInlineConfirmationController<ProfileConfirmationContext>(
     (view) => this.confirmationState.set(view),
     () => document.getElementById('profileSave'),
   );
   this.confirmationState = new ReactiveVar(this.confirmationController.getView());
+  this.profileRoutePath = FlowRouter.current()?.path || '/profile';
+  this.savedUiLocale = getActiveUiLocale();
+  this.beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+    if (!this.dirty.get()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  };
+  activeProfileTemplate = this;
+  registerProfileNavigationGuard();
+  window.addEventListener('beforeunload', this.beforeUnloadHandler);
   this.autorun(() => {
     if (Meteor.user()) {
       syncAvatarFromCurrentUser(this);
@@ -317,10 +398,19 @@ Template.profile.onCreated(function(this: ProfileTemplateInstance) {
 });
 
 Template.profile.onDestroyed(function(this: ProfileTemplateInstance) {
+  if (activeProfileTemplate === this) {
+    activeProfileTemplate = null;
+  }
+  window.removeEventListener('beforeunload', this.beforeUnloadHandler);
   this.confirmationController.destroy();
 });
 
 Template.profile.helpers({
+  contentCreatorDisplayNameRequired(): boolean {
+    return (globalThis as any).FlowRouter?.getQueryParam?.('contentCreator') === 'required'
+      && !String(currentProfile().displayName || '').trim();
+  },
+
   email(): string {
     return currentEmail();
   },
@@ -550,13 +640,23 @@ Template.profile.helpers({
 
 Template.profile.events({
   'input #profileDisplayName'(_event: Event, template: ProfileTemplateInstance) {
+    markProfileDirty(template);
     template.avatarType.set(template.avatarType.get());
+  },
+
+  'input #profileName'(_event: Event, template: ProfileTemplateInstance) {
+    markProfileDirty(template);
+  },
+
+  'input #openRouterApiKey'(_event: Event, template: ProfileTemplateInstance) {
+    markProfileDirty(template);
   },
 
   'change #profileUiLocale'(event: Event, template: ProfileTemplateInstance) {
     try {
       const nextLocale = (event.currentTarget as HTMLSelectElement).value;
       setActiveUiLocale(nextLocale);
+      markProfileDirty(template);
       clearStatus(template, 'locale');
     } catch (error: unknown) {
       setStatus(template, 'error', getErrorMessage(error), 'locale');
@@ -566,6 +666,7 @@ Template.profile.events({
   'change #openRouterDefaultModel'(event: Event, template: ProfileTemplateInstance) {
     template.openRouterSelectedModel.set((event.currentTarget as HTMLSelectElement).value);
     syncReasoningSelectionForModel(template);
+    markProfileDirty(template);
   },
 
   'change #openRouterReasoningLevel'(event: Event, template: ProfileTemplateInstance) {
@@ -573,6 +674,7 @@ Template.profile.events({
       (event.currentTarget as HTMLSelectElement).value,
       'OpenRouter reasoning level',
     ));
+    markProfileDirty(template);
   },
 
   'click [data-avatar-type]'(event: Event, template: ProfileTemplateInstance) {
@@ -584,6 +686,7 @@ Template.profile.events({
       return;
     }
     template.avatarType.set(nextType);
+    markProfileDirty(template);
   },
 
   'click [data-avatar-icon]'(event: Event, template: ProfileTemplateInstance) {
@@ -596,6 +699,7 @@ Template.profile.events({
     }
     template.avatarIconId.set(icon.id);
     template.avatarType.set('icon');
+    markProfileDirty(template);
   },
 
   'click #profileAvatarUploadButton'(event: Event) {
@@ -613,6 +717,7 @@ Template.profile.events({
       const resizedImage = await resizeAvatarImage(file);
       template.avatarImageData.set(resizedImage);
       template.avatarType.set('image');
+      markProfileDirty(template);
       setStatus(template, 'info', profileText('profile.avatarPictureReady'), 'avatar');
     } catch (error: unknown) {
       setStatus(template, 'error', getErrorMessage(error), 'avatar');
@@ -625,6 +730,7 @@ Template.profile.events({
     event.preventDefault();
     template.avatarImageData.set('');
     template.avatarType.set('initials');
+    markProfileDirty(template);
     setStatus(template, 'info', profileText('profile.avatarPictureRemoved'), 'avatar');
   },
 
@@ -665,12 +771,24 @@ Template.profile.events({
       confirmLabel: profileText('profile.deleteKey'),
       cancelLabel: profileText('content.cancel'),
       severity: 'danger',
-      context: 'delete-openrouter-key',
+      context: { kind: 'delete-openrouter-key' },
     }, event.currentTarget as HTMLElement);
     Tracker.afterFlush(() => template.confirmationController.focusInitial());
   },
 
-  'click .admin-confirmation-cancel'(_event: Event, template: ProfileTemplateInstance) {
+  'click .admin-confirmation-cancel': async function(_event: Event, template: ProfileTemplateInstance) {
+    const context = template.confirmationController.getContext();
+    if (context?.kind === 'leave-profile') {
+      template.confirmationController.setPending(true);
+      const saved = await saveProfile(template);
+      if (!saved) {
+        template.confirmationController.setPending(false);
+        return;
+      }
+      template.confirmationController.complete();
+      navigateFromProfile(context.destination);
+      return;
+    }
     template.confirmationController.cancel();
   },
 
@@ -680,13 +798,18 @@ Template.profile.events({
 
   'click .admin-confirmation-confirm': async function(_event: Event, template: ProfileTemplateInstance) {
     const view = template.confirmationController.getView();
-    if (
-      view.status !== 'open'
-      || view.pending
-      || template.confirmationController.getContext() !== 'delete-openrouter-key'
-    ) {
+    const context = template.confirmationController.getContext();
+    if (view.status !== 'open' || view.pending || !context) {
       return;
     }
+    if (context.kind === 'leave-profile') {
+      setActiveUiLocale(template.savedUiLocale);
+      template.dirty.set(false);
+      template.confirmationController.complete();
+      navigateFromProfile(context.destination);
+      return;
+    }
+    if (context.kind !== 'delete-openrouter-key') return;
     template.confirmationController.setPending(true);
     template.saving.set(true);
     try {

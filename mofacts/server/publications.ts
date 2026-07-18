@@ -12,6 +12,7 @@ import {
 } from './lib/tdfPublicationAccess';
 import { createLessonFamilyResolver } from './lib/tdfLessonFamilyResolver';
 import { DynamicSettings } from '../common/Collections';
+import { CLIENT_VERBOSITY_SETTING } from '../common/loggingSettings';
 import { themeRegistry } from './lib/themeRegistry';
 
 // Use Meteor.roleAssignment — set unconditionally by alanning:roles v4 at
@@ -806,7 +807,7 @@ Meteor.publish('clientRuntimeSettings', function() {
     }
 
     return DynamicSettings.find(
-        { key: 'clientVerbosityLevel' },
+        { _id: CLIENT_VERBOSITY_SETTING.id },
         { fields: { key: 1, value: 1 } }
     );
 });

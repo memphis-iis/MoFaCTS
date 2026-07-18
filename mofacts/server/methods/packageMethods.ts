@@ -9,6 +9,7 @@ import { mergeEditorContentPreservingSourceShape } from '../../common/lib/editor
 import { createPackageGeneratedContentMethods } from './packageGeneratedContentMethods';
 import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { validateAndEncryptUploadedApiKey } from '../lib/uploadedApiKeyValidation';
+import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -89,6 +90,9 @@ type UpsertResult = {
 
 type PackageMethodsDeps = {
   Tdfs: any;
+  usersCollection: {
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
+  };
   DynamicAssets: any;
   H5PContents?: any;
   storageBoundary: ReturnType<typeof createStorageBoundary>;
@@ -224,6 +228,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
   }
 
   async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
+    const actingUserId = deps.normalizeCanonicalId(this.userId);
+    if (!actingUserId) {
+      throw new Meteor.Error(401, 'Must be logged in');
+    }
+    const ownerId = deps.normalizeCanonicalId(owner) || actingUserId;
+    await requireContentCreatorDisplayName(deps.usersCollection, ownerId);
     return processPackageUploadWorkflow(this, fileObjOrId, owner, emailToggle, {
       DynamicAssets: deps.DynamicAssets,
       storageBoundary: deps.storageBoundary,
@@ -458,6 +468,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!filecontents) throw new Error('File Contents required for File Save');
     const { ownerId } = await requireContentUploadActor(this, owner);
     if (type != 'tdf' && type != 'stim') throw new Error('Unknown file type not allowed: ' + type);
+
+    if (type === 'tdf') {
+      await requireContentCreatorDisplayName(deps.usersCollection, ownerId);
+    }
 
     try {
       if (type == 'tdf') {
@@ -857,6 +871,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       if (requestedOwnerId && requestedOwnerId !== actingUserId && !isAdmin) {
         throw new Meteor.Error(403, 'Can only confirm your own TDF updates unless admin');
       }
+      await requireContentCreatorDisplayName(
+        deps.usersCollection,
+        requestedOwnerId || actingUserId,
+      );
       if (!requestedOwnerId) {
         updateObj.ownerId = actingUserId;
       }
@@ -1045,6 +1063,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
 
     const userId = this.userId;
     if (!userId) throw new Meteor.Error('not-authorized', 'Must be logged in to copy TDF');
+    await requireContentCreatorDisplayName(deps.usersCollection, userId);
 
     const sourceTdf = await deps.Tdfs.findOneAsync({_id: sourceTdfId});
     if (!sourceTdf) throw new Meteor.Error('not-found', 'TDF not found');
@@ -1098,7 +1117,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return { newTdfId: newId, newName };
   }
 
-  const generatedContentMethods = createPackageGeneratedContentMethods(deps, { upsertPackage });
+  const generatedContentMethods = createPackageGeneratedContentMethods(deps, {
+    upsertPackage,
+    requireCreatorDisplayName: (userId) => requireContentCreatorDisplayName(deps.usersCollection, userId),
+  });
 
   return {
     getResponseKCMapForTdf,

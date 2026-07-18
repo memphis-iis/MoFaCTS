@@ -1848,10 +1848,10 @@ describe('system method authorization', function() {
     }
   });
 
-  it('requires admin access to initialize client verbosity settings', async function() {
+  it('requires admin access to change client verbosity settings', async function() {
     try {
-      await methods.ensureClientVerbositySetting.call({ userId: 'student-user' });
-      expect.fail('Expected client verbosity initialization to require admin access');
+      await methods.setClientVerbosity.call({ userId: 'student-user' }, 1);
+      expect.fail('Expected client verbosity changes to require admin access');
     } catch (error: any) {
       expect(error.error).to.equal('not-authorized');
     }

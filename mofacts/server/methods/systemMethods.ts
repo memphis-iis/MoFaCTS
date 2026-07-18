@@ -1,6 +1,11 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
 import {
+  CLIENT_VERBOSITY_SETTING,
+  SERVER_VERBOSITY_SETTING,
+  parseLoggingVerbosityLevel,
+} from '../../common/loggingSettings';
+import {
   requireAuthenticatedUser,
   requireUserMatchesOrHasRole,
   requireUserWithRoles,
@@ -27,9 +32,7 @@ type SystemMethodsDeps = {
     insertAsync: (document: UnknownRecord) => Promise<unknown>;
   };
   DynamicSettings: {
-    findOneAsync: (selector: UnknownRecord) => Promise<any>;
-    insertAsync: (document: UnknownRecord) => Promise<unknown>;
-    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
+    upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   requireAdminUser: (
@@ -41,7 +44,6 @@ type SystemMethodsDeps = {
   sendErrorReportSummaries: () => Promise<unknown>;
   sendEmail: (to: string, from: string, subject: string, text: string) => void;
   getCurrentUser: () => Promise<any>;
-  getVerbosityLevel: () => number;
   setVerbosityLevel: (level: number) => void;
 };
 
@@ -271,40 +273,34 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
 
     setVerbosity: async function(this: MethodContext, level: number | string) {
       await deps.requireAdminUser(this.userId, 'Only admins can change server verbosity level', 'not-authorized');
-      const parsedLevel = parseInt(String(level), 10);
-      deps.setVerbosityLevel(parsedLevel);
-      deps.serverConsole('Verbose logging set to ' + deps.getVerbosityLevel());
-    },
-
-    getVerbosity: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Only admins can read server verbosity level', 'not-authorized');
-      return deps.getVerbosityLevel();
-    },
-
-    ensureClientVerbositySetting: async function(this: MethodContext) {
-      await deps.requireAdminUser(this.userId, 'Only admins can initialize client verbosity level', 'not-authorized');
-      const existing = await deps.DynamicSettings.findOneAsync({ key: 'clientVerbosityLevel' });
-      if (!existing) {
-        await deps.DynamicSettings.insertAsync({
-          key: 'clientVerbosityLevel',
-          value: 0,
-        });
-        deps.serverConsole('Initialized clientVerbosityLevel setting to 0');
+      let parsedLevel;
+      try {
+        parsedLevel = parseLoggingVerbosityLevel(level);
+      } catch {
+        throw new Meteor.Error('invalid-value', 'Server verbosity level must be 0, 1, or 2');
       }
-      return existing ? existing.value : 0;
+      await deps.DynamicSettings.upsertAsync(
+        { _id: SERVER_VERBOSITY_SETTING.id },
+        { $set: { key: SERVER_VERBOSITY_SETTING.key, value: parsedLevel } },
+      );
+      deps.setVerbosityLevel(parsedLevel);
+      deps.serverConsole('Server verbosity level changed to ' + parsedLevel + ' by ' + this.userId);
+      return parsedLevel;
     },
 
     setClientVerbosity: async function(this: MethodContext, level: number | string) {
       await deps.requireAdminUser(this.userId, 'Only admins can change client verbosity level', 'not-authorized');
 
-      const parsedLevel = parseInt(String(level), 10);
-      if (parsedLevel < 0 || parsedLevel > 2) {
+      let parsedLevel;
+      try {
+        parsedLevel = parseLoggingVerbosityLevel(level);
+      } catch {
         throw new Meteor.Error('invalid-value', 'Verbosity level must be 0, 1, or 2');
       }
 
-      await deps.DynamicSettings.updateAsync(
-        { key: 'clientVerbosityLevel' },
-        { $set: { value: parsedLevel } }
+      await deps.DynamicSettings.upsertAsync(
+        { _id: CLIENT_VERBOSITY_SETTING.id },
+        { $set: { key: CLIENT_VERBOSITY_SETTING.key, value: parsedLevel } }
       );
 
       deps.serverConsole(`Client verbosity level changed to ${parsedLevel} by ${this.userId}`);

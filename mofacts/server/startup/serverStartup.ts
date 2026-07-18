@@ -16,6 +16,7 @@ import {
 import { createPerformanceIndexes } from '../migrations/add_performance_indexes';
 import { backfillPackageAssetIds } from '../migrations/backfill_package_asset_ids';
 import { cleanExperimentStateDupesAndAddUniqueIndex } from '../migrations/clean_experiment_state_dupes';
+import { migrateLoggingSettings } from '../migrations/migrate_logging_settings';
 import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migrations';
 import { migrateSparcHistoryPageIdentity } from '../migrations/migrate_sparc_history_page_identity';
 import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_authored_page_identity';
@@ -29,8 +30,8 @@ type Logger = (...args: unknown[]) => void;
 type RunServerStartupDeps = {
   serverConsole: Logger;
   DynamicSettings: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord) => Promise<any>;
-    insertAsync: (document: UnknownRecord) => Promise<unknown>;
     removeAsync: (selector: UnknownRecord) => Promise<number>;
     upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
@@ -107,6 +108,7 @@ type RunServerStartupDeps = {
   isArgon2Enabled: () => boolean;
   getPasswordHashRuntimeInfo: () => unknown;
   setRuntimeCounters: (values: { nextStimuliSetId: number; nextEventId: number }) => void;
+  setServerVerbosityLevel: (level: 0 | 1 | 2) => void;
 };
 
 const WebAppAny = WebApp as unknown as {
@@ -342,10 +344,12 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     nextStimuliSetId: highestStimuliSetDoc?.stimuliSetId ? parseInt(String(highestStimuliSetDoc.stimuliSetId), 10) + 1 : 1,
   });
 
-  const existingClientVerbosity = await deps.DynamicSettings.findOneAsync({ key: 'clientVerbosityLevel' });
-  if (!existingClientVerbosity) {
-    await deps.DynamicSettings.insertAsync({ key: 'clientVerbosityLevel', value: 0 });
-    deps.serverConsole('Initialized clientVerbosityLevel to default: 0');
+  const loggingSettings = await migrateLoggingSettings(deps.DynamicSettings);
+  deps.setServerVerbosityLevel(loggingSettings.serverVerbosityLevel);
+  if (loggingSettings.removedDuplicateDocuments > 0) {
+    deps.serverConsole(
+      `Consolidated ${loggingSettings.removedDuplicateDocuments} duplicate logging setting document(s)`,
+    );
   }
   const removedTestLoginSettings = await deps.DynamicSettings.removeAsync({ key: 'testLoginsEnabled' });
   if (removedTestLoginSettings > 0) {

@@ -133,17 +133,19 @@ describe('management interface baseline', function() {
       path.join(appRoot, 'client', 'views', 'shared', 'adminUi', 'adminUi.css'),
       'utf8',
     );
-    const inlineFeedback = sourceBlock(sharedStyles, '.admin-inline-feedback {', '}');
-    const inlineConfirmation = sourceBlock(sharedStyles, '.admin-inline-confirmation {', '}');
+    const inlineSizing = sourceBlock(sharedStyles, '.admin-command-region,', '}');
+    const inlineWrapping = sourceBlock(sharedStyles, '.admin-inline-feedback,', '}');
     const tableFeedback = sourceBlock(sharedStyles, '.admin-table-feedback {', '}');
 
     expect(sharedMarkup).to.include('{{statusIdAttrs}}');
     expect(sharedMarkup).to.include('{{statusClassName}}');
     expect(sharedMarkup).to.include('aria-atomic="true"');
-    expect(inlineFeedback).to.include('max-inline-size: 100%');
-    expect(inlineFeedback).not.to.include('25rem');
-    expect(inlineConfirmation).to.include('max-inline-size: 100%');
-    expect(inlineConfirmation).not.to.include('25rem');
+    expect(inlineSizing).to.include('.admin-inline-feedback');
+    expect(inlineSizing).to.include('.admin-inline-confirmation');
+    expect(inlineSizing).to.include('max-inline-size: 100%');
+    expect(inlineSizing).not.to.include('25rem');
+    expect(inlineWrapping).to.include('.admin-inline-confirmation');
+    expect(inlineWrapping).not.to.include('25rem');
     expect(tableFeedback).to.include('max-inline-size: min(100%, 25rem)');
     expect(tableFeedback).to.include('overflow-wrap: anywhere');
   });

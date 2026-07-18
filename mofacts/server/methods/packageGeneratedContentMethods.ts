@@ -66,6 +66,7 @@ type PackageGeneratedContentDeps = {
 
 type PackageGeneratedContentCallbacks = {
   upsertPackage: (packageJSON: PackagePayload, ownerId: string) => Promise<UpsertResult>;
+  requireCreatorDisplayName: (userId: string) => Promise<string>;
 };
 
 function requireRecord(value: unknown, fieldName: string): UnknownRecord {
@@ -135,6 +136,7 @@ export function createPackageGeneratedContentMethods(
       if (!actingUserId) {
         throw new Meteor.Error(401, 'Must be logged in to save generated content');
       }
+      await callbacks.requireCreatorDisplayName(actingUserId);
 
       const packageAssetId = deps.normalizeCanonicalId(payload.packageAssetId);
       if (!packageAssetId) {
