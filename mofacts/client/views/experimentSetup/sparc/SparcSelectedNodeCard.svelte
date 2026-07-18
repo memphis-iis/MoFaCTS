@@ -80,16 +80,24 @@
       class="admin-inline-confirmation admin-form-row"
       role="group"
       aria-labelledby={`${deleteConfirmationId}-title`}
-      aria-describedby={`${deleteConfirmationId}-message`}
-      on:keydown={handleDeleteConfirmationKeydown}>
+      aria-describedby={`${deleteConfirmationId}-message`}>
       <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
       <div>
         <div id={`${deleteConfirmationId}-title`} class="admin-inline-confirmation-title">{deleteConfirmation.title}</div>
         <div id={`${deleteConfirmationId}-message`} class="admin-inline-confirmation-message">{deleteConfirmation.message}</div>
       </div>
       <div class="admin-inline-confirmation-actions">
-        <button bind:this={cancelDeleteButton} type="button" class="btn btn-sm btn-outline-secondary" on:click={cancelDelete}>{sparcText('apkg.cancel')}</button>
-        <button type="button" class="btn btn-sm btn-danger" on:click={confirmDelete}>
+        <button
+          bind:this={cancelDeleteButton}
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          on:click={cancelDelete}
+          on:keydown={handleDeleteConfirmationKeydown}>{sparcText('apkg.cancel')}</button>
+        <button
+          type="button"
+          class="btn btn-sm btn-danger"
+          on:click={confirmDelete}
+          on:keydown={handleDeleteConfirmationKeydown}>
           <i class="fa fa-trash" aria-hidden="true"></i> {sparcText('admin.delete')}
         </button>
       </div>
