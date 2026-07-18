@@ -1,7 +1,8 @@
 import type { ManualCreatorState } from './manualDraftBuilder';
 import type { PromptAttribution } from './normalizedImportTypes';
+import type { AiCreationModuleId, AiMediaSlot } from '../../common/aiContentDrafts';
 
-export type CreationModuleId = 'learningSession' | 'assessmentSession' | 'autoTutor';
+export type CreationModuleId = AiCreationModuleId;
 
 export type CreatedOutput = {
   moduleId: CreationModuleId;
@@ -17,7 +18,17 @@ export type CreatedOutput = {
 };
 
 export type AiItem = {
-  prompt?: { text?: string; imgSrc?: string; audioSrc?: string; videoSrc?: string; attribution?: PromptAttribution };
+  id?: string;
+  prompt?: {
+    text?: string;
+    imgSrc?: string;
+    audioSrc?: string;
+    videoSrc?: string;
+    attribution?: PromptAttribution;
+    mediaQuery?: string;
+    mediaConstraints?: string[];
+    mediaSlot?: AiMediaSlot;
+  };
   response?: { correctResponse?: string; incorrectResponses?: string[] };
   sourceType?: 'freeResponse' | 'choice';
 };

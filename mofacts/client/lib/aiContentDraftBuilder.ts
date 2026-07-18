@@ -88,7 +88,7 @@ function attachUploadedImages(
   const referencedNames = new Set(
     output.items
       .map((item) => String(item.prompt?.imgSrc || '').trim())
-      .filter((source) => source && !/^https?:\/\//i.test(source))
+      .filter((source) => source && !/^https?:\/\//i.test(source) && !/^\/dynamic-assets\//i.test(source))
   );
   for (const name of referencedNames) {
     if (!assetsByName.has(name)) {

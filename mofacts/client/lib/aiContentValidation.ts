@@ -16,7 +16,7 @@ const TOP_BAR_MODES = new Set<ManualCreatorState['topBarMode']>(['time-score', '
 
 function hasPrompt(item: AiItem): boolean {
   const prompt = item.prompt || {};
-  return ['text', 'imgSrc', 'audioSrc', 'videoSrc'].some((field) => typeof (prompt as any)[field] === 'string' && (prompt as any)[field].trim());
+  return ['text', 'imgSrc', 'audioSrc', 'videoSrc', 'mediaQuery'].some((field) => typeof (prompt as any)[field] === 'string' && (prompt as any)[field].trim());
 }
 
 function normalizeComparable(value: unknown): string {
@@ -103,7 +103,8 @@ export function validateAiOutput(value: unknown) {
       typedItem.prompt?.text ||
       typedItem.prompt?.imgSrc ||
       typedItem.prompt?.audioSrc ||
-      typedItem.prompt?.videoSrc
+      typedItem.prompt?.videoSrc ||
+      typedItem.prompt?.mediaQuery
     );
     const answerKey = normalizeComparable(correctResponse);
     if (!hasPrompt(typedItem)) {

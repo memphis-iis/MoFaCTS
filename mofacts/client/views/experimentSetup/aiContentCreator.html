@@ -25,6 +25,7 @@
       </div>
       {{/if}}
 
+      {{#unless showReview}}
       <div class="ai-input-wrap">
         <label for="ai-source-text" class="ai-source-label">{{aiText 'aiCreator.sourceAriaLabel'}}</label>
         <textarea id="ai-source-text" class="ai-source-box" placeholder="{{aiText 'aiCreator.sourcePlaceholder'}}">{{sourceText}}</textarea>
@@ -107,6 +108,82 @@
           {{/if}}
         </button>
       </footer>
+      {{/unless}}
+
+      {{#if showReview}}
+      <section class="ai-review" aria-labelledby="ai-review-heading">
+        <div class="ai-review-heading">
+          <div>
+            <h3 id="ai-review-heading">Review draft</h3>
+            <p>Check each prompt and response. Blank required images must be supplied before saving.</p>
+          </div>
+          <span class="ai-review-count">{{reviewItemCount}} items</span>
+        </div>
+        {{#if draftWarnings.length}}
+        <div class="alert alert-warning ai-create-status" role="status">
+          {{#each draftWarnings}}<div>{{this}}</div>{{/each}}
+        </div>
+        {{/if}}
+        <div class="ai-review-list" role="list">
+          {{#each reviewItems}}
+          <article class="ai-review-item" role="listitem" data-item-id="{{id}}">
+            <div class="ai-review-item-number">{{number}}</div>
+            <div class="ai-review-stimulus">
+              <label class="ai-review-role" for="ai-prompt-{{id}}">Prompt</label>
+              {{#if imageRequired}}
+                {{#if imagePreview}}
+                <img class="ai-review-image" src="{{imagePreview}}" alt="Prompt image for {{responseText}}">
+                {{else}}
+                <div class="ai-review-missing-image" role="status">
+                  <i class="fa fa-picture-o" aria-hidden="true"></i>
+                  <strong>Image needed</strong>
+                  <span>{{imageFailure}}</span>
+                </div>
+                {{/if}}
+                <label class="btn btn-outline-primary btn-sm ai-review-upload-label" for="ai-review-image-{{id}}">
+                  {{#if imagePreview}}Replace image{{else}}Upload image{{/if}}
+                </label>
+                <input class="ai-review-image-input" id="ai-review-image-{{id}}" data-item-id="{{id}}" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif">
+              {{/if}}
+              <textarea id="ai-prompt-{{id}}" class="form-control ai-review-prompt" data-item-id="{{id}}" rows="2" placeholder="Optional prompt text">{{promptText}}</textarea>
+            </div>
+            <div class="ai-review-stimulus">
+              <label class="ai-review-role" for="ai-response-{{id}}">Response</label>
+              <input id="ai-response-{{id}}" class="form-control ai-review-response" data-item-id="{{id}}" type="text" value="{{responseText}}">
+              {{#if alternativeResponses.length}}
+              <div class="ai-review-alternatives">
+                {{#each alternativeResponses}}
+                <input class="form-control ai-review-alternative" data-item-id="{{../id}}" data-alternative-index="{{@index}}" type="text" value="{{this}}" aria-label="Alternative response {{@index}} for item {{../number}}">
+                {{/each}}
+              </div>
+              {{/if}}
+            </div>
+            <button type="button" class="btn btn-outline-danger btn-sm ai-review-remove" data-item-id="{{id}}" aria-label="Remove item {{number}}">
+              <i class="fa fa-trash" aria-hidden="true"></i>
+            </button>
+          </article>
+          {{/each}}
+        </div>
+        <footer class="ai-review-footer">
+          {{#if discardArmed}}
+          <div class="ai-review-discard-confirm" role="alert">
+            <span>Discard this draft and its uploaded replacement images?</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="ai-cancel-discard">Keep draft</button>
+            <button type="button" class="btn btn-danger btn-sm" id="ai-confirm-discard">Discard draft</button>
+          </div>
+          {{else}}
+          <button type="button" class="btn btn-outline-danger" id="ai-discard-draft">Discard and start over</button>
+          {{/if}}
+          {{#if canRetryDraft}}
+          <button type="button" class="btn btn-outline-primary" id="ai-retry-draft">Retry generation</button>
+          {{/if}}
+          <button type="button" class="btn btn-primary" id="ai-save-reviewed-draft" {{saveDraftAttrs}}>
+            {{#if creating}}<i class="fa fa-refresh fa-spin" aria-hidden="true"></i>{{/if}}
+            Save content
+          </button>
+        </footer>
+      </section>
+      {{/if}}
     </section>
   </div>
 </template>

@@ -10,10 +10,7 @@ import { ReactiveDict } from 'meteor/reactive-dict';
 import { Tracker } from 'meteor/tracker';
 import { Random } from 'meteor/random';
 import { currentUserHasRole } from '../../lib/roleUtils';
-import { buildStimuliFromNormalizedItems, buildTutorFromNormalizedItems, getImportFileNames } from '../../lib/importCompositionBuilder';
-import type { NormalizedImportItem } from '../../lib/normalizedImportTypes';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
-import { ensureSqlJs } from '../../lib/sqlJsLoader';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { hasPublicCreatorDisplayName } from '../../lib/contentCreatorIdentity';
@@ -1483,117 +1480,6 @@ Template.contentUpload.events({
     clearUploadMessage(template);
     queuePackageUploads(event.currentTarget.files, template);
   },
-  // Admin/Teachers - upload and convert .apkg file
-  'change #upload-apkg': async function(event: any) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Capture template instance before async operations
-    const template = (Template.instance() as any);
-
-    
-    $('#apkg-status').show();
-
-    try {
-      // Import JSZip dynamically
-      const JSZip = (await import('jszip')).default;
-
-      // Read .apkg file
-      const arrayBuffer = await file.arrayBuffer();
-      const zip = await JSZip.loadAsync(arrayBuffer);
-
-      
-
-      // Get SQLite database
-      let sqliteBytes;
-      const c21 = zip.file('collection.anki21');
-      const c2 = zip.file('collection.anki2');
-
-      if (c21) {
-        sqliteBytes = await c21.async('uint8array');
-      } else if (c2) {
-        sqliteBytes = await c2.async('uint8array');
-      } else {
-        throw new Error('No collection database found in .apkg file');
-      }
-
-      // Load media index
-      let mediaIndex = {};
-      const mediaJson = zip.file('media');
-      if (mediaJson) {
-        const txt = await mediaJson.async('string');
-        mediaIndex = JSON.parse(txt || '{}');
-      }
-
-      
-
-      const SQL = await ensureSqlJs();
-      const db = new SQL.Database(new Uint8Array(sqliteBytes));
-
-      // Extract data (using simplified version of our converter)
-      const result = await convertApkgData(db, mediaIndex, zip);
-
-      
-
-      // Build TDF and stims
-      const deckName = result.deckName || 'Imported_Deck';
-      const normalizedItems: NormalizedImportItem[] = result.cards.map((card: any) => ({
-        prompt: {
-          ...(card.prompt ? { text: card.prompt } : {}),
-          ...(card.hasImage && card.media.length > 0 ? { imgSrc: card.media[0] } : {})
-        },
-        response: {
-          correctResponse: card.answer
-        },
-        sourceType: 'freeResponse' as const
-      }));
-      const stims = buildStimuliFromNormalizedItems(normalizedItems);
-      const tdf = buildTutorFromNormalizedItems(
-        deckName,
-        '<p>This lesson was imported from an Anki deck.</p><p>Study each card and type your answer when prompted.</p>',
-        normalizedItems,
-        {
-          deliverySettings: {
-            displayPerformance: true,
-            displayTimeoutBar: false
-          }
-        }
-      );
-      const { stimFileName, tdfFileName } = getImportFileNames(deckName);
-
-      // Create ZIP file
-      const outputZip = new JSZip();
-      outputZip.file(tdfFileName, JSON.stringify(tdf, null, 2));
-      outputZip.file(stimFileName, JSON.stringify(stims, null, 2));
-
-      // Add media files
-      for (const [numStr, filename] of Object.entries(mediaIndex as Record<string, string>)) {
-        const entry = zip.file(numStr);
-        if (entry) {
-          const data = await entry.async('uint8array');
-          outputZip.file(filename, data);
-        }
-      }
-
-      // Generate ZIP blob
-      const zipBlob = await outputZip.generateAsync({ type: 'blob' });
-      const zipFile = new File([zipBlob], `${deckName}.zip`, { type: 'application/zip' });
-
-      
-
-      // Upload through normal ZIP process
-      $('#apkg-status').hide();
-      await doPackageUpload(zipFile, template);
-
-    } catch (error: any) {
-      clientConsole(1, '[APKG] Conversion error:', error);
-      $('#apkg-status').hide();
-      setUploadMessage(template, contentText('content.apkgConvertError', { error: uploadErrorText(error) }), 'error');
-    } finally {
-      // Clear file input
-      $('#upload-apkg').val('');
-    }
-  },  
   'click .show-stimuli-btn': function(event: any, template: any){
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-file');
@@ -2129,6 +2015,8 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
         const upload = DynamicAssetsCollection.insert({
           file: file,
           meta: {
+            uploadPurpose: 'content-media',
+            tdfId: String(tdfId),
             stimuliSetId: stimSetId,
             public: true
           },
@@ -2357,6 +2245,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
       file: file,
       chunkSize: 'dynamic',
       meta: {
+        uploadPurpose: 'package',
         expectedSize: uploadIntegrity.expectedSize,
         sha256: uploadIntegrity.sha256
       }
@@ -2603,133 +2492,6 @@ async function readFileAsDataURL(file: any) {
 
   return result;
 }
-
-// //////////////////////////////////////////////////////////////////////////
-// Anki .apkg conversion helper functions
-
-const US = '\x1f'; // Anki field separator
-
-function stripHtml(s: any) {
-  return (s || '').replace(/<[^>]+>/g, '').trim();
-}
-
-function splitFields(fldsRaw: any) {
-  return (fldsRaw || '').split(US);
-}
-
-function extractMediaRefs(fields: any) {
-  const refs = new Set();
-  for (const f of fields) {
-    if (!f) continue;
-    const regex = /<img[^>]+src=['"]([^'"]+)['"]|(?:\[sound:([^\]]+)\])/g;
-    for (const m of f.matchAll(regex)) {
-      const candidate = m[1] || m[2];
-      if (candidate) refs.add(candidate);
-    }
-  }
-  return [...refs];
-}
-
-function queryAll(db: any, sql: any) {
-  const stmt = db.prepare(sql);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
-async function convertApkgData(db: any, mediaIndex: any, _zip: any) {
-  // Get models and decks
-  const colRows = queryAll(db, 'SELECT models, decks FROM col');
-  const models = colRows.length > 0 ? JSON.parse(colRows[0].models || '{}') : {};
-  const decks = colRows.length > 0 ? JSON.parse(colRows[0].decks || '{}') : {};
-
-  // Build model index
-  const modelIndex = new Map();
-  for (const [id, m] of Object.entries(models as Record<string, any>)) {
-    modelIndex.set(parseInt(id, 10), {
-      name: m.name || `Model_${id}`,
-      isCloze: (m.name || '').toLowerCase().includes('cloze')
-    });
-  }
-
-  // Build deck index
-  const deckIndex = new Map();
-  for (const [id, d] of Object.entries(decks as Record<string, any>)) {
-    deckIndex.set(parseInt(id, 10), d.name || `Deck_${id}`);
-  }
-
-  // Load notes
-  const notes = new Map();
-  for (const row of queryAll(db, 'SELECT id, guid, mid, flds, tags FROM notes')) {
-    notes.set(row.id, {
-      id: row.id,
-      guid: row.guid,
-      mid: row.mid,
-      fields: splitFields(row.flds),
-      tags: row.tags || ''
-    });
-  }
-
-  // Process cards
-  const cards = [];
-  let primaryDeckName = null;
-
-  for (const row of queryAll(db, 'SELECT id, nid, did, ord FROM cards')) {
-    const { id: cid, nid, did, ord: _ord } = row;
-    const note = notes.get(nid);
-    if (!note) continue;
-
-    const model = modelIndex.get(note.mid);
-    const deckName = deckIndex.get(did) || `Deck_${did}`;
-    if (!primaryDeckName) primaryDeckName = deckName;
-
-    const isCloze = model ? model.isCloze : false;
-
-    // Extract prompt and answer
-    let prompt, answer;
-    if (isCloze) {
-      // Simplified cloze handling
-      const text = note.fields[0] || '';
-      prompt = stripHtml(text);
-      answer = stripHtml(text);
-    } else {
-      // Basic card: field 0 = front, field 1 = back
-      prompt = stripHtml(note.fields[0] || '');
-      answer = stripHtml(note.fields[1] || '');
-    }
-
-    // Extract media
-    const mediaRefs = extractMediaRefs(note.fields);
-    const mediaNames = mediaRefs.map(r => {
-      const n = Number(r);
-      if (Number.isFinite(n) && String(n) === r && mediaIndex[r]) {
-        return mediaIndex[r];
-      }
-      return r;
-    });
-    const hasImage = mediaNames.some(m => /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(m));
-
-    cards.push({
-      id: cid,
-      prompt,
-      answer,
-      media: mediaNames,
-      hasImage,
-      deck: deckName,
-      tags: note.tags
-    });
-  }
-
-  return {
-    cards,
-    deckName: primaryDeckName
-  };
-}
-
-
 
 
 

@@ -13,10 +13,10 @@ import { getErrorMessage } from '../../lib/errorUtils';
 import { getOpenRouterCapability, userHasServerOpenRouterKey, type OpenRouterCapability } from '../../lib/openRouterClientProfile';
 import { sanitizeImportName } from '../../lib/importCompositionBuilder';
 import type { ImportDraftLesson } from '../../lib/normalizedImportTypes';
-import type { CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
+import type { AiLessonOutput, CreatedOutput, CreationModuleId } from '../../lib/aiContentTypes';
 import { buildAutoTutorDraft, buildDrafts } from '../../lib/aiContentDraftBuilder';
 import { findCueLeaks, type CueLeak } from '../../lib/aiContentCueValidation';
-import { callOpenRouterForAutoTutor, callOpenRouterForItemCueRepair, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
+import { callOpenRouterForAutoTutor, callOpenRouterForIntent, callOpenRouterForItemCountRepair, callOpenRouterForItemCueRepair, callOpenRouterForItems } from '../../lib/aiContentOpenRouterClient';
 import type { AiContentRequestImage } from '../../lib/aiContentOpenRouterClient';
 import {
   generateAutoTutorExpectationRelationships,
@@ -24,6 +24,17 @@ import {
 import { enrichAiContentMedia } from '../../lib/aiContentMediaEnrichment';
 import { extractJsonObject, validateAiOutput, validateAutoTutorOutput } from '../../lib/aiContentValidation';
 import { enforceAiImageAuthorization } from '../../lib/aiContentImagePolicy';
+import {
+  materializeAiDraftOutput,
+  parseStrictAiJson,
+  validateAiAuthoringIntent,
+} from '../../lib/aiContentIntent';
+import {
+  isAiDraftReviewComplete,
+  type AiAuthoringIntent,
+  type AiContentDraft,
+  type AiContentDraftPhase,
+} from '../../../common/aiContentDrafts';
 import {
   buildUploadWithNameConflictRetry,
   suggestedReplacementName,
@@ -51,43 +62,24 @@ type BlazeDragEvent = DragEvent & { originalEvent?: DragEvent };
 type DebugRecord = {
   id?: string;
   creationRecordId?: string;
-  sourceTextPreview: string;
   selectedModules: CreationModuleId[];
   model: string;
   status: 'succeeded' | 'failed';
   failureStage?: string;
   warnings: string[];
-  rawAiResponse?: string;
-  parsedJson?: unknown;
-  llmCalls?: {
-    itemGeneration?: { rawAiResponse: string; parsedJson: unknown };
-    itemCueRepairs?: Array<{ rawAiResponse: string; parsedJson: unknown; repairedItemIndexes: number[] }>;
-    autoTutorGeneration?: { rawAiResponse: string; parsedJson: unknown };
-    autoTutorRelationshipGeneration?: {
-      model: string;
-      attemptedModels: string[];
-      sourceKeyType: 'tdf' | 'user' | 'admin';
-      cacheKey: string;
-      costUsd?: number;
-    };
-  };
   rejectedItems?: Array<{ item: unknown; reason: string }>;
   outputs?: CreatedOutput[];
   error?: string;
 };
 
 type ItemGenerationResult = {
-  rawAiResponse: string;
-  parsedJson: unknown;
-  repairs: Array<{ rawAiResponse: string; parsedJson: unknown; repairedItemIndexes: number[] }>;
+  repairs: Array<{ repairedItemIndexes: number[] }>;
   result: Awaited<ReturnType<typeof enrichAiContentMedia>> & {
     rejectedItems: ReturnType<typeof validateAiOutput>['rejectedItems'];
   };
 };
 
 type AutoTutorGenerationResult = {
-  rawAiResponse: string;
-  parsedJson: unknown;
   result: ReturnType<typeof validateAutoTutorOutput>;
 };
 
@@ -96,7 +88,6 @@ type CreationRecord = {
   createdAt: string;
   createdBy: string;
   sourceTextHash: string;
-  sourceTextPreview?: string;
   selectedModules: CreationModuleId[];
   modelProvider: 'openrouter';
   model: string;
@@ -127,6 +118,12 @@ type AiCreatorInstance = Blaze.TemplateInstance & {
   statusKind: ReactiveVar<StatusKind>;
   debugRecord: ReactiveVar<DebugRecord | null>;
   openRouterCapability: ReactiveVar<OpenRouterCapability | null>;
+  activeDraft: ReactiveVar<AiContentDraft<AiLessonOutput> | null>;
+  reviewPreviewUrls: ReactiveVar<Record<string, string>>;
+  discardArmed: ReactiveVar<boolean>;
+  draftAutosaveTimer?: ReturnType<typeof Meteor.setTimeout>;
+  draftAutosaveRunning?: Promise<void>;
+  draftAutosaveQueued?: boolean;
   autoStartFromHandoff?: boolean;
 };
 
@@ -155,13 +152,12 @@ const CREATION_MODULES: Array<{
 ];
 
 const CREATION_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.records';
-const DEBUG_RECORDS_STORAGE_KEY = 'mofacts.aiContentCreation.debugRecords';
 const AI_CREATION_HANDOFF_STORAGE_KEY = 'mofacts.aiContentCreation.pendingRequest';
 const PROMPT_TEMPLATE_VERSION = 'ai-content-creator-v2';
 const COMPACT_SCHEMA_VERSION = 'ai-normalized-v1';
 const MAX_STORED_RECORDS = 50;
-const MAX_DEBUG_PAYLOAD_LENGTH = 20000;
 const MAX_ITEM_CUE_REPAIR_PASSES = 2;
+const MAX_ITEM_COUNT_REPAIR_PASSES = 2;
 
 function aiText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
@@ -234,14 +230,6 @@ function readStoredArray<T>(key: string): T[] {
   }
 }
 
-function truncateDebugValue(value: unknown): unknown {
-  const text = typeof value === 'string' ? value : JSON.stringify(value);
-  if (typeof text !== 'string' || text.length <= MAX_DEBUG_PAYLOAD_LENGTH) {
-    return value;
-  }
-  return `${text.slice(0, MAX_DEBUG_PAYLOAD_LENGTH)}\n...[truncated]`;
-}
-
 function saveCreationRecord(record: CreationRecord, debugRecord?: DebugRecord): void {
   const records = readStoredArray<CreationRecord>(CREATION_RECORDS_STORAGE_KEY);
   window.localStorage.setItem(
@@ -249,19 +237,7 @@ function saveCreationRecord(record: CreationRecord, debugRecord?: DebugRecord): 
     JSON.stringify([record, ...records].slice(0, MAX_STORED_RECORDS)),
   );
 
-  if (debugRecord) {
-    const debugRecords = readStoredArray<DebugRecord>(DEBUG_RECORDS_STORAGE_KEY);
-    const storedDebug = {
-      ...debugRecord,
-      rawAiResponse: debugRecord.rawAiResponse ? String(truncateDebugValue(debugRecord.rawAiResponse)) : undefined,
-      parsedJson: debugRecord.parsedJson ? truncateDebugValue(debugRecord.parsedJson) : undefined,
-      llmCalls: debugRecord.llmCalls ? truncateDebugValue(debugRecord.llmCalls) : undefined,
-    };
-    window.localStorage.setItem(
-      DEBUG_RECORDS_STORAGE_KEY,
-      JSON.stringify([storedDebug, ...debugRecords].slice(0, MAX_STORED_RECORDS)),
-    );
-  }
+  void debugRecord;
 }
 
 function statusClass(kind: StatusKind): string {
@@ -316,8 +292,6 @@ async function generateAutoTutorFromAi(
     result.output.expectationRelationshipProvenance = relationshipResult.expectationRelationshipProvenance;
   }
   return {
-    rawAiResponse,
-    parsedJson,
     result,
   };
 }
@@ -365,12 +339,65 @@ async function generateItemsFromAi(
   apiKey: string,
   model: string,
   uploadedImages: AiContentRequestImage[],
+  intent: AiAuthoringIntent,
+  onItemsGenerated?: (output: ReturnType<typeof validateAiOutput>['output']) => Promise<void>,
 ): Promise<ItemGenerationResult> {
-  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, apiKey, model, uploadedImages);
-  const parsedJson = extractJsonObject(rawAiResponse);
+  const rawAiResponse = await callOpenRouterForItems(sourceText, selectedModules, apiKey, model, uploadedImages, intent);
+  const parsedJson = parseStrictAiJson(rawAiResponse, 'AI item response');
   const repairs: ItemGenerationResult['repairs'] = [];
   const repairWarnings: string[] = [];
-  let validation = enforceAiImageAuthorization(validateAiOutput(parsedJson), sourceText, uploadedImages.length);
+  let validation = validateAiOutput(parsedJson);
+  const rejectedItems = validation.rejectedItems.slice();
+  if (!intent.imagesExplicitlyRequested && uploadedImages.length === 0) {
+    validation = enforceAiImageAuthorization(validation, sourceText, uploadedImages.length);
+  }
+  if (intent.requestedItemCount !== null && validation.output.items.length > intent.requestedItemCount) {
+    repairWarnings.push(`AI returned ${validation.output.items.length} usable items; only the requested ${intent.requestedItemCount} were retained.`);
+    validation.output.items = validation.output.items.slice(0, intent.requestedItemCount);
+  }
+  for (let pass = 0; intent.requestedItemCount !== null && validation.output.items.length < intent.requestedItemCount && pass < MAX_ITEM_COUNT_REPAIR_PASSES; pass += 1) {
+    const missingCount = intent.requestedItemCount - validation.output.items.length;
+    try {
+      const rawRepairResponse = await callOpenRouterForItemCountRepair(
+        sourceText,
+        selectedModules,
+        validation.output,
+        missingCount,
+        intent,
+        apiKey,
+        model,
+        uploadedImages,
+      );
+      const parsedRepair = parseStrictAiJson(rawRepairResponse, 'AI item-count repair response') as { items?: unknown[] };
+      const candidateItems = Array.isArray(parsedRepair.items) ? parsedRepair.items : [];
+      if (candidateItems.length === 0) {
+        throw new Error('The item-count repair did not include any items.');
+      }
+      const priorCount = validation.output.items.length;
+      const repairedValidation = validateAiOutput({
+        ...validation.output,
+        items: validation.output.items.concat(candidateItems as never[]),
+      });
+      rejectedItems.push(...repairedValidation.rejectedItems);
+      validation = repairedValidation;
+      if (!intent.imagesExplicitlyRequested && uploadedImages.length === 0) {
+        validation = enforceAiImageAuthorization(validation, sourceText, uploadedImages.length);
+      }
+      if (validation.output.items.length > intent.requestedItemCount) {
+        validation.output.items = validation.output.items.slice(0, intent.requestedItemCount);
+      }
+      if (validation.output.items.length === priorCount) {
+        throw new Error('The item-count repair did not add any unique usable items.');
+      }
+    } catch (error) {
+      repairWarnings.push(`Item-count repair pass ${pass + 1} failed: ${getErrorMessage(error)}`);
+    }
+  }
+  if (intent.requestedItemCount !== null && validation.output.items.length !== intent.requestedItemCount) {
+    const partialOutput = materializeAiDraftOutput(validation.output, intent, false) as ReturnType<typeof validateAiOutput>['output'];
+    await onItemsGenerated?.(partialOutput);
+    throw new Error(`AI produced ${validation.output.items.length} usable unique items after bounded repair, but the request requires exactly ${intent.requestedItemCount}. The partial draft and diagnostics were preserved for retry.`);
+  }
   for (let pass = 0; pass < MAX_ITEM_CUE_REPAIR_PASSES; pass += 1) {
     const leaks = findCueLeaks(validation.output);
     if (leaks.length === 0) {
@@ -378,15 +405,16 @@ async function generateItemsFromAi(
     }
     try {
       const rawRepairResponse = await callOpenRouterForItemCueRepair(sourceText, selectedModules, rawAiResponse, leaks, apiKey, model, uploadedImages);
-      const parsedRepairJson = extractJsonObject(rawRepairResponse);
+      const parsedRepairJson = parseStrictAiJson(rawRepairResponse, 'AI cue repair response');
       const repairedItemIndexes = applyCueRepairResponse(parsedRepairJson, validation);
       repairs.push({
-        rawAiResponse: rawRepairResponse,
-        parsedJson: parsedRepairJson,
         repairedItemIndexes,
       });
       const priorWarnings = validation.warnings;
-      validation = enforceAiImageAuthorization(validateAiOutput(validation.output), sourceText, uploadedImages.length);
+      validation = validateAiOutput(validation.output);
+      if (!intent.imagesExplicitlyRequested && uploadedImages.length === 0) {
+        validation = enforceAiImageAuthorization(validation, sourceText, uploadedImages.length);
+      }
       validation.warnings = priorWarnings.concat(validation.warnings);
     } catch (error) {
       repairWarnings.push(`Cue repair pass ${pass + 1} did not return usable replacements: ${getErrorMessage(error)}`);
@@ -397,10 +425,10 @@ async function generateItemsFromAi(
   const cueLeakWarnings = remainingLeaks.length > 0
     ? [`Review generated cue text for possible answer hints: ${summarizeCueLeaks(remainingLeaks)}`]
     : [];
+  validation.output = materializeAiDraftOutput(validation.output, intent) as ReturnType<typeof validateAiOutput>['output'];
+  await onItemsGenerated?.(validation.output);
   const enriched = await enrichAiContentMedia(validation.output, sourceText);
   return {
-    rawAiResponse,
-    parsedJson,
     repairs,
     result: {
       ...enriched,
@@ -409,7 +437,7 @@ async function generateItemsFromAi(
         .concat(repairWarnings)
         .concat(cueLeakWarnings)
         .concat(enriched.warnings),
-      rejectedItems: validation.rejectedItems,
+      rejectedItems,
     },
   };
 }
@@ -457,6 +485,217 @@ function promptForReplacementName(conflict: GeneratedNameConflict): string | nul
   return normalized || null;
 }
 
+async function persistAiDraft(
+  instance: AiCreatorInstance,
+  phase: AiContentDraftPhase,
+  patch: Partial<Pick<AiContentDraft<AiLessonOutput>, 'intent' | 'output' | 'warnings' | 'failure'>> = {},
+): Promise<AiContentDraft<AiLessonOutput>> {
+  const current = instance.activeDraft.get();
+  if (!current) {
+    throw new Error('AI content draft is unavailable. Start the request again.');
+  }
+  const saved = await MeteorAny.callAsync('saveAiContentDraft', {
+    draftId: current._id,
+    expectedRevision: current.revision,
+    phase,
+    ...patch,
+  }) as AiContentDraft<AiLessonOutput>;
+  instance.activeDraft.set(saved);
+  return saved;
+}
+
+async function loadActiveAiDraft(instance: AiCreatorInstance): Promise<void> {
+  try {
+    const draft = await MeteorAny.callAsync('getActiveAiContentDraft') as AiContentDraft<AiLessonOutput> | null;
+    if (!draft) return;
+    instance.activeDraft.set(draft);
+    instance.sourceText.set(draft.sourceText);
+    instance.selectedModules.set(draft.selectedModules);
+    if (draft.phase === 'resolving-media' && draft.output) {
+      setStatus(instance, 'info', 'Resuming image resolution for the saved draft.');
+      const enriched = await enrichAiContentMedia(draft.output as ReturnType<typeof validateAiOutput>['output'], draft.sourceText);
+      await persistAiDraft(instance, 'review', {
+        output: enriched.output,
+        warnings: (draft.warnings || []).concat(enriched.warnings),
+      });
+      setStatus(instance, enriched.output.items.some((item) => item.prompt?.mediaSlot?.status === 'unresolved') ? 'warning' : 'success', 'Draft ready for review.');
+      return;
+    }
+    if (draft.phase === 'review' || draft.phase === 'saving') {
+      setStatus(instance, 'info', 'Review the generated draft below. Your changes are saved automatically.');
+    } else if (draft.phase === 'failed') {
+      setStatus(instance, 'error', draft.failure?.message || 'The saved AI draft needs to be retried.');
+    } else {
+      setStatus(instance, 'info', `Resuming saved AI draft from ${draft.phase.replace('-', ' ')}.`);
+    }
+  } catch (error) {
+    setStatus(instance, 'error', getErrorMessage(error));
+  }
+}
+
+async function flushDraftAutosave(instance: AiCreatorInstance): Promise<void> {
+  if (instance.draftAutosaveRunning) {
+    instance.draftAutosaveQueued = true;
+    return instance.draftAutosaveRunning;
+  }
+  const run = async () => {
+    do {
+      instance.draftAutosaveQueued = false;
+      const snapshot = instance.activeDraft.get();
+      if (!snapshot?.output) return;
+      const saved = await MeteorAny.callAsync('saveAiContentDraft', {
+        draftId: snapshot._id,
+        expectedRevision: snapshot.revision,
+        phase: 'review',
+        output: snapshot.output,
+      }) as AiContentDraft<AiLessonOutput>;
+      const latest = instance.activeDraft.get();
+      if (latest?._id === saved._id) {
+        instance.activeDraft.set(latest.output ? { ...saved, output: latest.output } : saved);
+      }
+    } while (instance.draftAutosaveQueued);
+  };
+  instance.draftAutosaveRunning = run().finally(() => {
+    delete instance.draftAutosaveRunning;
+  });
+  return instance.draftAutosaveRunning;
+}
+
+function updateDraftOutput(instance: AiCreatorInstance, mutator: (output: AiLessonOutput) => AiLessonOutput): void {
+  const draft = instance.activeDraft.get();
+  if (!draft?.output) return;
+  instance.activeDraft.set({ ...draft, output: mutator(draft.output) });
+  if (instance.draftAutosaveTimer) Meteor.clearTimeout(instance.draftAutosaveTimer);
+  instance.draftAutosaveTimer = Meteor.setTimeout(() => {
+    delete instance.draftAutosaveTimer;
+    void flushDraftAutosave(instance).catch((error) => {
+      setStatus(instance, 'error', getErrorMessage(error));
+    });
+  }, 500);
+}
+
+function updateDraftItem(instance: AiCreatorInstance, itemId: string, updater: (item: NonNullable<AiLessonOutput['items']>[number]) => NonNullable<AiLessonOutput['items']>[number]): void {
+  updateDraftOutput(instance, (output) => ({
+    ...output,
+    items: (output.items || []).map((item) => String(item.id || '') === itemId ? updater(item) : item),
+  }));
+}
+
+async function uploadReviewImage(instance: AiCreatorInstance, itemId: string, source: AiImageSourceFile): Promise<void> {
+  const draft = instance.activeDraft.get();
+  const item = draft?.output?.items?.find((candidate) => String(candidate.id || '') === itemId);
+  const slot = item?.prompt?.mediaSlot;
+  if (!draft || !item || !slot) throw new Error('The selected draft image slot no longer exists.');
+  const [prepared] = await prepareAiImageAssets([source], []);
+  if (!prepared) throw new Error('The selected image could not be prepared.');
+  const file = new File([new Uint8Array(prepared.bytes)], prepared.packageFileName, { type: 'image/webp' });
+  const fileObj = await new Promise<any>((resolve, reject) => {
+    const upload = DynamicAssets.insert({
+      file,
+      chunkSize: 'dynamic',
+      meta: {
+        uploadPurpose: 'ai-draft-media',
+        draftId: draft._id,
+        itemId,
+        mediaSlotId: slot.id,
+        public: false,
+      },
+    }, false);
+    upload.on('end', (error: unknown, result: any) => error ? reject(error) : resolve(result));
+    upload.start();
+  });
+  if (slot.assetId) {
+    await MeteorAny.callAsync('removeAssetById', slot.assetId);
+  }
+  const previousPreview = instance.reviewPreviewUrls.get()[itemId];
+  if (previousPreview) URL.revokeObjectURL(previousPreview);
+  instance.reviewPreviewUrls.set({
+    ...instance.reviewPreviewUrls.get(),
+    [itemId]: URL.createObjectURL(new Blob([new Uint8Array(prepared.bytes)], { type: 'image/webp' })),
+  });
+  const publicPath = `/dynamic-assets/${fileObj._id}/${encodeURIComponent(prepared.packageFileName)}`;
+  updateDraftItem(instance, itemId, (current) => {
+    const { failureReason: _failureReason, ...resolvedSlot } = slot;
+    const { attribution: _attribution, ...promptWithoutAttribution } = current.prompt || {};
+    return {
+      ...current,
+      prompt: {
+        ...promptWithoutAttribution,
+        imgSrc: publicPath,
+        mediaSlot: {
+          ...resolvedSlot,
+          status: 'resolved',
+          source: 'user-replacement',
+          assetId: String(fileObj._id),
+          fileName: prepared.packageFileName,
+        },
+      },
+    };
+  });
+  if (instance.draftAutosaveTimer) {
+    Meteor.clearTimeout(instance.draftAutosaveTimer);
+    delete instance.draftAutosaveTimer;
+  }
+  instance.draftAutosaveQueued = true;
+  await flushDraftAutosave(instance);
+}
+
+async function saveReviewedDraft(instance: AiCreatorInstance): Promise<void> {
+  let draft = instance.activeDraft.get();
+  if (!draft?.output || !isAiDraftReviewComplete({ output: draft.output })) {
+    setStatus(instance, 'warning', 'Resolve every required prompt and response before saving.');
+    return;
+  }
+  instance.creating.set(true);
+  try {
+    if (instance.draftAutosaveTimer) {
+      Meteor.clearTimeout(instance.draftAutosaveTimer);
+      delete instance.draftAutosaveTimer;
+    }
+    instance.draftAutosaveQueued = true;
+    await flushDraftAutosave(instance);
+    draft = instance.activeDraft.get();
+    if (!draft?.output || !isAiDraftReviewComplete({ output: draft.output })) {
+      throw new Error('Resolve every required prompt and response before saving.');
+    }
+    const savingDraft = await persistAiDraft(instance, 'saving', { output: draft.output });
+    const itemModules = savingDraft.selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
+    const validatedOutput = validateAiOutput(savingDraft.output).output;
+    const drafts = buildDrafts(validatedOutput, itemModules, instance.uploadedImages.get());
+    const { outputs } = await buildUploadWithNameConflictRetry(drafts, savingDraft.output?.creationSummary || '', {
+      dynamicAssets: DynamicAssets,
+      callAsync: MeteorAny.callAsync.bind(MeteorAny),
+      getUploadIntegrity,
+      promptForReplacementName,
+      refreshAssets: () => Session.set('assetsRefreshTrigger', Date.now()),
+      logCleanupError: (cleanupError) => clientConsole(1, '[AI CONTENT CREATOR] Package cleanup failed:', cleanupError),
+    }, { draftId: savingDraft._id, draftRevision: savingDraft.revision });
+    await MeteorAny.callAsync('completeAiContentDraft', {
+      draftId: savingDraft._id,
+      expectedRevision: savingDraft.revision,
+      outputTdfIds: outputs.map((output) => output.tdfId).filter(Boolean),
+    });
+    instance.activeDraft.set(null);
+    instance.sourceText.set('');
+    setStatus(instance, 'success', `Saved ${outputs.length} content system${outputs.length === 1 ? '' : 's'}.`);
+    Session.set('assetsRefreshTrigger', Date.now());
+  } catch (error) {
+    setStatus(instance, 'error', getErrorMessage(error));
+    const current = instance.activeDraft.get();
+    if (current) {
+      try {
+        await persistAiDraft(instance, 'review', {
+          failure: { stage: 'saving', code: 'save-failed', message: getErrorMessage(error) },
+        });
+      } catch (draftError) {
+        clientConsole(1, '[AI CONTENT CREATOR] Failed to restore review phase:', draftError);
+      }
+    }
+  } finally {
+    instance.creating.set(false);
+  }
+}
+
 async function runCreation(instance: AiCreatorInstance): Promise<void> {
   const sourceText = instance.sourceText.get().trim();
   const uploadedImages = instance.uploadedImages.get();
@@ -468,7 +707,6 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
   const debugBase: DebugRecord = {
     id: debugRecordId,
     creationRecordId,
-    sourceTextPreview: sourceText.slice(0, 500),
     selectedModules,
     model,
     status: 'failed',
@@ -498,12 +736,28 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
       : aiText('aiCreator.creatingContent'),
   );
   try {
+    let draft = instance.activeDraft.get();
+    if (draft) {
+      setStatus(instance, 'warning', 'Resume or discard the saved AI draft before starting another request.');
+      return;
+    }
+    draft = await MeteorAny.callAsync('startAiContentDraft', {
+      sourceText,
+      selectedModules,
+      model,
+    }) as AiContentDraft<AiLessonOutput>;
+    instance.activeDraft.set(draft);
     const sourceTextHash = await hashCreationSource(sourceText, uploadedImages);
     const apiKey = '__server_resolved_openrouter__';
     const requestImages = await prepareRequestImages(uploadedImages);
+    const rawIntentResponse = await callOpenRouterForIntent(sourceText, apiKey, model);
+    const intent = validateAiAuthoringIntent(parseStrictAiJson(rawIntentResponse, 'AI authoring intent'), sourceText);
+    await persistAiDraft(instance, 'generating', { intent });
     const itemModules = selectedModules.filter((moduleId) => moduleId === 'learningSession' || moduleId === 'assessmentSession');
     const itemGenerationPromise = itemModules.length > 0
-      ? generateItemsFromAi(sourceText, itemModules, apiKey, model, requestImages)
+      ? generateItemsFromAi(sourceText, itemModules, apiKey, model, requestImages, intent, async (output) => {
+          await persistAiDraft(instance, 'resolving-media', { output });
+        })
       : null;
     const autoTutorGenerationPromise = selectedModules.includes('autoTutor')
       ? generateAutoTutorFromAi(sourceText, apiKey, model, instance.openRouterCapability.get()?.source || 'user')
@@ -514,52 +768,34 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     ]);
     const drafts: ImportDraftLesson[] = [];
     let creationSummary = '';
-    let rawAiResponse = '';
-    let parsedJson: unknown = null;
-    const llmCalls: DebugRecord['llmCalls'] = {};
     let warnings: string[] = [];
     let rejectedItems: Array<{ item: unknown; reason: string }> = [];
 
     if (itemGeneration) {
-      rawAiResponse = itemGeneration.rawAiResponse;
-      parsedJson = itemGeneration.parsedJson;
-      llmCalls.itemGeneration = {
-        rawAiResponse: itemGeneration.rawAiResponse,
-        parsedJson: itemGeneration.parsedJson,
-      };
-      if (itemGeneration.repairs.length > 0) {
-        llmCalls.itemCueRepairs = itemGeneration.repairs;
-      }
       drafts.push(...buildDrafts(itemGeneration.result.output, itemModules, uploadedImages));
       warnings = warnings.concat(itemGeneration.result.warnings);
       rejectedItems = rejectedItems.concat(itemGeneration.result.rejectedItems);
       creationSummary = itemGeneration.result.output.creationSummary;
+      const reviewDraft = await persistAiDraft(instance, 'review', {
+        output: itemGeneration.result.output,
+        warnings,
+      });
+      instance.activeDraft.set(reviewDraft);
+      setStatus(
+        instance,
+        itemGeneration.result.output.items.some((item) => item.prompt?.mediaSlot?.status === 'unresolved') ? 'warning' : 'success',
+        'Draft ready for review. Resolve any blank image prompts, edit items if needed, then save the content.',
+      );
+      return;
     }
 
     if (autoTutorGeneration) {
-      llmCalls.autoTutorGeneration = {
-        rawAiResponse: autoTutorGeneration.rawAiResponse,
-        parsedJson: autoTutorGeneration.parsedJson,
-      };
-      if (autoTutorGeneration.result.output.expectationRelationshipProvenance) {
-        const provenance = autoTutorGeneration.result.output.expectationRelationshipProvenance;
-        llmCalls.autoTutorRelationshipGeneration = {
-          model: provenance.model,
-          attemptedModels: provenance.attemptedModels,
-          sourceKeyType: provenance.sourceKeyType,
-          cacheKey: provenance.cacheKey,
-        };
-      }
       drafts.push(buildAutoTutorDraft(autoTutorGeneration.result.output, '', model));
       warnings = warnings.concat(autoTutorGeneration.result.warnings);
       creationSummary = [
         creationSummary,
         autoTutorGeneration.result.output.creationSummary,
       ].filter(Boolean).join(' ');
-      if (!rawAiResponse) {
-        rawAiResponse = autoTutorGeneration.rawAiResponse;
-        parsedJson = autoTutorGeneration.parsedJson;
-      }
     }
 
     const { builtPackage, outputs } = await buildUploadWithNameConflictRetry(drafts, creationSummary, {
@@ -579,18 +815,12 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
       rejectedItems,
       outputs,
     };
-    if (warnings.length || rejectedItems.length) {
-      debugRecord.rawAiResponse = rawAiResponse;
-      debugRecord.parsedJson = parsedJson;
-      debugRecord.llmCalls = llmCalls;
-    }
     instance.debugRecord.set(debugRecord);
     saveCreationRecord({
       id: creationRecordId,
       createdAt: new Date().toISOString(),
       createdBy: Meteor.userId() || '',
       sourceTextHash,
-      sourceTextPreview: sourceText.slice(0, 500),
       selectedModules,
       modelProvider: 'openrouter',
       model,
@@ -629,12 +859,20 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
       error: getErrorMessage(error),
     };
     instance.debugRecord.set(debugRecord);
+    if (instance.activeDraft.get()) {
+      try {
+        await persistAiDraft(instance, 'failed', {
+          failure: { stage: instance.activeDraft.get()?.phase || 'failed', code: 'generation-failed', message: getErrorMessage(error) },
+        });
+      } catch (draftError) {
+        clientConsole(1, '[AI CONTENT CREATOR] Failed to persist draft failure state:', draftError);
+      }
+    }
     saveCreationRecord({
       id: creationRecordId,
       createdAt: new Date().toISOString(),
       createdBy: Meteor.userId() || '',
       sourceTextHash,
-      sourceTextPreview: sourceText.slice(0, 500),
       selectedModules,
       modelProvider: 'openrouter',
       model,
@@ -662,15 +900,21 @@ Template.aiContentCreator.onCreated(function(this: AiCreatorInstance) {
   this.statusKind = new ReactiveVar('info');
   this.debugRecord = new ReactiveVar(null);
   this.openRouterCapability = new ReactiveVar(null);
+  this.activeDraft = new ReactiveVar(null);
+  this.reviewPreviewUrls = new ReactiveVar({});
+  this.discardArmed = new ReactiveVar(false);
   this.autoStartFromHandoff = pendingHandoff?.autoStart === true;
 });
 
 Template.aiContentCreator.onDestroyed(function(this: AiCreatorInstance) {
   this.uploadedImages.get().forEach((image) => URL.revokeObjectURL(image.previewUrl));
+  Object.values(this.reviewPreviewUrls.get()).forEach((url) => URL.revokeObjectURL(url));
+  if (this.draftAutosaveTimer) Meteor.clearTimeout(this.draftAutosaveTimer);
 });
 
 Template.aiContentCreator.onRendered(function(this: AiCreatorInstance) {
   void refreshOpenRouterCapability(this);
+  void loadActiveAiDraft(this);
 
   if (!this.autoStartFromHandoff) {
     return;
@@ -725,6 +969,51 @@ Template.aiContentCreator.helpers({
   },
   creating() {
     return (Template.instance() as AiCreatorInstance).creating.get();
+  },
+  showReview() {
+    const draft = (Template.instance() as AiCreatorInstance).activeDraft.get();
+    return Boolean(draft);
+  },
+  reviewItems() {
+    const instance = Template.instance() as AiCreatorInstance;
+    const items = instance.activeDraft.get()?.output?.items || [];
+    const previews = instance.reviewPreviewUrls.get();
+    return items.map((item, index) => {
+      const itemId = String(item.id || '');
+      const slot = item.prompt?.mediaSlot;
+      const durablePreview = slot?.source === 'wikimedia'
+        ? String(slot.previewUrl || item.prompt?.imgSrc || '')
+        : '';
+      return {
+        ...item,
+        id: itemId,
+        number: index + 1,
+        promptText: String(item.prompt?.text || ''),
+        responseText: String(item.response?.correctResponse || ''),
+        alternativeResponses: Array.isArray(item.response?.incorrectResponses) ? item.response.incorrectResponses : [],
+        imageRequired: slot?.required === true,
+        imagePreview: previews[itemId] || durablePreview,
+        imageFailure: String(slot?.failureReason || (slot?.status === 'resolved' ? `Uploaded: ${slot.fileName || 'image'}` : 'No image was resolved.')),
+      };
+    });
+  },
+  reviewItemCount() {
+    return (Template.instance() as AiCreatorInstance).activeDraft.get()?.output?.items?.length || 0;
+  },
+  draftWarnings() {
+    return (Template.instance() as AiCreatorInstance).activeDraft.get()?.warnings || [];
+  },
+  saveDraftAttrs() {
+    const instance = Template.instance() as AiCreatorInstance;
+    const draft = instance.activeDraft.get();
+    return instance.creating.get() || !draft?.output || !isAiDraftReviewComplete({ output: draft.output }) ? { disabled: true } : {};
+  },
+  discardArmed() {
+    return (Template.instance() as AiCreatorInstance).discardArmed.get();
+  },
+  canRetryDraft() {
+    const draft = (Template.instance() as AiCreatorInstance).activeDraft.get();
+    return Boolean(draft && (draft.phase === 'failed' || !draft.output));
   },
   createAttrs() {
     const instance = Template.instance() as AiCreatorInstance;
@@ -823,6 +1112,98 @@ Template.aiContentCreator.events({
       return;
     }
     void runCreation(instance);
+  },
+  'input .ai-review-prompt'(event: Event, instance: AiCreatorInstance) {
+    const input = event.currentTarget as HTMLTextAreaElement;
+    const itemId = String(input.dataset.itemId || '');
+    updateDraftItem(instance, itemId, (item) => ({
+      ...item,
+      prompt: { ...(item.prompt || {}), text: input.value },
+    }));
+  },
+  'input .ai-review-response'(event: Event, instance: AiCreatorInstance) {
+    const input = event.currentTarget as HTMLInputElement;
+    const itemId = String(input.dataset.itemId || '');
+    updateDraftItem(instance, itemId, (item) => ({
+      ...item,
+      response: { ...(item.response || {}), correctResponse: input.value },
+    }));
+  },
+  'input .ai-review-alternative'(event: Event, instance: AiCreatorInstance) {
+    const input = event.currentTarget as HTMLInputElement;
+    const itemId = String(input.dataset.itemId || '');
+    const alternativeIndex = Number(input.dataset.alternativeIndex);
+    if (!Number.isInteger(alternativeIndex) || alternativeIndex < 0) return;
+    updateDraftItem(instance, itemId, (item) => {
+      const incorrectResponses = Array.isArray(item.response?.incorrectResponses)
+        ? item.response.incorrectResponses.slice()
+        : [];
+      incorrectResponses[alternativeIndex] = input.value;
+      return {
+        ...item,
+        response: { ...(item.response || {}), incorrectResponses },
+      };
+    });
+  },
+  'click .ai-review-remove'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    const itemId = String((event.currentTarget as HTMLButtonElement).dataset.itemId || '');
+    const assetId = instance.activeDraft.get()?.output?.items
+      ?.find((item) => String(item.id || '') === itemId)?.prompt?.mediaSlot?.assetId;
+    updateDraftOutput(instance, (output) => ({
+      ...output,
+      items: (output.items || []).filter((item) => String(item.id || '') !== itemId),
+    }));
+    if (assetId) {
+      void MeteorAny.callAsync('removeAssetById', assetId).catch((error: unknown) => {
+        setStatus(instance, 'error', `The item was removed, but its staged image cleanup failed: ${getErrorMessage(error)}`);
+      });
+    }
+  },
+  'change .ai-review-image-input'(event: Event, instance: AiCreatorInstance) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    const itemId = String(input.dataset.itemId || '');
+    input.value = '';
+    if (!file) return;
+    setStatus(instance, 'info', `Preparing ${file.name}...`);
+    void uploadReviewImage(instance, itemId, { file, sourcePath: file.name }).then(() => {
+      setStatus(instance, 'success', 'Replacement image saved to this draft.');
+    }).catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
+  },
+  'click #ai-discard-draft'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    instance.discardArmed.set(true);
+  },
+  'click #ai-cancel-discard'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    instance.discardArmed.set(false);
+  },
+  'click #ai-confirm-discard'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    const draft = instance.activeDraft.get();
+    if (!draft) return;
+    void MeteorAny.callAsync('discardAiContentDraft', draft._id).then(() => {
+      instance.activeDraft.set(null);
+      instance.discardArmed.set(false);
+      instance.sourceText.set('');
+      instance.statusMessage.set('');
+      const textarea = instance.find('#ai-source-text') as HTMLTextAreaElement | null;
+      if (textarea) textarea.value = '';
+    }).catch((error: unknown) => setStatus(instance, 'error', getErrorMessage(error)));
+  },
+  'click #ai-save-reviewed-draft'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    void saveReviewedDraft(instance);
+  },
+  'click #ai-retry-draft'(event: Event, instance: AiCreatorInstance) {
+    event.preventDefault();
+    const draft = instance.activeDraft.get();
+    if (!draft) return;
+    void MeteorAny.callAsync('discardAiContentDraft', draft._id).then(() => {
+      instance.activeDraft.set(null);
+      void runCreation(instance);
+    }).catch((error: unknown) => setStatus(instance, 'error', getErrorMessage(error)));
   },
   'click #ai-open-manual-creator'(event: Event) {
     event.preventDefault();

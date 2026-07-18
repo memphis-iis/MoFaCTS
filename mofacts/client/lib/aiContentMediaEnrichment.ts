@@ -1,6 +1,5 @@
 import type { AiItem } from './aiContentTypes';
 import type { validateAiOutput } from './aiContentValidation';
-import { sourceExplicitlyRequestsImages } from './aiContentImagePolicy';
 
 type ValidatedAiLessonOutput = ReturnType<typeof validateAiOutput>['output'];
 
@@ -20,166 +19,157 @@ type WikimediaImageAttribution = {
   };
 };
 
-const WIKIPEDIA_API_URL = 'https://en.wikipedia.org/w/api.php';
 const COMMONS_API_URL = 'https://commons.wikimedia.org/w/api.php';
+const MAX_CANDIDATES = 12;
+const RESOLUTION_CONCURRENCY = 4;
 
 function stripHtml(value: unknown): string {
-  return String(value || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return String(value || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
 }
 
-function normalizeLicenseUrl(licenseName: string, licenseUrl: string): string {
-  if (licenseUrl) {
-    return licenseUrl;
-  }
-  if (/public\s*domain/i.test(licenseName)) {
-    return 'https://creativecommons.org/publicdomain/mark/1.0/';
-  }
+function normalizeTerms(value: string): string[] {
+  return value
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .filter((term) => term.length > 2 && !['image', 'picture', 'photo', 'show', 'with', 'from', 'that', 'this'].includes(term));
+}
+
+function licenseUrlFor(name: string, explicitUrl: string): string {
+  if (explicitUrl) return explicitUrl;
+  const normalized = name.toLocaleLowerCase();
+  if (normalized.includes('public domain')) return 'https://creativecommons.org/publicdomain/mark/1.0/';
+  if (normalized.includes('cc0')) return 'https://creativecommons.org/publicdomain/zero/1.0/';
   return '';
 }
 
-function hasImageIntent(sourceText: string): boolean {
-  return sourceExplicitlyRequestsImages(sourceText);
+function violatesConstraint(title: string, constraints: string[]): boolean {
+  const normalizedTitle = title.toLocaleLowerCase();
+  const requiresNoLabels = constraints.some((constraint) => /(?:nothing|no|without|un)\s*(?:is\s+)?label/i.test(constraint));
+  return requiresNoLabels && /\b(?:labeled|labelled|names|text|caption)\b/.test(normalizedTitle);
 }
 
-function hasAttribution(item: AiItem): boolean {
-  const attribution = item.prompt?.attribution;
-  return Boolean(attribution?.sourceUrl && attribution?.licenseName && attribution?.licenseUrl);
+function scoreCandidate(title: string, query: string, constraints: string[]): number {
+  if (violatesConstraint(title, constraints)) return -1;
+  const titleTerms = new Set(normalizeTerms(title));
+  const queryTerms = normalizeTerms(query);
+  if (queryTerms.length === 0) return -1;
+  const matched = queryTerms.filter((term) => titleTerms.has(term)).length;
+  const mapBonus = /\bmap\b/i.test(query) && /\bmap\b/i.test(title) ? 0.25 : 0;
+  return matched / queryTerms.length + mapBonus;
 }
 
-function needsImage(item: AiItem): boolean {
-  return !String(item.prompt?.imgSrc || '').trim();
-}
-
-function buildApiUrl(baseUrl: string, params: Record<string, string>): string {
-  const url = new URL(baseUrl);
-  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-  return url.toString();
-}
-
-async function fetchJson(url: string): Promise<any> {
-  const response = await fetch(url);
+export async function resolveWikimediaImage(
+  query: string,
+  constraints: string[],
+  fetcher: typeof fetch = fetch,
+): Promise<WikimediaImageAttribution | null> {
+  const url = new URL(COMMONS_API_URL);
+  Object.entries({
+    action: 'query',
+    format: 'json',
+    origin: '*',
+    generator: 'search',
+    gsrnamespace: '6',
+    gsrlimit: String(MAX_CANDIDATES),
+    gsrsearch: query,
+    prop: 'imageinfo',
+    iiprop: 'url|extmetadata',
+  }).forEach(([key, value]) => url.searchParams.set(key, value));
+  const response = await fetcher(url.toString());
   if (!response.ok) {
     throw new Error(`Wikimedia request failed with HTTP ${response.status}`);
   }
-  return response.json();
-}
-
-async function fetchLeadImageFileName(title: string): Promise<{ fileName: string; imageUrl: string } | null> {
-  const data = await fetchJson(buildApiUrl(WIKIPEDIA_API_URL, {
-    action: 'query',
-    format: 'json',
-    origin: '*',
-    redirects: '1',
-    prop: 'pageimages',
-    piprop: 'name|original',
-    titles: title,
-  }));
-  const pages = data?.query?.pages && Object.values(data.query.pages);
-  const page = Array.isArray(pages) ? pages.find((entry: any) => entry?.pageimage && entry?.original?.source) as any : null;
-  if (!page?.pageimage || !page?.original?.source) {
-    return null;
-  }
-  return {
-    fileName: String(page.pageimage),
-    imageUrl: String(page.original.source),
-  };
-}
-
-async function fetchCommonsAttribution(fileName: string, imageUrl: string): Promise<WikimediaImageAttribution | null> {
-  const data = await fetchJson(buildApiUrl(COMMONS_API_URL, {
-    action: 'query',
-    format: 'json',
-    origin: '*',
-    prop: 'imageinfo',
-    iiprop: 'url|extmetadata',
-    titles: `File:${fileName}`,
-  }));
-  const pages = data?.query?.pages && Object.values(data.query.pages);
-  const imageInfo = Array.isArray(pages) ? (pages[0] as any)?.imageinfo?.[0] : null;
-  const metadata = imageInfo?.extmetadata || {};
-  const licenseName = stripHtml(metadata.LicenseShortName?.value || metadata.License?.value);
-  const licenseUrl = normalizeLicenseUrl(licenseName, stripHtml(metadata.LicenseUrl?.value));
-  if (!licenseName || !licenseUrl) {
-    return null;
-  }
-  const sourceUrl = `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(fileName).replace(/%20/g, '_')}`;
-  return {
-    imgSrc: String(imageInfo?.url || imageUrl),
-    attribution: {
-      creatorName: stripHtml(metadata.Artist?.value || metadata.Credit?.value || 'Wikimedia Commons contributor'),
-      sourceName: stripHtml(metadata.ObjectName?.value || fileName),
-      sourceUrl,
+  const data = await response.json();
+  const pages = data?.query?.pages ? Object.values(data.query.pages) as any[] : [];
+  const candidates = pages.map((page) => {
+    const info = page?.imageinfo?.[0];
+    const metadata = info?.extmetadata || {};
+    const title = String(page?.title || metadata.ObjectName?.value || '').replace(/^File:/i, '').trim();
+    const licenseName = stripHtml(metadata.LicenseShortName?.value || metadata.License?.value);
+    const licenseUrl = licenseUrlFor(licenseName, stripHtml(metadata.LicenseUrl?.value));
+    return {
+      score: scoreCandidate(title, query, constraints),
+      title,
+      info,
       licenseName,
       licenseUrl,
+      creatorName: stripHtml(metadata.Artist?.value || metadata.Credit?.value || 'Wikimedia Commons contributor'),
+    };
+  }).filter((candidate) => candidate.info?.url && candidate.licenseName && candidate.licenseUrl && candidate.score >= 0.5)
+    .sort((left, right) => right.score - left.score);
+  const best = candidates[0];
+  if (!best) return null;
+  return {
+    imgSrc: String(best.info.url),
+    attribution: {
+      creatorName: best.creatorName,
+      sourceName: best.title,
+      sourceUrl: String(best.info.descriptionurl || `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(best.title).replace(/%20/g, '_')}`),
+      licenseName: best.licenseName,
+      licenseUrl: best.licenseUrl,
     },
   };
 }
 
-async function fetchWikimediaImageAttribution(title: string): Promise<WikimediaImageAttribution | null> {
-  const leadImage = await fetchLeadImageFileName(title);
-  if (!leadImage) {
-    return null;
-  }
-  return fetchCommonsAttribution(leadImage.fileName, leadImage.imageUrl);
-}
-
-export async function enrichAiContentMedia(output: ValidatedAiLessonOutput, sourceText: string): Promise<AiMediaEnrichmentResult> {
-  const warnings: string[] = [];
-  const items = Array.isArray(output.items) ? output.items : [];
-  if (!hasImageIntent(sourceText) || items.length === 0) {
-    return { output, warnings };
-  }
-
-  const requestedImageCount = items.filter((item) => needsImage(item)).length;
-  const enrichedItems = await Promise.all(items.map(async (item) => {
-    const title = String(item?.response?.correctResponse || item?.prompt?.text || '').trim();
-    if (!title || !needsImage(item)) {
-      return item;
-    }
-    try {
-      const image = await fetchWikimediaImageAttribution(title);
-      if (!image) {
-        return item;
-      }
+async function enrichItem(item: AiItem): Promise<AiItem> {
+  const slot = item.prompt?.mediaSlot;
+  if (!slot || slot.kind !== 'image' || slot.status === 'resolved') return item;
+  try {
+    const image = await resolveWikimediaImage(slot.query, slot.constraints);
+    if (!image) {
       return {
         ...item,
         prompt: {
           ...(item.prompt || {}),
-          imgSrc: image.imgSrc,
-          attribution: image.attribution,
+          mediaSlot: { ...slot, status: 'unresolved', failureReason: 'No sufficiently confident attributed Wikimedia image matched this prompt.' },
         },
       };
-    } catch {
-      return item;
     }
-  }));
+    const { failureReason: _failureReason, ...resolvedSlot } = slot;
+    return {
+      ...item,
+      prompt: {
+        ...(item.prompt || {}),
+        imgSrc: image.imgSrc,
+        attribution: image.attribution,
+        mediaSlot: { ...resolvedSlot, status: 'resolved', source: 'wikimedia', previewUrl: image.imgSrc },
+      },
+    };
+  } catch (error) {
+    return {
+      ...item,
+      prompt: {
+        ...(item.prompt || {}),
+        mediaSlot: {
+          ...slot,
+          status: 'unresolved',
+          failureReason: error instanceof Error ? error.message : 'Wikimedia image resolution failed.',
+        },
+      },
+    };
+  }
+}
 
-  const missingImageCount = enrichedItems.filter((item) => needsImage(item)).length;
-  const missingAttributionCount = enrichedItems.filter((item) => {
-    const imageSource = String(item.prompt?.imgSrc || '').trim();
-    return /^https?:\/\//i.test(imageSource) && !hasAttribution(item);
-  }).length;
-  const enrichedCount = requestedImageCount - missingImageCount;
-  if (enrichedCount > 0) {
-    warnings.push(`Added Wikimedia image attribution for ${enrichedCount} generated item${enrichedCount === 1 ? '' : 's'}.`);
-  }
-  if (missingImageCount > 0) {
-    warnings.push(`${missingImageCount} visual identification item${missingImageCount === 1 ? '' : 's'} could not be matched to an attributed Wikimedia image.`);
-  }
-  if (missingAttributionCount > 0) {
-    warnings.push('Generated media content is locked private because one or more media prompts lack attribution evidence.');
-  }
-
+export async function enrichAiContentMedia(output: ValidatedAiLessonOutput, _sourceText: string): Promise<AiMediaEnrichmentResult> {
+  const items = Array.isArray(output.items) ? output.items : [];
+  const enrichedItems = new Array<AiItem>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(RESOLUTION_CONCURRENCY, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      enrichedItems[index] = await enrichItem(items[index]!);
+    }
+  });
+  await Promise.all(workers);
+  const resolvedCount = enrichedItems.filter((item) => item.prompt?.mediaSlot?.status === 'resolved').length;
+  const unresolvedCount = enrichedItems.filter((item) => item.prompt?.mediaSlot?.status === 'unresolved').length;
+  const warnings: string[] = [];
+  if (resolvedCount > 0) warnings.push(`Resolved ${resolvedCount} attributed Wikimedia image prompt${resolvedCount === 1 ? '' : 's'}.`);
+  if (unresolvedCount > 0) warnings.push(`${unresolvedCount} image prompt${unresolvedCount === 1 ? '' : 's'} could not be resolved and must be reviewed.`);
   return {
-    output: {
-      ...output,
-      promptType: enrichedCount > 0 ? 'text-image' : output.promptType,
-      visibility: missingAttributionCount > 0 ? 'private' : output.visibility,
-      visibilityLockReason: missingAttributionCount > 0
-        ? 'Generated visual content requires image attribution evidence before public sharing.'
-        : output.visibilityLockReason,
-      items: enrichedItems,
-    },
+    output: { ...output, items: enrichedItems },
     warnings,
   };
 }

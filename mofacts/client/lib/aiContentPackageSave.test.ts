@@ -69,16 +69,17 @@ function buildDeps(options: {
       type: fileOptions.type,
     }) as unknown as File),
     dynamicAssets: {
+      link: sinon.stub().returns('/dynamic-assets/package.zip'),
       insert: sinon.stub().callsFake(() => {
-        let endCallback: ((error: unknown, fileObj: { _id: string }) => void | Promise<void>) | null = null;
+        let endCallback: ((error: unknown, fileObj: { _id: string; ext?: string }) => void) | null = null;
         const assetId = assetIds[Math.min(uploadIndex, assetIds.length - 1)] || 'asset';
         uploadIndex += 1;
         return {
-          on: (_eventName: 'end', callback: typeof endCallback) => {
-            endCallback = callback;
+          on: (eventName: 'start' | 'progress' | 'end', callback: typeof endCallback) => {
+            if (eventName === 'end') endCallback = callback;
           },
           start: () => {
-            void endCallback?.(null, { _id: assetId });
+            void endCallback?.(null, { _id: assetId, ext: 'zip' });
           },
         };
       }),

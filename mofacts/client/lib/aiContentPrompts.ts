@@ -1,15 +1,39 @@
 import type { CreationModuleId } from './aiContentTypes';
 import type { CueLeak } from './aiContentCueValidation';
+import type { AiAuthoringIntent } from '../../common/aiContentDrafts';
 
 export type AiContentPromptImage = {
   packageFileName: string;
   originalName: string;
 };
 
+export function buildIntentAuthoringPrompt(sourceText: string) {
+  return [
+    'Interpret this authoring request without generating lesson items.',
+    'Quote exact short phrases from the request as imageRequestEvidence only when the user explicitly asks for visual prompts.',
+    'Treat words such as pictures, maps, photographs, diagrams, and images as visual evidence even when modified by another word.',
+    'Honor explicit negation such as no images or without pictures.',
+    'Convert written item counts such as fifty to numbers.',
+    'Return JSON only with this shape:',
+    JSON.stringify({
+      requestedItemCount: 50,
+      promptModality: 'image',
+      responseModality: 'typed',
+      imagesExplicitlyRequested: true,
+      imageRequestEvidence: ['map pictures'],
+      imageConstraints: ['show the state in its location', 'nothing labeled'],
+    }, null, 2),
+    '',
+    'Authoring request:',
+    sourceText,
+  ].join('\n');
+}
+
 export function buildItemAuthoringPrompt(
   sourceText: string,
   selectedModules: CreationModuleId[],
   uploadedImages: AiContentPromptImage[] = [],
+  intent?: AiAuthoringIntent,
 ) {
   const uploadedImageNames = uploadedImages.map((image) => ({
     assetFileName: image.packageFileName,
@@ -19,6 +43,15 @@ export function buildItemAuthoringPrompt(
     'Return compact normalized import-ready JSON, not raw TDF.',
     'Create a shared item pool usable for the selected MoFaCTS modules.',
     `Selected modules: ${selectedModules.join(', ')}`,
+    ...(intent ? [
+      `Validated authoring intent: ${JSON.stringify(intent)}`,
+      intent.requestedItemCount !== null
+        ? `Return exactly ${intent.requestedItemCount} unique items.`
+        : 'Use the default item-count guidance below.',
+      intent.imagesExplicitlyRequested
+        ? 'For every required visual prompt, provide prompt.mediaQuery and prompt.mediaConstraints. Do not invent an image URL.'
+        : 'Do not provide prompt.mediaQuery, prompt.mediaConstraints, or prompt.imgSrc.',
+    ] : []),
     'If the user specifies what should be stimulus and response, follow that instruction exactly.',
     'Treat the requested stimulus modality as a constraint. If the user requests a text stimulus and does not explicitly request images, set promptType to "text" and omit prompt.imgSrc and image attribution.',
     'Do not add images merely because a topic could be illustrated. Images are allowed only when the user explicitly requests images or supplies uploaded image assets with this request.',
@@ -65,6 +98,8 @@ export function buildItemAuthoringPrompt(
         prompt: {
           text: 'learner-visible question, definition, description, or content clue that does not name or give away the correctResponse',
           imgSrc: 'omit unless images were explicitly requested; for an uploaded image, use its exact assetFileName',
+          mediaQuery: 'search phrase for a required external image; omit for text or uploaded-image prompts',
+          mediaConstraints: ['visual constraints copied from the validated authoring intent'],
           attribution: {
             creatorName: '',
             sourceName: '',
@@ -110,6 +145,41 @@ export function buildItemCueRepairPrompt(leaks: CueLeak[]) {
       currentPromptText: leak.promptText,
       forbiddenTerms: leak.forbiddenTerms,
     })), null, 2),
+  ].join('\n');
+}
+
+export function buildItemCountRepairPrompt(
+  missingCount: number,
+  existingItems: unknown[],
+  intent: AiAuthoringIntent,
+) {
+  return [
+    `Generate exactly ${missingCount} additional unique item${missingCount === 1 ? '' : 's'} to complete the validated authoring request.`,
+    'Return only new items. Do not repeat, paraphrase, or renumber an existing prompt/response pair.',
+    'Every new item must have a nonempty prompt, a nonempty compact correctResponse, and the requested modality.',
+    intent.imagesExplicitlyRequested
+      ? 'Each new visual prompt must provide mediaQuery and mediaConstraints and must not provide imgSrc.'
+      : 'Do not provide mediaQuery, mediaConstraints, or imgSrc.',
+    `Validated authoring intent: ${JSON.stringify(intent)}`,
+    'Return JSON only with this shape:',
+    JSON.stringify({
+      items: [{
+        prompt: { text: '', mediaQuery: 'required image search phrase', mediaConstraints: ['required visual constraint'] },
+        response: { correctResponse: 'compact answer', incorrectResponses: [] },
+        sourceType: 'freeResponse',
+      }],
+    }, null, 2),
+    '',
+    'Existing prompt/response pairs that must not be repeated:',
+    JSON.stringify(existingItems.map((item) => {
+      const typedItem = item && typeof item === 'object'
+        ? item as { prompt?: { text?: string; mediaQuery?: string }; response?: { correctResponse?: string } }
+        : {};
+      return {
+        prompt: String(typedItem.prompt?.text || typedItem.prompt?.mediaQuery || '').trim(),
+        response: String(typedItem.response?.correctResponse || '').trim(),
+      };
+    }), null, 2),
   ].join('\n');
 }
 

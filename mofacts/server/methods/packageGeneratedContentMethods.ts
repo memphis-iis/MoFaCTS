@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
+import { AI_CONTENT_DRAFT_TYPE, isAiDraftReviewComplete } from '../../common/aiContentDrafts';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -53,10 +54,13 @@ type AiGeneratedPackageSavePayload = {
   packageFileName?: unknown;
   entries?: unknown;
   creationSummary?: unknown;
+  draftId?: unknown;
+  draftRevision?: unknown;
 };
 
 type PackageGeneratedContentDeps = {
   DynamicAssets: any;
+  ManualContentDrafts: any;
   normalizeCanonicalId: (value: unknown) => string | null;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   getTdfByFileName: (filename: string) => Promise<any>;
@@ -138,6 +142,24 @@ export function createPackageGeneratedContentMethods(
       }
       await callbacks.requireCreatorDisplayName(actingUserId);
 
+      const draftId = deps.normalizeCanonicalId(payload.draftId);
+      const draftRevision = Number(payload.draftRevision);
+      if (!draftId || !Number.isInteger(draftRevision)) {
+        throw new Meteor.Error(400, 'AI draft id and revision are required');
+      }
+      const aiDraft = await deps.ManualContentDrafts.findOneAsync({
+        _id: draftId,
+        ownerId: actingUserId,
+        draftType: AI_CONTENT_DRAFT_TYPE,
+        revision: draftRevision,
+      });
+      if (!aiDraft) {
+        throw new Meteor.Error('ai-draft-conflict', 'The AI draft changed before package save.');
+      }
+      if (!isAiDraftReviewComplete({ output: aiDraft.output })) {
+        throw new Meteor.Error('ai-draft-incomplete', 'Resolve all required prompts and responses before saving.');
+      }
+
       const packageAssetId = deps.normalizeCanonicalId(payload.packageAssetId);
       if (!packageAssetId) {
         throw new Meteor.Error(400, 'Package asset id is required');
@@ -150,6 +172,9 @@ export function createPackageGeneratedContentMethods(
       const isAdmin = await deps.userIsInRoleAsync(actingUserId, ['admin']);
       if (assetOwnerId && assetOwnerId !== actingUserId && !isAdmin) {
         throw new Meteor.Error(403, 'Can only save generated packages you uploaded');
+      }
+      if (packageAsset.meta?.uploadPurpose !== 'package') {
+        throw new Meteor.Error(400, 'Generated content must be saved from a package-purpose upload');
       }
 
       const isTeacherOrAdmin = await deps.userIsInRoleAsync(actingUserId, ['admin', 'teacher']);

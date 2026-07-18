@@ -1212,10 +1212,19 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
             await meteorCallAsync('removeAssetById', existingFile._id);
         }
 
-        // Upload using (globalThis as any).DynamicAssets (ostrio:files)
+        const tdf = findTdf(instance?.tdfId);
+        if (!tdf?._id || tdf.stimuliSetId === undefined || tdf.stimuliSetId === null) {
+            throw new Error('The content media target is unavailable. Reload the editor and try again.');
+        }
         const upload = (globalThis as any).DynamicAssets.insert({
             file: file,
-            chunkSize: 'dynamic'
+            chunkSize: 'dynamic',
+            meta: {
+                uploadPurpose: 'content-media',
+                tdfId: String(tdf._id),
+                stimuliSetId: tdf.stimuliSetId,
+                public: true
+            }
         }, false);
 
         upload.on('progress', function(progress: any) {

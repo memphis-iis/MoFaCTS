@@ -44,6 +44,15 @@ MoFaCTS supports multiple stimulus and response formats, including:
 - Test TDFs in a staging or local environment before learner use.
 - Do not include private learner data, credentials, or institutional secrets in content packages.
 
+## Creation And Import Paths
+
+- AI creation is a resumable draft workflow: interpret the request, generate items, resolve requested prompt images, review/edit, then save the completed package. Unresolved required images remain as uploadable blank prompt slots; they do not erase the draft.
+- The simple AI review shows prompts, responses, and image replacement controls. It does not expose TDF JSON or lesson-delivery settings.
+- Direct package upload accepts MoFaCTS `.zip` packages only.
+- The Anki wizard reads `.apkg` locally and uploads only the converted MoFaCTS `.zip` package.
+- The Canvas/Common Cartridge wizard reads `.imscc` locally and uploads only the converted MoFaCTS `.zip` package.
+- Lesson media uploads are separate from package imports and must target a specific TDF and stimulus set.
+
 ## Where Detailed Examples Belong
 
 Detailed course examples, content packages, sync workflows, and internal authoring notes belong in the configuration/content repository or the GitHub wiki, not in the public application README.

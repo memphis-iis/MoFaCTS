@@ -3,6 +3,7 @@ import { Mongo } from 'meteor/mongo';
 import { Roles } from 'meteor/alanning:roles';
 import { FilesCollection } from 'meteor/ostrio:files';
 import { collectionMongoName } from './collectionOwnership';
+import { validateDynamicAssetUpload, type DynamicAssetUploadMeta } from './fileUploadPolicy';
 
 /*
  * Collection declarations are the persistence boundary for MoFaCTS.
@@ -41,49 +42,56 @@ const ManualContentDrafts = new Mongo.Collection(collectionMongoName('ManualCont
 const H5PContents = new Mongo.Collection(collectionMongoName('H5PContents'));
 const BackupJobs = new Mongo.Collection(collectionMongoName('BackupJobs'));
 
-// DynamicAssets upload policy. Later split target: common/fileUploadPolicy.ts.
 const DynamicAssets = new FilesCollection({
   collectionName: collectionMongoName('DynamicAssets'),
   storagePath: process.env.HOME + '/dynamic-assets',
   allowClientCode: false, // Security: Disallow file operations from client (use server methods)
-  onBeforeUpload(this: { userId?: string }, file: { name?: string; extension?: string }) {
-    // Security: Validate file uploads to prevent malicious content
-    // Note: This callback is synchronous - async checks moved to onInitiateUpload
-
-    // 1. Basic authentication check
+  onBeforeUpload(this: { userId?: string }, file: { name?: string; extension?: string; type?: string; meta?: DynamicAssetUploadMeta }) {
     if (!this.userId) {
       return 'Must be logged in to upload files';
     }
-
-    // 2. File size limit enforced in onInitiateUpload (role-based)
-    // Admins have no limit, regular users have 10MB limit
-
-    // 3. Filename validation - prevent path traversal
-    const filename = file.name || '';
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      return 'Invalid filename - path traversal not allowed';
-    }
-
-    // 4. Extension validation - only zip and apkg files
-    if (!file.extension || !/^(zip|apkg)$/i.test(file.extension)) {
-      return 'Only .zip and .apkg files are allowed';
-    }
-
-    return true;
+    return validateDynamicAssetUpload(file);
   },
-  async onInitiateUpload(this: { userId?: string }, fileData: { size: number }) {
-    // Security: Authorization check using async Roles API (Meteor 3.x compatible)
-    // This callback executes on server right after onBeforeUpload returns true
-
+  async onInitiateUpload(this: { userId?: string }, fileData: { size: number; meta?: DynamicAssetUploadMeta }) {
     if (!this.userId) {
       throw new Meteor.Error('not-authorized', 'Must be logged in to upload files');
     }
+    const userId = this.userId;
+    const meta = fileData.meta || {};
+    const isAdmin = await Roles.userIsInRoleAsync(userId, ['admin']);
+    const isTeacherOrAdmin = isAdmin || await Roles.userIsInRoleAsync(userId, ['teacher']);
 
-    // Check if user is teacher/admin - they get higher limits and no quota
-    const isTeacherOrAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin', 'teacher']);
+    if (meta.uploadPurpose === 'content-media') {
+      const tdf = await Tdfs.findOneAsync(
+        { _id: String(meta.tdfId || '') },
+        { fields: { ownerId: 1, accessors: 1, stimuliSetId: 1 } }
+      );
+      const accessors = Array.isArray((tdf as any)?.accessors) ? (tdf as any).accessors : [];
+      const hasSharedAccess = accessors.some((accessor: unknown) =>
+        accessor === userId || (accessor && typeof accessor === 'object' && (accessor as { userId?: unknown }).userId === userId)
+      );
+      if (!tdf || (!isAdmin && (tdf as any).ownerId !== userId && !hasSharedAccess)) {
+        throw new Meteor.Error('not-authorized', 'You cannot upload media for this content');
+      }
+      if (String((tdf as any).stimuliSetId) !== String(meta.stimuliSetId)) {
+        throw new Meteor.Error('invalid-upload-target', 'The media stimuli set does not match the selected content');
+      }
+    }
+
+    if (meta.uploadPurpose === 'ai-draft-media') {
+      const draft = await ManualContentDrafts.findOneAsync({
+        _id: String(meta.draftId || ''),
+        ownerId: userId,
+        draftType: 'ai-content-creator',
+      });
+      const items = Array.isArray((draft as any)?.output?.items) ? (draft as any).output.items : [];
+      const item = items.find((candidate: any) => String(candidate?.id || '') === String(meta.itemId || ''));
+      if (!draft || !item || String(item?.prompt?.mediaSlot?.id || '') !== String(meta.mediaSlotId || '')) {
+        throw new Meteor.Error('not-authorized', 'The AI draft media slot is not owned by this user');
+      }
+    }
 
     if (isTeacherOrAdmin) {
-      // Admins/teachers: no file size limit, no daily quota
       return true;
     }
 

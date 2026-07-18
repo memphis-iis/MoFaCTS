@@ -90,6 +90,7 @@ type UpsertResult = {
 
 type PackageMethodsDeps = {
   Tdfs: any;
+  ManualContentDrafts: any;
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
@@ -227,14 +228,13 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return responseKC[0].maxResponseKC;
   }
 
-  async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
+  async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, _owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
     const actingUserId = deps.normalizeCanonicalId(this.userId);
     if (!actingUserId) {
       throw new Meteor.Error(401, 'Must be logged in');
     }
-    const ownerId = deps.normalizeCanonicalId(owner) || actingUserId;
-    await requireContentCreatorDisplayName(deps.usersCollection, ownerId);
-    return processPackageUploadWorkflow(this, fileObjOrId, owner, emailToggle, {
+    await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
+    return processPackageUploadWorkflow(this, fileObjOrId, actingUserId, emailToggle, {
       DynamicAssets: deps.DynamicAssets,
       storageBoundary: deps.storageBoundary,
       userIsInRoleAsync: deps.userIsInRoleAsync,

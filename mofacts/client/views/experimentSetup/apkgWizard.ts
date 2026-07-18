@@ -17,6 +17,7 @@ import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getImportIndexSelectionCount, parseImportIndexSpec } from '../../lib/importRangeUtils';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { uploadAndProcessPackage } from '../../lib/packageUploadClient';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import './draftEditorWorkspace';
@@ -771,111 +772,47 @@ Template.apkgWizard.events({
         }
       }
 
-      const upload = DynamicAssets.insert({
-        file: file,
-        chunkSize: 'dynamic'
-      }, false);
-
-      upload.on('start', function () {
-        template.uploadStatus.set({
-          message: apkgText('apkg.uploadingPackage'),
-          progress: 0
-        });
-      });
-
-      upload.on('progress', function (progress: any) {
-        // Upload is 0-50% of total progress
-        template.uploadStatus.set({
+      const { processing: processResult } = await uploadAndProcessPackage({
+        dynamicAssets: DynamicAssets,
+        file,
+        getUploadIntegrity,
+        callAsync: (Meteor as any).callAsync.bind(Meteor),
+        userId: Meteor.userId(),
+        onStart: () => template.uploadStatus.set({ message: apkgText('apkg.uploadingPackage'), progress: 0 }),
+        onProgress: (progress) => template.uploadStatus.set({
           message: apkgText('apkg.uploadingPackage'),
           progress: Math.round(progress * 0.5)
-        });
+        }),
+        onProcessing: () => template.uploadStatus.set({
+          message: apkgText('apkg.extractingValidatingTdfs'),
+          progress: 65,
+          hint: apkgText('apkg.largePackageHint')
+        }),
       });
-
-      upload.on('end', async function (error: any, fileObj: any) {
-        if (error) {
-          template.uploadStatus.set(null);
-          template.uploadError.set(apkgText('apkg.uploadError', { error }));
-        } else {
-          const link = DynamicAssets.link({...fileObj});
-          if (fileObj.ext === "zip") {
-            
-
-            try {
-              // Processing is 50-100% of total progress
-              template.uploadStatus.set({
-                message: apkgText('apkg.processingPackage'),
-                progress: 55,
-                hint: apkgText('apkg.largePackageHint')
-              });
-
-              const emailToggle = false; // Not using email notification for wizard uploads
-
-              template.uploadStatus.set({
-                message: apkgText('apkg.extractingValidatingTdfs'),
-                progress: 65,
-                hint: apkgText('apkg.largePackageHint')
-              });
-
-              const uploadIntegrity = await getUploadIntegrity(file);
-              const processResult = await (Meteor as any).callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
-
-              
-
-              template.uploadStatus.set({
-                message: apkgText('apkg.finalizingUpload'),
-                progress: 85
-              });
-
-              // Handle confirmation dialogs for overwrites
-              for (const res of processResult.results) {
-                if (res.data && res.data.res === 'awaitClientTDF') {
-                  const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                  const reason: string[] = [];
-                  if (reasons.includes('prevTDFExists'))
-                    reason.push(apkgText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
-                  if (reasons.includes('prevStimExists'))
-                    reason.push(apkgText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
-
-                  const confirmed = await requestApkgConfirmation(template, {
-                    id: `overwrite-tdf-${res.data.TDF._id || res.data.TDF.content.fileName}`,
-                    title: apkgText('apkg.overwriteTdfTitle'),
-                    message: reason.join(' '),
-                    confirmLabel: apkgText('apkg.overwriteContent')
-                  });
-
-                  if (confirmed) {
-                    template.uploadStatus.set({
-                      message: apkgText('apkg.confirmingTdfUpdate'),
-                      progress: 95
-                    });
-                    await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
-                    closeInlineConfirmation(template, false);
-                  } else {
-                    template.uploadStatus.set(null);
-                    template.uploadError.set(apkgText('apkg.uploadStoppedBeforeOverwrite'));
-                    return;
-                  }
-                } else if (!res.result) {
-                  template.uploadStatus.set(null);
-                  template.uploadError.set(apkgText('apkg.packageUploadFailed', { error: res.errmsg }));
-                  return;
-                }
-              }
-
-              // Clear status and mark complete
-              template.uploadStatus.set(null);
-              template.uploadComplete.set(true);
-              Session.set('assetsRefreshTrigger', Date.now());
-
-            } catch (err: unknown) {
-              template.uploadStatus.set(null);
-              template.uploadError.set(apkgText('apkg.processingError', { error: getErrorMessage(err) }));
-            }
-          }
+      template.uploadStatus.set({ message: apkgText('apkg.finalizingUpload'), progress: 85 });
+      for (const res of processResult.results) {
+        if (res.data && res.data.res === 'awaitClientTDF') {
+          const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
+          const reason: string[] = [];
+          if (reasons.includes('prevTDFExists')) reason.push(apkgText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
+          if (reasons.includes('prevStimExists')) reason.push(apkgText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
+          const confirmed = await requestApkgConfirmation(template, {
+            id: `overwrite-tdf-${res.data.TDF._id || res.data.TDF.content.fileName}`,
+            title: apkgText('apkg.overwriteTdfTitle'),
+            message: reason.join(' '),
+            confirmLabel: apkgText('apkg.overwriteContent')
+          });
+          if (!confirmed) throw new Error(apkgText('apkg.uploadStoppedBeforeOverwrite'));
+          template.uploadStatus.set({ message: apkgText('apkg.confirmingTdfUpdate'), progress: 95 });
+          await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
+          closeInlineConfirmation(template, false);
+        } else if (!res.result) {
+          throw new Error(apkgText('apkg.packageUploadFailed', { error: res.errmsg }));
         }
-      });
-
-      upload.start();
+      }
+      template.uploadStatus.set(null);
+      template.uploadComplete.set(true);
+      Session.set('assetsRefreshTrigger', Date.now());
 
     } catch (error: unknown) {
       clientConsole(1, 'Error uploading package:', error);

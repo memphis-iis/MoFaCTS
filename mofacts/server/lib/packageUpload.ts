@@ -191,6 +191,10 @@ export async function processPackageUploadWorkflow(
   if (assetOwnerId && assetOwnerId !== context.userId && !actingUserIsAdmin) {
     throw new Meteor.Error(403, 'Can only process package assets you uploaded');
   }
+  const uploadPurpose = typeof fileObj.meta?.uploadPurpose === 'string' ? fileObj.meta.uploadPurpose : '';
+  if (uploadPurpose && uploadPurpose !== 'package') {
+    throw new Meteor.Error(400, 'Only package-purpose assets can enter package processing');
+  }
 
   if (owner !== context.userId && !actingUserIsAdmin) {
     throw new Meteor.Error(403, 'Can only upload packages for yourself unless admin');

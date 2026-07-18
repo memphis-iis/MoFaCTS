@@ -2,6 +2,7 @@ import { buildImportPackageFromDraftLessons } from './importPackageBuilder';
 import { getImportFileNames, sanitizeImportName } from './importCompositionBuilder';
 import type { BuiltImportPackage, ImportDraftLesson } from './normalizedImportTypes';
 import type { CreatedOutput } from './aiContentTypes';
+import { uploadPackageAsset } from './packageUploadClient';
 
 export type GeneratedNameConflict = {
   entryIndex: number;
@@ -10,19 +11,25 @@ export type GeneratedNameConflict = {
 };
 
 type UploadHandle = {
-  on: (eventName: 'end', callback: (error: unknown, fileObj: { _id: string }) => void | Promise<void>) => void;
+  on: (eventName: 'start' | 'progress' | 'end', callback: (...args: any[]) => void) => void;
   start: () => void;
 };
 
 export type AiContentPackageSaveDeps = {
   dynamicAssets: {
-    insert: (options: { file: File; chunkSize: 'dynamic' }, autoStart: false) => UploadHandle;
+    insert: (options: { file: File; chunkSize: 'dynamic'; meta: Record<string, unknown> }, autoStart: false) => UploadHandle;
+    link: (file: Record<string, unknown>) => string;
   };
   callAsync: (name: string, ...args: any[]) => Promise<any>;
   getUploadIntegrity: (file: File) => Promise<unknown>;
   refreshAssets?: () => void;
   logCleanupError?: (error: unknown) => void;
   makeFile?: (parts: BlobPart[], fileName: string, options: FilePropertyBag) => File;
+};
+
+export type AiContentDraftSaveContext = {
+  draftId: string;
+  draftRevision: number;
 };
 
 export function readGeneratedNameConflict(error: unknown): GeneratedNameConflict | null {
@@ -89,49 +96,43 @@ export function uploadBuiltPackage(
   builtPackage: BuiltImportPackage,
   creationSummary: string,
   deps: AiContentPackageSaveDeps,
+  draftContext?: AiContentDraftSaveContext,
 ): Promise<CreatedOutput[]> {
-  return new Promise((resolve, reject) => {
+  return (async () => {
     const firstManifest = Array.isArray(builtPackage.manifest) && builtPackage.manifest.length > 0
       ? builtPackage.manifest[0]
       : null;
     const fileName = firstManifest ? `${firstManifest.tdfName}.zip` : 'MoFaCTS_AI_Content.zip';
-    const startUpload = async () => {
-      try {
-        const makeFile = deps.makeFile || ((parts, name, options) => new File(parts, name, options));
-        const file = makeFile([builtPackage.zipBlob], fileName, { type: 'application/zip' });
-        const uploadIntegrity = await deps.getUploadIntegrity(file);
-        const upload = deps.dynamicAssets.insert({ file, chunkSize: 'dynamic' }, false);
-        upload.on('end', async function(error: unknown, fileObj: { _id: string }) {
-          if (error) {
-            reject(error);
-            return;
-          }
-          try {
-            const outputs = await deps.callAsync('saveAiGeneratedPackageContent', {
-              packageAssetId: fileObj._id,
+    const makeFile = deps.makeFile || ((parts, name, options) => new File(parts, name, options));
+    const file = makeFile([builtPackage.zipBlob], fileName, { type: 'application/zip' });
+    const { asset, integrity: uploadIntegrity } = await uploadPackageAsset({
+      dynamicAssets: deps.dynamicAssets,
+      file,
+      getUploadIntegrity: deps.getUploadIntegrity as (file: File) => Promise<Partial<{ expectedSize: number; sha256?: string }>>,
+    });
+    try {
+      const outputs = await deps.callAsync('saveAiGeneratedPackageContent', {
+              packageAssetId: asset._id,
               packageFileName: fileName,
               uploadIntegrity,
               entries: buildSaveEntries(builtPackage),
               creationSummary,
+              ...(draftContext ? {
+                draftId: draftContext.draftId,
+                draftRevision: draftContext.draftRevision,
+              } : {}),
             });
-            deps.refreshAssets?.();
-            resolve(outputs as CreatedOutput[]);
-          } catch (processError) {
-            try {
-              await deps.callAsync('removeAssetById', fileObj._id);
-            } catch (cleanupError) {
-              deps.logCleanupError?.(cleanupError);
-            }
-            reject(processError);
-          }
-        });
-        upload.start();
-      } catch (setupError) {
-        reject(setupError);
+      deps.refreshAssets?.();
+      return outputs as CreatedOutput[];
+    } catch (processError) {
+      try {
+        await deps.callAsync('removeAssetById', asset._id);
+      } catch (cleanupError) {
+        deps.logCleanupError?.(cleanupError);
       }
-    };
-    void startUpload();
-  });
+      throw processError;
+    }
+  })();
 }
 
 export async function buildUploadWithNameConflictRetry(
@@ -140,6 +141,7 @@ export async function buildUploadWithNameConflictRetry(
   deps: AiContentPackageSaveDeps & {
     promptForReplacementName: (conflict: GeneratedNameConflict) => string | null;
   },
+  draftContext?: AiContentDraftSaveContext,
 ): Promise<{ builtPackage: BuiltImportPackage; outputs: CreatedOutput[] }> {
   const outputs: CreatedOutput[] = [];
   const maxAttempts = drafts.length + 3;
@@ -148,7 +150,7 @@ export async function buildUploadWithNameConflictRetry(
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const singlePackage = await buildImportPackageFromDraftLessons([draft]);
       try {
-        outputs.push(...await uploadBuiltPackage(singlePackage, creationSummary, deps));
+        outputs.push(...await uploadBuiltPackage(singlePackage, creationSummary, deps, draftContext));
         saved = true;
         break;
       } catch (error) {

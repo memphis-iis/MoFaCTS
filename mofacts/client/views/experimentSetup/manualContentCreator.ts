@@ -9,6 +9,7 @@ import './manualContentCreator.css';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { uploadAndProcessPackage } from '../../lib/packageUploadClient';
 import {
   buildManualDraftLesson,
   createDefaultManualCreatorState,
@@ -960,98 +961,45 @@ Template.manualContentCreator.events({
         }
 
         const file = new File([result.zipBlob], fileName, { type: 'application/zip' });
-        const upload = DynamicAssets.insert({
+        const { processing: processResult } = await uploadAndProcessPackage({
+          dynamicAssets: DynamicAssets,
           file,
-          chunkSize: 'dynamic'
-        }, false);
-
-        upload.on('start', function() {
-          instance.uploadStatus.set({
+          getUploadIntegrity,
+          callAsync: (Meteor as any).callAsync.bind(Meteor),
+          userId: Meteor.userId(),
+          onStart: () => instance.uploadStatus.set({
             message: manualText('content.uploadingFile', { filename: fileName }),
             progress: 5
-          });
-        });
-
-        upload.on('progress', function(progress: number) {
-          instance.uploadStatus.set({
+          }),
+          onProgress: (progress) => instance.uploadStatus.set({
             message: manualText('content.uploadingFile', { filename: fileName }),
             progress: Math.round(progress * 0.5)
-          });
+          }),
+          onProcessing: () => instance.uploadStatus.set({ message: manualText('content.processingPackage'), progress: 65 }),
         });
-
-        upload.on('end', async function(error: any, fileObj: any) {
-          if (error) {
-            instance.uploadStatus.set(null);
-            instance.uploadError.set(manualText('content.uploadFailedForFile', { filename: fileName, error: String(error) }));
-            return;
-          }
-
-          try {
-            instance.uploadStatus.set({
-              message: manualText('content.processingPackage'),
-              progress: 65
+        for (const res of processResult.results || []) {
+          if (res?.data?.res === 'awaitClientTDF') {
+            const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
+            const prompts = [];
+            if (reasons.includes('prevTDFExists')) prompts.push(manualText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
+            if (reasons.includes('prevStimExists')) prompts.push(manualText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
+            const confirmed = prompts.length === 0 || await requestManualConfirmation(instance, uploadTrigger, {
+              title: manualText('content.overwriteExistingContent'),
+              message: prompts.join(' '),
+              confirmLabel: manualText('content.overwriteContent'),
+              placement: 'upload',
             });
-
-            const link = DynamicAssets.link({ ...fileObj });
-            const uploadIntegrity = await getUploadIntegrity(file);
-            const processResult = await (Meteor as any).callAsync(
-              'processPackageUpload',
-              fileObj._id,
-              Meteor.userId(),
-              link,
-              false,
-              uploadIntegrity
-            );
-
-            for (const res of processResult.results || []) {
-              if (res?.data?.res === 'awaitClientTDF') {
-                const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                const prompts = [];
-                if (reasons.includes('prevTDFExists')) {
-                  prompts.push(manualText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
-                }
-                if (reasons.includes('prevStimExists')) {
-                  prompts.push(manualText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
-                }
-
-                const confirmed = prompts.length === 0 || await requestManualConfirmation(instance, uploadTrigger, {
-                  title: manualText('content.overwriteExistingContent'),
-                  message: prompts.join(' '),
-                  confirmLabel: manualText('content.overwriteContent'),
-                  placement: 'upload',
-                });
-                if (confirmed) {
-                  instance.uploadStatus.set({
-                    message: manualText('content.processing'),
-                    progress: 92
-                  });
-                  await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
-                } else {
-                  instance.uploadStatus.set(null);
-                  instance.uploadError.set(manualText('content.uploadCanceledPackage', { filename: fileName }));
-                  return;
-                }
-              } else if (!res?.result) {
-                instance.uploadStatus.set(null);
-                instance.uploadError.set(manualText('content.packageProcessingFailed', { error: res?.errmsg || 'unknown error' }));
-                return;
-              }
-            }
-
-            instance.uploadStatus.set(null);
-            instance.uploadComplete.set(true);
-            Session.set('assetsRefreshTrigger', Date.now());
-            if (instance.currentDraftId.get()) {
-              await deleteCurrentDraft(instance, { silent: true });
-            }
-          } catch (processError: unknown) {
-            clientConsole(1, '[MANUAL CREATOR] Package processing failed:', processError);
-            instance.uploadStatus.set(null);
-            instance.uploadError.set(getErrorMessage(processError));
+            if (!confirmed) throw new Error(manualText('content.uploadCanceledPackage', { filename: fileName }));
+            instance.uploadStatus.set({ message: manualText('content.processing'), progress: 92 });
+            await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
+          } else if (!res?.result) {
+            throw new Error(manualText('content.packageProcessingFailed', { error: res?.errmsg || 'unknown error' }));
           }
-        });
-
-        upload.start();
+        }
+        instance.uploadStatus.set(null);
+        instance.uploadComplete.set(true);
+        Session.set('assetsRefreshTrigger', Date.now());
+        if (instance.currentDraftId.get()) await deleteCurrentDraft(instance, { silent: true });
       } catch (error: unknown) {
         clientConsole(1, '[MANUAL CREATOR] Upload setup failed:', error);
         instance.uploadStatus.set(null);

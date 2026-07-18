@@ -14,6 +14,7 @@ import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuild
 import { sanitizeImportName } from '../../lib/importCompositionBuilder';
 import { clientConsole } from '../..';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { uploadAndProcessPackage } from '../../lib/packageUploadClient';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { formatActiveInterfaceDateTime } from '../../lib/interfaceFormatting';
@@ -682,77 +683,31 @@ Template.imsccWizard.events({
       }
 
       const file = new File([result.zipBlob], uploadName, { type: 'application/zip' });
-      const upload = DynamicAssets.insert({ file, chunkSize: 'dynamic' }, false);
-
-      upload.on('start', function() {
-        template.uploadStatus.set({
-          message: imsccText('imscc.uploadingPackage'),
-          progress: 5
-        });
-      });
-
-      upload.on('progress', function(progress: any) {
-        template.uploadStatus.set({
+      const { processing: processResult } = await uploadAndProcessPackage({
+        dynamicAssets: DynamicAssets,
+        file,
+        getUploadIntegrity,
+        callAsync: (Meteor as any).callAsync.bind(Meteor),
+        userId: Meteor.userId(),
+        onStart: () => template.uploadStatus.set({ message: imsccText('imscc.uploadingPackage'), progress: 5 }),
+        onProgress: (progress) => template.uploadStatus.set({
           message: imsccText('imscc.uploadingPackage'),
           progress: Math.round(progress * 0.5)
-        });
+        }),
+        onProcessing: () => template.uploadStatus.set({ message: imsccText('imscc.processingPackage'), progress: 65 }),
       });
-
-      upload.on('end', async function(error: any, fileObj: any) {
-        if (error) {
-          template.uploadStatus.set(null);
-          template.uploadError.set(imsccText('imscc.uploadFailed', { error }));
-          template.uploading.set(false);
-          return;
+      for (const res of processResult.results) {
+        if (res?.data?.res === 'awaitClientTDF') throw new Error(imsccText('imscc.overwriteRequired'));
+        if (!res?.result) {
+          throw new Error(imsccText('imscc.packageUploadFailed', {
+            error: res.errmsg || imsccText('imscc.unknownError')
+          }));
         }
-
-        try {
-          template.uploadStatus.set({
-            message: imsccText('imscc.processingPackage'),
-            progress: 65
-          });
-
-          const link = DynamicAssets.link({ ...fileObj });
-          const uploadIntegrity = await getUploadIntegrity(file);
-          const processResult = await (Meteor as any).callAsync(
-            'processPackageUpload',
-            fileObj._id,
-            Meteor.userId(),
-            link,
-            false,
-            uploadIntegrity
-          );
-
-          for (const res of processResult.results) {
-            if (res?.data?.res === 'awaitClientTDF') {
-              template.uploadStatus.set(null);
-              template.uploadError.set(imsccText('imscc.overwriteRequired'));
-              template.uploading.set(false);
-              return;
-            }
-            if (!res?.result) {
-              template.uploadStatus.set(null);
-              template.uploadError.set(imsccText('imscc.packageUploadFailed', {
-                error: res.errmsg || imsccText('imscc.unknownError')
-              }));
-              template.uploading.set(false);
-              return;
-            }
-          }
-
-          template.uploadStatus.set(null);
-          template.uploadComplete.set(true);
-          template.uploading.set(false);
-          Session.set('assetsRefreshTrigger', Date.now());
-        } catch (processError: any) {
-          clientConsole(1, '[IMSCC WIZARD] Package processing failed:', processError);
-          template.uploadStatus.set(null);
-          template.uploadError.set(processError.reason || processError.message || imsccText('imscc.packageProcessingFailed'));
-          template.uploading.set(false);
-        }
-      });
-
-      upload.start();
+      }
+      template.uploadStatus.set(null);
+      template.uploadComplete.set(true);
+      template.uploading.set(false);
+      Session.set('assetsRefreshTrigger', Date.now());
     } catch (error: any) {
       clientConsole(1, '[IMSCC WIZARD] Upload setup failed:', error);
       template.uploadStatus.set(null);
