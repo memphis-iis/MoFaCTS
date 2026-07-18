@@ -50,7 +50,6 @@ When instructions compete, use this order:
 - Typecheck from `mofacts/`: `npm run typecheck`
 - Lint from `mofacts/`: `npm run lint`
 - Generate schemas from `mofacts/`: `npm run generate:schemas`
-- Start native hotfix dev app from `deploy/`: `.\hotfix-dev.ps1 start -SettingsPath "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"`
 
 ## Repo Map
 
@@ -108,7 +107,6 @@ Use the verification path that matches the change. Say clearly when a check coul
 | TypeScript-bearing app changes | Run `npm run typecheck` from `mofacts/`. |
 | Lintable TypeScript, JavaScript, or Svelte changes | Run `npm run lint` from `mofacts/`. |
 | TDF field registry or schema changes | Run `npm run generate:schemas` from `mofacts/` and inspect generated schema diffs. |
-| UI/runtime behavior changes | Use the native hotfix dev server plus MoFaCTS Playwright sidecar smoke testing against `http://localhost:3200` / `http://host.docker.internal:3200`. |
 | Meteor integration or client contract coverage | Use CI or another supported Meteor test environment. Do not run `npm run test:ci` routinely on local Windows. |
 | Docker build, push, deploy, or release confidence | Run only when explicitly requested. |
 
@@ -150,40 +148,10 @@ Run it from `mofacts/`. Do not substitute per-file checks or targeted `tsc` invo
 - Use inline UI patterns instead of modal popups unless explicitly requested.
 - Preserve keyboard operation, visible focus, semantic labels, screen-reader announcements, readable contrast, and reduced-motion behavior where applicable.
 - Keep interface locale, authored content language, learner response language, speech-recognition language, and text-to-speech language as distinct contracts. Do not infer one silently from another.
-- For UI work, use the native hotfix dev loop first and the MoFaCTS Playwright sidecar for browser smoke testing.
-- Do not use the hotfix dev service as release confidence, deploy confidence, or a substitute for `npm run typecheck`.
-- For UI smoke tests, report the route tested, browser-visible result, and any console/network errors observed through the sidecar.
-
-## Native Hotfix Dev Loop
-
-For fast UI/application hot fixes on Windows, use the native local hotfix dev server. This is the intended observe/edit/reload loop after startup has warmed caches. Detailed helper ownership and setup guidance lives in `deploy/hotfix-dev/README.md`.
-
-- Start the dev service from `deploy/` with `.\hotfix-dev.ps1 start -SettingsPath <local-settings-json>`.
-- On this setup, the settings path is defined by `C:\dev\mofacts_config\deploy and build.txt`: `$LocalSettingsPath = "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"`.
-- Use that explicit `-SettingsPath`; do not guess a settings file under `C:\dev\MoFaCTS\deploy`.
-- The dev app runs at `http://localhost:3200` and uses local MongoDB database `MoFACT-meteor3`.
-- The dev server runs Meteor natively from the Windows checkout and uses Docker only for MongoDB.
-- Agents may run this hotfix dev server even though it starts Meteor in watch mode. This is the only automation exception to "never run `meteor run`".
-- The hotfix script treats the app port `3200` and Rspack HMR port `8082` as required readiness endpoints. If `start` finds an existing hotfix process with either port unreachable, it stops the process, removes generated `mofacts/_build/main-dev` output, and starts cleanly. `restart` also removes that generated dev bundle directory before starting.
-- Local dev logs and PID files belong under ignored local state in `deploy/local-dev/`.
-- If a dependency or Meteor package changes, run the required install/update step deliberately and restart the hotfix dev service.
-
-## MoFaCTS Playwright Sidecar
-
-For UI work, use the MoFaCTS sidecar Playwright MCP server from `mofacts-mcp-sidecar/`, not the bundled Browser or Chrome extension registry. Detailed startup and troubleshooting guidance lives in `mofacts-mcp-sidecar/README.md`.
-
-- Correct MCP namespace in this environment: `mcp__mofacts_playwright__`.
-- Sidecar endpoint: `http://localhost:8931/mcp`.
-- Docker target for the native hotfix app: `http://host.docker.internal:3200`.
-- Start or restart from `mofacts-mcp-sidecar/` with `docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up --build`.
-- To check status, run `mofacts-mcp-sidecar\scripts\check-hotfix-sidecar.ps1`; add `-Start` or `-Restart` when appropriate.
-- When asked to check UI with MCP/Playwright, first verify/start the hotfix dev app, then verify/start the sidecar, then use the `mcp__mofacts_playwright__` tools.
-- If expected MCP tools are not exposed in the current turn, do not switch to ad hoc Playwright or raw MCP JSON-RPC. Verify the sidecar health and explicitly search for the missing tool names with `tool_search`.
-- Missing tool exposure in Codex is distinct from sidecar health. Report that distinction clearly before changing application code.
 
 ## Local Hotfix Bundle Loop
 
-The local-only bundle loop under `deploy/` is for production-shaped app-code verification without creating a deployable Docker image. It is slower than the native hotfix dev loop. Helper ownership is documented in `deploy/hotfix/README.md`.
+The local-only bundle loop under `deploy/` is for production-shaped app-code verification without creating a deployable Docker image. Helper ownership is documented in `deploy/hotfix/README.md`.
 
 - Code hot fixes still require a Meteor bundle rebuild. Do not monkey-patch compiled files inside a running container.
 - Use `docker-compose.hotfix-local.yml` together with `docker-compose.yml` and `docker-compose.local.yml`.

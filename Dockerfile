@@ -46,7 +46,7 @@ RUN cd $APP_SOURCE_FOLDER && \
         meteor build --allow-incompatible-update --allow-superuser --directory $APP_BUNDLE_FOLDER --server-only \
         >"$BUILD_LOG" 2>&1; then \
         echo "Meteor build succeeded on attempt $i"; \
-        grep -aniE "warn(ing)?" "$BUILD_LOG" | tail -n 100 || true; \
+        awk 'tolower($0) ~ /warning/ { lines = 12 } lines > 0 { print; lines-- }' "$BUILD_LOG"; \
         exit 0; \
       fi; \
       echo "Meteor build failed on attempt $i. Key diagnostics:" >&2; \
