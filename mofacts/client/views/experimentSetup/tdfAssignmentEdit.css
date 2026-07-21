@@ -118,12 +118,36 @@
 }
 
 @media (max-width: 720px) {
+  .assignment-editor-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--app-space-1);
+  }
+
+  .assignment-picker-list {
+    max-height: min(40vh, 24rem);
+  }
+
+  .assignment-row-list {
+    max-height: none;
+    overflow: visible;
+  }
+
   .assignment-editor-row {
-    grid-template-columns: 1fr;
+    grid-template-areas:
+      "main main"
+      "order remove";
+    grid-template-columns: minmax(0, 1fr) auto;
+    max-width: 100%;
   }
 
   .assignment-row-order {
-    order: 2;
+    align-items: center;
+    grid-area: order;
+  }
+
+  .assignment-row-main {
+    grid-area: main;
   }
 
   .assignment-row-controls {
@@ -135,6 +159,29 @@
   }
 
   .assignment-date-control {
-    min-width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-width: 0;
+  }
+
+  .assignment-date-control label {
+    grid-column: 1 / -1;
+  }
+
+  .assignment-date-control .btn-link {
+    align-self: center;
+  }
+
+  .assignment-editor-row .remove-assignment {
+    align-self: center;
+    grid-area: remove;
+  }
+
+  .assignment-save-bar {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .assignment-save-bar > .btn {
+    width: 100%;
   }
 }

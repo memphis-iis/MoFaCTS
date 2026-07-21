@@ -232,8 +232,9 @@ Template.adminBackups.helpers({
   },
   backupRowConfirmation(jobId: string) {
     const instance = currentAdminBackupsInstance();
+    const confirmation = instance.confirmationState.get();
     return instance.confirmationController.getContext()?.job._id === jobId
-      ? instance.confirmationState.get()
+      ? confirmation
       : null;
   },
   backupText(key: Parameters<typeof translatePlatformString>[1]) {
