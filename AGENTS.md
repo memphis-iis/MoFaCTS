@@ -35,6 +35,8 @@ When instructions compete, use this order:
 
 - When the user asks a conceptual question whose answer is already available from the prompt, answer it directly without workspace inspection.
 - A repository diagnosis, review, audit, or status question authorizes bounded read-only inspection of the named workspace, including source searches, diffs, status checks, and non-mutating diagnostics. It does not authorize edits, service startup, tests with side effects, external actions, commits, or pushes.
+- When a diagnosis depends on a runtime value that is not visible in the supplied evidence, such as the selected model, reasoning level, credential source, provider route, environment, or persisted setting, ask the user for that value before hypothesizing or patching. Do not substitute assumptions or external research for information the user can provide directly.
+- Do not add user-visible fields, controls, workflow stages, output types, or behavior outside the user-approved specification. If an apparently necessary product-surface addition is not already approved, stop and ask the user before implementing it.
 - If a change seems needed after a question, recommend it separately and wait for explicit approval.
 - When the user asks for a change, implement it end to end when feasible, then report what changed and what was verified.
 - Stay on the current branch unless the user explicitly asks to create or switch branches.
