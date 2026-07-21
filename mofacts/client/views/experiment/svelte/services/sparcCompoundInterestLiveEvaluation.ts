@@ -30,9 +30,10 @@ const INPUT_NODE_ID = 'learner-response-input';
 type MisconceptionId = 'M1' | 'M2' | 'M3';
 const COVERAGE_THRESHOLD = 0.8;
 const MISCONCEPTION_ACTIVATION_THRESHOLD = 0.2;
-const E4_ID = 'autotutor.compound-interest-001.kc.e4';
+const E2_ID = 'autotutor.compound-interest-001.kc.e2';
+const E4_ID = 'autotutor.compound-interest-001.kc.e4-frequency';
 const PROBLEM_STATEMENT = 'Suppose $1,000 earns 5% interest each year and the interest is left in the account. In your own words, how does compound interest make the balance grow over time?';
-const GRADUATION_SYNTHESIS = 'After each year, the earned interest is added to the account balance. The next year’s 5% is calculated on that updated balance—the original $1,000 plus previously earned interest. This repeatedly multiplies the current balance by 1.05, so growth is multiplicative and the dollar amount of interest increases rather than remaining fixed as it would if interest were calculated only from the original principal.';
+const GRADUATION_SYNTHESIS = 'After each year, the earned interest is added to the account balance. The next year’s 5% is calculated on that updated balance—the original $1,000 plus previously earned interest. This repeatedly multiplies the current balance by 1.05, so growth is multiplicative and the dollar amount of interest increases rather than remaining fixed as it would if interest were calculated only from the original principal. At the same nominal annual rate, adding interest more frequently generally produces a higher ending balance.';
 
 export const SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS = [
   'Well it means you gain $50 each year.',
@@ -41,6 +42,7 @@ export const SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS = [
   'So you\'re saying that actually it\'s not the calculated on the principle? It\'s calculated on the entire balance? We compute the 5% on 1050?',
   '52.50 ending balance 1102.50',
   'Well it means the starting amount for the calculation of interest goes up each time. It doesn\'t stay the same and so you earn accumulating interest that goes up over time.',
+  'At the same annual rate, compounding more frequently generally gives a higher ending balance because the interest is added sooner.',
 ] as const;
 
 export type SparcCompoundInterestLiveEvaluationTurn = Readonly<{
@@ -148,8 +150,8 @@ function createFixture(): { display: SparcTrialDisplay; document: SparcAuthoredD
       text: 'Compound growth applies a rate repeatedly, so the balance follows a multiplicative or exponential pattern rather than a fixed dollar increase.',
     },
     {
-      clusterKC: 'autotutor.compound-interest-001.kc.e4',
-      text: 'Interest calculated only from the original principal differs from compound interest, which uses the updated balance.',
+      clusterKC: 'autotutor.compound-interest-001.kc.e4-frequency',
+      text: 'At the same nominal annual rate, adding interest more frequently produces a different—and generally higher—ending balance.',
     },
   ] as const;
   const misconceptions = [
@@ -307,6 +309,8 @@ function runRobustnessChecks(
 ): readonly SparcCompoundInterestLiveEvaluationCheck[] {
   const turn2 = turns.find((turn) => turn.turn === 2);
   const turn4 = turns.find((turn) => turn.turn === 4);
+  const turn4E2Coverage = turn4?.effectiveScoringState.learningTargetScores
+    .find((score) => score.clusterKC === E2_ID)?.coverage;
   const exactTranscriptTurns = turns.filter((turn) => turn.phase === 'exact-transcript');
   const turn6OrEarlierCompletion = exactTranscriptTurns.find((turn) => turn.turn === 6)
     ?? exactTranscriptTurns.at(-1);
@@ -325,8 +329,11 @@ function runRobustnessChecks(
         && evaluation.evidenceDirection === 'supports'
         && evaluation.evidenceStrength > 0))
     .map((turn) => turn.turn);
-  const earlyE4FalseSupport = turns
-    .filter((turn) => turn.phase === 'exact-transcript' && turn.turn <= 3)
+  const preFrequencyE4FalseSupport = turns
+    .filter((turn) => (
+      turn.phase === 'exact-transcript'
+      && turn.turn < SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS.length
+    ))
     .flatMap((turn) => turn.evidenceEnvelope.learningTargetEvaluations
       .filter((evaluation) => evaluation.clusterKC === E4_ID
         && evaluation.evidenceDirection === 'supports'
@@ -338,11 +345,11 @@ function runRobustnessChecks(
       && turn2.learnerResponseScore.learnerContribution?.type !== 'off-task',
     message: `Turn 2 contribution type was ${turn2?.learnerResponseScore.learnerContribution?.type ?? 'missing'}.`,
   }, {
-    id: 'early-incorrect-responses-do-not-support-e4',
-    passed: earlyE4FalseSupport.length === 0,
-    message: earlyE4FalseSupport.length === 0
-      ? 'The incorrect fixed-dollar and original-principal responses on turns 1-3 did not support E4.'
-      : `E4 received false support from incorrect early response(s): ${earlyE4FalseSupport.map((entry) => `turn ${entry.turn} at strength ${entry.strength}`).join(', ')}.`,
+    id: 'pre-frequency-responses-do-not-support-e4',
+    passed: preFrequencyE4FalseSupport.length === 0,
+    message: preFrequencyE4FalseSupport.length === 0
+      ? 'The responses before the explicit compounding-frequency answer did not support frequency E4.'
+      : `Frequency E4 received false support from earlier response(s): ${preFrequencyE4FalseSupport.map((entry) => `turn ${entry.turn} at strength ${entry.strength}`).join(', ')}.`,
   }, {
     id: 'turn-6-m1-inactive',
     passed: turn6M1SupportStrength !== undefined
@@ -369,11 +376,15 @@ function runRobustnessChecks(
         && turn4.learnerResponseScore.learnerQuestion?.contentFocused === true),
     message: `Turn 4 contribution type was ${turn4?.learnerResponseScore.learnerContribution?.type ?? 'missing'}${turn4?.learnerResponseScore.learnerContribution?.type === 'question' ? ` with contentFocused ${String(turn4.learnerResponseScore.learnerQuestion?.contentFocused)}` : ''}.`,
   }, {
+    id: 'turn-4-cumulative-e2-coverage',
+    passed: turn4E2Coverage !== undefined && turn4E2Coverage >= COVERAGE_THRESHOLD,
+    message: `Cumulative E2 coverage after turn 4 was ${turn4E2Coverage ?? 'missing'}; completion requires ${COVERAGE_THRESHOLD} or greater.`,
+  }, {
     id: 'unsupported-m3-not-inferred',
     passed: unsupportedM3Turns.length === 0,
     message: unsupportedM3Turns.length === 0
-      ? 'The transcript did not activate the unexpressed compounding-frequency misconception.'
-      : `The unexpressed compounding-frequency misconception received positive support strength on turn(s) ${unsupportedM3Turns.join(', ')}.`,
+      ? 'The transcript did not falsely support the compounding-frequency misconception.'
+      : `The contradicted compounding-frequency misconception received positive support strength on turn(s) ${unsupportedM3Turns.join(', ')}.`,
   }, {
     id: 'turn-2-latest-response-receipt',
     passed: turn2 !== undefined

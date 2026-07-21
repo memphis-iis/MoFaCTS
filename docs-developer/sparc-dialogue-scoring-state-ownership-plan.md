@@ -18,36 +18,34 @@ Remaining empirical verification:
 
 ## Objective
 
-Make the live AI evaluate the instructional meaning of the latest learner contribution, and make SPARC code compare that evaluation with prior learner state.
+Make the live AI evaluate the learner's accumulated instructional knowledge across the full dialogue through the latest contribution, and make SPARC code compare that fresh cumulative evaluation with prior learner state.
 
-This addresses two observed failures:
+This addresses three observed failures:
 
 - a complete response can omit a represented expectation because the model is also deciding whether that expectation changed; and
 - an unrelated response can acquire weak misconception support because the model is also trying to preserve or revise prior misconception state.
+- complementary learner statements distributed across turns can each remain below threshold even though the dialogue as a whole demonstrates the expectation.
 
 The implementation must not change the shared continuous rubric, authored propositions, thresholds, production rules, target selection, scaffold progression, completion criteria, or model configuration. A later approved hardening step may tighten universal tutor receipt ownership and misconception non-endorsement wording without changing move selection or pedagogical content.
 
 ## Current Problem
 
-The scoring call currently owns both:
+Before this correction, the scoring call received the complete role-preserving dialogue but its prompt restricted instructional evidence to the latest learner contribution. SPARC then retained only the strongest supplied coverage. That preserved prior coverage but could not semantically combine complementary learner statements such as “the entire balance,” “5% on 1050,” and “the starting amount goes up.”
 
-1. semantic evaluation of the latest learner contribution; and
-2. learner-state management using `priorCoverage`, `priorSupportStrength`, cumulative expectation rules, reversible misconception rules, and sparse changed-value output.
-
-These responsibilities compete in the prompt. The parser already filters unchanged scores, but the model is first asked to perform the same comparison and omit unchanged values. In the compound-interest live evaluation, identical complete synthesis text has therefore produced different subsets of expectation updates. The model has also assigned M3 support to a calculation that does not address compounding frequency.
+The provider must own semantic integration across learner turns. Application code must continue to own comparison with durable prior state, sparse changed-value output, and persistence. Numeric per-turn addition is not a valid substitute because it cannot distinguish complementary meaning from repetition.
 
 ## Final Ownership Boundary
 
 ```text
-latest learner contribution + authored propositions + dialogue context
-  -> live AI evaluates every proposition against the latest contribution
+full learner trajectory + latest contribution + authored propositions + tutor context
+  -> live AI evaluates cumulative learner evidence through the current turn
   -> provider response is parsed and validated as a complete evidence envelope
   -> SPARC scoring code reduces evidence against prior learner state
   -> existing sparse SparcLearnerResponseScoringResult
   -> existing facts, production-rule chaining, target selection, and persistence
 ```
 
-The live AI decides what the latest contribution expresses. SPARC code alone decides how that evidence changes stored state.
+The live AI decides what the learner has demonstrated across the dialogue and the learner's resolved misconception stance. SPARC code alone decides how that cumulative evidence changes stored state.
 
 ## Provider Evidence Contract
 
@@ -63,7 +61,7 @@ The scoring call receives:
 
 The authored proposition objects sent to the model contain only their identifier and text. Remove `priorCoverage` and `priorSupportStrength` from the model input. Prior scores remain available to application code and are never part of the AI task.
 
-Dialogue history may resolve pronouns, ellipsis, confirmation-shaped contributions, and the object under discussion. It must not cause tutor-authored content or an earlier learner statement to be scored as if it were newly expressed in the latest learner contribution.
+Dialogue history is instructional evidence only for learner-authored turns. The model may combine distinct complementary learner statements across turns, use later clarification or self-correction to resolve earlier ambiguity or error, and use tutor turns to resolve pronouns, prompts, and the object under discussion. Tutor-authored hints, assertions, corrections, and summaries never count as learner knowledge unless a learner later adopts, explains, applies, or correctly confirms them. Repetition alone must not increase coverage.
 
 ### Output shape
 
@@ -106,21 +104,21 @@ This is a provider-only evaluation contract. The downstream `SparcLearnerRespons
 
 ### Direction
 
-Evaluate each proposition independently against the learner's current position in the latest contribution:
+Evaluate each proposition independently against the learner's accumulated, resolved position across all learner-authored turns through the latest contribution:
 
-- `supports`: the learner presents some of the proposition's defining meaning as part of the learner's current account, including a tentative current account;
-- `contradicts`: the learner explicitly rejects, corrects, contrasts, or replaces the proposition with its correct opposite; or
-- `unaddressed`: the learner does not take a current stance on the proposition.
+- `supports`: the learner's accumulated account presents some of the proposition's defining meaning, including a tentative account;
+- `contradicts`: the learner's resolved account explicitly rejects, corrects, contrasts, or replaces the proposition with its correct opposite; or
+- `unaddressed`: the learner's own contributions establish no resolved stance on the proposition.
 
 Quoting, recalling, or asking about a proposition without adopting or rejecting it does not by itself support or contradict it. Requiring an evaluation for every proposition is not evidence that every proposition was addressed; `unaddressed` is the normal result for unrelated propositions.
 
-When a contribution first repeats a misconception and then self-corrects it, use the learner's resolved final/current stance. For example, “I thought X, but now I see Y” contradicts X when Y replaces X. An unresolved comparison that adopts neither alternative is `unaddressed`. If some misconception meaning remains part of the learner's current account, it is `supports` with proportional strength. Do not add a fourth `mixed` direction or speculate about private belief.
+When the trajectory first supports a misconception and later self-corrects it, use the learner's resolved final/current stance. For example, “I thought X, but now I see Y” contradicts X when Y replaces X. An unresolved comparison that adopts neither alternative is `unaddressed`. If some misconception meaning remains part of the learner's resolved account, it is `supports` with proportional strength. Do not add a fourth `mixed` direction or speculate about private belief.
 
 Keep the existing contribution-classification rule: a confirmation-shaped contribution may be classified as either a question or an answer according to its conversational function, but its instructional meaning is scored the same either way.
 
 ### Strength
 
-`evidenceStrength` uses the existing shared continuous rubric and measures how much of the authored proposition's defining meaning the learner explicitly represents in the selected `evidenceDirection`:
+`evidenceStrength` uses the existing shared continuous rubric and measures how much of the authored proposition's defining meaning the learner explicitly represents across the full learner trajectory in the selected `evidenceDirection`:
 
 - `0`: none;
 - `0.25`: a significant portion;
@@ -130,7 +128,7 @@ Keep the existing contribution-classification rule: a confirmation-shaped contri
 
 These are anchors on a continuous scale. Any value from 0 through 1 is allowed.
 
-Direction carries polarity; strength carries only the proportion represented in that direction. For `supports`, a larger strength means that more of the proposition is endorsed. For `contradicts`, a larger strength means that more of the proposition is explicitly rejected or replaced. Strength does not measure confidence, correctness, prior state, or state change.
+Direction carries polarity; strength carries only the cumulative semantic proportion represented in that direction. For `supports`, a larger strength means that more of the proposition is demonstrated. For `contradicts`, a larger strength means that more of the proposition is explicitly rejected or replaced in the resolved account. Strength does not measure confidence or the numeric size of improvement.
 
 Direction and strength must be internally consistent:
 
@@ -165,13 +163,13 @@ Expectation coverage therefore remains cumulative and never decreases.
 | `contradicts` | 0 | Emit no update. |
 | `unaddressed` | any | Emit no update. |
 
-Misconception support therefore retains its existing reversible, latest-evidence behavior. An unaddressed misconception preserves its prior state; application code does not manufacture a replacement score.
+Misconception support therefore retains its existing reversible behavior while the provider evaluates the learner's latest resolved stance across the whole trajectory. An unaddressed misconception preserves its prior state; application code does not manufacture a replacement score.
 
 ### Contribution consistency
 
 Keep contribution classification and learner-question metadata in the same provider call.
 
-An `off-task` contribution must return every proposition as `unaddressed` with strength 0. Treat any provider response that labels a contribution `off-task` while also returning supported or contradicted proposition evidence as an inconsistent envelope and fail validation. Do not silently discard contradictory provider output.
+Contribution classification describes the latest learner turn, while instructional evidence describes the accumulated learner trajectory. An `off-task` latest contribution contributes no new instructional meaning, but it may coexist with supported or contradicted cumulative evidence established by prior learner turns. Tutor-authored content remains context only.
 
 Preserve the current learner-question boundary exactly:
 
@@ -200,7 +198,7 @@ Split the current `parseScoreEnvelope(...)` responsibility: provider parsing val
 - evidence-direction and complete-evaluation types;
 - exact identifier-set validation against authored expectation and misconception facts;
 - direction/strength consistency validation;
-- off-task envelope consistency;
+- independence of latest-turn contribution classification from cumulative instructional evidence;
 - comparison with prior score facts; and
 - reduction to the existing sparse `SparcLearnerResponseScoringResult`.
 
@@ -232,13 +230,13 @@ The post-implementation live review authorized seven narrow follow-up changes:
 
 - expose each validated complete provider evidence envelope to the live-evaluation harness and save it with the corresponding turn;
 - save the complete effective post-reducer scoring state derived from the controller's score facts, alongside the existing sparse downstream score;
-- require M1 to be inactive after exact-transcript turn 6 (or at a valid earlier completion) and require an added graduation synthesis to support E4 at the authored completion threshold; and
+- require M1 to be inactive after exact-transcript turn 6 (or at a valid earlier completion), require accumulated E2 coverage to reach the authored completion threshold by corrective turn 4, and require an added graduation synthesis to support E4 at the authored completion threshold; and
 - clarify in the scoring prompt that a whole relation must be represented with the correct roles and direction, that an unambiguous correct calculation can contradict a misconception, and that tutor receipts must attribute learner claims without praising or adopting misconceptions;
 - retain the attempted learner turn, raw parsed provider payload, and parsed evidence envelope when a provider response is rejected or a rate limit interrupts the turn;
 - report scoring or harness errors as evaluation errors with student and robustness outcomes marked not evaluated, calculate the displayed graduation rate only from evaluated runs, make an unavailable rate explicit, record the absolute required graduation-run count, and require every planned run to be evaluated; and
-- reject any E4 support assigned to the known-incorrect responses in exact-transcript turns 1 through 3.
+- reject any E4 support assigned before the explicit compounding-frequency response on exact-transcript turn 7.
 
-These changes add observability and semantic prompt constraints. They do not add scoring heuristics, change the rubric or thresholds, alter the reducer, change production-rule chaining, or create a deterministic live route.
+These changes add observability and semantic prompt constraints. The cumulative correction also removes the obsolete validation that treated latest-turn `off-task` classification as incompatible with prior cumulative evidence. It does not change the reducer's state-update tables, add scoring heuristics, change the rubric or thresholds, change production-rule chaining, or create a deterministic live route.
 
 ## Implementation Sequence
 
@@ -247,7 +245,7 @@ These changes add observability and semantic prompt constraints. They do not add
 - Define the three directions and complete evidence-envelope types in `sparcLearnerResponseScoring.ts`.
 - Validate exact identifier-set equality: no missing, unknown, or duplicate target identifiers.
 - Validate every strength as finite and within 0 through 1.
-- Validate direction/strength and off-task consistency.
+- Validate direction/strength consistency while allowing cumulative instructional evidence alongside latest-turn contribution classification.
 - Derive the existing sparse score arrays using the state tables above.
 - Preserve contribution and learner-question fields without renaming them downstream.
 
@@ -261,15 +259,17 @@ These changes add observability and semantic prompt constraints. They do not add
 - Remove provider-local prior-score maps and filtering that become unused.
 - Preserve the existing schema name, request intent, temperature, response-token budget, model selection, and telemetry fields.
 
-### 3. Narrow the scoring prompt
+### 3. Make the scoring prompt cumulative
 
-- Describe the call as evaluation of the latest learner response, not an update to a cumulative learner model.
+- Describe the call as a fresh cumulative semantic evaluation of all learner-authored turns through the latest response, not as numeric per-turn score addition.
+- Require complementary learner meaning across turns to be combined without rewarding repetition.
+- Treat tutor turns only as context and let later learner clarification or self-correction determine the resolved stance.
 - Require one independent evaluation for every supplied proposition.
 - Define the three directions and their strength consistency.
 - Retain the current contribution and question-classification policy.
 - Retain the shared continuous rubric and conservative misconception-evidence language.
 - Retain the bare-calculation restriction.
-- Remove prior-state, cumulative-update, reversible-update, changed-value, and omission instructions.
+- Remove prior-state, changed-value, and omission instructions; keep cumulative semantic evaluation separate from application-owned durable-state comparison.
 - Do not add overlap-allocation, necessary-entailment, counterfactual, repetition, or score-floor language.
 
 ### 4. Add deterministic contract tests
@@ -295,7 +295,7 @@ Reducer tests must prove:
 - unchanged derived values are omitted from the sparse result;
 - missing, unknown, and duplicate identifiers fail clearly;
 - invalid directions, strengths, and direction/strength combinations fail clearly;
-- inconsistent off-task evidence fails clearly; and
+- cumulative instructional evidence remains valid when the latest contribution is off-task; and
 - learner-question metadata remains required exactly when contribution type is `question`.
 
 Do not make these deterministic reducer tests call the AI. The existing five-run admin evaluation remains the live scoring and tutor-generation regression.
@@ -329,18 +329,19 @@ Do not change or add:
 - tutor move policies or pedagogical move content beyond the approved universal receipt boundaries;
 - TDF fields, authored content, package ZIPs, or config sync;
 - stored facts, history metadata, migrations, or analytics fields;
-- retries, compatibility paths, fallback scoring, or deterministic live-test substitutes; or
+- retries, compatibility paths, alternate scoring paths, or deterministic live-test substitutes; or
 - a fourth evidence direction.
 
 ## Acceptance Criteria
 
 - The provider receives no prior instructional scores.
-- The provider returns exactly one independently evaluated entry for every authored expectation and misconception.
+- The provider returns exactly one independently evaluated cumulative entry for every authored expectation and one resolved-stance entry for every authored misconception.
 - `evidenceStrength` retains the agreed continuous rubric; `evidenceDirection` alone determines whether that represented meaning supports or contradicts the proposition.
-- SPARC code alone applies cumulative expectation and reversible misconception rules.
+- The provider performs cumulative semantic integration; SPARC code alone compares that evaluation with durable expectation and reversible misconception state.
 - The downstream score, fact, controller, and persistence contracts remain unchanged; the live-evaluation artifact adds the complete evidence envelope, canonical effective scoring state, attempted-turn diagnostics for rejected or interrupted scoring responses, and the approved robustness checks.
 - A scoring or harness failure is labeled as an evaluation error rather than student non-graduation, is excluded from the graduation-rate denominator, and independently prevents the overall evaluation from passing.
-- Incorrect exact-transcript turns 1 through 3 cannot receive supporting E4 evidence.
+- Exact-transcript turns before the explicit frequency response cannot receive supporting E4 evidence.
+- The corrective Compound Interest trajectory reaches at least `0.8` accumulated E2 coverage by turn 4.
 - The complete compound-interest synthesis can update all represented expectations, including E4.
 - The compounding-frequency misconception remains unaddressed by the unrelated `52.50 ending balance 1102.50` calculation.
 - Existing production-rule chaining and target selection are unchanged.

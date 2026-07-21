@@ -58,7 +58,18 @@ function dialogueDisplay(): SparcControllerDisplay {
   };
 }
 
-function scorerContext(autoTutorTargets = dialogueDisplay().autoTutorTargets) {
+type ScorerDialogueEntry = Readonly<{
+  speaker: 'learner' | 'tutor';
+  text: string;
+}>;
+
+function scorerContext(
+  autoTutorTargets = dialogueDisplay().autoTutorTargets,
+  dialogueHistory: readonly ScorerDialogueEntry[] = [{
+    speaker: 'tutor',
+    text: 'What happens after the first year?',
+  }],
+) {
   return {
     document: {
       id: 'dialogue-doc',
@@ -70,10 +81,10 @@ function scorerContext(autoTutorTargets = dialogueDisplay().autoTutorTargets) {
       }, {
         factType: 'diagnostic.misconceptionScore',
         slots: { id: 'mis-1', supportStrength: 0.5 },
-      }, {
+      }, ...dialogueHistory.map((entry) => ({
         factType: 'dialogue.utterance',
-        slots: { speaker: 'tutor', text: 'What happens after the first year?' },
-      }],
+        slots: { speaker: entry.speaker, text: entry.text },
+      }))],
       root: { id: 'root', kind: 'document' as const },
     },
     replayState: createEmptySparcReplayState(),
@@ -251,25 +262,35 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(calls[0]).to.not.have.nested.property('intent.strictSchema', true);
     expect(calls[0]).to.have.property('tdfId', 'tdf-1');
     const systemMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[0];
-    expect(systemMessage?.content).to.contain('evaluate the instructional meaning expressed in the latest learner response');
+    expect(systemMessage?.content).to.contain('accumulated instructional knowledge across the full dialogue through the latest response');
     expect(systemMessage?.content).to.contain('primary conversational action genuinely requests information or confirmation');
     expect(systemMessage?.content).to.contain('may be either a question or an answer');
     expect(systemMessage?.content).to.contain('score its instructional meaning the same either way');
     expect(systemMessage?.content).to.contain('A response that addresses the problem or answers the tutor cannot be off-task');
     expect(systemMessage?.content).to.contain('exactly one learningTargetEvaluations entry for every supplied learning target');
     expect(systemMessage?.content).to.contain('exactly one diagnosticMisconceptionEvaluations entry for every supplied misconception');
-    expect(systemMessage?.content).to.contain('Score only meaning expressed in the latest learner response');
-    expect(systemMessage?.content).to.contain('earlier learner or tutor statements are not new evidence by themselves');
-    expect(systemMessage?.content).to.contain('Requiring an entry for every misconception does not make every misconception a candidate for support');
-    expect(systemMessage?.content).to.contain('supports: the learner presents some of the proposition’s defining meaning');
-    expect(systemMessage?.content).to.contain('contradicts: the learner explicitly rejects, corrects, contrasts, or replaces');
-    expect(systemMessage?.content).to.contain('unaddressed: the learner takes no current stance');
+    expect(systemMessage?.content).to.contain('Assess instructional evidence cumulatively from every learner-authored turn');
+    expect(systemMessage?.content).to.contain('Study the learner’s trajectory and improvement');
+    expect(systemMessage?.content).to.contain('combine distinct complementary learner statements across turns');
+    expect(systemMessage?.content).to.contain('Do not average turns, sum per-turn scores');
+    expect(systemMessage?.content).to.contain('Tutor turns provide context');
+    expect(systemMessage?.content).to.contain('never learner evidence');
+    expect(systemMessage?.content).to.contain('return the cumulative semantic coverage the learner has demonstrated');
+    expect(systemMessage?.content).to.contain('does not erase knowledge demonstrated in earlier learner turns');
+    expect(systemMessage?.content).to.contain('return the learner’s resolved stance at the end of the dialogue');
+    expect(systemMessage?.content).to.contain('supersedes conflicting earlier learner evidence');
+    expect(systemMessage?.content).to.contain('do not reactivate a repaired misconception solely because an earlier turn supported it');
+    expect(systemMessage?.content).to.contain('supports: the learner’s accumulated, resolved account presents some');
+    expect(systemMessage?.content).to.contain('contradicts: the learner’s resolved account explicitly rejects');
+    expect(systemMessage?.content).to.contain('unaddressed: the learner’s own contributions establish no resolved stance');
+    expect(systemMessage?.content).to.not.contain('Score only meaning expressed in the latest learner response');
+    expect(systemMessage?.content).to.not.contain('earlier learner or tutor statements are not new evidence by themselves');
     expect(systemMessage?.content).to.contain('naming only one side or participant is not support');
     expect(systemMessage?.content).to.contain('stated relation with the stated roles and direction');
     expect(systemMessage?.content).to.contain('opposite relation or reverses the roles');
     expect(systemMessage?.content).to.contain('one continuous semantic-coverage rubric for evidenceStrength');
     expect(systemMessage?.content).to.contain('explicitly represents in the selected evidenceDirection');
-    expect(systemMessage?.content).to.contain('0 means the response represents none of the proposition in that direction');
+    expect(systemMessage?.content).to.contain('0 means the accumulated learner account represents none of the proposition in that direction');
     expect(systemMessage?.content).to.contain('0.25 means it represents a significant portion');
     expect(systemMessage?.content).to.contain('0.5 means it represents more than half');
     expect(systemMessage?.content).to.contain('0.75 means it represents most');
@@ -277,8 +298,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.contain('anchors on a continuous scale, not discrete categories');
     expect(systemMessage?.content).to.contain('supports and contradicts require evidenceStrength greater than 0');
     expect(systemMessage?.content).to.contain('unaddressed requires evidenceStrength 0');
-    expect(systemMessage?.content).to.contain('evidenceDirection determines whether the evidence supports or contradicts');
-    expect(systemMessage?.content).to.contain('does not measure confidence, correctness, prior state, or state change');
+    expect(systemMessage?.content).to.contain('evidenceDirection determines whether the resolved evidence supports or contradicts');
+    expect(systemMessage?.content).to.contain('cumulative semantic coverage, not confidence or the size of the learner’s improvement');
+    expect(systemMessage?.content).to.contain('If the latest contribution is off-task');
+    expect(systemMessage?.content).to.contain('Still evaluate prior learner-authored turns cumulatively');
     expect(systemMessage?.content).to.not.contain('contradicts and unaddressed require evidenceStrength 0');
     expect(systemMessage?.content).to.not.contain('larger positive evidenceStrength always means more affirmative representation');
     expect(systemMessage?.content).to.contain('Do not speculate about what the learner is thinking. This is an evidentiary evaluation');
@@ -389,16 +412,36 @@ describe('SPARC dialogue OpenRouter provider', function() {
     );
   });
 
+  it('accepts accumulated prior evidence when the latest learner contribution is off-task', async function() {
+    const provider = createSparcDialogueOpenRouterProvider({
+      async callResolvedOpenRouterJson() {
+        return {
+          parsedContent: {
+            learningTargetEvaluations: [{
+              clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.4,
+            }],
+            diagnosticMisconceptionEvaluations: [{
+              id: 'mis-1', evidenceDirection: 'supports', evidenceStrength: 0.5,
+            }],
+            learnerContribution: { type: 'off-task' },
+          },
+        };
+      },
+    });
+
+    const score = await provider.scoreLearnerResponse({
+      display: dialogueDisplay(),
+      learnerText: 'Can we talk about something else?',
+      ...scorerContext(),
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+
+    expect(score.learningTargetScores).to.deep.equal([]);
+    expect(score.diagnosticMisconceptionScores).to.equal(undefined);
+    expect(score.learnerContribution).to.deep.equal({ type: 'off-task' });
+  });
+
   it('rejects incomplete, inconsistent, unknown, and duplicate evidence at the provider boundary', async function() {
     const invalidEnvelopes = [{
-      learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
-      }],
-      diagnosticMisconceptionEvaluations: [{
-        id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-      }],
-      learnerContribution: { type: 'off-task' },
-    }, {
       learningTargetEvaluations: [{
         clusterKC: 'unknown-kc', evidenceDirection: 'supports', evidenceStrength: 0.6,
       }],
@@ -439,7 +482,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
       learnerContribution: { type: 'answer' },
     }];
     const expectedMessages = [
-      'off-task contribution must leave every instructional proposition unaddressed',
       'unknown learning target clusterKC "unknown-kc"',
       'duplicate diagnostic misconception id "mis-1"',
       'missing learning target clusterKC "kc-a"',
@@ -657,7 +699,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       .to.equal('Let us work with that question a little longer. What relationship should you examine next?');
   });
 
-  it('supplies the Compound Interest problem and history without evidence control fields', async function() {
+  it('supplies the full Compound Interest learner trajectory for cumulative evidence', async function() {
     const display: SparcControllerDisplay = {
       ...dialogueDisplay(),
       autoTutorTargets: {
@@ -674,6 +716,26 @@ describe('SPARC dialogue OpenRouter provider', function() {
         }],
       },
     };
+    const cumulativeDialogueHistory: readonly ScorerDialogueEntry[] = [{
+      speaker: 'learner',
+      text: 'well I think it grows 50$ per year',
+    }, {
+      speaker: 'tutor',
+      text: 'After the first year, is the second-year amount still $1,000?',
+    }, {
+      speaker: 'learner',
+      text: 'its still 1000',
+    }, {
+      speaker: 'tutor',
+      text: 'Interest left in the account is added to the balance.',
+    }, {
+      speaker: 'learner',
+      text: 'after year 1 there is 1050 and in year 2 you add 52.50',
+    }, {
+      speaker: 'tutor',
+      text: 'What amount is the year-2 interest based on?',
+    }];
+    const latestLearnerText = 'It is based on the total so far, so each year it is 5% of a larger number.';
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
         const scoreSchema = params.intent.schema as {
@@ -682,12 +744,12 @@ describe('SPARC dialogue OpenRouter provider', function() {
         const userMessage = JSON.parse(params.messages[1]?.content ?? '{}') as Record<string, unknown>;
         expect(userMessage).to.deep.include({
           problemStatement: 'Suppose $1,000 earns 5% interest and interest remains in the account. How does the balance grow?',
-          learnerText: 'well it is 50$ a year until you change your balance',
+          learnerText: latestLearnerText,
         });
-        expect(userMessage.dialogueHistory).to.deep.equal([{
-          role: 'tutor',
-          text: 'What happens after the first year?',
-        }]);
+        expect(userMessage.dialogueHistory).to.deep.equal(cumulativeDialogueHistory.map((entry) => ({
+          role: entry.speaker === 'learner' ? 'student' : 'tutor',
+          text: entry.text,
+        })));
         expect(userMessage.learningTargets).to.deep.include({
           clusterKC: 'compound.e2',
           text: 'Later interest is calculated on the original principal plus previously earned interest.',
@@ -714,19 +776,19 @@ describe('SPARC dialogue OpenRouter provider', function() {
           parsedContent: {
             learningTargetEvaluations: [{
               clusterKC: 'compound.e1',
-              evidenceDirection: 'unaddressed',
-              evidenceStrength: 0,
+              evidenceDirection: 'supports',
+              evidenceStrength: 0.85,
             }, {
               clusterKC: 'compound.e2',
               evidenceDirection: 'supports',
-              evidenceStrength: 0.3,
+              evidenceStrength: 0.95,
             }],
             diagnosticMisconceptionEvaluations: [{
               id: 'M1',
-              evidenceDirection: 'supports',
-              evidenceStrength: 0.5,
+              evidenceDirection: 'contradicts',
+              evidenceStrength: 1,
             }],
-            learnerContribution: { type: 'answer', confidence: 0.45 },
+            learnerContribution: { type: 'answer', confidence: 0.9 },
           },
         };
       },
@@ -734,18 +796,18 @@ describe('SPARC dialogue OpenRouter provider', function() {
 
     const score = await provider.scoreLearnerResponse({
       display,
-      learnerText: 'well it is 50$ a year until you change your balance',
-      ...scorerContext(display.autoTutorTargets),
+      learnerText: latestLearnerText,
+      ...scorerContext(display.autoTutorTargets, cumulativeDialogueHistory),
     } as Parameters<typeof provider.scoreLearnerResponse>[0]);
 
-    expect(score.learningTargetScores?.[0]).to.deep.include({
+    expect(score.learningTargetScores).to.deep.equal([{
+      clusterKC: 'compound.e1',
+      coverage: 0.85,
+    }, {
       clusterKC: 'compound.e2',
-      coverage: 0.3,
-    });
-    expect(score.diagnosticMisconceptionScores?.[0]).to.deep.include({
-      id: 'M1',
-      supportStrength: 0.5,
-    });
+      coverage: 0.95,
+    }]);
+    expect(score.diagnosticMisconceptionScores).to.equal(undefined);
   });
 
   it('constructs the eleven target-aware prompt cases without attributing rubric text to the learner', async function() {

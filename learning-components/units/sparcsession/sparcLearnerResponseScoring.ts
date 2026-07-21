@@ -32,8 +32,11 @@ export type SparcDiagnosticMisconceptionEvidence = {
 };
 
 export type SparcLearnerResponseEvidenceEnvelope = {
+  /** Cumulative learner-authored evidence through the current turn. */
   readonly learningTargetEvaluations: readonly SparcLearningTargetEvidence[];
+  /** The learner's resolved misconception stance after the full dialogue trajectory. */
   readonly diagnosticMisconceptionEvaluations: readonly SparcDiagnosticMisconceptionEvidence[];
+  /** Classification of the latest learner contribution only. */
   readonly learnerContribution: {
     readonly type: 'answer' | 'question' | 'off-task' | 'other';
     readonly confidence?: number;
@@ -222,8 +225,6 @@ export function reduceSparcLearnerResponseEvidence(params: {
   });
   const learningTargetScores: SparcLearningTargetScoreInput[] = [];
   const diagnosticMisconceptionScores: SparcDiagnosticMisconceptionScoreInput[] = [];
-  const validatedLearningTargetEvidence = new Map<string, ReturnType<typeof validatedEvidence>>();
-  const validatedMisconceptionEvidence = new Map<string, ReturnType<typeof validatedEvidence>>();
 
   for (const clusterKC of knownClusterKcs) {
     const evaluation = learningTargetEvaluations.get(clusterKC)!;
@@ -232,7 +233,6 @@ export function reduceSparcLearnerResponseEvidence(params: {
       strength: evaluation.evidenceStrength,
       label: `SPARC learning target evidence "${clusterKC}"`,
     });
-    validatedLearningTargetEvidence.set(clusterKC, evidence);
     if (evidence.direction === 'supports' && evidence.strength > (previousCoverage.get(clusterKC) ?? 0)) {
       learningTargetScores.push({ clusterKC, coverage: evidence.strength });
     }
@@ -245,7 +245,6 @@ export function reduceSparcLearnerResponseEvidence(params: {
       strength: evaluation.evidenceStrength,
       label: `SPARC diagnostic misconception evidence "${id}"`,
     });
-    validatedMisconceptionEvidence.set(id, evidence);
     const priorStrength = previousSupportStrength.get(id) ?? 0;
     if (evidence.direction === 'supports' && evidence.strength !== priorStrength) {
       diagnosticMisconceptionScores.push({ id, supportStrength: evidence.strength });
@@ -257,15 +256,6 @@ export function reduceSparcLearnerResponseEvidence(params: {
   const contributionType = params.evidence.learnerContribution?.type;
   if (contributionType !== 'answer' && contributionType !== 'question' && contributionType !== 'off-task' && contributionType !== 'other') {
     throw new Error('SPARC learner-response evidence learnerContribution.type is invalid');
-  }
-  if (contributionType === 'off-task') {
-    const inconsistentInstructionalEvidence = [
-      ...validatedLearningTargetEvidence.values(),
-      ...validatedMisconceptionEvidence.values(),
-    ].some((evidence) => evidence.direction !== 'unaddressed' || evidence.strength !== 0);
-    if (inconsistentInstructionalEvidence) {
-      throw new Error('SPARC learner-response evidence off-task contribution must leave every instructional proposition unaddressed');
-    }
   }
   if (contributionType === 'question' && !params.evidence.learnerQuestion) {
     throw new Error('SPARC learner question metadata is required when learnerContribution.type is question');

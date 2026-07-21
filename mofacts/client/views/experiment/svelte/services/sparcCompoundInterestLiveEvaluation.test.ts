@@ -16,23 +16,23 @@ const EXPECTATION_IDS = [
   'autotutor.compound-interest-001.kc.e1',
   'autotutor.compound-interest-001.kc.e2',
   'autotutor.compound-interest-001.kc.e3',
-  'autotutor.compound-interest-001.kc.e4',
+  'autotutor.compound-interest-001.kc.e4-frequency',
 ] as const;
 const MISCONCEPTION_IDS = ['M1', 'M2', 'M3'] as const;
 const TURN_FOUR_EXPECTATION_IDS: readonly string[] = [
   EXPECTATION_IDS[0],
   EXPECTATION_IDS[1],
-  EXPECTATION_IDS[3],
 ];
 
 type EvaluationScenario = Readonly<{
-  completeOnExactTurnFive: boolean;
+  completeOnExactTurnSeven: boolean;
   classifyTurnFourAsQuestion?: boolean;
+  underScoreCumulativeE2OnTurnFour?: boolean;
   inferUnsupportedM3?: boolean;
   inferUnsupportedM3OnSynthesis?: boolean;
   keepM1ActiveAfterTurnSix?: boolean;
   synthesisE4Strength?: number;
-  supportE4OnEarlyTurn?: 1 | 2 | 3;
+  supportE4OnEarlyTurn?: 1 | 2 | 3 | 4;
 }>;
 
 function exactTurnIndex(learnerText: string): number {
@@ -77,8 +77,11 @@ function scoreForTurn(
     return {
       learningTargetScores: [
         { clusterKC: EXPECTATION_IDS[0], coverage: 0.9 },
-        { clusterKC: EXPECTATION_IDS[1], coverage: 0.9 },
-        { clusterKC: EXPECTATION_IDS[3], coverage: 0.9 },
+        {
+          clusterKC: EXPECTATION_IDS[1],
+          coverage: scenario.underScoreCumulativeE2OnTurnFour ? 0.6 : 0.9,
+        },
+        ...earlyE4Scores,
       ],
       diagnosticMisconceptionScores: [
         { id: 'M1', supportStrength: 0 },
@@ -90,7 +93,7 @@ function scoreForTurn(
         : { learnerQuestion: { contentFocused: true } }),
     };
   }
-  if (exactTurn === 4 && scenario.completeOnExactTurnFive) {
+  if (exactTurn === 4 && scenario.completeOnExactTurnSeven) {
     return {
       learningTargetScores: [{ clusterKC: EXPECTATION_IDS[2], coverage: 0.9 }],
       diagnosticMisconceptionScores: scenario.inferUnsupportedM3
@@ -103,6 +106,13 @@ function scoreForTurn(
     return {
       learningTargetScores: [],
       diagnosticMisconceptionScores: [{ id: 'M1', supportStrength: 0.5 }],
+      learnerContribution: { type: 'answer' },
+    };
+  }
+  if (exactTurn === 6 && scenario.completeOnExactTurnSeven) {
+    return {
+      learningTargetScores: [{ clusterKC: EXPECTATION_IDS[3], coverage: 0.9 }],
+      diagnosticMisconceptionScores: [{ id: 'M3', supportStrength: 0 }],
       learnerContribution: { type: 'answer' },
     };
   }
@@ -143,8 +153,12 @@ function evidenceForTurn(
       if (scenario.supportE4OnEarlyTurn === exactTurn + 1 && clusterKC === EXPECTATION_IDS[3]) {
         evidenceStrength = 0.5;
       } else if (exactTurn === 3 && TURN_FOUR_EXPECTATION_IDS.includes(clusterKC)) {
+        evidenceStrength = clusterKC === EXPECTATION_IDS[1] && scenario.underScoreCumulativeE2OnTurnFour
+          ? 0.6
+          : 0.9;
+      } else if (exactTurn === 4 && scenario.completeOnExactTurnSeven && clusterKC === EXPECTATION_IDS[2]) {
         evidenceStrength = 0.9;
-      } else if (exactTurn === 4 && scenario.completeOnExactTurnFive && clusterKC === EXPECTATION_IDS[2]) {
+      } else if (exactTurn === 6 && scenario.completeOnExactTurnSeven && clusterKC === EXPECTATION_IDS[3]) {
         evidenceStrength = 0.9;
       } else if (exactTurn < 0) {
         evidenceStrength = clusterKC === EXPECTATION_IDS[3]
@@ -179,11 +193,17 @@ function evidenceForTurn(
       if (exactTurn === 5 && id === 'M1' && scenario.keepM1ActiveAfterTurnSix) {
         return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.5 };
       }
+      if (exactTurn === 6 && id === 'M3' && scenario.completeOnExactTurnSeven) {
+        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
+      }
       if (exactTurn < 0 && (id === 'M1' || id === 'M2')) {
         return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
       }
       if (exactTurn < 0 && id === 'M3' && scenario.inferUnsupportedM3OnSynthesis) {
         return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.25 };
+      }
+      if (exactTurn < 0 && id === 'M3') {
+        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
       }
       return { id, evidenceDirection: 'unaddressed' as const, evidenceStrength: 0 };
     }),
@@ -247,9 +267,9 @@ function evaluationOptions(scenario: EvaluationScenario) {
 }
 
 describe('SPARC Compound Interest live evaluation harness', function() {
-  it('stops an exact replay at early completion and retains the complete turn log', async function() {
+  it('completes the exact replay without synthesis and retains the complete turn log', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
-      completeOnExactTurnFive: true,
+      completeOnExactTurnSeven: true,
     }));
     const run = result.runs[0]!;
 
@@ -261,7 +281,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(run.robustnessPassed).to.equal(true);
     expect(run.graduationPassed).to.equal(true);
     expect(run.exactTranscriptCompleted).to.equal(true);
-    expect(run.turns).to.have.length(5);
+    expect(run.turns).to.have.length(7);
     expect(run.turns.every((turn) => turn.phase === 'exact-transcript')).to.equal(true);
     expect(run.turns.every((turn) => (
       turn.evidenceEnvelope.learningTargetEvaluations.length === 4
@@ -278,7 +298,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
       completed: false,
     });
     expect(run.turns[1]?.tutorText).to.contain(SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS[1]);
-    expect(run.turns[4]).to.deep.include({
+    expect(run.turns[6]).to.deep.include({
       productionRuleId: 'dialogue.completion.summary',
       action: 'summary',
       completed: true,
@@ -290,7 +310,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
 
   it('adds the explicit synthesis only when the exact replay has not graduated', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
-      completeOnExactTurnFive: false,
+      completeOnExactTurnSeven: false,
     }));
     const run = result.runs[0]!;
 
@@ -300,19 +320,20 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(run.allRequirementsPassed).to.equal(true);
     expect(run.studentOutcome).to.equal('graduated');
     expect(run.robustnessOutcome).to.equal('passed');
-    expect(run.turns).to.have.length(7);
-    expect(run.turns[6]?.phase).to.equal('graduation-synthesis');
-    expect(run.turns[6]?.learnerText).to.contain('earned interest is added to the account balance');
-    expect(run.turns[6]?.learnerText).to.contain('original $1,000 plus previously earned interest');
-    expect(run.turns[6]?.learnerText).to.contain('multiplies the current balance by 1.05');
-    expect(run.turns[6]?.learnerText).to.contain('rather than remaining fixed');
-    expect(run.turns[6]?.evidenceEnvelope.learningTargetEvaluations)
+    expect(run.turns).to.have.length(8);
+    expect(run.turns[7]?.phase).to.equal('graduation-synthesis');
+    expect(run.turns[7]?.learnerText).to.contain('earned interest is added to the account balance');
+    expect(run.turns[7]?.learnerText).to.contain('original $1,000 plus previously earned interest');
+    expect(run.turns[7]?.learnerText).to.contain('multiplies the current balance by 1.05');
+    expect(run.turns[7]?.learnerText).to.contain('rather than remaining fixed');
+    expect(run.turns[7]?.learnerText).to.contain('adding interest more frequently');
+    expect(run.turns[7]?.evidenceEnvelope.learningTargetEvaluations)
       .to.deep.include({
         clusterKC: EXPECTATION_IDS[3],
         evidenceDirection: 'supports',
         evidenceStrength: 1,
       });
-    expect(run.turns[6]).to.deep.include({
+    expect(run.turns[7]).to.deep.include({
       productionRuleId: 'dialogue.completion.summary',
       action: 'summary',
       completed: true,
@@ -322,7 +343,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
 
   it('accepts turn 4 as a hesitant answer as well as a content-focused question', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
-      completeOnExactTurnFive: true,
+      completeOnExactTurnSeven: true,
       classifyTurnFourAsQuestion: false,
     }));
     const run = result.runs[0]!;
@@ -338,26 +359,42 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(result.ok).to.equal(true);
   });
 
-  it('fails robustness when an incorrect early response falsely supports E4', async function() {
+  it('fails robustness when the accumulated turn-4 dialogue leaves E2 below completion coverage', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
-      completeOnExactTurnFive: true,
-      supportE4OnEarlyTurn: 2,
+      completeOnExactTurnSeven: true,
+      underScoreCumulativeE2OnTurnFour: true,
     }));
     const run = result.runs[0]!;
 
     expect(run.studentOutcome).to.equal('graduated');
     expect(run.robustnessOutcome).to.equal('failed');
     expect(run.failedRobustnessCheckIds).to.deep.equal([
-      'early-incorrect-responses-do-not-support-e4',
+      'turn-4-cumulative-e2-coverage',
     ]);
-    expect(run.checks.find((check) => check.id === 'early-incorrect-responses-do-not-support-e4')?.message)
-      .to.contain('turn 2 at strength 0.5');
+    expect(run.checks.find((check) => check.id === 'turn-4-cumulative-e2-coverage')?.message)
+      .to.contain('was 0.6; completion requires 0.8');
+  });
+
+  it('fails robustness when a pre-frequency response falsely supports E4', async function() {
+    const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
+      completeOnExactTurnSeven: true,
+      supportE4OnEarlyTurn: 4,
+    }));
+    const run = result.runs[0]!;
+
+    expect(run.studentOutcome).to.equal('graduated');
+    expect(run.robustnessOutcome).to.equal('failed');
+    expect(run.failedRobustnessCheckIds).to.deep.equal([
+      'pre-frequency-responses-do-not-support-e4',
+    ]);
+    expect(run.checks.find((check) => check.id === 'pre-frequency-responses-do-not-support-e4')?.message)
+      .to.contain('turn 4 at strength 0.5');
   });
 
   it('reports positive M3 support strength as unsupported by the exact transcript', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(
       evaluationOptions({
-        completeOnExactTurnFive: true,
+        completeOnExactTurnSeven: true,
         inferUnsupportedM3: true,
       }),
     );
@@ -373,7 +410,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
   it('includes the optional synthesis turn in robustness evaluation', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(
       evaluationOptions({
-        completeOnExactTurnFive: false,
+        completeOnExactTurnSeven: false,
         inferUnsupportedM3OnSynthesis: true,
       }),
     );
@@ -384,12 +421,12 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(run.robustnessOutcome).to.equal('failed');
     expect(run.failedRobustnessCheckIds).to.deep.equal(['unsupported-m3-not-inferred']);
     expect(run.checks.find((check) => check.id === 'unsupported-m3-not-inferred')?.message)
-      .to.contain('turn(s) 7');
+      .to.contain('turn(s) 8');
   });
 
   it('fails robustness when M1 remains active after exact-transcript turn 6', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
-      completeOnExactTurnFive: false,
+      completeOnExactTurnSeven: false,
       keepM1ActiveAfterTurnSix: true,
     }));
     const run = result.runs[0]!;
@@ -403,12 +440,12 @@ describe('SPARC Compound Interest live evaluation harness', function() {
 
   it('fails robustness when the synthesis does not recognize E4 at completion strength', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
-      completeOnExactTurnFive: false,
+      completeOnExactTurnSeven: false,
       synthesisE4Strength: 0.75,
     }));
     const run = result.runs[0]!;
 
-    expect(run.studentOutcome).to.equal('graduated');
+    expect(run.studentOutcome).to.equal('not-graduated');
     expect(run.robustnessOutcome).to.equal('failed');
     expect(run.failedRobustnessCheckIds).to.deep.equal(['synthesis-e4-recognized']);
     expect(run.checks.find((check) => check.id === 'synthesis-e4-recognized')?.message)
@@ -416,7 +453,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
   });
 
   it('retains rejected scoring evidence and excludes evaluation errors from the graduation denominator', async function() {
-    const scenario: EvaluationScenario = { completeOnExactTurnFive: true };
+    const scenario: EvaluationScenario = { completeOnExactTurnSeven: true };
     const baseEnvelope = evidenceForTurn(
       SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS[0],
       scenario,
@@ -517,7 +554,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
   });
 
   it('retains attempted-turn diagnostics when the provider rate-limits tutor generation', async function() {
-    const scenario: EvaluationScenario = { completeOnExactTurnFive: true };
+    const scenario: EvaluationScenario = { completeOnExactTurnSeven: true };
     const result = await runSparcCompoundInterestLiveEvaluation({
       totalRuns: 2,
       createProvider(onLearnerResponseScoringTrace) {

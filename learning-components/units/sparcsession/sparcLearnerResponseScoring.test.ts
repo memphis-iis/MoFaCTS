@@ -202,7 +202,7 @@ describe('sparcLearnerResponseScoring', function() {
     }
   });
 
-  it('rejects inconsistent evidence directions, strengths, and off-task classifications', function() {
+  it('rejects inconsistent evidence directions and strengths', function() {
     const invalidEvidence = [{
       learningTargetEvaluations: [{
         clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0,
@@ -233,22 +233,11 @@ describe('sparcLearnerResponseScoring', function() {
         id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
       }],
       learnerContribution: { type: 'answer' },
-    }, {
-      learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.5,
-      }, {
-        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-      }],
-      diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-      }],
-      learnerContribution: { type: 'off-task' },
     }] as SparcLearnerResponseEvidenceEnvelope[];
     const messages = [
       /evidenceStrength must be greater than 0 when evidenceDirection is supports/,
       /evidenceStrength must be greater than 0 when evidenceDirection is contradicts/,
       /evidenceStrength must be 0 when evidenceDirection is unaddressed/,
-      /off-task contribution must leave every instructional proposition unaddressed/,
     ];
 
     invalidEvidence.forEach((evidence, index) => {
@@ -260,6 +249,27 @@ describe('sparcLearnerResponseScoring', function() {
         messages[index]!,
       );
     });
+  });
+
+  it('accepts cumulative instructional evidence with an off-task latest contribution', function() {
+    const score = reduceSparcLearnerResponseEvidence({
+      facts: document.workingMemoryFacts ?? [],
+      evidence: {
+        learningTargetEvaluations: [{
+          clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.4,
+        }, {
+          clusterKC: 'kc-b', evidenceDirection: 'supports', evidenceStrength: 0.1,
+        }],
+        diagnosticMisconceptionEvaluations: [{
+          id: 'm1', evidenceDirection: 'supports', evidenceStrength: 0.2,
+        }],
+        learnerContribution: { type: 'off-task' },
+      },
+    });
+
+    assert.deepEqual(score.learningTargetScores, []);
+    assert.equal(score.diagnosticMisconceptionScores, undefined);
+    assert.deepEqual(score.learnerContribution, { type: 'off-task' });
   });
 
   it('rejects invalid evidence directions and nonnumeric strengths', function() {
