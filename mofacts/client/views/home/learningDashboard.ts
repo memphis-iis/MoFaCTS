@@ -31,7 +31,7 @@ import {
   learnerTdfFieldAppliesToUnit,
   type LearnerTdfConfig
 } from '../../../common/lib/learnerTdfConfig';
-import { isAudioPromptModeEnabled } from '../../../common/lib/audioPromptMode';
+import { resolvePracticeTtsIndicatorState } from './practiceAudioIndicators';
 import { detectTdfUnitType } from '../../../common/fieldApplicability';
 import {
   finishLaunchLoading,
@@ -837,21 +837,15 @@ function getUserAudioSettings() {
 function getEffectiveTtsState(tdf: any) {
   const tdfId = String(tdf?.TDFId || '');
   const promptModeOverride = learnerConfigHasSetSpecAudioOverride(tdfId, 'audioPromptMode');
-  const effectivePromptMode = promptModeOverride
-    ? getEffectiveSetSpecValue(tdf, 'audioPromptMode')
+  const lessonPromptMode = getEffectiveSetSpecValue(tdf, 'audioPromptMode');
+  const runtimePromptMode = promptModeOverride
+    ? lessonPromptMode
     : getUserAudioSettings().audioPromptMode;
-  const promptModeEnabled = isAudioPromptModeEnabled(effectivePromptMode);
-  const keyAvailable = tdf?.hasTTSAPIKey === true;
-  const supported = promptModeEnabled ||
-    promptModeOverride ||
-    isAudioPromptModeEnabled(tdf?.audioPromptMode);
-
-  return {
-    supported,
-    active: supported && promptModeEnabled && keyAvailable,
-    promptModeEnabled,
-    keyAvailable,
-  };
+  return resolvePracticeTtsIndicatorState({
+    lessonPromptMode,
+    runtimePromptMode,
+    keyAvailable: tdf?.hasTTSAPIKey === true,
+  });
 }
 
 function getEffectiveSrState(tdf: any) {
@@ -930,7 +924,7 @@ const lessonRowHelpers = {
     const state = getEffectiveTtsState(this);
     if (state.active) return dashboardText('dashboard.ttsEnabled');
     if (!state.keyAvailable) return dashboardText('dashboard.ttsNeedsApiKey');
-    if (!state.promptModeEnabled) return dashboardText('dashboard.ttsTurnedOff');
+    if (!state.runtimePromptModeEnabled) return dashboardText('dashboard.ttsTurnedOff');
     return dashboardText('dashboard.ttsUnavailable');
   },
 
@@ -943,7 +937,7 @@ const lessonRowHelpers = {
   },
 
   showTtsIcon(this: any): boolean {
-    return getEffectiveTtsState(this).supported;
+    return getEffectiveTtsState(this).visible;
   },
 
   showSrIcon(this: any): boolean {
