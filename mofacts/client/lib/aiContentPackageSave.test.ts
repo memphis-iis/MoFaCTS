@@ -9,6 +9,14 @@ import {
   type AiContentPackageSaveDeps,
 } from './aiContentPackageSave';
 import type { BuiltImportPackage, ImportDraftLesson } from './normalizedImportTypes';
+import { AI_CONTENT_CONTRACT_VERSION, type AiContentSaveContract } from '../../common/aiContentContract';
+
+const saveContract: AiContentSaveContract = {
+  contractVersion: AI_CONTENT_CONTRACT_VERSION,
+  mode: 'learning',
+  title: 'AI Lesson',
+  pairs: [{ id: 'pair-1', kind: 'text', stimulus: 'Prompt', response: 'Answer' }],
+};
 
 function buildDraft(title: string): ImportDraftLesson {
   return {
@@ -143,7 +151,7 @@ describe('aiContentPackageSave', function() {
     const deps = buildDeps({ callAsync });
 
     try {
-      await uploadBuiltPackage(buildPackage(), 'summary', deps);
+      await uploadBuiltPackage(buildPackage(), 'summary', deps, saveContract);
       throw new Error('Expected upload failure');
     } catch (error) {
       expect(error).to.equal(saveError);
@@ -174,7 +182,7 @@ describe('aiContentPackageSave', function() {
       promptForReplacementName,
     };
 
-    const result = await buildUploadWithNameConflictRetry([draft], 'summary', deps);
+    const result = await buildUploadWithNameConflictRetry([draft], 'summary', deps, saveContract);
 
     expect(promptForReplacementName.calledOnce).to.equal(true);
     expect(draft.title).to.equal('Replacement_Name');
@@ -184,38 +192,25 @@ describe('aiContentPackageSave', function() {
     expect(result.outputs[0]!.title).to.equal('Replacement_Name');
   });
 
-  it('uploads each generated draft as its own package asset', async function() {
-    const drafts = [buildDraft('Learn Draft'), buildDraft('Tutor Draft')];
+  it('rejects multiple generated modules before creating a package', async function() {
+    const drafts = [buildDraft('Learn Draft'), buildDraft('Assessment Draft')];
     const callAsync = sinon.stub();
-    callAsync.onFirstCall().resolves([{
-      moduleId: 'learningSession',
-      title: 'Learn_Draft',
-      artifactKindLabel: 'Learning session',
-      packageAssetId: 'asset-1',
-      itemCount: 1,
-    }]);
-    callAsync.onSecondCall().resolves([{
-      moduleId: 'autoTutor',
-      title: 'Tutor_Draft',
-      artifactKindLabel: 'SPARC AutoTutor',
-      packageAssetId: 'asset-2',
-      itemCount: 1,
-    }]);
+    callAsync.onFirstCall().resolves([
+      { moduleId: 'learningSession', title: 'Learn_Draft', artifactKindLabel: 'Learning session', packageAssetId: 'asset-1', itemCount: 1 },
+      { moduleId: 'assessmentSession', title: 'Assessment_Draft', artifactKindLabel: 'Assessment session', packageAssetId: 'asset-1', itemCount: 1 },
+    ]);
     const deps = {
       ...buildDeps({ callAsync, assetIds: ['asset-1', 'asset-2'] }),
       promptForReplacementName: sinon.stub(),
     };
 
-    const result = await buildUploadWithNameConflictRetry(drafts, 'summary', deps);
-
-    const insertStub = deps.dynamicAssets.insert as sinon.SinonStub;
-    expect(insertStub.callCount).to.equal(2);
-    expect(callAsync.firstCall.args[0]).to.equal('saveAiGeneratedPackageContent');
-    expect(callAsync.firstCall.args[1]).to.include({ packageAssetId: 'asset-1' });
-    expect(callAsync.firstCall.args[1].entries).to.have.length(1);
-    expect(callAsync.secondCall.args[0]).to.equal('saveAiGeneratedPackageContent');
-    expect(callAsync.secondCall.args[1]).to.include({ packageAssetId: 'asset-2' });
-    expect(callAsync.secondCall.args[1].entries).to.have.length(1);
-    expect(result.outputs.map((output) => output.packageAssetId)).to.deep.equal(['asset-1', 'asset-2']);
+    try {
+      await buildUploadWithNameConflictRetry(drafts, 'summary', deps, saveContract);
+      throw new Error('Expected the single-content-system guard to fail');
+    } catch (error) {
+      expect((error as Error).message).to.equal('AI Content Creator saves exactly one Learning or Test content system.');
+    }
+    expect((deps.dynamicAssets.insert as sinon.SinonStub).called).to.equal(false);
+    expect(callAsync.called).to.equal(false);
   });
 });

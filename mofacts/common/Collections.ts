@@ -78,19 +78,6 @@ const DynamicAssets = new FilesCollection({
       }
     }
 
-    if (meta.uploadPurpose === 'ai-draft-media') {
-      const draft = await ManualContentDrafts.findOneAsync({
-        _id: String(meta.draftId || ''),
-        ownerId: userId,
-        draftType: 'ai-content-creator',
-      });
-      const items = Array.isArray((draft as any)?.output?.items) ? (draft as any).output.items : [];
-      const item = items.find((candidate: any) => String(candidate?.id || '') === String(meta.itemId || ''));
-      if (!draft || !item || String(item?.prompt?.mediaSlot?.id || '') !== String(meta.mediaSlotId || '')) {
-        throw new Meteor.Error('not-authorized', 'The AI draft media slot is not owned by this user');
-      }
-    }
-
     if (isTeacherOrAdmin) {
       return true;
     }

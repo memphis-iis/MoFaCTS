@@ -8,12 +8,6 @@ import {
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
 import { createContentAssetMaintenanceMethods } from './contentAssetMaintenanceMethods';
-import {
-  AI_CONTENT_DRAFT_RETENTION_MS,
-  AI_CONTENT_DRAFT_TYPE,
-  isAiDraftReviewComplete,
-  type AiContentDraftPhase,
-} from '../../common/aiContentDrafts';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -32,7 +26,20 @@ type DynamicAssetDoc = {
   uploadedAt?: unknown;
   ext?: unknown;
   extension?: unknown;
-  meta?: { public?: boolean; stimuliSetId?: unknown; storageBackend?: unknown; storageKey?: unknown };
+  path?: unknown;
+  meta?: {
+    public?: boolean;
+    stimuliSetId?: unknown;
+    storageBackend?: unknown;
+    storageKey?: unknown;
+    uploadPurpose?: unknown;
+    draftId?: unknown;
+    itemId?: unknown;
+    mediaSlotId?: unknown;
+    setId?: unknown;
+    setAssetId?: unknown;
+    targetId?: unknown;
+  };
 };
 
 type TdfLike = {
@@ -188,44 +195,6 @@ async function getOwnedManualContentDraft(
     },
     Object.keys(fields).length > 0 ? { fields } : undefined
   );
-}
-
-const AI_DRAFT_PHASES = new Set<AiContentDraftPhase>([
-  'interpreting',
-  'generating',
-  'resolving-media',
-  'review',
-  'saving',
-  'complete',
-  'failed',
-]);
-
-async function removeAiDraftAndMedia(deps: ContentMethodsDeps, userId: string, draftId: string) {
-  await deps.DynamicAssets.removeAsync({
-    userId,
-    'meta.uploadPurpose': 'ai-draft-media',
-    'meta.draftId': draftId,
-  });
-  await deps.ManualContentDrafts.removeAsync({ _id: draftId, ownerId: userId, draftType: AI_CONTENT_DRAFT_TYPE });
-}
-
-function publicAiDraft(draft: any) {
-  return {
-    _id: String(draft?._id || ''),
-    ownerId: String(draft?.ownerId || ''),
-    draftType: AI_CONTENT_DRAFT_TYPE,
-    phase: AI_DRAFT_PHASES.has(draft?.phase) ? draft.phase : 'failed',
-    revision: Number.isInteger(draft?.revision) ? draft.revision : 1,
-    sourceText: String(draft?.sourceText || ''),
-    selectedModules: Array.isArray(draft?.selectedModules) ? draft.selectedModules : [],
-    model: String(draft?.model || ''),
-    ...(draft?.intent ? { intent: draft.intent } : {}),
-    ...(draft?.output ? { output: draft.output } : {}),
-    warnings: Array.isArray(draft?.warnings) ? draft.warnings.map((warning: unknown) => String(warning)) : [],
-    ...(draft?.failure ? { failure: draft.failure } : {}),
-    createdAt: draft?.createdAt || null,
-    updatedAt: draft?.updatedAt || null,
-  };
 }
 
 async function getContentUploadSummariesForIds(
@@ -514,179 +483,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
     },
 
     ...assetMaintenanceMethods,
-
-    getActiveAiContentDraft: async function(this: MethodContext) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      const cutoff = new Date(Date.now() - AI_CONTENT_DRAFT_RETENTION_MS);
-      const staleDrafts = await deps.ManualContentDrafts.find({
-        ownerId: this.userId,
-        draftType: AI_CONTENT_DRAFT_TYPE,
-        updatedAt: { $lt: cutoff },
-      }, { fields: { _id: 1 }, limit: 25 }).fetchAsync();
-      for (const stale of staleDrafts) {
-        await removeAiDraftAndMedia(deps, this.userId, String(stale._id));
-      }
-      const draft = await deps.ManualContentDrafts.findOneAsync(
-        { ownerId: this.userId, draftType: AI_CONTENT_DRAFT_TYPE, phase: { $ne: 'complete' } },
-        { sort: { updatedAt: -1 } }
-      );
-      return draft ? publicAiDraft(draft) : null;
-    },
-
-    startAiContentDraft: async function(this: MethodContext, payload: UnknownRecord = {}) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      if (!deps.isPlainRecord(payload)) {
-        throw new Meteor.Error(400, 'Invalid AI draft payload');
-      }
-      const existing = await deps.ManualContentDrafts.findOneAsync({
-        ownerId: this.userId,
-        draftType: AI_CONTENT_DRAFT_TYPE,
-        phase: { $ne: 'complete' },
-      });
-      if (existing) {
-        throw new Meteor.Error('ai-draft-exists', 'Resume or discard the existing AI content draft before starting another.');
-      }
-      const sourceText = String(payload.sourceText || '').trim();
-      const model = String(payload.model || '').trim();
-      const selectedModules = Array.isArray(payload.selectedModules)
-        ? payload.selectedModules.filter((moduleId) => ['learningSession', 'assessmentSession', 'autoTutor'].includes(String(moduleId)))
-        : [];
-      if (!sourceText || !model || selectedModules.length === 0) {
-        throw new Meteor.Error(400, 'Source text, model, and at least one target are required');
-      }
-      await requireContentCreatorDisplayName(deps.usersCollection, this.userId);
-      const now = new Date();
-      const draftId = await deps.ManualContentDrafts.insertAsync({
-        ownerId: this.userId,
-        draftType: AI_CONTENT_DRAFT_TYPE,
-        phase: 'interpreting',
-        revision: 1,
-        sourceText,
-        selectedModules,
-        model,
-        warnings: [],
-        createdAt: now,
-        updatedAt: now,
-      });
-      const draft = await deps.ManualContentDrafts.findOneAsync({ _id: draftId, ownerId: this.userId });
-      return publicAiDraft(draft);
-    },
-
-    saveAiContentDraft: async function(this: MethodContext, payload: UnknownRecord = {}) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      if (!deps.isPlainRecord(payload)) {
-        throw new Meteor.Error(400, 'Invalid AI draft payload');
-      }
-      const draftId = String(payload.draftId || '').trim();
-      const expectedRevision = Number(payload.expectedRevision);
-      const phase = String(payload.phase || '') as AiContentDraftPhase;
-      if (!draftId || !Number.isInteger(expectedRevision) || !AI_DRAFT_PHASES.has(phase)) {
-        throw new Meteor.Error(400, 'Draft id, revision, and valid phase are required');
-      }
-      const existing = await deps.ManualContentDrafts.findOneAsync({
-        _id: draftId,
-        ownerId: this.userId,
-        draftType: AI_CONTENT_DRAFT_TYPE,
-      });
-      if (!existing) {
-        throw new Meteor.Error(404, 'AI content draft not found');
-      }
-      const set: UnknownRecord = { phase, updatedAt: new Date() };
-      for (const field of ['intent', 'output', 'warnings', 'failure']) {
-        if (Object.prototype.hasOwnProperty.call(payload, field)) {
-          set[field] = deps.cloneJsonLike(payload[field]);
-        }
-      }
-      const updated = await deps.ManualContentDrafts.updateAsync(
-        { _id: draftId, ownerId: this.userId, draftType: AI_CONTENT_DRAFT_TYPE, revision: expectedRevision },
-        { $set: set, $inc: { revision: 1 } }
-      );
-      if (Number(updated) !== 1) {
-        throw new Meteor.Error('ai-draft-conflict', 'This AI draft changed in another tab. Reload the current draft before editing.');
-      }
-      const draft = await deps.ManualContentDrafts.findOneAsync({ _id: draftId, ownerId: this.userId });
-      return publicAiDraft(draft);
-    },
-
-    discardAiContentDraft: async function(this: MethodContext, draftId: string) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      const draft = await deps.ManualContentDrafts.findOneAsync({
-        _id: String(draftId || ''),
-        ownerId: this.userId,
-        draftType: AI_CONTENT_DRAFT_TYPE,
-      });
-      if (!draft) {
-        throw new Meteor.Error(404, 'AI content draft not found');
-      }
-      await removeAiDraftAndMedia(deps, this.userId, String(draft._id));
-      return { discarded: true };
-    },
-
-    completeAiContentDraft: async function(this: MethodContext, payload: UnknownRecord = {}) {
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      const draftId = String(payload.draftId || '').trim();
-      const expectedRevision = Number(payload.expectedRevision);
-      const draft = await deps.ManualContentDrafts.findOneAsync({
-        _id: draftId,
-        ownerId: this.userId,
-        draftType: AI_CONTENT_DRAFT_TYPE,
-        revision: expectedRevision,
-      });
-      if (!draft) {
-        throw new Meteor.Error('ai-draft-conflict', 'The AI draft changed before completion.');
-      }
-      if (!isAiDraftReviewComplete({ output: draft.output })) {
-        throw new Meteor.Error('ai-draft-incomplete', 'Resolve all required prompts and responses before saving.');
-      }
-      const outputTdfIds = Array.isArray(payload.outputTdfIds)
-        ? payload.outputTdfIds.map((value) => String(value || '').trim()).filter(Boolean)
-        : [];
-      const stagedAssetSelector = {
-        userId: this.userId,
-        'meta.uploadPurpose': 'ai-draft-media',
-        'meta.draftId': draftId,
-      };
-      const hasStagedAssets = Boolean(await deps.DynamicAssets.findOneAsync(stagedAssetSelector, { fields: { _id: 1 } }));
-      if (hasStagedAssets && outputTdfIds.length === 0) {
-        throw new Meteor.Error('ai-draft-output-missing', 'The saved content output is required before staged draft media can be completed.');
-      }
-      const primaryTdf = outputTdfIds.length > 0
-        ? await deps.Tdfs.findOneAsync({ _id: outputTdfIds[0] }, { fields: { _id: 1, ownerId: 1, stimuliSetId: 1 } })
-        : null;
-      if (outputTdfIds.length > 0 && (!primaryTdf || primaryTdf.ownerId !== this.userId)) {
-        throw new Meteor.Error(403, 'The saved content output is not owned by this draft owner.');
-      }
-      if (primaryTdf && primaryTdf.ownerId === this.userId) {
-        if (typeof deps.DynamicAssets.collection.updateAsync !== 'function') {
-          throw new Meteor.Error(500, 'Dynamic asset metadata updates are unavailable');
-        }
-        await deps.DynamicAssets.collection.updateAsync(
-          stagedAssetSelector,
-          {
-            $set: {
-              'meta.uploadPurpose': 'content-media',
-              'meta.tdfId': String(primaryTdf._id),
-              'meta.stimuliSetId': primaryTdf.stimuliSetId,
-              'meta.public': true,
-            },
-            $unset: { 'meta.draftId': '', 'meta.itemId': '', 'meta.mediaSlotId': '' },
-          },
-          { multi: true }
-        );
-      }
-      await deps.ManualContentDrafts.removeAsync({ _id: draftId, ownerId: this.userId, draftType: AI_CONTENT_DRAFT_TYPE });
-      return { completed: true };
-    },
 
     listManualContentDrafts: async function(this: MethodContext) {
       if (!this.userId) {

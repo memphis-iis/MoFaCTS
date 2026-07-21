@@ -3,6 +3,7 @@ export type AiFlowStatus = 'started' | 'succeeded' | 'failed';
 export type AiFlowTelemetry = {
   surface?: string;
   operation?: string;
+  contractVersion?: number;
   componentId?: string;
   unitType?: string;
   requestId?: string;

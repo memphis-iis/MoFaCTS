@@ -1,6 +1,5 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
-import { extractJsonObject } from '../../common/lib/jsonExtraction';
 import {
   callOpenRouterEmbeddings,
   callOpenRouterJson,
@@ -11,6 +10,7 @@ import {
 } from '../../common/lib/openRouterClient';
 import {
   expandOpenRouterCompletionBudget,
+  normalizeOpenRouterReasoningLevel,
   validateOpenRouterReasoningLevelForModel,
   type OpenRouterReasoningLevel,
 } from '../../common/lib/openRouterModelCatalog';
@@ -342,8 +342,9 @@ async function executeResolvedOpenRouterJson(
     }
     const result = await callOpenRouterJson(callOptions);
     return {
+      request: result.requestBody,
       rawContent: result.rawContent,
-      parsedContent: extractJsonObject(result.rawContent),
+      parsedContent: result.value,
       responseBody: result.responseBody,
       costUsd: result.costUsd,
       source: credentials.source,
@@ -352,6 +353,126 @@ async function executeResolvedOpenRouterJson(
     };
   } catch (error) {
     throw redactProviderError(deps, operation, error);
+  }
+}
+
+function validateSchemaValue(value: unknown, schema: unknown, path = '$'): string[] {
+  if (!isRecord(schema)) return [`${path} schema must be an object.`];
+  const errors: string[] = [];
+  const allowedTypes = Array.isArray(schema.type) ? schema.type.map(String) : schema.type ? [String(schema.type)] : [];
+  const actualType = value === null ? 'null' : Array.isArray(value) ? 'array' : Number.isInteger(value) ? 'integer' : typeof value;
+  if (allowedTypes.length > 0 && !allowedTypes.includes(actualType) && !(actualType === 'integer' && allowedTypes.includes('number'))) {
+    return [`${path} must be ${allowedTypes.join(' or ')}.`];
+  }
+  if (Array.isArray(schema.enum) && !schema.enum.some((entry) => JSON.stringify(entry) === JSON.stringify(value))) {
+    errors.push(`${path} is not an allowed enum value.`);
+  }
+  if (typeof value === 'string') {
+    if (typeof schema.minLength === 'number' && value.length < schema.minLength) errors.push(`${path} is shorter than ${schema.minLength}.`);
+    if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) errors.push(`${path} is longer than ${schema.maxLength}.`);
+  }
+  if (typeof value === 'number') {
+    if (typeof schema.minimum === 'number' && value < schema.minimum) errors.push(`${path} is below ${schema.minimum}.`);
+    if (typeof schema.maximum === 'number' && value > schema.maximum) errors.push(`${path} is above ${schema.maximum}.`);
+  }
+  if (Array.isArray(value)) {
+    if (typeof schema.minItems === 'number' && value.length < schema.minItems) errors.push(`${path} has fewer than ${schema.minItems} items.`);
+    if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) errors.push(`${path} has more than ${schema.maxItems} items.`);
+    if (schema.items) value.forEach((entry, index) => errors.push(...validateSchemaValue(entry, schema.items, `${path}[${index}]`)));
+  }
+  if (isRecord(value)) {
+    const required = Array.isArray(schema.required) ? schema.required.map(String) : [];
+    required.forEach((key) => { if (!(key in value)) errors.push(`${path}.${key} is required.`); });
+    const properties = isRecord(schema.properties) ? schema.properties : {};
+    Object.entries(value).forEach(([key, entry]) => {
+      if (properties[key]) errors.push(...validateSchemaValue(entry, properties[key], `${path}.${key}`));
+      else if (schema.additionalProperties === false) errors.push(`${path}.${key} is not allowed.`);
+    });
+  }
+  return errors;
+}
+
+function adminLabReasoningLevel(value: unknown): OpenRouterReasoningLevel {
+  if (value === undefined || value === null || value === false) return 'none';
+  if (!isRecord(value)) throw new Meteor.Error(400, 'OpenRouter reasoning must be an object when supplied');
+  if (value.enabled === true && value.effort === undefined) return 'default';
+  return normalizeOpenRouterReasoningLevel(value.effort, 'Admin Tests OpenRouter reasoning effort');
+}
+
+function assertSafeAdminRequest(value: UnknownRecord): void {
+  const serialized = JSON.stringify(value);
+  if (serialized.length > 2_000_000) throw new Meteor.Error(400, 'Admin Tests OpenRouter request is too large');
+  if (/"(?:authorization|api_?key)"\s*:/i.test(serialized)) {
+    throw new Meteor.Error(400, 'Admin Tests request must not include credentials');
+  }
+  if (value.stream !== false) throw new Meteor.Error(400, 'Admin Tests OpenRouter requests must set stream to false');
+}
+
+async function executeAdminOpenRouterRequest(
+  deps: OpenRouterMethodsDeps,
+  userId: string,
+  request: unknown,
+) {
+  if (!isRecord(request)) throw new Meteor.Error(400, 'Admin Tests OpenRouter request must be an object');
+  assertSafeAdminRequest(request);
+  const credentials = await resolveOpenRouterCredentials(deps, userId, null, 'admin');
+  if (!credentials.apiKey) throw new Meteor.Error('no-api-key', 'No configured admin OpenRouter API key is available');
+  const model = normalizeString(request.model) || credentials.model;
+  const reasoningLevel = adminLabReasoningLevel(request.reasoning);
+  await validateResolvedOpenRouterConfiguration(deps, { model, reasoningLevel });
+  const responseFormat = isRecord(request.response_format) ? request.response_format : null;
+  const jsonSchema = responseFormat?.type === 'json_schema' && isRecord(responseFormat.json_schema)
+    ? responseFormat.json_schema
+    : null;
+  const schema = jsonSchema && isRecord(jsonSchema.schema) ? jsonSchema.schema : undefined;
+  const strictSchema = jsonSchema?.strict === true;
+  const provider = isRecord(request.provider) ? request.provider : undefined;
+  const startedAt = new Date();
+  const startedMs = Date.now();
+  try {
+    const options: Parameters<typeof callOpenRouterJson>[0] = {
+      apiKey: credentials.apiKey,
+      model,
+      reasoningLevel,
+      messages: normalizeMessages(request.messages),
+      ...(provider ? { provider } : {}),
+      intent: {
+        title: 'MoFaCTS Admin AI Content Prompt Lab',
+        ...(jsonSchema && normalizeString(jsonSchema.name) ? { schemaName: normalizeString(jsonSchema.name) } : {}),
+        ...(schema ? { schema } : {}),
+        strictSchema,
+        missingContentMessage: 'OpenRouter Prompt Lab response did not include message content.',
+        parse(value) { return value; },
+      },
+      telemetry: { surface: 'admin-tests', operation: 'ai-content-prompt-lab' },
+    };
+    if (typeof request.temperature === 'number') options.temperature = request.temperature;
+    if (typeof request.max_tokens === 'number') options.maxTokens = request.max_tokens;
+    const result = await callOpenRouterJson(options);
+    const parsedContent = result.value;
+    const validationErrors = schema ? validateSchemaValue(parsedContent, schema) : [];
+    const responseRecord = isRecord(result.responseBody) ? result.responseBody : {};
+    const resolvedModel = normalizeString(responseRecord.model) || model;
+    return {
+      startedAt: startedAt.toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedMs,
+      requestWithoutCredentials: request,
+      rawContent: result.rawContent,
+      parsedContent,
+      responseBody: result.responseBody,
+      usage: isRecord(responseRecord.usage) ? responseRecord.usage : null,
+      validation: { ok: validationErrors.length === 0, errors: validationErrors },
+      costUsd: result.costUsd,
+      source: credentials.source,
+      requestedModel: model,
+      model: resolvedModel,
+      reasoningLevel,
+    };
+  } catch (error) {
+    const summary = summarizeProviderError(error);
+    deps.serverConsole('[OpenRouter] request failed', { operation: 'admin-prompt-lab', ...summary });
+    throw new Meteor.Error('openrouter-request-failed', providerReason(summary), JSON.stringify(summary));
   }
 }
 
@@ -385,6 +506,16 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
         forbiddenMessage: 'Only admins can run Admin Tests OpenRouter evaluations',
       });
       return executeResolvedOpenRouterJson(deps, userId, params, 'admin-test-json', 'admin');
+    },
+
+    callAdminTestOpenRouterRequest: async function(this: MethodContext, request: unknown) {
+      const userId = await requireUserWithRoles(deps.getMethodAuthorizationDeps(), {
+        userId: this.userId,
+        roles: ['admin'],
+        notLoggedInMessage: 'Must be logged in to run the Admin Tests Prompt Lab',
+        forbiddenMessage: 'Only admins can run the Admin Tests Prompt Lab',
+      });
+      return executeAdminOpenRouterRequest(deps, userId, request);
     },
 
     callResolvedOpenRouterEmbeddings: async function(this: MethodContext, params: unknown) {

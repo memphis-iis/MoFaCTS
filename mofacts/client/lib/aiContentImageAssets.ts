@@ -225,7 +225,8 @@ export async function convertAiImageToWebp(file: File): Promise<ConvertedImage> 
   }
 }
 
-function uniquePackageFileName(sourceName: string, reserved: Set<string>): string {
+export function uniqueAiImagePackageFileName(sourceName: string, existingNames: string[] = []): string {
+  const reserved = new Set(existingNames.map((name) => name.toLocaleLowerCase()));
   const withoutExtension = sourceName.replace(/\.[^.]+$/, '');
   const base = sanitizeImportName(withoutExtension, 'image');
   let candidate = `${base}.webp`;
@@ -247,11 +248,12 @@ export async function prepareAiImageAssets(
   if (expanded.length === 0) {
     throw new Error('No supported images were found. Use JPEG, PNG, WebP, GIF, BMP, or AVIF files.');
   }
-  const reserved = new Set(existingAssets.map((asset) => asset.packageFileName.toLowerCase()));
+  const reservedNames = existingAssets.map((asset) => asset.packageFileName);
   const prepared: PreparedAiImageAsset[] = [];
   for (const source of expanded) {
     const converted = await converter(source.file);
-    const packageFileName = uniquePackageFileName(source.file.name, reserved);
+    const packageFileName = uniqueAiImagePackageFileName(source.file.name, reservedNames);
+    reservedNames.push(packageFileName);
     prepared.push({
       id: packageFileName,
       originalName: source.file.name,

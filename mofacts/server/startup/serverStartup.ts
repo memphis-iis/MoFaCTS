@@ -23,7 +23,8 @@ import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_au
 import { sendScheduledTurkMessages } from '../turk_methods';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
-import { AI_CONTENT_DRAFT_RETENTION_MS, AI_CONTENT_DRAFT_TYPE } from '../../common/aiContentDrafts';
+
+const LEGACY_AI_CONTENT_DRAFT_TYPE = 'ai-content-creator';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -240,31 +241,14 @@ async function findUserByName(deps: RunServerStartupDeps, username: string) {
   return await deps.usersCollection.findOneAsync(lookupSelector);
 }
 
-async function cleanupExpiredAiContentDrafts(deps: RunServerStartupDeps) {
-  const cutoff = new Date(Date.now() - AI_CONTENT_DRAFT_RETENTION_MS);
-  const staleDrafts = await deps.ManualContentDrafts.find(
-    { draftType: AI_CONTENT_DRAFT_TYPE, updatedAt: { $lt: cutoff } },
-    { fields: { _id: 1, ownerId: 1 }, sort: { updatedAt: 1 }, limit: 25 }
+async function purgeLegacyAiContentDraftStorage(deps: RunServerStartupDeps) {
+  const legacyDrafts = await deps.ManualContentDrafts.find(
+    { draftType: LEGACY_AI_CONTENT_DRAFT_TYPE },
+    { fields: { _id: 1 } }
   ).fetchAsync();
-  for (const draft of staleDrafts) {
-    const draftId = String(draft?._id || '');
-    const ownerId = String(draft?.ownerId || '');
-    if (!draftId || !ownerId) continue;
-    await deps.DynamicAssets.removeAsync({
-      userId: ownerId,
-      'meta.uploadPurpose': 'ai-draft-media',
-      'meta.draftId': draftId,
-    });
-    await deps.ManualContentDrafts.removeAsync({
-      _id: draftId,
-      ownerId,
-      draftType: AI_CONTENT_DRAFT_TYPE,
-      updatedAt: { $lt: cutoff },
-    });
-  }
-  if (staleDrafts.length > 0) {
-    deps.serverConsole(`[AI CONTENT DRAFT] Removed ${staleDrafts.length} expired draft(s).`);
-  }
+  await deps.DynamicAssets.removeAsync({ 'meta.uploadPurpose': 'ai-draft-media' });
+  await deps.ManualContentDrafts.removeAsync({ draftType: LEGACY_AI_CONTENT_DRAFT_TYPE });
+  if (legacyDrafts.length > 0) deps.serverConsole(`[AI CONTENT CREATOR] Removed ${legacyDrafts.length} obsolete server-side working record(s).`);
 }
 
 function getExistingAccountMethod(user: any): 'password' | 'google' | 'microsoft' | 'memphisSaml' | 'different-method' {
@@ -721,21 +705,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   await deps.AuthThrottleState.rawCollection().createIndex({ updatedAt: 1 });
   await deps.ManualContentDrafts.rawCollection().createIndex({ ownerId: 1, updatedAt: -1 });
   await deps.ManualContentDrafts.rawCollection().createIndex({ ownerId: 1, draftType: 1, phase: 1, updatedAt: -1 });
-  await deps.ManualContentDrafts.rawCollection().createIndex(
-    { ownerId: 1, draftType: 1 },
-    { unique: true, partialFilterExpression: { draftType: AI_CONTENT_DRAFT_TYPE } }
-  );
-  await deps.DynamicAssets.collection.rawCollection().createIndex({
-    userId: 1,
-    'meta.uploadPurpose': 1,
-    'meta.draftId': 1,
-  });
-  await cleanupExpiredAiContentDrafts(deps);
-  Meteor.setInterval(() => {
-    void cleanupExpiredAiContentDrafts(deps).catch((error) => {
-      deps.serverConsole('[AI CONTENT DRAFT] Expiration cleanup failed', error);
-    });
-  }, 24 * 60 * 60 * 1000);
+  await purgeLegacyAiContentDraftStorage(deps);
   await deps.StimulusCrowdStats.rawCollection().createIndex({ stimulusKey: 1 }, { unique: true });
   await deps.StimulusCrowdStats.rawCollection().createIndex({ stimuliSetId: 1, KCId: 1 });
   await deps.StimulusCrowdStats.rawCollection().createIndex({ stimuliSetId: 1 });

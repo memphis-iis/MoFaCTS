@@ -41,6 +41,107 @@
           <div class="admin-header-action-row">
             <div>
               <div class="admin-section-heading admin-section-heading-compact">
+                <i class="fa fa-plug admin-section-icon" aria-hidden="true"></i>
+                <h5>OpenRouter strict-schema preflight</h5>
+              </div>
+              <div class="text-muted small">
+                Makes a real authenticated request and verifies the configured model can honor the current strict JSON contract.
+              </div>
+            </div>
+            {{#if openRouterPreflightPending}}
+              <button type="button" class="btn btn-primary run-openrouter-strict-preflight" disabled aria-busy="true">
+                <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                Testing OpenRouter
+              </button>
+            {{else}}
+              <button type="button" class="btn btn-primary run-openrouter-strict-preflight" aria-busy="false">
+                <i class="fa fa-plug" aria-hidden="true"></i>
+                Test OpenRouter
+              </button>
+            {{/if}}
+          </div>
+
+          <div id="openrouter-strict-preflight-output" class="admin-output-region" aria-live="polite">
+            {{#with openRouterPreflightOutput}}
+              {{> Template.dynamic template=template data=data}}
+            {{/with}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="card admin-card">
+        <div class="card-body">
+          <div class="admin-header-action-row">
+            <div>
+              <div class="admin-section-heading admin-section-heading-compact">
+                <i class="fa fa-flask admin-section-icon" aria-hidden="true"></i>
+                <h5>AI Content Prompt Lab</h5>
+              </div>
+              <div class="text-muted small">Edit the complete non-secret OpenRouter request. Requests and results are not retained.</div>
+            </div>
+            {{#if promptLabPending}}
+              <button type="button" class="btn btn-primary run-ai-content-prompt-lab" disabled aria-busy="true">Running...</button>
+            {{else}}
+              <button type="button" class="btn btn-primary run-ai-content-prompt-lab" aria-busy="false">Run</button>
+            {{/if}}
+          </div>
+          <label for="ai-content-prompt-lab-request" class="form-label">OpenRouter request JSON</label>
+          <textarea id="ai-content-prompt-lab-request" class="form-control admin-form-monospace" rows="24" spellcheck="false">{{promptLabRequest}}</textarea>
+          {{#if promptLabError}}
+            <label for="ai-content-prompt-lab-error" class="form-label admin-form-row-top">Complete error details</label>
+            <textarea id="ai-content-prompt-lab-error" class="form-control admin-form-monospace is-invalid" rows="10" readonly>{{promptLabError}}</textarea>
+          {{/if}}
+          {{#if promptLabResult}}
+            <label for="ai-content-prompt-lab-result" class="form-label admin-form-row-top">Raw request, provider response, parsed result, validation, and usage</label>
+            <textarea id="ai-content-prompt-lab-result" class="form-control admin-form-monospace" rows="24" readonly>{{promptLabResult}}</textarea>
+          {{/if}}
+          {{#if promptLabPairs}}
+            <label for="ai-content-prompt-lab-pairs" class="form-label admin-form-row-top">Successfully validated pair array</label>
+            <textarea id="ai-content-prompt-lab-pairs" class="form-control admin-form-monospace" rows="14" readonly>{{promptLabPairs}}</textarea>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="card admin-card">
+        <div class="card-body">
+          <div class="admin-header-action-row">
+            <div>
+              <div class="admin-section-heading admin-section-heading-compact">
+                <i class="fa fa-wikipedia-w admin-section-icon" aria-hidden="true"></i>
+                <h5>Wikimedia Discovery Lab</h5>
+              </div>
+              <div class="text-muted small">Wikipedia identifies the requested collection members and their associated images during one traversal. Every query, grounded link, selection, and rejection is shown; results are not retained.</div>
+            </div>
+            {{#if wikimediaLabPending}}
+              <button type="button" class="btn btn-primary run-wikimedia-discovery-lab" disabled aria-busy="true">Running...</button>
+            {{else}}
+              <button type="button" class="btn btn-primary run-wikimedia-discovery-lab" aria-busy="false">Run Discovery</button>
+            {{/if}}
+          </div>
+          <label for="wikimedia-lab-notes" class="form-label">Notes</label>
+          <textarea id="wikimedia-lab-notes" class="form-control" rows="3">{{wikimediaLabNotes}}</textarea>
+          {{#if wikimediaLabError}}
+            <label for="wikimedia-lab-error" class="form-label admin-form-row-top">Discovery error details</label>
+            <textarea id="wikimedia-lab-error" class="form-control admin-form-monospace is-invalid" rows="12" readonly>{{wikimediaLabError}}</textarea>
+          {{/if}}
+          {{#if wikimediaLabResult}}
+            <label for="wikimedia-lab-result" class="form-label admin-form-row-top">Traversal result and diagnostics</label>
+            <textarea id="wikimedia-lab-result" class="form-control admin-form-monospace" rows="24" readonly>{{wikimediaLabResult}}</textarea>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="card admin-card">
+        <div class="card-body">
+          <div class="admin-header-action-row">
+            <div>
+              <div class="admin-section-heading admin-section-heading-compact">
                 <i class="fa fa-comments admin-section-icon"></i>
                 <h5>{{testText 'adminTests.sparcLiveEvaluation'}}</h5>
               </div>

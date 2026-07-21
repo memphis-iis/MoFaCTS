@@ -1,12 +1,9 @@
-export type DynamicAssetUploadPurpose = 'package' | 'content-media' | 'ai-draft-media';
+export type DynamicAssetUploadPurpose = 'package' | 'content-media';
 
 export type DynamicAssetUploadMeta = {
   uploadPurpose?: DynamicAssetUploadPurpose;
   tdfId?: string;
   stimuliSetId?: string | number;
-  draftId?: string;
-  itemId?: string;
-  mediaSlotId?: string;
   public?: boolean;
   expectedSize?: number;
   sha256?: string;
@@ -38,7 +35,6 @@ const CONTENT_MEDIA_MIME_BY_EXTENSION: Record<string, ReadonlySet<string>> = {
   webm: new Set(['video/webm']),
   mov: new Set(['video/quicktime']),
 };
-const AI_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif']);
 
 function fileExtension(file: DynamicAssetUploadFile): string {
   const explicit = String(file.extension || '').trim().toLowerCase().replace(/^\./, '');
@@ -74,19 +70,6 @@ export function validateDynamicAssetUpload(file: DynamicAssetUploadFile): true |
   if (purpose === 'content-media') {
     if (!String(file.meta?.tdfId || '').trim() || file.meta?.stimuliSetId === undefined || file.meta?.stimuliSetId === null) {
       return 'Content media uploads require a TDF and stimuli set';
-    }
-    return true;
-  }
-
-  if (purpose === 'ai-draft-media') {
-    if (!AI_IMAGE_EXTENSIONS.has(extension) || !mimeType.startsWith('image/')) {
-      return 'AI draft media must be an approved image file';
-    }
-    if (!String(file.meta?.draftId || '').trim() || !String(file.meta?.itemId || '').trim() || !String(file.meta?.mediaSlotId || '').trim()) {
-      return 'AI draft media uploads require a draft, item, and media slot';
-    }
-    if (file.meta?.public === true) {
-      return 'AI draft media must remain private until content is saved';
     }
     return true;
   }

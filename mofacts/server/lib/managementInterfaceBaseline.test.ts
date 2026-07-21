@@ -171,4 +171,65 @@ describe('management interface baseline', function() {
     expect(eventBlock).not.to.include('stepWizardMessage(step: number)');
     expect(eventBlock).not.to.include('stepInlineConfirmation(step: number)');
   });
+
+  it('keeps the AI Content Creator on the approved minimal input and review surfaces', function() {
+    const creatorMarkup = fs.readFileSync(
+      path.join(findAppRoot(), 'client', 'views', 'experimentSetup', 'aiContentCreator.html'),
+      'utf8',
+    );
+    const input = sourceBlock(creatorMarkup, '{{#if showInput}}', '{{/if}}\n\n      {{#if showReview}}');
+    const review = sourceBlock(creatorMarkup, '{{#if showReview}}', '{{/if}}\n    </section>');
+
+    expect(input).to.include('id="ai-notes"');
+    expect(input).to.include('id="ai-image-files"');
+    expect(input).to.include('id="ai-image-folder"');
+    expect(input).to.include('data-mode="learning"');
+    expect(input).to.include('data-mode="test"');
+    expect(input).to.include('id="ai-submit"');
+    for (const forbidden of ['source-material', 'source-url', 'item-count', 'language', 'response-type', 'visibility', 'tags', 'shuffle', 'blueprint']) {
+      expect(input.toLocaleLowerCase()).not.to.include(forbidden);
+    }
+
+    expect(review).to.include('id="ai-review-title"');
+    expect(review).to.include('ai-review-stimulus');
+    expect(review).to.include('ai-review-response');
+    expect(review).to.include('Replace image');
+    expect(review).to.include('Image needed');
+    for (const forbidden of ['learner instructions', 'quota', 'distractor', 'suggested response', 'approve & generate', 'blueprint']) {
+      expect(review.toLocaleLowerCase()).not.to.include(forbidden);
+    }
+  });
+
+  it('keeps both no-retention AI Content labs on Admin Tests', function() {
+    const testMarkup = fs.readFileSync(
+      path.join(findAppRoot(), 'client', 'views', 'testRunner.html'),
+      'utf8',
+    );
+    expect(testMarkup).to.include('run-openrouter-strict-preflight');
+    expect(testMarkup).to.include('id="ai-content-prompt-lab-request"');
+    expect(testMarkup).to.include('run-ai-content-prompt-lab');
+    expect(testMarkup).to.include('id="ai-content-prompt-lab-pairs"');
+    expect(testMarkup).to.include('id="wikimedia-lab-notes"');
+    expect(testMarkup).not.to.include('id="wikimedia-lab-pairs"');
+    expect(testMarkup).not.to.include('copy-prompt-lab-pairs-to-discovery');
+    expect(testMarkup).to.include('run-wikimedia-discovery-lab');
+    expect(testMarkup).to.include('Run Discovery');
+  });
+
+  it('keeps AI working state browser-owned and stale-operation guarded', function() {
+    const appRoot = findAppRoot();
+    const creatorSource = fs.readFileSync(
+      path.join(appRoot, 'client', 'views', 'experimentSetup', 'aiContentCreator.ts'),
+      'utf8',
+    );
+    const workingStore = fs.readFileSync(
+      path.join(appRoot, 'client', 'lib', 'aiContentWorkingStore.ts'),
+      'utf8',
+    );
+    expect(creatorSource).to.include('instance.operationSequence !== operation');
+    expect(creatorSource).to.include('AiContentWorkingSaveQueue');
+    expect(workingStore).to.include('globalThis.indexedDB');
+    expect(creatorSource).not.to.match(/(?:start|save|complete|discard)AiContentDraft/);
+    expect(workingStore).not.to.include('Meteor.call');
+  });
 });

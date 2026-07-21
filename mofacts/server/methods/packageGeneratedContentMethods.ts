@@ -1,7 +1,11 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
-import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
-import { AI_CONTENT_DRAFT_TYPE, isAiDraftReviewComplete } from '../../common/aiContentDrafts';
+import {
+  AI_CONTENT_CONTRACT_VERSION,
+  getAiContentSaveBlockingIssues,
+  validateAiContentSaveContract,
+  type AiContentSaveContract,
+} from '../../common/aiContentContract';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -54,13 +58,11 @@ type AiGeneratedPackageSavePayload = {
   packageFileName?: unknown;
   entries?: unknown;
   creationSummary?: unknown;
-  draftId?: unknown;
-  draftRevision?: unknown;
+  contract?: unknown;
 };
 
 type PackageGeneratedContentDeps = {
   DynamicAssets: any;
-  ManualContentDrafts: any;
   normalizeCanonicalId: (value: unknown) => string | null;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   getTdfByFileName: (filename: string) => Promise<any>;
@@ -91,9 +93,6 @@ function normalizeGeneratedPackageFileName(value: unknown, packageAssetId: strin
 function artifactKindLabel(moduleId: string): string {
   if (moduleId === 'assessmentSession') {
     return 'Assessment session';
-  }
-  if (moduleId === 'autoTutor') {
-    return 'SPARC AutoTutor';
   }
   return 'Learning session';
 }
@@ -142,22 +141,18 @@ export function createPackageGeneratedContentMethods(
       }
       await callbacks.requireCreatorDisplayName(actingUserId);
 
-      const draftId = deps.normalizeCanonicalId(payload.draftId);
-      const draftRevision = Number(payload.draftRevision);
-      if (!draftId || !Number.isInteger(draftRevision)) {
-        throw new Meteor.Error(400, 'AI draft id and revision are required');
+      let contract: AiContentSaveContract;
+      let contractIssues: string[];
+      try {
+        contract = validateAiContentSaveContract(payload.contract);
+        contractIssues = getAiContentSaveBlockingIssues(contract);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'AI content contract is structurally invalid.';
+        if (message.includes('contract version')) throw new Meteor.Error('ai-content-contract-version', `AI content contract version ${AI_CONTENT_CONTRACT_VERSION} is required.`);
+        throw new Meteor.Error('ai-content-contract-invalid', message);
       }
-      const aiDraft = await deps.ManualContentDrafts.findOneAsync({
-        _id: draftId,
-        ownerId: actingUserId,
-        draftType: AI_CONTENT_DRAFT_TYPE,
-        revision: draftRevision,
-      });
-      if (!aiDraft) {
-        throw new Meteor.Error('ai-draft-conflict', 'The AI draft changed before package save.');
-      }
-      if (!isAiDraftReviewComplete({ output: aiDraft.output })) {
-        throw new Meteor.Error('ai-draft-incomplete', 'Resolve all required prompts and responses before saving.');
+      if (contractIssues.length > 0) {
+        throw new Meteor.Error('ai-content-contract-incomplete', contractIssues.join(' '));
       }
 
       const packageAssetId = deps.normalizeCanonicalId(payload.packageAssetId);
@@ -186,10 +181,21 @@ export function createPackageGeneratedContentMethods(
       if (entries.length === 0) {
         throw new Meteor.Error(400, 'Generated package has no content entries');
       }
+      if (entries.length !== 1) {
+        throw new Meteor.Error('ai-content-contract-module-mismatch', 'AI Content Creator saves exactly one Learning or Test content system.');
+      }
+      const expectedModule = contract.mode === 'test' ? 'assessmentSession' : 'learningSession';
 
       const seenTdfFiles = new Set<string>();
       for (let index = 0; index < entries.length; index += 1) {
         const entry = entries[index] || {};
+        const moduleId = typeof entry.moduleId === 'string' ? entry.moduleId : '';
+        if (moduleId !== expectedModule) {
+          throw new Meteor.Error('ai-content-contract-module-mismatch', 'Generated package mode does not match the reviewed Learning or Test selection.');
+        }
+        if (Number(entry.itemCount) !== contract.pairs.length) {
+          throw new Meteor.Error('ai-content-contract-item-mismatch', 'Generated package item count does not match the reviewed stimulus-response pairs.');
+        }
         const tdfFile = typeof entry.tdfFile === 'string' ? entry.tdfFile.trim() : '';
         if (!tdfFile) {
           throw new Meteor.Error(400, 'Generated package entry is missing TDF filename');
@@ -245,10 +251,6 @@ export function createPackageGeneratedContentMethods(
           tutor.setspec.aiVisibilityLockReason = existingLockReason || mediaVisibilityLockReason;
         }
         const tdfs = { tutor };
-        const autoTutorValidation = validateAutoTutorContent({ tdf: { tutor }, stimuli });
-        if (!autoTutorValidation.valid) {
-          throw new Meteor.Error('invalid-autotutor-content', autoTutorValidation.errors.join('; '));
-        }
         const result = await callbacks.upsertPackage({
           fileName: tdfFile,
           tdfs,

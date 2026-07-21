@@ -1,187 +1,130 @@
 <template name="aiContentCreator">
-  <div class="ai-create-page {{embeddedClass}}">
-    <section class="ai-create-card" role="region" aria-label="{{aiText 'aiCreator.regionLabel'}}">
+  <div class="ai-create-page {{#if embedded}}embedded{{/if}}">
+    <section class="ai-create-card" role="region" aria-labelledby="ai-create-title">
       <header class="ai-create-header">
-        <div class="ai-create-icon" aria-hidden="true">
-          <i class="fa fa-magic"></i>
-        </div>
-        <div>
-          <h2 class="ai-create-title">{{aiText 'aiCreator.title'}}</h2>
-          <p class="ai-create-subtitle">{{aiText 'aiCreator.subtitle'}}</p>
-        </div>
+        <span class="ai-create-icon" aria-hidden="true"><i class="fa fa-magic"></i></span>
+        <h2 id="ai-create-title" class="ai-create-title">Create New Content</h2>
       </header>
 
-      {{#unless hasOpenRouterConfig}}
-      <div class="alert alert-warning ai-create-status">
-        {{aiText 'aiCreator.openRouterRequired'}}
-        <a href="/profile" class="btn btn-outline-primary btn-sm admin-inline-action">{{aiText 'aiCreator.goToProfile'}}</a>
-      </div>
-      {{/unless}}
-
       {{#if statusMessage}}
-      <div class="alert {{statusClass}} ai-create-status" role="status">
-        {{#if creating}}<i class="fa fa-refresh fa-spin"></i>{{/if}}
+      <div class="alert alert-{{statusClass}} ai-create-status" role="status" aria-live="polite">
+        {{#if creating}}<i class="fa fa-refresh fa-spin" aria-hidden="true"></i>{{/if}}
         {{statusMessage}}
       </div>
       {{/if}}
 
-      {{#unless showReview}}
-      <div class="ai-input-wrap">
-        <label for="ai-source-text" class="ai-source-label">{{aiText 'aiCreator.sourceAriaLabel'}}</label>
-        <textarea id="ai-source-text" class="ai-source-box" placeholder="{{aiText 'aiCreator.sourcePlaceholder'}}">{{sourceText}}</textarea>
-        <div class="ai-source-meta">
-          <span class="ai-char-count">{{sourceLength}}</span>
-        </div>
-      </div>
+      {{#if showInput}}
+      <form class="ai-simple-form">
+        <textarea id="ai-notes" class="form-control ai-notes" rows="7" aria-label="Content input" placeholder="Paste notes, learning objectives, quiz items, or a short topic. Add what learners should practice, any examples to preserve, and anything that should become flashcards or a quiz.">{{notes}}</textarea>
 
-      <section class="ai-image-input" aria-labelledby="ai-image-source-label">
-        <div class="ai-image-input-heading">
-          <span id="ai-image-source-label" class="ai-source-label">{{aiText 'aiCreator.imageSourceLabel'}}</span>
-          {{#if hasUploadedImages}}<span class="ai-image-count">{{uploadedImageSummary}}</span>{{/if}}
-        </div>
-        <div class="ai-image-drop-zone {{#if processingImages}}is-processing{{/if}}">
-          <div class="ai-image-drop-copy">
-            <i class="fa fa-cloud-upload" aria-hidden="true"></i>
-            <strong>{{aiText 'aiCreator.imageDropPrompt'}}</strong>
-            <span>{{aiText 'aiCreator.imageDropHelp'}}</span>
+        <section class="ai-image-picker" aria-label="Images">
+          {{#if localImages.length}}<span class="ai-image-count">{{localImages.length}} image(s) ready</span>{{/if}}
+          <div class="ai-image-drop-zone {{#if processingImages}}is-processing{{/if}}">
+            <div class="ai-image-drop-copy">
+              <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+              <strong>Drop images, a folder, or a ZIP here</strong>
+              <span>Images are converted to WebP at a maximum width of 1280 pixels.</span>
+            </div>
+            <div class="ai-image-picker-actions">
+              <label class="btn btn-outline-primary btn-sm" for="ai-image-files">
+                <i class="fa fa-picture-o" aria-hidden="true"></i>
+                Choose images
+              </label>
+              <label class="btn btn-outline-primary btn-sm" for="ai-image-folder">
+                <i class="fa fa-folder-open" aria-hidden="true"></i>
+                Choose folder
+              </label>
+            </div>
+            <input id="ai-image-files" class="ai-image-file-input" type="file" accept="image/*,.zip,application/zip" multiple {{submitDisabled}}>
+            <input id="ai-image-folder" class="ai-image-file-input" type="file" accept="image/*" multiple webkitdirectory directory {{submitDisabled}}>
           </div>
-          <div class="ai-image-picker-actions">
-            <label class="btn btn-outline-primary btn-sm" for="ai-image-files">
-              <i class="fa fa-picture-o" aria-hidden="true"></i>
-              {{aiText 'aiCreator.chooseImages'}}
-            </label>
-            <label class="btn btn-outline-primary btn-sm" for="ai-image-folder">
-              <i class="fa fa-folder-open" aria-hidden="true"></i>
-              {{aiText 'aiCreator.chooseFolder'}}
-            </label>
+
+          {{#if localImages.length}}
+          <div class="ai-image-grid" role="list" aria-label="Selected images">
+            {{#each localImages}}
+            <article class="ai-image-item" role="listitem">
+              <img src="{{previewUrl}}" alt="{{originalName}}">
+              <div class="ai-image-item-copy">
+                <strong title="{{sourcePath}}">{{originalName}}</strong>
+                <span>{{width}} × {{height}} · WebP</span>
+              </div>
+              <button type="button" class="ai-remove-image" data-image-id="{{id}}" aria-label="Remove {{originalName}}">
+                <i class="fa fa-times" aria-hidden="true"></i>
+              </button>
+            </article>
+            {{/each}}
           </div>
-          <input id="ai-image-files" class="ai-image-file-input" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,.zip,application/zip">
-          <input id="ai-image-folder" class="ai-image-file-input" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif" webkitdirectory directory>
-        </div>
-
-        {{#if hasUploadedImages}}
-        <div class="ai-image-grid" role="list">
-          {{#each uploadedImages}}
-          <article class="ai-image-item" role="listitem">
-            <img src="{{previewUrl}}" alt="{{originalName}}">
-            <div class="ai-image-item-copy">
-              <strong title="{{sourcePath}}">{{originalName}}</strong>
-              <span>{{width}} × {{height}} · WebP</span>
-            </div>
-            <button type="button" class="ai-remove-image" data-image-id="{{id}}" aria-label="{{aiText 'aiCreator.removeImage' filename=originalName}}">
-              <i class="fa fa-times" aria-hidden="true"></i>
-            </button>
-          </article>
-          {{/each}}
-        </div>
-        {{/if}}
-      </section>
-
-      <fieldset class="ai-mode-fieldset">
-        <legend class="ai-mode-label">{{aiText 'aiCreator.modeLabel'}}</legend>
-        <div class="ai-mode-selector" role="group" aria-label="{{aiText 'aiCreator.modeGroupLabel'}}">
-          {{#each modules}}
-          <button type="button" class="ai-mode-card {{selectedClass}}" aria-pressed="{{pressed}}" data-module-id="{{id}}">
-            <div class="ai-mode-icon" aria-hidden="true">
-              <i class="fa {{icon}}"></i>
-            </div>
-            <div class="ai-mode-text">
-              <strong>{{shortLabel}} ({{description}})</strong>
-            </div>
-          </button>
-          {{/each}}
-        </div>
-      </fieldset>
-
-      <footer class="ai-create-footer">
-        <button type="button" class="ai-manual-link" id="ai-open-manual-creator">
-          <i class="fa fa-plus" aria-hidden="true"></i>
-          {{aiText 'aiCreator.advancedManual'}} <i class="fa fa-arrow-right" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="btn btn-primary ai-create-submit" id="ai-create-submit" {{createAttrs}}>
-          {{#if creating}}
-            <i class="fa fa-refresh fa-spin" aria-hidden="true"></i>
-            {{aiText 'aiCreator.creating'}}
-          {{else}}
-            <i class="fa fa-magic" aria-hidden="true"></i>
-            {{aiText 'aiCreator.create'}}
           {{/if}}
-        </button>
-      </footer>
-      {{/unless}}
+        </section>
+
+        <fieldset class="ai-mode-selector">
+          <legend>Session type</legend>
+          <button type="button" class="ai-mode-option {{#if learningSelected}}selected{{/if}}" data-mode="learning" aria-pressed="{{learningSelected}}">Learn it (Learning session)</button>
+          <button type="button" class="ai-mode-option {{#if testSelected}}selected{{/if}}" data-mode="test" aria-pressed="{{testSelected}}">Test me (Assessment session)</button>
+        </fieldset>
+
+        <div class="ai-form-actions">
+          <button type="button" class="btn btn-primary" id="ai-submit" {{submitDisabled}}>
+            {{#if creating}}Creating...{{else}}Submit{{/if}}
+          </button>
+        </div>
+      </form>
+      {{/if}}
 
       {{#if showReview}}
-      <section class="ai-review" aria-labelledby="ai-review-heading">
-        <div class="ai-review-heading">
-          <div>
-            <h3 id="ai-review-heading">Review draft</h3>
-            <p>Check each prompt and response. Blank required images must be supplied before saving.</p>
-          </div>
-          <span class="ai-review-count">{{reviewItemCount}} items</span>
-        </div>
-        {{#if draftWarnings.length}}
-        <div class="alert alert-warning ai-create-status" role="status">
-          {{#each draftWarnings}}<div>{{this}}</div>{{/each}}
+      <section class="ai-review" aria-labelledby="ai-review-title-heading">
+        <h3 id="ai-review-title-heading">Review</h3>
+
+        <label class="ai-field-label" for="ai-review-title">Title</label>
+        <input id="ai-review-title" class="form-control ai-review-title" type="text" value="{{reviewTitle}}" required>
+
+        {{#if reviewWarnings.length}}
+        <div class="alert alert-warning" role="status">
+          {{#each reviewWarnings}}<div>{{this}}</div>{{/each}}
         </div>
         {{/if}}
-        <div class="ai-review-list" role="list">
-          {{#each reviewItems}}
-          <article class="ai-review-item" role="listitem" data-item-id="{{id}}">
-            <div class="ai-review-item-number">{{number}}</div>
-            <div class="ai-review-stimulus">
-              <label class="ai-review-role" for="ai-prompt-{{id}}">Prompt</label>
-              {{#if imageRequired}}
-                {{#if imagePreview}}
-                <img class="ai-review-image" src="{{imagePreview}}" alt="Prompt image for {{responseText}}">
+
+        <div class="ai-pair-list">
+          {{#each reviewPairs}}
+          <article class="ai-pair-row">
+            <div class="ai-pair-number">{{number}}</div>
+            <div class="ai-pair-stimulus">
+              {{#if isText}}
+                <label for="ai-stimulus-{{id}}">Stimulus</label>
+                <textarea id="ai-stimulus-{{id}}" class="form-control ai-review-stimulus" data-pair-id="{{id}}" rows="3">{{stimulus}}</textarea>
+              {{/if}}
+              {{#if isImage}}
+                <span class="ai-field-label">Image</span>
+                {{#if imageResolved}}
+                  <img class="ai-review-image" src="{{imagePreviewUrl}}" alt="Review image for pair {{number}}">
                 {{else}}
-                <div class="ai-review-missing-image" role="status">
-                  <i class="fa fa-picture-o" aria-hidden="true"></i>
-                  <strong>Image needed</strong>
-                  <span>{{imageFailure}}</span>
-                </div>
+                  <div class="ai-missing-image" role="status">Image needed</div>
                 {{/if}}
-                <label class="btn btn-outline-primary btn-sm ai-review-upload-label" for="ai-review-image-{{id}}">
-                  {{#if imagePreview}}Replace image{{else}}Upload image{{/if}}
+                <label class="btn btn-secondary ai-replace-image">
+                  Replace image
+                  <input class="sr-only ai-review-image-input" data-pair-id="{{id}}" type="file" accept="image/*">
                 </label>
-                <input class="ai-review-image-input" id="ai-review-image-{{id}}" data-item-id="{{id}}" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif">
-              {{/if}}
-              <textarea id="ai-prompt-{{id}}" class="form-control ai-review-prompt" data-item-id="{{id}}" rows="2" placeholder="Optional prompt text">{{promptText}}</textarea>
-            </div>
-            <div class="ai-review-stimulus">
-              <label class="ai-review-role" for="ai-response-{{id}}">Response</label>
-              <input id="ai-response-{{id}}" class="form-control ai-review-response" data-item-id="{{id}}" type="text" value="{{responseText}}">
-              {{#if alternativeResponses.length}}
-              <div class="ai-review-alternatives">
-                {{#each alternativeResponses}}
-                <input class="form-control ai-review-alternative" data-item-id="{{../id}}" data-alternative-index="{{@index}}" type="text" value="{{this}}" aria-label="Alternative response {{@index}} for item {{../number}}">
-                {{/each}}
-              </div>
               {{/if}}
             </div>
-            <button type="button" class="btn btn-outline-danger btn-sm ai-review-remove" data-item-id="{{id}}" aria-label="Remove item {{number}}">
-              <i class="fa fa-trash" aria-hidden="true"></i>
-            </button>
+            <div class="ai-pair-response">
+              <label for="ai-response-{{id}}">Correct response</label>
+              <input id="ai-response-{{id}}" class="form-control ai-review-response" data-pair-id="{{id}}" type="text" value="{{response}}">
+            </div>
           </article>
           {{/each}}
         </div>
-        <footer class="ai-review-footer">
-          {{#if discardArmed}}
-          <div class="ai-review-discard-confirm" role="alert">
-            <span>Discard this draft and its uploaded replacement images?</span>
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="ai-cancel-discard">Keep draft</button>
-            <button type="button" class="btn btn-danger btn-sm" id="ai-confirm-discard">Discard draft</button>
-          </div>
-          {{else}}
-          <button type="button" class="btn btn-outline-danger" id="ai-discard-draft">Discard and start over</button>
-          {{/if}}
-          {{#if canRetryDraft}}
-          <button type="button" class="btn btn-outline-primary" id="ai-retry-draft">Retry generation</button>
-          {{/if}}
-          <button type="button" class="btn btn-primary" id="ai-save-reviewed-draft" {{saveDraftAttrs}}>
-            {{#if creating}}<i class="fa fa-refresh fa-spin" aria-hidden="true"></i>{{/if}}
-            Save content
-          </button>
-        </footer>
+
+        {{#if saveBlockingIssues.length}}
+        <div class="alert alert-danger" role="alert" aria-live="assertive">
+          {{#each saveBlockingIssues}}<div>{{this}}</div>{{/each}}
+        </div>
+        {{/if}}
+
+        <div class="ai-review-actions">
+          <button type="button" class="btn btn-secondary" id="ai-back">Back</button>
+          <button type="button" class="btn btn-outline-danger" id="ai-discard">Discard</button>
+          <button type="button" class="btn btn-primary" id="ai-save-content" {{submitDisabled}}>{{#if creating}}Saving...{{else}}Save{{/if}}</button>
+        </div>
       </section>
       {{/if}}
     </section>

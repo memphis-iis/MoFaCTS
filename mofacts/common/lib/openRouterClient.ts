@@ -3,7 +3,7 @@ import {
   recordAiFlowEvent,
   type AiFlowTelemetry,
 } from './aiFlowLogger';
-import { extractJsonObject } from './jsonExtraction';
+import { extractJsonValue } from './jsonExtraction';
 import {
   normalizeOpenRouterReasoningLevel,
   type OpenRouterReasoningLevel,
@@ -49,12 +49,14 @@ export type OpenRouterCallOptions<T> = {
   apiKey: string;
   requireUsageCost?: boolean;
   telemetry?: AiFlowTelemetry;
+  provider?: Record<string, unknown>;
 };
 
 export type OpenRouterResult<T> = {
   value: T;
   rawContent: string;
   responseBody: unknown;
+  requestBody: Record<string, unknown>;
   costUsd?: number;
 };
 
@@ -223,6 +225,26 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       'OpenRouter request reasoning level',
     );
     const responseFormat = buildResponseFormat(options.intent);
+    const requestBody = {
+      model: trimmedModel,
+      messages: options.messages,
+      ...(reasoningLevel === 'none'
+        ? {}
+        : {
+          reasoning: reasoningLevel === 'default'
+            ? { enabled: true }
+            : { effort: reasoningLevel },
+        }),
+      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options.maxTokens !== undefined ? { max_tokens: options.maxTokens } : {}),
+      ...(responseFormat ? { response_format: responseFormat } : {}),
+      ...(options.provider
+        ? { provider: options.provider }
+        : responseFormat && options.intent.strictSchema === true
+          ? { provider: { require_parameters: true, allow_fallbacks: false } }
+          : {}),
+      stream: false,
+    };
     const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {
@@ -231,17 +253,7 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
         'HTTP-Referer': getOpenRouterReferer(),
         'X-OpenRouter-Title': options.intent.title,
       },
-      body: JSON.stringify({
-        model: trimmedModel,
-        messages: options.messages,
-        reasoning: reasoningLevel === 'default'
-          ? { enabled: true }
-          : { effort: reasoningLevel },
-        temperature: options.temperature ?? 0,
-        ...(options.maxTokens !== undefined ? { max_tokens: options.maxTokens } : {}),
-        ...(responseFormat ? { response_format: responseFormat } : {}),
-        stream: false,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     httpStatus = response.status;
@@ -254,11 +266,12 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       responseBody,
       options.intent.missingContentMessage || 'OpenRouter response did not include message content.',
     );
-    const parsedContent = extractJsonObject(rawContent);
+    const parsedContent = extractJsonValue(rawContent);
     const result: OpenRouterResult<T> = {
       value: options.intent.parse(parsedContent),
       rawContent,
       responseBody,
+      requestBody,
     };
     if (options.requireUsageCost) {
       result.costUsd = readOpenRouterCost(responseBody);

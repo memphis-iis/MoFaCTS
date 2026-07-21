@@ -1,11 +1,18 @@
 import { expect } from 'chai';
 import JSZip from 'jszip';
 import {
+  AI_IMAGE_MAX_WIDTH,
+  AI_IMAGE_WEBP_QUALITY,
   expandAiImageSources,
   prepareAiImageAssets,
 } from './aiContentImageAssets';
 
 describe('aiContentImageAssets', function() {
+  it('uses the approved WebP conversion settings', function() {
+    expect(AI_IMAGE_MAX_WIDTH).to.equal(1280);
+    expect(AI_IMAGE_WEBP_QUALITY).to.equal(0.86);
+  });
+
   it('extracts supported images from ZIP files and ignores non-image entries', async function() {
     const zip = new JSZip();
     zip.file('photos/first.png', new Uint8Array([1, 2, 3]));

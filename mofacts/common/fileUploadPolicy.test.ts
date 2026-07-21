@@ -13,11 +13,6 @@ describe('Dynamic asset upload policy', function() {
     expect(validateDynamicAssetUpload({ name: 'map.png', extension: 'png', type: 'image/png', meta: { uploadPurpose: 'content-media', tdfId: 'tdf-1', stimuliSetId: 7 } })).to.equal(true);
   });
 
-  it('requires private draft, item, and slot metadata for AI images', function() {
-    expect(validateDynamicAssetUpload({ name: 'map.webp', extension: 'webp', type: 'image/webp', meta: { uploadPurpose: 'ai-draft-media', draftId: 'draft-1', itemId: 'item-1', mediaSlotId: 'slot-1', public: false } })).to.equal(true);
-    expect(validateDynamicAssetUpload({ name: 'map.webp', extension: 'webp', type: 'image/png', meta: { uploadPurpose: 'ai-draft-media', draftId: 'draft-1', itemId: 'item-1', mediaSlotId: 'slot-1', public: false } })).to.contain('do not match');
-  });
-
   it('rejects missing purposes and unsafe filenames', function() {
     expect(validateDynamicAssetUpload({ name: 'lesson.zip', extension: 'zip', type: 'application/zip' })).to.equal('Upload purpose is required');
     expect(validateDynamicAssetUpload({ name: '../lesson.zip', extension: 'zip', type: 'application/zip', meta: { uploadPurpose: 'package' } })).to.contain('path traversal');

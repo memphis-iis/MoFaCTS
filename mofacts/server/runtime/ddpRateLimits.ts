@@ -120,7 +120,9 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     name(name: string) {
       return [
         'callResolvedOpenRouterJson',
-        'callResolvedOpenRouterEmbeddings'
+        'callResolvedOpenRouterEmbeddings',
+        'callAdminTestResolvedOpenRouterJson',
+        'callAdminTestOpenRouterRequest'
       ].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }

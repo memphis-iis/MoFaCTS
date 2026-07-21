@@ -19,6 +19,22 @@ import {
   runSparcCompoundInterestLiveEvaluation,
   type SparcCompoundInterestLiveEvaluationResult,
 } from './experiment/svelte/services/sparcCompoundInterestLiveEvaluation';
+import {
+  AI_CONTENT_CONTRACT_VERSION,
+  AI_GENERATED_PAIR_RESPONSE_SCHEMA,
+  validateGeneratedPairResponse,
+} from '../../common/aiContentContract';
+import { AI_CONTENT_SYSTEM_PROMPT, buildPairGenerationPrompt } from '../lib/aiContentPrompts';
+import { discoverAuthoritativeWikimediaPairs } from '../lib/aiContentImageSets';
+import { copyablePromptLabPairs } from '../lib/aiContentPromptLabState';
+
+type OpenRouterStrictPreflightResult = {
+  ok: true;
+  model: string;
+  source: string;
+  reasoningLevel: string;
+  message: string;
+};
 
 type TestRunnerInstance = Blaze.TemplateInstance & {
   readinessState: ReactiveVar<AsyncCommandState<DeploymentReadinessResult>>;
@@ -26,6 +42,18 @@ type TestRunnerInstance = Blaze.TemplateInstance & {
   sparcLiveState: ReactiveVar<AsyncCommandState<SparcCompoundInterestLiveEvaluationResult>>;
   sparcLiveCommand: AsyncCommandController<SparcCompoundInterestLiveEvaluationResult>;
   sparcLiveSavedJson: ReactiveVar<string>;
+  openRouterPreflightState: ReactiveVar<AsyncCommandState<OpenRouterStrictPreflightResult>>;
+  openRouterPreflightCommand: AsyncCommandController<OpenRouterStrictPreflightResult>;
+  promptLabRequest: ReactiveVar<string>;
+  promptLabResult: ReactiveVar<string>;
+  promptLabPairs: ReactiveVar<string>;
+  promptLabError: ReactiveVar<string>;
+  promptLabPending: ReactiveVar<boolean>;
+  wikimediaLabNotes: ReactiveVar<string>;
+  wikimediaLabResult: ReactiveVar<string>;
+  wikimediaLabError: ReactiveVar<string>;
+  wikimediaLabPending: ReactiveVar<boolean>;
+  wikimediaLabModel: ReactiveVar<string>;
 };
 
 function testText(
@@ -58,6 +86,90 @@ function readinessState(): AsyncCommandState<DeploymentReadinessResult> {
 function sparcLiveState(): AsyncCommandState<SparcCompoundInterestLiveEvaluationResult> {
   return (Template.instance() as TestRunnerInstance).sparcLiveState.get();
 }
+
+function openRouterPreflightState(): AsyncCommandState<OpenRouterStrictPreflightResult> {
+  return (Template.instance() as TestRunnerInstance).openRouterPreflightState.get();
+}
+
+async function runOpenRouterStrictPreflight(): Promise<OpenRouterStrictPreflightResult> {
+  const meteor = Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> };
+  const capability = await meteor.callAsync('getAdminTestOpenRouterCapability');
+  const result = await meteor.callAsync('callAdminTestOpenRouterRequest', {
+    model: capability.model,
+    messages: [
+      { role: 'system', content: AI_CONTENT_SYSTEM_PROMPT },
+      { role: 'user', content: 'Return exactly one text pair whose stimulus is "2 + 2" and whose response is "4".' },
+    ],
+    max_tokens: 80,
+    response_format: {
+      type: 'json_schema',
+      json_schema: { name: `mofacts_ai_content_pairs_v${AI_CONTENT_CONTRACT_VERSION}`, strict: true, schema: AI_GENERATED_PAIR_RESPONSE_SCHEMA },
+    },
+    provider: { require_parameters: true, allow_fallbacks: false },
+    stream: false,
+  });
+  const pairs = validateGeneratedPairResponse(result?.parsedContent);
+  if (pairs.length !== 1 || pairs[0]?.kind !== 'text' || pairs[0]?.stimulus !== '2 + 2' || pairs[0]?.response !== '4' || result?.validation?.ok !== true) {
+    throw new Error('OpenRouter returned content that did not satisfy the strict preflight contract.');
+  }
+  return {
+    ok: true,
+    model: String(result.model || ''),
+    source: String(result.source || ''),
+    reasoningLevel: String(result.reasoningLevel || ''),
+    message: `Strict schema v${AI_CONTENT_CONTRACT_VERSION} passed with ${String(result.model || 'the configured model')}.`,
+  };
+}
+
+function seedPromptLabRequest(model = ''): string {
+  return JSON.stringify({
+    model,
+    messages: [
+      { role: 'system', content: AI_CONTENT_SYSTEM_PROMPT },
+      { role: 'user', content: buildPairGenerationPrompt('Create text prompts for the capitals of Tennessee, Arkansas, and Mississippi.') },
+    ],
+    max_tokens: 12000,
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: `mofacts_ai_content_pairs_v${AI_CONTENT_CONTRACT_VERSION}`,
+        strict: true,
+        schema: AI_GENERATED_PAIR_RESPONSE_SCHEMA,
+      },
+    },
+    provider: { require_parameters: true, allow_fallbacks: false },
+    stream: false,
+  }, null, 2);
+}
+
+function promptLabErrorDetails(error: unknown): string {
+  const meteorError = error as { error?: unknown; reason?: unknown; message?: unknown; details?: unknown };
+  let details: unknown = meteorError?.details;
+  if (typeof details === 'string') {
+    try { details = JSON.parse(details); } catch { /* Keep the provider's sanitized text. */ }
+  }
+  return JSON.stringify({
+    code: meteorError?.error || null,
+    message: meteorError?.reason || meteorError?.message || getErrorMessage(error),
+    details: details || null,
+  }, null, 2);
+}
+
+function discoveryLabResultJson(result: Awaited<ReturnType<typeof discoverAuthoritativeWikimediaPairs>>): string {
+  return JSON.stringify(result, (key, value) => (key === 'sourceBytes' || key === 'webpBytes') && value instanceof Uint8Array
+    ? { byteLength: value.byteLength, retainedOnlyForThisBrowserRun: true }
+    : value, 2);
+}
+
+function discoveryLabErrorDetails(error: unknown): string {
+  const value = error as { message?: unknown; attempts?: unknown };
+  return JSON.stringify({
+    message: value?.message || getErrorMessage(error),
+    ...(Array.isArray(value?.attempts) ? { topicPlanningAttempts: value.attempts } : {}),
+  }, null, 2);
+}
+
+const WIKIMEDIA_LAB_NOTES = 'bones of the human hand and wrist with image prompts';
 
 const SPARC_LIVE_RESULT_STORAGE_KEY = 'mofacts.adminTests.sparcCompoundInterestLiveEvaluation.latest';
 
@@ -94,11 +206,32 @@ Template.testRunner.onCreated(function(this: TestRunnerInstance) {
     this.sparcLiveState.set(state);
   });
   this.sparcLiveSavedJson = new ReactiveVar<string>(savedSparcLiveResultJson());
+  this.openRouterPreflightState = new ReactiveVar<AsyncCommandState<OpenRouterStrictPreflightResult>>({ status: 'idle' });
+  this.openRouterPreflightCommand = createAsyncCommandController((state) => this.openRouterPreflightState.set(state));
+  this.promptLabRequest = new ReactiveVar(seedPromptLabRequest());
+  this.promptLabResult = new ReactiveVar('');
+  this.promptLabPairs = new ReactiveVar('');
+  this.promptLabError = new ReactiveVar('');
+  this.promptLabPending = new ReactiveVar(false);
+  this.wikimediaLabNotes = new ReactiveVar(WIKIMEDIA_LAB_NOTES);
+  this.wikimediaLabResult = new ReactiveVar('');
+  this.wikimediaLabError = new ReactiveVar('');
+  this.wikimediaLabPending = new ReactiveVar(false);
+  this.wikimediaLabModel = new ReactiveVar('');
+  void (Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> })
+    .callAsync('getAdminTestOpenRouterCapability')
+    .then((capability) => {
+      const model = String(capability?.model || '');
+      this.wikimediaLabModel.set(model);
+      this.promptLabRequest.set(seedPromptLabRequest(model));
+    })
+    .catch((error) => this.promptLabError.set(getErrorMessage(error)));
 });
 
 Template.testRunner.onDestroyed(function(this: TestRunnerInstance) {
   this.readinessCommand.destroy();
   this.sparcLiveCommand.destroy();
+  this.openRouterPreflightCommand.destroy();
 });
 
 Template.testRunner.helpers({
@@ -243,6 +376,25 @@ Template.testRunner.helpers({
     }
     return null;
   },
+  openRouterPreflightPending() {
+    return openRouterPreflightState().status === 'pending';
+  },
+  openRouterPreflightOutput() {
+    const state = openRouterPreflightState();
+    if (state.status === 'pending') return { template: 'adminStatus', data: { variant: 'info', text: 'Testing the configured OpenRouter model with strict JSON Schema...', urgent: false } };
+    if (state.status === 'error') return { template: 'adminStatus', data: { variant: 'error', text: state.message, urgent: true } };
+    if (state.status === 'success') return { template: 'adminStatus', data: { variant: 'success', text: `${state.result.message} Source: ${state.result.source}; reasoning: ${state.result.reasoningLevel}.`, urgent: false } };
+    return null;
+  },
+  promptLabRequest() { return (Template.instance() as TestRunnerInstance).promptLabRequest.get(); },
+  promptLabResult() { return (Template.instance() as TestRunnerInstance).promptLabResult.get(); },
+  promptLabPairs() { return (Template.instance() as TestRunnerInstance).promptLabPairs.get(); },
+  promptLabError() { return (Template.instance() as TestRunnerInstance).promptLabError.get(); },
+  promptLabPending() { return (Template.instance() as TestRunnerInstance).promptLabPending.get(); },
+  wikimediaLabNotes() { return (Template.instance() as TestRunnerInstance).wikimediaLabNotes.get(); },
+  wikimediaLabResult() { return (Template.instance() as TestRunnerInstance).wikimediaLabResult.get(); },
+  wikimediaLabError() { return (Template.instance() as TestRunnerInstance).wikimediaLabError.get(); },
+  wikimediaLabPending() { return (Template.instance() as TestRunnerInstance).wikimediaLabPending.get(); },
 });
 
 Template.testRunner.events({
@@ -264,5 +416,52 @@ Template.testRunner.events({
   'click .download-sparc-live-evaluation'(event: Event) {
     event.preventDefault();
     downloadSavedSparcLiveResult();
+  },
+  async 'click .run-openrouter-strict-preflight'(event: Event, instance: TestRunnerInstance) {
+    event.preventDefault();
+    await instance.openRouterPreflightCommand.run(runOpenRouterStrictPreflight, { getErrorMessage });
+  },
+  'input #ai-content-prompt-lab-request'(event: Event, instance: TestRunnerInstance) {
+    instance.promptLabRequest.set((event.currentTarget as HTMLTextAreaElement).value);
+  },
+  async 'click .run-ai-content-prompt-lab'(event: Event, instance: TestRunnerInstance) {
+    event.preventDefault();
+    instance.promptLabPending.set(true);
+    instance.promptLabError.set('');
+    instance.promptLabResult.set('');
+    instance.promptLabPairs.set('');
+    try {
+      const request = JSON.parse(instance.promptLabRequest.get());
+      const result = await (Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> })
+        .callAsync('callAdminTestOpenRouterRequest', request);
+      instance.promptLabResult.set(JSON.stringify(result, null, 2));
+      instance.promptLabPairs.set(copyablePromptLabPairs(result));
+    } catch (error) {
+      instance.promptLabError.set(promptLabErrorDetails(error));
+    } finally {
+      instance.promptLabPending.set(false);
+    }
+  },
+  'input #wikimedia-lab-notes'(event: Event, instance: TestRunnerInstance) {
+    instance.wikimediaLabNotes.set((event.currentTarget as HTMLTextAreaElement).value);
+  },
+  async 'click .run-wikimedia-discovery-lab'(event: Event, instance: TestRunnerInstance) {
+    event.preventDefault();
+    instance.wikimediaLabPending.set(true);
+    instance.wikimediaLabError.set('');
+    instance.wikimediaLabResult.set('');
+    try {
+      const model = instance.wikimediaLabModel.get();
+      if (!model) throw new Error('No configured OpenRouter model is available for Wikipedia topic planning.');
+      const result = await discoverAuthoritativeWikimediaPairs({
+        notes: instance.wikimediaLabNotes.get(),
+        model,
+      });
+      instance.wikimediaLabResult.set(discoveryLabResultJson(result));
+    } catch (error) {
+      instance.wikimediaLabError.set(discoveryLabErrorDetails(error));
+    } finally {
+      instance.wikimediaLabPending.set(false);
+    }
   },
 });

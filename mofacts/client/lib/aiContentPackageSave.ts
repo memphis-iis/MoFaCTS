@@ -3,6 +3,7 @@ import { getImportFileNames, sanitizeImportName } from './importCompositionBuild
 import type { BuiltImportPackage, ImportDraftLesson } from './normalizedImportTypes';
 import type { CreatedOutput } from './aiContentTypes';
 import { uploadPackageAsset } from './packageUploadClient';
+import type { AiContentSaveContract } from '../../common/aiContentContract';
 
 export type GeneratedNameConflict = {
   entryIndex: number;
@@ -25,11 +26,6 @@ export type AiContentPackageSaveDeps = {
   refreshAssets?: () => void;
   logCleanupError?: (error: unknown) => void;
   makeFile?: (parts: BlobPart[], fileName: string, options: FilePropertyBag) => File;
-};
-
-export type AiContentDraftSaveContext = {
-  draftId: string;
-  draftRevision: number;
 };
 
 export function readGeneratedNameConflict(error: unknown): GeneratedNameConflict | null {
@@ -96,7 +92,7 @@ export function uploadBuiltPackage(
   builtPackage: BuiltImportPackage,
   creationSummary: string,
   deps: AiContentPackageSaveDeps,
-  draftContext?: AiContentDraftSaveContext,
+  saveContract: AiContentSaveContract,
 ): Promise<CreatedOutput[]> {
   return (async () => {
     const firstManifest = Array.isArray(builtPackage.manifest) && builtPackage.manifest.length > 0
@@ -117,10 +113,7 @@ export function uploadBuiltPackage(
               uploadIntegrity,
               entries: buildSaveEntries(builtPackage),
               creationSummary,
-              ...(draftContext ? {
-                draftId: draftContext.draftId,
-                draftRevision: draftContext.draftRevision,
-              } : {}),
+              contract: saveContract,
             });
       deps.refreshAssets?.();
       return outputs as CreatedOutput[];
@@ -141,34 +134,22 @@ export async function buildUploadWithNameConflictRetry(
   deps: AiContentPackageSaveDeps & {
     promptForReplacementName: (conflict: GeneratedNameConflict) => string | null;
   },
-  draftContext?: AiContentDraftSaveContext,
+  saveContract: AiContentSaveContract,
 ): Promise<{ builtPackage: BuiltImportPackage; outputs: CreatedOutput[] }> {
-  const outputs: CreatedOutput[] = [];
+  if (drafts.length !== 1) throw new Error('AI Content Creator saves exactly one Learning or Test content system.');
   const maxAttempts = drafts.length + 3;
-  for (const draft of drafts) {
-    let saved = false;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const singlePackage = await buildImportPackageFromDraftLessons([draft]);
-      try {
-        outputs.push(...await uploadBuiltPackage(singlePackage, creationSummary, deps, draftContext));
-        saved = true;
-        break;
-      } catch (error) {
-        const conflict = readGeneratedNameConflict(error);
-        if (!conflict || conflict.entryIndex !== 0) {
-          throw error;
-        }
-        const newName = deps.promptForReplacementName(conflict);
-        if (!newName) {
-          throw new Error('Generated content save canceled because the name already exists.');
-        }
-        renameDraftLesson(draft, newName);
-      }
-    }
-    if (!saved) {
-      throw new Error('Generated content could not be saved after repeated name conflicts.');
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const builtPackage = await buildImportPackageFromDraftLessons(drafts);
+    try {
+      const outputs = await uploadBuiltPackage(builtPackage, creationSummary, deps, saveContract);
+      return { builtPackage, outputs };
+    } catch (error) {
+      const conflict = readGeneratedNameConflict(error);
+      if (!conflict || !drafts[conflict.entryIndex]) throw error;
+      const newName = deps.promptForReplacementName(conflict);
+      if (!newName) throw new Error('Generated content save canceled because the name already exists.');
+      renameDraftLesson(drafts[conflict.entryIndex]!, newName);
     }
   }
-  const builtPackage = await buildImportPackageFromDraftLessons(drafts);
-  return { builtPackage, outputs };
+  throw new Error('Generated content could not be saved after repeated name conflicts.');
 }
