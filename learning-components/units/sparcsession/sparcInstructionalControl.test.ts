@@ -8,7 +8,7 @@ const config: SparcInstructionalControllerConfig = {
   adapterId: 'sparc-autotutor-v1',
   policyId: 'progressive-scaffolding-v1',
   policyVersion: 1,
-  parameters: { minimumProgress: 0.3 },
+  parameters: { minimumProgress: 0.2 },
 };
 
 function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMemoryFact {
@@ -43,7 +43,7 @@ describe('SPARC AutoTutor instructional adapter', function() {
     assert.equal(result.find((entry) => entry.factType === 'scaffold.state')?.slots?.stage, 'ELICIT');
   });
 
-  it('requires at least 0.3 expectation progress', function() {
+  it('requires at least 0.2 expectation progress', function() {
     const result = instantiateSparcAutoTutorInstructionalFacts({
       selection: expectationSelection,
       config,
@@ -57,7 +57,7 @@ describe('SPARC AutoTutor instructional adapter', function() {
         }),
         fact('scaffold.state', { focusEpisodeId: 'episode-1', targetKey: 'expectation:kc-a', stage: 'PUMP' }),
         fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.39 }),
       ],
     });
     assert.deepEqual(result.find((entry) => entry.factType === 'learningObservation.targetProgress')?.slots, {
@@ -65,14 +65,14 @@ describe('SPARC AutoTutor instructional adapter', function() {
       targetKind: 'expectation',
       targetId: 'kc-a',
       progressBefore: 0.2,
-      progressAfter: 0.4,
-      progressDelta: 0.2,
+      progressAfter: 0.39,
+      progressDelta: 0.19,
       madeProgress: false,
       newlyResolved: false,
     });
   });
 
-  it('requires at least 0.3 normalized misconception progress', function() {
+  it('requires at least 0.2 normalized misconception progress', function() {
     const selection: SparcLearningTargetSelection = {
       ...expectationSelection,
       selectedTargetType: 'misconception',
@@ -90,15 +90,15 @@ describe('SPARC AutoTutor instructional adapter', function() {
           focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
         }),
         fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.6 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.61 }),
       ],
     });
     const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');
-    assert.equal(observation?.slots?.progressDelta, 0.2);
+    assert.equal(observation?.slots?.progressDelta, 0.19);
     assert.equal(observation?.slots?.madeProgress, false);
   });
 
-  it('accepts a 0.3 gain for both expectations and misconceptions', function() {
+  it('accepts a 0.2 gain for both expectations and misconceptions', function() {
     const baseFacts = [
       fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
       fact('instructionalFocus.episode', {
@@ -114,7 +114,7 @@ describe('SPARC AutoTutor instructional adapter', function() {
           targetKey: 'expectation:kc-a', targetKind: 'expectation', targetId: 'kc-a', resolutionThreshold: 0.8,
         }),
         fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.5 }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
       ],
     });
     const misconceptionResult = instantiateSparcAutoTutorInstructionalFacts({
@@ -133,7 +133,7 @@ describe('SPARC AutoTutor instructional adapter', function() {
           focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
         }),
         fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.5 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.6 }),
       ],
     });
 

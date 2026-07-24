@@ -79,7 +79,7 @@ For a completion target, the structured input supplies the completion reason and
 
 Each runtime move policy owns:
 
-- conversational receipt and acknowledgement;
+- acknowledgement of the latest answer or progress;
 - learner-language attribution boundaries;
 - the transition into the selected move;
 - local scaffolding principles;
@@ -194,7 +194,7 @@ Internal misconception context: A fixed annual rate means the same dollar amount
 
 Required behavior:
 
-- Start with a natural conversational receipt.
+- Usually start with a natural acknowledgement of the latest answer or progress.
 - Refer to `$50 every year` because the learner used that construction.
 - Do not say or imply that the learner used or understood `fixed annual rate`.
 - Execute the app-selected move using the misconception branch.
@@ -217,7 +217,7 @@ Because this changes learner-facing runtime dialogue, perform a native hotfix SP
 - the actual tutor response for the primary regression case;
 - the browser-visible selected production;
 - absence of rubric-language attribution;
-- presence of conversational receipt;
+- appropriate acknowledgement without a fixed template;
 - browser console errors; and
 - relevant network/provider errors.
 

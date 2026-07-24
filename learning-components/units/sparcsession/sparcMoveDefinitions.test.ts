@@ -58,6 +58,7 @@ describe('SPARC move definitions', function() {
         'Do not present rubric language as something the learner said, meant, believed, or knew.',
       ));
       assert.doesNotMatch(definition.promptPolicy, /\*\*|`|<br>|\|/i);
+      assert.doesNotMatch(definition.promptPolicy, /I hear you|I hear that you think|Always begin/);
     }
   });
 
@@ -70,6 +71,15 @@ describe('SPARC move definitions', function() {
         'Do not describe repetition or endorsement of an active misconception as progress, closeness, or a good start.',
       ));
     }
+  });
+
+  it('grounds pump and hint moves in the selected authored target content', function() {
+    const pump = requireActiveSparcMoveDefinition('pump').promptPolicy;
+    const hint = requireActiveSparcMoveDefinition('hint').promptPolicy;
+
+    assert.ok(pump.includes('Use the selected authored target content to choose the dimension of elaboration'));
+    assert.ok(pump.includes('When the selected expectation introduces a new extension'));
+    assert.ok(hint.includes('Use the selected authored target content as the destination of the clue'));
   });
 
   it('defines separate legitimate-question and scope-boundary moves', function() {

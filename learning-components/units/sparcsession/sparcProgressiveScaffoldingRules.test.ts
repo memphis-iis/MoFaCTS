@@ -68,11 +68,35 @@ describe('SPARC progressive scaffolding productions', function() {
     assert.equal(selectedAction(facts({ stage: 'ASSERTION', completed: true })), 'summary');
   });
 
-  it('defers legitimate content questions and then advances through the no-progress scaffold branch', function() {
+  it('defers legitimate content questions and preserves scored progress', function() {
     const execution = runSparcProductionRules({
       facts: [
-      ...facts({ stage: 'PUMP' }),
-      fact('dialogue.learnerQuestion', { contentFocused: true }),
+        ...facts({ stage: 'PUMP', madeProgress: true }),
+        fact('dialogue.learnerQuestion', { contentFocused: true }),
+      ],
+      rules: createSparcProgressiveScaffoldingRules(),
+    });
+
+    assert.deepEqual(execution.firings.map((firing) => firing.ruleId), [
+      'dialogue.question.defer',
+      'dialogue.scaffold.pump',
+    ]);
+    assert.equal(selectedAction(execution.initialFacts), 'pump');
+    assert.equal(
+      execution.facts.find((entry) => entry.factType === 'dialogue.responseModifier')?.slots?.action,
+      'question-deferral',
+    );
+    assert.equal(
+      execution.facts.some((entry) => entry.slots?.observationKind === 'learner-question-no-progress'),
+      false,
+    );
+  });
+
+  it('defers legitimate content questions and follows real no-progress observations', function() {
+    const execution = runSparcProductionRules({
+      facts: [
+        ...facts({ stage: 'PUMP', madeProgress: false }),
+        fact('dialogue.learnerQuestion', { contentFocused: true }),
       ],
       rules: createSparcProgressiveScaffoldingRules(),
     });
@@ -82,10 +106,6 @@ describe('SPARC progressive scaffolding productions', function() {
       'dialogue.scaffold.prompt',
     ]);
     assert.equal(selectedAction(execution.initialFacts), 'prompt');
-    assert.equal(
-      execution.facts.find((entry) => entry.factType === 'dialogue.responseModifier')?.slots?.action,
-      'question-deferral',
-    );
   });
 
   it('declines off-topic or inappropriate questions without advancing the scaffold', function() {

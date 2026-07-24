@@ -205,7 +205,7 @@ function createFixture(): { display: SparcTrialDisplay; document: SparcAuthoredD
       policyId: 'progressive-scaffolding-v1',
       policyVersion: 1,
       parameters: {
-        minimumProgress: 0.3,
+        minimumProgress: 0.2,
         progressResponse: 'deescalate',
         nonAddressingResponse: 'hold',
         postAssertionResponse: 'cycle-to-pump',
@@ -587,9 +587,9 @@ async function runOnce(
     const checks = runRobustnessChecks(turns);
     const robustnessPassed = checks.every((check) => check.passed);
     const finalTurn = turns.at(-1);
-    const graduationPassed = finalTurn?.completed === true
-      && finalTurn.action === 'summary'
-      && finalTurn.targetType === 'completion';
+    const graduationPassed = exactTranscriptCompleted
+      && exactFinalTurn?.action === 'summary'
+      && exactFinalTurn.targetType === 'completion';
     const allRequirementsPassed = robustnessPassed && graduationPassed;
     const failedCheckIds = checks.filter((check) => !check.passed).map((check) => check.id);
     const misconceptionSupportStrengths = finalMisconceptionSupportStrengths(turns);

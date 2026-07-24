@@ -624,12 +624,16 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.contain('Selected move: hint.');
         expect(params.messages[0]?.content).to.contain('Move prompt:');
         expect(params.messages[0]?.content).to.contain('Follow the selected runtime move policy.');
-        expect(params.messages[0]?.content).to.contain('Receipt boundary for every move');
+        expect(params.messages[0]?.content).to.contain('Acknowledgement boundary for every move');
+        expect(params.messages[0]?.content).to.contain('Usually begin with a brief acknowledgement');
         expect(params.messages[0]?.content).to.contain('does not agree with the answer or adopt the learner\'s claim as the tutor\'s own position');
         expect(params.messages[0]?.content).to.contain('explicitly attribute it to the learner');
+        expect(params.messages[0]?.content).to.contain('Do not use a fixed template or repeat the same opener across turns');
         expect(params.messages[0]?.content).to.contain('Misconception boundary for every move');
         expect(params.messages[0]?.content).to.contain('do not praise, endorse, validate, or describe that claim as correct, useful progress, close, or a good start');
         expect(params.messages[0]?.content).to.contain('never mention content found only in an earlier response');
+        expect(params.messages[0]?.content).to.not.contain('I hear you');
+        expect(params.messages[0]?.content).to.not.contain('I hear that you think');
         expect(params).to.have.property('temperature', 0.15);
         expect(params.messages[0]?.content).to.not.contain('Begin tutorMessage with one brief immediate-feedback statement');
         expect(params.messages[0]?.content).to.not.contain('selectedMisconception is an incorrect learner belief');
@@ -637,7 +641,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
         expect(userMessage.content).to.contain('Problem statement:');
         expect(userMessage.content).to.contain(problemStatement);
-        expect(userMessage.content).to.contain('Latest student answer (the only source for the conversational receipt):');
+        expect(userMessage.content).to.contain('Latest student answer (the primary source for any acknowledgement):');
         expect(userMessage.content.indexOf('Latest student answer')).to.be.greaterThan(
           userMessage.content.indexOf('Full dialogue history'),
         );
@@ -855,10 +859,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
       const systemPrompt = messages[0]?.content ?? '';
       const userPrompt = messages[1]?.content ?? '';
       expect(systemPrompt).to.contain(`Selected move: ${move}.`);
-      expect(systemPrompt).to.contain('Receipt boundary for every move');
+      expect(systemPrompt).to.contain('Acknowledgement boundary for every move');
       expect(systemPrompt).to.contain('explicitly attribute it to the learner');
+      expect(systemPrompt).to.contain('Do not use a fixed template or repeat the same opener across turns');
       expect(systemPrompt).to.contain('Misconception boundary for every move');
-      expect(systemPrompt.indexOf('Receipt boundary for every move')).to.be.lessThan(
+      expect(systemPrompt.indexOf('Acknowledgement boundary for every move')).to.be.lessThan(
         systemPrompt.indexOf('Selected move:'),
       );
       expect(systemPrompt.indexOf('Misconception boundary for every move')).to.be.lessThan(
@@ -869,6 +874,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
       );
       expect(systemPrompt).to.contain('The JSON object must exactly follow this envelope shape:');
       expect(systemPrompt).to.not.contain('Begin tutorMessage with one brief immediate-feedback statement');
+      expect(systemPrompt).to.not.contain('I hear you');
+      expect(systemPrompt).to.not.contain('I hear that you think');
       expect(userPrompt).to.contain(`"targetType": "${targetType}"`);
       expect(userPrompt).to.contain(`"selectedMove": "${move}"`);
 

@@ -220,7 +220,7 @@ Update:
 - `mofacts/client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts`; and
 - `learning-components/units/sparcsession/sparcLearnerResponseScoring.test.ts`.
 
-The live compound-interest evaluator consumes the unchanged downstream score result. The approved live-evaluation hardening below extends its saved per-turn diagnostics and robustness gates while preserving its transcript, graduation synthesis, pass threshold, and live scoring/generation behavior.
+The live compound-interest evaluator consumes the unchanged downstream score result. The approved live-evaluation hardening below extends its saved per-turn diagnostics and robustness gates. The optional graduation synthesis is diagnostic only; exact-transcript completion is required for the live gate to pass.
 
 No config-repository, TDF, package ZIP, wiki, persistence, migration, or analytics change is expected. The public authoring/runtime contract is unchanged; this document is the developer-facing record of the internal ownership correction.
 
@@ -230,7 +230,7 @@ The post-implementation live review authorized seven narrow follow-up changes:
 
 - expose each validated complete provider evidence envelope to the live-evaluation harness and save it with the corresponding turn;
 - save the complete effective post-reducer scoring state derived from the controller's score facts, alongside the existing sparse downstream score;
-- require M1 to be inactive after exact-transcript turn 6 (or at a valid earlier completion), require accumulated E2 coverage to reach the authored completion threshold by corrective turn 4, and require an added graduation synthesis to support E4 at the authored completion threshold; and
+- require M1 to be inactive after exact-transcript turn 6 (or at a valid earlier completion), require accumulated E2 coverage to reach the authored completion threshold by corrective turn 4, and require exact-transcript completion for graduation while retaining any added graduation synthesis as diagnostic evidence; and
 - clarify in the scoring prompt that a whole relation must be represented with the correct roles and direction, that an unambiguous correct calculation can contradict a misconception, and that tutor receipts must attribute learner claims without praising or adopting misconceptions;
 - retain the attempted learner turn, raw parsed provider payload, and parsed evidence envelope when a provider response is rejected or a rate limit interrupts the turn;
 - report scoring or harness errors as evaluation errors with student and robustness outcomes marked not evaluated, calculate the displayed graduation rate only from evaluated runs, make an unavailable rate explicit, record the absolute required graduation-run count, and require every planned run to be evaluated; and

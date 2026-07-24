@@ -217,20 +217,6 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
           sourceRuleId: literal('dialogue.question.defer'),
         },
       },
-    }, {
-      type: 'assert-fact',
-      persist: false,
-      fact: {
-        factType: 'learningObservation.targetProgress',
-        slots: {
-          targetKey: variable('targetKey'),
-          targetKind: variable('targetKind'),
-          targetId: variable('targetId'),
-          madeProgress: literal(false),
-          newlyResolved: literal(false),
-          observationKind: literal('learner-question-no-progress'),
-        },
-      },
     }],
   }, terminalLearnerQuestionRule({
     id: 'dialogue.question.scope-refusal',

@@ -240,7 +240,7 @@ function deterministicProvider(
       return learnerResponseScore;
     },
     generateTutorUtterance: (request: { learnerText?: string }) => (
-      `Okay, I hear your latest response: ${request.learnerText ?? ''}`
+      `The latest response was recorded: ${request.learnerText ?? ''}`
     ),
   };
 }
@@ -308,7 +308,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(run.message).to.contain('Final misconception support strengths M1=0, M2=0, M3=0');
   });
 
-  it('adds the explicit synthesis only when the exact replay has not graduated', async function() {
+  it('adds the explicit synthesis diagnostically when the exact replay has not graduated', async function() {
     const result = await runSparcCompoundInterestLiveEvaluation(evaluationOptions({
       completeOnExactTurnSeven: false,
     }));
@@ -316,10 +316,11 @@ describe('SPARC Compound Interest live evaluation harness', function() {
 
     expect(run.robustnessPassed).to.equal(true);
     expect(run.exactTranscriptCompleted).to.equal(false);
-    expect(run.graduationPassed).to.equal(true);
-    expect(run.allRequirementsPassed).to.equal(true);
-    expect(run.studentOutcome).to.equal('graduated');
+    expect(run.graduationPassed).to.equal(false);
+    expect(run.allRequirementsPassed).to.equal(false);
+    expect(run.studentOutcome).to.equal('not-graduated');
     expect(run.robustnessOutcome).to.equal('passed');
+    expect(run.overallOutcome).to.equal('requirements-failed');
     expect(run.turns).to.have.length(8);
     expect(run.turns[7]?.phase).to.equal('graduation-synthesis');
     expect(run.turns[7]?.learnerText).to.contain('earned interest is added to the account balance');
@@ -431,7 +432,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     }));
     const run = result.runs[0]!;
 
-    expect(run.studentOutcome).to.equal('graduated');
+    expect(run.studentOutcome).to.equal('not-graduated');
     expect(run.robustnessOutcome).to.equal('failed');
     expect(run.failedRobustnessCheckIds).to.deep.equal(['turn-6-m1-inactive']);
     expect(run.checks.find((check) => check.id === 'turn-6-m1-inactive')?.message)
