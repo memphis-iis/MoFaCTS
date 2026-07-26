@@ -59,6 +59,21 @@ function readProviderEffort(value: unknown, label: string): OpenRouterProviderRe
   return value;
 }
 
+function sanitizeSupportedParameters(value: unknown, label: string): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new TypeError(`${label} must be an array when present`);
+  }
+  const parameters = value.map((parameter, index) =>
+    readNonEmptyString(parameter, `${label}[${index}]`));
+  if (new Set(parameters).size !== parameters.length) {
+    throw new TypeError(`${label} must not contain duplicates`);
+  }
+  return parameters;
+}
+
 function sanitizeProviderReasoning(
   value: unknown,
   label: string,
@@ -115,6 +130,9 @@ export function sanitizeOpenRouterModelCatalogResponse(
       id: readNonEmptyString(rawModel.id, `${label}.id`),
       name: readNonEmptyString(rawModel.name, `${label}.name`),
       reasoning: sanitizeProviderReasoning(rawModel.reasoning, `${label}.reasoning`),
+      ...(hasOwn(rawModel, 'supported_parameters')
+        ? { supportedParameters: sanitizeSupportedParameters(rawModel.supported_parameters, `${label}.supported_parameters`) }
+        : {}),
     };
   });
   return parseOpenRouterModelCatalog(sanitized).sort((left, right) => {
@@ -129,6 +147,7 @@ export function sanitizeOpenRouterModelCatalogResponse(
 function cloneCatalog(models: OpenRouterModelCatalogEntry[]): OpenRouterModelCatalogEntry[] {
   return models.map((model) => ({
     ...model,
+    ...(Array.isArray(model.supportedParameters) ? { supportedParameters: [...model.supportedParameters] } : {}),
     reasoning: model.reasoning
       ? {
         ...model.reasoning,

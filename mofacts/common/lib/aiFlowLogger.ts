@@ -19,6 +19,31 @@ export type AiFlowEvent = AiFlowTelemetry & {
   messageCount?: number;
   durationMs?: number;
   httpStatus?: number;
+  providerRequestId?: string;
+  providerName?: string;
+  providerErrorType?: string;
+  providerErrorCode?: string | number;
+  retryAfterSeconds?: number;
+  rateLimitLimit?: string;
+  rateLimitRemaining?: string;
+  rateLimitReset?: string;
+  rateLimitLimitRequests?: string;
+  rateLimitLimitTokens?: string;
+  rateLimitRemainingRequests?: string;
+  rateLimitRemainingTokens?: string;
+  rateLimitResetRequests?: string;
+  rateLimitResetTokens?: string;
+  retryAfterMs?: number;
+  responseModel?: string;
+  requestBodyBytes?: number;
+  messageCharacters?: number;
+  maxTokensRequested?: number;
+  strictSchema?: boolean;
+  requireParameters?: boolean;
+  allowFallbacks?: boolean;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
   costUsd?: number;
   error?: string;
   createdAt: string;
@@ -66,6 +91,31 @@ function summarizeEvent(event: AiFlowEvent): Record<string, unknown> {
     messageCount: event.messageCount,
     durationMs: event.durationMs,
     httpStatus: event.httpStatus,
+    providerRequestId: event.providerRequestId,
+    providerName: event.providerName,
+    providerErrorType: event.providerErrorType,
+    providerErrorCode: event.providerErrorCode,
+    retryAfterSeconds: event.retryAfterSeconds,
+    rateLimitLimit: event.rateLimitLimit,
+    rateLimitRemaining: event.rateLimitRemaining,
+    rateLimitReset: event.rateLimitReset,
+    rateLimitLimitRequests: event.rateLimitLimitRequests,
+    rateLimitLimitTokens: event.rateLimitLimitTokens,
+    rateLimitRemainingRequests: event.rateLimitRemainingRequests,
+    rateLimitRemainingTokens: event.rateLimitRemainingTokens,
+    rateLimitResetRequests: event.rateLimitResetRequests,
+    rateLimitResetTokens: event.rateLimitResetTokens,
+    retryAfterMs: event.retryAfterMs,
+    responseModel: event.responseModel,
+    requestBodyBytes: event.requestBodyBytes,
+    messageCharacters: event.messageCharacters,
+    maxTokensRequested: event.maxTokensRequested,
+    strictSchema: event.strictSchema,
+    requireParameters: event.requireParameters,
+    allowFallbacks: event.allowFallbacks,
+    promptTokens: event.promptTokens,
+    completionTokens: event.completionTokens,
+    totalTokens: event.totalTokens,
     costUsd: event.costUsd,
     error: event.error,
     createdAt: event.createdAt,

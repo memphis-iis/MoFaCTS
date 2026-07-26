@@ -85,7 +85,7 @@ describe('createSparcDialogueTurnTransition', function() {
     assert.equal((nodes[1] as { targetId?: string }).targetId, 'kc-evaporation');
     assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'paper-rule-06-hint');
     assert.equal((nodes[1] as { promptId?: string }).promptId, 'autotutor.hint');
-    assert.equal((nodes[1] as { promptVersion?: string }).promptVersion, 'v1');
+    assert.equal((nodes[1] as { promptVersion?: string }).promptVersion, 'v3');
     assert.equal((nodes[1] as { outputSchemaId?: string }).outputSchemaId, 'autotutor.chat_utterance');
     assert.equal((nodes[1] as { outputSchemaVersion?: string }).outputSchemaVersion, 'v1');
     assert.equal((nodes[1] as { renderer?: string }).renderer, 'sparc.dialogue_utterance');
@@ -115,7 +115,7 @@ describe('createSparcDialogueTurnTransition', function() {
     assert.equal(facts[1]?.slots?.targetId, 'kc-evaporation');
     assert.equal(facts[1]?.slots?.productionRuleName, 'paper-rule-06-hint');
     assert.equal(facts[1]?.slots?.promptId, 'autotutor.hint');
-    assert.equal(facts[1]?.slots?.promptVersion, 'v1');
+    assert.equal(facts[1]?.slots?.promptVersion, 'v3');
     assert.equal(facts[1]?.slots?.outputSchemaId, 'autotutor.chat_utterance');
     assert.equal(facts[1]?.slots?.outputSchemaVersion, 'v1');
     assert.equal(facts[1]?.slots?.renderer, 'sparc.dialogue_utterance');

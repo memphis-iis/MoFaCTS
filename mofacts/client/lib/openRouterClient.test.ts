@@ -145,6 +145,73 @@ describe('openRouterClient', function() {
     expect(body.provider).to.deep.equal({ require_parameters: true, allow_fallbacks: false });
   });
 
+  it('omits unsupported optional parameters from strict requests with known model metadata', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch');
+    fetchStub.resolves(new Response(JSON.stringify({
+      choices: [{ message: { content: '{"ok":true}' } }],
+    }), { status: 200 }));
+
+    await callOpenRouterJson({
+      apiKey: 'sk-or-v1-test',
+      model: 'openai/test-model',
+      temperature: 0.2,
+      maxTokens: 64,
+      supportedParameters: ['response_format', 'max_tokens'],
+      messages: [{ role: 'user', content: 'Return ok.' }],
+      intent: {
+        title: 'MoFaCTS Strict Test',
+        schemaName: 'mofacts_strict_test',
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { ok: { type: 'boolean' } },
+          required: ['ok'],
+        },
+        strictSchema: true,
+        parse(value) {
+          return value;
+        },
+      },
+    });
+
+    const body = JSON.parse(String((fetchStub.firstCall.args[1] as RequestInit).body));
+    expect(body).not.to.have.property('temperature');
+    expect(body).to.have.property('max_tokens', 64);
+    expect(body.response_format.json_schema.strict).to.equal(true);
+    expect(body.provider).to.deep.equal({ require_parameters: true, allow_fallbacks: false });
+  });
+
+  it('fails locally when a strict request needs structured output unsupported by known model metadata', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch');
+
+    try {
+      await callOpenRouterJson({
+        apiKey: 'sk-or-v1-test',
+        model: 'openai/test-model',
+        supportedParameters: ['max_tokens'],
+        messages: [{ role: 'user', content: 'Return ok.' }],
+        intent: {
+          title: 'MoFaCTS Strict Test',
+          schemaName: 'mofacts_strict_test',
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: { ok: { type: 'boolean' } },
+            required: ['ok'],
+          },
+          strictSchema: true,
+          parse(value) {
+            return value;
+          },
+        },
+      });
+      throw new Error('Expected unsupported structured output to fail');
+    } catch (error) {
+      expect((error as Error).message).to.contain('does not support response_format');
+    }
+    expect(fetchStub.callCount).to.equal(0);
+  });
+
   it('redacts OpenRouter keys from provider failures', async function() {
     const fetchStub = sinon.stub(globalThis, 'fetch');
     fetchStub.resolves(new Response(JSON.stringify({

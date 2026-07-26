@@ -137,6 +137,10 @@ function observationForPreviousTarget(params: {
   const progressAfter = targetKind === 'expectation' ? afterScore : 1 - afterScore;
   const progressDelta = Math.round((progressAfter - progressBefore) * 1_000_000) / 1_000_000;
   const resolutionThreshold = optionalNumber(target?.slots?.resolutionThreshold) ?? 0.8;
+  const newlyResolved = targetKind === 'expectation'
+    ? progressAfter >= resolutionThreshold
+    : progressAfter > resolutionThreshold;
+  const madeMinimumProgress = progressDelta >= minimumProgress(params.config);
   return {
     factType: 'learningObservation.targetProgress',
     slots: {
@@ -146,10 +150,8 @@ function observationForPreviousTarget(params: {
       progressBefore,
       progressAfter,
       progressDelta,
-      madeProgress: progressDelta >= minimumProgress(params.config),
-      newlyResolved: targetKind === 'expectation'
-        ? progressAfter >= resolutionThreshold
-        : progressAfter > resolutionThreshold,
+      madeProgress: madeMinimumProgress && (targetKind === 'expectation' || newlyResolved),
+      newlyResolved,
     },
   };
 }

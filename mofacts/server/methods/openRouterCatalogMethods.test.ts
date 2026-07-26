@@ -27,6 +27,7 @@ const providerCatalog = {
         default_effort: 'medium',
         ignored: true,
       },
+      supported_parameters: ['response_format', 'max_tokens'],
     },
     {
       id: 'vendor/basic-model',
@@ -52,6 +53,7 @@ describe('openRouterCatalogMethods', function() {
           supportedLevels: ['high', 'medium', 'none'],
           defaultLevel: 'medium',
         },
+        supportedParameters: ['response_format', 'max_tokens'],
       },
     ]);
   });
@@ -143,11 +145,13 @@ describe('openRouterCatalogMethods', function() {
     });
     const first = await service.getCatalog();
     first[0]!.name = 'Mutated client copy';
+    first[1]!.supportedParameters!.push('mutated');
     currentTime = 999;
     const second = await service.getCatalog();
 
     expect(fetchCount).to.equal(1);
     expect(second[0]!.name).to.equal('Basic Model');
+    expect(second[1]!.supportedParameters).to.deep.equal(['response_format', 'max_tokens']);
   });
 
   it('shares one in-flight provider request across concurrent catalog reads', async function() {

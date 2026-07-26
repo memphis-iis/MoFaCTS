@@ -5,7 +5,6 @@
  */
 
 import JSZip from 'jszip';
-import { init as initZstd, decompress as decompressZstd } from '@bokuweb/zstd-wasm';
 import { Reader } from 'protobufjs/minimal';
 import { clientConsole } from './clientLogger';
 import { buildImportLessonDraft } from './importCompositionBuilder';
@@ -13,15 +12,14 @@ import { parseImportIndexSpec } from './importRangeUtils';
 import { buildImportPackageFromDraftLessons } from './importPackageBuilder';
 import type { ImportDraftLesson } from './normalizedImportTypes';
 import { ensureSqlJs } from './sqlJsLoader';
+import { decompressZstd } from './zstdDecoder';
 
 const US = '\x1f'; // Anki field separator
-const ZSTD_WASM_URL = '/vendor/zstd-wasm/0.0.27/zstd.wasm';
 const ZSTD_MAGIC = [0x28, 0xb5, 0x2f, 0xfd] as const;
 export type ApkgArchiveFormat = 'legacy' | 'modern';
 
 // sql.js needs to load the WASM file
 let SQL: any = null;
-let zstdLoadPromise: Promise<void> | null = null;
 
 /**
  * Initialize sql.js (loads WASM)
@@ -31,17 +29,6 @@ async function initSQL(): Promise<any> {
     SQL = await ensureSqlJs();
   }
   return SQL;
-}
-
-async function initZstdDecoder(): Promise<void> {
-  if (!zstdLoadPromise) {
-    const initZstdFromUrl = initZstd as (path?: string) => Promise<void>;
-    zstdLoadPromise = initZstdFromUrl(ZSTD_WASM_URL).catch((error: unknown) => {
-      zstdLoadPromise = null;
-      throw error;
-    });
-  }
-  return zstdLoadPromise;
 }
 
 function hasZstdMagic(bytes: Uint8Array) {
@@ -171,9 +158,8 @@ async function decompressModernApkgEntry(bytes: Uint8Array, entryName: string) {
   if (!hasZstdMagic(bytes)) {
     throw new Error(`Modern APKG ${entryName} is not Zstandard-compressed`);
   }
-  await initZstdDecoder();
   try {
-    return decompressZstd(bytes);
+    return await decompressZstd(bytes);
   } catch (error) {
     throw new Error(`Modern APKG ${entryName} could not be decompressed: ${error instanceof Error ? error.message : String(error)}`);
   }

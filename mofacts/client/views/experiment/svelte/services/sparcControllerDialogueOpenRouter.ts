@@ -103,13 +103,13 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
       additionalProperties: false,
       properties: {
         type: { type: 'string', enum: ['answer', 'question', 'off-task', 'other'] },
-        confidence: { type: 'number' },
-        streakCount: { type: 'number' },
+        confidence: { type: ['number', 'null'] },
+        streakCount: { type: ['number', 'null'] },
       },
-      required: ['type'],
+      required: ['type', 'confidence', 'streakCount'],
     },
     learnerQuestion: {
-      type: 'object',
+      type: ['object', 'null'],
       additionalProperties: false,
       properties: {
         contentFocused: { type: 'boolean' },
@@ -117,19 +117,16 @@ const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
       required: ['contentFocused'],
     },
   },
-  required: ['learningTargetEvaluations', 'diagnosticMisconceptionEvaluations', 'learnerContribution'],
+  required: ['learningTargetEvaluations', 'diagnosticMisconceptionEvaluations', 'learnerContribution', 'learnerQuestion'],
 };
 
 const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    targetType: { type: 'string', enum: ['learningTarget', 'misconception', 'learnerQuestion', 'completion'] },
-    targetId: { type: ['string', 'null'] },
-    selectedMove: { type: 'string' },
     tutorMessage: { type: 'string' },
   },
-  required: ['targetType', 'targetId', 'selectedMove', 'tutorMessage'],
+  required: ['tutorMessage'],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -278,29 +275,16 @@ function parseEvidenceEnvelope(value: unknown): SparcLearnerResponseEvidenceEnve
     diagnosticMisconceptionEvaluations,
     learnerContribution: {
       type: contributionType as 'answer' | 'question' | 'off-task' | 'other',
-      ...(contribution.confidence !== undefined ? { confidence: unitScore(contribution.confidence, 'SPARC dialogue learner contribution confidence') } : {}),
-      ...(Number.isFinite(Number(contribution.streakCount)) ? { streakCount: Number(contribution.streakCount) } : {}),
+      ...(typeof contribution.confidence === 'number' ? { confidence: unitScore(contribution.confidence, 'SPARC dialogue learner contribution confidence') } : {}),
+      ...(typeof contribution.streakCount === 'number' && Number.isFinite(contribution.streakCount) ? { streakCount: contribution.streakCount } : {}),
     },
     ...(contributionType === 'question' && learnerQuestion ? { learnerQuestion } : {}),
   };
 }
 
-function parseUtteranceEnvelope(value: unknown, request: SparcUtteranceRequest): string {
+function parseUtteranceEnvelope(value: unknown): string {
   if (!isRecord(value)) {
     throw new Error('SPARC dialogue utterance response must be an object');
-  }
-  const targetType = nonBlankString(value.targetType);
-  if (targetType !== request.targetType) {
-    throw new Error(`SPARC dialogue utterance response targetType "${targetType}" did not match selected targetType "${request.targetType}"`);
-  }
-  const targetId = value.targetId === null ? null : nonBlankString(value.targetId);
-  const expectedTargetId = request.targetId || null;
-  if (targetId !== expectedTargetId) {
-    throw new Error(`SPARC dialogue utterance response targetId "${String(value.targetId)}" did not match selected targetId "${String(expectedTargetId)}"`);
-  }
-  const selectedMove = nonBlankString(value.selectedMove);
-  if (selectedMove !== request.action) {
-    throw new Error(`SPARC dialogue utterance response selectedMove "${selectedMove}" did not match selected move "${request.action}"`);
   }
   const tutorMessage = nonBlankString(value.tutorMessage);
   if (!tutorMessage) {
@@ -310,9 +294,6 @@ function parseUtteranceEnvelope(value: unknown, request: SparcUtteranceRequest):
 }
 
 const SPARC_AUTOTUTOR_UTTERANCE_ENVELOPE_SCHEMA = Object.freeze({
-  targetType: 'learningTarget | misconception | learnerQuestion | completion',
-  targetId: 'string | null',
-  selectedMove: 'pump | prompt | hint | assertion | question-scope-refusal | summary',
   tutorMessage: 'string',
 });
 
@@ -324,15 +305,16 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
   ]);
   return [
     'Return JSON only. Do not wrap it in Markdown.',
-    'Echo targetType, targetId, and selectedMove exactly as provided by the application.',
+    'Generate only tutorMessage. The application owns the selected target and dialogue move metadata.',
     'Do not expose internal ids, rule ids, rubric labels, scoring fields, or planner metadata in tutorMessage.',
     'Use only the authored lesson content and dialogue context supplied in the user message.',
     'Follow the selected runtime move policy.',
-    'Acknowledgement boundary for every move: Usually begin with a brief acknowledgement of the learner\'s latest answer or the progress it shows. If there was no progress, acknowledge the answer neutrally before continuing. An acknowledgement confirms that the latest student answer was received; it does not agree with the answer or adopt the learner\'s claim as the tutor\'s own position. If you refer to learner content, explicitly attribute it to the learner. Do not use a fixed template or repeat the same opener across turns.',
+    'Acknowledgement boundary for every move: Usually begin with one brief, natural response to the substance of the learner\'s latest contribution or the progress it demonstrates. If there was no progress, use a neutral acknowledgement without agreeing with an incorrect claim. Speak directly to the learner rather than narrating the receipt or processing of their message. Do not say that you heard, received, noted, recorded, recognized, or processed the learner\'s answer or question. Do not use a fixed acknowledgement template, and avoid repeating the same opening pattern across nearby turns. Omit the acknowledgement when including one would sound artificial.',
+    'Learner-language and terminology boundary for every move: Represent the learner\'s meaning faithfully, but do not mechanically reproduce their wording. In the tutor\'s own voice, use canonical authored terminology and silently normalize obvious misspellings, transcription errors, malformed grammar, and incorrect nonconceptual word choices. Do not attribute rubric language, unstated beliefs, or missing content to the learner. Do not interrupt the lesson to correct the learner\'s language unless the terminology distinction is itself instructionally relevant.',
     'Misconception boundary for every move: If the latest answer states or relies on a misconception, do not praise, endorse, validate, or describe that claim as correct, useful progress, close, or a good start. Acknowledge it neutrally, or give accurate corrective feedback when the selected move calls for feedback.',
     'Use earlier dialogue only as context; never mention content found only in an earlier response as though it were the latest contribution.',
     ...(responseModifierPrompt.length > 0 ? [
-      'Apply the response modifiers within the selected move. When the selected move starts with an acknowledgement, use it once near the beginning, then apply each modifier, then complete the remainder of the selected move. Produce one coherent tutorMessage with one instructional question.',
+      'Apply the response modifiers and the selected move as one natural tutor response. Usually begin with one brief acknowledgement of the learner\'s latest contribution. Then answer, clarify, correct, redirect, or defer as required by each response modifier. After that, bridge directly into the selected pedagogical move without announcing the transition. Do not describe tutoring procedure, answer revelation, reflection time, application state, or system behavior. Produce exactly one coherent tutorMessage with no more than one instructional question, supplied by the selected move.',
       ...responseModifierPrompt,
     ] : []),
     `Selected move: ${moveDefinition.moveId}.`,
@@ -344,22 +326,19 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
 }
 
 function buildSparcUtteranceUserPrompt(request: SparcUtteranceRequest): string {
+  const isPump = request.action === 'pump';
   const targetContentLabel = request.targetType === 'misconception'
     ? 'Internal diagnostic target context (authored content; not necessarily the learner\'s expressed position):'
     : request.targetType === 'learnerQuestion'
       ? 'Learner-question routing context (application classification):'
       : 'Relevant authored target content:';
   return [
-    'Problem statement:',
-    request.problemStatement,
-    '',
-    'App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response:',
-    JSON.stringify({
-      targetType: request.targetType,
-      targetId: request.targetId || null,
-      selectedMove: request.action,
-    }, null, 2),
-    '',
+    ...(isPump ? [] : [
+      'Problem statement:',
+      request.problemStatement,
+      '',
+    ]),
+    `Target kind: ${request.targetType}.`,
     'Registered move definition:',
     JSON.stringify({
       moveId: request.moveDefinition.moveId,
@@ -381,15 +360,21 @@ function buildSparcUtteranceUserPrompt(request: SparcUtteranceRequest): string {
       promptVersion: modifier.moveDefinition.promptVersion,
     })), null, 2),
     '',
-    'App-selected pedagogical state:',
-    JSON.stringify(request.pedagogicalState ?? null, null, 2),
-    '',
-    targetContentLabel,
-    JSON.stringify(request.targetContent ?? request.contentTexts, null, 2),
-    '',
-    'Current scored planner state:',
-    JSON.stringify(request.plannerState ?? null, null, 2),
-    '',
+    ...(isPump ? [
+      'Pump content boundary:',
+      'The separate problem statement, selected target content, and planner state are intentionally withheld. Use only the visible dialogue and latest learner contribution to make a genuinely open invitation for the learner to continue.',
+      '',
+    ] : [
+      'App-selected pedagogical state:',
+      JSON.stringify(request.pedagogicalState ?? null, null, 2),
+      '',
+      targetContentLabel,
+      JSON.stringify(request.targetContent ?? request.contentTexts, null, 2),
+      '',
+      'Current scored planner state:',
+      JSON.stringify(request.plannerState ?? null, null, 2),
+      '',
+    ]),
     'Full dialogue history:',
     JSON.stringify(request.dialogueHistory ?? [], null, 2),
     '',
@@ -485,6 +470,7 @@ export function createSparcDialogueOpenRouterProvider(
           schemaName: 'mofacts_sparc_dialogue_score',
           schema: SPARC_DIALOGUE_SCORE_JSON_SCHEMA,
           missingContentMessage: 'OpenRouter SPARC dialogue scoring response did not include message content.',
+          strictSchema: true,
         },
         telemetry: {
           surface: 'sparc-dialogue-runtime',
@@ -547,7 +533,7 @@ export function createSparcDialogueOpenRouterProvider(
           unitType: 'sparcsession',
         },
       });
-      return parseUtteranceEnvelope(result.parsedContent, request);
+      return parseUtteranceEnvelope(result.parsedContent);
     },
   };
 }

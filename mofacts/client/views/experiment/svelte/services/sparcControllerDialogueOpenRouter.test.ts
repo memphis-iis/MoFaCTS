@@ -259,7 +259,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_score');
     expect(calls[0]).to.have.property('temperature', 0);
-    expect(calls[0]).to.not.have.nested.property('intent.strictSchema', true);
+    expect(calls[0]).to.have.nested.property('intent.strictSchema', true);
     expect(calls[0]).to.have.property('tdfId', 'tdf-1');
     const systemMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[0];
     expect(systemMessage?.content).to.contain('accumulated instructional knowledge across the full dialogue through the latest response');
@@ -585,15 +585,12 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.learnerContribution?.type).to.equal('answer');
   });
 
-  it('fails clearly when the model echoes tutor metadata that does not match the selected action', async function() {
+  it('requires nonblank tutor text without delegating control metadata to the model', async function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson() {
         return {
           parsedContent: {
-            targetType: 'learningTarget',
-            targetId: 'kc-b',
-            selectedMove: 'hint',
-            tutorMessage: 'Changed target.',
+            tutorMessage: '   ',
           },
         };
       },
@@ -607,15 +604,21 @@ describe('SPARC dialogue OpenRouter provider', function() {
     }
 
     expect(error).to.be.instanceOf(Error);
-    expect((error as Error).message).to.equal(
-      'SPARC dialogue utterance response targetId "kc-b" did not match selected targetId "kc-a"',
-    );
+    expect((error as Error).message).to.equal('SPARC dialogue utterance response requires tutorMessage');
   });
 
-  it('returns constrained tutor text when the provider echoes the selected target and action', async function() {
+  it('returns constrained tutor text while the application retains target and move ownership', async function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
         expect(params).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_utterance');
+        expect(params.intent.schema).to.deep.equal({
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            tutorMessage: { type: 'string' },
+          },
+          required: ['tutorMessage'],
+        });
         const userMessage = params.messages[1];
         expect(userMessage).to.not.equal(undefined);
         if (!userMessage) {
@@ -625,10 +628,12 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.contain('Move prompt:');
         expect(params.messages[0]?.content).to.contain('Follow the selected runtime move policy.');
         expect(params.messages[0]?.content).to.contain('Acknowledgement boundary for every move');
-        expect(params.messages[0]?.content).to.contain('Usually begin with a brief acknowledgement');
-        expect(params.messages[0]?.content).to.contain('does not agree with the answer or adopt the learner\'s claim as the tutor\'s own position');
-        expect(params.messages[0]?.content).to.contain('explicitly attribute it to the learner');
-        expect(params.messages[0]?.content).to.contain('Do not use a fixed template or repeat the same opener across turns');
+        expect(params.messages[0]?.content).to.contain('Usually begin with one brief, natural response');
+        expect(params.messages[0]?.content).to.contain('without agreeing with an incorrect claim');
+        expect(params.messages[0]?.content).to.contain('rather than narrating the receipt or processing of their message');
+        expect(params.messages[0]?.content).to.contain('avoid repeating the same opening pattern across nearby turns');
+        expect(params.messages[0]?.content).to.contain('Learner-language and terminology boundary for every move');
+        expect(params.messages[0]?.content).to.contain('use canonical authored terminology and silently normalize obvious misspellings');
         expect(params.messages[0]?.content).to.contain('Misconception boundary for every move');
         expect(params.messages[0]?.content).to.contain('do not praise, endorse, validate, or describe that claim as correct, useful progress, close, or a good start');
         expect(params.messages[0]?.content).to.contain('never mention content found only in an earlier response');
@@ -638,6 +643,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.not.contain('Begin tutorMessage with one brief immediate-feedback statement');
         expect(params.messages[0]?.content).to.not.contain('selectedMisconception is an incorrect learner belief');
         expect(params.messages[0]?.content).to.not.contain('Use correctExpectations as the authoritative positive content');
+        expect(params.messages[0]?.content).to.contain(
+          'Generate only tutorMessage. The application owns the selected target and dialogue move metadata.',
+        );
         expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
         expect(userMessage.content).to.contain('Problem statement:');
         expect(userMessage.content).to.contain(problemStatement);
@@ -645,19 +653,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(userMessage.content.indexOf('Latest student answer')).to.be.greaterThan(
           userMessage.content.indexOf('Full dialogue history'),
         );
-        expect(userMessage.content).to.contain('App-selected plan. Echo targetType, targetId, and selectedMove exactly in the response.');
+        expect(userMessage.content).to.contain('Target kind: learningTarget.');
         expect(userMessage.content).to.contain('Registered move definition:');
         expect(userMessage.content).to.not.contain('Immediate-feedback evidence:');
-        expect(userMessage.content).to.contain('"targetType": "learningTarget"');
         expect(userMessage.content).to.contain('"targetId": "kc-a"');
-        expect(userMessage.content).to.contain('"selectedMove": "hint"');
         expect(params).to.have.nested.property('intent.strictSchema', true);
         expect(userMessage.content).to.contain('Full dialogue history:');
         return {
           parsedContent: {
-            targetType: 'learningTarget',
-            targetId: 'kc-a',
-            selectedMove: 'hint',
             tutorMessage: 'Try using the authored hint.',
           },
         };
@@ -676,13 +679,15 @@ describe('SPARC dialogue OpenRouter provider', function() {
         const selectedMoveIndex = systemPrompt.indexOf('Selected move: prompt.');
         expect(modifierIndex).to.be.greaterThan(-1);
         expect(selectedMoveIndex).to.be.greaterThan(modifierIndex);
-        expect(systemPrompt).to.contain('Produce one coherent tutorMessage with one instructional question.');
-        expect(systemPrompt).to.contain('Do not answer the learner\'s question');
+        expect(systemPrompt).to.contain('Produce exactly one coherent tutorMessage with no more than one instructional question');
+        expect(systemPrompt).to.contain('give brief and direct correctness feedback on that proposal');
+        expect(systemPrompt).to.contain('Confirm it when correct');
+        expect(systemPrompt).to.contain('confirm or reject only the proposition the learner supplied');
+        expect(systemPrompt).to.contain('Do not calculate an unstated result');
+        expect(systemPrompt).to.contain('Defer only when the learner asks the tutor to perform reasoning');
+        expect(systemPrompt).to.not.contain('work with the problem a little longer');
         return {
           parsedContent: {
-            targetType: 'learningTarget',
-            targetId: 'kc-a',
-            selectedMove: 'prompt',
             tutorMessage: 'Let us work with that question a little longer. What relationship should you examine next?',
           },
         };
@@ -814,7 +819,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.diagnosticMisconceptionScores).to.equal(undefined);
   });
 
-  it('constructs the eleven target-aware prompt cases without attributing rubric text to the learner', async function() {
+  it('constructs the eleven move prompts without attributing rubric text to the learner', async function() {
     const cases = [
       ['pump', 'learningTarget'],
       ['pump', 'misconception'],
@@ -832,17 +837,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
         capturedMessages.push(params.messages);
-        const userPrompt = params.messages[1]?.content ?? '';
-        const planStart = userPrompt.indexOf('{', userPrompt.indexOf('App-selected plan.'));
-        const planEnd = userPrompt.indexOf('\n\nRegistered move definition:', planStart);
-        const plan = JSON.parse(userPrompt.slice(planStart, planEnd)) as {
-          targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion';
-          targetId: string;
-          selectedMove: string;
-        };
         return {
           parsedContent: {
-            ...plan,
             tutorMessage: 'Constructed response.',
           },
         };
@@ -860,8 +856,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
       const userPrompt = messages[1]?.content ?? '';
       expect(systemPrompt).to.contain(`Selected move: ${move}.`);
       expect(systemPrompt).to.contain('Acknowledgement boundary for every move');
-      expect(systemPrompt).to.contain('explicitly attribute it to the learner');
-      expect(systemPrompt).to.contain('Do not use a fixed template or repeat the same opener across turns');
+      expect(systemPrompt).to.contain('rather than narrating the receipt or processing of their message');
+      expect(systemPrompt).to.contain('avoid repeating the same opening pattern across nearby turns');
+      expect(systemPrompt).to.contain('Learner-language and terminology boundary for every move');
       expect(systemPrompt).to.contain('Misconception boundary for every move');
       expect(systemPrompt.indexOf('Acknowledgement boundary for every move')).to.be.lessThan(
         systemPrompt.indexOf('Selected move:'),
@@ -869,23 +866,38 @@ describe('SPARC dialogue OpenRouter provider', function() {
       expect(systemPrompt.indexOf('Misconception boundary for every move')).to.be.lessThan(
         systemPrompt.indexOf('Selected move:'),
       );
-      expect(systemPrompt).to.contain(
-        'Do not present rubric language as something the learner said, meant, believed, or knew.',
-      );
+      expect(systemPrompt).to.contain('Do not attribute rubric language, unstated beliefs, or missing content to the learner.');
       expect(systemPrompt).to.contain('The JSON object must exactly follow this envelope shape:');
       expect(systemPrompt).to.not.contain('Begin tutorMessage with one brief immediate-feedback statement');
       expect(systemPrompt).to.not.contain('I hear you');
       expect(systemPrompt).to.not.contain('I hear that you think');
-      expect(userPrompt).to.contain(`"targetType": "${targetType}"`);
-      expect(userPrompt).to.contain(`"selectedMove": "${move}"`);
+      expect(userPrompt).to.contain(`Target kind: ${targetType}.`);
+      expect(userPrompt).to.not.contain('App-selected plan.');
 
-      if (targetType === 'misconception') {
+      if (move === 'pump') {
+        expect(userPrompt).to.contain('Pump content boundary:');
+        expect(userPrompt).to.contain('separate problem statement, selected target content, and planner state are intentionally withheld');
+        expect(userPrompt).to.not.contain('Problem statement:');
+        expect(userPrompt).to.not.contain(problemStatement);
+        expect(userPrompt).to.not.contain('App-selected pedagogical state:');
+        expect(userPrompt).to.not.contain('Current scored planner state:');
+        expect(userPrompt).to.not.contain('Relevant authored target content:');
+        expect(userPrompt).to.not.contain('Internal diagnostic target context');
+        expect(userPrompt).to.not.contain('A target text');
+        expect(userPrompt).to.not.contain('A fixed annual rate means the same dollar amount is added every year.');
+        expect(userPrompt).to.not.contain('Interest is earned on the original principal plus accumulated interest.');
+        expect(userPrompt).to.not.contain('kc-a');
+        expect(userPrompt).to.not.contain('mis-1');
+      } else if (targetType === 'misconception') {
         expect(systemPrompt).to.contain('If targetType is misconception');
         expect(userPrompt).to.contain(
           'Internal diagnostic target context (authored content; not necessarily the learner\'s expressed position):',
         );
         expect(userPrompt).to.contain('Well I guess you get $50 every year.');
         expect(userPrompt).to.contain('A fixed annual rate means the same dollar amount is added every year.');
+        expect(userPrompt).to.not.contain('Relevant authored target content:');
+      } else if (targetType === 'learnerQuestion') {
+        expect(userPrompt).to.contain('Learner-question routing context (application classification):');
         expect(userPrompt).to.not.contain('Relevant authored target content:');
       } else {
         expect(userPrompt).to.contain('Relevant authored target content:');
@@ -894,10 +906,12 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(systemPrompt).to.contain('If targetType is learningTarget');
       }
       if (targetType === 'completion') {
-        expect(systemPrompt).to.contain('Because targetType is completion');
+        expect(systemPrompt).to.contain('For required-coverage completion');
       }
       if (move === 'question-deferral') {
-        expect(systemPrompt).to.contain('Do not answer the learner\'s question');
+        expect(systemPrompt).to.contain('Confirm it when correct');
+        expect(systemPrompt).to.contain('Do not calculate an unstated result');
+        expect(systemPrompt).to.contain('Defer only when the learner asks the tutor to perform reasoning');
         expect(userPrompt).to.contain('Learner-question routing context (application classification):');
       }
       if (move === 'question-scope-refusal') {

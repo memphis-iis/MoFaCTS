@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
-import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
+import {
+  assertCanonicalSparcProgressiveScaffoldingRules,
+  createSparcProgressiveScaffoldingRules,
+} from './sparcProgressiveScaffoldingRules';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 
 function fact(factType: string, slots: Record<string, unknown> = {}): SparcWorkingMemoryFact {
@@ -52,6 +55,29 @@ function selectedAction(inputFacts: readonly SparcWorkingMemoryFact[]): string {
 }
 
 describe('SPARC progressive scaffolding productions', function() {
+  it('accepts structurally identical rules regardless of object-key order', function() {
+    function reverseKeys(value: unknown): unknown {
+      if (Array.isArray(value)) return value.map(reverseKeys);
+      if (typeof value !== 'object' || value === null) return value;
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+        .reverse()
+        .map(([key, child]) => [key, reverseKeys(child)]));
+    }
+    const reordered = reverseKeys(createSparcProgressiveScaffoldingRules());
+    assert.doesNotThrow(() => assertCanonicalSparcProgressiveScaffoldingRules(
+      reordered as ReturnType<typeof createSparcProgressiveScaffoldingRules>,
+    ));
+  });
+
+  it('identifies the first rule whose behavior diverges', function() {
+    const rules = [...createSparcProgressiveScaffoldingRules()];
+    rules[1] = { ...rules[1]!, salience: 1 };
+    assert.throws(
+      () => assertCanonicalSparcProgressiveScaffoldingRules(rules),
+      /productionRules\[1\].*dialogue\.question\.defer/,
+    );
+  });
+
   it('selects the four no-progress stages without relying on salience', function() {
     assert.equal(selectedAction(facts({ stage: 'ELICIT' })), 'pump');
     assert.equal(selectedAction(facts({ stage: 'PUMP', madeProgress: false })), 'prompt');

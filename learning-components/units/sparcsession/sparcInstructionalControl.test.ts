@@ -98,7 +98,7 @@ describe('SPARC AutoTutor instructional adapter', function() {
     assert.equal(observation?.slots?.madeProgress, false);
   });
 
-  it('accepts a 0.2 gain for both expectations and misconceptions', function() {
+  it('accepts a 0.2 expectation gain but not a confidence drop that leaves a misconception active', function() {
     const baseFacts = [
       fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
       fact('instructionalFocus.episode', {
@@ -143,7 +143,32 @@ describe('SPARC AutoTutor instructional adapter', function() {
     );
     assert.equal(
       misconceptionResult.find((entry) => entry.factType === 'learningObservation.targetProgress')?.slots?.madeProgress,
-      true,
+      false,
     );
+  });
+
+  it('accepts misconception progress when contradictory evidence makes it inactive', function() {
+    const result = instantiateSparcAutoTutorInstructionalFacts({
+      selection: {
+        ...expectationSelection,
+        selectedTargetType: 'misconception',
+        selectedMisconceptionId: 'm1',
+      },
+      config,
+      facts: [
+        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
+        fact('instructionalTarget.active', {
+          targetKey: 'misconception:m1', targetKind: 'misconception', targetId: 'm1', resolutionThreshold: 0.8,
+        }),
+        fact('instructionalFocus.episode', {
+          focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
+        }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0 }),
+      ],
+    });
+    const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');
+    assert.equal(observation?.slots?.madeProgress, true);
+    assert.equal(observation?.slots?.newlyResolved, true);
   });
 });

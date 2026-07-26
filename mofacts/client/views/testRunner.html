@@ -161,6 +161,11 @@
                   <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
                   {{testText 'adminTests.runSparcLiveEvaluation'}}
                 </button>
+              {{else if sparcLiveUnavailable}}
+                <button type="button" class="btn btn-primary run-sparc-live-evaluation" disabled aria-busy="false">
+                  <i class="fa fa-comments" aria-hidden="true"></i>
+                  {{testText 'adminTests.runSparcLiveEvaluation'}}
+                </button>
               {{else}}
                 <button type="button" class="btn btn-primary run-sparc-live-evaluation" aria-busy="false">
                   <i class="fa fa-comments" aria-hidden="true"></i>
@@ -168,6 +173,30 @@
                 </button>
               {{/if}}
             </div>
+          </div>
+
+          <div class="admin-form-row-top">
+            <label for="sparc-live-evaluation-source" class="form-label">Uploaded SPARC lesson</label>
+            <select
+              id="sparc-live-evaluation-source"
+              class="form-select"
+              disabled="{{sparcSourcesPending}}"
+              aria-describedby="sparc-live-evaluation-source-help"
+            >
+              {{#if sparcHasSourceOptions}}
+                {{#each sparcSourceOptions}}
+                  <option value="{{key}}" selected="{{selected}}">{{label}}</option>
+                {{/each}}
+              {{else}}
+                <option value="">No compatible uploaded compound-interest SPARC lesson found</option>
+              {{/if}}
+            </select>
+            <div id="sparc-live-evaluation-source-help" class="form-text">
+              The selected uploaded page supplies the problem, targets, misconceptions, graph, rules, thresholds, and instructional controller for this evaluation.
+            </div>
+            {{#if sparcSourceError}}
+              <div class="invalid-feedback d-block">{{sparcSourceError}}</div>
+            {{/if}}
           </div>
 
           <div id="sparc-live-evaluation-output" class="admin-output-region" aria-live="polite">
@@ -196,6 +225,7 @@
 
 <template name="testRunnerSparcLiveResult">
   {{> adminStatus variant=summaryVariant text=summaryText urgent=summaryUrgent}}
+  <div class="text-muted small admin-form-row-top">Source: {{sourceLabel}}</div>
   {{> adminTableShell
     label=tableLabel
     tableTemplate="testRunnerSparcLiveTable"

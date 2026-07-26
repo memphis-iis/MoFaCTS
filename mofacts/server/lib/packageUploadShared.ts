@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor';
 
 import type { UploadedPackageFile } from './packageParser';
 import type { createStorageBoundary } from './storageBoundary';
+import type { OpenRouterEmbeddingOptions, OpenRouterEmbeddingResult } from '../../common/lib/openRouterClient';
 
 export type MethodContext = {
   userId?: string | null;
@@ -65,6 +66,7 @@ export type ProcessPackageUploadDeps = {
   serverConsole: (...args: unknown[]) => void;
   encryptData: (value: string) => string;
   getApiKeyResolutionDeps: () => import('./apiKeyResolution').ApiKeyResolutionDeps;
+  callOpenRouterEmbeddings?: (options: OpenRouterEmbeddingOptions) => Promise<OpenRouterEmbeddingResult>;
   legacyTrim: (value: unknown) => string;
   upsertPackage: (record: any, owner: string) => Promise<any>;
   updateStimDisplayTypeMap: (stimuliSetIds: Array<string | number>) => Promise<unknown>;

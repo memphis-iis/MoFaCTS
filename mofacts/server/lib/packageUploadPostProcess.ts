@@ -29,26 +29,77 @@ function nonBlankString(value: unknown) {
 function getWorkingMemoryFacts(display: unknown) {
   return isRecord(display) && Array.isArray(display.workingMemoryFacts)
     ? display.workingMemoryFacts
-    : null;
+    : [];
 }
 
-function hasKcGraphRelationships(facts: readonly unknown[]) {
-  return facts.some((fact) => isRecord(fact) && fact.factType === 'kcGraph.relationship');
+function collectGraphNodeClusterKcs(facts: readonly unknown[]): Set<string> {
+  return new Set(facts.flatMap((fact) => (
+    isRecord(fact)
+      && fact.factType === 'kcGraph.node'
+      && nonBlankString(fact.slots?.clusterKC)
+      ? [nonBlankString(fact.slots.clusterKC)]
+      : []
+  )));
 }
 
-function collectClusterKcRelationshipNodesFromClusters(clusters: unknown): ClusterKcRelationshipNode[] {
+function relationshipKey(sourceClusterKC: string, targetClusterKC: string) {
+  return `${sourceClusterKC}\u0000${targetClusterKC}`;
+}
+
+function collectGraphRelationshipKeys(facts: readonly unknown[]): Set<string> {
+  return new Set(facts.flatMap((fact) => {
+    if (!isRecord(fact) || fact.factType !== 'kcGraph.relationship') {
+      return [];
+    }
+    const sourceClusterKC = nonBlankString(fact.slots?.sourceClusterKC);
+    const targetClusterKC = nonBlankString(fact.slots?.targetClusterKC);
+    return sourceClusterKC && targetClusterKC
+      ? [relationshipKey(sourceClusterKC, targetClusterKC)]
+      : [];
+  }));
+}
+
+function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>) {
+  return left.size === right.size && [...left].every((value) => right.has(value));
+}
+
+function hasCompleteKcGraphFacts(params: {
+  readonly facts: readonly unknown[];
+  readonly nodes: readonly ClusterKcRelationshipNode[];
+}) {
+  const expectedNodeClusterKcs = new Set(params.nodes.map((node) => node.clusterKC));
+  if (!sameSet(collectGraphNodeClusterKcs(params.facts), expectedNodeClusterKcs)) {
+    return false;
+  }
+  const expectedRelationshipKeys = new Set<string>();
+  for (const source of params.nodes) {
+    for (const target of params.nodes) {
+      if (source.clusterKC !== target.clusterKC) {
+        expectedRelationshipKeys.add(relationshipKey(source.clusterKC, target.clusterKC));
+      }
+    }
+  }
+  return sameSet(collectGraphRelationshipKeys(params.facts), expectedRelationshipKeys);
+}
+
+function collectClusterKcRelationshipNodesFromExpectations(display: unknown): ClusterKcRelationshipNode[] {
   const nodes: ClusterKcRelationshipNode[] = [];
   const seen = new Set<string>();
-  for (const cluster of Array.isArray(clusters) ? clusters : []) {
-    if (!isRecord(cluster)) {
+  const targets = isRecord(display) && isRecord(display.autoTutorTargets)
+    ? display.autoTutorTargets
+    : null;
+  const expectations = Array.isArray(targets?.expectations)
+    ? targets.expectations
+    : [];
+  for (const expectation of expectations) {
+    if (!isRecord(expectation)) {
       continue;
     }
-    const clusterKC = nonBlankString(cluster.clusterKC);
+    const clusterKC = nonBlankString(expectation.clusterKC);
     if (!clusterKC || seen.has(clusterKC)) {
       continue;
     }
-    const firstStim = Array.isArray(cluster.stims) ? cluster.stims.find(isRecord) : null;
-    const text = nonBlankString(firstStim?.text);
+    const text = nonBlankString(expectation.text);
     if (!text) {
       continue;
     }
@@ -80,11 +131,17 @@ async function ensureAutoTutorSparcGraph(args: {
       continue;
     }
     const facts = getWorkingMemoryFacts(display);
-    if (!facts || hasKcGraphRelationships(facts)) {
+    const nodes = collectClusterKcRelationshipNodesFromExpectations(display);
+    if (nodes.length === 0 || hasCompleteKcGraphFacts({ facts, nodes })) {
       continue;
     }
-    const nodes = collectClusterKcRelationshipNodesFromClusters(setspec.clusters);
-    if (nodes.length < 2) {
+
+    if (nodes.length === 1) {
+      display.workingMemoryFacts = [
+        ...facts.filter((fact) => !isRecord(fact) || (fact.factType !== 'kcGraph.node' && fact.factType !== 'kcGraph.relationship')),
+        ...createClusterKcGraphFacts({ nodes, relationships: [] }),
+      ];
+      generatedPageCount += 1;
       continue;
     }
 
@@ -103,7 +160,7 @@ async function ensureAutoTutorSparcGraph(args: {
     for (const candidateModel of [AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL, AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL]) {
       attemptedModels.push(candidateModel);
       try {
-        embeddingResult = await callOpenRouterEmbeddings({
+        embeddingResult = await (deps.callOpenRouterEmbeddings ?? callOpenRouterEmbeddings)({
           apiKey: keyResolution.apiKey,
           model: candidateModel,
           input: nodes.map((node) => node.description),

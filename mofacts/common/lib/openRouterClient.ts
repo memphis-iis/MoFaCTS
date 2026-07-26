@@ -46,6 +46,7 @@ export type OpenRouterCallOptions<T> = {
   reasoningLevel?: OpenRouterReasoningLevel;
   temperature?: number;
   maxTokens?: number;
+  supportedParameters?: readonly string[];
   apiKey: string;
   requireUsageCost?: boolean;
   telemetry?: AiFlowTelemetry;
@@ -59,6 +60,49 @@ export type OpenRouterResult<T> = {
   requestBody: Record<string, unknown>;
   costUsd?: number;
 };
+
+export type OpenRouterResponseDiagnostics = Readonly<{
+  providerRequestId?: string;
+  providerName?: string;
+  providerErrorType?: string;
+  providerErrorCode?: string | number;
+  retryAfterSeconds?: number;
+  rateLimitLimit?: string;
+  rateLimitRemaining?: string;
+  rateLimitReset?: string;
+  rateLimitLimitRequests?: string;
+  rateLimitLimitTokens?: string;
+  rateLimitRemainingRequests?: string;
+  rateLimitRemainingTokens?: string;
+  rateLimitResetRequests?: string;
+  rateLimitResetTokens?: string;
+  retryAfterMs?: number;
+  responseModel?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+}>;
+
+type OpenRouterRequestDiagnostics = Readonly<{
+  requestBodyBytes: number;
+  messageCharacters: number;
+  maxTokensRequested?: number;
+  strictSchema: boolean;
+  requireParameters?: boolean;
+  allowFallbacks?: boolean;
+}>;
+
+export class OpenRouterHttpError extends Error {
+  readonly httpStatus: number;
+  readonly diagnostics: OpenRouterResponseDiagnostics;
+
+  constructor(message: string, httpStatus: number, diagnostics: OpenRouterResponseDiagnostics) {
+    super(message);
+    this.name = 'OpenRouterHttpError';
+    this.httpStatus = httpStatus;
+    this.diagnostics = diagnostics;
+  }
+}
 
 export type OpenRouterEmbeddingResult = {
   embeddings: number[][];
@@ -183,6 +227,82 @@ function buildResponseFormat(intent: OpenRouterIntent<unknown>): Record<string, 
   };
 }
 
+function readHeader(response: Response, name: string): string | undefined {
+  const value = response.headers.get(name)?.trim();
+  return value || undefined;
+}
+
+function readFiniteHeaderNumber(response: Response, name: string): number | undefined {
+  const value = readHeader(response, name);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function responseDiagnostics(response: Response, responseBody: unknown): OpenRouterResponseDiagnostics {
+  const error = isRecord(responseBody) && isRecord(responseBody.error) ? responseBody.error : undefined;
+  const metadata = error && isRecord(error.metadata) ? error.metadata : undefined;
+  const usage = isRecord(responseBody) && isRecord(responseBody.usage) ? responseBody.usage : undefined;
+  const responseModel = isRecord(responseBody) && typeof responseBody.model === 'string'
+    ? responseBody.model.trim()
+    : undefined;
+  const providerRequestId = readHeader(response, 'x-openrouter-request-id')
+    ?? readHeader(response, 'x-request-id');
+  const retryAfterSeconds = readFiniteHeaderNumber(response, 'retry-after');
+  const retryAfterMs = readFiniteHeaderNumber(response, 'retry-after-ms');
+  const rateLimitLimit = readHeader(response, 'x-ratelimit-limit');
+  const rateLimitRemaining = readHeader(response, 'x-ratelimit-remaining');
+  const rateLimitReset = readHeader(response, 'x-ratelimit-reset');
+  const rateLimitLimitRequests = readHeader(response, 'x-ratelimit-limit-requests');
+  const rateLimitLimitTokens = readHeader(response, 'x-ratelimit-limit-tokens');
+  const rateLimitRemainingRequests = readHeader(response, 'x-ratelimit-remaining-requests');
+  const rateLimitRemainingTokens = readHeader(response, 'x-ratelimit-remaining-tokens');
+  const rateLimitResetRequests = readHeader(response, 'x-ratelimit-reset-requests');
+  const rateLimitResetTokens = readHeader(response, 'x-ratelimit-reset-tokens');
+  const diagnostics: OpenRouterResponseDiagnostics = {
+    ...(providerRequestId ? { providerRequestId } : {}),
+    ...(metadata && typeof metadata.provider_name === 'string' && metadata.provider_name.trim()
+      ? { providerName: metadata.provider_name.trim() }
+      : {}),
+    ...(error && typeof error.type === 'string'
+      ? { providerErrorType: error.type }
+      : metadata && typeof metadata.error_type === 'string'
+        ? { providerErrorType: metadata.error_type }
+        : {}),
+    ...(error && (typeof error.code === 'number' || typeof error.code === 'string')
+      ? { providerErrorCode: error.code }
+      : {}),
+    ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+    ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+    ...(rateLimitLimit ? { rateLimitLimit } : {}),
+    ...(rateLimitRemaining ? { rateLimitRemaining } : {}),
+    ...(rateLimitReset ? { rateLimitReset } : {}),
+    ...(rateLimitLimitRequests ? { rateLimitLimitRequests } : {}),
+    ...(rateLimitLimitTokens ? { rateLimitLimitTokens } : {}),
+    ...(rateLimitRemainingRequests ? { rateLimitRemainingRequests } : {}),
+    ...(rateLimitRemainingTokens ? { rateLimitRemainingTokens } : {}),
+    ...(rateLimitResetRequests ? { rateLimitResetRequests } : {}),
+    ...(rateLimitResetTokens ? { rateLimitResetTokens } : {}),
+    ...(responseModel ? { responseModel } : {}),
+    ...(usage && typeof usage.prompt_tokens === 'number' ? { promptTokens: usage.prompt_tokens } : {}),
+    ...(usage && typeof usage.completion_tokens === 'number' ? { completionTokens: usage.completion_tokens } : {}),
+    ...(usage && typeof usage.total_tokens === 'number' ? { totalTokens: usage.total_tokens } : {}),
+  };
+  return diagnostics;
+}
+
+function providerRequiresParameters(provider: Record<string, unknown> | undefined): boolean {
+  return provider?.require_parameters === true;
+}
+
+function supportedParameterSet(parameters: readonly string[] | undefined): Set<string> | null {
+  return parameters ? new Set(parameters) : null;
+}
+
+function parameterIsSupported(parameters: Set<string> | null, parameter: string): boolean {
+  return !parameters || parameters.has(parameter);
+}
+
 export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): Promise<OpenRouterResult<T>> {
   const requestId = options.telemetry?.requestId || createAiFlowRequestId('openrouter');
   const startedAt = Date.now();
@@ -212,9 +332,13 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
     model: trimmedModel,
     ...(options.intent.schemaName ? { schemaName: options.intent.schemaName } : {}),
     messageCount: options.messages.length,
+    messageCharacters: options.messages.reduce((total, message) => total + message.content.length, 0),
+    strictSchema: options.intent.strictSchema === true,
   });
 
   let httpStatus: number | undefined;
+  let responseDiagnosticsValue: OpenRouterResponseDiagnostics | undefined;
+  let requestDiagnostics: OpenRouterRequestDiagnostics | undefined;
   try {
     const apiKey = String(options.apiKey || '').trim();
     if (!apiKey) {
@@ -225,6 +349,18 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       'OpenRouter request reasoning level',
     );
     const responseFormat = buildResponseFormat(options.intent);
+    const provider = options.provider
+      ?? (responseFormat && options.intent.strictSchema === true
+        ? { require_parameters: true, allow_fallbacks: false }
+        : undefined);
+    const knownSupportedParameters = supportedParameterSet(options.supportedParameters);
+    if (
+      responseFormat
+      && providerRequiresParameters(provider)
+      && !parameterIsSupported(knownSupportedParameters, 'response_format')
+    ) {
+      throw new Error(`Configured OpenRouter model ${JSON.stringify(trimmedModel)} does not support response_format required by strict structured output`);
+    }
     const requestBody = {
       model: trimmedModel,
       messages: options.messages,
@@ -235,15 +371,25 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
             ? { enabled: true }
             : { effort: reasoningLevel },
         }),
-      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-      ...(options.maxTokens !== undefined ? { max_tokens: options.maxTokens } : {}),
+      ...(options.temperature !== undefined && parameterIsSupported(knownSupportedParameters, 'temperature')
+        ? { temperature: options.temperature }
+        : {}),
+      ...(options.maxTokens !== undefined && parameterIsSupported(knownSupportedParameters, 'max_tokens')
+        ? { max_tokens: options.maxTokens }
+        : {}),
       ...(responseFormat ? { response_format: responseFormat } : {}),
-      ...(options.provider
-        ? { provider: options.provider }
-        : responseFormat && options.intent.strictSchema === true
-          ? { provider: { require_parameters: true, allow_fallbacks: false } }
-          : {}),
+      ...(provider ? { provider } : {}),
       stream: false,
+    };
+    const requestBodyBytes = JSON.stringify(requestBody).length;
+    const providerRecord = isRecord(requestBody.provider) ? requestBody.provider : undefined;
+    requestDiagnostics = {
+      requestBodyBytes,
+      messageCharacters: options.messages.reduce((total, message) => total + message.content.length, 0),
+      ...(typeof requestBody.max_tokens === 'number' ? { maxTokensRequested: requestBody.max_tokens } : {}),
+      strictSchema: options.intent.strictSchema === true,
+      ...(providerRecord && providerRecord.require_parameters === true ? { requireParameters: true } : {}),
+      ...(providerRecord && providerRecord.allow_fallbacks === false ? { allowFallbacks: false } : {}),
     };
     const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
@@ -258,8 +404,13 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
 
     httpStatus = response.status;
     const responseBody = await readOpenRouterResponseBody(response);
+    responseDiagnosticsValue = responseDiagnostics(response, responseBody);
     if (!response.ok) {
-      throw new Error(redactOpenRouterSecrets(openRouterErrorMessage(responseBody, response.status)));
+      throw new OpenRouterHttpError(
+        redactOpenRouterSecrets(openRouterErrorMessage(responseBody, response.status)),
+        response.status,
+        responseDiagnosticsValue,
+      );
     }
 
     const rawContent = readOpenRouterMessageContent(
@@ -289,6 +440,8 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       messageCount: options.messages.length,
       durationMs: Date.now() - startedAt,
       httpStatus: response.status,
+      ...requestDiagnostics,
+      ...responseDiagnosticsValue,
       ...(result.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
     });
     return result;
@@ -304,6 +457,8 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       messageCount: options.messages.length,
       durationMs: Date.now() - startedAt,
       ...(httpStatus !== undefined ? { httpStatus } : {}),
+      ...requestDiagnostics,
+      ...(responseDiagnosticsValue ? responseDiagnosticsValue : {}),
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;

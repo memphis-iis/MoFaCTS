@@ -17,6 +17,7 @@ import {
 } from './testRunnerState';
 import {
   runSparcCompoundInterestLiveEvaluation,
+  type SparcCompoundInterestLiveEvaluationSource,
   type SparcCompoundInterestLiveEvaluationResult,
 } from './experiment/svelte/services/sparcCompoundInterestLiveEvaluation';
 import {
@@ -36,12 +37,22 @@ type OpenRouterStrictPreflightResult = {
   message: string;
 };
 
+type SparcCompoundInterestSourceOption = Readonly<{
+  tdfId: string;
+  tdfName: string;
+  pageId: string;
+}>;
+
 type TestRunnerInstance = Blaze.TemplateInstance & {
   readinessState: ReactiveVar<AsyncCommandState<DeploymentReadinessResult>>;
   readinessCommand: AsyncCommandController<DeploymentReadinessResult>;
   sparcLiveState: ReactiveVar<AsyncCommandState<SparcCompoundInterestLiveEvaluationResult>>;
   sparcLiveCommand: AsyncCommandController<SparcCompoundInterestLiveEvaluationResult>;
   sparcLiveSavedJson: ReactiveVar<string>;
+  sparcSourceOptions: ReactiveVar<readonly SparcCompoundInterestSourceOption[]>;
+  sparcSelectedSourceKey: ReactiveVar<string>;
+  sparcSourceError: ReactiveVar<string>;
+  sparcSourcesPending: ReactiveVar<boolean>;
   openRouterPreflightState: ReactiveVar<AsyncCommandState<OpenRouterStrictPreflightResult>>;
   openRouterPreflightCommand: AsyncCommandController<OpenRouterStrictPreflightResult>;
   promptLabRequest: ReactiveVar<string>;
@@ -173,6 +184,10 @@ const WIKIMEDIA_LAB_NOTES = 'bones of the human hand and wrist with image prompt
 
 const SPARC_LIVE_RESULT_STORAGE_KEY = 'mofacts.adminTests.sparcCompoundInterestLiveEvaluation.latest';
 
+function sparcSourceKey(source: Pick<SparcCompoundInterestSourceOption, 'tdfId' | 'pageId'>): string {
+  return `${source.tdfId}\t${source.pageId}`;
+}
+
 function savedSparcLiveResultJson(): string {
   return globalThis.localStorage?.getItem(SPARC_LIVE_RESULT_STORAGE_KEY) ?? '';
 }
@@ -206,6 +221,10 @@ Template.testRunner.onCreated(function(this: TestRunnerInstance) {
     this.sparcLiveState.set(state);
   });
   this.sparcLiveSavedJson = new ReactiveVar<string>(savedSparcLiveResultJson());
+  this.sparcSourceOptions = new ReactiveVar<readonly SparcCompoundInterestSourceOption[]>([]);
+  this.sparcSelectedSourceKey = new ReactiveVar<string>('');
+  this.sparcSourceError = new ReactiveVar<string>('');
+  this.sparcSourcesPending = new ReactiveVar<boolean>(true);
   this.openRouterPreflightState = new ReactiveVar<AsyncCommandState<OpenRouterStrictPreflightResult>>({ status: 'idle' });
   this.openRouterPreflightCommand = createAsyncCommandController((state) => this.openRouterPreflightState.set(state));
   this.promptLabRequest = new ReactiveVar(seedPromptLabRequest());
@@ -226,6 +245,23 @@ Template.testRunner.onCreated(function(this: TestRunnerInstance) {
       this.promptLabRequest.set(seedPromptLabRequest(model));
     })
     .catch((error) => this.promptLabError.set(getErrorMessage(error)));
+  void (Meteor as typeof Meteor & { callAsync: (name: string, ...args: any[]) => Promise<any> })
+    .callAsync('getAdminTestSparcCompoundInterestSources')
+    .then((sources: unknown) => {
+      const options = Array.isArray(sources)
+        ? sources.filter((source): source is SparcCompoundInterestSourceOption => (
+          source !== null
+          && typeof source === 'object'
+          && typeof source.tdfId === 'string'
+          && typeof source.tdfName === 'string'
+          && typeof source.pageId === 'string'
+        ))
+        : [];
+      this.sparcSourceOptions.set(options);
+      this.sparcSelectedSourceKey.set(options[0] ? sparcSourceKey(options[0]) : '');
+    })
+    .catch((error) => this.sparcSourceError.set(getErrorMessage(error)))
+    .finally(() => this.sparcSourcesPending.set(false));
 });
 
 Template.testRunner.onDestroyed(function(this: TestRunnerInstance) {
@@ -299,6 +335,31 @@ Template.testRunner.helpers({
   sparcLiveHasSavedJson() {
     return Boolean((Template.instance() as TestRunnerInstance).sparcLiveSavedJson.get());
   },
+  sparcSourceOptions() {
+    const instance = Template.instance() as TestRunnerInstance;
+    const selectedKey = instance.sparcSelectedSourceKey.get();
+    return instance.sparcSourceOptions.get().map((source) => ({
+      ...source,
+      key: sparcSourceKey(source),
+      label: `${source.tdfName} (${source.pageId})`,
+      selected: sparcSourceKey(source) === selectedKey,
+    }));
+  },
+  sparcSourceError() {
+    return (Template.instance() as TestRunnerInstance).sparcSourceError.get();
+  },
+  sparcHasSourceOptions() {
+    return (Template.instance() as TestRunnerInstance).sparcSourceOptions.get().length > 0;
+  },
+  sparcSourcesPending() {
+    return (Template.instance() as TestRunnerInstance).sparcSourcesPending.get();
+  },
+  sparcLiveUnavailable() {
+    const instance = Template.instance() as TestRunnerInstance;
+    return instance.sparcSourcesPending.get()
+      || !instance.sparcSelectedSourceKey.get()
+      || instance.sparcLiveState.get().status === 'pending';
+  },
   sparcLiveOutput() {
     const state = sparcLiveState();
     if (state.status === 'pending') {
@@ -342,6 +403,7 @@ Template.testRunner.helpers({
             },
           ),
           summaryUrgent: !state.result.ok,
+          sourceLabel: `${state.result.sourceTdfName} (${state.result.sourcePageId}; ${state.result.sourceTdfId})`,
           tableLabel: testText('adminTests.sparcLiveEvaluation'),
           checkLabel: testText('adminTests.run'),
           graduationLabel: testText('adminTests.sparcLiveGraduation'),
@@ -406,12 +468,33 @@ Template.testRunner.events({
   },
   async 'click .run-sparc-live-evaluation'(event: Event, instance: TestRunnerInstance) {
     event.preventDefault();
-    await instance.sparcLiveCommand.run(runSparcCompoundInterestLiveEvaluation, {
+    const selectedKey = instance.sparcSelectedSourceKey.get();
+    const selected = instance.sparcSourceOptions.get()
+      .find((source) => sparcSourceKey(source) === selectedKey);
+    if (!selected) {
+      instance.sparcSourceError.set('Select an uploaded compatible SPARC TDF before running the evaluation.');
+      return;
+    }
+    instance.sparcSourceError.set('');
+    await instance.sparcLiveCommand.run(async () => {
+      const source = await (Meteor as typeof Meteor & {
+        callAsync: (name: string, ...args: any[]) => Promise<SparcCompoundInterestLiveEvaluationSource>;
+      }).callAsync(
+        'getAdminTestSparcCompoundInterestSource',
+        selected.tdfId,
+        selected.pageId,
+      );
+      return runSparcCompoundInterestLiveEvaluation({ source });
+    }, {
       getErrorMessage,
       onSuccess: () => {
         instance.sparcLiveSavedJson.set(savedSparcLiveResultJson());
       },
     });
+  },
+  'change #sparc-live-evaluation-source'(event: Event, instance: TestRunnerInstance) {
+    instance.sparcSelectedSourceKey.set((event.currentTarget as HTMLSelectElement).value);
+    instance.sparcSourceError.set('');
   },
   'click .download-sparc-live-evaluation'(event: Event) {
     event.preventDefault();

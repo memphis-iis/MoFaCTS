@@ -42,6 +42,7 @@ type AdminMethodsDeps = {
   };
   Tdfs: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => CountAndFetchCursor;
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   DynamicAssets: {
@@ -109,6 +110,9 @@ type AdminMethodsDeps = {
 
 const OPENROUTER_MODEL_MAX_LENGTH = 160;
 const API_KEY_MAX_LENGTH = 4096;
+const COMPOUND_INTEREST_MECHANISM_ID = 'autotutor.compound-interest-001.kc.compounding-mechanism';
+const COMPOUND_INTEREST_GROWTH_ID = 'autotutor.compound-interest-001.kc.growth-consequence';
+const COMPOUND_INTEREST_FREQUENCY_ID = 'autotutor.compound-interest-001.kc.frequency-effect';
 
 const ADMIN_API_KEY_PROVIDER_FIELDS = {
   openrouter: 'openRouter',
@@ -118,6 +122,40 @@ const ADMIN_API_KEY_PROVIDER_FIELDS = {
 
 function trimString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function compatibleCompoundInterestPages(tdf: any) {
+  const pages = tdf?.rawStimuliFile?.setspec?.sparcPages;
+  if (!Array.isArray(pages)) return [];
+  return pages.filter((page: unknown) => {
+    if (!isRecord(page) || !isRecord(page.display)) return false;
+    if (page.display.unitType !== 'sparc-autotutor-dialogue') return false;
+    const targets = isRecord(page.display.autoTutorTargets)
+      ? page.display.autoTutorTargets
+      : {};
+    const expectations = Array.isArray(targets.expectations) ? targets.expectations : [];
+    const misconceptions = Array.isArray(targets.misconceptions) ? targets.misconceptions : [];
+    const expectationIds = new Set(expectations
+      .filter(isRecord)
+      .map((target) => trimString(target.clusterKC)));
+    const misconceptionIds = new Set(misconceptions
+      .filter(isRecord)
+      .map((target) => trimString(target.id)));
+    return expectationIds.has(COMPOUND_INTEREST_MECHANISM_ID)
+      && expectationIds.has(COMPOUND_INTEREST_GROWTH_ID)
+      && expectationIds.has(COMPOUND_INTEREST_FREQUENCY_ID)
+      && ['M1', 'M2', 'M3'].every((id) => misconceptionIds.has(id));
+  });
+}
+
+function adminTestTdfName(tdf: any): string {
+  return trimString(tdf?.content?.tdfs?.tutor?.setspec?.lessonname)
+    || trimString(tdf?.content?.fileName)
+    || trimString(tdf?._id);
 }
 
 function hasControlCharacters(value: string): boolean {
@@ -381,6 +419,78 @@ async function upsertManagedUser(
 
 export function createAdminMethods(deps: AdminMethodsDeps) {
   return {
+    getAdminTestSparcCompoundInterestSources: async function(this: MethodContext) {
+      await deps.requireAdminUser(
+        this.userId,
+        'Only admins can select uploaded TDFs for SPARC live evaluations',
+      );
+      const tdfs = await deps.Tdfs.find(
+        { 'rawStimuliFile.setspec.sparcPages.display.unitType': 'sparc-autotutor-dialogue' },
+        {
+          fields: {
+            _id: 1,
+            'content.fileName': 1,
+            'content.tdfs.tutor.setspec.lessonname': 1,
+            'rawStimuliFile.setspec.sparcPages.pageId': 1,
+            'rawStimuliFile.setspec.sparcPages.display.unitType': 1,
+            'rawStimuliFile.setspec.sparcPages.display.autoTutorTargets': 1,
+          },
+        },
+      ).fetchAsync();
+      return tdfs.flatMap((tdf: any) => compatibleCompoundInterestPages(tdf).map((page: any) => ({
+        tdfId: trimString(tdf?._id),
+        tdfName: adminTestTdfName(tdf),
+        pageId: trimString(page?.pageId),
+      }))).filter((option: { tdfId: string; pageId: string }) => option.tdfId && option.pageId)
+        .sort((left, right) => `${left.tdfName}\u0000${left.pageId}`.localeCompare(`${right.tdfName}\u0000${right.pageId}`));
+    },
+
+    getAdminTestSparcCompoundInterestSource: async function(
+      this: MethodContext,
+      tdfId: string,
+      pageId: string,
+    ) {
+      check(tdfId, String);
+      check(pageId, String);
+      await deps.requireAdminUser(
+        this.userId,
+        'Only admins can load uploaded TDFs for SPARC live evaluations',
+      );
+      const normalizedTdfId = trimString(tdfId);
+      const normalizedPageId = trimString(pageId);
+      if (!normalizedTdfId || !normalizedPageId) {
+        throw new Meteor.Error('invalid-sparc-evaluation-source', 'A TDF and SPARC page must be selected');
+      }
+      const tdf = await deps.Tdfs.findOneAsync(
+        { _id: normalizedTdfId },
+        {
+          fields: {
+            _id: 1,
+            'content.fileName': 1,
+            'content.tdfs.tutor.setspec.lessonname': 1,
+            'rawStimuliFile.setspec.sparcPages': 1,
+          },
+        },
+      );
+      if (!tdf) {
+        throw new Meteor.Error('sparc-evaluation-source-not-found', 'The selected uploaded TDF was not found');
+      }
+      const page = compatibleCompoundInterestPages(tdf)
+        .find((candidate: any) => trimString(candidate?.pageId) === normalizedPageId);
+      if (!page) {
+        throw new Meteor.Error(
+          'incompatible-sparc-evaluation-source',
+          'The selected TDF page is not compatible with the compound-interest evaluation scenario',
+        );
+      }
+      return {
+        tdfId: normalizedTdfId,
+        tdfName: adminTestTdfName(tdf),
+        pageId: normalizedPageId,
+        display: page.display,
+      };
+    },
+
     getAdminApiKeyAlternativeMetadata: async function(this: MethodContext) {
       await deps.requireAdminUser(this.userId, 'Only admins can read API key alternative settings');
       const doc = await deps.DynamicSettings.findOneAsync({ key: ADMIN_API_KEY_SETTINGS_KEY });

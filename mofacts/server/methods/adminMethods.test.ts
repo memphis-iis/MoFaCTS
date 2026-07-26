@@ -20,6 +20,7 @@ function createAdminDeps(
     },
     Tdfs: {
       find: () => ({ countAsync: async () => 0, fetchAsync: async () => [] }),
+      findOneAsync: async () => null,
       removeAsync: async () => 0,
     },
     DynamicAssets: {
@@ -98,6 +99,90 @@ function createAdminDeps(
 }
 
 describe('adminMethods', function() {
+  it('lists only uploaded SPARC pages compatible with the compound-interest evaluation', async function() {
+    const compatibleDisplay = {
+      unitType: 'sparc-autotutor-dialogue',
+      autoTutorTargets: {
+        expectations: [
+          { clusterKC: 'autotutor.compound-interest-001.kc.compounding-mechanism' },
+          { clusterKC: 'autotutor.compound-interest-001.kc.growth-consequence' },
+          { clusterKC: 'autotutor.compound-interest-001.kc.frequency-effect' },
+        ],
+        misconceptions: [{ id: 'M1' }, { id: 'M2' }, { id: 'M3' }],
+      },
+    };
+    const deps = {
+      ...createAdminDeps(),
+      Tdfs: {
+        find: () => ({
+          countAsync: async () => 2,
+          fetchAsync: async () => [{
+            _id: 'compound-tdf',
+            content: { tdfs: { tutor: { setspec: { lessonname: 'Compound Interest' } } } },
+            rawStimuliFile: { setspec: { sparcPages: [
+              { pageId: 'compound-page', display: compatibleDisplay },
+              {
+                pageId: 'other-page',
+                display: {
+                  ...compatibleDisplay,
+                  autoTutorTargets: { expectations: [], misconceptions: [] },
+                },
+              },
+            ] } },
+          }],
+        }),
+        findOneAsync: async () => null,
+        removeAsync: async () => 0,
+      },
+    };
+    const methods = createAdminMethods(deps);
+
+    expect(await methods.getAdminTestSparcCompoundInterestSources.call({ userId: 'admin-user' }))
+      .to.deep.equal([{
+        tdfId: 'compound-tdf',
+        tdfName: 'Compound Interest',
+        pageId: 'compound-page',
+      }]);
+  });
+
+  it('returns only the selected compatible uploaded SPARC display', async function() {
+    const display = {
+      unitType: 'sparc-autotutor-dialogue',
+      autoTutorTargets: {
+        expectations: [
+          { clusterKC: 'autotutor.compound-interest-001.kc.compounding-mechanism' },
+          { clusterKC: 'autotutor.compound-interest-001.kc.growth-consequence' },
+          { clusterKC: 'autotutor.compound-interest-001.kc.frequency-effect' },
+        ],
+        misconceptions: [{ id: 'M1' }, { id: 'M2' }, { id: 'M3' }],
+      },
+    };
+    const deps = {
+      ...createAdminDeps(),
+      Tdfs: {
+        find: () => ({ countAsync: async () => 1, fetchAsync: async () => [] }),
+        findOneAsync: async () => ({
+          _id: 'compound-tdf',
+          content: { fileName: 'Compound.zip' },
+          rawStimuliFile: { setspec: { sparcPages: [{ pageId: 'compound-page', display }] } },
+        }),
+        removeAsync: async () => 0,
+      },
+    };
+    const methods = createAdminMethods(deps);
+
+    expect(await methods.getAdminTestSparcCompoundInterestSource.call(
+      { userId: 'admin-user' },
+      'compound-tdf',
+      'compound-page',
+    )).to.deep.equal({
+      tdfId: 'compound-tdf',
+      tdfName: 'Compound.zip',
+      pageId: 'compound-page',
+      display,
+    });
+  });
+
   it('does not let a non-admin caller grant roles', async function() {
     const deps = {
       ...createAdminDeps(),

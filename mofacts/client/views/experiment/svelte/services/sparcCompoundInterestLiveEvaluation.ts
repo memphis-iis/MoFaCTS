@@ -12,6 +12,7 @@ import {
   applySparcStateTransition,
   createEmptySparcReplayState,
 } from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
+import { createSparcAuthoredDocumentFromTrialDisplay } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type {
   SparcAuthoredDocument,
   SparcInterfaceEvent,
@@ -29,11 +30,13 @@ const PAGE_KEY = 'sparc-session-compound-interest-live-evaluation';
 const INPUT_NODE_ID = 'learner-response-input';
 type MisconceptionId = 'M1' | 'M2' | 'M3';
 const COVERAGE_THRESHOLD = 0.8;
+const EARLY_MECHANISM_ROBUSTNESS_THRESHOLD = 0.6;
 const MISCONCEPTION_ACTIVATION_THRESHOLD = 0.2;
-const E2_ID = 'autotutor.compound-interest-001.kc.e2';
-const E4_ID = 'autotutor.compound-interest-001.kc.e4-frequency';
-const PROBLEM_STATEMENT = 'Suppose $1,000 earns 5% interest each year and the interest is left in the account. In your own words, how does compound interest make the balance grow over time?';
-const GRADUATION_SYNTHESIS = 'After each year, the earned interest is added to the account balance. The next year’s 5% is calculated on that updated balance—the original $1,000 plus previously earned interest. This repeatedly multiplies the current balance by 1.05, so growth is multiplicative and the dollar amount of interest increases rather than remaining fixed as it would if interest were calculated only from the original principal. At the same nominal annual rate, adding interest more frequently generally produces a higher ending balance.';
+const MECHANISM_ID = 'autotutor.compound-interest-001.kc.compounding-mechanism';
+const GROWTH_CONSEQUENCE_ID = 'autotutor.compound-interest-001.kc.growth-consequence';
+const FREQUENCY_EFFECT_ID = 'autotutor.compound-interest-001.kc.frequency-effect';
+const TEST_FIXTURE_PROBLEM_STATEMENT = 'Suppose $1,000 earns 5% interest each year and the interest is left in the account. In your own words, explain how compound interest makes the balance grow over time and how splitting that same 5% annual rate across more frequent compounding periods would affect the ending balance.';
+const GRADUATION_SYNTHESIS = 'After each year, the earned interest is added to the account balance. The next year’s 5% is calculated on that updated balance—the original $1,000 plus previously earned interest. This repeatedly multiplies the current balance by 1.05, so growth is multiplicative and the dollar amount of interest increases rather than remaining fixed as it would if interest were calculated only from the original principal. When the same nominal annual rate is divided across compounding periods over the same length of time, adding interest more frequently generally produces a higher ending balance because the interest is added sooner and begins earning interest sooner.';
 
 export const SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS = [
   'Well it means you gain $50 each year.',
@@ -114,6 +117,9 @@ export type SparcCompoundInterestLiveEvaluationResult = Readonly<{
   model: string;
   modelSource: 'tdf' | 'user' | 'admin' | null;
   reasoningLevel: OpenRouterCapability['reasoningLevel'];
+  sourceTdfId: string;
+  sourceTdfName: string;
+  sourcePageId: string;
   problemStatement: string;
   requiredPassRate: number;
   requiredGraduationRuns: number;
@@ -131,33 +137,44 @@ export type SparcCompoundInterestLiveEvaluationResult = Readonly<{
   runs: readonly SparcCompoundInterestLiveEvaluationRun[];
 }>;
 
+export type SparcCompoundInterestLiveEvaluationSource = Readonly<{
+  tdfId: string;
+  tdfName: string;
+  pageId: string;
+  display: SparcTrialDisplay;
+}>;
+
+type SparcCompoundInterestLiveEvaluationFixture = Readonly<{
+  source: SparcCompoundInterestLiveEvaluationSource;
+  pageKey: string;
+  problemStatement: string;
+  display: SparcTrialDisplay;
+  document: SparcAuthoredDocument;
+}>;
+
 function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMemoryFact {
   return { factType, slots };
 }
 
-function createFixture(): { display: SparcTrialDisplay; document: SparcAuthoredDocument } {
+function createFixture(): SparcCompoundInterestLiveEvaluationFixture {
   const expectations = [
     {
-      clusterKC: 'autotutor.compound-interest-001.kc.e1',
-      text: 'After each compounding period, earned interest is added to the balance or principal.',
+      clusterKC: 'autotutor.compound-interest-001.kc.compounding-mechanism',
+      text: 'Earned interest remains in the account and becomes part of the balance used to calculate the next period\'s interest.',
     },
     {
-      clusterKC: 'autotutor.compound-interest-001.kc.e2',
-      text: 'Later interest is calculated on the original principal plus previously earned interest.',
+      clusterKC: 'autotutor.compound-interest-001.kc.growth-consequence',
+      text: 'Because the same percentage is applied to an increasing balance, the dollar amount of interest increases over time rather than remaining fixed.',
     },
     {
-      clusterKC: 'autotutor.compound-interest-001.kc.e3',
-      text: 'Compound growth applies a rate repeatedly, so the balance follows a multiplicative or exponential pattern rather than a fixed dollar increase.',
-    },
-    {
-      clusterKC: 'autotutor.compound-interest-001.kc.e4-frequency',
-      text: 'At the same nominal annual rate, adding interest more frequently produces a different—and generally higher—ending balance.',
+      clusterKC: 'autotutor.compound-interest-001.kc.frequency-effect',
+      text: 'At the same nominal annual rate (the annual rate is divided across the compounding periods) and over the same length of time, more frequent compounding generally produces a higher ending balance because earned interest is added sooner and begins earning interest sooner.',
     },
   ] as const;
   const misconceptions = [
     { id: 'M1', text: 'A fixed annual rate means the same dollar amount is added every year.' },
-    { id: 'M2', text: 'Compound interest is just interest on the original principal.' },
-    { id: 'M3', text: 'The frequency of compounding—shorter or longer intervals between interest additions—makes no difference to the ending balance.' },
+    { id: 'M2', text: 'Later interest is calculated only on the original principal, even when earned interest remains in the account.' },
+    { id: 'M3', text: 'When the same nominal annual rate is divided across compounding periods over the same length of time, compounding frequency makes no difference to the ending balance.' },
   ] as const;
   const workingMemoryFacts = [
     fact('dialogue.thresholds', {
@@ -235,7 +252,90 @@ function createFixture(): { display: SparcTrialDisplay; document: SparcAuthoredD
       children: [{ id: INPUT_NODE_ID, kind: 'input' }],
     },
   };
-  return { display, document };
+  return {
+    source: {
+      tdfId: 'deterministic-test-fixture',
+      tdfName: 'Deterministic compound-interest test fixture',
+      pageId: PAGE_KEY,
+      display,
+    },
+    pageKey: PAGE_KEY,
+    problemStatement: TEST_FIXTURE_PROBLEM_STATEMENT,
+    display,
+    document,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function collectDisplayNodes(nodes: readonly unknown[] | undefined): readonly Record<string, unknown>[] {
+  const collected: Record<string, unknown>[] = [];
+  for (const node of nodes ?? []) {
+    if (!isRecord(node)) continue;
+    collected.push(node);
+    if (Array.isArray(node.children)) collected.push(...collectDisplayNodes(node.children));
+    if (Array.isArray(node.panels)) {
+      for (const panel of node.panels) {
+        if (isRecord(panel) && Array.isArray(panel.children)) {
+          collected.push(...collectDisplayNodes(panel.children));
+        }
+      }
+    }
+  }
+  return collected;
+}
+
+function requireUploadedFixture(
+  source: SparcCompoundInterestLiveEvaluationSource,
+): SparcCompoundInterestLiveEvaluationFixture {
+  const tdfId = source.tdfId.trim();
+  const tdfName = source.tdfName.trim();
+  const pageId = source.pageId.trim();
+  if (!tdfId || !tdfName || !pageId) {
+    throw new Error('SPARC live evaluation source requires a TDF id, TDF name, and page id.');
+  }
+  const display = { ...source.display, pageId, pageKey: pageId };
+  if ((display as unknown as Record<string, unknown>).unitType !== 'sparc-autotutor-dialogue') {
+    throw new Error(`Selected SPARC page "${pageId}" is not an AutoTutor dialogue page.`);
+  }
+  const document = createSparcAuthoredDocumentFromTrialDisplay({
+    pageKey: pageId,
+    display,
+  });
+  const expectationIds = new Set(
+    (document.autoTutorTargets?.expectations ?? []).map((target) => target.clusterKC),
+  );
+  const misconceptionIds = new Set(
+    (document.autoTutorTargets?.misconceptions ?? []).map((target) => target.id),
+  );
+  const missingExpectations = [MECHANISM_ID, GROWTH_CONSEQUENCE_ID, FREQUENCY_EFFECT_ID]
+    .filter((id) => !expectationIds.has(id));
+  const missingMisconceptions = ['M1', 'M2', 'M3'].filter((id) => !misconceptionIds.has(id));
+  if (missingExpectations.length > 0 || missingMisconceptions.length > 0) {
+    throw new Error(
+      `Selected SPARC page "${pageId}" is incompatible with the compound-interest evaluation scenario. Missing expectations: ${missingExpectations.join(', ') || 'none'}; missing misconceptions: ${missingMisconceptions.join(', ') || 'none'}.`,
+    );
+  }
+  const opening = collectDisplayNodes(display.nodes)
+    .find((node) => node.id === 'opening-tutor-message');
+  const input = collectDisplayNodes(display.nodes)
+    .find((node) => node.id === INPUT_NODE_ID && node.atomType === 'text-input');
+  if (!input) {
+    throw new Error(`Selected SPARC page "${pageId}" requires the ${INPUT_NODE_ID} text input.`);
+  }
+  const problemStatement = typeof opening?.value === 'string' ? opening.value.trim() : '';
+  if (!problemStatement) {
+    throw new Error(`Selected SPARC page "${pageId}" requires opening-tutor-message.value.`);
+  }
+  return {
+    source: { tdfId, tdfName, pageId, display },
+    pageKey: pageId,
+    problemStatement,
+    display,
+    document,
+  };
 }
 
 function completionFromFacts(facts: readonly SparcWorkingMemoryFact[]): boolean {
@@ -309,8 +409,8 @@ function runRobustnessChecks(
 ): readonly SparcCompoundInterestLiveEvaluationCheck[] {
   const turn2 = turns.find((turn) => turn.turn === 2);
   const turn4 = turns.find((turn) => turn.turn === 4);
-  const turn4E2Coverage = turn4?.effectiveScoringState.learningTargetScores
-    .find((score) => score.clusterKC === E2_ID)?.coverage;
+  const turn4MechanismCoverage = turn4?.effectiveScoringState.learningTargetScores
+    .find((score) => score.clusterKC === MECHANISM_ID)?.coverage;
   const exactTranscriptTurns = turns.filter((turn) => turn.phase === 'exact-transcript');
   const turn6OrEarlierCompletion = exactTranscriptTurns.find((turn) => turn.turn === 6)
     ?? exactTranscriptTurns.at(-1);
@@ -318,8 +418,8 @@ function runRobustnessChecks(
     ? misconceptionSupportStrengthFromTurn(turn6OrEarlierCompletion, 'M1')
     : undefined;
   const synthesisTurn = turns.find((turn) => turn.phase === 'graduation-synthesis');
-  const synthesisE4Evidence = synthesisTurn?.evidenceEnvelope.learningTargetEvaluations
-    .find((evaluation) => evaluation.clusterKC === E4_ID);
+  const synthesisFrequencyEvidence = synthesisTurn?.evidenceEnvelope.learningTargetEvaluations
+    .find((evaluation) => evaluation.clusterKC === FREQUENCY_EFFECT_ID);
   const turn2M2SupportStrength = turn2
     ? misconceptionSupportStrengthFromTurn(turn2, 'M2')
     : undefined;
@@ -329,13 +429,13 @@ function runRobustnessChecks(
         && evaluation.evidenceDirection === 'supports'
         && evaluation.evidenceStrength > 0))
     .map((turn) => turn.turn);
-  const preFrequencyE4FalseSupport = turns
+  const preFrequencyFalseSupport = turns
     .filter((turn) => (
       turn.phase === 'exact-transcript'
       && turn.turn < SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS.length
     ))
     .flatMap((turn) => turn.evidenceEnvelope.learningTargetEvaluations
-      .filter((evaluation) => evaluation.clusterKC === E4_ID
+      .filter((evaluation) => evaluation.clusterKC === FREQUENCY_EFFECT_ID
         && evaluation.evidenceDirection === 'supports'
         && evaluation.evidenceStrength > 0)
       .map((evaluation) => ({ turn: turn.turn, strength: evaluation.evidenceStrength })));
@@ -345,11 +445,11 @@ function runRobustnessChecks(
       && turn2.learnerResponseScore.learnerContribution?.type !== 'off-task',
     message: `Turn 2 contribution type was ${turn2?.learnerResponseScore.learnerContribution?.type ?? 'missing'}.`,
   }, {
-    id: 'pre-frequency-responses-do-not-support-e4',
-    passed: preFrequencyE4FalseSupport.length === 0,
-    message: preFrequencyE4FalseSupport.length === 0
-      ? 'The responses before the explicit compounding-frequency answer did not support frequency E4.'
-      : `Frequency E4 received false support from earlier response(s): ${preFrequencyE4FalseSupport.map((entry) => `turn ${entry.turn} at strength ${entry.strength}`).join(', ')}.`,
+    id: 'pre-frequency-responses-do-not-support-frequency-effect',
+    passed: preFrequencyFalseSupport.length === 0,
+    message: preFrequencyFalseSupport.length === 0
+      ? 'The responses before the explicit compounding-frequency answer did not support the frequency-effect expectation.'
+      : `The frequency-effect expectation received false support from earlier response(s): ${preFrequencyFalseSupport.map((entry) => `turn ${entry.turn} at strength ${entry.strength}`).join(', ')}.`,
   }, {
     id: 'turn-6-m1-inactive',
     passed: turn6M1SupportStrength !== undefined
@@ -362,13 +462,13 @@ function runRobustnessChecks(
     passed: turn2M2SupportStrength !== undefined && turn2M2SupportStrength >= 0.2,
     message: `Effective M2 support strength after turn 2 was ${turn2M2SupportStrength ?? 'missing'}.`,
   }, {
-    id: 'synthesis-e4-recognized',
+    id: 'synthesis-frequency-effect-recognized',
     passed: synthesisTurn === undefined
-      || (synthesisE4Evidence?.evidenceDirection === 'supports'
-        && synthesisE4Evidence.evidenceStrength >= COVERAGE_THRESHOLD),
+      || (synthesisFrequencyEvidence?.evidenceDirection === 'supports'
+        && synthesisFrequencyEvidence.evidenceStrength >= COVERAGE_THRESHOLD),
     message: synthesisTurn === undefined
-      ? 'The exact transcript completed, so no graduation synthesis required E4 evaluation.'
-      : `Graduation-synthesis E4 evidence was ${synthesisE4Evidence?.evidenceDirection ?? 'missing'} at strength ${synthesisE4Evidence?.evidenceStrength ?? 'missing'}; recognition requires supports at strength ${COVERAGE_THRESHOLD} or greater.`,
+      ? 'The exact transcript completed, so no graduation synthesis required frequency-effect evaluation.'
+      : `Graduation-synthesis frequency-effect evidence was ${synthesisFrequencyEvidence?.evidenceDirection ?? 'missing'} at strength ${synthesisFrequencyEvidence?.evidenceStrength ?? 'missing'}; recognition requires supports at strength ${COVERAGE_THRESHOLD} or greater.`,
   }, {
     id: 'turn-4-coherent-contribution',
     passed: turn4?.learnerResponseScore.learnerContribution?.type === 'answer'
@@ -376,9 +476,10 @@ function runRobustnessChecks(
         && turn4.learnerResponseScore.learnerQuestion?.contentFocused === true),
     message: `Turn 4 contribution type was ${turn4?.learnerResponseScore.learnerContribution?.type ?? 'missing'}${turn4?.learnerResponseScore.learnerContribution?.type === 'question' ? ` with contentFocused ${String(turn4.learnerResponseScore.learnerQuestion?.contentFocused)}` : ''}.`,
   }, {
-    id: 'turn-4-cumulative-e2-coverage',
-    passed: turn4E2Coverage !== undefined && turn4E2Coverage >= COVERAGE_THRESHOLD,
-    message: `Cumulative E2 coverage after turn 4 was ${turn4E2Coverage ?? 'missing'}; completion requires ${COVERAGE_THRESHOLD} or greater.`,
+    id: 'turn-4-cumulative-mechanism-coverage',
+    passed: turn4MechanismCoverage !== undefined
+      && turn4MechanismCoverage >= EARLY_MECHANISM_ROBUSTNESS_THRESHOLD,
+    message: `Cumulative compounding-mechanism coverage after turn 4 was ${turn4MechanismCoverage ?? 'missing'}; the early robustness checkpoint requires ${EARLY_MECHANISM_ROBUSTNESS_THRESHOLD} or greater.`,
   }, {
     id: 'unsupported-m3-not-inferred',
     passed: unsupportedM3Turns.length === 0,
@@ -430,6 +531,7 @@ const callAdminTestResolvedOpenRouterJson: CallResolvedOpenRouterJson = async (p
 
 async function runOnce(
   run: number,
+  fixture: SparcCompoundInterestLiveEvaluationFixture,
   createProvider: (
     onLearnerResponseScoringTrace: SparcLearnerResponseScoringTraceObserver,
   ) => SparcLiveEvaluationProvider,
@@ -464,7 +566,9 @@ async function runOnce(
   let evaluationDiagnostic: SparcCompoundInterestLiveEvaluationDiagnostic | undefined;
 
   try {
-    const { display, document } = createFixture();
+    const {
+      display, document, pageKey, problemStatement,
+    } = fixture;
     const provider = createProvider(onLearnerResponseScoringTrace);
     async function evaluateLearnerTurn(
       learnerText: string,
@@ -473,9 +577,9 @@ async function runOnce(
       const turn = turns.length + 1;
       const timestamp = Date.now() + turn;
       const event: SparcInterfaceEvent = {
-        eventId: `${PAGE_KEY}:run-${run}:turn-${turn}`,
+        eventId: `${pageKey}:run-${run}:turn-${turn}`,
         type: 'response-submitted',
-        source: { pageKey: PAGE_KEY, nodeId: INPUT_NODE_ID },
+        source: { pageKey, nodeId: INPUT_NODE_ID },
         time: timestamp,
         payload: { input: learnerText },
       };
@@ -494,7 +598,7 @@ async function runOnce(
           display,
           result,
           event,
-          problemStatement: PROBLEM_STATEMENT,
+          problemStatement,
           learnerText,
           replayState,
         });
@@ -529,7 +633,7 @@ async function runOnce(
           document,
           replayState,
           event,
-          problemStatement: PROBLEM_STATEMENT,
+          problemStatement,
           learnerResponseScore,
           generateTutorUtterance: provider.generateTutorUtterance,
         });
@@ -587,9 +691,9 @@ async function runOnce(
     const checks = runRobustnessChecks(turns);
     const robustnessPassed = checks.every((check) => check.passed);
     const finalTurn = turns.at(-1);
-    const graduationPassed = exactTranscriptCompleted
-      && exactFinalTurn?.action === 'summary'
-      && exactFinalTurn.targetType === 'completion';
+    const graduationPassed = finalTurn?.completed === true
+      && finalTurn.action === 'summary'
+      && finalTurn.targetType === 'completion';
     const allRequirementsPassed = robustnessPassed && graduationPassed;
     const failedCheckIds = checks.filter((check) => !check.passed).map((check) => check.id);
     const misconceptionSupportStrengths = finalMisconceptionSupportStrengths(turns);
@@ -637,6 +741,7 @@ async function runOnce(
 }
 
 export async function runSparcCompoundInterestLiveEvaluation(options: {
+  readonly source?: SparcCompoundInterestLiveEvaluationSource;
   readonly totalRuns?: number;
   readonly requiredPassRate?: number;
   readonly createProvider?: (
@@ -654,6 +759,14 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
   }
 
   const runs: SparcCompoundInterestLiveEvaluationRun[] = [];
+  const fixture = options.source
+    ? requireUploadedFixture(options.source)
+    : options.createProvider
+      ? createFixture()
+      : undefined;
+  if (!fixture) {
+    throw new Error('SPARC live evaluation requires a selected uploaded TDF page.');
+  }
   const capability = await (options.getCapability ?? getConfiguredOpenRouterCapability)();
   if (!capability.configured || !capability.model) {
     throw new Error('SPARC live evaluation requires a configured OpenRouter model and API key.');
@@ -661,6 +774,7 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
   for (let run = 1; run <= totalRuns; run += 1) {
     const result = await runOnce(
       run,
+      fixture,
       options.createProvider ?? ((onLearnerResponseScoringTrace) => createSparcDialogueOpenRouterProvider({
         callResolvedOpenRouterJson: callAdminTestResolvedOpenRouterJson,
         onLearnerResponseScoringTrace,
@@ -707,7 +821,10 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
     model: capability.model,
     modelSource: capability.source,
     reasoningLevel: capability.reasoningLevel,
-    problemStatement: PROBLEM_STATEMENT,
+    sourceTdfId: fixture.source.tdfId,
+    sourceTdfName: fixture.source.tdfName,
+    sourcePageId: fixture.source.pageId,
+    problemStatement: fixture.problemStatement,
     requiredPassRate,
     requiredGraduationRuns,
     passRate,

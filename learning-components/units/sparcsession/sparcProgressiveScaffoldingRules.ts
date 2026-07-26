@@ -265,10 +265,34 @@ export const SPARC_PROGRESSIVE_SCAFFOLDING_RULE_IDS = Object.freeze([
   'dialogue.scaffold.assertion',
 ] as const);
 
+function structurallyStableJson(value: unknown): string {
+  function normalize(entry: unknown): unknown {
+    if (Array.isArray(entry)) {
+      return entry.map(normalize);
+    }
+    if (typeof entry === 'object' && entry !== null) {
+      return Object.fromEntries(
+        Object.entries(entry as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, child]) => [key, normalize(child)]),
+      );
+    }
+    return entry;
+  }
+  return JSON.stringify(normalize(value));
+}
+
 export function assertCanonicalSparcProgressiveScaffoldingRules(
   rules: readonly SparcProductionRule[],
 ): void {
-  if (JSON.stringify(rules) !== JSON.stringify(createSparcProgressiveScaffoldingRules())) {
-    throw new Error('SPARC AutoTutor productionRules must exactly match progressive-scaffolding-v1');
+  const expected = createSparcProgressiveScaffoldingRules();
+  const mismatchIndex = Array.from({ length: Math.max(rules.length, expected.length) })
+    .findIndex((_, index) => structurallyStableJson(rules[index]) !== structurallyStableJson(expected[index]));
+  if (mismatchIndex >= 0) {
+    const authoredId = rules[mismatchIndex]?.id ?? 'missing';
+    const expectedId = expected[mismatchIndex]?.id ?? 'none';
+    throw new Error(
+      `SPARC AutoTutor productionRules must exactly match progressive-scaffolding-v1; first mismatch at productionRules[${mismatchIndex}] (authored ${JSON.stringify(authoredId)}, expected ${JSON.stringify(expectedId)})`,
+    );
   }
 }

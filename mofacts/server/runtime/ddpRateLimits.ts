@@ -17,6 +17,13 @@ const DDPRateLimiterWithErrorMessage = DDPRateLimiter as DdpRateLimiterLike;
 
 let rateLimitsRegistered = false;
 
+export function isRateLimitedOpenRouterMethod(name: string): boolean {
+  return [
+    'callResolvedOpenRouterJson',
+    'callResolvedOpenRouterEmbeddings'
+  ].includes(name);
+}
+
 export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
   if (rateLimitsRegistered) {
     return;
@@ -70,7 +77,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
   DDPRateLimiter.addRule({
     type: 'method',
     name(name: string) {
-      return ['deleteAllFiles', 'deletePackageFile', 'removeAssetById', 'removeMultipleAssets', 'deleteManualContentDraft', 'cleanupOrphanDynamicAssets'].includes(name);
+      return ['deletePackageFile', 'removeAssetById', 'removeMultipleAssets', 'deleteManualContentDraft'].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }
   }, 10, 3600000);
@@ -81,10 +88,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
       return [
         'transferDataOwnership',
         'assignAccessors',
-        'resolveUsersForTdf',
-        'adminCreateOrUpdateUser',
-        'insertNewUsers',
-        'userAdminNewsEmailRecipients'
+        'resolveUsersForTdf'
       ].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }
@@ -117,28 +121,9 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
 
   DDPRateLimiter.addRule({
     type: 'method',
-    name(name: string) {
-      return [
-        'callResolvedOpenRouterJson',
-        'callResolvedOpenRouterEmbeddings',
-        'callAdminTestResolvedOpenRouterJson',
-        'callAdminTestOpenRouterRequest'
-      ].includes(name);
-    },
+    name: isRateLimitedOpenRouterMethod,
     userId(userId: string | null | undefined) { return !!userId; }
   }, 120, 3600000);
-
-  DDPRateLimiter.addRule({
-    type: 'method',
-    name(name: string) {
-      return [
-        'getAdminApiKeyAlternativeMetadata',
-        'saveAdminApiKeyAlternative',
-        'deleteAdminApiKeyAlternative'
-      ].includes(name);
-    },
-    userId(userId: string | null | undefined) { return !!userId; }
-  }, 30, 3600000);
 
   DDPRateLimiterWithErrorMessage.setErrorMessage(function(rateLimitResult: RateLimitResult) {
     const { timeToReset, numInvocationsLeft } = rateLimitResult;

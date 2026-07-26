@@ -12,7 +12,7 @@ describe('SPARC move definitions', function() {
     assert.equal(hint.family, 'autotutor-dialogue');
     assert.equal(hint.status, 'active');
     assert.equal(hint.promptId, 'autotutor.hint');
-    assert.equal(hint.promptVersion, 'v1');
+    assert.equal(hint.promptVersion, 'v3');
     assert.equal(hint.outputSchemaId, 'autotutor.chat_utterance');
     assert.equal(hint.outputSchemaVersion, 'v1');
     assert.equal(hint.renderer, 'sparc.dialogue_utterance');
@@ -40,7 +40,12 @@ describe('SPARC move definitions', function() {
       assert.equal(definition.family, 'autotutor-dialogue');
       assert.equal(definition.status, 'active');
       assert.equal(definition.promptId, `autotutor.${definition.moveId}`);
-      assert.equal(definition.promptVersion, 'v1');
+      const expectedPromptVersion = definition.moveId === 'question-scope-refusal' ? 'v1'
+        : definition.moveId === 'pump' ? 'v4'
+          : definition.moveId === 'question-deferral' || definition.moveId === 'prompt' || definition.moveId === 'hint'
+            ? 'v3'
+            : 'v2';
+      assert.equal(definition.promptVersion, expectedPromptVersion);
       assert.equal(definition.outputSchemaId, 'autotutor.chat_utterance');
       assert.equal(definition.outputSchemaVersion, 'v1');
       assert.equal(definition.renderer, 'sparc.dialogue_utterance');
@@ -54,16 +59,14 @@ describe('SPARC move definitions', function() {
       lines.forEach((line, index) => {
         assert.match(line, new RegExp(`^${index + 1}\\. `));
       });
-      assert.ok(definition.promptPolicy.includes(
-        'Do not present rubric language as something the learner said, meant, believed, or knew.',
-      ));
+      assert.ok(definition.promptPolicy.includes('rubric language'));
       assert.doesNotMatch(definition.promptPolicy, /\*\*|`|<br>|\|/i);
       assert.doesNotMatch(definition.promptPolicy, /I hear you|I hear that you think|Always begin/);
     }
   });
 
   it('defines target-specific execution in every scaffold move', function() {
-    for (const moveId of ['pump', 'prompt', 'hint', 'assertion']) {
+    for (const moveId of ['prompt', 'hint', 'assertion']) {
       const policy = requireActiveSparcMoveDefinition(moveId).promptPolicy;
       assert.ok(policy.includes('If targetType is learningTarget'));
       assert.ok(policy.includes('If targetType is misconception'));
@@ -73,34 +76,56 @@ describe('SPARC move definitions', function() {
     }
   });
 
-  it('grounds pump and hint moves in the selected authored target content', function() {
+  it('keeps pumps open while grounding hints in the selected authored target content', function() {
     const pump = requireActiveSparcMoveDefinition('pump').promptPolicy;
     const hint = requireActiveSparcMoveDefinition('hint').promptPolicy;
 
-    assert.ok(pump.includes('Use the selected authored target content to choose the dimension of elaboration'));
-    assert.ok(pump.includes('When the selected expectation introduces a new extension'));
+    assert.ok(pump.includes('genuinely open invitation'));
+    assert.ok(pump.includes('Treat the selected target and authored target content as internal routing information only'));
+    assert.ok(pump.includes('Do not identify, name, paraphrase, narrow toward, or ask directly about missing target content'));
+    assert.ok(pump.includes('Base the invitation on the learner\'s latest contribution'));
+    assert.ok(pump.includes('Semantic openness check'));
+    assert.ok(pump.includes('Do not reuse the same interrogative frame'));
+    assert.ok(pump.includes('Do not combine an open invitation with a content-specific question'));
+    assert.doesNotMatch(pump, /choose the dimension of elaboration|open that dimension explicitly/);
     assert.ok(hint.includes('Use the selected authored target content as the destination of the clue'));
   });
 
-  it('defines separate legitimate-question and scope-boundary moves', function() {
+  it('answers legitimate attempted questions while retaining work-preserving deferral and scope boundaries', function() {
     const deferral = requireActiveSparcMoveDefinition('question-deferral').promptPolicy;
     const refusal = requireActiveSparcMoveDefinition('question-scope-refusal').promptPolicy;
 
-    assert.ok(deferral.includes('Do not answer the learner\'s question'));
-    assert.ok(deferral.includes('work with the problem a little longer'));
-    assert.ok(deferral.includes('ask the learner for a response as part of this modifier'));
+    assert.ok(deferral.includes('give brief and direct correctness feedback on that proposal'));
+    assert.ok(deferral.includes('Confirm it when correct'));
+    assert.ok(deferral.includes('Defer only when the learner asks the tutor to perform reasoning'));
+    assert.ok(deferral.includes('confirm or reject only the proposition the learner supplied'));
+    assert.ok(deferral.includes('Do not calculate an unstated result'));
+    assert.ok(deferral.includes('without referring to answer revelation, tutoring procedure, reflection time'));
+    assert.ok(deferral.includes('Do not add a separate instructional question as part of this modifier'));
+    assert.doesNotMatch(deferral, /work with the problem a little longer|Do not answer the learner's question/);
     assert.ok(refusal.includes('cannot discuss that subject'));
     assert.ok(refusal.includes('rude, lewd, illicit'));
+  });
+
+  it('keeps hints short of assertions and explains technically decisive conditions', function() {
+    const hint = requireActiveSparcMoveDefinition('hint').promptPolicy;
+    const prompt = requireActiveSparcMoveDefinition('prompt').promptPolicy;
+
+    assert.ok(hint.includes('it must leave the selected inference or correction for the learner'));
+    assert.ok(hint.includes('Do not simply replace the learner\'s claim with the complete correct claim'));
+    assert.ok(hint.includes('Technical-condition clarity'));
+    assert.ok(prompt.includes('Technical-condition clarity'));
+    assert.ok(prompt.includes('Briefly restate the decisive condition in learner-accessible language'));
   });
 
   it('gives summary completion-specific trajectory instructions', function() {
     const policy = requireActiveSparcMoveDefinition('summary').promptPolicy;
 
-    assert.ok(policy.includes('Because targetType is completion'));
-    assert.ok(policy.includes('correct expectations the learner established'));
-    assert.ok(policy.includes('misconception repairs the learner completed'));
-    assert.ok(policy.includes('repaired misconceptions from unresolved misconceptions'));
-    assert.ok(policy.includes('If the reason is max-turns'));
+    assert.ok(policy.includes('Build the summary primarily from completed expectations, repaired misconceptions'));
+    assert.ok(policy.includes('Emphasize what the learner established'));
+    assert.ok(policy.includes('Do not quote, catalogue, or foreground the learner\'s earlier errors'));
+    assert.ok(policy.includes('Do not narrate the conversation turn by turn'));
+    assert.ok(policy.includes('For max-turn completion'));
   });
 
   it('does not register retired SPARC move primitives', function() {

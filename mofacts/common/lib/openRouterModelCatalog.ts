@@ -27,6 +27,7 @@ export type OpenRouterModelCatalogEntry = {
   id: string;
   name: string;
   reasoning: OpenRouterModelReasoningCapabilities | null;
+  supportedParameters?: string[];
 };
 
 const OPENROUTER_PROVIDER_EFFORT_LEVELS = OPENROUTER_REASONING_LEVELS.filter(
@@ -250,10 +251,22 @@ export function parseOpenRouterModelCatalog(value: unknown): OpenRouterModelCata
     if (!hasOwn(entry, 'reasoning')) {
       throw new TypeError(`${label}.reasoning is required`);
     }
+    let supportedParameters: string[] | undefined;
+    if (hasOwn(entry, 'supportedParameters')) {
+      if (!Array.isArray(entry.supportedParameters)) {
+        throw new TypeError(`${label}.supportedParameters must be an array when present`);
+      }
+      supportedParameters = entry.supportedParameters.map((parameter, parameterIndex) =>
+        readNonEmptyString(parameter, `${label}.supportedParameters[${parameterIndex}]`));
+      if (new Set(supportedParameters).size !== supportedParameters.length) {
+        throw new TypeError(`${label}.supportedParameters must not contain duplicates`);
+      }
+    }
     return {
       id,
       name,
       reasoning: parseReasoningCapabilities(entry.reasoning, `${label}.reasoning`),
+      ...(supportedParameters ? { supportedParameters } : {}),
     };
   });
 }

@@ -147,7 +147,7 @@ async function resolveOpenRouterConfiguration(deps: ApiKeyResolutionDeps, params
 async function validateResolvedOpenRouterConfiguration(
   deps: OpenRouterMethodsDeps,
   configuration: { model: string; reasoningLevel: OpenRouterReasoningLevel },
-): Promise<{ model: string; reasoningLevel: OpenRouterReasoningLevel }> {
+): Promise<{ model: string; reasoningLevel: OpenRouterReasoningLevel; supportedParameters?: string[] }> {
   if (!configuration.model) return configuration;
   const catalog = await deps.openRouterModelCatalogService.getCatalog();
   const catalogModel = catalog.find((entry) => entry.id === configuration.model);
@@ -165,6 +165,9 @@ async function validateResolvedOpenRouterConfiguration(
         catalogModel,
         'Configured OpenRouter reasoning level',
       ),
+      ...(Array.isArray(catalogModel.supportedParameters)
+        ? { supportedParameters: catalogModel.supportedParameters }
+        : {}),
     };
   } catch (error) {
     throw new Meteor.Error(
@@ -238,6 +241,20 @@ function summarizeProviderError(error: unknown): UnknownRecord {
       }
     } else if (cause !== undefined) {
       summary.cause = sanitizeProviderText(cause);
+    }
+    const errorRecord = error as Error & {
+      code?: unknown;
+      httpStatus?: unknown;
+      diagnostics?: unknown;
+    };
+    if (typeof errorRecord.code === 'string' || typeof errorRecord.code === 'number') {
+      summary.code = sanitizeProviderText(String(errorRecord.code));
+    }
+    if (typeof errorRecord.httpStatus === 'number') {
+      summary.httpStatus = errorRecord.httpStatus;
+    }
+    if (isRecord(errorRecord.diagnostics)) {
+      summary.diagnostics = errorRecord.diagnostics;
     }
   } else {
     summary.message = sanitizeProviderText(error);
@@ -331,6 +348,9 @@ async function executeResolvedOpenRouterJson(
       requireUsageCost: data.requireUsageCost === true,
       intent: openRouterIntent,
     };
+    if (Array.isArray(credentials.supportedParameters)) {
+      callOptions.supportedParameters = credentials.supportedParameters;
+    }
     if (typeof data.temperature === 'number') {
       callOptions.temperature = data.temperature;
     }
@@ -446,6 +466,9 @@ async function executeAdminOpenRouterRequest(
       },
       telemetry: { surface: 'admin-tests', operation: 'ai-content-prompt-lab' },
     };
+    if (Array.isArray(credentials.supportedParameters)) {
+      options.supportedParameters = credentials.supportedParameters;
+    }
     if (typeof request.temperature === 'number') options.temperature = request.temperature;
     if (typeof request.max_tokens === 'number') options.maxTokens = request.max_tokens;
     const result = await callOpenRouterJson(options);

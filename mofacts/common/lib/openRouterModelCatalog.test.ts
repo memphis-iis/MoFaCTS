@@ -128,6 +128,7 @@ describe('openRouterModelCatalog', function() {
           supportedLevels: ['high', 'none'],
           defaultLevel: 'high',
         },
+        supportedParameters: ['response_format', 'max_tokens'],
       },
       { id: 'vendor/basic', name: 'Basic', reasoning: null },
     ])).to.deep.equal([
@@ -139,6 +140,7 @@ describe('openRouterModelCatalog', function() {
           supportedLevels: ['high', 'none'],
           defaultLevel: 'high',
         },
+        supportedParameters: ['response_format', 'max_tokens'],
       },
       { id: 'vendor/basic', name: 'Basic', reasoning: null },
     ]);
@@ -178,5 +180,13 @@ describe('openRouterModelCatalog', function() {
         reasoning: { mandatory: false, supportedLevels: ['low'], defaultLevel: 'high' },
       },
     ])).to.throw('must be included in supportedLevels');
+    expect(() => parseOpenRouterModelCatalog([
+      {
+        id: 'vendor/model',
+        name: 'Model',
+        reasoning: null,
+        supportedParameters: ['temperature', 'temperature'],
+      },
+    ])).to.throw('must not contain duplicates');
   });
 });
