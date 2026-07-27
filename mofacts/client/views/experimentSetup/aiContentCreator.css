@@ -4,12 +4,33 @@
 }
 
 .ai-create-card {
+  position: relative;
+  overflow: hidden;
   max-width: 920px;
   margin: 0 auto;
   padding: 1rem;
   border: 1px solid var(--border-color, #555);
   border-radius: 0.75rem;
   background: var(--background-color, transparent);
+}
+
+.ai-create-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: max-content;
+  max-width: 90%;
+  color: var(--app-secondary-text-color, #777);
+  font-size: clamp(2rem, 8vw, 5rem);
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.4;
+  pointer-events: none;
+  text-align: center;
+  text-transform: uppercase;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  user-select: none;
 }
 
 .ai-create-header {

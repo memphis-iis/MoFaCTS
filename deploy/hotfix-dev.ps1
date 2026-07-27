@@ -625,6 +625,28 @@ function Test-HotfixDevEndpoints {
         (Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort))
 }
 
+function Stop-OwnedRspackDevPortListener {
+    $listeners = @(Get-NetTCPConnection -LocalPort ([int]$rspackDevServerPort) -State Listen -ErrorAction SilentlyContinue)
+    foreach ($listener in $listeners) {
+        $ownerProcessId = [int]$listener.OwningProcess
+        $ownerProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $ownerProcessId" -ErrorAction SilentlyContinue
+        if ($null -eq $ownerProcess) {
+            continue
+        }
+
+        $commandLine = [string]$ownerProcess.CommandLine
+        $isOwnedRspack = $commandLine -like "*$appDir*" -and
+            $commandLine -match "rspack(\.js)?['`" ]+serve|webpack-dev-server" -and
+            $commandLine -match "devServerPort=($rspackDevServerPort)|[: ]$rspackDevServerPort(\s|$)"
+        if (-not $isOwnedRspack) {
+            throw "Rspack HMR port $rspackDevServerPort is occupied by unrelated PID $ownerProcessId. Stop that process or configure a different port before starting hotfix dev."
+        }
+
+        Write-Host "Stopping stale MoFaCTS Rspack dev-server listener PID $ownerProcessId on port $rspackDevServerPort."
+        Stop-ProcessTree -RootProcessId $ownerProcessId
+    }
+}
+
 function Remove-RspackDevBuild {
     $mainDevDir = Join-Path $appDir "_build\main-dev"
     if (-not (Test-Path $mainDevDir)) {
@@ -679,6 +701,8 @@ function Start-HotfixDev {
         Write-Host "Hotfix dev server PID $($existing.Id) is running but app/HMR ports are not both reachable; rebuilding generated dev bundles."
         Stop-HotfixDev
     }
+
+    Stop-OwnedRspackDevPortListener
 
     Remove-RspackDevBuild
     Ensure-RspackDevBootstrap

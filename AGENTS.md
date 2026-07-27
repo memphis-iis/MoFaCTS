@@ -45,6 +45,7 @@ When instructions compete, use this order:
 - Never revert user or unrelated working-tree changes unless the user explicitly requests it.
 - Do not commit or push unless the user explicitly asks.
 - When committing, include only intentional files and mention verification performed.
+- For a direct commit-and-push request, use plain Git with the repository's existing remote credentials. Do not require the GitHub CLI or open a pull request unless the user explicitly requests a PR or another operation that requires `gh`.
 
 ## Common Commands
 

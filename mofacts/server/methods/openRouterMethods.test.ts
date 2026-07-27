@@ -52,7 +52,7 @@ describe('openRouterMethods Admin Tests configuration', function() {
   });
 
   it('forwards a valid session id only when prefix caching is enabled', async function() {
-    const fetchStub = sinon.stub(globalThis, 'fetch').resolves(new Response(JSON.stringify({
+    const fetchStub = sinon.stub(globalThis, 'fetch').callsFake(async () => new Response(JSON.stringify({
       choices: [{ message: { content: '{"ok":true}' } }],
       usage: {
         prompt_tokens: 10,

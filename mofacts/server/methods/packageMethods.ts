@@ -1,12 +1,13 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
-import type { UploadedPackageFile } from '../lib/packageParser';
+import { parsePackageZip, type UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
-import type { PackageUploadIntegrity } from '../lib/packageUploadShared';
+import { uploadPackageMedia } from '../lib/mediaUploader';
+import type { PackageUploadIntegrity, ProcessPackageUploadDeps } from '../lib/packageUploadShared';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
 import { mergeEditorContentPreservingSourceShape } from '../../common/lib/editorSaveShape';
-import { createPackageGeneratedContentMethods } from './packageGeneratedContentMethods';
+import { createPackageGeneratedContentMethods, prepareAiGeneratedPackage } from './packageGeneratedContentMethods';
 import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { validateAndEncryptUploadedApiKey } from '../lib/uploadedApiKeyValidation';
 import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
@@ -228,13 +229,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return responseKC[0].maxResponseKC;
   }
 
-  async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, _owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
-    const actingUserId = deps.normalizeCanonicalId(this.userId);
-    if (!actingUserId) {
-      throw new Meteor.Error(401, 'Must be logged in');
-    }
-    await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
-    return processPackageUploadWorkflow(this, fileObjOrId, actingUserId, emailToggle, {
+  function getPackageUploadDeps(): ProcessPackageUploadDeps {
+    return {
       DynamicAssets: deps.DynamicAssets,
       storageBoundary: deps.storageBoundary,
       userIsInRoleAsync: deps.userIsInRoleAsync,
@@ -262,8 +258,17 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       processAudioFilesForTDF: deps.processAudioFilesForTDF,
       canonicalizeStimDisplayMediaRefs: deps.canonicalizeStimDisplayMediaRefs,
       getNewItemFormat: deps.getNewItemFormat,
-      canonicalizeFlatStimuliMediaRefs: deps.canonicalizeFlatStimuliMediaRefs
-    }, integrity);
+      canonicalizeFlatStimuliMediaRefs: deps.canonicalizeFlatStimuliMediaRefs,
+    };
+  }
+
+  async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, _owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
+    const actingUserId = deps.normalizeCanonicalId(this.userId);
+    if (!actingUserId) {
+      throw new Meteor.Error(401, 'Must be logged in');
+    }
+    await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
+    return processPackageUploadWorkflow(this, fileObjOrId, actingUserId, emailToggle, getPackageUploadDeps(), integrity);
   }
 
   async function saveMediaFile(media: UploadedPackageFile, owner: string, stimSetId: string | number | null | undefined){
@@ -327,6 +332,85 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       deps.serverConsole(`File ${media.name} could not be uploaded`, error);
       throw error;
     }
+  }
+
+  async function repairAiGeneratedPackageMedia(this: MethodContext, tdfIdValue: string) {
+    check(tdfIdValue, String);
+    const actingUserId = deps.normalizeCanonicalId(this.userId);
+    const tdfId = deps.normalizeCanonicalId(tdfIdValue);
+    if (!actingUserId || !tdfId) throw new Meteor.Error(401, 'Must be logged in to repair generated content');
+    const tdf = await deps.Tdfs.findOneAsync({ _id: tdfId });
+    if (!tdf) throw new Meteor.Error(404, 'Generated content system not found');
+    if (!(await deps.userCanManageTdf(actingUserId, tdf))) {
+      throw new Meteor.Error(403, 'Can only repair generated content you can manage');
+    }
+    const stimuliSetId = tdf.stimuliSetId;
+    if (stimuliSetId === undefined || stimuliSetId === null) {
+      throw new Meteor.Error('ai-content-repair-invalid', 'Generated content has no stimulus-set scope.');
+    }
+    const rawStimuli = JSON.parse(JSON.stringify(tdf.rawStimuliFile || {}));
+    const unresolvedNames = new Set<string>();
+    const clusters = Array.isArray(rawStimuli?.setspec?.clusters) ? rawStimuli.setspec.clusters : [];
+    for (const cluster of clusters) {
+      for (const stim of Array.isArray(cluster?.stims) ? cluster.stims : []) {
+        for (const field of ['imgSrc', 'audioSrc', 'videoSrc']) {
+          const reference = String(stim?.display?.[field] || '').trim();
+          if (!reference || /^(https?:|data:|blob:|\/\/)/i.test(reference)) continue;
+          if (!deps.parseLocalMediaReference(reference).assetId) unresolvedNames.add(reference.replace(/^.*[\\/]/, ''));
+        }
+      }
+    }
+    if (unresolvedNames.size === 0) return { repaired: false, mediaCount: 0 };
+
+    const packageAssetId = deps.normalizeCanonicalId(tdf.packageAssetId);
+    if (!packageAssetId) throw new Meteor.Error('ai-content-repair-invalid', 'Generated content has no retained package asset.');
+    const packageAsset = await deps.DynamicAssets.findOneAsync({ _id: packageAssetId });
+    if (!packageAsset?.path) throw new Meteor.Error('ai-content-repair-invalid', 'Retained generated package asset was not found.');
+    const packageFile = `${packageAssetId}.${packageAsset.ext || 'zip'}`;
+    const parsedFiles = await parsePackageZip(packageAsset.path, packageFile, deps.serverConsole);
+    const tdfFileName = String(tdf.tdfFileName || tdf.content?.fileName || '').trim();
+    if (!parsedFiles.some((file) => file.type === 'tdf' && file.name === tdfFileName)) {
+      throw new Meteor.Error('ai-content-repair-mismatch', 'Retained package does not contain the selected content system.');
+    }
+    const mediaByName = new Map(parsedFiles.filter((file) => file.type === 'media').map((file) => [file.name, file]));
+    const missingNames = Array.from(unresolvedNames).filter((name) => !mediaByName.has(name));
+    if (missingNames.length > 0) {
+      throw new Meteor.Error('ai-content-repair-mismatch', `Retained package is missing referenced media: ${missingNames.join(', ')}`);
+    }
+    const pathMaps = await uploadPackageMedia({
+      mediaFiles: Array.from(unresolvedNames).map((name) => mediaByName.get(name)!),
+      uploadStimSetIds: new Set([stimuliSetId]),
+      fallbackStimSetId: stimuliSetId,
+      owner: tdf.ownerId || actingUserId,
+      saveMediaFile,
+      toCanonicalDynamicAssetPath: deps.toCanonicalDynamicAssetPath,
+      normalizeUploadedMediaLookupKey: deps.normalizeUploadedMediaLookupKey,
+      serverConsole: deps.serverConsole,
+    });
+    const uploadedMediaPathMap = pathMaps.get(String(stimuliSetId).trim());
+    await deps.canonicalizeStimDisplayMediaRefs(rawStimuli, stimuliSetId, {
+      rejectUnresolved: true,
+      allowFilenameLookup: false,
+      uploadedMediaPathMap,
+      requireUploadedMediaMatch: true,
+    });
+    const responseKCMap = await getResponseKCMapForTdf(tdfId);
+    const stimulusFileName = String(tdf.stimulusFileName || tdf.content?.tdfs?.tutor?.setspec?.stimulusfile || 'unknown');
+    const canonicalStimuli = deps.getNewItemFormat({
+      fileName: stimulusFileName,
+      stimuli: rawStimuli,
+      owner: tdf.ownerId,
+      source: 'upload',
+    }, stimulusFileName, stimuliSetId, responseKCMap);
+    await deps.canonicalizeFlatStimuliMediaRefs(canonicalStimuli, stimuliSetId, {
+      rejectUnresolved: true,
+      allowFilenameLookup: false,
+      uploadedMediaPathMap,
+      requireUploadedMediaMatch: true,
+    });
+    await deps.Tdfs.updateAsync({ _id: tdfId }, { $set: { rawStimuliFile: rawStimuli, stimuli: canonicalStimuli } });
+    await deps.updateStimDisplayTypeMap([stimuliSetId]);
+    return { repaired: true, mediaCount: unresolvedNames.size };
   }
 
   async function validateStimAndTdf(tdfJson: unknown, stimJson: unknown, tdfFileName: string, stimFileName: string) {
@@ -1118,8 +1202,78 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
   }
 
   const generatedContentMethods = createPackageGeneratedContentMethods(deps, {
-    upsertPackage,
     requireCreatorDisplayName: (userId) => requireContentCreatorDisplayName(deps.usersCollection, userId),
+    ingestGeneratedPackage: async ({
+      actingUserId,
+      packageAsset,
+      packageAssetId,
+      uploadIntegrity,
+      contract,
+      creationSummary,
+    }) => {
+      let prepared: ReturnType<typeof prepareAiGeneratedPackage> | null = null;
+      let mayRollbackNewTdf = false;
+      try {
+        const ingestion = await processPackageUploadWorkflow(
+          { userId: actingUserId },
+          packageAsset,
+          actingUserId,
+          false,
+          getPackageUploadDeps(),
+          uploadIntegrity as PackageUploadIntegrity,
+          {
+            requireAllContentResults: true,
+            prepareParsedPackage: async ({ unzippedFiles, isTeacherOrAdmin }) => {
+              prepared = prepareAiGeneratedPackage(unzippedFiles, contract, isTeacherOrAdmin);
+              const preparedPackage = prepared as ReturnType<typeof prepareAiGeneratedPackage>;
+              const existingTdf = await deps.getTdfByFileName(preparedPackage.tdfFileName);
+              if (existingTdf?._id) {
+                throw new Meteor.Error(
+                  'generated-package-name-conflict',
+                  `Content already exists under the name "${preparedPackage.tdfFileName}". Choose a different name.`,
+                  JSON.stringify({ entryIndex: 0, tdfFile: preparedPackage.tdfFileName, title: preparedPackage.title }),
+                );
+              }
+              mayRollbackNewTdf = true;
+            },
+          },
+        );
+        if (!ingestion) throw new Meteor.Error('generated-package-save-failed', 'Generated package ingestion did not complete.');
+        const failedResult = ingestion.results.find((result) => !result.result);
+        if (failedResult) {
+          throw new Meteor.Error('generated-package-save-failed', failedResult.errmsg || 'Generated package save failed');
+        }
+        if (!prepared) throw new Meteor.Error('generated-package-save-failed', 'Generated package was not validated.');
+        const preparedPackage = prepared as ReturnType<typeof prepareAiGeneratedPackage>;
+        const savedTdf = await deps.getTdfByFileName(preparedPackage.tdfFileName);
+        const tdfId = typeof savedTdf?._id === 'string' ? savedTdf._id : '';
+        return [{
+          moduleId: preparedPackage.moduleId,
+          title: preparedPackage.title,
+          artifactKindLabel: preparedPackage.moduleId === 'assessmentSession' ? 'Assessment session' : 'Learning session',
+          ...(tdfId ? { tdfId, route: '/contentUpload', editRoute: `/contentEdit/${tdfId}`, tdfEditRoute: `/tdfEdit/${tdfId}` } : {}),
+          packageAssetId,
+          itemCount: contract.pairs.length,
+          summary: creationSummary,
+        }];
+      } catch (error) {
+        if (prepared && mayRollbackNewTdf) {
+          const preparedPackage = prepared as ReturnType<typeof prepareAiGeneratedPackage>;
+          const partialTdf = await deps.getTdfByFileName(preparedPackage.tdfFileName);
+          if (partialTdf?._id && partialTdf.ownerId === actingUserId) {
+            try {
+              if (partialTdf.stimuliSetId !== undefined && partialTdf.stimuliSetId !== null) {
+                await deps.DynamicAssets.removeAsync({ 'meta.stimuliSetId': partialTdf.stimuliSetId });
+              }
+              await deps.Tdfs.removeAsync({ _id: partialTdf._id });
+            } catch (cleanupError) {
+              deps.serverConsole('AI generated package rollback failed:', preparedPackage.tdfFileName, cleanupError);
+            }
+          }
+        }
+        throw error;
+      }
+    },
   });
 
   return {
@@ -1127,6 +1281,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     getMaxResponseKC,
     processPackageUpload,
     ...generatedContentMethods,
+    repairAiGeneratedPackageMedia,
     saveContentFile,
     tdfUpdateConfirmed,
     saveTdfStimuli,

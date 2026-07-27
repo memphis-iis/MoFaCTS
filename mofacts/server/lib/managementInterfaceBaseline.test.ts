@@ -62,15 +62,16 @@ function findAppRoot(): string {
 }
 
 function sourceBlock(source: string, start: string, end: string): string {
-  const startIndex = source.indexOf(start);
+  const normalizedSource = source.replace(/\r\n/g, '\n');
+  const startIndex = normalizedSource.indexOf(start);
   if (startIndex < 0) {
     throw new Error(`Missing source block start: ${start}`);
   }
-  const endIndex = source.indexOf(end, startIndex);
+  const endIndex = normalizedSource.indexOf(end, startIndex);
   if (endIndex < 0) {
     throw new Error(`Missing source block end after ${start}: ${end}`);
   }
-  return source.slice(startIndex, endIndex + end.length);
+  return normalizedSource.slice(startIndex, endIndex + end.length);
 }
 
 describe('management interface baseline', function() {

@@ -121,6 +121,7 @@ Template.contentEdit.onCreated(function(this: any) {
 
 Template.contentEdit.onDestroyed(function(this: any) {
     this.lifetime.destroy();
+    (document.querySelector('.media-full-size-preview') as HTMLElement | null)?.click();
     // Clean up editor
     if (this.editor) {
         this.editor.destroy();
@@ -985,9 +986,10 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
     if (!root) return;
 
     // Find all inputs that are media fields based on their data-schemapath
-    const allInputs = root.matches && root.matches('input[type="text"]')
+    const mediaFieldSelector = 'input[type="text"], textarea';
+    const allInputs = root.matches && root.matches(mediaFieldSelector)
         ? [root]
-        : root.querySelectorAll('input[type="text"]');
+        : root.querySelectorAll(mediaFieldSelector);
 
     if (!instance._mediaAssetCache) {
         instance._mediaAssetCache = new Map();
@@ -997,7 +999,7 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
     const mediaFilenames = new Set();
     allInputs.forEach((input: any) => {
         const value = input.value?.trim();
-        if (value && !value.includes('http://') && !value.includes('https://')) {
+        if (value && !/^(https?:|data:|blob:|\/)/i.test(value)) {
             if (!instance._mediaAssetCache.has(value)) {
                 mediaFilenames.add(value);
             }
@@ -1014,7 +1016,7 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
     // Create cached resolver function (checks cache first, falls back to findOne for new values)
     const resolveMediaUrlCached = (src: any) => {
         if (!src) return '';
-        if (src.includes('http://') || src.includes('https://')) return src;
+        if (/^(https?:|data:|blob:|\/)/i.test(src)) return src;
 
         // Check cache first
         let asset = instance._mediaAssetCache.get(src);
@@ -1063,7 +1065,7 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
 
         // Create wrapper
         const wrapper = document.createElement('div');
-        wrapper.className = 'media-field-wrapper';
+        wrapper.className = `media-field-wrapper media-field-${mediaType}`;
         input.parentNode.insertBefore(wrapper, input);
         wrapper.appendChild(input);
 
@@ -1101,7 +1103,20 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
 
             if (mediaType === 'image') {
                 const imageFailedMessage = contentEditorText('contentEditor.imageFailedToLoad');
-                preview.innerHTML = `<img src="${resolvedUrl}" alt="${contentEditorText('contentEditor.previewAlt')}" onerror="this.outerHTML='<span class=\\'media-error\\'><i class=\\'fa fa-exclamation-triangle\\'></i> ${imageFailedMessage}</span>'">`;
+                preview.innerHTML = '';
+                const openPreview = document.createElement('button');
+                openPreview.type = 'button';
+                openPreview.className = 'media-image-preview-button';
+                openPreview.setAttribute('aria-label', contentEditorText('contentEditor.previewAlt'));
+                const image = document.createElement('img');
+                image.src = resolvedUrl;
+                image.alt = contentEditorText('contentEditor.previewAlt');
+                image.addEventListener('error', () => {
+                    preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> ${imageFailedMessage}</span>`;
+                }, { once: true });
+                openPreview.appendChild(image);
+                openPreview.addEventListener('click', () => openFullSizeImagePreview(resolvedUrl, openPreview));
+                preview.appendChild(openPreview);
             } else if (mediaType === 'audio') {
                 preview.innerHTML = `
                     <div class="audio-controls">
@@ -1133,23 +1148,20 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
             }
         });
 
-        // Drag and drop handling
-        dropZone.addEventListener('dragover', (e: any) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-over');
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('drag-over');
-        });
-
-        dropZone.addEventListener('drop', (e: any) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-over');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleMediaUpload(files[0], mediaType, input, preview, instance);
-            }
+        // Images can be replaced by dropping on either the thumbnail or upload target.
+        const dropTargets = mediaType === 'image' ? [dropZone, preview] : [dropZone];
+        dropTargets.forEach((target) => {
+            target.addEventListener('dragover', (e: any) => {
+                e.preventDefault();
+                target.classList.add('drag-over');
+            });
+            target.addEventListener('dragleave', () => target.classList.remove('drag-over'));
+            target.addEventListener('drop', (e: any) => {
+                e.preventDefault();
+                target.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) void handleMediaUpload(files[0], mediaType, input, preview, instance);
+            });
         });
 
         fileInput?.addEventListener('change', (e: any) => {
@@ -1158,6 +1170,31 @@ function enhanceMediaFields(container: any, editor: any, instance: any, rootArg?
             }
         });
     });
+}
+
+function openFullSizeImagePreview(src: string, returnFocusTo: HTMLElement) {
+    document.querySelector('.media-full-size-preview')?.remove();
+    const overlay = document.createElement('button');
+    overlay.type = 'button';
+    overlay.className = 'media-full-size-preview';
+    overlay.setAttribute('aria-label', contentEditorText('contentEditor.previewAlt'));
+    const image = document.createElement('img');
+    image.src = src;
+    image.alt = contentEditorText('contentEditor.previewAlt');
+    overlay.appendChild(image);
+
+    const close = () => {
+        document.removeEventListener('keydown', onKeydown);
+        overlay.remove();
+        returnFocusTo.focus();
+    };
+    const onKeydown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') close();
+    };
+    overlay.addEventListener('click', close, { once: true });
+    document.addEventListener('keydown', onKeydown);
+    document.body.appendChild(overlay);
+    overlay.focus();
 }
 
 /**
@@ -1205,17 +1242,20 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
     `;
 
     try {
+        const tdf = findTdf(instance?.tdfId);
+        if (!tdf?._id || tdf.stimuliSetId === undefined || tdf.stimuliSetId === null) {
+            throw new Error('The content media target is unavailable. Reload the editor and try again.');
+        }
         // Check for existing file with same name
-        const existingFile = (globalThis as any).DynamicAssets.findOne({ name: file.name, userId: Meteor.userId() });
+        const existingFile = (globalThis as any).DynamicAssets.findOne({
+            name: file.name,
+            'meta.stimuliSetId': tdf.stimuliSetId,
+        });
         if (existingFile) {
             // Remove existing file before uploading new one
             await meteorCallAsync('removeAssetById', existingFile._id);
         }
 
-        const tdf = findTdf(instance?.tdfId);
-        if (!tdf?._id || tdf.stimuliSetId === undefined || tdf.stimuliSetId === null) {
-            throw new Error('The content media target is unavailable. Reload the editor and try again.');
-        }
         const upload = (globalThis as any).DynamicAssets.insert({
             file: file,
             chunkSize: 'dynamic',
@@ -1239,20 +1279,12 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
                 clientConsole(1, '[Content Edit] Media upload error:', error);
                 preview.innerHTML = `<span class="media-error"><i class="fa fa-exclamation-triangle"></i> ${contentEditorText('contentEditor.uploadFailed', { error })}</span>`;
             } else {
-                // Success - update input with just the filename
-                const filePath = (globalThis as any).DynamicAssets.link({...fileObj});
-                input.value = file.name;
+                // Success - persist the canonical path used by runtime and export.
+                let filePath = (globalThis as any).DynamicAssets.link({...fileObj});
+                const pathMatch = filePath.match(/^https?:\/\/[^/]+(\/.+)$/);
+                if (pathMatch) filePath = pathMatch[1];
+                input.value = filePath;
                 input.dispatchEvent(new Event('change', { bubbles: true }));
-
-                // Update preview
-                preview.innerHTML = '';
-                if (mediaType === 'image') {
-                    preview.innerHTML = `<img src="${filePath}" alt="${contentEditorText('contentEditor.previewAlt')}"><span class="text-success media-upload-success"><i class="fa fa-check"></i> ${contentEditorText('contentEditor.uploaded')}</span>`;
-                } else if (mediaType === 'audio') {
-                    preview.innerHTML = `<audio controls src="${filePath}"></audio><span class="text-success media-upload-success"><i class="fa fa-check"></i> ${contentEditorText('contentEditor.uploaded')}</span>`;
-                } else if (mediaType === 'video') {
-                    preview.innerHTML = `<video controls src="${filePath}"></video><span class="text-success media-upload-success"><i class="fa fa-check"></i> ${contentEditorText('contentEditor.uploaded')}</span>`;
-                }
             }
         });
 

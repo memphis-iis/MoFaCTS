@@ -17,6 +17,15 @@ import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
 
 const INCOMPLETE_UPLOAD_MESSAGE = 'The uploaded ZIP appears incomplete or truncated. Please upload the file again.';
 
+export type PackageUploadPolicy = {
+  requireAllContentResults?: boolean;
+  prepareParsedPackage?: (args: {
+    unzippedFiles: UploadedPackageFile[];
+    owner: string;
+    isTeacherOrAdmin: boolean;
+  }) => Promise<void> | void;
+};
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -172,7 +181,8 @@ export async function processPackageUploadWorkflow(
   owner: string,
   emailToggle: boolean,
   deps: ProcessPackageUploadDeps,
-  integrity?: PackageUploadIntegrity
+  integrity?: PackageUploadIntegrity,
+  policy: PackageUploadPolicy = {}
 ) {
   if (!context.userId) {
     throw new Meteor.Error(401, 'Must be logged in to upload packages');
@@ -222,6 +232,7 @@ export async function processPackageUploadWorkflow(
     await validateUploadedPackageFile(zipPath, fileObj, deps, integrity);
     await mirrorPackageAssetToS3(fileObj, deps);
     unzippedFiles = await parsePackageZip(zipPath, packageFile, deps.serverConsole);
+    await policy.prepareParsedPackage?.({ unzippedFiles, owner, isTeacherOrAdmin });
 
     failureStage = 'content processing';
     const { results, touchedStimuliSetIds } = await processParsedPackageTdfs({
@@ -236,6 +247,10 @@ export async function processPackageUploadWorkflow(
       deps,
       state
     });
+    if (policy.requireAllContentResults) {
+      const failedResult = results.find((result) => !result.result);
+      if (failedResult) throw new Error(failedResult.errmsg || 'Package content persistence failed.');
+    }
     failureStage = 'media upload';
     await uploadParsedPackageMedia({
       unzippedFiles,
@@ -262,6 +277,10 @@ export async function processPackageUploadWorkflow(
     return { results, stimSetId: state.stimSetId };
   } catch (error: unknown) {
     if (error && typeof error === 'object' && (error as { error?: unknown }).error === 'package-upload-failed') {
+      throw error;
+    }
+    const domainErrorCode = error && typeof error === 'object' ? String((error as { error?: unknown }).error || '') : '';
+    if (domainErrorCode === 'generated-package-name-conflict' || domainErrorCode.startsWith('ai-content-')) {
       throw error;
     }
     const message = normalizePackageInitializationError(error);

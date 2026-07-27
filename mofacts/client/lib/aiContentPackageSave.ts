@@ -111,7 +111,6 @@ export function uploadBuiltPackage(
               packageAssetId: asset._id,
               packageFileName: fileName,
               uploadIntegrity,
-              entries: buildSaveEntries(builtPackage),
               creationSummary,
               contract: saveContract,
             });

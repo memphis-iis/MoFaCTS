@@ -172,6 +172,7 @@ The dev server:
 - creates or verifies the local admin account through the running app and stores credentials in ignored `deploy/local-dev/agent-secrets.env`,
 - sets `HOME` to `deploy/local-data` so dynamic assets and H5P content resolve to the same local data folders as the container workflows,
 - writes logs and a PID file to ignored local state under `deploy/local-dev/`,
+- retires an orphaned listener on Rspack HMR port `8082` only when its command line identifies it as this checkout's dev server; an unrelated listener causes startup to stop with an explicit port-ownership error,
 - maintains an ignored `.meteor/local/build/package.json` marker so Meteor's generated CommonJS dev bundle is not treated as ESM by the app root package,
 - relies on `rspack.config.js` allowing `host.docker.internal` for the Rspack dev client so Playwright MCP can load the native dev app from its container,
 - is intended for observe/edit/reload work, not release confidence.

@@ -248,10 +248,25 @@
             flex-wrap: nowrap;
         }
 
-        #stim-editor-container .media-field-wrapper > input[type="text"] {
+        #stim-editor-container .media-field-wrapper > input[type="text"],
+        #stim-editor-container .media-field-wrapper > textarea {
             flex: 0 1 auto;
             min-width: 150px;
             max-width: 250px;
+        }
+
+        #stim-editor-container .media-field-image {
+            display: grid;
+            grid-template-columns: minmax(12rem, 1fr) auto;
+            align-items: stretch;
+        }
+
+        #stim-editor-container .media-field-image > textarea,
+        #stim-editor-container .media-field-image > input[type="text"] {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            max-width: none;
+            min-height: 2.75rem;
         }
 
         #stim-editor-container .media-preview {
@@ -270,10 +285,30 @@
         }
 
         #stim-editor-container .media-preview img {
-            max-width: 120px;
-            max-height: 80px;
+            max-width: min(100%, 32rem);
+            max-height: 18rem;
             object-fit: contain;
             border-radius: 3px;
+        }
+
+        #stim-editor-container .media-image-preview-button {
+            width: 100%;
+            min-height: 8rem;
+            padding: var(--app-space-2);
+            border: 0;
+            background: transparent;
+            cursor: zoom-in;
+        }
+
+        #stim-editor-container .media-image-preview-button:focus-visible {
+            outline: 2px solid var(--app-info-color);
+            outline-offset: 2px;
+        }
+
+        #stim-editor-container .media-preview.drag-over {
+            border-color: var(--app-info-color);
+            background: var(--app-info-surface-color);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-info-color) 18%, transparent);
         }
 
         #stim-editor-container .media-preview audio {
@@ -343,6 +378,32 @@
 
         #stim-editor-container .media-upload-success {
             margin-left: var(--app-space-2);
+        }
+
+        .media-full-size-preview {
+            position: fixed;
+            inset: 0;
+            z-index: 1100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100vh;
+            padding: clamp(1rem, 4vw, 4rem);
+            border: 0;
+            background: rgba(0, 0, 0, 0.88);
+            cursor: zoom-out;
+        }
+
+        .media-full-size-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .media-full-size-preview:focus-visible {
+            outline: 3px solid var(--app-info-color);
+            outline-offset: -6px;
         }
 
         /* =================================================================
@@ -564,10 +625,15 @@
                 align-items: stretch;
             }
 
-            #stim-editor-container .media-field-wrapper > input[type="text"] {
+            #stim-editor-container .media-field-wrapper > input[type="text"],
+            #stim-editor-container .media-field-wrapper > textarea {
                 min-width: 100%;
                 max-width: 100%;
                 order: 1;
+            }
+
+            #stim-editor-container .media-field-image {
+                display: flex;
             }
 
             #stim-editor-container .media-preview {

@@ -158,6 +158,7 @@ describe('aiContentPackageSave', function() {
     }
 
     expect(callAsync.calledWith('saveAiGeneratedPackageContent')).to.equal(true);
+    expect(callAsync.firstCall.args[1]).not.to.have.property('entries');
     expect(callAsync.calledWith('removeAssetById', 'asset-1')).to.equal(true);
   });
 
