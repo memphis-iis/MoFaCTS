@@ -30,6 +30,8 @@ export type OpenRouterModelCatalogEntry = {
   supportedParameters?: string[];
 };
 
+export type OpenRouterReasoningControlKind = 'hidden' | 'toggle' | 'effort';
+
 const OPENROUTER_PROVIDER_EFFORT_LEVELS = OPENROUTER_REASONING_LEVELS.filter(
   (level): level is OpenRouterProviderReasoningLevel => level !== 'default',
 );
@@ -104,6 +106,23 @@ export function getAllowedOpenRouterReasoningLevels(
     allowed.delete('none');
   }
   return OPENROUTER_REASONING_LEVELS.filter((level) => allowed.has(level));
+}
+
+/** Describes the user-facing control supported by the model's reasoning metadata. */
+export function getOpenRouterReasoningControlKind(
+  model: OpenRouterModelCatalogEntry,
+): OpenRouterReasoningControlKind {
+  if (!model.reasoning) {
+    return 'hidden';
+  }
+  const supportedLevels = model.reasoning.supportedLevels;
+  const selectableEfforts = supportedLevels === null
+    ? OPENROUTER_PROVIDER_EFFORT_LEVELS.filter((level) => level !== 'none')
+    : (supportedLevels ?? []).filter((level) => level !== 'none');
+  if (selectableEfforts.length > 0) {
+    return 'effort';
+  }
+  return model.reasoning.mandatory ? 'hidden' : 'toggle';
 }
 
 export function getDefaultOpenRouterReasoningLevel(

@@ -1,6 +1,7 @@
 import type {
   OpenRouterJsonSchema,
   OpenRouterMessage,
+  OpenRouterUsageSummary,
 } from '../../../../lib/openRouterClient';
 import type { SparcControllerDisplay } from './sparcController';
 import {
@@ -23,6 +24,7 @@ import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-compone
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
+  readonly sessionId?: string;
   readonly messages: readonly OpenRouterMessage[];
   readonly intent: {
     readonly title: string;
@@ -39,6 +41,14 @@ export type CallResolvedOpenRouterJson = (params: {
   readonly model?: string;
   readonly source?: string;
   readonly costUsd?: number;
+  readonly usage?: OpenRouterUsageSummary;
+  readonly sessionIdApplied?: boolean;
+}>;
+
+export type SparcDialogueOpenRouterUsageEvent = Readonly<{
+  operation: 'scoring' | 'utterance';
+  usage: OpenRouterUsageSummary;
+  sessionIdApplied: boolean;
 }>;
 
 export type SparcDialogueLearnerResponseEvaluation = Readonly<{
@@ -62,69 +72,19 @@ export type SparcDialogueLearnerResponseScoringTraceEvent =
 
 export type SparcDialogueOpenRouterProviderOptions = {
   readonly tdfId?: string | null;
+  readonly sessionId?: string;
   readonly callResolvedOpenRouterJson?: CallResolvedOpenRouterJson;
   readonly onLearnerResponseScoringTrace?: (
     event: SparcDialogueLearnerResponseScoringTraceEvent,
   ) => void;
-};
-
-const SPARC_DIALOGUE_SCORE_JSON_SCHEMA: OpenRouterJsonSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    learningTargetEvaluations: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          clusterKC: { type: 'string' },
-          evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
-          evidenceStrength: { type: 'number' },
-        },
-        required: ['clusterKC', 'evidenceDirection', 'evidenceStrength'],
-      },
-    },
-    diagnosticMisconceptionEvaluations: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          id: { type: 'string' },
-          evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
-          evidenceStrength: { type: 'number' },
-        },
-        required: ['id', 'evidenceDirection', 'evidenceStrength'],
-      },
-    },
-    learnerContribution: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        type: { type: 'string', enum: ['answer', 'question', 'off-task', 'other'] },
-        confidence: { type: ['number', 'null'] },
-        streakCount: { type: ['number', 'null'] },
-      },
-      required: ['type', 'confidence', 'streakCount'],
-    },
-    learnerQuestion: {
-      type: ['object', 'null'],
-      additionalProperties: false,
-      properties: {
-        contentFocused: { type: 'boolean' },
-      },
-      required: ['contentFocused'],
-    },
-  },
-  required: ['learningTargetEvaluations', 'diagnosticMisconceptionEvaluations', 'learnerContribution', 'learnerQuestion'],
+  readonly onUsage?: (event: SparcDialogueOpenRouterUsageEvent) => void;
 };
 
 const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    tutorMessage: { type: 'string' },
+    tutorMessage: { type: 'string', minLength: 1 },
   },
   required: ['tutorMessage'],
 };
@@ -202,6 +162,72 @@ function misconceptionSummaries(
         text,
       };
     });
+}
+
+function buildSparcDialogueScoreJsonSchema(
+  learningTargets: readonly Record<string, unknown>[],
+  misconceptions: readonly Record<string, unknown>[],
+): OpenRouterJsonSchema {
+  const targetIds = learningTargets.map((target) => String(target.clusterKC));
+  const misconceptionIds = misconceptions.map((misconception) => String(misconception.id));
+  const boundedEvidenceStrength = { type: 'number', minimum: 0, maximum: 1 };
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      learningTargetEvaluations: {
+        type: 'array',
+        minItems: targetIds.length,
+        maxItems: targetIds.length,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            clusterKC: { type: 'string', enum: targetIds },
+            evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
+            evidenceStrength: boundedEvidenceStrength,
+          },
+          required: ['clusterKC', 'evidenceDirection', 'evidenceStrength'],
+        },
+      },
+      diagnosticMisconceptionEvaluations: {
+        type: 'array',
+        minItems: misconceptionIds.length,
+        maxItems: misconceptionIds.length,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            id: misconceptionIds.length > 0
+              ? { type: 'string', enum: misconceptionIds }
+              : { type: 'string' },
+            evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
+            evidenceStrength: boundedEvidenceStrength,
+          },
+          required: ['id', 'evidenceDirection', 'evidenceStrength'],
+        },
+      },
+      learnerContribution: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          type: { type: 'string', enum: ['answer', 'question', 'off-task', 'other'] },
+          confidence: { type: ['number', 'null'], minimum: 0, maximum: 1 },
+          streakCount: { type: ['number', 'null'] },
+        },
+        required: ['type', 'confidence', 'streakCount'],
+      },
+      learnerQuestion: {
+        type: ['object', 'null'],
+        additionalProperties: false,
+        properties: {
+          contentFocused: { type: 'boolean' },
+        },
+        required: ['contentFocused'],
+      },
+    },
+    required: ['learningTargetEvaluations', 'diagnosticMisconceptionEvaluations', 'learnerContribution', 'learnerQuestion'],
+  };
 }
 
 function exactEvidenceId(value: unknown, label: string): string {
@@ -413,10 +439,10 @@ export function createSparcDialogueOpenRouterProvider(
     const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
     const learningTargets = targetSummaries(display);
     const misconceptions = misconceptionSummaries(display);
-    const result = await callResolvedOpenRouterJson({
+    const scoringRequest: Parameters<CallResolvedOpenRouterJson>[0] = {
         tdfId: options.tdfId ?? null,
+        ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         temperature: 0,
-        maxTokens: 1200,
         messages: [{
           role: 'system',
           content: [
@@ -468,7 +494,7 @@ export function createSparcDialogueOpenRouterProvider(
         intent: {
           title: 'MoFaCTS SPARC Dialogue Scoring',
           schemaName: 'mofacts_sparc_dialogue_score',
-          schema: SPARC_DIALOGUE_SCORE_JSON_SCHEMA,
+          schema: buildSparcDialogueScoreJsonSchema(learningTargets, misconceptions),
           missingContentMessage: 'OpenRouter SPARC dialogue scoring response did not include message content.',
           strictSchema: true,
         },
@@ -478,7 +504,15 @@ export function createSparcDialogueOpenRouterProvider(
           componentId: 'mofacts.sparc-session-unit',
           unitType: 'sparcsession',
         },
-    });
+    };
+    const result = await callResolvedOpenRouterJson(scoringRequest);
+    if (result.usage) {
+      options.onUsage?.({
+        operation: 'scoring',
+        usage: result.usage,
+        sessionIdApplied: result.sessionIdApplied === true,
+      });
+    }
     options.onLearnerResponseScoringTrace?.({
       stage: 'provider-response',
       parsedContent: result.parsedContent,
@@ -508,10 +542,10 @@ export function createSparcDialogueOpenRouterProvider(
     },
 
     async generateTutorUtterance(request) {
-      const result = await callResolvedOpenRouterJson({
+      const utteranceRequest: Parameters<CallResolvedOpenRouterJson>[0] = {
         tdfId: options.tdfId ?? null,
+        ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         temperature: 0.15,
-        maxTokens: 700,
         messages: [{
           role: 'system',
           content: buildSparcUtteranceSystemPrompt(request),
@@ -532,7 +566,15 @@ export function createSparcDialogueOpenRouterProvider(
           componentId: 'mofacts.sparc-session-unit',
           unitType: 'sparcsession',
         },
-      });
+      };
+      const result = await callResolvedOpenRouterJson(utteranceRequest);
+      if (result.usage) {
+        options.onUsage?.({
+          operation: 'utterance',
+          usage: result.usage,
+          sessionIdApplied: result.sessionIdApplied === true,
+        });
+      }
       return parseUtteranceEnvelope(result.parsedContent);
     },
   };

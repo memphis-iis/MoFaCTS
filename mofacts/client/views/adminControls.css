@@ -3,6 +3,8 @@
 .admin-api-key-fields { display: grid; gap: var(--app-space-3); }
 .admin-api-key-actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--app-space-2); justify-content: center; }
 .admin-api-key-actions .btn { white-space: nowrap; }
+.admin-reasoning-toggle { align-items: center; display: flex; gap: var(--app-space-2); }
+.admin-reasoning-toggle input[type="checkbox"] { margin: 0; }
 .admin-maintenance-card .card-body, .admin-verbosity-card .card-body { padding: var(--app-space-3) var(--app-space-4); }
 .admin-maintenance-row { align-items: center; display: grid; gap: var(--app-space-4); grid-template-columns: minmax(0, 1fr) auto; }
 .admin-maintenance-copy { display: grid; gap: var(--app-space-1); }

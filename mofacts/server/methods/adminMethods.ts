@@ -259,9 +259,11 @@ function summarizeAdminApiKeySettings(
       keyUpdatedAt: entry.keyUpdatedAt || null,
       modelUpdatedAt: provider === 'openRouter' ? entry.modelUpdatedAt || null : null,
       reasoningLevelUpdatedAt: provider === 'openRouter' ? entry.reasoningLevelUpdatedAt || null : null,
+      prefixCachingUpdatedAt: provider === 'openRouter' ? entry.prefixCachingUpdatedAt || null : null,
       updatedBy: entry.updatedBy || null,
       ...(provider === 'openRouter' ? {
         model: trimString(entry.model),
+        prefixCachingEnabled: entry.prefixCachingEnabled === true,
         reasoningLevel: normalizeOpenRouterReasoningLevel(
           entry.reasoningLevel,
           'Stored admin OpenRouter reasoning level',
@@ -500,13 +502,19 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
     saveAdminApiKeyAlternative: async function(
       this: MethodContext,
       provider: AdminApiKeyProvider,
-      params: { apiKey?: unknown; model?: unknown; reasoningLevel?: unknown } = {},
+      params: {
+        apiKey?: unknown;
+        model?: unknown;
+        reasoningLevel?: unknown;
+        prefixCachingEnabled?: unknown;
+      } = {},
     ) {
       check(provider, String);
       check(params, {
         apiKey: Match.Maybe(String),
         model: Match.Maybe(String),
         reasoningLevel: Match.Maybe(String),
+        prefixCachingEnabled: Match.Maybe(Boolean),
       });
       await deps.requireAdminUser(this.userId, 'Only admins can save API key alternatives');
       if (!deps.encryptData) {
@@ -539,6 +547,10 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         setFields['value.openRouter.modelUpdatedAt'] = now;
         setFields['value.openRouter.reasoningLevel'] = openRouterReasoningLevel;
         setFields['value.openRouter.reasoningLevelUpdatedAt'] = now;
+        if (typeof params?.prefixCachingEnabled === 'boolean') {
+          setFields['value.openRouter.prefixCachingEnabled'] = params.prefixCachingEnabled;
+          setFields['value.openRouter.prefixCachingUpdatedAt'] = now;
+        }
       }
       if (!apiKey && provider !== 'openrouter') {
         throw new Meteor.Error('missing-api-key', 'API key is required');
@@ -550,9 +562,12 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         keyUpdated: Boolean(apiKey),
         modelUpdated: provider === 'openrouter',
         reasoningLevelUpdated: provider === 'openrouter',
+        prefixCachingUpdated: provider === 'openrouter'
+          && typeof params?.prefixCachingEnabled === 'boolean',
         ...(provider === 'openrouter'
           ? {
             reasoningLevel: openRouterReasoningLevel,
+            prefixCachingEnabled: params?.prefixCachingEnabled === true,
           }
           : {}),
       });

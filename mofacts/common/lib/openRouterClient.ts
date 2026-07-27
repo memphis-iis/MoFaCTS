@@ -51,13 +51,26 @@ export type OpenRouterCallOptions<T> = {
   requireUsageCost?: boolean;
   telemetry?: AiFlowTelemetry;
   provider?: Record<string, unknown>;
+  sessionId?: string;
 };
+
+export type OpenRouterUsageSummary = Readonly<{
+  promptTokens?: number;
+  cachedPromptTokens?: number;
+  cacheWritePromptTokens?: number;
+  cacheReadRatio?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  costUsd?: number;
+  cacheDiscountUsd?: number;
+}>;
 
 export type OpenRouterResult<T> = {
   value: T;
   rawContent: string;
   responseBody: unknown;
   requestBody: Record<string, unknown>;
+  usage: OpenRouterUsageSummary;
   costUsd?: number;
 };
 
@@ -79,8 +92,16 @@ export type OpenRouterResponseDiagnostics = Readonly<{
   retryAfterMs?: number;
   responseModel?: string;
   promptTokens?: number;
+  cachedPromptTokens?: number;
+  cacheWritePromptTokens?: number;
+  cacheReadRatio?: number;
   completionTokens?: number;
   totalTokens?: number;
+  cacheDiscountUsd?: number;
+  finishReason?: string;
+  nativeFinishReason?: string;
+  messageContentCharacters?: number;
+  reasoningCharacters?: number;
 }>;
 
 type OpenRouterRequestDiagnostics = Readonly<{
@@ -90,6 +111,7 @@ type OpenRouterRequestDiagnostics = Readonly<{
   strictSchema: boolean;
   requireParameters?: boolean;
   allowFallbacks?: boolean;
+  sessionIdApplied?: boolean;
 }>;
 
 export class OpenRouterHttpError extends Error {
@@ -100,6 +122,16 @@ export class OpenRouterHttpError extends Error {
     super(message);
     this.name = 'OpenRouterHttpError';
     this.httpStatus = httpStatus;
+    this.diagnostics = diagnostics;
+  }
+}
+
+export class OpenRouterResponseContentError extends Error {
+  readonly diagnostics: OpenRouterResponseDiagnostics;
+
+  constructor(message: string, diagnostics: OpenRouterResponseDiagnostics) {
+    super(message);
+    this.name = 'OpenRouterResponseContentError';
     this.diagnostics = diagnostics;
   }
 }
@@ -239,12 +271,39 @@ function readFiniteHeaderNumber(response: Response, name: string): number | unde
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function nonNegativeFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function responseDiagnostics(response: Response, responseBody: unknown): OpenRouterResponseDiagnostics {
   const error = isRecord(responseBody) && isRecord(responseBody.error) ? responseBody.error : undefined;
   const metadata = error && isRecord(error.metadata) ? error.metadata : undefined;
   const usage = isRecord(responseBody) && isRecord(responseBody.usage) ? responseBody.usage : undefined;
+  const promptTokenDetails = usage && isRecord(usage.prompt_tokens_details)
+    ? usage.prompt_tokens_details
+    : undefined;
+  const promptTokens = nonNegativeFiniteNumber(usage?.prompt_tokens);
+  const cachedPromptTokens = nonNegativeFiniteNumber(promptTokenDetails?.cached_tokens);
+  const cacheWritePromptTokens = nonNegativeFiniteNumber(promptTokenDetails?.cache_write_tokens);
+  const rootCacheDiscountUsd = isRecord(responseBody)
+    ? finiteNumber(responseBody.cache_discount)
+    : undefined;
+  const cacheDiscountUsd = rootCacheDiscountUsd ?? finiteNumber(usage?.cache_discount);
   const responseModel = isRecord(responseBody) && typeof responseBody.model === 'string'
     ? responseBody.model.trim()
+    : undefined;
+  const firstChoice = isRecord(responseBody) && Array.isArray(responseBody.choices) && isRecord(responseBody.choices[0])
+    ? responseBody.choices[0]
+    : undefined;
+  const message = firstChoice && isRecord(firstChoice.message) ? firstChoice.message : undefined;
+  const providerName = isRecord(responseBody) && typeof responseBody.provider === 'string'
+    ? responseBody.provider.trim()
     : undefined;
   const providerRequestId = readHeader(response, 'x-openrouter-request-id')
     ?? readHeader(response, 'x-request-id');
@@ -261,8 +320,10 @@ function responseDiagnostics(response: Response, responseBody: unknown): OpenRou
   const rateLimitResetTokens = readHeader(response, 'x-ratelimit-reset-tokens');
   const diagnostics: OpenRouterResponseDiagnostics = {
     ...(providerRequestId ? { providerRequestId } : {}),
-    ...(metadata && typeof metadata.provider_name === 'string' && metadata.provider_name.trim()
-      ? { providerName: metadata.provider_name.trim() }
+    ...(providerName
+      ? { providerName }
+      : metadata && typeof metadata.provider_name === 'string' && metadata.provider_name.trim()
+        ? { providerName: metadata.provider_name.trim() }
       : {}),
     ...(error && typeof error.type === 'string'
       ? { providerErrorType: error.type }
@@ -284,9 +345,27 @@ function responseDiagnostics(response: Response, responseBody: unknown): OpenRou
     ...(rateLimitResetRequests ? { rateLimitResetRequests } : {}),
     ...(rateLimitResetTokens ? { rateLimitResetTokens } : {}),
     ...(responseModel ? { responseModel } : {}),
-    ...(usage && typeof usage.prompt_tokens === 'number' ? { promptTokens: usage.prompt_tokens } : {}),
+    ...(promptTokens !== undefined ? { promptTokens } : {}),
+    ...(cachedPromptTokens !== undefined ? { cachedPromptTokens } : {}),
+    ...(cacheWritePromptTokens !== undefined ? { cacheWritePromptTokens } : {}),
+    ...(promptTokens !== undefined && promptTokens > 0 && cachedPromptTokens !== undefined
+      ? { cacheReadRatio: cachedPromptTokens / promptTokens }
+      : {}),
     ...(usage && typeof usage.completion_tokens === 'number' ? { completionTokens: usage.completion_tokens } : {}),
     ...(usage && typeof usage.total_tokens === 'number' ? { totalTokens: usage.total_tokens } : {}),
+    ...(cacheDiscountUsd !== undefined ? { cacheDiscountUsd } : {}),
+    ...(firstChoice && typeof firstChoice.finish_reason === 'string'
+      ? { finishReason: firstChoice.finish_reason }
+      : {}),
+    ...(firstChoice && typeof firstChoice.native_finish_reason === 'string'
+      ? { nativeFinishReason: firstChoice.native_finish_reason }
+      : {}),
+    ...(message && typeof message.content === 'string'
+      ? { messageContentCharacters: message.content.length }
+      : {}),
+    ...(message && typeof message.reasoning === 'string'
+      ? { reasoningCharacters: message.reasoning.length }
+      : {}),
   };
   return diagnostics;
 }
@@ -351,7 +430,7 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
     const responseFormat = buildResponseFormat(options.intent);
     const provider = options.provider
       ?? (responseFormat && options.intent.strictSchema === true
-        ? { require_parameters: true, allow_fallbacks: false }
+        ? { require_parameters: true, allow_fallbacks: true }
         : undefined);
     const knownSupportedParameters = supportedParameterSet(options.supportedParameters);
     if (
@@ -363,6 +442,7 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
     }
     const requestBody = {
       model: trimmedModel,
+      ...(options.sessionId ? { session_id: options.sessionId } : {}),
       messages: options.messages,
       ...(reasoningLevel === 'none'
         ? {}
@@ -389,7 +469,10 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       ...(typeof requestBody.max_tokens === 'number' ? { maxTokensRequested: requestBody.max_tokens } : {}),
       strictSchema: options.intent.strictSchema === true,
       ...(providerRecord && providerRecord.require_parameters === true ? { requireParameters: true } : {}),
-      ...(providerRecord && providerRecord.allow_fallbacks === false ? { allowFallbacks: false } : {}),
+      ...(providerRecord && typeof providerRecord.allow_fallbacks === 'boolean'
+        ? { allowFallbacks: providerRecord.allow_fallbacks }
+        : {}),
+      ...(options.sessionId ? { sessionIdApplied: true } : {}),
     };
     const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
@@ -413,21 +496,63 @@ export async function callOpenRouterJson<T>(options: OpenRouterCallOptions<T>): 
       );
     }
 
-    const rawContent = readOpenRouterMessageContent(
-      responseBody,
-      options.intent.missingContentMessage || 'OpenRouter response did not include message content.',
-    );
-    const parsedContent = extractJsonValue(rawContent);
+    let rawContent: string;
+    try {
+      rawContent = readOpenRouterMessageContent(
+        responseBody,
+        options.intent.missingContentMessage || 'OpenRouter response did not include message content.',
+      );
+    } catch (error) {
+      throw new OpenRouterResponseContentError(
+        error instanceof Error ? error.message : String(error),
+        responseDiagnosticsValue,
+      );
+    }
+    let parsedContent: unknown;
+    try {
+      parsedContent = extractJsonValue(rawContent);
+    } catch (error) {
+      throw new OpenRouterResponseContentError(
+        error instanceof Error ? error.message : String(error),
+        responseDiagnosticsValue,
+      );
+    }
     const result: OpenRouterResult<T> = {
       value: options.intent.parse(parsedContent),
       rawContent,
       responseBody,
       requestBody,
+      usage: {
+        ...(responseDiagnosticsValue.promptTokens !== undefined
+          ? { promptTokens: responseDiagnosticsValue.promptTokens }
+          : {}),
+        ...(responseDiagnosticsValue.cachedPromptTokens !== undefined
+          ? { cachedPromptTokens: responseDiagnosticsValue.cachedPromptTokens }
+          : {}),
+        ...(responseDiagnosticsValue.cacheWritePromptTokens !== undefined
+          ? { cacheWritePromptTokens: responseDiagnosticsValue.cacheWritePromptTokens }
+          : {}),
+        ...(responseDiagnosticsValue.cacheReadRatio !== undefined
+          ? { cacheReadRatio: responseDiagnosticsValue.cacheReadRatio }
+          : {}),
+        ...(responseDiagnosticsValue.completionTokens !== undefined
+          ? { completionTokens: responseDiagnosticsValue.completionTokens }
+          : {}),
+        ...(responseDiagnosticsValue.totalTokens !== undefined
+          ? { totalTokens: responseDiagnosticsValue.totalTokens }
+          : {}),
+        ...(responseDiagnosticsValue.cacheDiscountUsd !== undefined
+          ? { cacheDiscountUsd: responseDiagnosticsValue.cacheDiscountUsd }
+          : {}),
+      },
     };
     if (options.requireUsageCost) {
       result.costUsd = readOpenRouterCost(responseBody);
     } else if (isRecord(responseBody) && isRecord(responseBody.usage) && typeof responseBody.usage.cost === 'number') {
       result.costUsd = responseBody.usage.cost;
+    }
+    if (result.costUsd !== undefined) {
+      result.usage = { ...result.usage, costUsd: result.costUsd };
     }
     recordAiFlowEvent({
       ...options.telemetry,

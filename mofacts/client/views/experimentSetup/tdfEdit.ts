@@ -22,6 +22,7 @@ import {
     OPENROUTER_REASONING_LEVELS,
     getAllowedOpenRouterReasoningLevels,
     getDefaultOpenRouterReasoningLevel,
+    getOpenRouterReasoningControlKind,
     normalizeOpenRouterReasoningLevel,
     type OpenRouterModelCatalogEntry,
     type OpenRouterReasoningLevel,
@@ -455,6 +456,7 @@ function syncOpenRouterEditorControls(instance: any): void {
     if (!reasoningEditor) return;
 
     const input = reasoningEditor.input as HTMLSelectElement | undefined;
+    const container = reasoningEditor.container as HTMLElement | undefined;
     if (!modelId) {
         if (reasoningEditor.getValue() !== 'none') {
             reasoningEditor.setValue('none');
@@ -472,14 +474,17 @@ function syncOpenRouterEditorControls(instance: any): void {
             });
             input.disabled = true;
         }
+        if (container) container.style.display = 'none';
         return;
     }
     if (!model) {
+        if (container) container.style.display = '';
         if (input) input.disabled = true;
         return;
     }
 
     const allowed = getAllowedOpenRouterReasoningLevels(model);
+    const controlKind = getOpenRouterReasoningControlKind(model);
     let current: OpenRouterReasoningLevel;
     try {
         current = normalizeOpenRouterReasoningLevel(
@@ -493,6 +498,13 @@ function syncOpenRouterEditorControls(instance: any): void {
         current = getDefaultOpenRouterReasoningLevel(model);
         reasoningEditor.setValue(current);
     }
+
+    if (controlKind === 'hidden') {
+        if (container) container.style.display = 'none';
+        if (input) input.disabled = true;
+        return;
+    }
+    if (container) container.style.display = '';
 
     if (input?.options) {
         const editorValues = Array.isArray(reasoningEditor.enum_values)

@@ -54,6 +54,19 @@
   font-weight: var(--app-font-weight-semibold);
 }
 
+.profile-field .profile-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+}
+
+.profile-field .profile-checkbox-field input[type="checkbox"] {
+  width: auto;
+  min-height: auto;
+  margin: 0;
+  padding: 0;
+}
+
 .profile-field input,
 .profile-field select {
   width: 100%;

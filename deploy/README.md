@@ -78,6 +78,16 @@ docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.loc
 
 Build, push, and deploy commands should be run only by maintainers or release owners with the appropriate environment access.
 
+## SPARC OpenRouter Prefix Caching
+
+“Improve prompt caching” is an on/off checkbox in User Admin alongside the global OpenRouter API key, model, and reasoning controls. It defaults to off for existing and new settings. Enabling it sends OpenRouter's top-level `session_id` for SPARC requests so related calls stay on one provider route; disabling it omits that field. Provider prompt caching may still occur automatically when this option is off, and enabling it does not guarantee lower total cost because output tokens and completed turns also affect cost. Changes apply to subsequent requests without rebuilding or restarting the server. The ID is generated randomly in the dialogue runtime, is stable only for one TDF/attempt/page scope (or one live-evaluation run), and contains no learner, attempt, TDF, or content-derived identity. It is never written to AI-flow logs.
+
+This setting changes only provider cache locality. It does not change prompt messages, message order, structured-output schemas, model selection, reasoning, sampling, response handling, or provider fallback routing. It does not enable whole-response caching, response replay, explicit cache breakpoints, or provider-specific cache policy.
+
+AI-flow telemetry records request counts indirectly through events plus prompt, cached-prompt, cache-write, completion, and total tokens; cache-read ratio; reported cache discount and cost; provider; model; operation; duration; and whether the session ID was applied. The live-evaluation artifact additionally aggregates these usage values for scoring and utterance separately, reports session-ID application counts and normalized cost per request and dialogue turn, and uses `null` when OpenRouter did not report a cache discount. These summaries exclude prompts, learner text, raw responses, credentials, account identifiers, attempt identifiers, TDF identifiers, and the session ID.
+
+To stop sending the sticky-session routing hint, clear the checkbox in User Admin. No data cleanup, prompt change, rebuild, or server restart is required.
+
 `server-deploy-validate.sh` can make an operator-provided readiness probe mandatory after the container reaches running state:
 
 ```bash

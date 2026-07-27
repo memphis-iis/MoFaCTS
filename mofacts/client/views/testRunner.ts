@@ -116,7 +116,7 @@ async function runOpenRouterStrictPreflight(): Promise<OpenRouterStrictPreflight
       type: 'json_schema',
       json_schema: { name: `mofacts_ai_content_pairs_v${AI_CONTENT_CONTRACT_VERSION}`, strict: true, schema: AI_GENERATED_PAIR_RESPONSE_SCHEMA },
     },
-    provider: { require_parameters: true, allow_fallbacks: false },
+    provider: { require_parameters: true, allow_fallbacks: true },
     stream: false,
   });
   const pairs = validateGeneratedPairResponse(result?.parsedContent);
@@ -148,7 +148,7 @@ function seedPromptLabRequest(model = ''): string {
         schema: AI_GENERATED_PAIR_RESPONSE_SCHEMA,
       },
     },
-    provider: { require_parameters: true, allow_fallbacks: false },
+    provider: { require_parameters: true, allow_fallbacks: true },
     stream: false,
   }, null, 2);
 }

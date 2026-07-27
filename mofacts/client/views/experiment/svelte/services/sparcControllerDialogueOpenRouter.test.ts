@@ -5,6 +5,7 @@ import { requireActiveSparcMoveDefinition } from '../../../../../../learning-com
 import {
   createSparcDialogueOpenRouterProvider,
   type SparcDialogueLearnerResponseScoringTraceEvent,
+  type SparcDialogueOpenRouterUsageEvent,
 } from './sparcControllerDialogueOpenRouter.ts';
 import { createEmptySparcReplayState } from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
 
@@ -189,14 +190,24 @@ describe('SPARC dialogue OpenRouter provider', function() {
   it('scores learner responses through server-resolved OpenRouter without choosing a move', async function() {
     const calls: unknown[] = [];
     const observedTrace: SparcDialogueLearnerResponseScoringTraceEvent[] = [];
+    const observedUsage: SparcDialogueOpenRouterUsageEvent[] = [];
     const provider = createSparcDialogueOpenRouterProvider({
       tdfId: 'tdf-1',
+      sessionId: 'opaque-session',
+      onUsage(event) {
+        observedUsage.push(event);
+      },
       onLearnerResponseScoringTrace(event) {
         observedTrace.push(event);
       },
       async callResolvedOpenRouterJson(params) {
         calls.push(params);
         return {
+          usage: {
+            promptTokens: 100,
+            cachedPromptTokens: 60,
+          },
+          sessionIdApplied: true,
           parsedContent: {
             learningTargetEvaluations: [{
               clusterKC: 'kc-a',
@@ -259,8 +270,18 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_score');
     expect(calls[0]).to.have.property('temperature', 0);
+    expect(calls[0]).to.not.have.property('maxTokens');
     expect(calls[0]).to.have.nested.property('intent.strictSchema', true);
     expect(calls[0]).to.have.property('tdfId', 'tdf-1');
+    expect(calls[0]).to.have.property('sessionId', 'opaque-session');
+    expect(observedUsage).to.deep.equal([{
+      operation: 'scoring',
+      usage: {
+        promptTokens: 100,
+        cachedPromptTokens: 60,
+      },
+      sessionIdApplied: true,
+    }]);
     const systemMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[0];
     expect(systemMessage?.content).to.contain('accumulated instructional knowledge across the full dialogue through the latest response');
     expect(systemMessage?.content).to.contain('primary conversational action genuinely requests information or confirmation');
@@ -608,14 +629,20 @@ describe('SPARC dialogue OpenRouter provider', function() {
   });
 
   it('returns constrained tutor text while the application retains target and move ownership', async function() {
+    const observedUsage: SparcDialogueOpenRouterUsageEvent[] = [];
     const provider = createSparcDialogueOpenRouterProvider({
+      sessionId: 'opaque-session',
+      onUsage(event) {
+        observedUsage.push(event);
+      },
       async callResolvedOpenRouterJson(params) {
+        expect(params).to.have.property('sessionId', 'opaque-session');
         expect(params).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_utterance');
         expect(params.intent.schema).to.deep.equal({
           type: 'object',
           additionalProperties: false,
           properties: {
-            tutorMessage: { type: 'string' },
+            tutorMessage: { type: 'string', minLength: 1 },
           },
           required: ['tutorMessage'],
         });
@@ -640,6 +667,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.not.contain('I hear you');
         expect(params.messages[0]?.content).to.not.contain('I hear that you think');
         expect(params).to.have.property('temperature', 0.15);
+        expect(params).to.not.have.property('maxTokens');
         expect(params.messages[0]?.content).to.not.contain('Begin tutorMessage with one brief immediate-feedback statement');
         expect(params.messages[0]?.content).to.not.contain('selectedMisconception is an incorrect learner belief');
         expect(params.messages[0]?.content).to.not.contain('Use correctExpectations as the authoritative positive content');
@@ -660,6 +688,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params).to.have.nested.property('intent.strictSchema', true);
         expect(userMessage.content).to.contain('Full dialogue history:');
         return {
+          usage: {
+            promptTokens: 80,
+            cachedPromptTokens: 20,
+          },
+          sessionIdApplied: true,
           parsedContent: {
             tutorMessage: 'Try using the authored hint.',
           },
@@ -669,6 +702,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
 
     expect(await provider.generateTutorUtterance(utteranceRequest))
       .to.equal('Try using the authored hint.');
+    expect(observedUsage).to.deep.equal([{
+      operation: 'utterance',
+      usage: {
+        promptTokens: 80,
+        cachedPromptTokens: 20,
+      },
+      sessionIdApplied: true,
+    }]);
   });
 
   it('orders a question-deferral modifier before the terminal scaffold move', async function() {
@@ -748,7 +789,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
         const scoreSchema = params.intent.schema as {
-          properties?: Record<string, { items?: { properties?: Record<string, unknown>; required?: string[] } }>;
+          properties?: Record<string, {
+            minItems?: number;
+            maxItems?: number;
+            items?: { properties?: Record<string, Record<string, unknown>>; required?: string[] };
+          }>;
         };
         const userMessage = JSON.parse(params.messages[1]?.content ?? '{}') as Record<string, unknown>;
         expect(userMessage).to.deep.include({
@@ -775,12 +820,20 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.required).to.deep.equal([
           'clusterKC', 'evidenceDirection', 'evidenceStrength',
         ]);
+        expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 2, maxItems: 2 });
+        expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.clusterKC?.enum)
+          .to.deep.equal(['compound.e1', 'compound.e2']);
+        expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.evidenceStrength)
+          .to.include({ minimum: 0, maximum: 1 });
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties).to.have.all.keys(
           'id', 'evidenceDirection', 'evidenceStrength',
         );
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.required).to.deep.equal([
           'id', 'evidenceDirection', 'evidenceStrength',
         ]);
+        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 1, maxItems: 1 });
+        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties?.id?.enum)
+          .to.deep.equal(['M1']);
         return {
           parsedContent: {
             learningTargetEvaluations: [{

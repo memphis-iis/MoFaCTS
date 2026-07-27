@@ -4,6 +4,7 @@ import {
   expandOpenRouterCompletionBudget,
   getAllowedOpenRouterReasoningLevels,
   getDefaultOpenRouterReasoningLevel,
+  getOpenRouterReasoningControlKind,
   normalizeOpenRouterReasoningLevel,
   parseOpenRouterModelCatalog,
   validateOpenRouterReasoningLevelForModel,
@@ -42,6 +43,19 @@ describe('openRouterModelCatalog', function() {
     const entry = model(null);
     expect(getAllowedOpenRouterReasoningLevels(entry)).to.deep.equal(['none']);
     expect(getDefaultOpenRouterReasoningLevel(entry)).to.equal('none');
+    expect(getOpenRouterReasoningControlKind(entry)).to.equal('hidden');
+  });
+
+  it('uses a toggle when reasoning supports on and off but no effort selector', function() {
+    const entry = model({ mandatory: false, defaultLevel: null });
+    expect(getAllowedOpenRouterReasoningLevels(entry)).to.deep.equal(['none', 'default']);
+    expect(getOpenRouterReasoningControlKind(entry)).to.equal('toggle');
+  });
+
+  it('hides fixed mandatory reasoning that has no user-selectable effort', function() {
+    const entry = model({ mandatory: true, defaultLevel: null });
+    expect(getAllowedOpenRouterReasoningLevels(entry)).to.deep.equal(['default']);
+    expect(getOpenRouterReasoningControlKind(entry)).to.equal('hidden');
   });
 
   it('keeps reasoning off by default for an optional reasoning model', function() {
@@ -57,6 +71,7 @@ describe('openRouterModelCatalog', function() {
       'medium',
       'high',
     ]);
+    expect(getOpenRouterReasoningControlKind(entry)).to.equal('effort');
     expect(getDefaultOpenRouterReasoningLevel(entry)).to.equal('none');
   });
 

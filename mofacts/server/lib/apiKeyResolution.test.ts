@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { expect } from 'chai';
 import {
+  getAdminOpenRouterPrefixCachingEnabled,
   getAdminOpenRouterReasoningLevel,
   getTdfOpenRouterReasoningLevel,
   getUserOpenRouterReasoningLevel,
@@ -55,6 +56,12 @@ describe('apiKeyResolution', function() {
     expect(getAdminOpenRouterReasoningLevel({
       value: { openRouter: { reasoningLevel: 'low' } },
     })).to.equal('low');
+    expect(getAdminOpenRouterPrefixCachingEnabled({
+      value: { openRouter: { prefixCachingEnabled: true } },
+    })).to.equal(true);
+    expect(getAdminOpenRouterPrefixCachingEnabled({
+      value: { openRouter: {} },
+    })).to.equal(false);
     expect(getUserOpenRouterReasoningLevel({ profile: {} })).to.equal('none');
   });
 

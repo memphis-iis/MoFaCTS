@@ -209,13 +209,20 @@ describe('adminMethods', function() {
     const result = await methods.saveAdminApiKeyAlternative.call(
       { userId: 'admin-user' },
       'openrouter',
-      { apiKey: 'sk-or-v1-test', model: 'openai/test-model', reasoningLevel: 'high' }
+      {
+        apiKey: 'sk-or-v1-test',
+        model: 'openai/test-model',
+        reasoningLevel: 'high',
+        prefixCachingEnabled: true,
+      }
     );
 
     expect(result.openRouter.configured).to.equal(true);
     expect(result.openRouter.model).to.equal('openai/test-model');
     expect(result.openRouter.reasoningLevel).to.equal('high');
+    expect(result.openRouter.prefixCachingEnabled).to.equal(true);
     expect((deps as any).getDynamicSettingsDoc().value.openRouter.reasoningLevel).to.equal('high');
+    expect((deps as any).getDynamicSettingsDoc().value.openRouter.prefixCachingEnabled).to.equal(true);
     expect(JSON.stringify(result)).to.not.contain('sk-or-v1-test');
     expect(JSON.stringify(result)).to.not.contain('encrypted:');
     expect(auditCalls).to.deep.include({
@@ -225,7 +232,9 @@ describe('adminMethods', function() {
         keyUpdated: true,
         modelUpdated: true,
         reasoningLevelUpdated: true,
+        prefixCachingUpdated: true,
         reasoningLevel: 'high',
+        prefixCachingEnabled: true,
       },
     });
   });
@@ -241,6 +250,7 @@ describe('adminMethods', function() {
     );
 
     expect(result.openRouter.reasoningLevel).to.equal('none');
+    expect(result.openRouter.prefixCachingEnabled).to.equal(false);
     expect((deps as any).getDynamicSettingsDoc().value.openRouter.reasoningLevel).to.equal('none');
   });
 
@@ -251,12 +261,13 @@ describe('adminMethods', function() {
     await methods.saveAdminApiKeyAlternative.call(
       { userId: 'admin-user' },
       'openrouter',
-      { model: 'openai/test-model', reasoningLevel: 'high' },
+      { model: 'openai/test-model', reasoningLevel: 'high', prefixCachingEnabled: true },
     );
     const reloaded = await methods.getAdminApiKeyAlternativeMetadata.call({ userId: 'admin-user' });
 
     expect((deps as any).getDynamicSettingsDoc().value.openRouter.reasoningLevel).to.equal('high');
     expect(reloaded.openRouter.reasoningLevel).to.equal('high');
+    expect(reloaded.openRouter.prefixCachingEnabled).to.equal(true);
   });
 
   it('rejects unsupported admin OpenRouter reasoning levels without writing settings', async function() {

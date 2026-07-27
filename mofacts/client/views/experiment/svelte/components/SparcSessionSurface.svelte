@@ -11,6 +11,7 @@
   import {
     createSparcDialogueOpenRouterProvider,
   } from '../services/sparcControllerDialogueOpenRouter';
+  import { createSparcOpenRouterSession } from '../services/sparcOpenRouterSession';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
   import {
@@ -26,6 +27,7 @@
 
   const dispatch = createEventDispatcher();
   const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
+  const openRouterSession = createSparcOpenRouterSession();
 
   export let display = {};
   export let adminDiagnosticMode = false;
@@ -472,6 +474,11 @@
       }
       const provider = createSparcDialogueOpenRouterProvider({
         tdfId: typeof tdfId === 'string' ? tdfId : null,
+        sessionId: openRouterSession.sessionIdForScope({
+          tdfId,
+          attemptId,
+          pageKey: currentDisplay.pageKey,
+        }),
       });
       const priorProgressiveOperations = currentSparcProgressiveNodeOperations();
       const optimisticOperations = buildOptimisticDialogueLearnerOperations(currentDisplay, sparcResult);

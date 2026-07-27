@@ -66,9 +66,11 @@ export type AdminApiKeyProviderSettings = {
   keyEncrypted?: unknown;
   model?: unknown;
   reasoningLevel?: unknown;
+  prefixCachingEnabled?: unknown;
   keyUpdatedAt?: unknown;
   modelUpdatedAt?: unknown;
   reasoningLevelUpdatedAt?: unknown;
+  prefixCachingUpdatedAt?: unknown;
   updatedBy?: unknown;
 };
 
@@ -175,6 +177,10 @@ export function getAdminOpenRouterReasoningLevel(settings: AdminApiKeySettingsDo
     settings?.value?.openRouter?.reasoningLevel,
     'Stored admin OpenRouter reasoning level',
   );
+}
+
+export function getAdminOpenRouterPrefixCachingEnabled(settings: AdminApiKeySettingsDoc): boolean {
+  return settings?.value?.openRouter?.prefixCachingEnabled === true;
 }
 
 export function getTdfOpenRouterModel(tdf: TdfApiKeyDoc) {

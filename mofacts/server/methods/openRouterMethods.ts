@@ -19,6 +19,7 @@ import {
   type ApiKeySource,
   getAdminApiKeyFromSettings,
   getAdminOpenRouterModel,
+  getAdminOpenRouterPrefixCachingEnabled,
   getAdminOpenRouterReasoningLevel,
   getTdfOpenRouterModel,
   getTdfOpenRouterReasoningLevel,
@@ -32,6 +33,9 @@ import {
   requireUserWithRoles,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
+import {
+  openRouterSessionCorrelationId,
+} from '../lib/openRouterPrefixCaching';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -182,8 +186,8 @@ async function resolveOpenRouterCredentials(
   userId: string,
   tdfId: string | null,
   mode: OpenRouterResolutionMode,
+  resolverDeps: ApiKeyResolutionDeps = deps.getApiKeyResolutionDeps(),
 ) {
-  const resolverDeps = deps.getApiKeyResolutionDeps();
   if (mode === 'admin') {
     if (!resolverDeps.getAdminApiKeySettings) {
       throw new Meteor.Error(
@@ -285,7 +289,22 @@ function redactProviderError(deps: OpenRouterMethodsDeps, operation: string, err
     operation,
     ...summary,
   });
-  return new Meteor.Error('openrouter-request-failed', reason);
+  return new Meteor.Error('openrouter-request-failed', reason, JSON.stringify(summary));
+}
+
+function optionalOpenRouterSessionId(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw new Meteor.Error(400, 'OpenRouter sessionId must be a string when supplied');
+  }
+  const sessionId = value.trim();
+  if (!sessionId) {
+    throw new Meteor.Error(400, 'OpenRouter sessionId must be nonblank when supplied');
+  }
+  if (sessionId.length > 256) {
+    throw new Meteor.Error(400, 'OpenRouter sessionId must not exceed 256 characters');
+  }
+  return sessionId;
 }
 
 async function resolveOpenRouterCapability(
@@ -316,8 +335,20 @@ async function executeResolvedOpenRouterJson(
     intent: Object,
   }));
   const data = params as UnknownRecord;
+  const sessionId = optionalOpenRouterSessionId(data.sessionId);
   const tdfId = normalizeString(data.tdfId) || null;
-  const credentials = await resolveOpenRouterCredentials(deps, userId, tdfId, mode);
+  const baseResolverDeps = deps.getApiKeyResolutionDeps();
+  let adminSettingsPromise: ReturnType<NonNullable<ApiKeyResolutionDeps['getAdminApiKeySettings']>> | undefined;
+  const resolverDeps: ApiKeyResolutionDeps = {
+    ...baseResolverDeps,
+    ...(baseResolverDeps.getAdminApiKeySettings ? {
+      getAdminApiKeySettings: () => {
+        adminSettingsPromise ??= baseResolverDeps.getAdminApiKeySettings!();
+        return adminSettingsPromise;
+      },
+    } : {}),
+  };
+  const credentials = await resolveOpenRouterCredentials(deps, userId, tdfId, mode, resolverDeps);
   if (!credentials.apiKey) {
     throw new Meteor.Error('no-api-key', 'No configured OpenRouter API key alternative is available');
   }
@@ -329,6 +360,12 @@ async function executeResolvedOpenRouterJson(
   const title = normalizeString(intent.title) || 'MoFaCTS OpenRouter';
   const schemaName = normalizeString(intent.schemaName);
   const missingContentMessage = normalizeString(intent.missingContentMessage) || 'OpenRouter response did not include message content.';
+  const adminSettings = resolverDeps.getAdminApiKeySettings
+    ? await resolverDeps.getAdminApiKeySettings()
+    : null;
+  const sessionIdApplied = Boolean(
+    sessionId && getAdminOpenRouterPrefixCachingEnabled(adminSettings),
+  );
   try {
     const openRouterIntent: Parameters<typeof callOpenRouterJson>[0]['intent'] = {
       title,
@@ -347,6 +384,9 @@ async function executeResolvedOpenRouterJson(
       messages: normalizeMessages(data.messages),
       requireUsageCost: data.requireUsageCost === true,
       intent: openRouterIntent,
+      ...(sessionId && sessionIdApplied
+        ? { sessionId }
+        : {}),
     };
     if (Array.isArray(credentials.supportedParameters)) {
       callOptions.supportedParameters = credentials.supportedParameters;
@@ -357,8 +397,14 @@ async function executeResolvedOpenRouterJson(
     if (typeof data.maxTokens === 'number') {
       callOptions.maxTokens = expandOpenRouterCompletionBudget(data.maxTokens, reasoningLevel);
     }
-    if (isRecord(data.telemetry)) {
-      callOptions.telemetry = data.telemetry;
+    if (isRecord(data.telemetry) || sessionId) {
+      callOptions.telemetry = {
+        ...(isRecord(data.telemetry) ? data.telemetry : {}),
+        ...(sessionId ? {
+          sessionCorrelationId: openRouterSessionCorrelationId(sessionId),
+          sessionIdApplied,
+        } : {}),
+      };
     }
     const result = await callOpenRouterJson(callOptions);
     return {
@@ -367,6 +413,8 @@ async function executeResolvedOpenRouterJson(
       parsedContent: result.value,
       responseBody: result.responseBody,
       costUsd: result.costUsd,
+      usage: result.usage,
+      sessionIdApplied,
       source: credentials.source,
       model,
       reasoningLevel,

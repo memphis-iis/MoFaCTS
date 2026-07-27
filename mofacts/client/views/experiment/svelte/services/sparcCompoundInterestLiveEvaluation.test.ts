@@ -440,6 +440,90 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(run.failedRobustnessCheckIds).to.deep.equal(['turn-6-m1-inactive']);
     expect(run.checks.find((check) => check.id === 'turn-6-m1-inactive')?.message)
       .to.contain('was 0.5');
+    expect(run.usage.cacheDiscountUsd).to.equal(null);
+  });
+
+  it('uses one opaque session per run and aggregates sanitized usage by operation', async function() {
+    const scenario: EvaluationScenario = { completeOnExactTurnSeven: true };
+    const sessionIds: string[] = [];
+    const result = await runSparcCompoundInterestLiveEvaluation({
+      totalRuns: 2,
+      createProvider(onLearnerResponseScoringTrace, sessionId, onUsage) {
+        sessionIds.push(sessionId);
+        const provider = deterministicProvider(scenario, onLearnerResponseScoringTrace);
+        return {
+          scoreLearnerResponse(request) {
+            onUsage({
+              operation: 'scoring',
+              sessionIdApplied: true,
+              usage: {
+                promptTokens: 100,
+                cachedPromptTokens: 50,
+                cacheWritePromptTokens: 10,
+                completionTokens: 5,
+                totalTokens: 105,
+                costUsd: 0.01,
+                cacheDiscountUsd: 0.004,
+              },
+            });
+            return provider.scoreLearnerResponse(request);
+          },
+          generateTutorUtterance(request) {
+            onUsage({
+              operation: 'utterance',
+              sessionIdApplied: true,
+              usage: {
+                promptTokens: 80,
+                cachedPromptTokens: 20,
+                cacheWritePromptTokens: 5,
+                completionTokens: 10,
+                totalTokens: 90,
+                costUsd: 0.02,
+              },
+            });
+            return provider.generateTutorUtterance(request);
+          },
+        };
+      },
+      getCapability: configuredCapability,
+    });
+
+    expect(sessionIds).to.have.length(2);
+    expect(sessionIds[0]).to.be.a('string').and.not.equal('');
+    expect(sessionIds[1]).to.not.equal(sessionIds[0]);
+    expect(result.runs[0]?.usage.byOperation.scoring).to.deep.include({
+      requestCount: 7,
+      promptTokens: 700,
+      cachedPromptTokens: 350,
+      cacheWritePromptTokens: 70,
+      completionTokens: 35,
+      totalTokens: 735,
+      cacheReadRatio: 0.5,
+    });
+    expect(result.runs[0]?.usage.byOperation.utterance).to.deep.include({
+      requestCount: 7,
+      promptTokens: 560,
+      cachedPromptTokens: 140,
+      cacheWritePromptTokens: 35,
+      completionTokens: 70,
+      totalTokens: 630,
+      cacheReadRatio: 0.25,
+    });
+    expect(result.usage).to.deep.include({
+      requestCount: 28,
+      promptTokens: 2520,
+      cachedPromptTokens: 980,
+      cacheWritePromptTokens: 210,
+      completionTokens: 210,
+      totalTokens: 2730,
+      cacheDiscountReportedRequestCount: 14,
+      sessionIdAppliedRequestCount: 28,
+    });
+    expect(result.usage.cacheReadRatio).to.be.closeTo(980 / 2520, 1e-12);
+    expect(result.usage.costUsd).to.be.closeTo(0.42, 1e-12);
+    expect(result.usage.cacheDiscountUsd).to.be.closeTo(0.056, 1e-12);
+    expect(result.usage.costPerRequestUsd).to.be.closeTo(0.015, 1e-12);
+    expect(result.usage.costPerDialogueTurnUsd).to.be.closeTo(0.03, 1e-12);
   });
 
   it('fails robustness when the synthesis does not recognize the frequency effect at completion strength', async function() {
@@ -599,5 +683,32 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(result.passRate).to.equal(null);
     expect(result.evaluationRequirementMet).to.equal(false);
     expect(result.ok).to.equal(false);
+  });
+
+  it('stops planned runs when OpenRouter reports a structured HTTP 429 during scoring', async function() {
+    const result = await runSparcCompoundInterestLiveEvaluation({
+      totalRuns: 2,
+      createProvider() {
+        return {
+          scoreLearnerResponse() {
+            throw Object.assign(new Error('OpenRouter request failed with HTTP 429.'), {
+              error: 'openrouter-request-failed',
+              details: JSON.stringify({ httpStatus: 429 }),
+            });
+          },
+          generateTutorUtterance() {
+            throw new Error('Tutor generation must not run after scoring fails');
+          },
+        };
+      },
+      getCapability: configuredCapability,
+    });
+
+    expect(result.runs[0]?.overallOutcome).to.equal('not-run');
+    expect(result.runs[0]?.evaluationDiagnostic?.stage).to.equal('scoring-provider');
+    expect(result.runs[1]?.overallOutcome).to.equal('not-run');
+    expect(result.runs[1]?.message).to.contain('preceding run');
+    expect(result.evaluationErrorRuns).to.equal(0);
+    expect(result.notRunRuns).to.equal(2);
   });
 });

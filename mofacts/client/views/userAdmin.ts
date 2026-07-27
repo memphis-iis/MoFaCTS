@@ -22,6 +22,7 @@ import { createInlineConfirmationController } from '../lib/adminUi/inlineConfirm
 import {
   getAllowedOpenRouterReasoningLevels,
   getDefaultOpenRouterReasoningLevel,
+  getOpenRouterReasoningControlKind,
   normalizeOpenRouterReasoningLevel,
   type OpenRouterModelCatalogEntry,
   type OpenRouterReasoningLevel,
@@ -62,6 +63,8 @@ type AdminApiKeyMetadata = {
     updatedBy?: unknown;
     model?: string;
     reasoningLevel?: OpenRouterReasoningLevel;
+    prefixCachingEnabled?: boolean;
+    prefixCachingUpdatedAt?: unknown;
   };
   googleTts?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
   googleSpeech?: { configured?: boolean; unusable?: boolean; keyUpdatedAt?: unknown; updatedBy?: unknown };
@@ -273,6 +276,7 @@ function applyAdminOpenRouterMetadata(instance: any, metadata: any): void {
     metadata?.openRouter?.reasoningLevel,
     'Stored admin OpenRouter reasoning level',
   ));
+  instance.openRouterPrefixCachingEnabled.set(metadata?.openRouter?.prefixCachingEnabled === true);
   syncAdminReasoningSelectionForModel(instance);
 }
 
@@ -340,6 +344,7 @@ async function saveAdminOpenRouterSelection(
       apiKey: apiKeyInput?.value || '',
       model: String(instance.openRouterSelectedModel.get() || ''),
       reasoningLevel: instance.openRouterSelectedReasoningLevel.get(),
+      prefixCachingEnabled: instance.openRouterPrefixCachingEnabled.get() === true,
     });
     applyAdminOpenRouterMetadata(instance, result);
     if (apiKeyInput) apiKeyInput.value = '';
@@ -480,6 +485,7 @@ Template.userAdmin.onCreated(function(this: any) {
   this.openRouterModelCatalogError = new ReactiveVar('');
   this.openRouterSelectedModel = new ReactiveVar('');
   this.openRouterSelectedReasoningLevel = new ReactiveVar('none' as OpenRouterReasoningLevel);
+  this.openRouterPrefixCachingEnabled = new ReactiveVar(false);
   this.sortField = new ReactiveVar('identifier');
   this.sortDirection = new ReactiveVar('asc' as SortDirection);
   this.roleStateOverrides = new ReactiveVar({} as RoleStateOverrides);
@@ -804,10 +810,12 @@ Template.userAdmin.helpers({
   showAdminOpenRouterReasoningLevel: function() {
     const instance = Template.instance() as any;
     const model = findAdminCatalogModel(instance);
-    if (model) {
-      return model.reasoning !== null;
-    }
-    return Boolean(instance.openRouterSelectedModel.get());
+    return model ? getOpenRouterReasoningControlKind(model) === 'effort' : false;
+  },
+
+  showAdminOpenRouterReasoningToggle: function() {
+    const model = findAdminCatalogModel(Template.instance() as any);
+    return model ? getOpenRouterReasoningControlKind(model) === 'toggle' : false;
   },
 
   adminOpenRouterReasoningLevelOptions: function() {
@@ -834,6 +842,31 @@ Template.userAdmin.helpers({
       && !providerApiKeyBusy(instance, 'openrouter')
       ? {}
       : { disabled: true };
+  },
+
+  adminOpenRouterReasoningToggleAttrs: function() {
+    const instance = Template.instance() as any;
+    const selectedLevel = normalizeOpenRouterReasoningLevel(
+      instance.openRouterSelectedReasoningLevel.get(),
+      'Admin OpenRouter reasoning level',
+    );
+    const disabled = instance.openRouterModelCatalogState.get() !== 'ready'
+      || !findAdminCatalogModel(instance)
+      || providerApiKeyBusy(instance, 'openrouter');
+    return {
+      ...(selectedLevel === 'default' ? { checked: true } : {}),
+      ...(disabled ? { disabled: true } : {}),
+    };
+  },
+
+  adminOpenRouterPrefixCachingAttrs: function() {
+    const instance = Template.instance() as any;
+    return {
+      ...(instance.openRouterPrefixCachingEnabled.get() === true ? { checked: true } : {}),
+      ...(providerApiKeyBusy(instance, 'openrouter') || !instance.apiKeyMetadataLoaded.get()
+        ? { disabled: true }
+        : {}),
+    };
   },
 
   openRouterKeyPlaceholder: function() {
@@ -1226,6 +1259,20 @@ Template.userAdmin.events({
       (event.currentTarget as HTMLSelectElement).value,
       'Admin OpenRouter reasoning level',
     ));
+    await saveAdminOpenRouterSelection(instance);
+  },
+
+  'change #adminOpenRouterReasoningEnabled': async function(event: any, instance: any) {
+    instance.openRouterSelectedReasoningLevel.set(
+      (event.currentTarget as HTMLInputElement).checked ? 'default' : 'none',
+    );
+    await saveAdminOpenRouterSelection(instance);
+  },
+
+  'change #adminOpenRouterPrefixCachingEnabled': async function(event: any, instance: any) {
+    instance.openRouterPrefixCachingEnabled.set(
+      (event.currentTarget as HTMLInputElement).checked,
+    );
     await saveAdminOpenRouterSelection(instance);
   },
 

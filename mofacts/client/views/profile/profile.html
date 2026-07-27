@@ -129,6 +129,15 @@
           <div id="openRouterModelCatalogStatus" class="profile-alert {{openRouterModelCatalogMessageClass}}" role="status">{{openRouterModelCatalogMessage}}</div>
         {{/if}}
 
+        {{#if showOpenRouterReasoningToggle}}
+        <div class="profile-field">
+          <label for="openRouterReasoningEnabled" class="profile-checkbox-field">
+            <input id="openRouterReasoningEnabled" type="checkbox" aria-describedby="openRouterReasoningLevelHelp" {{openRouterReasoningToggleAttrs}}>
+            {{t 'profile.openRouterReasoningLevel'}}
+          </label>
+          <p id="openRouterReasoningLevelHelp">{{t 'profile.openRouterReasoningLevelHelp'}}</p>
+        </div>
+        {{else}}
         {{#if showOpenRouterReasoningLevel}}
         <div class="profile-field">
           <label for="openRouterReasoningLevel">{{t 'profile.openRouterReasoningLevel'}}</label>
@@ -139,6 +148,7 @@
           </select>
           <p id="openRouterReasoningLevelHelp">{{t 'profile.openRouterReasoningLevelHelp'}}</p>
         </div>
+        {{/if}}
         {{/if}}
 
         {{#if openRouterStatusMessage}}

@@ -22,6 +22,7 @@ import { loadOpenRouterModelCatalog } from '../../lib/openRouterModelCatalogClie
 import {
   getAllowedOpenRouterReasoningLevels,
   getDefaultOpenRouterReasoningLevel,
+  getOpenRouterReasoningControlKind,
   normalizeOpenRouterReasoningLevel,
   validateOpenRouterReasoningLevelForModel,
   type OpenRouterModelCatalogEntry,
@@ -558,10 +559,12 @@ Template.profile.helpers({
   showOpenRouterReasoningLevel(): boolean {
     const template = Template.instance() as ProfileTemplateInstance;
     const model = findCatalogModel(template);
-    if (model) {
-      return model.reasoning !== null;
-    }
-    return Boolean(template.openRouterSelectedModel.get());
+    return model ? getOpenRouterReasoningControlKind(model) === 'effort' : false;
+  },
+
+  showOpenRouterReasoningToggle(): boolean {
+    const model = findCatalogModel(Template.instance() as ProfileTemplateInstance);
+    return model ? getOpenRouterReasoningControlKind(model) === 'toggle' : false;
   },
 
   openRouterReasoningLevelOptions(): Array<{ value: string; label: string; selectedAttrs: Record<string, boolean> }> {
@@ -583,6 +586,16 @@ Template.profile.helpers({
     return template.openRouterModelCatalogState.get() === 'ready' && Boolean(findCatalogModel(template))
       ? {}
       : { disabled: true };
+  },
+
+  openRouterReasoningToggleAttrs(): Record<string, boolean> {
+    const template = Template.instance() as ProfileTemplateInstance;
+    const disabled = template.openRouterModelCatalogState.get() !== 'ready'
+      || !findCatalogModel(template);
+    return {
+      ...(template.openRouterSelectedReasoningLevel.get() === 'default' ? { checked: true } : {}),
+      ...(disabled ? { disabled: true } : {}),
+    };
   },
 
   openRouterStatusMessage(): string {
@@ -674,6 +687,13 @@ Template.profile.events({
       (event.currentTarget as HTMLSelectElement).value,
       'OpenRouter reasoning level',
     ));
+    markProfileDirty(template);
+  },
+
+  'change #openRouterReasoningEnabled'(event: Event, template: ProfileTemplateInstance) {
+    template.openRouterSelectedReasoningLevel.set(
+      (event.currentTarget as HTMLInputElement).checked ? 'default' : 'none',
+    );
     markProfileDirty(template);
   },
 

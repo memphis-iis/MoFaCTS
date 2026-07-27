@@ -7,6 +7,8 @@ export type AiFlowTelemetry = {
   componentId?: string;
   unitType?: string;
   requestId?: string;
+  sessionCorrelationId?: string;
+  sessionIdApplied?: boolean;
 };
 
 export type AiFlowEvent = AiFlowTelemetry & {
@@ -42,8 +44,16 @@ export type AiFlowEvent = AiFlowTelemetry & {
   requireParameters?: boolean;
   allowFallbacks?: boolean;
   promptTokens?: number;
+  cachedPromptTokens?: number;
+  cacheWritePromptTokens?: number;
+  cacheReadRatio?: number;
   completionTokens?: number;
   totalTokens?: number;
+  cacheDiscountUsd?: number;
+  finishReason?: string;
+  nativeFinishReason?: string;
+  messageContentCharacters?: number;
+  reasoningCharacters?: number;
   costUsd?: number;
   error?: string;
   createdAt: string;
@@ -85,6 +95,7 @@ function summarizeEvent(event: AiFlowEvent): Record<string, unknown> {
     operation: event.operation,
     componentId: event.componentId,
     unitType: event.unitType,
+    sessionCorrelationId: event.sessionCorrelationId,
     title: event.title,
     model: event.model,
     schemaName: event.schemaName,
@@ -113,9 +124,18 @@ function summarizeEvent(event: AiFlowEvent): Record<string, unknown> {
     strictSchema: event.strictSchema,
     requireParameters: event.requireParameters,
     allowFallbacks: event.allowFallbacks,
+    sessionIdApplied: event.sessionIdApplied,
     promptTokens: event.promptTokens,
+    cachedPromptTokens: event.cachedPromptTokens,
+    cacheWritePromptTokens: event.cacheWritePromptTokens,
+    cacheReadRatio: event.cacheReadRatio,
     completionTokens: event.completionTokens,
     totalTokens: event.totalTokens,
+    cacheDiscountUsd: event.cacheDiscountUsd,
+    finishReason: event.finishReason,
+    nativeFinishReason: event.nativeFinishReason,
+    messageContentCharacters: event.messageContentCharacters,
+    reasoningCharacters: event.reasoningCharacters,
     costUsd: event.costUsd,
     error: event.error,
     createdAt: event.createdAt,

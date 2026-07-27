@@ -41,7 +41,7 @@ describe('SPARC move definitions', function() {
       assert.equal(definition.status, 'active');
       assert.equal(definition.promptId, `autotutor.${definition.moveId}`);
       const expectedPromptVersion = definition.moveId === 'question-scope-refusal' ? 'v1'
-        : definition.moveId === 'pump' ? 'v4'
+        : definition.moveId === 'pump' ? 'v5'
           : definition.moveId === 'question-deferral' || definition.moveId === 'prompt' || definition.moveId === 'hint'
             ? 'v3'
             : 'v2';
@@ -81,7 +81,11 @@ describe('SPARC move definitions', function() {
     const hint = requireActiveSparcMoveDefinition('hint').promptPolicy;
 
     assert.ok(pump.includes('genuinely open invitation'));
+    assert.ok(pump.includes('Content-grounded acknowledgement'));
+    assert.ok(pump.includes('anchored to one concept, relationship, calculation, or conclusion actually present'));
     assert.ok(pump.includes('Treat the selected target and authored target content as internal routing information only'));
+    assert.ok(pump.includes('do not announce or preview the new focus'));
+    assert.ok(pump.includes('content the learner has already contributed or correctly established'));
     assert.ok(pump.includes('Do not identify, name, paraphrase, narrow toward, or ask directly about missing target content'));
     assert.ok(pump.includes('Base the invitation on the learner\'s latest contribution'));
     assert.ok(pump.includes('Semantic openness check'));

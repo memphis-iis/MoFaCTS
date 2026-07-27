@@ -27,6 +27,15 @@
                                     </select>
                                     <small id="adminOpenRouterModelStatus" class="text-muted d-block admin-form-row-top">{{openRouterModelStatus}}</small>
                                 </div>
+                                {{#if showAdminOpenRouterReasoningToggle}}
+                                <div>
+                                    <label for="adminOpenRouterReasoningEnabled" class="form-label admin-reasoning-toggle">
+                                        <input id="adminOpenRouterReasoningEnabled" type="checkbox" aria-describedby="adminOpenRouterReasoningLevelHelp" {{adminOpenRouterReasoningToggleAttrs}}>
+                                        {{userAdminText 'profile.openRouterReasoningLevel'}}
+                                    </label>
+                                    <small id="adminOpenRouterReasoningLevelHelp" class="text-muted d-block admin-form-row-top">{{userAdminText 'profile.openRouterReasoningLevelHelp'}}</small>
+                                </div>
+                                {{else}}
                                 {{#if showAdminOpenRouterReasoningLevel}}
                                 <div>
                                     <label for="adminOpenRouterReasoningLevel" class="form-label">{{userAdminText 'profile.openRouterReasoningLevel'}}</label>
@@ -38,6 +47,14 @@
                                     <small id="adminOpenRouterReasoningLevelHelp" class="text-muted d-block admin-form-row-top">{{userAdminText 'profile.openRouterReasoningLevelHelp'}}</small>
                                 </div>
                                 {{/if}}
+                                {{/if}}
+                                <div>
+                                    <label for="adminOpenRouterPrefixCachingEnabled" class="form-label admin-reasoning-toggle">
+                                        <input id="adminOpenRouterPrefixCachingEnabled" type="checkbox" aria-describedby="adminOpenRouterPrefixCachingHelp" {{adminOpenRouterPrefixCachingAttrs}}>
+                                        {{userAdminText 'admin.openRouterPrefixCaching'}}
+                                    </label>
+                                    <small id="adminOpenRouterPrefixCachingHelp" class="text-muted d-block admin-form-row-top">{{userAdminText 'admin.openRouterPrefixCachingHelp'}}</small>
+                                </div>
                             </div>
                             {{#if openRouterModelCatalogMessage}}
                             <div id="adminOpenRouterCatalogStatus" class="admin-status admin-status-{{openRouterModelCatalogAlertClass}} admin-status-small admin-form-row-sm" role="status" aria-live="polite">

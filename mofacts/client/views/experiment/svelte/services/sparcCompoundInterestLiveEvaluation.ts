@@ -23,7 +23,9 @@ import {
   type CallResolvedOpenRouterJson,
   type SparcDialogueLearnerResponseEvaluation,
   type SparcDialogueLearnerResponseScoringTraceEvent,
+  type SparcDialogueOpenRouterUsageEvent,
 } from './sparcControllerDialogueOpenRouter';
+import { createOpaqueSparcOpenRouterSessionId } from './sparcOpenRouterSession';
 import type { OpenRouterCapability } from '../../../../lib/openRouterClientProfile';
 
 const PAGE_KEY = 'sparc-session-compound-interest-live-evaluation';
@@ -78,6 +80,29 @@ export type SparcCompoundInterestLiveEvaluationCheck = Readonly<{
   message: string;
 }>;
 
+export type SparcCompoundInterestLiveEvaluationUsage = Readonly<{
+  requestCount: number;
+  promptTokens: number;
+  cachedPromptTokens: number;
+  cacheWritePromptTokens: number;
+  cacheReadRatio: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  costPerRequestUsd: number | null;
+  cacheDiscountUsd: number | null;
+  cacheDiscountReportedRequestCount: number;
+  sessionIdAppliedRequestCount: number;
+}>;
+
+export type SparcCompoundInterestLiveEvaluationUsageReport = SparcCompoundInterestLiveEvaluationUsage & Readonly<{
+  costPerDialogueTurnUsd: number | null;
+  byOperation: Readonly<{
+    scoring: SparcCompoundInterestLiveEvaluationUsage;
+    utterance: SparcCompoundInterestLiveEvaluationUsage;
+  }>;
+}>;
+
 export type SparcCompoundInterestLiveEvaluationDiagnostic = Readonly<{
   stage: 'scoring-provider'
     | 'scoring-response-parse'
@@ -107,6 +132,7 @@ export type SparcCompoundInterestLiveEvaluationRun = Readonly<{
   exactTranscriptCompleted: boolean;
   checks: readonly SparcCompoundInterestLiveEvaluationCheck[];
   turns: readonly SparcCompoundInterestLiveEvaluationTurn[];
+  usage: SparcCompoundInterestLiveEvaluationUsageReport;
   evaluationDiagnostic?: SparcCompoundInterestLiveEvaluationDiagnostic;
   message: string;
 }>;
@@ -134,6 +160,7 @@ export type SparcCompoundInterestLiveEvaluationResult = Readonly<{
   evaluationRequirementMet: boolean;
   robustnessRequirementMet: boolean;
   graduationRequirementMet: boolean;
+  usage: SparcCompoundInterestLiveEvaluationUsageReport;
   runs: readonly SparcCompoundInterestLiveEvaluationRun[];
 }>;
 
@@ -500,9 +527,29 @@ function rateLimitError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) {
     return false;
   }
-  const candidate = error as { error?: unknown; message?: unknown };
+  const candidate = error as {
+    error?: unknown;
+    message?: unknown;
+    reason?: unknown;
+    details?: unknown;
+  };
+  let details = candidate.details;
+  if (typeof details === 'string') {
+    try {
+      details = JSON.parse(details);
+    } catch {
+      details = undefined;
+    }
+  }
+  const structuredStatus = typeof details === 'object' && details !== null
+    ? (details as { httpStatus?: unknown }).httpStatus
+    : undefined;
+  const providerMessage = [candidate.reason, candidate.message]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ');
   return candidate.error === 'too-many-requests'
-    || (typeof candidate.message === 'string' && candidate.message.includes('Too many requests'));
+    || structuredStatus === 429
+    || /\b429\b|rate[- ]limited|too many requests/i.test(providerMessage);
 }
 
 type SparcLiveEvaluationProvider = Pick<
@@ -512,6 +559,122 @@ type SparcLiveEvaluationProvider = Pick<
 type SparcLearnerResponseScoringTraceObserver = (
   event: SparcDialogueLearnerResponseScoringTraceEvent,
 ) => void;
+
+type MutableUsage = {
+  requestCount: number;
+  promptTokens: number;
+  cachedPromptTokens: number;
+  cacheWritePromptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  cacheDiscountUsd: number;
+  cacheDiscountReportedRequestCount: number;
+  sessionIdAppliedRequestCount: number;
+};
+
+function emptyMutableUsage(): MutableUsage {
+  return {
+    requestCount: 0,
+    promptTokens: 0,
+    cachedPromptTokens: 0,
+    cacheWritePromptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    costUsd: 0,
+    cacheDiscountUsd: 0,
+    cacheDiscountReportedRequestCount: 0,
+    sessionIdAppliedRequestCount: 0,
+  };
+}
+
+function usageSnapshot(usage: MutableUsage): SparcCompoundInterestLiveEvaluationUsage {
+  return {
+    ...usage,
+    cacheReadRatio: usage.promptTokens > 0 ? usage.cachedPromptTokens / usage.promptTokens : 0,
+    costPerRequestUsd: usage.requestCount > 0 ? usage.costUsd / usage.requestCount : null,
+    cacheDiscountUsd: usage.cacheDiscountReportedRequestCount > 0
+      ? usage.cacheDiscountUsd
+      : null,
+  };
+}
+
+function addUsage(target: MutableUsage, usage: SparcCompoundInterestLiveEvaluationUsage): void {
+  target.requestCount += usage.requestCount;
+  target.promptTokens += usage.promptTokens;
+  target.cachedPromptTokens += usage.cachedPromptTokens;
+  target.cacheWritePromptTokens += usage.cacheWritePromptTokens;
+  target.completionTokens += usage.completionTokens;
+  target.totalTokens += usage.totalTokens;
+  target.costUsd += usage.costUsd;
+  target.cacheDiscountUsd += usage.cacheDiscountUsd ?? 0;
+  target.cacheDiscountReportedRequestCount += usage.cacheDiscountReportedRequestCount;
+  target.sessionIdAppliedRequestCount += usage.sessionIdAppliedRequestCount;
+}
+
+function reportFromOperations(operations: {
+  scoring: MutableUsage;
+  utterance: MutableUsage;
+}, dialogueTurnCount = 0): SparcCompoundInterestLiveEvaluationUsageReport {
+  const total = emptyMutableUsage();
+  addUsage(total, usageSnapshot(operations.scoring));
+  addUsage(total, usageSnapshot(operations.utterance));
+  return {
+    ...usageSnapshot(total),
+    costPerDialogueTurnUsd: dialogueTurnCount > 0 ? total.costUsd / dialogueTurnCount : null,
+    byOperation: {
+      scoring: usageSnapshot(operations.scoring),
+      utterance: usageSnapshot(operations.utterance),
+    },
+  };
+}
+
+function createUsageCollector(): {
+  observe: (event: SparcDialogueOpenRouterUsageEvent) => void;
+  report: (dialogueTurnCount?: number) => SparcCompoundInterestLiveEvaluationUsageReport;
+} {
+  const operations = {
+    scoring: emptyMutableUsage(),
+    utterance: emptyMutableUsage(),
+  };
+  return {
+    observe(event) {
+      const target = operations[event.operation];
+      target.requestCount += 1;
+      target.promptTokens += event.usage.promptTokens ?? 0;
+      target.cachedPromptTokens += event.usage.cachedPromptTokens ?? 0;
+      target.cacheWritePromptTokens += event.usage.cacheWritePromptTokens ?? 0;
+      target.completionTokens += event.usage.completionTokens ?? 0;
+      target.totalTokens += event.usage.totalTokens ?? 0;
+      target.costUsd += event.usage.costUsd ?? 0;
+      if (event.usage.cacheDiscountUsd !== undefined) {
+        target.cacheDiscountUsd += event.usage.cacheDiscountUsd;
+        target.cacheDiscountReportedRequestCount += 1;
+      }
+      if (event.sessionIdApplied) {
+        target.sessionIdAppliedRequestCount += 1;
+      }
+    },
+    report(dialogueTurnCount = 0) {
+      return reportFromOperations(operations, dialogueTurnCount);
+    },
+  };
+}
+
+function combineUsageReports(
+  reports: readonly SparcCompoundInterestLiveEvaluationUsageReport[],
+  dialogueTurnCount: number,
+): SparcCompoundInterestLiveEvaluationUsageReport {
+  const operations = {
+    scoring: emptyMutableUsage(),
+    utterance: emptyMutableUsage(),
+  };
+  for (const report of reports) {
+    addUsage(operations.scoring, report.byOperation.scoring);
+    addUsage(operations.utterance, report.byOperation.utterance);
+  }
+  return reportFromOperations(operations, dialogueTurnCount);
+}
 
 async function getConfiguredOpenRouterCapability(): Promise<OpenRouterCapability> {
   const { Meteor } = await import('meteor/meteor');
@@ -534,8 +697,11 @@ async function runOnce(
   fixture: SparcCompoundInterestLiveEvaluationFixture,
   createProvider: (
     onLearnerResponseScoringTrace: SparcLearnerResponseScoringTraceObserver,
+    sessionId: string,
+    onUsage: (event: SparcDialogueOpenRouterUsageEvent) => void,
   ) => SparcLiveEvaluationProvider,
 ): Promise<SparcCompoundInterestLiveEvaluationRun> {
+  const usageCollector = createUsageCollector();
   let currentProviderResponseRecorded = false;
   let currentProviderParsedContent: unknown;
   let currentEvidenceEnvelope: SparcLearnerResponseEvidenceEnvelope | undefined;
@@ -569,7 +735,11 @@ async function runOnce(
     const {
       display, document, pageKey, problemStatement,
     } = fixture;
-    const provider = createProvider(onLearnerResponseScoringTrace);
+    const provider = createProvider(
+      onLearnerResponseScoringTrace,
+      createOpaqueSparcOpenRouterSessionId(),
+      usageCollector.observe,
+    );
     async function evaluateLearnerTurn(
       learnerText: string,
       phase: SparcCompoundInterestLiveEvaluationTurn['phase'],
@@ -712,6 +882,7 @@ async function runOnce(
       exactTranscriptCompleted,
       checks,
       turns,
+      usage: usageCollector.report(turns.length),
       message: `Student ${graduationPassed ? 'graduated' : 'did not graduate'}; robustness ${robustnessPassed ? 'passed' : `failed (${failedCheckIds.join(', ')})`}; exact transcript ${exactTranscriptCompleted ? 'completed' : 'required synthesis'}. Final misconception support strengths M1=${misconceptionSupportStrengths.M1}, M2=${misconceptionSupportStrengths.M2}, M3=${misconceptionSupportStrengths.M3}. Final move ${finalTurn?.action ?? 'unknown'} for ${finalTurn?.targetType ?? 'unknown'}:${finalTurn?.targetId ?? 'unknown'}. Trace: ${traceText(turns)}`,
     };
   } catch (error) {
@@ -734,6 +905,7 @@ async function runOnce(
       exactTranscriptCompleted: false,
       checks: [],
       turns,
+      usage: usageCollector.report(turns.length),
       evaluationDiagnostic: recordedEvaluationDiagnostic,
       message: `${notRun ? `Evaluation not run during ${recordedEvaluationDiagnostic.stage}` : `Evaluation error during ${recordedEvaluationDiagnostic.stage}`}: ${message}${turns.length > 0 ? ` Trace: ${traceText(turns)}` : ''}`,
     };
@@ -746,6 +918,8 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
   readonly requiredPassRate?: number;
   readonly createProvider?: (
     onLearnerResponseScoringTrace: SparcLearnerResponseScoringTraceObserver,
+    sessionId: string,
+    onUsage: (event: SparcDialogueOpenRouterUsageEvent) => void,
   ) => SparcLiveEvaluationProvider;
   readonly getCapability?: () => Promise<OpenRouterCapability>;
 } = {}): Promise<SparcCompoundInterestLiveEvaluationResult> {
@@ -775,9 +949,11 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
     const result = await runOnce(
       run,
       fixture,
-      options.createProvider ?? ((onLearnerResponseScoringTrace) => createSparcDialogueOpenRouterProvider({
+      options.createProvider ?? ((onLearnerResponseScoringTrace, sessionId, onUsage) => createSparcDialogueOpenRouterProvider({
         callResolvedOpenRouterJson: callAdminTestResolvedOpenRouterJson,
         onLearnerResponseScoringTrace,
+        sessionId,
+        onUsage,
       })),
     );
     runs.push(result);
@@ -796,6 +972,7 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
           exactTranscriptCompleted: false,
           checks: [],
           turns: [],
+          usage: createUsageCollector().report(),
           message: 'Not attempted because the live provider rate-limited the preceding run.',
         });
       }
@@ -838,6 +1015,10 @@ export async function runSparcCompoundInterestLiveEvaluation(options: {
     evaluationRequirementMet,
     robustnessRequirementMet,
     graduationRequirementMet,
+    usage: combineUsageReports(
+      runs.map((run) => run.usage),
+      runs.reduce((total, run) => total + run.turns.length, 0),
+    ),
     runs,
   };
   globalThis.localStorage?.setItem(

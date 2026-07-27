@@ -21,6 +21,8 @@ cp settings.self-hosted.example.json settings.self-hosted.json
 
 Edit both files. Replace every placeholder, especially passwords, `ROOT_URL`, `MAIL_URL`, `owner`, `emailFrom`, `initRoles.admins`, and `encryptionKey`. `METEOR_SETTINGS_HOST_PATH` must point to the private settings file. The app fails startup when required settings are missing, examples are still present, MongoDB is unauthenticated in the self-hosted path, or Redis is required but unavailable.
 
+The SPARC OpenRouter sticky-session optimization is disabled by default. An administrator can enable or disable “Improve prompt caching” alongside the global OpenRouter key, model, and reasoning controls in User Admin. The option improves provider-route consistency; provider caching may still happen automatically when it is off. Changes apply to subsequent requests without rebuilding or restarting the server. Follow the telemetry and privacy guidance in `deploy/README.md`.
+
 The admin backup control plane writes local archives to `/backups` inside the app container. Compose mounts `MOFACTS_BACKUP_HOST_PATH` there, defaulting to `/backups/mofacts` on the host. Create and protect that host directory before production use, then copy completed archives off-server. A backup stored only on the same server does not protect against server loss, disk loss, hosting-account loss, or accidental deletion of the backup directory.
 
 For email verification deliverability, set `emailFrom` to an address on a domain authenticated with your SMTP provider, for example `MoFaCTS <no-reply@your-domain.example>`, and use `emailReplyTo` for the admin contact address. Do not send production verification mail from a personal Gmail address through a separate SMTP provider.
