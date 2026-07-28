@@ -85,9 +85,10 @@ describe('SPARC progressive scaffolding productions', function() {
     assert.equal(selectedAction(facts({ stage: 'HINT', madeProgress: false })), 'assertion');
   });
 
-  it('de-escalates progress and cycles post-assertion failure to pump', function() {
+  it('de-escalates pre-assertion progress but keeps assertion as the bottom-out stage', function() {
     assert.equal(selectedAction(facts({ stage: 'HINT', madeProgress: true })), 'pump');
-    assert.equal(selectedAction(facts({ stage: 'ASSERTION', madeProgress: false })), 'pump');
+    assert.equal(selectedAction(facts({ stage: 'ASSERTION', madeProgress: false })), 'assertion');
+    assert.equal(selectedAction(facts({ stage: 'ASSERTION', madeProgress: true })), 'assertion');
   });
 
   it('selects summary independently at completion', function() {

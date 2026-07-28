@@ -294,6 +294,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.contain('Study the learner’s trajectory and improvement');
     expect(systemMessage?.content).to.contain('combine distinct complementary learner statements across turns');
     expect(systemMessage?.content).to.contain('Do not average turns, sum per-turn scores');
+    expect(systemMessage?.content).to.contain('as an answer to the immediately preceding tutor question');
+    expect(systemMessage?.content).to.contain('A short phrase, choice, number, or confirmation can fully establish');
+    expect(systemMessage?.content).to.contain('do not require the learner to restate the original problem');
     expect(systemMessage?.content).to.contain('Tutor turns provide context');
     expect(systemMessage?.content).to.contain('never learner evidence');
     expect(systemMessage?.content).to.contain('return the cumulative semantic coverage the learner has demonstrated');
@@ -654,6 +657,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.contain('Selected move: hint.');
         expect(params.messages[0]?.content).to.contain('Move prompt:');
         expect(params.messages[0]?.content).to.contain('Follow the selected runtime move policy.');
+        expect(params.messages[0]?.content).to.contain('Active-target isolation:');
+        expect(params.messages[0]?.content).to.contain(
+          'do not preview or address a requirement outside the selected target',
+        );
         expect(params.messages[0]?.content).to.contain('Acknowledgement boundary for every move');
         expect(params.messages[0]?.content).to.contain('Usually begin with one brief, natural response');
         expect(params.messages[0]?.content).to.contain('without agreeing with an incorrect claim');
@@ -675,7 +682,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
           'Generate only tutorMessage. The application owns the selected target and dialogue move metadata.',
         );
         expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
-        expect(userMessage.content).to.contain('Problem statement:');
+        expect(userMessage.content).to.contain('Problem statement (task context only; its other requirements are outside the active target):');
         expect(userMessage.content).to.contain(problemStatement);
         expect(userMessage.content).to.contain('Latest student answer (the primary source for any acknowledgement):');
         expect(userMessage.content.indexOf('Latest student answer')).to.be.greaterThan(
@@ -685,6 +692,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(userMessage.content).to.contain('Registered move definition:');
         expect(userMessage.content).to.not.contain('Immediate-feedback evidence:');
         expect(userMessage.content).to.contain('"targetId": "kc-a"');
+        expect(userMessage.content).to.not.contain('Current scored planner state:');
         expect(params).to.have.nested.property('intent.strictSchema', true);
         expect(userMessage.content).to.contain('Full dialogue history:');
         return {
@@ -928,19 +936,20 @@ describe('SPARC dialogue OpenRouter provider', function() {
       expect(userPrompt).to.not.contain('App-selected plan.');
 
       if (move === 'pump') {
-        expect(userPrompt).to.contain('Pump content boundary:');
-        expect(userPrompt).to.contain('separate problem statement, selected target content, and planner state are intentionally withheld');
-        expect(userPrompt).to.not.contain('Problem statement:');
-        expect(userPrompt).to.not.contain(problemStatement);
-        expect(userPrompt).to.not.contain('App-selected pedagogical state:');
+        expect(systemPrompt).to.contain('Explicitly identify the active concept before the open invitation');
+        expect(userPrompt).to.contain('Problem statement (task context only; its other requirements are outside the active target):');
+        expect(userPrompt).to.contain(problemStatement);
+        expect(userPrompt).to.contain('App-selected pedagogical state:');
         expect(userPrompt).to.not.contain('Current scored planner state:');
-        expect(userPrompt).to.not.contain('Relevant authored target content:');
-        expect(userPrompt).to.not.contain('Internal diagnostic target context');
-        expect(userPrompt).to.not.contain('A target text');
-        expect(userPrompt).to.not.contain('A fixed annual rate means the same dollar amount is added every year.');
-        expect(userPrompt).to.not.contain('Interest is earned on the original principal plus accumulated interest.');
-        expect(userPrompt).to.not.contain('kc-a');
-        expect(userPrompt).to.not.contain('mis-1');
+        if (targetType === 'misconception') {
+          expect(userPrompt).to.contain('Internal diagnostic target context');
+          expect(userPrompt).to.contain('A fixed annual rate means the same dollar amount is added every year.');
+          expect(userPrompt).to.contain('mis-1');
+        } else {
+          expect(userPrompt).to.contain('Relevant authored target content:');
+          expect(userPrompt).to.contain('A target text');
+          expect(userPrompt).to.contain('kc-a');
+        }
       } else if (targetType === 'misconception') {
         expect(systemPrompt).to.contain('If targetType is misconception');
         expect(userPrompt).to.contain(

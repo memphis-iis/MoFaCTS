@@ -335,6 +335,7 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
     'Do not expose internal ids, rule ids, rubric labels, scoring fields, or planner metadata in tutorMessage.',
     'Use only the authored lesson content and dialogue context supplied in the user message.',
     'Follow the selected runtime move policy.',
+    'Active-target isolation: For every move except summary, teach, correct, hint, prompt, and ask only about the app-selected target in Relevant authored target content. The problem statement, dialogue history, and acknowledgement context do not authorize introducing, explaining, comparing, or asking about another expectation or misconception. Even when the original problem has several requirements, do not preview or address a requirement outside the selected target. Finish the selected target before any transition to another target.',
     'Acknowledgement boundary for every move: Usually begin with one brief, natural response to the substance of the learner\'s latest contribution or the progress it demonstrates. If there was no progress, use a neutral acknowledgement without agreeing with an incorrect claim. Speak directly to the learner rather than narrating the receipt or processing of their message. Do not say that you heard, received, noted, recorded, recognized, or processed the learner\'s answer or question. Do not use a fixed acknowledgement template, and avoid repeating the same opening pattern across nearby turns. Omit the acknowledgement when including one would sound artificial.',
     'Learner-language and terminology boundary for every move: Represent the learner\'s meaning faithfully, but do not mechanically reproduce their wording. In the tutor\'s own voice, use canonical authored terminology and silently normalize obvious misspellings, transcription errors, malformed grammar, and incorrect nonconceptual word choices. Do not attribute rubric language, unstated beliefs, or missing content to the learner. Do not interrupt the lesson to correct the learner\'s language unless the terminology distinction is itself instructionally relevant.',
     'Misconception boundary for every move: If the latest answer states or relies on a misconception, do not praise, endorse, validate, or describe that claim as correct, useful progress, close, or a good start. Acknowledge it neutrally, or give accurate corrective feedback when the selected move calls for feedback.',
@@ -352,18 +353,15 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
 }
 
 function buildSparcUtteranceUserPrompt(request: SparcUtteranceRequest): string {
-  const isPump = request.action === 'pump';
   const targetContentLabel = request.targetType === 'misconception'
     ? 'Internal diagnostic target context (authored content; not necessarily the learner\'s expressed position):'
     : request.targetType === 'learnerQuestion'
       ? 'Learner-question routing context (application classification):'
       : 'Relevant authored target content:';
   return [
-    ...(isPump ? [] : [
-      'Problem statement:',
-      request.problemStatement,
-      '',
-    ]),
+    'Problem statement (task context only; its other requirements are outside the active target):',
+    request.problemStatement,
+    '',
     `Target kind: ${request.targetType}.`,
     'Registered move definition:',
     JSON.stringify({
@@ -386,21 +384,12 @@ function buildSparcUtteranceUserPrompt(request: SparcUtteranceRequest): string {
       promptVersion: modifier.moveDefinition.promptVersion,
     })), null, 2),
     '',
-    ...(isPump ? [
-      'Pump content boundary:',
-      'The separate problem statement, selected target content, and planner state are intentionally withheld. Use only the visible dialogue and latest learner contribution to make a genuinely open invitation for the learner to continue.',
-      '',
-    ] : [
-      'App-selected pedagogical state:',
-      JSON.stringify(request.pedagogicalState ?? null, null, 2),
-      '',
-      targetContentLabel,
-      JSON.stringify(request.targetContent ?? request.contentTexts, null, 2),
-      '',
-      'Current scored planner state:',
-      JSON.stringify(request.plannerState ?? null, null, 2),
-      '',
-    ]),
+    'App-selected pedagogical state:',
+    JSON.stringify(request.pedagogicalState ?? null, null, 2),
+    '',
+    targetContentLabel,
+    JSON.stringify(request.targetContent ?? request.contentTexts, null, 2),
+    '',
     'Full dialogue history:',
     JSON.stringify(request.dialogueHistory ?? [], null, 2),
     '',
@@ -454,6 +443,7 @@ export function createSparcDialogueOpenRouterProvider(
             '2. Use "question" when the learner’s primary conversational action genuinely requests information or confirmation. Use "answer" when the learner primarily offers an interpretation or attempted answer, even if it is hesitant or phrased with question-like intonation. A confirmation-shaped contribution such as "Are you saying Y?" or "Do we compute Y?" may be either a question or an answer; classify its function in context and score its instructional meaning the same either way. Include learnerQuestion with contentFocused true for a substantive content question; use contentFocused false only for an off-topic, rude, lewd, illicit, or otherwise inappropriate question.',
             '3. Return exactly one learningTargetEvaluations entry for every supplied learning target and exactly one diagnosticMisconceptionEvaluations entry for every supplied misconception. Evaluate every proposition independently and copy every clusterKC and id exactly.',
             '4. Assess instructional evidence cumulatively from every learner-authored turn in dialogueHistory together with learnerText. Study the learner’s trajectory and improvement: combine distinct complementary learner statements across turns when they form one developing explanation, and give later clarification, worked application, or self-correction full weight. Do not average turns, sum per-turn scores, or increase coverage merely because the learner repeats the same meaning.',
+            '4a. Interpret the latest learner contribution as an answer to the immediately preceding tutor question. Resolve ordinary contextual references and elliptical answers from that question. A short phrase, choice, number, or confirmation can fully establish the requested proposition when it unambiguously fills the slot or relation the tutor asked for; do not require the learner to restate the original problem or produce a standalone explanation before crediting that meaning.',
             '5. Tutor turns provide context for references, prompts, and the instructional trajectory, but tutor hints, assertions, corrections, and summaries are never learner evidence. Credit an idea supplied by the tutor only when the learner later adopts, explains, applies, or correctly confirms it.',
             '6. For learning targets, return the cumulative semantic coverage the learner has demonstrated through the current turn. A later omission, short answer, or change of topic does not erase knowledge demonstrated in earlier learner turns.',
             '7. For misconceptions, return the learner’s resolved stance at the end of the dialogue. A later learner clarification or self-correction supersedes conflicting earlier learner evidence; do not reactivate a repaired misconception solely because an earlier turn supported it.',

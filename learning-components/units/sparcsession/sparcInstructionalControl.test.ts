@@ -171,4 +171,47 @@ describe('SPARC AutoTutor instructional adapter', function() {
     assert.equal(observation?.slots?.madeProgress, true);
     assert.equal(observation?.slots?.newlyResolved, true);
   });
+
+  it('accepts criterion-crossing progress even when the score delta is below minimumProgress', function() {
+    const expectationResult = instantiateSparcAutoTutorInstructionalFacts({
+      selection: expectationSelection,
+      config,
+      facts: [
+        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
+        fact('instructionalTarget.active', {
+          targetKey: 'expectation:kc-a', targetKind: 'expectation', targetId: 'kc-a', resolutionThreshold: 0.8,
+        }),
+        fact('instructionalFocus.episode', {
+          focusEpisodeId: 'episode-a', targetKey: 'expectation:kc-a', startedAtTurn: 1, status: 'active',
+        }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.65 }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.8 }),
+      ],
+    });
+    const misconceptionResult = instantiateSparcAutoTutorInstructionalFacts({
+      selection: {
+        ...expectationSelection,
+        selectedTargetType: 'misconception',
+        selectedMisconceptionId: 'm1',
+      },
+      config,
+      facts: [
+        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
+        fact('instructionalTarget.active', {
+          targetKey: 'misconception:m1', targetKind: 'misconception', targetId: 'm1', resolutionThreshold: 0.8,
+        }),
+        fact('instructionalFocus.episode', {
+          focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
+        }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.21 }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.19 }),
+      ],
+    });
+
+    for (const result of [expectationResult, misconceptionResult]) {
+      const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');
+      assert.equal(observation?.slots?.madeProgress, true);
+      assert.equal(observation?.slots?.newlyResolved, true);
+    }
+  });
 });

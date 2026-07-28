@@ -141,6 +141,9 @@ function observationForPreviousTarget(params: {
     ? progressAfter >= resolutionThreshold
     : progressAfter > resolutionThreshold;
   const madeMinimumProgress = progressDelta >= minimumProgress(params.config);
+  const madeProgress = targetKind === 'expectation'
+    ? madeMinimumProgress || newlyResolved
+    : newlyResolved;
   return {
     factType: 'learningObservation.targetProgress',
     slots: {
@@ -150,7 +153,7 @@ function observationForPreviousTarget(params: {
       progressBefore,
       progressAfter,
       progressDelta,
-      madeProgress: madeMinimumProgress && (targetKind === 'expectation' || newlyResolved),
+      madeProgress,
       newlyResolved,
     },
   };

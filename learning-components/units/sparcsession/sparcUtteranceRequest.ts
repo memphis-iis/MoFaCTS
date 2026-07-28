@@ -240,6 +240,23 @@ function pedagogicalState(selectedAction: SparcWorkingMemoryFact): Readonly<Reco
   };
 }
 
+function assertSelectedActionMatchesActiveTarget(params: {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly targetType: string;
+  readonly targetId: string;
+}): void {
+  const activeTarget = latestFact(params.facts, 'instructionalTarget.active');
+  if (!activeTarget) return;
+  const activeKind = stringSlot(activeTarget, 'targetKind');
+  const activeId = stringSlot(activeTarget, 'targetId');
+  const requestKind = params.targetType === 'learningTarget' ? 'expectation' : params.targetType;
+  if (activeKind !== requestKind || activeId !== params.targetId) {
+    throw new Error(
+      `SPARC selected action target "${requestKind}:${params.targetId}" does not match active instructional target "${activeKind ?? 'missing'}:${activeId ?? 'missing'}"`,
+    );
+  }
+}
+
 export function createSparcUtteranceRequestFromFacts(
   facts: readonly SparcWorkingMemoryFact[],
 ): SparcUtteranceRequest {
@@ -262,6 +279,9 @@ export function createSparcUtteranceRequestFromFacts(
   }
   const moveDefinition = requireActiveSparcMoveDefinition(action);
   const targetId = selectedTargetId(selectedAction, targetType);
+  if (targetType !== 'completion' && targetType !== 'learnerQuestion') {
+    assertSelectedActionMatchesActiveTarget({ facts, targetType, targetId });
+  }
   const contentTexts = cleanContentTextForTarget({
     facts,
     targetType,

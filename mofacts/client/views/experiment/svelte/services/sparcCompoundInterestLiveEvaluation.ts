@@ -252,7 +252,6 @@ function createFixture(): SparcCompoundInterestLiveEvaluationFixture {
         minimumProgress: 0.2,
         progressResponse: 'deescalate',
         nonAddressingResponse: 'hold',
-        postAssertionResponse: 'cycle-to-pump',
       },
     },
     autoTutorTargets: { expectations, misconceptions },

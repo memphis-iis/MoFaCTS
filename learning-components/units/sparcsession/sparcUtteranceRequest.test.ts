@@ -54,6 +54,28 @@ describe('createSparcUtteranceRequestFromFacts', function() {
     assert.equal(request.sourceRuleId, 'paper-rule-06-hint');
   });
 
+  it('rejects an utterance action that does not match the active instructional target', function() {
+    assert.throws(
+      () => createSparcUtteranceRequestFromFacts([
+        fact('dialogue.problemStatement', { text: 'Explain both ideas.' }),
+        fact('autotutor.expectation', { clusterKC: 'kc-a', text: 'First idea.' }),
+        fact('autotutor.expectation', { clusterKC: 'kc-b', text: 'Second idea.' }),
+        fact('instructionalTarget.active', {
+          targetKind: 'expectation',
+          targetId: 'kc-a',
+          targetKey: 'expectation:kc-a',
+          focusEpisodeId: 'expectation:kc-a:turn:0',
+        }),
+        fact('controller.selectedAction', {
+          targetType: 'expectation',
+          targetId: 'kc-b',
+          action: 'assertion',
+        }),
+      ]),
+      /does not match active instructional target/,
+    );
+  });
+
   it('matches clean misconception text by misconception id', function() {
     const request = createSparcUtteranceRequestFromFacts([
       fact('dialogue.problemStatement', { text: 'Explain the relationship.' }),

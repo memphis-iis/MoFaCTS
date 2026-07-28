@@ -226,6 +226,24 @@ function previousSelectedTarget(facts: readonly SparcWorkingMemoryFact[]): Sparc
   return selectedFacts.at(-1);
 }
 
+type PreviousInstructionalTarget =
+  | { readonly type: 'learningTarget'; readonly id: string }
+  | { readonly type: 'misconception'; readonly id: string };
+
+function previousInstructionalTarget(
+  facts: readonly SparcWorkingMemoryFact[],
+): PreviousInstructionalTarget | undefined {
+  const activeTarget = facts
+    .filter((fact) => fact.factType === 'instructionalTarget.active')
+    .at(-1);
+  if (!activeTarget || stringSlot(activeTarget, 'status') !== 'active') return undefined;
+  const kind = stringSlot(activeTarget, 'targetKind');
+  const id = stringSlot(activeTarget, 'targetId');
+  if (kind === 'expectation' && id) return { type: 'learningTarget', id };
+  if (kind === 'misconception' && id) return { type: 'misconception', id };
+  return undefined;
+}
+
 function previousSelectedMisconception(facts: readonly SparcWorkingMemoryFact[]): string | undefined {
   return facts
     .filter((fact) => fact.factType === 'diagnostic.misconceptionSelected')
@@ -376,17 +394,33 @@ export function selectSparcLearningTargetFromFacts(
       eligible: supportStrength >= repairThreshold,
     };
   });
-  const selectedMisconception = selectMisconceptionCandidate(
-    misconceptionCandidates,
-    previousSelectedMisconception(facts),
-  );
+  const previousTarget = previousInstructionalTarget(facts);
+  const continuingExpectation = previousTarget?.type === 'learningTarget'
+    ? candidates.find((candidate) => (
+      candidate.clusterKC === previousTarget.id
+      && candidate.coverage < coverageThreshold
+    ))
+    : undefined;
+  const continuingMisconception = previousTarget?.type === 'misconception'
+    ? misconceptionCandidates.find((candidate) => (
+      candidate.id === previousTarget.id
+      && candidate.eligible
+    ))
+    : undefined;
+  const selectedMisconception = continuingExpectation
+    ? undefined
+    : continuingMisconception ?? selectMisconceptionCandidate(
+      misconceptionCandidates,
+      previousSelectedMisconception(facts),
+    );
 
-  const selected = candidates
+  const rankedExpectation = candidates
     .filter((candidate) => candidate.eligible)
     .sort((left, right) => (
       right.priorityScore - left.priorityScore
       || left.clusterKC.localeCompare(right.clusterKC)
     ))[0];
+  const selected = continuingExpectation ?? rankedExpectation;
 
   if (!selected && !selectedMisconception) {
     throw new Error('SPARC target selection could not select an uncovered required learning target');

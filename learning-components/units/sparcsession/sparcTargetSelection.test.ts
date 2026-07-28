@@ -201,6 +201,76 @@ describe('selectSparcLearningTargetFromFacts', function() {
     });
   });
 
+  it('keeps an unfinished expectation focused even when another target has higher priority', function() {
+    const result = selectSparcLearningTargetFromFacts([
+      ...baseFacts(),
+      {
+        factType: 'learningTarget.selected',
+        slots: {
+          clusterKC: 'kc-a',
+          focusActive: true,
+          focusTurnCount: 1,
+          firstFocusTurn: 0,
+          moveCycleIndex: 1,
+        },
+      },
+      {
+        factType: 'instructionalTarget.active',
+        slots: { targetKind: 'expectation', targetId: 'kc-a', status: 'active' },
+      },
+    ], {
+      anchorClusterKC: 'kc-a',
+    });
+
+    assert.equal(result.candidates.find((candidate) => candidate.clusterKC === 'kc-b')?.priorityScore, 0.82375);
+    assert.equal(result.selectedClusterKC, 'kc-a');
+  });
+
+  it('releases an expectation only after it reaches the coverage criterion', function() {
+    const facts = baseFacts().filter((fact) => (
+      fact.factType !== 'learningTarget.score' || fact.slots?.clusterKC !== 'kc-a'
+    ));
+    facts.push(
+      score('kc-a', 0.8),
+      {
+        factType: 'learningTarget.selected',
+        slots: { clusterKC: 'kc-a', focusActive: true },
+      },
+      {
+        factType: 'instructionalTarget.active',
+        slots: { targetKind: 'expectation', targetId: 'kc-a', status: 'active' },
+      },
+    );
+
+    const result = selectSparcLearningTargetFromFacts(facts, {
+      anchorClusterKC: 'kc-a',
+    });
+
+    assert.notEqual(result.selectedClusterKC, 'kc-a');
+    assert.equal(result.selectedClusterKC, 'kc-b');
+  });
+
+  it('does not interrupt an unfinished expectation for a newly active misconception', function() {
+    const result = selectSparcLearningTargetFromFacts([
+      ...baseFacts(),
+      misconceptionSource('m-new'),
+      misconceptionScore('m-new', 0.9),
+      {
+        factType: 'learningTarget.selected',
+        slots: { clusterKC: 'kc-a', focusActive: true },
+      },
+      {
+        factType: 'instructionalTarget.active',
+        slots: { targetKind: 'expectation', targetId: 'kc-a', status: 'active' },
+      },
+    ], {
+      anchorClusterKC: 'kc-a',
+    });
+
+    assert.equal(result.selectedTargetType, 'learningTarget');
+    assert.equal(result.selectedClusterKC, 'kc-a');
+  });
+
   it('reads authored target-selection policy facts when options omit weights', function() {
     const result = selectSparcLearningTargetFromFacts([
       ...baseFacts(),

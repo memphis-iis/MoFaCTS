@@ -76,18 +76,19 @@ describe('SPARC move definitions', function() {
     }
   });
 
-  it('keeps pumps open while grounding hints in the selected authored target content', function() {
+  it('keeps pumps open within a named active concept while grounding hints in target content', function() {
     const pump = requireActiveSparcMoveDefinition('pump').promptPolicy;
     const hint = requireActiveSparcMoveDefinition('hint').promptPolicy;
 
     assert.ok(pump.includes('genuinely open invitation'));
     assert.ok(pump.includes('Content-grounded acknowledgement'));
     assert.ok(pump.includes('anchored to one concept, relationship, calculation, or conclusion actually present'));
-    assert.ok(pump.includes('Treat the selected target and authored target content as internal routing information only'));
-    assert.ok(pump.includes('do not announce or preview the new focus'));
+    assert.ok(pump.includes('Explicitly identify the active concept before the open invitation'));
+    assert.ok(pump.includes('Derive one short, natural, learner-facing concept name'));
+    assert.ok(pump.includes('do not expose an internal id or recite the full target proposition'));
     assert.ok(pump.includes('content the learner has already contributed or correctly established'));
-    assert.ok(pump.includes('Do not identify, name, paraphrase, narrow toward, or ask directly about missing target content'));
-    assert.ok(pump.includes('Base the invitation on the learner\'s latest contribution'));
+    assert.ok(pump.includes('Keep the invitation open within that named concept'));
+    assert.ok(pump.includes('Use the selected target to determine the pump\'s named subject'));
     assert.ok(pump.includes('Semantic openness check'));
     assert.ok(pump.includes('Do not reuse the same interrogative frame'));
     assert.ok(pump.includes('Do not combine an open invitation with a content-specific question'));
@@ -157,6 +158,8 @@ describe('SPARC move definitions', function() {
     const assertion = requireActiveSparcMoveDefinition('assertion');
     assert.equal(assertion.status, 'active');
     assert.ok(assertion.promptPolicy.includes('state the missing expectation content'));
+    assert.ok(assertion.promptPolicy.includes('Assertion is the terminal scaffold level for an unresolved target'));
+    assert.ok(assertion.promptPolicy.includes('Do not return to a pump, prompt, or hint'));
   });
 
   it('uses unique move ids and prompt ids', function() {

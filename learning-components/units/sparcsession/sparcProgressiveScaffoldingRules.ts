@@ -228,8 +228,9 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
     stage: 'PUMP',
     eligible: any(
       statePattern('ELICIT'),
-      all(statePattern(), observationPattern({ madeProgress: true })),
-      all(statePattern('ASSERTION'), observationPattern({ madeProgress: false })),
+      all(statePattern('PUMP'), observationPattern({ madeProgress: true })),
+      all(statePattern('PROMPT'), observationPattern({ madeProgress: true })),
+      all(statePattern('HINT'), observationPattern({ madeProgress: true })),
     ),
   }), moveRule({
     id: 'dialogue.scaffold.prompt',
@@ -251,6 +252,7 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
     stage: 'ASSERTION',
     eligible: any(
       all(statePattern('HINT'), observationPattern({ madeProgress: false })),
+      statePattern('ASSERTION'),
     ),
   })];
 }
