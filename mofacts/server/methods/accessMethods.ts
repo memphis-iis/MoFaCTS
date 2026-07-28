@@ -29,7 +29,7 @@ type AccessMethodsDeps = {
   exactCaseInsensitiveRegex: (value: string) => RegExp;
   isValidEmailAddress: (value: string) => boolean;
   normalizeCanonicalId: (value: unknown) => string | null;
-  resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
+  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
 };
 
 export function createAccessMethods(deps: AccessMethodsDeps) {

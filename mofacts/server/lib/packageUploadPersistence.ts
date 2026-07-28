@@ -36,6 +36,9 @@ export async function processParsedPackageTdfs(args: {
   const touchedStimuliSetIds = new Set<string | number>();
   const results: SaveContentResult[] = [];
   const childUserSelectByFileName = new Map<string, string>();
+  const identityByFileName = new Map(
+    (state.identityPlan?.entries || []).map((entry) => [entry.fileName, entry])
+  );
 
   for (const rootCandidate of unzippedFiles.filter((file) => file.type === 'tdf')) {
     const rootContents = rootCandidate.contents as {
@@ -85,6 +88,10 @@ export async function processParsedPackageTdfs(args: {
           };
         };
       };
+      const identity = identityByFileName.get(tdf.name);
+      if (!identity) {
+        throw new Error(`Package identity preflight did not assign an id to TDF "${tdf.name}".`);
+      }
       const stim = unzippedFiles.find((file) => file.name === tdfContents.tutor.setspec.stimulusfile);
       deps.serverConsole(
         'Processing stimFileName:',
@@ -149,6 +156,7 @@ export async function processParsedPackageTdfs(args: {
           throw new Error(`Invalid AutoTutor content: ${autoTutorValidation.errors.join('; ')}`);
         }
         const record = {
+          tdfId: identity.tdfId,
           fileName: tdf.name,
           tdfs: json,
           ownerId: owner,
@@ -156,7 +164,8 @@ export async function processParsedPackageTdfs(args: {
           stimuli: stimContents,
           stimFileName: stim.name,
           packageFile: tdf.packageFile,
-          packageAssetId
+          packageAssetId,
+          conditionTdfIds: identity.conditionTdfIds,
         };
         const ret = await deps.upsertPackage(record, owner);
         if (ret && (ret as { result?: unknown }).result === false) {
@@ -172,6 +181,7 @@ export async function processParsedPackageTdfs(args: {
         }
         packageResult.data = ret;
         packageResult.tdfFileName = tdf.name;
+        packageResult.tdfId = identity.tdfId;
       } catch (error: unknown) {
         packageResult.result = false;
         packageResult.errmsg = String(error);

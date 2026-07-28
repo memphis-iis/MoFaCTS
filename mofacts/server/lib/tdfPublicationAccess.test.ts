@@ -58,7 +58,6 @@ describe('tdfPublicationAccess', function() {
 
     expect(findCalls[0]?.$or).to.deep.include({ ownerId: 'user-1' });
     expect(selector.$or).to.deep.include({ _id: { $in: ['assigned-root', 'accessed-root'] } });
-    expect(selector.$or).to.deep.include({ 'content.fileName': { $in: ['cond-file', '42'] } });
     expect(selector.$or).to.deep.include({ _id: { $in: ['cond-id', '7'] } });
   });
 

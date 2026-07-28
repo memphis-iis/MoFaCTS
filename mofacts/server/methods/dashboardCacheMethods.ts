@@ -386,15 +386,17 @@ export function createDashboardCacheMethods({
       addTdfDocumentToResetScope(root, { cache: true });
 
       const setspec = getLessonFamilySetspec(root);
-      if (Array.isArray(setspec.condition)) {
-        for (const conditionRef of setspec.condition) {
-          addNonEmptyString(tdfKeys, conditionRef);
-        }
-      }
-      if (Array.isArray(setspec.conditionTdfIds)) {
-        for (const conditionTdfId of setspec.conditionTdfIds) {
+      const canonicalConditionIds = Array.isArray(setspec.conditionTdfIds)
+        ? setspec.conditionTdfIds.filter((conditionTdfId) => typeof conditionTdfId === 'string' && conditionTdfId.trim())
+        : [];
+      if (canonicalConditionIds.length > 0) {
+        for (const conditionTdfId of canonicalConditionIds) {
           addNonEmptyString(tdfIds, conditionTdfId);
           addNonEmptyString(tdfKeys, conditionTdfId);
+        }
+      } else if (Array.isArray(setspec.condition)) {
+        for (const conditionRef of setspec.condition) {
+          addNonEmptyString(tdfKeys, conditionRef);
         }
       }
     }

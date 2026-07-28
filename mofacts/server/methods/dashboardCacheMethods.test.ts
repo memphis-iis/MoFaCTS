@@ -1254,7 +1254,17 @@ describe('dashboardCacheMethods', function() {
     expect(cacheDoc.tdfStats).to.not.have.property('child-tdf');
     expect(tdfFindSelectors[1]).to.deep.equal({
       $or: [
-        { 'content.tdfs.tutor.setspec.condition': { $in: ['child-tdf', 'child.json'] } },
+        {
+          $and: [
+            { 'content.tdfs.tutor.setspec.condition': { $in: ['child-tdf', 'child.json'] } },
+            {
+              $or: [
+                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
+                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
+              ],
+            },
+          ],
+        },
         { 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-tdf'] } }
       ]
     });

@@ -73,8 +73,12 @@ export function collectLessonFamilyRefs(rootTdfs: any[]): LessonFamilyRefSets {
   const conditionTdfIds = new Set<string>();
   for (const rootTdf of rootTdfs) {
     const setspec = getLessonFamilySetspec(rootTdf);
-    addAll(conditionFileNames, normalizeLessonFamilyRefs(setspec.condition));
-    addAll(conditionTdfIds, normalizeLessonFamilyRefs(setspec.conditionTdfIds));
+    const canonicalIds = normalizeLessonFamilyRefs(setspec.conditionTdfIds);
+    if (canonicalIds.length > 0) {
+      addAll(conditionTdfIds, canonicalIds);
+    } else {
+      addAll(conditionFileNames, normalizeLessonFamilyRefs(setspec.condition));
+    }
   }
   return {
     conditionFileNames: Array.from(conditionFileNames),
@@ -83,17 +87,19 @@ export function collectLessonFamilyRefs(rootTdfs: any[]): LessonFamilyRefSets {
   };
 }
 
-export function buildConditionChildSelector(childLookupRefs: string[]): LessonFamilySelector | null {
-  const refs = normalizeLessonFamilyRefs(childLookupRefs);
-  if (refs.length === 0) {
+export function buildConditionChildSelector(
+  conditionFileNames: string[],
+  conditionTdfIds: string[] = []
+): LessonFamilySelector | null {
+  const fileNames = normalizeLessonFamilyRefs(conditionFileNames);
+  const tdfIds = normalizeLessonFamilyRefs(conditionTdfIds);
+  const terms: LessonFamilySelector[] = [];
+  if (tdfIds.length > 0) terms.push({ _id: { $in: tdfIds } });
+  if (fileNames.length > 0) terms.push({ 'content.fileName': { $in: fileNames } });
+  if (terms.length === 0) {
     return null;
   }
-  return {
-    $or: [
-      { _id: { $in: refs } },
-      { 'content.fileName': { $in: refs } },
-    ],
-  };
+  return { $or: terms };
 }
 
 export function buildParentRootSelector(
@@ -104,7 +110,17 @@ export function buildParentRootSelector(
   const normalizedChildTdfIds = normalizeLessonFamilyRefs(childTdfIds);
   const terms: LessonFamilySelector[] = [];
   if (normalizedChildRefs.length > 0) {
-    terms.push({ 'content.tdfs.tutor.setspec.condition': { $in: normalizedChildRefs } });
+    terms.push({
+      $and: [
+        { 'content.tdfs.tutor.setspec.condition': { $in: normalizedChildRefs } },
+        {
+          $or: [
+            { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
+            { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
+          ],
+        },
+      ],
+    });
   }
   if (normalizedChildTdfIds.length > 0) {
     terms.push({ 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: normalizedChildTdfIds } });
@@ -158,7 +174,7 @@ export function createLessonFamilyResolver(deps: LessonFamilyResolverDeps) {
 
   async function findConditionChildrenForRoots(rootTdfs: any[], fields?: LessonFamilySelector) {
     const refs = collectLessonFamilyRefs(rootTdfs);
-    const selector = buildConditionChildSelector(refs.childLookupRefs);
+    const selector = buildConditionChildSelector(refs.conditionFileNames, refs.conditionTdfIds);
     if (!selector) {
       return [];
     }

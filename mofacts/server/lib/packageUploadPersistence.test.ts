@@ -20,6 +20,9 @@ function packageDeps(overrides: Partial<ProcessPackageUploadDeps> = {}): Process
     async userIsInRoleAsync() {
       return false;
     },
+    async userCanManageTdf() {
+      return true;
+    },
     normalizeCanonicalId(value: unknown) {
       return typeof value === 'string' && value.trim() ? value.trim() : null;
     },
@@ -61,6 +64,9 @@ function packageDeps(overrides: Partial<ProcessPackageUploadDeps> = {}): Process
       async insertAsync() {},
     },
     Tdfs: {
+      find() {
+        return { async fetchAsync() { return []; } };
+      },
       async findOneAsync() {
         return null;
       },
@@ -140,6 +146,19 @@ describe('packageUploadPersistence', function() {
       uploadActorUserId: 'user-a',
       stimSetId: undefined,
       uploadedMediaPathMapsByStimSetId: new Map(),
+      identityPlan: {
+        fingerprint: 'fingerprint',
+        updates: [],
+        creates: [{ tdfId: 'collision-tdf', fileName: 'collision_tdf.json', lessonName: 'Collision Lesson' }],
+        entries: [{
+          tdfId: 'collision-tdf',
+          incomingTdfId: null,
+          fileName: 'collision_tdf.json',
+          action: 'create',
+          lessonName: 'Collision Lesson',
+          conditionTdfIds: [],
+        }],
+      },
     };
     const errorMessage = 'TDF file name "collision_tdf.json" is already used by another user.';
 

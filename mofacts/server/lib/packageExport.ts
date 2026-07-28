@@ -32,7 +32,7 @@ type BuildAndStoreCurrentPackageAssetDeps = {
   }) => Promise<any[]>;
   normalizeCanonicalId: (value: unknown) => string | null;
   decryptData: (value: string) => string;
-  resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
+  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
   DynamicAssets: {
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<DynamicAssetRef | null>;
     writeAsync: (data: Buffer, options: Record<string, unknown>) => Promise<DynamicAssetRef>;
@@ -271,11 +271,16 @@ async function resolvePackageExportMemberTdfs(rootTdfId: string, deps: BuildAndS
 
   const rootSetspec = rootTdf.content?.tdfs?.tutor?.setspec || {};
   const rawConditions = Array.isArray(rootSetspec.condition) ? rootSetspec.condition : [];
-  let conditionIds = Array.isArray(rootSetspec.conditionTdfIds)
+  const hasCanonicalConditionIds = Array.isArray(rootSetspec.conditionTdfIds)
+    && rootSetspec.conditionTdfIds.length > 0;
+  let conditionIds = hasCanonicalConditionIds
     ? rootSetspec.conditionTdfIds.map((id: unknown) => deps.normalizeCanonicalId(id))
     : [];
 
-  if (!conditionIds.some(Boolean) && rawConditions.length > 0) {
+  if (hasCanonicalConditionIds && conditionIds.length !== rawConditions.length) {
+    throw new Meteor.Error(409, 'Current package has inconsistent condition and conditionTdfIds lengths.');
+  }
+  if (!hasCanonicalConditionIds && rawConditions.length > 0) {
     conditionIds = await deps.resolveConditionTdfIds(rootSetspec);
   }
 
@@ -433,6 +438,7 @@ async function preparePackageExportState(
   }
 
   const reservedZipNames = new Set<string>();
+  const stimulusPayloadHashByZipName = new Map<string, string>();
   const reserveZipEntry = (rawFileName: unknown, fallbackName: string, label: string) => {
     const safeName = getSafePackageExportFileName(rawFileName, fallbackName);
     if (reservedZipNames.has(safeName)) {
@@ -470,10 +476,9 @@ async function preparePackageExportState(
       if (Object.prototype.hasOwnProperty.call(setspec, 'openRouterApiKey')) {
         setspec.openRouterApiKey = maybeDecryptPackageExportSecret(setspec.openRouterApiKey, deps);
       }
-      delete setspec.conditionTdfIds;
     }
 
-    const exportTdfDoc = { tutor: tutorDoc };
+    const exportTdfDoc = { tdfId: memberTdfId, tutor: tutorDoc };
     rewriteKnownMediaReferencesForPackageExport(exportTdfDoc, deps);
     rewriteKnownMediaReferencesForPackageExport(rawStimuliFile, deps);
 
@@ -485,11 +490,22 @@ async function preparePackageExportState(
       `lesson-${String(memberTdf?._id || 'unknown')}.json`,
       'TDF'
     );
-    const stimFileName = reserveZipEntry(
+    const stimFileName = getSafePackageExportFileName(
       (tutorDoc as { setspec?: { stimulusfile?: unknown } })?.setspec?.stimulusfile,
-      `stim-${String(memberTdf?._id || 'unknown')}.json`,
-      'stimulus file'
+      `stim-${String(memberTdf?._id || 'unknown')}.json`
     );
+    const stimulusPayloadHash = hashPackageExportPayload(rawStimuliFile);
+    const existingStimulusPayloadHash = stimulusPayloadHashByZipName.get(stimFileName);
+    if (existingStimulusPayloadHash && existingStimulusPayloadHash !== stimulusPayloadHash) {
+      throw new Meteor.Error(409, `Package export cannot include different stimulus files named "${stimFileName}".`);
+    }
+    if (!existingStimulusPayloadHash) {
+      if (reservedZipNames.has(stimFileName)) {
+        throw new Meteor.Error(409, `Package export cannot include duplicate filename "${stimFileName}" (stimulus file).`);
+      }
+      reservedZipNames.add(stimFileName);
+      stimulusPayloadHashByZipName.set(stimFileName, stimulusPayloadHash);
+    }
 
     preparedEntries.push({
       tdfId: memberTdfId,
@@ -499,6 +515,22 @@ async function preparePackageExportState(
       stimFileName,
       stimuliSetId: memberTdf?.stimuliSetId ?? null
     });
+  }
+
+  const exportEntryByTdfId = new Map(preparedEntries.map((entry) => [entry.tdfId, entry]));
+  for (const entry of preparedEntries) {
+    const setspec = (entry.exportTdfDoc as any)?.tutor?.setspec;
+    if (!setspec || !Array.isArray(setspec.conditionTdfIds) || setspec.conditionTdfIds.length === 0) {
+      continue;
+    }
+    const conditionFileNames = setspec.conditionTdfIds.map((conditionTdfId: unknown) => {
+      const conditionEntry = exportEntryByTdfId.get(String(conditionTdfId || ''));
+      if (!conditionEntry) {
+        throw new Meteor.Error(404, `Package export is missing condition TDF ${String(conditionTdfId || '')}.`);
+      }
+      return conditionEntry.tdfFileName;
+    });
+    setspec.condition = conditionFileNames;
   }
 
   const assetsByZipName = await resolvePackageExportAssets(memberTdfs, deps);
@@ -626,10 +658,14 @@ async function buildAndStorePreparedPackageAsset(
   deps: BuildAndStoreCurrentPackageAssetDeps
 ) {
   const zip = new JSZip();
+  const writtenStimulusFiles = new Set<string>();
 
   for (const entry of preparedState.preparedEntries) {
     zip.file(entry.tdfFileName, JSON.stringify(entry.exportTdfDoc, null, 2));
-    zip.file(entry.stimFileName, JSON.stringify(entry.rawStimuliFile, null, 2));
+    if (!writtenStimulusFiles.has(entry.stimFileName)) {
+      zip.file(entry.stimFileName, JSON.stringify(entry.rawStimuliFile, null, 2));
+      writtenStimulusFiles.add(entry.stimFileName);
+    }
   }
 
   for (const [zipName, asset] of preparedState.assetsByZipName.entries()) {

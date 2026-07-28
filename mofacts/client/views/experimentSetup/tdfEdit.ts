@@ -206,13 +206,27 @@ Template.tdfEdit.helpers({
 
         // Check if this TDF is referenced as a condition in any root TDF
         const rootTdf = TdfsCollection.findOne({
-            'content.tdfs.tutor.setspec.condition': tdf.content.fileName
+            $or: [
+                { 'content.tdfs.tutor.setspec.conditionTdfIds': tdfId },
+                {
+                    $and: [
+                        { 'content.tdfs.tutor.setspec.condition': tdf.content.fileName },
+                        {
+                            $or: [
+                                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
+                                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
 
         if (!rootTdf) return null;
 
         const conditions = rootTdf.content.tdfs.tutor.setspec.condition || [];
-        const index = conditions.indexOf(tdf.content.fileName);
+        const conditionTdfIds = rootTdf.content.tdfs.tutor.setspec.conditionTdfIds || [];
+        const index = conditionTdfIds.length > 0 ? conditionTdfIds.indexOf(tdfId) : conditions.indexOf(tdf.content.fileName);
 
         if (index === -1) return null;
 

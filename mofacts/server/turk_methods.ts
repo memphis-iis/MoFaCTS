@@ -765,8 +765,11 @@ Meteor.methods({
     const setspec = (expTDF as any)?.content?.tdfs?.tutor?.setspec || {};
     const conditionRefs = Array.isArray(setspec.condition) ? setspec.condition : [];
     const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
+    const identityRefs = conditionTdfIds.some((entry: unknown) => legacyTrim(String(entry || '')).length > 0)
+      ? conditionTdfIds
+      : conditionRefs;
     const conditionLookupKeys = [...new Set(
-      [...conditionRefs, ...conditionTdfIds]
+      identityRefs
         .map((entry: any) => legacyTrim(String(entry || '')))
         .filter((entry: string) => entry.length > 0)
     )];

@@ -204,6 +204,16 @@ export function createTdfSchemaFromRegistry(): Record<string, unknown> {
     required: ['tutor'],
     additionalProperties: false,
     properties: {
+      tdfId: {
+        type: 'string',
+        title: 'Server-managed TDF identity',
+        description: 'Stable identity assigned and exported automatically by MoFaCTS. Content authors do not enter or edit this value.',
+        minLength: 1,
+        maxLength: 128,
+        pattern: '^[A-Za-z0-9_-]+$',
+        readOnly: true,
+        'x-editor': false,
+      },
       tutor: {
         type: 'object',
         title: 'Tutor',

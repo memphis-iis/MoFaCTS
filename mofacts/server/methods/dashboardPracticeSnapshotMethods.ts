@@ -152,13 +152,16 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
     const setspec = root?.content?.tdfs?.tutor?.setspec || {};
     const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
     const resolvedIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-    for (const condition of conditions) {
-      const normalized = normalizeOptionalString(condition);
-      if (normalized) conditionFileNames.add(normalized);
-    }
-    for (const conditionTdfId of resolvedIds) {
-      const normalized = normalizeOptionalString(conditionTdfId);
-      if (normalized) conditionTdfIds.add(normalized);
+    const canonicalIds = resolvedIds
+      .map((conditionTdfId: unknown) => normalizeOptionalString(conditionTdfId))
+      .filter((conditionTdfId: string | null): conditionTdfId is string => !!conditionTdfId);
+    if (canonicalIds.length > 0) {
+      canonicalIds.forEach((conditionTdfId: string) => conditionTdfIds.add(conditionTdfId));
+    } else {
+      for (const condition of conditions) {
+        const normalized = normalizeOptionalString(condition);
+        if (normalized) conditionFileNames.add(normalized);
+      }
     }
   }
 
@@ -399,13 +402,16 @@ export function createDashboardPracticeSnapshotMethods(deps: DashboardPracticeSn
         const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
         const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
         const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-        for (const condition of conditions) {
-          const normalized = normalizeOptionalString(condition);
-          if (normalized) conditionChildFileNames.add(normalized);
-        }
-        for (const conditionTdfId of conditionTdfIds) {
-          const normalized = normalizeOptionalString(conditionTdfId);
-          if (normalized) conditionChildIds.add(normalized);
+        const canonicalIds = conditionTdfIds
+          .map((conditionTdfId: unknown) => normalizeOptionalString(conditionTdfId))
+          .filter((conditionTdfId: string | null): conditionTdfId is string => !!conditionTdfId);
+        if (canonicalIds.length > 0) {
+          canonicalIds.forEach((conditionTdfId: string) => conditionChildIds.add(conditionTdfId));
+        } else {
+          for (const condition of conditions) {
+            const normalized = normalizeOptionalString(condition);
+            if (normalized) conditionChildFileNames.add(normalized);
+          }
         }
       }
 

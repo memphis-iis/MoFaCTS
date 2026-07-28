@@ -116,12 +116,13 @@ function teacherListingSelector(userId: string) {
 
 async function conditionStimSetIdsForRefs(
     tdfs: TdfPublicationCollection,
-    conditionRefs: string[]
+    conditionRefs: string[],
+    conditionTdfIds: string[] = []
 ) {
-    if (conditionRefs.length === 0) {
+    if (conditionRefs.length === 0 && conditionTdfIds.length === 0) {
         return [];
     }
-    const selector = buildConditionChildSelector(conditionRefs);
+    const selector = buildConditionChildSelector(conditionRefs, conditionTdfIds);
     if (!selector) {
         return [];
     }
@@ -288,14 +289,18 @@ export function createTdfPublicationAccessResolver(
         if (participantExperimentTarget) {
             const participantRoot = await deps.tdfs.findOneAsync(
                 { 'content.tdfs.tutor.setspec.experimentTarget': participantExperimentTarget },
-                { fields: { stimuliSetId: 1, 'content.tdfs.tutor.setspec.condition': 1 } }
+                { fields: { stimuliSetId: 1, 'content.tdfs.tutor.setspec.condition': 1, 'content.tdfs.tutor.setspec.conditionTdfIds': 1 } }
             );
             const participantConditionRefs = Array.isArray(participantRoot?.content?.tdfs?.tutor?.setspec?.condition)
                 ? participantRoot.content.tdfs.tutor.setspec.condition
                 : [];
+            const participantConditionTdfIds = Array.isArray(participantRoot?.content?.tdfs?.tutor?.setspec?.conditionTdfIds)
+                ? normalizeIdList(participantRoot.content.tdfs.tutor.setspec.conditionTdfIds)
+                : [];
             const participantConditionStimSetIds = await conditionStimSetIdsForRefs(
                 deps.tdfs,
-                normalizeIdList(participantConditionRefs)
+                participantConditionTdfIds.length > 0 ? [] : normalizeIdList(participantConditionRefs),
+                participantConditionTdfIds
             );
             participantExperimentStimSetIds = [
                 participantRoot?.stimuliSetId,

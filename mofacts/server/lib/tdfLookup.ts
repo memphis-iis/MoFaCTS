@@ -143,6 +143,9 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
         if (conditionIds.includes(requestedTdfId)) {
           return true;
         }
+        if (conditionIds.length > 0) {
+          continue;
+        }
       }
 
       const conditions = Array.isArray(rootSetspec?.condition) ? rootSetspec.condition : [];
@@ -326,11 +329,13 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
         return await loadFullTdf();
       }
       const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec;
-      if (Array.isArray(rootSetspec?.conditionTdfIds)) {
-        const resolvedIds = rootSetspec.conditionTdfIds
-          .map((id: unknown) => deps.normalizeCanonicalId(id))
-          .filter((id: string | null): id is string => typeof id === 'string');
-        if (resolvedIds.includes(TDFId)) {
+      const canonicalConditionIds = Array.isArray(rootSetspec?.conditionTdfIds)
+        ? rootSetspec.conditionTdfIds
+            .map((id: unknown) => deps.normalizeCanonicalId(id))
+            .filter((id: string | null): id is string => typeof id === 'string')
+        : [];
+      if (canonicalConditionIds.length > 0) {
+        if (canonicalConditionIds.includes(TDFId)) {
           return await loadFullTdf();
         }
       } else {

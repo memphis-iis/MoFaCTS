@@ -687,12 +687,28 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, ex
     }
 
     const targetQuery = { "content.tdfs.tutor.setspec.experimentTarget": normalizedTarget };
-    let query: any = targetQuery;
-    if (experimentConditions && Array.isArray(experimentConditions) && experimentConditions.length > 0) {
-        const normalizedConditions = normalizeIdList(experimentConditions);
-        query = normalizedConditions.length
-            ? { $or: [{ "content.fileName": { $in: normalizedConditions } }, targetQuery] }
-            : targetQuery;
+    const rootTdf = await Tdfs.findOneAsync(
+        targetQuery,
+        { fields: { _id: 1, 'content.tdfs.tutor.setspec.condition': 1, 'content.tdfs.tutor.setspec.conditionTdfIds': 1 } }
+    );
+    if (!rootTdf?._id) {
+        return this.ready();
+    }
+    const rootSetspec = rootTdf.content?.tdfs?.tutor?.setspec || {};
+    const canonicalConditionIds = normalizeIdList(rootSetspec.conditionTdfIds || []);
+    let query: any;
+    if (canonicalConditionIds.length > 0) {
+        query = { _id: { $in: [String(rootTdf._id), ...canonicalConditionIds] } };
+    } else {
+        const suppliedLegacyConditions = Array.isArray(experimentConditions)
+            ? normalizeIdList(experimentConditions)
+            : [];
+        const legacyConditions = suppliedLegacyConditions.length > 0
+            ? suppliedLegacyConditions
+            : normalizeIdList(rootSetspec.condition || []);
+        query = legacyConditions.length > 0
+            ? { $or: [{ "content.fileName": { $in: legacyConditions } }, { _id: String(rootTdf._id) }] }
+            : { _id: String(rootTdf._id) };
     }
 
     // Security: Filter results based on user role and permissions
@@ -717,14 +733,6 @@ Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any, ex
     }
 
     // Students: resolve canonical root+condition ids and verify participant access to target.
-    const rootTdf = await Tdfs.findOneAsync(
-        targetQuery,
-        { fields: { _id: 1, 'content.tdfs.tutor.setspec.condition': 1, 'content.tdfs.tutor.setspec.conditionTdfIds': 1 } }
-    );
-    if (!rootTdf?._id) {
-        return this.ready();
-    }
-
     const allowedIds = Array.from(new Set<string>([
         String(rootTdf._id),
         ...await lessonFamilyResolver.resolveConditionChildIdsForRoots([rootTdf]),

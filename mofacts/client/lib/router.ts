@@ -528,9 +528,12 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
     if (tdf) {
 
       if (tdf.content.tdfs.tutor.setspec.condition){
-        Session.set('experimentConditions', tdf.content.tdfs.tutor.setspec.condition)
-        const condition = tdf.content.tdfs.tutor.setspec.condition;
-        Meteor.subscribe('tdfByExperimentTarget', target, condition)
+        const conditionTdfIds = tdf.content.tdfs.tutor.setspec.conditionTdfIds;
+        const conditionRefs = Array.isArray(conditionTdfIds) && conditionTdfIds.length > 0
+          ? conditionTdfIds
+          : tdf.content.tdfs.tutor.setspec.condition;
+        Session.set('experimentConditions', conditionRefs)
+        Meteor.subscribe('tdfByExperimentTarget', target, conditionRefs)
       }
       clientConsole(2, 'tdf found');
       // Security: Replace eval() with safe boolean check

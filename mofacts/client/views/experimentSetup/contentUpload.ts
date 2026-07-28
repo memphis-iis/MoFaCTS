@@ -2356,50 +2356,52 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
 
           (async () => {
             try {
-              const result = await MeteorAny.callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
+              let result = await MeteorAny.callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
 
-              for (const res of (result.results || [])) {
-                if (res.data && res.data.res == 'awaitClientTDF') {
-                  let reason = []
-                  const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-                  if(reasons.includes('prevTDFExists'))
-                    reason.push(contentText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }))
-                  if(reasons.includes(`prevStimExists`))
-                    reason.push(contentText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }))
+              while (result?.status === 'confirmation-required') {
+                const updates = Array.isArray(result.updates) ? result.updates : [];
+                const message = updates
+                  .map((entry: any) => contentText('content.previousTdfOverwriteMessage', {
+                    filename: entry?.lessonName || entry?.fileName || entry?.tdfId || ''
+                  }))
+                  .join(' ');
+                const confirmed = await requestContentConfirmation(template, {
+                  placement: 'upload-package',
+                  title: contentText('content.overwriteExistingContent'),
+                  message,
+                  confirmLabel: contentText('content.overwriteContent'),
+                  cancelLabel: contentText('content.cancel'),
+                  level: 'warning'
+                });
 
-                  const confirmed = await requestContentConfirmation(template, {
-                    placement: 'upload-package',
-                    title: contentText('content.overwriteExistingContent'),
-                    message: reason.join(' '),
-                    confirmLabel: contentText('content.overwriteContent'),
-                    cancelLabel: contentText('content.cancel'),
-                    level: 'warning'
-                  });
-                  if(confirmed){
+                if (!confirmed) {
+                  const stagedPackageAssetId = result.packageAssetId || packageAssetId;
+                  if (stagedPackageAssetId) {
                     try {
-                      await MeteorAny.callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
-                    } catch (err: any) {
-                      // OPTIMISTIC UI: Update error state (no alert)
-                      const uploadData = template.pendingUploads.get(pendingUploadId);
-                      const message = contentText('content.confirmationFailed', { error: uploadErrorText(err) });
-                      if (uploadData) {
-                        template.pendingUploads.set(pendingUploadId, {
-                          ...uploadData,
-                          status: "error",
-                          packageAssetId: packageAssetId,
-                          error: message
-                        });
-                        setUploadMessage(template, message, 'error');
-                        assetsHelperLastRun = 0;
-                        assetsHelperCachedResult = [];
-                      }
-                      clientConsole(1, '[UPLOAD] Confirmation failed:', err);
-                      finish({ fileName: file.name, error: message });
-                      return;
+                      await MeteorAny.callAsync('removeAssetById', stagedPackageAssetId);
+                    } catch (cleanupError: any) {
+                      clientConsole(1, '[UPLOAD] Failed to remove canceled staged package:', cleanupError);
                     }
                   }
+                  setUploadMessage(template, contentText('content.uploadCanceledPackage', { filename: file.name }), 'warning');
+                  template.pendingUploads.set(pendingUploadId, undefined);
+                  assetsHelperLastRun = 0;
+                  assetsHelperCachedResult = [];
+                  finish({ fileName: file.name, skipped: true });
+                  return;
                 }
-                else if(!res.result) {
+
+                result = await MeteorAny.callAsync(
+                  'confirmPackageUpload',
+                  result.packageAssetId,
+                  result.preflightFingerprint,
+                  emailToggle,
+                  uploadIntegrity
+                );
+              }
+
+              for (const res of (result.results || [])) {
+                if(!res.result) {
                   // OPTIMISTIC UI: Update error state (no alert)
                   const uploadData = template.pendingUploads.get(pendingUploadId);
                   const message = res.errmsg

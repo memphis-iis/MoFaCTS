@@ -248,9 +248,18 @@ async function getContentUploadSummariesForIds(
   for (const tdf of tdfs as TdfLike[]) {
     const setspec = tdf.content?.tdfs?.tutor?.setspec;
     const conditions = Array.isArray(setspec?.condition) ? setspec.condition : [];
-    for (const condition of conditions) {
-      if (typeof condition === 'string' && condition.trim().length > 0) {
-        conditionLookupKeys.add(condition.trim());
+    const conditionTdfIds = Array.isArray(setspec?.conditionTdfIds)
+      ? setspec.conditionTdfIds
+          .map((id: unknown) => deps.normalizeCanonicalId(id))
+          .filter((id: string | null): id is string => !!id)
+      : [];
+    if (conditionTdfIds.length > 0) {
+      conditionTdfIds.forEach((id: string) => conditionLookupKeys.add(id));
+    } else {
+      for (const condition of conditions) {
+        if (typeof condition === 'string' && condition.trim().length > 0) {
+          conditionLookupKeys.add(condition.trim());
+        }
       }
     }
 

@@ -282,15 +282,21 @@ export async function postProcessUploadedTdfs(args: {
     await storeH5PLibrariesFromPackage(h5pFile);
   }
 
+  const identityByFileName = new Map(
+    (state.identityPlan?.entries || []).map((entry) => [entry.fileName, entry])
+  );
   for (const tdfFile of unzippedFiles.filter((file) => file.type === 'tdf')) {
-    const tdf = await deps.Tdfs.findOneAsync({ tdfFileName: tdfFile.name });
+    const identity = identityByFileName.get(tdfFile.name);
+    if (!identity) {
+      throw new Error(`Package identity preflight did not assign an id to TDF "${tdfFile.name}".`);
+    }
+    const tdf = await deps.Tdfs.findOneAsync({ _id: identity.tdfId });
     const setspec = tdf?.content?.tdfs?.tutor?.setspec;
     if (setspec && Array.isArray(setspec.condition) && setspec.condition.length > 0) {
-      const conditionTdfIds = await deps.resolveConditionTdfIds(setspec);
-      if (conditionTdfIds.some((id) => !id)) {
+      const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
+      if (conditionTdfIds.length !== setspec.condition.length || conditionTdfIds.some((id: unknown) => !id)) {
         throw new Error(`TDF "${tdfFile.name}" references condition TDFs that were not found after package upload.`);
       }
-      setspec.conditionTdfIds = conditionTdfIds;
     }
     if (tdf && tdf.content && tdf.content.tdfs && tdf.content.tdfs.tutor && tdf.content.tdfs.tutor.unit) {
       const responseKCMap = tdf._id ? await deps.getResponseKCMapForTdf(tdf._id) : {};

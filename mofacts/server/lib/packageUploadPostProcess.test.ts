@@ -13,6 +13,19 @@ function packageState(): PackageUploadRuntimeState {
     uploadActorUserId: 'user-a',
     stimSetId: 7,
     uploadedMediaPathMapsByStimSetId: new Map(),
+    identityPlan: {
+      fingerprint: 'fingerprint',
+      updates: [],
+      creates: [{ tdfId: 'tdf-1', fileName: 'lesson_tdf.json', lessonName: 'Package' }],
+      entries: [{
+        tdfId: 'tdf-1',
+        incomingTdfId: null,
+        fileName: 'lesson_tdf.json',
+        action: 'create',
+        lessonName: 'Package',
+        conditionTdfIds: [],
+      }],
+    },
   };
 }
 
@@ -33,6 +46,9 @@ function packageDeps(params: {
     storageBoundary: {} as ProcessPackageUploadDeps['storageBoundary'],
     async userIsInRoleAsync() {
       return false;
+    },
+    async userCanManageTdf() {
+      return true;
     },
     normalizeCanonicalId(value: unknown) {
       return typeof value === 'string' && value.trim() ? value.trim() : null;
@@ -117,6 +133,9 @@ function packageDeps(params: {
       async insertAsync() {},
     },
     Tdfs: {
+      find() {
+        return { async fetchAsync() { return []; } };
+      },
       async findOneAsync() {
         return params.tdf;
       },

@@ -129,6 +129,7 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
     getTdfNamesByOwnerId: async () => [],
     assertUserOwnsTdfs: async () => true,
     canDownloadOwnedTdfData: () => false,
+    getTdfByFileName: async () => null,
     resolveConditionTdfIds: async () => [],
     getClassPerformanceByTdfWorkflow: async () => ({}),
     getStimuliSetById: async () => [],

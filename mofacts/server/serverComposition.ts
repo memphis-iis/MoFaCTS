@@ -444,6 +444,7 @@ const packageMethods = createPackageMethods({
 const {
   getResponseKCMapForTdf,
   processPackageUpload,
+  confirmPackageUpload,
   saveAiGeneratedPackageContent,
   saveContentFile,
   tdfUpdateConfirmed,
@@ -508,6 +509,7 @@ const analyticsMethods = createAnalyticsMethods({
   getTdfNamesByOwnerId,
   assertUserOwnsTdfs,
   canDownloadOwnedTdfData,
+  getTdfByFileName,
   resolveConditionTdfIds,
   getClassPerformanceByTdfWorkflow,
   getStimuliSetById,
@@ -1068,6 +1070,7 @@ export const asyncMethods: Record<string, unknown> = {
 
   getResponseKCMapForTdf: getResponseKCMapForTdfPublic,
   processPackageUpload,
+  confirmPackageUpload,
 
   tdfUpdateConfirmed, saveTdfStimuli, saveTdfContent,
   persistAutoTutorExpectationRelationships,

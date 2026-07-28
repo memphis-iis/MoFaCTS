@@ -15,6 +15,7 @@ import {
 } from '../lib/memphisSaml';
 import { createPerformanceIndexes } from '../migrations/add_performance_indexes';
 import { backfillPackageAssetIds } from '../migrations/backfill_package_asset_ids';
+import { backfillConditionTdfIds } from '../migrations/backfill_condition_tdf_ids';
 import { cleanExperimentStateDupesAndAddUniqueIndex } from '../migrations/clean_experiment_state_dupes';
 import { migrateLoggingSettings } from '../migrations/migrate_logging_settings';
 import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migrations';
@@ -340,11 +341,21 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     DynamicSettings: deps.DynamicSettings,
     serverConsole: deps.serverConsole,
   });
-
+  let packageAssetBackfillSucceeded = false;
   try {
     await backfillPackageAssetIds();
+    packageAssetBackfillSucceeded = true;
   } catch (error: unknown) {
     deps.serverConsole('Warning: Package asset id backfill failed:', error instanceof Error ? error.message : String(error));
+  }
+  if (packageAssetBackfillSucceeded) {
+    await backfillConditionTdfIds({
+      Tdfs: deps.Tdfs,
+      DynamicSettings: deps.DynamicSettings,
+      serverConsole: deps.serverConsole,
+    });
+  } else {
+    deps.serverConsole('[TDF identity migration] deferred because package asset id backfill did not complete');
   }
   try {
     await createPerformanceIndexes();

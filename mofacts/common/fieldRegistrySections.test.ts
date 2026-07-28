@@ -35,6 +35,13 @@ describe('field registry section composition', function() {
     const stimSchema = createStimSchemaFromRegistry();
 
     expect(tdfSchema.properties).to.have.property('tutor');
+    expect(tdfSchema.properties).to.have.property('tdfId');
+    expect((tdfSchema.properties as any).tdfId).to.include({
+      type: 'string',
+      readOnly: true,
+      'x-editor': false,
+    });
+    expect((tdfSchema.required as string[])).not.to.include('tdfId');
     expect(stimSchema.properties).to.have.property('setspec');
     expect(DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS).to.include({
       stimuliPosition: 'top',

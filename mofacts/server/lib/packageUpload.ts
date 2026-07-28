@@ -14,6 +14,7 @@ import { uploadParsedPackageMedia } from './packageUploadMedia';
 import { processParsedPackageTdfs } from './packageUploadPersistence';
 import { postProcessUploadedTdfs } from './packageUploadPostProcess';
 import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
+import { preflightPackageTdfIdentities } from './packageTdfIdentity';
 
 const INCOMPLETE_UPLOAD_MESSAGE = 'The uploaded ZIP appears incomplete or truncated. Please upload the file again.';
 
@@ -24,6 +25,7 @@ export type PackageUploadPolicy = {
     owner: string;
     isTeacherOrAdmin: boolean;
   }) => Promise<void> | void;
+  confirmedIdentityFingerprint?: string | null;
 };
 
 function sleep(ms: number) {
@@ -225,7 +227,8 @@ export async function processPackageUploadWorkflow(
     filePath: '',
     uploadActorUserId: context.userId,
     stimSetId: undefined,
-    uploadedMediaPathMapsByStimSetId: new Map<string, Map<string, string>>()
+    uploadedMediaPathMapsByStimSetId: new Map<string, Map<string, string>>(),
+    identityPlan: null,
   };
 
   try {
@@ -233,6 +236,24 @@ export async function processPackageUploadWorkflow(
     await mirrorPackageAssetToS3(fileObj, deps);
     unzippedFiles = await parsePackageZip(zipPath, packageFile, deps.serverConsole);
     await policy.prepareParsedPackage?.({ unzippedFiles, owner, isTeacherOrAdmin });
+
+    failureStage = 'identity preflight';
+    const identityPlan = await preflightPackageTdfIdentities({
+      unzippedFiles,
+      packageAssetId,
+      ownerId: owner,
+      deps,
+    });
+    state.identityPlan = identityPlan;
+    if (identityPlan.updates.length > 0 && policy.confirmedIdentityFingerprint !== identityPlan.fingerprint) {
+      return {
+        status: 'confirmation-required',
+        packageAssetId,
+        preflightFingerprint: identityPlan.fingerprint,
+        updates: identityPlan.updates,
+        creates: identityPlan.creates,
+      };
+    }
 
     failureStage = 'content processing';
     const { results, touchedStimuliSetIds } = await processParsedPackageTdfs({

@@ -539,6 +539,30 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       const preselectedCondition = Session.get('preselectedConditionTdfId');
       const resolvedConditionIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
 
+      const loadConditionTdf = async (conditionFileName: string): Promise<TdfDocumentLike | null> => {
+        const conditionIndex = conditionOptions.indexOf(conditionFileName);
+        const canonicalConditionId = typeof resolvedConditionIds[conditionIndex] === 'string'
+          ? resolvedConditionIds[conditionIndex]
+          : null;
+        if (resolvedConditionIds.length > 0 && !canonicalConditionId) {
+          throw new Error(`Condition "${conditionFileName}" has no canonical TDF id in root TDF "${Session.get('currentRootTdfId')}"`);
+        }
+        if (canonicalConditionId) {
+          let conditionTdf = findTdf({ _id: canonicalConditionId });
+          if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
+            conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', canonicalConditionId, {
+              courseAssignment: getCourseAssignmentLaunchContext(),
+            });
+          }
+          return conditionTdf;
+        }
+        let conditionTdf = findTdf({ 'content.fileName': conditionFileName });
+        if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
+          conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfByFileName', conditionFileName);
+        }
+        return conditionTdf;
+      };
+
       let conditionTdfId: string | null = null;
 
       if (preselectedCondition) {
@@ -571,14 +595,10 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
           if (!randomConditionFileName) {
             return handleResumeFailure('Unfortunately, no experiment condition was available to select.');
           }
-          let conditionTdf = findTdf({ 'content.fileName': randomConditionFileName });
+          let conditionTdf = await loadConditionTdf(randomConditionFileName);
           if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
-            clientConsole(1, 'Condition TDF not found or incomplete in client collection, fetching from server:', randomConditionFileName);
-            conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfByFileName', randomConditionFileName);
-            if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
-              clientConsole(1, 'Could not find condition TDF:', randomConditionFileName);
-              return handleResumeFailure('Unfortunately, the experiment condition TDF could not be found. Please contact your administrator.');
-            }
+            clientConsole(1, 'Could not find condition TDF:', randomConditionFileName);
+            return handleResumeFailure('Unfortunately, the experiment condition TDF could not be found. Please contact your administrator.');
           }
           conditionTdfId = conditionTdf._id ?? null;
           newExperimentState.conditionTdfId = conditionTdfId;
@@ -613,15 +633,11 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
             if (!randomConditionFileName) {
               return handleResumeFailure('Unfortunately, no experiment condition was available to select.');
             }
-            let conditionTdf = findTdf({ 'content.fileName': randomConditionFileName });
-            if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
-              clientConsole(1, 'Condition TDF not found or incomplete in client collection, fetching from server:', randomConditionFileName);
-              conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfByFileName', randomConditionFileName);
+            let conditionTdf = await loadConditionTdf(randomConditionFileName);
             if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
               clientConsole(1, 'Could not find condition TDF:', randomConditionFileName);
               return handleResumeFailure('Unfortunately, the experiment condition TDF could not be found. Please contact your administrator.');
             }
-          }
             conditionTdfId = conditionTdf._id ?? null;
           } else if(setspec.loadbalancing == "min"){
             // Select randomly from conditions with count equal to min
@@ -645,15 +661,11 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
             if (!randomConditionFileName) {
               return handleResumeFailure('Unfortunately, no experiment condition was available to select.');
             }
-            let conditionTdf = findTdf({ 'content.fileName': randomConditionFileName });
-            if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
-              clientConsole(1, 'Condition TDF not found or incomplete in client collection, fetching from server:', randomConditionFileName);
-              conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfByFileName', randomConditionFileName);
+            let conditionTdf = await loadConditionTdf(randomConditionFileName);
             if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
               clientConsole(1, 'Could not find condition TDF:', randomConditionFileName);
               return handleResumeFailure('Unfortunately, the experiment condition TDF could not be found. Please contact your administrator.');
             }
-          }
             conditionTdfId = conditionTdf._id ?? null;
             clientConsole(2, 'conditionTdf, conditionTdfId', conditionTdf, conditionTdf._id);
           } else {

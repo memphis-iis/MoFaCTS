@@ -31,7 +31,8 @@ type AnalyticsDownloadDeps = {
   getTdfNamesByOwnerId: (ownerId: string) => Promise<string[] | null>;
   assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
   canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
-  resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
+  getTdfByFileName: (filename: string) => Promise<any>;
+  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
 };
 
 function sanitizeFileNameSegment(value: unknown, defaultValue: string) {
@@ -119,7 +120,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
       }
 
       const downloadFileName = fileName.split('.json')[0] + '-data.tsv';
-      const tdf = await deps.Tdfs.findOneAsync({ 'content.fileName': fileName });
+      const tdf = await deps.getTdfByFileName(fileName);
       if (!tdf) {
         throw new Meteor.Error(404, 'TDF not found');
       }

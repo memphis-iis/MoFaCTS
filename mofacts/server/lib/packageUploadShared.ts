@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 
 import type { UploadedPackageFile } from './packageParser';
+import type { PackageTdfIdentityPlan } from './packageTdfIdentity';
 import type { createStorageBoundary } from './storageBoundary';
 import type { OpenRouterEmbeddingOptions, OpenRouterEmbeddingResult } from '../../common/lib/openRouterClient';
 
@@ -33,6 +34,7 @@ export type SaveContentResult = {
   action: string;
   data?: unknown;
   tdfFileName?: string;
+  tdfId?: string;
 };
 
 export type UploadedMediaRecord = {
@@ -49,6 +51,7 @@ export type PackageUploadRuntimeState = {
   uploadActorUserId: string | null;
   stimSetId: string | number | undefined;
   uploadedMediaPathMapsByStimSetId: UploadedMediaPathMapsByStimSetId;
+  identityPlan: PackageTdfIdentityPlan | null;
 };
 
 export type ProcessPackageUploadDeps = {
@@ -62,6 +65,7 @@ export type ProcessPackageUploadDeps = {
   };
   storageBoundary: ReturnType<typeof createStorageBoundary>;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
+  userCanManageTdf: (userId: string, tdf: any) => Promise<boolean> | boolean;
   normalizeCanonicalId: (value: unknown) => string | null;
   serverConsole: (...args: unknown[]) => void;
   encryptData: (value: string) => string;
@@ -88,13 +92,14 @@ export type ProcessPackageUploadDeps = {
     insertAsync: (document: Record<string, unknown>) => Promise<unknown>;
   };
   Tdfs: {
-    findOneAsync: (selector: Record<string, unknown>) => Promise<any>;
+    find: (selector: Record<string, unknown>, options?: Record<string, unknown>) => { fetchAsync: () => Promise<any[]> };
+    findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>;
     upsertAsync: (selector: Record<string, unknown>, document: Record<string, unknown>) => Promise<unknown>;
   };
   H5PContents?: {
     upsertAsync: (selector: Record<string, unknown>, modifier: Record<string, unknown>) => Promise<unknown>;
   };
-  resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
+  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
   getResponseKCMapForTdf: (tdfId: string) => Promise<Record<string, unknown>>;
   processAudioFilesForTDF: (tdfDoc: any, stimuliSetId: any, options: any) => Promise<any>;
   canonicalizeStimDisplayMediaRefs: (stimuliDoc: any, stimuliSetId: any, options: any) => Promise<any>;

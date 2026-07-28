@@ -74,7 +74,8 @@ type AnalyticsMethodsDeps = {
   getTdfNamesByOwnerId: (ownerId: string) => Promise<string[] | null>;
   assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
   canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
-  resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
+  getTdfByFileName: (filename: string) => Promise<any>;
+  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
   getClassPerformanceByTdfWorkflow: (
     classId: string,
     tdfId: string,
@@ -193,7 +194,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         .map((id) => deps.normalizeCanonicalId(id))
         .filter((id): id is string => typeof id === 'string')
     );
-    if (Array.isArray(setspec?.condition)) {
+    if (!Array.isArray(setspec?.conditionTdfIds) || setspec.conditionTdfIds.length === 0) {
       for (const conditionId of await deps.resolveConditionTdfIds(setspec)) {
         const normalizedConditionId = deps.normalizeCanonicalId(conditionId);
         if (normalizedConditionId) {

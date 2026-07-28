@@ -65,12 +65,14 @@ type TdfPayload = {
 };
 
 type PackagePayload = {
+  tdfId: string;
   fileName: string;
   packageFile?: string;
   packageAssetId?: string;
   stimFileName: string;
   stimuli: unknown;
   tdfs: TdfPayload['tdfs'];
+  conditionTdfIds?: Array<string | null>;
 };
 
 type UpsertPendingResult = {
@@ -87,6 +89,7 @@ type UpsertResult = {
   TDF?: UnknownRecord;
   result?: boolean;
   errmsg?: string;
+  tdfId?: string;
 };
 
 type PackageMethodsDeps = {
@@ -234,6 +237,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       DynamicAssets: deps.DynamicAssets,
       storageBoundary: deps.storageBoundary,
       userIsInRoleAsync: deps.userIsInRoleAsync,
+      userCanManageTdf: deps.userCanManageTdf,
       normalizeCanonicalId: deps.normalizeCanonicalId,
       serverConsole: deps.serverConsole,
       encryptData: deps.encryptData,
@@ -269,6 +273,32 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     }
     await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
     return processPackageUploadWorkflow(this, fileObjOrId, actingUserId, emailToggle, getPackageUploadDeps(), integrity);
+  }
+
+  async function confirmPackageUpload(
+    this: MethodContext,
+    packageAssetId: string,
+    preflightFingerprint: string,
+    emailToggle: boolean = false,
+    integrity?: PackageUploadIntegrity
+  ) {
+    const actingUserId = deps.normalizeCanonicalId(this.userId);
+    if (!actingUserId) throw new Meteor.Error(401, 'Must be logged in');
+    check(packageAssetId, String);
+    check(preflightFingerprint, String);
+    if (!/^[a-f0-9]{64}$/.test(preflightFingerprint)) {
+      throw new Meteor.Error(400, 'Invalid package preflight fingerprint');
+    }
+    await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
+    return processPackageUploadWorkflow(
+      this,
+      packageAssetId,
+      actingUserId,
+      emailToggle,
+      getPackageUploadDeps(),
+      integrity,
+      { confirmedIdentityFingerprint: preflightFingerprint }
+    );
   }
 
   async function saveMediaFile(media: UploadedPackageFile, owner: string, stimSetId: string | number | null | undefined){
@@ -681,8 +711,17 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return stimuliSetId
   }
 
-  async function resolveConditionTdfIds(setspec: { condition?: string[] } = {}) {
+  async function resolveConditionTdfIds(setspec: { condition?: string[]; conditionTdfIds?: unknown[] } = {}) {
     const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
+    if (Array.isArray(setspec.conditionTdfIds) && setspec.conditionTdfIds.length > 0) {
+      if (conditions.length > 0 && setspec.conditionTdfIds.length !== conditions.length) {
+        throw new Meteor.Error(
+          'condition-identity-length-mismatch',
+          'conditionTdfIds must contain one entry for every condition filename.'
+        );
+      }
+      return setspec.conditionTdfIds.map((entry) => deps.normalizeCanonicalId(entry));
+    }
     if (!conditions.length) {
       return [];
     }
@@ -805,6 +844,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
 
   async function upsertPackage(packageJSON: PackagePayload, ownerId: string): Promise<UpsertResult> {
     deps.serverConsole('upsertPackage', packageJSON.packageFile || 'unknown');
+    const tdfId = deps.normalizeCanonicalId(packageJSON.tdfId);
+    if (!tdfId) {
+      throw new Meteor.Error(500, 'TDF id missing after package identity preflight');
+    }
     const stimulusFileName = packageJSON.stimFileName
     const stimJSON = packageJSON.stimuli
     const packageFile = packageJSON.packageFile
@@ -812,22 +855,19 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!packageAssetId) {
       throw new Meteor.Error(500, 'Package asset id missing during package upsert');
     }
-    let ret: UpsertPendingResult = {reason: []};
     const Tdf = packageJSON.tdfs;
     const lessonName = deps.legacyTrim(Tdf.tutor.setspec.lessonname);
-    const prev = await deps.getTdfByFileName(packageJSON.fileName);
+    const prev = await deps.Tdfs.findOneAsync({ _id: tdfId });
     if (prev?._id && !(await deps.userCanManageTdf(ownerId, prev))) {
       return {
         result: false,
-        errmsg: `TDF file name "${packageJSON.fileName}" is already used by another user. Choose a unique TDF JSON filename in the package, or ask the owner to share access before replacing it.`
+        errmsg: `TDF id "${tdfId}" belongs to content this account cannot manage.`
       };
     }
     const responseKCMap = prev?._id ? await getResponseKCMapForTdf(prev._id) : {};
     let stimuliSetId = prev ? prev.stimuliSetId : null;
     if (!stimuliSetId) {
       stimuliSetId = deps.allocateNextStimuliSetId();
-    } else {
-      ret = {res: 'awaitClientTDF', reason: ['prevStimExists']}
     }
     if (lessonName.length < 1) {
       return { result: false, errmsg: 'TDF has no lessonname - it cannot be valid' };
@@ -855,8 +895,19 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if(newFormatttedTips.length > 0){
       Tdf.tutor.setspec.tips = newFormatttedTips;
     }
-    Tdf.tutor.setspec.conditionTdfIds = await resolveConditionTdfIds(Tdf.tutor.setspec);
-    const tdfJSON: TdfPayload = {'fileName': packageJSON.fileName, 'tdfs': Tdf, 'ownerId': ownerId, 'source': 'upload'};
+    Tdf.tutor.setspec.conditionTdfIds = Array.isArray(packageJSON.conditionTdfIds)
+      ? packageJSON.conditionTdfIds
+      : [];
+    const persistedOwnerId = typeof prev?.ownerId === 'string' && prev.ownerId.trim()
+      ? prev.ownerId
+      : ownerId;
+    const tdfJSON: TdfPayload = {
+      fileName: packageJSON.fileName,
+      tdfs: Tdf,
+      ownerId: persistedOwnerId,
+      source: 'upload',
+      ...(prev?.content?.createdAt ? { createdAt: prev.content.createdAt } : {}),
+    };
     const formattedStims: unknown[] = [];
     deps.serverConsole('getAssociatedStimSetIdForStimFile', stimulusFileName, stimuliSetId);
     const oldStimFormat = {
@@ -875,47 +926,27 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       formattedStims.push(stim);
     }
 
-    let tdfJSONtoUpsert: TdfPayload;
-    if (prev && prev._id) {
-      tdfJSONtoUpsert = tdfJSON;
-      const updateObj = {
-        _id: prev._id,
-        tdfFileName: packageJSON.fileName,
-        content: tdfJSONtoUpsert,
-        ownerId: ownerId,
-        packageFile: packageFile,
-        packageAssetId: packageAssetId,
-        rawStimuliFile: stimJSON,
-        stimuli: formattedStims,
-        stimuliSetId: stimuliSetId
-      };
-      if(ret.res != 'awaitClientTDF'){
-        ret.res = 'awaitClientTDF';
-      }
-      ret.stimuliSetId = stimuliSetId;
-      ret.TDF = updateObj;
-      ret.reason.push('prevTDFExists');
-      return ret;
-    } else {
+    const tdfJSONtoUpsert = tdfJSON;
+    if (!prev) {
       tdfJSON.createdAt = new Date();
-      tdfJSONtoUpsert = tdfJSON;
     }
     const conditionCounts = tdfJSONtoUpsert.tdfs.tutor.setspec.condition ? new Array(tdfJSONtoUpsert.tdfs.tutor.setspec.condition.length).fill(0) : [];
 
-    await deps.Tdfs.upsertAsync({"content.fileName": packageJSON.fileName}, {$set: {
+    const setFields: UnknownRecord = {
       tdfFileName: packageJSON.fileName,
       content: tdfJSONtoUpsert,
-      ownerId: ownerId,
+      ownerId: persistedOwnerId,
       packageFile: packageFile,
       packageAssetId: packageAssetId,
       rawStimuliFile: stimJSON,
       stimuli: formattedStims,
-      stimuliSetId: stimuliSetId,
-      conditionCounts: conditionCounts
-    }});
+      stimuliSetId: stimuliSetId
+    };
+    if (!prev) setFields.conditionCounts = conditionCounts;
+    await deps.Tdfs.upsertAsync({ _id: tdfId }, { $set: setFields });
     await enforceConditionChildUserSelect(Tdf.tutor.setspec.conditionTdfIds ?? []);
 
-    return {stimuliSetId: stimuliSetId}
+    return { res: 'upserted', stimuliSetId: stimuliSetId, tdfId }
   }
 
   async function tdfUpdateConfirmed(
@@ -1213,6 +1244,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     }) => {
       let prepared: ReturnType<typeof prepareAiGeneratedPackage> | null = null;
       let mayRollbackNewTdf = false;
+      let savedTdfId = '';
       try {
         const ingestion = await processPackageUploadWorkflow(
           { userId: actingUserId },
@@ -1225,41 +1257,40 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
             requireAllContentResults: true,
             prepareParsedPackage: async ({ unzippedFiles, isTeacherOrAdmin }) => {
               prepared = prepareAiGeneratedPackage(unzippedFiles, contract, isTeacherOrAdmin);
-              const preparedPackage = prepared as ReturnType<typeof prepareAiGeneratedPackage>;
-              const existingTdf = await deps.getTdfByFileName(preparedPackage.tdfFileName);
-              if (existingTdf?._id) {
-                throw new Meteor.Error(
-                  'generated-package-name-conflict',
-                  `Content already exists under the name "${preparedPackage.tdfFileName}". Choose a different name.`,
-                  JSON.stringify({ entryIndex: 0, tdfFile: preparedPackage.tdfFileName, title: preparedPackage.title }),
-                );
-              }
               mayRollbackNewTdf = true;
             },
           },
         );
         if (!ingestion) throw new Meteor.Error('generated-package-save-failed', 'Generated package ingestion did not complete.');
+        if (!Array.isArray(ingestion.results)) {
+          throw new Meteor.Error('generated-package-save-failed', 'Generated package ingestion unexpectedly required confirmation.');
+        }
         const failedResult = ingestion.results.find((result) => !result.result);
         if (failedResult) {
           throw new Meteor.Error('generated-package-save-failed', failedResult.errmsg || 'Generated package save failed');
         }
         if (!prepared) throw new Meteor.Error('generated-package-save-failed', 'Generated package was not validated.');
         const preparedPackage = prepared as ReturnType<typeof prepareAiGeneratedPackage>;
-        const savedTdf = await deps.getTdfByFileName(preparedPackage.tdfFileName);
-        const tdfId = typeof savedTdf?._id === 'string' ? savedTdf._id : '';
+        savedTdfId = typeof ingestion.results[0]?.tdfId === 'string' ? ingestion.results[0].tdfId : '';
+        if (!savedTdfId) {
+          throw new Meteor.Error('generated-package-save-failed', 'Generated package did not return its assigned TDF id.');
+        }
         return [{
           moduleId: preparedPackage.moduleId,
           title: preparedPackage.title,
           artifactKindLabel: preparedPackage.moduleId === 'assessmentSession' ? 'Assessment session' : 'Learning session',
-          ...(tdfId ? { tdfId, route: '/contentUpload', editRoute: `/contentEdit/${tdfId}`, tdfEditRoute: `/tdfEdit/${tdfId}` } : {}),
+          tdfId: savedTdfId,
+          route: '/contentUpload',
+          editRoute: `/contentEdit/${savedTdfId}`,
+          tdfEditRoute: `/tdfEdit/${savedTdfId}`,
           packageAssetId,
           itemCount: contract.pairs.length,
           summary: creationSummary,
         }];
       } catch (error) {
-        if (prepared && mayRollbackNewTdf) {
+        if (prepared && mayRollbackNewTdf && savedTdfId) {
           const preparedPackage = prepared as ReturnType<typeof prepareAiGeneratedPackage>;
-          const partialTdf = await deps.getTdfByFileName(preparedPackage.tdfFileName);
+          const partialTdf = await deps.Tdfs.findOneAsync({ _id: savedTdfId });
           if (partialTdf?._id && partialTdf.ownerId === actingUserId) {
             try {
               if (partialTdf.stimuliSetId !== undefined && partialTdf.stimuliSetId !== null) {
@@ -1280,6 +1311,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     getResponseKCMapForTdf,
     getMaxResponseKC,
     processPackageUpload,
+    confirmPackageUpload,
     ...generatedContentMethods,
     repairAiGeneratedPackageMedia,
     saveContentFile,
