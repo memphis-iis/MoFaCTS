@@ -16,6 +16,7 @@ import { resolveSpeechIgnoreOutOfGrammarResponses } from '../../lib/speechRecogn
 import '../../lib/memphisSaml';
 import { translatePlatformString, type TranslationValues } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { resolveProlificExperimentEntry } from '../../lib/prolificExperimentEntry';
 
 
 import { legacyTrim } from '../../../common/underscoreCompat';
@@ -347,6 +348,27 @@ Template.signIn.onRendered(async function(this: any) {
       });
     });
   });
+
+  if (isExperimentFlow && !Session.get('experimentPasswordRequired') && !template._prolificAutoSignInAttempted) {
+    template._prolificAutoSignInAttempted = true;
+    const entry = resolveProlificExperimentEntry(
+      Session.get('experimentTarget'),
+      FlowRouterAny?.current?.()?.queryParams
+    );
+    if (entry.mode === 'automatic') {
+      const usernameInput = document.getElementById('signInUsername') as HTMLInputElement | null;
+      if (usernameInput) {
+        usernameInput.value = entry.participantId;
+        $('#experimentSignin').prop('disabled', true);
+        await userPasswordCheck(template);
+      }
+    } else if (entry.reason !== 'missing') {
+      clientConsole(1, '[PROLIFIC-ENTRY] Automatic experiment sign-in skipped', {
+        reason: entry.reason,
+        experimentTarget: Session.get('experimentTarget')
+      });
+    }
+  }
 });
 
 
