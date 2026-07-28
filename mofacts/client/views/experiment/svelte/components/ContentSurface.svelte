@@ -277,6 +277,7 @@
   $: inputSrSnapshot = buildCardInputSrSnapshot({
     user,
     tdfFile: Session.get('currentTdfFile'),
+    currentUnit: Session.get('currentTdfUnit'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
     buttonTrial: Boolean(context.buttonTrial),

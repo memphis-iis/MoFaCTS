@@ -8,6 +8,7 @@ import {
   questionAudioGateService,
   evaluateAnswerService,
 } from './services';
+import { getMainTimeoutMs } from '../utils/timeoutUtils';
 import {
   clearSparcRuntimeState,
   rememberSparcRuntimeHistoryRecord,
@@ -284,6 +285,17 @@ describe('machine services contracts', function() {
 
     expect(fromReveal).to.equal(7000);
     expect(fromReset).to.equal(9500);
+  });
+
+  it('preserves a zero drill timeout as an unlimited response window', function() {
+    const context = {
+      testType: 'd',
+      deliverySettings: { drill: '0' },
+      timestamps: { trialStart: 1000 },
+    };
+
+    expect(getMainTimeoutMs(context)).to.equal(0);
+    expect(getMainTimeoutRemainingMs(context, 4000)).to.equal(0);
   });
 });
 

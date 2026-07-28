@@ -1,3 +1,5 @@
+import { resolveUnitSpeechRecognitionEnabled } from './speechRecognitionConfig';
+
 type SrAvailabilityStatus = 'available' | 'blocked' | 'pending' | 'failed';
 
 type SrAvailabilityDetail =
@@ -41,6 +43,7 @@ type SrAvailabilityInput = {
   serverSpeechConfigured?: unknown;
   requireTextTrial?: boolean;
   isTextTrial?: boolean;
+  currentUnit?: { audioInputEnabled?: unknown } | null;
 };
 
 type SrAvailabilityResult = {
@@ -68,16 +71,8 @@ function hasNonEmptyString(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function parseBooleanLike(value: unknown): boolean {
-  return value === true || value === 'true' || value === 1 || value === '1';
-}
-
 function getUserAudioInputPreference(user?: UserLike | null): boolean {
   return user?.audioSettings?.audioInputMode === true;
-}
-
-function isTdfAudioInputEnabled(tdfFile?: TdfLike | null): boolean {
-  return parseBooleanLike(tdfFile?.tdfs?.tutor?.setspec?.audioInputEnabled);
 }
 
 export function resolveSpeechApiKeyAvailability(input: Pick<SrAvailabilityInput, 'user' | 'tdfFile' | 'sessionSpeechApiKey' | 'serverSpeechConfigured'>): boolean {
@@ -90,7 +85,10 @@ export function resolveSpeechApiKeyAvailability(input: Pick<SrAvailabilityInput,
 
 export function evaluateSrAvailability(input: SrAvailabilityInput): SrAvailabilityResult {
   const userAudioEnabled = getUserAudioInputPreference(input.user);
-  const tdfAudioEnabled = isTdfAudioInputEnabled(input.tdfFile);
+  const tdfAudioEnabled = resolveUnitSpeechRecognitionEnabled(
+    input.currentUnit,
+    input.tdfFile?.tdfs?.tutor?.setspec
+  );
   const hasAnySpeechApiKey = resolveSpeechApiKeyAvailability(input);
 
   if (input.requireTextTrial && input.isTextTrial !== true) {

@@ -4,6 +4,7 @@ import { deriveSrStatus } from '../utils/srStatus';
 type CardInputSrSnapshotInput = {
   user: Parameters<typeof evaluateSrAvailability>[0]['user'];
   tdfFile: Parameters<typeof evaluateSrAvailability>[0]['tdfFile'];
+  currentUnit?: Parameters<typeof evaluateSrAvailability>[0]['currentUnit'];
   sessionSpeechApiKey: unknown;
   serverSpeechConfigured: unknown;
   buttonTrial: boolean;
@@ -26,6 +27,7 @@ export function buildCardInputSrSnapshot(input: CardInputSrSnapshotInput): CardI
   const srAvailability = evaluateSrAvailability({
     user: input.user ?? null,
     tdfFile: input.tdfFile ?? null,
+    currentUnit: input.currentUnit ?? null,
     sessionSpeechApiKey: input.sessionSpeechApiKey,
     serverSpeechConfigured: input.serverSpeechConfigured,
     requireTextTrial: true,

@@ -20,7 +20,7 @@ import {
   getAudioPromptSpeakingRate,
   setAudioPromptSpeakingRate
 } from '../../../../lib/state/audioState';
-import { isAudioPromptModeEnabled } from '../../../../../common/lib/audioPromptMode';
+import { isAudioPromptModeEnabled, resolveUnitAudioPromptMode } from '../../../../../common/lib/audioPromptMode';
 import { audioManager } from '../../../../lib/audioContextManager';
 import { setEngine } from '../../../../lib/engineManager';
 import { resolveUnitEngineTypeForUnit } from '../../engineConstructors';
@@ -868,9 +868,14 @@ export async function initializeContentSurface(): Promise<ContentSurfaceInitResu
   });
   ensureCurrentStimuliSetId(Session.get('currentStimuliSetId') || tdfFile.stimuliSetId || null);
 
+  const currentUnitNumber = Number(Session.get('currentUnitNumber') ?? 0);
+  const currentUnit = Session.get('currentTdfUnit') ??
+    (Number.isInteger(currentUnitNumber) ? tutor.unit?.[currentUnitNumber] : null);
+
   const srAvailability = evaluateSrAvailability({
     user: getMeteorUser() ?? null,
     tdfFile: (tdfFile as Parameters<typeof evaluateSrAvailability>[0]['tdfFile']) ?? null,
+    currentUnit,
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
@@ -884,7 +889,11 @@ export async function initializeContentSurface(): Promise<ContentSurfaceInitResu
     }
   }
 
-  if (isAudioPromptModeEnabled(getAudioPromptMode()) && !getAudioPromptSpeakingRate()) {
+  if (isAudioPromptModeEnabled(resolveUnitAudioPromptMode(
+    currentUnit,
+    getAudioPromptMode(),
+    Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())
+  )) && !getAudioPromptSpeakingRate()) {
     const speakingRate = parseFloat(String(tutor.setspec?.audioPromptSpeakingRate ?? '')) || 1;
     setAudioPromptSpeakingRate(speakingRate);
   }

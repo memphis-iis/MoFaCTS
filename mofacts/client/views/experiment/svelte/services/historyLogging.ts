@@ -19,7 +19,7 @@ import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';
 import { SCHEDULE_UNIT } from '../../../../../common/Definitions';
-import { isAudioPromptModeEnabled } from '../../../../../common/lib/audioPromptMode';
+import { isAudioPromptModeEnabled, resolveUnitAudioPromptMode } from '../../../../../common/lib/audioPromptMode';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { requireCurrentLearningAttemptId } from './attemptIdentity';
@@ -550,6 +550,7 @@ function checkAudioInputMode(): boolean {
   return evaluateSrAvailability({
     user: getMeteorUser() ?? null,
     tdfFile: Session.get('currentTdfFile'),
+    currentUnit: Session.get('currentTdfUnit'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   }).status === 'available';
@@ -775,7 +776,11 @@ export function createHistoryRecord({
 
     // Custom fields (CF prefix)
     'CFAudioInputEnabled': checkAudioInputMode(),
-    'CFAudioOutputEnabled': isAudioPromptModeEnabled(getAudioPromptMode()),
+    'CFAudioOutputEnabled': isAudioPromptModeEnabled(resolveUnitAudioPromptMode(
+      Session.get('currentTdfUnit'),
+      getAudioPromptMode(),
+      Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())
+    )),
     'CFDisplayOrder': displayOrder,
     'CFStimFileIndex': stimFileIndex,
     'CFSetShuffledIndex': shufIndex,

@@ -12,6 +12,24 @@ type SetSpecWithSpeechGrammar = {
   srfilterclose?: unknown;
 };
 
+type SpeechEnabledConfig = {
+  audioInputEnabled?: unknown;
+};
+
+function parseSpeechEnabled(value: unknown): boolean {
+  return value === true || value === 1 || String(value ?? '').trim().toLowerCase() === 'true';
+}
+
+export function resolveUnitSpeechRecognitionEnabled(
+  unit: SpeechEnabledConfig | null | undefined,
+  setSpec: SpeechEnabledConfig | null | undefined
+): boolean {
+  if (unit && Object.prototype.hasOwnProperty.call(unit, 'audioInputEnabled')) {
+    return parseSpeechEnabled(unit.audioInputEnabled);
+  }
+  return parseSpeechEnabled(setSpec?.audioInputEnabled);
+}
+
 export function resolveSpeechRecognitionLanguage(
   setSpec: SetSpecWithSpeechLanguage | null | undefined,
   uiLocale: string | null | undefined = 'en'

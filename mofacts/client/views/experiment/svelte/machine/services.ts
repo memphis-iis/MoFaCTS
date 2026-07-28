@@ -203,6 +203,13 @@ async function prefetchImage(context: { currentDisplay?: { imgSrc?: string } }, 
  * @returns {Promise<void>}
  */
 function mainCardTimeout(context: TimeoutContextLike, _event: unknown) {
+  const timeout = getMainTimeoutMs(context);
+  if (timeout === 0) {
+    return new Promise<void>(() => {
+      // A zero drill timeout explicitly leaves the response window open indefinitely.
+    });
+  }
+
   const remaining = getMainTimeoutRemainingMs(context);
 
   return new Promise<void>((resolve) => {

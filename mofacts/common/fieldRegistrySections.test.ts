@@ -41,6 +41,9 @@ describe('field registry section composition', function() {
       displayCorrectFeedback: true,
       displayIncorrectFeedback: true,
     });
+    const unitProperties = (tdfSchema as any).properties.tutor.properties.unit.items.properties;
+    expect(unitProperties.audioInputEnabled).to.exist;
+    expect(unitProperties.audioPromptMode.enum).to.deep.equal(['silent', 'question', 'feedback', 'all']);
   });
 
   it('allows cluster-level clusterKC in the public stimulus schema', function() {

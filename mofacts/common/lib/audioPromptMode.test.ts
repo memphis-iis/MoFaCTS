@@ -1,11 +1,18 @@
 import { expect } from 'chai';
 import {
   audioPromptModeAllows,
+  resolveUnitAudioPromptMode,
   isAudioPromptModeEnabled,
   normalizeAudioPromptMode,
 } from './audioPromptMode';
 
 describe('audioPromptMode', function() {
+  it('uses an explicit unit mode and otherwise inherits the active lesson mode', function() {
+    expect(resolveUnitAudioPromptMode({ audioPromptMode: 'feedback' }, 'question')).to.equal('feedback');
+    expect(resolveUnitAudioPromptMode({}, 'question')).to.equal('question');
+    expect(resolveUnitAudioPromptMode({ audioPromptMode: 'silent' }, 'all')).to.equal('silent');
+    expect(resolveUnitAudioPromptMode({ audioPromptMode: 'all' }, 'silent', false)).to.equal('silent');
+  });
   it('normalizes unknown prompt modes to silent', function() {
     expect(normalizeAudioPromptMode('feedback')).to.equal('feedback');
     expect(normalizeAudioPromptMode(' FEEDBACK ')).to.equal('feedback');

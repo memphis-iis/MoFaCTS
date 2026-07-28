@@ -38,7 +38,7 @@ import { resolveExplicitTtsLanguageCode } from '../../../../lib/audioLanguage';
 import { resolvePlatformPromptTtsLanguage } from '../../../../../common/lib/interfaceLocales';
 import {
   audioPromptModeAllows,
-  normalizeAudioPromptMode,
+  resolveUnitAudioPromptMode,
 } from '../../../../../common/lib/audioPromptMode';
 import type {
   AudioPromptSource,
@@ -317,7 +317,12 @@ async function restartSrAfterTtsHandoff(): Promise<void> {
  * @returns {boolean} True if question TTS enabled
  */
 function getEffectiveAudioPromptMode(): string {
-  return normalizeAudioPromptMode(getAudioPromptMode());
+  const inheritedMode = getAudioPromptMode();
+  return resolveUnitAudioPromptMode(
+    Session.get('currentTdfUnit'),
+    inheritedMode,
+    Boolean(Session.get('experimentTarget')) || inheritedMode !== 'silent'
+  );
 }
 
 /**

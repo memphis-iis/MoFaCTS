@@ -27,7 +27,8 @@ import { setEnterKeyLock } from './svelte/services/trialReadinessState';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getAudioPromptMode } from '../../lib/state/audioState';
-import { isAudioPromptModeEnabled } from '../../../common/lib/audioPromptMode';
+import { isAudioPromptModeEnabled, resolveUnitAudioPromptMode } from '../../../common/lib/audioPromptMode';
+import { resolveUnitSpeechRecognitionEnabled } from '../../lib/speechRecognitionConfig';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
 declare const Meteor: any;
@@ -74,7 +75,10 @@ const INSTRUCTIONS_LEAVING_KEY = 'instructionsLeaving';
 
 function checkAudioInputMode() {
   const userAudioToggled = (Meteor.user() as any)?.audioSettings?.audioInputMode || false;
-  const tdfAudioEnabled = Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.audioInputEnabled === 'true';
+  const tdfAudioEnabled = resolveUnitSpeechRecognitionEnabled(
+    Session.get('currentTdfUnit'),
+    Session.get('currentTdfFile')?.tdfs?.tutor?.setspec
+  );
   return userAudioToggled && tdfAudioEnabled;
 }
 
@@ -886,7 +890,11 @@ function gatherInstructionLogRecord(trialEndTimeStamp: any, trialStartTimeStamp:
     'displayedStimulus': displayedStimulus,
     'eventType': 'instruct',
     'CFAudioInputEnabled': checkAudioInputMode(),
-    'CFAudioOutputEnabled': isAudioPromptModeEnabled(getAudioPromptMode()),
+    'CFAudioOutputEnabled': isAudioPromptModeEnabled(resolveUnitAudioPromptMode(
+      Session.get('currentTdfUnit'),
+      getAudioPromptMode(),
+      Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())
+    )),
     'CFResponseTime': trialEndTimeStamp,
     'feedbackType': '',
     'entryPoint': loginParams.entryPoint

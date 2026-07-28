@@ -12,6 +12,7 @@ import { getAudioPromptMode } from '../../../../lib/state/audioState';
 import {
   audioPromptModeAllows,
   isAudioPromptModeEnabled,
+  resolveUnitAudioPromptMode,
 } from '../../../../../common/lib/audioPromptMode';
 import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
@@ -218,6 +219,7 @@ export function srEnabled(args: ContentRuntimeMachineActorArgs): boolean {
   const availability = evaluateSrAvailability({
     user: Meteor.user() as MeteorUserLike | null,
     tdfFile: Session.get('currentTdfFile'),
+    currentUnit: Session.get('currentTdfUnit'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
     requireTextTrial: true,
@@ -284,7 +286,7 @@ export function attemptsExhausted(args: ContentRuntimeMachineActorArgs): boolean
  * @returns {boolean}
  */
 export function ttsEnabled(_args: ContentRuntimeMachineActorArgs): boolean {
-  return audioPromptModeAllows(getAudioPromptMode(), 'question');
+  return audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'question');
 }
 
 /**
@@ -293,7 +295,7 @@ export function ttsEnabled(_args: ContentRuntimeMachineActorArgs): boolean {
  * @returns {boolean}
  */
 export function ttsDisabled(_args: ContentRuntimeMachineActorArgs): boolean {
-  return !isAudioPromptModeEnabled(getAudioPromptMode());
+  return !isAudioPromptModeEnabled(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())));
 }
 
 function feedbackContentReady({ context }: ContentRuntimeMachineActorArgs): boolean {
@@ -307,13 +309,13 @@ export function feedbackReadyForTts(args: ContentRuntimeMachineActorArgs): boole
   return args.context.feedbackRevealStarted === true &&
     args.context.feedbackSuppressed !== true &&
     feedbackContentReady(args) &&
-    audioPromptModeAllows(getAudioPromptMode(), 'feedback');
+    audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'feedback');
 }
 
 export function feedbackReadyWithoutTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
     feedbackContentReady(args) &&
-    (args.context.feedbackSuppressed === true || !audioPromptModeAllows(getAudioPromptMode(), 'feedback'));
+    (args.context.feedbackSuppressed === true || !audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'feedback'));
 }
 
 // =============================================================================

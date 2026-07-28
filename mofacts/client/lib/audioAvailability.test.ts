@@ -26,6 +26,32 @@ describe('audioAvailability', function() {
     expect(result.detail).to.equal('tdf_audio_disabled');
   });
 
+  it('lets the current unit override the TDF speech-recognition setting', function() {
+    const base = {
+      user: { audioSettings: { audioInputMode: true } },
+      sessionSpeechApiKey: 'session-key',
+    };
+    expect(evaluateSrAvailability({
+      ...base,
+      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'false' } } } },
+      currentUnit: { audioInputEnabled: 'true' },
+    }).status).to.equal('available');
+    expect(evaluateSrAvailability({
+      ...base,
+      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true' } } } },
+      currentUnit: { audioInputEnabled: 'false' },
+    }).detail).to.equal('tdf_audio_disabled');
+  });
+
+  it('inherits TDF speech recognition when the unit omits its override', function() {
+    expect(evaluateSrAvailability({
+      user: { audioSettings: { audioInputMode: true } },
+      tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true' } } } },
+      currentUnit: {},
+      sessionSpeechApiKey: 'session-key',
+    }).status).to.equal('available');
+  });
+
   it('allows speech input without a TDF speech language when key availability is satisfied', function() {
     const result = evaluateSrAvailability({
       user: { audioSettings: { audioInputMode: true } },

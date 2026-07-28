@@ -22,7 +22,7 @@ export function getMainTimeoutMs(context: TimeoutContext): number {
     if (studyMs !== null) return studyMs;
   }
 
-  const drillMs = parseTimeoutMs((delivery as Record<string, unknown>).drill);
+  const drillMs = parseTimeoutMs((delivery as Record<string, unknown>).drill, { allowZero: true });
   if (drillMs !== null) return drillMs;
 
   return DEFAULT_TIMINGS.MAIN_TIMEOUT;

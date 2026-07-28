@@ -350,6 +350,14 @@ export const UNIT_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Unit name for tracking.',
     verbose: 'Tracking/display name for this unit.'
   }),
+  audioInputEnabled: simpleField(legacyBooleanField(undefined), {
+    brief: 'Enable speech recognition for this unit.',
+    verbose: 'Unit-level speech-recognition override. When omitted, the lesson setspec value is used.'
+  }),
+  audioPromptMode: simpleField(enumStringField(['silent', 'question', 'feedback', 'all'], undefined, 4), {
+    brief: 'TTS mode for this unit.',
+    verbose: 'Unit-level text-to-speech mode override. When omitted, the lesson setspec value is used.'
+  }),
   unitinstructions: simpleField(textareaField(''), {
     brief: 'Instructions shown before the unit.',
     verbose: 'HTML or text instructions shown before the unit begins.'
@@ -701,6 +709,8 @@ export const UNIT_DIRECT_RUNTIME_KEYS = Object.freeze([
   'adaptive',
   'adaptiveLogic',
   'adaptiveUnitTemplate',
+  'audioInputEnabled',
+  'audioPromptMode',
   'buttonOptions',
   'buttonorder',
   'buttontrial',

@@ -915,6 +915,39 @@
                       "grid_columns": 6
                     }
                   },
+                  "audioInputEnabled": {
+                    "title": "Enable speech recognition for this unit.",
+                    "description": "Unit-level speech-recognition override. When omitted, the lesson setspec value is used.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "audioPromptMode": {
+                    "title": "TTS mode for this unit.",
+                    "description": "Unit-level text-to-speech mode override. When omitted, the lesson setspec value is used.",
+                    "type": "string",
+                    "enum": [
+                      "silent",
+                      "question",
+                      "feedback",
+                      "all"
+                    ],
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
                   "unitinstructions": {
                     "title": "Instructions shown before the unit.",
                     "description": "HTML or text instructions shown before the unit begins.",
@@ -3293,6 +3326,39 @@
                 "default": "",
                 "options": {
                   "grid_columns": 6
+                }
+              },
+              "audioInputEnabled": {
+                "title": "Enable speech recognition for this unit.",
+                "description": "Unit-level speech-recognition override. When omitted, the lesson setspec value is used.",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ],
+                "options": {
+                  "grid_columns": 4
+                }
+              },
+              "audioPromptMode": {
+                "title": "TTS mode for this unit.",
+                "description": "Unit-level text-to-speech mode override. When omitted, the lesson setspec value is used.",
+                "type": "string",
+                "enum": [
+                  "silent",
+                  "question",
+                  "feedback",
+                  "all"
+                ],
+                "options": {
+                  "grid_columns": 4
                 }
               },
               "unitinstructions": {

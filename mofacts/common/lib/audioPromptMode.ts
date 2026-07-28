@@ -23,3 +23,22 @@ export function isAudioPromptModeEnabled(value: unknown): boolean {
   return normalizeAudioPromptMode(value) !== 'silent';
 }
 
+type UnitAudioPromptConfig = {
+  audioPromptMode?: unknown;
+};
+
+export function resolveUnitAudioPromptMode(
+  unit: UnitAudioPromptConfig | null | undefined,
+  inheritedMode: unknown,
+  allowUnitEnable = true
+): AudioPromptMode {
+  const normalizedInheritedMode = normalizeAudioPromptMode(inheritedMode);
+  if (unit && Object.prototype.hasOwnProperty.call(unit, 'audioPromptMode')) {
+    if (!allowUnitEnable && normalizedInheritedMode === 'silent') {
+      return 'silent';
+    }
+    return normalizeAudioPromptMode(unit.audioPromptMode);
+  }
+  return normalizedInheritedMode;
+}
+

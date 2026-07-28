@@ -45,6 +45,8 @@ describe('machine guard contracts', function() {
   afterEach(function() {
     Session.set('isVideoSession', false);
     Session.set('videoCheckpoints', null);
+    Session.set('currentTdfUnit', null);
+    Session.set('experimentTarget', null);
     resetAudioState();
   });
 
@@ -189,6 +191,21 @@ describe('machine guard contracts', function() {
     expect(ttsEnabled(makeArgs())).to.equal(true);
 
     setAudioPromptMode('all');
+    expect(ttsEnabled(makeArgs())).to.equal(true);
+  });
+
+  it('applies the current unit TTS mode without forcing audio for an opted-out profile learner', function() {
+    Session.set('currentTdfUnit', { audioPromptMode: 'feedback' });
+    setAudioPromptMode('all');
+    expect(ttsEnabled(makeArgs())).to.equal(false);
+
+    Session.set('currentTdfUnit', { audioPromptMode: 'question' });
+    expect(ttsEnabled(makeArgs())).to.equal(true);
+
+    setAudioPromptMode('silent');
+    expect(ttsEnabled(makeArgs())).to.equal(false);
+
+    Session.set('experimentTarget', 'experiment');
     expect(ttsEnabled(makeArgs())).to.equal(true);
   });
 

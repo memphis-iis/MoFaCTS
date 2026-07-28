@@ -573,6 +573,7 @@ function isSrEnabled(): boolean {
   const availability = evaluateSrAvailability({
     user: getMeteorUser(),
     tdfFile: Session.get('currentTdfFile'),
+    currentUnit: Session.get('currentTdfUnit'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
@@ -614,6 +615,7 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
   const srAvailability = evaluateSrAvailability({
     user: getMeteorUser(),
     tdfFile: Session.get('currentTdfFile'),
+    currentUnit: Session.get('currentTdfUnit'),
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
