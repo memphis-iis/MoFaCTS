@@ -4,6 +4,7 @@
  */
 
 import type { UploadedPackageFile } from './packageParser';
+import type { PackageMediaMutation, UploadedMediaRecord } from './packageUploadShared';
 
 /**
  * Upload media files from a parsed package, scoped to the given stimuli set IDs.
@@ -14,13 +15,15 @@ export async function uploadPackageMedia(opts: {
   uploadStimSetIds: Set<string | number>;
   fallbackStimSetId: string | number | undefined;
   owner: string;
-  saveMediaFile: (media: UploadedPackageFile, owner: string, stimSetId: string | number | null | undefined) => Promise<{ _id?: string; name?: string; link?: () => string } | null>;
-  toCanonicalDynamicAssetPath: (savedMedia: { _id?: string; name?: string; link?: () => string } | null) => string;
+  mutationJobId?: string | null;
+  mediaMutations?: PackageMediaMutation[];
+  saveMediaFile: (media: UploadedPackageFile, owner: string, stimSetId: string | number | null | undefined, options?: { mutationJobId?: string | null }) => Promise<UploadedMediaRecord | null>;
+  toCanonicalDynamicAssetPath: (savedMedia: UploadedMediaRecord | null) => string;
   normalizeUploadedMediaLookupKey: (value: unknown) => string;
   serverConsole: (...args: unknown[]) => void;
 }): Promise<Map<string, Map<string, string>>> {
   const {
-    mediaFiles, uploadStimSetIds, fallbackStimSetId, owner,
+    mediaFiles, uploadStimSetIds, fallbackStimSetId, owner, mutationJobId, mediaMutations = [],
     saveMediaFile, toCanonicalDynamicAssetPath, normalizeUploadedMediaLookupKey, serverConsole,
   } = opts;
 
@@ -31,7 +34,8 @@ export async function uploadPackageMedia(opts: {
   for (const media of mediaFiles) {
     if (uploadStimSetIds.size > 0) {
       for (const scopedStimSetId of uploadStimSetIds) {
-        const savedMedia = await saveMediaFile(media, owner, scopedStimSetId);
+        const savedMedia = await saveMediaFile(media, owner, scopedStimSetId, mutationJobId === undefined ? {} : { mutationJobId });
+        if (savedMedia?.replacement) mediaMutations.push(savedMedia.replacement);
         const canonicalPath = toCanonicalDynamicAssetPath(savedMedia);
         const scopedKey = String(scopedStimSetId ?? '').trim();
         if (canonicalPath && scopedKey) {
@@ -45,7 +49,8 @@ export async function uploadPackageMedia(opts: {
         }
       }
     } else {
-      const savedMedia = await saveMediaFile(media, owner, fallbackStimSetId);
+      const savedMedia = await saveMediaFile(media, owner, fallbackStimSetId, mutationJobId === undefined ? {} : { mutationJobId });
+      if (savedMedia?.replacement) mediaMutations.push(savedMedia.replacement);
       const canonicalPath = toCanonicalDynamicAssetPath(savedMedia);
       const scopedKey = String(fallbackStimSetId ?? '').trim();
       if (canonicalPath && scopedKey) {

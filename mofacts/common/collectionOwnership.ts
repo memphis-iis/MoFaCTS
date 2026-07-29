@@ -158,17 +158,18 @@ export const COLLECTION_OWNERSHIP = {
     owner: 'content',
     purpose: 'Draft manual content-creator documents.',
   },
-  H5PContents: {
-    mongoName: 'h5p_contents',
-    globalName: 'H5PContents',
-    owner: 'h5p-content',
-    purpose: 'Imported H5P content metadata and package references.',
-  },
   BackupJobs: {
     mongoName: 'backup_jobs',
     globalName: 'BackupJobs',
     owner: 'open-core-backups',
     purpose: 'Admin-only backup, verification, restore, and deletion job registry.',
+  },
+  TdfMutationJobs: {
+    mongoName: 'tdf_mutation_jobs',
+    globalName: 'TdfMutationJobs',
+    owner: 'content-upload',
+    purpose: 'Private durable journal for package uploads and condition-identity migrations.',
+    notes: 'Server-only. Never publish this collection or add it to the legacy global bridge.',
   },
   DynamicAssets: {
     mongoName: 'Assets',

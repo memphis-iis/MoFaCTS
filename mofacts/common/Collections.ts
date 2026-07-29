@@ -39,8 +39,8 @@ const UserDashboardCache = new Mongo.Collection(collectionMongoName('UserDashboa
 const CourseLearnerSnapshotCache = new Mongo.Collection(collectionMongoName('CourseLearnerSnapshotCache'));
 const UserUploadQuota = new Mongo.Collection(collectionMongoName('UserUploadQuota'));
 const ManualContentDrafts = new Mongo.Collection(collectionMongoName('ManualContentDrafts'));
-const H5PContents = new Mongo.Collection(collectionMongoName('H5PContents'));
 const BackupJobs = new Mongo.Collection(collectionMongoName('BackupJobs'));
+const TdfMutationJobs = new Mongo.Collection(collectionMongoName('TdfMutationJobs'));
 
 const DynamicAssets = new FilesCollection({
   collectionName: collectionMongoName('DynamicAssets'),
@@ -134,12 +134,11 @@ Object.assign(globalThis, {
   CourseLearnerSnapshotCache,
   UserUploadQuota,
   ManualContentDrafts,
-  H5PContents,
   BackupJobs,
   DynamicAssets,
 });
 
-export { Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, H5PContents, StimulusCrowdStats, BackupJobs };
+export { Tdfs, GlobalExperimentStates, Histories, DynamicSettings, UserDashboardCache, CourseLearnerSnapshotCache, StimulusCrowdStats, BackupJobs, TdfMutationJobs };
 
 GlobalExperimentStates.allow({
   update: function(userId: string, doc: unknown, _fieldNames: string[], _modifier: any) {

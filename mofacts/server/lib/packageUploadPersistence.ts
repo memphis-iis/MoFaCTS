@@ -166,6 +166,7 @@ export async function processParsedPackageTdfs(args: {
           packageFile: tdf.packageFile,
           packageAssetId,
           conditionTdfIds: identity.conditionTdfIds,
+          expectedRevision: identity.targetRevision,
         };
         const ret = await deps.upsertPackage(record, owner);
         if (ret && (ret as { result?: unknown }).result === false) {
@@ -173,9 +174,6 @@ export async function processParsedPackageTdfs(args: {
           packageResult.errmsg = typeof (ret as { errmsg?: unknown }).errmsg === 'string'
             ? (ret as { errmsg: string }).errmsg
             : 'Package processing failed';
-        } else if (ret && (ret as { res?: string }).res === 'awaitClientTDF') {
-          deps.serverConsole('awaitClientTDF', ret);
-          packageResult.result = false;
         } else {
           packageResult.result = true;
         }

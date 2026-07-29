@@ -38,7 +38,6 @@ declare var UserDashboardCache: any;
 declare var CourseLearnerSnapshotCache: any;
 declare var UserUploadQuota: any;
 declare var ManualContentDrafts: any;
-declare var H5PContents: any;
 declare var DynamicAssets: any;
 declare var JSONEditor: any;
 declare var bootstrap: any;

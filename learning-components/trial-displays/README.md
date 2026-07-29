@@ -4,8 +4,8 @@ Trial display components own interactive display adapters that can normalize dis
 
 Belongs here:
 
-- Display adapter manifests for H5P-style interactive content.
-- Display ownership checks such as "this trial is handled by H5P".
+- Display adapter manifests for interactive content.
+- Explicit display ownership checks.
 - Display/result normalization that feeds app-owned history and model-update paths.
 - Bounded display/result payload contracts that the app can place into the shared canonical history envelope without exceeding per-extension telemetry budgets.
 

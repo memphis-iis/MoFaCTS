@@ -1,17 +1,6 @@
-import type { H5PTrialResult } from '../../../../../common/types';
 import type { SparcControllerResult } from '../services/sparcController';
 import { getStimAnswerDisplayCase } from '../../../../lib/runtimeStimuli';
 import { assign, type ActionArgs, type ActionEvent } from './contentRuntimeMachineActionTypes';
-
-function getH5PSubmitResult(event?: ActionEvent): H5PTrialResult | null {
-  if (event?.source !== 'h5p') {
-    return null;
-  }
-  if (!event.h5pResult) {
-    throw new Error('[ContentRuntimeMachine] H5P submit event missing h5pResult');
-  }
-  return event.h5pResult;
-}
 
 function getSparcSubmitResult(event?: ActionEvent): SparcControllerResult | null {
   if (event?.source !== 'sparc') {
@@ -30,7 +19,6 @@ export const clearUserAnswer = assign({
 export const captureAnswer = assign({
   userAnswer: ({ event }: ActionArgs) => event?.userAnswer,
   source: ({ event, context }: ActionArgs) => event?.source || context.source || 'keyboard',
-  h5pResult: ({ event }: ActionArgs) => getH5PSubmitResult(event),
   sparcResult: ({ event }: ActionArgs) => getSparcSubmitResult(event),
   timestamps: ({ context, event }: ActionArgs) => ({
     ...context.timestamps,

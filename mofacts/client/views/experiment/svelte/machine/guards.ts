@@ -14,7 +14,6 @@ import {
   isAudioPromptModeEnabled,
   resolveUnitAudioPromptMode,
 } from '../../../../../common/lib/audioPromptMode';
-import { selfHostedH5PTrialDisplayOwnsInteraction } from '../services/h5pTrialDisplay';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
 import {
   getVideoCheckpoints,
@@ -126,7 +125,7 @@ export function isDrillTrial({ context }: ContentRuntimeMachineActorArgs): boole
  * @returns {boolean}
  */
 export function isTestTrial({ context }: ContentRuntimeMachineActorArgs): boolean {
-  return context.testType === TRIAL_TYPES.TEST || context.testType === TRIAL_TYPES.H5P;
+  return context.testType === TRIAL_TYPES.TEST;
 }
 
 /**
@@ -330,10 +329,6 @@ export function feedbackReadyWithoutTts(args: ContentRuntimeMachineActorArgs): b
  * @returns {boolean}
  */
 export function needsFeedback(args: ContentRuntimeMachineActorArgs): boolean {
-  if (selfHostedH5PTrialDisplayOwnsInteraction(args.context.currentDisplay)) {
-    return false;
-  }
-
   const feedbackTimeoutMs = resolveFeedbackTimeoutMs(args);
   return (
     isDrillTrial(args) &&
@@ -444,9 +439,6 @@ export function notWaitingForTranscription(args: ContentRuntimeMachineActorArgs)
 }
 
 export function trialDisplaySuppressesStandardTimeout({ context }: ContentRuntimeMachineActorArgs): boolean {
-  if (selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay)) {
-    return true;
-  }
   const display = context.currentDisplay;
   return Boolean(
     display &&

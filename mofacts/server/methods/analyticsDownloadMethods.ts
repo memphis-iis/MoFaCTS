@@ -6,6 +6,7 @@ import {
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import { createOwnHistoryDownloadToken } from '../lib/ownHistoryDownloadTokens';
+import { assertConditionFilenameIdAlignment, validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -32,7 +33,6 @@ type AnalyticsDownloadDeps = {
   assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
   canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
   getTdfByFileName: (filename: string) => Promise<any>;
-  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
 };
 
 function sanitizeFileNameSegment(value: unknown, defaultValue: string) {
@@ -128,17 +128,31 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
         throw new Meteor.Error(403, 'Not authorized to download data for this TDF');
       }
       const exportTdfIds = new Set<string>([String(tdf._id)]);
-      const setspec = tdf.content?.tdfs?.tutor?.setspec;
-      if (Array.isArray(setspec?.condition) && setspec.condition.length > 0) {
-        const conditionIds = await deps.resolveConditionTdfIds(setspec);
-        if (conditionIds.length > 0) {
-          const ownedConditionDocs = await deps.Tdfs.find(
-            { _id: { $in: conditionIds }, ownerId: this.userId },
-            { fields: { _id: 1 } }
-          ).fetchAsync();
-          for (const ownedCondition of ownedConditionDocs) {
-            exportTdfIds.add(String(ownedCondition._id));
-          }
+      const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
+      if (familyValidation.errors.length > 0) {
+        throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
+      }
+      if (familyValidation.conditionTdfIds.length > 0) {
+        const ownedConditionDocs = await deps.Tdfs.find(
+          { _id: { $in: familyValidation.conditionTdfIds }, ownerId: tdf.ownerId },
+          { fields: { _id: 1, 'content.fileName': 1 } }
+        ).fetchAsync();
+        const childFileNameById = new Map<string, string>(ownedConditionDocs.map((doc: any) => [
+          String(doc._id),
+          typeof doc?.content?.fileName === 'string' ? doc.content.fileName.trim() : '',
+        ]));
+        if (
+          ownedConditionDocs.length !== familyValidation.conditionTdfIds.length
+          || assertConditionFilenameIdAlignment(
+            familyValidation.conditionFileNames,
+            familyValidation.conditionTdfIds,
+            childFileNameById,
+          ).length > 0
+        ) {
+          throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
+        }
+        for (const ownedCondition of ownedConditionDocs) {
+          exportTdfIds.add(String(ownedCondition._id));
         }
       }
 

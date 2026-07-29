@@ -6,16 +6,14 @@
   import DOMPurify from 'dompurify';
   import { marked } from 'marked';
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
-  import { isExternalH5PDisplay } from '../../../../../common/lib/h5pDisplay';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { waitForBrowserPaint } from '../utils/paintTiming';
-  import H5PFrame from './H5PFrame.svelte';
 
   const dispatch = createEventDispatcher();
   const platformText = (key) => translatePlatformString(getActiveUiLocale(), key);
 
-  /** @type {{ text?: string, clozeText?: string, imgSrc?: string, videoSrc?: string, audioSrc?: string, h5p?: object, attribution?: { creatorName?: string, sourceName?: string, sourceUrl?: string, licenseName?: string, licenseUrl?: string } }} */
+  /** @type {{ text?: string, clozeText?: string, imgSrc?: string, videoSrc?: string, audioSrc?: string, attribution?: { creatorName?: string, sourceName?: string, sourceUrl?: string, licenseName?: string, licenseUrl?: string } }} */
   export let display = {};
 
   /** @type {boolean} Whether to show the display */
@@ -80,7 +78,6 @@
     displayAttribution.sourceUrl,
     displayAttribution.licenseUrl,
   ].join('::');
-  $: hasExternalH5PContent = isExternalH5PDisplay(safeDisplay);
   $: needsImageLayout = Boolean(safeDisplay.imgSrc);
   $: needsAttributedImageLayout = needsImageLayout && hasAttribution && Boolean(attributionCaption);
   $: imageViewportStyle = imageViewportWidthPx === null || imageViewportHeightPx === null
@@ -168,12 +165,8 @@
     }
   }
 
-  function handleH5PResult(event) {
-    dispatch('h5presult', event.detail);
-  }
-
   $: hasTextContent = Boolean(safeDisplay.clozeText || safeDisplay.text);
-  $: hasVisualContent = Boolean(safeDisplay.imgSrc || safeDisplay.videoSrc || hasExternalH5PContent);
+  $: hasVisualContent = Boolean(safeDisplay.imgSrc || safeDisplay.videoSrc);
   $: isAudioOnly = Boolean(safeDisplay.audioSrc) && !hasTextContent && !hasVisualContent;
   $: showTextAttribution = hasTextContent && !safeDisplay.imgSrc && hasAttribution && Boolean(attributionCaption);
   $: waitingForImage = Boolean(safeDisplay.imgSrc) && !imageReady;
@@ -401,14 +394,13 @@
     class:flow-row={componentFlow === 'row'}
     class:flow-column={componentFlow !== 'row'}
     class:loading-image={waitingForImage}
-    class:h5p-display={hasExternalH5PContent}
   >
     {#if !waitingForImage}
       {#if showQuestionNumber && questionNumber > 0}
         <div class="question-number">Question {questionNumber}</div>
       {/if}
 
-      {#key sanitizedText + sanitizedCloze + (safeDisplay.imgSrc || '') + (safeDisplay.videoSrc || '') + (safeDisplay.audioSrc || '') + JSON.stringify(safeDisplay.h5p || {}) + attributionCaption + attributionLinkSignature}
+      {#key sanitizedText + sanitizedCloze + (safeDisplay.imgSrc || '') + (safeDisplay.videoSrc || '') + (safeDisplay.audioSrc || '') + attributionCaption + attributionLinkSignature}
         {#if safeDisplay.imgSrc}
           <div class="stimulus-image-block" bind:this={imageBlockElement}>
             {#if hasAttribution && attributionCaption}
@@ -477,12 +469,6 @@
                 <track kind="captions" src={safeDisplay.videoCaptionSrc} srclang="en" label="English captions" default />
               {/if}
             </video>
-          </div>
-        {/if}
-
-        {#if hasExternalH5PContent}
-          <div class="stimulus-h5p">
-            <H5PFrame config={safeDisplay.h5p} on:h5presult={handleH5PResult} />
           </div>
         {/if}
 

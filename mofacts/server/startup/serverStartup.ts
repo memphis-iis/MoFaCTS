@@ -24,6 +24,7 @@ import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_au
 import { sendScheduledTurkMessages } from '../turk_methods';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
+import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery';
 
 const LEGACY_AI_CONTENT_DRAFT_TYPE = 'ai-content-creator';
 
@@ -59,9 +60,16 @@ type RunServerStartupDeps = {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
     rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
   };
+  TdfMutationJobs: {
+    rawCollection: () => any;
+    insertAsync: (document: UnknownRecord) => Promise<unknown>;
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<number>;
+  };
   DynamicAssets: {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
     collection: {
+      updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
       rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
     };
   };
@@ -79,6 +87,7 @@ type RunServerStartupDeps = {
       fetchAsync: () => Promise<any[]>;
     };
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<number>;
+    removeAsync: (selector: UnknownRecord) => Promise<number>;
   };
   Histories: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -91,7 +100,7 @@ type RunServerStartupDeps = {
   AssetsAny: { getTextAsync: (path: string) => Promise<string> };
   updateActiveThemeDocument: (userId: string | null | undefined, mutator: (theme: any) => any) => Promise<unknown>;
   upsertStimFile: (filename: string, json: unknown, ownerId: string) => Promise<string | number | null | undefined>;
-  upsertTDFFile: (filename: string, rec: any, ownerId: string) => Promise<{ stimuliSetId?: number | string | null } | unknown>;
+  importPrivateRepoTdfBatch: (records: any[], ownerId: string) => Promise<Array<{ tdfId: string; stimuliSetId?: number | string | null }>>;
   updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
   sendErrorReportSummaries: () => Promise<unknown>;
   sendEmail: (to: string, from: string, subject: string, text: string) => void;
@@ -319,6 +328,15 @@ function findExistingUserByCanonicalEmail(canonicalEmail: string) {
 }
 
 export async function runServerStartup(deps: RunServerStartupDeps) {
+  const recovery = await reconcileInterruptedTdfMutationJobs({
+    TdfMutationJobs: deps.TdfMutationJobs,
+    Tdfs: deps.Tdfs,
+    DynamicAssets: deps.DynamicAssets,
+    serverConsole: deps.serverConsole,
+  });
+  if (recovery.scanned > 0) {
+    deps.serverConsole('[TDF mutation recovery] startup reconciliation', recovery);
+  }
   registerSecurityHeaders();
   await themeRegistry.initialize();
   await runStartupCleanupMigrations({
@@ -349,11 +367,16 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     deps.serverConsole('Warning: Package asset id backfill failed:', error instanceof Error ? error.message : String(error));
   }
   if (packageAssetBackfillSucceeded) {
-    await backfillConditionTdfIds({
-      Tdfs: deps.Tdfs,
-      DynamicSettings: deps.DynamicSettings,
-      serverConsole: deps.serverConsole,
-    });
+    try {
+      await backfillConditionTdfIds({
+        Tdfs: deps.Tdfs,
+        TdfMutationJobs: deps.TdfMutationJobs,
+        DynamicSettings: deps.DynamicSettings,
+        serverConsole: deps.serverConsole,
+      });
+    } catch (error: unknown) {
+      deps.serverConsole('Warning: TDF identity migration v2 failed; invalid roots remain blocked:', error instanceof Error ? error.message : String(error));
+    }
   } else {
     deps.serverConsole('[TDF identity migration] deferred because package asset id backfill did not complete');
   }
@@ -601,7 +624,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       serverConsole: deps.serverConsole,
       AssetsAny: deps.AssetsAny,
       upsertStimFile: deps.upsertStimFile,
-      upsertTDFFile: deps.upsertTDFFile,
+      importPrivateRepoTdfBatch: deps.importPrivateRepoTdfBatch,
       updateStimDisplayTypeMap: deps.updateStimDisplayTypeMap,
     });
   }
@@ -716,6 +739,9 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   await deps.AuthThrottleState.rawCollection().createIndex({ updatedAt: 1 });
   await deps.ManualContentDrafts.rawCollection().createIndex({ ownerId: 1, updatedAt: -1 });
   await deps.ManualContentDrafts.rawCollection().createIndex({ ownerId: 1, draftType: 1, phase: 1, updatedAt: -1 });
+  await deps.TdfMutationJobs.rawCollection().createIndex({ status: 1, updatedAt: 1 });
+  await deps.TdfMutationJobs.rawCollection().createIndex({ actorUserId: 1, status: 1, confirmationExpiresAt: 1 });
+  await deps.TdfMutationJobs.rawCollection().createIndex({ cleanupAt: 1 }, { expireAfterSeconds: 0, sparse: true });
   await purgeLegacyAiContentDraftStorage(deps);
   await deps.StimulusCrowdStats.rawCollection().createIndex({ stimulusKey: 1 }, { unique: true });
   await deps.StimulusCrowdStats.rawCollection().createIndex({ stimuliSetId: 1, KCId: 1 });

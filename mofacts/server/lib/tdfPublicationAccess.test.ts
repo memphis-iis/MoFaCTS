@@ -26,8 +26,8 @@ describe('tdfPublicationAccess', function() {
                 tdfs: {
                   tutor: {
                     setspec: {
-                      condition: ['cond-file', 42, ' '],
-                      conditionTdfIds: ['cond-id', 7, null]
+                      condition: ['cond-file', 'cond-7'],
+                      conditionTdfIds: ['cond-id', '7']
                     }
                   }
                 }
@@ -65,20 +65,24 @@ describe('tdfPublicationAccess', function() {
     let findCalls = 0;
     let findOneCalls = 0;
     let userCalls = 0;
+    const findOptions: PublicationSelector[] = [];
     const resolver = createTdfPublicationAccessResolver({
       tdfs: {
-        find(selector: PublicationSelector) {
+        find(selector: PublicationSelector, options?: PublicationSelector) {
           findCalls += 1;
-          if (selector.$or?.some((term: any) => term['content.fileName'])) {
-            const refs = selector.$or.find((term: any) => term['content.fileName'])['content.fileName'].$in;
-            return cursor(refs.map((ref: string) => ({
-              stimuliSetId: ref === 'participant-cond' ? 404 : 202
+          findOptions.push(options || {});
+          if (selector._id?.$in) {
+            return cursor(selector._id.$in.map((id: string) => ({
+              stimuliSetId: id === 'participant-cond-id' ? 404 : 202
             })));
           }
           return cursor([
             {
               stimuliSetId: 101,
-              content: { tdfs: { tutor: { setspec: { condition: ['cond-file'] } } } }
+              content: { tdfs: { tutor: { setspec: {
+                condition: ['cond-file'],
+                conditionTdfIds: ['cond-id'],
+              } } } }
             }
           ]);
         },
@@ -86,7 +90,10 @@ describe('tdfPublicationAccess', function() {
           findOneCalls += 1;
           return {
             stimuliSetId: 303,
-            content: { tdfs: { tutor: { setspec: { condition: ['participant-cond'] } } } }
+            content: { tdfs: { tutor: { setspec: {
+              condition: ['participant-cond'],
+              conditionTdfIds: ['participant-cond-id'],
+            } } } }
           };
         }
       },
@@ -117,6 +124,7 @@ describe('tdfPublicationAccess', function() {
     expect(userCalls).to.equal(1);
     expect(findOneCalls).to.equal(1);
     expect(findCalls).to.equal(3);
+    expect(findOptions[0]?.fields?.['content.tdfs.tutor.setspec.conditionTdfIds']).to.equal(1);
   });
 
   it('bounds cached entries by evicting the oldest user lookup', async function() {

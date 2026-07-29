@@ -120,7 +120,7 @@ export interface PracticeDashboardSnapshotLesson {
   contentLanguage?: string;
   recommendedUiLocales?: string[];
   translationStatus?: string;
-  availability: 'available';
+  availability: 'available' | 'repair-required';
   currentStimuliSetId: string | number | null;
   learnerConfig: LearnerTdfConfig | null;
   progress: PracticeDashboardProgressStats;

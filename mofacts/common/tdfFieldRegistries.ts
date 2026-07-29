@@ -254,22 +254,33 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
       verbose: 'Controls when condition completion counts are incremented.'
     }
   ),
-  condition: simpleField(stringArrayField('Conditions', 'Condition'), {
+  condition: simpleField({
+    ...stringArrayField('Conditions', 'Condition'),
+    minItems: 1,
+    uniqueItems: true,
+    readOnly: true,
+  }, {
     brief: 'Experiment condition file names.',
-    verbose: 'Condition TDF filenames used by root experiments.'
+    verbose: 'Package-managed condition TDF filenames used by root experiments.'
+  }, {
+    surfaces: { editor: false, learnerConfig: false },
   }),
   conditionTdfIds: simpleField({
     type: 'array',
     title: 'Condition TDF IDs',
+    minItems: 1,
+    uniqueItems: true,
+    readOnly: true,
     items: {
-      anyOf: [{ type: 'string' }, { type: 'null' }],
+      type: 'string',
+      pattern: '^[A-Za-z0-9_-]{1,128}$',
       title: 'Condition TDF ID',
     },
   }, {
     brief: 'Resolved condition TDF IDs.',
     verbose: 'Server-resolved TDF IDs corresponding to condition filenames. Used by experiment dashboards and package workflows.'
   }, {
-    surfaces: { learnerConfig: false },
+    surfaces: { editor: false, learnerConfig: false },
   }),
   duedate: simpleField(stringField('', 4), {
     brief: 'Class practice due date.',

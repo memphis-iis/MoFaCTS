@@ -1,5 +1,4 @@
 import { assign as xAssign } from 'xstate';
-import type { H5PTrialResult } from '../../../../../common/types';
 import type { SparcControllerResult } from '../services/sparcController';
 
 export type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
@@ -34,7 +33,6 @@ export type ActionContext = {
   preparedAdvanceMode?: PreparedAdvanceMode;
   preparedTrial?: Record<string, unknown> | null;
   source?: string;
-  h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcControllerResult | null;
   sparcNodeValues?: Record<string, unknown>;
   questionIndex: number;
@@ -74,7 +72,6 @@ export type ActionEvent = {
   eventType?: string;
   timestamp?: number;
   userAnswer?: string;
-  h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcControllerResult | null;
   transcript?: string;
   isCorrect?: boolean;

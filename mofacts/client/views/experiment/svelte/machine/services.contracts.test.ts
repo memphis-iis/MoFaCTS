@@ -60,27 +60,6 @@ describe('machine services contracts', function() {
     expect(result).to.deep.equal({ skipped: true });
   });
 
-  it('evaluates H5P correctness from part outcomes rather than the completion placeholder', async function() {
-    const result = await evaluateAnswerService({
-      userAnswer: '__H5P_COMPLETED__',
-      currentAnswer: '__H5P_COMPLETED__',
-      h5pResult: {
-        contentId: 'activity-1',
-        batchId: 'batch-1',
-        completed: true,
-        events: [
-          { eventIndex: 0, correct: true },
-          { eventIndex: 1, correct: false },
-        ],
-      },
-    });
-
-    expect(result).to.deep.equal({
-      isCorrect: false,
-      matchText: '10',
-    });
-  });
-
   it('passes accent-sensitive delivery settings into answer evaluation', async function() {
     const result = await evaluateAnswerService({
       userAnswer: 'corazon',

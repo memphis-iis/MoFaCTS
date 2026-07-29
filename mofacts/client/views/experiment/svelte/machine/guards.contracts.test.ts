@@ -6,8 +6,6 @@ import {
   isUnsupportedTrialType,
   needsForceCorrectPrompt,
   isCorrectForceCorrection,
-  needsFeedback,
-  noFeedback,
   unitFinished,
   canEngineUsePreparedAdvance,
   canUsePreparedAdvance,
@@ -98,40 +96,7 @@ describe('machine guard contracts', function() {
     expect(needsForceCorrectPrompt(completed)).to.equal(false);
   });
 
-  it('lets self-hosted H5P own feedback inside the activity frame', function() {
-    const h5pDrill = makeArgs({
-      context: {
-        testType: 'd',
-        currentDisplay: {
-          h5p: {
-            sourceType: 'self-hosted',
-            contentId: 'h5p-tester-multichoice-001',
-            packageAssetId: 'multiple-choice-713.h5p',
-            library: 'H5P.MultiChoice 1.16',
-            completionPolicy: 'xapi-completed',
-            scorePolicy: 'record-only',
-          },
-        },
-      },
-    });
-
-    expect(needsFeedback(h5pDrill)).to.equal(false);
-    expect(noFeedback(h5pDrill)).to.equal(true);
-  });
-
-  it('suppresses the standard response timeout for H5P and production-rule SPARC displays', function() {
-    const h5pDisplay = makeArgs({
-      context: {
-        currentDisplay: {
-          h5p: {
-            sourceType: 'self-hosted',
-            contentId: 'h5p-tester-multichoice-001',
-            packageAssetId: 'multiple-choice-713.h5p',
-            library: 'H5P.MultiChoice 1.16',
-          },
-        },
-      },
-    });
+  it('suppresses the standard response timeout for production-rule SPARC displays', function() {
     const sparcProductionRuleDisplay = makeArgs({
       context: {
         currentDisplay: {
@@ -150,7 +115,6 @@ describe('machine guard contracts', function() {
       },
     });
 
-    expect(trialDisplaySuppressesStandardTimeout(h5pDisplay)).to.equal(true);
     expect(trialDisplaySuppressesStandardTimeout(sparcProductionRuleDisplay)).to.equal(true);
     expect(trialDisplaySuppressesStandardTimeout(sparcPlainDisplay)).to.equal(false);
   });

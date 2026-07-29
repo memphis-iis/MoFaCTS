@@ -7,7 +7,6 @@ import "./publications";
 import "./http/health";
 import "./http/pwa";
 import "./http/socialPreview";
-import "./http/h5pContent";
 import "./http/backupArchives";
 import "./http/ownHistoryDownload";
 import "./migrations/convert_delivery_settings";

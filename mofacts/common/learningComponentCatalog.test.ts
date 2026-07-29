@@ -212,16 +212,6 @@ describe('Learning component catalog', function() {
       });
     expect(summary.trialDisplays).to.deep.equal([
       {
-        id: 'mofacts.h5p-trial-display',
-        kind: 'trial-display',
-        unitTypes: [],
-        displayTypes: ['h5p'],
-        requiredCapabilities: ['history', 'media'],
-        requiredServerMethods: [],
-        providedServices: [],
-        providedServiceDetails: [],
-      },
-      {
         id: 'mofacts.sparc-trial-display',
         kind: 'trial-display',
         unitTypes: [],

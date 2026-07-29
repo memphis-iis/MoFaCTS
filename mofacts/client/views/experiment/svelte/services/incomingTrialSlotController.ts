@@ -17,7 +17,6 @@ export interface IncomingTrialSlotKeyInput {
       readonly display?: {
         readonly audioSrc?: unknown;
         readonly clozeText?: unknown;
-        readonly h5p?: { readonly contentId?: unknown } | null;
         readonly imgSrc?: unknown;
         readonly text?: unknown;
         readonly videoSrc?: unknown;
@@ -45,7 +44,6 @@ export function buildIncomingTrialSlotKey(input: IncomingTrialSlotKeyInput): str
     display.imgSrc || '',
     display.videoSrc || '',
     display.audioSrc || '',
-    display.h5p?.contentId || '',
   ].join('::');
 }
 

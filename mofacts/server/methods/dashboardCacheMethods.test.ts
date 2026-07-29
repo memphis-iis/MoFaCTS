@@ -1174,6 +1174,7 @@ describe('dashboardCacheMethods', function() {
           tutor: {
             setspec: {
               lessonname: 'Root Lesson',
+              condition: ['child.json'],
               conditionTdfIds: ['child-tdf']
             }
           }
@@ -1220,9 +1221,7 @@ describe('dashboardCacheMethods', function() {
               if (selector?._id?.$in?.includes('child-tdf')) {
                 return [childTdf];
               }
-              if (selector?.$or?.some((term: any) =>
-                term['content.tdfs.tutor.setspec.conditionTdfIds']?.$in?.includes('child-tdf')
-              )) {
+              if (selector?.['content.tdfs.tutor.setspec.conditionTdfIds']?.$in?.includes('child-tdf')) {
                 return [rootTdf];
               }
               return [];
@@ -1253,20 +1252,7 @@ describe('dashboardCacheMethods', function() {
     expect(cacheDoc.tdfStats).to.have.property('root-tdf');
     expect(cacheDoc.tdfStats).to.not.have.property('child-tdf');
     expect(tdfFindSelectors[1]).to.deep.equal({
-      $or: [
-        {
-          $and: [
-            { 'content.tdfs.tutor.setspec.condition': { $in: ['child-tdf', 'child.json'] } },
-            {
-              $or: [
-                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
-                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
-              ],
-            },
-          ],
-        },
-        { 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-tdf'] } }
-      ]
+      'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-tdf'] },
     });
     expect(tdfFindSelectors.some((selector) => selector?.['content.tdfs.tutor.setspec.condition']?.$exists === true)).to.equal(false);
   });
@@ -1436,7 +1422,7 @@ describe('dashboardCacheMethods', function() {
         },
         find: (selector: any) => ({
           fetchAsync: async () => {
-            if (selector.$or?.some((entry: any) => entry._id?.$in?.includes('condition-a') || entry['content.fileName']?.$in?.includes('condition-a.json'))) {
+            if (selector?._id?.$in?.includes('condition-a')) {
               return [docs.child];
             }
             return [];

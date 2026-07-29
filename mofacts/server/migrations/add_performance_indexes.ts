@@ -251,6 +251,12 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: Tdfs.packageFile');
 
     await Tdfs.rawCollection().createIndex(
+      { 'sourceIdentity.kind': 1, 'sourceIdentity.key': 1 },
+      { name: 'unique_source_identity', unique: true, sparse: true, background: true }
+    );
+    serverConsole('  Created: Tdfs.sourceIdentity unique');
+
+    await Tdfs.rawCollection().createIndex(
       { 'content.tdfs.tutor.setspec.lessonname': 1 },
       { name: 'perf_lessonname', background: true }
     );

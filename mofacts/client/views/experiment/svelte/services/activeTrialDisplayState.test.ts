@@ -33,7 +33,6 @@ describe('active trial display state', function() {
       displayIncorrectFeedback: true,
       feedbackMessage: 'Feedback',
       formatAnswerText: (answer) => `fmt:${answer}`,
-      h5pOwnsResponse: false,
       isCorrect: false,
       isForceCorrecting: false,
       isStudyState: false,
@@ -62,7 +61,6 @@ describe('active trial display state', function() {
       displayIncorrectFeedback: true,
       feedbackMessage: '',
       formatAnswerText: (answer) => answer,
-      h5pOwnsResponse: true,
       isCorrect: false,
       isForceCorrecting: false,
       isStudyState: false,
@@ -83,7 +81,6 @@ describe('active trial display state', function() {
       displayIncorrectFeedback: true,
       feedbackMessage: 'ignored',
       formatAnswerText: (answer) => `fmt:${answer}`,
-      h5pOwnsResponse: false,
       isCorrect: false,
       isForceCorrecting: false,
       isStudyState: true,
@@ -108,7 +105,7 @@ describe('active trial display state', function() {
 
   it('refreshes the frozen snapshot from current display values outside outgoing transition states', function() {
     const current = values({
-      display: { text: 'new', h5p: { nested: { value: 1 } } },
+      display: { text: 'new' },
     });
     const previousFrozen = values({
       display: { text: 'old' },
@@ -131,7 +128,6 @@ describe('active trial display state', function() {
       imgSrc: '',
       videoSrc: '',
       audioSrc: '',
-      h5p: { nested: { value: 1 } },
     });
     expect(snapshot.active.display).to.not.equal(current.display);
     expect(snapshot.frozen).to.deep.equal(snapshot.active);

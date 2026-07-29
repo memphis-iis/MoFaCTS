@@ -25,6 +25,8 @@ export async function uploadParsedPackageMedia(args: {
       uploadStimSetIds,
       fallbackStimSetId: state.stimSetId,
       owner,
+      mutationJobId: state.mutationJobId,
+      mediaMutations: state.mediaMutations,
       saveMediaFile: deps.saveMediaFile,
       toCanonicalDynamicAssetPath: deps.toCanonicalDynamicAssetPath,
       normalizeUploadedMediaLookupKey: deps.normalizeUploadedMediaLookupKey,

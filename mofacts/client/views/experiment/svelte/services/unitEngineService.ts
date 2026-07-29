@@ -16,7 +16,6 @@ import { computePracticeTimeMs } from '../../../../../lib/practiceTime';
 import { calculateTrialTimings } from './historyLogging';
 import { getExperimentState } from './experimentState';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
-import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import { getPreparedCardDataFromSelection as buildPreparedCardDataFromSelection } from './cardPayloadBuilder';
 import { resolveSessionSurfaceState } from './sessionSurfaceMode';
 import { resolveSparcControllerDisplay } from './sparcController';
@@ -47,7 +46,6 @@ import {
 import type {
   EngineServiceResult,
   ExperimentState,
-  H5PTrialResult,
   SelectCardServiceEvent,
   UnitEngineLike,
   UpdateEngineServiceEvent,
@@ -60,7 +58,6 @@ interface UnitEngineServiceContext extends Record<string, unknown> {
   engine?: UnitEngineLike | null;
   questionIndex?: number;
   isCorrect?: boolean;
-  h5pResult?: H5PTrialResult | null;
   testType?: string;
   timestamps?: {
     trialEnd: number;
@@ -83,7 +80,6 @@ interface UnitEngineServiceContext extends Record<string, unknown> {
 }
 
 interface UpdateEngineServiceContext extends UnitEngineServiceContext {
-  h5pResult?: H5PTrialResult | null;
   timestamps: {
     trialEnd: number;
     trialStart: number;
@@ -699,21 +695,8 @@ export async function updateEngineService(
         testType
       );
     const practiceTime = computePracticeTimeMs(timings.endLatency, timings.feedbackLatency);
-    const h5pOutcomes = context.h5pResult
-        ? resolveH5PModelOutcomes(context.h5pResult)
-        : null;
-
-    if (h5pOutcomes) {
-        clientConsole(2, '[Unit Engine] H5P model outcome batch', {
-          contentId: context.h5pResult?.contentId,
-          batchId: context.h5pResult?.batchId,
-          outcomes: h5pOutcomes.map((outcome) => outcome.correct ? 1 : 0),
-          practiceTime,
-        });
-
-    }
     await engine.advanceAfterAnswer(
-      h5pOutcomes || [{ correct: isCorrect }],
+      [{ correct: isCorrect }],
       practiceTime,
       testType,
     );

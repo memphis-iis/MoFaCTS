@@ -21,3 +21,5 @@ Beginner content smoke path:
 - The content owner has confirmed this sample is redistributable and includes attribution/provenance metadata.
 - Do not require H5P for the beginner smoke test.
 - After content is available, launch one learner flow and complete one trial.
+
+In non-production private-repository bootstrap, TDF records are keyed by the server-owned `sourceIdentity` (`private-repo` plus the repository-relative source key), not by filename. Renaming a displayed/archive filename therefore does not create a second identity, and same-named TDFs from other sources are not overwritten.

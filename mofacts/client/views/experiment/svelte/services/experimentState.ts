@@ -101,6 +101,10 @@ function mergeExperimentState(
   return filteredState;
 }
 
+type ExperimentStateWriteOptions = {
+  replaceExistingState?: boolean;
+};
+
 /**
  * Get current experiment state from server.
  * Loads state into ExperimentStateStore for reactive access.
@@ -126,13 +130,18 @@ export async function getExperimentState(): Promise<ExperimentState> {
  * but never for the standard per-trial learning loop.
  */
 export async function createExperimentState(
-  partialState: ExperimentState
+  partialState: ExperimentState,
+  options: ExperimentStateWriteOptions = {},
 ): Promise<string | undefined> {
   assertIdInvariants('experimentState.create', { requireCurrentTdfId: true, requireStimuliSetId: false });
 
-  const existingState = ExperimentStateStore.get();
+  const existingState = options.replaceExistingState ? undefined : ExperimentStateStore.get();
   const stateToPersist = mergeExperimentState(existingState, partialState);
-  const persistedState = await meteorCallAsync<ExperimentState>('createExperimentState', stateToPersist);
+  const persistedState = await meteorCallAsync<ExperimentState>(
+    'createExperimentState',
+    stateToPersist,
+    options,
+  );
   const nextState = persistedState || stateToPersist;
 
   ExperimentStateStore.set(nextState);

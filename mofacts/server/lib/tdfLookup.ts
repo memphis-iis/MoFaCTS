@@ -1,5 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { curSemester } from '../../common/Definitions';
+import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -19,6 +20,7 @@ type TdfAccessDoc = {
   tdfFileName?: string;
   ownerId?: string;
   accessors?: Array<{ userId?: string }>;
+  tdfAvailability?: string;
   content?: {
     fileName?: string;
     tdfs?: {
@@ -78,6 +80,7 @@ const TDF_ACCESS_FIELDS = {
   ownerId: 1,
   accessors: 1,
   tdfFileName: 1,
+  tdfAvailability: 1,
   'content.fileName': 1,
   'content.tdfs.tutor.setspec.userselect': 1,
   'content.tdfs.tutor.setspec.experimentTarget': 1,
@@ -130,40 +133,19 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
 
     const rootTdfDocs = await deps.Tdfs.find(
       { _id: { $in: normalizedRootIds } },
-      { fields: { _id: 1, 'content.tdfs.tutor.setspec': 1 } }
+      { fields: { _id: 1, 'content.tdfs.tutor': 1 } }
     ).fetchAsync();
 
-    const conditionFileNames: string[] = [];
     for (const rootTdf of rootTdfDocs) {
-      const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec;
-      if (Array.isArray(rootSetspec?.conditionTdfIds)) {
-        const conditionIds = rootSetspec.conditionTdfIds
-          .map((id: unknown) => deps.normalizeCanonicalId(id))
-          .filter((id: string | null): id is string => typeof id === 'string');
-        if (conditionIds.includes(requestedTdfId)) {
-          return true;
-        }
-        if (conditionIds.length > 0) {
-          continue;
-        }
+      const validation = validateConditionFamilyTutor(rootTdf?.content?.tdfs?.tutor, { requireCanonicalIds: true });
+      if (validation.isConditionRoot && validation.errors.length > 0) {
+        throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
       }
-
-      const conditions = Array.isArray(rootSetspec?.condition) ? rootSetspec.condition : [];
-      for (const condition of conditions) {
-        if (typeof condition === 'string' && condition.trim()) {
-          conditionFileNames.push(condition.trim());
-        }
+      if (validation.conditionTdfIds.includes(requestedTdfId)) {
+        return true;
       }
     }
-
-    if (conditionFileNames.length === 0) {
-      return false;
-    }
-
-    const conditionDocs = await getTdfsByFileNameOrId(conditionFileNames);
-    return conditionDocs.some((conditionDoc) =>
-      deps.normalizeCanonicalId(conditionDoc?._id) === requestedTdfId
-    );
+    return false;
   }
 
   async function requireMatchingCourseAssignmentContext(
@@ -242,6 +224,9 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     if (!tdfAccess) {
       return null;
     }
+    if (tdfAccess.tdfAvailability === 'repair-required') {
+      throw new Meteor.Error('tdf-identity-repair-required', 'This lesson requires an identity repair before it can be used.');
+    }
 
     const loadFullTdf = async () => await deps.Tdfs.findOneAsync({ _id: TDFId });
     const assignedRootIds = new Set(await deps.resolveAssignedRootTdfIdsForUser(this.userId));
@@ -300,10 +285,9 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
 
     const rootTdfDocs = await deps.Tdfs.find(
       { _id: { $in: rootTdfIds } },
-      { fields: { _id: 1, ownerId: 1, accessors: 1, 'content.tdfs.tutor.setspec': 1 } }
+      { fields: { _id: 1, ownerId: 1, accessors: 1, tdfAvailability: 1, 'content.tdfs.tutor': 1 } }
     ).fetchAsync();
 
-    const conditionFileNames: string[] = [];
     for (const rootTdf of rootTdfDocs) {
       const rootId = String(rootTdf?._id || '');
       const canViewRoot = await deps.canViewDashboardTdf(this.userId, rootTdf);
@@ -328,34 +312,14 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       if (rootId === TDFId) {
         return await loadFullTdf();
       }
-      const rootSetspec = rootTdf?.content?.tdfs?.tutor?.setspec;
-      const canonicalConditionIds = Array.isArray(rootSetspec?.conditionTdfIds)
-        ? rootSetspec.conditionTdfIds
-            .map((id: unknown) => deps.normalizeCanonicalId(id))
-            .filter((id: string | null): id is string => typeof id === 'string')
-        : [];
-      if (canonicalConditionIds.length > 0) {
-        if (canonicalConditionIds.includes(TDFId)) {
-          return await loadFullTdf();
-        }
-      } else {
-        const conditions = Array.isArray(rootSetspec?.condition) ? rootSetspec.condition : [];
-        for (const c of conditions) {
-          if (typeof c === 'string' && c.trim()) {
-            conditionFileNames.push(c.trim());
-          }
-        }
+      if (rootTdf.tdfAvailability === 'repair-required') {
+        continue;
       }
-    }
-
-    if (conditionFileNames.length > 0) {
-      const conditionDocs = await getTdfsByFileNameOrId(conditionFileNames);
-      const resolvedConditionIds = new Set<string>();
-      for (const doc of conditionDocs) {
-        const id = deps.normalizeCanonicalId(doc?._id);
-        if (id) resolvedConditionIds.add(id);
+      const familyValidation = validateConditionFamilyTutor(rootTdf?.content?.tdfs?.tutor, { requireCanonicalIds: true });
+      if (familyValidation.isConditionRoot && familyValidation.errors.length > 0) {
+        throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
       }
-      if (resolvedConditionIds.has(TDFId)) {
+      if (familyValidation.conditionTdfIds.includes(TDFId)) {
         return await loadFullTdf();
       }
     }

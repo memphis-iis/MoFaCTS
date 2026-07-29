@@ -20,6 +20,7 @@ import {
   deriveAssessmentScheduleCursor,
   hasAssessmentResumeProgress,
   resolveResumeHistoryRoute,
+  shouldRequireAssessmentScheduleArtifact,
   shouldSkipResumeInstructionsForHistoryRoute,
 } from './assessmentResume';
 import {
@@ -531,7 +532,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     const conditionOptions = setspec.condition ?? [];
     const needExpCondition = conditionOptions.length > 0;
 
-    const newExperimentState = JSON.parse(JSON.stringify(curExperimentState)) as ResumeExperimentState;
+    let newExperimentState = JSON.parse(JSON.stringify(curExperimentState)) as ResumeExperimentState;
 
     if (needExpCondition) {
       clientConsole(2, 'Experimental condition is required: searching');
@@ -581,7 +582,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
           currentRootTdfId: Session.get('currentRootTdfId'),
           currentTdfId: conditionTdfId,
           conditionTdfId,
-        });
+        }, { replaceExistingState: true });
+        curExperimentState = (ExperimentStateStore.get() || {}) as ResumeExperimentState;
+        newExperimentState = JSON.parse(JSON.stringify(curExperimentState)) as ResumeExperimentState;
         Session.set('preselectedConditionTdfId', null);
       } else if (prevCondition) {
         clientConsole(2, 'Found previous experimental condition: using that');
@@ -1091,7 +1094,10 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       return { redirected: true, redirectTo: COMPLETED_LESSON_REDIRECT };
     }
 
-    if (resumeHistoryRoute.requiresAssessmentScheduleArtifact) {
+    if (shouldRequireAssessmentScheduleArtifact(
+      resumeHistoryRoute,
+      assessmentHasDurableResumeProgress,
+    )) {
       try {
         assertAssessmentScheduleArtifactForUnit(curExperimentState, currentUnitNumber);
       } catch (error) {

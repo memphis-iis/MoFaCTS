@@ -31,11 +31,10 @@ describe('incoming trial slot controller', function() {
             imgSrc: '/img.png',
             videoSrc: '/video.mp4',
             audioSrc: '/audio.mp3',
-            h5p: { contentId: 'h5p-1' },
           },
         },
       },
-    })).to.equal('4::Prompt::Cloze::/img.png::/video.mp4::/audio.mp3::h5p-1');
+    })).to.equal('4::Prompt::Cloze::/img.png::/video.mp4::/audio.mp3');
 
     expect(buildIncomingTrialSlotKey({
       preparedTrial: { questionIndex: 4 },

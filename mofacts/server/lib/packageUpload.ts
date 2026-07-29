@@ -26,7 +26,12 @@ export type PackageUploadPolicy = {
     isTeacherOrAdmin: boolean;
   }) => Promise<void> | void;
   confirmedIdentityFingerprint?: string | null;
+  expectedArchiveSha256?: string | null;
+  mutationJobId?: string | null;
 };
+
+const UPLOAD_PLAN_TTL_MS = 30 * 60 * 1000;
+const TERMINAL_JOB_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -149,8 +154,8 @@ async function validateUploadedPackageFile(
     throw new Error(`${INCOMPLETE_UPLOAD_MESSAGE} Stored ${storedSize} of ${expectedSize} bytes.`);
   }
 
+  const actualSha256 = computeFileSha256(zipPath);
   if (expectedSha256) {
-    const actualSha256 = computeFileSha256(zipPath);
     if (actualSha256 !== expectedSha256) {
       throw new Error(`Uploaded package checksum mismatch. Expected ${expectedSha256}, got ${actualSha256}. Please upload the file again.`);
     }
@@ -167,6 +172,7 @@ async function validateUploadedPackageFile(
     'sha256Checked=',
     Boolean(expectedSha256)
   );
+  return actualSha256;
 }
 
 function normalizePackageInitializationError(error: unknown) {
@@ -228,11 +234,17 @@ export async function processPackageUploadWorkflow(
     uploadActorUserId: context.userId,
     stimSetId: undefined,
     uploadedMediaPathMapsByStimSetId: new Map<string, Map<string, string>>(),
+    mediaMutations: [],
     identityPlan: null,
+    mutationJobId: policy.mutationJobId || null,
   };
+  let uploadPlanExpiresAt: Date | null = null;
 
   try {
-    await validateUploadedPackageFile(zipPath, fileObj, deps, integrity);
+    const archiveSha256 = await validateUploadedPackageFile(zipPath, fileObj, deps, integrity);
+    if (policy.expectedArchiveSha256 && policy.expectedArchiveSha256 !== archiveSha256) {
+      throw new Meteor.Error('changed-package-asset', 'The uploaded package changed after preflight. Upload it again.');
+    }
     await mirrorPackageAssetToS3(fileObj, deps);
     unzippedFiles = await parsePackageZip(zipPath, packageFile, deps.serverConsole);
     await policy.prepareParsedPackage?.({ unzippedFiles, owner, isTeacherOrAdmin });
@@ -245,11 +257,32 @@ export async function processPackageUploadWorkflow(
       deps,
     });
     state.identityPlan = identityPlan;
+    if (!state.mutationJobId) {
+      const createdAt = new Date();
+      const expiresAt = new Date(createdAt.getTime() + UPLOAD_PLAN_TTL_MS);
+      uploadPlanExpiresAt = expiresAt;
+      state.mutationJobId = await deps.TdfMutationJobs.insertAsync({
+        kind: 'package-upload',
+        status: identityPlan.updates.length > 0 ? 'awaiting-confirmation' : 'committing',
+        actorUserId: context.userId,
+        ownerId: owner,
+        packageAssetId,
+        archiveSha256,
+        identityFingerprint: identityPlan.fingerprint,
+        operations: identityPlan.entries,
+        creates: identityPlan.creates,
+        updates: identityPlan.updates,
+        createdAt,
+        updatedAt: createdAt,
+        confirmationExpiresAt: identityPlan.updates.length > 0 ? expiresAt : undefined,
+        cleanupAt: identityPlan.updates.length > 0 ? expiresAt : undefined,
+      });
+    }
     if (identityPlan.updates.length > 0 && policy.confirmedIdentityFingerprint !== identityPlan.fingerprint) {
       return {
         status: 'confirmation-required',
-        packageAssetId,
-        preflightFingerprint: identityPlan.fingerprint,
+        uploadPlanId: state.mutationJobId,
+        expiresAt: uploadPlanExpiresAt,
         updates: identityPlan.updates,
         creates: identityPlan.creates,
       };
@@ -268,10 +301,8 @@ export async function processPackageUploadWorkflow(
       deps,
       state
     });
-    if (policy.requireAllContentResults) {
-      const failedResult = results.find((result) => !result.result);
-      if (failedResult) throw new Error(failedResult.errmsg || 'Package content persistence failed.');
-    }
+    const failedResult = results.find((result) => !result.result);
+    if (failedResult) throw new Error(failedResult.errmsg || 'Package content persistence failed.');
     failureStage = 'media upload';
     await uploadParsedPackageMedia({
       unzippedFiles,
@@ -282,7 +313,7 @@ export async function processPackageUploadWorkflow(
       state,
       touchedStimuliSetIds
     });
-    failureStage = 'H5P post-processing';
+    failureStage = 'content post-processing';
     await postProcessUploadedTdfs({ unzippedFiles, deps, state });
     failureStage = 'side effects';
     await applyPackageUploadSideEffects({
@@ -295,16 +326,117 @@ export async function processPackageUploadWorkflow(
       results
     });
 
-    return { results, stimSetId: state.stimSetId };
+    const tdfIds = results
+      .map((result) => result.tdfId)
+      .filter((tdfId): tdfId is string => typeof tdfId === 'string' && tdfId.length > 0);
+    const terminalResult = {
+      status: 'complete',
+      tdfIds,
+      routes: tdfIds.map((tdfId) => `/content/${encodeURIComponent(tdfId)}`),
+      results,
+      stimSetId: state.stimSetId,
+    };
+    for (const mediaMutation of state.mediaMutations) {
+      await deps.DynamicAssets.collection.updateAsync?.(
+        { _id: mediaMutation.newAssetId },
+        { $unset: { 'meta.mutationJobId': '' } },
+      );
+      for (const previousAsset of mediaMutation.previousAssets) {
+        try {
+          await deps.DynamicAssets.removeAsync?.({ _id: previousAsset._id });
+        } catch (cleanupError) {
+          deps.serverConsole('Committed package media backup cleanup failed:', previousAsset._id, cleanupError);
+        }
+      }
+    }
+    if (state.mutationJobId) {
+      await deps.TdfMutationJobs.updateAsync(
+        { _id: state.mutationJobId, status: 'committing' },
+        {
+          $set: {
+            status: 'complete',
+            terminalResult,
+            updatedAt: new Date(),
+            cleanupAt: new Date(Date.now() + TERMINAL_JOB_RETENTION_MS),
+          },
+          $unset: { confirmationExpiresAt: '' },
+        },
+      );
+    }
+    return terminalResult;
   } catch (error: unknown) {
-    if (error && typeof error === 'object' && (error as { error?: unknown }).error === 'package-upload-failed') {
-      throw error;
-    }
     const domainErrorCode = error && typeof error === 'object' ? String((error as { error?: unknown }).error || '') : '';
-    if (domainErrorCode === 'generated-package-name-conflict' || domainErrorCode.startsWith('ai-content-')) {
-      throw error;
-    }
     const message = normalizePackageInitializationError(error);
+    if (state.identityPlan && state.mutationJobId) {
+      let rollbackFailed = false;
+      for (const mediaMutation of [...state.mediaMutations].reverse()) {
+        try {
+          await deps.DynamicAssets.removeAsync?.({ _id: mediaMutation.newAssetId });
+          for (const previousAsset of mediaMutation.previousAssets) {
+            const restored = await deps.DynamicAssets.collection.updateAsync?.(
+              { _id: previousAsset._id },
+              { $set: { name: previousAsset.name, fileName: previousAsset.fileName, meta: previousAsset.meta || {} } },
+            );
+            if (restored === undefined) throw new Error('DynamicAssets.collection.updateAsync is unavailable');
+          }
+        } catch (rollbackError) {
+          rollbackFailed = true;
+          deps.serverConsole('Package media rollback failed:', mediaMutation.newAssetId, rollbackError);
+        }
+      }
+      for (const entry of [...state.identityPlan.entries].reverse()) {
+        try {
+          if (entry.action === 'create') {
+            await deps.Tdfs.removeAsync({ _id: entry.tdfId, packageAssetId });
+            continue;
+          }
+          const before = entry.beforeImage || {};
+          const current = await deps.Tdfs.findOneAsync(
+            { _id: entry.tdfId },
+            { fields: { _id: 1, tdfRevision: 1 } },
+          );
+          const currentRevision = Number.isInteger(current?.tdfRevision) ? current.tdfRevision : 0;
+          if (currentRevision === entry.targetRevision) continue;
+          if (currentRevision !== entry.targetRevision + 1) {
+            throw new Error(`TDF "${entry.tdfId}" changed again before rollback.`);
+          }
+          const setFields: Record<string, unknown> = { tdfRevision: entry.targetRevision };
+          const unsetFields: Record<string, string> = {};
+          for (const field of ['tdfFileName', 'content', 'ownerId', 'stimuliSetId', 'rawStimuliFile', 'stimuli', 'packageFile', 'packageAssetId', 'conditionCounts', 'tdfAvailability', 'tdfIdentityState']) {
+            if (Object.prototype.hasOwnProperty.call(before, field) && before[field] !== undefined) setFields[field] = before[field];
+            else unsetFields[field] = '';
+          }
+          const restored = await deps.Tdfs.updateAsync(
+            { _id: entry.tdfId, tdfRevision: entry.targetRevision + 1 },
+            { $set: setFields, ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}) },
+          );
+          if (restored !== 1) throw new Error(`TDF "${entry.tdfId}" could not be restored.`);
+        } catch (rollbackError) {
+          rollbackFailed = true;
+          deps.serverConsole('Package rollback failed for TDF:', entry.tdfId, rollbackError);
+        }
+      }
+      await deps.TdfMutationJobs.updateAsync(
+        { _id: state.mutationJobId, status: 'committing' },
+        {
+          $set: {
+            status: rollbackFailed ? 'recovery-required' : 'rolled-back',
+            updatedAt: new Date(),
+            ...(rollbackFailed ? {} : { cleanupAt: new Date(Date.now() + TERMINAL_JOB_RETENTION_MS) }),
+          },
+          $unset: { confirmationExpiresAt: '' },
+        },
+      );
+      if (!rollbackFailed) {
+        const remainingReferences = await deps.Tdfs.find(
+          { packageAssetId },
+          { fields: { _id: 1 } },
+        ).fetchAsync();
+        if (remainingReferences.length === 0 && typeof deps.DynamicAssets.removeAsync === 'function') {
+          await deps.DynamicAssets.removeAsync({ _id: packageAssetId });
+        }
+      }
+    }
     deps.serverConsole(
       `Package upload ${failureStage} failure details:`,
       fileObj._id,
@@ -327,6 +459,13 @@ export async function processPackageUploadWorkflow(
       } catch (cleanupError: unknown) {
         deps.serverConsole('Could not remove package asset after failed initialization:', fileObj._id, cleanupError);
       }
+    }
+    if (
+      domainErrorCode === 'package-upload-failed'
+      || domainErrorCode === 'generated-package-name-conflict'
+      || domainErrorCode.startsWith('ai-content-')
+    ) {
+      throw error;
     }
     await failPackageUpload(emailToggle, deps, {
       zipPath,

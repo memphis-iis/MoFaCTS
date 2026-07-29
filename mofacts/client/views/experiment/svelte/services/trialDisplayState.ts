@@ -18,7 +18,6 @@ export interface TrialDisplayContent {
   imgSrc?: string;
   videoSrc?: string;
   audioSrc?: string;
-  h5p?: unknown;
   attribution?: TrialDisplayAttribution;
   type?: string;
   schema?: string;

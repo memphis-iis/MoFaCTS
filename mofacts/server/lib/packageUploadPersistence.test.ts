@@ -9,6 +9,11 @@ import type { UploadedPackageFile } from './packageParser';
 
 function packageDeps(overrides: Partial<ProcessPackageUploadDeps> = {}): ProcessPackageUploadDeps {
   return {
+    TdfMutationJobs: {
+      async insertAsync() { return 'upload-plan-1'; },
+      async findOneAsync() { return null; },
+      async updateAsync() { return 1; },
+    },
     DynamicAssets: {
       collection: {
         async findOneAsync() {
@@ -71,9 +76,8 @@ function packageDeps(overrides: Partial<ProcessPackageUploadDeps> = {}): Process
         return null;
       },
       async upsertAsync() {},
-    },
-    async resolveConditionTdfIds() {
-      return [];
+      async updateAsync() { return 1; },
+      async removeAsync() { return 1; },
     },
     async getResponseKCMapForTdf() {
       return {};
@@ -146,6 +150,8 @@ describe('packageUploadPersistence', function() {
       uploadActorUserId: 'user-a',
       stimSetId: undefined,
       uploadedMediaPathMapsByStimSetId: new Map(),
+      mediaMutations: [],
+      mutationJobId: null,
       identityPlan: {
         fingerprint: 'fingerprint',
         updates: [],
@@ -157,6 +163,8 @@ describe('packageUploadPersistence', function() {
           action: 'create',
           lessonName: 'Collision Lesson',
           conditionTdfIds: [],
+          targetRevision: 0,
+          beforeImage: null,
         }],
       },
     };

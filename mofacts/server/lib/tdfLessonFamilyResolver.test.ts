@@ -16,20 +16,7 @@ function cursor(rows: any[]) {
 describe('tdfLessonFamilyResolver', function() {
   it('builds child-to-parent selectors from indexed condition fields', function() {
     expect(buildParentRootSelector(['child-id', 'child.json'], ['child-id'])).to.deep.equal({
-      $or: [
-        {
-          $and: [
-            { 'content.tdfs.tutor.setspec.condition': { $in: ['child-id', 'child.json'] } },
-            {
-              $or: [
-                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
-                { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
-              ],
-            },
-          ],
-        },
-        { 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-id'] } },
-      ],
+      'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-id'] },
     });
   });
 
@@ -39,15 +26,15 @@ describe('tdfLessonFamilyResolver', function() {
         tdfs: {
           tutor: {
             setspec: {
-              condition: ['condition-a.json', 42, ' '],
-              conditionTdfIds: ['condition-a', 7, null],
+              condition: ['condition-a.json', 'condition-b.json'],
+              conditionTdfIds: ['condition-a', 'condition-b'],
             },
           },
         },
       },
     }]);
 
-    expect(terms).to.deep.equal([{ _id: { $in: ['condition-a', '7'] } }]);
+    expect(terms).to.deep.equal([{ _id: { $in: ['condition-a', 'condition-b'] } }]);
   });
 
   it('uses explicit condition ids instead of same-named filename refs', async function() {
@@ -82,7 +69,7 @@ describe('tdfLessonFamilyResolver', function() {
     const childIds = await resolver.resolveConditionChildIdsForRootIds(['root']);
 
     expect(childIds).to.deep.equal(['condition-b']);
-    expect(findSelectors[1]).to.deep.equal({ $or: [{ _id: { $in: ['condition-b'] } }] });
+    expect(findSelectors[1]).to.deep.equal({ _id: { $in: ['condition-b'] } });
   });
 
   it('maps child ids and filenames back to their root ids', function() {
@@ -118,6 +105,6 @@ describe('tdfLessonFamilyResolver', function() {
     expect(childToRoot.get('condition-a.json')).to.equal(undefined);
     expect(childToRoot.get('condition-a')).to.equal(undefined);
     expect(childToRoot.get('condition-b')).to.equal('root');
-    expect(childToRoot.get('condition-b.json')).to.equal('root');
+    expect(childToRoot.get('condition-b.json')).to.equal(undefined);
   });
 });

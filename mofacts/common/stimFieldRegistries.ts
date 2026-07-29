@@ -84,54 +84,6 @@ export const STIM_DISPLAY_FIELD_REGISTRY: SectionFieldRegistry = {
       severity: 'warning',
     },
   }),
-  h5p: simpleField({
-    type: 'object',
-    title: 'H5P display',
-    required: ['sourceType', 'completionPolicy'],
-    additionalProperties: false,
-    properties: {
-      sourceType: {
-        type: 'string',
-        enum: ['external-embed', 'self-hosted'],
-        default: 'external-embed',
-      },
-      embedUrl: {
-        type: 'string',
-        default: '',
-      },
-      completionPolicy: {
-        type: 'string',
-        enum: ['viewed', 'manual-continue', 'xapi-completed', 'xapi-passed'],
-        default: 'manual-continue',
-      },
-      preferredHeight: {
-        type: 'number',
-        minimum: 1,
-      },
-      scorePolicy: {
-        type: 'string',
-        enum: ['correct-if-passed', 'correct-if-full-score', 'record-only'],
-      },
-      contentId: {
-        type: 'string',
-      },
-      packageAssetId: {
-        type: 'string',
-      },
-      library: {
-        type: 'string',
-      },
-    },
-  }, {
-    brief: 'H5P interactive display.',
-    verbose: 'H5P activity metadata for learner display. Phase 1 supports passive external iframe embeds only.'
-  }, {
-    validation: {
-      validators: [{ type: 'h5pDisplayConfig', message: 'Invalid H5P display configuration' }],
-      severity: 'error',
-      breaking: true,
-    },
-  }),
   attribution: simpleField(createClosedObjectSchema('Attribution', {
     creatorName: simpleField(stringField('', 12), {
       brief: 'Attribution creator name.',
@@ -375,7 +327,6 @@ export const STIM_DISPLAY_DIRECT_RUNTIME_KEYS = Object.freeze([
   'attribution',
   'clozeStimulus',
   'clozeText',
-  'h5p',
   'imgSrc',
   'text',
   'videoSrc',

@@ -8,7 +8,7 @@ Belongs here:
 
 - The `TrialType` contract.
 - Trial type registry and factories.
-- Standard drill, study, test, multiple-choice, H5P, video-prompt, and simulation trial behavior.
+- Standard drill, study, test, multiple-choice, video-prompt, and simulation trial behavior.
 
 Does not belong here:
 

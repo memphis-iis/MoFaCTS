@@ -33,7 +33,6 @@ export interface ActiveTrialCurrentDisplayInput {
   readonly displayIncorrectFeedback: unknown;
   readonly feedbackMessage: unknown;
   readonly formatAnswerText: (answer: string) => string;
-  readonly h5pOwnsResponse: boolean;
   readonly isCorrect: unknown;
   readonly isForceCorrecting: boolean;
   readonly isStudyState: boolean;
@@ -91,8 +90,7 @@ export function buildActiveTrialCurrentDisplayValues(
       : input.feedbackMessage,
     feedbackVisible,
     isForceCorrecting: input.isForceCorrecting,
-    responseVisible: !input.h5pOwnsResponse &&
-      !input.sparcSessionOwnsResponse &&
+    responseVisible: !input.sparcSessionOwnsResponse &&
       (input.trialSubsetKind === 'question' || input.trialSubsetKind === 'forceCorrect'),
     showSkipStudyButton: input.isStudyState && input.skipStudyEnabled,
     trialSubsetKind: input.trialSubsetKind,

@@ -18,11 +18,19 @@ export type PackageAssetUploadOptions = {
   onProcessing?: (asset: Record<string, unknown>) => void;
 };
 
-type PackageUploadOptions = PackageAssetUploadOptions & {
+type PackageProcessingOptions = {
   callAsync: (method: string, ...args: unknown[]) => Promise<any>;
   userId: string | null;
   emailOnCompletion?: boolean;
+  confirmUpdates?: (plan: {
+    uploadPlanId: string;
+    expiresAt: Date | string;
+    creates: Array<Record<string, unknown>>;
+    updates: Array<Record<string, unknown>>;
+  }) => Promise<boolean>;
 };
+
+type PackageUploadOptions = PackageAssetUploadOptions & PackageProcessingOptions;
 
 export type UploadedPackageAsset = {
   asset: Record<string, unknown> & { _id: string };
@@ -80,7 +88,13 @@ export async function uploadAndProcessPackage(options: PackageUploadOptions): Pr
   const uploaded = await uploadPackageAsset(options);
   const { asset, link, integrity } = uploaded;
   options.onProcessing?.(asset);
-  const processing = await options.callAsync(
+  const processing = await processUploadedPackage({ ...options, asset, link, integrity });
+  return { asset, link, integrity, processing };
+}
+
+export async function processUploadedPackage(options: PackageProcessingOptions & UploadedPackageAsset): Promise<any> {
+  const { asset, link, integrity } = options;
+  let processing = await options.callAsync(
     'processPackageUpload',
     asset._id,
     options.userId,
@@ -88,8 +102,21 @@ export async function uploadAndProcessPackage(options: PackageUploadOptions): Pr
     options.emailOnCompletion === true,
     integrity,
   );
+  if (processing?.status === 'confirmation-required') {
+    const confirmed = await options.confirmUpdates?.(processing) ?? false;
+    if (!confirmed) {
+      await options.callAsync('cancelPackageUpload', processing.uploadPlanId);
+      throw new Error('Package upload was cancelled before overwriting existing content.');
+    }
+    processing = await options.callAsync(
+      'confirmPackageUpload',
+      processing.uploadPlanId,
+      options.emailOnCompletion === true,
+      integrity,
+    );
+  }
   if (!processing || !Array.isArray(processing.results)) {
     throw new Error('Package processing did not return a completion result.');
   }
-  return { asset, link, integrity, processing };
+  return processing;
 }

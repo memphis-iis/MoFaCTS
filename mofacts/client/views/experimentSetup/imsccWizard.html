@@ -315,6 +315,7 @@
 
       {{#if isStep 4}}
       <div class="wizard-step">
+        {{#with inlineConfirmation}}<div class="wizard-card">{{> adminInlineConfirmation confirmation=this}}</div>{{/with}}
         <h4>{{imsccText 'imscc.step4Title'}}</h4>
 
         {{#if generating}}

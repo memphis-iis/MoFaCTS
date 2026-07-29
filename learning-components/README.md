@@ -15,7 +15,7 @@ Current extension boundaries:
 - `runtime/registerLearningComponents.ts`: shared manifest-list bootstrap and manifest summary helpers.
 - `defaultLearningComponentCatalog.ts`: default in-repo component package used by app bootstraps.
 - `samples/echo-unit/`: test-only sample component package that demonstrates the manifest, implementation, fixture, and README shape for future component bundles.
-- `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for H5P-style interactions.
+- `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for interactive display extensions.
 - `units/UnitEngineRegistry.ts`: unit engine registration and creation.
 - `units/learning-session/`: model learning-session unit package, including learning/video session runtime-config interpretation and model-card selection behavior.
 - `units/sparcsession/`: SPARC session unit package; current wrapper over shared adaptive/logistic sequencing and target home for the reactive instructional document graph described in its README.
@@ -23,7 +23,6 @@ Current extension boundaries:
 - `units/autotutor/`: AutoTutor unit package, runtime contracts, saved state/history validation, and planning helpers.
 - `units/instruction/`: instruction-only unit-engine package.
 - `units/video-session/`: minimal video-session unit package and adaptive video question helpers.
-- `trial-displays/h5p/`: H5P trial-display package and result/display normalization.
 
 Belongs here:
 
@@ -31,7 +30,7 @@ Belongs here:
 - Trial types.
 - Adaptive models and model policies.
 - TDF, stimulus, display, and response-normalization logic.
-- H5P, xAPI, and external-widget adapters.
+- xAPI and external-widget adapters.
 - Runtime contracts for pedagogical components.
 
 Does not belong here:
@@ -44,7 +43,7 @@ Dependency direction: `app/` may import `learning-components/`; `learning-compon
 
 ## Component Package Checklist
 
-Use this checklist before adding a production component such as a deeper AutoTutor unit, a new H5P-style display, or another external-widget adapter:
+Use this checklist before adding a production component such as a deeper AutoTutor unit or another external-widget adapter:
 
 1. Create one package folder under the relevant component family, for example `units/<component>/` or `trial-displays/<component>/`.
 2. Keep pedagogical behavior, display/result normalization, model policy, and authored-content interpretation in the package.

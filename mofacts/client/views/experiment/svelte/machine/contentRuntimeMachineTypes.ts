@@ -1,5 +1,4 @@
 import { DEFAULT_DELIVERY_SETTINGS, SR_CONFIG } from './constants';
-import type { H5PTrialResult } from '../../../../../common/types';
 import type { SparcControllerResult } from '../services/sparcController';
 
 export type DeliverySettings = typeof DEFAULT_DELIVERY_SETTINGS & Record<string, unknown>;
@@ -68,7 +67,6 @@ export interface ContentRuntimeMachineContext {
   feedbackText: string;
   feedbackRevealStarted: boolean;
   feedbackSuppressed: boolean;
-  h5pResult: H5PTrialResult | null;
   sparcResult: SparcControllerResult | null;
   sparcNodeValues: Record<string, unknown>;
   isCorrect: boolean;
@@ -120,7 +118,6 @@ export interface ContentRuntimeMachineEvent extends Record<string, unknown> {
   feedbackText?: string;
   feedbackHtml?: string;
   feedbackSuppressed?: boolean;
-  h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcControllerResult | null;
   sparcNodeValues?: Record<string, unknown>;
 }
@@ -176,7 +173,6 @@ export const initialContext: ContentRuntimeMachineContext = {
   feedbackText: '',
   feedbackRevealStarted: false,
   feedbackSuppressed: false,
-  h5pResult: null,
   sparcResult: null,
   sparcNodeValues: {},
   isCorrect: false,

@@ -125,14 +125,11 @@ export function sortPropertiesModal(modal: Element): void {
 }
 
 function filterPropertiesModal(editor: JsonEditorLike, modal: Element, objectPath: string | null): void {
-  if (!objectPath || !/\.deliverySettings$/.test(objectPath)) {
+  if (!objectPath) {
     return;
   }
   const unitPath = getUnitPathFromConfigPath(objectPath);
-  if (!unitPath) {
-    return;
-  }
-  const unitType = detectTdfUnitType(getUnitValue(editor, unitPath));
+  const unitType = unitPath ? detectTdfUnitType(getUnitValue(editor, unitPath)) : null;
   modal.querySelectorAll(':scope > .form-group').forEach((group) => {
     const key = checkboxPropertyKey(editor, objectPath, group);
     if (!key) {

@@ -16,7 +16,6 @@ import {
   createStimValidatorMap,
   createTdfValidatorMap,
 } from '../../common/fieldRegistry';
-import { validateH5PDisplayConfig } from '../../common/lib/h5pDisplay';
 
 // =============================================================================
 // TDF VALIDATORS
@@ -49,8 +48,8 @@ export const STIM_VALIDATORS = {
     validators: [
       {
         type: 'atLeastOneOf',
-        fields: ['text', 'clozeText', 'clozeStimulus', 'imgSrc', 'audioSrc', 'videoSrc', 'h5p'],
-        message: 'At least one display element required (text, cloze, image, audio, video, or H5P)'
+        fields: ['text', 'clozeText', 'clozeStimulus', 'imgSrc', 'audioSrc', 'videoSrc'],
+        message: 'At least one display element required (text, cloze, image, audio, or video)'
       }
     ],
     severity: 'error'
@@ -295,16 +294,6 @@ export const VALIDATOR_TYPES = {
     // Check if it's a local media file
     const exists = context.mediaAssetExists(value);
     return { valid: exists };
-  },
-
-  /**
-   * Validate the supported Phase 1 H5P display subset.
-   */
-  h5pDisplayConfig: (value: any) => {
-    const baseUrl = typeof window !== 'undefined' && window.location?.origin
-      ? window.location.origin + '/'
-      : 'https://mofacts.local/';
-    return validateH5PDisplayConfig(value, baseUrl);
   },
 
   /**

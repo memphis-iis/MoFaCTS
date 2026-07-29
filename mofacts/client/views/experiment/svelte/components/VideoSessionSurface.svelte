@@ -82,7 +82,6 @@
     on:feedbackcontent={(event) => forward('feedbackcontent', event.detail)}
     on:blockingassetstate={(event) => forward('blockingassetstate', event.detail)}
     on:reviewrevealstarted={(event) => forward('reviewrevealstarted', event.detail)}
-    on:h5presult={(event) => forward('h5presult', event.detail)}
   />
 </VideoSessionMode>
 

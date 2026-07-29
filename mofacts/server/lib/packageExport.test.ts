@@ -20,7 +20,7 @@ function tdfDoc(id: string, lessonName: string, options: { conditions?: string[]
             ...(options.conditions ? { condition: options.conditions } : {}),
             ...(options.conditionTdfIds ? { conditionTdfIds: options.conditionTdfIds } : {}),
           },
-          unit: [],
+          ...(options.conditions ? {} : { unit: [{}] }),
         },
       },
     },
@@ -30,7 +30,7 @@ function tdfDoc(id: string, lessonName: string, options: { conditions?: string[]
 describe('packageExport identity', function() {
   it('exports stable TDF ids and rewrites root condition filenames to exported members', async function() {
     const root = tdfDoc('root-id', 'Root Lesson', {
-      conditions: ['old-child-name.json'],
+      conditions: ['child-id.json'],
       conditionTdfIds: ['child-id'],
     });
     const child = tdfDoc('child-id', 'Child Lesson');
@@ -55,9 +55,6 @@ describe('packageExport identity', function() {
       },
       decryptData(value: string) {
         return value;
-      },
-      async resolveConditionTdfIds() {
-        return ['child-id'];
       },
       DynamicAssets: {
         async findOneAsync() {

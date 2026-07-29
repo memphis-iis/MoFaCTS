@@ -10,7 +10,12 @@ import { mergeEditorContentPreservingSourceShape } from '../../common/lib/editor
 import { createPackageGeneratedContentMethods, prepareAiGeneratedPackage } from './packageGeneratedContentMethods';
 import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { validateAndEncryptUploadedApiKey } from '../lib/uploadedApiKeyValidation';
+import { assertNoH5PContent } from '../../common/lib/unsupportedContent';
 import { requireContentCreatorDisplayName } from '../lib/contentCreatorIdentity';
+import {
+  reconcileConditionCountsByChildId,
+  validateConditionFamilyTutor,
+} from '../../common/lib/tdfIdentityContract';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -30,7 +35,7 @@ type DynamicAssetLike = {
   size?: number;
 };
 
-type SaveContentResult = {
+type _SaveContentResult = {
   result: boolean | null;
   errmsg: string;
   action: string;
@@ -73,13 +78,14 @@ type PackagePayload = {
   stimuli: unknown;
   tdfs: TdfPayload['tdfs'];
   conditionTdfIds?: Array<string | null>;
+  expectedRevision: number;
 };
 
-type UpsertPendingResult = {
-  res?: string;
-  reason: string[];
-  stimuliSetId?: string | number | null;
-  TDF?: UnknownRecord;
+type PrivateRepoTdfRecord = {
+  sourceKey: string;
+  sourceFileName: string;
+  fileName: string;
+  tdfs: TdfPayload['tdfs'];
 };
 
 type UpsertResult = {
@@ -94,12 +100,12 @@ type UpsertResult = {
 
 type PackageMethodsDeps = {
   Tdfs: any;
+  TdfMutationJobs: any;
   ManualContentDrafts: any;
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   DynamicAssets: any;
-  H5PContents?: any;
   storageBoundary: ReturnType<typeof createStorageBoundary>;
   UserUploadQuota: any;
   AuditLog: any;
@@ -174,7 +180,7 @@ function deleteEditorRelativePath(root: unknown, path: string) {
 }
 
 export function createPackageMethods(deps: PackageMethodsDeps) {
-  async function requireContentUploadActor(thisArg: MethodContext, requestedOwner: unknown) {
+  async function _requireContentUploadActor(thisArg: MethodContext, requestedOwner: unknown) {
     const actingUserId = deps.normalizeCanonicalId(thisArg.userId);
     if (!actingUserId) {
       throw new Meteor.Error(401, 'Must be logged in');
@@ -256,8 +262,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       UserUploadQuota: deps.UserUploadQuota,
       AuditLog: deps.AuditLog,
       Tdfs: deps.Tdfs,
-      H5PContents: deps.H5PContents,
-      resolveConditionTdfIds,
+      TdfMutationJobs: deps.TdfMutationJobs,
       getResponseKCMapForTdf,
       processAudioFilesForTDF: deps.processAudioFilesForTDF,
       canonicalizeStimDisplayMediaRefs: deps.canonicalizeStimDisplayMediaRefs,
@@ -277,31 +282,96 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
 
   async function confirmPackageUpload(
     this: MethodContext,
-    packageAssetId: string,
-    preflightFingerprint: string,
+    uploadPlanId: string,
     emailToggle: boolean = false,
     integrity?: PackageUploadIntegrity
   ) {
     const actingUserId = deps.normalizeCanonicalId(this.userId);
     if (!actingUserId) throw new Meteor.Error(401, 'Must be logged in');
-    check(packageAssetId, String);
-    check(preflightFingerprint, String);
-    if (!/^[a-f0-9]{64}$/.test(preflightFingerprint)) {
-      throw new Meteor.Error(400, 'Invalid package preflight fingerprint');
+    check(uploadPlanId, String);
+    const job = await deps.TdfMutationJobs.findOneAsync({ _id: uploadPlanId, kind: 'package-upload' });
+    if (!job || job.actorUserId !== actingUserId) {
+      throw new Meteor.Error(404, 'Upload plan unavailable');
+    }
+    if (job.status === 'complete') {
+      return job.terminalResult;
+    }
+    if (job.status !== 'awaiting-confirmation') {
+      throw new Meteor.Error('upload-plan-unavailable', 'This upload plan can no longer be confirmed.');
+    }
+    if (!(job.confirmationExpiresAt instanceof Date) || job.confirmationExpiresAt.getTime() <= Date.now()) {
+      await deps.TdfMutationJobs.updateAsync(
+        { _id: uploadPlanId, status: 'awaiting-confirmation' },
+        { $set: { status: 'expired', updatedAt: new Date() } },
+      );
+      throw new Meteor.Error('upload-plan-expired', 'This upload confirmation expired. Upload the package again.');
     }
     await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
-    return processPackageUploadWorkflow(
-      this,
-      packageAssetId,
-      actingUserId,
-      emailToggle,
-      getPackageUploadDeps(),
-      integrity,
-      { confirmedIdentityFingerprint: preflightFingerprint }
+    const claimed = await deps.TdfMutationJobs.updateAsync(
+      { _id: uploadPlanId, actorUserId: actingUserId, status: 'awaiting-confirmation' },
+      { $set: { status: 'committing', updatedAt: new Date() }, $unset: { cleanupAt: '', confirmationExpiresAt: '' } },
     );
+    if (claimed !== 1) {
+      throw new Meteor.Error('upload-plan-conflict', 'This upload plan is already being processed.');
+    }
+    try {
+      const result = await processPackageUploadWorkflow(
+        this,
+        job.packageAssetId,
+        actingUserId,
+        emailToggle,
+        getPackageUploadDeps(),
+        integrity,
+        {
+          confirmedIdentityFingerprint: job.identityFingerprint,
+          expectedArchiveSha256: job.archiveSha256,
+          mutationJobId: uploadPlanId,
+        }
+      );
+      await deps.TdfMutationJobs.updateAsync(
+        { _id: uploadPlanId, actorUserId: actingUserId, status: 'committing' },
+        { $set: { status: 'complete', terminalResult: result, updatedAt: new Date() } },
+      );
+      return result;
+    } catch (error) {
+      await deps.TdfMutationJobs.updateAsync(
+        { _id: uploadPlanId, actorUserId: actingUserId, status: 'committing' },
+        { $set: { status: 'failed', updatedAt: new Date() } },
+      );
+      throw error;
+    }
   }
 
-  async function saveMediaFile(media: UploadedPackageFile, owner: string, stimSetId: string | number | null | undefined){
+  async function cancelPackageUpload(this: MethodContext, uploadPlanId: string) {
+    const actingUserId = deps.normalizeCanonicalId(this.userId);
+    if (!actingUserId) throw new Meteor.Error(401, 'Must be logged in');
+    check(uploadPlanId, String);
+    const job = await deps.TdfMutationJobs.findOneAsync({
+      _id: uploadPlanId,
+      actorUserId: actingUserId,
+      kind: 'package-upload',
+      status: 'awaiting-confirmation',
+    });
+    if (!job) throw new Meteor.Error(404, 'Upload plan unavailable');
+    const cancelled = await deps.TdfMutationJobs.updateAsync(
+      { _id: uploadPlanId, actorUserId: actingUserId, kind: 'package-upload', status: 'awaiting-confirmation' },
+      { $set: { status: 'cancelled', updatedAt: new Date() } },
+    );
+    if (cancelled !== 1) {
+      throw new Meteor.Error(404, 'Upload plan unavailable');
+    }
+    if (job?.packageAssetId) {
+      await deps.DynamicAssets.removeAsync({ _id: job.packageAssetId });
+    }
+    return { status: 'cancelled' };
+  }
+
+  async function saveMediaFile(
+    media: UploadedPackageFile,
+    owner: string,
+    stimSetId: string | number | null | undefined,
+    options: { mutationJobId?: string | null } = {},
+  ){
     deps.serverConsole("Uploading:", media.name);
     const scopedQuery: Record<string, unknown> = { name: media.name };
     if (stimSetId !== undefined && stimSetId !== null) {
@@ -310,7 +380,46 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       scopedQuery.userId = owner;
     }
     const existingFiles = await deps.DynamicAssets.find(scopedQuery).fetchAsync();
-    if (existingFiles.length > 0) {
+    const stagedPreviousAssets: Array<{
+      _id: string;
+      name?: string;
+      fileName?: string;
+      meta?: Record<string, unknown>;
+    }> = [];
+    if (existingFiles.length > 0 && options.mutationJobId) {
+      if (typeof deps.DynamicAssets.collection?.updateAsync !== 'function') {
+        throw new Error('Package media replacement requires DynamicAssets.collection.updateAsync');
+      }
+      for (const existing of existingFiles) {
+        stagedPreviousAssets.push({
+          _id: String(existing._id),
+          name: existing.name,
+          fileName: existing.fileName,
+          meta: existing.meta,
+        });
+      }
+      const plannedJournaled = await deps.TdfMutationJobs.updateAsync(
+        { _id: options.mutationJobId, status: 'committing' },
+        {
+          $push: { mediaMutations: { newAssetId: '', previousAssets: stagedPreviousAssets } },
+          $set: { updatedAt: new Date() },
+        },
+      );
+      if (plannedJournaled !== 1) throw new Error('Package media replacement could not be planned');
+      for (const existing of existingFiles) {
+        const backupName = `${media.name}.mofacts-backup-${options.mutationJobId}-${existing._id}`;
+        await deps.DynamicAssets.collection.updateAsync(
+          { _id: existing._id },
+          {
+            $set: {
+              name: backupName,
+              fileName: backupName,
+              'meta.mutationBackupFor': options.mutationJobId,
+            },
+          },
+        );
+      }
+    } else if (existingFiles.length > 0) {
       for (const existing of existingFiles) {
         await deps.DynamicAssets.removeAsync({_id: existing._id});
       }
@@ -320,6 +429,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     }
 
     const mimeType = deps.getMimeTypeForAssetName(media.name);
+    let writtenAssetId = '';
 
     try {
       const fileRef = await deps.DynamicAssets.writeAsync(media.contents, {
@@ -328,9 +438,11 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         type: mimeType,
         meta: {
           stimuliSetId: stimSetId,
-          public: true
+          public: true,
+          ...(options.mutationJobId ? { mutationJobId: options.mutationJobId } : {}),
         }
       });
+      writtenAssetId = fileRef?._id ? String(fileRef._id) : '';
       if (deps.storageBoundary.backend === 's3') {
         if (!fileRef?._id) {
           throw new Error(`S3 storage requires DynamicAssets.writeAsync to return an asset id for ${media.name}`);
@@ -357,8 +469,26 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       }
 
       deps.serverConsole(`File ${media.name} uploaded successfully`);
+      if (options.mutationJobId && fileRef?._id) {
+        fileRef.replacement = {
+          newAssetId: String(fileRef._id),
+          previousAssets: stagedPreviousAssets,
+        };
+        const journaled = await deps.TdfMutationJobs.updateAsync(
+          { _id: options.mutationJobId, status: 'committing' },
+          { $push: { mediaMutations: fileRef.replacement }, $set: { updatedAt: new Date() } },
+        );
+        if (journaled !== 1) throw new Error('Package media replacement could not be journaled');
+      }
       return fileRef;
     } catch (error: unknown) {
+      if (writtenAssetId) await deps.DynamicAssets.removeAsync({ _id: writtenAssetId });
+      for (const previousAsset of stagedPreviousAssets) {
+        await deps.DynamicAssets.collection?.updateAsync?.(
+          { _id: previousAsset._id },
+          { $set: { name: previousAsset.name, fileName: previousAsset.fileName, meta: previousAsset.meta || {} } },
+        );
+      }
       deps.serverConsole(`File ${media.name} could not be uploaded`, error);
       throw error;
     }
@@ -438,12 +568,15 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       uploadedMediaPathMap,
       requireUploadedMediaMatch: true,
     });
-    await deps.Tdfs.updateAsync({ _id: tdfId }, { $set: { rawStimuliFile: rawStimuli, stimuli: canonicalStimuli } });
+    await deps.Tdfs.updateAsync(
+      { _id: tdfId },
+      { $set: { rawStimuliFile: rawStimuli, stimuli: canonicalStimuli }, $inc: { tdfRevision: 1 } },
+    );
     await deps.updateStimDisplayTypeMap([stimuliSetId]);
     return { repaired: true, mediaCount: unresolvedNames.size };
   }
 
-  async function validateStimAndTdf(tdfJson: unknown, stimJson: unknown, tdfFileName: string, stimFileName: string) {
+  async function _validateStimAndTdf(tdfJson: unknown, stimJson: unknown, tdfFileName: string, stimFileName: string) {
     const stimDoc = stimJson as { setspec?: { clusters?: Array<{ stims?: Array<{ response?: { correctResponse?: unknown }; display?: Record<string, unknown> }> }> } } | null;
     const tdfDoc = tdfJson as { tutor?: { setspec?: { lessonname?: string; stimulusfile?: string }; unit?: unknown[]; unitTemplate?: unknown[] } };
     const scopedStimuliSetId = await deps.getStimuliSetIdByFilename(stimFileName);
@@ -476,10 +609,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         if (!stim || typeof stim !== 'object') {
           return { result: false, errmsg: `Stim ${stimIdx} in cluster ${clusterIdx} is not an object.` };
         }
-        const h5pOwnsResponse = (stim.display as Record<string, unknown> | undefined)?.h5p
-          && ((stim.display as Record<string, unknown>).h5p as Record<string, unknown>).sourceType === 'self-hosted';
         const autoTutorOwnsResponse = Object.prototype.hasOwnProperty.call(stim, 'autoTutor');
-        if (!h5pOwnsResponse && !autoTutorOwnsResponse && (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse'))) {
+        if (!autoTutorOwnsResponse && (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse'))) {
           return { result: false, errmsg: `Stim ${stimIdx} in cluster ${clusterIdx} missing correctResponse.` };
         }
         if (stim.display) {
@@ -569,109 +700,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return { result: true };
   }
 
-  async function saveContentFile(this: MethodContext, type: string, filename: string, filecontents: unknown, owner: string, packagePath: string | null = null) {
-    deps.serverConsole('saveContentFile', type, filename, owner);
-    const results: SaveContentResult = {
-      'result': null,
-      'errmsg': 'No action taken?',
-      'action': 'None',
-    };
-    const touchedStimuliSetIds = new Set();
-    if (!type) throw new Error('Type required for File Save');
-    if (!filename) throw new Error('Filename required for File Save');
-    if (!filecontents) throw new Error('File Contents required for File Save');
-    const { ownerId } = await requireContentUploadActor(this, owner);
-    if (type != 'tdf' && type != 'stim') throw new Error('Unknown file type not allowed: ' + type);
-
-    if (type === 'tdf') {
-      await requireContentCreatorDisplayName(deps.usersCollection, ownerId);
-    }
-
-    try {
-      if (type == 'tdf') {
-        let jsonContents;
-        try {
-          jsonContents = typeof filecontents == 'string' ? JSON.parse(filecontents) : filecontents;
-        } catch (e: unknown) {
-          const message = e instanceof Error ? e.message : String(e);
-          results.result = false;
-          results.errmsg = `Error parsing JSON in file "${filename}": ${message}`;
-          return results;
-        }
-        const stimFileName = jsonContents.tutor.setspec.stimulusfile;
-        const stimTdf = await deps.Tdfs.findOneAsync({stimulusFileName: stimFileName});
-        const stimJson = stimTdf ? stimTdf.rawStimuliFile : null;
-        const validation = await validateStimAndTdf(jsonContents, stimJson, filename, stimFileName);
-        if (!validation.result) {
-          results.result = false;
-          results.errmsg = validation.errmsg || 'Validation failed';
-          return results;
-        }
-        const setspec = jsonContents.tutor?.setspec;
-        if (setspec && Object.prototype.hasOwnProperty.call(setspec, 'textToSpeechAPIKey')) {
-          setspec.textToSpeechAPIKey = validateAndEncryptUploadedApiKey({
-            encryptData: deps.encryptData,
-            field: 'textToSpeechAPIKey',
-            value: setspec.textToSpeechAPIKey,
-          });
-        }
-        if (setspec && Object.prototype.hasOwnProperty.call(setspec, 'speechAPIKey')) {
-          setspec.speechAPIKey = validateAndEncryptUploadedApiKey({
-            encryptData: deps.encryptData,
-            field: 'speechAPIKey',
-            value: setspec.speechAPIKey,
-          });
-        }
-        if (setspec && Object.prototype.hasOwnProperty.call(setspec, 'openRouterApiKey')) {
-          setspec.openRouterApiKey = validateAndEncryptUploadedApiKey({
-            encryptData: deps.encryptData,
-            field: 'openRouterApiKey',
-            value: setspec.openRouterApiKey,
-          });
-        }
-        const upsertResult = await upsertTDFFile(
-          filename,
-          {fileName: filename, tdfs: jsonContents, ownerId: ownerId, source: 'upload'},
-          ownerId,
-          packagePath
-        );
-        if (upsertResult?.stimuliSetId !== undefined && upsertResult?.stimuliSetId !== null) {
-          touchedStimuliSetIds.add(upsertResult.stimuliSetId);
-        }
-      } else if (type === 'stim') {
-        let jsonContents;
-        try {
-          jsonContents = typeof filecontents == 'string' ? JSON.parse(filecontents) : filecontents;
-        } catch (e: unknown) {
-          const message = e instanceof Error ? e.message : String(e);
-          results.result = false;
-          results.errmsg = `Error parsing JSON in stimulus file "${filename}": ${message}`;
-          return results;
-        }
-        const stimuliSetId = await upsertStimFile(filename, jsonContents, ownerId, packagePath);
-        if (stimuliSetId !== undefined && stimuliSetId !== null) {
-          touchedStimuliSetIds.add(stimuliSetId);
-        }
-        results.data = jsonContents;
-      }
-    } catch (e: unknown) {
-      const stack = e instanceof Error ? e.stack : undefined;
-      deps.serverConsole('ERROR saving content file:', e, stack);
-      results.result = false;
-      const message = e instanceof Error ? e.message : String(e);
-      results.errmsg = `saveContentFile error in file "${filename}": ${message}`;
-      return results;
-    }
-
-    if (touchedStimuliSetIds.size > 0) {
-      await deps.updateStimDisplayTypeMap(Array.from(touchedStimuliSetIds));
-    }
-
-    results.result = true;
-    results.errmsg = '';
-    return results;
-  }
-
   async function upsertStimFile(stimulusFileName: string, stimJSON: unknown, ownerId: string, packagePath: string | null = null) {
     const formattedStims: unknown[] = [];
 
@@ -701,57 +729,33 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       }
       formattedStims.push(stim);
     }
-    await deps.Tdfs.upsertAsync({"content.tdfs.tutor.setspec.stimulusfile": stimulusFileName}, {$set: {
-      stimulusFileName: stimulusFileName,
-      stimuliSetId: stimuliSetId,
-      rawStimuliFile: stimJSON,
-      stimuli: formattedStims,
-    }}, {multi: true});
+    await deps.Tdfs.updateAsync(
+      { "content.tdfs.tutor.setspec.stimulusfile": stimulusFileName },
+      {
+        $set: {
+          stimulusFileName,
+          stimuliSetId,
+          rawStimuliFile: stimJSON,
+          stimuli: formattedStims,
+        },
+        $inc: { tdfRevision: 1 },
+      },
+      { multi: true },
+    );
 
     return stimuliSetId
   }
 
-  async function resolveConditionTdfIds(setspec: { condition?: string[]; conditionTdfIds?: unknown[] } = {}) {
-    const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
-    if (Array.isArray(setspec.conditionTdfIds) && setspec.conditionTdfIds.length > 0) {
-      if (conditions.length > 0 && setspec.conditionTdfIds.length !== conditions.length) {
-        throw new Meteor.Error(
-          'condition-identity-length-mismatch',
-          'conditionTdfIds must contain one entry for every condition filename.'
-        );
-      }
-      return setspec.conditionTdfIds.map((entry) => deps.normalizeCanonicalId(entry));
-    }
-    if (!conditions.length) {
-      return [];
-    }
-
-    const normalizedConditions = conditions.map((entry) => (typeof entry === 'string' ? entry.trim() : ''));
-    const conditionDocs = await deps.getTdfsByFileNameOrId(normalizedConditions);
-    const conditionIdByKey = new Map<string, string>();
-    for (const conditionDoc of conditionDocs) {
-      const resolvedId = typeof conditionDoc?._id === 'string' ? conditionDoc._id : '';
-      if (!resolvedId) {
-        continue;
-      }
-      conditionIdByKey.set(resolvedId, resolvedId);
-      const fileName = typeof conditionDoc?.content?.fileName === 'string'
-        ? conditionDoc.content.fileName.trim()
-        : '';
-      if (fileName && !conditionIdByKey.has(fileName)) {
-        conditionIdByKey.set(fileName, resolvedId);
-      }
-    }
-
-    return normalizedConditions.map((entry) => (entry ? (conditionIdByKey.get(entry) || null) : null));
-  }
-
   async function enforceConditionChildUserSelect(conditionTdfIds: Array<string | null>) {
-    const validIds = conditionTdfIds.filter((id): id is string => typeof id === 'string' && id.length > 0);
-    for (const id of validIds) {
+    const validIds = [...new Set(conditionTdfIds.filter((id): id is string => typeof id === 'string' && id.length > 0))];
+    if (validIds.length > 0) {
       await deps.Tdfs.updateAsync(
-        { _id: id },
-        { $set: { 'content.tdfs.tutor.setspec.userselect': 'false' } }
+        { _id: { $in: validIds } },
+        {
+          $set: { 'content.tdfs.tutor.setspec.userselect': 'false' },
+          $inc: { tdfRevision: 1 },
+        },
+        { multi: true },
       );
     }
   }
@@ -762,84 +766,6 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     }
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : null;
-  }
-
-  async function upsertTDFFile(tdfFilename: string, tdfJSON: TdfPayload, ownerId: string, packagePath: string | null = null): Promise<UpsertResult> {
-    deps.serverConsole('upsertTDFFile', tdfFilename);
-    let ret: UpsertPendingResult = {reason: []};
-    const Tdf = tdfJSON.tdfs;
-    const lessonName = deps.legacyTrim(Tdf.tutor.setspec.lessonname);
-    const prev = await deps.getTdfByFileName(tdfFilename);
-    let stimuliSetId = prev?.stimuliSetId;
-    if (!stimuliSetId) {
-      stimuliSetId = deps.allocateNextStimuliSetId();
-    } else {
-      ret = {res: 'awaitClientTDF', reason: ['prevStimExists']}
-    }
-    if (lessonName.length < 1) {
-      return { result: false, errmsg: 'TDF has no lessonname - it cannot be valid' };
-    }
-    const tips = Tdf.tutor.setspec.tips;
-    const newFormatttedTips: string[] = [];
-    if(tips){
-      for(const tip of tips){
-        if(tip.split('<img').length > 1){
-          const imgSection = tip.split('<img')[1];
-          const srcSection = imgSection?.split('src="')[1];
-          const imageName = srcSection?.split('"')[0];
-          if (!imageName) {
-            continue;
-          }
-          const image = await deps.DynamicAssets.findOneAsync({userId: ownerId, name: imageName});
-          if(image){
-            const imageLink = image.link();
-            newFormatttedTips.push(tip.replace(imageName, imageLink));
-            deps.serverConsole('imageLink', imageLink);
-          }
-        }
-      }
-    }
-    if(newFormatttedTips.length > 0){
-      Tdf.tutor.setspec.tips = newFormatttedTips;
-    }
-    Tdf.tutor.setspec.conditionTdfIds = await resolveConditionTdfIds(Tdf.tutor.setspec);
-    tdfJSON = {'fileName': tdfFilename, 'tdfs': Tdf, 'ownerId': ownerId, 'source': 'upload'};
-    let tdfJSONtoUpsert: TdfPayload;
-    let formattedStims: unknown[] = [];
-    if (prev && prev._id) {
-      formattedStims = prev.formattedStims;
-      deps.serverConsole('updating tdf', tdfFilename, formattedStims);
-      tdfJSONtoUpsert = tdfJSON;
-      const updateObj = {
-        _id: prev._id,
-        ownerId: ownerId,
-        stimuliSetId: stimuliSetId,
-        content: tdfJSONtoUpsert
-      };
-      if(ret.res != 'awaitClientTDF'){
-        ret.res = 'awaitClientTDF';
-      }
-      ret.stimuliSetId = stimuliSetId;
-      ret.TDF = updateObj;
-      ret.reason.push('prevTDFExists');
-      return ret;
-    } else {
-      formattedStims = [];
-      deps.serverConsole('inserting tdf', tdfFilename, formattedStims);
-      tdfJSON.createdAt = new Date();
-      tdfJSONtoUpsert = tdfJSON;
-    }
-    const conditionCounts = tdfJSONtoUpsert.tdfs.tutor.setspec.condition ? new Array(tdfJSONtoUpsert.tdfs.tutor.setspec.condition.length).fill(0) : [];
-
-    await deps.Tdfs.upsertAsync({_id: prev._id}, {$set: {
-      path: packagePath,
-      content: tdfJSONtoUpsert,
-      ownerId: ownerId,
-      conditionCounts: conditionCounts
-      }});
-    await enforceConditionChildUserSelect(Tdf.tutor.setspec.conditionTdfIds ?? []);
-
-    return {res: 'upserted', stimuliSetId};
   }
 
   async function upsertPackage(packageJSON: PackagePayload, ownerId: string): Promise<UpsertResult> {
@@ -930,7 +856,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!prev) {
       tdfJSON.createdAt = new Date();
     }
-    const conditionCounts = tdfJSONtoUpsert.tdfs.tutor.setspec.condition ? new Array(tdfJSONtoUpsert.tdfs.tutor.setspec.condition.length).fill(0) : [];
+    const nextConditionIds = Tdf.tutor.setspec.conditionTdfIds ?? [];
+    const conditionCounts = reconcileConditionCountsByChildId(
+      prev?.content?.tdfs?.tutor?.setspec?.conditionTdfIds,
+      prev?.conditionCounts,
+      nextConditionIds.filter((id): id is string => typeof id === 'string'),
+    );
 
     const setFields: UnknownRecord = {
       tdfFileName: packageJSON.fileName,
@@ -940,86 +871,127 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       packageAssetId: packageAssetId,
       rawStimuliFile: stimJSON,
       stimuli: formattedStims,
-      stimuliSetId: stimuliSetId
+      stimuliSetId: stimuliSetId,
+      tdfAvailability: 'available',
     };
-    if (!prev) setFields.conditionCounts = conditionCounts;
-    await deps.Tdfs.upsertAsync({ _id: tdfId }, { $set: setFields });
+    setFields.conditionCounts = conditionCounts;
+    if (prev) {
+      const revisionSelector = packageJSON.expectedRevision === 0
+        ? { _id: tdfId, $or: [{ tdfRevision: 0 }, { tdfRevision: { $exists: false } }] }
+        : { _id: tdfId, tdfRevision: packageJSON.expectedRevision };
+      const updated = await deps.Tdfs.updateAsync(revisionSelector, {
+        $set: setFields,
+        $inc: { tdfRevision: 1 },
+      });
+      if (updated !== 1) {
+        throw new Meteor.Error('tdf-revision-conflict', `TDF "${tdfId}" changed after package preflight.`);
+      }
+    } else {
+      await deps.Tdfs.insertAsync({
+        _id: tdfId,
+        ...setFields,
+        tdfRevision: 1,
+      });
+    }
     await enforceConditionChildUserSelect(Tdf.tutor.setspec.conditionTdfIds ?? []);
 
     return { res: 'upserted', stimuliSetId: stimuliSetId, tdfId }
   }
 
-  async function tdfUpdateConfirmed(
-    this: MethodContext,
-    updateObj: { _id: string; TDFId?: string; stimuliSetId?: string | number } & UnknownRecord,
-    resetShuffleClusters: boolean = false,
-    policyReasons: string[] = []
-  ){
-    deps.serverConsole('tdfUpdateConfirmed for TDF:', updateObj.TDFId || 'unknown');
-    const actingUserId = deps.normalizeCanonicalId(this.userId);
-    if (!actingUserId) {
-      throw new Meteor.Error(401, 'Must be logged in');
+  async function importPrivateRepoTdfBatch(records: PrivateRepoTdfRecord[], ownerId: string) {
+    if (!Array.isArray(records) || records.length === 0) return [];
+    const sourceKeys = records.map((record) => record.sourceKey.trim());
+    if (sourceKeys.some((key) => !key) || new Set(sourceKeys).size !== sourceKeys.length) {
+      throw new Meteor.Error('invalid-private-repo-batch', 'Private repository source keys must be non-empty and unique.');
     }
-    if (!updateObj || typeof updateObj !== 'object' || Array.isArray(updateObj)) {
-      throw new Meteor.Error(400, 'Invalid TDF update');
-    }
-    const targetTdfId = deps.normalizeCanonicalId(updateObj._id) || deps.normalizeCanonicalId(updateObj.TDFId);
-    if (!targetTdfId) {
-      throw new Meteor.Error(400, 'TDF id is required');
-    }
-    updateObj._id = targetTdfId;
-    const existingTdf = await deps.Tdfs.findOneAsync({ _id: targetTdfId });
-    if (existingTdf) {
-      const canManage = await deps.userCanManageTdf(actingUserId, existingTdf);
-      if (!canManage) {
-        const existingFileName = typeof existingTdf?.content?.fileName === 'string'
-          ? existingTdf.content.fileName
-          : targetTdfId;
-        throw new Meteor.Error(
-          403,
-          `TDF file name "${existingFileName}" is already used by another user. Choose a unique TDF JSON filename in the package, or ask the owner to share access before replacing it.`
-        );
-      }
-    } else {
-      const requestedOwnerId = deps.normalizeCanonicalId((updateObj as any).ownerId);
-      const isAdmin = await deps.userIsInRoleAsync(actingUserId, ['admin']);
-      if (requestedOwnerId && requestedOwnerId !== actingUserId && !isAdmin) {
-        throw new Meteor.Error(403, 'Can only confirm your own TDF updates unless admin');
-      }
-      await requireContentCreatorDisplayName(
-        deps.usersCollection,
-        requestedOwnerId || actingUserId,
-      );
-      if (!requestedOwnerId) {
-        updateObj.ownerId = actingUserId;
-      }
-    }
-    void resetShuffleClusters;
-    void policyReasons;
-    await deps.Tdfs.upsertAsync({_id: updateObj._id},{$set:updateObj});
-    const confirmedConditionTdfIds = (updateObj as any)?.content?.tdfs?.tutor?.setspec?.conditionTdfIds;
-    if (Array.isArray(confirmedConditionTdfIds)) {
-      await enforceConditionChildUserSelect(confirmedConditionTdfIds);
-    }
-    if (updateObj?.stimuliSetId !== undefined && updateObj?.stimuliSetId !== null) {
-      await deps.updateStimDisplayTypeMap([updateObj.stimuliSetId]);
-    } else {
-      const currentTdf = await deps.Tdfs.findOneAsync(
-        { _id: updateObj._id },
-        { fields: { stimuliSetId: 1 } }
-      );
-      if (currentTdf?.stimuliSetId !== undefined && currentTdf?.stimuliSetId !== null) {
-        await deps.updateStimDisplayTypeMap([currentTdf.stimuliSetId]);
+    const existing = await deps.Tdfs.find({
+      'sourceIdentity.kind': 'private-repo',
+      'sourceIdentity.key': { $in: sourceKeys },
+    }).fetchAsync();
+    const existingByKey = new Map<string, any>(
+      existing.map((tdf: any) => [String(tdf?.sourceIdentity?.key || ''), tdf] as const),
+    );
+    const crypto = Npm.require('crypto');
+    const entries = records.map((record) => {
+      const previous = existingByKey.get(record.sourceKey);
+      return {
+        record,
+        previous,
+        tdfId: previous?._id || `tdf_${crypto.randomBytes(12).toString('hex')}`,
+      };
+    });
+    const entryBySourceName = new Map(entries.map((entry) => [entry.record.sourceFileName, entry]));
+    const entryByFinalName = new Map(entries.map((entry) => [entry.record.fileName, entry]));
+    for (const entry of entries) {
+      const setspec = entry.record.tdfs.tutor.setspec;
+      const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
+      if (conditions.length > 0) {
+        const children = conditions.map((fileName) => entryBySourceName.get(fileName) || entryByFinalName.get(fileName));
+        if (children.some((child) => !child)) {
+          throw new Meteor.Error('invalid-private-repo-family', `Private repository root ${entry.record.sourceFileName} references a child outside its batch.`);
+        }
+        setspec.condition = children.map((child) => child!.record.fileName);
+        setspec.conditionTdfIds = children.map((child) => child!.tdfId);
+        const previousIds = entry.previous?.content?.tdfs?.tutor?.setspec?.conditionTdfIds;
+        if (Array.isArray(previousIds) && previousIds.some((id: unknown) => typeof id === 'string' && !setspec.conditionTdfIds!.includes(id))) {
+          throw new Meteor.Error('condition-removal-forbidden', `Private repository root ${entry.record.sourceFileName} cannot remove an established child.`);
+        }
+        delete entry.record.tdfs.tutor.unit;
       } else {
-        await deps.rebuildStimDisplayTypeMapSnapshot(deps.getStimDisplayTypeMapDeps());
+        delete setspec.conditionTdfIds;
+      }
+      const validation = validateConditionFamilyTutor(entry.record.tdfs.tutor, { requireCanonicalIds: true });
+      if (validation.errors.length > 0) {
+        throw new Meteor.Error('invalid-private-repo-tdf', `${entry.record.sourceFileName}: ${validation.errors.join('; ')}`);
       }
     }
+
+    const results = [];
+    for (const entry of entries) {
+      const previousRevision = Number.isInteger(entry.previous?.tdfRevision) ? entry.previous.tdfRevision : 0;
+      const stimuliSetId = entry.previous?.stimuliSetId
+        ?? await deps.getStimuliSetIdByFilename(String(entry.record.tdfs.tutor.setspec.stimulusfile || ''))
+        ?? deps.allocateNextStimuliSetId();
+      const conditionIds = entry.record.tdfs.tutor.setspec.conditionTdfIds?.filter((id): id is string => typeof id === 'string') || [];
+      const fields = {
+        ownerId,
+        sourceIdentity: { kind: 'private-repo', key: entry.record.sourceKey },
+        stimuliSetId,
+        content: {
+          fileName: entry.record.fileName,
+          ownerId,
+          source: 'repo',
+          tdfs: entry.record.tdfs,
+          ...(entry.previous?.content?.createdAt ? { createdAt: entry.previous.content.createdAt } : { createdAt: new Date() }),
+        },
+        conditionCounts: reconcileConditionCountsByChildId(
+          entry.previous?.content?.tdfs?.tutor?.setspec?.conditionTdfIds,
+          entry.previous?.conditionCounts,
+          conditionIds,
+        ),
+        tdfIdentityState: { status: 'valid', checkedAt: new Date() },
+        tdfAvailability: 'available',
+      };
+      if (entry.previous) {
+        const selector = previousRevision === 0
+          ? { _id: entry.tdfId, $or: [{ tdfRevision: 0 }, { tdfRevision: { $exists: false } }] }
+          : { _id: entry.tdfId, tdfRevision: previousRevision };
+        const updated = await deps.Tdfs.updateAsync(selector, { $set: fields, $inc: { tdfRevision: 1 } });
+        if (updated !== 1) throw new Meteor.Error('tdf-revision-conflict', `Private repository TDF ${entry.record.sourceFileName} changed during import.`);
+      } else {
+        await deps.Tdfs.insertAsync({ _id: entry.tdfId, ...fields, tdfRevision: 1 });
+      }
+      results.push({ tdfId: entry.tdfId, stimuliSetId });
+    }
+    return results;
   }
 
   async function saveTdfStimuli(this: MethodContext, tdfId: string, updatedRawStimuliFile: UnknownRecord, filteredStimuli: unknown[] | null | undefined) {
     check(tdfId, String);
     check(updatedRawStimuliFile, Object);
     check(filteredStimuli, Match.OneOf(Array, null, undefined));
+    assertNoH5PContent(updatedRawStimuliFile);
+    assertNoH5PContent(filteredStimuli);
 
     const tdf = await deps.Tdfs.findOneAsync({_id: tdfId});
     if (!tdf) {
@@ -1069,7 +1041,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       $set: {
         rawStimuliFile: updatedRawStimuliFile,
         stimuli: stimuliToSave
-      }
+      },
+      $inc: { tdfRevision: 1 },
     });
 
     await deps.updateStimDisplayTypeMap([stimuliSetId]);
@@ -1085,6 +1058,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     apiKeyUpdates: { speechAPIKey?: boolean; textToSpeechAPIKey?: boolean; openRouterApiKey?: boolean } = {},
     removedTutorPaths: string[] = []
   ) {
+    assertNoH5PContent(tdfContent);
     check(tdfId, String);
     check(tdfContent, Object);
     check(apiKeyUpdates, Object);
@@ -1108,11 +1082,25 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     const tutorToSave = tdfContentToSave.tdfs?.tutor;
     if (tutorToSave) {
       for (const path of removedTutorPaths) {
+        if (/^setspec\.(condition|conditionTdfIds)(?:\.|$)/.test(path)) {
+          continue;
+        }
         deleteEditorRelativePath(tutorToSave, path);
       }
     }
     const setspec = tdfContentToSave.tdfs?.tutor?.setspec;
     if (setspec) {
+      const persistedSetspec = tdf.content?.tdfs?.tutor?.setspec;
+      if (Array.isArray(persistedSetspec?.condition)) {
+        setspec.condition = [...persistedSetspec.condition];
+      } else {
+        delete setspec.condition;
+      }
+      if (Array.isArray(persistedSetspec?.conditionTdfIds)) {
+        setspec.conditionTdfIds = [...persistedSetspec.conditionTdfIds];
+      } else {
+        delete setspec.conditionTdfIds;
+      }
       if (apiKeyUpdates.speechAPIKey && setspec.speechAPIKey) {
         setspec.speechAPIKey = validateAndEncryptUploadedApiKey({
           encryptData: deps.encryptData,
@@ -1137,11 +1125,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         });
         deps.serverConsole('saveTdfContent: Encrypted new openRouterApiKey');
       }
-      if (Array.isArray(setspec.condition) && setspec.condition.length > 0) {
-        setspec.conditionTdfIds = await resolveConditionTdfIds(setspec);
-      } else {
-        delete setspec.conditionTdfIds;
-      }
+    }
+    const familyValidation = validateConditionFamilyTutor(tdfContentToSave.tdfs?.tutor, {
+      requireCanonicalIds: true,
+    });
+    if (familyValidation.errors.length > 0) {
+      throw new Meteor.Error('invalid-tdf-identity', familyValidation.errors.join('; '));
     }
     const autoTutorValidation = validateAutoTutorContent({
       tdf: tdfContentToSave.tdfs,
@@ -1161,7 +1150,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     await deps.Tdfs.updateAsync({_id: tdfId}, {
       $set: {
         content: tdfContentToSave
-      }
+      },
+      $inc: { tdfRevision: 1 },
     });
 
     deps.serverConsole('saveTdfContent: Updated TDF', tdfId, 'lesson:', tdfContentToSave.tdfs?.tutor?.setspec?.lessonname || '');
@@ -1225,6 +1215,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       newTdf.content.tdfs.tutor.setspec.lessonname = newName;
       newTdf.content.tdfs.tutor.setspec.userselect = 'false';
     }
+    delete newTdf.sourceIdentity;
+    newTdf.tdfRevision = 1;
 
     const newId = await deps.Tdfs.insertAsync(newTdf);
     deps.serverConsole('copyTdf: Created copy', newId, 'of TDF', sourceTdfId, 'with name', newName);
@@ -1262,7 +1254,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
           },
         );
         if (!ingestion) throw new Meteor.Error('generated-package-save-failed', 'Generated package ingestion did not complete.');
-        if (!Array.isArray(ingestion.results)) {
+        if (!('results' in ingestion) || !Array.isArray(ingestion.results)) {
           throw new Meteor.Error('generated-package-save-failed', 'Generated package ingestion unexpectedly required confirmation.');
         }
         const failedResult = ingestion.results.find((result) => !result.result);
@@ -1312,16 +1304,14 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     getMaxResponseKC,
     processPackageUpload,
     confirmPackageUpload,
+    cancelPackageUpload,
     ...generatedContentMethods,
     repairAiGeneratedPackageMedia,
-    saveContentFile,
-    tdfUpdateConfirmed,
     saveTdfStimuli,
     saveTdfContent,
     copyTdf,
     upsertStimFile,
-    upsertTDFFile,
-    resolveConditionTdfIds,
+    importPrivateRepoTdfBatch,
     normalizeOptionalString,
   };
 }

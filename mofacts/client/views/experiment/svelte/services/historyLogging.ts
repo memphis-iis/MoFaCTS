@@ -33,11 +33,6 @@ import { recordRuntimeOutcomeHistories } from './cardRuntimeState';
 import { getQuestionIndex } from './trialProgressionState';
 import { getAlternateDisplayIndex } from './activeTrialDisplayRuntimeState';
 import {
-  applyH5PSummaryToRecord,
-  insertH5PHistoryRows,
-  resolveH5PResultForHistory,
-} from './historyH5P';
-import {
   readSparcResumeSnapshot,
   rememberSparcRuntimeHistoryRecord,
 } from './sparcRuntimeState';
@@ -48,12 +43,10 @@ import type {
 import {
   resolveSparcControllerDisplay,
 } from './sparcController';
-import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
 import type {
   HistoryLoggingEvent,
   HistoryLoggingResult,
   HistoryRecord,
-  H5PTrialResult,
   TrialTimingSummary,
   UnitEngineLike,
 } from '../../../../../common/types';
@@ -92,7 +85,6 @@ type HistoryLoggingServiceContext = {
   currentAnswer?: unknown;
   feedbackText?: string;
   feedbackSuppressed?: boolean;
-  h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcControllerResult | null;
 };
 type HistoryAnswerContext = {
@@ -848,10 +840,7 @@ export async function historyLoggingService(
 ): Promise<HistoryLoggingResult> {
   try {
     
-    const h5pBatch = resolveH5PResultForHistory(context.currentDisplay, context.h5pResult);
-    const outcomeHistoryValues = h5pBatch
-      ? resolveH5PModelOutcomes(h5pBatch).map((outcome) => outcome.correct)
-      : [context.isCorrect];
+    const outcomeHistoryValues = [context.isCorrect];
 
     if (!(event as Record<string, unknown>)?.skipOutcomeHistoryUpdate) {
       recordSessionOutcomeHistories(context.testType, outcomeHistoryValues);
@@ -870,10 +859,8 @@ export async function historyLoggingService(
       ? context.timestamps.trialStart
       : context.timestamps.firstKeypress ?? context.timestamps.trialEnd;
 
-    const feedbackSuppressed = context.feedbackSuppressed === true || Boolean(h5pBatch);
-    const feedbackText = h5pBatch
-      ? ''
-      : getDisplayedFeedbackText(context.testType, context.feedbackText, feedbackSuppressed);
+    const feedbackSuppressed = context.feedbackSuppressed === true;
+    const feedbackText = getDisplayedFeedbackText(context.testType, context.feedbackText, feedbackSuppressed);
 
     // Create record
     const engine = (event.engine || context.engine) as HistoryEngineLike;
@@ -909,18 +896,11 @@ export async function historyLoggingService(
     record.CFStartLatency = timings.startLatency;
     record.CFEndLatency = timings.endLatency;
     record.CFFeedbackLatency = timings.feedbackLatency;
-    if (h5pBatch) {
-      applyH5PSummaryToRecord(record, h5pBatch);
-    }
-
     // Insert record
     await insertHistoryRecord(record);
     const assessmentModelRecord = createAssessmentModelEvidenceRecord(record);
     if (assessmentModelRecord) {
       await insertHistoryRecord(assessmentModelRecord);
-    }
-    if (h5pBatch) {
-      await insertH5PHistoryRows(record, h5pBatch, insertHistoryRecord);
     }
     await commitSparcProductionRulesForHistory({
       engine,

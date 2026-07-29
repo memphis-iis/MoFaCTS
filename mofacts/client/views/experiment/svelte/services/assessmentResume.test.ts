@@ -8,6 +8,7 @@ import {
   hasAssessmentResumeProgress,
   hasScheduleArtifactForUnit,
   resolveResumeHistoryRoute,
+  shouldRequireAssessmentScheduleArtifact,
   shouldSkipResumeInstructionsForHistoryRoute,
 } from './assessmentResume';
 
@@ -42,6 +43,8 @@ describe('assessmentResume', function() {
       });
       expect(shouldSkipResumeInstructionsForHistoryRoute(route, true)).to.equal(true);
       expect(shouldSkipResumeInstructionsForHistoryRoute(route, false)).to.equal(false);
+      expect(shouldRequireAssessmentScheduleArtifact(route, true)).to.equal(true);
+      expect(shouldRequireAssessmentScheduleArtifact(route, false)).to.equal(false);
     });
 
     it('keeps non-history unit resume as an explicit no-op route', function() {

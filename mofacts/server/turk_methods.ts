@@ -4,6 +4,7 @@ import {turk} from './turk';
 import {displayify} from '../common/globalHelpers';
 
 import { legacyDisplay, legacyFloat, legacyInt, legacyProp, legacyTrim } from '../common/underscoreCompat';
+import { assertConditionFilenameIdAlignment, validateConditionFamilyTutor } from '../common/lib/tdfIdentityContract';
 const MeteorAny = Meteor as any;
 const RolesAny = Roles as any;
 const turkAny = turk as any;
@@ -762,28 +763,34 @@ Meteor.methods({
 
     const expTDFId = expTDF._id;
     const expTDFFileName = legacyTrim((expTDF as any)?.content?.fileName || '');
-    const setspec = (expTDF as any)?.content?.tdfs?.tutor?.setspec || {};
-    const conditionRefs = Array.isArray(setspec.condition) ? setspec.condition : [];
-    const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-    const identityRefs = conditionTdfIds.some((entry: unknown) => legacyTrim(String(entry || '')).length > 0)
-      ? conditionTdfIds
-      : conditionRefs;
+    const familyValidation = validateConditionFamilyTutor((expTDF as any)?.content?.tdfs?.tutor, { requireCanonicalIds: true });
+    if (familyValidation.isConditionRoot && familyValidation.errors.length > 0) {
+      throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair before it can be used.');
+    }
     const conditionLookupKeys = [...new Set(
-      identityRefs
+      familyValidation.conditionTdfIds
         .map((entry: any) => legacyTrim(String(entry || '')))
         .filter((entry: string) => entry.length > 0)
     )];
     const conditionDocs = conditionLookupKeys.length > 0
       ? await Tdfs.find(
         {
-          $or: [
-            { _id: { $in: conditionLookupKeys } },
-            { 'content.fileName': { $in: conditionLookupKeys } }
-          ]
+          _id: { $in: conditionLookupKeys }
         },
-        { fields: { _id: 1, 'content.fileName': 1, 'content.tdfs.tutor.unit.unitname': 1 } }
+        { fields: { _id: 1, ownerId: 1, 'content.fileName': 1, 'content.tdfs.tutor.unit.unitname': 1 } }
       ).fetchAsync()
       : [];
+    const childFileNameById = new Map<string, string>(
+      conditionDocs.map((tdf: any) => [String(tdf._id), legacyTrim(tdf?.content?.fileName || '')]),
+    );
+    const alignmentErrors = assertConditionFilenameIdAlignment(
+      familyValidation.conditionFileNames,
+      familyValidation.conditionTdfIds,
+      childFileNameById,
+    );
+    if (conditionDocs.length !== conditionLookupKeys.length || conditionDocs.some((tdf: any) => tdf.ownerId !== expTDF.ownerId) || alignmentErrors.length > 0) {
+      throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair before it can be used.');
+    }
     const scopedTdfIds = [...new Set(
       [expTDFId, ...conditionDocs.map((tdf: any) => tdf?._id)]
         .map((entry) => legacyTrim(String(entry || '')))
@@ -798,7 +805,7 @@ Meteor.methods({
 
     // Omnibus scope:
     // - Selected TDF
-    // - Any condition TDF referenced by selected root (by fileName and/or _id)
+    // - Any condition TDF referenced by the selected root's canonical child IDs
     const allExperimentStates = await GlobalExperimentStates.find({
       TDFId: {$in: scopedTdfIds}
     }).fetchAsync();

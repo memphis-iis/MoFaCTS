@@ -788,25 +788,18 @@ Template.apkgWizard.events({
           progress: 65,
           hint: apkgText('apkg.largePackageHint')
         }),
+        confirmUpdates: async (plan) => requestApkgConfirmation(template, {
+          id: `overwrite-package-${plan.uploadPlanId}`,
+          title: apkgText('apkg.overwriteTdfTitle'),
+          message: plan.updates.map((entry: any) => apkgText('content.previousTdfOverwriteMessage', {
+            filename: entry.lessonName || entry.fileName || entry.tdfId,
+          })).join(' '),
+          confirmLabel: apkgText('apkg.overwriteContent'),
+        }),
       });
       template.uploadStatus.set({ message: apkgText('apkg.finalizingUpload'), progress: 85 });
       for (const res of processResult.results) {
-        if (res.data && res.data.res === 'awaitClientTDF') {
-          const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-          const reason: string[] = [];
-          if (reasons.includes('prevTDFExists')) reason.push(apkgText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
-          if (reasons.includes('prevStimExists')) reason.push(apkgText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
-          const confirmed = await requestApkgConfirmation(template, {
-            id: `overwrite-tdf-${res.data.TDF._id || res.data.TDF.content.fileName}`,
-            title: apkgText('apkg.overwriteTdfTitle'),
-            message: reason.join(' '),
-            confirmLabel: apkgText('apkg.overwriteContent')
-          });
-          if (!confirmed) throw new Error(apkgText('apkg.uploadStoppedBeforeOverwrite'));
-          template.uploadStatus.set({ message: apkgText('apkg.confirmingTdfUpdate'), progress: 95 });
-          await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
-          closeInlineConfirmation(template, false);
-        } else if (!res.result) {
+        if (!res.result) {
           throw new Error(apkgText('apkg.packageUploadFailed', { error: res.errmsg }));
         }
       }

@@ -29,11 +29,10 @@ type BootstrapPrivateRepoContentDeps = {
   serverConsole: Logger;
   AssetsAny: { getTextAsync: (path: string) => Promise<string> };
   upsertStimFile: (filename: string, json: unknown, adminUserId: string) => Promise<string | number | null | undefined>;
-  upsertTDFFile: (
-    filename: string,
-    rec: BootstrapTdfPayload,
-    adminUserId: string
-  ) => Promise<{ stimuliSetId?: number | string | null } | unknown>;
+  importPrivateRepoTdfBatch: (
+    records: Array<{ sourceKey: string; sourceFileName: string; fileName: string; tdfs: BootstrapTdfPayload['tdfs'] }>,
+    adminUserId: string,
+  ) => Promise<Array<{ tdfId: string; stimuliSetId?: number | string | null }>>;
   updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
 };
 
@@ -73,9 +72,9 @@ export async function bootstrapPrivateRepoContentIfNeeded(deps: BootstrapPrivate
   }
 
   const tdfFilenames = await readRepoJsonFilenames('./assets/app/tdf/', deps.serverConsole);
-  const tdfStimSetIds = new Set<string | number>();
-  for (let filename of tdfFilenames) {
-    const data = await deps.AssetsAny.getTextAsync('tdf/' + filename);
+  const tdfRecords = [];
+  for (const sourceFileName of tdfFilenames) {
+    const data = await deps.AssetsAny.getTextAsync('tdf/' + sourceFileName);
     const json = JSON.parse(data) as {
       tutor: {
         setspec: {
@@ -90,9 +89,17 @@ export async function bootstrapPrivateRepoContentIfNeeded(deps: BootstrapPrivate
         [key: string]: unknown;
       };
     };
-    filename = filename.replace('.json', deps.curSemester + '.json');
-    const rec: BootstrapTdfPayload = { fileName: filename, tdfs: json, ownerId: deps.adminUserId, source: 'repo' };
-    const tdfResult = await deps.upsertTDFFile(filename, rec, deps.adminUserId) as { stimuliSetId?: number | string | null };
+    const fileName = sourceFileName.replace('.json', deps.curSemester + '.json');
+    tdfRecords.push({
+      sourceKey: `tdf/${sourceFileName}`,
+      sourceFileName,
+      fileName,
+      tdfs: json,
+    });
+  }
+  const tdfStimSetIds = new Set<string | number>();
+  const importedTdfs = await deps.importPrivateRepoTdfBatch(tdfRecords, deps.adminUserId);
+  for (const tdfResult of importedTdfs) {
     if (tdfResult?.stimuliSetId !== undefined && tdfResult?.stimuliSetId !== null) {
       tdfStimSetIds.add(tdfResult.stimuliSetId);
     }

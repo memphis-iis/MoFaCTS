@@ -69,7 +69,12 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
   DDPRateLimiter.addRule({
     type: 'method',
     name(name: string) {
-      return ['processPackageUpload', 'saveAiGeneratedPackageContent'].includes(name);
+      return [
+        'processPackageUpload',
+        'confirmPackageUpload',
+        'cancelPackageUpload',
+        'saveAiGeneratedPackageContent',
+      ].includes(name);
     },
     userId(userId: string | null | undefined) { return !!userId; }
   }, 20, 3600000);

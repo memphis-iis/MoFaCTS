@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import {
   hasUserRole,
   requireAuthenticatedUser,
@@ -122,7 +123,6 @@ type ContentMethodsDeps = {
   isPlainRecord: (value: unknown) => value is UnknownRecord;
   cloneJsonLike: <T>(value: T) => T;
   normalizeCanonicalId: (value: unknown) => string | null;
-  getTdfsByFileNameOrId: (keys: unknown[]) => Promise<any[]>;
   canAccessContentUploadTdf: (userId: string, tdf: any) => boolean | Promise<boolean>;
   getOrBuildCurrentPackageAsset: (
     tdfId: string,
@@ -138,7 +138,6 @@ type ContentMethodsDeps = {
   rebuildStimDisplayTypeMapSnapshot: (deps: any) => Promise<unknown>;
   getStimDisplayTypeMapDeps: () => any;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
-  resolveConditionTdfIds: (setspec?: { condition?: string[] }) => Promise<Array<string | null>>;
 };
 
 const MANUAL_CREATOR_STEP_LABELS = [
@@ -247,21 +246,8 @@ async function getContentUploadSummariesForIds(
   const stimLookupKeys = new Set<string>();
   for (const tdf of tdfs as TdfLike[]) {
     const setspec = tdf.content?.tdfs?.tutor?.setspec;
-    const conditions = Array.isArray(setspec?.condition) ? setspec.condition : [];
-    const conditionTdfIds = Array.isArray(setspec?.conditionTdfIds)
-      ? setspec.conditionTdfIds
-          .map((id: unknown) => deps.normalizeCanonicalId(id))
-          .filter((id: string | null): id is string => !!id)
-      : [];
-    if (conditionTdfIds.length > 0) {
-      conditionTdfIds.forEach((id: string) => conditionLookupKeys.add(id));
-    } else {
-      for (const condition of conditions) {
-        if (typeof condition === 'string' && condition.trim().length > 0) {
-          conditionLookupKeys.add(condition.trim());
-        }
-      }
-    }
+    const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
+    familyValidation.conditionTdfIds.forEach((id: string) => conditionLookupKeys.add(id));
 
     if (typeof setspec?.stimulusfile === 'string' && setspec.stimulusfile.trim().length > 0) {
       stimLookupKeys.add(setspec.stimulusfile.trim());
@@ -278,7 +264,10 @@ async function getContentUploadSummariesForIds(
 
   const [resolvedConditionDocs, stimDocs] = await Promise.all([
     conditionLookupKeys.size > 0
-      ? deps.getTdfsByFileNameOrId(Array.from(conditionLookupKeys))
+      ? deps.Tdfs.find(
+          { _id: { $in: Array.from(conditionLookupKeys) } },
+          { fields: { _id: 1, ownerId: 1, 'content.fileName': 1 } },
+        ).fetchAsync()
       : Promise.resolve([]),
     stimLookupKeys.size > 0
       ? deps.Stims.find(
@@ -295,12 +284,6 @@ async function getContentUploadSummariesForIds(
       continue;
     }
     resolvedConditionIdByKey.set(resolvedId, resolvedId);
-    const fileName = typeof conditionDoc?.content?.fileName === 'string'
-      ? conditionDoc.content.fileName.trim()
-      : '';
-    if (fileName && !resolvedConditionIdByKey.has(fileName)) {
-      resolvedConditionIdByKey.set(fileName, resolvedId);
-    }
   }
 
   const stimDocsByFileName = new Map<string, { _id: string }>();
@@ -348,17 +331,11 @@ async function getContentUploadSummariesForIds(
 
     const conditions = Array.isArray(setspec?.condition) ? setspec.condition : [];
     if (conditions.length > 0) {
-      const persistedConditionIds = Array.isArray(setspec?.conditionTdfIds)
-        ? setspec.conditionTdfIds.map((id: unknown) => deps.normalizeCanonicalId(id))
-        : [];
-      const resolvedConditionIds = conditions.map((conditionFilename: string, index: number) => {
-        const persistedId = persistedConditionIds[index];
-        if (typeof persistedId === 'string') {
-          return persistedId;
-        }
-        const normalizedCondition = typeof conditionFilename === 'string' ? conditionFilename.trim() : '';
-        return normalizedCondition ? (resolvedConditionIdByKey.get(normalizedCondition) || null) : null;
-      });
+      const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
+      const resolvedConditionIds = familyValidation.conditionTdfIds.map((id) => resolvedConditionIdByKey.get(id) || null);
+      if (familyValidation.errors.length > 0 || resolvedConditionIds.some((id) => !id)) {
+        summary.errors.push('Condition identity repair is required before this lesson can be used.');
+      }
 
       if (Array.isArray(tdf.conditionCounts)) {
         if (tdf.conditionCounts.length < conditions.length) {
@@ -671,11 +648,9 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         }
       );
 
-      if (!tdf) {
-        throw new Meteor.Error(404, 'TDF not found');
-      }
-      if (!deps.canAccessContentUploadTdf(this.userId, tdf)) {
-        throw new Meteor.Error(403, 'Not authorized to download this package');
+      const isAdmin = await deps.getMethodAuthorizationDeps().userIsInRoleAsync(this.userId, ['admin']);
+      if (!tdf || (tdf.ownerId !== this.userId && !isAdmin)) {
+        throw new Meteor.Error(404, 'Package unavailable');
       }
 
       try {
@@ -686,7 +661,6 @@ export function createContentMethods(deps: ContentMethodsDeps) {
           findDynamicAssetsScopedBatch: deps.findDynamicAssetsScopedBatch,
           normalizeCanonicalId: deps.normalizeCanonicalId,
           decryptData: deps.decryptData,
-          resolveConditionTdfIds: deps.resolveConditionTdfIds,
           DynamicAssets: deps.DynamicAssets,
           storageBoundary: deps.storageBoundary,
           Tdfs: deps.Tdfs,
@@ -900,19 +874,21 @@ export function createContentMethods(deps: ContentMethodsDeps) {
         throw new Meteor.Error('tdf-public-locked', visibilityLockReason);
       }
 
+      const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
+      if (familyValidation.errors.length > 0) {
+        throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
+      }
+
       await deps.Tdfs.updateAsync(
         { _id: tdfId },
-        { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect } }
+        { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect }, $inc: { tdfRevision: 1 } }
       );
 
-      const setspec = tdf.content?.tdfs?.tutor?.setspec;
-      const conditionIds = Array.isArray(setspec?.condition)
-        ? (await deps.resolveConditionTdfIds(setspec)).filter(Boolean)
-        : [];
+      const conditionIds = familyValidation.conditionTdfIds;
       if (conditionIds.length > 0) {
         await deps.Tdfs.updateAsync(
           { _id: { $in: conditionIds }, ownerId: tdf.ownerId },
-          { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect } },
+          { $set: { 'content.tdfs.tutor.setspec.userselect': newUserSelect }, $inc: { tdfRevision: 1 } },
           { multi: true }
         );
       }

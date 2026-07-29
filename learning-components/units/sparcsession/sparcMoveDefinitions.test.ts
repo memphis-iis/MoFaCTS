@@ -41,7 +41,7 @@ describe('SPARC move definitions', function() {
       assert.equal(definition.status, 'active');
       assert.equal(definition.promptId, `autotutor.${definition.moveId}`);
       const expectedPromptVersion = definition.moveId === 'question-scope-refusal' ? 'v1'
-        : definition.moveId === 'pump' ? 'v5'
+        : definition.moveId === 'pump' ? 'v7'
           : definition.moveId === 'question-deferral' || definition.moveId === 'prompt' || definition.moveId === 'hint'
             ? 'v3'
             : 'v2';
@@ -84,12 +84,16 @@ describe('SPARC move definitions', function() {
     assert.ok(pump.includes('Content-grounded acknowledgement'));
     assert.ok(pump.includes('anchored to one concept, relationship, calculation, or conclusion actually present'));
     assert.ok(pump.includes('Explicitly identify the active concept before the open invitation'));
-    assert.ok(pump.includes('Derive one short, natural, learner-facing concept name'));
-    assert.ok(pump.includes('do not expose an internal id or recite the full target proposition'));
+    assert.ok(pump.includes('compact learner-facing concept label'));
+    assert.ok(pump.includes('one to three content words'));
+    assert.ok(pump.includes('do not use a descriptive clause'));
+    assert.ok(pump.includes('Do not explain, extend, interpret, or paraphrase'));
+    assert.ok(pump.includes('an internal id, or the full target proposition'));
     assert.ok(pump.includes('content the learner has already contributed or correctly established'));
     assert.ok(pump.includes('Keep the invitation open within that named concept'));
     assert.ok(pump.includes('Use the selected target to determine the pump\'s named subject'));
-    assert.ok(pump.includes('Semantic openness check'));
+    assert.ok(pump.includes('Semantic openness and brevity check'));
+    assert.ok(pump.includes('If the label exceeds three content words'));
     assert.ok(pump.includes('Do not reuse the same interrogative frame'));
     assert.ok(pump.includes('Do not combine an open invitation with a content-specific question'));
     assert.doesNotMatch(pump, /choose the dimension of elaboration|open that dimension explicitly/);

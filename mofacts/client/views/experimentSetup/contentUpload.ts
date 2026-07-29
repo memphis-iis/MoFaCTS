@@ -4,13 +4,14 @@ import { Session } from 'meteor/session';
 import './contentUpload.html';
 import './contentUpload.css';
 import './aiContentCreator';
-import { meteorCallAsync, clientConsole } from '../..';
+import { clientConsole } from '../..';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveDict } from 'meteor/reactive-dict';
 import { Tracker } from 'meteor/tracker';
 import { Random } from 'meteor/random';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { processUploadedPackage } from '../../lib/packageUploadClient';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { hasPublicCreatorDisplayName } from '../../lib/contentCreatorIdentity';
@@ -39,7 +40,6 @@ import {
   type ContentUploadSummaryMap,
   type UploadQuotaStatus,
 } from './contentUploadState';
-export {doFileUpload};
 
 const FlowRouter = (globalThis as any).FlowRouter;
 const MeteorAny = Meteor as any;
@@ -1567,7 +1567,7 @@ Template.contentUpload.events({
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       await template.commandRegistry.run(`asset:${tdfId}`, async () => {
         try {
-          await MeteorAny.callAsync('deletePackageFile', packageAssetId);
+          await MeteorAny.callAsync('deletePackageFile', packageAssetId, { wholeFamily: true });
           
           // Invalidate cache and trigger reactive refresh
           assetsHelperLastRun = 0;
@@ -2065,119 +2065,6 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
 }
 
 
-// //////////////////////////////////////////////////////////////////////////
-// Our main logic for uploading files
-
-async function doFileUpload(fileArray: any) {
-  const template = (Template.instance() as any);
-  //reorder fileArray so that packages are uploaded first, then stimuli, then TdfsCollection
-  fileArray.sort((a: any, b: any) => {
-    if (a.fileType == 'package') {
-      return -1;
-    } else if (b.fileType == 'package') {
-      return 1;
-    } else if (a.fileType == 'stim') {
-      return -1;
-    } else if (b.fileType == 'stim') {
-      return 1;
-    } else {
-      return 0;
-    }
-  });
-  const files = fileArray;
-  
-  const errorStack = [];
-
-  for (const file of files) {
-  //check if file type is package
-  if (file.fileType == 'package') {
-    //check if package exists in DynamicAssetsCollection
-    let existingFile = null;
-    try {
-      existingFile = await MeteorAny.callAsync('getUserAssetByName', file.name);
-    } catch (error: any) {
-      clientConsole(1, '[UPLOAD] Failed to check existing package:', error);
-      setUploadMessage(template, contentText('content.existingPackageCheckError', { error: uploadErrorText(error) }), 'error');
-      continue;
-    }
-    if (existingFile) {
-      //atempts to delete existing file
-      try {
-        // Security: Use server method instead of direct client remove
-        MeteorAny.callAsync('removeAssetById', existingFile._id);
-      } catch (e) {
-        
-        setUploadMessage(template, contentText('content.deleteExistingFileError'), 'error');
-      }
-    } else {
-      await doPackageUpload(file, (Template.instance() as any));
-    }
-  } else {
-      const name = file.name;
-      const fileType = file.fileType;
-      const fileDescrip = file.fileDescrip;
-      if (name.indexOf('<') != -1 || name.indexOf('>') != -1 || name.indexOf(':') != -1 ||
-        name.indexOf('"') != -1 || name.indexOf('/') != -1 || name.indexOf('|') != -1 ||
-        name.indexOf('?') != -1 || name.indexOf('*') != -1) {
-        setUploadMessage(template, contentText('content.invalidFilenameCharacters'), 'warning');
-      } else {
-        const fileData = await readFileAsDataURL(file);
-        
-
-        try {
-          const result: any = await meteorCallAsync('saveContentFile', fileType, name, fileData, Meteor.userId());
-          if (!result.result) {
-            if(result.data && result.data.res == 'awaitClientTDF'){
-              const reasons = Array.isArray(result.data.reason) ? result.data.reason : [];
-              const confirmed = await requestContentConfirmation(template, {
-                placement: 'upload-package',
-                title: contentText('content.overwriteExistingContent'),
-                message: contentText('content.previousFileOverwriteMessage', { filename: result.data.TDF.content.fileName }),
-                confirmLabel: contentText('content.overwriteContent'),
-                cancelLabel: contentText('content.cancel'),
-                level: 'warning'
-              });
-              if(confirmed){
-                try {
-                  await MeteorAny.callAsync('tdfUpdateConfirmed', result.data.TDF, false, reasons);
-                } catch (err: any) {
-                  setUploadMessage(template, contentText('content.confirmationFailed', { error: uploadErrorText(err) }), 'error');
-                }
-              }
-            } else {
-              
-              errorStack.push(contentText('content.fileSaveError', { fileDescription: fileDescrip, error: result.errmsg || '' }));
-            }
-          }
-        } catch (error: any) {
-          
-          errorStack.push(contentText('content.fileCriticalSaveError', { fileDescription: fileDescrip, error: uploadErrorText(error) }));
-        }
-      }
-    }
-
-    $('#stimUploadLoadingSymbol').hide()
-    
-    if (errorStack.length == 0) {
-      setUploadMessage(template, contentText('content.filesSaved'), 'success');
-    } else {
-      setUploadMessage(template, contentText('content.fileUploadErrors', { count: errorStack.length, errors: errorStack.join('; ') }), 'error');
-    }
-
-    //force the stimDisplayTypeMap to refresh on next card load
-    Session.set('stimDisplayTypeMap', undefined);
-
-    //clear the file upload fields
-    $('#upload-file').val('');
-
-     // Now we can clear the selected file
-    $('#upload-file').val('');
-    $('#upload-file').parent().find('.file-info').html('');
-    }
-  }
-
-
-
 async function doPackageUpload(file: any, template: any): Promise<{ fileName: string; error?: string; skipped?: boolean }>{
   let existingFile = null;
   try {
@@ -2356,49 +2243,24 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
 
           (async () => {
             try {
-              let result = await MeteorAny.callAsync('processPackageUpload', fileObj._id, Meteor.userId(), link, emailToggle, uploadIntegrity);
-
-              while (result?.status === 'confirmation-required') {
-                const updates = Array.isArray(result.updates) ? result.updates : [];
-                const message = updates
-                  .map((entry: any) => contentText('content.previousTdfOverwriteMessage', {
-                    filename: entry?.lessonName || entry?.fileName || entry?.tdfId || ''
-                  }))
-                  .join(' ');
-                const confirmed = await requestContentConfirmation(template, {
+              const result = await processUploadedPackage({
+                asset: fileObj,
+                link,
+                integrity: uploadIntegrity,
+                callAsync: MeteorAny.callAsync.bind(MeteorAny),
+                userId: Meteor.userId(),
+                emailOnCompletion: emailToggle,
+                confirmUpdates: async (plan) => requestContentConfirmation(template, {
                   placement: 'upload-package',
                   title: contentText('content.overwriteExistingContent'),
-                  message,
+                  message: plan.updates.map((entry: any) => contentText('content.previousTdfOverwriteMessage', {
+                    filename: entry?.lessonName || entry?.fileName || entry?.tdfId || '',
+                  })).join(' '),
                   confirmLabel: contentText('content.overwriteContent'),
                   cancelLabel: contentText('content.cancel'),
-                  level: 'warning'
-                });
-
-                if (!confirmed) {
-                  const stagedPackageAssetId = result.packageAssetId || packageAssetId;
-                  if (stagedPackageAssetId) {
-                    try {
-                      await MeteorAny.callAsync('removeAssetById', stagedPackageAssetId);
-                    } catch (cleanupError: any) {
-                      clientConsole(1, '[UPLOAD] Failed to remove canceled staged package:', cleanupError);
-                    }
-                  }
-                  setUploadMessage(template, contentText('content.uploadCanceledPackage', { filename: file.name }), 'warning');
-                  template.pendingUploads.set(pendingUploadId, undefined);
-                  assetsHelperLastRun = 0;
-                  assetsHelperCachedResult = [];
-                  finish({ fileName: file.name, skipped: true });
-                  return;
-                }
-
-                result = await MeteorAny.callAsync(
-                  'confirmPackageUpload',
-                  result.packageAssetId,
-                  result.preflightFingerprint,
-                  emailToggle,
-                  uploadIntegrity
-                );
-              }
+                  level: 'warning',
+                }),
+              });
 
               for (const res of (result.results || [])) {
                 if(!res.result) {
@@ -2484,19 +2346,5 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
     upload.start();
   });
 }
-
-async function readFileAsDataURL(file: any) {
-  const result = await new Promise((resolve: any) => {
-    const fileReader = new FileReader();
-    fileReader.onload = () => resolve(fileReader.result);
-    fileReader.readAsText(file, 'UTF-8');
-  });
-
-  return result;
-}
-
-
-
-
 
 

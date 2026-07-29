@@ -23,7 +23,7 @@ function tdfFile(name: string, options: {
           ...(options.conditions ? { condition: options.conditions } : {}),
           ...(options.conditionTdfIds ? { conditionTdfIds: options.conditionTdfIds } : {}),
         },
-        unit: [],
+        ...(options.conditions ? {} : { unit: [{}] }),
       },
     },
   };
@@ -84,7 +84,7 @@ describe('packageTdfIdentity', function() {
     assert.match(plan.entries[0]?.tdfId || '', /^tdf_[a-f0-9]{24}$/);
   });
 
-  it('updates only an exact manageable tdfId and preserves unknown ids for creates', async function() {
+  it('updates only an exact manageable tdfId and rejects unknown supplied ids', async function() {
     const existing = { _id: 'known-id', ownerId: 'owner-1', stimuliSetId: 9, content: { fileName: 'old.json' } };
     const updatePlan = await preflightPackageTdfIdentities({
       unzippedFiles: packageFiles(tdfFile('renamed.json', { tdfId: 'known-id' })),
@@ -92,17 +92,15 @@ describe('packageTdfIdentity', function() {
       ownerId: 'owner-1',
       deps: deps([existing]),
     });
-    const createPlan = await preflightPackageTdfIdentities({
+    await assert.rejects(() => preflightPackageTdfIdentities({
       unzippedFiles: packageFiles(tdfFile('portable.json', { tdfId: 'portable-id' })),
       packageAssetId: 'asset-3',
       ownerId: 'owner-1',
       deps: deps([]),
-    });
+    }), /does not exist/);
 
     assert.equal(updatePlan.entries[0]?.action, 'update');
     assert.equal(updatePlan.entries[0]?.tdfId, 'known-id');
-    assert.equal(createPlan.entries[0]?.action, 'create');
-    assert.equal(createPlan.entries[0]?.tdfId, 'portable-id');
   });
 
   it('rejects unauthorized, malformed, and duplicate ids before persistence', async function() {
@@ -148,11 +146,15 @@ describe('packageTdfIdentity', function() {
       unzippedFiles: packageFiles(
         tdfFile('root.json', { conditions: ['child.json'], conditionTdfIds: ['different-id'] }),
         tdfFile('child.json', { tdfId: 'child-id' }),
+        tdfFile('different-child.json', { tdfId: 'different-id' }),
       ),
       packageAssetId: 'asset-8',
       ownerId: 'owner-1',
-      deps: deps([]),
-    }), /child is not in the package|different tdfId/);
+      deps: deps([
+        { _id: 'child-id', ownerId: 'owner-1' },
+        { _id: 'different-id', ownerId: 'owner-1' },
+      ]),
+    }), (error: any) => error?.error === 'condition-identity-mismatch');
 
     await assert.rejects(() => preflightPackageTdfIdentities({
       unzippedFiles: packageFiles(tdfFile('root.json', { conditions: ['missing.json'] })),

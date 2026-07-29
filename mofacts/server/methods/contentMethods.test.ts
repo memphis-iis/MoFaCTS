@@ -117,8 +117,7 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
     updateStimDisplayTypeMap: async () => undefined,
     rebuildStimDisplayTypeMapSnapshot: async () => undefined,
     getStimDisplayTypeMapDeps: () => ({}),
-    getMethodAuthorizationDeps: () => ({}),
-    resolveConditionTdfIds: async () => []
+    getMethodAuthorizationDeps: () => ({})
   };
 
   return { ...deps, ...overrides } as any;
@@ -245,6 +244,9 @@ describe('contentMethods content upload summaries', function() {
       Tdfs: {
         find: (selector: any) => ({
           fetchAsync: async () => {
+            if (selector?._id?.$nin) {
+              return [];
+            }
             if (selector?.$or) {
               return tdfs.filter((tdf) => tdf.packageAssetId === 'package-delete');
             }
@@ -296,7 +298,7 @@ describe('contentMethods content upload summaries', function() {
     });
     const methods = createContentMethods(deps);
 
-    await methods.deletePackageFile.call({ userId: 'admin-user' }, 'package-delete');
+    await methods.deletePackageFile.call({ userId: 'admin-user' }, 'package-delete', { wholeFamily: true });
 
     expect(removed).to.deep.equal(['package-delete', 'media-delete']);
     expect(assets.map((asset) => asset._id)).to.deep.equal(['media-keep']);

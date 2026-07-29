@@ -178,7 +178,7 @@
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,svelte}": [
-      "eslint --ignore-pattern .meteor/** --ignore-pattern public/h5p-standalone/** --ignore-pattern public/vendor/** --fix"
+      "eslint --ignore-pattern .meteor/** --ignore-pattern public/vendor/** --fix"
     ]
   },
   "author": "",

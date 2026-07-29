@@ -1,11 +1,14 @@
 import { Meteor } from 'meteor/meteor';
 
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
+import {
+  TDF_ID_PATTERN,
+  validateConditionFamilyTutor,
+} from '../../common/lib/tdfIdentityContract';
 import type { UploadedPackageFile } from './packageParser';
+import { assertNoH5PContent } from '../../common/lib/unsupportedContent';
 
 const crypto = require('crypto');
-
-const TDF_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 export type PackageTdfIdentityEntry = {
   fileName: string;
@@ -14,6 +17,8 @@ export type PackageTdfIdentityEntry = {
   action: 'create' | 'update';
   lessonName: string;
   conditionTdfIds: Array<string | null>;
+  targetRevision: number;
+  beforeImage: Record<string, unknown> | null;
 };
 
 export type PackageTdfIdentityPlan = {
@@ -59,7 +64,12 @@ function readConditionIds(file: UploadedPackageFile): Array<string | null> {
     throw new Meteor.Error('invalid-condition-tdf-ids', `TDF "${file.name}" has invalid conditionTdfIds.`);
   }
   return rawIds.map((rawId: unknown, index: number) => {
-    if (rawId === null || rawId === '') return null;
+    if (rawId === null || rawId === '') {
+      throw new Meteor.Error(
+        'invalid-condition-tdf-id',
+        `TDF "${file.name}" has a missing conditionTdfIds value at position ${index + 1}.`
+      );
+    }
     if (typeof rawId !== 'string' || rawId !== rawId.trim() || !TDF_ID_PATTERN.test(rawId)) {
       throw new Meteor.Error(
         'invalid-condition-tdf-id',
@@ -110,6 +120,7 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
 
   for (const tdf of tdfFiles) {
     const contents = tdf.contents as any;
+    assertNoH5PContent(contents);
     const setspec = contents?.tutor?.setspec;
     if (!setspec || typeof setspec !== 'object') {
       throw new Meteor.Error('invalid-package-tdf', `TDF "${tdf.name}" is missing tutor.setspec.`);
@@ -136,6 +147,14 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
       throw new Meteor.Error(
         'invalid-package-content',
         `TDF "${tdf.name}" has invalid AutoTutor content: ${autoTutorValidation.errors.join('; ')}`
+      );
+    }
+    assertNoH5PContent(stimulus.contents);
+    const familyValidation = validateConditionFamilyTutor(contents.tutor);
+    if (familyValidation.errors.length > 0) {
+      throw new Meteor.Error(
+        'invalid-package-tdf-shape',
+        `TDF "${tdf.name}" has invalid root/unit structure: ${familyValidation.errors.join('; ')}`
       );
     }
   }
@@ -167,7 +186,8 @@ export async function preflightPackageTdfIdentities(args: {
   const tdfFiles = unzippedFiles.filter((file) => file.type === 'tdf');
   const filesByName = new Map<string, UploadedPackageFile>();
   const incomingIdByFile = new Map<UploadedPackageFile, string | null>();
-  const suppliedIds = new Set<string>();
+  const incomingIds = new Set<string>();
+  const referencedConditionIds = new Set<string>();
 
   for (const file of tdfFiles) {
     if (filesByName.has(file.name)) {
@@ -176,21 +196,32 @@ export async function preflightPackageTdfIdentities(args: {
     filesByName.set(file.name, file);
     const incomingTdfId = readIncomingTdfId(file);
     if (incomingTdfId) {
-      if (suppliedIds.has(incomingTdfId)) {
+      if (incomingIds.has(incomingTdfId)) {
         throw new Meteor.Error('duplicate-package-tdf-id', `Package contains duplicate tdfId "${incomingTdfId}".`);
       }
-      suppliedIds.add(incomingTdfId);
+      incomingIds.add(incomingTdfId);
     }
     for (const conditionTdfId of readConditionIds(file)) {
-      if (conditionTdfId) suppliedIds.add(conditionTdfId);
+      if (conditionTdfId) referencedConditionIds.add(conditionTdfId);
     }
     incomingIdByFile.set(file, incomingTdfId);
   }
 
+  const suppliedIds = new Set([...incomingIds, ...referencedConditionIds]);
   const existingDocs = suppliedIds.size > 0
     ? await deps.Tdfs.find({ _id: { $in: Array.from(suppliedIds) } }).fetchAsync()
     : [];
   const existingById = new Map(existingDocs.map((doc: any) => [String(doc._id), doc]));
+
+  for (const file of tdfFiles) {
+    const incomingTdfId = incomingIdByFile.get(file);
+    if (incomingTdfId && !existingById.has(incomingTdfId)) {
+      throw new Meteor.Error(
+        'unknown-tdf-id',
+        `TDF "${file.name}" supplies tdfId "${incomingTdfId}", but that TDF does not exist. Remove all package identity fields to create new content.`
+      );
+    }
+  }
 
   for (const existing of existingDocs) {
     if (!(await deps.userCanManageTdf(ownerId, existing))) {
@@ -217,6 +248,25 @@ export async function preflightPackageTdfIdentities(args: {
       action: existingById.has(tdfId) ? 'update' : 'create',
       lessonName: readLessonName(file),
       conditionTdfIds: [],
+      targetRevision: Number.isInteger(existingById.get(tdfId)?.tdfRevision)
+        ? existingById.get(tdfId).tdfRevision
+        : 0,
+      beforeImage: existingById.has(tdfId) ? {
+        tdfFileName: existingById.get(tdfId).tdfFileName,
+        content: existingById.get(tdfId).content,
+        ownerId: existingById.get(tdfId).ownerId,
+        stimuliSetId: existingById.get(tdfId).stimuliSetId,
+        rawStimuliFile: existingById.get(tdfId).rawStimuliFile,
+        stimuli: existingById.get(tdfId).stimuli,
+        packageFile: existingById.get(tdfId).packageFile,
+        packageAssetId: existingById.get(tdfId).packageAssetId,
+        conditionCounts: existingById.get(tdfId).conditionCounts,
+        tdfAvailability: existingById.get(tdfId).tdfAvailability,
+        tdfIdentityState: existingById.get(tdfId).tdfIdentityState,
+        tdfRevision: Number.isInteger(existingById.get(tdfId).tdfRevision)
+          ? existingById.get(tdfId).tdfRevision
+          : 0,
+      } : null,
     };
     entries.push(entry);
     entryByFileName.set(entry.fileName, entry);
@@ -277,6 +327,18 @@ export async function preflightPackageTdfIdentities(args: {
         `TDF "${file.name}" references condition file "${conditionName}", but that child is not in the package.`
       );
     }
+
+    const existing = existingById.get(entry.tdfId);
+    const previousConditionIds = Array.isArray(existing?.content?.tdfs?.tutor?.setspec?.conditionTdfIds)
+      ? existing.content.tdfs.tutor.setspec.conditionTdfIds.filter((id: unknown): id is string => typeof id === 'string' && !!id)
+      : [];
+    const removedConditionId = previousConditionIds.find((id: string) => !entry.conditionTdfIds.includes(id));
+    if (removedConditionId) {
+      throw new Meteor.Error(
+        'condition-removal-forbidden',
+        `TDF "${file.name}" cannot remove established condition TDF "${removedConditionId}".`
+      );
+    }
   }
 
   const fingerprint = hashValue({
@@ -289,6 +351,7 @@ export async function preflightPackageTdfIdentities(args: {
           incomingTdfId: entry.incomingTdfId,
           tdfId: entry.tdfId,
           action: entry.action,
+          targetRevision: entry.targetRevision,
           conditionTdfIds: entry.conditionTdfIds,
           existingHash: existing
             ? hashValue({ ownerId: existing.ownerId, stimuliSetId: existing.stimuliSetId, content: existing.content })

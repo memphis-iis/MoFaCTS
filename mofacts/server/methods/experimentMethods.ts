@@ -15,6 +15,7 @@ type ExperimentMethodsDeps = {
   Tdfs: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
+  resolveExperimentTargetFamily: (experimentTarget: unknown, rootAccessSelector?: UnknownRecord) => Promise<{ root: any } | null>;
   GlobalExperimentStates: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
@@ -59,14 +60,13 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
   }
 
   async function getTdfByExperimentTarget(experimentTarget: string) {
-    experimentTarget = experimentTarget.toLowerCase();
     try {
       deps.serverConsole('getTdfByExperimentTarget:' + experimentTarget);
-      const tdf = await deps.Tdfs.findOneAsync({"content.tdfs.tutor.setspec.experimentTarget": experimentTarget});
-      return tdf;
+      const family = await deps.resolveExperimentTargetFamily(experimentTarget);
+      return family?.root || null;
     } catch (e: unknown) {
       deps.serverConsole('getTdfByExperimentTarget ERROR,', experimentTarget, ',', e);
-      return null;
+      throw e;
     }
   }
 

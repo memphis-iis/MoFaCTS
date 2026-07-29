@@ -17,7 +17,6 @@ function resetTrialResponseState() {
     feedbackText: '',
     feedbackRevealStarted: false,
     feedbackSuppressed: false,
-    h5pResult: null,
     sparcResult: null,
     isCorrect: false,
     isTimeout: false,

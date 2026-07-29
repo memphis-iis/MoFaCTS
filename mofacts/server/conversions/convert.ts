@@ -111,14 +111,11 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
       if (!stim || typeof stim !== 'object') {
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" is undefined or not an object.`);
       }
-      const h5pOwnsResponse = stim.display?.h5p?.sourceType === 'self-hosted';
       const autoTutorOwnsResponse = Boolean(stim.autoTutor);
       const sparcOwnsResponse = stim.display?.type === 'sparc' && stim.display?.response && typeof stim.display.response === 'object';
       const sparcAutoTutorTargetOwnsResponse = isSparcAutoTutorTargetStim(stim, setspecHasSparcAutoTutorPage);
       if (!stim.response || typeof stim.response !== 'object') {
-        if (h5pOwnsResponse) {
-          stim.response = { correctResponse: '__H5P_COMPLETED__' };
-        } else if (autoTutorOwnsResponse) {
+        if (autoTutorOwnsResponse) {
           stim.response = { correctResponse: '__AUTOTUTOR_SESSION__' };
         } else if (sparcOwnsResponse) {
           stim.response = { correctResponse: '__SPARC_COMPLETED__' };
@@ -129,9 +126,7 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
         }
       }
       if (!Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse')) {
-        if (h5pOwnsResponse) {
-          stim.response.correctResponse = '__H5P_COMPLETED__';
-        } else if (autoTutorOwnsResponse) {
+        if (autoTutorOwnsResponse) {
           stim.response.correctResponse = '__AUTOTUTOR_SESSION__';
         } else if (sparcOwnsResponse) {
           stim.response.correctResponse = '__SPARC_COMPLETED__';

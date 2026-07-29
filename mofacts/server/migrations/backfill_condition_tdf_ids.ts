@@ -1,25 +1,22 @@
-type UnknownRecord = Record<string, unknown>;
+import { normalizeTdfIdentity } from '../../common/lib/tdfIdentityContract';
 
+type UnknownRecord = Record<string, unknown>;
 type RootRow = {
   _id: unknown;
   ownerId?: unknown;
   packageAssetId?: unknown;
-  content?: {
-    tdfs?: {
-      tutor?: {
-        setspec?: {
-          condition?: unknown;
-          conditionTdfIds?: unknown;
-        };
-      };
-    };
-  };
+  tdfRevision?: unknown;
+  tdfIdentityState?: unknown;
+  content?: { tdfs?: { tutor?: { unit?: unknown; setspec?: { condition?: unknown; conditionTdfIds?: unknown } } } };
 };
 
 type MigrationDeps = {
   Tdfs: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<number>;
+  };
+  TdfMutationJobs: {
+    insertAsync: (document: UnknownRecord) => Promise<unknown>;
   };
   DynamicSettings: {
     findOneAsync: (selector: UnknownRecord) => Promise<any>;
@@ -28,7 +25,8 @@ type MigrationDeps = {
   serverConsole: (...args: unknown[]) => void;
 };
 
-const MIGRATION_KEY = 'migration.conditionTdfIds.v1';
+const MIGRATION_KEY = 'migration.conditionTdfIds.v2';
+const MIGRATION_VERSION = 2;
 const BATCH_SIZE = 100;
 const MAX_ROOTS_PER_STARTUP = 1000;
 
@@ -47,14 +45,46 @@ function selectUniqueCandidate(root: RootRow, conditionFileName: string, candida
   const packageAssetId = normalize(root.packageAssetId);
   if (packageAssetId) {
     const samePackage = matching.filter((candidate) => normalize(candidate?.packageAssetId) === packageAssetId);
-    if (samePackage.length === 1) return samePackage[0];
-    if (samePackage.length > 1) return null;
+    return samePackage.length === 1 ? samePackage[0] : null;
   }
   const ownerId = normalize(root.ownerId);
-  const sameOwner = ownerId
-    ? matching.filter((candidate) => normalize(candidate?.ownerId) === ownerId)
-    : [];
+  const sameOwner = ownerId ? matching.filter((candidate) => normalize(candidate?.ownerId) === ownerId) : [];
   return sameOwner.length === 1 ? sameOwner[0] : null;
+}
+
+function revisionSelector(root: RootRow): UnknownRecord {
+  const revision = Number.isInteger(root.tdfRevision) ? Number(root.tdfRevision) : 0;
+  return revision === 0
+    ? { _id: root._id, $or: [{ tdfRevision: 0 }, { tdfRevision: { $exists: false } }] }
+    : { _id: root._id, tdfRevision: revision };
+}
+
+function readConditionsExactly(root: RootRow): string[] | null {
+  const raw = root.content?.tdfs?.tutor?.setspec?.condition;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const normalized = raw.map((value) => typeof value === 'string' && value === value.trim() && value.length > 0 ? value : null);
+  if (normalized.some((value) => value === null)) return null;
+  const conditions = normalized as string[];
+  return new Set(conditions).size === conditions.length ? conditions : null;
+}
+
+async function recordMigrationJob(
+  deps: MigrationDeps,
+  root: RootRow,
+  before: UnknownRecord,
+  after: UnknownRecord,
+) {
+  await deps.TdfMutationJobs.insertAsync({
+    kind: 'condition-identity-migration',
+    status: 'complete',
+    actorUserId: 'server-startup',
+    targetId: root._id,
+    targetRevision: Number.isInteger(root.tdfRevision) ? root.tdfRevision : 0,
+    beforeImage: before,
+    afterImage: after,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
 }
 
 export async function backfillConditionTdfIds(deps: MigrationDeps) {
@@ -62,43 +92,40 @@ export async function backfillConditionTdfIds(deps: MigrationDeps) {
   if (migrationState?.value?.completedAt) return migrationState.value;
 
   let lastId: unknown = migrationState?.value?.lastId ?? null;
+  let scanned = Number(migrationState?.value?.scanned) || 0;
   let updated = Number(migrationState?.value?.updated) || 0;
-  let ambiguousOrMissing = Number(migrationState?.value?.ambiguousOrMissing) || 0;
-  const affectedRootIds: string[] = Array.isArray(migrationState?.value?.affectedRootIds)
-    ? migrationState.value.affectedRootIds.map(normalize).filter((value: string | null): value is string => !!value)
-    : [];
+  let unresolved = Number(migrationState?.value?.unresolved) || 0;
   let processedThisRun = 0;
+  let reachedEnd = false;
 
   while (processedThisRun < MAX_ROOTS_PER_STARTUP) {
     const roots = await deps.Tdfs.find({
       'content.tdfs.tutor.setspec.condition.0': { $exists: true },
-      $or: [
-        { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
-        { 'content.tdfs.tutor.setspec.conditionTdfIds': null },
-        { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
-      ],
+      'tdfIdentityState.migrationVersion': { $ne: MIGRATION_VERSION },
       ...(lastId === null ? {} : { _id: { $gt: lastId } }),
     }, {
       fields: {
         _id: 1,
         ownerId: 1,
         packageAssetId: 1,
+        tdfRevision: 1,
+        tdfIdentityState: 1,
+        'content.fileName': 1,
+        'content.tdfs.tutor.unit': 1,
         'content.tdfs.tutor.setspec.condition': 1,
+        'content.tdfs.tutor.setspec.conditionTdfIds': 1,
       },
       sort: { _id: 1 },
       limit: BATCH_SIZE,
     }).fetchAsync() as RootRow[];
-    if (roots.length === 0) break;
+    if (roots.length === 0) {
+      reachedEnd = true;
+      break;
+    }
     processedThisRun += roots.length;
+    scanned += roots.length;
 
-    const conditionFileNames = Array.from(new Set(
-      roots.flatMap((root) => {
-        const conditions = root.content?.tdfs?.tutor?.setspec?.condition;
-        return Array.isArray(conditions)
-          ? conditions.map(normalize).filter((value): value is string => !!value)
-          : [];
-      })
-    ));
+    const conditionFileNames = Array.from(new Set(roots.flatMap((root) => readConditionsExactly(root) || [])));
     const candidates = conditionFileNames.length > 0
       ? await deps.Tdfs.find({
           $or: [
@@ -111,65 +138,107 @@ export async function backfillConditionTdfIds(deps: MigrationDeps) {
       : [];
 
     for (const root of roots) {
-      const conditions = root.content?.tdfs?.tutor?.setspec?.condition;
-      const normalizedConditions = Array.isArray(conditions)
-        ? conditions.map(normalize).filter((value): value is string => !!value)
-        : [];
-      const resolved = normalizedConditions.map((conditionFileName) =>
-        selectUniqueCandidate(root, conditionFileName, candidates)
-      );
-      if (normalizedConditions.length === 0 || resolved.some((candidate) => !candidate?._id)) {
-        ambiguousOrMissing += 1;
+      const conditions = readConditionsExactly(root);
+      const existingIds = root.content?.tdfs?.tutor?.setspec?.conditionTdfIds;
+      let conditionTdfIds: string[] | null = null;
+      if (conditions && Array.isArray(existingIds) && existingIds.length === conditions.length) {
+        const normalizedExisting = existingIds.map(normalizeTdfIdentity);
+        if (normalizedExisting.every((id): id is string => !!id) && new Set(normalizedExisting).size === normalizedExisting.length) {
+          const childById = new Map(candidates.map((candidate) => [String(candidate._id), candidate]));
+          const aligned = normalizedExisting.every((id, index) => {
+            const candidate = childById.get(id);
+            return candidate
+              && normalize(candidate.ownerId) === normalize(root.ownerId)
+              && candidateFileNames(candidate).includes(conditions[index]!);
+          });
+          if (aligned) conditionTdfIds = normalizedExisting;
+        }
+      }
+      if (!conditionTdfIds && conditions) {
+        const resolved = conditions.map((fileName) => selectUniqueCandidate(root, fileName, candidates));
+        const resolvedIds = resolved.map((candidate) => normalizeTdfIdentity(candidate?._id));
+        if (resolvedIds.every((id): id is string => !!id) && new Set(resolvedIds).size === resolvedIds.length) {
+          conditionTdfIds = resolvedIds;
+        }
+      }
+
+      const unit = root.content?.tdfs?.tutor?.unit;
+      const canNormalizeEmptyUnit = Array.isArray(unit) && unit.length === 0;
+      if (!conditions || !conditionTdfIds || (unit !== undefined && !canNormalizeEmptyUnit)) {
+        unresolved += 1;
+        const reason = !conditions
+          ? 'Condition filenames are missing, invalid, or duplicated.'
+          : !conditionTdfIds
+            ? 'Condition filenames could not be resolved to unique canonical TDF ids.'
+            : 'A condition root contains tutor.unit entries and cannot be normalized automatically.';
+        const beforeState = root.tdfIdentityState;
+        const changed = await deps.Tdfs.updateAsync(revisionSelector(root), {
+          $set: {
+            tdfIdentityState: {
+              status: 'repair-required',
+              reason,
+              migrationVersion: MIGRATION_VERSION,
+              checkedAt: new Date(),
+            },
+            tdfAvailability: 'repair-required',
+          },
+          $inc: { tdfRevision: 1 },
+        });
+        if (changed === 1) {
+          await recordMigrationJob(deps, root, { tdfIdentityState: beforeState }, {
+            tdfIdentityState: { status: 'repair-required', reason, migrationVersion: MIGRATION_VERSION },
+          });
+        }
         continue;
       }
-      const rootId = normalize(root._id);
-      if (!rootId) {
-        ambiguousOrMissing += 1;
-        continue;
+
+      const before = {
+        conditionTdfIds: existingIds,
+        unit,
+        tdfIdentityState: root.tdfIdentityState,
+      };
+      const modifier: UnknownRecord = {
+        $set: {
+          'content.tdfs.tutor.setspec.conditionTdfIds': conditionTdfIds,
+          tdfIdentityState: { status: 'valid', migrationVersion: MIGRATION_VERSION, checkedAt: new Date() },
+          tdfAvailability: 'available',
+        },
+        $inc: { tdfRevision: 1 },
+      };
+      if (canNormalizeEmptyUnit) {
+        modifier.$unset = { 'content.tdfs.tutor.unit': '' };
       }
-      const conditionTdfIds = resolved.map((candidate) => String(candidate._id));
-      const changed = await deps.Tdfs.updateAsync({
-        _id: root._id,
-        $or: [
-          { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
-          { 'content.tdfs.tutor.setspec.conditionTdfIds': null },
-          { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
-        ],
-      }, {
-        $set: { 'content.tdfs.tutor.setspec.conditionTdfIds': conditionTdfIds },
-      });
-      if (changed > 0) {
+      const changed = await deps.Tdfs.updateAsync(revisionSelector(root), modifier);
+      if (changed === 1) {
         updated += 1;
-        affectedRootIds.push(rootId);
+        await recordMigrationJob(deps, root, before, {
+          conditionTdfIds,
+          unit: undefined,
+          tdfIdentityState: { status: 'valid', migrationVersion: MIGRATION_VERSION },
+        });
+      } else {
+        unresolved += 1;
       }
     }
 
     lastId = roots[roots.length - 1]?._id ?? null;
     await deps.DynamicSettings.upsertAsync(
       { key: MIGRATION_KEY },
-      { $set: { value: { updated, ambiguousOrMissing, affectedRootIds, lastId } } }
+      { $set: { value: { scanned, updated, unresolved, lastId } } },
     );
-    deps.serverConsole('[TDF identity migration] progress', { updated, ambiguousOrMissing });
+    deps.serverConsole('[TDF identity migration v2] progress', { scanned, updated, unresolved });
   }
 
-  if (processedThisRun >= MAX_ROOTS_PER_STARTUP) {
-    const paused = { updated, ambiguousOrMissing, affectedRootIds, lastId };
-    deps.serverConsole('[TDF identity migration] paused at startup bound', {
-      processedThisRun,
-      updated,
-      ambiguousOrMissing,
-    });
+  if (!reachedEnd) {
+    const paused = { scanned, updated, unresolved, lastId };
+    await deps.DynamicSettings.upsertAsync({ key: MIGRATION_KEY }, { $set: { value: paused } });
+    deps.serverConsole('[TDF identity migration v2] incomplete', paused);
     return paused;
   }
 
-  const completed = {
-    completedAt: new Date().toISOString(),
-    updated,
-    ambiguousOrMissing,
-    affectedRootIds,
-  };
+  const completed = { completedAt: new Date().toISOString(), scanned, updated, unresolved, lastId: null };
   await deps.DynamicSettings.upsertAsync({ key: MIGRATION_KEY }, { $set: { value: completed } });
-  deps.serverConsole('[TDF identity migration] complete', { updated, ambiguousOrMissing });
+  deps.serverConsole('[TDF identity migration v2] complete', completed);
   return completed;
 }
 

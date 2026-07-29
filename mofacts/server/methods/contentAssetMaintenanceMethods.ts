@@ -195,7 +195,7 @@ async function cleanupOrphanDynamicAssets(
       if (!hasActiveTdf) {
         reason = 'noActiveTdfForStimuliSetId';
       }
-    } else if (['zip', 'apkg', 'h5p'].includes(assetExtension(asset))) {
+    } else if (['zip', 'apkg'].includes(assetExtension(asset))) {
       const hasActivePackageReference = packageReferenceCandidates(asset)
         .some((candidate) => activePackageReferences.has(candidate));
       if (!hasActivePackageReference) {
@@ -253,7 +253,11 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
       return await cleanupOrphanDynamicAssets(deps, options || {});
     },
 
-    deletePackageFile: async function(this: MethodContext, packageAssetIdInput: string) {
+    deletePackageFile: async function(
+      this: MethodContext,
+      packageAssetIdInput: string,
+      confirmation: { wholeFamily?: boolean } = {},
+    ) {
       deps.serverConsole('Remove package asset:', packageAssetIdInput);
       const userId = this.userId;
       if (!userId) {
@@ -261,6 +265,9 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
       }
       if (!packageAssetIdInput || typeof packageAssetIdInput !== 'string') {
         throw new Meteor.Error(400, 'Package id missing');
+      }
+      if (confirmation?.wholeFamily !== true) {
+        throw new Meteor.Error('whole-family-confirmation-required', 'Confirm deletion of the complete lesson family.');
       }
 
       try {
@@ -287,13 +294,37 @@ export function createContentAssetMaintenanceMethods(deps: ContentAssetMaintenan
               { packageFile: { $in: Array.from(packageFileCandidates) } },
             ],
           },
-          { fields: { _id: 1, ownerId: 1, stimuliSetId: 1, stimuli: 1 } }
+          { fields: {
+            _id: 1,
+            ownerId: 1,
+            stimuliSetId: 1,
+            stimuli: 1,
+            'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+          } }
         ).fetchAsync();
 
         deps.serverConsole('Found', matchingTdfs.length, 'TDFs for package asset:', packageAssetId);
 
         if (!isAdmin && matchingTdfs.some((tdf: { ownerId?: string }) => tdf.ownerId !== userId)) {
           throw new Meteor.Error(403, 'Can only delete your own packages');
+        }
+
+        const familyIds = matchingTdfs.map((tdf: TdfLike) => String(tdf._id || '')).filter(Boolean);
+        const externalParents = familyIds.length > 0
+          ? await deps.Tdfs.find(
+              {
+                _id: { $nin: familyIds },
+                'content.tdfs.tutor.setspec.conditionTdfIds': { $in: familyIds },
+              },
+              { fields: { _id: 1 } },
+            ).fetchAsync()
+          : [];
+        const missingMembers = matchingTdfs.flatMap((tdf: any) => {
+          const childIds = tdf?.content?.tdfs?.tutor?.setspec?.conditionTdfIds;
+          return Array.isArray(childIds) ? childIds.filter((id: unknown) => !familyIds.includes(String(id))) : [];
+        });
+        if (externalParents.length > 0 || missingMembers.length > 0) {
+          throw new Meteor.Error('partial-family-deletion-forbidden', 'The selected package is not a complete, isolated lesson family.');
         }
 
         const assetsToCheck = new Set();

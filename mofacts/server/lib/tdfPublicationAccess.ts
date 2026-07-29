@@ -273,7 +273,8 @@ export function createTdfPublicationAccessResolver(
             {
                 fields: {
                     stimuliSetId: 1,
-                    'content.tdfs.tutor.setspec.condition': 1
+                    'content.tdfs.tutor.setspec.condition': 1,
+                    'content.tdfs.tutor.setspec.conditionTdfIds': 1
                 }
             }
         ).fetchAsync();

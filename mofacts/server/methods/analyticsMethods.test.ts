@@ -130,7 +130,6 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
     assertUserOwnsTdfs: async () => true,
     canDownloadOwnedTdfData: () => false,
     getTdfByFileName: async () => null,
-    resolveConditionTdfIds: async () => [],
     getClassPerformanceByTdfWorkflow: async () => ({}),
     getStimuliSetById: async () => [],
     hasMeaningfulProgressSignal: () => false,
@@ -151,11 +150,14 @@ describe('analyticsMethods', function() {
       Tdfs: {
         find: (selector: Record<string, any>) => ({
           fetchAsync: async () => {
-            const refs = selector.$or
+            const refs = [
+              ...(selector._id?.$in || []),
+              ...(selector.$or
               ?.flatMap((term: Record<string, any>) => [
                 ...(term._id?.$in || []),
                 ...(term['content.fileName']?.$in || []),
-              ]) || [];
+              ]) || []),
+            ];
             return refs.includes('child.json') || refs.includes('child-tdf')
               ? [{ _id: 'child-tdf', content: { fileName: 'child.json' } }]
               : [];
@@ -171,6 +173,7 @@ describe('analyticsMethods', function() {
                 tdfs: {
                   tutor: {
                     setspec: {
+                      condition: ['child.json'],
                       conditionTdfIds: ['child-tdf'],
                     },
                   },
@@ -189,10 +192,60 @@ describe('analyticsMethods', function() {
         },
         updateAsync: async () => true,
       },
-      resolveConditionTdfIds: async () => ['child-tdf'],
       ...overrides,
     });
   }
+
+  it('replaces stale condition-scoped control state for an explicit fresh condition launch', async function() {
+    let updateModifier: Record<string, any> | null = null;
+    const { deps } = createAssignedRootDeps({
+      GlobalExperimentStates: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async () => ({
+          _id: 'state-1',
+          userId: 'learner-1',
+          TDFId: 'root-tdf',
+          experimentState: {
+            currentRootTdfId: 'root-tdf',
+            currentTdfId: 'old-child-tdf',
+            conditionTdfId: 'old-child-tdf',
+            clusterMapping: [0, 1],
+            mappingSignature: 'old-signature',
+            schedule: { q: [0, 1] },
+            scheduleUnitNumber: 0,
+          },
+        }),
+        updateAsync: async (_selector: Record<string, unknown>, modifier: Record<string, any>) => {
+          updateModifier = modifier;
+          return true;
+        },
+        insertAsync: async () => 'state-id',
+      },
+    });
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    const result = await methods.createExperimentState.call(
+      { userId: 'learner-1' },
+      {
+        currentRootTdfId: 'root-tdf',
+        currentTdfId: 'child-tdf',
+        conditionTdfId: 'child-tdf',
+      },
+      { replaceExistingState: true },
+    );
+
+    const persistedExperimentState = (updateModifier as Record<string, any> | null)?.$set?.experimentState;
+    expect(persistedExperimentState).to.deep.equal({
+      currentRootTdfId: 'root-tdf',
+      currentTdfId: 'child-tdf',
+      conditionTdfId: 'child-tdf',
+    });
+    expect(result).to.include({
+      id: 'state-1',
+      currentTdfId: 'child-tdf',
+      conditionTdfId: 'child-tdf',
+    });
+  });
 
   it('insertHistory invokes the dashboard summary hook after durable history insert', async function() {
     const hookRecords: Record<string, unknown>[] = [];
@@ -422,11 +475,14 @@ describe('analyticsMethods', function() {
       Tdfs: {
         find: (selector: Record<string, any>) => ({
           fetchAsync: async () => {
-            const refs = selector.$or
+            const refs = [
+              ...(selector._id?.$in || []),
+              ...(selector.$or
               ?.flatMap((term: Record<string, any>) => [
                 ...(term._id?.$in || []),
                 ...(term['content.fileName']?.$in || []),
-              ]) || [];
+              ]) || []),
+            ];
             return refs.includes('child.json') || refs.includes('child-tdf')
               ? [{ _id: 'child-tdf', content: { fileName: 'child.json' } }]
               : [];
@@ -441,6 +497,7 @@ describe('analyticsMethods', function() {
                   tutor: {
                     setspec: {
                       condition: ['child.json'],
+                      conditionTdfIds: ['child-tdf'],
                     },
                   },
                 },
@@ -466,7 +523,6 @@ describe('analyticsMethods', function() {
       Courses: {
         find: () => ({ fetchAsync: async () => [{ _id: 'course-1', visibility: 'public' }] }),
       },
-      resolveConditionTdfIds: async () => ['child-tdf'],
     });
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
 

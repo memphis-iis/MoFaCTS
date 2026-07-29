@@ -1,7 +1,6 @@
 // Owner: Learning Runtime Team
 // Shared service contracts for content-surface initialization and resume flows.
 
-import type { H5PTrialResult } from './h5p';
 import type { SparcTrialResult } from '../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
 
 export type SparcControllerResult = SparcTrialResult;
@@ -268,7 +267,6 @@ export interface HistoryLoggingContext {
   reviewEntry?: string;
   feedbackText?: string;
   feedbackSuppressed?: boolean;
-  h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcControllerResult | null;
 }
 

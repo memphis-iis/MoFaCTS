@@ -1,5 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import type { createStorageBoundary } from './storageBoundary';
+import {
+  assertConditionFilenameIdAlignment,
+  validateConditionFamilyTutor,
+} from '../../common/lib/tdfIdentityContract';
 
 const fs = require('fs');
 const path = require('path');
@@ -32,7 +36,6 @@ type BuildAndStoreCurrentPackageAssetDeps = {
   }) => Promise<any[]>;
   normalizeCanonicalId: (value: unknown) => string | null;
   decryptData: (value: string) => string;
-  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
   DynamicAssets: {
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<DynamicAssetRef | null>;
     writeAsync: (data: Buffer, options: Record<string, unknown>) => Promise<DynamicAssetRef>;
@@ -269,35 +272,13 @@ async function resolvePackageExportMemberTdfs(rootTdfId: string, deps: BuildAndS
     throw new Meteor.Error(404, 'TDF not found');
   }
 
-  const rootSetspec = rootTdf.content?.tdfs?.tutor?.setspec || {};
-  const rawConditions = Array.isArray(rootSetspec.condition) ? rootSetspec.condition : [];
-  const hasCanonicalConditionIds = Array.isArray(rootSetspec.conditionTdfIds)
-    && rootSetspec.conditionTdfIds.length > 0;
-  let conditionIds = hasCanonicalConditionIds
-    ? rootSetspec.conditionTdfIds.map((id: unknown) => deps.normalizeCanonicalId(id))
-    : [];
-
-  if (hasCanonicalConditionIds && conditionIds.length !== rawConditions.length) {
-    throw new Meteor.Error(409, 'Current package has inconsistent condition and conditionTdfIds lengths.');
+  const familyValidation = validateConditionFamilyTutor(rootTdf.content?.tdfs?.tutor, {
+    requireCanonicalIds: true,
+  });
+  if (familyValidation.errors.length > 0) {
+    throw new Meteor.Error('tdf-identity-repair-required', 'This lesson package requires an identity repair before export.');
   }
-  if (!hasCanonicalConditionIds && rawConditions.length > 0) {
-    conditionIds = await deps.resolveConditionTdfIds(rootSetspec);
-  }
-
-  const missingConditions = rawConditions
-    .map((condition: unknown, index: number) => ({
-      condition: typeof condition === 'string' ? condition.trim() : '',
-      resolvedId: conditionIds[index]
-    }))
-    .filter((entry: { condition: string; resolvedId: string | null | undefined }) => entry.condition && !entry.resolvedId)
-    .map((entry: { condition: string }) => entry.condition);
-
-  if (missingConditions.length > 0) {
-    throw new Meteor.Error(
-      409,
-      `Current package is missing one or more condition TDFs: ${missingConditions.join(', ')}`
-    );
-  }
+  const conditionIds = familyValidation.conditionTdfIds;
 
   const memberIds = [
     rootTdfId,
@@ -319,10 +300,27 @@ async function resolvePackageExportMemberTdfs(rootTdfId: string, deps: BuildAndS
 
   const missingMemberIds = memberIds.filter((memberId) => !docsById.has(memberId));
   if (missingMemberIds.length > 0) {
-    throw new Meteor.Error(
-      404,
-      `Current package is missing one or more TDF records: ${missingMemberIds.join(', ')}`
-    );
+    throw new Meteor.Error('tdf-identity-repair-required', 'This lesson package requires an identity repair before export.');
+  }
+
+  const rootOwnerId = deps.normalizeCanonicalId(rootTdf.ownerId);
+  const childFileNameById = new Map<string, string>();
+  for (const childId of conditionIds) {
+    const child = docsById.get(childId);
+    const childOwnerId = deps.normalizeCanonicalId(child?.ownerId);
+    const childFileName = typeof child?.content?.fileName === 'string' ? child.content.fileName.trim() : '';
+    if (!rootOwnerId || childOwnerId !== rootOwnerId || !childFileName) {
+      throw new Meteor.Error('tdf-identity-repair-required', 'This lesson package requires an identity repair before export.');
+    }
+    childFileNameById.set(childId, childFileName);
+  }
+  const alignmentErrors = assertConditionFilenameIdAlignment(
+    familyValidation.conditionFileNames,
+    conditionIds,
+    childFileNameById,
+  );
+  if (alignmentErrors.length > 0) {
+    throw new Meteor.Error('tdf-identity-repair-required', 'This lesson package requires an identity repair before export.');
   }
 
   return memberIds.map((memberId) => docsById.get(memberId));
@@ -727,7 +725,7 @@ async function buildAndStorePreparedPackageAsset(
   if (preparedState.memberIds.length > 0) {
     await deps.Tdfs.updateAsync(
       { _id: { $in: preparedState.memberIds } },
-      { $set: { packageFile, packageAssetId } },
+      { $set: { packageFile, packageAssetId }, $inc: { tdfRevision: 1 } },
       { multi: true }
     );
   }

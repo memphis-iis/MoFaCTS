@@ -58,7 +58,7 @@ export function createAnalyticsConditionCountMethods(
         { currentTdfId: normalizedTdfId },
         'methods.updateTdfConditionCounts'
       );
-      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts } });
+      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $inc: { tdfRevision: 1 } });
     },
 
     incrementTdfConditionCount: async function(this: MethodContext, TDFId: string, conditionIndex: number) {
@@ -95,7 +95,7 @@ export function createAnalyticsConditionCountMethods(
       );
       await deps.Tdfs.updateAsync(
         { _id: normalizedTdfId },
-        { $inc: { [`conditionCounts.${conditionIndex}`]: 1 } }
+        { $inc: { [`conditionCounts.${conditionIndex}`]: 1, tdfRevision: 1 } }
       );
     },
 
@@ -121,7 +121,7 @@ export function createAnalyticsConditionCountMethods(
       const setspec = tdf?.content?.tdfs?.tutor?.setspec;
       const conditions = Array.isArray(setspec?.condition) ? setspec.condition : [];
       const conditionCounts = new Array(conditions.length).fill(0);
-      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts } });
+      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $inc: { tdfRevision: 1 } });
     },
   };
 }

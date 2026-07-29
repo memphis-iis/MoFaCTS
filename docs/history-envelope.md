@@ -1,6 +1,8 @@
 # Canonical History Envelope
 
-MoFaCTS history rows share one canonical envelope across standard cards, instructions, video sessions, H5P interactions, and AutoTutor turns. Components may add bounded extension fields, but they must write through the app-owned history path so persistence, authorization, compression, and export behavior stay integrated.
+MoFaCTS history rows share one canonical envelope across standard cards, instructions, video sessions, and AutoTutor turns. Components may add bounded extension fields, but they must write through the app-owned history path so persistence, authorization, compression, and export behavior stay integrated.
+
+Historical H5P extension fields remain readable and exportable so durable learner histories are preserved. H5P is not an active authoring or runtime capability, and no new H5P history rows are written.
 
 ## Schema Version
 
@@ -42,7 +44,7 @@ Current event-type vocabulary:
 - `''`: standard card response rows.
 - `instruct`: instruction-continue rows.
 - `video`: video-session interaction rows.
-- `h5p`: H5P summary and part rows.
+- `h5p`: read-only historical H5P summary and part rows.
 - `autotutor-turn`: AutoTutor learner/tutor turn rows.
 - `sparc`: SPARC document events, practice observations, replayable state
   transitions, and model-trace steps.
@@ -54,7 +56,7 @@ New event types must be stable, documented here, added to `HISTORY_EVENT_TYPES` 
 Known component extension fields:
 
 - `CFNote`: compact component note payload, currently used by AutoTutor saved state.
-- `h5p`: compact H5P summary or part-event payload.
+- `h5p`: compact historical H5P summary or part-event payload retained for reads and exports.
 - `sparc`: compact SPARC event payload for document addresses, practice
   observations, state transitions, and runtime trace steps.
 
@@ -86,7 +88,7 @@ agree.
 
 Components must not call `insertHistory` directly. They emit canonical history through the app-owned helper/runtime capability:
 
-- Standard cards and H5P rows: `historyLogging.ts`.
+- Standard cards: `historyLogging.ts`.
 - Instructions: instruction history writer.
 - Video-session events: shared compressed-history client helper.
 - AutoTutor: `AutoTutorHistoryRuntime.writeCanonicalHistory`.

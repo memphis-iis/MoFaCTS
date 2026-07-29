@@ -75,7 +75,6 @@ type AnalyticsMethodsDeps = {
   assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
   canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
   getTdfByFileName: (filename: string) => Promise<any>;
-  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
   getClassPerformanceByTdfWorkflow: (
     classId: string,
     tdfId: string,
@@ -188,20 +187,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!rootTdf) {
       return false;
     }
-    const setspec = rootTdf.content?.tdfs?.tutor?.setspec;
     const childIds = new Set(
       (await lessonFamilies.resolveConditionChildIdsForRoots([rootTdf]))
         .map((id) => deps.normalizeCanonicalId(id))
         .filter((id): id is string => typeof id === 'string')
     );
-    if (!Array.isArray(setspec?.conditionTdfIds) || setspec.conditionTdfIds.length === 0) {
-      for (const conditionId of await deps.resolveConditionTdfIds(setspec)) {
-        const normalizedConditionId = deps.normalizeCanonicalId(conditionId);
-        if (normalizedConditionId) {
-          childIds.add(normalizedConditionId);
-        }
-      }
-    }
     return childIds.has(historyTdfId);
   }
 
@@ -454,7 +444,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   async function createExperimentState(
     this: MethodContext | undefined,
     curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
-    actorUserId: string | null = null
+    actorUserId: string | null = null,
+    options: { replaceExistingState?: boolean } = {},
   ) {
     const resolvedUserId = actorUserId || this?.userId || Meteor.userId();
     const rootTdfId = deps.normalizeCanonicalId((curExperimentState as any)?.currentRootTdfId)
@@ -476,7 +467,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     });
 
     if (existingDoc?._id) {
-      const nextExperimentState = Object.assign({}, existingDoc.experimentState || {}, curExperimentState);
+      const nextExperimentState = options.replaceExistingState
+        ? Object.assign({}, curExperimentState)
+        : Object.assign({}, existingDoc.experimentState || {}, curExperimentState);
       await deps.GlobalExperimentStates.updateAsync(
         { _id: existingDoc._id },
         { $set: { experimentState: nextExperimentState } }
@@ -505,7 +498,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         throw error;
       }
 
-      const nextExperimentState = Object.assign({}, concurrentDoc.experimentState || {}, curExperimentState);
+      const nextExperimentState = options.replaceExistingState
+        ? Object.assign({}, curExperimentState)
+        : Object.assign({}, concurrentDoc.experimentState || {}, curExperimentState);
       await deps.GlobalExperimentStates.updateAsync(
         { _id: concurrentDoc._id },
         { $set: { experimentState: nextExperimentState } }
@@ -1500,9 +1495,19 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   return {
     createExperimentState: async function(
       this: MethodContext,
-      curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string }
+      curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
+      options: { replaceExistingState?: boolean } = {},
     ) {
-      return await createExperimentState.call(this, curExperimentState, this.userId || null);
+      if (
+        options === null
+        || typeof options !== 'object'
+        || Array.isArray(options)
+        || Object.keys(options).some((key) => key !== 'replaceExistingState')
+        || (options.replaceExistingState !== undefined && typeof options.replaceExistingState !== 'boolean')
+      ) {
+        throw new Meteor.Error(400, 'Invalid experiment state write options');
+      }
+      return await createExperimentState.call(this, curExperimentState, this.userId || null, options);
     },
     getClassPerformanceByTDF,
     getStudentPerformanceByIdAndTDFIdFromHistory: async function(

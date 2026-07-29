@@ -217,7 +217,7 @@ export function createTdfSchemaFromRegistry(): Record<string, unknown> {
       tutor: {
         type: 'object',
         title: 'Tutor',
-        required: ['setspec', 'unit'],
+        required: ['setspec'],
         additionalProperties: false,
         properties: {
           setspec: createSetspecSchema(),
@@ -228,6 +228,22 @@ export function createTdfSchemaFromRegistry(): Record<string, unknown> {
           },
           deliverySettings: tutorDeliverySettingsSchema,
         },
+        allOf: [{
+          if: {
+            properties: {
+              setspec: { required: ['condition'] },
+            },
+          },
+          then: {
+            not: { required: ['unit'] },
+          },
+          else: {
+            required: ['unit'],
+            properties: {
+              unit: { minItems: 1 },
+            },
+          },
+        }],
       },
     },
   };

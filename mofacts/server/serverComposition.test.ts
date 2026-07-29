@@ -430,6 +430,7 @@ describe('public TDF and stimulus method authorization', function() {
             setspec: {
               lessonname: 'Assigned Condition Root',
               userselect: 'true',
+              condition: ['AssignedConditionChild.json'],
               conditionTdfIds: ['assigned-condition-child'],
             },
           },
@@ -487,6 +488,7 @@ describe('public TDF and stimulus method authorization', function() {
             setspec: {
               lessonname: 'Assigned Condition Context Root',
               userselect: 'false',
+              condition: ['AssignedConditionContextChild.json'],
               conditionTdfIds: ['assigned-condition-context-child'],
             },
           },
@@ -1002,6 +1004,7 @@ describe('public TDF and stimulus method authorization', function() {
     await TdfsAny.insertAsync({
       _id: 'experiment-root',
       ownerId: 'owner-user',
+      tdfAvailability: 'available',
       stimuliSetId: 106,
       stimuli: [{ stimulusKC: 4 }],
       rawStimuliFile: { setspec: { clusters: [{ stims: [] }] } },
@@ -1018,14 +1021,24 @@ describe('public TDF and stimulus method authorization', function() {
               speechAPIKey: 'encrypted-speech-key',
               textToSpeechAPIKey: 'encrypted-tts-key',
               condition: ['condition-a.json'],
+              conditionTdfIds: ['experiment-condition-a'],
             },
             deliverySettings: {
               experimentLoginText: 'Participant ID',
               privateAdminNote: 'do not expose',
             },
-            unit: [{ unitname: 'private unit' }],
           },
         },
+      },
+    });
+
+    await TdfsAny.insertAsync({
+      _id: 'experiment-condition-a',
+      ownerId: 'owner-user',
+      tdfAvailability: 'available',
+      content: {
+        fileName: 'condition-a.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Experiment Condition A' }, unit: [{}] } },
       },
     });
 
@@ -1048,6 +1061,7 @@ describe('public TDF and stimulus method authorization', function() {
     await TdfsAny.insertAsync({
       _id: 'owned-experiment-root',
       ownerId: 'owner-user',
+      tdfAvailability: 'available',
       stimuliSetId: 107,
       content: {
         fileName: 'owned-experiment-root.json',
@@ -1116,13 +1130,14 @@ describe('editor save shape preservation methods', function() {
         tutor: {
           setspec: {
             lessonname: 'Condition Root',
-            condition: ['condition-a.json', 'condition-b.json'],
+            condition: ['forged.json'],
+            conditionTdfIds: ['foreign-child'],
             loadbalancing: 'max',
           },
           unit: [],
         },
       },
-    }, {});
+    }, {}, ['setspec.condition', 'setspec.conditionTdfIds']);
 
     const updated = await TdfsAny.findOneAsync({ _id: 'condition-root-save' });
     expect(updated.content.fileName).to.equal('condition-root.json');
@@ -1187,6 +1202,7 @@ describe('editor save shape preservation methods', function() {
             deliverySettings: {
               experimentLoginText: 'Keep login prompt',
             },
+            unit: [{}],
           },
         },
       },
@@ -1777,14 +1793,13 @@ describe('learner analytics method authorization', function() {
       ownerId: 'current-user',
       content: {
         fileName: 'state-tdf.json',
-        tdfs: { tutor: { setspec: { lessonname: 'State TDF', userselect: 'false' } } },
+        tdfs: { tutor: { setspec: { lessonname: 'State TDF', userselect: 'false' }, unit: [{}] } },
       },
     });
 
     await (asyncMethods.createExperimentState as any).call(
       { userId: 'current-user' },
       { currentTdfId: 'state-tdf', currentRootTdfId: 'state-tdf' },
-      'other-user'
     );
 
     expect(await GlobalExperimentStatesAny.findOneAsync({ userId: 'other-user' })).to.equal(undefined);
@@ -2436,68 +2451,9 @@ describe('content helper authorization', function() {
     }
   });
 
-  it('denies manual content upload helper calls by non-teachers', async function() {
-    try {
-      await (asyncMethods.saveContentFile as any).call(
-        { userId: 'student-user' },
-        'tdf',
-        'lesson.json',
-        { tutor: { setspec: { lessonname: 'Lesson', stimulusfile: 'stim.json' }, unit: [] } },
-        'student-user'
-      );
-      expect.fail('Expected non-teacher content save to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
-
-  it('requires authentication before confirming TDF updates', async function() {
-    try {
-      await (asyncMethods.tdfUpdateConfirmed as any).call({}, { _id: 'tdf-update', ownerId: 'owner-user' });
-      expect.fail('Expected anonymous TDF update confirmation to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(401);
-    }
-  });
-
-  it('preserves srfilterclose when confirming an uploaded TDF overwrite', async function() {
-    await TdfsAny.insertAsync({
-      _id: 'tdf-update',
-      ownerId: 'owner-user',
-      content: {
-        fileName: 'lesson.json',
-        tdfs: {
-          tutor: {
-            setspec: {
-              lessonname: 'Old Lesson',
-              stimulusfile: 'old-stim.json',
-            },
-            unit: [],
-          },
-        },
-      },
-    });
-
-    await (asyncMethods.tdfUpdateConfirmed as any).call({ userId: 'owner-user' }, {
-      _id: 'tdf-update',
-      ownerId: 'owner-user',
-      content: {
-        fileName: 'lesson.json',
-        tdfs: {
-          tutor: {
-            setspec: {
-              lessonname: 'Updated Lesson',
-              stimulusfile: 'stim.json',
-              srfilterclose: 'false',
-            },
-            unit: [],
-          },
-        },
-      },
-    });
-
-    const updated = await TdfsAny.findOneAsync({ _id: 'tdf-update' });
-    expect(updated.content.tdfs.tutor.setspec.srfilterclose).to.equal('false');
+  it('does not expose retired raw content save or fingerprint confirmation methods', function() {
+    expect(asyncMethods).not.to.have.property('saveContentFile');
+    expect(asyncMethods).not.to.have.property('tdfUpdateConfirmed');
   });
 });
 

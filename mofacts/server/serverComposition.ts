@@ -29,7 +29,7 @@ if (typeof underscoreAny.display !== 'function') {
   };
 }
 import { applyMeteorSettingsWorkaround } from './startup/meteorSettingsWorkaround';
-import { BackupJobs } from '../common/Collections';
+import { BackupJobs, TdfMutationJobs } from '../common/Collections';
 import { runServerStartup } from './startup/serverStartup';
 import { createStorageBoundary } from './lib/storageBoundary';
 import { createRedisBoundary } from './lib/redisBoundary';
@@ -52,6 +52,7 @@ import { createDeploymentReadinessMethods } from './methods/deploymentReadinessM
 import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
 import { createExperimentMethods } from './methods/experimentMethods';
+import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
 import { createPackageMethods } from './methods/packageMethods';
 import {
   createOpenRouterCatalogMethods,
@@ -402,10 +403,10 @@ const {
 
 const packageMethods = createPackageMethods({
   Tdfs,
+  TdfMutationJobs,
   usersCollection: MeteorAny.users,
   DynamicAssets,
   ManualContentDrafts,
-  H5PContents,
   storageBoundary,
   UserUploadQuota,
   AuditLog,
@@ -445,15 +446,13 @@ const {
   getResponseKCMapForTdf,
   processPackageUpload,
   confirmPackageUpload,
+  cancelPackageUpload,
   saveAiGeneratedPackageContent,
-  saveContentFile,
-  tdfUpdateConfirmed,
   saveTdfStimuli,
   saveTdfContent,
   copyTdf,
   upsertStimFile,
-  upsertTDFFile,
-  resolveConditionTdfIds,
+  importPrivateRepoTdfBatch,
   normalizeOptionalString,
 } = packageMethods;
 
@@ -510,7 +509,6 @@ const analyticsMethods = createAnalyticsMethods({
   assertUserOwnsTdfs,
   canDownloadOwnedTdfData,
   getTdfByFileName,
-  resolveConditionTdfIds,
   getClassPerformanceByTdfWorkflow,
   getStimuliSetById,
   hasMeaningfulProgressSignal,
@@ -544,6 +542,8 @@ const openRouterModelCatalogService = createOpenRouterModelCatalogService({
   serverConsole,
 });
 
+export const resolveExperimentTargetFamily = createExperimentTargetFamilyResolver({ Tdfs });
+
 const experimentMethods = createExperimentMethods({
   serverConsole,
   Tdfs,
@@ -555,6 +555,7 @@ const experimentMethods = createExperimentMethods({
   withSignUpLock,
   createUserWithRetry,
   writeAuditLog,
+  resolveExperimentTargetFamily,
 });
 const {
   getTdfByExperimentTarget: getTdfByExperimentTargetRaw,
@@ -651,7 +652,6 @@ export const methods: any = {
     exactCaseInsensitiveRegex,
     isValidEmailAddress,
     normalizeCanonicalId,
-    resolveConditionTdfIds,
   }),
 
   ...createAdminMethods({
@@ -740,7 +740,6 @@ export const methods: any = {
     isPlainRecord,
     cloneJsonLike,
     normalizeCanonicalId,
-    getTdfsByFileNameOrId,
     canAccessContentUploadTdf,
     getOrBuildCurrentPackageAsset,
     storageBoundary,
@@ -754,7 +753,6 @@ export const methods: any = {
     rebuildStimDisplayTypeMapSnapshot,
     getStimDisplayTypeMapDeps,
     getMethodAuthorizationDeps,
-    resolveConditionTdfIds,
   }),
 
   ...createThemeMethods({
@@ -883,6 +881,7 @@ async function persistAutoTutorExpectationRelationships(
       rawStimuliFile,
       stimuli,
     },
+    $inc: { tdfRevision: 1 },
   });
   if (accessibleTdf.stimuliSetId !== undefined && accessibleTdf.stimuliSetId !== null) {
     await updateStimDisplayTypeMap([accessibleTdf.stimuliSetId]);
@@ -1065,14 +1064,14 @@ export const asyncMethods: Record<string, unknown> = {
   getStimuliSetById: getStimuliSetByIdPublic,
   updateStimDisplayTypeMap: updateStimDisplayTypeMapPublic,
 
-  saveContentFile,
   saveAiGeneratedPackageContent,
 
   getResponseKCMapForTdf: getResponseKCMapForTdfPublic,
   processPackageUpload,
   confirmPackageUpload,
+  cancelPackageUpload,
 
-  tdfUpdateConfirmed, saveTdfStimuli, saveTdfContent,
+  saveTdfStimuli, saveTdfContent,
   persistAutoTutorExpectationRelationships,
   copyTdf,
 
@@ -1132,6 +1131,7 @@ Meteor.startup(async function() {
     CourseLearnerSnapshotCache,
     usersCollection: MeteorAny.users,
     ManualContentDrafts,
+    TdfMutationJobs,
     DynamicAssets,
     ScheduledTurkMessages,
     AuthThrottleState: AuthThrottleStateAny,
@@ -1141,7 +1141,7 @@ Meteor.startup(async function() {
     AssetsAny,
     updateActiveThemeDocument,
     upsertStimFile,
-    upsertTDFFile,
+    importPrivateRepoTdfBatch,
     updateStimDisplayTypeMap,
     sendErrorReportSummaries,
     sendEmail,

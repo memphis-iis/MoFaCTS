@@ -72,18 +72,22 @@ export function collectLessonFamilyRefs(rootTdfs: any[]): LessonFamilyRefSets {
   const conditionFileNames = new Set<string>();
   const conditionTdfIds = new Set<string>();
   for (const rootTdf of rootTdfs) {
-    const setspec = getLessonFamilySetspec(rootTdf);
-    const canonicalIds = normalizeLessonFamilyRefs(setspec.conditionTdfIds);
-    if (canonicalIds.length > 0) {
-      addAll(conditionTdfIds, canonicalIds);
-    } else {
-      addAll(conditionFileNames, normalizeLessonFamilyRefs(setspec.condition));
+    const validation = validateConditionFamilyTutor(rootTdf?.content?.tdfs?.tutor, {
+      requireCanonicalIds: true,
+    });
+    if (validation.isConditionRoot && validation.errors.length > 0) {
+      throw new Meteor.Error(
+        'tdf-identity-repair-required',
+        'This lesson family requires an identity repair before it can be used.',
+      );
     }
+    addAll(conditionFileNames, validation.conditionFileNames);
+    addAll(conditionTdfIds, validation.conditionTdfIds);
   }
   return {
     conditionFileNames: Array.from(conditionFileNames),
     conditionTdfIds: Array.from(conditionTdfIds),
-    childLookupRefs: Array.from(new Set([...conditionFileNames, ...conditionTdfIds])),
+    childLookupRefs: Array.from(conditionTdfIds),
   };
 }
 
@@ -91,49 +95,23 @@ export function buildConditionChildSelector(
   conditionFileNames: string[],
   conditionTdfIds: string[] = []
 ): LessonFamilySelector | null {
-  const fileNames = normalizeLessonFamilyRefs(conditionFileNames);
   const tdfIds = normalizeLessonFamilyRefs(conditionTdfIds);
-  const terms: LessonFamilySelector[] = [];
-  if (tdfIds.length > 0) terms.push({ _id: { $in: tdfIds } });
-  if (fileNames.length > 0) terms.push({ 'content.fileName': { $in: fileNames } });
-  if (terms.length === 0) {
-    return null;
-  }
-  return { $or: terms };
+  return tdfIds.length > 0 ? { _id: { $in: tdfIds } } : null;
 }
 
 export function buildParentRootSelector(
   childRefs: string[],
   childTdfIds: string[] = childRefs
 ): LessonFamilySelector | null {
-  const normalizedChildRefs = normalizeLessonFamilyRefs(childRefs);
   const normalizedChildTdfIds = normalizeLessonFamilyRefs(childTdfIds);
-  const terms: LessonFamilySelector[] = [];
-  if (normalizedChildRefs.length > 0) {
-    terms.push({
-      $and: [
-        { 'content.tdfs.tutor.setspec.condition': { $in: normalizedChildRefs } },
-        {
-          $or: [
-            { 'content.tdfs.tutor.setspec.conditionTdfIds': { $exists: false } },
-            { 'content.tdfs.tutor.setspec.conditionTdfIds': { $size: 0 } },
-          ],
-        },
-      ],
-    });
-  }
-  if (normalizedChildTdfIds.length > 0) {
-    terms.push({ 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: normalizedChildTdfIds } });
-  }
-  return terms.length > 0 ? { $or: terms } : null;
+  return normalizedChildTdfIds.length > 0
+    ? { 'content.tdfs.tutor.setspec.conditionTdfIds': { $in: normalizedChildTdfIds } }
+    : null;
 }
 
 export function buildConditionVisibilityTerms(rootTdfs: any[]): LessonFamilySelector[] {
   const refs = collectLessonFamilyRefs(rootTdfs);
   const terms: LessonFamilySelector[] = [];
-  if (refs.conditionFileNames.length > 0) {
-    terms.push({ 'content.fileName': { $in: refs.conditionFileNames } });
-  }
   if (refs.conditionTdfIds.length > 0) {
     terms.push({ _id: { $in: refs.conditionTdfIds } });
   }
@@ -157,13 +135,12 @@ export function createLessonFamilyResolver(deps: LessonFamilyResolverDeps) {
 
   async function findRootsForChildTdfs(childTdfs: any[], fields?: LessonFamilySelector) {
     const childTdfIds = normalizeLessonFamilyRefs(childTdfs.map((tdf) => tdf?._id));
-    const childFileNames = normalizeLessonFamilyRefs(childTdfs.map((tdf) => tdf?.content?.fileName));
     const params: {
       childRefs: string[];
       childTdfIds: string[];
       fields?: LessonFamilySelector;
     } = {
-      childRefs: Array.from(new Set([...childTdfIds, ...childFileNames])),
+      childRefs: childTdfIds,
       childTdfIds,
     };
     if (fields) {
@@ -218,9 +195,8 @@ export function createLessonFamilyResolver(deps: LessonFamilyResolverDeps) {
       return null;
     }
 
-    const targetFileName = normalizeLessonFamilyRef(target?.content?.fileName);
     const roots = await findRootsForChildRefs({
-      childRefs: targetFileName ? [normalizedTdfId, targetFileName] : [normalizedTdfId],
+      childRefs: [normalizedTdfId],
       childTdfIds: [normalizedTdfId],
       fields,
     });
@@ -233,9 +209,7 @@ export function createLessonFamilyResolver(deps: LessonFamilyResolverDeps) {
     const childByRef = new Map<string, any>();
     for (const child of childTdfs) {
       const childId = normalizeLessonFamilyRef(child?._id);
-      const fileName = normalizeLessonFamilyRef(child?.content?.fileName);
       if (childId) childByRef.set(childId, child);
-      if (fileName) childByRef.set(fileName, child);
     }
 
     const childToRootMap = new Map<string, string>();
@@ -249,9 +223,7 @@ export function createLessonFamilyResolver(deps: LessonFamilyResolverDeps) {
         childToRootMap.set(childRef, rootId);
         const child = childByRef.get(childRef);
         const childId = normalizeLessonFamilyRef(child?._id);
-        const fileName = normalizeLessonFamilyRef(child?.content?.fileName);
         if (childId) childToRootMap.set(childId, rootId);
-        if (fileName) childToRootMap.set(fileName, rootId);
       }
     }
     return childToRootMap;
@@ -267,3 +239,5 @@ export function createLessonFamilyResolver(deps: LessonFamilyResolverDeps) {
     buildChildToRootMap,
   };
 }
+import { Meteor } from 'meteor/meteor';
+import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';

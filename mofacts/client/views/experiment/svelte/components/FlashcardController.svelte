@@ -6,9 +6,7 @@
    */
   import { createEventDispatcher, tick } from 'svelte';
   import StimulusDisplay from './StimulusDisplay.svelte';
-  import H5PTrialSurface from './H5PTrialSurface.svelte';
   import TrialInteractionPane from './TrialInteractionPane.svelte';
-  import { resolveSelfHostedH5PTrialDisplay } from '../services/h5pTrialDisplay';
   import { clientConsole } from '../../../../lib/clientLogger';
   import { waitForBrowserPaint } from '../utils/paintTiming';
 
@@ -16,10 +14,6 @@
 
   function handleFeedbackContent(event) {
     dispatch('feedbackcontent', event.detail);
-  }
-
-  function handleH5PResult(event) {
-    dispatch('h5presult', event.detail);
   }
 
   /** @type {'top' | 'left'} Layout mode (top = over-under, left = split) */
@@ -149,10 +143,6 @@
   $: isSplitLayout = normalizedLayoutMode === 'left';
   $: isOverUnder = !isSplitLayout;
   $: isImageStimulus = Boolean(display?.imgSrc || display?.videoSrc);
-  $: isH5PStimulus = Boolean(display?.h5p);
-  $: selfHostedH5PTrialDisplay = resolveSelfHostedH5PTrialDisplay(display, '[FlashcardController]');
-  $: h5pOwnsInteraction = Boolean(selfHostedH5PTrialDisplay);
-  $: useH5POwnedSurface = h5pOwnsInteraction && displayVisible;
   $: requestedInteractionKind = feedbackVisible ? 'feedback' : (responseVisible ? 'response' : 'none');
 
   let interactionFadeElement;
@@ -336,51 +326,9 @@
   class:split={isSplitLayout}
   class:over-under={isOverUnder}
   class:image-stimulus={isImageStimulus}
-  class:h5p-stimulus={isH5PStimulus}
-  class:h5p-owned={h5pOwnsInteraction}
   class:non-image-stimulus={!isImageStimulus}
   data-subset-kind={subsetKind}
 >
-  {#if useH5POwnedSurface}
-    <div class="h5p-owned-main">
-      <div class="h5p-owned-surface">
-        <H5PTrialSurface
-          config={selfHostedH5PTrialDisplay.h5p}
-          {showQuestionNumber}
-          {questionNumber}
-          on:h5presult={handleH5PResult}
-        />
-      </div>
-
-      {#if requestedInteractionKind === 'feedback'}
-        <div class="interaction-container h5p-feedback-container">
-          <TrialInteractionPane
-            bind:fadeElement={interactionFadeElement}
-            {interactionVisible}
-            {mountedFeedbackVisible}
-            mountedResponseVisible={false}
-            {isCorrect}
-            {isTimeout}
-            {feedbackUserAnswer}
-            {correctAnswer}
-            {correctAnswerImageSrc}
-            {correctLabelText}
-            {incorrectLabelText}
-            {feedbackMessage}
-            {correctColor}
-            {incorrectColor}
-            {displayCorrectFeedback}
-            {displayIncorrectFeedback}
-            {displayUserAnswerInFeedback}
-            {feedbackLayout}
-            {displayCorrectAnswerInIncorrectFeedback}
-            on:feedbackcontent={handleFeedbackContent}
-            on:blockingassetstate
-          />
-        </div>
-      {/if}
-    </div>
-  {:else}
     <div class="trial-main">
       <div class="stimulus-container">
         <StimulusDisplay
@@ -392,7 +340,6 @@
           {replayEnabled}
           on:replay
           on:blockingassetstate
-          on:h5presult={handleH5PResult}
         />
       </div>
 
@@ -443,7 +390,6 @@
         />
       </div>
     </div>
-  {/if}
 </div>
 
 <style>

@@ -1,5 +1,6 @@
 import { resolveUnitEngineTypeForUnit } from '../views/experiment/engineConstructors';
 import { CARD_ENTRY_INTENT, type CardEntryIntent } from './cardEntryIntent';
+import { isConditionRootWithoutUnitArray } from './tdfUtils';
 import type { UnitType } from '../../common/types';
 
 type TdfUnitLike = Record<string, unknown>;
@@ -7,6 +8,9 @@ type TdfUnitLike = Record<string, unknown>;
 type TdfContentLike = {
   tdfs?: {
     tutor?: {
+      setspec?: {
+        condition?: unknown[];
+      };
       unit?: TdfUnitLike[];
     };
   };
@@ -39,6 +43,10 @@ export function resolveLessonLaunchEntryRoute(params: {
   intent: CardEntryIntent;
 }): LessonLaunchEntryRoute {
   if (params.intent !== CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY) {
+    return { route: '/content' };
+  }
+
+  if (isConditionRootWithoutUnitArray(params.content)) {
     return { route: '/content' };
   }
 

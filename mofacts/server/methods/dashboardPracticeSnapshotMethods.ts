@@ -21,6 +21,7 @@ import {
   resolveDashboardTdfFileName,
 } from './dashboardCacheShared';
 import { ADMIN_API_KEY_SETTINGS_KEY } from '../lib/apiKeyResolution';
+import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 
 type DashboardPracticeSnapshotDeps = {
   Meteor: any;
@@ -141,33 +142,20 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
         _id: 1,
         'content.fileName': 1,
         'content.tdfs.tutor.setspec.condition': 1,
-        'content.tdfs.tutor.setspec.conditionTdfIds': 1
+        'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+        tdfAvailability: 1,
       }
     }
   ).fetchAsync();
 
-  const conditionFileNames = new Set<string>();
   const conditionTdfIds = new Set<string>();
   for (const root of accessibleRoots) {
-    const setspec = root?.content?.tdfs?.tutor?.setspec || {};
-    const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
-    const resolvedIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-    const canonicalIds = resolvedIds
-      .map((conditionTdfId: unknown) => normalizeOptionalString(conditionTdfId))
-      .filter((conditionTdfId: string | null): conditionTdfId is string => !!conditionTdfId);
-    if (canonicalIds.length > 0) {
-      canonicalIds.forEach((conditionTdfId: string) => conditionTdfIds.add(conditionTdfId));
-    } else {
-      for (const condition of conditions) {
-        const normalized = normalizeOptionalString(condition);
-        if (normalized) conditionFileNames.add(normalized);
-      }
+    const validation = validateConditionFamilyTutor(root?.content?.tdfs?.tutor, { requireCanonicalIds: true });
+    if (validation.errors.length === 0) {
+      validation.conditionTdfIds.forEach((conditionTdfId: string) => conditionTdfIds.add(conditionTdfId));
     }
   }
 
-  if (conditionFileNames.size > 0) {
-    visibilityTerms.push({ 'content.fileName': { $in: Array.from(conditionFileNames) } });
-  }
   if (conditionTdfIds.size > 0) {
     visibilityTerms.push({ _id: { $in: Array.from(conditionTdfIds) } });
   }
@@ -355,7 +343,7 @@ function buildPracticeDashboardLesson(
     contentLanguage,
     recommendedUiLocales,
     translationStatus,
-    availability: 'available',
+    availability: tdf.tdfAvailability === 'repair-required' ? 'repair-required' : 'available',
     currentStimuliSetId: tdf.stimuliSetId ?? null,
     learnerConfig,
     completed: false,
@@ -396,31 +384,19 @@ export function createDashboardPracticeSnapshotMethods(deps: DashboardPracticeSn
         deps.UserDashboardCache.findOneAsync({ userId })
       ]);
 
-      const conditionChildFileNames = new Set<string>();
       const conditionChildIds = new Set<string>();
       for (const tdf of tdfs) {
-        const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
-        const conditions = Array.isArray(setspec.condition) ? setspec.condition : [];
-        const conditionTdfIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
-        const canonicalIds = conditionTdfIds
-          .map((conditionTdfId: unknown) => normalizeOptionalString(conditionTdfId))
-          .filter((conditionTdfId: string | null): conditionTdfId is string => !!conditionTdfId);
-        if (canonicalIds.length > 0) {
-          canonicalIds.forEach((conditionTdfId: string) => conditionChildIds.add(conditionTdfId));
-        } else {
-          for (const condition of conditions) {
-            const normalized = normalizeOptionalString(condition);
-            if (normalized) conditionChildFileNames.add(normalized);
-          }
+        const validation = validateConditionFamilyTutor(tdf?.content?.tdfs?.tutor, { requireCanonicalIds: true });
+        if (validation.errors.length === 0) {
+          validation.conditionTdfIds.forEach((conditionTdfId: string) => conditionChildIds.add(conditionTdfId));
         }
       }
 
       const lessons: PracticeDashboardSnapshotLesson[] = [];
       for (const tdf of tdfs) {
         const TDFId = normalizeOptionalString(tdf?._id);
-        const fileName = resolveDashboardTdfFileName(tdf);
         if (!TDFId) continue;
-        if (conditionChildIds.has(TDFId) || (fileName && conditionChildFileNames.has(fileName))) {
+        if (conditionChildIds.has(TDFId)) {
           continue;
         }
         const lesson = buildPracticeDashboardLesson(

@@ -41,7 +41,18 @@ export type UploadedMediaRecord = {
   _id?: string;
   name?: string;
   link?: () => string;
+  replacement?: {
+    newAssetId: string;
+    previousAssets: Array<{
+      _id: string;
+      name?: string;
+      fileName?: string;
+      meta?: Record<string, unknown>;
+    }>;
+  };
 };
+
+export type PackageMediaMutation = NonNullable<UploadedMediaRecord['replacement']>;
 
 export type UploadedMediaPathMapsByStimSetId = Map<string, Map<string, string>>;
 
@@ -51,10 +62,17 @@ export type PackageUploadRuntimeState = {
   uploadActorUserId: string | null;
   stimSetId: string | number | undefined;
   uploadedMediaPathMapsByStimSetId: UploadedMediaPathMapsByStimSetId;
+  mediaMutations: PackageMediaMutation[];
   identityPlan: PackageTdfIdentityPlan | null;
+  mutationJobId: string | null;
 };
 
 export type ProcessPackageUploadDeps = {
+  TdfMutationJobs: {
+    insertAsync: (document: Record<string, unknown>) => Promise<string>;
+    findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>;
+    updateAsync: (selector: Record<string, unknown>, modifier: Record<string, unknown>) => Promise<number>;
+  };
   DynamicAssets: {
     findOneAsync?: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
     collection: {
@@ -78,7 +96,8 @@ export type ProcessPackageUploadDeps = {
   saveMediaFile: (
     media: UploadedPackageFile,
     owner: string,
-    stimSetId: string | number | null | undefined
+    stimSetId: string | number | null | undefined,
+    options?: { mutationJobId?: string | null }
   ) => Promise<UploadedMediaRecord | null>;
   toCanonicalDynamicAssetPath: (savedMedia: UploadedMediaRecord | null) => string;
   normalizeUploadedMediaLookupKey: (value: unknown) => string;
@@ -95,11 +114,9 @@ export type ProcessPackageUploadDeps = {
     find: (selector: Record<string, unknown>, options?: Record<string, unknown>) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>;
     upsertAsync: (selector: Record<string, unknown>, document: Record<string, unknown>) => Promise<unknown>;
+    updateAsync: (selector: Record<string, unknown>, modifier: Record<string, unknown>, options?: Record<string, unknown>) => Promise<number>;
+    removeAsync: (selector: Record<string, unknown>) => Promise<number>;
   };
-  H5PContents?: {
-    upsertAsync: (selector: Record<string, unknown>, modifier: Record<string, unknown>) => Promise<unknown>;
-  };
-  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
   getResponseKCMapForTdf: (tdfId: string) => Promise<Record<string, unknown>>;
   processAudioFilesForTDF: (tdfDoc: any, stimuliSetId: any, options: any) => Promise<any>;
   canonicalizeStimDisplayMediaRefs: (stimuliDoc: any, stimuliSetId: any, options: any) => Promise<any>;

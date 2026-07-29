@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
 import {
   requireUserMatchesOrHasRole,
   type MethodAuthorizationDeps,
@@ -29,7 +30,6 @@ type AccessMethodsDeps = {
   exactCaseInsensitiveRegex: (value: string) => RegExp;
   isValidEmailAddress: (value: string) => boolean;
   normalizeCanonicalId: (value: unknown) => string | null;
-  resolveConditionTdfIds: (setspec?: { condition?: string[]; conditionTdfIds?: unknown[] }) => Promise<Array<string | null>>;
 };
 
 export function createAccessMethods(deps: AccessMethodsDeps) {
@@ -298,7 +298,7 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
       }
 
       deps.serverConsole('assignAccessors', TDFId, normalizedAccessors, normalizedRevoked);
-      await deps.Tdfs.updateAsync({ _id: TDFId }, { $set: { accessors: normalizedAccessors } });
+      await deps.Tdfs.updateAsync({ _id: TDFId }, { $set: { accessors: normalizedAccessors }, $inc: { tdfRevision: 1 } });
       const userIds = normalizedAccessors.map((x: { userId: string }) => x.userId);
       if (userIds.length > 0) {
         await deps.usersCollection.updateAsync({ _id: { $in: userIds } }, { $addToSet: { accessedTDFs: TDFId } }, { multi: true });
@@ -307,10 +307,11 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         await deps.usersCollection.updateAsync({ _id: { $in: actuallyRemovedIds } }, { $pull: { accessedTDFs: TDFId } }, { multi: true });
       }
 
-      const setspec = tdf.content?.tdfs?.tutor?.setspec;
-      const conditionIds = Array.isArray(setspec?.condition)
-        ? (await deps.resolveConditionTdfIds(setspec)).filter(Boolean)
-        : [];
+      const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
+      if (familyValidation.errors.length > 0) {
+        throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
+      }
+      const conditionIds = familyValidation.conditionTdfIds;
       if (conditionIds.length > 0) {
         const childIds = [...new Set(conditionIds)].filter((id) => typeof id === 'string' && id !== TDFId);
         for (const childId of childIds) {
@@ -332,7 +333,7 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
             }
           }
 
-          await deps.Tdfs.updateAsync({ _id: childId }, { $set: { accessors: normalizedAccessors } });
+          await deps.Tdfs.updateAsync({ _id: childId }, { $set: { accessors: normalizedAccessors }, $inc: { tdfRevision: 1 } });
           if (userIds.length > 0) {
             await deps.usersCollection.updateAsync({ _id: { $in: userIds } }, { $addToSet: { accessedTDFs: childId } }, { multi: true });
           }
@@ -366,6 +367,7 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         throw new Meteor.Error(400, 'New owner id is required');
       }
       tdf.ownerId = newOwnerId;
+      tdf.tdfRevision = (Number.isInteger(tdf.tdfRevision) ? tdf.tdfRevision : 0) + 1;
       await deps.Tdfs.upsertAsync({ _id: tdfId }, tdf);
       deps.serverConsole(tdf);
       deps.serverConsole('transfer ' + tdfId + 'to' + newOwnerId);

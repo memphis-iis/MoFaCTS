@@ -72,11 +72,6 @@
   import { resolveContentLanguageAttributes } from '../../../../../common/lib/contentLanguageAttributes';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
-  import {
-    resolveH5PTrialDisplayResult,
-    selfHostedH5PTrialDisplayOwnsInteraction,
-  } from '../services/h5pTrialDisplay';
-  import { createTrialDisplaySubmissionController } from '../services/trialDisplaySubmission';
   import { createLearningProgressRuntimeController } from '../services/learningProgressPanelRuntime';
   import {
     notifyLearningProgressLayoutChange,
@@ -225,14 +220,6 @@
       actor.send(event);
     }
   };
-  const trialDisplaySubmissionController = createTrialDisplaySubmissionController({
-    getCurrentDisplay: () => context.currentDisplay,
-    h5pOwnsResponse: () => h5pOwnsResponse,
-    resolveH5PResult: resolveH5PTrialDisplayResult,
-    now: () => Date.now(),
-    submit: send,
-  });
-
   function adminDiagnosticModeEnabled() {
     return currentUserHasRole('admin');
   }
@@ -432,9 +419,7 @@
     isQuestionState,
     isStudyState,
   });
-  $: h5pOwnsResponse = selfHostedH5PTrialDisplayOwnsInteraction(context.currentDisplay) && baseTrialSubsetKind === 'question';
   $: sparcSessionOwnsCurrentResponse = sessionContentSurface.showSparcSession && baseTrialSubsetKind === 'question';
-  $: trialDisplaySubmissionController.resetForDisplay(baseTrialSubsetKind === 'question' ? context.currentDisplay : undefined);
   let studyInteractionText = '';
   $: if (!isStudyState && studyInteractionText) {
     studyInteractionText = '';
@@ -455,7 +440,6 @@
     displayIncorrectFeedback: deliverySettings.displayIncorrectFeedback,
     feedbackMessage: context.feedbackMessage,
     formatAnswerText: getDisplayAnswerText,
-    h5pOwnsResponse,
     isCorrect: context.isCorrect,
     isForceCorrecting: baseIsForceCorrecting,
     isStudyState,
@@ -674,7 +658,7 @@
     deliverySettings,
     engine: resolveLearningProgressEngine(context.engine),
     feedbackEnd: context.timestamps?.feedbackEnd || 0,
-    refreshSignal: context.h5pResult?.batchId || context.sparcResult?.observationId || context.sparcResult?.responseValue || contentSurfaceRefreshVersion || '',
+    refreshSignal: context.sparcResult?.observationId || context.sparcResult?.responseValue || contentSurfaceRefreshVersion || '',
     surfaceState: sessionSurfaceState,
   }));
   $: sessionSurfaceShell = learningProgressRuntimeSnapshot.sessionSurfaceShell;
@@ -791,10 +775,6 @@
 
   function handleChoice(event) {
     flashcardEventController.handleChoice(event);
-  }
-
-  function handleH5PResult(event) {
-    trialDisplaySubmissionController.handleH5PResult(event.detail || {});
   }
 
   function handleRuntimeEvent(event) {
@@ -1204,7 +1184,6 @@
       on:feedbackcontent={handleFeedbackContent}
       on:blockingassetstate={handleBlockingAssetState}
       on:reviewrevealstarted={handleReviewRevealStarted}
-      on:h5presult={handleH5PResult}
       on:instructioncontinue={(event) => videoEventRuntime.handleInstructionContinue(event)}
       on:videocontinue={() => videoEventRuntime.handleContinue()}
     />
@@ -1276,7 +1255,6 @@
       on:blockingassetstate={handleBlockingAssetState}
       on:incomingblockingassetstate={(event) => handleBlockingAssetState(event, 'incoming')}
       on:reviewrevealstarted={handleReviewRevealStarted}
-      on:h5presult={handleH5PResult}
       on:skipstudy={handleSkipStudy}
       on:learningprogresstoggle={handleLearningProgressPanelToggle}
     />

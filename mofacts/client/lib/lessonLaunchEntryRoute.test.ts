@@ -44,6 +44,23 @@ describe('lessonLaunchEntryRoute', function() {
     expect(result).to.deep.equal({ route: '/content' });
   });
 
+  it('routes an initial condition root to content for condition resolution', function() {
+    const result = resolveLessonLaunchEntryRoute({
+      intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
+      content: {
+        tdfs: {
+          tutor: {
+            setspec: {
+              condition: ['condition-a.json', 'condition-b.json'],
+            },
+          },
+        },
+      },
+    });
+
+    expect(result).to.deep.equal({ route: '/content' });
+  });
+
   for (const unit of [
     { unitname: 'Model Practice', learningsession: { clusterlist: '0' } },
     { unitname: 'Assessment Practice', assessmentsession: { clusterlist: '0' } },

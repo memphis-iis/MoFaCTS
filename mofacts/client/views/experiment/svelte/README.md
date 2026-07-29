@@ -23,7 +23,7 @@ The card runtime presents trials, manages learner response UI, coordinates speec
 - `machine/` owns trial lifecycle state, transition guards, actions, invoked service contracts, and fail-clear machine errors.
 - `components/ContentSurface.svelte` coordinates UI composition and wires Svelte state to services and the machine; new domain behavior should move into a service or machine file before the component grows new business logic.
 - `services/videoMachineBridge.ts`, `services/videoSessionInit.ts`, and `components/VideoSessionMode.svelte` own video-session bridge behavior until a stable unit-runtime adapter boundary exists.
-- `components/AutoTutorSession.svelte` and `services/autoTutorClient.ts` own current AutoTutor client integration. H5P display behavior belongs in the H5P components, H5P utilities, and `services/unitEngineService.ts` integration points.
+- `components/AutoTutorSession.svelte` and `services/autoTutorClient.ts` own current AutoTutor client integration.
 
 ## Supported Interaction Patterns
 

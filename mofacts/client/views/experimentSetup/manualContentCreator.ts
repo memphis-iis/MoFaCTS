@@ -976,23 +976,17 @@ Template.manualContentCreator.events({
             progress: Math.round(progress * 0.5)
           }),
           onProcessing: () => instance.uploadStatus.set({ message: manualText('content.processingPackage'), progress: 65 }),
+          confirmUpdates: async (plan) => requestManualConfirmation(instance, uploadTrigger, {
+            title: manualText('content.overwriteExistingContent'),
+            message: plan.updates.map((entry: any) => manualText('content.previousTdfOverwriteMessage', {
+              filename: entry.lessonName || entry.fileName || entry.tdfId,
+            })).join(' '),
+            confirmLabel: manualText('content.overwriteContent'),
+            placement: 'upload',
+          }),
         });
         for (const res of processResult.results || []) {
-          if (res?.data?.res === 'awaitClientTDF') {
-            const reasons = Array.isArray(res.data.reason) ? res.data.reason : [];
-            const prompts = [];
-            if (reasons.includes('prevTDFExists')) prompts.push(manualText('content.previousTdfOverwriteMessage', { filename: res.data.TDF.content.fileName }));
-            if (reasons.includes('prevStimExists')) prompts.push(manualText('content.previousStimOverwriteMessage', { filename: res.data.TDF.content.tdfs.tutor.setspec.stimulusfile }));
-            const confirmed = prompts.length === 0 || await requestManualConfirmation(instance, uploadTrigger, {
-              title: manualText('content.overwriteExistingContent'),
-              message: prompts.join(' '),
-              confirmLabel: manualText('content.overwriteContent'),
-              placement: 'upload',
-            });
-            if (!confirmed) throw new Error(manualText('content.uploadCanceledPackage', { filename: fileName }));
-            instance.uploadStatus.set({ message: manualText('content.processing'), progress: 92 });
-            await (Meteor as any).callAsync('tdfUpdateConfirmed', res.data.TDF, false, reasons);
-          } else if (!res?.result) {
+          if (!res?.result) {
             throw new Error(manualText('content.packageProcessingFailed', { error: res?.errmsg || 'unknown error' }));
           }
         }

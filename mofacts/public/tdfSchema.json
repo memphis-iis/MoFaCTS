@@ -22,8 +22,7 @@
       "type": "object",
       "title": "Tutor",
       "required": [
-        "setspec",
-        "unit"
+        "setspec"
       ],
       "additionalProperties": false,
       "properties": {
@@ -709,28 +708,30 @@
             },
             "condition": {
               "title": "Conditions",
-              "description": "Condition TDF filenames used by root experiments.",
+              "description": "Package-managed condition TDF filenames used by root experiments.",
               "type": "array",
               "items": {
                 "type": "string",
                 "title": "Condition"
-              }
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "readOnly": true,
+              "x-editor": false
             },
             "conditionTdfIds": {
               "title": "Condition TDF IDs",
               "description": "Server-resolved TDF IDs corresponding to condition filenames. Used by experiment dashboards and package workflows.",
               "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "readOnly": true,
               "items": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,128}$",
                 "title": "Condition TDF ID"
-              }
+              },
+              "x-editor": false
             },
             "duedate": {
               "title": "Class practice due date.",
@@ -6545,7 +6546,37 @@
           },
           "additionalProperties": false
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "setspec": {
+                "required": [
+                  "condition"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "unit"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "unit"
+            ],
+            "properties": {
+              "unit": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

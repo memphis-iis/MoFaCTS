@@ -8,7 +8,7 @@ describe('backfillConditionTdfIds', function() {
       _id: 'root-package',
       ownerId: 'owner-1',
       packageAssetId: 'package-1',
-      content: { tdfs: { tutor: { setspec: { condition: ['child.json'] } } } },
+      content: { tdfs: { tutor: { setspec: { condition: ['child.json'] }, unit: [] } } },
     }, {
       _id: 'root-ambiguous',
       ownerId: 'owner-1',
@@ -51,6 +51,9 @@ describe('backfillConditionTdfIds', function() {
           return 1;
         },
       },
+      TdfMutationJobs: {
+        async insertAsync() { return 'migration-job'; },
+      },
       DynamicSettings: {
         async findOneAsync() {
           return migrationState;
@@ -63,8 +66,30 @@ describe('backfillConditionTdfIds', function() {
     });
 
     assert.equal(result.updated, 1);
-    assert.equal(result.ambiguousOrMissing, 1);
+    assert.equal(result.unresolved, 1);
+    assert.ok(result.completedAt);
     assert.deepEqual(updates[0]?.modifier.$set['content.tdfs.tutor.setspec.conditionTdfIds'], ['child-package']);
-    assert.deepEqual(result.affectedRootIds, ['root-package']);
+    assert.deepEqual(updates[0]?.modifier.$unset, { 'content.tdfs.tutor.unit': '' });
+    assert.equal(updates[1]?.modifier.$set.tdfIdentityState.status, 'repair-required');
+    assert.equal(updates[1]?.modifier.$set.tdfIdentityState.migrationVersion, 2);
+    assert.match(updates[1]?.modifier.$set.tdfIdentityState.reason, /unique canonical/);
+
+    const updateCount = updates.length;
+    const secondResult = await backfillConditionTdfIds({
+      Tdfs: {
+        find() { throw new Error('completed migration must not rescan roots'); },
+        async updateAsync() { throw new Error('completed migration must not rewrite roots'); },
+      },
+      TdfMutationJobs: {
+        async insertAsync() { throw new Error('completed migration must not add journals'); },
+      },
+      DynamicSettings: {
+        async findOneAsync() { return migrationState; },
+        async upsertAsync() { throw new Error('completed migration must not rewrite state'); },
+      },
+      serverConsole() {},
+    });
+    assert.deepEqual(secondResult, result);
+    assert.equal(updates.length, updateCount);
   });
 });

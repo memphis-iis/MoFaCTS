@@ -64,6 +64,13 @@ export function shouldSkipResumeInstructionsForHistoryRoute(
   return route.inferAssessmentPosition && assessmentHasDurableResumeProgress;
 }
 
+export function shouldRequireAssessmentScheduleArtifact(
+  route: ResumeHistoryRoute,
+  assessmentHasDurableResumeProgress: boolean,
+): boolean {
+  return route.requiresAssessmentScheduleArtifact && assessmentHasDurableResumeProgress;
+}
+
 export function hasScheduleArtifactForUnit(
   experimentState: Record<string, unknown> | null | undefined,
   unitNumber: number

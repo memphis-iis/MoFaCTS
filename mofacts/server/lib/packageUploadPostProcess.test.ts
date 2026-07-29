@@ -13,6 +13,8 @@ function packageState(): PackageUploadRuntimeState {
     uploadActorUserId: 'user-a',
     stimSetId: 7,
     uploadedMediaPathMapsByStimSetId: new Map(),
+    mediaMutations: [],
+    mutationJobId: null,
     identityPlan: {
       fingerprint: 'fingerprint',
       updates: [],
@@ -24,6 +26,8 @@ function packageState(): PackageUploadRuntimeState {
         action: 'create',
         lessonName: 'Package',
         conditionTdfIds: [],
+        targetRevision: 0,
+        beforeImage: null,
       }],
     },
   };
@@ -31,11 +35,16 @@ function packageState(): PackageUploadRuntimeState {
 
 function packageDeps(params: {
   readonly tdf: Record<string, any>;
-  readonly upserted?: Record<string, any>[];
+  readonly updated?: Record<string, any>[];
   readonly embeddingInputs?: string[][];
   readonly embeddings?: number[][];
 }): ProcessPackageUploadDeps {
   return {
+    TdfMutationJobs: {
+      async insertAsync() { return 'upload-plan-1'; },
+      async findOneAsync() { return null; },
+      async updateAsync() { return 1; },
+    },
     DynamicAssets: {
       collection: {
         async findOneAsync() {
@@ -139,12 +148,12 @@ function packageDeps(params: {
       async findOneAsync() {
         return params.tdf;
       },
-      async upsertAsync(_selector, document) {
-        params.upserted?.push(document);
+      async upsertAsync() {},
+      async updateAsync(selector, modifier) {
+        params.updated?.push({ selector, modifier });
+        return 1;
       },
-    },
-    async resolveConditionTdfIds() {
-      return [];
+      async removeAsync() { return 1; },
     },
     async getResponseKCMapForTdf() {
       return {};
@@ -227,12 +236,12 @@ describe('packageUploadPostProcess SPARC AutoTutor graph generation', function()
       },
     };
     const tdf = tdfWithDisplay(display);
-    const upserted: Record<string, any>[] = [];
+    const updated: Record<string, any>[] = [];
     const embeddingInputs: string[][] = [];
 
     await postProcessUploadedTdfs({
       unzippedFiles: [uploadedTdfFile()],
-      deps: packageDeps({ tdf, upserted, embeddingInputs }),
+      deps: packageDeps({ tdf, updated, embeddingInputs }),
       state: packageState(),
     });
 
@@ -253,7 +262,7 @@ describe('packageUploadPostProcess SPARC AutoTutor graph generation', function()
         .sort(),
       ['kc-e1->kc-e2', 'kc-e2->kc-e1'],
     );
-    assert.equal(upserted.length, 1);
+    assert.equal(updated.length, 1);
   });
 
   it('regenerates stale or partial KC graph facts for the expectation set', async function() {

@@ -9,6 +9,7 @@ import { Session } from 'meteor/session';
 import './imsccWizard.html';
 import './imsccWizard.css';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import './draftEditorWorkspace';
 import { buildImportPackageFromDraftLessons } from '../../lib/importPackageBuilder';
 import { sanitizeImportName } from '../../lib/importCompositionBuilder';
@@ -18,6 +19,11 @@ import { uploadAndProcessPackage } from '../../lib/packageUploadClient';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { formatActiveInterfaceDateTime } from '../../lib/interfaceFormatting';
+import {
+  createInlineConfirmationController,
+  type InlineConfirmationController,
+} from '../../lib/adminUi/inlineConfirmationController';
+import '../shared/adminUi/adminUi';
 
 declare const $: any;
 declare const DynamicAssets: any;
@@ -25,6 +31,33 @@ type PlatformStringKey = Parameters<typeof translatePlatformString>[1];
 
 function imsccText(key: PlatformStringKey, values?: Parameters<typeof translatePlatformString>[2]): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
+}
+
+type ImsccConfirmationContext = { resolve: (confirmed: boolean) => void };
+
+function closeImsccConfirmation(template: any, confirmed: boolean) {
+  const controller = template.inlineConfirmationController as InlineConfirmationController<ImsccConfirmationContext>;
+  const context = controller.getContext();
+  const closed = confirmed ? controller.complete() : controller.cancel();
+  if (closed) context?.resolve(confirmed);
+}
+
+function requestImsccConfirmation(template: any, plan: any): Promise<boolean> {
+  closeImsccConfirmation(template, false);
+  return new Promise((resolve) => {
+    template.inlineConfirmationController.open({
+      confirmationId: `imscc-package-${plan.uploadPlanId}`,
+      title: imsccText('content.overwriteExistingContent'),
+      message: plan.updates.map((entry: any) => imsccText('content.previousTdfOverwriteMessage', {
+        filename: entry.lessonName || entry.fileName || entry.tdfId,
+      })).join(' '),
+      confirmLabel: imsccText('content.overwriteContent'),
+      cancelLabel: imsccText('content.cancel'),
+      severity: 'warning',
+      context: { resolve },
+    }, template.find('#upload-imscc-package'));
+    Tracker.afterFlush(() => template.inlineConfirmationController.focusInitial());
+  });
 }
 
 // Lazy-load imsccProcessor (and its jszip dependency) only when the wizard is
@@ -100,14 +133,29 @@ Template.imsccWizard.onCreated(function(this: any) {
   this.uploadStatus = new ReactiveVar(null);
   this.uploadError = new ReactiveVar(null);
   this.uploadComplete = new ReactiveVar(false);
+  this.inlineConfirmation = new ReactiveVar(null);
+  this.inlineConfirmationController = createInlineConfirmationController<ImsccConfirmationContext>(
+    (view) => this.inlineConfirmation.set(view.status === 'open' ? view : null),
+    () => this.find('#close-imscc-wizard'),
+  );
 
   this.joinMode = new ReactiveVar(false);
   this.joinedConfig = new ReactiveVar({ name: '', instructions: imsccText('imscc.defaultInstructions'), isValid: false, validationError: imsccText('imscc.tdfNameRequired') });
 });
 
+Template.imsccWizard.onDestroyed(function(this: any) {
+  const context = this.inlineConfirmationController.getContext() as ImsccConfirmationContext | undefined;
+  this.inlineConfirmationController.destroy();
+  context?.resolve(false);
+});
+
 Template.imsccWizard.helpers({
   imsccText(key: PlatformStringKey, options?: { hash?: Parameters<typeof translatePlatformString>[2] }) {
     return imsccText(key, options?.hash);
+  },
+
+  inlineConfirmation() {
+    return (Template.instance() as any).inlineConfirmation.get();
   },
 
   isStep(num: any) {
@@ -695,9 +743,9 @@ Template.imsccWizard.events({
           progress: Math.round(progress * 0.5)
         }),
         onProcessing: () => template.uploadStatus.set({ message: imsccText('imscc.processingPackage'), progress: 65 }),
+        confirmUpdates: async (plan) => requestImsccConfirmation(template, plan),
       });
       for (const res of processResult.results) {
-        if (res?.data?.res === 'awaitClientTDF') throw new Error(imsccText('imscc.overwriteRequired'));
         if (!res?.result) {
           throw new Error(imsccText('imscc.packageUploadFailed', {
             error: res.errmsg || imsccText('imscc.unknownError')
@@ -732,6 +780,23 @@ Template.imsccWizard.events({
     if (wizardContainer.length && wizardContainer.is(':visible')) {
       wizardContainer.slideUp();
     }
+  },
+
+  'click .admin-confirmation-cancel': function(event: any, template: any) {
+    event.preventDefault();
+    closeImsccConfirmation(template, false);
+  },
+
+  'click .admin-confirmation-confirm': function(event: any, template: any) {
+    event.preventDefault();
+    const controller = template.inlineConfirmationController as InlineConfirmationController<ImsccConfirmationContext>;
+    if (!controller.getView().pending) closeImsccConfirmation(template, true);
+  },
+
+  'keydown #imscc-wizard-container': function(event: KeyboardEvent, template: any) {
+    const controller = template.inlineConfirmationController as InlineConfirmationController<ImsccConfirmationContext>;
+    const context = controller.getContext();
+    if (controller.handleKeydown(event)) context?.resolve(false);
   }
 });
 

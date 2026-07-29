@@ -23,8 +23,6 @@ import {
   type SparcAnswerEvaluationContext,
 } from '../services/sparcProductionRuleEvaluation';
 import { fromCallback, fromPromise, type AnyEventObject } from 'xstate';
-import { resolveH5PModelOutcomes } from '../../../../../common/lib/h5pTrialResult';
-import type { H5PTrialResult } from '../../../../../common/types';
 
 type TimeoutContextLike = Parameters<typeof getMainTimeoutMs>[0] & {
   feedbackTimeoutMs?: number;
@@ -48,7 +46,6 @@ interface AnswerEvaluationContext extends ServiceRecord {
   userAnswer?: unknown;
   currentAnswer?: string;
   originalAnswer?: string;
-  h5pResult?: H5PTrialResult | null;
   sparcResult?: SparcAnswerEvaluationContext['sparcResult'];
   engine?: ServiceRecord | null;
   currentDisplay?: {
@@ -494,14 +491,6 @@ export function createServices() {
  * We still need to evaluate the transcript against the actual answer.
  */
 export async function evaluateAnswerService(context: AnswerEvaluationContext) {
-  if (context.h5pResult) {
-    const outcomes = resolveH5PModelOutcomes(context.h5pResult);
-    return {
-      isCorrect: outcomes.every((outcome) => outcome.correct),
-      matchText: outcomes.map((outcome) => outcome.correct ? '1' : '0').join(''),
-    };
-  }
-
   const sparcProductionRuleEvaluation = evaluateSparcProductionRuleOutcome(context);
   if (sparcProductionRuleEvaluation) {
     return sparcProductionRuleEvaluation;
