@@ -640,13 +640,6 @@
     width: 100%;
   }
 
-  .stimulus-display.h5p-display {
-    padding: var(--app-space-0);
-    gap: var(--app-space-0);
-    align-items: stretch;
-    justify-content: stretch;
-  }
-
   .stimulus-text.cloze {
     font-family: var(--app-font-family);
   }
@@ -862,11 +855,4 @@
     margin: var(--app-space-0) auto;
   }
 
-  .stimulus-h5p {
-    flex: 1 1 auto;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
 </style>

@@ -410,29 +410,6 @@
     overflow: hidden;
   }
 
-  .h5p-owned-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    width: 100%;
-    overflow: hidden;
-  }
-
-  .h5p-owned-surface {
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-    overflow: hidden;
-  }
-
-  .h5p-feedback-container {
-    flex: 0 0 min(28%, 14rem);
-    min-height: 8rem;
-    width: 100%;
-    border-top: 1px solid var(--app-secondary-surface-color);
-  }
-
   /* Over-under layout (vertical stack) */
   .trial-content.over-under .trial-main {
     flex-direction: column;
