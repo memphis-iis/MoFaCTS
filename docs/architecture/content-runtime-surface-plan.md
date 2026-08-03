@@ -41,7 +41,7 @@ ContentSurface
     SparcController
 ```
 
-`AutoTutorSession` and H5P are deprecated for this planning pass and should not drive the target architecture. Existing H5P behavior should be preserved until removal, but it should not shape new names or boundaries.
+`AutoTutorSession` is deprecated for this planning pass and should not drive the target architecture. H5P support has been removed.
 
 ## Boundary Rules
 
@@ -207,7 +207,7 @@ This table is the source-to-target audit for the learner-runtime surface pass. R
 | `mofacts/client/views/experiment/svelte/services/cardSessionRuntime.ts` | Builds current session-surface snapshot and video instruction state under card naming. | `ContentSurface` runtime helper or renamed content/session runtime helper. | Rename/classify after `ContentSurface` exists. | No session-surface selection helper remains card-specific unless it truly refers to the legacy route. |
 | `mofacts/client/views/experiment/svelte/services/cardMachineRuntime.ts` | XState actor lifecycle controller under card naming. | `ContentSurface` / `contentRuntimeMachine` controller. | Rename in the machine-name phase. | Machine actor lifecycle no longer uses `cardMachine*` names unless preserved as temporary route compatibility. |
 | `mofacts/client/views/experiment/svelte/components/StandardCardSessionSurface.svelte` | Learning/assessment flashcard session layout. | `FlashcardSessionSurface.svelte` | Rename. | Learning and assessment sessions render through `FlashcardSessionSurface`. |
-| `mofacts/client/views/experiment/svelte/components/TrialContent.svelte` | Current normal flashcard rendering, but also contains obsolete SPARC/H5P branches. | `FlashcardController`-owned flashcard runtime pieces. | Classify and split/rename. Do not blindly rename if it still routes SPARC. | Flashcard runtime has no SPARC branch and is owned by `FlashcardController`. |
+| `mofacts/client/views/experiment/svelte/components/TrialContent.svelte` | Current normal flashcard rendering. | `FlashcardController`-owned flashcard runtime pieces. | Classify and split/rename. Do not blindly rename if it still routes SPARC. | Flashcard runtime has no SPARC branch and is owned by `FlashcardController`. |
 | `mofacts/client/views/experiment/svelte/services/trialContentProps.ts` | Builds props for current `TrialContent`. | `FlashcardController` helper. | Rename/classify with flashcard controller work. | Prop building name reflects flashcard runtime, not generic trial content. |
 | `mofacts/client/views/experiment/svelte/components/ActiveTrialContentSlot.svelte` | Active slot for current flashcard display handoff under trial naming. | `FlashcardController` helper or flashcard slot component. | Rename/classify with flashcard controller work. | Slot name no longer implies generic trial ownership if it is flashcard-only. |
 | `mofacts/client/views/experiment/svelte/components/IncomingTrialContentSlot.svelte` | Incoming slot for prepared flashcard display handoff under trial naming. | `FlashcardController` helper or flashcard slot component. | Rename/classify with flashcard controller work. | Slot name no longer implies generic trial ownership if it is flashcard-only. |
@@ -312,7 +312,6 @@ Steps:
   - no response timer is applicable
 - Document why any display suppresses the standard timer.
 - Do not infer timer behavior from whether a display has custom input controls.
-- Preserve existing H5P behavior until H5P removal, but do not use H5P as a design driver.
 
 Implementation sequence:
 
@@ -631,7 +630,7 @@ Use this checklist in the PR or commit notes for each phase:
 - Low-level runtime state owners need their own boundary plans before future renames or ownership changes.
 - Low-level trial-object contracts in `learning-components/` need a separate API-boundary cleanup before removing names such as `SparcTrialDisplay*`.
 - SPARC editor operability needs its own plan, including how `/sparcEdit/:tdfId` should be reached and whether authoring preview should reuse `SparcSessionSurface` without learner-runtime `SparcController` behavior.
-- H5P removal or timer-policy redesign needs its own plan. This pass preserves H5P behavior while keeping timer policy explicit.
+- Timer-policy redesign needs its own plan; keep timer policy explicit.
 - Remaining app-side helper names such as `activeTrial*`, `incomingTrial*`, and generic `trialDisplay*` should be classified before future renames; they currently describe low-level flashcard handoff/display objects, not session routing.
 
 ## Implementation Evidence

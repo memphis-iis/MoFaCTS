@@ -331,10 +331,11 @@ function summarizeSpeechAdaptation(
 
 export function normalizeSpeechToken(value: unknown): string {
   return String(value || '')
+    .toLowerCase()
     .normalize('NFD')
+    .replace(/n\u0303/g, 'ñ')
     .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
+    .trim();
 }
 
 export function normalizeSpeechGrammarLookupToken(value: unknown): string {

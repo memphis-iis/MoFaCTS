@@ -163,10 +163,10 @@ describe('Learning component manifests', function() {
     expect(() => validateLearningComponentManifest({
       id: 'sample.duplicates',
       kind: 'trial-display',
-      displayTypes: ['h5p', ' h5p '],
+      displayTypes: ['widget', ' widget '],
       requiredCapabilities: [],
       register() {},
-    })).to.throw('Learning component "sample.duplicates" declares duplicate display type: h5p');
+    })).to.throw('Learning component "sample.duplicates" declares duplicate display type: widget');
   });
 
   it('fails clearly when required named server methods are missing', function() {
@@ -237,12 +237,12 @@ describe('Learning component manifests', function() {
     const manifest: LearningComponentManifest = {
       id: 'sample.display',
       kind: 'trial-display',
-      displayTypes: ['h5p'],
+      displayTypes: ['widget'],
       requiredCapabilities: ['media', 'history'],
       register(context) {
         context.registerTrialDisplayAdapter({
-          id: 'sample.h5p',
-          displayType: 'h5p',
+          id: 'sample.widget',
+          displayType: 'widget',
           requiredCapabilities: ['media', 'history'],
           ownsInteraction: () => true,
           normalizeDisplay: (display) => display,

@@ -815,7 +815,7 @@ npm run lint
 
 UI verification:
 
-- Use the native hotfix dev server from `deploy/`.
+- Use the canonical localhost hotfix server from `deploy/`.
 - Use the MoFaCTS Playwright sidecar against `http://host.docker.internal:3200`.
 - Verify Class Management visibility save/hydrate.
 - Verify Course Assignments add/reorder/date/save/reload.

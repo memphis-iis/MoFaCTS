@@ -47,10 +47,10 @@ describe('trial display state', function() {
     expect(isPreparedAdvanceWaitState(stateMatching(['presenting.awaiting']))).to.equal(false);
   });
 
-  it('clones display content and keeps H5P nested state isolated', function() {
+  it('clones display content and keeps widget nested state isolated', function() {
     const original = {
       text: 'Question',
-      h5p: { packageId: 'pkg-1', nested: { value: 1 } },
+      widget: { packageId: 'pkg-1', nested: { value: 1 } },
       attribution: { creatorName: 'Author' },
     };
     const cloned = cloneDisplay(original);
@@ -61,7 +61,7 @@ describe('trial display state', function() {
       imgSrc: '',
       videoSrc: '',
       audioSrc: '',
-      h5p: { packageId: 'pkg-1', nested: { value: 1 } },
+      widget: { packageId: 'pkg-1', nested: { value: 1 } },
       attribution: {
         creatorName: 'Author',
         sourceName: '',
@@ -70,7 +70,7 @@ describe('trial display state', function() {
         licenseUrl: '',
       },
     });
-    expect(cloned.h5p).to.not.equal(original.h5p);
+    expect(cloned.widget).to.not.equal(original.widget);
   });
 
   it('preserves structured SPARC display payloads during cloning', function() {
@@ -134,7 +134,23 @@ describe('trial display state', function() {
       },
       isVideoSession: true,
       subset,
-    })).to.equal('4::5::6::::Prompt:::/image.png::::::Source:::');
+    })).to.equal([
+      4,
+      5,
+      6,
+      '',
+      'Prompt',
+      '',
+      '/image.png',
+      '',
+      '',
+      JSON.stringify(subset.display),
+      '',
+      'Source',
+      '',
+      '',
+      '',
+    ].join('::'));
 
     expect(buildTrialSubsetKey({
       context: {

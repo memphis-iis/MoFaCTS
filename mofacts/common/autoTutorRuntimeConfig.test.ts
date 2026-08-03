@@ -80,6 +80,7 @@ function createCapabilities(overrides: {
     },
     serverMethods: {
       getAutoTutorHistoryForUnit: async () => [],
+      getPreferredOpenRouterApiKey: async () => null,
     },
     history: {
       normalizeResult: (result) => result as any,

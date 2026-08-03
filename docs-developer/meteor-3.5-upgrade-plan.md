@@ -19,12 +19,12 @@ Mongo reactivity, and DDP sessions are retained briefly after an ungraceful
 disconnect. Those defaults require explicit qualification even though the
 release is not labeled breaking.
 
-The newest upstream ref found during this review is
-`release/METEOR@3.5.1-beta.0`; there is no stable 3.5.1 release. Several fixes
-that matter to MoFaCTS are therefore **not present in stable 3.5.0**. Check the
-stable tags and changelog again immediately before implementation. Prefer a
-later stable 3.5 patch only after reviewing its final notes and repeating the
-selection and compatibility gates; never substitute a beta, release branch, PR
+Stable 3.5.0 includes Change Streams and enables them by default when MongoDB 6+
+is a replica set or sharded cluster. The newer
+`release/METEOR@3.5.1-beta.0` ref contains fixes for defects discovered after
+3.5.0, but those fixes are a known-risk and qualification register—not a claim
+that Change Streams are unavailable in stable 3.5.0. Check stable tags and the
+changelog again before promotion. Never substitute a beta, release branch, PR
 build, or unpinned `latest` release.
 
 Meteor's generic deployment page currently contains older Node examples. For
@@ -46,31 +46,76 @@ systems or architectures.
 | `RECOMMENDATION` | A proposed design, threshold, owner, or sequence. It becomes binding only when the named approver accepts it. |
 | `EXPERIMENT` | A claim that must be proved with the defined MoFaCTS workload; upstream benchmark results are not acceptance evidence. |
 
-### Readiness after repository audit
+### Readiness after repository audit and implementation
 
 Repository entry state was re-audited on 2026-07-25. This readiness verdict is
-about what is present in source control, not merely what this plan intends.
+updated through the local candidate, conversion rehearsal, Phase 4
+qualification, full client/server regression repair, and exact-image smoke
+recorded through 2026-08-03 and is
+about what is present in the current working tree, not merely what this plan
+intends.
 
 - **Decision readiness: `READY`.** The contained base track is bounded by the
-  defaults in [Resolved planning defaults and hard
-  blockers](#resolved-planning-defaults-and-hard-blockers). No additional
+  defaults in [Resolved planning defaults and execution
+  rule](#resolved-planning-defaults-and-execution-rule). No additional
   product behavior or optional capability decision is needed to prepare the
   baseline.
-- **Repository implementation entry: `NOT READY`.** The repository still pins
-  Meteor 3.4.1 and Node 22, preserves URI parsing and Meteor 2 authentication
-  compatibility paths, omits the containment settings, and suppresses updater
-  failures. These are entry-gate failures, not work that may be silently
-  deferred while application migration proceeds. Only E0a gate remediation may
-  begin from this state; contained-base application work remains blocked.
-- **Production release readiness: `NOT READY`.** Production topology, release
-  patch, rollback, capacity, and protected runtime facts are not yet accepted;
-  no code has been built or exercised under Meteor 3.5.
-- **Change Streams readiness on stable 3.5.0: `NOT READY`.** Keep
-  `METEOR_REACTIVITY_ORDER` on the proven fallback. Do not enable Change
-  Streams until a reviewed stable release contains the required fixes in the
-  following disposition register and passes MoFaCTS-specific qualification.
+- **Repository candidate implementation: `IMPLEMENTED`.** The current working
+  tree pins Meteor 3.5 and Node 24.15.0/npm 11.12.1, treats MongoDB URIs as
+  opaque driver inputs, uses documented per-tab Accounts storage, applies the
+  polling/SockJS/zero-grace containment settings, and rejects updater graph
+  drift. The deterministic native-amd64 build, ABI check, runtime audit, and
+  isolated health smoke pass. The maintainer confirmed the supplied 3.4.1
+  state was working; rebuilding and rerunning it is not an upgrade gate.
+- **Base-candidate acceptance: `ACCEPTED FOR REPOSITORY PROGRESSION`.** The
+  exact framework/runtime graph, static checks, server integration suite,
+  deterministic amd64 build, bundle ABI assertion, runtime audit, and isolated
+  health smoke provide proportionate evidence for A6. The supported Linux
+  Meteor/Playwright run now passes with zero server and client failures; broader
+  browser/provider coverage remains ordinary CI and release evidence.
+- **Production release readiness: `NOT READY`.** Production topology, rollback,
+  capacity, Change Streams qualification, and protected runtime facts are not yet accepted.
+  The local Meteor 3.5 candidate evidence is not production authorization.
+- **Change Streams Phase 4 disposition: `ADOPT FOR STAGED PROGRESSION`; no
+  production authorization.** Stable 3.5.0 supports Change Streams and the
+  project qualifies `METEOR_REACTIVITY_ORDER=changeStreams,polling`. Across the
+  thirteenth and fourteenth Linux invocations, MongoDB reported one active
+  qualification `$changeStream`; the supported dotted projection, bounded
+  `$in`, snapshot-race, secret-containment, and login-shaped write-fence cases
+  passed. The thirteenth invocation also passed injected error-286 history-loss
+  recovery and one-member-primary restart recovery. It exposed a separate
+  production defect in the real polling-owned `filteredUsers` publication:
+  Meteor 3 returns a promise from `observeChanges`, so its handle must be
+  awaited before `stop()`. After that correction, the fourteenth invocation
+  passed all 565 server tests with 12 pending and no server failure. Its manual
+  coordinator missed both 45-second recovery acknowledgments, so those two
+  repetitions are not counted as new recovery passes; the checked-in workflow
+  polls and acknowledges them automatically. The combined adjacent-run
+  evidence is accepted because the intervening change is confined to the
+  ordered polling publication and does not alter Change Stream recovery code.
+  The subsequent full-suite repair reduced the 70 client failures to zero. On
+  2026-08-03 the supported isolated Linux run completed with 0 server failures,
+  883 passing client tests, 7 pending client tests, and 0 client failures.
+  Production remains on polling until Phase 5A and the separately authorized
+  Phase 5B rollout.
+- **Phase 4B canonical localhost runtime: `COMPLETE`.** On
+  2026-08-02 the single localhost application instance was started through
+  `deploy/hotfix-local.ps1` as the native Meteor/Rspack source watcher. The base
+  and local Compose files supplied MongoDB and its replica-set initialization,
+  not a second application instance. The application was healthy on port 3200,
+  logged `changeStreams,polling (Change Streams enabled)`, connected to the
+  named replica set, exposed a nonzero live `$changeStream` count, and completed
+  the local-admin DDP bootstrap. The native watcher was the only application
+  port owner; no competing Docker application container was running. An
+  authenticated browser smoke then proved password login, the
+  publication-backed home dashboard, populated learning-history/owned-content
+  data, content management, live admin status and user metrics, and an actual
+  `Times_Tables` learner-content launch. The browser reported no warnings or
+  errors; the corresponding server log showed successful login and lesson-data
+  calls without a smoke-time error. This completes Phase 4B but does not
+  authorize production.
 
-### Resolved planning defaults and hard blockers
+### Resolved planning defaults and execution rule
 
 The following choices are fixed for this plan. They remove choices that were
 previously described as approvals while preserving the boundaries that cannot
@@ -79,84 +124,154 @@ be decided from repository or upstream evidence.
 | Topic | Binding decision | Consequence |
 | --- | --- | --- |
 | Meteor release | Use exactly `METEOR@3.5` / v3.5.0. Do not use 3.5.1-beta.0 or any other prerelease. | `meteor update --release 3.5` is the only upgrade command in scope. A later patch is a new plan amendment, not an automatic substitution. |
-| Toolchain ownership | Meteor 3.5.0's bundled Node 24.15.0 and npm 11.12.1 are the canonical bundle-build and bundle-runtime versions. | Retain the established builder as `geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083`. Use official `node:24.15.0-alpine` for the bundle-dependency and runtime stages, pinned by the manifest digest for every approved target architecture in the implementation change. The first build must assert the bundled Meteor, Node, and npm versions before the source change is accepted. |
+| Toolchain ownership | Meteor 3.5.0's bundled Node 24.15.0 and npm 11.12.1 are the canonical bundle-build and bundle-runtime versions. | Retain the established builder for the existing `linux/amd64` deployment architecture. Pin the builder and official `node:24.15.0-alpine` base to verified immutable OCI index digests, build and smoke-test the amd64 artifact, and assert the bundled Meteor, Node, and npm versions before the source change is accepted. ARM64 is not an established deployment target and is not an upgrade gate. |
 | Base reactivity | Set `METEOR_REACTIVITY_ORDER=polling` in every base-track environment. | Oplog and Change Streams are out of scope for the base release. This is also the tested rollback state. |
 | Base DDP transport and resumption | Use SockJS and set `Meteor.server.options.disconnectGracePeriod = 0`. | `uws` and DDP session resumption are not enabled or evaluated in the base release. |
-| Database authority | Preserve the existing production database, URI, topology, and backup authority. | No replica-set, managed-platform, URI, or backup change is part of this upgrade. Change Streams remains deferred and does not create a database-platform project. |
+| Database authority | Convert the existing self-hosted MongoDB service and data volume in place to a configurable replica set, initially with one member. Preserve the existing logical database and writer authority. | The first member stays on the current server; no second server is required for Change Streams. Keep the replica-set identity, member address, credentials, and seed-list URI explicit so later members or a parallel target can be added without changing the application data contract. Production execution remains separately authorized. |
 | Connection-string handling | Treat MongoDB URIs as opaque credentials. The driver or `mongosh` validates a live connection; plan code must not parse or print a URI. | A bespoke parser is prohibited unless a later, separately approved exception names the unavoidable offline check and its redaction contract. |
-| Optional capabilities | `Change Streams`, DDP resumption, `uws`, async rate matching, `accounts-express`, collation, and native async Accounts refactoring are deferred. | “Deferred” means no source, dependency, configuration, schema, topology, or deployment change is made for that capability in this release. It does not imply future adoption. |
-| Android | Android remains a supported MoFaCTS client. | Include Android build and smoke coverage in the base-upgrade compatibility work; this is implementation verification, not a decision about whether Android is supported. |
+| Capability sequence | Change Streams are the intended performance-capability track after the contained base and database qualification. DDP resumption, `uws`, async rate matching, `accounts-express`, collation, and native async Accounts refactoring remain independent. | Qualify stable 3.5.0 now in isolation, using the post-3.5.0 fixes as named regression scenarios rather than an entry prohibition. Continue until a demonstrated technical blocker or a newly discovered material design question is reached. |
+| Android web app | MoFaCTS remains installable and usable through an Android browser. It does not ship a native Cordova package. | Cover Android-browser and installable-web-app behavior through the ordinary browser build; do not require an APK/AAB build, Android SDK, emulator, or signing toolchain. |
 
-The following are hard blockers, not choices for the implementer to infer:
+The following boundaries require user authority for the named external action,
+but they do not block safe repository-owned work that can continue independently:
 
 | Blocker | Required evidence | Decision owner |
 | --- | --- | --- |
-| Production topology and effective reactivity driver | Sanitized `hello`/topology result and effective environment configuration, with no URI or credential recorded. | Database operations |
+| Production conversion and effective reactivity driver | Sanitized pre/post-conversion topology evidence and effective environment configuration, with no URI, keyfile, or credential recorded. | Database operations |
 | Production rollout | Explicit deployment authority, last-known-good artifact, rollback owner, and required protected operational evidence. | Change authority |
 
-For any optional experiment, “adopt” requires three comparable candidate runs
-against two baseline runs of the approved workload, no correctness, security,
-or availability regression, and at least a 15% improvement in its single
-named primary metric. A missing workload, metric, or owner yields **defer**.
-A blocked item cannot be implemented, tested against production, or treated as
-release evidence.
+#### Outcome-driven continuation and blocker rule
+
+Once the requested outcome is clear, continue every safe, in-scope,
+repository-owned implementation and verification step without waiting for
+optional evidence, a named owner, a preferred test environment, a benchmark,
+or a formal phase-promotion ceremony. Missing nice-to-have evidence is recorded
+as a verification limitation and followed up through normal CI or release work;
+it does not stop progress.
+
+Pause only for:
+
+1. a **technical blocker**: the required implementation cannot work safely or
+   correctly after reasonable in-scope investigation and attempts; or
+2. a **design question**: two or more viable choices would materially change
+   user-visible behavior, a durable data contract, database topology or writer
+   authority, security/privacy behavior, or another product invariant.
+
+Required authorization for a production, destructive, credential-bearing, or
+otherwise externally consequential action blocks only that action. It does not
+block independent source, configuration, documentation, test, or staging
+preparation. A failed check blocks only work whose correctness it actually
+contradicts; unrelated work continues.
+
+##### Blocker-declaration protocol
+
+Because a recorded blocked status is terminal and may not be reversible to an
+active status, do not record this plan or its execution goal as blocked on the
+first or second observation of a problem. The same condition must remain a
+real impasse for three consecutive continuation passes. Before declaring that
+impasse, all of the following must be written down and verified:
+
+1. the exact required outcome that cannot currently be achieved;
+2. direct evidence of the failure from the current stable artifact, current
+   worktree, or current protected boundary—not an inference from an unreleased
+   branch, proposed fix, missing optional evidence, or an unrun experiment;
+3. the safe in-scope attempts and alternatives already tried, including why
+   each failed to reach the required outcome;
+4. confirmation that no meaningful independent source, configuration,
+   documentation, test preparation, isolated rehearsal, or verification work
+   remains; and
+5. whether the condition is the technical blocker or material design question
+   defined above, rather than an authorization boundary affecting only one
+   external action.
+
+The following are explicitly **not whole-plan blockers** by themselves:
+
+- a Docker build, integration-test invocation, workflow trigger, deployment,
+  or protected-environment operation awaiting explicit authorization;
+- a test or benchmark that has not yet been run;
+- an upstream defect fixed only on a beta or unreleased branch, unless the
+  current stable artifact reproduces that defect in a required flow;
+- incomplete promotion, soak, performance, or production evidence while safe
+  repository or isolated work remains; or
+- a failure confined to an optional capability when the contained base remains
+  valid.
+
+When one of those conditions is reached, keep the goal active, record the
+specific pending action and verification boundary, and continue every other
+safe step. If a genuine blocker is eventually proven, state it to the
+maintainer with the evidence and affected outcome before recording the blocked
+status.
+
+Performance experiments support quantitative MoFaCTS performance claims, but
+they are not prerequisites for installing or configuring an upstream
+capability. When a benchmark is run, use comparable workloads and report its
+limits honestly; do not invent a numeric adoption threshold merely to advance
+the phase.
 
 ### Entry gate and exact first implementation slice
 
 There are no additional product-feature decisions before the contained base
-track, but repository prerequisites are incomplete. **E0a is the exact first
-implementation slice.** No application migration, compatibility repair, or
-optional experiment begins until E0a is reviewed as one baseline-pin package.
-Within E0a, `mofacts/.meteor/release` is the first source-of-truth edit.
+track. The repository prerequisites described in this section have been
+completed in the current working tree. The table below is the historical entry
+audit that bounded the implementation; it is not a statement that the current
+tree still contains the listed 3.4.1 inputs. **E0a was a read-only preflight.**
+It recorded the supplied known-good 3.4.1 source/artifact identity without
+rebuilding or rerunning that state. D1 and A1 then preceded A2, which ran the
+official updater and aligned the complete release/package/toolchain consistency
+set as one atomic review package. No intermediate state claimed Meteor 3.5 while
+retaining the 3.4.1 resolved package graph.
 
-| Entry gate | Audited repository state | Required E0a or prerequisite exit evidence |
+| Entry gate | Audited repository state | Required preflight or A2 exit evidence |
 | --- | --- | --- |
-| Meteor release owner | `mofacts/.meteor/release` is `METEOR@3.4.1`. | Change first to exactly `METEOR@3.5`; later run the selected updater unsuppressed in A2 and review the complete resolved Meteor graph. |
-| Builder identity | Root `Dockerfile` and hotfix Compose use `geoffreybooth/meteor-base:3.4.1`. | Pin `geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083` everywhere the Meteor builder is selected; assert `Meteor 3.5`, Node 24.15.0 and npm 11.12.1 from that immutable image. |
-| Bundle dependency/runtime Node | Docker and hotfix dependency/runtime paths use Node 22.22.0 tags. | Pin `node:24.15.0-alpine` by the approved target-architecture digest in builder-dependency, runtime and hotfix paths; never mix native modules built for another OS, ABI or architecture. |
+| Meteor release owner | `mofacts/.meteor/release` is `METEOR@3.4.1`. | Preserve it through E0a. In A2 run `meteor update --release 3.5` unsuppressed and review `.meteor/release`, `.meteor/packages`, `.meteor/versions`, and the npm lockfile together. Never edit the release pin ahead of the resolved graph. |
+| Builder identity | Root `Dockerfile` and hotfix Compose use `geoffreybooth/meteor-base:3.4.1`. | In E0a verify the selected `geoffreybooth/meteor-base:3.5` immutable OCI index and its `linux/amd64` child; do not edit consumers. In A2 pin the verified index everywhere the builder is selected and assert Meteor 3.5, Node 24.15.0 and npm 11.12.1 in the amd64 artifact. |
+| Bundle dependency/runtime Node | Docker and hotfix dependency/runtime paths use Node 22.22.0 tags. | In E0a verify an immutable OCI index and its `linux/amd64` child for official `node:24.15.0-alpine`; do not edit consumers. In A2 pin it in bundle-dependency, runtime and hotfix paths. Build native dependencies for the target amd64 environment and never copy native modules from another OS, ABI or architecture. |
 | Developer/CI Node owner | `.nvmrc` says `22`; package engines permit Node 22; CI installs Node 22 and Meteor 3.4.1. | Make one exact Node 24.15.0 owner and align `.nvmrc`, package engine/package-manager policy, CI Meteor/Node installation and explicit version assertions. |
 | Updater observability | CI and the Docker build redirect `meteor update --npm` errors and continue successfully. | Remove redirection and `|| true`; a migration/update failure is blocking and its non-secret output is retained in the change record. |
 | Opaque Mongo URI contract | Shell, hotfix and server readiness/settings paths locally parse the URI. | Before A2, complete the base-relevant part of D1: pass the URI opaquely to the supported driver or `mongosh`, assert a live authenticated connection and selected database/capabilities, redact failures, and add no parser or compatibility fallback. |
-| Per-tab authentication contract | `authStorage.ts` falls from `Accounts.storageLocation` through Meteor 2 private storage/token APIs. | Before A2, complete A1: retain only the supported Meteor 3 storage contract, preserve per-tab UX, and make its absence an explicit compatibility blocker. |
+| Per-tab authentication contract | `authStorage.ts` assigns `Accounts.storageLocation` and falls through private Meteor storage/token APIs to force per-tab credentials. | Before A2, complete A1: configure the documented `clientStorage: "session"` contract through the one settings owner verified in the stable 3.5 implementation, remove the private mutation layer, preserve per-tab UX, and make failure of the documented contract an explicit compatibility blocker. Do not set both `accounts` and `accounts-base` keys as a compatibility measure. |
 | Framework containment | Base/staging Compose does not track polling, SockJS or reconnect-grace settings. | Before candidate acceptance, complete A4: `METEOR_REACTIVITY_ORDER=polling`, `DDP_TRANSPORT=sockjs`, and app-owned `Meteor.server.options.disconnectGracePeriod = 0` across every base environment. |
-| Baseline evidence | No Meteor 3.4.1 baseline or immutable 3.5 candidate evidence is recorded. | After E0a and before application-source migration, complete E0d with the approved functional workload and two repeatable baseline runs. This is compatibility evidence, not an optional-capability performance experiment. |
+| Pre-upgrade baseline | The maintainer supplied and confirmed a working Meteor 3.4.1 state. | Record its source/artifact identity for rollback. Do not rebuild or rerun 3.4.1 merely to prove the supplied starting state worked; acceptance effort belongs to the 3.5 candidate. |
 
-E0a must also record the source commit/dirty-tree disposition so updater output
-cannot absorb unrelated package, Zstd, upload, OpenRouter, SPARC or other user
-work. The release pin, image pins, exact local/CI Node policy, and updater
-observability changes form one review stack; do not promote an intermediate
-state whose release file and resolved package graph disagree.
+E0a records the source commit, dirty-tree disposition, exact last-good 3.4.1
+artifact/configuration fingerprint, candidate OCI index identities,
+and the intended A2 consistency set so updater output cannot absorb unrelated
+package, Zstd, upload, OpenRouter, SPARC or other user work. A2 then applies the
+release pin, resolved package graph, image pins, exact local/CI Node policy, and
+updater-observability correction as one review package; do not commit or
+promote an intermediate state whose release file and resolved graph disagree.
 
-After E0a and E0d pass, execute the base prerequisites in this order: the
-base-relevant D1 opaque-URI/readiness correction, A1 authentication storage,
-A2 exact Meteor package solution, A3 Node/build ownership reconciliation, A4
-containment settings, then conditional compatibility fixes and A6 acceptance.
-Android build/smoke coverage remains part of A6. Change Streams, DDP resumption,
-`uws`, database-platform changes, and other optional capabilities remain out of
-scope.
+After E0a passes, execute the base prerequisites in this order: the
+base-relevant D1 opaque-URI/readiness correction, A1 documented authentication
+storage, A2 atomic framework/package/toolchain transition, A3 resolved ABI
+validation, A4 containment settings, then conditional compatibility fixes and
+A6 acceptance. A6 covers only upgrade-owned contracts. Broader Android/browser,
+provider, TDF, and whole-product regression coverage remains ordinary CI or
+release work and does not block the Change Streams track by absence alone.
 
 ### Upstream issue and fix disposition register
 
 Status is relative to stable `METEOR@3.5` (`meteor-tool@3.5.0`) on the review
 date. A merged PR on an unreleased branch is not a shipped fix.
 
-| Behavior | 3.5.0 disposition | Required gate |
+| Behavior | 3.5.0 disposition | Qualification disposition |
 | --- | --- | --- |
-| Standalone MongoDB Change Streams capability detection | Included in 3.5.0. | Still prove that standalone uses the declared fallback; do not infer production topology from this fix. |
-| Initial-snapshot/restart races, `skip`/`limit` fallback, and ObjectID projection handling listed in the 3.5 changelog | Included in 3.5.0. | Run the focused observer regression matrix against MoFaCTS publications. |
-| Nested-object projection crash fallback ([PR 14518](https://github.com/meteor/meteor/pull/14518)) | Merged only toward the unreleased 3.5.1 line. | Required in the selected stable patch before Change Streams; dotted and nested projection tests remain mandatory. |
-| Change Stream write-fence/multiplexer deadlock affecting login-style writes ([PR 14564](https://github.com/meteor/meteor/pull/14564)) | Merged only toward the unreleased 3.5.1 line. | Required in the selected stable patch before Change Streams; no risk bypass is recommended for authentication/learner writes. |
-| Cross-connection write-fence timestamps ([PR 14602](https://github.com/meteor/meteor/pull/14602)) | Merged only toward the unreleased 3.5.1 line. | Inventory Mongo connections; require the fix before Change Streams if more than one connection participates in a write fence. |
-| `ChangeStreamHistoryLost` restart loop ([PR 14607](https://github.com/meteor/meteor/pull/14607)) | Merged only toward the unreleased 3.5.1 line. | Required before Change Streams; rehearse an oplog-history-loss condition and alert on restart storms. |
-| Change Stream operation-time comparison crash ([PR 14609](https://github.com/meteor/meteor/pull/14609)) and related observer fixes listed in the beta changelog | Present only in the 3.5.1 beta line. | Reconcile every related fix against the final stable changelog; require the selected stable patch and run the snapshot/restart/fence matrix before Change Streams. |
+| Standalone MongoDB Change Streams capability detection | Included in 3.5.0. | Still prove that standalone selects the declared polling path; do not infer production topology from this fix. |
+| Initial-snapshot/restart races, `skip`/`limit` polling selection, and ObjectID projection handling listed in the 3.5 changelog | Included in 3.5.0. | Run the focused observer regression matrix against MoFaCTS publications. |
+| Nested-object projection crash handling ([PR 14518](https://github.com/meteor/meteor/pull/14518)) | Fix is not in stable 3.5.0; upstream identifies dotted projection notation as the workaround. | MoFaCTS production publications already use dotted notation. Qualify that supported form and keep a static guard against introducing the unsupported nested-object form; do not make an unused syntax defect a production-adoption blocker. |
+| Change Stream write-fence/multiplexer deadlock affecting login-style writes ([PR 14564](https://github.com/meteor/meteor/pull/14564)) | Fix is not in stable 3.5.0. | Stress login-style and learner-write fences on stable 3.5.0. Any unresolved method, readiness-before-own-write defect, or deadlock blocks production adoption. |
+| Cross-connection write-fence timestamps ([PR 14602](https://github.com/meteor/meteor/pull/14602)) | Fix is not in stable 3.5.0. | Current source inventory finds only Meteor's default runtime Mongo connection; the direct `MongoClient` belongs to an offline audit process and cannot participate in a DDP fence. Record not applicable for the current app, and reopen this case if a `RemoteCollectionDriver`, second runtime Mongo connection, or server-side DDP connection is introduced. |
+| `ChangeStreamHistoryLost` restart loop ([PR 14607](https://github.com/meteor/meteor/pull/14607)) | Fix is not in stable 3.5.0. | Inject stream interruption/history loss and observe recovery on stable 3.5.0. A restart loop, lost reactivity, or unbounded resource growth blocks production adoption. |
+| Change Stream operation-time comparison crash ([PR 14609](https://github.com/meteor/meteor/pull/14609)) and related observer fixes listed in the beta changelog | Fixes are not in stable 3.5.0. | Run concurrent snapshot/restart/fence cases on stable 3.5.0. Any crash or integrity failure blocks production adoption. Reconcile later stable patches before promotion, but do not use a beta. |
 | Quiet `uws` connection closed by the legacy heartbeat watchdog ([PR 14546](https://github.com/meteor/meteor/pull/14546)) | Merged only toward the unreleased 3.5.1 line. | `uws` remains deferred until a stable fix and the network experiment pass. |
 | DDP resumption dropped messages, spurious reconnects, closed-connection leaks, subscription stop/double-stop and batching edge cases (3.5.1 beta PRs 14526, 14528, 14530, 14532, 14534, 14536, 14538, 14542, 14544) | Present only in the 3.5.1 beta line. | Stable 3.5.0 baseline uses grace period zero. Enable resumption only on a stable patch whose final notes contain the applicable fixes and after the isolated Phase 2B experiment. |
 | Non-retrying client method can remain unresolved when force-disconnected between `result` and `updated` ([PR 14193](https://github.com/meteor/meteor/pull/14193)) | Open upstream; not proven fixed in 3.5.0 or the beta. Grace period zero does not fix this client abort semantic. | No app-owned `DDP.connect`/`retry:false` path was found; inventory packages/custom connections and, where applicable, test the precise force-disconnect window. Record not-applicable only with that evidence. |
 | Rspack Docker-build hang ([issue 14445](https://github.com/meteor/meteor/issues/14445)) and orphan processes on shutdown ([issue 14384](https://github.com/meteor/meteor/issues/14384)) | Open upstream on the review date. | Exercise bounded build shutdown/retry behavior in supported Docker/CI paths; a hang or leaked process aborts promotion. |
 
-The release owner must update this register from the final stable changelog and
-linked issue/PR state. “In a beta,” “merged,” and “milestoned” never satisfy a
-stable-release gate.
+The release owner must update this register from stable changelogs and linked
+issue/PR state. Beta code is never installed. Post-3.5.0 fixes define focused
+regression scenarios and production risks; they do not prohibit isolated
+qualification of the supported stable 3.5.0 capability.
 
 ## Goal
 
@@ -168,9 +283,10 @@ opt-in capability. Enable Change Streams only after the framework upgrade is
 stable and MoFaCTS runs against a qualified, operationally owned MongoDB
 replica-set or managed platform whose workload has been proven compatible.
 
-This is an implementation plan, not authorization to change the framework,
-MongoDB topology, data, deployment configuration, dependencies, public API
-surface, or query semantics.
+This plan now authorizes the repository-owned framework and one-member
+replica-set configuration described here. It does not authorize executing the
+live production conversion, deploying an artifact, mutating production data, or
+changing writer authority.
 
 ## Advantages MoFaCTS Can Realistically Gain
 
@@ -182,7 +298,7 @@ decision register; a capability is not adopted merely because its code ships.
 | Selected-release Node/npm (3.5.0: Node 24.15.0/npm 11.12.1) | **Automatic/unavoidable** | Supported runtime used by the selected Meteor release. | Exact release selection; Node 24/Alpine support for Argon2, SWC/Rspack and all native modules; npm lockfile review. Maintenance benefit only—no speed claim. | Rebuild builder, bundle dependencies, runtime and CI from clean inputs; static/integration/build evidence and exact-version assertions. | Roll back the complete Meteor image/package set before any incompatible data write; no mixed Node bundle. | Release engineering | 2A |
 | EJSON/DDP allocation reductions and shipped correctness fixes | **Automatic/unavoidable** | Potentially fewer copies/allocations and less GC pressure; maintained core behavior. | Copy-on-write aliasing may break code that expected a deep clone; exact shipped-fix set varies by patch. | Payload/custom-type mutation tests and same-workload heap/GC/DDP correctness comparison. | Roll back the complete framework release; no feature switch. | Application | 2A |
 | DDP session resumption | **Enabled by default but configurable; initially disable** | Can reduce full re-subscribe work on brief same-process reconnects. | Open reconnect defects; the tracked deploy is one process/no cross-instance resume, but Phase 0 must confirm live topology. MoFaCTS also persists private/overloaded identity values. Replay, memory, auth and identity risks are high. | Preserve base identity semantics; then require a separate identity contract plus short/long and same-/different-process, idempotency, auth, queue, memory and storm gates. | `disconnectGracePeriod = 0`; fresh session/re-subscribe. | Application + release engineering | 1, 2B |
-| MongoDB Change Streams | **Infrastructure-dependent; default-preferred by Meteor but initially disable** | Eligible unordered observers may move matching work from app processes to MongoDB. | MongoDB 6+ replica set/sharded cluster, privileges, connection capacity, selectors/indexes, and a stable Meteor patch containing the required fixes. May increase database load or fall back per observer. | Driver evidence; publication compatibility matrix; failure injection; correctness/integrity; matched fallback A/B workload. | Tested `polling`, or proven `oplog,polling`; never an untested placeholder. | Database operations + application | 3–5 |
+| MongoDB Change Streams | **Infrastructure-dependent; default-preferred by Meteor but initially disable** | Eligible unordered observers may move matching work from app processes to MongoDB. | MongoDB 6+ replica set/sharded cluster, privileges, connection capacity, and suitable selectors/indexes. Stable 3.5.0 has named projection, fence, operation-time, and recovery risks from fixes shipped later; reproduce those cases during isolated qualification and defer adoption if any fails. May increase database load or select polling for unsupported cursor shapes. | Driver evidence; publication compatibility matrix; failure injection; correctness/integrity; matched fallback A/B workload only for a quantified performance claim. | Tested `polling`; oplog adoption is outside this plan and would require a separately approved change. | Database operations + application | 3–5 |
 | DDP `uws` transport | **Optional/deferred** | Possible raw-WebSocket latency/throughput improvement if SockJS is a measured bottleneck. | No HTTP-polling fallback; representative public/school/corporate/mobile networks; unique internal listener and stable heartbeat fix. The tracked path has no load balancer; Phase 0 must confirm live proxy/LB behavior. | Same-workload/network A/B with a pre-approved material-benefit threshold and zero required-network loss. | `DDP_TRANSPORT=sockjs`. | Release engineering + support | 6B |
 | Promise-based Accounts APIs | **Optional/recommended after base stabilization** | Remove manual promisification and improve typing/error flow without adding UI. | Private per-tab auth surfaces, Microsoft OAuth, Memphis SAML, callbacks and error parity. | Password/token/OAuth/SAML/per-tab/reconnect regression matrix. | Keep the existing wrappers while supported; revert this independent source change. | Application/authentication | 6A |
 | Async `DDPRateLimiter` matchers | **Optional/deferred until a named policy needs data** | Can enforce a database-backed abuse condition. | Matchers run sequentially on a connection queue; lookup latency/failure can affect availability. | Bounded/indexed lookup, latency budget, fail-closed and abuse tests. | Keep existing synchronous rules. | Security + application | 6C |
@@ -201,29 +317,34 @@ article include roughly 40% more connection capacity in one harness and large
 app-CPU/RAM/GC reductions in several scenarios. They are directional,
 workload-specific evidence, not a MoFaCTS capacity or cost forecast.
 
-## Current Baseline
+## Pre-implementation Baseline
+
+This table records the state that motivated the upgrade. It is intentionally
+historical; the current uncommitted candidate and verification status are
+recorded in the readiness checklist and
+`docs/deployment/meteor-3.5-implementation-record.md`.
 
 | Surface | Current state | Upgrade implication |
 | --- | --- | --- |
 | Framework | `mofacts/.meteor/release` pins `METEOR@3.4.1`; the researched stable target is `METEOR@3.5`. | This is an incremental 3.4.1 -> 3.5 update, not the Meteor 2 -> 3 async conversion. The older v3 migration site is background only, not this upgrade procedure. |
 | Node/tooling | Exact Node ownership is currently split: Docker, CI, and hotfix paths pin Node 22.22.0; `mofacts/.nvmrc` says only `22`; `package.json` permits `>=22.13.0 <23`; and Meteor 3.4.1 itself bundles Node 22.22.1. The audit shell was Node 22.20.0/npm 10.9.3. Meteor 3.5 bundles Node 24.15.0/npm 11.12.1. | Establish one exact Node owner and make every other surface assert or derive it. Rebuild native dependencies; do not let the Meteor-bundled build Node differ from the bundle-install/runtime Node. |
-| Build/runtime pins | `Dockerfile` and `deploy/docker-compose.hotfix-local.yml` use third-party `geoffreybooth/meteor-base:3.4.1`; CI and developer docs install Meteor 3.4.1/Node 22. Meteor now documents an official `meteor/meteor-base` image. | The publisher decision is fixed: retain `geoffreybooth/meteor-base`, move every builder consumer to the approved 3.5 digest, and pin official Node 24.15.0 Alpine by each supported target architecture. Assert contents and update all selected pins atomically in E0a; do not silently swap publishers. |
+| Build/runtime pins | `Dockerfile` and the hotfix services in `deploy/docker-compose.local.yml` use third-party `geoffreybooth/meteor-base:3.4.1`; CI and developer docs install Meteor 3.4.1/Node 22. Meteor now documents an official `meteor/meteor-base` image. | Retain `geoffreybooth/meteor-base` and the established `linux/amd64` deployment architecture. Pin verified immutable OCI index digests for the 3.5 builder and official Node 24.15.0 Alpine, assert their amd64 contents, build and smoke-test the amd64 artifact, and update all selected pins atomically in A2. ARM64 and emulator coverage are outside this upgrade. |
 | Meteor packages | `.meteor/packages` directly constrains `mongo@2.2.0`, `accounts-password@3.2.2`, `session@1.2.2`, `ejson@1.1.5`, `ecmascript@0.17`, `email@3.1.2`, and `rspack@1.0.0`. Resolved `.meteor/versions` includes `accounts-base@3.2.1`, `accounts-password@3.2.3`, `ddp-client/ddp-server@3.2.0`, `minimongo@2.1.0`, `mongo@2.3.0`, `npm-mongo@6.16.1`, `alanning:roles@4.0.0`, `ostrio:files@3.0.1`, `rspack@1.1.0`, and `webapp@2.1.2`. The 3.5 set moves relevant packages again. | Distinguish direct constraints from the resolved graph. Run the official updater and review `.meteor/packages`, all of `.meteor/versions`, npm lockfile, and user-owned dependency work; do not assume the release pin alone selects the intended packages. |
 | npm build stack | The dirty working-tree lock currently resolves `@meteorjs/rspack@2.0.1`, Rspack core/CLI 1.7.6, SWC 1.15.33, Svelte 5.55.7, `svelte-loader` 3.2.4 and `svelte-preprocess` 6.0.3; app Meteor types remain `@types/meteor@2.9.11`. | Re-capture after user dependency work is dispositioned. Reconcile Atmosphere/npm Rspack and Meteor-provided/community types; prove Node 24 and target-platform binary closure rather than inferring it from permissive engine ranges. |
 | Upgrade command observability | CI and the Docker build currently run `meteor update --npm` with errors redirected and ignored. | Run the 3.5 migration interactively without suppression, retain its non-secret output in the change record, and make the reviewed lockfiles authoritative. Do not accept a green build that hid an update failure. |
 | MongoDB version | Repository Compose uses the mutable line tag `mongo:8.0`; exact patch, image digest and FCV are not repository facts. | The declared line satisfies the Change Streams minimum, but Phase 0 must capture/pin the exact deployed patch/digest/FCV and verify topology. |
-| MongoDB topology | Repository Compose starts MongoDB without `--replSet`; the local/default self-hosted path must therefore be treated as standalone until an environment check proves otherwise. | A standalone MongoDB cannot use Change Streams. Meteor will fall back to the next configured driver. |
-| Reactivity configuration | No repository-owned `METEOR_REACTIVITY_ORDER` or `MONGO_OPLOG_URL` wiring was found. The checked-in standalone Compose path is therefore expected to poll, but protected environment configuration must be inspected before asserting the production driver. | Capture the actual current driver in every environment. Forcing `oplog,polling` does not prove 3.4-equivalent behavior when oplog is unavailable; force `polling` for an observed polling baseline or explicitly provision/test oplog if that is the intended rollback. |
-| Replica-set URI compatibility | WHATWG/single-host parsing exists in `deploy/docker/validate-mongo-url.sh`, `deploy/hotfix/run-bundle.sh`, `deploy/hotfix-dev.ps1`, `mofacts/server/lib/openCoreSettingsValidation.ts`, and `mofacts/server/methods/deploymentReadinessMethods.ts`. Standard multi-host seedlists are not safely supported, and one hotfix error path can echo the full URI. | Remove local parsing and establish one opaque-URI/connected-validation contract across shell, PowerShell and app code. Pass approved seedlist, `replicaSet`, `authSource`, encoded-credential, DNS/IPv6 and SRV forms to the supported driver or `mongosh`; assert the connected database/authentication/capabilities and redact every error path. A direct parser requires the separately approved exception. |
+| MongoDB topology | At audit start, repository Compose started MongoDB without `--replSet`; the observed local runtime was standalone. | The candidate converts the same service/volume to a configurable one-member replica set. It does not claim host redundancy. |
+| Reactivity configuration | At audit start, no repository-owned `METEOR_REACTIVITY_ORDER` or `MONGO_OPLOG_URL` wiring was found. | The contained candidate now forces `METEOR_REACTIVITY_ORDER=polling`. Do not provision or select oplog in this upgrade. |
+| Replica-set URI compatibility | WHATWG/single-host parsing exists in `deploy/docker/validate-mongo-url.sh`, `deploy/hotfix/run-bundle.sh`, `mofacts/server/lib/openCoreSettingsValidation.ts`, and `mofacts/server/methods/deploymentReadinessMethods.ts`. Standard multi-host seedlists are not safely supported, and one hotfix error path can echo the full URI. | Remove local parsing and establish one opaque-URI/connected-validation contract across shell, PowerShell and app code. Pass approved seedlist, `replicaSet`, `authSource`, encoded-credential, DNS/IPv6 and SRV forms to the supported driver or `mongosh`; assert the connected database/authentication/capabilities and redact every error path. A direct parser requires the separately approved exception. |
 | Deployment database ownership | Canonical Compose depends on/waits for its local `mongodb` and backup/restore execs into that container. There are two inconsistent production MCP paths: `mofacts-mcp-sidecar/scripts/start-production.ps1` plus `mofacts-mcp-sidecar/docker-compose.production.yml` tunnels to hard-coded `mofacts-mongodb-1`, while `C:\dev\mofacts_config\deploy and build.txt` launches `mofacts-mcp-sidecar/docker-compose.remote-server.yml` directly on a remote Docker network. The base sidecar default database name is also inconsistent. | Select one authoritative production sidecar/DB contract and retire or redirect the other through a separately approved config-repo change. A replica-set target requires coherent health/readiness, backup/restore, dependencies, URI, network/tunnel, sidecar and failover behavior. |
 | Deployment shape | Tracked Compose has one fixed-name app container and one Caddy upstream; replacement restarts that sole instance. `/health` is liveness only, although Compose uses it as a healthcheck. | Do not claim current rolling, canary, cross-instance resumption or load-balancer affinity support. Either keep a one-instance maintenance deployment and expect fresh sessions after process loss, or separately approve a multi-instance/LB design. Add DB-aware readiness distinct from liveness before database failover/cutover. |
 | Reactive surfaces | `mofacts/server/publications.ts` contains learner, content, dashboard, settings and sorted/paged user publications and manual `observeChanges`; `serverComposition.ts` observes Dynamic Settings. The roles path uses `(Meteor as any).roleAssignment` across publications, shared collections, startup, and client utilities because the package export is undefined in the Rspack bundle. | Classify every selector/projection/sort/skip/limit/observer and verify roles publication/global/autopublish/allow-rule behavior as a named Rspack/package gate. |
 | DDP sessions and durable identity | The app has no public resumption configuration, but private `_lastSessionId` is polled, persisted to the user and written to history. The overloaded history `sessionID` also receives app attempt IDs, timestamp-plus-TDF values from video/AutoTutor, and learning-component/SPARC session values. Readers include model/history exchanges, dashboards/analytics and exports. | Recommended base disposition: preserve every current value/meaning, keep grace zero, inventory all writers/readers, and do not collapse or reinterpret the field in this upgrade. A unified app-owned identity is a separate durable-data design/migration; resumption stays deferred until its contract is approved. |
 | DDP transport | No repository `DDP_TRANSPORT`/`DISABLE_SOCKJS` configuration was found, so the effective target default remains `sockjs`. MoFaCTS is public/mobile-facing. | Hold `sockjs` during the framework and database work. Treat `uws` as a measured, reversible later experiment, not part of the base migration. |
-| Accounts and HTTP | `signIn.ts` manually promisifies password/token login; `authStorage.ts` monkeypatches per-tab token storage and retains a labeled “Meteor 2 fallback” through private Accounts/Meteor storage APIs; `client/index.ts` also reads private stored-token/local-storage surfaces. The Microsoft package uses private `OAuth._*` helpers; Memphis SAML uses `globalThis.Package.oauth` and private credential/login-response helpers. The server has multiple `WebApp`/Connect handler tiers. | Treat password/token, per-tab storage, Microsoft OAuth, Memphis SAML, handler ordering and scoped download routes as separate contracts. A1 removes the labeled Meteor 2 fallback and proves the supported `Accounts.storageLocation` path; inability to preserve parity on that supported contract blocks the upgrade and does not authorize time-bounded fallback preservation. |
+| Accounts and HTTP | `signIn.ts` manually promisifies password/token login; `authStorage.ts` monkeypatches per-tab token storage through `Accounts.storageLocation` plus private Accounts/Meteor storage and token APIs; `client/index.ts` also reads private stored-token/local-storage surfaces. Meteor 3.5 documents `clientStorage: "session"` for per-tab credential storage, but the documentation uses both `packages.accounts` and an older `packages.accounts-base` reference, so the stable implementation must identify the one canonical settings owner. The Microsoft package uses private `OAuth._*` helpers; Memphis SAML uses `globalThis.Package.oauth` and private credential/login-response helpers. The server has multiple `WebApp`/Connect handler tiers. | Treat password/token, per-tab storage, Microsoft OAuth, Memphis SAML, handler ordering and scoped download routes as separate contracts. A1 configures the documented session-storage contract through exactly one verified owner, then removes the private storage/token mutation layer and unnecessary token migration. Inability to preserve per-tab parity with that documented contract blocks the upgrade and does not authorize dual-key configuration or private fallback preservation. |
 | Rate limiting | `server/runtime/ddpRateLimits.ts` defines synchronous method rules. | Verify them unchanged first. Async matchers are an available later refinement only where a database-backed condition improves policy. |
 | Async migration | MoFaCTS is already Meteor 3-style and contains async raw MongoDB calls and async server code. | Re-audit custom packages, raw MongoDB calls, HTTP middleware, and native modules against the selected release; do not assume the prior migration covers a new toolchain/runtime bump. |
-| Client/build integration | The application uses Blaze/Svelte/Rspack and custom `mofacts:*` packages. Its Svelte loader wrapper globally suppresses one warning while loading, which could hide a changed diagnostic. Argon2 is enabled in CI/local settings and relies on a prebuilt native binary in Alpine; Docker also prunes platform-specific SWC binaries. `.meteor/platforms` configures Android, but the tracked mobile script is destructive/non-reproducible and has portability/tooling/signing problems. | Treat bounded Rspack build/shutdown, suppressed-warning scope, Svelte integration, roles workaround, Argon2 password/rehash, SWC/OXC/native closure, custom packages and Android disposition as named Node 24 gates. Do not run the current mobile script as an acceptance check. |
+| Client/build integration | The application uses Blaze/Svelte/Rspack and custom `mofacts:*` packages. Its Svelte loader wrapper globally suppresses one warning while loading, which could hide a changed diagnostic. Argon2 is enabled in CI/local settings and relies on a prebuilt native binary in Alpine; Docker also prunes platform-specific SWC binaries. Android installation uses the ordinary web application, not Meteor's Cordova platform. | Treat bounded Rspack build/shutdown, suppressed-warning scope, Svelte integration, roles workaround, Argon2 password/rehash, SWC/OXC/native closure, custom packages, and representative Android-browser/web-app behavior as named Node 24 gates. Do not introduce or require an APK/AAB build toolchain. |
 | Learning components | `learning-components/` has no independent Meteor runtime/package pin. Its active boundary is the canonical history envelope's `sessionID` and pedagogical trial/history/model-state consumers reached through the app facade. | Preserve envelope meaning and test new/resumed trials, replay/retry, feedback/model-state, restore and resume. Do not invent a parallel history identity. |
 | Sidecar runtime | The Mongo MCP sidecar separately pins Node 22.22 and is not part of the Meteor bundle ABI. | Do not bump it incidentally. Decide separately whether it stays on its owned runtime; it must still support the approved Mongo URI/topology/readiness contract. |
 
@@ -240,7 +361,7 @@ an updater-generated diff is reviewed.
 | --- | --- | --- |
 | Meteor release, app packages, app behavior, URI/readiness validation | `C:\dev\MoFaCTS\mofacts` | Implement and verify the selected release and app contracts here. |
 | Canonical Compose/build/hotfix/backup/restore/sidecar mechanics | `C:\dev\MoFaCTS\deploy` and root deployment files | Make these the only executable deployment source of truth; add exact-version assertions and one database target contract. |
-| TDF/config content | `C:\dev\mofacts_config` | No TDF/schema/config-name change is expected. Replace the duplicate `deploy and build.txt` operational recipe with a pointer or explicitly owned private overlay in a separate approved change before topology cutover. Preserve its unrelated dirty stimulus edit. |
+| TDF/config content and private operator procedure | `C:\dev\mofacts_config` | No TDF/schema/config-name change is expected. Keep `deploy and build.txt` as the canonical private operator checklist for the exact staging/production host, key, build, copy, conversion, rollout, and status commands. Update it in the same work package whenever the public deployment contract changes, while keeping credentials and workstation-specific mappings out of the public repository. Preserve unrelated config-repository work. |
 | Published operator/developer guidance | `C:\dev\MoFaCTS.wiki` plus concise public repo docs | Update after behavior is implemented. The wiki's current old-host/EIP fast rollback must be removed or bounded before a new target accepts writes. Wiki instructions do not own executable deployment behavior. |
 | Production MongoDB topology, credentials, backup service and on-call response | Named database/platform operations owner | Supply protected runtime facts and approve topology, RPO/RTO, monitoring, failover and authority transition. No secret enters this plan or an implementation log. |
 
@@ -262,14 +383,13 @@ artifact.
 - Make no data-schema migration solely for this framework upgrade. If one turns
   out to be necessary, stop and create a separate, approved, forward-only and
   restartable migration plan.
-- Do not silently switch the production database platform. Phase 0 first
-  qualifies an acceptable existing replica/managed platform without transfer;
-  only a confirmed standalone/replacement branch uses the separately gated
-  parallel transfer, backup/restore, authority and cutover procedure.
-- Keep the actually observed, capacity-tested reactivity fallback (`polling`,
-  or `oplog,polling` only with proven oplog configuration) available through
-  private deploy-time settings or `METEOR_REACTIVITY_ORDER`; do not introduce
-  a public UI control for it.
+- Do not silently switch the production database platform or writer authority.
+  The approved current change converts the existing service and volume in place
+  to a one-member replica set. A later parallel target remains separately gated
+  by backup/restore, authority and cutover procedures.
+- Keep `METEOR_REACTIVITY_ORDER=polling` as the capacity-tested contained-base
+  reactivity contract through private deploy-time settings; do not introduce a
+  public UI control or an oplog alternative in this upgrade.
 - Keep `sockjs` as the deterministic upgrade transport. Do not enable `uws`,
   add `accounts-express`, introduce database-backed rate-limit rules, or change
   collation/query semantics as an incidental part of the release-pin change.
@@ -287,49 +407,52 @@ Separate the work into five deliberately gated capability tracks:
 1. **Framework/toolchain and automatic gains:** update to the Phase 0 selected
    stable 3.5 release and its exact Node/npm/package set while retaining the
    observed reactive driver, `sockjs`, and grace period zero. For today's
-   3.5.0, the tuple is Node 24.15.0/npm 11.12.1. Promote this contained base
-   against the unchanged authoritative database in Phase 2C; it does not wait
-   for a topology migration.
+   3.5.0, the tuple is Node 24.15.0/npm 11.12.1. Accept the contained base as
+   the A6 repository candidate. The maintainer cancelled a separate Phase 2C
+   production rollout; the exact A6 artifact is first deployed to production
+   with polling inside Phase 5A after replica-set readiness is established.
 2. **DDP session resumption:** after a stable patch contains the applicable
    fixes, qualify the enabled-by-default reconnect semantics as an isolated
    experiment and retain grace period zero as the behavior rollback.
-3. **Database-platform qualification/migration:** first verify the protected
-   production topology. If it is an acceptable MongoDB 6+ replica set/managed
-   cluster, qualify it without moving data. If it is standalone, build a new,
-   purpose-designed replica-set target, rehearse continuity, and cut over during
-   a controlled write freeze. The tracked standalone Compose path is not proof
-   of the live production topology.
-4. **Reactivity driver:** experiment with Change Streams on a fixed stable patch
-   in staging; adopt in production only if all gates and a target-only fallback
-   soak pass. Deferral is a valid result.
+3. **Database-platform conversion:** configure the existing service and volume
+   as a secure, named one-member replica set, rehearse the in-place conversion,
+   then execute it during an authorized maintenance window with a verified
+   backup and stopped writers. Keep member identity and URIs explicit so adding
+   members or moving to a parallel target remains possible later.
+4. **Reactivity driver:** experiment with Change Streams on stable 3.5.0 in
+   staging. Treat every known post-3.5.0 fix as a focused regression scenario;
+   adopt in production only if all gates and a polling fallback soak pass.
+   Deferral is a valid result.
 5. **Explicit opt-ins:** separately evaluate native async Accounts APIs,
    `uws`, async rate-limit matchers, `accounts-express`, and collation. Adopt
    only those with a demonstrated MoFaCTS benefit and an approved contract.
 
-An in-place standalone-to-replica-set conversion remains a documented
-contingency only. It may be useful for an emergency or constrained deployment,
-but it is not the intended long-term destination. This separation prevents a
-framework, Node, DDP lifecycle, DDP transport, database-platform, query
-semantics, and reactive-driver change from being debugged as one opaque event.
+The one-member in-place conversion is the intended current destination, not a
+claim of high availability. A future parallel or multi-member deployment remains
+an independent extension. This separation prevents framework, Node, DDP
+lifecycle, DDP transport, database topology, query semantics, and reactive-driver
+changes from being debugged as one opaque event.
 
 ### Phase control cards
 
-The named owner executes the phase; the named approver alone promotes it. A
-failed gate stops the dependent track but need not stop unrelated work
-packages. “Rollback” always means the tested action in this table plus the
-phase-specific detail below, never an improvised data rewind.
+Owner and approver columns identify operational accountability; their absence
+does not stop safe repository-owned work. Explicit user authority remains
+required for production, destructive, or externally consequential actions. A
+failed gate stops only the dependent behavior it disproves, while unrelated
+work continues. “Rollback” always means the tested action in this table plus
+the phase-specific detail below, never an improvised data rewind.
 
 | Phase | Objective | Owner / approver | Entry gate | Promotion evidence | Abort trigger | Tested rollback or containment |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 — release and evidence | Lock an exact stable release, facts, workload and thresholds. | Release engineering / technical lead | Named sponsor/change authority and authorized protected-environment access. | Full owner roster; immutable release/package/image identity; runtime/topology facts; a minimal baseline dataset and two repeatable runs at the approved current-capacity target; approved thresholds. | Stable patch lacks a mandatory fix with no safe feature containment; source/dependency intent is ambiguous; secrets appear in evidence. | Revert only E0b/E0c instrumentation/tooling if unsafe; redact/discard unsafe evidence and recapture. |
+| 0 — release and evidence | Lock an exact stable release and artifact identity. | Release engineering / technical lead | Named sponsor/change authority and authorized protected-environment access. | Immutable release/package/image identity, source/dirty-tree disposition, and the supplied known-good 3.4.1 rollback identity. No reconstructed 3.4.1 workload run is required. | Source/dependency intent is ambiguous, secrets appear in evidence, or an enabled base capability has no safe containment. | Revert only conditional instrumentation if unsafe; redact/discard unsafe evidence and recapture. |
 | 1 — compatibility | Give every package, private API, publication, identity and deployment consumer a disposition. | Application lead / technical lead | Phase 0 release candidate and source identity. | Inventory signed off; focused test owners; no unresolved compatibility blocker; overloaded identity is explicitly preserved for the contained base. | Unsupported native/package/private surface or duplicate identity/deploy owner has no accepted disposition. | Do not change the release; split a separately approved remediation package. |
-| 2A — framework/toolchain | Produce a deterministic Meteor 3.5 artifact with old reactivity, SockJS and session resumption disabled initially. | Release engineering / technical lead | Phases 0–1 pass; E0a immutable pins and release architecture are accepted. | Reviewed package graphs; exact versions; static, integration, auth/build and production-shaped checks; threshold-compliant workload. | Hidden update, mismatched Node, build hang/leak, auth/data error, or threshold failure. | Redeploy the complete last-good 3.4.1 artifact/config before any database contract changes. |
+| 2A — framework/toolchain | Produce a deterministic Meteor 3.5 artifact with old reactivity, SockJS and session resumption disabled initially. | Release engineering / technical lead | Exact release/source identity and release architecture are known. | Reviewed package graphs, exact versions, normal static checks, focused upgrade-owned tests, deterministic build/ABI evidence, and startup health. | Hidden update, mismatched Node, reproducible build/startup failure, or a focused test proving an upgrade-owned compatibility defect. | Redeploy the complete last-good 3.4.1 artifact/config before any database contract changes. |
 | 2B — DDP resumption | Decide whether retained sessions are safe and useful. | Application lead / technical lead + security for auth behavior | Phase 2A stable with grace period zero; separate identity contract approved. | Replay/idempotency, auth, memory, reconnect and same-process tests pass; tracked-versus-live process topology documented. | Duplicate/missing side effect, durable identity drift, auth leakage, memory/queue breach, or unresolved upstream defect. | Set `disconnectGracePeriod = 0` and prove fresh-session recovery. |
-| 2C — contained base production | Promote the exact 2A artifact against the unchanged authoritative database with all new optionals disabled. | Release engineering / change authority | Phase 2A passes; 2B may be deferred; protected current DB/driver facts and last-good 3.4.1 artifact/backup are verified. | Maintenance deployment, critical flows and at least 24-hour threshold-compliant soak on the unchanged data contract. | Any data/auth/build/runtime/metric gate breach or deployed config differs from candidate. | Redeploy exact 3.4.1 artifact/config against the unchanged authoritative database; no data rewind. |
-| 3 — database qualification/target | Accept an existing production replica-set platform, or build/rehearse a target only if topology requires migration. | Database operations / change authority | Phase 2A accepted; live topology, RPO/RTO, backup, security and owner decisions approved. | Existing-platform proof or at least one timed representative fresh-target restore/transfer; metadata/users/assets/URI parity, production-shaped election/failover, alerts and authority rehearsal. Repeat after a failure, material runbook/platform/data-volume change, or inadequate RTO margin. | Any unverified writer, secret leak, data mismatch, failed restore/failover, missing monitoring/on-call, or RTO/RPO breach. | No-transfer branch leaves authority unchanged; transfer branch follows pre-/post-write authority rules. |
-| 4 — Change Streams staging | Prove compatible observers, correctness, recovery and economic benefit on a fixed stable patch. | Application + database operations / technical lead | Phase 3 passes; selected stable patch contains mandatory fixes. | Driver evidence, failure matrix and three matched A/B runs meet all gates. | Silent fallback, correctness/write-fence/restart defect, database capacity breach, or no accepted benefit. | Restore the exact tested fallback order; keep replica-set topology. |
-| 5A — production database acceptance | With fallback reactivity, accept the already-qualified platform without transfer or execute the approved standalone-to-target authority move. | Database operations + release engineering / change authority | Phase 2C and Phase 3 branch pass; backup/runbook/communications current. | No-transfer branch proves unchanged authority; transfer branch proves RPO-zero freeze/target-only writer; both pass smoke and 24-hour soak. | Any branch-specific continuity, readiness, alert or threshold failure. | No-transfer branch changes nothing; transfer branch uses pre-/post-write authority rules. |
-| 5B — production Change Streams | Enable only the qualified reactivity configuration. | Release engineering + database operations / change authority | Phase 4 records **adopt** and 5A/fallback production soak pass. | Active-driver evidence and at least 24-hour threshold-compliant soak including peak period. | Any integrity, auth, observer, restart-storm or resource threshold breach. | Restore exact fallback order; do not roll back data/topology. |
+| 3 — database conversion rehearsal | Implement and rehearse the selected in-place one-member replica-set conversion while preserving later expansion. | Database operations / change authority | Phase 2A accepted; backup, keyfile, member identity, URI consumers, and maintenance owner are defined. | Disposable-copy conversion proves authenticated primary readiness, unchanged data/users/indexes, polling app startup, and restore. | Secret leak, identity mismatch, data loss, failed initialization/readiness, or failed restore. | Repository rehearsal never changes production; live rollback follows the conversion runbook. |
+| 4 — Change Streams staging | Prove compatible observers, correctness, and recovery on stable 3.5.0; measure performance when making a quantitative MoFaCTS claim. | Application + database operations / technical lead | A Change-Streams-capable isolated topology exists and the stable 3.5.0 candidate is identified. | Active-driver evidence plus focused observer, write-fence, restart, integrity, and known-3.5.0-risk checks. A comparable workload is required only for a quantified performance claim. | Correctness/write-fence/restart defect or database capacity breach. | Restore polling; keep replica-set topology. |
+| 4B — hotfix localhost rollout | Run the qualified configuration first on the hotfix server at `localhost:3200`. | Application maintainer | Phase 4 records adopt for staged progression and the local MongoDB member is a healthy named replica set. | Healthy app startup, explicit `changeStreams,polling` log, active MongoDB stream evidence, and focused local smoke. | Startup, observer, write-fence, or local database-health regression. | Set the canonical local Compose reactivity order back to polling; keep the local replica-set topology. |
+| 5A — production database and contained-app acceptance | Convert the existing service/volume in place, prove replica-set readiness, then deploy the exact A6 artifact with polling before reopening traffic. | Database operations + release engineering / change authority | A6 and Phase 3 pass; protected production facts, backup/runbook/communications, and the post-write recovery path are current. | Named-set primary readiness, exact A6 fingerprint, unchanged logical data/authority, all URI consumers, restore, focused smoke, and polling-mode production soak pass. | Concrete continuity, authentication, readiness, recovery, app compatibility, or capacity failure. | Before application writes, use the rehearsed standalone/3.4.1 abort. Afterward retain the replica set and recover forward or use only a replica-set-compatible last-good app artifact. |
+| 5B — production Change Streams | Enable only the qualified reactivity configuration. | Release engineering + database operations / change authority | Phase 4 records **adopt** and the Phase 5A polling-mode production soak passes. | Active-driver evidence and at least 24-hour threshold-compliant soak including peak period. | Any integrity, auth, observer, restart-storm or resource threshold breach. | Restore exact fallback order; do not roll back data/topology. |
 | 6 — optional capabilities | Adopt/defer/reject each opt-in independently. | Capability owner / technical lead plus security/product where named | Base production 3.5 stable; capability-specific problem and benefit defined. | Focused functional/security/accessibility/localization tests and matched experiment; recorded disposition. | No material benefit, compatibility loss, security/UX regression or threshold breach. | One-variable revert to the documented base contract. |
 
 ### Default quantitative promotion guardrails
@@ -442,52 +565,56 @@ links and metric/log retention in the protected runbook before Phases 3–5.
 
 ### Recommended direction and what "database migration" means here
 
-Live production topology is a `PROTECTED-RUNTIME-FACT`. The tracked Compose
-path is standalone, but this plan does not promote that repository observation
-to a production claim. Phase 0 selects exactly one branch:
+The topology direction is now resolved: convert the existing self-hosted
+MongoDB service and data volume in place to a named replica set, initially with
+one member on the current server. The live pre-conversion state remains a
+`PROTECTED-RUNTIME-FACT` to capture before execution, but it no longer leaves
+the architecture undecided. This is branch 2 below, using the in-place path:
 
 1. **Existing acceptable MongoDB 6+ replica set/managed cluster:** qualify its
    members/service tier, FCV, security, URI consumers, backups/restores,
    monitoring, connection budget and failover. Preserve the existing data
    authority and skip the transfer/write-freeze steps. Any architecture deficit
    discovered is a separate approved platform change.
-2. **Confirmed production standalone (or an explicitly rejected existing
-   platform):** the recommended long-term path is a **parallel transfer** to a
-   newly designed replica set. The physical platform changes while the logical
-   database, collection names, document shapes, `_id` values, references and
-   external-asset relationships remain unchanged.
+2. **Current selected path — existing self-hosted standalone:** convert the
+   current data-bearing service in place to a configurable one-member replica
+   set. The host, data volume, logical database, collection names, document
+   shapes, `_id` values, references and external-asset relationships remain
+   unchanged. The design must permit later `rs.add(...)` expansion or a
+   separately rehearsed parallel-target migration.
 3. **Unknown or contradictory topology:** stop the database/Change Streams
    tracks and obtain sanitized `db.hello()`/service evidence. Do not infer a
    migration or eligibility from a URI or tracked Compose file.
 
-Only branch 2 incurs the conditional data-continuity transfer below. A confirmed
-standalone has no oplog that can synchronize its last writes into a new target,
-so it requires a final write freeze. After cutover, the old standalone is a
-read-only recovery reference and never a concurrent writer.
+Branch 2 requires a maintenance-window write stop and verified backup before
+the in-place topology conversion. It does not require copying data to a second
+server. If a parallel target is adopted later, the separate transfer and
+authority boundary below applies at that time; a standalone source has no oplog
+that can synchronize its last writes, so that future transfer requires a final
+write freeze.
 
 ### Decisions this section must settle
 
 | Decision | Candidate choices | Required recorded outcome |
 | --- | --- | --- |
-| Live topology branch | Existing acceptable replica/managed platform; confirmed standalone/replacement; or unknown/stop. | Sanitized evidence, branch, acceptance deficits, database owner and approver. |
-| Migration path (branch 2 only) | **Recommended:** restore/copy into a newly built replica set. **Contingency:** convert the confirmed standalone in place. | Chosen path, technical owner, change approver, and documented reason if contingency replaces the recommendation. |
-| Target architecture | One member for local functional smoke only; production-shaped staging matches the approved production member/service/failover design. A one-member production target is an explicit no-HA exception. | Member count/service tier, voting/election or managed failover, host/DNS, volumes, TLS/internal auth, monitoring and on-call owner. |
-| Availability target | Existing-platform qualification without authority move, or planned maintenance/write freeze for a standalone-source transfer. | Branch-specific RPO, RTO, downtime, communication owner and success/abort thresholds. |
-| Data-transfer mechanism (branch 2 only) | **Recommended:** verified physical/logical source-to-target transfer. **Contingency:** in-place data retention. | Tool, source/target versions/FCV, indexes/validators/users/assets and restore evidence. |
+| Live topology branch | **Selected:** in-place conversion of the current self-hosted service/volume to a one-member replica set. | Capture sanitized pre/post topology evidence; no URI, keyfile, or credential enters the record. |
+| Migration path (branch 2 only) | **Selected now:** convert the existing service and volume in place. **Preserved future option:** restore/copy into a parallel replica set when high availability or a server move is wanted. | Record the in-place conversion and keep the parallel-transfer runbook independent rather than making a second server a prerequisite. |
+| Target architecture | One current member on the existing server, with a stable replica-set name and explicit advertised DNS name. This supplies Change Streams but not host redundancy. Later members or a parallel target use distinct volumes and the same logical database contract. | Current member identity, keyfile ownership, URI, backup/recovery, monitoring, and the separately approved future HA design when one is requested. |
+| Availability target | Current one-server availability is retained; the conversion adds replica-set capability, not host redundancy. | Planned maintenance/write stop, backup/recovery owner, communication, and explicit future HA path. |
+| Data-transfer mechanism | **Current conversion:** none; the existing volume remains authoritative. **Future parallel target:** verified physical/logical source-to-target transfer. | Current backup/restore proof stays separate from any later transfer tooling and authority cutover. |
 | Change Streams policy | Remain on fallback initially; experiment in staging; optionally enable only after a target-only production fallback soak. | Driver order, required metrics, promotion authority, and tested rollback configuration. |
 
-Do not select production topology from this document. A one-member replica set
-can exercise functional Change Streams locally but cannot prove production
-elections, member failure, connection discovery, capacity or high availability.
-Production-shaped staging must match the approved production failure model.
-Any new target is designed and approved before data is copied; it is never a
-side effect of the Meteor update.
+The one-member production choice is explicit: it enables replica-set features
+but does not claim host redundancy or failover. That limitation is recorded,
+not treated as a blocker to the chosen outcome. A later multi-member or parallel
+target must use resolvable member names, dedicated member volumes, internal
+authentication, and its own rehearsal before data or writer authority moves.
 
 ### Old-to-target continuity map
 
-For branch 1, use this as an in-place inventory/qualification checklist with no
-source-to-target transformation. For branch 2, it is the mapping to complete
-and sign off before the topology change. "Same"
+For the selected in-place conversion, use this as a before/after continuity
+checklist with no source-to-target transformation. For a future parallel target,
+it becomes the mapping to complete before writer authority moves. "Same"
 means preserve the exact logical contract; it does not mean assume the target
 will recreate the item automatically.
 
@@ -531,8 +658,9 @@ protected change record, never in the repository or handoff text.
 
 ### Data-authority transition
 
-This table applies only to branch 2. Branch 1 never changes data authority and
-must not perform a copy/cutover merely to enable Change Streams.
+This table applies only to a future parallel-target migration. The selected
+in-place conversion never changes data authority and must not perform a copy or
+cutover merely to enable Change Streams.
 
 | Cutover point | Authoritative database / allowed writers | Required action if the step fails |
 | --- | --- | --- |
@@ -541,9 +669,10 @@ must not perform a copy/cutover merely to enable Change Streams.
 | After continuity validation and URI cutover, before normal traffic | Target replica set only; start only target-connected application instances. | If the target has not accepted application writes, stop it and return the URI/configuration to the source under the runbook. |
 | After the target accepts any production write | Target replica set only; old source is locked read-only. | Do not automatically return traffic to the source. Use a separately approved recovery/reconciliation plan if the target must be abandoned. |
 
-### Branch 2 recommended path — Parallel target replica set and true data transfer
+### Branch 2 future option — Parallel target replica set and true data transfer
 
-Use this only after Phase 0 confirms a standalone/replacement branch. Build an
+Use this later if the maintainer chooses high availability, a new server, or a
+platform move. Build an
 isolated, purpose-designed target replica set and move the current logical
 application database into it without changing its data contract. The target can
 be rehearsed, secured, monitored and restored before it becomes authoritative.
@@ -575,15 +704,15 @@ be rehearsed, secured, monitored and restored before it becomes authoritative.
    verified backup through the agreed recovery deadline. It is evidence and a
    recovery input, not a live rollback database after target writes begin.
 
-### Branch 2 contingency — In-place standalone-to-replica-set conversion
+### Branch 2 selected current path — In-place standalone-to-replica-set conversion
 
-Use this only when the architecture owner documents why a parallel target
-cannot yet be delivered. It is a topology conversion, not a copy into a new
-application database: MongoDB can start the existing data-bearing node as the
-initial primary once a replica-set name is configured and initialized. It
-enables Change Streams but retains the existing data host/volume as part of the
-long-term platform and therefore does not satisfy the recommended target by
-itself.
+This is the approved current path. It is a topology conversion, not a copy into
+a new application database: MongoDB starts the existing data-bearing node as
+the initial primary once a replica-set name and member-authentication keyfile
+are configured and the set is initialized. It enables Change Streams but does
+not provide host redundancy. The configuration must remain extensible: do not
+hard-code application logic to one member, and preserve the ability to add
+members or execute the parallel-target procedure later.
 
 1. Rehearse the complete procedure on a non-production copy with the same
    MongoDB major version, feature-compatibility version, authentication mode,
@@ -604,8 +733,8 @@ itself.
    backups, and monitoring/alerting for every member.
 6. Update the protected connection configuration to use the approved seed list
    and `replicaSet` setting, then restart the app in a controlled order with
-   the Phase 3 tested fallback (`polling`, or `oplog,polling` only when oplog is
-   provisioned and proven) still forced.
+   `METEOR_REACTIVITY_ORDER=polling` still forced. Do not provision or select
+   oplog as part of this plan.
 7. Run the mapping-table acceptance evidence and retain the old standalone
    configuration/backup as recovery material until the migration is accepted.
 
@@ -644,13 +773,16 @@ Only after the topology/data-continuity gate passes:
    behavior against the retained oplog window. Change streams consume server
    connections and resume depends on the relevant oplog history remaining
    available.
-3. Remove the temporary fallback only in staging, execute Phase 4's workload,
-   and promote only when data correctness and operational thresholds pass.
+3. In isolated staging only, apply the explicit qualification gate and switch
+   the exact order from `polling` to `changeStreams,polling`; execute Phase 4's
+   workload and promote only when data correctness and operational thresholds
+   pass. Do not remove the order override, because Meteor's default would also
+   admit the unapproved oplog driver.
 
-**Topology/data-continuity exit gate:** the live branch is proven and approved,
-all applicable continuity-map rows have evidence, the replica-set/managed
-platform is operationally owned, and—only for branch 2—the old/new authority
-boundary is rehearsed before Change Streams are enabled.
+**Topology/data-continuity exit gate:** the in-place conversion and applicable
+continuity-map rows have evidence and the one-member replica set is operationally
+owned. Only a later parallel-target migration requires an old/new authority
+boundary rehearsal.
 
 ## Phase 0 — Select the Exact Target and Capture Evidence
 
@@ -660,11 +792,12 @@ boundary is rehearsed before Change Streams are enabled.
       PR builds and `latest`;
    2. choose the newest stable 3.5 patch whose final changelog/package set,
       Node/npm tuple and open-regression review pass the compatibility gate;
-   3. require every mandatory Change Streams/`uws` fix in the issue-disposition
-      register before that capability can be enabled;
-   4. if stable `METEOR@3.5`/tool 3.5.0 remains the only acceptable release,
-      proceed with the base framework only with fallback reactivity, SockJS and
-      `disconnectGracePeriod = 0`; and
+   3. require stable fixes before the separately deferred `uws` and DDP
+      resumption experiments, while using post-3.5.0 Change Streams fixes as
+      named qualification scenarios rather than an entry prohibition;
+   4. if stable `METEOR@3.5`/tool 3.5.0 remains the selected release, proceed
+      with the polling/SockJS/zero-grace base and the isolated stable-3.5.0
+      Change Streams qualification as separate configurations; and
    5. record the release tag/commit, tool/package graph, Node/npm versions,
       builder/runtime image tags and digests, application source and settings
       fingerprint as the immutable candidate identity.
@@ -672,8 +805,8 @@ boundary is rehearsed before Change Streams are enabled.
    core Meteor packages, bundled Node/npm, Mongo driver, Accounts, EJSON/DDP,
    and WebApp. Record that Rspack is an existing 3.4/3.4.1 capability, not a new
    3.5 benefit. Update the issue-disposition register from shipped code. Do not
-   replace a mandatory missing fix with tests alone; keep that capability
-   disabled until the fix ships in the selected stable release.
+   install prerelease code; use focused stable-3.5.0 testing and polling rollback
+   to decide the Change Streams production disposition.
 3. Record a reproducible baseline before any edit:
 
    - source commit/tag, `.meteor/release`, `.meteor/packages`,
@@ -689,30 +822,26 @@ boundary is rehearsed before Change Streams are enabled.
      database indexes, backup age, monitoring/on-call, and restore evidence;
    - baseline health, learner-flow, admin/content, reconnect, app/Mongo resource,
      event-loop, heap/GC, and DDP performance evidence.
-4. Build or designate a repeatable concurrency harness, synthetic/approved
-   dataset, workload mix, ramp/soak duration, environment manifest, and result
-   capture protocol. The existing production smoke/load document is explicitly
-   human-scale and approximately one concurrent user; it can validate flows but
-   cannot validate Meteor's capacity claims or a Change Streams/`uws` decision.
-5. Approve or replace the quantitative guardrails, alert destinations,
-   protected-evidence location and responsibility roster. Name release,
-   application/auth, database operations, security/privacy, performance,
-   product/accessibility/localization, documentation, change-authority and
-   on-call owners. An unassigned responsibility is a failed Phase 0 gate.
+4. Build a repeatable concurrency harness only before making a quantified
+   MoFaCTS capacity, speed, or memory claim. Focused correctness and recovery
+   work does not wait for that harness.
+5. Before an externally consequential production action, name the owner for
+   that action, its protected evidence, alerts, and recovery decision. Missing
+   operational ownership blocks that production action only; it does not block
+   independent repository implementation or static verification.
 
-Tracked and structurally inspected protected deploy inputs each describe one
-Compose `mongodb` endpoint and define none of `MONGO_OPLOG_URL`,
-`METEOR_REACTIVITY_ORDER`, or `DDP_TRANSPORT`; this supports a
-`VERIFIED-REPO` source observation and an `INFERENCE` of
-standalone/polling/SockJS. It does **not** prove
-the live production process or database. The sanitized runtime facts above are
-still required before any production recommendation.
+The pre-implementation inputs described one standalone Compose `mongodb`
+endpoint. The current candidate instead declares a named one-member replica set,
+polling, and SockJS. Neither source state proves the live production process or
+database; sanitized runtime facts remain required immediately before a live
+conversion or production recommendation.
 
-**Phase 0 exit gate:** the exact stable candidate and containment settings are
-locked; source/dependency intent is unambiguous; protected facts, owners,
-workload, evidence retention and numeric thresholds are approved; and all
-mandatory upstream issues have a shipped-fix, disabled-capability, or explicit
-non-production disposition.
+**Phase 0 repository exit gate:** the exact stable candidate and containment
+settings are locked, source/dependency intent is unambiguous, and mandatory
+upstream issues have a shipped-fix or the affected capability remains disabled.
+Protected production facts and owners are required only before their associated
+live action; workload and numeric-threshold approval is required only for a
+quantified performance claim.
 
 ## Phase 1 — Compatibility Inventory and Preflight
 
@@ -742,10 +871,14 @@ non-production disposition.
    framework surfaces: per-tab `authStorage.ts`, private `OAuth._*` calls in the
    Microsoft package, SAML's login-style/Accounts registration APIs, and the
    mixed `WebApp.handlers`/`connectHandlers`/`rawConnectHandlers` routes.
-   Decide whether to retain, replace, or remove the explicitly labeled Meteor 2
-   per-tab auth fallback and other private token-storage reads; document what
-   refresh, two-tab, logout, redirect, expired-token and resume behavior depends
-   on it. Cover health, backup/own-history token downloads, H5P, PWA, social
+   Trace the stable 3.5 Accounts initialization and settings reader to select
+   exactly one canonical owner for documented `clientStorage: "session"`; do
+   not configure both the documented `accounts` example and older
+   `accounts-base` reference. Inventory every `authStorage.ts` mutation and
+   private token-storage read so A1 can remove only behavior superseded by the
+   documented contract. Document what refresh, two-tab, logout, redirect,
+   expired-token and resume behavior depends on it. Cover health,
+   backup/own-history token downloads, H5P, PWA, social
    preview, security headers, dynamic assets and SAML GET/POST handler ordering,
    status/HEAD behavior, streaming/backpressure and promise rejection.
    Also regression-test the process-wide Mongo driver unhandled-error policy
@@ -788,9 +921,9 @@ non-production disposition.
    selected reactivity mode and that monitoring can distinguish Change Streams,
    oplog, and polling behavior without exposing secrets or learner records.
 5. Identify explicit test ownership for password, Google, Microsoft, and SAML
-   authentication; per-tab session persistence; Android/mobile builds (or an
-   approved retain/repair/replace/retire decision for that configured but
-   currently unproven target); and the custom package API surfaces.
+   authentication; per-tab session persistence; representative Android-browser
+   and installable-web-app behavior; and the custom package API surfaces. The
+   native Cordova Android target is not part of the product.
 6. Inventory the pre-existing overloaded identity contract before building on
    it: private `_lastSessionId` user/history writes; Svelte learning-attempt IDs;
    timestamp-plus-TDF IDs in `VideoSessionMode.svelte` and
@@ -823,11 +956,14 @@ non-production disposition.
    Select the canonical deployment/sidecar contract and a single opaque-URI and
    connected-validation specification. Treat any error path capable of printing
    credentials as a security blocker.
-10. Prove no TDF field/config/schema change is required by running a
-   representative config-repo TDF upload/validation/launch/response/resume
-   matrix. `npm run generate:schemas` is required only if an implementation
-   actually changes the registry or schema; an unchanged upgrade must produce
-   no generated schema diff.
+10. Prove no TDF field/config/schema change is required through the cross-repo
+    field/registry audit and focused tests for any upgrade-owned TDF boundary.
+    The current implementation changes no registry, schema, config key, or TDF
+    reader contract, so representative upload/launch/response/resume coverage
+    remains ordinary CI/release evidence rather than a Phase 1 gate.
+    `npm run generate:schemas` is required only if an implementation actually
+    changes the registry or schema; this unchanged upgrade must produce no
+    generated schema diff.
 11. Trace the `learning-components` history envelope and pedagogical consumers
    through the app facade. Verify new/freshly reconnected trials, ordinary versus
    H5P replay, feedback/model-state, restore and resume preserve each existing
@@ -854,8 +990,10 @@ from the database track. Candidate build success belongs to Phase 2A.
 
 ### 2A — Release, toolchain, and automatic runtime changes
 
-1. If current stable `METEOR@3.5` remains selected, run the official command
-   exactly on a clean, intentionally scoped working tree:
+1. Preserve `.meteor/release`, `.meteor/packages`, `.meteor/versions`, the npm
+   lockfile, and every release/toolchain consumer unchanged through E0a. If
+   current stable `METEOR@3.5` remains selected, begin A2 by running
+   the official command exactly on a clean, intentionally scoped working tree:
 
    ```bash
    meteor update --release 3.5
@@ -863,10 +1001,12 @@ from the database track. Candidate build success belongs to Phase 2A.
 
    If Phase 0 selects a later stable patch, use that patch's official exact
    release identifier instead. Run without suppressed output or ignored exit
-   status. Review every change to `.meteor/release`, `.meteor/packages`,
-   `.meteor/versions`, and the npm lockfile. Confirm the resulting release/tool
-   identity and reconcile all direct constraints with the selected release set.
-2. Update the release-consistency set together:
+   status. Do not manually edit `.meteor/release` before this command. Review
+   every change to `.meteor/release`, `.meteor/packages`, `.meteor/versions`, and
+   the npm lockfile. Confirm the resulting release/tool identity and reconcile
+   all direct constraints with the selected release set.
+2. In the same A2 worktree and review package, update the complete
+   release-consistency set together:
 
    - `mofacts/.meteor/release`;
    - `mofacts/.meteor/packages`, `.meteor/versions`, and
@@ -876,7 +1016,7 @@ from the database track. Candidate build success belongs to Phase 2A.
      and affected npm package constraints;
    - the explicitly approved official or third-party `Dockerfile` builder image
      by exact tag/digest and matching build/runtime Node images;
-   - `deploy/docker-compose.hotfix-local.yml` builder and runtime images;
+   - `deploy/docker-compose.local.yml` hotfix builder and runtime images;
    - `.github/workflows/ci.yml` exact Meteor and Node/npm setup;
    - Docker bundle dependency overrides for `@mapbox/node-pre-gyp`, `node-gyp`,
      and `underscore`, verifying whether every override is still necessary;
@@ -885,6 +1025,12 @@ from the database track. Candidate build success belongs to Phase 2A.
    - `deploy/README.md`, `docs/development.md`, and any release/version docs;
    - a build/startup assertion that prints only safe exact release/tool/runtime
      identities and fails on drift.
+
+   Do not commit, stage for promotion, or treat as a buildable checkpoint any
+   intermediate state in which `.meteor/release`, the resolved Meteor package
+   graph, Node/npm ownership, builder/runtime images, CI, or hotfix pins
+   disagree. The official updater output and all owning pins are one atomic
+   framework/toolchain transition.
 
 3. Rebuild dependencies rather than carrying forward binaries built for the
    old Node/Meteor toolchain. Recheck Node 24 ABI support, Docker bundle
@@ -899,9 +1045,7 @@ from the database track. Candidate build success belongs to Phase 2A.
    with:
 
    ```text
-   METEOR_REACTIVITY_ORDER=polling         # when Phase 0 proves polling today
-   # or: METEOR_REACTIVITY_ORDER=oplog,polling
-   #     when oplog is actually configured, observed, and the intended baseline
+   METEOR_REACTIVITY_ORDER=polling
    DDP_TRANSPORT=sockjs
    ```
 
@@ -909,10 +1053,10 @@ from the database track. Candidate build success belongs to Phase 2A.
    `Meteor.server.options.disconnectGracePeriod = 0` from an owned, validated
    server-startup contract. Record which
    reactivity mechanism and transport are actually active in each environment.
-   The reactivity value must preserve the driver actually observed in Phase 0,
-   not merely list a preferred fallback. On a standalone without
-   `MONGO_OPLOG_URL`, `oplog,polling` still resolves to polling. This isolates
-   Change Streams and `uws` and disables session retention; it does **not**
+   The contained-base value is always `polling`, regardless of whether Phase 0
+   discovers an oplog-capable environment; adopting oplog is outside this plan
+   and requires separate approval. This isolates Change Streams and `uws` and
+   disables session retention; it does **not**
    recreate all 3.4 behavior because the Node, Accounts, EJSON/DDP and other
    core changes are still present.
    Wire the selected variables through canonical and hotfix Compose environment
@@ -924,25 +1068,29 @@ from the database track. Candidate build success belongs to Phase 2A.
    observer fields. Do not expose a new public setting/control. Confirm through
    a supported startup/runtime contract that the grace period is actually zero;
    the exact app-owned wiring is selected in Phase 1.
-5. Run the normal static checks and the CI-supported Meteor integration suite.
-   Exercise all affected authentication providers and ordinary auth-session
-   continuity/fresh reconnects,
-   routes, HTTP download and asset handlers, background jobs, admin/content
-   flows, a representative learner session, and the Android/mobile build if it
-   remains supported. A local `npm run test:ci` invocation still requires fresh,
-   single-use maintainer authorization; otherwise use CI or another supported
-   Meteor test environment.
-6. Verify the automatic 3.5 paths that apply: EJSON/backup round trips and large
-   DDP payloads; Minimongo `forEachAsync`/`mapAsync` only if inventory finds an
-   app/dependency use (otherwise record N/A); URL/proxy-based local dev;
-   email startup without the missing-`Accounts.emailTemplates.from` warning;
-   and HttpOnly-cookie login only if MoFaCTS enables that earlier feature.
+5. Run the normal static checks and focused automated tests for upgrade-owned
+   changes. Require the exact framework/Node/npm graph, deterministic amd64
+   build and ABI assertion, clean application startup, health response, Mongo
+   connection validation, canonical Accounts client-storage configuration, and
+   EJSON backup round trip. A local `npm run test:ci` invocation still requires
+   fresh, single-use maintainer authorization; when it is not authorized or the
+   client runner is unavailable, preserve its CI ownership and continue unless
+   existing evidence reveals a concrete client compatibility defect.
+6. Use ordinary CI and release smoke coverage for unaffected authentication
+   providers, routes, asset/download handlers, background jobs, admin/content
+   flows, learner flows, reconnect permutations, Android-browser installation,
+   and TDF examples. These surfaces become A6 blockers only when the upgrade or
+   an upgrade-owned source change affects their contract or a focused check
+   exposes a regression. Conditional Meteor APIs such as Minimongo async
+   iterators or HttpOnly-cookie login are `N/A` when MoFaCTS does not use them.
 
-**Phase 2A exit gate:** the selected Meteor release has passed functional and
-deployment-shaped checks with forced fallback reactivity, `sockjs`, and grace
-period zero; the exact artifact is reproducible; required static/CI checks and
-the matched workload meet thresholds; and no database migration or unapproved
-product behavior was introduced.
+**Phase 2A exit gate:** the selected Meteor release and exact runtime graph pass
+the normal static checks, focused upgrade-owned tests, deterministic amd64
+build/ABI assertions, and startup health with forced polling, `sockjs`, and
+grace period zero. No known technical defect contradicts the candidate, and no
+database migration or unapproved product behavior was introduced. Broader CI,
+browser, provider, workload, or staging evidence is follow-up release evidence,
+not a blocker by absence alone.
 
 ### 2B — DDP session-resumption qualification
 
@@ -1008,56 +1156,28 @@ the effect of a retained Meteor connection.
 stable fixed patch; otherwise record **defer**, retain grace period zero, and
 allow the independently accepted Phase 2A runtime to continue.
 
-### 2C — Contained Base Production Rollout on the Unchanged Database
+### Phase 2C — Cancelled Separate Production Rollout
 
-This is the independent production completion path for the Meteor/Node upgrade.
-It neither waits for nor authorizes a database topology or Change Streams
-change. Its artifact uses the exact Phase 2A fallback reactivity, SockJS and
-grace-period-zero configuration; Phase 2B may remain deferred.
-
-1. Re-capture the protected production database/topology/driver and current app
-   process/proxy facts. Verify the exact last-good 3.4.1 artifact/configuration,
-   current authoritative database, supported backup and restore evidence, and
-   that the 3.5 candidate introduced no schema/data/query-semantic change.
-2. Obtain the separately required production/Docker authorization. Use the
-   tracked one-instance maintenance procedure if runtime evidence confirms it;
-   otherwise use the proven real deployment topology. Do not claim a rolling
-   deployment or retained in-memory session across a replaced process.
-3. Deploy the exact staging-approved Phase 2A artifact and configuration against
-   the same authoritative database. Confirm release/runtime/config fingerprints,
-   fallback driver, SockJS and grace period zero before returning traffic.
-4. Run critical synthetic/operator checks for every auth provider, per-tab/fresh
-   reconnect, learner launch/response/history/model/resume, representative TDF,
-   admin/content/settings, HTTP/assets/uploads/background work, backup/readiness
-   and accessibility/localization status behavior. Observe all quantitative
-   dashboards through at least 24 hours spanning a peak period.
-5. On any abort trigger, redeploy the exact last-good 3.4.1 artifact and its
-   configuration against the unchanged authoritative database, then repeat the
-   failed flow. Because this track forbids data-contract/topology changes, no
-   database restore or URI switch is part of framework rollback. An unexpected
-   incompatible write is an invariant breach: stop and invoke the separately
-   approved data-recovery decision rather than improvising.
-6. Record the exact artifact, contained capability disposition, measured result,
-   rollback evidence and documentation updates. The database track may then run
-   later and independently.
-
-**Phase 2C exit gate:** the contained Meteor 3.5 base passes critical flows and
-the 24-hour production soak on the unchanged authoritative database, and the
-3.4.1 full-artifact rollback has been rehearsed against representative staging
-evidence and remains operationally available for the production change window.
+The maintainer cancelled Phase 2C on 2026-08-02. It is not an entry gate,
+production action, work package, or prerequisite for any later phase. The A6
+candidate remains the accepted contained base, and its first production
+deployment now occurs within Phase 5A with polling after the converted database
+has passed authenticated replica-set readiness. This intentionally trades the
+extra standalone-database production step for one maintenance sequence; Phase
+5A therefore owns both exact A6 app compatibility and database-platform
+acceptance before traffic returns.
 
 ## Phase 3 — Production Database Qualification or Target-Transfer Rehearsal
 
-1. Determine the real production topology using safe administrative checks:
-   start with `db.hello()` and call `rs.status()` only after the result confirms
-   replica-set membership; do not infer topology from a connection
-   string alone. Record version/FCV, storage engine, authentication, database
-   inventory, backups, external assets and all URI consumers. Inventory source
-   write paths that must be stopped for cutover only if branch 2 applies.
-2. Record branch 1 (qualify the existing acceptable replica/managed platform),
-   branch 2 (build/transfer from a confirmed standalone or rejected platform),
-   or branch 3 (unknown/stop). Branch 1 makes no copy or authority transition;
-   branch 2 executes the continuity procedure; branch 3 blocks Phases 3–5.
+1. Before the authorized conversion, capture the real production state using
+   safe administrative checks: `db.hello()`, version/FCV, storage engine,
+   authentication, database inventory, backups, external assets and all URI
+   consumers. Do not infer those runtime facts from a URI or Compose file.
+2. Execute the selected branch-2 in-place conversion on the existing service
+   and data volume. Use a stable configurable replica-set name, an explicit
+   DNS member address, keyfile member authentication, and an idempotent
+   initializer. Keep the logical database and writer authority unchanged. A
+   second server and a data copy are not prerequisites.
 3. Before using a replica-set seedlist, make URI ownership coherent. Prefer the
    smallest design: treat `MONGO_URL`/`MONGO_URI` as opaque secrets, pass them to
    the supported MongoDB driver or `mongosh`, and validate the connected
@@ -1070,7 +1190,7 @@ evidence and remains operationally available for the production change window.
    package implicitly or add more ad hoc parsers. Touch only consumers shown to
    parse or mishandle the URI; inspect and test at least
    `deploy/docker/validate-mongo-url.sh`,
-   `deploy/hotfix/run-bundle.sh`, `deploy/hotfix-dev.ps1`,
+   `deploy/hotfix/run-bundle.sh`,
    `mofacts/server/lib/openCoreSettingsValidation.ts`, and
    `mofacts/server/methods/deploymentReadinessMethods.ts`, plus every
    wait-host/backup/restore/sidecar consumer. Preserve strict database-name
@@ -1089,40 +1209,33 @@ evidence and remains operationally available for the production change window.
    startup and ongoing sidecar health, backup/restore, tunnels/network, and
    operator commands for the chosen target. Do not leave operational tools on
    the old local container while the app uses the target.
-5. Decide what fallback reactivity means on the accepted/target platform. If actual oplog
-   tailing is required, provision and protect `MONGO_OPLOG_URL`, least-privilege
-   access, and monitoring, then prove `oplog` is active. Otherwise document that
-   `oplog,polling` falls through to polling and capacity-test that rollback.
+5. Preserve `METEOR_REACTIVITY_ORDER=polling` on the accepted/target platform
+   and capacity-test that exact rollback contract. Do not provision
+   `MONGO_OPLOG_URL` or add oplog selection in this plan; oplog adoption requires
+   a separate capability decision and qualification package.
 6. Keep `/health` as liveness and add a distinct bounded readiness contract for
    MongoDB, Redis and required storage. Readiness must use the shared URI
    contract, fail closed without leaking topology/credentials, and react to
    primary loss after startup. Align Compose health/dependency and deployment
    verification with the correct probe; do not turn transient dependency loss
    into an unbounded restart storm.
-7. For branch 1, qualify the existing platform in a production-shaped staging/
-   restore environment: exact version/FCV/service tier, member discovery,
-   security, connection budget, backups, alerts and actual failover behavior.
-   Complete at least one representative restore to an isolated target without
-   changing production authority, repeating only under the rehearsal rule
-   above. For branch 2, build the intended target. A one-member set may be
-   used only for local functional smoke; production-shaped staging must match
-   the approved production member/service/failure topology, which must preserve
-   TLS/internal authentication, least privilege, health/readiness, member-volume
-   ownership, backup/recovery, monitoring, alerting and on-call response. Pin
-   exact MongoDB image/patch and FCV; a floating `mongo:8.0` tag is not release
-   evidence.
-8. For branch 2, select the topology-grade backup mechanism and run at least one
-   timed representative rehearsal of the **recommended parallel target replica
-   set and true data transfer** path, repeating under the rehearsal rule above.
-   Each uses a fresh isolated target, encrypted/checksummed input, all writers
-   stopped when required, and proves the continuity map, users/roles, indexes,
-   options/TTL, assets, URI consumers, readiness, election and restoration
-   behavior. Record RPO/RTO and resource results without data/secrets.
-9. Write and approve the branch-specific runbook before touching production.
-   Branch 1 documents unchanged authority, backup/failover response and any
-   configuration-only acceptance. Branch 2 includes maintenance/write freeze,
-   backup/verification points, restore, users/indexes/TTL, URI switch, authority
-   rollback deadline, and learner communication.
+7. Rehearse the same in-place conversion against a disposable restored copy.
+   Prove that the existing data volume starts with replica-set configuration,
+   initializes exactly once, elects the member primary, accepts the authenticated
+   application URI, preserves users/indexes/options/data, and restores polling
+   operation. Record that one member has no host-level failover; do not require a
+   simulated multi-server architecture that is not part of this change. Pin the
+   exact MongoDB image/patch and FCV before production execution.
+8. Select and verify a topology-grade backup/restore mechanism before the live
+   conversion. A successful restore rehearsal, not an arbitrary performance
+   threshold, is the gate. The parallel-target transfer rehearsal is required
+   only when that future migration is actually selected.
+9. Write the in-place conversion runbook before touching production. It names
+   the write-stop, backup/verification point, keyfile placement, replica-set
+   initiation, URI update, post-conversion checks, abort point, recovery owner,
+   and communication. Once the converted primary accepts writes, recovery uses
+   the converted database or the verified backup; it does not run the old and
+   new configurations as concurrent authorities.
 10. Reconcile all public, wiki and config operator instructions before cutover.
    Remove the wiki fast rollback that reassigns traffic to the old co-located
    app/database after the target accepts writes; replace duplicate private
@@ -1136,52 +1249,61 @@ evidence and remains operationally available for the production change window.
    and if no separate scaling design is
    approved, use the maintenance-window procedure and expect fresh DDP sessions.
 
-**Phase 3 exit gate:** branch 1 proves the unchanged platform, a representative
-isolated restore and production-shaped failover; or branch 2 proves the target,
-a representative transfer and authority rehearsal. The applicable RPO/RTO gates, readiness,
-backup/restore, monitoring/alerts/on-call, every URI/sidecar/operator consumer
-and documentation owner are proven, and database operations/change authority
-approve the protected branch runbook.
+**Phase 3 exit gate:** repository configuration and a disposable-copy rehearsal
+prove the selected in-place conversion, authenticated primary readiness,
+backup/restore, unchanged logical data, and every URI/sidecar/operator consumer.
+The repository rehearsal may use synthetic representative data; the separately
+authorized live conversion still requires a protected-backup restore rehearsal
+with the real continuity inventory before writer authority changes.
+The live conversion then requires explicit production authorization and its
+protected backup/runtime evidence. Lack of multi-server failover does not block
+this one-member outcome; a future parallel or multi-member move gets its own
+authority and rehearsal.
 
 ## Phase 4 — Change Streams Qualification
 
-**Entry gate:** the selected stable Meteor patch contains every mandatory
-Change Streams fix in the upstream register; Phase 3's accepted existing/new
-platform, backup, URI, readiness, monitoring and failure-injection contracts
-pass. Stable 3.5.0 does
-not meet this entry gate on the review date.
+**Entry gate:** stable Meteor 3.5.0 is the selected candidate and Phase 3's
+converted isolated platform, backup, URI, readiness, and recovery contracts
+pass. The known post-3.5.0 fixes in the upstream register are mandatory test
+scenarios, not prerequisites. No beta or release-branch artifact is used.
 
-1. Remove the temporary fallback override only in the isolated replica-set
-   staging experiment
-   so Meteor's default order (`changeStreams,oplog,polling`) is exercised.
-   The configured order is global, while actual driver selection/fallback is
-   per cursor. Verify from application/database evidence which cursors use
-   Change Streams and which correctly fall back. Meteor documents no stable public
+1. Only in the isolated replica-set staging experiment, change the explicit
+   order from `polling` to `changeStreams,polling` and set
+   `MOFACTS_CHANGE_STREAMS_QUALIFICATION=true`. The application must reject the
+   changed order without that explicit gate and reject the gate when the order
+   does not match. The tracked
+   `deploy/docker-compose.change-streams-qualification.yml` overlay owns this
+   isolated difference; the base, local, staging, and hotfix definitions remain
+   pinned to polling. Do not exercise Meteor's
+   upstream default `changeStreams,oplog,polling`, because oplog adoption is not
+   approved by this plan. The configured order is global, while actual driver
+   selection is per cursor. Polling is the intentional driver for ordered/
+   paginated cursor shapes that Change Streams cannot own; verify from
+   application/database evidence which driver owns each tested cursor.
+   Meteor documents no stable public
    per-observer driver-introspection API: use declared configuration, supported
    logs/APM, MongoDB stream/operation evidence, and behavior tests rather than
    production code that reaches into private observer-driver fields.
-2. Run a repeatable workload against the same data shape and concurrency used
-   for the Phase 0 baseline. Cover at minimum:
-
-   - learner launch, response/history writes, resume, and multi-tab/session
-     behavior;
-   - teacher/admin content listing, editing, upload, and draft updates;
-   - paged/filtering user administration;
-   - settings updates, dashboard refreshes, asset serving, and reconnection
-     after brief network loss or app-process replacement/restart;
-   - narrow high-value publications, broad/high-write publications, ordered
-     observers, selectors rejected by `Minimongo.Matcher`, and `skip`/`limit`
-     cursors;
-   - unbounded history and ID-array inputs at approved maximums, full settings/
-     admin listings, and subscribe-time theme/audio initialization without
-     duplicate writes or amplification;
-   - ObjectID and nested/dotted projections, initial-snapshot plus concurrent
-     writes, stream close/restart/history-loss conditions, primary election,
-     operation-time comparison, login-style writes/write fences, and—if
-     MoFaCTS uses more than one Mongo connection—cross-connection write
-     coordination. These remain mandatory regressions even after the fixes ship.
-     For TDF projections, assert excluded speech/TTS/OpenRouter secret fields are
-     absent from both the initial snapshot and every reactive update.
+   The manually triggered
+   `.github/workflows/meteor-35-change-streams-qualification.yml` workflow is
+   the repository-owned execution path for the opt-in client/server observer
+   and write-fence matrix. It uses stable Meteor 3.5 and a disposable MongoDB 8
+   replica set; it never installs the beta or touches a protected database.
+   The workflow uses a test-only MongoDB failpoint to inject error 286 and then
+   restarts the disposable one-member primary while client subscriptions remain
+   active. Both cases require post-fault reactive delivery and write-fence
+   completion; no production failpoint or private observer-driver hook is added.
+2. Use the completed static inventory in
+   `docs/deployment/meteor-3.5-implementation-record.md`. Exercise an unordered
+   equality/`$in` publication, `filteredUsers` or `pagedTdfsListing` as the
+   ordered/paginated polling-owned path, the exact-id server-verbosity manual
+   observer, an unsupported or nested projection, initial snapshot with a
+   concurrent write, a login-style write fence, stream restart/history loss,
+   and primary election. Add a
+   MoFaCTS flow only when it owns one of those contracts; do not turn unrelated
+   product surfaces into phase gates. For any TDF projection exercised, assert
+   excluded speech/TTS/OpenRouter secret fields remain absent from both the
+   initial snapshot and reactive updates.
 
 3. Compare the fallback and Change Streams runs using:
 
@@ -1194,12 +1316,13 @@ not meet this entry gate on the review date.
    - integrity checks on learner histories, model state, assignments, content,
      and authentication/audit records.
 
-4. Run three alternating fallback/Change-Streams comparisons through the
-   concurrency ladder and fault/soak protocol. Size and monitor the MongoDB
-   connection pool above the proven open-stream and ordinary-operation demand;
-   do not infer capacity from a configured maximum alone.
-5. Keep the default only if every flow satisfies the quantitative guardrails
-   and the named database/app benefit is material. Narrow broad selectors or add/verify indexes
+4. When claiming a measured MoFaCTS speed, memory, or capacity improvement, run
+   at least one comparable polling/Change-Streams workload and report the
+   workload, variance, and limitations. Additional alternating runs are useful
+   when variance makes the result ambiguous, but an arbitrary run count is not
+   an implementation gate.
+5. Keep the capability when focused correctness/recovery checks pass and the
+   database remains within safe operating bounds. Narrow broad selectors or add/verify indexes
    where evidence identifies a query problem. The 3.5 driver order is global;
    do not invent an unsupported per-cursor force-driver setting. Record the
    defaults—100 ms restart delays after error/close and a 1000 ms
@@ -1208,62 +1331,114 @@ not meet this entry gate on the review date.
    lose the later stream event, but it can temporarily let a subscription
    become ready before the client's own write appears.
 
-**Phase 4 exit gate:** application and database owners record actual driver use,
-fallbacks, correctness, recovery, capacity and three-run A/B results. The
-technical lead records **adopt** only when all gates pass and benefit is
-material; otherwise record **defer** and retain the exact tested fallback.
-Either outcome completes the experiment. Any integrity/fence/restart-loop or
-capacity breach immediately restores the fallback and blocks production
-Change Streams.
+**Phase 4 exit gate:** active-driver evidence plus the focused observer,
+write-fence, restart, integrity, and database-capacity checks pass. Quantitative
+A/B evidence is additionally required only for a quantified performance claim.
+Any integrity/fence/restart-loop or capacity breach restores polling and is a
+technical blocker for production Change Streams.
+
+### Phase 4B — Hotfix Server on Localhost First
+
+1. The first non-test Change Streams runtime is the one canonical hotfix server
+   running on `http://localhost:3200`. Do not create a second local application
+   server.
+2. Manage that server only with `deploy/hotfix-local.ps1`. The script owns the
+   native Meteor/Rspack source watcher and uses exactly
+   `deploy/docker-compose.yml` plus `deploy/docker-compose.local.yml` for the
+   local MongoDB service and its named one-member replica set. Do not start a
+   second native process, Docker application container, or localhost
+   application overlay on port 3200.
+3. Set `MOFACTS_CHANGE_STREAMS_ENABLED=true` and
+   `METEOR_REACTIVITY_ORDER=changeStreams,polling` in the environment owned by
+   the canonical local management script.
+   Do not set the test-only `MOFACTS_CHANGE_STREAMS_QUALIFICATION` flag.
+   Base, staging, and production configurations remain explicitly on polling.
+4. Require healthy application startup, the startup mode log, an active
+   `$changeStream` in sanitized MongoDB operation evidence, and focused login,
+   publication, learner-history, content, and admin smoke on localhost.
+5. Use the hotfix server during normal local work before requesting a production
+   configuration change. A quantitative performance claim still requires a
+   comparable workload; ordinary local use is correctness and operational
+   evidence.
+
+**Phase 4B exit gate:** the hotfix server at `localhost:3200` is healthy with
+Change Streams explicitly active and the focused local flows remain correct.
+Failure restores only the hotfix reactivity setting to polling and does not
+undo the local replica-set topology.
+
+The repository previously supplied separate native-watcher and Docker-bundle
+management paths, with both described as localhost hotfix servers. That
+duplication caused operators and agents to select different application
+instances while using the same name and port. Phase 4B consolidates ownership
+under `deploy/hotfix-local.ps1` while retaining the source-watching native
+Meteor/Rspack workflow. The canonical script stops and removes any obsolete
+Docker application container before starting the watcher; Docker continues to
+own MongoDB and replica-set initialization. The invariant is one application
+version, one application port owner, and one management script—not one process
+or an all-Docker runtime.
+
+**Completion record (2026-08-02):** `deploy/hotfix-local.ps1 status` reported the
+canonical app and local MongoDB healthy and verified four active Change Streams.
+The authenticated localhost browser smoke reached `/home` with 17 published
+lessons (14 in progress and 3 new), loaded the populated `/dataDownload` owned-TDF
+table and learning-history action, rendered `/contentUpload`, rendered live
+server state in `/adminControls`, loaded persisted user-learning metrics in
+`/userAdmin`, and continued `Times_Tables` to the learner `/content` screen with
+the active response control. Browser warning/error capture was empty. No data
+download, admin mutation, or learner answer was submitted.
 
 ## Phase 5 — Production Database Acceptance and Optional Change Streams
 
 ### 5A — Production database-platform acceptance with fallback reactivity
 
-**Entry gate:** the contained base has passed Phase 2C; Phase 3's live topology
-branch, RPO/RTO, backup, monitoring/on-call and runbook are accepted; and the
-real app/proxy topology is represented accurately.
+**Entry gate:** A6 and Phase 3 are accepted; the in-place conversion rehearsal,
+backup/restore, readiness, and runbook are current; the real app/proxy topology
+is represented accurately; and the post-write recovery path is explicit.
 
-1. For either branch, verify the topology-grade backup of MongoDB, private
+1. Verify the topology-grade backup of MongoDB, private
    settings, environment files, dynamic assets, H5P content/libraries and key
    material. Record safe source/image/settings identities as required by
-   `docs/deployment/upgrade-guide.md`. Run the exact Phase 2C app artifact with
-   the Phase 3 fallback—`polling`, or `oplog,polling` only when oplog is proven.
-2. **Branch 1—existing accepted platform:** make no data copy or authority/URI
-   transition merely for Change Streams. Apply only the separately approved
-   security/readiness/operations corrections, prove failover and restore in the
-   production-shaped environment, run operator/learner smoke checks, and observe
-   a 24-hour fallback soak spanning a peak period. Abort by reverting only the
-   configuration/operations correction; data authority never moves.
-3. **Branch 2—confirmed standalone/replacement:** begin the maintenance window,
-   stop and verify every application/job/admin/external writer, take the final
-   snapshot, transfer database/metadata/assets to the rehearsed target, and
-   complete every continuity/authority validation before learner traffic.
-4. On branch 2, switch every private URI consumer, make the target the only
-   writable authority, and lock the old source against writers. Use the tracked
-   one-instance maintenance restart if live evidence confirms it; any approved
-   multi-instance rollout may contain only target-connected instances. Never
-   canary across two databases.
-5. On branch 2, an abort before the target's first accepted application write
-   may restore source authority exactly as rehearsed. After that first write,
-   the target remains authoritative; the old-host/EIP switch and old-container
-   restart are prohibited. Invoke forward recovery/reconciliation.
-6. For either branch, run `/admin/tests`, every critical synthetic/operator
-   flow, backup/readiness/alert checks and the 24-hour fallback soak.
+   `docs/deployment/upgrade-guide.md`. Lock the exact A6 application artifact
+   and its Phase 3 fallback fixed to `polling`.
+2. Begin the maintenance window and stop every application, job, admin, and
+   external writer. Confirm the verified backup and keyfile are available before
+   changing MongoDB startup configuration.
+3. Restart the existing data-bearing service with the configured replica-set
+   name and member-authentication keyfile. Run the idempotent initializer once,
+   wait for the current member to become writable primary, and update every
+   private URI consumer to include the same replica-set identity. Do not copy
+   data or introduce a second writer authority.
+4. Validate users/roles, collections, indexes/options, representative data,
+   assets, backups, and readiness while writers remain stopped. Then deploy the
+   exact A6 artifact with polling, confirm its release/runtime/config
+   fingerprint and database connection, and run representative learner and
+   admin checks before reopening traffic. Record the one-member no-HA
+   limitation.
+5. Before the converted primary accepts application writes, an abort may restore
+   the rehearsed standalone startup configuration and exact 3.4.1 app/config.
+   After it accepts writes, retain the replica-set configuration and recover
+   forward or use only a last-good app artifact already proved compatible with
+   the replica-set URI; do not run standalone and replica-set forms concurrently.
+6. Run focused operator/learner smoke checks and observe normal production
+   operation with polling. Only a concrete correctness, readiness, recovery, or
+   capacity failure blocks acceptance; missing optional evidence does not.
 
-**Phase 5A exit gate:** branch 1 proves unchanged authority, failover/restore and
-the fallback soak; or branch 2 proves RPO-zero freeze, RTO, continuity and
-target-only authority plus the soak. In both cases, smoke, backup, readiness,
-alerts and on-call meet all guardrails on the accepted platform.
+**Phase 5A exit gate:** the existing database is a healthy authenticated
+one-member replica set, the exact A6 application is running with polling, the
+logical data and writer authority are unchanged, all supported URI consumers
+connect to the named set, backup/recovery and readiness pass, and focused smoke
+plus the polling-mode production soak show no concrete regression.
 
 ### 5B — Production Change Streams rollout
 
-1. A Phase 4 **adopt** result on the exact production artifact/configuration and
-   the Phase 5A fallback-mode production soak are both
+1. A Phase 4 **adopt** result, a successful Phase 4B hotfix-localhost rollout,
+   and the Phase 5A polling-mode production soak are all
    prerequisites. Staging qualification does not authorize Change Streams in
-   production before Phase 5A accepts the existing or transferred platform.
-2. Remove the fallback override only through the approved production
-   configuration change, then confirm the expected reactivity driver and
+   production before Phase 5A accepts the converted platform.
+2. Apply the exact C1-qualified `changeStreams,polling` order and its explicit
+   gate only through the approved production configuration change; do not
+   remove the explicit order and thereby select Meteor's unqualified oplog
+   alternative. Then confirm the expected reactivity driver and
    monitor the agreed application, MongoDB, correctness, and reconnect
    metrics through a 24-hour soak spanning a peak period.
 3. If a reactive-behavior problem appears, restore:
@@ -1272,18 +1447,20 @@ alerts and on-call meet all guardrails on the accepted platform.
    METEOR_REACTIVITY_ORDER=<the tested Phase 3 fallback>
    ```
 
-   Use `polling` or `oplog,polling` exactly as approved; do not deploy the
-   placeholder. Confirm the active fallback and re-run the affected flow. Roll
+   Replace the placeholder with `polling`; do not deploy it literally or select
+   oplog. Confirm polling is active and re-run the affected flow. Roll
    back the app image/configuration only if the framework issue remains. Do not
    roll back database data or topology merely to reverse Change Streams.
 4. Promote documentation changes, release notes, measured outcomes, selected
    driver configuration, topology ownership, and any operational warnings only
    after the Change Streams soak succeeds.
 
-**Phase 5B exit gate:** active-driver evidence and the complete 24-hour result
-meet every guardrail. Any threshold breach restores the tested fallback. A
-deferred Change Streams decision is a valid final state and does not invalidate
-the already accepted Meteor/runtime or database platform.
+**Phase 5B exit gate:** active-driver evidence and the authorized production
+observation show no correctness, stability, or database-capacity regression.
+Any such regression restores polling. If a technical blocker or topology/
+authority design question remains, the base Meteor/runtime remains valid but
+the Change Streams objective remains explicitly incomplete rather than being
+silently reclassified as a successful defer result.
 
 ## Phase 6 — Deliberate Adoption of Optional 3.5 Capabilities
 
@@ -1389,19 +1566,19 @@ change or a documented reason that no runtime change was warranted.
 | Phase / surface | Mandatory verification and evidence | Environment / authority |
 | --- | --- | --- |
 | Plan-only change | `git diff --check -- docs-developer/meteor-3.5-upgrade-plan.md`; heading/anchor, table, code-fence, local-path and HTTP-reference validation; review final diff and working-tree scope. | Local, read-only except the plan edit. No app check is required for Markdown-only work. |
-| Phase 0 telemetry/harness/baseline | Reuse existing telemetry/load tooling where possible; safe signal/redaction/alert tests; minimal versioned synthetic dataset/seed/workload/result schema; approved dependency/privacy/storage controls; two repeatable 3.4.1 runs at the approved current-capacity target with spread. | Isolated load environment and protected evidence system; performance/operations/security owners. |
+| Phase 0 source/artifact identity | Record the supplied known-good 3.4.1 source/artifact identity, dirty-tree disposition, selected 3.5 release, and immutable amd64 base-image identities without exposing private settings or rebuilding the old application. | Local read-only inspection and safe implementation record; release engineering. |
 | Release/package graph | Unsuppressed successful exact-release updater; reviewed `.meteor/release`, direct/resolved Atmosphere packages and npm lockfile; `meteor --version`, `meteor node -v`, `meteor npm -v`, bundle `.node_version.txt`, image metadata/digests and startup assertions all match. | Clean implementation checkout/change record; release engineering. |
 | TypeScript/JavaScript/Svelte | From `C:\dev\MoFaCTS\mofacts`: `npm run typecheck`, `npm run typecheck:vendor`, and `npm run lint`. Required checks must pass before staging/commit/push. | Local/CI under selected Node; application owner. |
 | Meteor integration | CI `npm run test:ci`, plus focused auth, methods, publications, EJSON, Mongo-error-policy, HTTP, Rspack/Svelte/roles and native-module tests. A local invocation needs fresh explicit single-use maintainer authorization every time. | Supported CI/Meteor environment; test/application owner. |
 | TDF/schema compatibility | Representative config-repo TDF upload/validation/launch/response/resume. Run `npm run generate:schemas` from `mofacts` and inspect generated diffs **only** if a registry/schema field changes; no schema change is expected. | App + `C:\dev\mofacts_config`; content/schema owner. |
-| Build/runtime | Clean target-architecture bundle; native Argon2 and SWC/Rspack; dependency install under bundle-declared Node; bounded build exit/no orphan; process shutdown; exact artifact checks. | CI and production-shaped Docker Compose/staging. Docker build/hotfix execution requires explicit user authorization. |
-| DDP contained baseline | Polling/proven oplog driver evidence, SockJS network paths and grace-period-zero fresh reconnect; auth/per-tab/attempt identity; in-flight write and reconnect-storm correctness. | Staging matched workload; application/release owners. |
-| Phase 2C contained production | Exact Phase 2A fingerprint, unchanged authoritative database/schema/URI, critical synthetic/operator flows, 24-hour peak-period soak, and representative rehearsal of complete 3.4.1 artifact/config rollback. | Separately authorized production change; release/change authority. |
+| Build/runtime | Clean `linux/amd64` bundle from the pinned OCI indexes; recorded amd64 child digests; native Argon2 and SWC/Rspack; dependency install under bundle-declared Node; bounded build exit/no orphan; process shutdown; exact artifact checks and an amd64 smoke test. | CI and production-shaped Docker Compose/staging. Docker build/hotfix execution requires explicit user authorization. |
+| DDP contained baseline | Active polling-driver evidence, SockJS network paths and grace-period-zero fresh reconnect; auth/per-tab/attempt identity; in-flight write and reconnect-storm correctness. | Staging matched workload; application/release owners. |
+| Phase 5A combined production acceptance | Exact A6 fingerprint with polling; authenticated replica-set readiness; unchanged data/authority; all URI consumers; critical synthetic/operator flows; protected backup/recovery evidence; and a 24-hour peak-period polling soak. | Separately authorized production maintenance change; release/database/change authority. |
 | DDP resumption experiment | Short/long, resumable/non-resumable/process-replacement, overflow/HCP/logout/provider matrix; public `sessionResumed`, replay/side effects, memory/queue/workload gates; zero-grace rollback. | Stable fixed patch in staging; application/security owners. |
 | URI/readiness/operations | Connection strings remain opaque to shell/PowerShell and are passed to a supported Mongo client; connected `ping`/`hello`, database-name and redaction evidence; no secret output; liveness/readiness distinction; election/failover from every affected app, hotfix, backup/restore, sidecar/tunnel and operator path. An offline parser corpus applies only if its exceptional need and direct dependency are separately approved. | Isolated accepted/target platform; release/database/security owners. |
 | Branch 1 existing-platform acceptance | Sanitized live branch proof; exact platform/FCV/security/pool; at least one representative isolated restore, repeated after failure/material change or inadequate RTO margin; production-shaped failover; unchanged-authority/config rollback; operator/synthetic flows and 24-hour fallback soak. | Representative staging then separately authorized production correction/acceptance; database/change authority. |
 | Branch 2 target transfer | At least one timed representative fresh-target rehearsal, repeated after failure/material change or inadequate RTO margin; frozen-source identity; encrypted/checksummed backup; continuity map, indexes/options/TTL/users/roles/assets/URI consumers; RPO/RTO, target-only authority and forward-recovery drill. | Isolated target then separately authorized maintenance window; database/change authority. |
-| Change Streams | Selected stable-patch proof; active/fallback driver evidence; ordered/unsupported/pagination/projection/snapshot/restart/history-loss/operation-time/write-fence cases; three matched A/B runs and fault/soak protocol. | Replica-set staging, then separately approved production change; application/database owners. |
+| Change Streams | Stable 3.5.0 artifact identity; active-driver evidence; focused ordered/unsupported/pagination/projection/snapshot/restart/history-loss/operation-time/write-fence cases; comparable A/B workload only for quantified performance claims. | Replica-set staging, then separately approved production change; application/database owners. |
 | Native async Accounts | Password/token/Google/Microsoft/SAML success/error parity, hook/callback ordering, per-tab storage, login-time reconnect, accessibility status/focus and types. | Focused CI/UI/staging; application/auth owner. |
 | `uws` | Same-workload A/B against SockJS; required network/proxy/idle-timeout matrix; internal-port isolation; reconnect/session behavior and numeric benefit; SockJS rollback. | Isolated staging and representative networks; release/support owners. |
 | Async rate matcher | Named policy; bounded/indexed lookup; queue latency, rejection/error leakage, fail-closed and abuse tests. | Focused security/integration environment; security/application owner. |
@@ -1427,7 +1604,7 @@ commands are never implied by this plan.
 | Session resumption loses/replays work or retains resources. | Any duplicate/missing/cross-user side effect; auth mismatch; queue/memory/latency guardrail breach; stable patch lacks reconnect fixes. | Keep base at grace period zero. Isolate experiment; restore zero and verify fresh-session recovery. | Application/security |
 | EJSON copy-on-write unexpectedly aliases data. | Mutation/reference-identity test changes an earlier payload/object or produces client/server mismatch. | Use `EJSON.clone` only where a deep-copy contract is intended; focused tests. Revert the independent source adjustment or framework artifact. | Application |
 | Mongo driver error classifier restarts or masks incorrectly. | Pool/election/network fault causes a restart storm, or a fatal synthetic/real case remains alive/unreported. | Test selected-driver names/labels/messages and supported semantic signals; fail safely. Roll back artifact/classifier change. | Application/operations |
-| Stable Change Streams retains known defects. | Mandatory issue not shipped, projection crash, fence/login hang, operation-time error or history-loss restart/log storm. | Do not enter Phase 4; keep exact fallback. If seen, restore fallback immediately and capture redacted evidence. | Application/database |
+| Stable Change Streams retains known defects. | Projection crash, fence/login hang, operation-time error or history-loss restart/log storm appears in the mandatory stable-3.5.0 qualification scenarios. | Enter Phase 4 only on the isolated platform. If a defect is reproduced, record **defer**, restore polling, and capture redacted evidence; do not promote Change Streams to production. | Application/database |
 | Change Streams silently falls back or provides no benefit. | Declared default but observed streams/fallbacks differ; less than approved 15% bottleneck improvement. | Per-cursor evidence and A/B runs. Record defer; retain fallback without reverting topology. | Performance/application |
 | Change Streams overloads MongoDB. | Any Mongo connection/pool/CPU/memory/I/O/lag/slow-query guardrail breach. | Narrow/index measured queries or defer. Restore fallback; retain target database. | Database operations |
 | URI/readiness leaks a secret or fails a member/election. | Credential/URI appears in output, supported seedlist is rejected, readiness remains green without required DB, or primary election strands a consumer. | Shared spec, redaction tests, separate readiness. Abort cutover; before writes use source, after writes keep target and repair forward. | Release/security/database |
@@ -1452,30 +1629,26 @@ audit/test demonstrates the named need.
 
 | Order / package | Narrow change boundary | Verification and exit | Independent rollback / dependency |
 | --- | --- | --- | --- |
-| E0a — baseline source-of-truth and immutable pin lock | First edit `mofacts/.meteor/release` to `METEOR@3.5`; atomically align the approved Meteor builder digest, target-specific Node 24.15.0 image digest, exact `.nvmrc`/package/CI/hotfix ownership, version assertions and unsuppressed updater policy. Capture source/dependency dirty-tree intent and protected architecture evidence before editing overlapping files. No app behavior change belongs here. | Diff proves every release/toolchain consumer agrees; immutable builder reports Meteor 3.5, Node 24.15.0 and npm 11.12.1; target architecture and digest are named; no updater error is hidden; unrelated working-tree changes are preserved. | First repository change and prerequisite for E0d and every A/D/C/O source package. Hold E0a and A2 as one review stack so no mismatched release/resolved graph is promoted. |
-| E0b — safe telemetry (conditional commit/config package) | Reuse current operations signals; add only a missing bounded app/DDP/Mongo/artifact signal required by a gate, with privacy/access/retention controls. Do not create a new monitoring platform. | Synthetic signal/alert/redaction tests and operations/security approval. | Revert instrumentation/config without changing product/data semantics; depends E0a. |
-| E0c — minimal workload fixture | Extend existing load/test tooling with only the learner/admin/reconnect/write profiles and synthetic/minimized data needed for base comparison. Obtain explicit approval for any new dependency. | Repeatability, privacy, load-shape and environment-fingerprint review; no production learner data. | Remove test-only tooling; no runtime dependency unless separately approved. |
-| E0d — base functional baseline (no code commit) | After E0a locks the candidate facts, execute two runs of the approved compatibility workload against the preserved exact 3.4.1 last-good artifact captured before E0a edits, and store protected raw plus safe summarized evidence. Defer capacity ladders, performance claims and optional-capability experiments. | Two repeatable runs, critical-flow correctness, exact 3.4.1 artifact/config fingerprint and approved interpretation; no learner data or URI in retained evidence. | No app mutation; prerequisite for D1/A1/A2 and A6 comparison. |
+| E0a — read-only source, artifact and immutable-candidate lock | Make no repository edit. Record the source commit, dirty-tree disposition, supplied known-good 3.4.1 rollback identity, candidate Meteor builder and Node 24.15.0 Alpine OCI index identities, their `linux/amd64` child manifests, and the intended A2 release-consistency set. Inspect candidate indexes without changing their consumers. Do not reconstruct or rerun the 3.4.1 application. | Evidence proves unrelated work is dispositioned; the supplied last-good identity is recoverable; both candidate indexes contain the required `linux/amd64` target; amd64 child digests are recorded; and A2 has one bounded file/owner set. An ambiguous source/artifact identity stops before implementation. | First activity and prerequisite for every A/D/C/O source package; no commit or framework-owned edit. |
+| E0b — safe telemetry (conditional commit/config package) | Reuse current operations signals; add only a missing bounded app/DDP/Mongo/artifact signal required by a later gate, with privacy/access/retention controls. Do not create a new monitoring platform. | Synthetic signal/alert/redaction tests and operations/security approval. | Revert instrumentation/config without changing product/data semantics; depends E0a. |
 | I1 — durable identity inventory/decision (no code commit) | Inventory all overloaded `sessionID` writers/readers; approve preserving their current meanings/grace zero. Document a separate future semantic-migration boundary. | Data/application owner sign-off; no field/schema/value change. | No mutation; prerequisite for contained base and any later resumption design. |
 | D1 — opaque URI and readiness security (base prerequisite) | Before A1/A2, remove shell/PowerShell and server single-host parsing from the existing app/deploy/hotfix paths; pass the URI opaquely to the supported driver/`mongosh`, validate the connected database and required authentication/capabilities with `ping`/`hello` or driver facts, redact errors, and keep database platform/authority unchanged. Add a direct parser only through a later separately approved exception. | Existing approved URI forms connect; selected database and required capabilities are asserted; wrong target/auth fails closed; no URI/credential reaches output; liveness remains distinct from readiness. | Revert before candidate use; do not add a parser or platform migration. This base security prerequisite is the only D-series work pulled ahead of A2. |
-| A1 — private per-tab auth compatibility | Remove the labeled Meteor 2 `_storage` and token-method fallback branches and use only the supported Meteor 3 `Accounts.storageLocation` contract. Preserve existing per-tab UX; if Meteor 3.5 does not expose the contract, stop as a compatibility blocker rather than preserving or inventing another path. | Reload/two-tab/logout/provider/expired-token/fresh-reconnect security tests plus explicit supported-contract assertion. | Revert this auth-only commit; no durable identity change and no compatibility fallback. |
-| A2 — exact Meteor package solution | Run the selected stable updater unsuppressed; review release/direct/resolved/npm graphs without CI/Docker escape hatches. | Clean re-run yields the same graph; release identity assertions and diff review. | Revert complete package/release set; depends E0a–E0d, I1, D1, A1 and Phase 1 dispositions. |
-| A3 — resolved ABI and build validation | Reconcile A2's resolved Meteor/npm graph with E0a's exact Node/npm/image policy; assert the built bundle's `.node_version.txt`, rebuild target-platform native modules, verify package-manager identity, and remove unjustified incompatible-update flags. Do not introduce a second set of release or image pins. | Bundle/manifest assertions, target-platform native closure and config validation; final clean build proof occurs after A5 in A6. | Revert A3 with the A2 artifact; E0a remains the sole pin owner and no database/config contract changes. |
+| A1 — documented per-tab Accounts storage | Trace stable 3.5 initialization to select exactly one canonical settings owner for documented `clientStorage: "session"`; configure that owner, then remove `Accounts.storageLocation` assignment, private `_storage`/token-method overrides, `_sessionStorage` access, and migration code only where the documented contract supersedes them. Preserve existing per-tab UX and do not configure both `accounts` and `accounts-base`. If the documented contract cannot preserve parity, stop as a compatibility blocker rather than preserving or inventing a private fallback. | Password/token/Microsoft OAuth/Memphis SAML success and failure; reload; two tabs with distinct users; close/reopen; one-tab logout; redirect; expired token; fresh reconnect; no token in `localStorage`; token only in the intended tab's `sessionStorage`; explicit canonical-settings-owner assertion. | Revert this auth-only commit; no durable identity change, dual-key configuration or private compatibility fallback. |
+| A2 — atomic framework/package/toolchain transition | After E0a, run `meteor update --release 3.5` unsuppressed and, in the same worktree/review package, align `.meteor/release`, direct/resolved Meteor and npm graphs, verified builder/Node index pins, exact `.nvmrc`/engines/package-manager policy, CI/hotfix consumers, version assertions and updater observability. Do not manually edit the release first or create an intermediate commit. | Complete diff proves every release/package/toolchain consumer agrees; clean updater re-run yields the same graph; amd64 image identities are asserted; no update failure is hidden; no intermediate mismatched state is staged or promoted. | Revert the complete release/package/toolchain set; depends E0a, I1, D1, A1 and Phase 1 dispositions. |
+| A3 — resolved ABI and build validation | Validate A2's unified Meteor/npm/image solution; assert the built bundle's `.node_version.txt`, rebuild target-platform native modules, verify package-manager identity, and remove unjustified incompatible-update flags. Do not introduce a second set of release or image pins. | Bundle/manifest assertions, target-platform native closure and config validation; final clean build proof occurs after A5 in A6. | Revert A3 with the complete A2 artifact; no database/config contract changes. |
 | A4 — containment settings | Wire proven fallback reactivity, SockJS and an app-owned startup mapping to `Meteor.server.options.disconnectGracePeriod = 0`; add safe behavior diagnostics. | Static/config propagation and redaction tests; full contained workload occurs in A6. | Revert settings/startup commit; depends A2–A3. |
 | A5 — compatibility fixes (conditional; one commit per surface) | After A2–A4 assemble the candidate, fix only proven Rspack/roles, Mongo error-policy, EJSON, OAuth/SAML/Accounts, WebApp or native issues. | Focused unit/integration/auth/security/native tests; no unrelated surface in one commit. | Revert each surface independently; every blocker resolves before A6. |
-| A6 — base 3.5 acceptance | Add/complete deterministic integration and workload coverage, including representative config TDF flow, without enabling optional capability. | All Phase 2A and quantitative gates; exact staging artifact. | Revert base artifact before DB contract changes. |
-| A7 — contained base production | Deploy the exact A6 artifact against the unchanged authoritative database with fallback/SockJS/grace zero. | Phase 2C critical flows, fingerprint and 24-hour production soak. | Full last-good 3.4.1 artifact/config; no DB restore/URI change. |
+| A6 — base 3.5 acceptance | Confirm the exact runtime graph with normal static checks, focused upgrade-owned tests, deterministic amd64 build/ABI evidence, and startup health, without enabling later capabilities. | Proportionate evidence covers changed contracts; missing broad regression or benchmark evidence is tracked through ordinary CI/release work and does not block by itself. | Revert base artifact before DB contract changes. |
 | S1 — DDP resumption experiment (conditional) | On a stable fixed patch only, enable default grace/queue in staging and add replay, revocation, identity, queue/memory and same-process coverage. | Phase 2B adopt/defer record. | Grace period zero; independent of DB/Change Streams. |
-| D0 — protected topology branch lock (no code commit) | Use sanitized live evidence to choose existing-platform qualification, standalone/replacement transfer, or unknown/stop. | Database/change authority signs the branch and deficits; no URI recorded. | No mutation; prerequisite for D-series. |
-| D2 — deployment/sidecar ownership | Select canonical direct-network or approved topology-capable sidecar path; remove stale DB-name/single-container/tunnel assumptions; align wait-host, health and operator paths. | Sidecar app/database behavior and election/failure tests. | Restore old path only while old source remains authoritative; depends D1. |
-| D3a — existing-platform qualification (branch 1) | Qualify exact replica/managed security, URI, backup/restore, monitoring, pool, failover and on-call without moving authority. | Representative isolated restore, production-shaped failover, RPO/RTO/alerts and continuity inventory; repeat only under the rehearsal rule. | Production authority/config unchanged until D5a. |
-| D3b — target platform/rehearsal (branch 2) | Provision approved target security/volumes/monitoring and topology-grade backup; run a representative transfer rehearsal. | Fresh-target continuity, election/failover, RPO/RTO and alert evidence; repeat only under the rehearsal rule. | Destroy/recreate isolated targets; production source unchanged. |
-| D4a — unchanged-authority runbook/docs (branch 1) | Document platform acceptance, failover/restore and approved operations corrections; consolidate wiki/config owners. | Tabletop, one doc hierarchy, no migration/old-host ambiguity. | Revert corrections; data authority unchanged. |
-| D4b — transfer runbook/docs (branch 2) | Finalize freeze, authority transition, forward recovery and communication; remove unsafe old-host rollback; update owning repos separately. | Protected tabletop plus the accepted representative rehearsal evidence. | Before target write abort to source; after write recover forward. |
-| D5a — production platform acceptance (branch 1) | Apply approved operations corrections with fallback reactivity and unchanged data authority. | Phase 5A failover/restore, smoke and 24-hour soak. | Revert configuration correction; authority never moves. |
-| D5b — production target transfer (branch 2) | Execute approved maintenance transfer with fallback reactivity; no feature/schema change. | Phase 5A RPO/RTO, target-only authority, smoke and 24-hour soak. | Pre-write abort to source; post-write forward recovery on target. |
-| C1 — Change Streams staging qualification (conditional) | On a stable fixed patch, remove fallback only in staging; add missing observer/projection/fence/failure coverage and A/B evidence. | Phase 4 adopt/defer result from three runs and soak. | Restore exact fallback; database target remains. |
-| C2 — production Change Streams config (conditional) | Apply only the C1-approved setting after D5a or D5b accepts the platform. | Active driver, full metrics and 24-hour peak-period soak. | Restore exact fallback configuration; no data/topology rollback. |
+| D0 — topology decision and protected preflight | Use the approved in-place one-member design; capture sanitized live standalone/version/FCV/backup facts before execution. | Repository design is explicit; production facts contain no URI, keyfile, or credential. | No live mutation; prerequisite for production execution. |
+| D2 — deployment/sidecar ownership | Use one required opaque topology-capable URI and exact connected-set validation; remove stale DB-name/single-container/tunnel assumptions; align wait-host, health and operator paths. | All Compose variants render; exact-set/ping validation tests pass; the isolated polling app connects through the canonical path. Multi-member election behavior is tested only when a second member exists. | Restore old path only while old source remains authoritative; depends D1. |
+| D3 — in-place replica-set configuration and rehearsal | Configure keyfile authentication, named-set startup, idempotent initialization, exact-set readiness, and opaque replica-set URIs. Rehearse against a disposable restored copy. | Existing data/users/indexes remain intact; member becomes writable primary; polling app startup and backup restore pass. | Production source remains unchanged during repository work and rehearsal. |
+| D4 — in-place conversion runbook/docs | Document write stop, backup, keyfile placement, initialization, URI updates, validation, abort boundary, recovery, and the one-member no-HA limitation. Preserve a separate future parallel-target path. | Focused tabletop and one authoritative operator path. | Documentation/config can be reverted before live conversion; data authority remains on the current volume. |
+| D5 — production in-place conversion | During an authorized maintenance window, convert the existing service/volume with polling retained and no data copy. | Phase 5A exact-set readiness, continuity, smoke, backup/recovery, and normal-operation evidence. | Before application writes, use the rehearsed abort; after writes, recover the converted set or backup without concurrent authorities. |
+| D6 — future multi-member or parallel target (optional) | Add members with the shared keyfile or execute the separately rehearsed transfer when HA/server migration is selected. | Member/target-specific security, volumes, failover, continuity, and authority evidence. | Independent of the current one-member outcome. |
+| C1 — Change Streams staging qualification (conditional) | On stable 3.5.0, use the explicit qualification gate and tracked isolated Compose overlay to select `changeStreams,polling`; add focused observer/projection/fence/restart and known-defect coverage, with a comparable workload only when making a quantified performance claim. | Fail-closed configuration tests plus Phase 4 correctness/recovery result and active-driver evidence. | Remove the qualification overlay and restore polling; database target remains. |
+| C1B — hotfix localhost Change Streams | Enable the qualified order on the hotfix server running at `localhost:3200`, without the test-only qualification flag. | Healthy startup, active-stream evidence, and focused local application smoke. | Restore polling in the canonical local Compose definition; local replica-set topology remains. |
+| C2 — production Change Streams config (conditional) | Apply only the C1-approved setting after D5 accepts the converted platform. | Active driver and focused correctness/capacity observation. | Restore exact polling configuration; no data/topology rollback. |
 | O1 — native async login APIs | Replace manual password/token promisification only; preserve UI/error/provider/per-tab behavior. | Focused auth/accessibility tests plus static/CI checks. | Revert source commit; independent of other optionals. |
 | O2 — `uws` experiment (conditional) | Configuration/network experiment on a stable heartbeat-fixed patch; no product change. | Required-network matrix and >=15% named benefit with all gates. | SockJS setting. |
 | O3 — async rate matcher (conditional) | One named abuse policy with bounded data lookup; no HTTP package. | Matcher latency/rejection/leak/abuse tests. | Restore synchronous rule. |
@@ -1491,36 +1664,66 @@ committed, or pushed without the user's explicit acceptance of that exact risk.
 
 ## Final Readiness Checklist
 
-| Item | Status on 2026-07-25 | Evidence still required / blocking scope |
+| Item | Status through 2026-08-02 | Evidence still required / blocking scope |
 | --- | --- | --- |
 | Official Meteor/MongoDB/API research and stable-versus-beta distinction | Complete for plan | Re-check mutable stable tags, final changelog and issue register in E0. |
 | Main app, learning-components, deploy/CI, config repo and wiki audit | Complete for plan | Re-capture source commits/dirty intent; runtime behavior is not implied by source. |
 | Capability classifications, phases, owners, gates, rollback and work sequence | Complete for plan | Named people/teams must accept responsibilities and default thresholds. |
-| TDF/config compatibility | No Meteor-specific schema dependency found | Representative upload/launch/resume proof during A6; schema generation only if implementation changes a field/registry. |
-| Current stable framework containment | Blocking repository entry | A4 must track polling, SockJS and grace period zero consistently; the audited repository does not yet contain those settings. |
-| Exact selected stable patch/package/image graph | Blocking repository entry | E0a must land the release, builder, architecture-specific Node, local/CI/hotfix and assertion pins; A2 must then produce and review the resolved graph without hidden updater failures. |
-| Working-tree/dependency intent | Required before A2 | Preserve and explicitly disposition existing package/zstd/upload work; do not mix it with updater output. |
+| TDF/config compatibility | No registry/schema change; static compatibility retained | No A6-specific TDF exercise is required because the upgrade did not change a field, registry, or TDF reader contract. Ordinary CI/release smoke coverage remains appropriate. |
+| Current stable framework containment | Implemented and accepted for repository progression | Polling, SockJS and grace period zero are wired consistently and the verified amd64 image logged the expected active settings. |
+| Exact selected stable patch/package/image graph | Runtime graph implemented; exact current dev-lock image not rebuilt | Meteor 3.5, Node 24.15.0, npm 11.12.1, immutable OCI indexes, synchronized runtime package graphs, build-time drift checks, bundle ABI assertions, and the verified amd64 image identity are recorded in `docs/deployment/meteor-3.5-implementation-record.md`. That image predates the dev-only Playwright ownership correction; an exact current-lockfile rebuild requires new Docker authorization. Commit/push/promotion remain separate. |
+| Working-tree/dependency intent | Recorded candidate working tree | The implementation record binds the candidate to the supplied source identity plus reviewed working-tree changes. No commit or push was performed. |
 | Protected production facts | Required before Phase 0 exit and all production conclusions | Sanitized Mongo patch/FCV/`db.hello()`, effective driver/settings, app count/proxy timeouts, resource/connection/index/backup/restore/monitoring facts. |
-| Overloaded `sessionID` and private per-tab auth ownership | Identity preservation fixed; auth implementation blocking | Preserve every existing identity meaning with grace zero. A1 removes the Meteor 2 storage fallback and proves the supported Meteor 3 path; there is no retain-fallback option in this base track. |
-| Private auth/Rspack/native/Mongo-error compatibility | Needs implementation proof | A5 is conditional on focused tests/build results. |
-| Android support status | Blocking support claim, not server-only research | Retain/repair/replace/retire decision and build proof if retained. |
-| Functional baseline and observability | Not implemented | E0d requires two repeatable compatibility runs and safe environment evidence. Capacity/performance experiments remain deferred and require no base-track adoption threshold. |
-| Production database branch, URI and sidecar owner | Blocking Phase 3 | Protected existing-platform/transfer/stop branch; opaque-URI/readiness design, security, network and operations/on-call. A parser dependency is exceptional, not assumed. |
-| Backup, RPO/RTO and recovery | Blocking Phase 3 | Both branches need approved mechanism/numbers/restores; only branch 2 needs freeze/authority transfer/forward recovery. |
-| Change Streams stable-patch eligibility | Blocked on current stable 3.5.0 | Stable release containing mandatory fixes plus Phase 4 evidence; defer is acceptable. |
-| Contained base production rollout | Not ready | Phase 2C requires A6, live facts, explicit Docker/deploy authorization, last-good artifact/backup, alerts and change authority. |
-| Database-platform production acceptance | Not ready | Phase 5A requires the accepted Phase 3 branch and separate production authorization. |
+| Overloaded `sessionID` and private per-tab auth ownership | Canonical settings owner implemented; accepted for A6 | Existing identity meanings remain unchanged with grace zero. Public `accounts.clientStorage: "session"` is the sole owner and the private mutation layer is removed. Broader provider/browser-storage permutations remain normal CI/release evidence, not a blocker by absence. |
+| Private auth/Rspack/native/Mongo-error compatibility | Bridge accepted; corrected Change Streams qualification executed | The eighth through tenth runs isolated the upstream injection, browser-footer, and external-type boundaries. Injected test/production clients now combine a browser-owned library target with explicit `commonjs2` externals; server and development/HMR ownership is unchanged. The eleventh run proved the repaired bridge executes the client suite. The thirteenth and fourteenth runs exercised the corrected production-shaped mixed-driver cases. The remaining 70 ordinary client failures are a separate release gate, not a Rspack bridge or Change Streams failure. |
+| Android web-app support | Packaging disposition complete; not an A6 blocker | Android remains supported through the ordinary installable web application. The unused Cordova platform and APK/AAB wrappers are removed; representative browser testing remains ordinary release coverage. |
+| Pre-upgrade baseline and observability | Maintainer-provided baseline accepted | Preserve the supplied known-good 3.4.1 rollback identity; do not reconstruct the old environment. Capacity/performance experiments remain deferred. |
+| Database topology branch | Repository implementation and isolated Docker rehearsal complete | The same disposable MongoDB 8.0 volume was converted from authenticated standalone to `mofacts-rs`; data, collection UUID/options/indexes, app-user authentication, PRIMARY readiness, a real Change Stream event, backup/restore, restart, idempotent initialization, and polling-app startup passed. Every Mongo MCP sidecar variant now consumes an opaque topology-capable URI and rejects a standalone or wrong set without leaking it. This requires no second server and preserves later member expansion or a parallel-target migration. Live conversion and protected production evidence remain separate. |
+| Backup, RPO/RTO and recovery | Required only for an authorized production topology/authority change | Continue source and isolated-staging preparation independently. Define transfer/freeze/forward-recovery details only if the chosen branch moves writer authority. |
+| Change Streams stable-release eligibility | Stable 3.5.0 is eligible for isolated qualification, corrected 2026-08-01 | Official 3.5.0 documentation supports and enables Change Streams by default. The later beta fixes identify targeted crash, fence, projection, and restart risks to test on stable 3.5.0; the beta is not installed. Production adoption depends on the Phase 4 evidence and retains polling rollback. |
+| Change Streams qualification configuration | Phase 4 disposition: **adopt for staged progression**; production remains polling | Local `rspack@1.1.1` is copied exactly from PR #14562 commit `fa20c29abb4ae30fe78facab2819ce4f5c99e588`. The corrected suite proves dotted projections on Change Streams and the actual `filteredUsers` ordered page on polling under `changeStreams,polling`. The thirteenth run found one active qualification stream and passed history-loss, primary-restart, and login-shaped fence recovery. It also found the real Meteor 3 async-handle defect in `filteredUsers`; awaiting `observeChanges` fixed it, and the fourteenth run passed 565 server tests with 12 pending and zero failures. The fourteenth run's manually delayed recovery acknowledgments are not counted as repeated passes. No beta or source backport is required. Phase 5A production-platform acceptance and a separately authorized Phase 5B configuration change remain required. |
+| Canonical localhost Change Streams rollout (Phase 4B) | **Complete on 2026-08-02** | The single localhost application instance is the native Meteor/Rspack watcher managed by `deploy/hotfix-local.ps1`; Docker supplies MongoDB and replica-set initialization, not a second application instance. The application is healthy at `localhost:3200` under `changeStreams,polling`, the status gate found active Change Streams, and authenticated login, publication, learner-history, content, learner launch, and admin flows passed without browser errors. This does not authorize Phase 5A or 5B. |
+| Optional capability dispositions | Repository evaluation complete; all independent optionals explicitly dispositioned | Automatic EJSON/DDP allocation changes are part of the stable base without a quantified performance claim. DDP resumption, native async Accounts refactoring, `uws`, async rate matchers, `accounts-express`, and collation are deferred for their named missing need/fix/design evidence; `accounts-2fa` is rejected as out of scope. No optional is partially enabled or blocks Change Streams. |
+| Separate contained-base production rollout (Phase 2C/A7) | **Cancelled by maintainer on 2026-08-02** | It is not a prerequisite. The exact A6 artifact is first deployed with polling inside the authorized Phase 5A maintenance sequence after replica-set readiness. |
+| Database-platform production acceptance | Repository Phase 3 accepted; live conversion not authorized | Phase 5A requires a protected-backup continuity rehearsal and separate production authorization. |
 
-**Final classification: `NOT READY FOR CONTAINED-BASE APPLICATION
-IMPLEMENTATION`.** The desired contained-base decisions are complete, but the
-audited repository has not satisfied E0a's release/toolchain pin gate or E0d's
-baseline gate. Only E0a gate remediation may begin. After E0d, the base-relevant
-D1, A1, A2, A3 and A4 prerequisites execute in order before compatibility and
-acceptance work.
-Production deployment remains separately unready and requires explicit
-authorization plus protected evidence. Change Streams remains blocked on a
-suitable stable patch and may remain deferred without invalidating the base
-upgrade.
+**Final classification: `CONTAINED-BASE CANDIDATE IMPLEMENTED; A6 ACCEPTED FOR
+REPOSITORY PROGRESSION`.** E0a and the source-owned D1/A1-A4 candidate work are
+represented by the implementation record and current working tree. The normal
+static checks, server integration suite, deterministic native-amd64 build, ABI
+assertion, runtime audit, and isolated health smoke provide proportionate A6
+evidence. On 2026-08-03 the supported isolated Linux Meteor/Playwright suite
+completed with zero server failures and 883 passing, 7 pending, and zero
+failing client tests. The exact current working-tree image then built for
+`linux/amd64` on the first Meteor attempt, reported Node 24.15.0/npm 11.12.1,
+passed its runtime-bundle audit with zero vulnerabilities, and returned
+`status: "ok"` from an isolated production-shaped `/health` smoke under
+polling, SockJS, and disconnect grace zero. The fully preflighted sixth
+authorized Meteor 3.5
+qualification run passed all 565 server tests with 12 pending and then
+correctly failed its empty client phase. This established a concrete stable
+Rspack Blaze test-bridge defect rather than merely absent browser coverage. A
+pinned source-owned copy of the upstream correction is implemented, and the
+eleventh run proved that it loads and executes the full browser suite. That run
+did not settle Phase 4 because two focused gates modeled unsupported or
+intentionally polling behavior. Those gates were corrected, and the
+thirteenth/fourteenth adjacent-run evidence now settles the repository-owned
+staging qualification.
+
+Production deployment remains a separate externally consequential action and
+requires explicit authorization plus the data-safety facts necessary for that
+action. Repository-owned Phase 3 is accepted and the Change Streams
+qualification machinery is prepared. The maintainer authorized a project-owned
+bridge and the exact PR #14562 source is pinned under
+`mofacts/packages/rspack`. The eighth run proves that correction loads the
+client suite but also exposes its unhandled `commonjs2` browser-output boundary.
+That source-owned boundary is now corrected in `rspack.config.js`, with
+standalone regression coverage for test/production versus server/development
+ownership. Phase 4 is accepted for staged progression. The next plan boundary
+is Phase 5A production database acceptance; it requires protected runtime facts
+and separate authorization rather than another routine local integration run.
+Remove the override only after an official stable Rspack release contains the
+complete fix and passes the same client and recovery gates.
 
 ## Decisions Needed Before Implementation
 
@@ -1529,15 +1732,18 @@ upgrade.
 The base framework track uses the decisions above: v3.5.0 only, Meteor-owned
 Node 24.15.0/npm 11.12.1, polling, SockJS, zero disconnect grace period, no
 database-authority change, and no optional-capability work. It preserves all
-stored identity values and current Android support claims. It does not add a
+stored identity values and current Android web-app support claims. It does not add a
 dependency, parser, configuration fallback, or user-visible behavior unless a
 separate approved work package explicitly requires it.
 
-E0a is the first implementation package. Its builder source is fixed: the
-existing `geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083`
-builder and official Node 24.15.0 Alpine image, pinned by the approved target
-architecture digest. The release architecture itself must be named before that
-digest can be selected.
+E0a is the first activity and is read-only. Its platform contract is the
+established `linux/amd64` deployment target. Retain the existing
+`geoffreybooth/meteor-base` publisher and use official Node 24.15.0 Alpine.
+During E0a, inspect each candidate immutable OCI index, record its amd64 child
+digest, and verify the selected image contents without editing any consumer.
+After E0a, A2 pins the verified indexes as part of the
+atomic framework and toolchain transition. ARM64 is not an established
+deployment target and emulator-based ARM64 validation is outside this upgrade.
 
 ### Resolved base-track design decisions
 
@@ -1546,45 +1752,46 @@ implementation choices:
 
 | Design conclusion | Evidence and consequence |
 | --- | --- | --- | --- |
-| Retain Android support. | Android remains supported; include its build and smoke coverage in base-upgrade acceptance. |
+| Retain Android web-app support and retire unused Cordova packaging. | Android remains supported through its browser/installable-web-app path; APK/AAB packaging is not a product requirement. |
 | Retain one sidecar project with its existing local-hotfix and production SSH-tunnel modes. | The modes are deployment targets of `mofacts-mcp-sidecar`, not competing sidecar configurations. No sidecar architecture decision is required. |
-| Keep the current database platform and do not introduce a replica-set project. | Change Streams is deferred. RPO/RTO, backup-retention, and database-platform commitments are therefore outside this framework-only upgrade. |
+| Convert the existing database service in place to a configurable one-member replica set. | Change Streams remain the intended next performance capability. The current server and volume remain authoritative, no second server is required, and explicit replica-set/member/URI configuration preserves later expansion or a parallel-target migration. |
 | Do not add offline URI validation. | MongoDB URIs remain opaque; the connected driver or `mongosh` validates them and errors must be redacted. |
-| Defer all optional capability experiments. | No performance benchmark metric or optional-capability adoption threshold is needed for this release. E0d still runs the minimal functional compatibility workload required to compare the last-good 3.4.1 artifact with the 3.5 candidate. |
-| Remove the legacy Meteor 2 Accounts-storage compatibility branch during A1. | `mofacts/client/lib/authStorage.ts` already prefers that Meteor 3 API, then falls back to old internal APIs. The fallback is not retained; failure of `Accounts.storageLocation` is an upgrade blocker, not a reason to add another path. |
-| Retain the established Meteor builder publisher. | `geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083` is available for both amd64 and arm64. Keep the existing publisher and change only the release tag plus immutable digest. The first build must prove its bundled Meteor, Node, and npm versions; a failed assertion is a build blocker, not a reason to silently change publishers. |
+| Keep unrelated optional capabilities independent. | DDP resumption, `uws`, async rate matching, `accounts-express`, collation, and native async Accounts refactoring do not block Change Streams or the base upgrade. Performance benchmarks are needed only for quantified MoFaCTS improvement claims, not for installing or configuring the capability. |
+| Replace the private Accounts storage mutation layer during A1. | Meteor 3.5 documents `clientStorage: "session"` for per-tab credentials. Trace the stable implementation to choose exactly one canonical settings owner because the documentation contains both an `accounts` example and an older `accounts-base` reference. Configure only that owner, remove `Accounts.storageLocation` and private token/storage overrides that it supersedes, and prove password, token, OAuth, SAML, reload, close/reopen, two-tab, logout, expiry and reconnect parity. Failure of the documented contract is an upgrade blocker, not a reason to configure both keys or restore a private path. |
+| Retain the established Meteor builder publisher. | Keep `geoffreybooth/meteor-base`, but treat `geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083` as the candidate index reference until E0a proves its amd64 child. Pin the verified immutable index and assert its amd64 child digest and bundled Meteor/Node/npm versions. |
+| Retain the established application architecture. | The supported deployment target remains `linux/amd64`, matching the 3.4.1 path. Build and smoke-test that artifact and record its resolved base-image child manifests. ARM64 can be added only through a separately justified architecture decision and native validation, not as an incidental framework-upgrade requirement. |
 
-### Unresolved release-architecture decision
+### Resolved release-architecture decision
 
-The release engineering owner must decide whether the promoted artifact targets
-only the current production architecture or is intentionally multi-architecture
-for both `linux/amd64` and `linux/arm64`. A single target-manifest digest cannot
-represent both architectures. Record the supported target set and use the
-matching Node manifest digest(s) in E0a; do not substitute the mutable tag or
-infer production architecture from a developer workstation.
+The promoted artifact remains `linux/amd64`, matching the established 3.4.1
+deployment path. E0a verifies and records the amd64 child manifest for each
+immutable base-image index. CI builds and smoke-tests the amd64 application
+artifact directly; it does not install QEMU or emulate an unsupported target.
+Native modules must be built for the amd64 runtime environment.
 
-Apart from this artifact-architecture decision, there are no remaining product
-or architecture questions for the contained base upgrade. A Docker bootstrap
-failure or a failure of the supported Meteor 3 Accounts-storage API is an
-implementation blocker to report, not an invitation to invent a compatibility
-path.
+There are no remaining product or architecture questions for the contained
+base upgrade. A failed amd64 build or smoke test, Docker bootstrap failure, or
+failure of the supported Meteor 3 Accounts-storage API is an implementation
+blocker to report, not an invitation to invent a compatibility path.
 
 ### Approvals required only before the database/production tracks
 
-1. **Topology/URI branch:** accept Phase 0's protected branch: qualify an
-   existing replica/managed platform with unchanged authority; build/transfer
-   from a confirmed standalone/rejected platform; or stop while unknown. Approve
-   the canonical sidecar/network/document owner and the opaque-URI/connected-
-   client readiness design. Approve a direct connection-string parser only if
-   D1 documents an unavoidable offline check that the current stack cannot own.
+1. **Topology/URI execution:** the in-place one-member replica-set design is
+   approved. Before live conversion, supply the protected backup/runtime facts
+   and authorize the maintenance action. Keep the canonical sidecar/network/
+   document owner and opaque-URI/connected-client readiness design. Approve a
+   direct connection-string parser only if D1 documents an unavoidable offline
+   check that the current stack cannot own.
 2. **Continuity:** for either branch approve backup mechanism, numeric RPO/RTO,
    security, monitoring and database/on-call/change authority. Branch 1 approves
    unchanged-authority acceptance and configuration rollback. Branch 2 also
    approves RPO-zero write freeze, maintenance/communication, post-write forward
    recovery, target architecture and any in-place-conversion exception.
-3. **Reactivity:** preserve polling as the fallback and treat Change Streams as
-   an optional measured adoption. A **defer** result is final for this release
-   and is never a reason to use prerelease code.
+3. **Reactivity:** preserve polling as the tested rollback and continue the
+   Change Streams track through topology qualification and focused staging
+   correctness evidence. Pause only for a stable-release technical defect or a
+   material database-topology/writer-authority design question; do not use
+   prerelease code to bypass either condition.
 
 Protected runtime facts are evidence to collect, not choices to guess. Optional
 native async Accounts, `uws`, async rate matching, `accounts-express`, and
@@ -1596,6 +1803,8 @@ receives its capability-specific approval.
 - [Meteor 3.5 changelog and migration steps](https://docs.meteor.com/history)
 - [Stable Meteor 3.5 release tag](https://github.com/meteor/meteor/releases/tag/release%2FMETEOR%403.5)
 - [Meteor official tags (stable/prerelease check)](https://github.com/meteor/meteor/tags)
+- [Rspack Blaze client-test bridge defect](https://github.com/meteor/meteor/issues/14561)
+- [Pinned upstream Rspack serve-and-inject correction](https://github.com/meteor/meteor/pull/14562)
 - [Meteor 3.5.1 beta changelog (unreleased evidence only)](https://github.com/meteor/meteor/blob/release/METEOR%403.5.1-beta.0/v3-docs/docs/generators/changelog/versions/3.5.1.md)
 - [Open 3.5.1 release-preparation PR](https://github.com/meteor/meteor/pull/14555)
 - [Official Meteor 3.5 release article and supplemental benchmark context](https://dev.to/meteor/meteor-35-is-out-j13)

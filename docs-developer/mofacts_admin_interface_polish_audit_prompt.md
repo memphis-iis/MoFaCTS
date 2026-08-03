@@ -10,7 +10,7 @@ This audit must be performed entirely through source-code inspection and reposit
 
 - Do not open or interact with the running application.
 - Do not use Playwright, the MoFaCTS MCP sidecar, Browser, Chrome, screenshots, screen recordings, or any other browser-automation or visual-inspection tool.
-- Do not start or restart the native hotfix server, sidecar, Docker services, or any other runtime solely for this audit.
+- Do not start or restart the canonical localhost hotfix server, sidecar, Docker services, or any other runtime solely for this audit.
 - Do not throttle networks, resize browser windows, simulate devices, or manually exercise routes.
 - Do not describe a defect as visually observed, reproduced, or runtime-confirmed unless separate evidence already exists in the repository and is cited.
 - Base findings on route wiring, component lifecycle, reactive state, asynchronous data flow, templates, semantic HTML, shared components, CSS, responsive rules, accessibility attributes, and existing test source.

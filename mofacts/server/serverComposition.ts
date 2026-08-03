@@ -28,10 +28,9 @@ if (typeof underscoreAny.display !== 'function') {
     return val == null ? '' : String(val);
   };
 }
-import { applyMeteorSettingsWorkaround } from './startup/meteorSettingsWorkaround';
 import { BackupJobs, TdfMutationJobs } from '../common/Collections';
 import { runServerStartup } from './startup/serverStartup';
-import { createStorageBoundary } from './lib/storageBoundary';
+import { createStorageBoundary, getLocalStoragePaths } from './lib/storageBoundary';
 import { createRedisBoundary } from './lib/redisBoundary';
 import { registerServerRuntime } from './runtime/serverRuntime';
 import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
@@ -109,6 +108,7 @@ import {
   parseLoggingVerbosityLevel,
   shouldEmitLogMessage,
 } from '../common/loggingSettings';
+import { createServerVerbosityObserverCallbacks } from './lib/serverVerbosityObserver';
 
 const MeteorAny = Meteor as any;
 
@@ -238,8 +238,6 @@ const {
   assertRequiredMeteorSettings,
   requireAllowPublicSignupSetting,
 } = authSupport;
-
-applyMeteorSettingsWorkaround({ serverConsole });
 
 assertRequiredMeteorSettings();
 const storageBoundary = createStorageBoundary(Meteor.settings);
@@ -1113,6 +1111,7 @@ Meteor.methods({...methods, ...asyncMethods});
 registerServerRuntime({
   DynamicAssets,
   storageBoundary,
+  storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
   serverConsole,
 });
 
@@ -1178,17 +1177,5 @@ Meteor.startup(async function() {
   DynamicSettings.find(
     { _id: SERVER_VERBOSITY_SETTING.id },
     { fields: { value: 1 } },
-  ).observeChanges({
-    added(_id: string, fields: { value?: unknown }) {
-      setServerVerbosityLevel(fields.value);
-    },
-    changed(_id: string, fields: { value?: unknown }) {
-      if (Object.prototype.hasOwnProperty.call(fields, 'value')) {
-        setServerVerbosityLevel(fields.value);
-      }
-    },
-    removed() {
-      throw new Error('Server verbosity setting was removed after initialization');
-    },
-  });
+  ).observeChanges(createServerVerbosityObserverCallbacks(setServerVerbosityLevel));
 });

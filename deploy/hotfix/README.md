@@ -1,17 +1,19 @@
-# Local Hotfix Bundle Helpers
+# Local Hotfix Watch Helpers
 
-Scripts in this folder support the local-only production-shaped bundle loop.
+Scripts in this folder support the sole source-watching localhost application loop.
 
 Belongs here:
 
-- Meteor bundle build helpers.
-- Bundle dependency installation helpers.
-- Scripts that run the generated local bundle inside the hotfix container workflow.
+- The CommonJS build guard required by Meteor/Rspack watch mode.
+- The local admin bootstrap used after the watcher becomes ready.
 
 Does not belong here:
 
-- Native hotfix dev server scripts. Those belong under `deploy/hotfix-dev/`.
+- A second native or containerized localhost application server.
 - Release build, push, or deploy automation.
 - Source patches to generated bundle output.
 
-This workflow is for local verification only. It is not release confidence and should not replace the canonical Docker Compose image build for release validation.
+This workflow owns the only supported localhost application server. Run it
+through `deploy/hotfix-local.ps1`; that script owns the native Meteor/Rspack
+watcher while Docker owns MongoDB. Do not introduce another application process
+or Compose overlay for port 3200. It is local verification, not release confidence.

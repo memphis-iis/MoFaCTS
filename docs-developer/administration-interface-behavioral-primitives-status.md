@@ -26,7 +26,7 @@ current no-verification touch-up sequence.
 | Async command state | Pure contract, duplicate-run controller, rollback hook, and tests added; consumed by migrated management pages | Page-local pending booleans on migrated pages | Typecheck and lint pass before the no-verification touch-ups; later verification intentionally not run |
 | Template lifetime | Generation, supersession, destruction, and tests added; consumed by migrated management pages | Unguarded late completion on migrated pages | Typecheck and lint pass before the no-verification touch-ups; later verification intentionally not run |
 | Management routes | Existing access, path, shell, title, lazy-loader, and shell-heading behavior captured in characterization tests | None | Typecheck and lint pass; Meteor tests not run locally |
-| Route presentation | Canonical management policy, generation-guarded loading/ready/error state, stable page frame, target title, explicit retry, and one Flow Router render contract | `routeAccessPolicies.ts`; management entries in `lazyTemplateLoaders`, `APP_SHELL_TEMPLATES`, and `APP_SHELL_TITLE_KEYS`; alternate render attempts | Typecheck, lint, native hotfix compilation, and sidecar pilot smoke pass |
+| Route presentation | Canonical management policy, generation-guarded loading/ready/error state, stable page frame, target title, explicit retry, and one Flow Router render contract | `routeAccessPolicies.ts`; management entries in `lazyTemplateLoaders`, `APP_SHELL_TEMPLATES`, and `APP_SHELL_TITLE_KEYS`; alternate render attempts | Typecheck, lint, localhost hotfix compilation, and sidecar pilot smoke pass |
 | Shared status and empty state | Declarative constrained-variant partials consumed by Admin Tests | Admin Tests page-local alert/string injection | Typecheck, lint, native compilation, and sidecar state smoke pass |
 | Shared table shell | Labeled keyboard-focusable scroll region consumed by Admin Tests, Data Download, Instructor Reporting, and User Administration | Admin Tests generated table string; Data Download, Instructor Reporting, and User Administration page-local table wrappers | Typecheck, lint, native compilation, and semantic-header browser smoke pass before the no-verification touch-ups; later verification intentionally not run |
 | Admin Tests | Migrated to template-local command state, duplicate prevention, stable output, validated result shaping, declarative status, and semantic result table | jQuery `html()`, `escapeHtml()`, generated HTML strings, callback-owned result DOM | Typecheck, lint, native compilation, and sidecar pending/success/error smoke pass |
@@ -120,7 +120,7 @@ The server method and route contracts remain unchanged.
 
 - 2026-07-10: `npm run typecheck` from `mofacts/` passed.
 - 2026-07-10: `npm run lint` from `mofacts/` passed.
-- 2026-07-10: native hotfix app remained ready on `http://localhost:3200` and
+- 2026-07-10: the then-current localhost app remained ready on `http://localhost:3200` and
   recompiled the client changes without a build error.
 - 2026-07-10: authenticated Playwright sidecar direct-route smoke passed for
   `/admin/tests`, `/profile`, and `/classEdit`. Each route rendered one visible

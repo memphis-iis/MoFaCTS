@@ -97,7 +97,7 @@ describe('sparcPracticeHistoryBridge', function() {
       userId: 'user-1',
     });
 
-    assert.equal(bridge.fromCanonicalHistoryRecord({ eventType: 'h5p' }), null);
+    assert.equal(bridge.fromCanonicalHistoryRecord({ eventType: 'obsolete-component' }), null);
   });
 
   it('requires a shared user identity for persisted history records', function() {

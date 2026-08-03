@@ -104,7 +104,7 @@
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@meteorjs/rspack": "^2.0.1",
-    "@playwright/test": "^1.60.0",
+    "playwright": "^1.60.0",
     "@rsdoctor/rspack-plugin": "^1.5.11",
     "@rspack/cli": "^1.7.1",
     "@rspack/core": "^1.7.1",
@@ -139,19 +139,22 @@
       "server": "server/main.ts"
     },
     "testModule": {
-      "client": "tests/client-entry.js",
-      "server": "tests/server-entry.js"
+      "client": "client-test-entry.js",
+      "server": "server-test-entry.js"
     },
     "modules": [
       "client"
     ]
   },
   "engines": {
-    "node": ">=22.13.0 <23"
+    "node": "24.15.0",
+    "npm": "11.12.1"
   },
+  "packageManager": "npm@11.12.1",
   "scripts": {
     "test": "TEST_WATCH=1 meteor test --driver-package=meteortesting:mocha --port 3010 --settings settings.json",
-    "test:ci": "node scripts/runMeteorCiTest.cjs",
+    "test:ci": "npm run test:ci:harness && node scripts/runMeteorCiTest.cjs",
+    "test:ci:harness": "node --test scripts/meteorCiHarness.test.cjs",
     "test:coverage": "c8 --reporter=text-summary --reporter=lcov --report-dir coverage meteor test --once --driver-package=meteortesting:mocha --port 3010 --settings settings.json",
     "docs:api": "node scripts/generateApiDocs.js",
     "generate:schemas": "node --experimental-strip-types scripts/generateSchemas.ts",
@@ -178,7 +181,7 @@
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,svelte}": [
-      "eslint --ignore-pattern .meteor/** --ignore-pattern public/vendor/** --fix"
+      "eslint --ignore-pattern .meteor/** --ignore-pattern public/vendor/** --ignore-pattern packages/rspack/** --fix"
     ]
   },
   "author": "",

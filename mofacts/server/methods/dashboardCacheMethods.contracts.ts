@@ -25,10 +25,6 @@ export interface DashboardHistoryRecord {
   levelUnit?: number | string | null;
   sessionID?: string | null;
   CFNote?: string | null;
-  h5p?: {
-    eventType?: string;
-    latencyMs?: number | null;
-  } | null;
 }
 
 export interface DashboardTdfStats {

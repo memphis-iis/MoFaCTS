@@ -138,9 +138,9 @@ describe('aiContentPackageSave', function() {
 
     expect(draft.title).to.equal('New_Name');
     expect((draft.generatedBaseline.tutor as any).setspec.lessonname).to.equal('New_Name');
-    expect((draft.generatedBaseline.tutor as any).setspec.stimulusfile).to.equal('New_Name_stimuli.json');
+    expect((draft.generatedBaseline.tutor as any).setspec.stimulusfile).to.equal('New_Name_stims.json');
     expect((draft.workingCopy.tutor as any).setspec.lessonname).to.equal('New_Name');
-    expect((draft.workingCopy.tutor as any).setspec.stimulusfile).to.equal('New_Name_stimuli.json');
+    expect((draft.workingCopy.tutor as any).setspec.stimulusfile).to.equal('New_Name_stims.json');
   });
 
   it('cleans up the uploaded asset when final package save fails', async function() {

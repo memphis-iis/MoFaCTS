@@ -104,7 +104,7 @@ Add or update tests proving:
 - A representative historical compressed row containing key `61` leaves that retired property unused while keys `60` and `62+` still decode to their unchanged field names.
 - Adaptive probability parameters no longer expose `instructionQuestionResult`.
 
-For runtime verification, use the native hotfix app and MoFaCTS Playwright sidecar only after implementation and static checks pass. Smoke-test one normal instruction screen, one timed/locked instruction screen, and transition into both a learning session and a SPARC session.
+For runtime verification, use the canonical localhost hotfix server and MoFaCTS Playwright sidecar only after implementation and static checks pass. Smoke-test one normal instruction screen, one timed/locked instruction screen, and transition into both a learning session and a SPARC session.
 
 ## Deployment and rollback
 

@@ -61,8 +61,6 @@ const requiredSelfHostedSettingsKeys = [
   'openCore.requireRedis',
   'storage.backend',
   'storage.local.dynamicAssetsPath',
-  'storage.local.h5pContentPath',
-  'storage.local.h5pLibrariesPath',
   'public.sourceUrl',
 ];
 

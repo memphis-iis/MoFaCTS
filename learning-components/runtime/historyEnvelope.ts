@@ -9,7 +9,6 @@ export const HISTORY_EVENT_TYPES = [
   '',
   'instruct',
   'video',
-  'h5p',
   'autotutor-turn',
   'sparc',
 ] as const;
@@ -45,9 +44,10 @@ const RUNTIME_SNAPSHOT_FIELD_NAMES = new Set([
   'fullState',
 ]);
 
+const UNSUPPORTED_COMPONENT_FIELD_NAMES = new Set(['h5p']);
+
 const COMPONENT_EXTENSION_FIELD_NAMES = [
   'CFNote',
-  'h5p',
   'sparc',
 ] as const;
 
@@ -84,6 +84,13 @@ function assertNoRuntimeSnapshotFields(record: CanonicalHistoryRecord): void {
   const presentSnapshotFields = Object.keys(record).filter((key) => RUNTIME_SNAPSHOT_FIELD_NAMES.has(key));
   if (presentSnapshotFields.length > 0) {
     throw new Error(`History record contains per-trial runtime snapshot fields: ${presentSnapshotFields.join(', ')}`);
+  }
+}
+
+function assertNoUnsupportedComponentFields(record: CanonicalHistoryRecord): void {
+  const unsupportedFields = Object.keys(record).filter((key) => UNSUPPORTED_COMPONENT_FIELD_NAMES.has(key));
+  if (unsupportedFields.length > 0) {
+    throw new Error(`History record contains unsupported component fields: ${unsupportedFields.join(', ')}`);
   }
 }
 
@@ -147,6 +154,7 @@ export function assertCanonicalHistoryEnvelope(
   }
 
   assertNoRuntimeSnapshotFields(record);
+  assertNoUnsupportedComponentFields(record);
   assertStableEventType(record);
   assertModelPracticeHistoryIdentity(record);
   assertBoundedComponentExtensionFields(record, options);

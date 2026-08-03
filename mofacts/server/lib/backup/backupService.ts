@@ -335,8 +335,6 @@ export async function createBackupJob(deps: BackupServiceDeps, actor: BackupActo
       const localPaths = getLocalStoragePaths(deps.settings, deps.env || process.env);
       for (const [name, rootPath, archivePrefix] of [
         ['dynamic-assets', localPaths.dynamicAssetsPath, 'dynamic-assets'],
-        ['h5p-content', localPaths.h5pContentPath, 'h5p-content'],
-        ['h5p-libraries', localPaths.h5pLibrariesPath, 'h5p-libraries'],
       ] as const) {
         const collected = await collectFiles(rootPath, archivePrefix);
         entries.push(...collected.entries);
@@ -349,7 +347,7 @@ export async function createBackupJob(deps: BackupServiceDeps, actor: BackupActo
           ...(collected.fileCount > 0 ? {} : { message: `${rootPath} did not contain files at backup time` }),
         });
       }
-      warnings.push('Local asset-file backup is enabled. Large dynamic-assets or H5P directories can degrade the live app while the archive is created.');
+      warnings.push('Local asset-file backup is enabled. A large dynamic-assets directory can degrade the live app while the archive is created.');
     } else if (storageBackend === 'local') {
       excludedComponents.push(
         {
@@ -357,18 +355,8 @@ export async function createBackupJob(deps: BackupServiceDeps, actor: BackupActo
           status: 'excluded',
           message: 'Local content files are excluded from in-app backups. Use host-level snapshots or off-server asset sync for /dynamic-assets.',
         },
-        {
-          name: 'h5p-content',
-          status: 'excluded',
-          message: 'H5P content files are excluded from in-app backups. Use host-level snapshots or off-server asset sync for /h5p-content.',
-        },
-        {
-          name: 'h5p-libraries',
-          status: 'excluded',
-          message: 'H5P library files are excluded from in-app backups. Use host-level snapshots or off-server asset sync for /h5p-libraries.',
-        },
       );
-      warnings.push('This in-app backup excludes local content asset files to avoid degrading the live app. Back up /dynamic-assets, /h5p-content, and /h5p-libraries outside Meteor.');
+      warnings.push('This in-app backup excludes local content asset files to avoid degrading the live app. Back up /dynamic-assets outside Meteor.');
     } else {
       excludedComponents.push({
         name: 'object-storage-assets',
@@ -380,7 +368,7 @@ export async function createBackupJob(deps: BackupServiceDeps, actor: BackupActo
 
     if (config.includeSettings) {
       const settingsEntry = await readOptionalFile(
-        String(process.env.METEOR_SETTINGS_WORKAROUND || '/run/mofacts/settings.json'),
+        String(process.env.METEOR_SETTINGS_FILE || ''),
         'config/settings.json',
         warnings,
       );
@@ -666,8 +654,6 @@ export async function restoreBackupJob(deps: BackupServiceDeps, actor: BackupAct
       const localPaths = getLocalStoragePaths(deps.settings, deps.env || process.env);
       for (const [name, rootPath, archivePrefix] of [
         ['dynamic-assets', localPaths.dynamicAssetsPath, 'dynamic-assets'],
-        ['h5p-content', localPaths.h5pContentPath, 'h5p-content'],
-        ['h5p-libraries', localPaths.h5pLibrariesPath, 'h5p-libraries'],
       ] as const) {
         if (!manifestIncludesComponent(verification.manifest, name)) {
           restoredComponents.push({

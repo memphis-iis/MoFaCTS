@@ -5,7 +5,7 @@ $deployDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $deployDir
 try {
   Get-Process caddy -ErrorAction SilentlyContinue | Stop-Process -Force
-  docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml down
+  & (Join-Path $deployDir 'hotfix-local.ps1') stop
   Write-Host 'LAN HTTPS stopped.'
 }
 finally {

@@ -20,8 +20,6 @@ type StorageSettings = {
   backend?: string;
   local?: {
     dynamicAssetsPath?: string;
-    h5pContentPath?: string;
-    h5pLibrariesPath?: string;
   };
   s3?: {
     endpoint?: string;
@@ -56,14 +54,17 @@ export function getStorageBackend(settings: unknown): 'local' | 's3' {
   return backend;
 }
 
-export function getLocalStoragePaths(settings: unknown, env: NodeJS.ProcessEnv = process.env) {
+export function getLocalStoragePaths(settings: unknown, _env: NodeJS.ProcessEnv = process.env) {
   const storage = getStorageSettings(settings);
   const local = isRecord(storage.local) ? storage.local : {};
-  const home = String(env.HOME || process.cwd()).trim();
+  const dynamicAssetsPath = typeof local.dynamicAssetsPath === 'string'
+    ? local.dynamicAssetsPath.trim()
+    : '';
+  if (!dynamicAssetsPath) {
+    throw new Error('storage.local.dynamicAssetsPath is required when storage.backend is local');
+  }
   return {
-    dynamicAssetsPath: path.resolve(local.dynamicAssetsPath || path.join(home, 'dynamic-assets')),
-    h5pContentPath: path.resolve(local.h5pContentPath || path.join(home, 'h5p-content')),
-    h5pLibrariesPath: path.resolve(local.h5pLibrariesPath || path.join(home, 'h5p-libraries')),
+    dynamicAssetsPath: path.resolve(dynamicAssetsPath),
   };
 }
 
@@ -357,8 +358,6 @@ export async function validateStorageBoundary(settings: unknown, env: NodeJS.Pro
   const paths = getLocalStoragePaths(settings, env);
   const checks = [
     await validateDirectoryAccess('storage.local.dynamicAssetsPath', paths.dynamicAssetsPath),
-    await validateDirectoryAccess('storage.local.h5pContentPath', paths.h5pContentPath),
-    await validateDirectoryAccess('storage.local.h5pLibrariesPath', paths.h5pLibrariesPath),
   ];
   checks.push(...await validateS3Config(storage, settings));
   return checks;

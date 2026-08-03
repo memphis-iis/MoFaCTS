@@ -1697,7 +1697,7 @@ describe('learner analytics method authorization', function() {
       levelUnit: 2,
       levelUnitType: 'sparc',
       time: 975,
-      eventType: 'h5p',
+      eventType: 'obsolete-component',
       sparc: { pageKey: 'doc-ignored' },
     });
 
@@ -1726,49 +1726,6 @@ describe('learner analytics method authorization', function() {
     expect(rows[0].sparc).to.deep.equal(sparcExtension);
     expect(rows[0]).not.to.have.property('serverOnlyLargePayload');
     expect(rows[1]).to.have.nested.property('sparc.pageKey', 'doc-1');
-  });
-
-  it('counts one completed assessment trial per H5P summary row on resume', async function() {
-    const baseRecord = {
-      userId: 'current-user',
-      TDFId: 'h5p-assessment',
-      levelUnit: 0,
-      levelUnitType: 'schedule',
-      studentResponseType: 'ATTEMPT',
-      outcome: 'correct',
-    };
-
-    await HistoriesAny.insertAsync({
-      ...baseRecord,
-      _id: 'h5p-summary',
-      action: 'respond',
-      h5p: { eventType: 'summary', contentId: 'h5p-1' },
-    });
-    await HistoriesAny.insertAsync({
-      ...baseRecord,
-      _id: 'h5p-part-1',
-      action: 'h5p interaction',
-      h5p: { eventType: 'part', contentId: 'h5p-1', subContentId: 'blank-0' },
-    });
-    await HistoriesAny.insertAsync({
-      ...baseRecord,
-      _id: 'h5p-part-2',
-      action: 'h5p interaction',
-      h5p: { eventType: 'part', contentId: 'h5p-1', subContentId: 'blank-1' },
-    });
-    await HistoriesAny.insertAsync({
-      ...baseRecord,
-      _id: 'ordinary-assessment-row',
-    });
-
-    const count = await (asyncMethods.getAssessmentCompletedTrialCountFromHistory as any).call(
-      { userId: 'current-user' },
-      'current-user',
-      'h5p-assessment',
-      0
-    );
-
-    expect(count).to.equal(2);
   });
 
   it('denies cross-user experiment-state and recent-TDF reads', async function() {
@@ -2090,38 +2047,6 @@ describe('condition count method authorization', function() {
     expect(stat.incorrectCount).to.equal(1);
     expect(stat.totalCount).to.equal(2);
     expect(stat.KCId).to.equal('kc-1');
-  });
-
-  it('does not double-count duplicate H5P idempotency submissions', async function() {
-    await TdfsAny.insertAsync({
-      _id: 'history-h5p-crowd-stats',
-      ownerId: 'owner-user',
-      stimuliSetId: 'set-1',
-      content: {
-        fileName: 'history-h5p-crowd-stats.json',
-        tdfs: { tutor: { setspec: { lessonname: 'Crowd Stats H5P', userselect: 'true' } } },
-      },
-    });
-    await MeteorUsersAny.insertAsync({
-      _id: 'current-user',
-      profile: {},
-      loginParams: {},
-    });
-
-    const h5p = { idempotencyKey: 'h5p-key-1', eventType: 'summary' };
-    await (asyncMethods.insertHistory as any).call(
-      { userId: 'current-user' },
-      createServerHistoryRecord({ TDFId: 'history-h5p-crowd-stats', h5p })
-    );
-    const duplicateResult = await (asyncMethods.insertHistory as any).call(
-      { userId: 'current-user' },
-      createServerHistoryRecord({ TDFId: 'history-h5p-crowd-stats', h5p })
-    );
-
-    const stat = await StimulusCrowdStatsAny.findOneAsync({ stimulusKey: 'set-1:kc-1' }) as any;
-    expect(duplicateResult).to.deep.equal({ duplicate: true });
-    expect(stat.totalCount).to.equal(1);
-    expect(stat.correctCount).to.equal(1);
   });
 
   it('returns scoped batched stimulus crowd stats for the current deck', async function() {

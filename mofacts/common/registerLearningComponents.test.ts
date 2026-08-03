@@ -30,7 +30,7 @@ describe('registerLearningComponents', function() {
       {
         id: 'sample.display',
         kind: 'trial-display',
-        displayTypes: [' h5p '],
+        displayTypes: [' widget '],
         requiredCapabilities: ['history', 'media'],
         register() {},
       },
@@ -48,7 +48,7 @@ describe('registerLearningComponents', function() {
         id: 'sample.display',
         kind: 'trial-display',
         unitTypes: [],
-        displayTypes: ['h5p'],
+        displayTypes: ['widget'],
         requiredCapabilities: ['history', 'media'],
         requiredServerMethods: [],
         providedServices: [],

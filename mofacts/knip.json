@@ -4,8 +4,8 @@
     "client/index.ts",
     "client/views/experiment/svelte/components/ContentSurface.svelte",
     "server/main.ts",
-    "tests/client-entry.js",
-    "tests/server-entry.js",
+    "client-test-entry.js",
+    "server-test-entry.js",
     "**/*.test.{js,ts,svelte}",
     "tests/**/*.{js,ts}",
     "scripts/**/*.{js,cjs,mjs,ts}",
@@ -32,7 +32,7 @@
     "@rsdoctor/rspack-plugin",
     "meteor-node-stubs",
     "unzipper",
-    "@playwright/test"
+    "playwright"
   ],
   "ignoreFiles": [
     "public/lib/**"

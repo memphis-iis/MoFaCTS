@@ -211,7 +211,7 @@ npm run lint
 
 Add the prompt-contract coverage to the existing SPARC move-definition, utterance-request, dialogue-provider, and controller-dialogue test files. These tests run through the Meteor suite; this repository does not currently provide a supported focused local command for them. Run `CI=1 npm run test:ci` only with explicit user authorization. Without that authorization, report the Meteor tests as not run and rely on typecheck, lint, static prompt inspection, and the supported browser smoke test.
 
-Because this changes learner-facing runtime dialogue, perform a native hotfix SPARC smoke test through the MoFaCTS Playwright sidecar. Treat the live-model result as observational evidence, not a deterministic guarantee. Verify:
+Because this changes learner-facing runtime dialogue, perform a SPARC smoke test on the canonical localhost hotfix server through the MoFaCTS Playwright sidecar. Treat the live-model result as observational evidence, not a deterministic guarantee. Verify:
 
 - the Compound Interest route and prompt;
 - the actual tutor response for the primary regression case;

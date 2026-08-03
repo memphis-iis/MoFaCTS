@@ -39,7 +39,6 @@ function Set-CommonJsMarkerIfNeeded {
 
     return $false
 }
-
 function Ensure-CommonJsMarker {
     $changed = $false
 

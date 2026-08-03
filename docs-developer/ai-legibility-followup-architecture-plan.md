@@ -333,7 +333,7 @@ Update `AGENTS.md` for agent-facing operating rules and `docs/contributors/READM
 - TypeScript changes: `npm run typecheck`
 - Lintable changes: `npm run lint`
 - Schema registry changes: `npm run generate:schemas`
-- UI changes: hotfix dev server plus browser smoke
+- UI changes: canonical localhost hotfix server plus browser smoke
 - Meteor integration/client contract tests: CI or another supported Meteor test environment; do not run `npm run test:ci` as routine local Windows verification
 - Docker/deploy verification: only when explicitly requested
 

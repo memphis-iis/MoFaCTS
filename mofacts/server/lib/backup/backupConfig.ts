@@ -65,7 +65,7 @@ export function publicBackupConfigStatus(config: BackupConfig) {
     requirePreRestoreBackup: config.requirePreRestoreBackup,
     warning: config.includeLocalAssetFiles
       ? 'Local asset-file backup is enabled and can heavily degrade the live app on large installs. Prefer host-level snapshots or off-server asset sync.'
-      : 'In-app backups exclude local content asset files. Use host-level snapshots or off-server asset sync for /dynamic-assets and H5P storage.',
+      : 'In-app backups exclude local content asset files. Use host-level snapshots or off-server asset sync for /dynamic-assets.',
   };
 }
 

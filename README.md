@@ -49,16 +49,20 @@ npm run typecheck
 
 cd ..\deploy
 Copy-Item .env.local.example .env.local
-$LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
-Copy-Item settings.local.example.json $LocalSettingsPath
-# Edit .env.local and $LocalSettingsPath for your local machine.
+Copy-Item settings.local.example.json settings.local.json
+# Edit .env.local and settings.local.json for your local machine.
 # Do not commit local settings or secrets.
-.\hotfix-dev.ps1 start -SettingsPath $LocalSettingsPath
+.\hotfix-local.ps1
 ```
 
-Open `http://localhost:3200`. The Windows hotfix dev loop reads settings from the explicit `-SettingsPath` value, bootstraps a local admin account for the configured owner, and writes the ignored credentials to `deploy/local-dev/agent-secrets.env`. See [First Local Run](docs/development.md#first-local-run) for the full recipe, including Meteor installation, Docker Desktop, logs, and how to sign in.
+Open `http://localhost:3200`. This source-watching Meteor/Rspack hotfix server
+is the only supported localhost application. Docker supplies its MongoDB
+replica set; the launcher reads private settings from `.env.local`, bootstraps
+the configured local admin, and stores ignored credentials under
+`deploy/local-hotfix/`. See [First Local
+Run](docs/development.md#first-local-run).
 
-The supported local runtime baseline is Node.js `22.x`, npm `10.x`, and Meteor `3.4`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
+The supported local runtime baseline is Node.js `24.15.0`, npm `11.12.1`, and Meteor `3.5`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
 
 ## Documentation
 

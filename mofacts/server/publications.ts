@@ -50,7 +50,7 @@ export const DYNAMIC_ASSET_PUBLICATION_FIELDS = {
     versions: 1
 };
 
-const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
+export const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
     'content.tdfs.tutor.setspec.speechAPIKey': 0,
     'content.tdfs.tutor.setspec.textToSpeechAPIKey': 0,
     'content.tdfs.tutor.setspec.openRouterApiKey': 0
@@ -91,7 +91,7 @@ Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50
         limit: limit
     });
 
-    const pagedUsersHandle = pagedUsersCursor.observeChanges({
+    const pagedUsersHandle = await pagedUsersCursor.observeChanges({
         added: (id: string) => {
             this.added('filtered_user_page_ids', id, { userId: id });
         },

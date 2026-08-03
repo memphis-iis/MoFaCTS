@@ -1,0 +1,5 @@
+services:
+  mofacts:
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1:${MOFACTS_REHEARSAL_HTTP_BIND:-13200}:3000"

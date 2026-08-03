@@ -558,45 +558,6 @@ describe('dashboardCacheMethods', function() {
     expect(stats.itemsPracticedApplies).to.equal(false);
   });
 
-  it('computeCacheStats counts H5P exercise part rows without double-counting the summary row', function() {
-    const stats = computeCacheStats([
-      {
-        _id: 'h5p-summary',
-        outcome: 'incorrect',
-        levelUnitType: 'schedule',
-        CFEndLatency: 10000,
-        CFFeedbackLatency: 0,
-        h5p: { eventType: 'summary' },
-        recordedServerTime: new Date('2026-02-10T10:00:00.000Z')
-      },
-      {
-        _id: 'h5p-part-1',
-        outcome: 'correct',
-        levelUnitType: 'schedule',
-        CFEndLatency: 10000,
-        CFFeedbackLatency: 0,
-        h5p: { eventType: 'part', latencyMs: 1200 },
-        recordedServerTime: new Date('2026-02-10T10:00:01.000Z')
-      },
-      {
-        _id: 'h5p-part-2',
-        outcome: 'incorrect',
-        levelUnitType: 'schedule',
-        CFEndLatency: 10000,
-        CFFeedbackLatency: 0,
-        h5p: { eventType: 'part', latencyMs: 800 },
-        recordedServerTime: new Date('2026-02-10T10:00:02.000Z')
-      }
-    ], 'H5P Demo', (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0));
-
-    expect(stats.totalTrials).to.equal(2);
-    expect(stats.correctTrials).to.equal(1);
-    expect(stats.incorrectTrials).to.equal(1);
-    expect(stats.overallAccuracy).to.equal(50);
-    expect(stats.totalTimeMs).to.equal(2000);
-    expect(stats.itemsPracticedApplies).to.equal(false);
-  });
-
   it('computeCacheStats does not compute an accuracy percentage for AutoTutor rows', function() {
     const stats = computeCacheStats([
       {

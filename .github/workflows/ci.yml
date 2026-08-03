@@ -19,21 +19,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22.22.0'
+          node-version: '24.15.0'
           cache: npm
           cache-dependency-path: mofacts/package-lock.json
 
-      - name: Install Meteor 3.4.1
-        run: curl https://install.meteor.com/?release=3.4.1 | sh
+      - name: Install Meteor 3.5
+        run: curl https://install.meteor.com/?release=3.5 | sh
+
+      - name: Assert framework toolchain
+        run: |
+          test "$(meteor --version)" = "Meteor 3.5"
+          test "$(meteor node --version)" = "v24.15.0"
+          test "$(meteor npm --version)" = "11.12.1"
+          test "$(node --version)" = "v24.15.0"
+          test "$(npm --version)" = "11.12.1"
 
       - name: Sync Meteor npm dependencies
-        run: meteor update --npm 2>/dev/null || true
+        run: |
+          meteor update --npm
+          git diff --exit-code -- .meteor/release .meteor/packages .meteor/versions package.json package-lock.json
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Prepare test settings
-        run: cp settings.ci.json settings.json
 
       - name: Lint
         run: npm run lint
@@ -41,5 +48,77 @@ jobs:
       - name: Typecheck (blocking)
         run: npm run typecheck
 
+      - name: Typecheck vendor declarations (blocking)
+        run: npm run typecheck:vendor
+
+      - name: Install CI browser
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+
       - name: Test
         run: npm run test:ci
+        env:
+          TEST_BROWSER_DRIVER: playwright
+          PLAYWRIGHT_BROWSER: chromium
+          TEST_RUN_TIMEOUT_MS: 1200000
+          TEST_SETTINGS_FILE: settings.ci.json
+          EXPECTED_MONGO_DB_NAME: meteor
+          METEOR_REACTIVITY_ORDER: polling
+          DDP_TRANSPORT: sockjs
+          MOFACTS_SELF_HOSTED: 'false'
+          MOFACTS_REQUIRE_REDIS: 'false'
+
+  docker-amd64-smoke:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build amd64 application image
+        run: |
+          test "$(uname -m)" = "x86_64"
+          docker build --platform linux/amd64 --tag mofacts-ci:meteor-3.5-amd64 .
+
+      - name: Assert bundle ABI and runtime identity
+        run: |
+          docker run --rm \
+            --entrypoint /bin/sh \
+            mofacts-ci:meteor-3.5-amd64 \
+            -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.15.0 && test "$(node --version)" = v24.15.0 && test "$(npm --version)" = 11.12.1'
+
+      - name: Boot and health-check application image
+        run: |
+          network=mofacts-ci-amd64
+          mongo=mofacts-ci-mongo-amd64
+          app=mofacts-ci-app-amd64
+          docker network create "$network"
+          docker run -d --name "$mongo" --network "$network" mongo:8.0
+          docker run -d \
+            --name "$app" \
+            --network "$network" \
+            --env PORT=3000 \
+            --env ROOT_URL=http://localhost:3200 \
+            --env MONGO_URL="mongodb://$mongo:27017/MoFACT-meteor3" \
+            --env EXPECTED_MONGO_DB_NAME=MoFACT-meteor3 \
+            --env METEOR_REACTIVITY_ORDER=polling \
+            --env DDP_TRANSPORT=sockjs \
+            --env METEOR_SETTINGS_FILE=/run/mofacts/settings.json \
+            --env MOFACTS_SELF_HOSTED=false \
+            --env MOFACTS_REQUIRE_REDIS=false \
+            --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
+            mofacts-ci:meteor-3.5-amd64
+          for attempt in $(seq 1 60); do
+            if docker exec "$app" node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              echo "linux/amd64 application health check passed"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs "$app"
+          exit 1
+
+      - name: Clean up smoke containers
+        if: always()
+        run: |
+          docker rm -f mofacts-ci-app-amd64 mofacts-ci-mongo-amd64 2>/dev/null || true
+          docker network rm mofacts-ci-amd64 2>/dev/null || true

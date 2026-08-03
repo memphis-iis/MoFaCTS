@@ -9,6 +9,7 @@ import {
   clearSavedUserThemeSelection,
   findAvailableUserTheme,
   getSavedUserThemeId,
+  saveUserThemeSelection,
   serializeThemeSelection,
 } from './userThemeSelection';
 
@@ -223,32 +224,6 @@ export function getCurrentTheme() {
   Tracker.autorun(() => {
     clientConsole(2, 'getCurrentTheme - autorun triggered');
 
-    // Wait for subscription to be ready before applying theme
-    // This prevents flash of default theme before actual theme loads
-    if (!themeSubscription.ready()) {
-      clientConsole(2, 'getCurrentTheme - subscription not ready, waiting...');
-      return;
-    }
-
-    const themeSetting = DynamicSettings.findOne({key: 'customTheme'});
-    let themeData: ThemeData | undefined;
-
-    if (themeSetting && themeSetting.value && themeSetting.value.enabled !== false) {
-      // Use active custom theme
-      themeData = themeSetting.value as ThemeData;
-      Session.set('serverActiveTheme', themeData);
-      clientConsole(2, 'getCurrentTheme - using custom theme');
-    } else {
-      // No custom theme; use MoFaCTS default theme
-      clientConsole(2, 'getCurrentTheme - no custom theme found, using MoFaCTS default');
-      themeData = {
-        ...(defaultTheme as ThemeData),
-        activeThemeId: 'mofacts-default',
-        themeName: 'MoFaCTS',
-      };
-      Session.set('serverActiveTheme', themeData);
-    }
-
     const savedThemeId = getSavedUserThemeId();
     if (savedThemeId) {
       if (!themeLibrarySubscription.ready()) {
@@ -262,16 +237,37 @@ export function getCurrentTheme() {
         clientConsole(1, `[ThemeToggle] Saved theme "${savedThemeId}" is no longer configured.`);
       } else {
         Session.set('userThemeOverrideActive', true);
-        applyThemeCSSProperties(serializeThemeSelection(selectedTheme));
+        const serializedTheme = serializeThemeSelection(selectedTheme);
+        saveUserThemeSelection(serializedTheme);
+        applyThemeCSSProperties(serializedTheme);
         return;
       }
     }
 
-    if (Session.get('userThemeOverrideActive') === true) {
-      clientConsole(2, 'getCurrentTheme - user theme override active');
+    Session.set('userThemeOverrideActive', false);
+
+    // The server theme is relevant only when no valid user override exists.
+    if (!themeSubscription.ready()) {
+      clientConsole(2, 'getCurrentTheme - server theme not ready, waiting...');
       return;
     }
 
+    const themeSetting = DynamicSettings.findOne({key: 'customTheme'});
+    let themeData: ThemeData;
+
+    if (themeSetting && themeSetting.value && themeSetting.value.enabled !== false) {
+      themeData = themeSetting.value as ThemeData;
+      clientConsole(2, 'getCurrentTheme - using custom server theme');
+    } else {
+      clientConsole(2, 'getCurrentTheme - no custom server theme found, using MoFaCTS default');
+      themeData = {
+        ...(defaultTheme as ThemeData),
+        activeThemeId: 'mofacts-default',
+        themeName: 'MoFaCTS',
+      };
+    }
+
+    Session.set('serverActiveTheme', themeData);
     applyThemeCSSProperties(themeData);
   });
 }

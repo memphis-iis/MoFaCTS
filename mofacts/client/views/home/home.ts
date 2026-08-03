@@ -1,6 +1,5 @@
 import {checkUserSession, clientConsole} from '../../lib/userSessionHelpers';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
-import { Tracker } from 'meteor/tracker';
 import { ReactiveVar } from 'meteor/reactive-var';
 import DOMPurify from 'dompurify';
 import { Cookie } from '../../lib/cookies';
@@ -13,10 +12,8 @@ import type { PlatformStringKey } from '../../lib/interfaceI18nResources';
 import { TARGET_LOCALE_DEFINITIONS, TARGET_UI_LOCALES } from '../../../common/lib/interfaceLocales';
 import { applyThemeCSSProperties } from '../../lib/themeRuntime';
 import {
-  clearSavedUserThemeSelection,
   findAvailableUserTheme,
   getAvailableUserThemes,
-  getSavedUserThemeId,
   getThemeDisplayName,
   saveUserThemeSelection,
   serializeThemeSelection,
@@ -60,7 +57,6 @@ type AppAccountMenuInstance = Blaze.TemplateInstance & {
   localeDisclosure: DisclosureController;
   themeDisclosure: DisclosureController;
   accountMenuDestroyed: boolean;
-  _themeLibraryAutorun?: Tracker.Computation | null;
   _appAccountDocumentClickHandler?: ((event: Event) => void) | null;
 };
 
@@ -250,25 +246,7 @@ function applyUserSelectedTheme(theme: ThemeLibraryEntry): void {
   const selectedTheme = serializeThemeSelection(theme);
   Session.set('userThemeOverrideActive', true);
   applyThemeCSSProperties(selectedTheme);
-  saveUserThemeSelection(selectedTheme.activeThemeId as string);
-}
-
-function restoreUserSelectedTheme(): void {
-  const selectedThemeId = getSavedUserThemeId();
-  if (!selectedThemeId) {
-    Session.set('userThemeOverrideActive', false);
-    return;
-  }
-
-  const selectedTheme = getAvailableUserThemes().find((theme) => theme.id === selectedThemeId);
-  if (!selectedTheme) {
-    clearSavedUserThemeSelection(selectedThemeId);
-    Session.set('userThemeOverrideActive', false);
-    throw new Error(`[ThemeToggle] Saved theme "${selectedThemeId}" is no longer configured.`);
-  }
-
-  Session.set('userThemeOverrideActive', true);
-  applyThemeCSSProperties(serializeThemeSelection(selectedTheme));
+  saveUserThemeSelection(selectedTheme);
 }
 
 function reportThemeToggleError(instance: AppAccountMenuInstance, error: unknown): void {
@@ -939,16 +917,6 @@ Template.appAccountMenu.onCreated(function(this: AppAccountMenuInstance) {
 });
 
 Template.appAccountMenu.onRendered(function(this: AppAccountMenuInstance) {
-  this._themeLibraryAutorun = this.autorun(() => {
-    if (this.themeLibraryPresentation.get().status !== 'ready') {
-      return;
-    }
-    try {
-      restoreUserSelectedTheme();
-    } catch (error: unknown) {
-      reportThemeToggleError(this, error);
-    }
-  });
   this._appAccountDocumentClickHandler = (event: Event) => {
     const target = event.target as HTMLElement | null;
     const root = document.getElementById('userAccountArea');
@@ -964,10 +932,6 @@ Template.appAccountMenu.onDestroyed(function(this: AppAccountMenuInstance) {
   this.accountDisclosure.destroy();
   this.localeDisclosure.destroy();
   this.themeDisclosure.destroy();
-  if (this._themeLibraryAutorun) {
-    this._themeLibraryAutorun.stop();
-    this._themeLibraryAutorun = null;
-  }
   if (this._appAccountDocumentClickHandler) {
     document.removeEventListener('click', this._appAccountDocumentClickHandler);
     this._appAccountDocumentClickHandler = null;

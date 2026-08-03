@@ -160,7 +160,7 @@ function resolveThemeLogoPath(imageUrl: string | null) {
 }
 
 async function getSocialPreviewSettings() {
-  const rootUrl = firstNonEmptyString(Meteor.settings.ROOT_URL, process.env.ROOT_URL, Meteor.absoluteUrl()) || 'http://localhost:3000';
+  const rootUrl = firstNonEmptyString(Meteor.settings.ROOT_URL, process.env.ROOT_URL, Meteor.absoluteUrl()) || 'http://localhost:3200';
   const root = rootUrl.replace(/\/+$/, '');
   const configured = ((Meteor.settings.public || {}) as { socialPreview?: SocialPreviewSettings }).socialPreview || {};
   const theme = await getActiveTheme();

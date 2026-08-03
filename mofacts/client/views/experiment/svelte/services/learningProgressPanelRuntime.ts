@@ -49,9 +49,6 @@ export function shouldCommitLearningProgressSnapshot(params: {
   if (!params.current.available && params.next.available) {
     return true;
   }
-  if (params.current.available && params.next.available && !learningProgressSnapshotsMatch(params.current, params.next)) {
-    return true;
-  }
   if (
     params.next.available &&
     params.refreshSignal !== undefined &&
@@ -61,36 +58,6 @@ export function shouldCommitLearningProgressSnapshot(params: {
     return true;
   }
   return params.feedbackEnd > 0 && params.feedbackEnd !== params.lastFeedbackEnd;
-}
-
-function learningProgressSnapshotsMatch(
-  current: LearningProgressPanelSnapshot,
-  next: LearningProgressPanelSnapshot,
-): boolean {
-  if (current.meanPercent !== next.meanPercent || current.thresholdPercent !== next.thresholdPercent) {
-    return false;
-  }
-  if (
-    current.stats.totalItems !== next.stats.totalItems
-    || current.stats.atOrAboveThreshold !== next.stats.atOrAboveThreshold
-    || current.stats.belowThreshold !== next.stats.belowThreshold
-    || current.stats.introducedItems !== next.stats.introducedItems
-    || current.stats.unintroducedItems !== next.stats.unintroducedItems
-  ) {
-    return false;
-  }
-  if (current.rows.length !== next.rows.length) {
-    return false;
-  }
-  return current.rows.every((row, index) => {
-    const nextRow = next.rows[index];
-    return nextRow !== undefined
-      && row.id === nextRow.id
-      && row.percent === nextRow.percent
-      && row.band === nextRow.band
-      && row.introduced === nextRow.introduced
-      && row.current === nextRow.current;
-  });
 }
 
 export function createLearningProgressRuntimeController(

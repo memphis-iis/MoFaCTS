@@ -44,7 +44,7 @@ describe('incomingTrialSlotDisplay', () => {
     });
 
     expect(snapshot.preparedSubsetKind).to.equal('question');
-    expect(snapshot.slotKey).to.equal('7::Prompt::::::');
+    expect(snapshot.slotKey).to.equal('7::Prompt::::::::');
     expect(snapshot.slot?.subset.kind).to.equal('question');
     expect(snapshot.slot?.subset.replayEnabled).to.equal(true);
     expect(snapshot.slot?.props).to.include({

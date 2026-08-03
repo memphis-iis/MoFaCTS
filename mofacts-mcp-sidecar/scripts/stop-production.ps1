@@ -1,15 +1,17 @@
+param(
+  [string]$EnvFile = $env:MOFACTS_PROD_ENV_FILE
+)
+
 $ErrorActionPreference = 'Stop'
-
 $projectRoot = Split-Path -Parent $PSScriptRoot
-
-# Set dummy env vars for stop so docker-compose doesn't complain about invalid volume specs
-$env:SSH_KEY_PATH = $PSScriptRoot # Just a dummy valid path
-$env:SSH_HOST = "dummy"
-$env:PROD_MONGO_HOST = "0.0.0.0"
+if (-not $EnvFile) {
+  throw 'MOFACTS_PROD_ENV_FILE or -EnvFile is required.'
+}
+$resolvedEnvFile = (Resolve-Path -LiteralPath $EnvFile).Path
 
 Push-Location $projectRoot
 try {
-  docker compose -f docker-compose.yml -f docker-compose.production.yml down
+  docker compose --env-file $resolvedEnvFile -f docker-compose.yml -f docker-compose.production.yml down
 } finally {
   Pop-Location
 }

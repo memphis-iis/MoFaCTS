@@ -40,7 +40,7 @@ function sparcSessionEngine(probabilityEstimate = 0.7) {
   };
 }
 
-function legacyModelEngine(probabilityEstimate = 0.7) {
+function adaptiveCardProbabilityEngine(probabilityEstimate = 0.7) {
   return {
     unitType: 'model',
     getCardProbabilitiesNoCalc: () => ({
@@ -104,7 +104,7 @@ describe('learning progress panel runtime', function() {
     });
   });
 
-  it('does not seed progress from the legacy raw card-probabilities shape alone', function() {
+  it('seeds progress from the adaptive card-probability provider', function() {
     const controller = createLearningProgressRuntimeController({
       defaultDeliverySettings: {},
       documentRef: () => null,
@@ -113,14 +113,14 @@ describe('learning progress panel runtime', function() {
 
     const runtime = controller.buildRuntimeSnapshot({
       deliverySettings: {},
-      engine: legacyModelEngine(),
+      engine: adaptiveCardProbabilityEngine(),
       feedbackEnd: 0,
     surfaceState: flashcardSurface,
     });
 
-    expect(runtime.snapshot.available).to.equal(false);
-    expect(runtime.snapshot.reason).to.equal('Progress requires a model-progress provider.');
-    expect(runtime.showPanel).to.equal(false);
+    expect(runtime.snapshot.available).to.equal(true);
+    expect(runtime.snapshot.rows[0]?.probability).to.equal(0.7);
+    expect(runtime.showPanel).to.equal(true);
   });
 
   it('commits updated progress only for a new feedback end timestamp', function() {

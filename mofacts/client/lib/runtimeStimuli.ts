@@ -24,6 +24,7 @@ function currentClusters(): RuntimeStimulusCluster[] {
     currentStimuliSet: Session.get('currentStimuliSet'),
     currentStimuliSetId: Session.get('currentStimuliSetId'),
     currentTdfId: Session.get('currentTdfId'),
+    currentTdfDoc: Session.get('currentTdfDoc'),
   });
 }
 

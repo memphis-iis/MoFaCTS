@@ -8,6 +8,7 @@ declare const DynamicSettings: {
 
 const USER_THEME_SELECTION_KEY_PREFIX = 'mofacts.userThemeSelection.v1.';
 const DEVICE_THEME_SELECTION_KEY = 'mofacts.userThemeSelection.v1.device';
+export const DEVICE_THEME_BOOTSTRAP_KEY = 'mofacts.userThemeSelection.v1.deviceBootstrap';
 
 export type ThemeLibraryEntry = {
   id?: string;
@@ -66,15 +67,27 @@ export function getSavedUserThemeId(): string | null {
   return window.localStorage.getItem(DEVICE_THEME_SELECTION_KEY);
 }
 
-export function saveUserThemeSelection(themeId: string): void {
+export function saveUserThemeSelection(theme: ThemeLibraryEntry): void {
   if (typeof window === 'undefined' || !window.localStorage) {
     throw new Error('[ThemeToggle] User theme selection requires localStorage.');
   }
+  const serializedTheme = serializeThemeSelection(theme);
+  const themeId = serializedTheme.activeThemeId as string;
   const key = getUserThemeSelectionKey();
   if (key) {
     window.localStorage.setItem(key, themeId);
   }
   window.localStorage.setItem(DEVICE_THEME_SELECTION_KEY, themeId);
+
+  const backgroundColor = serializedTheme.properties?.app_background_color;
+  if (typeof backgroundColor === 'string' && backgroundColor.trim()) {
+    window.localStorage.setItem(DEVICE_THEME_BOOTSTRAP_KEY, JSON.stringify({
+      themeId,
+      backgroundColor: backgroundColor.trim(),
+    }));
+  } else {
+    window.localStorage.removeItem(DEVICE_THEME_BOOTSTRAP_KEY);
+  }
 }
 
 export function clearSavedUserThemeSelection(themeId: string): void {
@@ -87,6 +100,17 @@ export function clearSavedUserThemeSelection(themeId: string): void {
   }
   if (window.localStorage.getItem(DEVICE_THEME_SELECTION_KEY) === themeId) {
     window.localStorage.removeItem(DEVICE_THEME_SELECTION_KEY);
+  }
+  const bootstrapValue = window.localStorage.getItem(DEVICE_THEME_BOOTSTRAP_KEY);
+  if (bootstrapValue) {
+    try {
+      const bootstrap = JSON.parse(bootstrapValue) as { themeId?: unknown };
+      if (bootstrap.themeId === themeId) {
+        window.localStorage.removeItem(DEVICE_THEME_BOOTSTRAP_KEY);
+      }
+    } catch (_error) {
+      window.localStorage.removeItem(DEVICE_THEME_BOOTSTRAP_KEY);
+    }
   }
 }
 

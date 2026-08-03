@@ -20,40 +20,91 @@ services:
         bind:
           create_host_path: true
       - type: bind
-        source: /h5p-content
-        target: /root/h5p-content
-        bind:
-          create_host_path: true
-      - type: bind
-        source: /h5p-libraries
-        target: /root/h5p-libraries
-        bind:
-          create_host_path: true
-      - type: bind
         source: ${METEOR_SETTINGS_HOST_PATH:-./settingsstaging.json}
         target: /run/mofacts/settings.json
         read_only: true
     ports:
       - '3000:3000'
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+      mongodb-replica-init:
+        condition: service_completed_successfully
     environment:
       ROOT_URL: ${ROOT_URL:-https://staging.optimallearning.org}
-      MONGO_URL: ${MONGO_URL:-mongodb://mongodb:27017/MoFACT-meteor3}
+      MONGO_URL: ${MONGO_URL:?MONGO_URL with MoFaCTS app-user credentials and replicaSet is required}
       EXPECTED_MONGO_DB_NAME: ${EXPECTED_MONGO_DB_NAME:-MoFACT-meteor3}
+      MOFACTS_MONGO_REPLICA_SET_NAME: ${MOFACTS_MONGO_REPLICA_SET_NAME:-mofacts-rs}
+      METEOR_REACTIVITY_ORDER: polling
+      DDP_TRANSPORT: sockjs
       PORT: ${PORT:-3000}
       WAIT_HOSTS: mongodb:27017
-      METEOR_SETTINGS_WORKAROUND: /run/mofacts/settings.json
+      METEOR_SETTINGS_FILE: /run/mofacts/settings.json
     networks:
       - mofacts
 
   mongodb:
     image: mongo:8.0
     restart: always
+    entrypoint:
+      - /bin/bash
+      - /opt/mofacts-mongodb/entrypoint.sh
     command:
       - --storageEngine=wiredTiger
+      - --auth
+      - --replSet
+      - ${MOFACTS_MONGO_REPLICA_SET_NAME:-mofacts-rs}
+      - --keyFile
+      - /data/configdb/mongodb-keyfile
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?MONGO_INITDB_ROOT_USERNAME is required}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD is required}
+      MOFACTS_MONGO_APP_DATABASE: ${MOFACTS_MONGO_APP_DATABASE:-MoFACT-meteor3}
+      MOFACTS_MONGO_APP_USERNAME: ${MOFACTS_MONGO_APP_USERNAME:?MOFACTS_MONGO_APP_USERNAME is required}
+      MOFACTS_MONGO_APP_PASSWORD: ${MOFACTS_MONGO_APP_PASSWORD:?MOFACTS_MONGO_APP_PASSWORD is required}
+      MOFACTS_MONGO_REPLICA_SET_NAME: ${MOFACTS_MONGO_REPLICA_SET_NAME:-mofacts-rs}
     volumes:
       - data:/data/db
+      - type: bind
+        source: ./mongo-init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+      - type: bind
+        source: ./mongodb
+        target: /opt/mofacts-mongodb
+        read_only: true
+      - type: bind
+        source: ${MONGO_REPLICA_SET_KEYFILE_HOST_PATH:?MONGO_REPLICA_SET_KEYFILE_HOST_PATH must point to the private replica-set keyfile}
+        target: /run/secrets/mongodb-keyfile-source
+        read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host 127.0.0.1:27017 --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"const h=db.adminCommand({hello:1}); const s=db.adminCommand({replSetGetStatus:1}); quit(h.ok===1 && h.setName===process.env.MOFACTS_MONGO_REPLICA_SET_NAME && (h.isWritablePrimary===true || h.secondary===true) && s.ok===1 && s.members.some(m=>m.state===1) ? 0 : 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - mofacts
+
+  mongodb-replica-init:
+    image: mongo:8.0
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_started
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?MONGO_INITDB_ROOT_USERNAME is required}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD is required}
+      MOFACTS_MONGO_REPLICA_SET_NAME: ${MOFACTS_MONGO_REPLICA_SET_NAME:-mofacts-rs}
+      MOFACTS_MONGO_REPLICA_SET_MEMBER: ${MOFACTS_MONGO_REPLICA_SET_MEMBER:-mongodb:27017}
+    volumes:
+      - type: bind
+        source: ./mongodb
+        target: /opt/mofacts-mongodb
+        read_only: true
+    entrypoint:
+      - /bin/bash
+      - /opt/mofacts-mongodb/init-replica-set.sh
     networks:
       - mofacts
 

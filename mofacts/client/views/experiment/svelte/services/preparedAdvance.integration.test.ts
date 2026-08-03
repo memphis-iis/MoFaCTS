@@ -21,6 +21,22 @@ function primeMinimalSession(): void {
   Session.set('currentUnitNumber', 0);
   Session.set('currentTdfId', 'tdf-prepared');
   Session.set('currentTdfName', 'prepared-tdf');
+  Session.set('currentStimuliSetId', 'set-prepared');
+  Session.set('currentTdfDoc', {
+    _id: 'tdf-prepared',
+    rawStimuliFile: {
+      setspec: {
+        clusters: [{
+          clusterKC: '1000',
+          stims: [{
+            stimulusKC: 'KC-1',
+            display: { text: 'Prompt 1' },
+            response: { correctResponse: 'alpha' },
+          }],
+        }],
+      },
+    },
+  });
   Session.set('currentTdfUnit', {});
   Session.set('schedule', null);
   Session.set('currentTdfFile', {

@@ -41,13 +41,14 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T mongodb \
   --username "$MONGO_INITDB_ROOT_USERNAME" \
   --password "$MONGO_INITDB_ROOT_PASSWORD" \
   --authenticationDatabase admin \
+  --db "$MOFACTS_MONGO_APP_DATABASE" \
   --drop \
+  --restoreDbUsersAndRoles \
+  --stopOnError \
   --archive < "$ARCHIVE"
 
 for archive_path in \
-  "$BACKUP_DIR/assets/dynamic-assets.tar:/dynamic-assets" \
-  "$BACKUP_DIR/h5p-content/h5p-content.tar:/h5p-content" \
-  "$BACKUP_DIR/h5p-libraries/h5p-libraries.tar:/h5p-libraries"; do
+  "$BACKUP_DIR/assets/dynamic-assets.tar:/dynamic-assets"; do
   source_archive="${archive_path%%:*}"
   target_dir="${archive_path##*:}"
   if [ ! -f "$source_archive" ]; then

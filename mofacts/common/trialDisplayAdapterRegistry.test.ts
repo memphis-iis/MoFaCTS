@@ -16,14 +16,14 @@ describe('Trial display adapter registry', function() {
   it('requires adapter identity, display type, and lifecycle functions', function() {
     expect(() => validateTrialDisplayAdapter({
       id: '',
-      displayType: 'h5p',
+      displayType: 'widget',
       requiredCapabilities: [],
       ownsInteraction: () => true,
       normalizeDisplay: (display) => display,
     })).to.throw('Trial display adapter id must be a non-empty string');
 
     expect(() => validateTrialDisplayAdapter({
-      id: 'h5p',
+      id: 'widget',
       displayType: '',
       requiredCapabilities: [],
       ownsInteraction: () => true,
@@ -31,8 +31,8 @@ describe('Trial display adapter registry', function() {
     })).to.throw('displayType must be a non-empty string');
 
     expect(() => validateTrialDisplayAdapter({
-      id: 'h5p',
-      displayType: 'h5p',
+      id: 'widget',
+      displayType: 'widget',
       requiredCapabilities: [],
       ownsInteraction: undefined as unknown as TrialDisplayAdapter['ownsInteraction'],
       normalizeDisplay: (display) => display,
@@ -41,24 +41,24 @@ describe('Trial display adapter registry', function() {
 
   it('registers and resolves adapters by display type without fallback behavior', function() {
     const adapter: TrialDisplayAdapter = {
-      id: 'mofacts.h5p-display',
-      displayType: 'h5p',
+      id: 'sample.widget-display',
+      displayType: 'widget',
       requiredCapabilities: ['media', 'history'],
-      ownsInteraction: (display) => Boolean((display as { h5p?: unknown })?.h5p),
+      ownsInteraction: (display) => Boolean((display as { widget?: unknown })?.widget),
       normalizeDisplay: (display) => display,
     };
 
     registerTrialDisplayAdapter(adapter);
 
-    expect(getRegisteredTrialDisplayAdapterTypes()).to.deep.equal(['h5p']);
-    expect(getTrialDisplayAdapter('h5p')).to.equal(adapter);
+    expect(getRegisteredTrialDisplayAdapterTypes()).to.deep.equal(['widget']);
+    expect(getTrialDisplayAdapter('widget')).to.equal(adapter);
     expect(() => getTrialDisplayAdapter('autotutor')).to.throw('No trial display adapter registered for "autotutor"');
   });
 
   it('rejects duplicate display type registration', function() {
     const adapter: TrialDisplayAdapter = {
       id: 'first',
-      displayType: 'h5p',
+      displayType: 'widget',
       requiredCapabilities: [],
       ownsInteraction: () => true,
       normalizeDisplay: (display) => display,
@@ -69,6 +69,6 @@ describe('Trial display adapter registry', function() {
     expect(() => registerTrialDisplayAdapter({
       ...adapter,
       id: 'second',
-    })).to.throw('Trial display adapter for "h5p" is already registered');
+    })).to.throw('Trial display adapter for "widget" is already registered');
   });
 });

@@ -332,7 +332,7 @@ Deployment move invariants:
 - `deploy/` becomes the single canonical deployment and runtime-operations directory.
 - `mofacts/.deploy/` must not remain as a second supported workflow.
 - Any temporary path shim must be a short-lived migration aid that fails clearly and points to `deploy/`; it must not run an alternate hidden workflow.
-- Dockerfile copy paths, settings paths, hotfix dev scripts, hotfix local scripts, Compose files, public docs, and agent instructions are updated in the same coherent phase or in a sequence where each intermediate state is explicitly verified.
+- Dockerfile copy paths, settings paths, the canonical localhost hotfix manager, Compose files, public docs, and agent instructions are updated in the same coherent phase or in a sequence where each intermediate state is explicitly verified.
 - Local ignored state currently under `mofacts/.deploy/local-dev/` and local data currently under `mofacts/.deploy/local-data/` get a deliberate new home, with `.gitignore` rules updated before generated state is produced.
 
 ### Phase 3: Add README files as architectural signs

@@ -817,7 +817,7 @@ remains CI-gated and should not be used routinely on local Windows.
 
 ### UI/runtime implementation verification
 
-For each UI migration, use the native hotfix dev server and MoFaCTS Playwright
+For each UI migration, use the canonical localhost hotfix server and MoFaCTS Playwright
 sidecar as required by the repository guide. Verify:
 
 - direct refresh;

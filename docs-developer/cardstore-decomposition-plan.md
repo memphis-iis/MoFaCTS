@@ -330,7 +330,7 @@ Verification:
 
 - Run `npm run typecheck` from `mofacts/`.
 - Run `npm run lint` from `mofacts/`.
-- For UI/runtime behavior changes, use the native hotfix dev server plus the
+- For UI/runtime behavior changes, use the canonical localhost hotfix server plus the
   MoFaCTS Playwright sidecar smoke test.
 
 ### Phase 5: Delete `CardStore`
@@ -351,7 +351,7 @@ Verification:
 
 - Run `npm run typecheck` from `mofacts/`.
 - Run `npm run lint` from `mofacts/`.
-- Use the native hotfix dev server plus the MoFaCTS Playwright sidecar smoke
+- Use the canonical localhost hotfix server plus the MoFaCTS Playwright sidecar smoke
   test for learner runtime routes touched by the extraction.
 
 ## Implementation Gates

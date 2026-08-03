@@ -39,7 +39,7 @@ const surfaceRules = [
   ['Svelte learning components', /client[\\/]views[\\/]experiment[\\/]svelte/],
   ['JSON editor/generated controls', /jsoneditor|schemaApplicabilityEditor|validatorUI|contentEdit|tdfEdit/i],
   ['mobile/table surfaces', /Reporting|reporting|table|mobile/i],
-  ['third-party override boundary', /public[\\/]h5p-standalone|packages[\\/]/],
+  ['third-party override boundary', /packages[\\/]/],
 ];
 
 function walk(dir) {

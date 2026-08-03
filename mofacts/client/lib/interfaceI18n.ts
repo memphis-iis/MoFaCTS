@@ -32,15 +32,13 @@ export function assertCompletePlatformLocaleResources(
 }
 
 function interpolateTemplate(template: string, values: TranslationValues | undefined): string {
-  if (!values) {
-    return template;
-  }
+  const interpolationValues = values ?? {};
 
   return template.replace(/\{([A-Za-z0-9_.-]+)\}/g, (match, token: string) => {
-    if (!Object.prototype.hasOwnProperty.call(values, token)) {
+    if (!Object.prototype.hasOwnProperty.call(interpolationValues, token)) {
       throw new Error(`Missing interpolation value "${token}" for platform translation`);
     }
-    return String(values[token]);
+    return String(interpolationValues[token]);
   });
 }
 
@@ -62,4 +60,3 @@ export function translatePlatformString(
 export function getPlatformTextDirection(localeInput: string): 'ltr' | 'rtl' {
   return getTextDirectionForLocale(localeInput);
 }
-

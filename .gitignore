@@ -68,6 +68,8 @@ deploy/.env*.staging
 deploy/local-data/
 deploy/local-build/
 deploy/local-dev/
+deploy/local-hotfix/
+deploy/local-secrets/
 deploy/caddy.stdout.log
 deploy/caddy.stderr.log
 

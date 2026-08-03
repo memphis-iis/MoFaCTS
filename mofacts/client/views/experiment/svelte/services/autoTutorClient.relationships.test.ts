@@ -109,25 +109,27 @@ describe('autoTutorClient relationship graph initialization', function() {
 
   it('generates and persists missing expectation relationships before planner state initializes', async function() {
     const meteorCallStub = sinon.stub(Meteor as MeteorCallAsyncHost, 'callAsync');
-    meteorCallStub.withArgs('persistAutoTutorExpectationRelationships').resolves({ success: true });
-    const fetchStub = sinon.stub(globalThis, 'fetch');
-    fetchStub.resolves(new Response(JSON.stringify({
-      data: [
-        { embedding: [1, 0, 0] },
-        { embedding: [0.6, 0.8, 0] },
-        { embedding: [0.4, 0.4, 0.8] },
+    meteorCallStub.withArgs('getOpenRouterCapability', 'tdf-1').resolves({ source: 'tdf' });
+    meteorCallStub.withArgs('callResolvedOpenRouterEmbeddings').resolves({
+      embeddings: [
+        [1, 0, 0],
+        [0.95, 0.05, 0],
+        [0.9, 0.1, 0],
       ],
-      usage: { cost: 0.0001 },
-    }), { status: 200 }));
+      responseBody: {},
+      costUsd: 0.0001,
+    });
+    meteorCallStub.withArgs('persistAutoTutorExpectationRelationships').resolves({ success: true });
 
     const { createAutoTutorRuntime } = await import('./autoTutorClient');
     const runtime = await createAutoTutorRuntime(buildCapabilities());
     const state = runtime.getState();
 
-    expect(fetchStub.calledOnce).to.equal(true);
+    expect(meteorCallStub.calledWith('callResolvedOpenRouterEmbeddings')).to.equal(true);
     expect(meteorCallStub.calledWith('persistAutoTutorExpectationRelationships')).to.equal(true);
     expect(runtime.config.script.expectationRelationships).to.have.keys(['E1', 'E2', 'E3']);
-    expect(state.expectations.E1?.centrality).to.be.greaterThan(0);
-    expect(state.expectations.E2?.priority).to.be.greaterThan(0);
+    expect(runtime.config.script.expectationRelationships?.E1?.E2).to.be.greaterThan(0);
+    expect(state.expectations.E1?.centrality).to.equal(0);
+    expect(state.expectations.E2?.priority).to.equal(0);
   });
 });

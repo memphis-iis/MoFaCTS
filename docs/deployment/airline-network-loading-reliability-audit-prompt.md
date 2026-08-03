@@ -29,7 +29,7 @@ Preflight completeness check:
 6. Confirm the plan does not introduce silent fallbacks or hidden compatibility paths.
 7. Confirm temporary startup behavior is visible to users when theme/DDP readiness is delayed.
 8. Confirm modal cleanup accounts for all Bootstrap modal surfaces and removes `$(...).modal(...)` reliance.
-9. Confirm verification includes `npm run typecheck`, `npm run lint`, hotfix dev app UI smoke testing, sidecar console/network reporting, and route-specific blocked-domain tests.
+9. Confirm verification includes `npm run typecheck`, `npm run lint`, canonical localhost UI smoke testing, sidecar console/network reporting, and route-specific blocked-domain tests.
 10. Confirm the plan includes checking whether `C:\dev\MoFaCTS.wiki` needs an update.
 
 Implementation review:

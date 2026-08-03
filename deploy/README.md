@@ -5,18 +5,23 @@ This folder contains executable deployment examples and scripts for MoFaCTS. Hum
 ## Contents
 
 - `docker-compose.yml`: canonical Self-Hosted MoFaCTS app, authenticated MongoDB, and Redis runtime.
-- `docker-compose.local.yml`: local override file for development or staging-style checks.
-- `docker-compose.hotfix-native.yml`: publishes local MongoDB to `127.0.0.1:27017` for the native hotfix dev server.
-- `docker-compose.hotfix-local.yml`: local-only bundle runner for faster code hotfix loops without producing a deploy image.
+- `docker-compose.local.yml`: local supporting-service overrides, including the
+  MongoDB host port used by the source watcher.
+- `docker-compose.change-streams-qualification.yml`: test-only stable-3.5.0
+  Change Streams recovery qualification override; it is not part of the
+  production path.
 - `.env.self-hosted.example`: shareable self-hosted environment template. Copy it to ignored `.env.self-hosted`.
 - `settings.self-hosted.example.json`: shareable self-hosted settings template. Copy it to ignored private settings before use.
 - `.env.local.example`: shareable local environment template. Copy it to ignored `.env.local` for machine-specific values.
-- `settings.local.example.json`: shareable local settings template. Copy it to a private location and pass that path to `hotfix-dev.ps1` with `-SettingsPath`.
-- Private settings files under `deploy/` are mounted into the container at runtime; the native hotfix dev loop reads the explicit settings file passed with `-SettingsPath`.
+- `settings.local.example.json`: shareable local settings template. Copy it to
+  ignored `settings.local.json`, or point `.env.local` at another private path.
+- The canonical localhost watcher reads the private settings path from `.env.local`; self-hosted containers mount their private settings at runtime.
 - `docker/`: scripts copied into the app image.
-- `hotfix-dev.ps1`: native Windows Meteor hotfix dev server launcher.
-- `hotfix/`: scripts used by the local-only bundle runner.
+- `hotfix-local.ps1`: the sole localhost source-watcher start, restart, status,
+  logs, and stop command.
+- `hotfix/`: scripts used by the local Meteor/Rspack watcher.
 - `SERVER_IMAGE_DEPLOY_RUNBOOK.md`: server deployment runbook.
+- `../docs/deployment/mongodb-replica-set-conversion.md`: maintenance, recovery, and future-expansion runbook for the in-place replica-set conversion.
 - `server-deploy-validate.sh`: remote rollout validation helper.
 - `start-lan-https.ps1`, `stop-lan-https.ps1`, `Caddyfile.local`: local LAN HTTPS helpers.
 - `build-timed.ps1`: optional timing wrapper around Docker Compose builds.
@@ -39,7 +44,34 @@ cp .env.self-hosted.example .env.self-hosted
 cp settings.self-hosted.example.json settings.self-hosted.json
 ```
 
-Replace every placeholder before startup. The app validates settings, MongoDB authentication, Redis configuration, and storage paths and fails clearly when required values are missing.
+Replace every placeholder before startup. Create the private MongoDB replica-set
+keyfile named by `MONGO_REPLICA_SET_KEYFILE_HOST_PATH`; for example, on a Linux
+host:
+
+```bash
+sudo install -d -m 700 /etc/mofacts
+openssl rand -base64 756 | tr -d '\n' | sudo tee /etc/mofacts/mongodb-keyfile >/dev/null
+sudo chmod 600 /etc/mofacts/mongodb-keyfile
+```
+
+The keyfile is a cluster secret. Keep the same value when adding future members
+and never commit or print it. The application `MONGO_URL` must use the configured
+replica-set name, for example by including `replicaSet=mofacts-rs` along with the
+existing app-user credentials and `authSource`.
+
+The canonical Compose path starts MongoDB with replica-set member
+authentication and runs an idempotent initializer. On a fresh volume it creates
+the app users and then initializes the set. On an existing standalone volume it
+preserves the data and users, starts that volume as the first member, and
+initializes the set. That existing-volume conversion is a maintenance action:
+stop writers and verify a restorable backup before running it on a live server.
+The initial one-member set enables replica-set features but does not provide
+host failover. Its explicit set/member configuration supports adding members or
+migrating to a parallel replica-set target later.
+
+The app validates settings, MongoDB authentication, the exact replica-set
+identity, Redis configuration, and storage paths and fails clearly when required
+values are missing.
 
 ## Local Settings
 
@@ -51,11 +83,21 @@ For local Docker Compose validation, start from the tracked template:
 cp .env.local.example .env.local
 ```
 
-For the native Windows hotfix dev loop, create or update a private settings file wherever it is convenient on your machine:
+Create the ignored local keyfile once from PowerShell:
 
 ```powershell
-$LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
-Copy-Item settings.local.example.json $LocalSettingsPath
+.\New-MongoReplicaSetKeyfile.ps1
+```
+
+Replace the MongoDB URL placeholder in `.env.local`. The sole application runs
+inside Docker, so its opaque URL uses `mongodb:27017` and
+`replicaSet=mofacts-rs` (or the same custom name configured by
+`MOFACTS_MONGO_REPLICA_SET_NAME`). There is no native application URI.
+
+Create the ignored private settings file named by `METEOR_SETTINGS_HOST_PATH`:
+
+```powershell
+Copy-Item settings.local.example.json settings.local.json
 ```
 
 Start from `settings.local.example.json`, then replace placeholders. The launcher fails clearly if the settings path is missing or invalid.
@@ -67,14 +109,49 @@ $env:MOFACTS_CADDY_EXE = 'C:\Path\To\caddy.exe'
 .\start-lan-https.ps1
 ```
 
+The normal local application URL remains `http://localhost:3200`. The LAN
+HTTPS helper intentionally reserves `https://localhost:3000` as the only local
+port-3000 exception and proxies it to the application on port 3200.
+
 ## Typical Local Validation
 
-Only run Docker commands when you intend to validate the container workflow:
+Validate the canonical definition without printing resolved secrets:
 
 ```bash
 cd deploy
-docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml config
+docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml config --quiet
 ```
+
+For an explicitly isolated Change Streams qualification, append both the
+rehearsal and qualification overlays:
+
+```bash
+docker compose -p mofacts-cs-qualification --env-file .env.local \
+  -f docker-compose.yml -f docker-compose.rehearsal.yml \
+  -f docker-compose.change-streams-qualification.yml config
+```
+
+The qualification overlay sets both `MOFACTS_CHANGE_STREAMS_ENABLED=true` and
+the test-only `MOFACTS_CHANGE_STREAMS_QUALIFICATION=true`, with the exact driver
+order `changeStreams,polling`. The application rejects that order without the
+enablement gate, rejects qualification unless enablement is also explicit,
+keeps SockJS and disconnect grace zero, and reports the selected qualification
+mode at startup. Polling is retained as
+the intentional driver for ordered or otherwise incompatible observers. Stop
+the isolated project and remove the overlay to restore the normal explicit
+`polling` configuration. Do not add this overlay to a production Compose
+command unless Phase 4 records an adopt decision and the production change is
+separately authorized.
+
+The opt-in client/server regression matrix is exercised by the manually
+triggered `Meteor 3.5 Change Streams qualification` GitHub Actions workflow.
+That workflow installs stable Meteor 3.5, starts a disposable MongoDB 8
+one-member replica set, selects the qualification overlay's exact environment
+contract, and runs the existing supported Linux Meteor/Playwright test path.
+It is intentionally separate from ordinary polling CI because its purpose is
+to produce an adopt/defer result for the optional driver. Triggering the
+workflow is an explicit test authorization; it does not deploy or modify a
+protected database.
 
 Build, push, and deploy commands should be run only by maintainers or release owners with the appropriate environment access.
 
@@ -96,147 +173,40 @@ READINESS_COMMAND='./run-admin-readiness-check.sh' ./server-deploy-validate.sh -
 
 The readiness command must call the admin-only deployment readiness path for that environment, such as an authenticated browser/DDP check against `/admin/tests`. The script fails the rollout when `--require-readiness` is set and no command is provided, or when the command exits non-zero.
 
-## Real Hotfix Dev Loop
+## Canonical Local Hotfix Server
 
-Use this loop when the goal is fast local UI/application iteration with browser/MCP observation.
+There is exactly one supported local application server: the source-watching
+Meteor/Rspack hotfix server at `http://localhost:3200`. It is owned by
+`hotfix-local.ps1`. Docker Compose supplies MongoDB and replica-set
+initialization; it does not run another localhost application container. Do not
+add another port-3200 application path.
 
-### First-Time Windows Setup
-
-Before starting the loop on a new Windows machine, confirm the local runtime prerequisites:
-
-```powershell
-node --version
-npm --version
-docker version
-docker compose version
-```
-
-The supported baseline is Node.js `22.x`, npm `10.x`, Docker Desktop with the Linux engine running, and the Meteor release declared in `../mofacts/.meteor/release`. If `hotfix-dev.ps1` reports that the matching Meteor tool is missing under `$env:LOCALAPPDATA\.meteor\packages\meteor-tool`, install the project release once:
-
-```powershell
-npm install -g meteor@3.4.1 --foreground-script
-```
-
-Then verify the project tool is available:
-
-```powershell
-Test-Path "$env:LOCALAPPDATA\.meteor\packages\meteor-tool\3.4.1\mt-os.windows.x86_64\meteor.bat"
-```
-
-That check should return `True`. If `docker version` prints a client version but cannot connect to `dockerDesktopLinuxEngine`, start or restart Docker Desktop before running the hotfix loop.
-
-Start the persistent native Meteor dev server:
+Prepare `.env.local` and the private settings file named by its
+`METEOR_SETTINGS_HOST_PATH`, then run:
 
 ```powershell
 cd deploy
-$LocalSettingsPath = "$env:USERPROFILE\Desktop\settings.local.json"
-.\hotfix-dev.ps1 start -SettingsPath $LocalSettingsPath
-```
-
-The dev app is exposed at:
-
-```text
-http://localhost:3200
-```
-
-The launcher also ensures a local admin account for the owner configured in the settings JSON passed with `-SettingsPath`. On a new local database, the default hotfix-dev login is `admin@localhost.test` with password `local-admin-2026`. Credentials are written to ignored local state and preserved there:
-
-```powershell
-Get-Content .\local-dev\agent-secrets.env
-```
-
-Use `MOFACTS_AGENT_ADMIN_EMAIL` and `MOFACTS_AGENT_ADMIN_PASSWORD` from that file to sign in locally. If the local database already contains that admin account with a different password, the launcher fails clearly instead of resetting it silently; reset the local database or account deliberately before changing the saved password.
-
-Follow Meteor startup and incremental rebuild output:
-
-```powershell
-.\hotfix-dev.ps1 logs
-```
-
-On first startup after installing Meteor or refreshing local caches, the log may sit at `Started proxy` for a few minutes while Meteor/Rspack finishes the initial build. Wait for `Started your app` and verify `http://localhost:3200` before treating startup as complete.
-
-Check or control the service:
-
-```powershell
-.\hotfix-dev.ps1 status
-.\hotfix-dev.ps1 restart -SettingsPath $LocalSettingsPath
-.\hotfix-dev.ps1 stop
-```
-
-The dev server:
-
-- runs Meteor natively from the Windows checkout so source watching does not cross Docker Desktop's Windows bind-mount filesystem,
-- uses Docker only for the local MongoDB service,
-- publishes MongoDB on `127.0.0.1:27017` through `docker-compose.hotfix-native.yml`,
-- uses the local MongoDB database `MoFACT-meteor3`,
-- creates or verifies the local admin account through the running app and stores credentials in ignored `deploy/local-dev/agent-secrets.env`,
-- sets `HOME` to `deploy/local-data` so dynamic assets and H5P content resolve to the same local data folders as the container workflows,
-- writes logs and a PID file to ignored local state under `deploy/local-dev/`,
-- retires an orphaned listener on Rspack HMR port `8082` only when its command line identifies it as this checkout's dev server; an unrelated listener causes startup to stop with an explicit port-ownership error,
-- maintains an ignored `.meteor/local/build/package.json` marker so Meteor's generated CommonJS dev bundle is not treated as ESM by the app root package,
-- relies on `rspack.config.js` allowing `host.docker.internal` for the Rspack dev client so Playwright MCP can load the native dev app from its container,
-- is intended for observe/edit/reload work, not release confidence.
-
-For MCP browser testing against this dev server, start the sidecar with its hotfix-dev override:
-
-```powershell
-cd ../mofacts-mcp-sidecar
-docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up -d
-```
-
-That points Playwright MCP at `http://host.docker.internal:3200` and keeps Mongo MCP on `MoFACT-meteor3`.
-
-For TypeScript-bearing changes, still run the required full app check from `mofacts/` before considering the change complete:
-
-```powershell
-cd ../mofacts
-npm run typecheck
-```
-
-## Local Hotfix Bundle Loop
-
-The local hotfix bundle workflow is for production-shaped local verification. It compiles a Meteor server bundle and runs that bundle in a Node container, but it does not create, tag, push, or validate a deployable Docker image. It is slower than the real hotfix dev loop above.
-
-Use it only from this folder:
-
-```bash
-cd deploy
-```
-
-After TypeScript-bearing app code changes, verify the app first:
-
-```bash
-cd ../mofacts
-npm run typecheck
-cd ../deploy
-```
-
-Build or rebuild the local hotfix bundle:
-
-```bash
-docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.hotfix-local.yml --profile hotfix-build run --rm hotfix-builder
-docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.hotfix-local.yml --profile hotfix-build run --rm hotfix-deps
-```
-
-Start or restart the local app from the hotfix bundle:
-
-```bash
-docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.hotfix-local.yml up -d mongodb mofacts
-```
-
-The app is exposed at `http://localhost:3100` unless `.env.local` or compose port settings are changed. The generated bundle lives in the Docker volume `deploy_hotfix_bundle` so the app runs from Linux-native storage rather than a Windows bind mount.
-
-On Windows, the same rebuild-and-restart loop can be run with:
-
-```powershell
 .\hotfix-local.ps1
 ```
 
-Use `.\hotfix-local.ps1 -NoStart` to compile and install bundle dependencies without restarting the app container. Use `.\hotfix-local.ps1 -SkipTypecheck` only when the current change did not touch TypeScript-bearing app code or the required typecheck has already run in the same loop.
+That command validates the pinned Meteor tool and Compose configuration before
+cleanup, starts the local MongoDB replica set, and launches the native
+Meteor/Rspack watcher. It waits for the app and HMR endpoints and creates or
+verifies the local admin. Subsequent source edits rebuild and reload
+automatically; rerun the command only to restart the watcher itself.
 
-For UI work, an agent may continue the loop by opening `http://localhost:3100` with the local browser/MCP tooling, observing the interface, making another code change, rebuilding the hotfix bundle, restarting `mofacts`, and testing again. If browser/MCP validation is not requested or not available, the agent should rebuild, report that the app is ready for manual testing, and include any checks it did run.
+Its management actions are:
 
-This workflow is not release confidence. Use the production-shaped Docker Compose image build for release or deployment validation.
+```powershell
+.\hotfix-local.ps1 status
+.\hotfix-local.ps1 logs
+.\hotfix-local.ps1 stop
+```
+
+`status` reports the owning Meteor process and both the app and Rspack watcher
+ports. Local admin credentials are stored only in ignored
+`deploy/local-hotfix/agent-secrets.env`. This workflow is local verification,
+not release confidence; production remains a separately authorized path.
 
 ## Security Notes
 

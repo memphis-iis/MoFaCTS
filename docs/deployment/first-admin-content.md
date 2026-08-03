@@ -19,7 +19,7 @@ Beginner content smoke path:
   `mofacts_config/World Maps (Top 200 by population)`.
 - The package files are `Wiki World Maps_TDF.json`, `Wiki_World_Maps_top200_2025.json`, and `Wiki World Maps URL Map.csv`.
 - The content owner has confirmed this sample is redistributable and includes attribution/provenance metadata.
-- Do not require H5P for the beginner smoke test.
+- Use a standard card lesson for the beginner smoke test.
 - After content is available, launch one learner flow and complete one trial.
 
 In non-production private-repository bootstrap, TDF records are keyed by the server-owned `sourceIdentity` (`private-repo` plus the repository-relative source key), not by filename. Renaming a displayed/archive filename therefore does not create a second identity, and same-named TDFs from other sources are not overwritten.

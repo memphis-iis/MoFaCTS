@@ -659,8 +659,8 @@ export function createAuthSupport(deps: AuthSupportDeps) {
     }
 
     if (missing.length > 0) {
-      const configuredSource = process.env.METEOR_SETTINGS_WORKAROUND
-        ? 'METEOR_SETTINGS_WORKAROUND=' + process.env.METEOR_SETTINGS_WORKAROUND
+      const configuredSource = process.env.METEOR_SETTINGS_FILE
+        ? 'METEOR_SETTINGS_FILE=' + process.env.METEOR_SETTINGS_FILE
         : 'Meteor runtime settings';
       const msg = 'Missing/invalid required Meteor settings: ' + missing.join(', ') +
         '. Source: ' + configuredSource;

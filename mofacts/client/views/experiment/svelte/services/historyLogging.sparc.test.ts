@@ -1,4 +1,6 @@
 import { expect } from 'chai';
+import { Meteor } from 'meteor/meteor';
+import sinon from 'sinon';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type { UnitEngineLike } from '../../../../../common/types';
 import { SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
@@ -12,6 +14,7 @@ import {
 } from './sparcRuntimeState';
 
 const display = {
+  schema: 'tutorscript-sparc/2.0' as const,
   pageKey: 'fractions-addition',
   nodes: [],
   productionRules: [{ id: 'fractions.determine-lcd', when: [], then: [] }],
@@ -26,10 +29,14 @@ function historyRecord(params: {
 }): CanonicalHistoryRecord {
   const pageKey = params.pageKey ?? 'fractions-addition';
   const write = params.progressive
-    ? {
+      ? {
         target: { pageKey, nodeId: 'dialogue-root' },
         key: 'progressive-node-operation',
-        value: { operation: 'append', parentNodeId: 'dialogue-root', node: { id: 'turn-1' } },
+        value: {
+          type: 'append-node',
+          boxId: 'dialogue-root',
+          node: { id: 'turn-1', nodeType: 'group' },
+        },
       }
     : {
         target: { pageKey, nodeId: 'answer-node' },
@@ -37,11 +44,22 @@ function historyRecord(params: {
         value: params.value,
       };
   return {
+    historySchemaVersion: 1,
     eventType: 'sparc',
     TDFId: 'tdf-1',
     sessionID: params.sessionID,
     userId: 'user-1',
     levelUnit: params.levelUnit ?? 2,
+    levelUnitType: 'sparcsession',
+    time: params.sessionID === 'attempt-1' ? 1000 : 2000,
+    problemStartTime: params.sessionID === 'attempt-1' ? 900 : 1900,
+    selection: 'answer',
+    action: 'respond',
+    outcome: 'correct',
+    typeOfResponse: 'sparc',
+    responseValue: params.value ?? '',
+    input: params.value ?? '',
+    displayedStimulus: display,
     sparc: {
       pageKey,
       sourceAddress: { pageKey, nodeId: 'answer-node' },
@@ -61,6 +79,7 @@ function historyRecord(params: {
 
 describe('SPARC runtime history and resume snapshot', function() {
   afterEach(function() {
+    sinon.restore();
     clearSparcRuntimeState();
   });
 
@@ -148,6 +167,8 @@ describe('SPARC runtime history and resume snapshot', function() {
   });
 
   it('advances the same snapshot after a successful canonical history write', async function() {
+    const meteorCallStub = sinon.stub(Meteor, 'callAsync');
+    meteorCallStub.withArgs('insertHistory').resolves();
     const priorRecord = historyRecord({ sessionID: 'attempt-1', value: '12' });
     const writtenRecord = historyRecord({ sessionID: 'attempt-2', value: '24' });
     rememberSparcRuntimeHistoryRecord(priorRecord);
@@ -181,11 +202,12 @@ describe('SPARC runtime history and resume snapshot', function() {
     });
     expect(snapshot.retainedHistoryRecords).to.deep.equal([priorRecord, writtenRecord]);
     expect(snapshot.nodeValues['answer-node']).to.equal('24');
+    expect(meteorCallStub.calledWith('insertHistory')).to.equal(true);
   });
 
   it('rejects history without the canonical durable scope', function() {
     const valid = historyRecord({ sessionID: 'attempt-1', value: '12' });
-    expect(() => hydrateSparcRuntimeHistory([{ ...valid, eventType: 'h5p' }]))
+    expect(() => hydrateSparcRuntimeHistory([{ ...valid, eventType: 'obsolete-component' }]))
       .to.throw('[SPARC] Runtime hydration received a non-SPARC history record');
     expect(() => hydrateSparcRuntimeHistory([{ ...valid, sparc: {} }]))
       .to.throw('[SPARC] Runtime state requires userId, TDFId, non-negative levelUnit, and pageKey');

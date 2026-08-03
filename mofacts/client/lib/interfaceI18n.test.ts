@@ -420,8 +420,6 @@ describe('interfaceI18n', function() {
     'reporting.rootConditions',
   ] as const;
   const urduVisibleChromeKeys = [
-    'h5p.activityTitle',
-    'h5p.invalidDisplayConfiguration',
     'admin.manifest',
     'manualCreator.cancel',
     'manualCreator.status',

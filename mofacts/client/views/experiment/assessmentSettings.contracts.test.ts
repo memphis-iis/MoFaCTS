@@ -126,7 +126,7 @@ describe('assessment schedule settings parser', function() {
       groupnames: 'A',
       clustersrepeated: '2',
       templatesrepeated: '2',
-      initialpositions: 'A1 A2',
+      initialpositions: 'A_1 A_2',
       group: '0,t,d,0 1,t,d,1',
     });
 

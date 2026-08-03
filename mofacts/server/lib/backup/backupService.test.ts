@@ -12,12 +12,8 @@ describe('backup restore service', function() {
     const basePath = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-restore-test-'));
     const backupPath = path.join(basePath, 'backups');
     const dynamicAssetsPath = path.join(basePath, 'dynamic-assets');
-    const h5pContentPath = path.join(basePath, 'h5p-content');
-    const h5pLibrariesPath = path.join(basePath, 'h5p-libraries');
     await fs.mkdir(backupPath);
     await fs.mkdir(dynamicAssetsPath);
-    await fs.mkdir(h5pContentPath);
-    await fs.mkdir(h5pLibrariesPath);
 
     const mongoDump = Buffer.from(JSON.stringify({
       databaseName: 'MoFACT-meteor3',
@@ -72,8 +68,6 @@ describe('backup restore service', function() {
           backend: 'local',
           local: {
             dynamicAssetsPath,
-            h5pContentPath,
-            h5pLibrariesPath,
           },
         },
       },

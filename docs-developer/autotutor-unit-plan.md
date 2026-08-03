@@ -119,7 +119,7 @@ Completion is based on the authored TDF graduation rule. Phase 1 uses `graduatio
    - Add unit tests for schema validation, unit detection, script validation, move selection, progress scoring, and OpenRouter payload construction.
    - Add a simplified algorithm test file/fixture for fast controller testing.
    - Run `npm run typecheck` from `mofacts/`.
-   - Use the hotfix dev loop at `http://localhost:3200` for browser verification once UI exists.
+   - Use the canonical localhost hotfix server at `http://localhost:3200` for browser verification once UI exists.
 
 ## OpenRouter Protocol Notes
 

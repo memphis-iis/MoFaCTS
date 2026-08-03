@@ -40,7 +40,7 @@ In your Azure AD app registration, you **must** configure both redirect URIs:
 
 1. **Web Redirect URIs:**
    - `https://your-domain.com/_oauth/microsoft` (production)
-   - `http://localhost:3000/_oauth/microsoft` (development)
+   - `http://localhost:3200/_oauth/microsoft` (development)
 
 2. **Important Settings:**
    - Enable "Accounts in any organizational directory and personal Microsoft accounts" under Supported account types

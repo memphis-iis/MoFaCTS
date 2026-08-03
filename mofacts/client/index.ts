@@ -60,6 +60,8 @@ import './index.html';
 // -- Home / Auth --
 import './views/home/home';
 import './views/home/learningDashboard';
+import './views/home/learningAnalyticsMock/learningAnalyticsMock';
+import { getLearningAnalyticsMockStrings } from './views/home/learningAnalyticsMock/learningAnalyticsMockI18n';
 import './views/home/profileDebugToggles';
 import './views/login/signIn';
 import './views/login/signUp';
@@ -101,6 +103,7 @@ const PRACTICE_SHELL_TEMPLATES = new Set([
 
 const HOME_SHELL_TEMPLATES = new Set([
   'home',
+  'learningAnalyticsMock',
 ]);
 
 type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
@@ -508,32 +511,6 @@ function handleUnexpectedLogout(currentPath: string) {
 let lastKnownUserId: string | null = null;
 let pendingUnexpectedLogoutTimer: ReturnType<typeof setTimeout> | null = null;
 let authObserverStartedAt = Date.now();
-const AUTH_RESUME_GRACE_MS = 1200;
-let authResumePendingSince: number | null = null;
-
-function hasStoredLoginToken(): boolean {
-  try {
-    const accountsAny = Accounts as any;
-    const tokenFromAccounts = typeof accountsAny?._storedLoginToken === 'function'
-      ? accountsAny._storedLoginToken()
-      : null;
-    if (tokenFromAccounts) {
-      return true;
-    }
-  } catch (_error) {
-    // Fall through to localStorage checks.
-  }
-
-  try {
-    const meteorAny = Meteor as any;
-    const tokenFromMeteorStorage =
-      meteorAny?._localStorage?.getItem?.('Meteor.loginToken') ||
-      meteorAny?._localStorage?.getItem?.('Meteor.loginTokenExpires');
-    return !!tokenFromMeteorStorage;
-  } catch (_error) {
-    return false;
-  }
-}
 
 Meteor.startup(function() {
 
@@ -570,18 +547,6 @@ Meteor.startup(function() {
     const currentUserId = Meteor.userId();
     const currentUser = Meteor.user();
     const loggingIn = Meteor.loggingIn();
-    const hasToken = hasStoredLoginToken();
-    const shouldTrackResume = !currentUserId && !loggingIn && hasToken;
-    if (shouldTrackResume && authResumePendingSince === null) {
-      authResumePendingSince = Date.now();
-    }
-    if (!shouldTrackResume) {
-      authResumePendingSince = null;
-    }
-    const waitingForResume =
-      shouldTrackResume &&
-      authResumePendingSince !== null &&
-      (Date.now() - authResumePendingSince) < AUTH_RESUME_GRACE_MS;
 
     if (loggingIn && !currentUserId) {
       Session.set('authReady', false);
@@ -592,14 +557,12 @@ Meteor.startup(function() {
 
     if (!currentUserId) {
       lastAuthSyncedUserId = null;
-      if (!waitingForResume) {
-        const clearedRoles = { admin: false, teacher: false };
-        Session.set('authRoles', clearedRoles);
-        cacheAuthRoles(clearedRoles);
-      }
-      Session.set('authRolesHydrated', !waitingForResume);
+      const clearedRoles = { admin: false, teacher: false };
+      Session.set('authRoles', clearedRoles);
+      cacheAuthRoles(clearedRoles);
+      Session.set('authRolesHydrated', true);
       Session.set('authRolesSyncedUserId', null);
-      Session.set('authReady', !waitingForResume);
+      Session.set('authReady', true);
       return;
     }
 
@@ -907,6 +870,9 @@ Template.registerHelper('appContentClass', function() {
 Template.registerHelper('appShellTitle', function() {
   if (getAuthenticatedChromeMode() === 'practice') {
     return getPracticeLessonTitle();
+  }
+  if (Session.get('currentTemplate') === 'learningAnalyticsMock') {
+    return getLearningAnalyticsMockStrings(getActiveUiLocale()).title;
   }
   const routePresentation = managementRoutePresentation.get();
   if (routePresentation.status === 'idle') {

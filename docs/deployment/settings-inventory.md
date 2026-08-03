@@ -26,11 +26,12 @@ This inventory classifies the self-hosted configuration surface used by applicat
 | `saml.memphis.*` | optional integration, private-server, secret-capable | when Memphis SAML is enabled | SAML metadata/config helpers |
 | `openCore.requireRedis` | required, private-server | completed self-hosted runtime | Redis validation and Redis boundary creation |
 | `openCore.redisUrl` | optional, private-server, secret-capable | only if not using `REDIS_URL` | Redis boundary creation |
-| `storage.backend` | optional, private-server | defaults to `local`; `s3` enables object storage | storage boundary, readiness, package/H5P/media paths |
-| `storage.local.*Path` | optional, private-server | local storage backend | storage boundary, readiness |
+| `storage.backend` | optional, private-server | defaults to `local`; `s3` enables object storage | storage boundary, readiness, package and media paths |
+| `storage.local.dynamicAssetsPath` | required for deployed local storage, private-server | local uploaded-asset storage | FilesCollection, dynamic asset route, storage boundary, readiness, backup and restore |
 | `storage.s3.*` | optional integration, private-server, secret-capable | S3-compatible storage backend | storage boundary and readiness |
 | `public.systemName` | public-client | optional branding | client title/branding |
 | `public.forceSSL` | public-client | public HTTPS deployments | client SSL redirect behavior |
+| `public.packages.accounts.clientStorage` | required, public-client auth behavior | all supported runtimes | Meteor Accounts credential persistence; must be `session` for per-tab authentication |
 | `public.sourceUrl` | public-client | public source traceability | footer License / Source link |
 | `public.socialPreview.*` | public-client | optional preview metadata | social preview/http metadata |
 | `debug` | development-only/private-server | local debugging | settings template only |
@@ -39,19 +40,24 @@ This inventory classifies the self-hosted configuration surface used by applicat
 
 | Variable | Classification | Required When | Consumers |
 | --- | --- | --- | --- |
-| `METEOR_SETTINGS_WORKAROUND` | required, private-server | container startup | settings loader, startup validation, readiness |
+| `METEOR_SETTINGS_FILE` | required, private-server | container startup | pre-start Meteor settings loader, startup validation, readiness |
 | `METEOR_SETTINGS_HOST_PATH` | required, deployment file | Compose host mount | Compose and backup script |
 | `ROOT_URL` | required, deployment-specific | self-hosted production | Meteor runtime and settings validation |
 | `PORT` | required, deployment file | app container | Compose/app runtime |
 | `MOFACTS_HTTP_BIND` | optional, deployment file | direct app port binding | Compose port binding |
 | `MONGO_URL` | required, private-server, secret | app runtime | Meteor MongoDB connection, readiness, validation |
 | `EXPECTED_MONGO_DB_NAME` | required, private-server | self-hosted production | settings validation and readiness |
+| `MOFACTS_MONGO_REPLICA_SET_NAME` | required, private-server | self-hosted MongoDB replica set | MongoDB startup, initialization, and exact-topology readiness |
+| `MOFACTS_MONGO_REPLICA_SET_MEMBER` | required, deployment file | initial replica-set member | initial `rs.initiate` configuration; later expansion remains explicit |
+| `MONGO_REPLICA_SET_KEYFILE_HOST_PATH` | required, deployment secret path | self-hosted MongoDB replica set | read-only source for internal member-authentication key |
 | `MOFACTS_SELF_HOSTED` | required, private-server | self-hosted production | settings validation and readiness |
+| `MOFACTS_CHANGE_STREAMS_ENABLED` | required by tracked Compose, runtime behavior | Meteor 3.5 reactivity owner | `true` only for the hotfix server running on localhost and a separately qualified rollout; base/staging/production remain `false` |
+| `METEOR_REACTIVITY_ORDER` | required, runtime behavior | Meteor 3.5 reactivity owner | Must be `changeStreams,polling` when explicitly enabled and `polling` otherwise |
+| `DDP_TRANSPORT` | required, runtime behavior | Meteor 3.5 contained base | DDP transport selection; must be `sockjs` |
 | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` | required, deployment secret | MongoDB bootstrap | Compose MongoDB init |
 | `MOFACTS_MONGO_APP_DATABASE`, `MOFACTS_MONGO_APP_USERNAME`, `MOFACTS_MONGO_APP_PASSWORD` | required, deployment secret | MongoDB app user bootstrap | Mongo init script and Compose |
 | `REDIS_URL` | required, private-server, secret-capable | when Redis is required | Redis boundary and readiness |
 | `MOFACTS_REQUIRE_REDIS` | optional, private-server | env override for Redis requirement | settings validation and Redis boundary |
-| `HOME` | optional runtime path input | local storage defaults | dynamic assets and H5P default paths |
 | `MOFACTS_DEFAULT_THEME_DIR`, `MOFACTS_THEME_DIR` | optional, private-server | theme customization | theme registry |
 | `MOFACTS_INSERT_HISTORY_TIMING` | development-only/private-server | server diagnostics | bounded history-write timing, size, schema, field-presence, and event-category metadata; never raw learner-history values |
 | `RUN_CONVERT_SCRIPT` | development-only | direct conversion script runs | conversion helper |

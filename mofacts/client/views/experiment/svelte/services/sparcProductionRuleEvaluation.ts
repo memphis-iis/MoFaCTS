@@ -24,6 +24,7 @@ export interface SparcAnswerEvaluationContext extends ServiceRecord {
   sparcResult?: SparcControllerResult | null | undefined;
   engine?: ServiceRecord | null;
   currentDisplay?: {
+    schema?: string;
     type?: string;
     pageKey?: string;
     nodes?: unknown[];

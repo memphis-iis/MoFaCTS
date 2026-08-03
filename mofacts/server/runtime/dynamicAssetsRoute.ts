@@ -25,16 +25,12 @@ type DynamicAssetsRouteDeps = {
     findOneAsync: (selector: Record<string, unknown>) => Promise<DynamicAssetLike | null>;
   };
   storageBoundary: ReturnType<typeof createStorageBoundary>;
+  storageRoot: string;
   serverConsole: (...args: unknown[]) => void;
 };
 
 let routeRegistered = false;
 const CANONICAL_DYNAMIC_ASSETS_STORAGE_ROOT = '/root/dynamic-assets';
-
-function getDynamicAssetsStorageRoot() {
-  const home = String(process.env.HOME || '').trim();
-  return home ? path.resolve(home, 'dynamic-assets') : '';
-}
 
 function pathIsInsideDirectory(targetPath: string, parentPath: string): boolean {
   const relative = path.relative(parentPath, targetPath);
@@ -52,15 +48,10 @@ function canonicalDynamicAssetRelativePath(assetPath: string): string | null {
   return normalized.slice(CANONICAL_DYNAMIC_ASSETS_STORAGE_ROOT.length + 1);
 }
 
-function resolveStoredDynamicAssetPath(assetPath: string): string {
+function resolveStoredDynamicAssetPath(assetPath: string, storageRoot: string): string {
   const trimmedAssetPath = assetPath.trim();
   if (!trimmedAssetPath) {
     throw new Error('Dynamic asset storage path is missing');
-  }
-
-  const storageRoot = getDynamicAssetsStorageRoot();
-  if (!storageRoot) {
-    return path.resolve(trimmedAssetPath);
   }
 
   const resolvedAssetPath = path.resolve(trimmedAssetPath);
@@ -80,11 +71,7 @@ function resolveStoredDynamicAssetPath(assetPath: string): string {
   return rebasedAssetPath;
 }
 
-async function isPathWithinDynamicAssetsStorage(assetPath: string) {
-  const storageRoot = getDynamicAssetsStorageRoot();
-  if (!storageRoot) {
-    return true;
-  }
+async function isPathWithinDynamicAssetsStorage(assetPath: string, storageRoot: string) {
   try {
     const [realAssetPath, realStorageRoot] = await Promise.all([
       fs.promises.realpath(assetPath),
@@ -172,8 +159,8 @@ async function serveDynamicAssetById(
       res.end('Asset storage path is unavailable');
       return;
     }
-    const assetPath = resolveStoredDynamicAssetPath(storedAssetPath);
-    if (!(await isPathWithinDynamicAssetsStorage(assetPath))) {
+    const assetPath = resolveStoredDynamicAssetPath(storedAssetPath, deps.storageRoot);
+    if (!(await isPathWithinDynamicAssetsStorage(assetPath, deps.storageRoot))) {
       deps.serverConsole('[dynamic-assets] Refused asset outside storage root', assetId, storedAssetPath, assetPath);
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('File not found');

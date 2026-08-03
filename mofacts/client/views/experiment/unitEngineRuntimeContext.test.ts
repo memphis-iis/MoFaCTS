@@ -66,7 +66,7 @@ describe('unitEngineRuntimeContext', function() {
 
     const context = createAppUnitEngineRuntimeContext();
 
-    expect(context.stimuli.findTdfById('tdf-active')).to.equal(activeDoc);
+    expect(context.stimuli.findTdfById('tdf-active')).to.deep.equal(activeDoc);
     expect(collectionLookupCount).to.equal(0);
   });
 

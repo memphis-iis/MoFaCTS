@@ -21,10 +21,14 @@ import { migrateLoggingSettings } from '../migrations/migrate_logging_settings';
 import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migrations';
 import { migrateSparcHistoryPageIdentity } from '../migrations/migrate_sparc_history_page_identity';
 import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_authored_page_identity';
+import { migrateDynamicAssetLocalPaths } from '../migrations/migrate_dynamic_asset_local_paths';
+import { getLocalStoragePaths, getStorageBackend } from '../lib/storageBoundary';
 import { sendScheduledTurkMessages } from '../turk_methods';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
 import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery';
+import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
+import { applyDdpContainment } from '../lib/ddpContainment';
 
 const LEGACY_AI_CONTENT_DRAFT_TYPE = 'ai-content-creator';
 
@@ -69,6 +73,7 @@ type RunServerStartupDeps = {
   DynamicAssets: {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
     collection: {
+      find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
       updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
       rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
     };
@@ -81,6 +86,10 @@ type RunServerStartupDeps = {
     rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
   };
   Tdfs: {
+    rawDatabase: () => {
+      databaseName?: string;
+      command(command: UnknownRecord): Promise<UnknownRecord>;
+    };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     find: (selector?: UnknownRecord, options?: UnknownRecord) => {
       countAsync: () => Promise<number>;
@@ -328,6 +337,31 @@ function findExistingUserByCanonicalEmail(canonicalEmail: string) {
 }
 
 export async function runServerStartup(deps: RunServerStartupDeps) {
+  const meteor35Mode = applyDdpContainment(
+    (Meteor as unknown as { server?: { options: { disconnectGracePeriod?: number } } }).server,
+    process.env,
+  );
+  deps.serverConsole(
+    `[DDP] ${meteor35Mode.transport} transport with disconnect grace period 0; ` +
+    `Mongo reactivity ${meteor35Mode.reactivityOrder}` +
+    (meteor35Mode.qualificationMode
+      ? ' (isolated Change Streams qualification)'
+      : meteor35Mode.changeStreamsEnabled
+        ? ' (Change Streams enabled)'
+        : ''),
+  );
+
+  const mongoConnection = await validateMongoConnection(deps.Tdfs.rawDatabase(), process.env);
+  deps.serverConsole(1, `[MongoDB] ${formatMongoConnectionValidation(mongoConnection)}`);
+
+  await migrateDynamicAssetLocalPaths({
+    DynamicAssets: deps.DynamicAssets,
+    DynamicSettings: deps.DynamicSettings,
+    serverConsole: deps.serverConsole,
+    storageBackend: getStorageBackend(Meteor.settings),
+    storageRoot: getLocalStoragePaths(Meteor.settings, process.env).dynamicAssetsPath,
+  });
+
   const recovery = await reconcileInterruptedTdfMutationJobs({
     TdfMutationJobs: deps.TdfMutationJobs,
     Tdfs: deps.Tdfs,

@@ -42,9 +42,20 @@ const ManualContentDrafts = new Mongo.Collection(collectionMongoName('ManualCont
 const BackupJobs = new Mongo.Collection(collectionMongoName('BackupJobs'));
 const TdfMutationJobs = new Mongo.Collection(collectionMongoName('TdfMutationJobs'));
 
+function configuredDynamicAssetsStoragePath(): string {
+  const settings = Meteor.settings as {
+    storage?: { local?: { dynamicAssetsPath?: unknown } };
+  };
+  const configuredPath = settings?.storage?.local?.dynamicAssetsPath;
+  if (typeof configuredPath === 'string' && configuredPath.trim()) {
+    return configuredPath.trim();
+  }
+  throw new Error('storage.local.dynamicAssetsPath is required when storage.backend is local');
+}
+
 const DynamicAssets = new FilesCollection({
   collectionName: collectionMongoName('DynamicAssets'),
-  storagePath: process.env.HOME + '/dynamic-assets',
+  ...(Meteor.isServer ? { storagePath: configuredDynamicAssetsStoragePath() } : {}),
   allowClientCode: false, // Security: Disallow file operations from client (use server methods)
   onBeforeUpload(this: { userId?: string }, file: { name?: string; extension?: string; type?: string; meta?: DynamicAssetUploadMeta }) {
     if (!this.userId) {

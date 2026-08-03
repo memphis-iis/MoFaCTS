@@ -114,12 +114,17 @@ describe('card payload builder helpers', function() {
   it('preserves structured SPARC displays instead of flattening them to legacy prompt fields', function() {
     const originalGet = {
       currentTdfFile: Session.get('currentTdfFile'),
+      currentTdfDoc: Session.get('currentTdfDoc'),
       currentStimuliSetId: Session.get('currentStimuliSetId'),
+      clusterMapping: Session.get('clusterMapping'),
+      mappingSignature: Session.get('mappingSignature'),
       testType: Session.get('testType'),
     };
 
     Session.set('currentTdfFile', { tdfs: { tutor: { setspec: {} } } });
     Session.set('currentStimuliSetId', 'set-1');
+    Session.set('clusterMapping', [0]);
+    Session.set('mappingSignature', null);
     Session.set('testType', 'd');
 
     const engine = {
@@ -145,22 +150,22 @@ describe('card payload builder helpers', function() {
     };
 
     const cluster = {
-      stims: [{ display: sparcDisplay, correctResponse: '' }],
+      clusterKC: 'cluster-1',
+      stims: [{ stimulusKC: 'stimulus-1', display: sparcDisplay, correctResponse: '' }],
     };
-
-    const globalWithStimCluster = globalThis as typeof globalThis & {
-      getStimCluster: (() => typeof cluster) | undefined;
-    };
-    const originalGetStimCluster = globalWithStimCluster.getStimCluster;
-    globalWithStimCluster.getStimCluster = () => cluster;
+    Session.set('currentTdfDoc', {
+      rawStimuliFile: { setspec: { clusters: [cluster] } },
+    });
 
     try {
       const result = getPreparedCardDataFromSelection(engine, selection, 1) as Record<string, unknown>;
       expect(result.currentDisplay).to.deep.equal(sparcDisplay);
     } finally {
-      globalWithStimCluster.getStimCluster = originalGetStimCluster;
       Session.set('currentTdfFile', originalGet.currentTdfFile);
+      Session.set('currentTdfDoc', originalGet.currentTdfDoc);
       Session.set('currentStimuliSetId', originalGet.currentStimuliSetId);
+      Session.set('clusterMapping', originalGet.clusterMapping);
+      Session.set('mappingSignature', originalGet.mappingSignature);
       Session.set('testType', originalGet.testType);
     }
   });

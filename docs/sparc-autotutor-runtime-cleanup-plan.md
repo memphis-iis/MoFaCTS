@@ -209,4 +209,4 @@ This command verifies the canonical config repo at `C:\dev\mofacts_config`, audi
 3. Hand-edit target wording where needed.
 4. Update runtime consumers to require cluster-case expectations and the clean misconception table.
 5. Remove runtime compatibility reads for deleted structures.
-6. Run TypeScript, focused runtime tests, and UI smoke testing through the hotfix dev loop.
+6. Run TypeScript, focused runtime tests, and UI smoke testing through the canonical localhost hotfix server.

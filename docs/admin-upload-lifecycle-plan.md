@@ -223,10 +223,10 @@ npm run lint
 
 For UI/runtime behavior:
 
-1. Start native hotfix dev app from `deploy/`:
+1. Start the canonical localhost hotfix server from `deploy/`:
 
 ```powershell
-.\hotfix-dev.ps1 start -SettingsPath "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"
+.\hotfix-local.ps1 restart
 ```
 
 2. Use the MoFaCTS Playwright sidecar against `http://host.docker.internal:3200`.

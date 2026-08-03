@@ -37,7 +37,6 @@ const DASHBOARD_HISTORY_FIELDS = {
   userId: 1,
   levelUnitType: 1,
   modelEvidenceSource: 1,
-  h5p: 1,
 };
 
 type DashboardCacheDeps = {
@@ -77,18 +76,6 @@ function historyRecordSessionDateKey(record: DashboardHistoryRecord): string | n
   return timestamp > 0 ? new Date(timestamp).toDateString() : null;
 }
 
-function getH5PEventType(record: DashboardHistoryRecord): string {
-  return typeof record.h5p?.eventType === 'string' ? record.h5p.eventType : '';
-}
-
-function isH5PSummaryRecord(record: DashboardHistoryRecord): boolean {
-  return getH5PEventType(record) === 'summary';
-}
-
-function isH5PPartRecord(record: DashboardHistoryRecord): boolean {
-  return getH5PEventType(record) === 'part';
-}
-
 function isAutoTutorRecord(record: DashboardHistoryRecord): boolean {
   return record.levelUnitType === 'autotutor';
 }
@@ -97,17 +84,13 @@ function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): bool
   if (record.levelUnitType === 'model' && record.modelEvidenceSource === 'assessment') {
     return false;
   }
-  if (isH5PSummaryRecord(record)) {
-    return false;
-  }
   return true;
 }
 
 function resolveDashboardModelStimulusKey(record: DashboardHistoryRecord): string | null {
   if (
     record.levelUnitType !== 'model' ||
-    record.modelEvidenceSource === 'assessment' ||
-    isH5PPartRecord(record)
+    record.modelEvidenceSource === 'assessment'
   ) {
     return null;
   }
@@ -124,9 +107,6 @@ function getHistoryPracticeTimeMs(
   record: DashboardHistoryRecord,
   computePracticeTimeMs: ComputePracticeTimeMs
 ): number {
-  if (isH5PPartRecord(record) && typeof record.h5p?.latencyMs === 'number' && Number.isFinite(record.h5p.latencyMs)) {
-    return Math.max(0, record.h5p.latencyMs);
-  }
   return computePracticeTimeMs(record.CFEndLatency, record.CFFeedbackLatency);
 }
 

@@ -146,7 +146,7 @@ Deliverable: admin pages read as one coherent product surface while retaining th
 
 ### Phase 5: Browser Smoke and Theme QA
 
-For UI changes, use the native hotfix dev app and MoFaCTS Playwright sidecar as required by `AGENTS.md`.
+For UI changes, use the canonical localhost hotfix server and MoFaCTS Playwright sidecar as required by `AGENTS.md`.
 
 Smoke-test routes should include at minimum:
 

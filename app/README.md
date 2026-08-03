@@ -13,7 +13,7 @@ Belongs here:
 
 Does not belong here:
 
-- Contributor-facing learning-system extension code such as unit engines, trial types, adaptive models, TDF interpretation, or H5P adapters. Those belong under `learning-components/`.
+- Contributor-facing learning-system extension code such as unit engines, trial types, adaptive models, or TDF interpretation. Those belong under `learning-components/`.
 - Deployment operations. Those belong under `deploy/`.
 
 Before moving executable code here, update TypeScript, Meteor/Rspack, Docker, lint, and test configuration so this directory is a first-class source root.

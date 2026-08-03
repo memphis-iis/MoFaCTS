@@ -1,4 +1,5 @@
 import { URL } from 'url';
+import { inspectMeteor35RuntimeMode } from './ddpContainment';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -125,31 +126,34 @@ function validateMemphisSaml(issues: SettingsValidationIssue[], settings: Unknow
 }
 
 function validateMongoUrl(issues: SettingsValidationIssue[], env: NodeJS.ProcessEnv) {
-  const raw = env.MONGO_URL || '';
-  if (!raw.trim()) {
+  if (!String(env.MONGO_URL || '').trim()) {
     addIssue(issues, 'MONGO_URL', 'environment variable is required');
-    return;
   }
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol !== 'mongodb:' && parsed.protocol !== 'mongodb+srv:') {
-      addIssue(issues, 'MONGO_URL', 'must be a MongoDB connection string');
-    }
-    const dbName = parsed.pathname.replace(/^\//, '');
-    const expectedDb = env.EXPECTED_MONGO_DB_NAME || 'MoFACT-meteor3';
-    if (dbName !== expectedDb) {
-      addIssue(issues, 'MONGO_URL', `must target database ${expectedDb}`);
-    }
-    if (env.MOFACTS_SELF_HOSTED === 'true') {
-      if (!decodeURIComponent(parsed.username || '') || !decodeURIComponent(parsed.password || '')) {
-        addIssue(issues, 'MONGO_URL', 'self-hosted production requires app-user credentials in MONGO_URL');
-      }
-      if (!parsed.searchParams.get('authSource')) {
-        addIssue(issues, 'MONGO_URL', 'self-hosted production requires authSource in MONGO_URL');
-      }
-    }
-  } catch {
-    addIssue(issues, 'MONGO_URL', 'must be a valid MongoDB connection string');
+  if (!String(env.EXPECTED_MONGO_DB_NAME || '').trim()) {
+    addIssue(issues, 'EXPECTED_MONGO_DB_NAME', 'environment variable is required');
+  }
+  if (env.MOFACTS_SELF_HOSTED === 'true' && !String(env.MOFACTS_MONGO_REPLICA_SET_NAME || '').trim()) {
+    addIssue(issues, 'MOFACTS_MONGO_REPLICA_SET_NAME', 'environment variable is required for self-hosted MongoDB');
+  }
+}
+
+function validateMeteor35Containment(issues: SettingsValidationIssue[], env: NodeJS.ProcessEnv) {
+  const containment = inspectMeteor35RuntimeMode(env);
+  for (const issue of containment.issues) {
+    addIssue(issues, issue.path, issue.message);
+  }
+}
+
+function validateAccountsClientStorage(issues: SettingsValidationIssue[], settings: UnknownRecord) {
+  const publicSettings = isRecord(settings.public) ? settings.public : {};
+  const packages = isRecord(publicSettings.packages) ? publicSettings.packages : {};
+  const accounts = isRecord(packages.accounts) ? packages.accounts : {};
+  if (accounts.clientStorage !== 'session') {
+    addIssue(
+      issues,
+      'public.packages.accounts.clientStorage',
+      'must be session so credentials remain scoped to one browser tab',
+    );
   }
 }
 
@@ -240,6 +244,8 @@ export function validateOpenCoreSettings(
   validateOptionalProvider(issues, 'microsoft', settings.microsoft);
   validateMemphisSaml(issues, settings);
   validateMongoUrl(issues, env);
+  validateMeteor35Containment(issues, env);
+  validateAccountsClientStorage(issues, settings);
   validateRedis(issues, settings, env);
 
   return {

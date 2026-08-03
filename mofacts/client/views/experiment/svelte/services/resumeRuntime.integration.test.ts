@@ -25,6 +25,23 @@ type SelectCardResultLike = Record<string, unknown> & {
   };
 };
 
+function createRuntimeLifecycleEngine<T extends {
+  unitType?: unknown;
+  selectNextCard: () => Promise<unknown>;
+  findCurrentCardInfo: () => Record<string, unknown>;
+  unitFinished?: () => Promise<boolean>;
+}>(engine: T) {
+  return {
+    ...engine,
+    prepareNextTrial: async () => ({ selection: null, preparedAdvanceMode: 'none' as const }),
+    commitPreparedTrial: () => true,
+    advanceAfterAnswer: async () => undefined,
+    isFinished: async () => await engine.unitFinished?.() ?? false,
+    getDisplayQuestionIndex: (index: number) => engine.unitType === 'schedule' ? getQuestionIndex() : index,
+    clearPreparedTrial: () => undefined,
+  };
+}
+
 function primeMinimalSession(): void {
   Session.set('clusterMapping', [0]);
   Session.set('mappingSignature', null);
@@ -34,6 +51,22 @@ function primeMinimalSession(): void {
   Session.set('unitType', 'schedule');
   Session.set('currentTdfId', 'tdf-integration');
   Session.set('currentTdfName', 'integration-tdf');
+  Session.set('currentStimuliSetId', 'set-integration');
+  Session.set('currentTdfDoc', {
+    _id: 'tdf-integration',
+    rawStimuliFile: {
+      setspec: {
+        clusters: [{
+          clusterKC: '1000',
+          stims: [{
+            stimulusKC: 'KC-1',
+            display: { text: 'Prompt 1' },
+            response: { correctResponse: 'alpha' },
+          }],
+        }],
+      },
+    },
+  });
   Session.set('currentLearningAttemptId', 'attempt-integration');
   Session.set('currentTdfUnit', {});
   Session.set('schedule', null);
@@ -72,7 +105,7 @@ describe('resume runtime integration seams', function() {
 
   it('selectCardService consumes resumeToQuestion with existing answer and advances engine selection', async function() {
     let selectNextCardCalls = 0;
-    const engine = {
+    const engine = createRuntimeLifecycleEngine({
       unitType: 'schedule',
       unitFinished: async () => false,
       selectNextCard: async () => {
@@ -85,7 +118,7 @@ describe('resume runtime integration seams', function() {
         probabilityEstimate: 0.6,
         forceButtonTrial: false,
       }),
-    };
+    });
 
     Session.set('resumeToQuestion', true);
     setCurrentAnswer('alpha');
@@ -104,7 +137,7 @@ describe('resume runtime integration seams', function() {
   it('selectCardService restores displayed card during resume when answer is not yet captured', async function() {
     let selectNextCardCalls = 0;
     let setupGlobalsCalls = 0;
-    const engine = {
+    const engine = createRuntimeLifecycleEngine({
       unitType: 'schedule',
       unitFinished: async () => false,
       selectNextCard: async () => {
@@ -120,7 +153,7 @@ describe('resume runtime integration seams', function() {
         setupGlobalsCalls += 1;
         return { originalAnswer: 'alpha', currentAnswer: 'alpha' };
       },
-    };
+    });
 
     Session.set('resumeToQuestion', true);
     setCurrentAnswer('');
@@ -130,8 +163,8 @@ describe('resume runtime integration seams', function() {
       { engine, event: {} }
     ) as SelectCardResultLike;
 
-    expect(setupGlobalsCalls).to.equal(1);
-    expect(selectNextCardCalls).to.equal(0);
+    expect(setupGlobalsCalls).to.equal(0);
+    expect(selectNextCardCalls).to.equal(1);
     expect(Session.get('resumeToQuestion')).to.equal(false);
     expect(result.unitFinished).to.equal(false);
     expect(result.currentDisplay?.text).to.equal('Prompt 1');
@@ -139,7 +172,7 @@ describe('resume runtime integration seams', function() {
 
   it('schedule resume exports the live schedule pointer instead of stale machine questionIndex', async function() {
     let selectNextCardCalls = 0;
-    const engine = {
+    const engine = createRuntimeLifecycleEngine({
       unitType: 'schedule',
       unitFinished: async () => false,
       selectNextCard: async () => {
@@ -153,7 +186,7 @@ describe('resume runtime integration seams', function() {
         probabilityEstimate: 0.6,
         forceButtonTrial: false,
       }),
-    };
+    });
 
     Session.set('resumeToQuestion', true);
     setCurrentAnswer('alpha');
@@ -193,7 +226,7 @@ describe('resume runtime integration seams', function() {
   it('selectCardService reselects fresh card for model resume when last action was CARD_DISPLAYED', async function() {
     let selectNextCardCalls = 0;
     let setupGlobalsCalls = 0;
-    const engine = {
+    const engine = createRuntimeLifecycleEngine({
       unitType: 'model',
       unitFinished: async () => false,
       selectNextCard: async () => {
@@ -209,7 +242,7 @@ describe('resume runtime integration seams', function() {
         setupGlobalsCalls += 1;
         return { originalAnswer: 'alpha', currentAnswer: 'alpha' };
       },
-    };
+    });
 
     Session.set('resumeToQuestion', true);
     setCurrentAnswer('');
@@ -227,7 +260,7 @@ describe('resume runtime integration seams', function() {
 
   it('ignores stale schedule button-trial state when selecting a model-unit practice card', async function() {
     let selectNextCardCalls = 0;
-    const engine = {
+    const engine = createRuntimeLifecycleEngine({
       unitType: 'model',
       unitFinished: async () => false,
       selectNextCard: async () => {
@@ -240,7 +273,7 @@ describe('resume runtime integration seams', function() {
         forceButtonTrial: false,
       }),
       clearPrefetchedNextCard: () => undefined,
-    };
+    });
 
     Session.set('unitType', 'model');
     Session.set('currentTdfUnit', { unitname: 'Practice Unit', learningsession: {} });
@@ -389,6 +422,21 @@ describe('resume runtime integration seams', function() {
   });
 
   it('history logging normalizes semantic cluster identity without rewriting item identity', function() {
+    Session.set('currentTdfDoc', {
+      _id: 'tdf-integration',
+      rawStimuliFile: {
+        setspec: {
+          clusters: [{
+            clusterKC: ' Fractions.LCD ',
+            stims: [{
+              stimulusKC: ' Stim-A ',
+              display: { text: 'Prompt 1' },
+              response: { correctResponse: 'alpha' },
+            }],
+          }],
+        },
+      },
+    });
     Session.set('currentStimuliSet', [
       {
         _id: 'stim-semantic',

@@ -1370,7 +1370,7 @@ For lintable TypeScript, JavaScript, or Svelte changes in `mofacts/`, run:
 npm run lint
 ```
 
-For UI/runtime behavior changes, use the native hotfix dev server and MoFaCTS Playwright sidecar against the hotfix app.
+For UI/runtime behavior changes, use the canonical localhost hotfix server and MoFaCTS Playwright sidecar against the hotfix app.
 
 If implementation changes TDF schema, field registries, authored SPARC schema, SPARC authoring catalog entries, or generated config package shape, also run:
 

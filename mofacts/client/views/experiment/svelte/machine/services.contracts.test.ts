@@ -175,6 +175,7 @@ describe('machine services contracts', function() {
         },
       },
       currentDisplay: {
+        schema: 'tutorscript-sparc/2.0',
         pageKey: 'sparc-fractions-addition',
         nodes: [],
         productionRules: [{
@@ -210,6 +211,7 @@ describe('machine services contracts', function() {
       await evaluateAnswerService({
         engine: {},
         currentDisplay: {
+          schema: 'tutorscript-sparc/2.0',
           pageKey: 'sparc-fractions-addition',
           nodes: [],
           productionRules: [{

@@ -20,8 +20,8 @@ describe('deterministic AI Content draft builder', function() {
     const test = buildAiContentDraft(textContract('test'));
     expect(learning.sourceConfig?.moduleId).to.equal('learningSession');
     expect(test.sourceConfig?.moduleId).to.equal('assessmentSession');
-    expect((learning.workingCopy as any).instructions).to.contain(AI_LEARNING_INSTRUCTIONS);
-    expect((test.workingCopy as any).instructions).to.contain(AI_TEST_INSTRUCTIONS);
+    expect((learning.workingCopy.tutor as any).unit[0].unitinstructions).to.contain(AI_LEARNING_INSTRUCTIONS);
+    expect((test.workingCopy.tutor as any).unit[0].unitinstructions).to.contain(AI_TEST_INSTRUCTIONS);
     expect(learning.workingCopy.stimuli.setspec.clusters).to.have.length(2);
     expect(test.workingCopy.stimuli.setspec.clusters).to.have.length(2);
   });

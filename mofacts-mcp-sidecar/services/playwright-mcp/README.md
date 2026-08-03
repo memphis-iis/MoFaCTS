@@ -13,7 +13,7 @@ Current project defaults:
 Change the target website in the root `.env` file:
 
 ```text
-BASE_URL=http://host.docker.internal:3100
+BASE_URL=http://host.docker.internal:3200
 ```
 
 The MCP server itself stays generic; your AI client uses that base URL when it starts browsing the live site.

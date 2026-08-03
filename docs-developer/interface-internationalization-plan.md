@@ -152,7 +152,7 @@ Dependency decision gate:
 1. Search `mofacts/package.json`, lockfiles, current client/server helpers, and adjacent locale/formatting utilities before proposing a dependency.
 2. Document the missing capability that the existing stack cannot cover.
 3. Get explicit user approval for any new dependency before editing package manifests.
-4. Restart the hotfix dev service deliberately if dependency or Meteor package changes are made.
+4. Restart the canonical localhost hotfix server deliberately if dependency or Meteor package changes are made.
 
 ## Architecture And File Ownership
 
@@ -447,7 +447,7 @@ For implementation work, use the verification path that matches the changed file
 - TypeScript-bearing app changes: run `npm run typecheck` from `mofacts/`.
 - Lintable TypeScript, JavaScript, or Svelte changes: run `npm run lint` from `mofacts/`.
 - TDF field registry or schema changes: run `npm run generate:schemas` from `mofacts/` and inspect generated schema diffs.
-- UI/runtime behavior changes: use the native hotfix dev server and MoFaCTS Playwright sidecar smoke tests.
+- UI/runtime behavior changes: use the canonical localhost hotfix server and MoFaCTS Playwright sidecar smoke tests.
 - Meteor integration or client-contract coverage: use CI or another supported Meteor test environment.
 - Config/content compatibility changes: inspect and update `C:\dev\mofacts_config` deliberately; do not substitute another config repository.
 - Long-form developer/product documentation changes: inspect and update `C:\dev\MoFaCTS.wiki` deliberately when needed.

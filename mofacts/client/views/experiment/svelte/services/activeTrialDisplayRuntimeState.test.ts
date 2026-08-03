@@ -42,7 +42,7 @@ describe('activeTrialDisplayRuntimeState', function() {
     expect(getAlternateDisplayIndex()).to.equal(2);
     expect(Session.get('alternateDisplayIndex')).to.equal(2);
     expect(getOriginalQuestion()).to.equal('Prompt?');
-    expect(getCurrentDisplay()).to.equal(display);
+    expect(getCurrentDisplay()).to.deep.equal(display);
   });
 
   it('owns button trial display state', function() {

@@ -3,10 +3,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { MongoClient, ReadPreference } from 'mongodb';
 import * as z from 'zod/v4';
+import { validateConnectedMongoTarget } from './mongoConnectionValidation.js';
 
 const PORT = Number(process.env.PORT || 8932);
 const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = process.env.DB_NAME;
+const EXPECTED_REPLICA_SET_NAME = process.env.MOFACTS_MONGO_REPLICA_SET_NAME;
 const HISTORY_COLLECTION = 'history';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -18,11 +20,30 @@ if (!DB_NAME) {
   throw new Error('DB_NAME is required');
 }
 
+if (!EXPECTED_REPLICA_SET_NAME) {
+  throw new Error('MOFACTS_MONGO_REPLICA_SET_NAME is required');
+}
+
 const client = new MongoClient(MONGO_URI, {
   readPreference: ReadPreference.SECONDARY_PREFERRED
 });
 
 await client.connect();
+
+try {
+  const [ping, hello] = await Promise.all([
+    client.db(DB_NAME).command({ ping: 1 }),
+    client.db('admin').command({ hello: 1 })
+  ]);
+  validateConnectedMongoTarget({
+    hello,
+    ping,
+    expectedReplicaSetName: EXPECTED_REPLICA_SET_NAME
+  });
+} catch (_error) {
+  await client.close();
+  throw new Error('Mongo MCP could not validate the configured database and replica set.');
+}
 
 const db = client.db(DB_NAME);
 const history = db.collection(HISTORY_COLLECTION);

@@ -75,5 +75,5 @@ export function imageModalityIssues(pairs: GeneratedPair[], notes: string, uploa
   const actualImagePairs = pairs.filter((pair) => pair.kind === 'image').length;
   return actualImagePairs >= requiredUploadedPairs
     ? []
-    : [`${requiredUploadedPairs - actualImagePairs} uploaded image${requiredUploadedPairs - actualImagePairs === 1 ? '' : 's'} were changed into text pairs.`];
+    : [`${requiredUploadedPairs - actualImagePairs} uploaded image${requiredUploadedPairs - actualImagePairs === 1 ? ' was' : 's were'} changed into text pairs.`];
 }

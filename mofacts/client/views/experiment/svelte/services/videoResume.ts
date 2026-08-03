@@ -54,6 +54,14 @@ export function resolveVideoResumeAnchor(
     return null;
   }
 
+  const normalizedCheckpointTimes = checkpointTimes.map((checkpointTime, index) => {
+    const normalizedTime = toFiniteNumber(checkpointTime);
+    if (normalizedTime === null) {
+      throw new Error(`Video checkpoint time is invalid at index ${index}`);
+    }
+    return normalizedTime;
+  });
+
   const completedCount = toNonNegativeInteger(completedCheckpointQuestionCount);
   if (completedCount <= 0) {
     return null;
@@ -66,10 +74,7 @@ export function resolveVideoResumeAnchor(
   }
 
   const checkpointIndex = completedCount;
-  const checkpointTime = toFiniteNumber(checkpointTimes[completedCount - 1]);
-  if (checkpointTime === null) {
-    throw new Error(`Video checkpoint time is invalid at index ${completedCount - 1}`);
-  }
+  const checkpointTime = normalizedCheckpointTimes[completedCount - 1]!;
 
   return {
     resumeStartTime: checkpointTime + RESUME_AFTER_CHECKPOINT_OFFSET_SECONDS,

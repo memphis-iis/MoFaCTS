@@ -2,6 +2,8 @@ import { expect } from 'chai';
 import { buildFeedbackContent } from './feedbackTextBuilder';
 
 const englishFeedbackText = {
+  correctLabelText: 'Correct.',
+  incorrectLabelText: 'Incorrect.',
   userAnswerFeedbackText: 'Your answer was Lyon.',
   correctAnswerFeedbackText: 'The correct answer is Paris.',
   correctAnswerImageFeedbackText: 'Incorrect. The correct response is displayed below.',
@@ -13,6 +15,7 @@ describe('feedbackTextBuilder', function() {
     const content = buildFeedbackContent({
       message: 'Incorrect. The <b>answer</b> is <span class="x">Paris</span>.',
       isCorrectAnswer: false,
+      ...englishFeedbackText,
     });
 
     expect(content.feedbackText).to.equal('Incorrect. The answer is Paris.');
@@ -55,6 +58,8 @@ describe('feedbackTextBuilder', function() {
       correctAnswerText: 'Choong Moo one',
       displayCorrectAnswer: true,
       correctAnswerFeedbackText: 'The correct answer is Choong Moo one.',
+      correctLabelText: 'Correct.',
+      incorrectLabelText: 'Incorrect.',
     });
 
     expect(content.feedbackText).to.equal('Incorrect. The correct answer is Choong Moo one.');
@@ -67,6 +72,7 @@ describe('feedbackTextBuilder', function() {
       isCorrectAnswer: true,
       correctAnswerText: 'Paris',
       displayCorrectAnswer: true,
+      ...englishFeedbackText,
     });
 
     expect(content.feedbackText).to.equal("Close enough to the correct answer 'Paris'.");
@@ -100,6 +106,7 @@ describe('feedbackTextBuilder', function() {
     const content = buildFeedbackContent({
       message: 'Incorrect.',
       isCorrectAnswer: false,
+      correctLabelText: 'Correct.',
       incorrectLabelText: 'Not quite.',
     });
 
@@ -115,6 +122,7 @@ describe('feedbackTextBuilder', function() {
       userAnswerText: 'Lyon',
       correctAnswerText: 'Paris',
       displayCorrectAnswer: true,
+      correctLabelText: 'Correcto.',
       userAnswerFeedbackText: 'Tu respuesta fue Lyon.',
       correctAnswerFeedbackText: 'La respuesta correcta es Paris.',
       incorrectLabelText: 'Incorrecto.',
@@ -130,6 +138,8 @@ describe('feedbackTextBuilder', function() {
       isCorrectAnswer: false,
       correctAnswerText: 'Paris',
       displayCorrectAnswer: true,
+      correctLabelText: 'Correct.',
+      incorrectLabelText: 'Incorrect.',
     })).to.throw('[FeedbackDisplay] Missing localized feedback text: correctAnswerFeedbackText');
   });
 });

@@ -9,9 +9,7 @@ The full task plan for finishing Open Core lives in `open-core-implementation-pl
 ## Canonical Runtime Files
 
 - `deploy/docker-compose.yml`: production-shaped Compose file for the app and MongoDB.
-- `deploy/docker-compose.local.yml`: local override for production-shaped local checks.
-- `deploy/docker-compose.hotfix-native.yml`: MongoDB publication for the native hotfix dev server.
-- `deploy/docker-compose.hotfix-local.yml`: local bundle runner for production-shaped hotfix verification.
+- `deploy/docker-compose.local.yml`: the sole localhost app definition, including the production-shaped hotfix bundle runner and its MongoDB service.
 - `Dockerfile`: application image build and runtime image definition.
 - `deploy/docker/entrypoint.sh`: app container startup entrypoint.
 - `deploy/docker/validate-mongo-url.sh`: startup check that requires `MONGO_URL` to target the expected MongoDB database.
@@ -40,7 +38,7 @@ Current environment variables:
 - `EXPECTED_MONGO_DB_NAME`
 - `PORT`
 - `WAIT_HOSTS`
-- `METEOR_SETTINGS_WORKAROUND`
+- `METEOR_SETTINGS_FILE`
 
 Current mounted state:
 
@@ -73,7 +71,7 @@ The following state must be considered part of a complete self-hosted backup:
 - H5P content under `/root/h5p-content`.
 - H5P libraries under `/root/h5p-libraries`.
 - Deploy-time override assets under `/mofactsAssets_override`, including identity-provider certificates or keys.
-- Private Meteor settings files used by `METEOR_SETTINGS_WORKAROUND`.
+- Private Meteor settings files identified by `METEOR_SETTINGS_FILE`.
 - Environment files used by Docker Compose.
 
 Open question:
@@ -116,7 +114,7 @@ Target direction:
 Current facts:
 
 - The app container directly exposes port `3000`.
-- `deploy/Caddyfile.local` provides a local HTTPS helper that reverse proxies `https://localhost:3000` to `127.0.0.1:3100`.
+- `deploy/Caddyfile.local` provides a local HTTPS helper that reverse proxies `https://localhost:3000` to `127.0.0.1:3200`.
 - Production HTTPS termination is currently described as deployment-owner responsibility.
 
 Current gap:
@@ -140,8 +138,8 @@ Current gap:
 
 Current facts:
 
-- `METEOR_SETTINGS_WORKAROUND` points the app at a settings file path.
-- Startup rejects an empty settings workaround, inline JSON, or a missing settings file.
+- `METEOR_SETTINGS_FILE` points the entrypoint at the mounted settings file.
+- Startup rejects an empty settings-file path, inline JSON used as a path, or a missing settings file.
 - The Docker image currently bakes tracked settings files into `/app/settings.json` and `/app/settingsstaging.json`.
 - Local Compose overrides can mount `settings.local.json`.
 

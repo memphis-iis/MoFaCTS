@@ -60,7 +60,7 @@ Open-core work must follow the repository rules in `../../AGENTS.md`:
 - Keep server methods narrow: database access, auth/authorization, encryption, secrets, and external API calls belong server-side; pure compute should stay client-side, in `common/`, or in focused helpers.
 - Extract large server helpers out of `methods.ts` into `server/lib/` or `common/`.
 - For TypeScript-bearing app changes, run `npm run typecheck` from `mofacts/`. For lintable TypeScript, JavaScript, or Svelte changes, run `npm run lint` from `mofacts/`.
-- For UI/runtime behavior changes, use the native hotfix dev loop at `http://localhost:3200`; do not treat it as release confidence.
+- For UI/runtime behavior changes, use the canonical localhost hotfix server at `http://localhost:3200`; do not treat it as release confidence.
 - Do not run Docker build, push, or deploy commands unless explicitly requested. Docker Compose config validation and local runtime checks are useful, but release-confidence image builds require explicit direction.
 
 ## Pre-Implementation Decision Register
@@ -130,7 +130,7 @@ Tasks:
 - [x] Ensure the image does not bake private runtime settings; tracked examples may exist only as examples.
 - [x] Define the canonical runtime settings mount path for self-hosted deployments.
 - [x] Update Compose to mount/use the private runtime settings path deliberately.
-- [x] Remove the self-hosted production runtime fallback that defaults `METEOR_SETTINGS_WORKAROUND` to `/app/settings.json`.
+- [x] Require the mounted settings file through `METEOR_SETTINGS_FILE`; do not default to a baked `/app/settings.json`.
 - [x] Ensure missing runtime settings path, inline settings JSON, unreadable settings files, and example placeholder values fail with actionable errors.
 - [x] Add fail-fast startup validation for required settings.
 - [x] Validate `ROOT_URL` shape and consistency with public deployment docs.

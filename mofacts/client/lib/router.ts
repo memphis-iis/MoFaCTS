@@ -111,7 +111,6 @@ clearMappingRecordFromSession();
 let contentSubsWaitHandle: any = null;
 let rootUserWaitHandle: any = null;
 const pendingAuthRouteHandles: Record<string, any> = {};
-let homeUserHydrationHandle: any = null;
 
 type RouteAccessDecision = 'allow' | 'signin' | 'forbidden';
 type UserWithLoginParams = Meteor.User & { loginParams?: { loginMode?: string } };
@@ -589,7 +588,7 @@ function waitForAuthenticatedRoute(
     prepareManagementRoutePresentation(managementPolicy);
   }
   const currentDecision = evaluateRouteAccess(policy);
-  if (currentDecision === 'allow') {
+  if (currentDecision === 'allow' && Session.get('themeReady') === true) {
     const user = Meteor.user();
     const existing = pendingAuthRouteHandles[routeName];
     if (existing) {
@@ -607,7 +606,11 @@ function waitForAuthenticatedRoute(
     return;
   }
 
-  if (!managementPolicy) {
+  if (
+    !managementPolicy
+    && currentDecision !== 'allow'
+    && Session.get('themeReady') === true
+  ) {
     renderLayout(controller, 'customLoading');
   }
   if (pendingAuthRouteHandles[routeName]) {
@@ -624,6 +627,9 @@ function waitForAuthenticatedRoute(
 
     const deferredDecision = evaluateRouteAccess(policy);
     if (deferredDecision === 'allow') {
+      if (Session.get('themeReady') !== true) {
+        return;
+      }
       const currentUser = Meteor.user();
       pendingAuthRouteHandles[routeName]?.stop();
       delete pendingAuthRouteHandles[routeName];
@@ -1085,55 +1091,26 @@ FlowRouter.route('/home', {
   name: 'client.home',
   action: function() {
     clientConsole(2, '[ROUTER] /home - rendering home');
-    const userId = Meteor.userId();
-    const user = Meteor.user();
+    waitForAuthenticatedRoute(this, 'client.home', async (readyUser: any) => {
+      renderHomeForUser(this, readyUser);
+    });
+  },
+});
 
-    if (userId) {
-      if (getUserLoginMode(user) === 'experiment') {
+FlowRouter.route('/learning-analytics-mock', {
+  name: 'client.learningAnalyticsMock',
+  action: function() {
+    waitForAuthenticatedRoute(this, 'client.learningAnalyticsMock', async (readyUser: any) => {
+      if (getUserLoginMode(readyUser) === 'experiment') {
         routeToSignin();
         return;
       }
-
-      if (shouldRedirectToVerifyEmail(user)) {
+      if (shouldRedirectToVerifyEmail(readyUser)) {
         FlowRouter.go('/auth/verify-email');
         return;
       }
-
-      Session.set('curModule', 'home');
-      renderLayout(this, 'home');
-
-      if (!user && !homeUserHydrationHandle) {
-        homeUserHydrationHandle = Tracker.autorun(() => {
-          const hydratedUser = Meteor.user();
-          const isHomeRoute = FlowRouter.current()?.route?.name === 'client.home';
-          if (!isHomeRoute) {
-            homeUserHydrationHandle?.stop();
-            homeUserHydrationHandle = null;
-            return;
-          }
-          if (getUserLoginMode(hydratedUser) === 'experiment') {
-            homeUserHydrationHandle?.stop();
-            homeUserHydrationHandle = null;
-            routeToSignin();
-            return;
-          }
-          if (shouldRedirectToVerifyEmail(hydratedUser)) {
-            homeUserHydrationHandle?.stop();
-            homeUserHydrationHandle = null;
-            FlowRouter.go('/auth/verify-email');
-            return;
-          }
-          if (hydratedUser) {
-            homeUserHydrationHandle?.stop();
-            homeUserHydrationHandle = null;
-          }
-        });
-      }
-      return;
-    }
-
-    waitForAuthenticatedRoute(this, 'client.home', async (readyUser: any) => {
-      renderHomeForUser(this, readyUser);
+      Session.set('curModule', 'learningAnalyticsMock');
+      await renderRouteTemplate(this, 'learningAnalyticsMock');
     });
   },
 });

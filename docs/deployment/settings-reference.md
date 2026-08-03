@@ -1,6 +1,6 @@
 # Self-Hosted Settings Reference
 
-Runtime settings are mounted at `/run/mofacts/settings.json` and loaded through `METEOR_SETTINGS_WORKAROUND`. Self-hosted production must not rely on baked settings.
+Runtime settings are mounted at `/run/mofacts/settings.json`. `METEOR_SETTINGS_FILE` identifies that file, and the container entrypoint loads it into Meteor's standard `METEOR_SETTINGS` environment variable before Node starts. Self-hosted production must not rely on baked settings.
 
 Required settings:
 
@@ -11,6 +11,8 @@ Required settings:
 - `auth.allowPublicSignup`: boolean. Normally `true` for first-run self-hosting.
 - `auth.requireEmailVerification`: boolean.
 - `auth.argon2Enabled`: boolean.
+- `public.packages.accounts.clientStorage`: must be `session` so login
+  credentials remain scoped to the current browser tab.
 - `MAIL_URL`: required when `enableEmail` or `prod` is true.
 - `emailFrom`: required when `enableEmail` or `prod` is true. Use a sender identity authenticated by the SMTP provider, for example `MoFaCTS <no-reply@example.org>`.
 - `emailReplyTo`: optional reply-to address for system mail.
@@ -22,9 +24,18 @@ Required settings:
 Required environment:
 
 - `METEOR_SETTINGS_HOST_PATH`: private host settings path.
-- `MONGO_URL`: app-user MongoDB URL with credentials and `authSource`.
+- `MONGO_URL`: app-user MongoDB URL with credentials, `authSource`, and the configured `replicaSet` name.
 - `EXPECTED_MONGO_DB_NAME`: normally `MoFACT-meteor3`.
+- `MOFACTS_MONGO_REPLICA_SET_NAME`: immutable replica-set identity expected by MongoDB and application readiness; defaults to `mofacts-rs` in Compose.
+- `MOFACTS_MONGO_REPLICA_SET_MEMBER`: DNS name and port advertised by the initial member; defaults to `mongodb:27017`. Later members may be added without changing the logical database contract.
+- `MONGO_REPLICA_SET_KEYFILE_HOST_PATH`: private host file containing the shared replica-set member-authentication key. Every future member must receive the same key securely.
 - `MOFACTS_SELF_HOSTED`: set to `true` for the self-hosted production Compose path.
+- `MOFACTS_CHANGE_STREAMS_ENABLED`: the hotfix server running on localhost sets
+  this to `true`; base, staging, and production remain `false` until their own
+  rollout gate.
+- `METEOR_REACTIVITY_ORDER`: must be `changeStreams,polling` when Change Streams
+  are explicitly enabled and `polling` otherwise.
+- `DDP_TRANSPORT`: must be `sockjs` for the contained Meteor 3.5 base.
 - `REDIS_URL`: Redis connection string when Redis is required.
 - `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD`: Mongo root bootstrap credentials.
 - `MOFACTS_MONGO_APP_USERNAME` and `MOFACTS_MONGO_APP_PASSWORD`: app database user credentials.
@@ -40,9 +51,7 @@ Optional integrations:
 
 Local storage settings:
 
-- `storage.local.dynamicAssetsPath`: app-served dynamic assets path. Default is `$HOME/dynamic-assets`.
-- `storage.local.h5pContentPath`: self-hosted H5P content path. Default is `$HOME/h5p-content`.
-- `storage.local.h5pLibrariesPath`: self-hosted H5P library path. Default is `$HOME/h5p-libraries`.
+- `storage.local.dynamicAssetsPath`: app-served dynamic assets path. Set this explicitly to the durable host-mounted directory in each environment.
 
 S3-compatible storage settings:
 
@@ -53,7 +62,7 @@ S3-compatible storage settings:
 - `storage.s3.prefix`: optional object key prefix for this MoFaCTS instance.
 - `storage.s3.forcePathStyle`: optional boolean. Defaults to `true`, which is normally required for MinIO and many S3-compatible services.
 
-When `storage.backend` is `s3`, deployment readiness writes, heads, reads, and deletes a temporary `readiness/...txt` object. Missing bucket, invalid endpoint, invalid credentials, and insufficient object permissions fail readiness and do not switch to local storage. Dynamic assets, package export zips, H5P content, and H5P libraries are read from S3 metadata in S3 mode. Existing local-only asset records need migration metadata before switching an existing install to S3.
+When `storage.backend` is `s3`, deployment readiness writes, heads, reads, and deletes a temporary `readiness/...txt` object. Missing bucket, invalid endpoint, invalid credentials, and insufficient object permissions fail readiness and do not switch to local storage. Dynamic assets and package export zips are read from S3 metadata in S3 mode. Existing local-only asset records need migration metadata before switching an existing install to S3.
 
 Backup settings:
 

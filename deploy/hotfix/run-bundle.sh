@@ -3,13 +3,12 @@
 set -eu
 
 : "${APP_BUNDLE_FOLDER:?APP_BUNDLE_FOLDER is required}"
-: "${METEOR_SETTINGS_WORKAROUND:?METEOR_SETTINGS_WORKAROUND is required}"
+: "${METEOR_SETTINGS_FILE:?METEOR_SETTINGS_FILE is required}"
 : "${EXPECTED_MONGO_DB_NAME:?EXPECTED_MONGO_DB_NAME is required}"
 
 APP_BUNDLE_ROOT="$APP_BUNDLE_FOLDER"
 BUNDLE_DIR="$APP_BUNDLE_ROOT/bundle"
-SETTINGS_PATH="$METEOR_SETTINGS_WORKAROUND"
-EXPECTED_DB="$EXPECTED_MONGO_DB_NAME"
+SETTINGS_PATH="$METEOR_SETTINGS_FILE"
 
 if [ ! -f "$BUNDLE_DIR/main.js" ]; then
   echo "Missing hotfix bundle main.js at $BUNDLE_DIR/main.js. Rebuild the hotfix bundle before starting the app." >&2
@@ -26,34 +25,19 @@ if [ ! -f "$SETTINGS_PATH" ]; then
   exit 1
 fi
 
+test "$(cat "$BUNDLE_DIR/.node_version.txt")" = "v24.15.0"
+test "$(node --version)" = "v24.15.0"
+test "$(npm --version)" = "11.12.1"
+
 if [ -z "${MONGO_URL:-}" ]; then
   echo "MONGO_URL is required." >&2
-  exit 1
-fi
-
-MONGO_DB="$(printf '%s' "$MONGO_URL" | sed -E 's#^[^/]+//[^/]+/([^?]+).*#\1#')"
-if [ "$MONGO_DB" != "$EXPECTED_DB" ]; then
-  echo "MONGO_URL database '$MONGO_DB' does not match EXPECTED_MONGO_DB_NAME '$EXPECTED_DB'." >&2
   exit 1
 fi
 
 echo "[hotfix] Installing runtime OS dependencies..."
 apk add --no-cache ca-certificates font-dejavu imagemagick
 
-echo "[hotfix] Waiting for MongoDB..."
-until node -e "
-const net = require('net');
-const url = new URL(process.env.MONGO_URL);
-const socket = net.createConnection({ host: url.hostname, port: Number(url.port || 27017) });
-socket.setTimeout(1000);
-socket.on('connect', () => { socket.destroy(); process.exit(0); });
-socket.on('timeout', () => { socket.destroy(); process.exit(1); });
-socket.on('error', () => process.exit(1));
-"; do
-  sleep 1
-done
-
-export METEOR_SETTINGS_WORKAROUND="$SETTINGS_PATH"
+export METEOR_SETTINGS="$(cat "$SETTINGS_PATH")"
 cd "$BUNDLE_DIR"
 
 echo "[hotfix] Starting local hotfix bundle..."

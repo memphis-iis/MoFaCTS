@@ -99,7 +99,7 @@ Affected files: `mofacts/client/views/experimentSetup/sparc/SparcAuthoringEditor
 
 Compatibility checks: Confirm the saved `rawStimuliFile` is byte-shape compatible for existing SPARC config packages. Wiki pages already describe the visual editor and top-level `productionRules`; update them only if panel names or authoring workflow materially changes.
 
-Verification: Add unit tests for extracted pure validation and rule-model helpers in phase 1, then add component/controller tests as state moves out of the shell. Keep existing `mofacts/package.json` checks `check:sparc-authoring` and `check:sparc-rich-html` in the verification path. For UI behavior changes, use the native hotfix dev loop and MoFaCTS Playwright sidecar. At each phase, save a representative SPARC lesson and compare the resulting `rawStimuliFile` shape against the pre-refactor output.
+Verification: Add unit tests for extracted pure validation and rule-model helpers in phase 1, then add component/controller tests as state moves out of the shell. Keep existing `mofacts/package.json` checks `check:sparc-authoring` and `check:sparc-rich-html` in the verification path. For UI behavior changes, use the canonical localhost hotfix server and MoFaCTS Playwright sidecar. At each phase, save a representative SPARC lesson and compare the resulting `rawStimuliFile` shape against the pre-refactor output.
 
 Risks and guardrails: Split behavior-preserving slices only. Do not redesign the editor interaction model in the same change. Keep `saveTdfStimuli` as the persistence boundary. The first extraction phase is only the starting point; stop only when `SparcAuthoringEditor.svelte` has become a small composition shell or has been replaced by a modular editor entrypoint.
 
@@ -191,7 +191,7 @@ Risks and guardrails: Do not make performance assertions brittle. Prefer semanti
 - For TypeScript-bearing app or learning-component changes, run `npm run typecheck` from `mofacts/`.
 - For lintable TypeScript/Svelte changes, run `npm run lint` from `mofacts/`.
 - For SPARC runtime changes, run focused tests covering `sparcStateReplay`, `sparcTrialDisplayRuntimeBridge`, `sparcProductionRuleEvaluator`, `historyLogging.sparc`, and `serverComposition`.
-- For authoring UI changes, use the native hotfix dev server plus the MoFaCTS Playwright sidecar against `http://host.docker.internal:3200`.
+- For authoring UI changes, use the canonical localhost hotfix server plus the MoFaCTS Playwright sidecar against `http://host.docker.internal:3200`.
 - For TDF/schema changes, run `npm run generate:schemas` from `mofacts/` and inspect generated diffs.
 - For compatibility, scan representative SPARC config packages in `C:\dev\mofacts_config`, including SPARC Fractions Addition and the large Intro Stats modules.
 

@@ -49,6 +49,7 @@ interface AnswerEvaluationContext extends ServiceRecord {
   sparcResult?: SparcAnswerEvaluationContext['sparcResult'];
   engine?: ServiceRecord | null;
   currentDisplay?: {
+    schema?: string;
     type?: string;
     pageKey?: string;
     nodes?: unknown[];

@@ -9,7 +9,6 @@ Belongs here:
 - Minimal unit type examples.
 - Minimal trial type examples.
 - Model policy examples.
-- H5P trial examples.
 - Content adapter examples.
 
 Does not belong here:

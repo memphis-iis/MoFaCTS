@@ -2,6 +2,8 @@
 
 This log records concrete local verification evidence for Self-Hosted MoFaCTS readiness. It is not a substitute for the full clean self-hosted stack proof in `../../docs-developer/open-core-implementation-plan.md`.
 
+H5P entries below are retained only as dated verification history. H5P runtime and deployment support has since been removed; current content imports reject H5P fields explicitly.
+
 ## 2026-05-26 Local Static Pass
 
 Completed:

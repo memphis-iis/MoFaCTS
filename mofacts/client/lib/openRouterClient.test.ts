@@ -86,9 +86,11 @@ describe('openRouterClient', function() {
 
   it('serializes enabled-default and explicit reasoning efforts', async function() {
     const fetchStub = sinon.stub(globalThis, 'fetch');
-    fetchStub.resolves(new Response(JSON.stringify({
+    const responseBody = JSON.stringify({
       choices: [{ message: { content: '{"ok":true}' } }],
-    }), { status: 200 }));
+    });
+    fetchStub.onFirstCall().resolves(new Response(responseBody, { status: 200 }));
+    fetchStub.onSecondCall().resolves(new Response(responseBody, { status: 200 }));
 
     const baseOptions = {
       apiKey: 'sk-or-v1-test',
@@ -319,7 +321,9 @@ describe('openRouterClient', function() {
       });
       throw new Error('Expected request failure');
     } catch (error) {
-      expect((error as Error).message).to.equal('bad key [redacted OpenRouter key]');
+      expect((error as Error).message).to.equal(
+        'OpenRouter request failed with HTTP 401: bad key [redacted OpenRouter key]',
+      );
     }
     const failure = getRecentAiFlowEvents()[0];
     expect(failure).to.deep.include({
@@ -328,7 +332,7 @@ describe('openRouterClient', function() {
       title: 'MoFaCTS Test Intent',
       model: 'openai/test-model',
       httpStatus: 401,
-      error: 'bad key [redacted OpenRouter key]',
+      error: 'OpenRouter request failed with HTTP 401: bad key [redacted OpenRouter key]',
     });
   });
 

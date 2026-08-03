@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "skipLibCheck": false
+    "skipLibCheck": false,
+    "exactOptionalPropertyTypes": false
   }
 }

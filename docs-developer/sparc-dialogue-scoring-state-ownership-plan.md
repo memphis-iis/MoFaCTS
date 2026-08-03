@@ -8,7 +8,7 @@ Static verification completed on 2026-07-16:
 
 - `npm run typecheck` passed;
 - `npm run lint` passed;
-- the native hotfix app rebuilt and served the login route without current browser console errors; and
+- the then-current localhost app rebuilt and served the login route without current browser console errors; and
 - focused provider and reducer tests were added but were not executed because the Meteor CI suite requires fresh explicit authorization.
 
 Remaining empirical verification:
@@ -311,7 +311,7 @@ npm run lint
 
 Every invocation of the Meteor CI suite requires fresh, single-use authorization. Do not run `npm run test:ci` without that authorization.
 
-Because this changes learner-facing runtime scoring, use the native hotfix app and MoFaCTS Playwright sidecar for an authenticated SPARC smoke test when those tools and session state are available. Confirm that a learner turn reaches scoring, produces a tutor move, renders normally, and reports no relevant console or network error.
+Because this changes learner-facing runtime scoring, use the canonical localhost hotfix server and MoFaCTS Playwright sidecar for an authenticated SPARC smoke test when those tools and session state are available. Confirm that a learner turn reaches scoring, produces a tutor move, renders normally, and reports no relevant console or network error.
 
 Then run the existing five-run **SPARC Compound Interest Live AI Evaluation** from Admin Tests and save its full JSON result. Both scoring and tutor generation remain live. The existing gate remains authoritative: all robustness requirements and at least four of five graduations must pass. A stochastic failure should be diagnosed from the saved complete log rather than hidden by retry or deterministic substitution.
 

@@ -116,7 +116,7 @@ describe('canonical history envelope', function() {
   });
 
   it('keeps stable compressed keys for cross-component analytics fields', function() {
-    const compressed = compressHistoryRecord(createHistoryRecord({ eventType: 'h5p' }));
+    const compressed = compressHistoryRecord(createHistoryRecord({ eventType: 'video' }));
 
     expect(compressed['03']).to.equal('user-1');
     expect(compressed['04']).to.equal('tdf-1');
@@ -132,7 +132,7 @@ describe('canonical history envelope', function() {
     expect(compressed['32']).to.equal('answer');
     expect(compressed['33']).to.equal('respond');
     expect(compressed['34']).to.equal('answer');
-    expect(compressed['63']).to.equal('h5p');
+    expect(compressed['63']).to.equal('video');
     expect(compressed['73']).to.equal(1);
     expect(compressed['74']).to.equal('set-1');
     expect(compressed['75']).to.equal('kc-1');
@@ -193,30 +193,11 @@ describe('canonical history envelope', function() {
       .to.throw('Model practice history identity mismatch: KCId must equal stimulusKC');
   });
 
-  it('accepts bounded component-specific extension fields', function() {
-    const record = createHistoryRecord({
-      typeOfResponse: 'h5p',
-      selection: 'h5p interaction',
-      action: 'h5p interaction',
-      eventType: 'h5p',
-      h5p: {
-        contentId: 'content-1',
-        eventType: 'part',
-        eventIndex: 0,
-        completed: false,
-        passed: false,
-        correct: true,
-      },
-    });
-
-    expect(() => assertCanonicalHistoryEnvelope(record)).not.to.throw();
-    const compressed = compressHistoryRecord(record);
-    const result = validateHistoryWirePayload(compressed);
-    const decompressed = decompressHistoryRecord(compressed);
-
-    expect(result.wirePayloadBytes).to.be.lessThan(2048);
-    expect((decompressed.h5p as Record<string, unknown>).completed).to.equal(false);
-    expect((decompressed.h5p as Record<string, unknown>).passed).to.equal(false);
+  it('rejects removed H5P history events and extension fields', function() {
+    expect(() => assertCanonicalHistoryEnvelope(createHistoryRecord({ eventType: 'h5p' })))
+      .to.throw('eventType "h5p" is not documented');
+    expect(() => assertCanonicalHistoryEnvelope(createHistoryRecord({ h5p: { eventType: 'summary' } })))
+      .to.throw('unsupported component fields: h5p');
   });
 
   it('accepts compact SPARC extension fields on the canonical history path', function() {

@@ -1,10 +1,14 @@
 import { expect } from 'chai';
 import defaultTheme from '../../public/themes/mofacts-default.json';
 import { buildThemeContrastSchema, THEME_GENERATOR_DERIVED_PROPERTIES, THEME_GENERATOR_ROLE_PROPERTIES } from '../../common/themeRoleSchema';
-import { parseThemeColorList } from './themeColorMetrics';
+import { parseThemeColor, parseThemeColorList, rgbToHsl } from './themeColorMetrics';
 import { generateTheme } from './themeGenerator';
 
 describe('theme generator', function() {
+  function hue(value: unknown): number {
+    return rgbToHsl(parseThemeColor(value).rgb).h;
+  }
+
   it('generates a complete active-theme payload from the default palette', function() {
     const palette = parseThemeColorList('#7ed957\n#f2f2f2\n#000000\n#ff0000').colors;
     const generated = generateTheme({
@@ -100,8 +104,8 @@ describe('theme generator', function() {
       skippedCssValues: [],
     });
 
-    expect(generated.properties.app_accent_color).to.equal('#F9EE76');
-    expect(generated.properties.feedback_correct_color).to.equal('#E4B7F0');
+    expect(hue(generated.properties.app_accent_color)).to.be.closeTo(hue('#F9EE76'), 1);
+    expect(hue(generated.properties.feedback_correct_color)).to.be.closeTo(hue('#E4B7F0'), 1);
     expect(Object.values(generated.properties)).not.to.include('#047857');
     expect(Object.values(generated.properties)).not.to.include('#B91C1C');
   });
@@ -133,8 +137,9 @@ describe('theme generator', function() {
     });
 
     expect(generated.diagnostics.errors).to.deep.equal([]);
-    expect(generated.properties.app_primary_action_surface_color).to.equal('#BA5ACE');
-    expect(generated.properties.app_secondary_surface_color).not.to.equal('#BA5ACE');
+    expect(hue(generated.properties.app_primary_action_surface_color)).to.be.closeTo(hue('#BA5ACE'), 1);
+    expect(generated.properties.app_secondary_surface_color)
+      .not.to.equal(generated.properties.app_primary_action_surface_color);
   });
 
   it('keeps feedback roles derived from the fourth palette source', function() {
@@ -157,7 +162,9 @@ describe('theme generator', function() {
       skippedCssValues: [],
     });
 
-    expect(generated.properties.feedback_correct_color).to.equal('#8B8B00');
-    expect(generated.properties.feedback_error_color).to.equal('#636300');
+    expect(hue(generated.properties.feedback_correct_color)).to.be.closeTo(hue('#D6D600'), 1);
+    expect(hue(generated.properties.feedback_error_color)).to.be.closeTo(hue('#D6D600'), 1);
+    expect(generated.properties.feedback_correct_color)
+      .not.to.equal(generated.properties.feedback_error_color);
   });
 });

@@ -1,6 +1,8 @@
 # Backup and Restore
 
-Backups must include MongoDB, configuration, dynamic assets, H5P content, H5P libraries, and any configured OAuth/SAML key material.
+Backups must include MongoDB data plus database-scoped users/roles,
+configuration, the MongoDB replica-set keyfile, dynamic assets, and any
+configured OAuth/SAML key material.
 
 Admins can create and inspect Open Core backup jobs from **Admin > Backups**. The app stores backup job metadata and manifest summaries in MongoDB. Archive files are stored outside MongoDB in the configured backup destination. In the first Open Core implementation this destination is local filesystem storage mounted into the app container as `/backups`, backed by `MOFACTS_BACKUP_HOST_PATH` on the host and defaulting to `/backups/mofacts`.
 
@@ -17,7 +19,7 @@ Use **Admin > Backups** to:
 5. Restore a selected backup by typing `RESTORE`.
 6. Delete a selected local archive by typing `DELETE`.
 
-App-level restore verifies the archive first, creates a pre-restore backup when `openCore.backups.requirePreRestoreBackup` is enabled, restores Mongo application collections, and restores local dynamic assets, H5P content, and H5P libraries. The restore control plane preserves `backup_jobs` and `auditLog` so the restore job and audit trail remain visible after the operation.
+App-level restore verifies the archive first, creates a pre-restore backup when `openCore.backups.requirePreRestoreBackup` is enabled, restores Mongo application collections, and restores local dynamic assets. The restore control plane preserves `backup_jobs` and `auditLog` so the restore job and audit trail remain visible after the operation.
 
 The archive may include settings, the self-hosted environment file, and key material for rebuild evidence. The running app does not overwrite those operator-owned files during app-level restore. Reapply config or certificate material manually from the archive when rebuilding a host or moving to a new server.
 
@@ -45,16 +47,20 @@ Backup, verify, restore, and delete operations are mutually exclusive inside the
 14. Delete a disposable backup archive and confirm the registry marks it deleted.
 15. Confirm a non-admin user cannot access `/admin/backups` or call backup methods.
 
-## Legacy Shell Runbook
+## Shell Operator Runbook
 
-The legacy shell backup remains available for operator runbooks:
+The shell backup is the maintenance-window path used by the replica-set
+conversion runbook. It creates files with restrictive permissions and includes
+the application database, its database-scoped users/roles, private environment
+and settings files, the replica-set keyfile, and dynamic assets:
 
 ```bash
 cd deploy
 ENV_FILE=.env.self-hosted ./backup-self-hosted.sh ./backups/mofacts-$(date -u +%Y%m%d-%H%M%S)
 ```
 
-Shell restore is destructive and requires an explicit confirmation flag:
+Shell restore is destructive, restores database-scoped users/roles, stops on
+the first restore error, and requires an explicit confirmation flag:
 
 ```bash
 cd deploy
@@ -66,7 +72,9 @@ After any restore:
 1. Start the Compose stack.
 2. Run `/admin/tests` readiness.
 3. Sign in as an admin.
-4. Confirm content listing, dynamic asset serving, and H5P serving where applicable.
+4. Confirm content listing and dynamic asset serving.
 5. Launch one learner flow.
 
-Take a backup immediately before upgrades. Keep the matching `.env`, settings file, source tag, image tag, and release notes with the backup.
+Take a backup immediately before upgrades while the required writers are
+stopped. Keep the matching `.env`, settings file, replica-set keyfile, source
+tag, image tag, and release notes with the encrypted, access-restricted backup.

@@ -152,15 +152,15 @@ Run it from `mofacts/`. Do not substitute per-file checks or targeted `tsc` invo
 - Preserve keyboard operation, visible focus, semantic labels, screen-reader announcements, readable contrast, and reduced-motion behavior where applicable.
 - Keep interface locale, authored content language, learner response language, speech-recognition language, and text-to-speech language as distinct contracts. Do not infer one silently from another.
 
-## Local Hotfix Bundle Loop
+## Local Hotfix Watch Loop
 
-The local-only bundle loop under `deploy/` is for production-shaped app-code verification without creating a deployable Docker image. Helper ownership is documented in `deploy/hotfix/README.md`.
+The local hotfix loop under `deploy/` is the fast source-watching application workflow. Helper ownership is documented in `deploy/hotfix/README.md`.
 
-- Code hot fixes still require a Meteor bundle rebuild. Do not monkey-patch compiled files inside a running container.
-- Use `docker-compose.hotfix-local.yml` together with `docker-compose.yml` and `docker-compose.local.yml`.
-- On Windows, `deploy/hotfix-local.ps1` runs typecheck, compose config validation, hotfix bundle build, bundle dependency install, and app restart.
-- Generated hotfix output belongs in Docker volume `deploy_hotfix_bundle`; do not run the generated bundle from a Windows bind mount.
-- Use this loop only when production-shaped verification is needed. It is not release confidence and must not replace the canonical Docker Compose image build.
+- There is exactly one localhost application server: the native Meteor/Rspack watcher at `http://localhost:3200`, owned by `deploy/hotfix-local.ps1`.
+- Docker Compose owns MongoDB and its replica-set initialization for this workflow; it does not own a second localhost application container.
+- Source edits must rebuild and reload automatically. Do not replace the watcher with a manual generated-bundle loop or monkey-patch compiled output.
+- `deploy/hotfix-local.ps1` validates Compose and the pinned Meteor tool before starting, then manages start, restart, stop, status, and logs for the watcher.
+- This fast loop is local verification, not release confidence, and must not replace the canonical Docker Compose image build.
 
 ## Server Method Design
 

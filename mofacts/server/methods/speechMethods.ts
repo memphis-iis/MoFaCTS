@@ -1,8 +1,5 @@
 import { Meteor } from 'meteor/meteor';
-import type { IncomingMessage } from 'http';
 import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
-
-const https = require('https');
 
 type MethodContext = {
   userId?: string | null;
@@ -27,34 +24,41 @@ function getSafeErrorMessage(error: unknown): string {
   return redactGoogleApiKeys(message);
 }
 
-async function makeHTTPSrequest(options: unknown, request: string | Buffer, timeoutMs: number = 30000){
-  return new Promise<Buffer>((resolve, reject) => {
-    let chunks: Buffer[] = [];
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+type FetchImplementation = typeof fetch;
 
-    const req = https.request(options as Parameters<typeof https.request>[0], (res: IncomingMessage) => {
-      res.on('data', (d: Buffer) => {
-          chunks.push(d);
-      })
-      res.on('end', function() {
-          if (timeoutHandle) clearTimeout(timeoutHandle);
-          resolve(Buffer.concat(chunks));
-      })
-    })
-
-    req.on('error', (e: Error) => {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
-      reject(new Error(e.message));
+export async function postGoogleApiJson(
+  url: string,
+  request: string,
+  timeoutMs: number = 30000,
+  fetchImplementation: FetchImplementation = fetch
+): Promise<Record<string, any>> {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImplementation(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: request,
+      signal: controller.signal,
     });
-
-    timeoutHandle = setTimeout(() => {
-      req.destroy();
-      reject(new Error(`HTTPS request timeout after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    req.write(request)
-    req.end()
-  });
+    const responseText = await response.text();
+    if (!response.ok) {
+      const responseSummary = redactGoogleApiKeys(responseText).slice(0, 1000);
+      throw new Error(`Google API HTTP ${response.status}${responseSummary ? `: ${responseSummary}` : ''}`);
+    }
+    try {
+      return JSON.parse(responseText) as Record<string, any>;
+    } catch {
+      throw new Error('Google API returned an invalid JSON response');
+    }
+  } catch (error: unknown) {
+    if (controller.signal.aborted) {
+      throw new Error(`Google API request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
 }
 
 export function createSpeechMethods(deps: SpeechMethodsDeps) {
@@ -118,16 +122,10 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
           voice: voiceConfig,
           audioConfig: {audioEncoding: 'MP3', speakingRate: audioPromptSpeakingRate, volumeGainDb: audioVolume},
         });
-        const options = {
-          hostname: 'texttospeech.googleapis.com',
-          path: '/v1/text:synthesize?key=' + ttsAPIKey,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8'
-          }
-        }
-        const data = await makeHTTPSrequest(options, request) as Buffer | string;
-        const response = JSON.parse(Buffer.isBuffer(data) ? data.toString('utf-8') : String(data));
+        const response = await postGoogleApiJson(
+          `https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(ttsAPIKey)}`,
+          request
+        );
         return response.audioContent;
       } catch (error: unknown) {
         deps.serverConsole('[TTS] ERROR in makeGoogleTTSApiCall:', getSafeErrorMessage(error));
@@ -192,14 +190,12 @@ export function createSpeechMethods(deps: SpeechMethodsDeps) {
         throw new Meteor.Error('no-api-key', 'No speech API key available');
       }
 
-      const options = {
-        hostname: 'speech.googleapis.com',
-        path: '/v1p1beta1/speech:recognize?key=' + speechAPIKey,
-        method: 'POST'
-      }
       try {
-        const data = await makeHTTPSrequest(options, JSON.stringify(request), 30000) as Buffer | string;
-        const parsed = JSON.parse(Buffer.isBuffer(data) ? data.toString('utf-8') : String(data));
+        const parsed = await postGoogleApiJson(
+          `https://speech.googleapis.com/v1p1beta1/speech:recognize?key=${encodeURIComponent(speechAPIKey)}`,
+          JSON.stringify(request),
+          30000
+        );
         const elapsedMs = Date.now() - requestStartedAt;
         deps.serverConsole('[SR DEBUG] makeGoogleSpeechAPICall response meta', {
           tdfId: TDFId,

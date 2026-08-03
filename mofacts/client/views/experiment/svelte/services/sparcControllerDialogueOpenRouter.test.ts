@@ -313,7 +313,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.contain('stated relation with the stated roles and direction');
     expect(systemMessage?.content).to.contain('opposite relation or reverses the roles');
     expect(systemMessage?.content).to.contain('one continuous semantic-coverage rubric for evidenceStrength');
-    expect(systemMessage?.content).to.contain('explicitly represents in the selected evidenceDirection');
+    expect(systemMessage?.content).to.contain('explicitly represents across all learner-authored turns in the selected evidenceDirection');
     expect(systemMessage?.content).to.contain('0 means the accumulated learner account represents none of the proposition in that direction');
     expect(systemMessage?.content).to.contain('0.25 means it represents a significant portion');
     expect(systemMessage?.content).to.contain('0.5 means it represents more than half');
@@ -964,7 +964,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       } else {
         expect(userPrompt).to.contain('Relevant authored target content:');
       }
-      if (targetType === 'learningTarget') {
+      if (targetType === 'learningTarget' && ['prompt', 'hint', 'assertion'].includes(move)) {
         expect(systemPrompt).to.contain('If targetType is learningTarget');
       }
       if (targetType === 'completion') {

@@ -99,14 +99,10 @@ function historyDiagnosticMetadata(record: UnknownRecord) {
   const levelUnitType = typeof record.levelUnitType === 'string' && INSERT_HISTORY_EVENT_CATEGORIES.has(record.levelUnitType)
     ? record.levelUnitType
     : 'other';
-  const h5pEventType = (record.h5p as UnknownRecord | undefined)?.eventType;
-  const eventCategory = h5pEventType === 'part' || h5pEventType === 'summary'
-    ? `h5p-${h5pEventType}`
-    : levelUnitType;
   const schemaVersion = Number(record.historySchemaVersion);
   const fieldNames = Object.keys(record).sort().slice(0, INSERT_HISTORY_DIAGNOSTIC_FIELD_LIMIT);
   return {
-    eventCategory,
+    eventCategory: levelUnitType,
     historySchemaVersion: Number.isFinite(schemaVersion) ? schemaVersion : null,
     fieldCount: Object.keys(record).length,
     fieldNames,
@@ -567,20 +563,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       recordedServerTime: (new Date()).getTime(),
     });
     const recordBuildMs = elapsedMsSince(recordBuildStartTime);
-    const h5pIdempotencyKey = typeof (decompressedRecord.h5p as Record<string, unknown> | undefined)?.idempotencyKey === 'string'
-      ? String((decompressedRecord.h5p as Record<string, unknown>).idempotencyKey)
-      : '';
-    if (h5pIdempotencyKey) {
-      const existingH5PHistory = await deps.Histories.findOneAsync({
-        userId: actingUserId,
-        TDFId: tdfId,
-        'h5p.idempotencyKey': h5pIdempotencyKey,
-      });
-      if (existingH5PHistory) {
-        return { duplicate: true };
-      }
-    }
-
     let rawPayloadBytes: number | undefined;
     let finalRecordBytes: number | undefined;
     if (INSERT_HISTORY_TIMING_ENABLED) {
@@ -1100,10 +1082,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: Number(levelUnit),
       studentResponseType: 'ATTEMPT',
       outcome: { $in: ['correct', 'incorrect'] },
-      $or: [
-        { h5p: { $exists: false } },
-        { 'h5p.eventType': 'summary' },
-      ],
     }).countAsync();
   }
 

@@ -397,7 +397,7 @@ Run this only after the model-provider code, SPARC placement code, and canonical
 
 Use the MoFaCTS Playwright MCP sidecar for browser-level verification:
 
-1. Start or verify the hotfix dev app and the MoFaCTS Playwright MCP sidecar.
+1. Start or verify the canonical localhost hotfix server and the MoFaCTS Playwright MCP sidecar.
 2. Log in through the app UI using the configured local/admin account.
 3. Navigate to the content-management/upload surface through the UI.
 4. Delete the old uploaded fractions lesson/package version.
@@ -439,7 +439,7 @@ Targeted tests to add or update:
 
 UI verification:
 
-1. Start the native hotfix dev app through `deploy/hotfix-dev.ps1` using the explicit local settings path from `C:\dev\mofacts_config\deploy and build.txt`.
+1. Start the canonical localhost hotfix server through `deploy/hotfix-local.ps1`; its `.env.local` owns the explicit private settings path.
 2. Use the MoFaCTS Playwright sidecar against `http://host.docker.internal:3200`.
 3. Verify ordinary learning-session progress still works.
 4. Verify SPARC inline progress with 1, 7, 8, and hundreds of items.

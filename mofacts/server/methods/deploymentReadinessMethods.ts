@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { formatSettingsValidationIssues, validateOpenCoreSettings } from '../lib/openCoreSettingsValidation';
 import { validateStorageBoundary } from '../lib/storageBoundary';
 import { validateBackupConfig } from '../lib/backup/backupConfig';
+import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -34,31 +35,14 @@ async function check(name: string, work: () => Promise<string>) {
 }
 
 function settingsSourceMessage() {
-  const source = String(process.env.METEOR_SETTINGS_WORKAROUND || '').trim();
+  const source = String(process.env.METEOR_SETTINGS_FILE || '').trim();
   if (!source) {
-    throw new Error('METEOR_SETTINGS_WORKAROUND is not set; self-hosted deployments must mount a private settings file');
+    throw new Error('METEOR_SETTINGS_FILE is not set; self-hosted deployments must mount a private settings file');
   }
   if (source !== '/run/mofacts/settings.json') {
     throw new Error(`settings loaded from ${source}; expected /run/mofacts/settings.json`);
   }
   return source;
-}
-
-function mongoUrlMessage() {
-  const rawUrl = String(process.env.MONGO_URL || '').trim();
-  if (!rawUrl) {
-    throw new Error('MONGO_URL is not set');
-  }
-  const parsed = new URL(rawUrl);
-  const expectedDb = process.env.EXPECTED_MONGO_DB_NAME || 'MoFACT-meteor3';
-  const actualDb = parsed.pathname.replace(/^\//, '');
-  if (actualDb !== expectedDb) {
-    throw new Error(`MONGO_URL targets ${actualDb}; expected ${expectedDb}`);
-  }
-  if (process.env.MOFACTS_SELF_HOSTED === 'true' && (!parsed.username || !parsed.password)) {
-    throw new Error('self-hosted MONGO_URL must include app-user credentials');
-  }
-  return `connected to ${actualDb}`;
 }
 
 export function createDeploymentReadinessMethods(deps: ReadinessDeps) {
@@ -82,8 +66,8 @@ export function createDeploymentReadinessMethods(deps: ReadinessDeps) {
           return 'required settings are valid';
         }),
         await check('mongo.connection', async () => {
-          await deps.Tdfs.rawDatabase().command({ ping: 1 });
-          return mongoUrlMessage();
+          const result = await validateMongoConnection(deps.Tdfs.rawDatabase(), process.env);
+          return formatMongoConnectionValidation(result);
         }),
         await check('rootUrl', async () => {
           const rootUrl = String((Meteor.settings as any).ROOT_URL || '').trim();

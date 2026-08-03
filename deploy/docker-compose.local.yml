@@ -1,50 +1,6 @@
 services:
-  mofacts:
-    environment:
-      PORT: 3000
-      EXPECTED_MONGO_DB_NAME: MoFACT-meteor3
-      METEOR_SETTINGS_WORKAROUND: /run/mofacts/settings.json
-      MOFACTS_SELF_HOSTED: 'false'
-      MOFACTS_REQUIRE_REDIS: 'false'
-    volumes:
-      - type: bind
-        source: ./local-data/mofactsAssets_override
-        target: /mofactsAssets_override
-      - type: bind
-        source: ./local-data/dynamic-assets
-        target: /root/dynamic-assets
-      - type: bind
-        source: ./local-data/h5p-content
-        target: /root/h5p-content
-      - type: bind
-        source: ./local-data/h5p-libraries
-        target: /root/h5p-libraries
-      - type: bind
-        source: ./settings.local.json
-        target: /run/mofacts/settings.json
-        read_only: true
-    ports: !override
-      - "3100:3000"
-    build:
-      context: ../
-      dockerfile: Dockerfile
-    networks:
-      - mofacts
-
+  # The canonical localhost app runs natively through hotfix-local.ps1 so
+  # Meteor and Rspack can watch the source tree. Docker owns only its services.
   mongodb:
-    image: mongo:8.0
-    restart: always
-    command:
-      - --storageEngine=wiredTiger
-    volumes:
-      - data:/data/db
-    networks:
-      - mofacts
-
-volumes:
-  data:
-    driver: local
-
-networks:
-  mofacts:
-    driver: bridge
+    ports:
+      - "127.0.0.1:27017:27017"

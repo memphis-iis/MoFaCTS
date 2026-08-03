@@ -221,7 +221,7 @@ describe('ttsService Apple mobile recovery helpers', function() {
     });
     try {
       const result = await ttsPlaybackService({}, {
-        audioSrc: '/media/prompt.mp3',
+        audioSrc: 'data:audio/mpeg;base64,AA==',
         isQuestion: true,
       });
 

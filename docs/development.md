@@ -4,9 +4,9 @@ This guide covers the public contributor baseline for MoFaCTS.
 
 ## Requirements
 
-- Node.js `22.x`
-- npm `10.x`
-- Meteor `3.4`
+- Node.js `24.15.0`
+- npm `11.12.1`
+- Meteor `3.5`
 - Docker Desktop for local Compose-backed workflows
 - Git
 
@@ -21,17 +21,15 @@ npm ci
 
 Adjust local settings for your environment. Do not commit local settings or secrets.
 
-For the Windows native hotfix dev loop, use the deployment notes in `../deploy/README.md`. On a new machine, install/cache the exact Meteor release from `mofacts/.meteor/release` before running `deploy/hotfix-dev.ps1`; for the current app release that is:
-
-```powershell
-npm install -g meteor@3.4.1 --foreground-script
-```
-
-Docker Desktop must be running because the hotfix loop runs Meteor natively but uses Docker Compose for MongoDB.
+Docker Desktop must be running for MongoDB. The canonical localhost workflow
+runs one native Meteor/Rspack watcher and uses Docker only for supporting
+services. The pinned Meteor tool matching `mofacts/.meteor/release` must be
+installed locally.
 
 ## First Local Run
 
-The fastest supported contributor loop on Windows is the native hotfix dev server. It runs Meteor from the checkout, uses Docker only for MongoDB, and serves the app at `http://localhost:3200`.
+The only supported contributor server is the source-watching hotfix server at
+`http://localhost:3200`, managed by `deploy/hotfix-local.ps1`.
 
 1. Install dependencies and run the baseline check:
 
@@ -46,14 +44,14 @@ The fastest supported contributor loop on Windows is the native hotfix dev serve
    ```powershell
    cd ..\deploy
    Copy-Item .env.local.example .env.local
-   $OperatorRoot = Join-Path $env:USERPROFILE "OneDrive\Desktop"
-   $LocalSettingsPath = Join-Path $OperatorRoot "settings.local.json"
-   Copy-Item settings.local.example.json $LocalSettingsPath
+   Copy-Item settings.local.example.json settings.local.json
    ```
 
-   On this developer setup, `C:\dev\mofacts_config\deploy and build.txt` is the operator cheat sheet for this path and currently sets `$LocalSettingsPath` to `$env:USERPROFILE\OneDrive\Desktop\settings.local.json`. Pass that path explicitly to `hotfix-dev.ps1`; do not use or infer `deploy\settings.local.json`.
-
-   Replace placeholder values in `.env.local` and `$LocalSettingsPath`. The settings JSON must define `owner`; the hotfix launcher uses that address for the local admin bootstrap. Keep these files private.
+   Replace placeholder values in `.env.local` and its
+   `METEOR_SETTINGS_HOST_PATH` target. `MONGO_URL` is the Docker-network URI;
+   `MOFACTS_NATIVE_MONGO_URL` is the equivalent authenticated replica-set URI
+   through `127.0.0.1`. The settings JSON must define `owner` for local admin
+   bootstrap. Keep these files private.
 
 3. Confirm the local runtime prerequisites:
 
@@ -67,31 +65,34 @@ The fastest supported contributor loop on Windows is the native hotfix dev serve
 4. Start the app:
 
    ```powershell
-   .\hotfix-dev.ps1 start -SettingsPath $LocalSettingsPath
-   .\hotfix-dev.ps1 logs
+   .\hotfix-local.ps1
+   .\hotfix-local.ps1 logs
    ```
 
-   Wait for the logs to show that the app started, then open:
+   The command returns after the app and Rspack watcher are ready. Source edits
+   then rebuild and reload automatically. Open:
 
    ```text
    http://localhost:3200
    ```
 
-   The hotfix launcher creates or verifies a local admin account for the owner configured in the settings JSON passed with `-SettingsPath`. Read the ignored local credentials with:
+   The canonical hotfix manager creates or verifies a local admin account for the owner
+   configured in the settings JSON. Read the ignored local credentials with:
 
    ```powershell
-   Get-Content .\local-dev\agent-secrets.env
+   Get-Content .\local-hotfix\agent-secrets.env
    ```
 
    Use `MOFACTS_AGENT_ADMIN_EMAIL` and `MOFACTS_AGENT_ADMIN_PASSWORD` from that file to sign in.
 
-For more details, including status/restart/stop commands and the production-shaped local bundle loop, see `../deploy/README.md`.
+For status, logs, and stop commands, see `../deploy/README.md`. Do not start
+another Meteor or Compose application process on port 3200.
 
 ## First Admin And Content Pass
 
 After the first local startup:
 
-1. Sign in at `http://localhost:3200` using the local admin credentials from `deploy/local-dev/agent-secrets.env`.
+1. Sign in at `http://localhost:3200` using the local admin credentials from `deploy/local-hotfix/agent-secrets.env`.
 2. Open the content upload or content management area from the app navigation.
 3. Use a small local TDF/config package for smoke testing. Public TDF authoring concepts are summarized in [authoring.md](authoring.md); canonical project content lives outside this repository in the MoFaCTS configuration/content repository used by maintainers.
 4. Launch the uploaded or available lesson from the home/practice dashboard and complete a few trials.
@@ -103,7 +104,8 @@ After the first local startup:
    npm run lint
    ```
 
-Do not use the native hotfix loop as release confidence. Use the Docker Compose workflow under `deploy/` when validating deployment behavior.
+The localhost hotfix watcher is not release confidence. Production validation
+and deployment remain separate workflows.
 
 ## Common Checks
 
@@ -118,7 +120,12 @@ The full TypeScript check is the required TypeScript verification path for app c
 
 The repository defines test scripts in `mofacts/package.json`. Some local Meteor workflows may require additional environment setup. For release preparation, record any test limitations explicitly rather than treating a narrowed check as full release confidence.
 
-`npm run test:ci` is CI-only. It runs the Meteor server test suite and compiles the client test bundle in CI; local development should use the targeted checks above and should record Meteor integration or client contract coverage as unavailable locally rather than substituting a narrower check.
+CI owns `npm run test:ci`. The workflow supplies an explicit checked-in test
+settings file and launches Chromium through the configured Meteor browser
+driver, so both server and client tests execute. A local invocation requires
+fresh maintainer authorization and the same explicit environment contract;
+never overwrite a private `settings.json` or describe a narrower local check as
+equivalent coverage.
 
 ## Modify Or Add A Unit Type
 
@@ -157,6 +164,12 @@ If the change alters TDF fields, generated schemas, or authoring expectations, u
 The canonical build and deployment workflow lives in `deploy/`. Do not substitute a local Meteor build for release-confidence deployment validation.
 
 Do not run Docker build, push, or deploy commands unless a maintainer explicitly asks for that task.
+
+## Android Web-App Support
+
+MoFaCTS supports installation from an Android browser as a web app. This uses
+the ordinary browser build and does not require Meteor's Cordova `android`
+platform, an APK/AAB artifact, an Android SDK, or release signing.
 
 ## Documentation Updates
 

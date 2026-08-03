@@ -213,7 +213,7 @@ The readiness review has confirmed these requirements are explicit enough to imp
 - The plan does not introduce silent fallbacks or hidden compatibility paths.
 - Temporary startup behavior is visible to users when theme, DDP, auth, or role readiness is delayed.
 - Bootstrap modal cleanup accounts for all modal surfaces and removes `$(...).modal(...)` reliance.
-- Verification includes typecheck, lint, hotfix dev UI smoke testing, sidecar console/network reporting, and blocked-domain checks.
+- Verification includes typecheck, lint, canonical localhost UI smoke testing, sidecar console/network reporting, and blocked-domain checks.
 - Blocked-domain checks include external startup hints as well as CSS, JS, and WASM requests.
 - The plan includes checking whether `C:\dev\MoFaCTS.wiki` needs an update.
 
@@ -231,7 +231,7 @@ npm run lint
 
 Required UI checks:
 
-- Start the native hotfix dev app from `deploy/`.
+- Start the canonical localhost hotfix server from `deploy/`.
 - Use the MoFaCTS Playwright sidecar against `http://host.docker.internal:3200`.
 - Report route tested, browser-visible result, console errors, and network errors.
 - If a required smoke-test route cannot be reached locally, report the exact missing prerequisite: account, role, fixture, TDF, course, video session, editor document, or APKG sample.

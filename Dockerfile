@@ -1,5 +1,5 @@
 # The tag here should match the Meteor version of your app, per .meteor/release
-FROM geoffreybooth/meteor-base:3.4.1 AS meteor_builder
+FROM geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083 AS meteor_builder
 ENV METEOR_ALLOW_SUPERUSER=1
 ENV APP_SOURCE_FOLDER=/opt/mofacts
 
@@ -22,10 +22,14 @@ RUN echo "[Function] Clean Meteor local cache" && \
     rm -rf $APP_SOURCE_FOLDER/.meteor/local
 
 # Function: install app npm dependencies used by Meteor build.
-# Keep `meteor update --npm` in this same layer for Meteor-Rspack compatibility.
 RUN cd $APP_SOURCE_FOLDER && \
     echo "[Function] Install app dependencies" && \
-    (METEOR_ALLOW_SUPERUSER=1 meteor update --npm 2>/dev/null || true) && \
+    test "$(meteor --version)" = "Meteor 3.5" && \
+    test "$(meteor node --version)" = "v24.15.0" && \
+    test "$(meteor npm --version)" = "11.12.1" && \
+    sha256sum .meteor/release .meteor/packages .meteor/versions package.json package-lock.json > /tmp/mofacts-toolchain.sha256 && \
+    METEOR_ALLOW_SUPERUSER=1 meteor update --npm && \
+    sha256sum --check /tmp/mofacts-toolchain.sha256 && \
     METEOR_ALLOW_SUPERUSER=1 meteor npm ci
 
 # Function: expose Meteor bundled node binary on PATH for Rspack child processes.
@@ -35,7 +39,6 @@ RUN NODE_BIN="$(find /root/.meteor/packages/meteor-tool -type f -path '*/dev_bun
     ln -sf "$NODE_BIN" /usr/local/bin/node
 
 # Function: build Meteor server bundle with retries and focused diagnostics.
-# Build uses --allow-incompatible-update for Meteor 3.x migration compatibility.
 RUN cd $APP_SOURCE_FOLDER && \
     mkdir -p $APP_BUNDLE_FOLDER && \
     BUILD_LOG=/tmp/meteor-build.log && \
@@ -43,7 +46,7 @@ RUN cd $APP_SOURCE_FOLDER && \
       echo "Meteor build attempt $i"; \
       if NODE_PATH=$APP_SOURCE_FOLDER/node_modules:/root/.meteor/packages/node_modules \
         TOOL_NODE_FLAGS=--max-old-space-size=8000 \
-        meteor build --allow-incompatible-update --allow-superuser --directory $APP_BUNDLE_FOLDER --server-only \
+        meteor build --allow-superuser --directory $APP_BUNDLE_FOLDER --server-only \
         >"$BUILD_LOG" 2>&1; then \
         echo "Meteor build succeeded on attempt $i"; \
         awk 'tolower($0) ~ /warning/ { lines = 12 } lines > 0 { print; lines-- }' "$BUILD_LOG"; \
@@ -60,8 +63,8 @@ RUN cd $APP_SOURCE_FOLDER && \
     exit 1
 
 
-# Use the specific version of Node expected by your Meteor release, per https://docs.meteor.com/history; this is expected for Meteor 3.4
-FROM node:22.22.0-alpine AS bundle_deps_builder
+# Use the exact Node ABI bundled by Meteor 3.5.
+FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS bundle_deps_builder
 
 ENV APP_BUNDLE_FOLDER /opt/bundle
 ENV SCRIPTS_FOLDER /docker
@@ -106,7 +109,7 @@ RUN bash $SCRIPTS_FOLDER/build-meteor-npm-dependencies.sh && \
 
 # Start another Docker stage, so that the final image doesn't contain the layer with the build dependencies
 # See previous FROM line; this must match
-FROM node:22.22.0-alpine AS runtime
+FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS runtime
 
 ENV APP_BUNDLE_FOLDER /opt/bundle
 ENV SCRIPTS_FOLDER /docker

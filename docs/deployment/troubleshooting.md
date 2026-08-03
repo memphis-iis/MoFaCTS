@@ -3,14 +3,16 @@
 Startup fails before app boot:
 
 - Check `METEOR_SETTINGS_HOST_PATH` points to a real private settings file.
-- Check `METEOR_SETTINGS_WORKAROUND` is `/run/mofacts/settings.json` inside the container.
+- Check `METEOR_SETTINGS_FILE` is `/run/mofacts/settings.json` inside the container.
 - Replace placeholders in settings and `.env`.
 - Confirm `ROOT_URL` matches in settings and environment.
 
 MongoDB failures:
 
 - Self-hosted production requires authenticated MongoDB.
-- `MONGO_URL` must use the MoFaCTS app user and target `MoFACT-meteor3`.
+- `MONGO_URL` must use the MoFaCTS app user, target `MoFACT-meteor3`, and include the same `replicaSet` value as `MOFACTS_MONGO_REPLICA_SET_NAME`.
+- If `mongodb-replica-init` fails, inspect its redacted error and verify the configured set name, advertised member DNS name, root credentials, and non-empty keyfile path. Do not run `rs.reconfig()` as an automatic repair.
+- If MongoDB remains unhealthy, verify authenticated `hello` reports the configured set name and `isWritablePrimary: true`.
 - Existing volumes keep old Mongo init state; recreate only after taking backups.
 
 Redis failures:
@@ -20,10 +22,10 @@ Redis failures:
 
 Storage failures:
 
-- Dynamic asset, H5P content, and H5P library directories must exist and be readable/writable by the app container.
+- The dynamic asset directory must exist and be readable/writable by the app container.
 - S3-compatible storage is explicit. Invalid S3 config must be fixed; the app does not fall back to local storage.
 - For `storage.backend: "s3"`, check `storage.s3.endpoint`, `bucket`, `region`, credentials, optional `prefix`, and `forcePathStyle`.
-- Deployment readiness writes, heads, reads, and deletes a temporary object under `readiness/`. Failures there mean the app cannot safely use S3 for uploaded assets or H5P package files.
+- Deployment readiness writes, heads, reads, and deletes a temporary object under `readiness/`. Failures there mean the app cannot safely use S3 for uploaded assets.
 - If S3 mode reports missing asset metadata, the database record still points at local storage. Re-import the package/content or run a deliberate migration before switching that install to S3.
 
 Readiness failures:

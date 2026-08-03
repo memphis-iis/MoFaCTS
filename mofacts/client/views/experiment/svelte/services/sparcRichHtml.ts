@@ -20,7 +20,6 @@ const COLOR_VALUES = new Set(['accent', 'correct', 'warning', 'error', 'muted'])
 const CALLOUT_VALUES = new Set(['info', 'success', 'warning', 'error']);
 const DATA_TYPE_VALUES = new Set(['taskList', 'taskItem']);
 const ALLOWED_CLASSES = new Set([
-  'h5p-definition-list',
   'oli-callout',
   'oli-definition',
   'oli-embed',

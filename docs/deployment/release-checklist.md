@@ -36,7 +36,6 @@ Use this checklist for each public self-hosted MoFaCTS release. Replace every br
 - First-admin bootstrap was verified from a clean database.
 - World countries sample content was loaded and a learner smoke flow completed.
 - Dynamic asset serving and the default local filesystem storage backend were verified.
-- H5P content serving was verified when the release or deployment includes H5P content.
 - Backup completed and restore to a clean volume or clean host was verified.
-- Restored app behavior was verified, including login, content listing, dynamic assets, and H5P serving where applicable.
+- Restored app behavior was verified, including login, content listing, and dynamic assets.
 - Post-upgrade smoke test completed from the previous supported version when an upgrade path exists.

@@ -73,7 +73,7 @@ describe('cardRuntimeState', function() {
 
     const snapshot = resetCardRuntimeForInitialization();
 
-    expect(snapshot.currentTdfFile).to.equal(tdfFile);
+    expect(snapshot.currentTdfFile).to.deep.equal(tdfFile);
     expect(snapshot.overallOutcomeHistory).to.deep.equal([{ correct: true }]);
     expect(snapshot.overallStudyHistory).to.deep.equal([]);
     expect(isDisplayReady()).to.equal(false);

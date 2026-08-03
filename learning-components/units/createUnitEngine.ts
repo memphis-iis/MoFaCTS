@@ -282,6 +282,9 @@ export async function createUnitEngineByType(
   unitType: string,
 ) {
   registerDefaultUnitEngines(deps);
+  if (!hasRegisteredUnitEngine(unitType)) {
+    throw new Error(`No unit engine registered for "${String(unitType || '').trim()}"`);
+  }
   return await createWithBase(deps, curExperimentData, unitType);
 }
 

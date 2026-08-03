@@ -19,6 +19,10 @@ fi
 
 cd "$APP_DIR"
 
+test "$(meteor --version)" = "Meteor 3.5"
+test "$(meteor node --version)" = "v24.15.0"
+test "$(meteor npm --version)" = "11.12.1"
+
 CURRENT_LOCK_HASH="$(sha256sum "$LOCKFILE" | awk '{print $1}')"
 INSTALLED_LOCK_HASH=""
 if [ -f "$LOCK_HASH_FILE" ]; then
@@ -39,7 +43,7 @@ mkdir -p "$OUTPUT_DIR"
 
 NODE_PATH="$APP_DIR/node_modules:/root/.meteor/packages/node_modules" \
   TOOL_NODE_FLAGS=--max-old-space-size=8000 \
-  meteor build --allow-incompatible-update --allow-superuser --directory "$OUTPUT_DIR" --server-only
+  meteor build --allow-superuser --directory "$OUTPUT_DIR" --server-only
 
 if [ ! -f "$OUTPUT_DIR/bundle/main.js" ]; then
   echo "Meteor build completed without producing $OUTPUT_DIR/bundle/main.js" >&2

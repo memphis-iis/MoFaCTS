@@ -14,7 +14,7 @@ $caddyStderr = Join-Path $deployDir 'caddy.stderr.log'
 
 Push-Location $deployDir
 try {
-  docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml up --build -d
+  & (Join-Path $deployDir 'hotfix-local.ps1')
 
   Get-Process caddy -ErrorAction SilentlyContinue | Stop-Process -Force
   Remove-Item $caddyStdout, $caddyStderr -ErrorAction SilentlyContinue

@@ -36,9 +36,7 @@
   "storage": {
     "backend": "local",
     "local": {
-      "dynamicAssetsPath": "/root/dynamic-assets",
-      "h5pContentPath": "/root/h5p-content",
-      "h5pLibrariesPath": "/root/h5p-libraries"
+      "dynamicAssetsPath": "/root/dynamic-assets"
     }
   },
   "saml": {
@@ -48,6 +46,11 @@
     }
   },
   "public": {
+    "packages": {
+      "accounts": {
+        "clientStorage": "session"
+      }
+    },
     "systemName": "MoFaCTS",
     "forceSSL": true,
     "sourceUrl": "https://github.com/memphis-iis/MoFaCTS/tree/v0.1.0-alpha.1",

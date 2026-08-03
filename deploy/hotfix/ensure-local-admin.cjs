@@ -81,7 +81,7 @@ async function bootstrap(ws) {
     } catch (secondLoginError) {
       if (signupError) {
         throw new Error(
-          `Local admin account ${email} already exists, but the password in deploy/local-dev/agent-secrets.env does not match it. ` +
+          `Local admin account ${email} already exists, but the password in deploy/local-hotfix/agent-secrets.env does not match it. ` +
           'Sign in with the existing password or reset the local database/admin account deliberately.'
         );
       }

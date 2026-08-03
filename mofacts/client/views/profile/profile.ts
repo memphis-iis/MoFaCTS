@@ -432,10 +432,11 @@ Template.profile.helpers({
     const activeLocale = getActiveUiLocale();
     return TARGET_UI_LOCALES.map((locale) => {
       const definition = TARGET_LOCALE_DEFINITIONS[locale];
+      const selectedAttrs: Record<string, boolean> = activeLocale === locale ? { selected: true } : {};
       return {
         locale,
         label: `${definition.englishName} (${definition.nativeName})`,
-        selectedAttrs: activeLocale === locale ? { selected: true } : {},
+        selectedAttrs,
       };
     });
   },
@@ -574,11 +575,14 @@ Template.profile.helpers({
     const levels = model
       ? getAllowedOpenRouterReasoningLevels(model)
       : [selectedLevel];
-    return levels.map((level) => ({
-      value: level,
-      label: reasoningLevelLabel(level),
-      selectedAttrs: level === selectedLevel ? { selected: true } : {},
-    }));
+    return levels.map((level) => {
+      const selectedAttrs: Record<string, boolean> = level === selectedLevel ? { selected: true } : {};
+      return {
+        value: level,
+        label: reasoningLevelLabel(level),
+        selectedAttrs,
+      };
+    });
   },
 
   openRouterReasoningSelectAttrs(): Record<string, boolean> {

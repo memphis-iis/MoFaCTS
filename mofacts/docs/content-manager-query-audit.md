@@ -244,7 +244,7 @@ db.Assets.find(
 
 Local database checked through the running `deploy-mongodb-1` container against `MoFACT-meteor3` on 2026-05-28. The sample data set was small: 20 `tdfs`, 1372 `Assets`, and no populated `stim_files` collection.
 
-After starting the native hotfix dev service, startup created the new indexes. Confirmed local indexes included `perf_owner_lessonname_id`, `perf_packageFile`, `perf_accessors_userId`, `perf_accessors_user_lessonname_id`, `perf_userId_name`, `perf_userId_fileName`, `perf_stimuliSetId_name`, `perf_stimuliSetId_fileName`, `perf_stimuliSetId_id`, and `perf_public_uploadedAt`.
+After starting the then-current localhost service, startup created the new indexes. Confirmed local indexes included `perf_owner_lessonname_id`, `perf_packageFile`, `perf_accessors_userId`, `perf_accessors_user_lessonname_id`, `perf_userId_name`, `perf_userId_fileName`, `perf_stimuliSetId_name`, `perf_stimuliSetId_fileName`, `perf_stimuliSetId_id`, and `perf_public_uploadedAt`.
 
 Representative local `executionStats`:
 

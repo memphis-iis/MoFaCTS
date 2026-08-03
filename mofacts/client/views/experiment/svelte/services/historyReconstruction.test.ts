@@ -398,7 +398,7 @@ describe('history reconstruction', function() {
         CFEndLatency: 100,
         CFFeedbackLatency: 100,
       },
-    ])).to.throw('Missing required field clusterKC');
+    ])).to.throw('Model practice identity missing clusterKC');
   });
 
   it('rejects mismatched shared and legacy response keys', function() {

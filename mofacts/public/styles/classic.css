@@ -1,6 +1,10 @@
 /* ===== THEME VARIABLES - Colors and Design Tokens ===== */
-.theme-bootstrap-pending {
+.theme-bootstrap {
     visibility: hidden;
+}
+
+.theme-bootstrap.theme-bootstrap-ready {
+    visibility: visible;
 }
 
 :root {
@@ -473,6 +477,14 @@ select {
     color: var(--app-text-color);
     font-family: var(--app-font-family);
     font-size: var(--app-font-size-base);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+    background-color: var(--app-muted-surface-color);
+    border-color: var(--border-color);
+    color: var(--app-secondary-text-color);
+    opacity: 1;
 }
 
 .form-control::placeholder {

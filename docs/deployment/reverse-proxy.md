@@ -13,8 +13,10 @@ Use `deploy/Caddyfile.self-hosted.example` as the starting point. Caddy's `rever
 
 Cases:
 
-- Local HTTP: `http://localhost:3000`, no public learners.
-- LAN HTTPS: local certificate ownership is the operator's responsibility.
+- Local HTTP: `http://localhost:3200`, no public learners.
+- LAN HTTPS exception: `https://localhost:3000` proxies to
+  `http://localhost:3200`; local certificate ownership is the operator's
+  responsibility.
 - Public HTTPS: use a real DNS name, Caddy-managed certificates, and matching `ROOT_URL`.
 
 Troubleshooting:

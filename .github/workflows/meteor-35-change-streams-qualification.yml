@@ -1,0 +1,208 @@
+name: Meteor 3.5 Change Streams qualification
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stable-3-5-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: mofacts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.15.0'
+          cache: npm
+          cache-dependency-path: mofacts/package-lock.json
+
+      - name: Install stable Meteor 3.5
+        run: curl https://install.meteor.com/?release=3.5 | sh
+
+      - name: Assert stable framework toolchain
+        run: |
+          test "$(meteor --version)" = "Meteor 3.5"
+          test "$(meteor node --version)" = "v24.15.0"
+          test "$(meteor npm --version)" = "11.12.1"
+
+      - name: Install dependencies and browser
+        run: |
+          npm ci
+          ./node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Start isolated MongoDB 8 replica set
+        working-directory: .
+        run: |
+          docker run -d \
+            --name mofacts-cs-qualification-mongodb \
+            --publish 127.0.0.1:27018:27017 \
+            mongo:8.0 \
+            --replSet mofacts-ci-rs \
+            --setParameter enableTestCommands=1 \
+            --bind_ip_all
+          for attempt in $(seq 1 60); do
+            if docker exec mofacts-cs-qualification-mongodb \
+              mongosh --quiet --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo 'MongoDB did not become reachable'
+              exit 1
+            fi
+            sleep 1
+          done
+          docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval \
+            'rs.initiate({_id:"mofacts-ci-rs",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+          for attempt in $(seq 1 60); do
+            if docker exec mofacts-cs-qualification-mongodb \
+              mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'MongoDB replica set did not elect a writable primary'
+          exit 1
+
+      - name: Run stable Change Streams observer, fence, and recovery qualification
+        run: |
+          set -euo pipefail
+          history_marker=/tmp/mofacts-change-streams-history-loss-ready
+          restart_marker=/tmp/mofacts-change-streams-primary-restart-ready
+          rm -f "$history_marker" "$restart_marker"
+
+          npm run test:ci &
+          test_pid=$!
+
+          wait_for_marker() {
+            marker=$1
+            label=$2
+            for attempt in $(seq 1 900); do
+              if [ -f "$marker" ]; then
+                return 0
+              fi
+              if ! kill -0 "$test_pid" 2>/dev/null; then
+                echo "Meteor qualification ended before $label was requested"
+                if wait "$test_pid"; then
+                  echo 'Meteor qualification exited successfully without reaching the required marker'
+                else
+                  test_status=$?
+                  echo "Meteor qualification exited with status $test_status before reaching the required marker"
+                fi
+                return 1
+              fi
+              sleep 1
+            done
+            echo "Timed out waiting for $label request"
+            return 1
+          }
+
+          wait_for_primary() {
+            for attempt in $(seq 1 120); do
+              if docker exec mofacts-cs-qualification-mongodb \
+                mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo 'MongoDB did not return to writable-primary state'
+            return 1
+          }
+
+          assert_qualification_change_stream() {
+            docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval '
+              const operations = db.getSiblingDB("admin").aggregate([
+                {$currentOp:{allUsers:true,idleCursors:true,localOps:true}}
+              ]).toArray();
+              const streams = operations.filter((operation) => {
+                const command = operation.cursor?.originatingCommand
+                  || operation.originatingCommand
+                  || operation.command
+                  || {};
+                const pipeline = Array.isArray(command.pipeline) ? command.pipeline : [];
+                return command.aggregate === "meteor35_change_streams_qualification"
+                  && pipeline.some((stage) => Object.prototype.hasOwnProperty.call(stage, "$changeStream"));
+              });
+              printjson({qualificationChangeStreams:streams.length});
+              quit(streams.length > 0 ? 0 : 1);
+            '
+          }
+
+          capture_mongo_capacity() {
+            label=$1
+            docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval "
+              const status=db.serverStatus();
+              const repl=db.adminCommand({replSetGetStatus:1});
+              const primary=repl.members.find((member) => member.stateStr === 'PRIMARY');
+              if (!primary || status.connections.available <= 0) {
+                printjson({healthy:false,label:'$label'});
+                quit(1);
+              }
+              printjson({
+                healthy:true,
+                label:'$label',
+                connectionsCurrent:status.connections.current,
+                connectionsAvailable:status.connections.available,
+                opcounters:status.opcounters,
+                residentMemoryMB:status.mem.resident,
+                wiredTigerCacheBytes:status.wiredTiger?.cache?.['bytes currently in the cache'],
+                primaryState:primary?.stateStr || null,
+                electionCount:status.metrics?.repl?.election?.called || 0
+              });
+            "
+          }
+
+          wait_for_marker "$history_marker" 'history-loss injection'
+          assert_qualification_change_stream
+          capture_mongo_capacity 'before-faults'
+          docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval \
+            'db.adminCommand({configureFailPoint:"failCommand",mode:{times:20},data:{failCommands:["getMore"],errorCode:286}})'
+          docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval \
+            'db.getSiblingDB("meteor").meteor35_change_streams_qualification.updateOne({_id:"history-loss-wakeup"},{$set:{scope:"workflow",value:"wake",nested:{visible:"wake",secret:"wake"}}},{upsert:true})'
+          sleep 2
+          docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval \
+            'db.adminCommand({configureFailPoint:"failCommand",mode:"off"})'
+          docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval \
+            'db.getSiblingDB("meteor").meteor35_change_streams_qualification.deleteOne({_id:"history-loss-wakeup"})'
+          rm -f "$history_marker"
+
+          wait_for_marker "$restart_marker" 'primary restart'
+          docker restart mofacts-cs-qualification-mongodb
+          wait_for_primary
+          rm -f "$restart_marker"
+
+          wait "$test_pid"
+          capture_mongo_capacity 'after-recovery'
+        env:
+          TEST_BROWSER_DRIVER: playwright
+          PLAYWRIGHT_BROWSER: chromium
+          TEST_RUN_TIMEOUT_MS: 1200000
+          TEST_SETTINGS_FILE: settings.ci.json
+          MONGO_URL: mongodb://127.0.0.1:27018/meteor?replicaSet=mofacts-ci-rs&directConnection=true
+          EXPECTED_MONGO_DB_NAME: meteor
+          MOFACTS_MONGO_REPLICA_SET_NAME: mofacts-ci-rs
+          MOFACTS_CHANGE_STREAMS_ENABLED: 'true'
+          MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'true'
+          MOFACTS_CHANGE_STREAMS_HISTORY_LOSS_MARKER: /tmp/mofacts-change-streams-history-loss-ready
+          MOFACTS_CHANGE_STREAMS_PRIMARY_RESTART_MARKER: /tmp/mofacts-change-streams-primary-restart-ready
+          METEOR_REACTIVITY_ORDER: changeStreams,polling
+          DDP_TRANSPORT: sockjs
+          MOFACTS_SELF_HOSTED: 'false'
+          MOFACTS_REQUIRE_REDIS: 'false'
+
+      - name: Capture sanitized MongoDB topology after failure
+        if: failure()
+        working-directory: .
+        run: |
+          docker exec mofacts-cs-qualification-mongodb mongosh --quiet --eval \
+            'const h=db.hello(); printjson({setName:h.setName,isWritablePrimary:h.isWritablePrimary,maxWireVersion:h.maxWireVersion})' \
+            || true
+
+      - name: Clean up isolated MongoDB
+        if: always()
+        working-directory: .
+        run: docker rm -f mofacts-cs-qualification-mongodb 2>/dev/null || true

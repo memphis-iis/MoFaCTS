@@ -36,12 +36,12 @@ describe('videoResume', function() {
   });
 
   it('detects video resume sessions through the shared session surface state', function() {
-    expect(isVideoResumeSession({ videosession: { videosource: 'intro.mp4' } })).to.equal(true);
+    expect(isVideoResumeSession({ videosession: { videosource: 'https://example.com/intro.mp4' } })).to.equal(true);
     expect(isVideoResumeSession({})).to.equal(false);
   });
 
   it('resolves the video source only for video resume sessions', function() {
-    expect(resolveVideoResumeSource({ videosession: { videosource: 'intro.mp4' } })).to.equal('intro.mp4');
+    expect(resolveVideoResumeSource({ videosession: { videosource: 'https://example.com/intro.mp4' } })).to.equal('https://example.com/intro.mp4');
     expect(resolveVideoResumeSource({ videosession: { videosource: '' } })).to.equal(null);
     expect(resolveVideoResumeSource({})).to.equal(null);
   });

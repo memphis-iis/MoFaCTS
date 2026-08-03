@@ -1,10 +1,16 @@
 {
   "owner": "admin@localhost.test",
-  "ROOT_URL": "http://localhost:3000",
+  "ROOT_URL": "http://localhost:3200",
   "encryptionKey": "ci-development-encryption-key-do-not-use",
   "prod": false,
   "enableEmail": false,
   "mturkSandbox": true,
+  "storage": {
+    "backend": "local",
+    "local": {
+      "dynamicAssetsPath": "/tmp/mofacts-ci-dynamic-assets"
+    }
+  },
   "initRoles": {
     "admins": [
       "admin@localhost.test"
@@ -18,6 +24,11 @@
     "argon2Enabled": true
   },
   "public": {
+    "packages": {
+      "accounts": {
+        "clientStorage": "session"
+      }
+    },
     "systemName": "MoFaCTS",
     "forceSSL": false,
     "admin": "admin@localhost.test",
@@ -26,7 +37,7 @@
     "socialPreview": {
       "title": "MoFaCTS | Mobile Fact and Concept Training System",
       "type": "website",
-      "url": "http://localhost:3000/",
+      "url": "http://localhost:3200/",
       "description": "MoFaCTS is an open-source learning system for practice, assessment, instruction, and research.",
       "twitterDescription": "MoFaCTS is an open-source learning system for practice, assessment, instruction, and research.",
       "image": "theme",

@@ -558,14 +558,14 @@ npm run typecheck
 npm run lint
 ```
 
-For browser verification, use the supported native hotfix loop and MoFaCTS Playwright sidecar described by the repository guide:
+For browser verification, use the canonical localhost hotfix server and MoFaCTS Playwright sidecar described by the repository guide:
 
 ```powershell
 cd C:\dev\MoFaCTS\deploy
-.\hotfix-dev.ps1 start -SettingsPath "$env:USERPROFILE\OneDrive\Desktop\settings.local.json"
+.\hotfix-local.ps1 restart
 
 cd C:\dev\MoFaCTS\mofacts-mcp-sidecar
-.\scripts\check-hotfix-sidecar.ps1 -Start
+.\scripts\check-localhost-sidecar.ps1 -Start
 ```
 
 The app target is `http://localhost:3200`; the sidecar reaches it at `http://host.docker.internal:3200`. Do not run a Docker image build, push, deploy, or local Meteor test workflow for this UI migration. Use CI for Meteor integration coverage, and obtain fresh explicit authorization before every `npm run test:ci` invocation.
@@ -580,7 +580,7 @@ For every migrated surface:
 6. Test long unbroken messages, URLs, identifiers, and localized strings in affected tables at desktop, intermediate, and mobile widths.
 7. For feedback inside table markup, confirm `.admin-table-feedback` does not exceed approximately 25rem/400px or its narrower container. For non-table feedback, confirm only that it remains within its owning container.
 8. Run `npm run typecheck` and `npm run lint` from `mofacts/`.
-9. Use the native hotfix development server and MoFaCTS Playwright sidecar for browser-visible verification of each affected route.
+9. Use the canonical localhost hotfix server and MoFaCTS Playwright sidecar for browser-visible verification of each affected route.
 
 ### Automated test requirements
 
@@ -687,7 +687,7 @@ Verification completed before the final source-cleanup pass:
 - `npm run typecheck`: passed.
 - `npm run lint`: passed.
 - `npm run check:sparc-authoring`: passed with 30 palette entries and 14 rule-catalog entries.
-- Native hotfix server: running and reachable at `http://localhost:3200`; app port 3200 and HMR port 8082 are reachable. The current templates hot reload. Existing historical dev-log entries include a SPARC unused-export warning and transient missing-module/server-socket errors; the current public routes remained reachable.
+- The then-current localhost server was reachable at `http://localhost:3200`; app port 3200 and HMR port 8082 were reachable. The current templates hot reloaded. Existing historical dev-log entries included a SPARC unused-export warning and transient missing-module/server-socket errors; the current public routes remained reachable.
 - Playwright sidecar tools are exposed. Public smoke checks passed for sign-in empty-field validation and forgot-password empty-email validation at 900px: each error rendered in the owning field region, the invalid field received focus, and `aria-invalid`/`aria-describedby` referenced the visible error. A fresh navigation produced no console warnings or errors.
 - A browser computed-style probe using the shipped shared classes confirmed the table-only distinction: inside a 700px owner, `.admin-table-feedback` measured 400px with `max-inline-size: min(100%, 400px)` and `overflow-wrap: anywhere`, while `.admin-inline-feedback` used the full 700px with only `max-inline-size: 100%`. In a 300px table owner, table feedback stayed below the container width and introduced no page-level horizontal overflow.
 - Authenticated administration, teacher, user-menu, responsive table-width, confirmation-focus, and network smoke checks were not run. The user explicitly removed browser verification from scope; no credential bypass or secret transfer was used.

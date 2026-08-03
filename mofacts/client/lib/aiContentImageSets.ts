@@ -687,7 +687,7 @@ async function commonsCollectionImages(
   context: DiscoveryContext,
   responses: string[] = [],
 ): Promise<WikimediaImagePage[]> {
-  const params = reference.kind === 'category'
+  const params: Record<string, string> = reference.kind === 'category'
     ? {
       generator: 'categorymembers',
       gcmtitle: reference.title,
@@ -973,7 +973,10 @@ function selectFamilies(
       const coverage = new Set(available.map((candidate) => candidate.pairId)).size;
       const quality = Array.from(new Set(available.map((candidate) => candidate.pairId))).reduce((total, pairId) => {
         const best = available.filter((candidate) => candidate.pairId === pairId)
-          .reduce((score, candidate) => Math.max(score, (candidate.contextScore * 10) + Number(candidate.staticSource)), 0);
+          .reduce((score, candidate) => Math.max(
+            score,
+            (Number(candidate.staticSource) * 100) + (candidate.contextScore * 10),
+          ), 0);
         return total + best;
       }, 0);
       return { familyKey, familyCandidates, coverage, quality };
@@ -987,8 +990,8 @@ function selectFamilies(
     pairIds.forEach((pairId) => {
       const candidate = best.familyCandidates
         .filter((entry) => entry.pairId === pairId && !usedFiles.has(String(entry.page.title || '')))
-        .sort((left, right) => right.contextScore - left.contextScore
-          || Number(right.staticSource) - Number(left.staticSource)
+        .sort((left, right) => Number(right.staticSource) - Number(left.staticSource)
+          || right.contextScore - left.contextScore
           || right.matchScore - left.matchScore
           || String(left.page.title || '').localeCompare(String(right.page.title || '')))[0];
       if (!candidate) return;
@@ -1006,8 +1009,8 @@ function selectFamilies(
     const candidate = eligibleCandidates
       .filter((entry) => entry.pairId === pairId && !usedFiles.has(String(entry.page.title || '')))
       .filter((entry) => !contextRequired || entry.contextScore >= 3)
-      .sort((left, right) => right.contextScore - left.contextScore
-        || Number(right.staticSource) - Number(left.staticSource)
+      .sort((left, right) => Number(right.staticSource) - Number(left.staticSource)
+        || right.contextScore - left.contextScore
         || right.matchScore - left.matchScore
         || String(left.page.title || '').localeCompare(String(right.page.title || '')))[0];
     if (!candidate) return;

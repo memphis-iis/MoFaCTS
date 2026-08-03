@@ -30,7 +30,9 @@ mofacts-mcp-sidecar/
 ## Start
 
 1. Copy `.env.example` to `.env`.
-2. Fill in `MONGO_URI` and `DB_NAME`.
+2. Fill in `MONGO_URI`, `DB_NAME`, and
+   `MOFACTS_MONGO_REPLICA_SET_NAME`. `MONGO_URI` must contain a read-only
+   sidecar account, its `authSource`, and the selected replica-set name.
 3. Start everything:
 
 ```bash
@@ -44,13 +46,16 @@ That starts:
 
 ## Local Hotfix Dev Target
 
-When testing the MoFaCTS hotfix dev server at `http://localhost:3200`, start the sidecar with:
+When testing the canonical MoFaCTS hotfix server at `http://localhost:3200`, start the sidecar with:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.local-server.yml up -d
 ```
 
-That points Playwright MCP at `http://host.docker.internal:3200` and connects Mongo MCP to the local Docker database `MoFACT-meteor3` on the `deploy_mofacts` network.
+That points Playwright MCP at `http://host.docker.internal:3200` and attaches
+Mongo MCP to the `deploy_mofacts` network. The private environment file remains
+the sole owner of the authenticated topology-capable MongoDB URI; the overlay
+does not replace it with a standalone URL.
 
 For Codex agents working in this repo, this sidecar is the authoritative browser automation path for MoFaCTS UI checks. Use the `mcp__mofacts_playwright__` tools exposed by `http://localhost:8931/mcp`. Do not use the bundled Browser `iab` registry or the Chrome extension backend as a substitute for this sidecar.
 
@@ -85,7 +90,7 @@ docker logs mofacts-mcp-sidecar-playwright-mcp-1 --tail 80
 For a repeatable local check, run from the main repo:
 
 ```powershell
-mofacts-mcp-sidecar\scripts\check-hotfix-sidecar.ps1
+mofacts-mcp-sidecar\scripts\check-localhost-sidecar.ps1
 ```
 
 Use `-Start` or `-Restart` to start the hotfix sidecar before checking. The script reports the hotfix app endpoint, sidecar compose services, Playwright MCP endpoint, and the expected Codex namespace.
@@ -132,26 +137,22 @@ This uses the OpenAI Agents SDK with local Streamable HTTP MCP servers at:
 
 ## Production Start
 
-This repo also includes a production wrapper for your current server:
-
-- SSH host: `ubuntu@52.89.109.53`
-- Public site: `https://mofacts.optimallearning.org`
-- Remote Mongo DB: `MoFACT-meteor3`
+This repo includes a production wrapper that consumes a private environment
+file. The file must define `BASE_URL`, `MONGO_URI`, `DB_NAME`, and
+`MOFACTS_MONGO_REPLICA_SET_NAME`. `MONGO_URI` may be a reachable authenticated
+replica-set seed list or SRV URI; Compose does not resolve a container IP or
+force traffic through one MongoDB member.
 
 On Windows PowerShell:
 
 ```powershell
+$env:MOFACTS_PROD_ENV_FILE='C:\private\mofacts-sidecar.production.env'
 .\scripts\start-production.ps1
 ```
 
-That script:
-
-1. Resolves the current Mongo container IP on the production host.
-2. Starts a small SSH tunnel container inside Docker Compose.
-3. Starts the sidecar with:
-   - `BASE_URL=https://mofacts.optimallearning.org`
-   - `MONGO_URI=mongodb://ssh-tunnel:27017/MoFACT-meteor3`
-   - `DB_NAME=MoFACT-meteor3`
+The Mongo MCP process validates an authenticated ping and the exact connected
+replica-set identity before listening. Connection errors are not expanded with
+the URI, so credentials do not enter routine startup output.
 
 When you are done:
 
@@ -189,12 +190,12 @@ The AI connects to the Playwright MCP endpoint and uses browser tools to open pa
 By default, the intended site target is:
 
 ```text
-http://host.docker.internal:3100
+http://host.docker.internal:3200
 ```
 
-That address works from inside Docker containers and points back to a website running on your host machine. Change `BASE_URL` in `.env` if your site moves somewhere else.
+That address works from inside Docker containers and points back to the sole supported local MoFaCTS endpoint at `http://localhost:3200`.
 
-For the Windows native hotfix loop, the compose override `docker-compose.hotfix-dev.yml` changes this target to:
+The `docker-compose.local-server.yml` sidecar override targets the sole localhost server at:
 
 ```text
 http://host.docker.internal:3200
@@ -235,16 +236,18 @@ If the website is not running locally, change:
 BASE_URL=https://your-site.example.com
 ```
 
-If Mongo is remote too, update:
+If Mongo is remote too, use a reachable topology-capable URI:
 
 ```text
-MONGO_URI=mongodb+srv://...
+MONGO_URI=mongodb+srv://readonly-user:password@cluster.example/MoFACT-meteor3?authSource=MoFACT-meteor3
 DB_NAME=...
+MOFACTS_MONGO_REPLICA_SET_NAME=...
 ```
 
-Nothing else in the sidecar needs to change.
-
-If Mongo is private, prefer an SSH tunnel instead of exposing the database directly. The production wrapper script included here follows that pattern.
+Nothing else in the sidecar needs to change. Keep MongoDB private through the
+deployment network, VPN, or another topology-capable private route. Do not make
+a tunnel to one container the replica-set discovery contract; that would strand
+the sidecar after member movement or a later parallel-server migration.
 
 ## Safe Extension Points
 
@@ -259,4 +262,5 @@ Recommended rule: add narrowly scoped read-only tools for specific questions, in
 - The Playwright service is intentionally close to upstream. The local Dockerfile extends the official image so project defaults can be changed here without editing the main app.
 - The Mongo service is intentionally small and readable rather than abstract.
 - Both endpoints bind to `localhost` on the host machine by default so they are not exposed broadly.
-- Production Mongo access is tunneled over SSH rather than opened publicly.
+- Production Mongo access uses the private topology-capable route named by the
+  environment URI and validates the exact replica-set identity at startup.

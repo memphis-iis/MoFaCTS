@@ -5,7 +5,7 @@ Supported self-hosted upgrades are release-to-release. Operators should use sema
 Before upgrading:
 
 1. Read release notes for settings, storage, Redis, worker, schema, and migration changes.
-2. Back up MongoDB, settings, `.env`, dynamic assets, H5P content, H5P libraries, and key material.
+2. Back up MongoDB data and database-scoped users/roles, settings, `.env`, the replica-set keyfile, dynamic assets, and integration key material.
 3. Record the current source tag, image tag, settings template version, and release notes URL.
 
 Upgrade paths:
@@ -22,3 +22,13 @@ Schema and settings changes:
 - Generated schema diffs and settings-template changes must be called out in release notes with operator action required, if any.
 
 After upgrading, run `/admin/tests`, sign in as admin, confirm content listing, launch one learner flow, verify dynamic assets, and check the visible License / Source link points to the running source tag or archive.
+
+When an upgrade changes the application host operating system or the configured
+local dynamic-assets directory, startup reconciles FilesCollection's absolute
+`path`, `versions.original.path`, and `_storagePath` fields to the configured
+local storage root. The migration verifies each canonical
+`<asset-id>.<extension>` file before updating its record, checkpoints bounded
+batches, reruns when the configured root changes, and leaves missing or invalid
+assets unchanged with an explicit startup error report. Treat any unresolved
+asset as an upgrade blocker; do not continue learner launch verification until
+the corresponding file is restored.

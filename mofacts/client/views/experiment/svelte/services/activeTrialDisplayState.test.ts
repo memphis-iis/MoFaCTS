@@ -66,7 +66,7 @@ describe('active trial display state', function() {
       isStudyState: false,
       originalAnswer: '',
       skipStudyEnabled: false,
-      sparcSessionOwnsResponse: false,
+      sparcSessionOwnsResponse: true,
       studyInteractionText: '',
       trialSubsetKind: 'question',
     }).responseVisible).to.equal(false);

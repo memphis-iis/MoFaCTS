@@ -17,12 +17,17 @@ type SpanishPhoneticIndexEntry = {
 
 const spanishPhoneticCache = new Map<string, string[]>();
 
-function normalizeSpanishForPhonetics(word: string, preserveHardGBeforeFrontVowels = false): string {
-  let normalized = word
+function normalizeSpanishOrthography(word: string): string {
+  return word
     .toLowerCase()
     .trim()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/n\u0303/g, 'ñ')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizeSpanishForPhonetics(word: string, preserveHardGBeforeFrontVowels = false): string {
+  let normalized = normalizeSpanishOrthography(word)
     .replace(/[^a-zñü\s]/g, ' ')
     .replace(/\s+/g, '')
     .replace(/ph/g, 'f')
@@ -182,11 +187,11 @@ export function findSpanishPhoneticConflictsWithCorrectAnswer(
 ): string[] {
   const conflicts: string[] = [];
   const correctCodes = getAllSpanishPhoneticCodes(correctAnswer);
-  const normalizedCorrectAnswer = normalizeSpanishForPhonetics(correctAnswer);
+  const normalizedCorrectAnswer = normalizeSpanishOrthography(correctAnswer);
 
   for (const word of grammarList) {
     if (word === correctAnswer) continue;
-    if (normalizeSpanishForPhonetics(word) === normalizedCorrectAnswer) continue;
+    if (normalizeSpanishOrthography(word) === normalizedCorrectAnswer) continue;
 
     const wordCodes = getAllSpanishPhoneticCodes(word);
     const bestComparison = getBestSpanishPhoneticCodeComparison(

@@ -20,6 +20,8 @@ The canonical deployment workflow lives under `deploy/`.
 - `backup-restore.md`: complete backup and guarded restore procedures.
 - `first-admin-content.md`: first-admin and beginner content workflow.
 - `upgrade-guide.md`: release-to-release upgrade expectations.
+- `meteor-3.5-implementation-record.md`: immutable contained-base candidate identities, completed checks, and remaining acceptance gates.
+- `mongodb-replica-set-conversion.md`: in-place one-member conversion, recovery boundary, and future expansion path.
 - `public-release-source.md`: public release and source-availability checklist.
 - `release-checklist.md`: per-release evidence checklist.
 - `troubleshooting.md`: common deployment failures.

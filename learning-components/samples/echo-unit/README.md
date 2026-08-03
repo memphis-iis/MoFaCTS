@@ -8,6 +8,6 @@ The package demonstrates the minimum in-repo component shape:
 - `manifest.ts`: `LearningComponentManifest` that declares the unit type and required capabilities.
 - `fixtures.ts`: test dependencies for registry and creation tests.
 
-Use this as the reference layout before adding production components such as deeper AutoTutor units or additional H5P-style displays.
+Use this as the reference layout before adding production components such as deeper AutoTutor units or explicitly approved trial displays.
 
 When turning this shape into a production component, add a package README that names component-owned behavior, app-owned boundaries, required capabilities, and the tests that prove missing capabilities fail clearly.

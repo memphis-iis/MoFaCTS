@@ -23,20 +23,14 @@ const validEncryptionKeyFixture = [
 async function makeLocalStorageSettings() {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-readiness-test-'));
   const dynamicAssetsPath = path.join(base, 'dynamic-assets');
-  const h5pContentPath = path.join(base, 'h5p-content');
-  const h5pLibrariesPath = path.join(base, 'h5p-libraries');
   const localBackupPath = path.join(base, 'backups');
   await fs.mkdir(dynamicAssetsPath);
-  await fs.mkdir(h5pContentPath);
-  await fs.mkdir(h5pLibrariesPath);
   await fs.mkdir(localBackupPath);
   return {
     storage: {
       backend: 'local',
       local: {
         dynamicAssetsPath,
-        h5pContentPath,
-        h5pLibrariesPath,
       },
     },
     openCore: {
@@ -95,11 +89,12 @@ describe('deploymentReadinessMethods', function() {
     }
   });
 
-  it('returns passing checks for a valid local-storage self-hosted configuration', async function() {
-    process.env.METEOR_SETTINGS_WORKAROUND = '/run/mofacts/settings.json';
+  it('returns passing checks for a valid session-storage self-hosted configuration', async function() {
+    process.env.METEOR_SETTINGS_FILE = '/run/mofacts/settings.json';
     process.env.ROOT_URL = 'https://mofacts.operator.test';
     process.env.MONGO_URL = validSelfHostedMongoUrl;
     process.env.EXPECTED_MONGO_DB_NAME = 'MoFACT-meteor3';
+    process.env.MOFACTS_MONGO_REPLICA_SET_NAME = 'mofacts-rs';
     process.env.MOFACTS_SELF_HOSTED = 'true';
     process.env.REDIS_URL = '';
 
@@ -118,12 +113,32 @@ describe('deploymentReadinessMethods', function() {
         requireEmailVerification: false,
         argon2Enabled: true,
       },
+      public: {
+        packages: {
+          accounts: {
+            clientStorage: 'session',
+          },
+        },
+      },
       ...(await makeLocalStorageSettings()),
     };
 
     const methods = createDeploymentReadinessMethods({
       Roles: { userIsInRoleAsync: async () => true },
-      Tdfs: { rawDatabase: () => ({ command: async () => undefined }) },
+      Tdfs: {
+        rawDatabase: () => ({
+          databaseName: 'MoFACT-meteor3',
+          command: async (command: Record<string, unknown>) => {
+            if ('connectionStatus' in command) {
+              return { authInfo: { authenticatedUsers: [{ user: 'app', db: 'MoFACT-meteor3' }] } };
+            }
+            if ('hello' in command) {
+              return { ok: 1, setName: 'mofacts-rs' };
+            }
+            return { ok: 1 };
+          },
+        }),
+      },
       usersCollection: { findOneAsync: async () => ({ _id: 'admin-user' }) },
       redisBoundary: { enabled: false, async ping() { return undefined; } },
     });

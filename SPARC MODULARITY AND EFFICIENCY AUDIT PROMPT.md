@@ -16,7 +16,7 @@ The final audit output should be a ranked plan, not an implementation. Create th
 - Stay on the current branch. Do not create a new branch.
 - Do not make code changes during the audit unless explicitly asked after the plan is reviewed.
 - Do not run Docker build, push, or deploy commands.
-- Do not run `meteor run` directly. For UI observation, use the documented native hotfix dev loop and MoFaCTS Playwright sidecar.
+- Do not run `meteor run` directly. For UI observation, use the documented canonical localhost hotfix server and MoFaCTS Playwright sidecar.
 - Do not recommend moving work to server methods unless the work requires database access, authorization enforcement, secrets, encryption, or external API calls.
 - Do not recommend silent compatibility shims or recovery behavior that hides broken invariants.
 - Preserve existing working paths, especially any reference SPARC authoring, runtime, or model-history flows.

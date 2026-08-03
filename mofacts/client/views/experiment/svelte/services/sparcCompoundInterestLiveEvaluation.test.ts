@@ -127,7 +127,7 @@ function scoreForTurn(
     diagnosticMisconceptionScores: [
       { id: 'M1', supportStrength: 0 },
       { id: 'M2', supportStrength: 0 },
-      { id: 'M3', supportStrength: scenario.inferUnsupportedM3OnSynthesis ? 0.25 : 0 },
+      { id: 'M3', supportStrength: scenario.inferUnsupportedM3OnSynthesis ? 0.1 : 0 },
     ],
     learnerContribution: { type: 'answer' },
   };
@@ -193,7 +193,7 @@ function evidenceForTurn(
         return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
       }
       if (exactTurn < 0 && id === 'M3' && scenario.inferUnsupportedM3OnSynthesis) {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.25 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.1 };
       }
       if (exactTurn < 0 && id === 'M3') {
         return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };

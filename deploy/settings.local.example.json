@@ -33,7 +33,10 @@
     }
   },
   "storage": {
-    "backend": "local"
+    "backend": "local",
+    "local": {
+      "dynamicAssetsPath": "C:/path/to/MoFaCTS/deploy/local-data/dynamic-assets"
+    }
   },
   "saml": {
     "memphis": {
@@ -42,6 +45,11 @@
     }
   },
   "public": {
+    "packages": {
+      "accounts": {
+        "clientStorage": "session"
+      }
+    },
     "systemName": "MoFaCTS",
     "forceSSL": false,
     "enableDeleteAllButton": false

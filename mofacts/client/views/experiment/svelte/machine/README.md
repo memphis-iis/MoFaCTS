@@ -31,7 +31,7 @@ The card state machine coordinates learner trial lifecycle for the Svelte card r
 - Put context assignment and side-effect dispatch in the relevant `*Actions.ts` file, then expose it through `contentRuntimeMachineActions.ts`.
 - Put invoked service wiring in `services.ts` and keep the concrete effectful implementation in `../services/`.
 - Put video-session state-machine behavior in `videoSessionMachine.ts`; keep DOM/player integration in `../services/videoMachineBridge.ts` or `../components/VideoSessionMode.svelte`.
-- Do not add AutoTutor, H5P, or video runtime branches directly to the standard card lifecycle unless the behavior truly changes shared trial lifecycle semantics.
+- Do not add AutoTutor or video runtime branches directly to the standard card lifecycle unless the behavior truly changes shared trial lifecycle semantics.
 
 ## Trial Types
 

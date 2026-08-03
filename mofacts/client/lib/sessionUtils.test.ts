@@ -14,12 +14,19 @@ import {
 import type { SparcControllerDisplay } from '../views/experiment/svelte/services/sparcController';
 
 describe('sessionUtils mapping cleanup', function() {
+  const originalPath = window.location.pathname;
+
+  function setTestPath(pathname: string): void {
+    window.history.replaceState({}, '', pathname);
+  }
+
   beforeEach(function() {
     Session.set('clusterMapping', [2, 1, 0]);
     Session.set('mappingSignature', 'msig_v2_abc123');
   });
 
   afterEach(function() {
+    setTestPath(originalPath);
     Session.set('clusterMapping', '');
     Session.set('mappingSignature', null);
     Session.set('fromInstructions', false);
@@ -54,11 +61,7 @@ describe('sessionUtils mapping cleanup', function() {
   it('clears mapping and signature in the fromInstructions guard branch', function() {
     Session.set('fromInstructions', true);
     // Simulate navigating to /content so the guard branch executes
-    Object.defineProperty(document, 'location', {
-      value: { pathname: '/content' },
-      writable: true,
-      configurable: true,
-    });
+    setTestPath('/content');
 
     sessionCleanUp();
 
@@ -69,11 +72,7 @@ describe('sessionUtils mapping cleanup', function() {
   it('clears mapping and signature in the card bootstrap guard branch', function() {
     Session.set('fromInstructions', false);
     Session.set('contentBootstrapInProgress', true);
-    Object.defineProperty(document, 'location', {
-      value: { pathname: '/content' },
-      writable: true,
-      configurable: true,
-    });
+    setTestPath('/content');
 
     sessionCleanUp();
 
@@ -95,11 +94,7 @@ describe('sessionUtils mapping cleanup', function() {
       currentTdfId: 'tdf-a',
       unitNumber: 2,
     });
-    Object.defineProperty(document, 'location', {
-      value: { pathname: '/content' },
-      writable: true,
-      configurable: true,
-    });
+    setTestPath('/content');
 
     sessionCleanUp();
 
@@ -109,7 +104,7 @@ describe('sessionUtils mapping cleanup', function() {
     expect(Session.get('currentUnitNumber')).to.equal(2);
     expect(Session.get('currentTdfUnit')).to.deep.equal({ unitname: 'Unit 2' });
     expect(Session.get('currentRootTdfId')).to.equal('root-a');
-    expect(Session.get('currentAnswer')).to.equal(undefined);
+    expect(Session.get('currentAnswer')).to.equal('');
     expect(Session.get('filter')).to.equal(USER_ADMIN_DEFAULT_FILTER);
     expect(getCardEntryIntent()).to.equal(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE);
   });
@@ -128,11 +123,7 @@ describe('sessionUtils mapping cleanup', function() {
       TDFId: 'tdf-a',
       launchSource: 'courses',
     });
-    Object.defineProperty(document, 'location', {
-      value: { pathname: '/experimentList' },
-      writable: true,
-      configurable: true,
-    });
+    setTestPath('/experimentList');
 
     sessionCleanUp();
 
@@ -163,6 +154,7 @@ describe('sessionUtils mapping cleanup', function() {
     };
     rememberSparcRuntimeHistoryRecord(historyRecord);
     const display: SparcControllerDisplay = {
+      schema: 'tutorscript-sparc/2.0',
       pageKey: 'doc-a',
       nodes: [],
     };
@@ -174,11 +166,7 @@ describe('sessionUtils mapping cleanup', function() {
       display,
     });
     Session.set('fromInstructions', false);
-    Object.defineProperty(document, 'location', {
-      value: { pathname: '/experimentList' },
-      writable: true,
-      configurable: true,
-    });
+    setTestPath('/experimentList');
 
     sessionCleanUp();
 

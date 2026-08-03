@@ -5,6 +5,7 @@ const { defineConfig } = require("@meteorjs/rspack");
 const sveltePreprocess = require("svelte-preprocess");
 const svelteLoaderPath = require.resolve("./scripts/loaders/svelte-loader-wrapper.cjs");
 const smithyTypesRuntimePath = require.resolve("@smithy/types/dist-cjs/index.js");
+const { rspackClientOutputContract } = require("./scripts/rspackClientOutputContract.cjs");
 
 function getDevServerAllowedHosts() {
   const configuredHosts = String(process.env.MOFACTS_RSPACK_ALLOWED_HOSTS || "")
@@ -22,6 +23,11 @@ function getDevServerAllowedHosts() {
 
 export default defineConfig((Meteor) => {
   return {
+    // The pinned Rspack package serves and injects test/production client
+    // bundles directly. The stable npm config defaults every bundle to
+    // commonjs2, whose final `module.exports` crashes in a browser script.
+    // Keep server output and the established development/HMR path unchanged.
+    ...rspackClientOutputContract(Meteor),
     // Split node_modules into a separate "vendor" chunk for parallel loading
     // and better browser caching (vendor chunk changes less often than app code).
     // Client-only — server must emit a single bundle file.

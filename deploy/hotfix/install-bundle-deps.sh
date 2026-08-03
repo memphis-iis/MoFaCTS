@@ -16,6 +16,10 @@ if [ ! -f "$SERVER_DIR/package.json" ]; then
   exit 1
 fi
 
+test "$(cat "$OUTPUT_ROOT/bundle/.node_version.txt")" = "v24.15.0"
+test "$(node --version)" = "v24.15.0"
+test "$(npm --version)" = "11.12.1"
+
 cd "$SERVER_DIR"
 
 chmod -R u+rwX "$OUTPUT_ROOT/bundle"

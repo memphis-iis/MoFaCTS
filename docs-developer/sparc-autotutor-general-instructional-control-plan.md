@@ -733,7 +733,7 @@ Deployment is blocked until a repository-wide verifier proves:
 - Run `npm run generate:schemas` if authoring fields or schemas change, and inspect generated diffs.
 - Run `npm run typecheck` and `npm run lint` from `mofacts/`.
 - Parse and validate every changed config package in `C:\dev\mofacts_config`.
-- Use the native hotfix app and MoFaCTS Playwright sidecar for the Compound Interest pilot.
+- Use the canonical localhost hotfix server and MoFaCTS Playwright sidecar for the Compound Interest pilot.
 - Inspect browser-visible move traces and console/network errors.
 - Repeat continuation tests on at least one expectation-focused and one misconception-focused session.
 - Assert that discovery finds exactly the expected ten current AutoTutor displays, while reporting any additional display as a migration failure requiring review.

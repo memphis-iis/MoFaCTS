@@ -25,24 +25,18 @@ describe('storageBoundary', function() {
 
   it('fails local storage readiness when a configured directory is missing', async function() {
     const base = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-storage-test-'));
-    const dynamicAssetsPath = path.join(base, 'dynamic-assets');
-    const h5pContentPath = path.join(base, 'h5p-content');
-    const h5pLibrariesPath = path.join(base, 'h5p-libraries-missing');
-    await fs.mkdir(dynamicAssetsPath);
-    await fs.mkdir(h5pContentPath);
+    const dynamicAssetsPath = path.join(base, 'dynamic-assets-missing');
 
     const checks = await validateStorageBoundary({
       storage: {
         backend: 'local',
         local: {
           dynamicAssetsPath,
-          h5pContentPath,
-          h5pLibrariesPath,
         },
       },
     });
 
-    const missingCheck = checks.find((check) => check.name === 'storage.local.h5pLibrariesPath');
+    const missingCheck = checks.find((check) => check.name === 'storage.local.dynamicAssetsPath');
     expect(missingCheck?.status).to.equal('fail');
   });
 

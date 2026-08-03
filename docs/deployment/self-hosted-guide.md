@@ -1,6 +1,6 @@
 # Self-Hosted MoFaCTS Guide
 
-Self-Hosted MoFaCTS runs the app, authenticated MongoDB, Redis, local dynamic assets, and H5P storage on one Docker Compose host. Direct HTTP is for local or LAN evaluation. Public deployments should bind the app to localhost and expose HTTPS through a reverse proxy.
+Self-Hosted MoFaCTS runs the app, authenticated MongoDB, Redis, and local dynamic assets on one Docker Compose host. Direct HTTP is for local or LAN evaluation. Public deployments should bind the app to localhost and expose HTTPS through a reverse proxy.
 
 ## Files
 
@@ -19,7 +19,18 @@ cp .env.self-hosted.example .env.self-hosted
 cp settings.self-hosted.example.json settings.self-hosted.json
 ```
 
-Edit both files. Replace every placeholder, especially passwords, `ROOT_URL`, `MAIL_URL`, `owner`, `emailFrom`, `initRoles.admins`, and `encryptionKey`. `METEOR_SETTINGS_HOST_PATH` must point to the private settings file. The app fails startup when required settings are missing, examples are still present, MongoDB is unauthenticated in the self-hosted path, or Redis is required but unavailable.
+Edit both files. Replace every placeholder, especially passwords, `ROOT_URL`,
+`MAIL_URL`, `owner`, `emailFrom`, `initRoles.admins`, and `encryptionKey`.
+`METEOR_SETTINGS_HOST_PATH` must point to the private settings file. Create the
+private replica-set keyfile named by `MONGO_REPLICA_SET_KEYFILE_HOST_PATH`, and
+make `MONGO_URL` include the same `replicaSet` value as
+`MOFACTS_MONGO_REPLICA_SET_NAME`. The app fails startup when required settings
+are missing, examples are still present, MongoDB is unauthenticated or connected
+to the wrong replica set, or Redis is required but unavailable.
+
+For an existing standalone data volume, follow
+`docs/deployment/mongodb-replica-set-conversion.md` rather than treating normal
+startup as an unreviewed live conversion.
 
 The SPARC OpenRouter sticky-session optimization is disabled by default. An administrator can enable or disable “Improve prompt caching” alongside the global OpenRouter key, model, and reasoning controls in User Admin. The option improves provider-route consistency; provider caching may still happen automatically when it is off. Changes apply to subsequent requests without rebuilding or restarting the server. Follow the telemetry and privacy guidance in `deploy/README.md`.
 
@@ -44,14 +55,13 @@ After startup, sign up with the email configured as `owner` and included in `ini
 Back up all of these together:
 
 - MongoDB data volume.
+- MongoDB replica-set keyfile and database-scoped users/roles.
 - `.env.self-hosted` and private settings JSON.
 - Dynamic assets mounted at `/dynamic-assets`.
-- H5P content mounted at `/h5p-content`.
-- H5P libraries mounted at `/h5p-libraries`.
 - SAML/OAuth certificate or key material when configured.
 - Backup archives stored in `MOFACTS_BACKUP_HOST_PATH`; copy these off-server.
 
-When `storage.backend` is `s3`, object storage replaces the local dynamic asset, H5P content, and H5P library state for new uploads. Back up the bucket or bucket prefix with MongoDB and configuration. Do not switch an existing local-storage install to S3 until existing DynamicAssets and H5P content records have S3 metadata or have been re-imported.
+When `storage.backend` is `s3`, object storage replaces local dynamic-asset storage for new uploads. Back up the bucket or bucket prefix with MongoDB and configuration. Do not switch an existing local-storage install to S3 until existing DynamicAssets records have S3 metadata or have been re-imported.
 
 Redis is required for the completed open-core runtime, but current Redis dashboard-cache lock state is reconstructable from MongoDB and does not need restore.
 

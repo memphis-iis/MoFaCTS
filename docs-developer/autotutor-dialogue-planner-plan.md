@@ -349,7 +349,7 @@ Do not stop after drafting a partial design, adding only types, or implementing 
 - Confirm partial learner answers produce frontier-aligned prompts.
 - Confirm adjacent concepts produce coherent next expectation selection.
 - Use the available MCP/dev test server whenever it helps observe the running AutoTutor behavior. The planner can be tested incrementally at any point; do not wait until every source edit is complete before checking whether the dialogue state, selected target, selected move, and visible tutor response are behaving coherently.
-- For UI/runtime verification, prefer the repository hotfix dev loop and MCP inspection path documented in `AGENTS.md`. This is a behavior check, not a release-confidence substitute.
+- For UI/runtime verification, prefer the canonical localhost hotfix server and MCP inspection path documented in `AGENTS.md`. This is a behavior check, not a release-confidence substitute.
 
 ## Decisions
 

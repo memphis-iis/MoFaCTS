@@ -238,7 +238,7 @@ describe('sparcStateReplay', function() {
 
   it('preserves caller-provided initial state and ignores non-SPARC records', function() {
     const initialState = createEmptySparcReplayState();
-    const state = replaySparcHistory([{ eventType: 'h5p' }], initialState);
+    const state = replaySparcHistory([{ eventType: 'obsolete-component' }], initialState);
 
     assert.equal(state, initialState);
   });

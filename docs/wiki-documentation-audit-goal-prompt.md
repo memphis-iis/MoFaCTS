@@ -120,7 +120,7 @@ Work process:
    - Check whether wiki pages need updates for:
      - learning component manifests and capability boundaries
      - canonical history envelope and `historySchemaVersion`
-     - H5P trial-display contracts
+     - supported trial-display contracts
      - AutoTutor runtime/history behavior
      - learning, assessment, video, and instruction unit boundaries
      - adaptive video/assessment logic

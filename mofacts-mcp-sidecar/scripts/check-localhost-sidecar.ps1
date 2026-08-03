@@ -7,9 +7,9 @@ $ErrorActionPreference = 'Stop'
 
 $sidecarRoot = Split-Path -Parent $PSScriptRoot
 $repoRoot = Resolve-Path (Join-Path $sidecarRoot '..')
-$hotfixUrl = 'http://localhost:3200'
+$localhostUrl = 'http://localhost:3200'
 $mcpUrl = 'http://localhost:8931/mcp'
-$composeArgs = @('-f', 'docker-compose.yml', '-f', 'docker-compose.hotfix-dev.yml')
+$composeArgs = @('-f', 'docker-compose.yml', '-f', 'docker-compose.local-server.yml')
 
 function Test-HttpEndpoint {
   param(
@@ -60,7 +60,7 @@ function Invoke-SidecarCompose {
   }
 }
 
-Write-Host 'MoFaCTS hotfix Playwright MCP check'
+Write-Host 'MoFaCTS canonical localhost Playwright MCP check'
 Write-Host "Repo: $repoRoot"
 Write-Host "Sidecar: $sidecarRoot"
 Write-Host ''
@@ -75,7 +75,7 @@ if ($Restart) {
 
 Write-Host ''
 Write-Host 'HTTP endpoints:'
-Test-HttpEndpoint -Name 'Hotfix app' -Url $hotfixUrl | Format-Table -AutoSize
+Test-HttpEndpoint -Name 'Canonical localhost app' -Url $localhostUrl | Format-Table -AutoSize
 Test-HttpEndpoint -Name 'Playwright MCP' -Url $mcpUrl | Format-Table -AutoSize
 
 Write-Host ''
@@ -93,6 +93,6 @@ Write-Host 'treat it as a Codex tool-exposure/session issue, not as evidence tha
 Write-Host 'MoFaCTS Playwright sidecar is unavailable.'
 Write-Host ''
 Write-Host 'Useful commands:'
-Write-Host '  deploy\hotfix-dev.ps1 start'
+Write-Host '  deploy\hotfix-local.ps1'
 Write-Host '  cd mofacts-mcp-sidecar'
-Write-Host '  docker compose -f docker-compose.yml -f docker-compose.hotfix-dev.yml up --build'
+Write-Host '  docker compose -f docker-compose.yml -f docker-compose.local-server.yml up --build'

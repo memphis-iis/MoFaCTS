@@ -11,6 +11,24 @@ const secretPatterns = [
   { name: 'Mongo URI with credentials', regex: /\bmongodb(?:\+srv)?:\/\/[^/\s:@]+:[^@\s]+@/i },
 ];
 
+const allowedMongoPlaceholderPasswords = new Map([
+  ['deploy/.env.local.example', new Set(['local-app-password'])],
+  ['deploy/.env.self-hosted.example', new Set(['replace-with-url-encoded-app-password'])],
+  ['mofacts-mcp-sidecar/.env.example', new Set(['replace-me'])],
+  ['mofacts-mcp-sidecar/README.md', new Set(['password'])],
+  ['mofacts/server/lib/mongoConnectionValidation.test.ts', new Set(['secret'])],
+]);
+
+function isAllowedMongoPlaceholder(file, line) {
+  const allowedPasswords = allowedMongoPlaceholderPasswords.get(file);
+  if (!allowedPasswords) {
+    return false;
+  }
+
+  const match = line.match(/\bmongodb(?:\+srv)?:\/\/[^/\s:@]+:([^@\s]+)@/i);
+  return match !== null && allowedPasswords.has(match[1]);
+}
+
 function getStagedAdditions() {
   const output = execSync('git diff --cached --unified=0 --no-color', {
     encoding: 'utf8',
@@ -18,10 +36,18 @@ function getStagedAdditions() {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  return output
-    .split('\n')
-    .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
-    .map((line) => line.slice(1));
+  const additions = [];
+  let file = '';
+
+  for (const line of output.split('\n')) {
+    if (line.startsWith('+++ b/')) {
+      file = line.slice('+++ b/'.length).trimEnd();
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      additions.push({ file, line: line.slice(1) });
+    }
+  }
+
+  return additions;
 }
 
 function main() {
@@ -40,10 +66,16 @@ function main() {
 
   const findings = [];
 
-  for (const line of addedLines) {
+  for (const addition of addedLines) {
     for (const pattern of secretPatterns) {
-      if (pattern.regex.test(line)) {
-        findings.push({ pattern: pattern.name, line: line.trim() });
+      if (
+        pattern.regex.test(addition.line)
+        && !(
+          pattern.name === 'Mongo URI with credentials'
+          && isAllowedMongoPlaceholder(addition.file, addition.line)
+        )
+      ) {
+        findings.push({ pattern: pattern.name, line: addition.line.trim() });
       }
     }
   }

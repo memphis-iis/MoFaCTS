@@ -61,7 +61,7 @@ Components do not call `insertHistory` or persistence methods directly.
 
 The component emits compact canonical history records through the app-owned history capability/helper. The app stamps `historySchemaVersion`, validates the common core, enforces extension and wire-size budgets, compresses stable fields, authorizes the write, and persists the row.
 
-Component-specific data belongs only in bounded extension fields such as `CFNote` or `h5p`. Per-trial rows must not include full runtime snapshots, global session state, full experiment state, or unbounded dialogue/history dumps.
+Component-specific data belongs only in approved bounded extension fields such as `CFNote` or `sparc`. Per-trial rows must not include full runtime snapshots, global session state, full experiment state, or unbounded dialogue/history dumps.
 
 ## Server Boundary
 
@@ -79,7 +79,6 @@ Current named method dependencies:
 - `learning-components/units/autotutor/`: AutoTutor unit manifest, runtime capability contracts, end-state semantics, saved state/history validation, generation config, and planning helpers.
 - `learning-components/units/instruction/`: instruction-only unit-engine boundary for authored instruction units.
 - `learning-components/units/video-session/`: minimal video-session unit engine and adaptive video question helpers.
-- `learning-components/trial-displays/h5p/`: H5P display ownership, display config normalization, result normalization, and adapter manifest.
 - `learning-components/samples/echo-unit/`: test-only sample package showing the manifest and package shape.
 
 ## Contributor Checklist
