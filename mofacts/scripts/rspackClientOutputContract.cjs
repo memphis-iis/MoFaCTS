@@ -2,7 +2,7 @@ const CLIENT_LIBRARY_NAME = '__mofactsRspackClient';
 
 function rspackClientOutputContract(Meteor) {
   const requiresInjectedBrowserBundle = Boolean(
-    Meteor?.isClient && (Meteor?.isTest || Meteor?.isProduction),
+    Meteor?.isClient && !Meteor?.isNative,
   );
 
   if (!requiresInjectedBrowserBundle) {

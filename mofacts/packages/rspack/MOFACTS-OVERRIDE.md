@@ -26,11 +26,11 @@ binding. The run executed 29 client checks and then failed with
 markers.
 
 The application now owns the corresponding output correction in
-`rspack.config.js`: injected test/production client bundles use a named browser
-`window` library target, while server output and development/HMR retain their
-existing ownership. The standalone harness tests that mode boundary. This is
-implemented source, not completed qualification evidence; the full Linux suite
-must still pass before Change Streams can advance.
+`rspack.config.js`: every injected web client bundle, including development/HMR,
+uses a named browser `window` library target. Server and native-client output
+retain their existing ownership. The standalone harness tests that mode
+boundary. This is implemented source, not completed qualification evidence; the
+full Linux suite must still pass before Change Streams can advance.
 
 Two later authorized runs exposed the remaining external-resolution boundary.
 Although eager Meteor imports were present in `client-meteor.js`, changing the

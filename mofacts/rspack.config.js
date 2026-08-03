@@ -23,10 +23,10 @@ function getDevServerAllowedHosts() {
 
 export default defineConfig((Meteor) => {
   return {
-    // The pinned Rspack package serves and injects test/production client
-    // bundles directly. The stable npm config defaults every bundle to
-    // commonjs2, whose final `module.exports` crashes in a browser script.
-    // Keep server output and the established development/HMR path unchanged.
+    // The pinned Rspack package serves and injects every web client bundle
+    // directly, including development/HMR. The stable npm config defaults
+    // those bundles to commonjs2, whose final `module.exports` crashes in a
+    // browser script. Keep server and native-client output unchanged.
     ...rspackClientOutputContract(Meteor),
     // Split node_modules into a separate "vendor" chunk for parallel loading
     // and better browser caching (vendor chunk changes less often than app code).

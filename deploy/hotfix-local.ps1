@@ -227,9 +227,9 @@ function Wait-ForMongo {
         param([ValidateSet("root", "app")][string]$CredentialSet)
 
         $mongoCommand = if ($CredentialSet -eq "root") {
-            'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand({ ping: 1 }).ok"'
+            'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval ''db.adminCommand({ ping: 1 }).ok'''
         } else {
-            'mongosh --quiet --username "$MOFACTS_MONGO_APP_USERNAME" --password "$MOFACTS_MONGO_APP_PASSWORD" --authenticationDatabase "$MOFACTS_MONGO_APP_DATABASE" --eval "db.runCommand({ ping: 1 }).ok"'
+            'mongosh --quiet --username "$MOFACTS_MONGO_APP_USERNAME" --password "$MOFACTS_MONGO_APP_PASSWORD" --authenticationDatabase "$MOFACTS_MONGO_APP_DATABASE" --eval ''db.runCommand({ ping: 1 }).ok'''
         }
         $command = @($DockerComposeBinary) + $ComposeArgs + @("exec", "-T", "mongodb", "sh", "-lc", $mongoCommand)
         $commandArgs = $command[1..($command.Length - 1)]
@@ -566,7 +566,8 @@ function Test-TcpPortOpen {
 
 function Test-HotfixDevEndpoints {
     return (Test-HotfixDevAppHealth) -and
-        (Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort))
+        (Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort)) -and
+        (Get-HotfixDevClientBundleState).Ready
 }
 
 function Test-HotfixDevAppHealth {
@@ -579,6 +580,58 @@ function Test-HotfixDevAppHealth {
         return $payload.status -eq "ok"
     } catch {
         return $false
+    }
+}
+
+function Get-HotfixDevClientBundleState {
+    $bundleUrl = "$rootUrl/__rspack__/client-rspack.js"
+    try {
+        $response = Invoke-WebRequest -Uri $bundleUrl -UseBasicParsing -TimeoutSec 10
+        if ($response.StatusCode -ne 200) {
+            return [pscustomobject]@{
+                Ready = $false
+                Reason = "Client bundle returned HTTP $($response.StatusCode)."
+            }
+        }
+
+        $content = [string]$response.Content
+        if ($content.Length -lt 1024 -or $content.Contains("Placeholder until Rspack writes the client bundle")) {
+            return [pscustomobject]@{
+                Ready = $false
+                Reason = "Client bundle is still the generated bootstrap placeholder."
+            }
+        }
+
+        if (-not $content.Contains("./_build/main-dev/client-entry.js")) {
+            return [pscustomobject]@{
+                Ready = $false
+                Reason = "Client bundle does not contain the Hotfix application entry."
+            }
+        }
+
+        if (-not $content.Contains("__mofactsRspackClient")) {
+            return [pscustomobject]@{
+                Ready = $false
+                Reason = "Client bundle is missing the browser-owned output marker."
+            }
+        }
+
+        if ($content -match '(?m)\bmodule\.exports\s*=\s*__webpack_exports__\s*;') {
+            return [pscustomobject]@{
+                Ready = $false
+                Reason = "Client bundle still has the invalid CommonJS browser footer."
+            }
+        }
+
+        return [pscustomobject]@{
+            Ready = $true
+            Reason = "Browser client bundle is executable."
+        }
+    } catch {
+        return [pscustomobject]@{
+            Ready = $false
+            Reason = "Client bundle request failed: $($_.Exception.Message)"
+        }
     }
 }
 
@@ -801,6 +854,11 @@ function Show-HotfixDevStatus {
     Write-Host "URL: $rootUrl"
     Write-Host "App health endpoint ready: $(Test-HotfixDevAppHealth)"
     Write-Host "Rspack HMR port $rspackDevServerPort reachable: $(Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort))"
+    $clientBundleState = Get-HotfixDevClientBundleState
+    Write-Host "Browser client bundle ready: $($clientBundleState.Ready)"
+    if (-not $clientBundleState.Ready) {
+        Write-Host "Browser client bundle issue: $($clientBundleState.Reason)"
+    }
     $activeChangeStreams = Get-ActiveChangeStreamCount -DockerComposeBinary $dockerExe -ComposeArgs $composeArgs
     Write-Host "Active MongoDB Change Streams: $activeChangeStreams"
     Write-Host "Stdout: $stdoutPath"

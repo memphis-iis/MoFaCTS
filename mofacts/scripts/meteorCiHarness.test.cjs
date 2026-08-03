@@ -80,15 +80,19 @@ test('emits injected client bundles with a browser-owned library target', () => 
     rspackClientOutputContract({ isClient: true, isProduction: true }),
     expectedOutput,
   );
+  assert.deepEqual(
+    rspackClientOutputContract({ isClient: true, isDevelopment: true }),
+    expectedOutput,
+  );
 });
 
-test('does not change server or development client output ownership', () => {
+test('does not change server or native client output ownership', () => {
   assert.deepEqual(
     rspackClientOutputContract({ isServer: true, isTest: true }),
     {},
   );
   assert.deepEqual(
-    rspackClientOutputContract({ isClient: true, isDevelopment: true }),
+    rspackClientOutputContract({ isClient: true, isNative: true }),
     {},
   );
 });
@@ -203,6 +207,9 @@ test('enforces one canonical hotfix server on localhost', () => {
   assert.match(hotfixManager, /\$env:METEOR_REACTIVITY_ORDER = "changeStreams,polling"/);
   assert.match(hotfixManager, /-FilePath \$meteorTool\.ToolBat/);
   assert.match(hotfixManager, /"--settings", \$resolvedSettingsPath, "--port", \$port/);
+  assert.match(hotfixManager, /Get-HotfixDevClientBundleState/);
+  assert.match(hotfixManager, /__mofactsRspackClient/);
+  assert.match(hotfixManager, /module\\\.exports\\s\*=\\s\*__webpack_exports__/);
   assert.match(hotfixManager, /assert-change-streams\.sh/);
   assert.equal(fs.existsSync(path.join(deployRoot, 'mongodb/assert-change-streams.js')), true);
   assert.equal(fs.existsSync(path.join(deployRoot, 'mongodb/assert-change-streams.sh')), true);
