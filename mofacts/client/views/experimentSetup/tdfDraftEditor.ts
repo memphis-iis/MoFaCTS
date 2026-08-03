@@ -1,6 +1,7 @@
 import { clientConsole } from '../../lib/clientLogger';
 import { installSchemaApplicabilityControls } from '../../lib/schemaApplicabilityEditor';
 import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
+import { prepareTutorSchemaForJsonEditor } from './tdfDraftSchema';
 
 let cachedSchema: any = null;
 
@@ -152,7 +153,7 @@ export async function createTdfDraftEditor(
   const wrappedSchema = {
     type: 'object',
     properties: {
-      tutor: schema.properties?.tutor || {}
+      tutor: prepareTutorSchemaForJsonEditor(schema.properties?.tutor || {})
     },
     required: ['tutor']
   };
