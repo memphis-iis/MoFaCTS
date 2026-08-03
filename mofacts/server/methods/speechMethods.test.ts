@@ -27,13 +27,13 @@ describe('postGoogleApiJson', function() {
         '{}',
         1000,
         (async () => new Response(
-          '{"error":"request failed for ?key=AIza12345678901234567890"}',
+          '{"error":"request failed for ?key=test-google-api-key"}',
           { status: 403 }
         )) as typeof fetch
       ),
       (error: unknown) => {
         assert.match(String(error), /Google API HTTP 403/);
-        assert.doesNotMatch(String(error), /AIza12345678901234567890/);
+        assert.doesNotMatch(String(error), /test-google-api-key/);
         return true;
       }
     );
