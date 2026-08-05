@@ -50,8 +50,8 @@ systems or architectures.
 
 Repository entry state was re-audited on 2026-07-25. This readiness verdict is
 updated through the local candidate, conversion rehearsal, Phase 4
-qualification, full client/server regression repair, and exact-image smoke
-recorded through 2026-08-03 and is
+qualification, full client/server regression repair, exact-image smoke, and
+the production rollout recorded through 2026-08-05 and is
 about what is present in the current working tree, not merely what this plan
 intends.
 
@@ -73,11 +73,12 @@ intends.
   health smoke provide proportionate evidence for A6. The supported Linux
   Meteor/Playwright run now passes with zero server and client failures; broader
   browser/provider coverage remains ordinary CI and release evidence.
-- **Production release readiness: `NOT READY`.** Production topology, rollback,
-  capacity, Change Streams qualification, and protected runtime facts are not yet accepted.
-  The local Meteor 3.5 candidate evidence is not production authorization.
-- **Change Streams Phase 4 disposition: `ADOPT FOR STAGED PROGRESSION`; no
-  production authorization.** Stable 3.5.0 supports Change Streams and the
+- **Production release: `DEPLOYED`.** The approved Meteor 3.5 image is healthy
+  on the converted one-member `mofacts-rs` production topology. Protected
+  backup, continuity, authentication, resource, history, administration, and
+  runtime checks passed during the 2026-08-05 cutover.
+- **Change Streams: `ENABLED IN PRODUCTION`.** Stable 3.5.0 supports Change
+  Streams and the
   project qualifies `METEOR_REACTIVITY_ORDER=changeStreams,polling`. Across the
   thirteenth and fourteenth Linux invocations, MongoDB reported one active
   qualification `$changeStream`; the supported dotted projection, bounded
@@ -96,8 +97,10 @@ intends.
   The subsequent full-suite repair reduced the 70 client failures to zero. On
   2026-08-03 the supported isolated Linux run completed with 0 server failures,
   883 passing client tests, 7 pending client tests, and 0 client failures.
-  Production remains on polling until Phase 5A and the separately authorized
-  Phase 5B rollout.
+  Phase 5B was separately authorized and deployed on 2026-08-05. Production
+  logged `changeStreams,polling (Change Streams enabled)`, and MongoDB reported
+  8 active `$changeStream` operations. Polling remains second in the driver
+  order as the reviewed configuration recovery path.
 - **Phase 4B canonical localhost runtime: `COMPLETE`.** On
   2026-08-02 the single localhost application instance was started through
   `deploy/hotfix-local.ps1` as the native Meteor/Rspack source watcher. The base
@@ -625,7 +628,7 @@ will recreate the item automatically.
 | Collection metadata: indexes, collection options, validation rules, TTL behavior, and any MongoDB-managed metadata | Equivalent metadata on the target. | Inventory and restore/recreate deliberately; do not infer metadata coverage from a document-only export. | Source/target index and collection-option comparison, startup index checks, query-plan checks for critical paths. |
 | MongoDB root/app identities and roles | Intentionally bootstrapped/verified identities with the same least-privilege application capability. | Do not put secrets in the migration record. The existing shell backup archives the application database, while the Compose bootstrap creates the app user only for a fresh data directory; verify/provision admin and app users separately. | Authenticated app connection, role/privilege review, and a staging Change Streams authorization check. |
 | `MONGO_URL`/`MONGO_URI` consumers: app containers, hotfix/native paths, CI/staging inputs, Compose health/dependency gates, backup/restore tools, operators, and MCP/sidecar/tunnel tooling | Private URI with replica-set seed hosts, the chosen `replicaSet` name, application database, and required `authSource`, or an explicitly designed managed-service/tunnel contract. | Update every consumer in one controlled cutover; remove single-container/single-host assumptions, use resolvable hostnames, and keep credentials private. | Protected configuration inventory; connection and primary-failover tests from every supported runtime path; backup/restore and sidecar proof against the selected target. |
-| Dynamic assets, H5P content/libraries, object-storage data, settings, environment files, and key material | Same associated external state as the selected database snapshot. | Back up/snapshot independently; MongoDB data alone is not sufficient. | Manifest/checksum or storage-snapshot evidence plus asset/H5P smoke tests. |
+| Dynamic assets, uploaded resource files, object-storage data, settings, environment files, and key material | Same associated external state as the selected database snapshot. | Back up/snapshot independently; MongoDB data alone is not sufficient. | Manifest/checksum or storage-snapshot evidence plus asset/resource smoke tests. |
 | Redis coordination state | Reconstructable runtime state, not a data-migration source of truth. | Do not attempt to make it part of MongoDB continuity. | Normal application readiness after restart. |
 | Reactivity implementation | Initially the known fallback; later, validated Change Streams. | Do not couple a topology cutover to a driver change. | Driver/log/metric evidence that the expected fallback or Change Streams path is active. |
 
@@ -747,7 +750,7 @@ retaining learner data in source control or handoff notes:
   replication lag, oplog window, connection/auth status, and backup success;
 - collection/index/collection-option inventories and document-count snapshots;
 - authentication/role checks and representative learner history, model-state,
-  course, content, asset/H5P, audit, and backup-control checks;
+  course, content, asset/resource, audit, and backup-control checks;
 - `/admin/tests`, administrator sign-in, learner launch/response/resume, and
   application logs with no unexpected migration/startup errors.
 
@@ -878,7 +881,7 @@ quantified performance claim.
    private token-storage read so A1 can remove only behavior superseded by the
    documented contract. Document what refresh, two-tab, logout, redirect,
    expired-token and resume behavior depends on it. Cover health,
-   backup/own-history token downloads, H5P, PWA, social
+   backup/own-history token downloads, uploaded resources, PWA, social
    preview, security headers, dynamic assets and SAML GET/POST handler ordering,
    status/HEAD behavior, streaming/backpressure and promise rejection.
    Also regression-test the process-wide Mongo driver unhandled-error policy
@@ -966,7 +969,7 @@ quantified performance claim.
     generated schema diff.
 11. Trace the `learning-components` history envelope and pedagogical consumers
    through the app facade. Verify new/freshly reconnected trials, ordinary versus
-   H5P replay, feedback/model-state, restore and resume preserve each existing
+   uploaded-resource trials, feedback/model-state, restore and resume preserve each existing
    producer-specific `sessionID` meaning. Do not enable DDP resumption until a
    separately approved identity contract defines its effect.
 12. Inventory cron/background jobs, cache/dashboard rebuilds, backups,
@@ -1126,7 +1129,7 @@ the effect of a retained Meteor connection.
 4. Exercise in-flight writes and external side effects during disconnect:
    learner response/history/model state, content saves, account actions,
    uploads, notifications and administrative jobs. Prioritize non-idempotent
-   history inserts (only the H5P path currently has an idempotency key), MTurk
+   history inserts, MTurk
    message/pay/bonus, email/enrollment, package/S3 processing, billed OpenRouter
    calls, password/verification email and backup creation. Verify replay creates
    no duplicate, omission, cross-user action, payment, billable call, message or
@@ -1389,6 +1392,14 @@ download, admin mutation, or learner answer was submitted.
 
 ## Phase 5 — Production Database Acceptance and Optional Change Streams
 
+The production-only execution sequence for the already prepared release is
+maintained in
+`docs-developer/meteor-3.5-production-cutover-steps-4-13.md`. That runbook adds
+the externally served maintenance page, preserves separately authorized gates,
+and records the exact Steps 4-13 cutover order. The Phase 5 contracts below
+remain authoritative; the cutover runbook translates them into operator-sized
+actions.
+
 ### 5A — Production database-platform acceptance with fallback reactivity
 
 **Entry gate:** A6 and Phase 3 are accepted; the in-place conversion rehearsal,
@@ -1396,7 +1407,7 @@ backup/restore, readiness, and runbook are current; the real app/proxy topology
 is represented accurately; and the post-write recovery path is explicit.
 
 1. Verify the topology-grade backup of MongoDB, private
-   settings, environment files, dynamic assets, H5P content/libraries and key
+   settings, environment files, dynamic assets, uploaded resources and key
    material. Record safe source/image/settings identities as required by
    `docs/deployment/upgrade-guide.md`. Lock the exact A6 application artifact
    and its Phase 3 fallback fixed to `polling`.
@@ -1681,11 +1692,11 @@ committed, or pushed without the user's explicit acceptance of that exact risk.
 | Database topology branch | Repository implementation and isolated Docker rehearsal complete | The same disposable MongoDB 8.0 volume was converted from authenticated standalone to `mofacts-rs`; data, collection UUID/options/indexes, app-user authentication, PRIMARY readiness, a real Change Stream event, backup/restore, restart, idempotent initialization, and polling-app startup passed. Every Mongo MCP sidecar variant now consumes an opaque topology-capable URI and rejects a standalone or wrong set without leaking it. This requires no second server and preserves later member expansion or a parallel-target migration. Live conversion and protected production evidence remain separate. |
 | Backup, RPO/RTO and recovery | Required only for an authorized production topology/authority change | Continue source and isolated-staging preparation independently. Define transfer/freeze/forward-recovery details only if the chosen branch moves writer authority. |
 | Change Streams stable-release eligibility | Stable 3.5.0 is eligible for isolated qualification, corrected 2026-08-01 | Official 3.5.0 documentation supports and enables Change Streams by default. The later beta fixes identify targeted crash, fence, projection, and restart risks to test on stable 3.5.0; the beta is not installed. Production adoption depends on the Phase 4 evidence and retains polling rollback. |
-| Change Streams qualification configuration | Phase 4 disposition: **adopt for staged progression**; production remains polling | Local `rspack@1.1.1` is copied exactly from PR #14562 commit `fa20c29abb4ae30fe78facab2819ce4f5c99e588`. The corrected suite proves dotted projections on Change Streams and the actual `filteredUsers` ordered page on polling under `changeStreams,polling`. The thirteenth run found one active qualification stream and passed history-loss, primary-restart, and login-shaped fence recovery. It also found the real Meteor 3 async-handle defect in `filteredUsers`; awaiting `observeChanges` fixed it, and the fourteenth run passed 565 server tests with 12 pending and zero failures. The fourteenth run's manually delayed recovery acknowledgments are not counted as repeated passes. No beta or source backport is required. Phase 5A production-platform acceptance and a separately authorized Phase 5B configuration change remain required. |
+| Change Streams qualification configuration | **Enabled in production on 2026-08-05** | Local `rspack@1.1.1` is copied exactly from PR #14562 commit `fa20c29abb4ae30fe78facab2819ce4f5c99e588`. The corrected suite proves dotted projections on Change Streams and the actual `filteredUsers` ordered page on polling under `changeStreams,polling`. The thirteenth run found one active qualification stream and passed history-loss, primary-restart, and login-shaped fence recovery. It also found the real Meteor 3 async-handle defect in `filteredUsers`; awaiting `observeChanges` fixed it, and the fourteenth run passed 565 server tests with 12 pending and zero failures. Production now reports the qualified driver order and 8 active `$changeStream` operations; polling remains second as the configuration recovery path. |
 | Canonical localhost Change Streams rollout (Phase 4B) | **Complete on 2026-08-02** | The single localhost application instance is the native Meteor/Rspack watcher managed by `deploy/hotfix-local.ps1`; Docker supplies MongoDB and replica-set initialization, not a second application instance. The application is healthy at `localhost:3200` under `changeStreams,polling`, the status gate found active Change Streams, and authenticated login, publication, learner-history, content, learner launch, and admin flows passed without browser errors. This does not authorize Phase 5A or 5B. |
 | Optional capability dispositions | Repository evaluation complete; all independent optionals explicitly dispositioned | Automatic EJSON/DDP allocation changes are part of the stable base without a quantified performance claim. DDP resumption, native async Accounts refactoring, `uws`, async rate matchers, `accounts-express`, and collation are deferred for their named missing need/fix/design evidence; `accounts-2fa` is rejected as out of scope. No optional is partially enabled or blocks Change Streams. |
 | Separate contained-base production rollout (Phase 2C/A7) | **Cancelled by maintainer on 2026-08-02** | It is not a prerequisite. The exact A6 artifact is first deployed with polling inside the authorized Phase 5A maintenance sequence after replica-set readiness. |
-| Database-platform production acceptance | Repository Phase 3 accepted; live conversion not authorized | Phase 5A requires a protected-backup continuity rehearsal and separate production authorization. |
+| Database-platform production acceptance | **Accepted and deployed on 2026-08-05** | The protected backup and restore rehearsal, in-place conversion, continuity checks, authenticated application startup, focused smoke, and recover-forward boundary were completed on the canonical production server and volume. |
 
 **Final classification: `CONTAINED-BASE CANDIDATE IMPLEMENTED; A6 ACCEPTED FOR
 REPOSITORY PROGRESSION`.** E0a and the source-owned D1/A1-A4 candidate work are
