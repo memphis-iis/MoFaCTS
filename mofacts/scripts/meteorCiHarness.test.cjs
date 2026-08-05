@@ -63,6 +63,26 @@ test('pins the source-owned Rspack client-test bridge correction', () => {
   assert.match(provenance, /fa20c29abb4ae30fe78facab2819ce4f5c99e588/);
 });
 
+test('pins the source-owned Meteor DDP session-removal correction', () => {
+  const appRoot = path.resolve(__dirname, '..');
+  const directPackages = fs.readFileSync(path.join(appRoot, '.meteor/packages'), 'utf8');
+  const resolvedVersions = fs.readFileSync(path.join(appRoot, '.meteor/versions'), 'utf8');
+  const packageManifest = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/package.js'), 'utf8');
+  const serverSource = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/livedata_server.js'), 'utf8');
+  const serverTests = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/livedata_server_tests.js'), 'utf8');
+  const provenance = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/MOFACTS-OVERRIDE.md'), 'utf8');
+
+  assert.match(directPackages, /^ddp-server@3\.3\.0$/m);
+  assert.match(resolvedVersions, /^ddp-server@3\.3\.0$/m);
+  assert.match(packageManifest, /version: '3\.3\.0'/);
+  assert.match(serverSource, /session\.messageQueue = null/);
+  assert.match(serverSource, /!existingSession\._expectingDisconnect/);
+  assert.doesNotMatch(serverSource, /Meteor\.defer\(\(\) => \{\s*messageQueue\.forEach/);
+  assert.match(serverTests, /send after session removal is a no-op/);
+  assert.match(provenance, /3f23e5e402cf9091a4515cb94130b6a0a9ced11e/);
+  assert.match(provenance, /14528/);
+});
+
 test('emits injected client bundles with a browser-owned library target', () => {
   const expectedOutput = {
     externalsType: 'commonjs2',

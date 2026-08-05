@@ -16,6 +16,7 @@ export default [
       'mofacts/public/vendor/**',
       // Exact pinned upstream Meteor source; validated by the CI harness.
       'mofacts/packages/rspack/**',
+      'mofacts/packages/ddp-server/**',
       'mofacts/public/build-assets/**',
       'mofacts/public/build-chunks/**',
       'mofacts/private/build-assets/**',

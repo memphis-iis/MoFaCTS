@@ -185,7 +185,7 @@
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,svelte}": [
-      "eslint --ignore-pattern .meteor/** --ignore-pattern public/vendor/** --ignore-pattern packages/rspack/** --fix"
+      "eslint --ignore-pattern .meteor/** --ignore-pattern public/vendor/** --ignore-pattern packages/rspack/** --ignore-pattern packages/ddp-server/** --fix"
     ]
   },
   "author": "",

@@ -29,5 +29,8 @@
     "../learning-components/**/*.ts",
     "../examples/**/*.ts",
     "../packages/**/*.ts"
+  ],
+  "exclude": [
+    "packages/ddp-server/**"
   ]
 }
