@@ -24,6 +24,33 @@ import { themeRegistry } from './lib/themeRegistry';
 // undefined in the webpack bundle due to module loading order.
 const getRoleAssignment = () => (Meteor as any).roleAssignment;
 
+function fieldsWithoutId(document: Record<string, any>) {
+    const { _id, ...fields } = document;
+    return fields;
+}
+
+function normalizePageRequest(page: unknown, limit: unknown, maximumLimit = 200) {
+    const normalizedPage = Number(page);
+    const normalizedLimit = Number(limit);
+    if (!Number.isInteger(normalizedPage) || normalizedPage < 0) return undefined;
+    if (!Number.isInteger(normalizedLimit) || normalizedLimit < 1 || normalizedLimit > maximumLimit) {
+        return undefined;
+    }
+    return { page: normalizedPage, limit: normalizedLimit };
+}
+
+function buildFilteredUsersSelector(filter: unknown) {
+    const normalizedFilter = typeof filter === 'string' ? filter.trim() : '';
+    if (!normalizedFilter) return {};
+    return {
+        $or: [
+            { username: { $regex: normalizedFilter, $options: 'i' } },
+            { email_canonical: { $regex: normalizedFilter, $options: 'i' } },
+            { 'emails.address': { $regex: normalizedFilter, $options: 'i' } },
+        ],
+    };
+}
+
 // Auto-publish the current user's role assignments so client-side
 // minimongo is populated for synchronous role checks in roleUtils.ts.
 Meteor.publish(null, function() {
@@ -56,9 +83,9 @@ export const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
     'content.tdfs.tutor.setspec.openRouterApiKey': 0
 };
 
-// ===== PHASE 3: Paginated Users Publication =====
-// Server-side filtering and pagination for admin-only User Admin page
-// Eliminates O(n²) client-side iteration
+// ===== Admin user-page snapshots =====
+// This is intentionally a non-reactive snapshot publication. Meteor Change
+// Streams cannot represent a moving skip/limit result window without polling.
 Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50) {
     // Security check - must be admin
     if (!this.userId) {
@@ -71,48 +98,35 @@ Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50
         return this.ready();
     }
 
-    // Build query with server-side filtering
-    const query: any = {};
-    if (filter && filter.length > 0) {
-        query.$or = [
-            { username: { $regex: filter, $options: 'i' } },
-            { email_canonical: { $regex: filter, $options: 'i' } },
-            { 'emails.address': { $regex: filter, $options: 'i' } }
-        ];
-    }
+    const pageRequest = normalizePageRequest(page, limit);
+    if (!pageRequest) return this.ready();
+    const query = buildFilteredUsersSelector(filter);
 
     // For admins: also publish all role-assignment docs so the client
     // roleUtils can correctly display and toggle roles for any user.
     // There are only ever a small number of assigned roles so this is cheap.
-    const pagedUsersCursor = Meteor.users.find(query, {
+    const pagedUsers = await (Meteor.users.find(query, {
         fields: { username: 1, email_canonical: 1, emails: 1 },
         sort: { username: 1 },
-        skip: page * limit,
-        limit: limit
-    });
+        skip: pageRequest.page * pageRequest.limit,
+        limit: pageRequest.limit,
+    }) as any).fetchAsync();
 
-    const pagedUsersHandle = await pagedUsersCursor.observeChanges({
-        added: (id: string) => {
-            this.added('filtered_user_page_ids', id, { userId: id });
-        },
-        removed: (id: string) => {
-            this.removed('filtered_user_page_ids', id);
-        }
-    });
-
-    this.onStop(() => {
-        pagedUsersHandle.stop();
-    });
-
-    const cursors: any[] = [
-        pagedUsersCursor
-    ];
-
-    if (isAdmin) {
-        cursors.push(getRoleAssignment().find({}));
+    for (const user of pagedUsers) {
+        this.added('users', user._id, fieldsWithoutId(user));
+        this.added('filtered_user_page_ids', user._id, { userId: user._id });
     }
 
-    return cursors;
+    const roleAssignments = await (getRoleAssignment().find({}) as any).fetchAsync();
+    const roleAssignmentCollectionName = getRoleAssignment()._name;
+    if (typeof roleAssignmentCollectionName !== 'string' || !roleAssignmentCollectionName) {
+        throw new Error('Role assignment collection name is unavailable for the admin snapshot publication');
+    }
+    for (const assignment of roleAssignments) {
+        this.added(roleAssignmentCollectionName, assignment._id, fieldsWithoutId(assignment));
+    }
+
+    this.ready();
 });
 
 // Publish total count for pagination UI
@@ -128,15 +142,7 @@ Meteor.publish('filteredUsersCount', async function(filter = '') {
         return this.ready();
     }
 
-    // Build query with server-side filtering
-    const query: any = {};
-    if (filter && filter.length > 0) {
-        query.$or = [
-            { username: { $regex: filter, $options: 'i' } },
-            { email_canonical: { $regex: filter, $options: 'i' } },
-            { 'emails.address': { $regex: filter, $options: 'i' } }
-        ];
-    }
+    const query = buildFilteredUsersSelector(filter);
 
     // Use Counts package pattern - publish to a virtual collection
     const count = await (Meteor.users.find(query) as any).countAsync();
@@ -662,24 +668,22 @@ Meteor.publish('pagedTdfsListing', async function(page: any = 0, limit: any = 50
         return this.ready();
     }
 
-    const normalizedPage = Number(page);
-    const normalizedLimit = Number(limit);
-    if (!Number.isInteger(normalizedPage) || normalizedPage < 0) {
-        return this.ready();
-    }
-    if (!Number.isInteger(normalizedLimit) || normalizedLimit < 1 || normalizedLimit > 200) {
-        return this.ready();
-    }
+    const pageRequest = normalizePageRequest(page, limit);
+    if (!pageRequest) return this.ready();
 
     const options = {
         fields: TDF_LISTING_FIELDS,
         sort: { 'content.tdfs.tutor.setspec.lessonname': 1, 'content.fileName': 1, _id: 1 },
-        skip: normalizedPage * normalizedLimit,
-        limit: normalizedLimit
+        skip: pageRequest.page * pageRequest.limit,
+        limit: pageRequest.limit
     };
 
     const selector = await tdfPublicationAccess.resolveListingSelector(this.userId);
-    return Tdfs.find(selector, options);
+    const tdfs = await (Tdfs.find(selector, options) as any).fetchAsync();
+    for (const tdf of tdfs) {
+        this.added('tdfs', tdf._id, fieldsWithoutId(tdf));
+    }
+    this.ready();
 });
 
 Meteor.publish('tdfByExperimentTarget', async function(experimentTarget: any) {

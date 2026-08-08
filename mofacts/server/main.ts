@@ -2,6 +2,10 @@ import "../common/Collections";
 import "../common/globalHelpers";
 import "./lib/memphisSaml";
 import "./lib/installMongoDriverUnhandledPolicy";
+import { installStrictMongoReactivity } from './lib/strictMongoReactivity';
+
+installStrictMongoReactivity();
+
 import "./serverComposition";
 import "./publications";
 import "./http/health";

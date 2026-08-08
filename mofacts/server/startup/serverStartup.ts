@@ -346,9 +346,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     `Mongo reactivity ${meteor35Mode.reactivityOrder}` +
     (meteor35Mode.qualificationMode
       ? ' (isolated Change Streams qualification)'
-      : meteor35Mode.changeStreamsEnabled
-        ? ' (Change Streams enabled)'
-        : ''),
+      : ' (Change Streams required)'),
   );
 
   const mongoConnection = await validateMongoConnection(deps.Tdfs.rawDatabase(), process.env);

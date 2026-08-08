@@ -131,25 +131,23 @@ docker compose -p mofacts-cs-qualification --env-file .env.local \
   -f docker-compose.change-streams-qualification.yml config
 ```
 
-The qualification overlay sets both `MOFACTS_CHANGE_STREAMS_ENABLED=true` and
-the test-only `MOFACTS_CHANGE_STREAMS_QUALIFICATION=true`, with the exact driver
-order `changeStreams,polling`. The application rejects that order without the
-enablement gate, rejects qualification unless enablement is also explicit,
-keeps SockJS and disconnect grace zero, and reports the selected qualification
-mode at startup. Polling is retained as
-the intentional driver for ordered or otherwise incompatible observers. Stop
-the isolated project and remove the overlay to restore the normal explicit
-`polling` configuration. Do not add this overlay to a production Compose
-command unless Phase 4 records an adopt decision and the production change is
-separately authorized.
+The qualification overlay sets the test-only
+`MOFACTS_CHANGE_STREAMS_QUALIFICATION=true` flag with the exact driver order
+`changeStreams`. The application rejects polling and all alternate observer
+drivers, keeps SockJS and disconnect grace zero, and reports the selected
+qualification mode at startup. Ordered or otherwise incompatible reactive
+observers are defects: they must be redesigned or made explicitly
+non-reactive, never routed to polling. Do not add this overlay to a production
+Compose command unless the qualification gate passes and the production change
+is separately authorized.
 
 The opt-in client/server regression matrix is exercised by the manually
 triggered `Meteor 3.5 Change Streams qualification` GitHub Actions workflow.
 That workflow installs stable Meteor 3.5, starts a disposable MongoDB 8
 one-member replica set, selects the qualification overlay's exact environment
 contract, and runs the existing supported Linux Meteor/Playwright test path.
-It is intentionally separate from ordinary polling CI because its purpose is
-to produce an adopt/defer result for the optional driver. Triggering the
+It is intentionally separate from ordinary CI because its purpose is to
+exercise fault/restart qualification. Triggering the
 workflow is an explicit test authorization; it does not deploy or modify a
 protected database.
 

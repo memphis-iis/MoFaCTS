@@ -7,6 +7,7 @@ type MongoDatabaseLike = {
 
 export type MongoConnectionValidation = {
   databaseName: string;
+  mongoVersion: string;
   topology: 'replica-set' | 'sharded' | 'standalone';
   authenticated: boolean;
 };
@@ -46,12 +47,22 @@ export async function validateMongoConnection(
   }
 
   await runRedactedCommand(database, { ping: 1 }, 'MongoDB ping');
+  const buildInfo = await runRedactedCommand(database, { buildInfo: 1 }, 'MongoDB version check');
+  const mongoVersion = typeof buildInfo.version === 'string' ? buildInfo.version : 'unknown';
+  const mongoMajorVersion = Number(mongoVersion.split('.', 1)[0]);
+  if (!Number.isInteger(mongoMajorVersion) || mongoMajorVersion < 6) {
+    throw new Error(`connected MongoDB version is ${mongoVersion}; Change Streams require MongoDB 6 or later`);
+  }
+
   const hello = await runRedactedCommand(database, { hello: 1 }, 'MongoDB topology check');
   const topology = hello.msg === 'isdbgrid'
     ? 'sharded'
     : typeof hello.setName === 'string' && hello.setName.length > 0
       ? 'replica-set'
       : 'standalone';
+  if (topology === 'standalone') {
+    throw new Error('connected MongoDB topology is standalone; Change Streams require a replica set or sharded cluster');
+  }
 
   const expectedReplicaSetName = String(env.MOFACTS_MONGO_REPLICA_SET_NAME || '').trim();
   if (expectedReplicaSetName && hello.setName !== expectedReplicaSetName) {
@@ -77,6 +88,7 @@ export async function validateMongoConnection(
 
   return {
     databaseName: actualDatabase,
+    mongoVersion,
     topology,
     authenticated,
   };
@@ -84,5 +96,5 @@ export async function validateMongoConnection(
 
 export function formatMongoConnectionValidation(result: MongoConnectionValidation): string {
   const authentication = result.authenticated ? ', authenticated' : '';
-  return `connected to ${result.databaseName} (${result.topology}${authentication})`;
+  return `connected to ${result.databaseName} (${result.topology}, MongoDB ${result.mongoVersion}${authentication})`;
 }

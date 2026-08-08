@@ -3,6 +3,7 @@ import { formatSettingsValidationIssues, validateOpenCoreSettings } from '../lib
 import { validateStorageBoundary } from '../lib/storageBoundary';
 import { validateBackupConfig } from '../lib/backup/backupConfig';
 import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
+import { getStrictMongoReactivityMetrics } from '../lib/strictMongoReactivity';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -68,6 +69,14 @@ export function createDeploymentReadinessMethods(deps: ReadinessDeps) {
         await check('mongo.connection', async () => {
           const result = await validateMongoConnection(deps.Tdfs.rawDatabase(), process.env);
           return formatMongoConnectionValidation(result);
+        }),
+        await check('mongo.reactivity', async () => {
+          if (process.env.METEOR_REACTIVITY_ORDER !== 'changeStreams') {
+            throw new Error('METEOR_REACTIVITY_ORDER must be changeStreams');
+          }
+          const metrics = getStrictMongoReactivityMetrics();
+          const collectionCount = metrics.collections.length;
+          return `strict Change Streams driver; ${metrics.active} active observer(s) across ${collectionCount} collection(s); ${metrics.rejectedStarts} rejected start(s)`;
         }),
         await check('rootUrl', async () => {
           const rootUrl = String((Meteor.settings as any).ROOT_URL || '').trim();

@@ -54,6 +54,32 @@ jobs:
       - name: Install CI browser
         run: ./node_modules/.bin/playwright install --with-deps chromium
 
+      - name: Start Change Streams test MongoDB
+        working-directory: .
+        run: |
+          docker run -d \
+            --name mofacts-ci-mongodb \
+            --publish 127.0.0.1:27018:27017 \
+            mongo:8.0 \
+            --replSet mofacts-ci-rs \
+            --bind_ip_all
+          for attempt in $(seq 1 60); do
+            if docker exec mofacts-ci-mongodb mongosh --quiet --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'; then
+              break
+            fi
+            test "$attempt" -lt 60
+            sleep 1
+          done
+          docker exec mofacts-ci-mongodb mongosh --quiet --eval \
+            'rs.initiate({_id:"mofacts-ci-rs",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+          for attempt in $(seq 1 60); do
+            if docker exec mofacts-ci-mongodb mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
       - name: Test
         run: npm run test:ci
         env:
@@ -61,11 +87,18 @@ jobs:
           PLAYWRIGHT_BROWSER: chromium
           TEST_RUN_TIMEOUT_MS: 1200000
           TEST_SETTINGS_FILE: settings.ci.json
+          MONGO_URL: mongodb://127.0.0.1:27018/meteor?replicaSet=mofacts-ci-rs&directConnection=true
           EXPECTED_MONGO_DB_NAME: meteor
-          METEOR_REACTIVITY_ORDER: polling
+          MOFACTS_MONGO_REPLICA_SET_NAME: mofacts-ci-rs
+          METEOR_REACTIVITY_ORDER: changeStreams
           DDP_TRANSPORT: sockjs
           MOFACTS_SELF_HOSTED: 'false'
           MOFACTS_REQUIRE_REDIS: 'false'
+
+      - name: Clean up Change Streams test MongoDB
+        if: always()
+        working-directory: .
+        run: docker rm -f mofacts-ci-mongodb 2>/dev/null || true
 
   docker-amd64-smoke:
     needs: lint-and-test
@@ -86,11 +119,11 @@ jobs:
             mofacts-ci:meteor-3.5-amd64 \
             -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.15.0 && test "$(node --version)" = v24.15.0 && test "$(npm --version)" = 11.12.1'
 
-      - name: Boot and health-check application image
+      - name: Reject standalone MongoDB topology
         run: |
-          network=mofacts-ci-amd64
-          mongo=mofacts-ci-mongo-amd64
-          app=mofacts-ci-app-amd64
+          network=mofacts-ci-standalone
+          mongo=mofacts-ci-mongo-standalone
+          app=mofacts-ci-app-standalone
           docker network create "$network"
           docker run -d --name "$mongo" --network "$network" mongo:8.0
           docker run -d \
@@ -100,7 +133,55 @@ jobs:
             --env ROOT_URL=http://localhost:3200 \
             --env MONGO_URL="mongodb://$mongo:27017/MoFACT-meteor3" \
             --env EXPECTED_MONGO_DB_NAME=MoFACT-meteor3 \
-            --env METEOR_REACTIVITY_ORDER=polling \
+            --env METEOR_REACTIVITY_ORDER=changeStreams \
+            --env DDP_TRANSPORT=sockjs \
+            --env METEOR_SETTINGS_FILE=/run/mofacts/settings.json \
+            --env MOFACTS_SELF_HOSTED=false \
+            --env MOFACTS_REQUIRE_REDIS=false \
+            --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
+            mofacts-ci:meteor-3.5-amd64
+          for attempt in $(seq 1 60); do
+            if test "$(docker inspect --format '{{.State.Status}}' "$app")" = exited; then
+              docker logs "$app" | grep -F 'Change Streams require a replica set or sharded cluster'
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$app"
+          exit 1
+
+      - name: Boot and health-check Change Streams application image
+        run: |
+          network=mofacts-ci-amd64
+          mongo=mofacts-ci-mongo-amd64
+          app=mofacts-ci-app-amd64
+          docker network create "$network"
+          docker run -d --name "$mongo" --network "$network" mongo:8.0 --replSet mofacts-ci-rs --bind_ip_all
+          for attempt in $(seq 1 60); do
+            if docker exec "$mongo" mongosh --quiet --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'; then
+              break
+            fi
+            test "$attempt" -lt 60
+            sleep 1
+          done
+          docker exec "$mongo" mongosh --quiet --eval \
+            'rs.initiate({_id:"mofacts-ci-rs",members:[{_id:0,host:"mofacts-ci-mongo-amd64:27017"}]})'
+          for attempt in $(seq 1 60); do
+            if docker exec "$mongo" mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
+              break
+            fi
+            test "$attempt" -lt 60
+            sleep 1
+          done
+          docker run -d \
+            --name "$app" \
+            --network "$network" \
+            --env PORT=3000 \
+            --env ROOT_URL=http://localhost:3200 \
+            --env MONGO_URL="mongodb://$mongo:27017/MoFACT-meteor3?replicaSet=mofacts-ci-rs" \
+            --env EXPECTED_MONGO_DB_NAME=MoFACT-meteor3 \
+            --env MOFACTS_MONGO_REPLICA_SET_NAME=mofacts-ci-rs \
+            --env METEOR_REACTIVITY_ORDER=changeStreams \
             --env DDP_TRANSPORT=sockjs \
             --env METEOR_SETTINGS_FILE=/run/mofacts/settings.json \
             --env MOFACTS_SELF_HOSTED=false \
@@ -120,5 +201,6 @@ jobs:
       - name: Clean up smoke containers
         if: always()
         run: |
-          docker rm -f mofacts-ci-app-amd64 mofacts-ci-mongo-amd64 2>/dev/null || true
+          docker rm -f mofacts-ci-app-amd64 mofacts-ci-mongo-amd64 mofacts-ci-app-standalone mofacts-ci-mongo-standalone 2>/dev/null || true
           docker network rm mofacts-ci-amd64 2>/dev/null || true
+          docker network rm mofacts-ci-standalone 2>/dev/null || true

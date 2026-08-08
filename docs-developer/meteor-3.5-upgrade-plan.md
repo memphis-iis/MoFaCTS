@@ -1,5 +1,10 @@
 # Meteor 3.5 Upgrade and Capability-Adoption Plan
 
+> Superseded for Mongo reactivity: the current implementation contract is
+> `METEOR_REACTIVITY_ORDER=changeStreams` with no polling fallback. See
+> `meteor-3.5-change-streams-final-plan.md`. Historical polling references in
+> this document are retained only as rollout history.
+
 ## Research Basis and Release Identity
 
 This plan was checked against official Meteor, MongoDB, Node.js, npm, and

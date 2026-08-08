@@ -2,8 +2,9 @@
 
 This runbook converts the existing self-hosted MongoDB service and data volume
 to a named one-member replica set. It does not copy data, move writer authority,
-or require a second server. Polling remains the MoFaCTS reactivity driver during
-and after the conversion.
+or require a second server. The replica set is required for MoFaCTS's strict
+Change Streams-only reactive driver contract; polling is not a supported
+application reactivity mode.
 
 A one-member set enables Change Streams and transactions but does not provide
 host redundancy. The configuration deliberately preserves two later options:
@@ -48,7 +49,7 @@ Compose project and execute the conversion there. The rehearsal passes when:
   set rather than standalone or another set;
 - collection counts, users/roles, indexes, collection options, representative
   learner/admin records, and external assets match the protected preflight;
-- the application starts with polling, SockJS, and disconnect grace zero; and
+- the application starts with strict Change Streams, SockJS, and disconnect grace zero; and
 - a fresh destructive restore from the resulting protected backup succeeds.
 
 Do not require multi-server election testing for this one-member outcome. Test
@@ -72,7 +73,7 @@ Restart that same project using only the canonical replica-set definition, wait
 for the initializer, and verify continuity, authentication, a real Change Stream
 event, backup/restore, and restart. The optional
 `docker-compose.rehearsal.yml` overlay removes the fixed production container
-name and binds the isolated polling app to
+name and binds the isolated strict-Change-Streams app to
 `127.0.0.1:${MOFACTS_REHEARSAL_HTTP_BIND:-13200}`. Remove only the exact
 rehearsal project with `down -v --remove-orphans` after recording sanitized
 results. This synthetic rehearsal validates repository mechanics; it does not
@@ -113,8 +114,8 @@ authority changes.
    docker compose --env-file .env.self-hosted -f docker-compose.yml up -d --wait mofacts
    ```
 
-   Confirm startup reports the replica-set topology and authenticated session,
-   while reactivity remains polling. Exercise focused sign-in, learner
+   Confirm startup reports the replica-set topology, authenticated session, and
+   strict Change Streams reactivity. Exercise focused sign-in, learner
    launch/response/resume, content access, and administrator readiness checks.
 7. Reopen traffic and watch MongoDB/app readiness, write errors, and resource
    use. A concrete correctness, authentication, recovery, readiness, or capacity

@@ -185,11 +185,10 @@ jobs:
           MONGO_URL: mongodb://127.0.0.1:27018/meteor?replicaSet=mofacts-ci-rs&directConnection=true
           EXPECTED_MONGO_DB_NAME: meteor
           MOFACTS_MONGO_REPLICA_SET_NAME: mofacts-ci-rs
-          MOFACTS_CHANGE_STREAMS_ENABLED: 'true'
           MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'true'
           MOFACTS_CHANGE_STREAMS_HISTORY_LOSS_MARKER: /tmp/mofacts-change-streams-history-loss-ready
           MOFACTS_CHANGE_STREAMS_PRIMARY_RESTART_MARKER: /tmp/mofacts-change-streams-primary-restart-ready
-          METEOR_REACTIVITY_ORDER: changeStreams,polling
+          METEOR_REACTIVITY_ORDER: changeStreams
           DDP_TRANSPORT: sockjs
           MOFACTS_SELF_HOSTED: 'false'
           MOFACTS_REQUIRE_REDIS: 'false'

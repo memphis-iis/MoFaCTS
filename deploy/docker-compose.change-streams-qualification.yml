@@ -1,6 +1,5 @@
 services:
   mofacts:
     environment:
-      MOFACTS_CHANGE_STREAMS_ENABLED: 'true'
       MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'true'
-      METEOR_REACTIVITY_ORDER: changeStreams,polling
+      METEOR_REACTIVITY_ORDER: changeStreams

@@ -79,7 +79,7 @@ describe('Meteor 3.5 stable Change Streams qualification', function() {
       return;
     }
     enabled = true;
-    expect(status.reactivityOrder).to.equal('changeStreams,polling');
+    expect(status.reactivityOrder).to.equal('changeStreams');
     expect(status.release).to.equal('METEOR@3.5');
     scope = Random.id();
     await callQualificationMethod(CHANGE_STREAMS_QUALIFICATION_METHODS.seed, scope);

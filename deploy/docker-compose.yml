@@ -52,9 +52,8 @@ services:
       MONGO_URL: ${MONGO_URL:?MONGO_URL with MoFaCTS app-user credentials is required}
       EXPECTED_MONGO_DB_NAME: ${EXPECTED_MONGO_DB_NAME:-MoFACT-meteor3}
       MOFACTS_MONGO_REPLICA_SET_NAME: ${MOFACTS_MONGO_REPLICA_SET_NAME:-mofacts-rs}
-      MOFACTS_CHANGE_STREAMS_ENABLED: 'false'
       MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'false'
-      METEOR_REACTIVITY_ORDER: polling
+      METEOR_REACTIVITY_ORDER: changeStreams
       DDP_TRANSPORT: sockjs
       PORT: ${PORT:-3000}
       WAIT_HOSTS: mongodb:27017,redis:6379

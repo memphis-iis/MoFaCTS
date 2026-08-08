@@ -128,6 +128,7 @@ export { getTdfByFileName, getTdfById, getHistoryByTDFID, getStimuliSetById, ser
 // brackets instead of dot notation - that's because we prefer square brackets
 // for creating some MongoDB queries
 let serverVerbosityLevel: LoggingVerbosityLevel = SERVER_VERBOSITY_SETTING.defaultValue;
+let serverVerbosityObserverHandle: { stop(): void } | undefined;
 
 function setServerVerbosityLevel(value: unknown): void {
   serverVerbosityLevel = parseLoggingVerbosityLevel(value);
@@ -1174,8 +1175,19 @@ Meteor.startup(async function() {
     }
   });
 
-  DynamicSettings.find(
+  serverVerbosityObserverHandle?.stop();
+  serverVerbosityObserverHandle = await DynamicSettings.find(
     { _id: SERVER_VERBOSITY_SETTING.id },
     { fields: { value: 1 } },
   ).observeChanges(createServerVerbosityObserverCallbacks(setServerVerbosityLevel));
+  if (!serverVerbosityObserverHandle || typeof serverVerbosityObserverHandle.stop !== 'function') {
+    throw new Error('Server verbosity Change Streams observer did not provide a stop handle');
+  }
 });
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    serverVerbosityObserverHandle?.stop();
+    serverVerbosityObserverHandle = undefined;
+  });
+}

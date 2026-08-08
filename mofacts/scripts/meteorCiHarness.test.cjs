@@ -152,11 +152,12 @@ test('requires explicit acknowledgments for both coordinated recovery actions', 
   assert.match(workflow, /rm -f "\$restart_marker"/);
   assert.match(workflow, /idleCursors:true/);
   assert.match(workflow, /operation\.cursor\?\.originatingCommand/);
-  assert.match(workflow, /MOFACTS_CHANGE_STREAMS_ENABLED: 'true'/);
-  assert.match(serverFixture, /process\.env\.MOFACTS_CHANGE_STREAMS_ENABLED !== 'true'/);
+  assert.doesNotMatch(workflow, /MOFACTS_CHANGE_STREAMS_ENABLED/);
+  assert.doesNotMatch(serverFixture, /MOFACTS_CHANGE_STREAMS_ENABLED/);
+  assert.match(workflow, /METEOR_REACTIVITY_ORDER: changeStreams/);
 });
 
-test('qualifies production-shaped projections and the real ordered polling publication', () => {
+test('qualifies production-shaped projections and the real non-reactive paged publication', () => {
   const appRoot = path.resolve(__dirname, '..');
   const contract = fs.readFileSync(
     path.join(appRoot, 'tests/changeStreamsQualificationContract.ts'),
@@ -180,9 +181,10 @@ test('qualifies production-shaped projections and the real ordered polling publi
   assert.doesNotMatch(contract, /orderedPage|nestedObjectProjection/);
   assert.doesNotMatch(clientFixture, /ordered limited page|orderedPage/);
   assert.match(serverFixture, /publish_handlers\.filteredUsers/);
-  assert.match(serverFixture, /expected polling driver/);
+  assert.match(serverFixture, /non-reactive snapshot/);
   assert.match(serverFixture, /createRoleAsync\('admin', \{ unlessExists: true \}\)/);
-  assert.match(publications, /const pagedUsersHandle = await pagedUsersCursor\.observeChanges/);
+  assert.match(publications, /await \(Meteor\.users\.find\(query/);
+  assert.doesNotMatch(publications, /pagedUsersCursor\.observeChanges/);
 });
 
 test('enforces one canonical hotfix server on localhost', () => {
@@ -213,9 +215,8 @@ test('enforces one canonical hotfix server on localhost', () => {
       /["']3200:3000["']/.test(fs.readFileSync(path.join(deployRoot, fileName), 'utf8')),
     );
 
-  assert.match(baseCompose, /MOFACTS_CHANGE_STREAMS_ENABLED: 'false'/);
   assert.match(baseCompose, /MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'false'/);
-  assert.match(baseCompose, /METEOR_REACTIVITY_ORDER: polling/);
+  assert.match(baseCompose, /METEOR_REACTIVITY_ORDER: changeStreams/);
   assert.doesNotMatch(localCompose, /^\s{2}mofacts:/m);
   assert.deepEqual(composeFilesPublishingLocalhost, []);
   assert.match(hotfixManager, /-f", "docker-compose\.yml"/);
@@ -223,8 +224,8 @@ test('enforces one canonical hotfix server on localhost', () => {
   assert.match(hotfixManager, /config", "--quiet"/);
   assert.match(hotfixManager, /@\("stop", "mofacts"\)/);
   assert.match(hotfixManager, /@\("rm", "-f", "mofacts"\)/);
-  assert.match(hotfixManager, /\$env:MOFACTS_CHANGE_STREAMS_ENABLED = "true"/);
-  assert.match(hotfixManager, /\$env:METEOR_REACTIVITY_ORDER = "changeStreams,polling"/);
+  assert.match(hotfixManager, /Remove-Item Env:MOFACTS_CHANGE_STREAMS_ENABLED/);
+  assert.match(hotfixManager, /\$env:METEOR_REACTIVITY_ORDER = "changeStreams"/);
   assert.match(hotfixManager, /-FilePath \$meteorTool\.ToolBat/);
   assert.match(hotfixManager, /"--settings", \$resolvedSettingsPath, "--port", \$port/);
   assert.match(hotfixManager, /Get-HotfixDevClientBundleState/);
@@ -242,6 +243,7 @@ test('enforces one canonical hotfix server on localhost', () => {
   ]) {
     assert.equal(fs.existsSync(path.join(deployRoot, removedPath)), false, removedPath);
   }
-  assert.match(qualificationCompose, /MOFACTS_CHANGE_STREAMS_ENABLED: 'true'/);
+  assert.doesNotMatch(qualificationCompose, /MOFACTS_CHANGE_STREAMS_ENABLED/);
   assert.match(qualificationCompose, /MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'true'/);
+  assert.match(qualificationCompose, /METEOR_REACTIVITY_ORDER: changeStreams/);
 });

@@ -5,9 +5,8 @@ type MeteorServerWithOptions = {
 };
 
 export type Meteor35RuntimeMode = {
-  changeStreamsEnabled: boolean;
   qualificationMode: boolean;
-  reactivityOrder: 'polling' | 'changeStreams,polling';
+  reactivityOrder: 'changeStreams';
   transport: 'sockjs';
 };
 
@@ -20,15 +19,13 @@ export function inspectMeteor35RuntimeMode(
   env: NodeJS.ProcessEnv = process.env,
 ): { mode?: Meteor35RuntimeMode; issues: Meteor35ContainmentIssue[] } {
   const issues: Meteor35ContainmentIssue[] = [];
-  const changeStreamsSetting = env.MOFACTS_CHANGE_STREAMS_ENABLED;
-  const changeStreamsEnabled = changeStreamsSetting === 'true';
   const qualificationSetting = env.MOFACTS_CHANGE_STREAMS_QUALIFICATION;
   const qualificationMode = qualificationSetting === 'true';
 
-  if (changeStreamsSetting && changeStreamsSetting !== 'true' && changeStreamsSetting !== 'false') {
+  if (env.MOFACTS_CHANGE_STREAMS_ENABLED !== undefined) {
     issues.push({
       path: 'MOFACTS_CHANGE_STREAMS_ENABLED',
-      message: 'must be true, false, or unset',
+      message: 'is obsolete; Change Streams are required for every MoFaCTS process',
     });
   }
 
@@ -39,20 +36,10 @@ export function inspectMeteor35RuntimeMode(
     });
   }
 
-  if (qualificationMode && !changeStreamsEnabled) {
-    issues.push({
-      path: 'MOFACTS_CHANGE_STREAMS_ENABLED',
-      message: 'must be true when Change Streams qualification is enabled',
-    });
-  }
-
-  const expectedReactivityOrder = changeStreamsEnabled ? 'changeStreams,polling' : 'polling';
-  if (env.METEOR_REACTIVITY_ORDER !== expectedReactivityOrder) {
+  if (env.METEOR_REACTIVITY_ORDER !== 'changeStreams') {
     issues.push({
       path: 'METEOR_REACTIVITY_ORDER',
-      message: changeStreamsEnabled
-        ? 'must be changeStreams,polling when Change Streams are enabled'
-        : 'must be polling unless Change Streams are explicitly enabled',
+      message: 'must be changeStreams; polling and all alternate drivers are prohibited',
     });
   }
   if (env.DDP_TRANSPORT !== 'sockjs') {
@@ -68,9 +55,8 @@ export function inspectMeteor35RuntimeMode(
 
   return {
     mode: {
-      changeStreamsEnabled,
       qualificationMode,
-      reactivityOrder: expectedReactivityOrder,
+      reactivityOrder: 'changeStreams',
       transport: 'sockjs',
     },
     issues,

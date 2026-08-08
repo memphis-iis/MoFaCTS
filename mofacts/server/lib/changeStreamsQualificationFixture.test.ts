@@ -22,9 +22,8 @@ const observerHandles = new Map<string, { stop(): void }>();
 
 function requireQualificationMode() {
   if (
-    process.env.MOFACTS_CHANGE_STREAMS_ENABLED !== 'true'
-    || process.env.MOFACTS_CHANGE_STREAMS_QUALIFICATION !== 'true'
-    || process.env.METEOR_REACTIVITY_ORDER !== 'changeStreams,polling'
+    process.env.MOFACTS_CHANGE_STREAMS_QUALIFICATION !== 'true'
+    || process.env.METEOR_REACTIVITY_ORDER !== 'changeStreams'
   ) {
     throw new Meteor.Error(
       'qualification-disabled',
@@ -80,8 +79,7 @@ async function waitForQualificationCondition(assertion: () => boolean, timeoutMs
 Meteor.methods({
   [CHANGE_STREAMS_QUALIFICATION_METHODS.status]() {
     return {
-      enabled: process.env.MOFACTS_CHANGE_STREAMS_ENABLED === 'true'
-        && process.env.MOFACTS_CHANGE_STREAMS_QUALIFICATION === 'true',
+      enabled: process.env.MOFACTS_CHANGE_STREAMS_QUALIFICATION === 'true',
       reactivityOrder: process.env.METEOR_REACTIVITY_ORDER || null,
       release: Meteor.release,
     };
@@ -283,9 +281,8 @@ Meteor.publish(CHANGE_STREAMS_QUALIFICATION_PUBLICATIONS.tdfSecretProjection, fu
 });
 
 const describeChangeStreamsQualification = (
-  process.env.MOFACTS_CHANGE_STREAMS_ENABLED === 'true'
-  && process.env.MOFACTS_CHANGE_STREAMS_QUALIFICATION === 'true'
-  && process.env.METEOR_REACTIVITY_ORDER === 'changeStreams,polling'
+  process.env.MOFACTS_CHANGE_STREAMS_QUALIFICATION === 'true'
+  && process.env.METEOR_REACTIVITY_ORDER === 'changeStreams'
 )
   ? describe
   : describe.skip;
@@ -339,14 +336,41 @@ describeChangeStreamsQualification('Meteor 3.5 real publication qualification', 
     }
   });
 
-  it('keeps the real filteredUsers page correct through its expected polling driver', async function() {
+  it('fails closed instead of polling for a skip/limit observer', async function() {
+    const scope = `strict-driver-${Random.id()}`;
+    try {
+      await qualificationCollection.insertAsync({
+        _id: `${scope}-one`,
+        scope,
+        value: 'one',
+        rank: 1,
+        nested: { visible: 'visible-one', secret: 'secret-one' },
+      });
+
+      let error: Error | undefined;
+      try {
+        await qualificationCollection.find({ scope }, { skip: 1, limit: 1 }).observeChanges({
+          added() {},
+        });
+      } catch (caught) {
+        error = caught as Error;
+      }
+
+      expect(error?.message).to.equal(
+        'No Change Streams observer driver is available for this reactive cursor; polling fallback is prohibited',
+      );
+    } finally {
+      await qualificationCollection.removeAsync({ scope });
+    }
+  });
+
+  it('publishes the real filteredUsers page as a non-reactive snapshot', async function() {
     const prefix = `qualification-user-${Random.id()}`;
     const adminId = `${prefix}-admin-id`;
     const ids = [`${prefix}-b-id`, `${prefix}-c-id`, `${prefix}-d-id`];
     const firstId = `${prefix}-a-id`;
     const MeteorUsersAny = Meteor.users as any;
     const seen = new Set<string>();
-    const stopCallbacks: Array<() => void> = [];
 
     try {
       await MeteorUsersAny.insertAsync({
@@ -372,15 +396,8 @@ describeChangeStreamsQualification('Meteor 3.5 real publication qualification', 
         added(collectionName: string, id: string) {
           if (collectionName === 'filtered_user_page_ids') seen.add(id);
         },
-        removed(collectionName: string, id: string) {
-          if (collectionName === 'filtered_user_page_ids') seen.delete(id);
-        },
-        onStop(callback: () => void) {
-          stopCallbacks.push(callback);
-        },
       }, prefix, 0, 2);
 
-      await waitForQualificationCondition(() => seen.size === 2);
       expect([...seen].sort()).to.deep.equal(ids.slice(0, 2).sort());
 
       await MeteorUsersAny.insertAsync({
@@ -389,10 +406,9 @@ describeChangeStreamsQualification('Meteor 3.5 real publication qualification', 
         email_canonical: `${firstId}@example.invalid`,
         emails: [{ address: `${firstId}@example.invalid`, verified: false }],
       });
-      await waitForQualificationCondition(() => seen.has(firstId) && seen.size === 2, 20_000);
-      expect([...seen].sort()).to.deep.equal([firstId, ids[0]].sort());
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect([...seen].sort()).to.deep.equal(ids.slice(0, 2).sort());
     } finally {
-      stopCallbacks.forEach((stop) => stop());
       await Roles.removeUsersFromRolesAsync(adminId, 'admin');
       await MeteorUsersAny.removeAsync({ _id: { $in: [adminId, ...ids, firstId] } });
     }

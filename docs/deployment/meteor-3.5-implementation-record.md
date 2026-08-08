@@ -1,5 +1,9 @@
 # Meteor 3.5 Contained-Base Implementation Record
 
+> Historical record: its polling containment statements describe the earlier
+> rollout state only. The current policy is the strict Change Streams-only
+> contract in `docs-developer/meteor-3.5-change-streams-final-plan.md`.
+
 This record identifies the local contained-base candidate assembled on
 2026-07-30 and the additional verification and qualification preparation
 captured through 2026-08-01. It contains

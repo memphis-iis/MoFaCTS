@@ -760,9 +760,9 @@ function Start-HotfixDev {
         $env:EXPECTED_MONGO_DB_NAME = $expectedMongoDbName
         $env:ROOT_URL = $rootUrl
         $env:PORT = $port
-        $env:MOFACTS_CHANGE_STREAMS_ENABLED = "true"
+        Remove-Item Env:MOFACTS_CHANGE_STREAMS_ENABLED -ErrorAction SilentlyContinue
         $env:MOFACTS_CHANGE_STREAMS_QUALIFICATION = "false"
-        $env:METEOR_REACTIVITY_ORDER = "changeStreams,polling"
+        $env:METEOR_REACTIVITY_ORDER = "changeStreams"
         $env:DDP_TRANSPORT = "sockjs"
         $env:METEOR_INSTALLATION = "$($meteorTool.InstallDir)\"
         $env:PATH = "$($meteorTool.ToolDir);$previousPath"
@@ -799,7 +799,11 @@ function Start-HotfixDev {
         $env:EXPECTED_MONGO_DB_NAME = $previousExpectedMongoDbName
         $env:ROOT_URL = $previousRootUrl
         $env:PORT = $previousPort
-        $env:MOFACTS_CHANGE_STREAMS_ENABLED = $previousChangeStreamsEnabled
+        if ($null -eq $previousChangeStreamsEnabled) {
+            Remove-Item Env:MOFACTS_CHANGE_STREAMS_ENABLED -ErrorAction SilentlyContinue
+        } else {
+            $env:MOFACTS_CHANGE_STREAMS_ENABLED = $previousChangeStreamsEnabled
+        }
         $env:MOFACTS_CHANGE_STREAMS_QUALIFICATION = $previousChangeStreamsQualification
         $env:METEOR_REACTIVITY_ORDER = $previousReactivityOrder
         $env:DDP_TRANSPORT = $previousDdpTransport

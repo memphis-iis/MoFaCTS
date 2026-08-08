@@ -30,11 +30,9 @@ Required environment:
 - `MOFACTS_MONGO_REPLICA_SET_MEMBER`: DNS name and port advertised by the initial member; defaults to `mongodb:27017`. Later members may be added without changing the logical database contract.
 - `MONGO_REPLICA_SET_KEYFILE_HOST_PATH`: private host file containing the shared replica-set member-authentication key. Every future member must receive the same key securely.
 - `MOFACTS_SELF_HOSTED`: set to `true` for the self-hosted production Compose path.
-- `MOFACTS_CHANGE_STREAMS_ENABLED`: the hotfix server running on localhost sets
-  this to `true`; base, staging, and production remain `false` until their own
-  rollout gate.
-- `METEOR_REACTIVITY_ORDER`: must be `changeStreams,polling` when Change Streams
-  are explicitly enabled and `polling` otherwise.
+- `METEOR_REACTIVITY_ORDER`: must be `changeStreams`. MoFaCTS rejects polling
+  and all alternate reactive observer drivers. Incompatible reactive cursors
+  must be redesigned or made explicitly non-reactive.
 - `DDP_TRANSPORT`: must be `sockjs` for the contained Meteor 3.5 base.
 - `REDIS_URL`: Redis connection string when Redis is required.
 - `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD`: Mongo root bootstrap credentials.

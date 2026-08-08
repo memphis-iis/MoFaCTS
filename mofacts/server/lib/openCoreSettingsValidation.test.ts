@@ -51,7 +51,7 @@ const completeEnv = {
   MONGO_URL: validSelfHostedMongoUrl,
   EXPECTED_MONGO_DB_NAME: 'MoFACT-meteor3',
   MOFACTS_MONGO_REPLICA_SET_NAME: 'mofacts-rs',
-  METEOR_REACTIVITY_ORDER: 'polling',
+  METEOR_REACTIVITY_ORDER: 'changeStreams',
   DDP_TRANSPORT: 'sockjs',
   MOFACTS_SELF_HOSTED: 'true',
   REDIS_URL: 'redis://redis:6379/0',
@@ -116,7 +116,7 @@ describe('open-core settings validation', function() {
   it('requires the contained Meteor 3.5 transport and reactivity settings', function() {
     const result = validateOpenCoreSettings(completeSettings, {
       ...completeEnv,
-      METEOR_REACTIVITY_ORDER: 'changeStreams,polling',
+      METEOR_REACTIVITY_ORDER: 'polling',
       DDP_TRANSPORT: 'uws',
     });
     expect(result.ok).to.equal(false);
@@ -127,31 +127,29 @@ describe('open-core settings validation', function() {
   it('accepts the explicit isolated Change Streams qualification settings', function() {
     const result = validateOpenCoreSettings(completeSettings, {
       ...completeEnv,
-      MOFACTS_CHANGE_STREAMS_ENABLED: 'true',
       MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'true',
-      METEOR_REACTIVITY_ORDER: 'changeStreams,polling',
+      METEOR_REACTIVITY_ORDER: 'changeStreams',
     });
     expect(result.ok).to.equal(true);
     expect(result.issues).to.deep.equal([]);
   });
 
-  it('accepts Change Streams outside the test-only qualification mode', function() {
+  it('accepts the normal Change Streams-only mode', function() {
     const result = validateOpenCoreSettings(completeSettings, {
       ...completeEnv,
-      MOFACTS_CHANGE_STREAMS_ENABLED: 'true',
-      METEOR_REACTIVITY_ORDER: 'changeStreams,polling',
+      METEOR_REACTIVITY_ORDER: 'changeStreams',
     });
     expect(result.ok).to.equal(true);
     expect(result.issues).to.deep.equal([]);
   });
 
-  it('rejects a Change Streams enablement gate without the exact driver order', function() {
+  it('rejects the obsolete Change Streams enablement gate', function() {
     const result = validateOpenCoreSettings(completeSettings, {
       ...completeEnv,
       MOFACTS_CHANGE_STREAMS_ENABLED: 'true',
     });
     expect(result.ok).to.equal(false);
-    expect(result.issues.map((issue) => issue.path)).to.include('METEOR_REACTIVITY_ORDER');
+    expect(result.issues.map((issue) => issue.path)).to.include('MOFACTS_CHANGE_STREAMS_ENABLED');
   });
 
   it('requires Redis when open-core Redis is enabled', function() {
