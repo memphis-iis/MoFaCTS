@@ -95,6 +95,8 @@ describe('deploymentReadinessMethods', function() {
     process.env.MONGO_URL = validSelfHostedMongoUrl;
     process.env.EXPECTED_MONGO_DB_NAME = 'MoFACT-meteor3';
     process.env.MOFACTS_MONGO_REPLICA_SET_NAME = 'mofacts-rs';
+    process.env.METEOR_REACTIVITY_ORDER = 'changeStreams';
+    process.env.DDP_TRANSPORT = 'sockjs';
     process.env.MOFACTS_SELF_HOSTED = 'true';
     process.env.REDIS_URL = '';
 
@@ -129,6 +131,9 @@ describe('deploymentReadinessMethods', function() {
         rawDatabase: () => ({
           databaseName: 'MoFACT-meteor3',
           command: async (command: Record<string, unknown>) => {
+            if ('buildInfo' in command) {
+              return { version: '8.0.0' };
+            }
             if ('connectionStatus' in command) {
               return { authInfo: { authenticatedUsers: [{ user: 'app', db: 'MoFACT-meteor3' }] } };
             }
@@ -153,6 +158,7 @@ describe('deploymentReadinessMethods', function() {
       'settings.source',
       'settings.required',
       'mongo.connection',
+      'mongo.reactivity',
       'firstAdmin.account',
       'storage.local.dynamicAssetsPath',
     ]);
