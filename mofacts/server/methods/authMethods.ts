@@ -15,6 +15,10 @@ type MethodContext = {
   unblock?: () => void;
   connection?: { id?: string; clientAddress?: string | null } | null;
 };
+type AccountsPasswordApi = {
+  setPasswordAsync?: (userId: string, newPassword: string) => Promise<unknown>;
+  setPassword?: (userId: string, newPassword: string) => unknown;
+};
 
 type AuthMethodsDeps = {
   serverConsole: Logger;
@@ -105,6 +109,21 @@ function requireCurrentUserId(userId: string | null | undefined, message = 'Must
     throw new Meteor.Error(401, message);
   }
   return normalizedUserId;
+}
+
+async function setPasswordForUser(userId: string, newPassword: string) {
+  const accountsApi = Accounts as unknown as AccountsPasswordApi;
+  if (typeof accountsApi.setPasswordAsync === 'function') {
+    await accountsApi.setPasswordAsync(userId, newPassword);
+    return;
+  }
+
+  if (typeof accountsApi.setPassword === 'function') {
+    accountsApi.setPassword(userId, newPassword);
+    return;
+  }
+
+  throw new Meteor.Error('accounts-set-password-unavailable', 'Server password update API is unavailable');
 }
 
 export function createAuthMethods(deps: AuthMethodsDeps) {
@@ -262,7 +281,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
 
       await deps.PasswordResetTokens.updateAsync({ _id: resetRecord._id }, { $set: { used: true, usedAt: new Date() } });
 
-      Accounts.setPassword(resetRecord.userId, newPassword);
+      await setPasswordForUser(resetRecord.userId, newPassword);
       await deps.enforceCanonicalEmailIdentity(resetRecord.userId, normalizedEmail, {
         actorUserId: this.userId || null,
         source: 'resetPasswordWithToken',
