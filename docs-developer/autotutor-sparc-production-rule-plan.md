@@ -286,6 +286,166 @@ Scoring/evaluation facts
   -> utterance or page-mutation realization
 ```
 
+## Refined architecture conclusion: productions own the active instructional cycle
+
+The target-selection policy should not remain a permanent TypeScript controller that selects a target before productions can run. That design makes the production rules subordinate to an un-authored policy layer: productions can choose only how to act on a focus which was already selected elsewhere.
+
+The intended end state is that the production rules themselves select and continue an instructional cycle. A cycle has an active target, a stage, and a measured change after the learner response. The cycle may be continued, advanced, completed, or interrupted by a higher-need target through ordinary production matching and conflict resolution.
+
+In particular, an unfinished expectation is not passed procedurally from one rule's `then` clause into a special target selector. A firing asserts durable working-memory facts such as the active target and its stage. After the learner responds, evaluation asserts the updated target values and improvement facts. The next rule-evaluation pass sees the resulting facts and decides what is eligible next.
+
+The control loop becomes:
+
+```text
+Initial state or learner response
+  -> assessment produces target-value, goal-distance, and gain facts
+  -> productions select, continue, advance, complete, or interrupt a cycle
+  -> selected instructional move is realized as dialogue, page action, or another modality
+  -> learner response
+  -> repeat
+```
+
+This is a production-system loop, not a target-selection pre-pass followed by a limited move-selection rule set.
+
+### Required instructional facts
+
+The exact serialized schema is an implementation decision, but the rule semantics need the following information.
+
+```ts
+// One fact per currently relevant expectation or misconception.
+{
+  factType: 'pedagogy.candidate',
+  slots: {
+    targetType: 'expectation' | 'misconception',
+    targetId: '...',
+    currentValue: 0.45,
+    goalValue: 0.8,
+    instructionalNeed: 0.35,
+    frontier: 0.7,
+    coherence: 0.8,
+    centrality: 0.6,
+    eligible: true
+  }
+}
+
+// At most one active instructional cycle.
+{
+  factType: 'pedagogy.activeCycle',
+  slots: {
+    targetType: 'expectation',
+    targetId: '...',
+    stage: 'pump' | 'prompt' | 'hint' | 'assertion' | 'correction',
+    priorValue: 0.45,
+    turnCount: 1
+  }
+}
+
+// Produced after the learner response is assessed.
+{
+  factType: 'pedagogy.progress',
+  slots: {
+    targetType: 'expectation',
+    targetId: '...',
+    currentValue: 0.57,
+    gain: 0.12,
+    meaningfulGain: true,
+    goalReached: false
+  }
+}
+```
+
+`frontier`, `coherence`, and `centrality` are inputs to selecting a new expectation candidate. They do not make a target permanently active. The active-cycle and progress facts make the immediately preceding instructional action visible to the next set of productions.
+
+### Use one comparable measure of instructional need
+
+Expectations and misconceptions must not compete using raw, semantically different assessment scores. A misconception score might represent activation while an expectation score represents coverage; comparing `0.70` to `0.45` directly has no instructional meaning.
+
+Each candidate therefore needs a normalized `instructionalNeed`: its distance from the desired state. For example:
+
+```text
+expectation instructional need   = expectation goal coverage - current coverage
+misconception instructional need = current misconception activation - repair goal
+```
+
+The exact goals and normalization must be authored or policy-defined explicitly. Once all candidates use the same direction and scale, rules can make the intended comparison: a misconception whose unresolved need exceeds every eligible expectation's need is eligible to begin a misconception `pump` cycle. This is an interruption decision based on instructional need, not an AutoTutor-only special case or a comparison of unrelated raw scores.
+
+### Natural expectation sequencing
+
+The continuation rules should use the active expectation's prior stage and its observed gain. At a minimum:
+
+```text
+IF the active cycle is an expectation at pump
+AND its progress does not show meaningful gain
+THEN retain that expectation at pump.
+
+IF the active cycle is an expectation at pump
+AND its progress shows meaningful gain
+AND the expectation goal is not reached
+THEN make prompt for that same expectation eligible.
+
+IF the active cycle's expectation goal is reached
+THEN close the cycle and make no continuation move for it eligible.
+```
+
+Equivalent rules can define later `prompt`, `hint`, and `assertion` stages. The important point is that stage transitions depend on the response to the prior move, not on a mechanical move-cycle counter or an external selector deciding that the expectation must remain locked.
+
+The definition of `meaningfulGain` needs to be explicit and stable. It may be a minimum positive change, a reliability-weighted change, or an authored threshold. It must not be inferred ad hoc from whichever rule happens to fire.
+
+### Misconception interruption
+
+Misconceptions should participate in every decision pass, including while an expectation cycle is active. The essential interruption rule is:
+
+```text
+IF an unresolved misconception has instructional need greater than
+the active expectation's instructional need
+AND it is the highest-need eligible candidate overall
+THEN close or suspend the expectation cycle,
+assert an active misconception cycle at pump,
+and make misconception pump eligible.
+```
+
+This rule permits the immediate behavior that the present target-selection layer blocks: a stronger misconception can preempt an unfinished expectation after the learner has just revealed it. It does not require the expectation first to reach its coverage threshold, complete a fixed dialogue cycle, or fail a series of moves.
+
+When the misconception is adequately repaired, productions close that cycle and re-evaluate all candidates. They may return to the prior expectation if it remains the strongest eligible need, but the prior expectation does not receive an unconditional lock.
+
+### Selecting a new focus
+
+When no instructional cycle is active, the rule system must expose every unresolved expectation and misconception as a candidate. A new target is selected from the eligible candidate with the greatest `instructionalNeed`; expectation frontier/coherence/centrality can be part of its candidate priority when multiple expectations are competing.
+
+```text
+IF no active cycle exists
+AND candidate C is eligible
+AND no other eligible candidate has greater instructional need
+THEN assert an active cycle for C at pump.
+```
+
+Ties require a deterministic, inspectable policy, such as explicit authored priority followed by a stable target identifier. Rule salience should order rule families and safety/terminal rules; it should not hide a separate hard-coded target ranking that overrides the candidate facts.
+
+### What is general and what remains dialogue-specific
+
+This architecture is not limited to dialogue. The reusable instructional-control substrate is:
+
+- candidate facts with normalized instructional need;
+- active-cycle and progress facts;
+- production rules that continue, advance, complete, interrupt, or begin a cycle; and
+- explicit conflict resolution and rule-firing history.
+
+AutoTutor-specific policy is the mapping from an eligible cycle stage to a dialogue move such as `pump`, `prompt`, `hint`, `assertion`, or `correction`, plus LLM utterance realization. A SPARC page can use the same target-selection and progression facts while mapping the selected cycle to a node operation, worked example, feedback panel, question, or other authored instructional action.
+
+Consequently, the general rule engine should not contain special cases such as “misconceptions always follow expectations,” “an expectation cannot be interrupted,” or “dialogue stages must run in a fixed cycle.” Those are policies, if desired, that belong in explicit authored productions. The generic engine only needs to evaluate facts, apply rule conditions, resolve explicitly declared conflicts, assert effects, and record why a rule fired.
+
+### Observability requirement
+
+Every instructional decision should leave an auditable record containing:
+
+- the active cycle before the decision, if any;
+- all eligible candidates with their current values, goals, and normalized instructional needs;
+- the prior target value and measured gain;
+- the rule or rules that matched and the rule selected after conflict resolution;
+- the active cycle and instructional move asserted by the firing.
+
+This record is necessary to distinguish an evaluation error from a rule-policy decision. It would make a case such as a learner mentioning genes traceable: the history could show whether the relevant expectation gained credit, whether a misconception was activated, and why the selected rule nevertheless continued or changed the cycle.
+
 This is the route by which SPARC can eventually do AutoTutor.
 
 ## Implementation plan
