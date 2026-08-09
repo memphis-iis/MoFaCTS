@@ -122,6 +122,7 @@ describe('learning-session crowd stats integration', function() {
       normalizeResponseText: (answer) => answer.toLowerCase(),
       legacyFloat: (value) => Number(value),
       log() {},
+      nowMs: 2_000,
     });
 
     expect(result.probability).to.equal(0.5);
