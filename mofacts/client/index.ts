@@ -60,8 +60,8 @@ import './index.html';
 // -- Home / Auth --
 import './views/home/home';
 import './views/home/learningDashboard';
-import './views/home/learningAnalyticsMock/learningAnalyticsMock';
-import { getLearningAnalyticsMockStrings } from './views/home/learningAnalyticsMock/learningAnalyticsMockI18n';
+import './views/home/learningAnalytics/learningAnalytics';
+import { getLearningAnalyticsStrings } from './views/home/learningAnalytics/learningAnalyticsI18n';
 import './views/home/profileDebugToggles';
 import './views/login/signIn';
 import './views/login/signUp';
@@ -103,7 +103,7 @@ const PRACTICE_SHELL_TEMPLATES = new Set([
 
 const HOME_SHELL_TEMPLATES = new Set([
   'home',
-  'learningAnalyticsMock',
+  'learningAnalytics',
 ]);
 
 type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
@@ -871,8 +871,8 @@ Template.registerHelper('appShellTitle', function() {
   if (getAuthenticatedChromeMode() === 'practice') {
     return getPracticeLessonTitle();
   }
-  if (Session.get('currentTemplate') === 'learningAnalyticsMock') {
-    return getLearningAnalyticsMockStrings(getActiveUiLocale()).title;
+  if (Session.get('currentTemplate') === 'learningAnalytics') {
+    return getLearningAnalyticsStrings(getActiveUiLocale()).title;
   }
   const routePresentation = managementRoutePresentation.get();
   if (routePresentation.status === 'idle') {

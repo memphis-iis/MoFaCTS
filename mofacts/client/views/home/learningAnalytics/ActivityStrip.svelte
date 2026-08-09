@@ -4,12 +4,12 @@
     formatInterfaceNumber,
   } from '../../../../common/lib/interfaceFormatting';
   import type { TargetUiLocale } from '../../../../common/lib/interfaceLocales';
-  import type { ActivityDay, ActivityWeekSummary } from './learningAnalyticsMockData';
-  import type { LearningAnalyticsMockStrings } from './learningAnalyticsMockI18n';
-  import { interpolateLearningAnalyticsMockString } from './learningAnalyticsMockI18n';
+  import type { ActivityDay, ActivityWeekSummary } from './learningAnalyticsViewModel';
+  import type { LearningAnalyticsStrings } from './learningAnalyticsI18n';
+  import { interpolateLearningAnalyticsString } from './learningAnalyticsI18n';
 
   export let uiLocale: TargetUiLocale;
-  export let strings: LearningAnalyticsMockStrings;
+  export let strings: LearningAnalyticsStrings;
   export let activity: ActivityDay[];
   export let weeks: ActivityWeekSummary[];
   export let totals: { activeDays: number; attempts: number; activeMinutes: number };
@@ -28,16 +28,16 @@
   function dayDescription(day: ActivityDay): string {
     const date = formatDate(day.date, { dateStyle: 'full' });
     if (activityLevel(day) === 0) {
-      return interpolateLearningAnalyticsMockString(strings.noPractice, { date });
+      return interpolateLearningAnalyticsString(strings.noPractice, { date });
     }
-    return interpolateLearningAnalyticsMockString(strings.practiceDayDescription, {
+    return interpolateLearningAnalyticsString(strings.practiceDayDescription, {
       date,
       attempts: formatInterfaceNumber(uiLocale, day.attempts),
       minutes: formatInterfaceNumber(uiLocale, day.activeMinutes),
     });
   }
 
-  $: summary = interpolateLearningAnalyticsMockString(strings.activitySummary, {
+  $: summary = interpolateLearningAnalyticsString(strings.activitySummary, {
     days: formatInterfaceNumber(uiLocale, totals.activeDays),
     attempts: formatInterfaceNumber(uiLocale, totals.attempts),
     minutes: formatInterfaceNumber(uiLocale, totals.activeMinutes),
@@ -69,33 +69,36 @@
     <li><span class="legend-swatch activity-level-3" aria-hidden="true"></span>{strings.activityLevelHigh}</li>
   </ul>
 
-  <!-- The horizontally scrollable table region must remain keyboard-focusable. -->
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="table-scroll" tabindex="0" role="region" aria-label={strings.activityTableCaption}>
-    <table>
-      <caption>{strings.activityTableCaption}</caption>
-      <thead>
-        <tr>
-          <th scope="col">{strings.week.replace('{number}', '')}</th>
-          <th scope="col">{strings.dateRange}</th>
-          <th scope="col">{strings.practiceDays}</th>
-          <th scope="col">{strings.attempts}</th>
-          <th scope="col">{strings.activeMinutes}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each weeks as week}
+  <details class="activity-details">
+    <summary>{strings.activityTableCaption}</summary>
+    <!-- The horizontally scrollable table region must remain keyboard-focusable. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" tabindex="0" role="region" aria-label={strings.activityTableCaption}>
+      <table>
+        <caption>{strings.activityTableCaption}</caption>
+        <thead>
           <tr>
-            <th scope="row">{interpolateLearningAnalyticsMockString(strings.week, { number: formatInterfaceNumber(uiLocale, week.weekNumber) })}</th>
-            <td>{formatDate(week.startDate, { month: 'short', day: 'numeric' })}–{formatDate(week.endDate, { month: 'short', day: 'numeric' })}</td>
-            <td>{formatInterfaceNumber(uiLocale, week.activeDays)}</td>
-            <td>{formatInterfaceNumber(uiLocale, week.attempts)}</td>
-            <td>{formatInterfaceNumber(uiLocale, week.activeMinutes)}</td>
+            <th scope="col">{strings.week.replace('{number}', '')}</th>
+            <th scope="col">{strings.dateRange}</th>
+            <th scope="col">{strings.practiceDays}</th>
+            <th scope="col">{strings.attempts}</th>
+            <th scope="col">{strings.activeMinutes}</th>
           </tr>
-        {/each}
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          {#each weeks as week}
+            <tr>
+              <th scope="row">{interpolateLearningAnalyticsString(strings.week, { number: formatInterfaceNumber(uiLocale, week.weekNumber) })}</th>
+              <td>{formatDate(week.startDate, { month: 'short', day: 'numeric' })}–{formatDate(week.endDate, { month: 'short', day: 'numeric' })}</td>
+              <td>{formatInterfaceNumber(uiLocale, week.activeDays)}</td>
+              <td>{formatInterfaceNumber(uiLocale, week.attempts)}</td>
+              <td>{formatInterfaceNumber(uiLocale, week.activeMinutes)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  </details>
 </section>
 
 <style>
@@ -126,7 +129,7 @@
 
   .activity-summary {
     color: var(--app-text-color);
-    font-weight: 600;
+    font-weight: var(--app-font-weight-semibold);
   }
 
   .activity-strip {
@@ -191,7 +194,26 @@
   }
 
   .table-scroll {
+    margin-top: var(--app-space-2-px);
     overflow-x: auto;
+    border-radius: var(--app-border-radius-sm);
+  }
+
+  .activity-details {
+    border-top: 1px solid color-mix(in srgb, var(--app-text-color) 11%, transparent);
+    padding-top: var(--app-space-2-px);
+  }
+
+  .activity-details summary {
+    width: fit-content;
+    color: var(--app-primary-action-surface-color);
+    font-weight: var(--app-font-weight-semibold);
+    cursor: pointer;
+  }
+
+  .activity-details summary:focus-visible {
+    outline: 3px solid var(--app-accent-color);
+    outline-offset: 3px;
     border-radius: var(--app-border-radius-sm);
   }
 
@@ -211,7 +233,7 @@
   caption {
     padding: 0 0 var(--app-space-2-px);
     color: var(--app-secondary-text-color);
-    font-weight: 600;
+    font-weight: var(--app-font-weight-semibold);
     text-align: start;
   }
 

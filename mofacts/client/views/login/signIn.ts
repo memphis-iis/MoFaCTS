@@ -17,12 +17,24 @@ import '../../lib/memphisSaml';
 import { translatePlatformString, type TranslationValues } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { resolveProlificExperimentEntry } from '../../lib/prolificExperimentEntry';
+import {
+  DEFAULT_NORMAL_LOGIN_DESTINATION,
+  resolveNormalLoginDestination,
+  type NormalLoginDestination,
+} from '../../lib/normalLoginDestination';
 
 
 import { legacyTrim } from '../../../common/underscoreCompat';
 
 const FlowRouterAny = FlowRouter as any;
 const MeteorAny = Meteor as any;
+
+function routeAfterNormalSignIn(destination: NormalLoginDestination) {
+  if (destination === DEFAULT_NORMAL_LOGIN_DESTINATION) {
+    queueMainMenuReturnTour();
+  }
+  FlowRouter.go(destination);
+}
 
 function authText(key: Parameters<typeof translatePlatformString>[1], values?: TranslationValues): string {
   return translatePlatformString(getActiveUiLocale(), key, values);
@@ -210,6 +222,10 @@ Session.setDefault('memphisSamlEnabled', false);
 Session.setDefault('memphisSamlDisplayName', 'University of Memphis');
 
 Template.signIn.onCreated(function(this: any) {
+  this.normalLoginDestination = resolveNormalLoginDestination(
+    FlowRouterAny?.current?.()?.queryParams?.returnTo
+  );
+
   // CRITICAL: Subscribe to OAuth service configuration for Google/Microsoft login
   // Store subscription handle so we can check if it's ready
   this.oauthConfigSub = this.subscribe('meteor.loginServiceConfiguration');
@@ -264,7 +280,7 @@ Template.signIn.onRendered(async function(this: any) {
       container.style.visibility = 'hidden';
     }
     if(userLoggedIn) {
-      FlowRouter.go("/home");
+      routeAfterNormalSignIn(template.normalLoginDestination);
       return; // Exit early - don't load teachers or do anything else
     }
     return; // Exit early if logging in
@@ -314,8 +330,8 @@ Template.signIn.onRendered(async function(this: any) {
 
       const currentRouteName = getCurrentRouteName();
       if (currentRouteName !== 'client.home') {
-        clientConsole(2, '[SIGNIN] Authenticated user detected on sign-in route, redirecting to /home');
-        FlowRouter.go('/home');
+        clientConsole(2, '[SIGNIN] Authenticated user detected on sign-in route, redirecting after normal sign-in');
+        routeAfterNormalSignIn(template.normalLoginDestination);
       }
       return;
     }
@@ -474,10 +490,8 @@ Template.signIn.events({
       Meteor.logoutOtherClients();
       void meteorCallAsync('recordSessionRevocation', 'logout-other-clients-microsoft');
 
-      // Route to /profile like password login does
-      clientConsole(2, '[MS-LOGIN] Routing to /profile');
-      queueMainMenuReturnTour();
-      FlowRouter.go('/home');
+      clientConsole(2, '[MS-LOGIN] Routing after normal sign-in');
+      routeAfterNormalSignIn(template.normalLoginDestination);
 
     } catch (error) {
       clientConsole(1, '[MS-LOGIN] Login Error:', error);
@@ -551,9 +565,8 @@ Template.signIn.events({
       Meteor.logoutOtherClients();
       void meteorCallAsync('recordSessionRevocation', 'logout-other-clients-memphis-saml');
 
-      clientConsole(2, '[MEMPHIS-SAML] Routing to /home');
-      queueMainMenuReturnTour();
-      FlowRouter.go('/home');
+      clientConsole(2, '[MEMPHIS-SAML] Routing after normal sign-in');
+      routeAfterNormalSignIn(template.normalLoginDestination);
     } catch (error) {
       clientConsole(1, '[MEMPHIS-SAML] Login Error:', error);
       clientConsole(1, '[MEMPHIS-SAML] Error details:', JSON.stringify(error, null, 2));
@@ -675,10 +688,8 @@ Template.signIn.events({
       Meteor.logoutOtherClients();
       void meteorCallAsync('recordSessionRevocation', 'logout-other-clients-google');
 
-      // Route to /profile like password login does
-      clientConsole(2, '[GOOGLE-LOGIN] Routing to /profile');
-      queueMainMenuReturnTour();
-      FlowRouter.go('/home');
+      clientConsole(2, '[GOOGLE-LOGIN] Routing after normal sign-in');
+      routeAfterNormalSignIn(template.normalLoginDestination);
 
     } catch (error) {
       clientConsole(1, '[GOOGLE-LOGIN] Login Error:', error);
@@ -836,7 +847,10 @@ Template.signIn.helpers({
 // Implementation functions
 
 // Called after we have signed in
-async function signInNotify(landingPage: string | false = '/home') {
+async function signInNotify(
+  landingPage?: string | false,
+  normalLoginDestination: NormalLoginDestination = DEFAULT_NORMAL_LOGIN_DESTINATION
+) {
   if (Session.get('debugging')) {
     const currentUser = (Meteor.users.findOne({ _id: Meteor.userId() as string }) as any)?.username;
     clientConsole(2, currentUser + ' was logged in successfully! Current route is ', getCurrentRouteName());
@@ -849,8 +863,12 @@ async function signInNotify(landingPage: string | false = '/home') {
   } catch (error) {
     clientConsole(1, '[AUTH] logoutOtherClients failed after sign-in:', error);
   }
-  if(landingPage) {
-    queueMainMenuReturnTour();
+  if (landingPage === undefined) {
+    routeAfterNormalSignIn(normalLoginDestination);
+  } else if (landingPage) {
+    if (landingPage === DEFAULT_NORMAL_LOGIN_DESTINATION) {
+      queueMainMenuReturnTour();
+    }
     FlowRouter.go(landingPage);
   }
 }
@@ -1170,7 +1188,7 @@ async function userPasswordCheck(template?: any) {
       return;
     }
 
-    signInNotify();
+    signInNotify(undefined, template.normalLoginDestination);
   } catch (error) {
     clientConsole(1, 'Login error: ' + error);
     if (getMeteorErrorCode(error) === 'email-not-verified') {

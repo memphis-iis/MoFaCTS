@@ -30,6 +30,10 @@ import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionCon
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
 import { hasPublicCreatorDisplayName } from './contentCreatorIdentity';
+import {
+  LEARNING_ANALYTICS_DESTINATION,
+  type NormalLoginReturnDestination,
+} from './normalLoginDestination';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const Tdfs: any = (globalThis as any).Tdfs;
 const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
@@ -430,7 +434,7 @@ function handleIndexRoute(controller: any, user: any) {
   renderLayout(controller, 'signIn');
 }
 
-function routeToSignin() {
+function routeToSignin(returnTo?: NormalLoginReturnDestination) {
   // If the isExperiment cookie is set we always for experiment mode. This
   // handles an experimental participant refreshing the browser
   const expCookie = legacyInt(legacyTrim(Cookie.get('isExperiment')));
@@ -455,8 +459,8 @@ function routeToSignin() {
     }
 
     FlowRouter.go(routeParts.join('/'));
-  } else if (loginMode === 'password') {
-    FlowRouter.go('/auth/login');
+  } else if (returnTo) {
+    FlowRouter.go('/auth/login', {}, { returnTo });
   } else { // Normal login mode
     FlowRouter.go('/auth/login');
   }
@@ -581,7 +585,8 @@ function waitForAuthenticatedRoute(
   controller: any,
   routeName: string,
   onReady: (user: any) => void | Promise<void>,
-  policy: RouteAccessPolicy = { requiresAuth: true }
+  policy: RouteAccessPolicy = { requiresAuth: true },
+  signInReturnDestination?: NormalLoginReturnDestination
 ) {
   const managementPolicy = getManagementRoutePolicyByRouteName(routeName);
   if (managementPolicy) {
@@ -650,7 +655,7 @@ function waitForAuthenticatedRoute(
       if (shouldWaitForAuthHydration()) return;
       pendingAuthRouteHandles[routeName]?.stop();
       delete pendingAuthRouteHandles[routeName];
-      routeToSignin();
+      routeToSignin(signInReturnDestination);
     }
   });
 }
@@ -1097,10 +1102,10 @@ FlowRouter.route('/home', {
   },
 });
 
-FlowRouter.route('/learning-analytics-mock', {
-  name: 'client.learningAnalyticsMock',
+FlowRouter.route('/learning-analytics', {
+  name: 'client.learningAnalytics',
   action: function() {
-    waitForAuthenticatedRoute(this, 'client.learningAnalyticsMock', async (readyUser: any) => {
+    waitForAuthenticatedRoute(this, 'client.learningAnalytics', async (readyUser: any) => {
       if (getUserLoginMode(readyUser) === 'experiment') {
         routeToSignin();
         return;
@@ -1109,9 +1114,9 @@ FlowRouter.route('/learning-analytics-mock', {
         FlowRouter.go('/auth/verify-email');
         return;
       }
-      Session.set('curModule', 'learningAnalyticsMock');
-      await renderRouteTemplate(this, 'learningAnalyticsMock');
-    });
+      Session.set('curModule', 'learningAnalytics');
+      await renderRouteTemplate(this, 'learningAnalytics');
+    }, { requiresAuth: true }, LEARNING_ANALYTICS_DESTINATION);
   },
 });
 

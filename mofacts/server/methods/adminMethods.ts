@@ -69,6 +69,7 @@ type AdminMethodsDeps = {
   UserMetrics: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   PasswordResetTokens: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   UserDashboardCache: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
+  LearnerUnitAnalyticsCache: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   UserUploadQuota: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   requireAdminUser: (
     userId: string | null | undefined,
@@ -358,6 +359,7 @@ async function removeUserAdminScopedData(deps: AdminMethodsDeps, targetUserId: s
     deps.UserMetrics.removeAsync({ _id: targetUserId }),
     deps.PasswordResetTokens.removeAsync({ userId: targetUserId }),
     deps.UserDashboardCache.removeAsync({ userId: targetUserId }),
+    deps.LearnerUnitAnalyticsCache.removeAsync({ userId: targetUserId }),
     deps.UserUploadQuota.removeAsync({ userId: targetUserId }),
   ]);
 }

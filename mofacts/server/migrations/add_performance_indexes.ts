@@ -97,6 +97,12 @@ export async function createPerformanceIndexes() {
     serverConsole('  Created: Histories.dashboard_user_type_tdf_recorded_time');
 
     await Histories.rawCollection().createIndex(
+      { userId: 1, TDFId: 1, _id: 1 },
+      { name: 'learner_analytics_user_tdf_history_cursor', background: true }
+    );
+    serverConsole('  Created: Histories.learner_analytics_user_tdf_history_cursor');
+
+    await Histories.rawCollection().createIndex(
       { TDFId: 1, levelUnitType: 1, recordedServerTime: -1 },
       { name: 'perf_TDFId_type_time', background: true }
     );
@@ -373,6 +379,19 @@ export async function createPerformanceIndexes() {
       { name: 'perf_usageSummary_lastActivityDate', background: true }
     );
     serverConsole('  Created: UserDashboardCache.usageSummary.lastActivityDate');
+
+    serverConsole('Creating indexes for LearnerUnitAnalyticsCache collection...');
+    await LearnerUnitAnalyticsCache.rawCollection().createIndex(
+      { userId: 1, rootTdfId: 1, unitIndex: 1 },
+      { name: 'learner_unit_analytics_identity', background: true, unique: true }
+    );
+    serverConsole('  Created: LearnerUnitAnalyticsCache.identity');
+
+    await LearnerUnitAnalyticsCache.rawCollection().createIndex(
+      { calculatedAt: 1 },
+      { name: 'learner_unit_analytics_calculated_at', background: true }
+    );
+    serverConsole('  Created: LearnerUnitAnalyticsCache.calculatedAt');
 
     serverConsole('Creating indexes for CourseLearnerSnapshotCache collection...');
     await CourseLearnerSnapshotCache.rawCollection().createIndex(

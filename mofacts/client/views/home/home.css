@@ -393,6 +393,8 @@
     max-width: min(54vw, 52rem);
     overflow: hidden;
     text-overflow: ellipsis;
+    /* Practice lesson names are contextual chrome, not a second page heading. */
+    font-size: calc(var(--app-font-size-base) * 1.25);
 }
 
 .practice-return-button {

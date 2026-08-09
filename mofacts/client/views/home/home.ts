@@ -74,6 +74,7 @@ type HomeTourStep = {
 };
 
 const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
+  learningAnalyticsButton: '/learning-analytics',
   coursesButton: '/courses',
   contentUploadButton: '/contentUpload',
   classEditButton: '/classEdit',
@@ -90,6 +91,7 @@ const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
 
 const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
   home: '/home',
+  learningAnalytics: '/learning-analytics',
   courses: '/courses',
   contentUpload: '/contentUpload',
   dataDownload: '/dataDownload',
@@ -106,6 +108,7 @@ const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
 
 const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
   home: ['/home', '/'],
+  learningAnalytics: ['/learning-analytics'],
   courses: ['/courses'],
   content: ['/contentUpload', '/contentCreate', '/contentEdit', '/tdfEdit'],
   data: ['/dataDownload'],

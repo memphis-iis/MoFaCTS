@@ -28,7 +28,7 @@ if (typeof underscoreAny.display !== 'function') {
     return val == null ? '' : String(val);
   };
 }
-import { BackupJobs, TdfMutationJobs } from '../common/Collections';
+import { BackupJobs, LearnerUnitAnalyticsCache, TdfMutationJobs } from '../common/Collections';
 import { runServerStartup } from './startup/serverStartup';
 import { createStorageBoundary, getLocalStoragePaths } from './lib/storageBoundary';
 import { createRedisBoundary } from './lib/redisBoundary';
@@ -47,6 +47,7 @@ import { createContentMethods } from './methods/contentMethods';
 import { createCourseMethods } from './methods/courseMethods';
 import type { CourseAssignmentHistoryContext } from '../common/courseAssignments.contracts';
 import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
+import { createLearnerAnalyticsMethods } from './methods/learnerAnalyticsMethods';
 import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
 import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
@@ -353,6 +354,7 @@ const {
   Assignments,
   Histories,
   GlobalExperimentStates,
+  LearnerUnitAnalyticsCache,
   invalidateCourseSnapshotsForCourse,
   invalidateCourseSnapshotsForAssignment,
 });
@@ -466,6 +468,7 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   Sections,
   SectionUserMap,
   UserDashboardCache,
+  LearnerUnitAnalyticsCache,
   usersCollection: MeteorAny.users,
   DynamicSettings,
   decryptData,
@@ -478,6 +481,23 @@ const {
   applyDashboardHistoryRecord,
   ...publicDashboardCacheMethods
 } = dashboardCacheMethods;
+
+const learnerAnalyticsMethods = createLearnerAnalyticsMethods({
+  Meteor,
+  Tdfs,
+  Histories,
+  StimulusCrowdStats,
+  LearnerUnitAnalyticsCache,
+  computePracticeTimeMs,
+  getPracticeDashboardSnapshot: async (context) => (
+    await dashboardCacheMethods.getPracticeDashboardSnapshot.call(context)
+  ),
+  getStimuliSetById,
+  getResponseKCMapForTdf,
+  serverConsole,
+  redisBoundary,
+  now: () => Date.now(),
+});
 
 const analyticsMethods = createAnalyticsMethods({
   serverConsole,
@@ -668,6 +688,7 @@ export const methods: any = {
     UserMetrics,
     PasswordResetTokens,
     UserDashboardCache,
+    LearnerUnitAnalyticsCache,
     UserUploadQuota,
     requireAdminUser,
     normalizeCanonicalEmail,
@@ -1088,6 +1109,7 @@ export const asyncMethods: Record<string, unknown> = {
   ...createOpenRouterCatalogMethods(openRouterModelCatalogService),
 
   ...publicDashboardCacheMethods,
+  ...learnerAnalyticsMethods,
 
   ...createDeploymentReadinessMethods({
     Roles,

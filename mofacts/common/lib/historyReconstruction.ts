@@ -1,6 +1,6 @@
-import { computePracticeTimeMs } from '../../../lib/practiceTime';
-import { isBlankIdentityValue } from '../../../common/historyEnvelope';
-import { normalizeClusterKC } from '../../../../learning-components/runtime/sharedModelPracticeIdentity';
+import { computePracticeTimeMs } from '../../lib/practiceTime';
+import { isBlankIdentityValue } from '../historyEnvelope';
+import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
 
 export type LearningOutcome = 'study' | 'correct' | 'incorrect';
 

@@ -1,8 +1,8 @@
 export type {
   LearningHistoryRecord,
   LearningOutcome,
-} from '../../../../lib/history/historyReconstruction';
+} from '../../../../../common/lib/historyReconstruction';
 
 export {
   reconstructLearningStateFromHistory,
-} from '../../../../lib/history/historyReconstruction';
+} from '../../../../../common/lib/historyReconstruction';

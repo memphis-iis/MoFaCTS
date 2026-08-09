@@ -36,6 +36,10 @@
             <span class="fa fa-play-circle" aria-hidden="true"></span>
             <span>{{t 'home.practice'}}</span>
           </button>
+          <button type="button" class="nav-item {{sidebarActiveClass 'learningAnalytics'}}" data-label="{{t 'home.myLearning'}}" id="learningAnalyticsButton">
+            <span class="fa fa-line-chart" aria-hidden="true"></span>
+            <span>{{t 'home.myLearning'}}</span>
+          </button>
           <button type="button" class="nav-item {{sidebarActiveClass 'courses'}}" data-label="{{t 'home.courses'}}" id="coursesButton">
             <span class="fa fa-list-alt" aria-hidden="true"></span>
             <span>{{t 'home.courses'}}</span>
@@ -202,6 +206,7 @@
     </button>
     <div class="app-practice-menu-panel">
       <button type="button" data-practice-menu-action="home"><span class="fa fa-play-circle" aria-hidden="true"></span> {{t 'home.practice'}}</button>
+      <button type="button" data-practice-menu-action="learningAnalytics"><span class="fa fa-line-chart" aria-hidden="true"></span> {{t 'home.myLearning'}}</button>
       <button type="button" data-practice-menu-action="courses"><span class="fa fa-list-alt" aria-hidden="true"></span> {{t 'home.courses'}}</button>
       <button type="button" data-practice-menu-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> {{t 'home.content'}}</button>
       <button type="button" data-practice-menu-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> {{t 'home.detailedData'}}</button>

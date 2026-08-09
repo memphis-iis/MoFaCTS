@@ -19,7 +19,7 @@ import { displayify } from '../../../common/globalHelpers';
 import { getDisplayAnswerText } from './learnerResponseAssessment';
 import { KC_MULTIPLE } from '../../../common/Definitions';
 import { AdaptiveUnitCoordinator } from '../../../../learning-components/units/shared/AdaptiveUnitCoordinator';
-import { reconstructLearningStateFromHistory } from '../../lib/history/historyReconstruction';
+import { reconstructLearningStateFromHistory } from '../../../common/lib/historyReconstruction';
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 import { createUnitEngineServerMethods } from './unitEngineServerMethods';
 import { callOpenRouterJson } from '../../lib/openRouterClient';
