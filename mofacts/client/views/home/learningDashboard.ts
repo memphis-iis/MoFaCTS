@@ -8,7 +8,6 @@ import {sessionCleanUp} from '../../lib/sessionUtils';
 import {checkUserSession} from '../../lib/userSessionHelpers';
 import { DelayedLoadingVisibility } from '../../lib/delayedLoadingVisibility';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
-import {currentUserHasRole} from '../../lib/roleUtils';
 import {
   setAudioPromptMode, setAudioPromptFeedbackView,
   setAudioEnabledView, setAudioEnabled,
@@ -815,10 +814,7 @@ function configForLessonTable(tdf: any) {
 }
 
 function shouldShowSettingsButton(tdf: any): boolean {
-  if (currentUserHasRole('admin')) {
-    return Boolean(tdf.hasConfigurableSettings);
-  }
-  return Boolean(tdf.hasLearnerConfigurableSettings);
+  return Boolean(tdf.hasConfigurableSettings);
 }
 
 function parseBooleanLike(value: unknown): boolean {
@@ -1231,8 +1227,8 @@ Template.learnerTdfConfigPanel.helpers({
     return getSettingFields(this as LearnerConfigState).length > 0;
   },
 
-  currentUserIsAdmin() {
-    return currentUserHasRole('admin');
+  canResetOwnProgress() {
+    return Boolean(Meteor.userId());
   },
 
   resetProgressButtonLabel() {
@@ -1466,7 +1462,7 @@ Template.learningDashboard.events({
 
     instance.learnerConfigState.set({ ...current, resettingProgress: true, error: null });
     try {
-      const result = await meteorCallAsync('resetAdminLessonProgress', current.tdfId) as {
+      const result = await meteorCallAsync('resetOwnLessonProgress', current.tdfId) as {
         cacheTdfIds?: string[];
       };
       if (!Array.isArray(result?.cacheTdfIds) || result.cacheTdfIds.length === 0) {

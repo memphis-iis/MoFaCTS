@@ -567,8 +567,8 @@
                 </div>
               {{/if}}
               <div class="learner-config-footer">
-                {{#if currentUserIsAdmin}}
-                  <div class="learner-config-admin-reset">
+                {{#if canResetOwnProgress}}
+                  <div class="learner-config-own-progress-reset">
                     {{#if this.resetConfirming}}
                       <button type="button" class="btn btn-sm btn-link learner-config-reset-progress-cancel" disabled="{{#if this.resettingProgress}}disabled{{/if}}">
                         {{t 'dashboard.cancel'}}

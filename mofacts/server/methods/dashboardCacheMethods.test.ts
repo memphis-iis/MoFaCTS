@@ -1276,8 +1276,8 @@ describe('dashboardCacheMethods', function() {
     expect(logs.some((line) => line.includes('Refreshed 12/12 user dashboard caches'))).to.equal(true);
   });
 
-  it('resetAdminLessonProgress clears admin history, experiment state, and root cache stats for a condition family', async function() {
-    const userId = 'admin-1';
+  it('resetOwnLessonProgress clears the learner history, experiment state, and root cache stats for a condition family', async function() {
+    const userId = 'learner-1';
     const docs = {
       root: {
         _id: 'root',
@@ -1305,6 +1305,7 @@ describe('dashboardCacheMethods', function() {
     };
     const removedSelectors: any[] = [];
     const stateRemovedSelectors: any[] = [];
+    const analyticsCacheRemovedSelectors: any[] = [];
     let cacheDoc: any = {
       _id: 'cache-1',
       userId,
@@ -1404,6 +1405,12 @@ describe('dashboardCacheMethods', function() {
         },
         upsertAsync: async () => undefined
       },
+      LearnerUnitAnalyticsCache: {
+        removeAsync: async (selector: any) => {
+          analyticsCacheRemovedSelectors.push(selector);
+          return 1;
+        }
+      },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
@@ -1412,7 +1419,7 @@ describe('dashboardCacheMethods', function() {
       redisBoundary: disabledRedisBoundary
     });
 
-    const result = await methods.resetAdminLessonProgress.call({ userId }, 'root');
+    const result = await methods.resetOwnLessonProgress.call({ userId }, 'root');
 
     expect(result.success).to.equal(true);
     expect(result.cacheTdfIds).to.deep.equal(['root']);
@@ -1424,13 +1431,17 @@ describe('dashboardCacheMethods', function() {
       'condition-a.json',
     ]);
     expect(stateRemovedSelectors[0].$or).to.deep.include({ TDFId: { $in: removedSelectors[0].TDFId.$in } });
+    expect(analyticsCacheRemovedSelectors).to.deep.equal([{
+      userId,
+      rootTdfId: { $in: ['root'] },
+    }]);
     expect(cacheDoc.tdfStats).to.not.have.property('root');
     expect(cacheDoc.tdfStats).to.have.property('other');
     expect(cacheDoc.learnerTdfConfigs).to.have.property('root');
   });
 
-  it('resetAdminLessonProgress fails before deleting history for course-assigned lessons', async function() {
-    const userId = 'admin-1';
+  it('resetOwnLessonProgress fails before deleting history for the learner\'s course-assigned lessons', async function() {
+    const userId = 'learner-1';
     let historyRemoveCalled = false;
     let experimentStateRemoveCalled = false;
     const methods = createDashboardCacheMethods({
@@ -1493,6 +1504,7 @@ describe('dashboardCacheMethods', function() {
         updateAsync: async () => undefined,
         upsertAsync: async () => undefined
       },
+      LearnerUnitAnalyticsCache: { removeAsync: async () => 0 },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
@@ -1502,7 +1514,7 @@ describe('dashboardCacheMethods', function() {
     });
 
     try {
-      await methods.resetAdminLessonProgress.call({ userId }, 'root');
+      await methods.resetOwnLessonProgress.call({ userId }, 'root');
       expect.fail('Expected course-assigned lesson reset to fail');
     } catch (error: any) {
       expect(error.error).to.equal('course-reset-blocked');
@@ -1512,8 +1524,8 @@ describe('dashboardCacheMethods', function() {
     expect(experimentStateRemoveCalled).to.equal(false);
   });
 
-  it('resetAdminLessonProgress remains available when the target user is not enrolled in the assigned course', async function() {
-    const userId = 'admin-1';
+  it('resetOwnLessonProgress remains available when the learner is not enrolled in the assigned course', async function() {
+    const userId = 'learner-1';
     let historyRemoveCalled = false;
     const methods = createDashboardCacheMethods({
       Meteor: {
@@ -1572,6 +1584,7 @@ describe('dashboardCacheMethods', function() {
         updateAsync: async () => undefined,
         upsertAsync: async () => undefined
       },
+      LearnerUnitAnalyticsCache: { removeAsync: async () => 0 },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
@@ -1580,7 +1593,7 @@ describe('dashboardCacheMethods', function() {
       redisBoundary: disabledRedisBoundary
     });
 
-    const result = await methods.resetAdminLessonProgress.call({ userId }, 'root');
+    const result = await methods.resetOwnLessonProgress.call({ userId }, 'root');
 
     expect(result.success).to.equal(true);
     expect(historyRemoveCalled).to.equal(true);

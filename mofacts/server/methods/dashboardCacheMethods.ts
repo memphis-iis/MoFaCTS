@@ -50,6 +50,7 @@ type DashboardCacheDeps = {
   Sections?: any;
   SectionUserMap?: any;
   UserDashboardCache: any;
+  LearnerUnitAnalyticsCache?: any;
   usersCollection: any;
   DynamicSettings: any;
   decryptData?: (value: string) => string;
@@ -292,6 +293,7 @@ export function createDashboardCacheMethods({
   Sections,
   SectionUserMap,
   UserDashboardCache,
+  LearnerUnitAnalyticsCache,
   usersCollection,
   DynamicSettings,
   decryptData,
@@ -827,17 +829,15 @@ export function createDashboardCacheMethods({
       return await methods.initializeDashboardCache.call(this);
     },
 
-    resetAdminLessonProgress: async function(this: any, tdfId: string) {
+    resetOwnLessonProgress: async function(this: any, tdfId: string) {
       if (!this.userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
-
-      const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-      if (!isAdmin) {
-        throw new Meteor.Error('not-authorized', 'Admin only');
-      }
       if (!GlobalExperimentStates) {
         throw new Meteor.Error('server-misconfigured', 'Experiment state collection is unavailable');
+      }
+      if (!LearnerUnitAnalyticsCache) {
+        throw new Meteor.Error('server-misconfigured', 'Learner analytics cache collection is unavailable');
       }
 
       const normalizedTdfId = typeof tdfId === 'string' ? tdfId.trim() : '';
@@ -865,6 +865,10 @@ export function createDashboardCacheMethods({
         ]
       });
       const cacheChanged = await removeLessonProgressFromCache(this.userId, scope.cacheTdfIds);
+      await LearnerUnitAnalyticsCache.removeAsync({
+        userId: this.userId,
+        rootTdfId: { $in: scope.cacheTdfIds },
+      });
 
       return {
         success: true,

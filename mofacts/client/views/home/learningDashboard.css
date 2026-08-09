@@ -945,7 +945,7 @@
     text-align: right;
 }
 
-.learner-config-admin-reset {
+.learner-config-own-progress-reset {
     display: inline-flex;
     align-items: center;
     gap: calc(0.4rem * var(--app-density-scale));
