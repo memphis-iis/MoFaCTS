@@ -19,6 +19,8 @@ import { ExperimentStateStore } from "./state/experimentStateStore";
 import { clearMappingRecordFromSession } from "../views/experiment/svelte/services/mappingRecordService";
 import { clearSparcRuntimeState } from "../views/experiment/svelte/services/sparcRuntimeState";
 import { clearCurrentLearningAttemptId } from "../views/experiment/svelte/services/attemptIdentity";
+import { clearPracticeLaunchMode } from "./practiceLaunchMode";
+import { clearBlocksPracticeGame } from "../views/experiment/svelte/services/blocksPracticeRunState";
 import {
   applySessionCleanupEntries,
   CARD_RUNTIME_SESSION_DEFAULTS,
@@ -136,6 +138,8 @@ function sessionCleanUp() {
   }
 
   resetSharedCardRuntimeState();
+  clearPracticeLaunchMode();
+  clearBlocksPracticeGame();
   clearSparcReplayCachesForCleanup();
   clearCurrentLearningAttemptId();
 

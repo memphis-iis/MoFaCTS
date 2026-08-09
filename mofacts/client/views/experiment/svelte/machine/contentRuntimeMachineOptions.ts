@@ -2,6 +2,7 @@ import * as guards from './guards';
 import * as contentRuntimeMachineActions from './contentRuntimeMachineActions';
 import { createServices } from './services';
 import type { MachineArgs } from './contentRuntimeMachineTypes';
+import * as contentRuntimeMachineTransitionGuards from './contentRuntimeMachineTransitionGuards';
 
 export function getCssDuration(varName: string): number {
   if (typeof window === 'undefined') {
@@ -76,6 +77,7 @@ export const contentRuntimeMachineOptions = {
     didNotTimeout: guards.didNotTimeout,
     hitTimeoutThreshold: guards.hitTimeoutThreshold,
     trialRevealStarted: guards.trialRevealStarted,
+    canRecordTrialReveal: guards.canRecordTrialReveal,
     waitingForTranscription: guards.waitingForTranscription,
     notWaitingForTranscription: guards.notWaitingForTranscription,
     trialDisplaySuppressesStandardTimeout: guards.trialDisplaySuppressesStandardTimeout,
@@ -85,6 +87,8 @@ export const contentRuntimeMachineOptions = {
     unitNotFinished: guards.unitNotFinished,
     canUsePreparedAdvance: guards.canUsePreparedAdvance,
     hasPreparedTrial: guards.hasPreparedTrial,
+    shouldEnterBlocksBoard: contentRuntimeMachineTransitionGuards.shouldEnterBlocksBoard,
+    shouldEnterBlocksBoardFromPreparedAdvance: contentRuntimeMachineTransitionGuards.shouldEnterBlocksBoardFromPreparedAdvance,
 
     // Error guards
     isHardError: guards.isHardError,
@@ -104,6 +108,8 @@ export const contentRuntimeMachineOptions = {
   actions: {
     // Context assignment actions
     initializeSession: contentRuntimeMachineActions.initializeSession,
+    consumeBlocksTray: contentRuntimeMachineActions.consumeBlocksTray,
+    markBlocksTrayReady: contentRuntimeMachineActions.markBlocksTrayReady,
     loadCardData: contentRuntimeMachineActions.loadCardData,
     captureAnswer: contentRuntimeMachineActions.captureAnswer,
     setReviewEntry: contentRuntimeMachineActions.setReviewEntry,

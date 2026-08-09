@@ -99,6 +99,9 @@ export interface ContentRuntimeMachineContext {
   preparedTrial: PreparedAdvanceResult | null;
   incomingPreparationComplete: boolean;
   incomingReady: boolean;
+  practiceLaunchMode: 'normal' | 'blocks';
+  blocksNeedsTray: boolean;
+  blocksTrayGeneration: number;
   videoSession: VideoSessionState;
   timestamps: TrialTimestamps;
 }
@@ -118,6 +121,7 @@ export interface ContentRuntimeMachineEvent extends Record<string, unknown> {
   feedbackText?: string;
   feedbackHtml?: string;
   feedbackSuppressed?: boolean;
+  practiceLaunchMode?: string;
   sparcResult?: SparcControllerResult | null;
   sparcNodeValues?: Record<string, unknown>;
 }
@@ -211,6 +215,9 @@ export const initialContext: ContentRuntimeMachineContext = {
   preparedTrial: null,
   incomingPreparationComplete: false,
   incomingReady: false,
+  practiceLaunchMode: 'normal',
+  blocksNeedsTray: false,
+  blocksTrayGeneration: 0,
   videoSession: {
     isActive: false,
     checkpoints: [],

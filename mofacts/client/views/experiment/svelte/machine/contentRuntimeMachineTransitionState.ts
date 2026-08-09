@@ -191,6 +191,23 @@ export const contentRuntimeMachineTransitionState = {
       on: {
         [EVENTS.TRANSITION_COMPLETE]: [
           {
+            guard: 'shouldEnterBlocksBoardFromPreparedAdvance',
+            target: `#contentRuntimeMachine.${STATES.PRESENTING}.${STATES.BLOCKS_BOARD}`,
+            actions: [
+              'commitPreparedTrialRuntime',
+              commitPreparedTrialToActiveContext,
+              'resetSrState',
+              'resetSrAttempts',
+              'clearErrorMessage',
+              'syncDeliverySettings',
+              'setDisplayNotReady',
+              'setInputNotReady',
+              'clearFeedback',
+              'resetTimers',
+              'logStateTransition',
+            ],
+          },
+          {
             guard: 'hasPreparedTrial',
             target: `#contentRuntimeMachine.${STATES.PRESENTING}.${STATES.DISPLAYING}`,
             actions: [

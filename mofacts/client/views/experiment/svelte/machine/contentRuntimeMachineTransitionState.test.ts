@@ -81,12 +81,18 @@ describe('card machine transition state', function() {
     const transitions = contentRuntimeMachineTransitionState.states.fadingOut.on[EVENTS.TRANSITION_COMPLETE] as Transition[];
 
     expect(transitions[0]!).to.deep.include({
+      target: `#contentRuntimeMachine.${STATES.PRESENTING}.${STATES.BLOCKS_BOARD}`,
+      guard: 'shouldEnterBlocksBoardFromPreparedAdvance',
+    });
+    expect(transitions[0]!.actions).to.include('commitPreparedTrialRuntime');
+    expect(transitions[0]!.actions).to.include('setDisplayNotReady');
+    expect(transitions[1]!).to.deep.include({
       target: `#contentRuntimeMachine.${STATES.PRESENTING}.${STATES.DISPLAYING}`,
       guard: 'hasPreparedTrial',
     });
-    expect(transitions[0]!.actions).to.include('commitPreparedTrialRuntime');
-    expect(transitions[0]!.actions).to.include('setDisplayReady');
-    expect(transitions[1]).to.deep.equal({
+    expect(transitions[1]!.actions).to.include('commitPreparedTrialRuntime');
+    expect(transitions[1]!.actions).to.include('setDisplayReady');
+    expect(transitions[2]).to.deep.equal({
       target: 'clearing',
       actions: ['logStateTransition'],
     });

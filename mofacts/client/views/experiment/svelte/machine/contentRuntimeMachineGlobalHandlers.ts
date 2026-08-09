@@ -11,6 +11,7 @@ export const contentRuntimeMachineGlobalHandlers = {
     actions: storeFeedbackContent,
   },
   [EVENTS.TRIAL_REVEAL_STARTED]: {
+    guard: 'canRecordTrialReveal',
     actions: ['markTrialRevealStart', 'logStateTransition'],
   },
   [EVENTS.SPARC_ACTION]: {

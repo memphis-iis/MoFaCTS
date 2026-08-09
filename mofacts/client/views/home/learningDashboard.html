@@ -250,6 +250,13 @@
                         data-lessonname="{{this.displayName}}"
                         data-currentstimulisetid="{{this.currentStimuliSetId}}"
                         data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.continue'}}</button>
+                      {{#if this.blocksEligible}}
+                        <button class="btn btn-sm btn-outline-primary learning-dashboard-action-button start-blocks"
+                          data-tdfid="{{this.TDFId}}"
+                          data-lessonname="{{this.displayName}}"
+                          data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                          data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.blocks'}}</button>
+                      {{/if}}
                       {{#if showSettingsButton}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
                       {{/if}}
@@ -261,6 +268,13 @@
                         data-lessonname="{{this.displayName}}"
                         data-currentstimulisetid="{{this.currentStimuliSetId}}"
                         data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.start'}}</button>
+                      {{#if this.blocksEligible}}
+                        <button class="btn btn-sm btn-outline-primary learning-dashboard-action-button start-blocks"
+                          data-tdfid="{{this.TDFId}}"
+                          data-lessonname="{{this.displayName}}"
+                          data-currentstimulisetid="{{this.currentStimuliSetId}}"
+                          data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.blocks'}}</button>
+                      {{/if}}
                       {{#if showSettingsButton}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
                       {{/if}}
@@ -422,6 +436,13 @@
             data-ismultitdf="{{this.isMultiTdf}}">
             {{t 'dashboard.continue'}}
           </button>
+          {{#if this.blocksEligible}}
+            <button class="btn btn-sm btn-outline-primary start-blocks learning-dashboard-card-button"
+              data-tdfid="{{this.TDFId}}"
+              data-lessonname="{{this.displayName}}"
+              data-currentstimulisetid="{{this.currentStimuliSetId}}"
+              data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.blocks'}}</button>
+          {{/if}}
           <button class="btn btn-sm btn-primary learning-dashboard-card-button"
             type="button"
             data-bs-toggle="collapse"
@@ -446,6 +467,13 @@
             data-ismultitdf="{{this.isMultiTdf}}">
             {{t 'dashboard.start'}}
           </button>
+          {{#if this.blocksEligible}}
+            <button class="btn btn-sm btn-outline-primary start-blocks learning-dashboard-card-button"
+              data-tdfid="{{this.TDFId}}"
+              data-lessonname="{{this.displayName}}"
+              data-currentstimulisetid="{{this.currentStimuliSetId}}"
+              data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.blocks'}}</button>
+          {{/if}}
           {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
               {{t 'dashboard.settings'}}

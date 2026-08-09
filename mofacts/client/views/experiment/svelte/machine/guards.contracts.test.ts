@@ -19,6 +19,7 @@ import {
   ttsEnabled,
   trialDisplaySuppressesStandardTimeout,
   trialRevealStarted,
+  canRecordTrialReveal,
 } from './guards';
 
 function makeArgs(overrides: { context?: Record<string, unknown>; event?: Record<string, unknown> } = {}) {
@@ -204,6 +205,11 @@ describe('machine guard contracts', function() {
   it('treats a positive trialStart as the response-timeout reveal gate', function() {
     expect(trialRevealStarted(makeArgs({ context: { timestamps: { trialStart: 0 } } }))).to.equal(false);
     expect(trialRevealStarted(makeArgs({ context: { timestamps: { trialStart: 1234 } } }))).to.equal(true);
+  });
+
+  it('does not accept delayed card reveals while Blocks still requires a tray', function() {
+    expect(canRecordTrialReveal(makeArgs({ context: { blocksNeedsTray: true } }))).to.equal(false);
+    expect(canRecordTrialReveal(makeArgs({ context: { blocksNeedsTray: false } }))).to.equal(true);
   });
 
   it('allows prepared advance for schedule and model card sessions', function() {

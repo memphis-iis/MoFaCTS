@@ -46,6 +46,7 @@ import {
   findProfileAvatarIcon,
   type ProfileAvatarType,
 } from '../../../common/profileAvatar';
+import { clearPracticeLaunchMode, setPracticeLaunchMode } from '../../lib/practiceLaunchMode';
 
 declare const Template: any;
 declare const Meteor: any;
@@ -87,7 +88,7 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   resultMessage: null,
 };
 
-const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 3;
+const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 4;
 const PRACTICE_DASHBOARD_SEARCH_VERSION = 1;
 const PRACTICE_TABLE_STATISTICS_PREFERENCE_KEY = 'practiceTableStatisticsExpanded';
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
@@ -1321,6 +1322,25 @@ Template.learningDashboard.events({
     );
   },
 
+  'click .start-blocks': async function(event: any) {
+    event.preventDefault();
+    unlockAppleMobileAudioForUserGesture();
+    const target = $(event.currentTarget);
+    await safeSelectTdf(
+      target.data('tdfid'),
+      target.data('lessonname'),
+      target.data('currentstimulisetid'),
+      null,
+      null,
+      'Blocks from practice menu',
+      target.data('ismultitdf'),
+      null,
+      false,
+      false,
+      'blocks',
+    );
+  },
+
   'click .start-condition-root': async function(this: any, event: any) {
     event.preventDefault();
     unlockAppleMobileAudioForUserGesture();
@@ -1704,6 +1724,7 @@ async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
   try {
     await selectTdf(...args);
   } catch (error) {
+    clearPracticeLaunchMode();
     finishLaunchLoading('practice-launch-failed');
     clientConsole(1, '[LearningDashboard] Lesson launch failed:', error);
     setLessonCommandFeedback(
@@ -1715,13 +1736,15 @@ async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
 }
 
 async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId: any, ignoreOutOfGrammarResponses: any,
-  speechOutOfGrammarFeedback: any, how: any, isMultiTdf: any, setspec: any, isExperiment = false, isOwnerLaunch = false) {
+  speechOutOfGrammarFeedback: any, how: any, isMultiTdf: any, setspec: any, isExperiment = false, isOwnerLaunch = false,
+  practiceLaunchMode: 'normal' | 'blocks' = 'normal') {
 
   startLaunchLoading(dashboardText('dashboard.preparingLesson'), 'practiceMenu');
   markLaunchLoadingTiming('practiceMenuClick', { currentTdfId, lessonName, how, isMultiTdf });
 
   // make sure session variables are cleared from previous tests
   sessionCleanUp();
+  setPracticeLaunchMode(practiceLaunchMode);
   if (isOwnerLaunch) Session.set('ownerDashboardLaunch', true);
 
   let preparedLaunch;
@@ -1755,6 +1778,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
       lastUnitCompleted: launchProgress.lastUnitCompleted,
     });
     setLessonCommandFeedback(String(currentTdfId), dashboardText('dashboard.lessonAlreadyCompleted'), 'warning');
+    clearPracticeLaunchMode();
     finishLaunchLoading('module-completed');
     return;
   }

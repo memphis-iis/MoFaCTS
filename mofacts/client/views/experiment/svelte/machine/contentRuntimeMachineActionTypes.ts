@@ -32,6 +32,8 @@ export type ActionContext = {
   consecutiveTimeouts: number;
   preparedAdvanceMode?: PreparedAdvanceMode;
   preparedTrial?: Record<string, unknown> | null;
+  practiceLaunchMode?: 'normal' | 'blocks';
+  blocksNeedsTray?: boolean;
   source?: string;
   sparcResult?: SparcControllerResult | null;
   sparcNodeValues?: Record<string, unknown>;

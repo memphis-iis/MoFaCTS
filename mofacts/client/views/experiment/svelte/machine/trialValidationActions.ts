@@ -41,6 +41,9 @@ export const applyValidationResult = assign({
 
     return timeoutMs;
   },
+  blocksNeedsTray: ({ context, event }: ActionArgs) => context.practiceLaunchMode === 'blocks'
+    ? event?.output?.isCorrect === true
+    : context.blocksNeedsTray,
 });
 
 export const validateAnswer = assign({

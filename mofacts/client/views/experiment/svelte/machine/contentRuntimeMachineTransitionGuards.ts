@@ -24,6 +24,15 @@ export function activeTrialIsDrillOrTest({ context }: MachineArgs): boolean {
   return isDrillOrTestTrial(context);
 }
 
+export function shouldEnterBlocksBoard({ context }: MachineArgs): boolean {
+  return context.practiceLaunchMode === 'blocks' && context.blocksNeedsTray === true;
+}
+
+export function shouldEnterBlocksBoardFromPreparedAdvance({ context }: MachineArgs): boolean {
+  return shouldEnterBlocksBoard({ context, event: { type: '__machine_internal__' } }) &&
+    Boolean(context.preparedTrial?.currentDisplay);
+}
+
 export function feedbackAdvanceIsReady({ context }: MachineArgs): boolean {
   return isFeedbackAdvanceReady(context);
 }

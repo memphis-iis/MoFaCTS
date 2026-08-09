@@ -180,7 +180,7 @@ describe('dashboardCacheMethods', function() {
 
     const snapshot = await (methods as any).getPracticeDashboardSnapshot.call({ userId });
 
-    expect(snapshot.version).to.equal(3);
+    expect(snapshot.version).to.equal(4);
     expect(snapshot.creators).to.deep.equal([{
       displayName: 'Professor Ada',
       avatarType: 'icon',
@@ -195,6 +195,7 @@ describe('dashboardCacheMethods', function() {
       currentStimuliSetId: 'stim-set-a',
       hasConfigurableSettings: true,
       hasLearnerConfigurableSettings: true,
+      blocksEligible: true,
       isUsed: true
     });
     expect(snapshot.lessons[0].progress).to.include({

@@ -5,6 +5,7 @@ import { clientConsole } from '../../lib/userSessionHelpers';
 import { finishLaunchLoading, markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../lib/launchLoading';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
+import { getPracticeLaunchMode } from '../../lib/practiceLaunchMode';
 import { createBlazeMount } from './svelte/meteorIntegration';
 import './content.html';
 
@@ -44,6 +45,7 @@ Template.content.onRendered(function (this: ContentTemplateInstance) {
         engineIndices: Session.get('engineIndices'),
         experimentTarget: Session.get('experimentTarget'),
         experimentXCond: Session.get('experimentXCond'),
+        practiceLaunchMode: getPracticeLaunchMode(),
       };
     };
     clientConsole(2, '[Content Route] Mounting content surface identity', {

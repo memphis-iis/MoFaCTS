@@ -14,6 +14,8 @@
   import { Session } from 'meteor/session';
   import { Meteor } from 'meteor/meteor';
   import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+  import { clearPracticeLaunchMode } from '../../../../lib/practiceLaunchMode';
+  import { clearBlocksPracticeGame } from '../services/blocksPracticeRunState';
   import { currentUserHasRole } from '../../../../lib/roleUtils';
   import { stopStimDisplayTypeMapVersionSync } from '../../../../lib/stimDisplayTypeMapSync';
   import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
@@ -26,7 +28,7 @@
   } from '../../../../lib/launchLoading';
   import { getDisplayAnswerText } from '../../learnerResponseAssessment';
   import { contentRuntimeMachine } from '../machine/contentRuntimeMachine';
-  import { DEFAULT_DELIVERY_SETTINGS, EVENTS } from '../machine/constants';
+  import { DEFAULT_DELIVERY_SETTINGS, EVENTS, STATES } from '../machine/constants';
   import { initializeContentSurface } from '../services/contentSurfaceInit';
   import { createExperimentState } from '../services/experimentState';
   import {
@@ -129,6 +131,7 @@
   import AutoTutorSession from './AutoTutorSession.svelte';
   import DisplayTimeoutFooter from './DisplayTimeoutFooter.svelte';
   import FlashcardSessionSurface from './FlashcardSessionSurface.svelte';
+  import BlocksSessionSurface from './BlocksSessionSurface.svelte';
   import SparcSessionSurface from './SparcSessionSurface.svelte';
   import VideoSessionSurface from './VideoSessionSurface.svelte';
 
@@ -141,6 +144,9 @@
 
   /** @type {string} TDF ID */
   export let tdfId = '';
+
+  /** Presentation mode chosen by the practice menu. */
+  export let practiceLaunchMode = 'normal';
 
   /** @type {Object} Initial engine indices (optional) */
   export let engineIndices = null;
@@ -220,6 +226,9 @@
       actor.send(event);
     }
   };
+  function handleBlocksTrayComplete() {
+    send({ type: EVENTS.BLOCKS_TRAY_COMPLETE });
+  }
   function adminDiagnosticModeEnabled() {
     return currentUserHasRole('admin');
   }
@@ -524,6 +533,32 @@
   };
   $: showSparcSessionSurface = sessionContentSurface.showSparcSession &&
     flashcardControllerProps.subsetKind !== 'none';
+  $: showBlocksSessionSurface = practiceLaunchMode === 'blocks' && sessionContentSurface.showFlashcardSession;
+  $: blocksBoardActive = state.matches(`presenting.${STATES.BLOCKS_BOARD}`);
+  $: blocksShowDrill = !blocksBoardActive && !state.matches('error');
+  $: blocksTrayGeneration = state.context.blocksTrayGeneration;
+  $: blocksFlashcardProps = {
+    deliverySettings,
+    fadingOut: isFadingOut,
+    incomingSlot,
+    learningProgressPanelState,
+    learningProgressSnapshot,
+    performanceStatsProps,
+    showLearningProgressPanel,
+    showPerformanceStats,
+    showTrialTimerArea,
+    trialContentFadeElement,
+    flashcardControllerProps,
+    trialContentVisible,
+    trialSubset,
+    trialTimerProps,
+  };
+
+  function handleBlocksExit() {
+    clearBlocksPracticeGame();
+    clearPracticeLaunchMode();
+    FlowRouter.go('/home');
+  }
   let specializedSurfaceActivationScheduled = false;
   $: if (
     !specializedSurfaceActivationScheduled &&
@@ -537,6 +572,23 @@
     })
   ) {
     specializedSurfaceActivationScheduled = true;
+    contentLaunchCoordinator.markFirstTrialPreparing();
+    contentLaunchCoordinator.markFirstRenderCommitting();
+    void (async () => {
+      await tick();
+      await waitForBrowserPaint();
+      if (contentLaunchCoordinator.getSnapshot().phase === 'committing-first-render') {
+        contentLaunchCoordinator.markInitialRenderVisible();
+      }
+    })();
+  }
+  let blocksBoardActivationScheduled = false;
+  $: if (
+    !blocksBoardActivationScheduled &&
+    blocksBoardActive &&
+    contentLaunchPhase === 'initializing-engine'
+  ) {
+    blocksBoardActivationScheduled = true;
     contentLaunchCoordinator.markFirstTrialPreparing();
     contentLaunchCoordinator.markFirstRenderCommitting();
     void (async () => {
@@ -977,6 +1029,7 @@
       unitId,
       tdfId,
       engineIndices,
+      practiceLaunchMode,
     }),
     log: clientConsole,
   });
@@ -1226,6 +1279,31 @@
       on:runtimewatchedstatechanged={handleRuntimeRefresh}
       on:forceadvance={handleForceAdvance}
     />
+  {:else if showBlocksSessionSurface}
+    <BlocksSessionSurface
+      flashcardProps={blocksFlashcardProps}
+      boardActive={blocksBoardActive}
+      showDrill={blocksShowDrill}
+      trayGeneration={blocksTrayGeneration}
+      bind:trialContentFadeElement
+      on:transitionrun={logTrialFadeEvent}
+      on:transitionstart={logTrialFadeEvent}
+      on:transitionend={logTrialFadeEvent}
+      on:submit={handleSubmit}
+      on:choice={handleChoice}
+      on:input={handleInput}
+      on:activity={handleInputActivity}
+      on:firstKeypress={handleFirstKeypress}
+      on:feedbackcontent={handleFeedbackContent}
+      on:replay={handleReplay}
+      on:blockingassetstate={handleBlockingAssetState}
+      on:incomingblockingassetstate={(event) => handleBlockingAssetState(event, 'incoming')}
+      on:reviewrevealstarted={handleReviewRevealStarted}
+      on:skipstudy={handleSkipStudy}
+      on:learningprogresstoggle={handleLearningProgressPanelToggle}
+      on:traycomplete={handleBlocksTrayComplete}
+      on:exit={handleBlocksExit}
+    />
   {:else if sessionContentSurface.showFlashcardSession}
     <FlashcardSessionSurface
       bind:trialContentFadeElement={trialContentFadeElement}
@@ -1260,7 +1338,7 @@
     />
   {/if}
 
-  {#if hasDisplayTimeout}
+  {#if hasDisplayTimeout && !showBlocksSessionSurface}
     <DisplayTimeoutFooter
       canContinue={displayTimeoutCanContinue}
       continueButtonText={deliverySettings.continueButtonText || ''}

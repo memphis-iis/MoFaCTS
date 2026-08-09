@@ -23,6 +23,19 @@ export const initializeSession = assign({
   consecutiveTimeouts: () => 0,
   errorMessage: () => undefined,
   deliverySettings: () => deliverySettingsStore.get(),
+  practiceLaunchMode: ({ event }: ActionArgs) => event?.practiceLaunchMode === 'blocks' ? 'blocks' : 'normal',
+  blocksNeedsTray: ({ event }: ActionArgs) => event?.practiceLaunchMode === 'blocks',
+  blocksTrayGeneration: () => 0,
+});
+
+export const consumeBlocksTray = assign({
+  blocksNeedsTray: () => false,
+});
+
+// This token is the machine-owned command to make a tray available.  The board
+// consumes each generation exactly once; it is deliberately not persisted.
+export const markBlocksTrayReady = assign({
+  blocksTrayGeneration: ({ context }: ActionArgs) => Number(context.blocksTrayGeneration || 0) + 1,
 });
 
 export const syncDeliverySettings = ({ context }: ActionArgs) => {

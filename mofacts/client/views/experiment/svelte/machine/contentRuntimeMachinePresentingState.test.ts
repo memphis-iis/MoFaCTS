@@ -39,13 +39,30 @@ describe('card machine presenting state', function() {
       src: 'selectCardService',
     });
     expect(transitions[0]!).to.deep.include({
+      target: STATES.BLOCKS_BOARD,
+      guard: 'shouldEnterBlocksBoard',
+    });
+    expect(transitions[1]!).to.deep.include({
       target: STATES.READY_PROMPT,
       guard: 'isSupportedTrialType',
     });
-    expect(transitions[0]!.actions).to.include('syncDeliverySettings');
-    expect(transitions[1]!).to.deep.include({
+    expect(transitions[1]!.actions).to.include('syncDeliverySettings');
+    expect(transitions[2]!).to.deep.include({
       target: '#contentRuntimeMachine.error',
     });
+  });
+
+  it('keeps Blocks board state outside every response-capable service', function() {
+    const blocksBoard = states[STATES.BLOCKS_BOARD]!;
+
+    expect(blocksBoard.invoke).to.equal(undefined);
+    expect(blocksBoard.on![EVENTS.BLOCKS_TRAY_COMPLETE]).to.deep.equal({
+      target: STATES.READY_PROMPT,
+      actions: ['consumeBlocksTray', 'logStateTransition'],
+    });
+    expect(blocksBoard.entry).to.include('setDisplayNotReady');
+    expect(blocksBoard.entry).to.include('setInputNotReady');
+    expect(blocksBoard.entry).to.include('resetTimers');
   });
 
   it('branches display state to study, audio gate, awaiting, or error', function() {

@@ -58,6 +58,7 @@ type ContentRuntimeMachineActorArgs = {
     feedbackText?: string | undefined;
     feedbackRevealStarted?: boolean | undefined;
     feedbackSuppressed?: boolean | undefined;
+    blocksNeedsTray?: boolean | undefined;
   };
   event: {
     type?: string | undefined;
@@ -405,6 +406,15 @@ export function didNotTimeout({ context }: ContentRuntimeMachineActorArgs): bool
 
 export function trialRevealStarted({ context }: ContentRuntimeMachineActorArgs): boolean {
   return Number(context.timestamps?.trialStart) > 0;
+}
+
+/**
+ * A delayed reveal event from an unmounted flashcard must not arm the next
+ * Blocks question while its tray is still being played.  Otherwise awaiting's
+ * reveal guard immediately enables input and starts the response timeout.
+ */
+export function canRecordTrialReveal({ context }: ContentRuntimeMachineActorArgs): boolean {
+  return context.blocksNeedsTray !== true;
 }
 
 /**

@@ -134,11 +134,12 @@ export interface PracticeDashboardSnapshotLesson {
   hasLearnerConfigurableSettings: boolean;
   isMultiTdf: boolean;
   isOwner: boolean;
+  blocksEligible: boolean;
   conditions: Array<{ fileName: string; tdfId: string | null; count: number }> | null;
 }
 
 export interface PracticeDashboardSnapshot {
-  version: 3;
+  version: 4;
   userId: string;
   generatedAt: number;
   creators: PracticeDashboardCreator[];

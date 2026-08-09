@@ -48,6 +48,7 @@ import './views/shared/adminUi/adminUi';
 import { getErrorMessage } from './lib/errorUtils';
 import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
+import { getPracticeLaunchMode } from './lib/practiceLaunchMode';
 
 // =============================================================================
 // Blaze Template Registration
@@ -189,6 +190,12 @@ function isPracticeRoutePath(path: string): boolean {
 
 async function returnMobilePracticeDisplayToMenu(reason: string): Promise<void> {
   if (mobilePracticeReturnInProgress || !isMobilePracticeDisplay()) {
+    return;
+  }
+
+  // Blocks is a two-panel pointer game.  A transient browser blur is expected
+  // while dragging or switching input focus and must not terminate its run.
+  if (getPracticeLaunchMode() === 'blocks') {
     return;
   }
 

@@ -296,6 +296,13 @@ function unitHasLearnerConfigurableFields(unit: any): boolean {
   ));
 }
 
+function isBlocksEligible(tdf: any, setspec: any, units: any[]): boolean {
+  if (tdf?.tdfAvailability === 'repair-required' || tdf?.content?.isMultiTdf) return false;
+  if (Array.isArray(setspec?.condition) && setspec.condition.length > 0) return false;
+  const runnableUnits = units.filter((unit) => detectTdfUnitType(unit) !== 'instructions');
+  return runnableUnits.length > 0 && runnableUnits.every((unit) => detectTdfUnitType(unit) === 'learning');
+}
+
 function buildPracticeDashboardLesson(
   userId: string,
   tdf: any,
@@ -358,6 +365,7 @@ function buildPracticeDashboardLesson(
     hasLearnerConfigurableSettings: units.some(unitHasLearnerConfigurableFields),
     isMultiTdf: Boolean(tdfObject.isMultiTdf),
     isOwner: tdf.ownerId === userId,
+    blocksEligible: isBlocksEligible(tdf, setspec, units),
     conditions,
     ...statsProjection
   };

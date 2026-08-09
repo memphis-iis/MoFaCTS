@@ -25,6 +25,21 @@ export const contentRuntimeMachinePresentingState = {
         input: toSelectCardInput,
         onDone: [
           {
+            target: STATES.BLOCKS_BOARD,
+            guard: 'shouldEnterBlocksBoard',
+            actions: [
+              loadSelectedTrialIntoActiveContext,
+              'syncDeliverySettings',
+              'syncActiveTrialChoiceState',
+              'syncSessionIndices',
+              'syncCurrentAnswer',
+              'resetSrState',
+              'resetSrAttempts',
+              'clearErrorMessage',
+              'logStateTransition',
+            ],
+          },
+          {
             target: STATES.READY_PROMPT,
             guard: 'isSupportedTrialType',
             actions: [
@@ -63,6 +78,22 @@ export const contentRuntimeMachinePresentingState = {
           ],
         },
       ],
+    },
+
+    [STATES.BLOCKS_BOARD]: {
+      entry: [
+        'setDisplayNotReady',
+        'setInputNotReady',
+        'resetTimers',
+        'markBlocksTrayReady',
+        'logStateTransition',
+      ],
+      on: {
+        [EVENTS.BLOCKS_TRAY_COMPLETE]: {
+          target: STATES.READY_PROMPT,
+          actions: ['consumeBlocksTray', 'logStateTransition'],
+        },
+      },
     },
 
     [STATES.FADING_IN]: {

@@ -159,6 +159,7 @@ export const EVENTS = {
   SKIP_STUDY: 'SKIP_STUDY',
   TRIAL_REVEAL_STARTED: 'TRIAL_REVEAL_STARTED',
   REVIEW_REVEAL_STARTED: 'REVIEW_REVEAL_STARTED',
+  BLOCKS_TRAY_COMPLETE: 'BLOCKS_TRAY_COMPLETE',
 
   // Speech recognition events
   ENABLE_SR: 'ENABLE_SR',
@@ -198,6 +199,7 @@ export const STATES = {
   PRESTIMULUS: 'prestimulus',
   AUDIO_GATE: 'audioGate',
   AWAITING: 'awaiting',
+  BLOCKS_BOARD: 'blocksBoard',
   STUDY: 'study',
   FEEDBACK: 'feedback',
   TRANSITION: 'transition',
