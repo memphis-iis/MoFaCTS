@@ -40,6 +40,13 @@
   margin-bottom: 1rem;
 }
 
+.ai-create-title {
+  color: var(--app-page-header-text-color);
+  font-size: calc(var(--app-font-size-base) * 1.25);
+  font-weight: var(--app-font-weight-bold);
+  line-height: var(--app-line-height-tight);
+}
+
 .ai-create-icon {
   display: inline-flex;
   align-items: center;
@@ -65,7 +72,7 @@
 .ai-field-label,
 .ai-pair-row label,
 .ai-mode-selector legend {
-  font-weight: 600;
+  font-weight: var(--app-font-weight-semibold);
 }
 
 .ai-notes {
@@ -229,14 +236,22 @@
 .ai-mode-selector legend {
   grid-column: 1 / -1;
   margin-bottom: 0.25rem;
+  color: var(--app-page-header-text-color);
+  font-size: calc(var(--app-font-size-base) * 0.875);
+  letter-spacing: var(--app-label-letter-spacing);
+  line-height: var(--app-line-height-tight);
+  text-transform: var(--app-label-text-transform);
 }
 
 .ai-mode-option {
   padding: 0.7rem 1rem;
   border: 1px solid var(--border-color, #777);
   border-radius: 0.5rem;
-  background: transparent;
-  color: inherit;
+  background: var(--app-background-color);
+  color: var(--app-text-color);
+  font-size: calc(var(--app-font-size-base) * 0.875);
+  font-weight: var(--app-font-weight-semibold);
+  line-height: 1.25;
 }
 
 .ai-mode-option.selected {
