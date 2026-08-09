@@ -14,14 +14,15 @@ export interface CalculateSingleProbabilityParams {
   readonly normalizeResponseText: (answer: string) => string;
   readonly legacyFloat: (value: any) => number;
   readonly log: (...args: unknown[]) => void;
+  readonly nowMs: number;
 }
 
 function secs(t: any) {
   return t / 1000.0;
 }
 
-function elapsed(t: any) {
-  return t < 1 ? 0 : secs(Date.now() - t);
+function elapsed(t: any, nowMs: number) {
+  return t < 1 ? 0 : secs(nowMs - t);
 }
 
 // Given a single item from cardProbabilities, calculate the current probability.
@@ -51,15 +52,15 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.questionFailureCount = card.priorIncorrect;
   p.questionTotalTests = p.questionSuccessCount + p.questionFailureCount;
   p.questionStudyTrialCount = card.priorStudy;
-  p.questionSecsSinceLastShown = elapsed(card.lastSeen);
-  p.questionSecsSinceFirstShown = elapsed(card.firstSeen);
+  p.questionSecsSinceLastShown = elapsed(card.lastSeen, params.nowMs);
+  p.questionSecsSinceFirstShown = elapsed(card.firstSeen, params.nowMs);
   p.questionSecsPracticingOthers = secs(card.otherPracticeTime);
   p.questionTimeHistory = JSON.parse(JSON.stringify(card.timeHistory || []));
   p.questionSpacingLagged = pFunc.spacingLagged(p.questionTimeHistory);
 
   // Stimulus/cluster-version metrics
-  p.stimSecsSinceLastShown = elapsed(stim.lastSeen);
-  p.stimSecsSinceFirstShown = elapsed(stim.firstSeen);
+  p.stimSecsSinceLastShown = elapsed(stim.lastSeen, params.nowMs);
+  p.stimSecsSinceFirstShown = elapsed(stim.firstSeen, params.nowMs);
   p.stimSecsPracticingOthers = secs(stim.otherPracticeTime);
   const sourceStim = stim.modelPracticeOnly === true
     ? stim
@@ -88,7 +89,7 @@ export function calculateSingleProbability(params: CalculateSingleProbabilityPar
   p.responseSuccessCount = p.resp.priorCorrect;
   p.responseFailureCount = p.resp.priorIncorrect;
   p.responseOutcomeHistory = JSON.parse(JSON.stringify(p.resp.outcomeStack));
-  p.responseSecsSinceLastShown = elapsed(p.resp.lastSeen);
+  p.responseSecsSinceLastShown = elapsed(p.resp.lastSeen, params.nowMs);
   p.responseStudyTrialCount = p.resp.priorStudy;
   p.responseTotalTests = p.responseSuccessCount + p.responseFailureCount;
   p.responseTimeHistory = JSON.parse(JSON.stringify(p.resp.timeHistory || []));
@@ -126,6 +127,7 @@ export interface CalculateCardProbabilitiesParams {
   readonly normalizeResponseText: (answer: string) => string;
   readonly legacyFloat: (value: any) => number;
   readonly log: (...args: unknown[]) => void;
+  readonly nowMs: number;
 }
 
 // Mutates the existing card/stim probability model in place, matching the legacy engine contract.
@@ -154,6 +156,7 @@ export function calculateCardProbabilities(params: CalculateCardProbabilitiesPar
         normalizeResponseText: params.normalizeResponseText,
         legacyFloat: params.legacyFloat,
         log: params.log,
+        nowMs: params.nowMs,
       });
       tdfDebugLog.push(parms.debugLog);
 

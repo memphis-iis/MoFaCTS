@@ -54,6 +54,7 @@ export function calculateLearningSessionCardProbabilities(params: {
     normalizeResponseText: (answer: any) => stripSpacesAndLowerCase(answer),
     legacyFloat: params.deps.legacyFloat,
     log: (...args: unknown[]) => params.deps.log(2, ...args),
+    nowMs: Date.now(),
   });
 }
 
