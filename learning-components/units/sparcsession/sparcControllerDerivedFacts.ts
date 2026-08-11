@@ -95,6 +95,14 @@ function graduationPolicy(facts: readonly SparcWorkingMemoryFact[], targetCount:
   };
 }
 
+function misconceptionThreshold(facts: readonly SparcWorkingMemoryFact[]): number {
+  const thresholdFact = facts.find((fact) => fact.factType === 'dialogue.thresholds');
+  const threshold = thresholdFact ? optionalFiniteSlot(thresholdFact, 'misconceptionThreshold') : undefined;
+  if (threshold !== undefined) return threshold;
+  const targetSelectionPolicy = facts.find((fact) => fact.factType === 'controller.targetSelectionPolicy');
+  return targetSelectionPolicy ? optionalFiniteSlot(targetSelectionPolicy, 'misconceptionThreshold') ?? 0.2 : 0.2;
+}
+
 function hasCurrentLearnerTurn(facts: readonly SparcWorkingMemoryFact[]): boolean {
   return facts.some((fact) => (
     fact.factType === 'interface-event'
@@ -139,7 +147,7 @@ function meanRequiredCoverage(facts: readonly SparcWorkingMemoryFact[]): number 
 
 function activeMisconceptionCount(
   facts: readonly SparcWorkingMemoryFact[],
-  coverageThreshold: number,
+  activationThreshold: number,
 ): number {
   const authoredIds = new Set(facts
     .filter((fact) => fact.factType === 'autotutor.misconception')
@@ -153,7 +161,6 @@ function activeMisconceptionCount(
       supportStrengthById.set(id, optionalFiniteSlot(fact, 'supportStrength') ?? 0);
     }
   }
-  const activationThreshold = 1 - coverageThreshold;
   return [...supportStrengthById.values()].filter((supportStrength) => supportStrength >= activationThreshold).length;
 }
 
@@ -166,12 +173,13 @@ export function deriveSparcControllerFacts(
   const clusterKCs = requiredClusterKCs(facts);
   const coverage = coverageByClusterKC(facts);
   const coverageThreshold = completionCoverageThreshold(facts);
+  const activeMisconceptionThreshold = misconceptionThreshold(facts);
   const coveredTargetCount = clusterKCs
     .filter((clusterKC) => (coverage.get(clusterKC) ?? 0) >= coverageThreshold)
     .length;
   const policy = graduationPolicy(facts, clusterKCs.length);
   const turnCount = previousTurnCount(facts) + (currentTurn ? 1 : 0);
-  const activeMisconceptions = activeMisconceptionCount(facts, coverageThreshold);
+  const activeMisconceptions = activeMisconceptionCount(facts, activeMisconceptionThreshold);
   const misconceptionsWithinLimit = activeMisconceptions <= policy.maxActiveMisconceptions;
   const maxTurnsReached = turnCount >= policy.maxTurns;
   const requiredCoverageReached = coveredTargetCount >= policy.requiredTargetCount;
@@ -202,6 +210,7 @@ export function deriveSparcControllerFacts(
       requiredTargetCount: policy.requiredTargetCount,
       totalTargetCount: clusterKCs.length,
       coverageThreshold,
+      misconceptionThreshold: activeMisconceptionThreshold,
       activeMisconceptionCount: activeMisconceptions,
       maxActiveMisconceptions: policy.maxActiveMisconceptions,
       turnCount,

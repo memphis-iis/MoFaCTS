@@ -601,7 +601,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
           policyId: 'progressive-scaffolding-v1',
           policyVersion: 1,
         },
-        productionRules: [...createSparcProgressiveScaffoldingRules()],
         nodes: [{
           id: 'learner-response-input',
           nodeType: 'atomic',
@@ -642,6 +641,10 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         text: 'Misconception A clean text.',
       }],
     });
+    assert.deepEqual(
+      document.productionRules?.map((rule) => rule.id),
+      createSparcProgressiveScaffoldingRules().map((rule) => rule.id),
+    );
     assert.deepEqual(document.clusterTargets?.[0], {
       clusterIndex: 0,
       stimuliSetId: 'sparc:kc-a',
@@ -666,7 +669,6 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
             policyId: 'progressive-scaffolding-v1',
             policyVersion: 1,
           },
-          productionRules: [...createSparcProgressiveScaffoldingRules()],
           nodes: [{
             id: 'learner-response-input',
             nodeType: 'atomic',
@@ -695,7 +697,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     );
   });
 
-  it('rejects an AutoTutor display whose authored scaffold rules diverge from the policy contract', function() {
+  it('rejects AutoTutor production rules supplied by content because the policy is runtime-owned', function() {
     const rules = [...createSparcProgressiveScaffoldingRules()];
     rules[1] = { ...rules[1]!, salience: 1 };
     assert.throws(
@@ -718,7 +720,7 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
           productionRules: rules,
         },
       }),
-      /must exactly match progressive-scaffolding-v1/,
+      /production rules are runtime-owned/,
     );
   });
 

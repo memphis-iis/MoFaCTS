@@ -19,10 +19,10 @@ function document(extraFacts: readonly SparcWorkingMemoryFact[] = []): SparcAuth
       parameters: { minimumProgress: 0.05 },
     },
     workingMemoryFacts: [
-      fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
+      fact('dialogue.thresholds', { coverageThreshold: 0.8, misconceptionThreshold: 0.2 }),
       fact('controller.targetSelectionPolicy', { policy: 'kc-graph-priority', coverageThreshold: 0.8 }),
       fact('autotutor.expectation', { clusterKC: 'kc-a', text: 'Use A.' }),
-      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2, addressed: false }),
+      fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
       fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.5, description: 'A' }),
       ...extraFacts,
     ],
@@ -39,90 +39,59 @@ const event: SparcInterfaceEvent = {
   payload: { input: 'learner response' },
 };
 
-function selectedAction(result: ReturnType<typeof evaluateSparcControllerTurnPlanning>): SparcWorkingMemoryFact | undefined {
-  return result.productionRuleEvaluation.execution.firings
-    .flatMap((firing) => firing.assertedFacts)
-    .find((entry) => entry.factType === 'controller.selectedAction');
+function selectedAction(result: ReturnType<typeof evaluateSparcControllerTurnPlanning>): SparcWorkingMemoryFact {
+  return result.productionRuleEvaluation.execution.facts
+    .filter((entry) => entry.factType === 'controller.selectedAction')[0]!;
 }
 
 describe('evaluateSparcControllerTurnPlanning', function() {
-  it('instantiates a general expectation target before firing the authored Pump rule', function() {
+  it('lets a production start the maximum expectation at pump', function() {
     const result = evaluateSparcControllerTurnPlanning({ document: document(), event });
-    assert.equal(result.targetSelection.selectedTargetType, 'learningTarget');
-    assert.ok(result.productionRuleFacts.some((entry) => (
-      entry.factType === 'instructionalTarget.active'
-      && entry.slots?.targetKey === 'expectation:kc-a'
-    )));
-    assert.equal(selectedAction(result)?.slots?.action, 'pump');
-    assert.equal(selectedAction(result)?.slots?.targetType, 'expectation');
+    assert.equal(result.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-a');
+    assert.equal(selectedAction(result).slots?.targetType, 'expectation');
+    assert.equal(selectedAction(result).slots?.action, 'pump');
   });
 
-  it('instantiates a misconception through the same authored Pump rule', function() {
+  it('gives every threshold-eligible misconception priority and starts the maximum at prompt', function() {
+    const result = evaluateSparcControllerTurnPlanning({
+      document: document([
+        fact('autotutor.misconception', { id: 'm-low', text: 'Low.' }),
+        fact('autotutor.misconception', { id: 'm-high', text: 'High.' }),
+        fact('diagnostic.misconceptionScore', { id: 'm-low', supportStrength: 0.3 }),
+        fact('diagnostic.misconceptionScore', { id: 'm-high', supportStrength: 0.7 }),
+      ]),
+      event,
+    });
+    assert.equal(result.instructionalProjection.candidates.maximumMisconception?.targetId, 'm-high');
+    assert.equal(selectedAction(result).slots?.targetId, 'm-high');
+    assert.equal(selectedAction(result).slots?.action, 'prompt');
+  });
+
+  it('interrupts an unfinished expectation when a misconception crosses threshold', function() {
     const result = evaluateSparcControllerTurnPlanning({
       document: document([
         fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.7, addressed: true }),
+        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.4 }),
+        fact('instructional.activeCycle', {
+          cycleId: 'cycle-a', targetKind: 'expectation', targetId: 'kc-a', targetKey: 'expectation:kc-a',
+          stage: 'PUMP', priorValue: 0.1, startedAtTurn: 1, cycleTurnCount: 0, status: 'active',
+        }),
       ]),
       event,
     });
-    assert.equal(result.targetSelection.selectedTargetType, 'misconception');
-    assert.ok(result.productionRuleFacts.some((entry) => (
-      entry.factType === 'instructionalTarget.active'
-      && entry.slots?.targetKey === 'misconception:m1'
-    )));
-    assert.equal(selectedAction(result)?.slots?.action, 'pump');
-    assert.equal(selectedAction(result)?.slots?.targetType, 'misconception');
+    assert.equal(selectedAction(result).slots?.targetType, 'misconception');
+    assert.equal(selectedAction(result).slots?.action, 'prompt');
   });
 
-  it('keeps completion outside the scaffold chain', function() {
-    const result = evaluateSparcControllerTurnPlanning({
-      document: document([
-        fact('dialogue.graduation', { requiredTargetCount: 1 }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9, addressed: true }),
-      ]),
-      event,
-    });
-    assert.equal(selectedAction(result)?.slots?.action, 'summary');
-    assert.equal(selectedAction(result)?.slots?.targetType, 'completion');
-  });
-
-  it('uses current completion after replayed in-progress state when the learner succeeds', function() {
+  it('selects the terminal summary at completion', function() {
     const result = evaluateSparcControllerTurnPlanning({
       document: document([
         fact('dialogue.graduation', { requiredTargetCount: 1 }),
         fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),
       ]),
       event,
-      extraFacts: [
-        fact('controller.completionState', {
-          completed: false,
-          reason: 'in-progress',
-          coveredTargetCount: 0,
-          requiredTargetCount: 1,
-        }),
-      ],
     });
-
-    assert.equal(
-      result.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.completed,
-      true,
-    );
-    assert.equal(selectedAction(result)?.slots?.action, 'summary');
-    assert.equal(selectedAction(result)?.slots?.targetType, 'completion');
-  });
-
-  it('selects the terminal summary at the total turn limit even with an active misconception', function() {
-    const result = evaluateSparcControllerTurnPlanning({
-      document: document([
-        fact('dialogue.graduation', { requiredTargetCount: 1, maxActiveMisconceptions: 0, maxTurns: 1 }),
-        fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.7 }),
-      ]),
-      event,
-    });
-
-    assert.equal(selectedAction(result)?.slots?.action, 'summary');
-    assert.equal(selectedAction(result)?.slots?.targetType, 'completion');
-    assert.equal(result.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.reason, 'max-turns');
+    assert.equal(selectedAction(result).slots?.targetType, 'completion');
+    assert.equal(selectedAction(result).slots?.action, 'summary');
   });
 });

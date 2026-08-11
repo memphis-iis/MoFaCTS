@@ -11,179 +11,373 @@ const literalPattern = (value: unknown) => ({ type: 'literal' as const, value })
 const bind = (name: string) => ({ type: 'bind' as const, variable: name });
 const bound = (name: string) => ({ type: 'bound' as const, variable: name });
 
-function targetPattern(): SparcFactPattern {
+function assessmentPattern(): SparcFactPattern {
   return {
-    factType: 'instructionalTarget.active',
+    factType: 'instructional.assessmentSnapshot',
+    slots: { snapshotId: bind('snapshotId') },
+  };
+}
+
+function completionPattern(completed: boolean): SparcFactPattern {
+  return {
+    factType: 'controller.completionState',
+    slots: { completed: literalPattern(completed) },
+  };
+}
+
+function noDecisionPattern(): SparcProductionRuleCondition {
+  return {
+    type: 'not',
+    pattern: {
+      factType: 'instructional.decision',
+      slots: { snapshotId: bound('snapshotId') },
+    },
+  };
+}
+
+function noEligibleMisconceptionPattern(): SparcProductionRuleCondition {
+  return {
+    type: 'not',
+    pattern: {
+      factType: 'instructional.candidate',
+      slots: {
+        snapshotId: bound('snapshotId'),
+        targetKind: literalPattern('misconception'),
+        eligible: literalPattern(true),
+      },
+    },
+  };
+}
+
+function cycleStatusPattern(continuable: boolean): SparcFactPattern {
+  return {
+    factType: 'instructional.cycleStatus',
     slots: {
-      targetKey: bind('targetKey'),
-      targetKind: bind('targetKind'),
+      snapshotId: bound('snapshotId'),
+      continuable: literalPattern(continuable),
+    },
+  };
+}
+
+function activeCyclePattern(params: {
+  readonly targetKind: 'expectation' | 'misconception';
+  readonly stage?: string;
+}): SparcFactPattern {
+  return {
+    factType: 'instructional.activeCycle',
+    slots: {
+      cycleId: bind('cycleId'),
+      targetKind: literalPattern(params.targetKind),
       targetId: bind('targetId'),
-      focusEpisodeId: bind('focusEpisodeId'),
+      targetKey: bind('targetKey'),
+      stage: params.stage ? literalPattern(params.stage) : bind('currentStage'),
+      startedAtTurn: bind('startedAtTurn'),
+      cycleTurnCount: bind('cycleTurnCount'),
       status: literalPattern('active'),
     },
   };
 }
 
-function statePattern(stage?: string): SparcFactPattern {
+function interruptedExpectationPattern(): SparcFactPattern {
   return {
-    factType: 'scaffold.state',
+    factType: 'instructional.activeCycle',
     slots: {
-      targetKey: bound('targetKey'),
-      focusEpisodeId: bound('focusEpisodeId'),
-      ...(stage ? { stage: literalPattern(stage) } : {}),
+      cycleId: bind('previousCycleId'),
+      targetKind: literalPattern('expectation'),
+      targetId: bind('previousTargetId'),
+      targetKey: bind('previousTargetKey'),
+      stage: bind('previousStage'),
+      startedAtTurn: bind('previousStartedAtTurn'),
+      cycleTurnCount: bind('previousCycleTurnCount'),
+      status: literalPattern('active'),
     },
   };
 }
 
-function preservedQuestionStatePattern(): SparcFactPattern {
-  return {
-    factType: 'scaffold.state',
-    slots: {
-      targetKey: bound('targetKey'),
-      focusEpisodeId: bound('focusEpisodeId'),
-      stage: bind('questionStage'),
-      lastAction: bind('questionLastAction'),
-    },
-  };
-}
-
-function observationPattern(params: {
-  readonly madeProgress: boolean;
+function activeCandidatePattern(params: {
+  readonly targetKind: 'expectation' | 'misconception';
 }): SparcFactPattern {
   return {
-    factType: 'learningObservation.targetProgress',
+    factType: 'instructional.candidate',
     slots: {
+      snapshotId: bound('snapshotId'),
+      targetKind: literalPattern(params.targetKind),
+      targetId: bound('targetId'),
       targetKey: bound('targetKey'),
-      madeProgress: literalPattern(params.madeProgress),
-      newlyResolved: literalPattern(false),
+      currentValue: bind('currentValue'),
+      eligible: literalPattern(true),
     },
   };
 }
 
-function all(...conditions: readonly SparcProductionRuleCondition[]): SparcProductionRuleCondition {
-  return { type: 'all', conditions };
+function maximumCandidatePattern(params: {
+  readonly targetKind: 'expectation' | 'misconception';
+}): SparcFactPattern {
+  return {
+    factType: 'instructional.candidate',
+    slots: {
+      snapshotId: bound('snapshotId'),
+      targetKind: literalPattern(params.targetKind),
+      targetId: bind('targetId'),
+      targetKey: bind('targetKey'),
+      currentValue: bind('currentValue'),
+      eligible: literalPattern(true),
+      isMaximumWithinKind: literalPattern(true),
+    },
+  };
 }
 
-function any(...conditions: readonly SparcProductionRuleCondition[]): SparcProductionRuleCondition {
-  return { type: 'any', conditions };
+function progressPattern(meaningfulGain: boolean): SparcFactPattern {
+  return {
+    factType: 'instructional.progress',
+    slots: {
+      snapshotId: bound('snapshotId'),
+      cycleId: bound('cycleId'),
+      targetKey: bound('targetKey'),
+      meaningfulGain: literalPattern(meaningfulGain),
+      goalReached: literalPattern(false),
+    },
+  };
 }
 
-function selectedAction(action: string, sourceRuleId: string): SparcWorkingMemoryFactTemplate {
+function turnPattern(): SparcFactPattern {
+  return {
+    factType: 'session.turnState',
+    slots: { turnCount: bind('turnNumber') },
+  };
+}
+
+function selectedAction(
+  targetKind: 'expectation' | 'misconception',
+  action: string,
+  sourceRuleId: string,
+): SparcWorkingMemoryFactTemplate {
   return {
     factType: 'controller.selectedAction',
     slots: {
-      targetType: variable('targetKind'),
+      targetType: literal(targetKind),
       targetId: variable('targetId'),
       targetKey: variable('targetKey'),
-      focusEpisodeId: variable('focusEpisodeId'),
       action: literal(action),
       sourceRuleId: literal(sourceRuleId),
+      snapshotId: variable('snapshotId'),
     },
   };
 }
 
-function scaffoldState(stage: string, action: string): SparcWorkingMemoryFactTemplate {
+function instructionalDecision(params: {
+  readonly targetKind: 'expectation' | 'misconception';
+  readonly action: string;
+  readonly transition: string;
+  readonly sourceRuleId: string;
+  readonly reason: string;
+}): SparcWorkingMemoryFactTemplate {
   return {
-    factType: 'scaffold.state',
+    factType: 'instructional.decision',
     slots: {
-      focusEpisodeId: variable('focusEpisodeId'),
+      snapshotId: variable('snapshotId'),
+      targetKind: literal(params.targetKind),
+      targetId: variable('targetId'),
+      targetKey: variable('targetKey'),
+      action: literal(params.action),
+      transition: literal(params.transition),
+      sourceRuleId: literal(params.sourceRuleId),
+      reason: literal(params.reason),
+    },
+  };
+}
+
+function startedCycle(
+  targetKind: 'expectation' | 'misconception',
+  stage: string,
+): SparcWorkingMemoryFactTemplate {
+  return {
+    factType: 'instructional.activeCycle',
+    slots: {
+      cycleId: variable('snapshotId'),
+      targetKind: literal(targetKind),
+      targetId: variable('targetId'),
       targetKey: variable('targetKey'),
       stage: literal(stage),
-      lastAction: literal(action),
-      policyId: literal('progressive-scaffolding-v1'),
-      policyVersion: literal(1),
+      priorValue: variable('currentValue'),
+      startedAtTurn: variable('turnNumber'),
+      cycleTurnCount: literal(0),
+      status: literal('active'),
     },
   };
 }
 
-function moveRule(params: {
-  readonly id: string;
-  readonly action: string;
-  readonly stage: string;
-  readonly eligible: SparcProductionRuleCondition;
-}): SparcProductionRule {
+function continuedCycle(
+  targetKind: 'expectation' | 'misconception',
+  stage: string,
+): SparcWorkingMemoryFactTemplate {
   return {
-    id: params.id,
-    module: 'dialogue.move-selection',
-    salience: 0,
-    when: [targetPattern(), params.eligible],
-    then: [{
-      type: 'assert-fact',
-      persist: true,
-      fact: selectedAction(params.action, params.id),
-    }, {
-      type: 'assert-fact',
-      persist: true,
-      identitySlots: ['focusEpisodeId'],
-      fact: scaffoldState(params.stage, params.action),
-    }, {
-      type: 'terminate-production-phase',
-      reason: 'move-selected',
-    }],
+    factType: 'instructional.activeCycle',
+    slots: {
+      cycleId: variable('cycleId'),
+      targetKind: literal(targetKind),
+      targetId: variable('targetId'),
+      targetKey: variable('targetKey'),
+      stage: literal(stage),
+      priorValue: variable('currentValue'),
+      startedAtTurn: variable('startedAtTurn'),
+      cycleTurnCount: {
+        type: 'function',
+        name: 'add',
+        args: [variable('cycleTurnCount'), literal(1)],
+      },
+      status: literal('active'),
+    },
   };
 }
 
-function terminalLearnerQuestionRule(params: {
-  readonly id: string;
+function decisionEffects(params: {
+  readonly targetKind: 'expectation' | 'misconception';
   readonly action: string;
-  readonly contentFocused: boolean;
+  readonly stage: string;
+  readonly transition: string;
+  readonly sourceRuleId: string;
+  readonly reason: string;
+  readonly startsCycle: boolean;
+}): SparcProductionRule['then'] {
+  return [{
+    type: 'assert-fact',
+    persist: true,
+    identitySlots: ['snapshotId'],
+    fact: instructionalDecision(params),
+  }, {
+    type: 'assert-fact',
+    persist: true,
+    identitySlots: [],
+    fact: selectedAction(params.targetKind, params.action, params.sourceRuleId),
+  }, {
+    type: 'assert-fact',
+    persist: true,
+    identitySlots: [],
+    fact: params.startsCycle
+      ? startedCycle(params.targetKind, params.stage)
+      : continuedCycle(params.targetKind, params.stage),
+  }, {
+    type: 'terminate-production-phase',
+    reason: 'instructional-decision-selected',
+  }];
+}
+
+function continuationRule(params: {
+  readonly id: string;
+  readonly targetKind: 'expectation' | 'misconception';
+  readonly currentStage: string;
+  readonly meaningfulGain?: boolean;
+  readonly action: string;
+  readonly nextStage: string;
+}): SparcProductionRule {
+  const targetSpecificConditions: SparcProductionRuleCondition[] = params.targetKind === 'expectation'
+    ? [noEligibleMisconceptionPattern()]
+    : [];
+  return {
+    id: params.id,
+    module: 'dialogue.instructional-control',
+    salience: 60,
+    when: [
+      assessmentPattern(),
+      completionPattern(false),
+      activeCyclePattern({ targetKind: params.targetKind, stage: params.currentStage }),
+      activeCandidatePattern({ targetKind: params.targetKind }),
+      ...(params.meaningfulGain === undefined ? [] : [progressPattern(params.meaningfulGain)]),
+      ...targetSpecificConditions,
+      noDecisionPattern(),
+    ],
+    then: decisionEffects({
+      targetKind: params.targetKind,
+      action: params.action,
+      stage: params.nextStage,
+      transition: params.currentStage === params.nextStage ? 'continue' : 'advance',
+      sourceRuleId: params.id,
+      reason: params.meaningfulGain === true
+        ? 'meaningful-gain'
+        : (params.meaningfulGain === false ? 'insufficient-gain' : 'bottomed-out'),
+      startsCycle: false,
+    }),
+  };
+}
+
+function startRule(params: {
+  readonly id: string;
+  readonly targetKind: 'expectation' | 'misconception';
+  readonly action: 'pump' | 'prompt';
+  readonly stage: 'PUMP' | 'PROMPT';
 }): SparcProductionRule {
   return {
     id: params.id,
-    module: 'dialogue.move-selection',
-    salience: 90,
-    when: [targetPattern(), preservedQuestionStatePattern(), {
-      factType: 'dialogue.learnerQuestion',
-      slots: {
-        contentFocused: literalPattern(params.contentFocused),
-      },
-    }],
-    then: [{
-      type: 'assert-fact',
-      persist: true,
-      fact: {
-        factType: 'controller.selectedAction',
-        slots: {
-          targetType: literal('learnerQuestion'),
-          targetId: literal('learner-question'),
-          action: literal(params.action),
-          sourceRuleId: literal(params.id),
-        },
-      },
-    }, {
-      type: 'assert-fact',
-      persist: true,
-      identitySlots: ['focusEpisodeId'],
-      fact: {
-        factType: 'scaffold.state',
-        slots: {
-          focusEpisodeId: variable('focusEpisodeId'),
-          targetKey: variable('targetKey'),
-          stage: variable('questionStage'),
-          lastAction: variable('questionLastAction'),
-          policyId: literal('progressive-scaffolding-v1'),
-          policyVersion: literal(1),
-        },
-      },
-    }, {
-      type: 'terminate-production-phase',
-      reason: 'move-selected',
-    }],
+    module: 'dialogue.instructional-control',
+    salience: params.targetKind === 'misconception' ? 70 : 50,
+    when: [
+      assessmentPattern(),
+      completionPattern(false),
+      cycleStatusPattern(false),
+      maximumCandidatePattern({ targetKind: params.targetKind }),
+      ...(params.targetKind === 'expectation' ? [noEligibleMisconceptionPattern()] : []),
+      turnPattern(),
+      noDecisionPattern(),
+    ],
+    then: decisionEffects({
+      targetKind: params.targetKind,
+      action: params.action,
+      stage: params.stage,
+      transition: 'start',
+      sourceRuleId: params.id,
+      reason: params.targetKind === 'misconception' ? 'threshold-eligible-misconception' : 'maximum-eligible-expectation',
+      startsCycle: true,
+    }),
+  };
+}
+
+function learnerQuestionDecision(params: {
+  readonly id: string;
+  readonly action: string;
+}): SparcWorkingMemoryFactTemplate {
+  return {
+    factType: 'instructional.decision',
+    slots: {
+      snapshotId: variable('snapshotId'),
+      targetKind: literal('learnerQuestion'),
+      targetId: literal('learner-question'),
+      targetKey: literal('learnerQuestion:learner-question'),
+      action: literal(params.action),
+      transition: literal('continue'),
+      sourceRuleId: literal(params.id),
+      reason: literal('learner-question'),
+    },
   };
 }
 
 export function createSparcProgressiveScaffoldingRules(): readonly SparcProductionRule[] {
   return [{
     id: 'dialogue.completion.summary',
-    module: 'dialogue.move-selection',
+    module: 'dialogue.instructional-control',
     salience: 100,
-    when: [{ factType: 'dialogue.completionSelected' }, {
-      factType: 'controller.completionState',
-      slots: { completed: literalPattern(true) },
-    }],
+    when: [assessmentPattern(), completionPattern(true), noDecisionPattern()],
     then: [{
       type: 'assert-fact',
       persist: true,
+      identitySlots: ['snapshotId'],
+      fact: {
+        factType: 'instructional.decision',
+        slots: {
+          snapshotId: variable('snapshotId'),
+          targetKind: literal('completion'),
+          targetId: literal('completion'),
+          targetKey: literal('completion:completion'),
+          action: literal('summary'),
+          transition: literal('complete'),
+          sourceRuleId: literal('dialogue.completion.summary'),
+          reason: literal('controller-completion'),
+        },
+      },
+    }, {
+      type: 'assert-fact',
+      persist: true,
+      identitySlots: [],
       fact: {
         factType: 'controller.selectedAction',
         slots: {
@@ -191,21 +385,38 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
           targetId: literal('completion'),
           action: literal('summary'),
           sourceRuleId: literal('dialogue.completion.summary'),
+          snapshotId: variable('snapshotId'),
+        },
+      },
+    }, {
+      type: 'assert-fact',
+      persist: true,
+      identitySlots: [],
+      fact: {
+        factType: 'instructional.activeCycle',
+        slots: {
+          cycleId: variable('snapshotId'),
+          targetKind: literal('completion'),
+          targetId: literal('completion'),
+          targetKey: literal('completion:completion'),
+          stage: literal('SUMMARY'),
+          priorValue: literal(1),
+          startedAtTurn: literal(0),
+          cycleTurnCount: literal(0),
+          status: literal('closed'),
         },
       },
     }, {
       type: 'terminate-production-phase',
-      reason: 'move-selected',
+      reason: 'instructional-decision-selected',
     }],
   }, {
     id: 'dialogue.question.defer',
-    module: 'dialogue.move-selection',
+    module: 'dialogue.instructional-control',
     salience: 90,
-    when: [targetPattern(), preservedQuestionStatePattern(), {
+    when: [assessmentPattern(), {
       factType: 'dialogue.learnerQuestion',
-      slots: {
-        contentFocused: literalPattern(true),
-      },
+      slots: { contentFocused: literalPattern(true) },
     }],
     then: [{
       type: 'assert-fact',
@@ -218,83 +429,134 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
         },
       },
     }],
-  }, terminalLearnerQuestionRule({
+  }, {
     id: 'dialogue.question.scope-refusal',
-    action: 'question-scope-refusal',
-    contentFocused: false,
-  }), moveRule({
-    id: 'dialogue.scaffold.pump',
-    action: 'pump',
-    stage: 'PUMP',
-    eligible: any(
-      statePattern('ELICIT'),
-      all(statePattern('PUMP'), observationPattern({ madeProgress: true })),
-      all(statePattern('PROMPT'), observationPattern({ madeProgress: true })),
-      all(statePattern('HINT'), observationPattern({ madeProgress: true })),
-    ),
-  }), moveRule({
-    id: 'dialogue.scaffold.prompt',
+    module: 'dialogue.instructional-control',
+    salience: 90,
+    when: [assessmentPattern(), {
+      factType: 'dialogue.learnerQuestion',
+      slots: { contentFocused: literalPattern(false) },
+    }, noDecisionPattern()],
+    then: [{
+      type: 'assert-fact',
+      persist: true,
+      identitySlots: ['snapshotId'],
+      fact: learnerQuestionDecision({
+        id: 'dialogue.question.scope-refusal',
+        action: 'question-scope-refusal',
+      }),
+    }, {
+      type: 'assert-fact',
+      persist: true,
+      identitySlots: [],
+      fact: {
+        factType: 'controller.selectedAction',
+        slots: {
+          targetType: literal('learnerQuestion'),
+          targetId: literal('learner-question'),
+          action: literal('question-scope-refusal'),
+          sourceRuleId: literal('dialogue.question.scope-refusal'),
+          snapshotId: variable('snapshotId'),
+        },
+      },
+    }, {
+      type: 'terminate-production-phase',
+      reason: 'instructional-decision-selected',
+    }],
+  }, {
+    id: 'dialogue.target.misconception.interrupt',
+    module: 'dialogue.instructional-control',
+    salience: 80,
+    when: [
+      assessmentPattern(),
+      completionPattern(false),
+      interruptedExpectationPattern(),
+      cycleStatusPattern(true),
+      maximumCandidatePattern({ targetKind: 'misconception' }),
+      turnPattern(),
+      noDecisionPattern(),
+    ],
+    then: decisionEffects({
+      targetKind: 'misconception',
+      action: 'prompt',
+      stage: 'PROMPT',
+      transition: 'interrupt',
+      sourceRuleId: 'dialogue.target.misconception.interrupt',
+      reason: 'threshold-eligible-misconception',
+      startsCycle: true,
+    }),
+  },
+  startRule({
+    id: 'dialogue.target.misconception.start',
+    targetKind: 'misconception',
     action: 'prompt',
     stage: 'PROMPT',
-    eligible: any(
-      all(statePattern('PUMP'), observationPattern({ madeProgress: false })),
-    ),
-  }), moveRule({
-    id: 'dialogue.scaffold.hint',
-    action: 'hint',
-    stage: 'HINT',
-    eligible: any(
-      all(statePattern('PROMPT'), observationPattern({ madeProgress: false })),
-    ),
-  }), moveRule({
-    id: 'dialogue.scaffold.assertion',
-    action: 'assertion',
-    stage: 'ASSERTION',
-    eligible: any(
-      all(statePattern('HINT'), observationPattern({ madeProgress: false })),
-      statePattern('ASSERTION'),
-    ),
-  })];
+  }),
+  startRule({
+    id: 'dialogue.target.expectation.start',
+    targetKind: 'expectation',
+    action: 'pump',
+    stage: 'PUMP',
+  }),
+  ...(['expectation', 'misconception'] as const).flatMap((targetKind) => [
+    continuationRule({
+      id: `dialogue.scaffold.${targetKind}.pump-progress`,
+      targetKind,
+      currentStage: 'PUMP',
+      meaningfulGain: true,
+      action: 'pump',
+      nextStage: 'PUMP',
+    }),
+    continuationRule({
+      id: `dialogue.scaffold.${targetKind}.pump-no-progress`,
+      targetKind,
+      currentStage: 'PUMP',
+      meaningfulGain: false,
+      action: 'prompt',
+      nextStage: 'PROMPT',
+    }),
+    continuationRule({
+      id: `dialogue.scaffold.${targetKind}.prompt-progress`,
+      targetKind,
+      currentStage: 'PROMPT',
+      meaningfulGain: true,
+      action: 'pump',
+      nextStage: 'PUMP',
+    }),
+    continuationRule({
+      id: `dialogue.scaffold.${targetKind}.prompt-no-progress`,
+      targetKind,
+      currentStage: 'PROMPT',
+      meaningfulGain: false,
+      action: 'hint',
+      nextStage: 'HINT',
+    }),
+    continuationRule({
+      id: `dialogue.scaffold.${targetKind}.hint-progress`,
+      targetKind,
+      currentStage: 'HINT',
+      meaningfulGain: true,
+      action: 'pump',
+      nextStage: 'PUMP',
+    }),
+    continuationRule({
+      id: `dialogue.scaffold.${targetKind}.hint-no-progress`,
+      targetKind,
+      currentStage: 'HINT',
+      meaningfulGain: false,
+      action: 'assertion',
+      nextStage: 'ASSERTION',
+    }),
+    continuationRule({
+      id: `dialogue.scaffold.${targetKind}.assertion`,
+      targetKind,
+      currentStage: 'ASSERTION',
+      action: 'assertion',
+      nextStage: 'ASSERTION',
+    }),
+  ])];
 }
 
-export const SPARC_PROGRESSIVE_SCAFFOLDING_RULE_IDS = Object.freeze([
-  'dialogue.completion.summary',
-  'dialogue.question.defer',
-  'dialogue.question.scope-refusal',
-  'dialogue.scaffold.pump',
-  'dialogue.scaffold.prompt',
-  'dialogue.scaffold.hint',
-  'dialogue.scaffold.assertion',
-] as const);
-
-function structurallyStableJson(value: unknown): string {
-  function normalize(entry: unknown): unknown {
-    if (Array.isArray(entry)) {
-      return entry.map(normalize);
-    }
-    if (typeof entry === 'object' && entry !== null) {
-      return Object.fromEntries(
-        Object.entries(entry as Record<string, unknown>)
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([key, child]) => [key, normalize(child)]),
-      );
-    }
-    return entry;
-  }
-  return JSON.stringify(normalize(value));
-}
-
-export function assertCanonicalSparcProgressiveScaffoldingRules(
-  rules: readonly SparcProductionRule[],
-): void {
-  const expected = createSparcProgressiveScaffoldingRules();
-  const mismatchIndex = Array.from({ length: Math.max(rules.length, expected.length) })
-    .findIndex((_, index) => structurallyStableJson(rules[index]) !== structurallyStableJson(expected[index]));
-  if (mismatchIndex >= 0) {
-    const authoredId = rules[mismatchIndex]?.id ?? 'missing';
-    const expectedId = expected[mismatchIndex]?.id ?? 'none';
-    throw new Error(
-      `SPARC AutoTutor productionRules must exactly match progressive-scaffolding-v1; first mismatch at productionRules[${mismatchIndex}] (authored ${JSON.stringify(authoredId)}, expected ${JSON.stringify(expectedId)})`,
-    );
-  }
-}
+export const SPARC_PROGRESSIVE_SCAFFOLDING_RULE_IDS = Object.freeze(
+  createSparcProgressiveScaffoldingRules().map((rule) => rule.id),
+);

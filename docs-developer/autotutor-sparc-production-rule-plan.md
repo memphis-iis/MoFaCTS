@@ -1,351 +1,191 @@
-# AutoTutor and SPARC Production Rule Integration Plan
+# AutoTutor and SPARC Production-Rule Instructional Control Plan
 
 ## Status
 
-This document is a design and implementation planning note. It records the intended direction for integrating AutoTutor planning with the SPARC production rule system.
+This document records the agreed design for moving SPARC AutoTutor instructional control into the production-rule system. It is an implementation plan, not a description of the current behavior.
 
-The key requirement is that AutoTutor production rules must be realized through the SPARC production rule machinery, not as a separate one-off AutoTutor-only rule system. The goal is to generalize SPARC so it can support AutoTutor-style tutoring and, later, more general pedagogical focusing and target selection.
+The design is intended to be general enough for dialogue and non-dialogue instruction. AutoTutor supplies the first concrete rule set and realization adapter, but the rule engine and instructional-cycle contracts must not contain AutoTutor-only target-selection exceptions.
 
-## Core design conclusion
+## Objective
 
-The immediate conversion target is `selectAutoTutorMove`.
+The production rules must determine both:
 
-`selectAutoTutorMove` currently contains the AutoTutor move-selection policy in TypeScript. The plan is to break that policy into explicit production rules represented in the SPARC production rule format and evaluated by generalized SPARC rule infrastructure.
+1. which expectation or misconception is instructionally active; and
+2. which instructional move is appropriate for that target.
 
-This conversion should not initially replace the whole AutoTutor pipeline.
+The runtime may derive assessment, candidate, comparison, and progress facts. It must not choose a target before the productions run or lock the productions onto a target chosen elsewhere.
 
-The current near-term division should be:
-
-1. LLM scoring and evaluation call
-   - Produces expectation coverage, misconception scores, learner contribution classification, answer quality, and learner-question status.
-   - It must not select the tutoring target, select the tutoring move, or write the tutor message.
-
-2. Conversation-management target selection
-   - Current implementation: `selectAutoTutorTarget`.
-   - Selects the pedagogical target: expectation, misconception, learner question, or completion.
-   - This should remain deterministic during the first production-rule conversion.
-
-3. Production-rule move selection
-   - Current implementation: `selectAutoTutorMove`.
-   - This is the first function to decompose into explicit productions.
-   - Given the already selected target plus scored state, productions select the AutoTutor move.
-
-4. LLM utterance generation call
-   - Realizes the selected target and move in natural language.
-   - It must not change the app-selected target or move.
-
-## Important long-term design goal
-
-The long-term goal is broader than simply replacing one TypeScript function.
-
-SPARC should become capable of doing AutoTutor through correct production rules. That requires SPARC to generalize from page mutation and local interface behavior into a pedagogical production-rule substrate that can also select AutoTutor dialogue moves.
-
-The longer-term goal also includes target selection. Target selection is the mechanism that focuses the system on what it needs to teach the student. It gives SPARC a pedagogical schema to work with.
-
-Therefore the roadmap is:
-
-1. First: use generalized SPARC production rules to select AutoTutor moves.
-2. Later: generalize target selection through the same production-rule infrastructure.
-3. Eventually: allow SPARC pages to perform AutoTutor-style tutoring by combining target selection, move selection, and page mutation under a shared production-rule model.
-
-## Current relevant code
-
-AutoTutor planning:
-
-- `learning-components/units/autotutor/AutoTutorPlanner.ts`
-- `learning-components/units/autotutor/AutoTutorStateMachine.ts`
-- `learning-components/units/autotutor/AutoTutorUnitEngine.ts`
-
-Current move-selection function:
-
-- `selectAutoTutorMove(input, target)` in `AutoTutorPlanner.ts`
-
-Current target-selection function:
-
-- `selectAutoTutorTarget(input)` in `AutoTutorPlanner.ts`
-
-Current SPARC production rule engine:
-
-- `learning-components/units/sparcsession/sparcProductionRuleEvaluator.ts`
-- `learning-components/units/sparcsession/sparcSessionContracts.ts`
-
-The SPARC engine already supports explicit rule objects with:
-
-- `id`
-- optional `module`
-- optional `salience`
-- `when` fact patterns
-- optional `tests`
-- `then` effects
-
-The engine already supports working-memory facts, fact-pattern matching, variable binding, negated fact patterns, tests, salience ordering, fact assertion, state writes, messages, classifications, credits, model-practice observations, progressive node operations, and repeated rule execution until no new eligible firing remains.
-
-## Clarifying what `selectAutoTutorMove` becomes
-
-In the first implementation, `selectAutoTutorMove` does not need to disappear immediately.
-
-Possible transition design:
-
-```ts
-export function selectAutoTutorMove(input: AutoTutorPlannerInput, target: AutoTutorTarget): AutoTutorMove {
-  return selectAutoTutorMoveFromSparcProductions(input, target);
-}
-```
-
-`selectAutoTutorMoveFromSparcProductions` is a proposed adapter function. It does not currently exist. Its purpose would be to:
-
-1. Convert AutoTutor planner input into SPARC working-memory facts.
-2. Run AutoTutor move-selection productions through generalized SPARC rule evaluation.
-3. Read the selected candidate move.
-4. Return an `AutoTutorMove` compatible with the existing planner contract.
-
-This keeps the public AutoTutor planner contract stable while relocating the policy into production rules.
-
-## Why SPARC must be generalized
-
-The existing SPARC production rule engine is tied to SPARC session concepts. That is fine for page-based behavior, but AutoTutor needs to use the same underlying rule capability without pretending it is a SPARC page.
-
-The correct abstraction is not:
+The intended turn is:
 
 ```text
-AutoTutor imports SPARC page behavior.
+learner response
+  -> assessment snapshot
+  -> candidate, comparison, active-cycle, and gain facts
+  -> production-rule evaluation
+  -> exactly one instructional decision
+  -> dialogue or non-dialogue realization
+  -> committed cycle state and decision history
 ```
 
-The correct abstraction is:
+## Final design decisions
 
-```text
-SPARC production-rule infrastructure becomes a reusable pedagogical rule substrate.
-```
+1. The separate TypeScript target selector will no longer own instructional focus.
+2. Candidate derivation remains deterministic runtime work and is exposed completely as working-memory facts.
+3. Expectations and misconceptions receive directionally consistent, kind-specific instructional-need values; they are not compared across target kinds.
+4. Continuing an active cycle and starting a new cycle are different production families.
+5. An expectation does not switch to another expectation merely because the other expectation now ranks higher.
+6. A qualifying misconception may interrupt an active expectation through an initial targeted-prompt production.
+7. Any misconception at or above the misconception threshold has categorical priority over expectations; if several qualify, the maximum eligible misconception is selected.
+8. Meaningful gain after a pump keeps `pump` eligible. Insufficient gain permits a more supportive `prompt`.
+9. Learned expectations and repaired misconceptions cease to qualify through their own production conditions.
+10. Exactly one cycle-changing instructional decision may be produced for one assessment snapshot.
+11. The shared engine remains modality-neutral. Adapters realize the selected instructional action as dialogue, page behavior, or another instructional form.
+12. The old selector and its target-locking path will be removed in the cutover. There will not be two competing target-selection authorities.
 
-AutoTutor should be able to supply facts and rules, run the generalized rule evaluator, and interpret the resulting firings as AutoTutor planning decisions.
+## Current implementation and required correction
 
-This probably requires extracting or generalizing the reusable rule components from the `sparcsession` package into a shared location, while preserving SPARC session compatibility.
+The current implementation is workable but divides responsibility incorrectly.
 
-Possible future location:
+### `sparcTargetSelection.ts`
 
-- `learning-components/rules/`
-- or `learning-components/runtime/productionRules/`
+`selectSparcLearningTargetFromFacts(...)` currently:
 
-The exact location can be decided later, but the functional requirement is clear: AutoTutor productions must use the SPARC production-rule model and evaluator rather than a separate AutoTutor-only mini-engine.
+- calculates expectation candidates;
+- calculates misconception candidates;
+- applies thresholds;
+- computes frontier, coherence, centrality, and expectation priority;
+- preserves an unfinished active expectation;
+- preserves an active misconception;
+- gives active misconceptions precedence when no expectation is locked;
+- chooses the winning target; and
+- emits selected-target facts and move-cycle counters.
 
-## Proposed AutoTutor move-selection rule flow
+The calculation and validation responsibilities are useful. Target persistence and winner selection must move into productions.
 
-The first production-rule conversion should preserve current behavior as much as possible.
+### Current duplicated target state
 
-Flow:
+Instructional focus is represented through overlapping facts, including:
 
-```text
-AutoTutorPlannerInput + AutoTutorTarget
-  -> AutoTutor rule facts
-  -> SPARC/generalized production rule evaluator
-  -> candidate move fact or selected move fact
-  -> AutoTutorMove
-```
+- `learningTarget.selected`;
+- `instructionalTarget.active`;
+- `diagnostic.misconceptionSelected`; and
+- `moveCycleIndex` and related focus counters.
 
-Example input facts:
+These representations can disagree and make replay depend on which latest fact a caller happens to read. They must be replaced by one canonical current-cycle contract plus immutable history events.
 
-```ts
-[
-  { factType: 'autotutor.target', slots: { type: 'expectation', id: 'e1' } },
-  { factType: 'autotutor.learnerContribution', slots: { type: 'idk', confidence: 0.9, streakCount: 1 } },
-  { factType: 'autotutor.answerQuality', slots: { value: 'low' } },
-  { factType: 'autotutor.expectationScore', slots: { id: 'e1', coverage: 0.45 } },
-  { factType: 'autotutor.focus', slots: { expectationId: 'e1', firstFocusTurn: true, focusTurnCount: 0, moveCycleIndex: 0 } },
-  { factType: 'autotutor.threshold', slots: { name: 'coverage', value: 0.8 } }
-]
-```
+### Current threshold coupling
 
-Example candidate-move fact:
+The current selector derives misconception repair eligibility as `1 - coverageThreshold`. Expectation coverage and misconception repair are different constructs. Their goals must be independently authored or independently defined by the controller policy.
+
+### Current progression state
+
+The current selector increments a mechanical `moveCycleIndex`. That counter does not express whether the learner benefited from the preceding move. Progression productions must instead inspect target-specific gain between the prior and current assessment snapshots.
+
+### Current production execution
+
+The production evaluator can continue firing eligible rules as working memory changes. Instructional decision rules therefore need an explicit one-decision guard. Mutually exclusive pedagogical conditions are the primary protection; a decision fact asserted by the first firing is the runtime invariant that prevents a second cycle-changing firing in the same turn.
+
+## Architectural boundaries
+
+The system is divided into five responsibilities.
+
+### 1. Response assessment
+
+Assessment produces current expectation coverage and misconception support values. It does not select a target or move.
+
+For an active target, assessment must provide a finite current value. Missing active-target assessment is an invariant failure rather than silent zero gain.
+
+### 2. Instructional fact projection
+
+A deterministic projector converts the assessment snapshot, content graph, authored policy, and prior cycle into facts. It computes values and comparisons but does not produce an instructional decision.
+
+### 3. Production-rule instructional control
+
+Productions inspect projected facts and assert exactly one instructional decision. The selected production jointly identifies the target, cycle transition, and move.
+
+### 4. Decision validation and commit
+
+The controller validates that exactly one legal decision was asserted, commits the resulting canonical cycle state, and writes an immutable decision-history event.
+
+### 5. Realization adapter
+
+The registered adapter realizes the decision. AutoTutor generates a dialogue utterance. Other SPARC instruction may select a question, show feedback, reveal a worked example, or perform an authored page operation.
+
+The adapter cannot replace the selected target, cycle transition, or instructional action.
+
+## Canonical facts
+
+Names may be adjusted to existing naming conventions during implementation, but these semantic contracts are required.
+
+### Assessment snapshot
 
 ```ts
 {
-  factType: 'autotutor.candidateMove',
+  factType: 'instructional.assessmentSnapshot',
   slots: {
-    move: 'hint',
-    targetType: 'expectation',
-    targetId: 'e1',
-    reason: 'first idk or help request'
+    snapshotId: '...',
+    turnNumber: 4
   }
 }
 ```
 
-The adapter then selects the appropriate candidate according to rule salience or another explicit conflict-resolution policy.
+All candidate and progress facts in one decision pass carry the same `snapshotId`. Facts from different snapshots must never be compared in one decision.
 
-## Candidate rules for mirroring current `selectAutoTutorMove`
-
-The first implementation should mirror current behavior for regression safety.
-
-Initial rule set:
-
-1. Learner question target
-   - If target type is learner question, select `answer_question`.
-
-2. Misconception target
-   - If target type is misconception, select `correction`.
-   - Correction stage may remain handled by existing misconception cycle at first, or be represented as productions in the same pass if simple.
-
-3. Completion target
-   - If target type is completion, select `summary`.
-
-4. First repeated `idk` or `help_request`
-   - If target is expectation and contribution type is `idk` or `help_request` and same-type streak is 1, select `hint`.
-
-5. Second repeated `idk` or `help_request`
-   - If target is expectation and contribution type is `idk` or `help_request` and same-type streak is 2, select `prompt`.
-
-6. Third or later repeated `idk` or `help_request`
-   - If target is expectation and contribution type is `idk` or `help_request` and same-type streak is 3 or more, select `assertion`.
-
-7. Other low-agency contribution
-   - If target is expectation and contribution type is `uncertainty`, `affect`, `meta`, or `off_task`, select `hint`.
-   - This mirrors current behavior but should be reconsidered later because these types are pedagogically different.
-
-8. Low answer quality on first focus turn
-   - If target is expectation, answer quality is low, and this is the first focus turn, select `pump`.
-
-9. Near-threshold coverage
-   - If target is expectation and target expectation coverage is at least 75% of the coverage threshold but below the threshold, select `prompt`.
-
-10. Expectation move cycle fallback
-   - If no earlier expectation move rule selects a move, select from `hint`, `prompt`, `assertion` using the current move cycle index.
-   - This should be mirrored first, then redesigned later.
-
-## Conflict resolution in the production-rule version
-
-The original AutoTutor fuzzy production rules were probably not mutually exclusive. SPARC rules also should not assume mutual exclusivity.
-
-For the first conversion, use salience to preserve current priority order. Higher-salience rules should correspond to earlier cases in the current `selectAutoTutorMove` function.
-
-Example salience order:
-
-- 1000: non-expectation targets such as learner question, misconception, completion
-- 900: repeated `idk` / `help_request`
-- 800: other low-agency contribution
-- 700: low answer quality on first focus turn
-- 600: near-threshold coverage
-- 100: fallback expectation cycle
-
-The adapter should return exactly one move for the current AutoTutor planner contract.
-
-Later versions can allow more sophisticated selection, including candidate utility, multiple rule contributions to a decision, or separating immediate evaluative feedback from collaborative move realization. But the first version should preserve the one-selected-move contract.
-
-## Relationship to original AutoTutor production rules
-
-The original AutoTutor papers describe fuzzy production rules for dialog move selection. Those rules use values such as good-answer match, bad-answer match, topic coverage, student ability, and verbosity. They should inform the redesigned FireTutor production policy.
-
-However, the first implementation should not try to perfectly reconstruct original AutoTutor. It should first move the current policy into explicit productions using the SPARC production-rule infrastructure.
-
-After that, the rule set can be improved toward a better AutoTutor-like policy.
-
-Likely future improvements:
-
-- Separate uncertainty, affect, meta, and off-task handling rather than mapping all to `hint`.
-- Reconsider whether a low-quality first turn should select `pump` or whether some cases should select `hint`, `splice`, correction, or assertion.
-- Represent verbosity or learner initiative explicitly if it becomes available from scoring.
-- Represent misconception or bad-answer match more directly.
-- Replace the mechanical fallback move cycle with state-contingent productions.
-- Make prompt selection depend on the existence of a promptable missing component.
-- Make assertion selection depend on prior scaffolding failure or low expected value of elicitation.
-
-## Target selection as the next major generalization
-
-Target selection should remain outside the first move-selection conversion, but it is a major long-term goal.
-
-The reason is conceptual: target selection focuses the system on what it needs to teach. It supplies the pedagogical schema that lets SPARC decide what part of the learner model, content model, misconception model, or page state should be acted upon.
-
-Long-term target-selection rules should be able to choose among:
-
-- current expectation focus
-- next uncovered expectation
-- central expectation
-- coherent frontier expectation related to the last covered expectation
-- active misconception repair
-- learner question handling
-- completion / summary / final answer phase
-- SPARC page region or node that needs mutation
-- authored model target or knowledge component
-
-This would let SPARC perform AutoTutor-like focusing over a structured page or lesson, not only over a dialogue script.
-
-Possible target-selection fact types:
+### Candidate fact
 
 ```ts
-{ factType: 'pedagogy.expectation', slots: { id, coverage, priority, frontier, coherence, centrality } }
-{ factType: 'pedagogy.misconception', slots: { id, current, confidence, repaired } }
-{ factType: 'pedagogy.focus', slots: { targetType, targetId, turnCount } }
-{ factType: 'pedagogy.learnerQuestion', slots: { current, answerableFromAuthoredContent } }
-{ factType: 'sparc.nodeTarget', slots: { pageKey, nodeId, role, visible, completed } }
-```
-
-The long-term structure becomes:
-
-```text
-Scoring/evaluation facts
-  -> target-selection productions
-  -> move-selection productions
-  -> utterance or page-mutation realization
-```
-
-## Refined architecture conclusion: productions own the active instructional cycle
-
-The target-selection policy should not remain a permanent TypeScript controller that selects a target before productions can run. That design makes the production rules subordinate to an un-authored policy layer: productions can choose only how to act on a focus which was already selected elsewhere.
-
-The intended end state is that the production rules themselves select and continue an instructional cycle. A cycle has an active target, a stage, and a measured change after the learner response. The cycle may be continued, advanced, completed, or interrupted by a higher-need target through ordinary production matching and conflict resolution.
-
-In particular, an unfinished expectation is not passed procedurally from one rule's `then` clause into a special target selector. A firing asserts durable working-memory facts such as the active target and its stage. After the learner responds, evaluation asserts the updated target values and improvement facts. The next rule-evaluation pass sees the resulting facts and decides what is eligible next.
-
-The control loop becomes:
-
-```text
-Initial state or learner response
-  -> assessment produces target-value, goal-distance, and gain facts
-  -> productions select, continue, advance, complete, or interrupt a cycle
-  -> selected instructional move is realized as dialogue, page action, or another modality
-  -> learner response
-  -> repeat
-```
-
-This is a production-system loop, not a target-selection pre-pass followed by a limited move-selection rule set.
-
-### Required instructional facts
-
-The exact serialized schema is an implementation decision, but the rule semantics need the following information.
-
-```ts
-// One fact per currently relevant expectation or misconception.
 {
-  factType: 'pedagogy.candidate',
+  factType: 'instructional.candidate',
   slots: {
-    targetType: 'expectation' | 'misconception',
+    snapshotId: '...',
+    targetKind: 'expectation' | 'misconception',
     targetId: '...',
     currentValue: 0.45,
     goalValue: 0.8,
     instructionalNeed: 0.35,
-    frontier: 0.7,
-    coherence: 0.8,
-    centrality: 0.6,
-    eligible: true
+    eligible: true,
+    rankWithinKind: 1,
+    isMaximumWithinKind: true,
+    frontierScore: 0.7,
+    coherenceScore: 0.8,
+    centralityScore: 0.6
   }
 }
+```
 
-// At most one active instructional cycle.
+The graph fields apply to expectations. They remain visible even when the final ranking is projected so ranking decisions are inspectable.
+
+### Canonical active cycle
+
+```ts
 {
-  factType: 'pedagogy.activeCycle',
+  factType: 'instructional.activeCycle',
   slots: {
-    targetType: 'expectation',
+    cycleId: '...',
+    targetKind: 'expectation' | 'misconception',
     targetId: '...',
     stage: 'pump' | 'prompt' | 'hint' | 'assertion' | 'correction',
     priorValue: 0.45,
-    turnCount: 1
+    startedAtTurn: 3,
+    cycleTurnCount: 1,
+    status: 'active'
   }
 }
+```
 
-// Produced after the learner response is assessed.
+There is at most one active cycle. Interruption ends the current cycle with an `interrupted` history event and starts a new cycle. It does not leave two active facts or an implicit suspended stack.
+
+### Progress fact
+
+```ts
 {
-  factType: 'pedagogy.progress',
+  factType: 'instructional.progress',
   slots: {
-    targetType: 'expectation',
+    snapshotId: '...',
+    cycleId: '...',
+    targetKind: 'expectation',
     targetId: '...',
+    priorValue: 0.45,
     currentValue: 0.57,
     gain: 0.12,
     meaningfulGain: true,
@@ -354,277 +194,402 @@ The exact serialized schema is an implementation decision, but the rule semantic
 }
 ```
 
-`frontier`, `coherence`, and `centrality` are inputs to selecting a new expectation candidate. They do not make a target permanently active. The active-cycle and progress facts make the immediately preceding instructional action visible to the next set of productions.
+Gain is direction-normalized:
 
-### Use one comparable measure of instructional need
+- expectation gain is increased coverage;
+- misconception repair gain is decreased misconception support.
 
-Expectations and misconceptions must not compete using raw, semantically different assessment scores. A misconception score might represent activation while an expectation score represents coverage; comparing `0.70` to `0.45` directly has no instructional meaning.
+The authored policy defines the minimum meaningful gain. Zero, negative, and meaningful positive gain remain distinguishable.
 
-Each candidate therefore needs a normalized `instructionalNeed`: its distance from the desired state. For example:
+### Instructional decision
 
-```text
-expectation instructional need   = expectation goal coverage - current coverage
-misconception instructional need = current misconception activation - repair goal
+```ts
+{
+  factType: 'instructional.decision',
+  slots: {
+    snapshotId: '...',
+    targetKind: 'expectation',
+    targetId: '...',
+    action: 'pump',
+    transition: 'start' | 'continue' | 'advance' | 'interrupt' | 'complete',
+    sourceRuleId: '...',
+    reason: '...'
+  }
+}
 ```
 
-The exact goals and normalization must be authored or policy-defined explicitly. Once all candidates use the same direction and scale, rules can make the intended comparison: a misconception whose unresolved need exceeds every eligible expectation's need is eligible to begin a misconception `pump` cycle. This is an interruption decision based on instructional need, not an AutoTutor-only special case or a comparison of unrelated raw scores.
+Every cycle-changing production requires the absence of an `instructional.decision` for the current snapshot. Its `then` clause asserts that decision. The controller rejects zero or multiple decisions unless the single decision is an explicitly defined terminal outcome.
 
-### Natural expectation sequencing
+## Candidate and maximum calculation
 
-The continuation rules should use the active expectation's prior stage and its observed gain. At a minimum:
+### Eligibility
 
-```text
-IF the active cycle is an expectation at pump
-AND its progress does not show meaningful gain
-THEN retain that expectation at pump.
+An expectation is eligible while its coverage is below its authored coverage goal. A misconception becomes eligible when its support is at or above its independently authored misconception threshold. An active misconception remains active until it satisfies its authored repair criterion.
 
-IF the active cycle is an expectation at pump
-AND its progress shows meaningful gain
-AND the expectation goal is not reached
-THEN make prompt for that same expectation eligible.
+### Kind-specific instructional need
 
-IF the active cycle's expectation goal is reached
-THEN close the cycle and make no continuation move for it eligible.
-```
+Both target types use the same direction: larger `instructionalNeed` means farther from the desired instructional state. The values support ranking within each target kind; they are not used to decide whether an eligible misconception outranks an expectation.
 
-Equivalent rules can define later `prompt`, `hint`, and `assertion` stages. The important point is that stage transitions depend on the response to the prior move, not on a mechanical move-cycle counter or an external selector deciding that the expectation must remain locked.
-
-The definition of `meaningfulGain` needs to be explicit and stable. It may be a minimum positive change, a reliability-weighted change, or an authored threshold. It must not be inferred ad hoc from whichever rule happens to fire.
-
-### Misconception interruption
-
-Misconceptions should participate in every decision pass, including while an expectation cycle is active. The essential interruption rule is:
+At minimum:
 
 ```text
-IF an unresolved misconception has instructional need greater than
-the active expectation's instructional need
-AND it is the highest-need eligible candidate overall
-THEN close or suspend the expectation cycle,
-assert an active misconception cycle at pump,
-and make misconception pump eligible.
+expectation need   = normalized deficit below expectation coverage goal
+misconception need = normalized excess above misconception repair goal
 ```
 
-This rule permits the immediate behavior that the present target-selection layer blocks: a stronger misconception can preempt an unfinished expectation after the learner has just revealed it. It does not require the expectation first to reach its coverage threshold, complete a fixed dialogue cycle, or fail a series of moves.
+Normalization must be stable and inspectable within each target kind. Raw expectation coverage is never compared with raw misconception support because misconception priority is established by threshold eligibility.
 
-When the misconception is adequately repaired, productions close that cycle and re-evaluate all candidates. They may return to the prior expectation if it remains the strongest eligible need, but the prior expectation does not receive an unconditional lock.
+### Expectation ranking
 
-### Selecting a new focus
+Frontier, coherence, and centrality remain explicit inputs for choosing among expectations. The policy must expose all weights and intermediate scores. Graph ranking determines which expectation best represents current instructional need and the content structure when no misconception is eligible.
 
-When no instructional cycle is active, the rule system must expose every unresolved expectation and misconception as a candidate. A new target is selected from the eligible candidate with the greatest `instructionalNeed`; expectation frontier/coherence/centrality can be part of its candidate priority when multiple expectations are competing.
+The initial implementation should preserve the existing authored frontier, coherence, and centrality weights unless a separate pedagogical change is approved. It must add the normalized need component explicitly rather than allowing structural centrality alone to stand in for unfinished learning.
+
+### Maxima and ties
+
+The fact projector marks the maximum eligible expectation and maximum eligible misconception. Each maximum is calculated only within its own target kind. This is a deterministic comparison over declared candidate values, not a hidden target-selection decision.
+
+Ties are resolved visibly:
+
+1. larger instructional need;
+2. applicable within-kind structural or authored priority;
+3. authored target order; and
+4. stable target identifier.
+
+There is no cross-kind tie. If at least one misconception is threshold-eligible, misconceptions have priority. Ties among eligible misconceptions and ties among eligible expectations use the deterministic within-kind policy above.
+
+## Production families
+
+The rule set should use generic variable binding over candidate facts. Runtime content supplies expectation and misconception facts; the runtime does not generate separate TypeScript logic for every target.
+
+### A. Continue an active expectation at pump
 
 ```text
-IF no active cycle exists
-AND candidate C is eligible
-AND no other eligible candidate has greater instructional need
-THEN assert an active cycle for C at pump.
+IF an expectation cycle is active at pump
+AND the expectation remains unfinished
+AND the latest response produced meaningful gain for that expectation
+AND no misconception is threshold-eligible
+AND no decision exists for this snapshot
+THEN continue the same expectation at pump.
 ```
 
-Ties require a deterministic, inspectable policy, such as explicit authored priority followed by a stable target identifier. Rule salience should order rule families and safety/terminal rules; it should not hide a separate hard-coded target ranking that overrides the candidate facts.
+This preserves productive learner elaboration.
 
-### What is general and what remains dialogue-specific
-
-This architecture is not limited to dialogue. The reusable instructional-control substrate is:
-
-- candidate facts with normalized instructional need;
-- active-cycle and progress facts;
-- production rules that continue, advance, complete, interrupt, or begin a cycle; and
-- explicit conflict resolution and rule-firing history.
-
-AutoTutor-specific policy is the mapping from an eligible cycle stage to a dialogue move such as `pump`, `prompt`, `hint`, `assertion`, or `correction`, plus LLM utterance realization. A SPARC page can use the same target-selection and progression facts while mapping the selected cycle to a node operation, worked example, feedback panel, question, or other authored instructional action.
-
-Consequently, the general rule engine should not contain special cases such as “misconceptions always follow expectations,” “an expectation cannot be interrupted,” or “dialogue stages must run in a fixed cycle.” Those are policies, if desired, that belong in explicit authored productions. The generic engine only needs to evaluate facts, apply rule conditions, resolve explicitly declared conflicts, assert effects, and record why a rule fired.
-
-### Observability requirement
-
-Every instructional decision should leave an auditable record containing:
-
-- the active cycle before the decision, if any;
-- all eligible candidates with their current values, goals, and normalized instructional needs;
-- the prior target value and measured gain;
-- the rule or rules that matched and the rule selected after conflict resolution;
-- the active cycle and instructional move asserted by the firing.
-
-This record is necessary to distinguish an evaluation error from a rule-policy decision. It would make a case such as a learner mentioning genes traceable: the history could show whether the relevant expectation gained credit, whether a misconception was activated, and why the selected rule nevertheless continued or changed the cycle.
-
-This is the route by which SPARC can eventually do AutoTutor.
-
-## Implementation plan
-
-### Step 1: Preserve and document the current behavior
-
-- Add unit tests around current `selectAutoTutorMove` behavior.
-- Cover all current branches.
-- These tests become the equivalence suite for the production-rule conversion.
-
-Required cases:
-
-- learner question target selects `answer_question`
-- misconception target selects `correction`
-- completion target selects `summary`
-- first `idk` selects `hint`
-- second `idk` selects `prompt`
-- third `idk` selects `assertion`
-- first `help_request` selects `hint`
-- second `help_request` selects `prompt`
-- third `help_request` selects `assertion`
-- `uncertainty` selects `hint`
-- `affect` selects `hint`
-- `meta` selects `hint`
-- `off_task` selects `hint`
-- low answer quality on first focus turn selects `pump`
-- near-threshold coverage selects `prompt`
-- fallback cycle selects `hint`, `prompt`, then `assertion` according to cycle index
-
-### Step 2: Extract generalized production rule infrastructure from SPARC session code
-
-Goal: make the production rule evaluator reusable by AutoTutor without making AutoTutor depend on SPARC session UI concepts.
-
-Possible new module:
-
-- `learning-components/runtime/productionRules/`
-
-Candidate extracted pieces:
-
-- working-memory fact type
-- rule expression type
-- fact pattern type
-- production rule condition type
-- production rule test type
-- production rule evaluator
-- salience compiler
-- rule execution result
-
-SPARC-specific effects such as progressive node operations can remain as SPARC extensions or adapters.
-
-### Step 3: Add AutoTutor rule fact adapter
-
-Create a module such as:
-
-- `learning-components/units/autotutor/AutoTutorRuleFacts.ts`
-
-Responsibilities:
-
-- Convert `AutoTutorPlannerInput` and `AutoTutorTarget` into rule facts.
-- Include target type and target id.
-- Include learner contribution type, confidence, and streak count.
-- Include answer quality.
-- Include expectation coverage and missing elements for the selected target.
-- Include focus state, first-focus-turn status, focus turn count, and move cycle index.
-- Include thresholds.
-- Include completion state and final-answer-prompt requirement.
-
-### Step 4: Add AutoTutor move-selection production rules
-
-Create a module such as:
-
-- `learning-components/units/autotutor/AutoTutorMoveSelectionRules.ts`
-
-This module should export the initial rule set that mirrors current `selectAutoTutorMove` behavior.
-
-Rules should assert `autotutor.candidateMove` facts or another small generic candidate-decision form.
-
-### Step 5: Add AutoTutor rule-result adapter
-
-Create a module such as:
-
-- `learning-components/units/autotutor/AutoTutorRuleMoveSelector.ts`
-
-Responsibilities:
-
-- Run the generalized production rule evaluator.
-- Collect candidate move facts.
-- Select one candidate according to salience and deterministic tie-breaking.
-- Validate that the selected move is legal for the target type.
-- Return an `AutoTutorMove`.
-
-### Step 6: Route `selectAutoTutorMove` through production rules
-
-Change `selectAutoTutorMove` so it delegates to the production-rule move selector.
-
-The old implementation can temporarily remain as:
-
-- a fallback,
-- a test oracle,
-- or a deprecated helper used only in equivalence tests.
-
-### Step 7: Extend tests
-
-Add tests to prove:
-
-- the production-rule selector matches legacy `selectAutoTutorMove` for current cases,
-- rules are salience ordered,
-- overlapping candidate rules resolve deterministically,
-- invalid candidate moves fail clearly,
-- missing required facts fail clearly,
-- AutoTutor can use the generalized SPARC production-rule infrastructure without importing SPARC session UI behavior.
-
-### Step 8: Redesign the move policy toward better AutoTutor rules
-
-After equivalence is established, improve the rule set.
-
-Possible improvements:
-
-- Replace the fallback move cycle with explicit state-contingent rules.
-- Add separate rules for uncertainty, affect, meta, and off-task contributions.
-- Use missing expectation elements to decide when prompting is viable.
-- Use prior hint/prompt/assertion history rather than only a cycle index.
-- Add support for original AutoTutor-like variables such as verbosity, good-answer match, bad-answer match, and topic coverage when available.
-
-### Step 9: Generalize target selection
-
-Once move selection works through generalized SPARC productions, begin target-selection conversion.
-
-Initial target-selection conversion should preserve `selectAutoTutorTarget` behavior. Later target-selection rules should become the general pedagogical focusing mechanism for SPARC.
-
-This is the important long-term point: target selection is what lets SPARC know what it is trying to teach next.
-
-## Functional requirements
-
-1. AutoTutor move selection must be expressible as production rules.
-2. Those productions must be evaluated by generalized SPARC production-rule infrastructure.
-3. AutoTutor must not grow a separate incompatible production-rule engine.
-4. The first conversion must preserve current `selectAutoTutorMove` behavior unless a deliberate redesign is separately approved.
-5. The system must support deterministic conflict resolution for overlapping productions.
-6. The production-rule system must support AutoTutor facts that are not tied to visible SPARC page nodes.
-7. The generalized rule infrastructure must continue to support existing SPARC page/session behavior.
-8. The design must keep scoring/evaluation, target selection, move selection, and utterance generation conceptually separable.
-9. Target selection should be generalized after move selection and treated as the mechanism for pedagogical focus.
-10. The long-term system should allow SPARC to do AutoTutor-like tutoring through target-selection and move-selection productions, with realization either as dialogue, page mutation, or both.
-
-## Non-goals for the first implementation
-
-- Do not replace the LLM scoring call.
-- Do not replace utterance generation.
-- Do not rewrite SPARC page mutation.
-- Do not fully reconstruct original AutoTutor fuzzy rule conflict resolution yet.
-- Do not redesign target selection in the same first pass unless it is necessary for integration.
-- Do not require SPARC documents to be present for AutoTutor move-selection rules.
-
-## Open design questions
-
-1. Should the generalized production rule types live under `learning-components/runtime/productionRules/` or another shared location?
-2. Should AutoTutor move rules assert `autotutor.candidateMove` facts, or should there be a generic `candidateDecision` fact type?
-3. Should salience be the only first-pass conflict-resolution mechanism, or should candidate moves carry explicit utility/priority fields?
-4. Should correction stage selection be converted with move selection, or should it remain as the existing misconception cycle for the first pass?
-5. How should rule firings be logged into AutoTutor history for debugging and research analysis?
-6. When target selection is generalized, should it use the same fact vocabulary as move selection or a broader pedagogical fact vocabulary?
-
-## Working summary
-
-The immediate engineering move is:
+### B. Advance an active expectation from pump to prompt
 
 ```text
-Break selectAutoTutorMove into SPARC-style production rules.
+IF an expectation cycle is active at pump
+AND the expectation remains unfinished
+AND the latest response did not produce meaningful gain
+AND no misconception is threshold-eligible
+AND no decision exists for this snapshot
+THEN continue the same expectation with prompt.
 ```
 
-The key architectural move is:
+Later hint, assertion, and other stage transitions remain explicit productions. They must depend on assessed response and prior stage, not on a mechanical cycling counter.
+
+### C. Interrupt an expectation with a misconception
 
 ```text
-Generalize the SPARC production rule engine so AutoTutor can use it without building a separate rule system.
+IF an expectation cycle is active
+AND at least one misconception is threshold-eligible
+AND no decision exists for this snapshot
+THEN end the expectation cycle as interrupted
+AND start the maximum misconception with a targeted prompt.
 ```
 
-The long-term pedagogical move is:
+This is the misconception initial-prompt production. It is a policy rule, not special target-selection code in the engine. The prompt must be authored or realized for the identified misconception; it must not blindly reuse an expectation prompt that assumes merely missing knowledge.
+
+### D. Continue an active misconception
+
+An active misconception remains the cycle target while it is unresolved. Its stage-specific productions use direction-normalized repair gain to retain productive elicitation or provide stronger support. Another expectation does not interrupt an active misconception. A different misconception does not interrupt it in the first implementation; after repair, all candidates compete again.
+
+### E. Start a new misconception cycle
 
 ```text
-Generalize target selection so SPARC can focus on what to teach next, then select AutoTutor-style moves or page mutations from that focus.
+IF no continuable active cycle exists
+AND an eligible misconception exists
+AND no decision exists for this snapshot
+THEN start the maximum misconception with a targeted prompt.
 ```
+
+Expectation values do not participate in this decision. Once any misconception is threshold-eligible, the maximum eligible misconception qualifies.
+
+### F. Start a new expectation cycle
+
+```text
+IF no continuable active cycle exists
+AND an eligible expectation exists
+AND no misconception is threshold-eligible
+AND no decision exists for this snapshot
+THEN start the maximum eligible expectation at pump.
+```
+
+The maximum condition belongs here, not on every continuation rule. This prevents expectation-to-expectation thrashing during a coherent active cycle.
+
+### G. Release a learned or repaired target
+
+Goal attainment makes that target's continuation productions ineligible. The same decision pass may start the newly selected maximum target. The history records the old cycle as completed and the new cycle as started.
+
+### H. Completion
+
+```text
+IF no continuable active cycle exists
+AND no eligible expectation exists
+AND no eligible misconception exists
+AND no decision exists for this snapshot
+THEN assert the completion instructional decision.
+```
+
+This replaces the current selector error when no uncovered expectation remains.
+
+### I. Learner questions and other event targets
+
+Learner-question handling must also be expressed as an explicit production family rather than restored as a hard-coded selector exception. Its precedence and return-to-cycle behavior must be visible in conditions and history. It may produce a temporary answer action without changing the active instructional cycle, or an explicit cycle transition when authored policy requires one.
+
+## Why only one instructional direction qualifies
+
+The rule conditions are designed to be mutually exclusive:
+
+- expectation continuation requires that no misconception be threshold-eligible;
+- misconception interruption requires that at least one misconception be threshold-eligible;
+- new-cycle rules require no continuable active cycle;
+- completion requires no eligible targets;
+- every decision rule requires no existing decision for the snapshot.
+
+The first firing asserts the decision fact. Re-evaluation makes all other cycle-changing productions ineligible. Rule salience may order terminal or event rule families, but it must not conceal a separate target-ranking policy.
+
+## State, replay, and history
+
+The canonical cycle is durable controller state. Each turn projects that state into working memory and appends an immutable event after a decision is committed.
+
+Required event information:
+
+- assessment snapshot id and turn;
+- previous active cycle;
+- all candidate current values, goals, needs, and eligibility;
+- expectation and misconception maxima;
+- prior value, current value, and gain for the active target;
+- production id and bound variables;
+- selected decision and reason;
+- resulting active cycle; and
+- completion or interruption reason when a cycle ends.
+
+Replay must reconstruct exactly one active cycle from events and produce the same decision from the same assessment snapshot and policy facts.
+
+The current selected-target facts may be read during a bounded data transition if durable history requires it, but they must not remain parallel authorities after the cutover. Any transition reader must have an explicit removal point; new writes use only the canonical contract.
+
+## Generalization and maintainability
+
+### Generic runtime responsibilities
+
+The shared runtime owns:
+
+- fact matching and variable binding;
+- numeric and relational tests;
+- negated conditions;
+- deterministic rule conflict handling;
+- one-decision validation;
+- decision history; and
+- adapter dispatch.
+
+It does not own AutoTutor target priorities or dialogue-stage policy.
+
+### AutoTutor rule-pack responsibilities
+
+The AutoTutor rule pack owns:
+
+- expectation and misconception cycle rules;
+- pump, prompt, hint, assertion, and correction policy;
+- learner-question policy;
+- meaningful-gain thresholds; and
+- AutoTutor-specific terminal behavior.
+
+### Adapter responsibilities
+
+The adapter maps an already selected semantic instructional action into its modality. Dialogue realization may use `pump` and `prompt` directly. A non-dialogue adapter may map the same instructional intent to a question, feedback panel, worked example, or page operation.
+
+The core contract should represent the semantic action clearly enough that an adapter does not need to redo target selection.
+
+### Content responsibilities
+
+AutoTutor content continues to configure expectations, misconceptions, goals, graph relationships, and relevant policy values. It should not duplicate the generic production set once per authored target. Generic productions bind against authored target facts.
+
+No new TDF field should be introduced until both the runtime field registry and `C:\dev\mofacts_config` are checked for an existing equivalent.
+
+## Expected code changes
+
+### `learning-components/units/sparcsession/sparcTargetSelection.ts`
+
+- Split candidate projection from target selection.
+- Retain validation, graph calculations, eligibility, and transparent ranking inputs.
+- Remove active-target locking, selected-target emission, and winner return values.
+- Rename the module if its remaining responsibility is candidate projection rather than selection.
+
+### `learning-components/units/sparcsession/sparcInstructionalControl.ts`
+
+- Stop requiring a preselected target before production evaluation.
+- Supply the assessment snapshot, projected candidates, canonical cycle, and progress facts.
+- Validate and commit the single production decision.
+
+### `learning-components/units/sparcsession/sparcControllerTurnPlanning.ts`
+
+- Make the assessment, fact-projection, decision, commit, and realization phases explicit.
+- Ensure one immutable snapshot is used throughout a turn.
+- Remove any orchestration branch that reintroduces target selection outside productions.
+
+### `learning-components/units/sparcsession/sparcProgressiveScaffoldingRules.ts`
+
+- Add target-start, target-continuation, misconception-interruption, release, and completion conditions.
+- Replace mechanical cycle progression with target-specific gain conditions.
+- Ensure all cycle-changing rules assert the common decision fact.
+
+### `learning-components/units/sparcsession/sparcInstructionalAdapterRegistry.ts`
+
+- Accept the validated instructional decision.
+- Keep realization separate from target and progression policy.
+- Validate that adapters cannot replace the target or action.
+
+### Production-rule contracts and evaluator
+
+- Add or consolidate candidate, active-cycle, progress, and decision contracts.
+- Support the required comparisons and decision guard through existing generic rule constructs where possible.
+- Do not add AutoTutor-specific branches to the evaluator.
+- Add a clear invariant failure for zero or multiple instructional decisions.
+
+### Existing tests
+
+Tests that currently assert an unfinished expectation cannot be interrupted by a newly active misconception encode the behavior being replaced. They must be rewritten to assert the new comparison-based interruption policy.
+
+## Implementation sequence
+
+### Phase 1: Lock the behavioral decision table
+
+- Express every production family above as a truth table.
+- Include active-cycle kind, stage, goal status, gain status, maximum expectation, maximum misconception, and cross-kind comparison.
+- Confirm that each valid row yields exactly one decision.
+
+### Phase 2: Introduce canonical facts and candidate projection
+
+- Add the assessment snapshot, candidate, active-cycle, progress, and decision contracts.
+- Convert current target-selection calculations into pure fact projection.
+- Add independent expectation and misconception goals.
+- Add deterministic within-kind maximum and tie facts.
+
+### Phase 3: Consolidate cycle state
+
+- Make one active-cycle representation authoritative.
+- Project prior stored state into that representation.
+- Stop producing overlapping current-target facts on new turns.
+- Preserve immutable events for replay and research analysis.
+
+### Phase 4: Implement the production families
+
+- Implement expectation pump continuation and prompt advancement.
+- Implement misconception initial-prompt interruption.
+- Implement active misconception continuation.
+- Implement new expectation and misconception starts.
+- Implement release, completion, and learner-question rules.
+- Add the one-decision guard to every cycle-changing rule.
+
+### Phase 5: Cut controller planning over to production decisions
+
+- Remove the call that selects the target before productions run.
+- Pass all candidates and cycle facts into evaluation.
+- Validate exactly one decision and commit it.
+- Route realization through the adapter registry.
+
+### Phase 6: Remove the old authority
+
+- Delete old target-lock and winner-selection branches.
+- Delete mechanical move-cycle policy that has been replaced by gain rules.
+- Remove or migrate redundant selected-target state.
+- Remove tests that preserve the old lock behavior.
+- Do not retain a second selector path.
+
+### Phase 7: Add observability and replay proof
+
+- Record the compact decision trace.
+- Prove deterministic replay from the same snapshot and policy facts.
+- Make target assessment, comparison, rule selection, and realization distinguishable in logs.
+
+## Verification plan
+
+### Candidate projection tests
+
+- expectation eligibility below and at its goal;
+- misconception eligibility above and at its repair goal;
+- independently authored goals;
+- stable kind-specific need calculations;
+- frontier, coherence, centrality, and need components;
+- deterministic maxima and tie resolution; and
+- rejection of mixed assessment snapshot ids.
+
+### Production eligibility tests
+
+- productive expectation pump stays at pump;
+- insufficient-gain pump permits prompt;
+- another expectation does not interrupt an active expectation;
+- misconception below its threshold does not interrupt;
+- any misconception at or above its threshold interrupts an expectation with a targeted prompt;
+- expectation priority does not suppress a threshold-eligible misconception;
+- only the maximum misconception can start;
+- repaired misconception releases its cycle;
+- learned expectation releases its cycle;
+- new focus considers all eligible targets;
+- no eligible targets produces completion; and
+- learner-question rules have explicit, tested precedence.
+
+### Decision invariants
+
+- every valid assessment snapshot produces exactly one decision;
+- the decision references a candidate or declared terminal/event target;
+- no second cycle-changing rule fires after the decision fact exists;
+- the adapter cannot alter target or action; and
+- replay produces the same decision and cycle state.
+
+### Natural Selection regression scenario
+
+Replay the motivating interaction turn by turn and retain all expectation and misconception values. Verify that:
+
+- a correct response about genes changes the intended expectation assessment;
+- a newly strong misconception becomes eligible for its initial targeted prompt when it crosses the misconception threshold;
+- expectation productions are ineligible during that interruption;
+- productive pump gain retains pump; and
+- insufficient pump gain permits prompt.
+
+### Required repository verification after implementation
+
+From `mofacts/`:
+
+```text
+npm run typecheck
+npm run lint
+```
+
+If contracts introduce or change TDF fields, also run schema generation and inspect config-repository compatibility. Meteor integration tests require their separately authorized supported environment.
+
+## Non-goals
+
+- Do not change the learner-response scoring model as part of this control refactor.
+- Do not let the utterance model choose or rewrite the instructional target or move.
+- Do not create a second AutoTutor-only rule evaluator.
+- Do not duplicate generic productions for every authored expectation or misconception.
+- Do not preserve the old target selector as an alternate runtime authority.
+- Do not redesign every later dialogue-stage production before the target and initial-move rules are coherent.
+- Do not add configuration fields when existing contracts can express the required facts.
+
+## Completion criteria
+
+The implementation is complete when:
+
+1. no separate selector chooses or locks the instructional target before production evaluation;
+2. all eligible expectations and misconceptions are represented as inspectable facts;
+3. current-cycle continuation, misconception interruption, new-cycle selection, and completion are production outcomes;
+4. productive pump gain remains at pump and insufficient gain can advance to prompt;
+5. exactly one instructional decision is committed per assessment snapshot;
+6. one canonical active-cycle representation drives current behavior and replay;
+7. realization adapters cannot change the production-selected target or action;
+8. the old locking tests are replaced with the agreed rule-policy tests;
+9. the Natural Selection interaction demonstrates the intended interruption and progression behavior; and
+10. required typecheck, lint, applicable schema, and supported integration verification pass.

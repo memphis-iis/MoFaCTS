@@ -20,7 +20,7 @@ import {
 } from './sparcDialogueTurnNodes';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import type { SparcReplayState } from './sparcStateReplay';
-import type { SparcLearningTargetSelectionOptions } from './sparcTargetSelection';
+import type { SparcInstructionalCandidateOptions } from './sparcInstructionalCandidates';
 import {
   createSparcUtteranceRequestFromFacts,
   type SparcUtteranceRequest,
@@ -136,9 +136,6 @@ function assertCompletedDialogueReplayState(replayState: SparcReplayState | unde
       'learningTarget.score',
       'controller.selectedAction',
       'controller.completionState',
-      'instructionalTarget.active',
-      'instructionalFocus.episode',
-      'scaffold.state',
     ];
     if (!hasTutorUtterance(transition)) {
       throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing generated tutor utterance state`);
@@ -148,16 +145,21 @@ function assertCompletedDialogueReplayState(replayState: SparcReplayState | unde
         throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing required ${factType} state`);
       }
     }
-    if (!factTypes.has('learningTarget.selected') && !factTypes.has('diagnostic.misconceptionSelected')) {
-      throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing required selected instructional target state`);
+    const hasCanonicalControl = factTypes.has('instructional.activeCycle') && factTypes.has('instructional.decision');
+    const hasPreCanonicalControl = factTypes.has('instructionalTarget.active')
+      && factTypes.has('instructionalFocus.episode')
+      && factTypes.has('scaffold.state')
+      && (factTypes.has('learningTarget.selected') || factTypes.has('diagnostic.misconceptionSelected'));
+    if (!hasCanonicalControl && !hasPreCanonicalControl) {
+      throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing canonical or migratable instructional control state`);
     }
   }
 }
 
 function stableFactIdentitySlots(fact: SparcWorkingMemoryFact): Readonly<Record<string, unknown>> {
   const slots = fact.slots ?? {};
-  if (fact.factType === 'learningTarget.candidate') {
-    return { clusterKC: slots.clusterKC };
+  if (fact.factType === 'instructional.candidate') {
+    return { targetKind: slots.targetKind, targetId: slots.targetId };
   }
   if (fact.factType === 'learningTarget.score') {
     return { clusterKC: slots.clusterKC };
@@ -180,23 +182,23 @@ function stableFactIdentitySlots(fact: SparcWorkingMemoryFact): Readonly<Record<
   if (fact.factType === 'controller.selectedAction') {
     return {};
   }
-  if (fact.factType === 'learningTarget.selected') {
+  if (fact.factType === 'instructional.assessmentSnapshot') {
     return {};
   }
-  if (fact.factType === 'diagnostic.misconceptionSelected') {
+  if (fact.factType === 'instructional.thresholds') {
     return {};
   }
-  if (fact.factType === 'dialogue.completionSelected') {
+  if (fact.factType === 'instructional.progress') {
+    return { cycleId: slots.cycleId };
+  }
+  if (fact.factType === 'instructional.cycleStatus') {
     return {};
   }
-  if (fact.factType === 'instructionalTarget.active') {
+  if (fact.factType === 'instructional.activeCycle') {
     return {};
   }
-  if (fact.factType === 'instructionalFocus.episode') {
-    return {};
-  }
-  if (fact.factType === 'scaffold.state') {
-    return { focusEpisodeId: slots.focusEpisodeId };
+  if (fact.factType === 'instructional.decision') {
+    return { snapshotId: slots.snapshotId };
   }
   return {};
 }
@@ -212,15 +214,19 @@ function createStableControllerStateWrites(params: {
   };
   const assertedControllerFacts = params.planning.productionRuleEvaluation.execution.firings
     .flatMap((firing) => firing.persistentAssertedFacts)
-    .filter((fact) => fact.factType === 'controller.selectedAction' || fact.factType === 'scaffold.state');
-  const instructionalFacts = params.planning.productionRuleFacts.filter((fact) => (
-    fact.factType === 'instructionalTarget.active'
-    || fact.factType === 'instructionalFocus.episode'
+    .filter((fact) => (
+      fact.factType === 'controller.selectedAction'
+      || fact.factType === 'instructional.activeCycle'
+      || fact.factType === 'instructional.decision'
+    ));
+  const projectedFacts = params.planning.instructionalProjection.facts.filter((fact) => (
+    fact.factType !== 'instructional.activeCycle'
+    && fact.factType !== 'controller.selectedAction'
+    && fact.factType !== 'instructional.decision'
   ));
   const facts = [
-    ...params.planning.targetSelection.facts,
     ...params.planning.derivedFacts,
-    ...instructionalFacts,
+    ...projectedFacts,
     ...assertedControllerFacts,
   ];
   return facts.map((fact) => createSparcStableWorkingMemoryFactStateWrite({
@@ -301,7 +307,7 @@ export async function evaluateSparcControllerDialogueTurn(params: {
   readonly problemStatement: string;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
-  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
   readonly dialogueNodeOptions?: SparcDialogueTurnNodeOptions;
@@ -327,7 +333,7 @@ export async function evaluateSparcControllerDialogueTurn(params: {
       ...turnFacts,
       ...learnerResponseScoreFacts,
     ],
-    ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+    ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
     ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
   });
   const moveSelectionAudit = auditSparcMoveSelection({
@@ -396,7 +402,7 @@ export async function commitSparcControllerDialogueTurn(params: {
   readonly problemStatement: string;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
-  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
   readonly dialogueNodeOptions?: SparcDialogueTurnNodeOptions;

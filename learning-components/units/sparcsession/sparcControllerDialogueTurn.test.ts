@@ -88,7 +88,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           coverage: 0.6,
         }],
       },
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
       generateTutorUtterance: (request) => {
@@ -101,13 +101,13 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
     });
 
-    assert.equal(result.planning.targetSelection.selectedClusterKC, 'kc-a');
+    assert.equal(result.planning.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-a');
     assert.ok(result.learnerResponseScoreFacts.some((fact) => (
       fact.factType === 'learningTarget.score'
       && fact.slots?.clusterKC === 'kc-b'
       && fact.slots.coverage === 0.6
     )));
-    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.scaffold.pump');
+    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.target.expectation.start');
     assert.equal(result.moveSelectionAudit.selected?.action, 'pump');
     assert.equal(result.utteranceRequest.action, 'pump');
     assert.equal(result.tutorText, 'Think about how B depends on A.');
@@ -243,7 +243,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       'dialogue.question.defer',
       'dialogue.scaffold.pump',
     ]);
-    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.scaffold.pump');
+    assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.target.expectation.start');
     assert.equal(result.utteranceRequest.action, 'pump');
     assert.equal(result.transition.writes.some((write) => (
       write.value
@@ -254,7 +254,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     const preservedScaffold = result.transition.writes.find((write) => (
       write.value
       && typeof write.value === 'object'
-      && (write.value as { factType?: string }).factType === 'scaffold.state'
+      && (write.value as { factType?: string }).factType === 'instructional.activeCycle'
     ));
     assert.equal((preservedScaffold?.value as { slots?: { stage?: string } })?.slots?.stage, 'PUMP');
   });
@@ -351,7 +351,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           coverage: 0.6,
         }],
       },
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
       generateTutorUtterance: () => 'Think about how B depends on A.',
@@ -379,8 +379,8 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       && entry.slots?.targetId === 'kc-a'
     )));
     assert.ok(facts.some((entry) => (
-      entry.factType === 'learningTarget.selected'
-      && entry.slots?.clusterKC === 'kc-a'
+      entry.factType === 'instructional.activeCycle'
+      && entry.slots?.targetId === 'kc-a'
     )));
     assert.ok(facts.some((entry) => (
       entry.factType === 'controller.selectedAction'
@@ -400,7 +400,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
         document: document(),
         event,
         problemStatement,
-        targetSelectionOptions: {
+        candidateOptions: {
           anchorClusterKC: 'kc-a',
         },
         generateTutorUtterance: () => '   ',
@@ -428,7 +428,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           coverage: 0.6,
         }],
       },
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
       generateTutorUtterance: () => 'Think about how B depends on A.',
@@ -457,7 +457,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           coverage: 0.7,
         }],
       },
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-b',
       },
       generateTutorUtterance: (request) => {
@@ -468,7 +468,6 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     });
 
     assert.equal(secondTurnUtteranceCalls, 1);
-    assert.equal(secondTurn.planning.targetSelection.selectedClusterKC, 'kc-a');
     assert.equal(secondTurn.utteranceRequest.targetId, 'kc-a');
     assert.ok(secondTurn.transition.writes.some((write) => (
       write.value

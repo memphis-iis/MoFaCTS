@@ -1019,7 +1019,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
           input: 'three more words',
         },
       },
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
       generateTutorUtterance(request: { action: string; targetId: string }) {

@@ -118,13 +118,20 @@ explicit addressed node writes.
 SPARC 2.0 is a clean authored/runtime contract cutover. Trial displays must use
 `tutorscript-sparc/2.0`; the runtime does not translate v1 displays or histories.
 AutoTutor pages explicitly select the `sparc-autotutor-v1` adapter and author
-the `progressive-scaffolding-v1` productions. The adapter converts expectations,
-misconceptions, and semantic scores into general `instructionalTarget.active`,
-`learningObservation.targetProgress`, `instructionalFocus.episode`, and
-`scaffold.state` facts. The same four authored Pump, Prompt, Hint, and Assertion
-rules then operate without target-kind branches. Focus and scaffold state are
-stable replayed facts, while progress is turn-scoped and always positive in the
-direction of target resolution.
+the `progressive-scaffolding-v1` policy selection, but they do not copy its
+production rules into each stimulus file. The runtime-owned rule pack makes both
+target selection and scaffold progression from projected
+`instructional.candidate`, `instructional.activeCycle`,
+`instructional.progress`, and `instructional.cycleStatus` facts, and records one
+`instructional.decision` per assessment snapshot. Any misconception at or above
+the independent misconception threshold has categorical priority over
+expectations; the strongest eligible misconception starts, or interrupts an
+expectation cycle, with a targeted Prompt. With no eligible misconception, the
+strongest eligible expectation starts at Pump. Active cycles remain coherent
+under production-rule conditions: meaningful Pump gain stays at Pump, while no
+meaningful Pump gain advances to Prompt. The active cycle and decision are
+stable replayed facts; assessment candidates and progress are projected for the
+current learner-response snapshot.
 Stoichiometry content uses the same mechanism with authored `chemistry-field`
 facts: rules derive accepted conversion values, units, cancellation, and result
 values from problem facts and prior completed-field facts, while BRD-derived

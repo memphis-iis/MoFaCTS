@@ -4,7 +4,6 @@ import { commitSparcTrialDisplayControllerDialogueTurn } from './sparcTrialDispl
 import type { SparcTrialDisplay } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
-import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 
 function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMemoryFact {
   return { factType, slots };
@@ -64,7 +63,6 @@ function dialogueDisplay(): SparcTrialDisplay {
       }],
       misconceptions: [],
     },
-    productionRules: [...createSparcProgressiveScaffoldingRules()],
     clusterTargets: [{
       clusterIndex: 0,
       clusterKC: 'kc-a',
@@ -102,7 +100,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         timestamp: 1234,
       },
       priorHistoryRecords: [],
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
       scoreLearnerResponse: ({ learnerText, problemStatement }) => {
@@ -172,7 +170,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         timestamp: 1234,
       },
       priorHistoryRecords: [],
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
       scoreLearnerResponse: () => ({
@@ -212,7 +210,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
         timestamp: 2234,
       },
       priorHistoryRecords: historyRecords,
-      targetSelectionOptions: {
+      candidateOptions: {
         anchorClusterKC: 'kc-b',
       },
       scoreLearnerResponse: ({ replayState }) => {

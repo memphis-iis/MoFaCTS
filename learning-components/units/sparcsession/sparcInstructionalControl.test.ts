@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { instantiateSparcAutoTutorInstructionalFacts } from './sparcInstructionalControl';
-import type { SparcLearningTargetSelection } from './sparcTargetSelection';
+import { projectSparcAutoTutorInstructionalFacts } from './sparcInstructionalControl';
 import type { SparcInstructionalControllerConfig, SparcWorkingMemoryFact } from './sparcSessionContracts';
 
 const config: SparcInstructionalControllerConfig = {
@@ -15,203 +14,96 @@ function fact(factType: string, slots: Record<string, unknown>): SparcWorkingMem
   return { factType, slots };
 }
 
-const expectationSelection: SparcLearningTargetSelection = {
-  selectedTargetType: 'learningTarget',
-  selectedClusterKC: 'kc-a',
-  candidates: [],
-  misconceptionCandidates: [],
-  facts: [],
-};
+function authoredFacts(extra: readonly SparcWorkingMemoryFact[] = []): SparcWorkingMemoryFact[] {
+  return [
+    fact('dialogue.thresholds', { coverageThreshold: 0.8, misconceptionThreshold: 0.2 }),
+    fact('autotutor.expectation', { clusterKC: 'kc-a' }),
+    fact('kcGraph.node', { clusterKC: 'kc-a', centrality: 0.5 }),
+    ...extra,
+  ];
+}
 
-describe('SPARC AutoTutor instructional adapter', function() {
-  it('instantiates an expectation target and new focus at ELICIT', function() {
-    const result = instantiateSparcAutoTutorInstructionalFacts({
-      selection: expectationSelection,
+describe('SPARC AutoTutor instructional projection', function() {
+  it('does not choose a target when no cycle exists', function() {
+    const result = projectSparcAutoTutorInstructionalFacts({
+      snapshotId: 'snapshot-1',
       config,
-      facts: [fact('dialogue.thresholds', { coverageThreshold: 0.8 })],
+      facts: authoredFacts([fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 })]),
     });
-    assert.deepEqual(result.find((entry) => entry.factType === 'instructionalTarget.active')?.slots, {
-      targetKey: 'expectation:kc-a',
-      targetKind: 'expectation',
-      targetId: 'kc-a',
-      currentProgress: 0,
-      resolutionThreshold: 0.8,
-      resolutionInclusive: true,
-      focusEpisodeId: 'expectation:kc-a:turn:0',
-      status: 'active',
-    });
-    assert.equal(result.find((entry) => entry.factType === 'scaffold.state')?.slots?.stage, 'ELICIT');
+    assert.equal(result.facts.some((entry) => entry.factType === 'instructional.activeCycle'), false);
+    assert.equal(result.facts.find((entry) => entry.factType === 'instructional.cycleStatus')?.slots?.continuable, false);
   });
 
-  it('requires at least 0.2 expectation progress', function() {
-    const result = instantiateSparcAutoTutorInstructionalFacts({
-      selection: expectationSelection,
+  it('derives meaningful expectation gain from the canonical cycle prior value', function() {
+    const result = projectSparcAutoTutorInstructionalFacts({
+      snapshotId: 'snapshot-2',
       config,
-      facts: [
-        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
-        fact('instructionalTarget.active', {
-          targetKey: 'expectation:kc-a', targetKind: 'expectation', targetId: 'kc-a', resolutionThreshold: 0.8,
+      facts: authoredFacts([
+        fact('instructional.activeCycle', {
+          cycleId: 'cycle-a', targetKind: 'expectation', targetId: 'kc-a', targetKey: 'expectation:kc-a',
+          stage: 'PUMP', priorValue: 0.2, startedAtTurn: 1, cycleTurnCount: 0, status: 'active',
         }),
-        fact('instructionalFocus.episode', {
-          focusEpisodeId: 'episode-1', targetKey: 'expectation:kc-a', startedAtTurn: 1, status: 'active',
-        }),
-        fact('scaffold.state', { focusEpisodeId: 'episode-1', targetKey: 'expectation:kc-a', stage: 'PUMP' }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.39 }),
-      ],
-    });
-    assert.deepEqual(result.find((entry) => entry.factType === 'learningObservation.targetProgress')?.slots, {
-      targetKey: 'expectation:kc-a',
-      targetKind: 'expectation',
-      targetId: 'kc-a',
-      progressBefore: 0.2,
-      progressAfter: 0.39,
-      progressDelta: 0.19,
-      madeProgress: false,
-      newlyResolved: false,
-    });
-  });
-
-  it('requires at least 0.2 normalized misconception progress', function() {
-    const selection: SparcLearningTargetSelection = {
-      ...expectationSelection,
-      selectedTargetType: 'misconception',
-      selectedMisconceptionId: 'm1',
-    };
-    const result = instantiateSparcAutoTutorInstructionalFacts({
-      selection,
-      config,
-      facts: [
-        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
-        fact('instructionalTarget.active', {
-          targetKey: 'misconception:m1', targetKind: 'misconception', targetId: 'm1', resolutionThreshold: 0.8,
-        }),
-        fact('instructionalFocus.episode', {
-          focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
-        }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.61 }),
-      ],
-    });
-    const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');
-    assert.equal(observation?.slots?.progressDelta, 0.19);
-    assert.equal(observation?.slots?.madeProgress, false);
-  });
-
-  it('accepts a 0.2 expectation gain but not a confidence drop that leaves a misconception active', function() {
-    const baseFacts = [
-      fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
-      fact('instructionalFocus.episode', {
-        focusEpisodeId: 'episode-1', targetKey: 'expectation:kc-a', startedAtTurn: 1, status: 'active',
-      }),
-    ];
-    const expectationResult = instantiateSparcAutoTutorInstructionalFacts({
-      selection: expectationSelection,
-      config,
-      facts: [
-        ...baseFacts,
-        fact('instructionalTarget.active', {
-          targetKey: 'expectation:kc-a', targetKind: 'expectation', targetId: 'kc-a', resolutionThreshold: 0.8,
-        }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.2 }),
         fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
-      ],
+      ]),
     });
-    const misconceptionResult = instantiateSparcAutoTutorInstructionalFacts({
-      selection: {
-        ...expectationSelection,
-        selectedTargetType: 'misconception',
-        selectedMisconceptionId: 'm1',
-      },
+    const progress = result.facts.find((entry) => entry.factType === 'instructional.progress');
+    assert.equal(progress?.slots?.gain, 0.2);
+    assert.equal(progress?.slots?.meaningfulGain, true);
+    assert.equal(progress?.slots?.goalReached, false);
+  });
+
+  it('normalizes misconception repair gain in the improving direction', function() {
+    const result = projectSparcAutoTutorInstructionalFacts({
+      snapshotId: 'snapshot-3',
       config,
-      facts: [
-        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
-        fact('instructionalTarget.active', {
-          targetKey: 'misconception:m1', targetKind: 'misconception', targetId: 'm1', resolutionThreshold: 0.8,
+      facts: authoredFacts([
+        fact('autotutor.misconception', { id: 'm1' }),
+        fact('instructional.activeCycle', {
+          cycleId: 'cycle-m1', targetKind: 'misconception', targetId: 'm1', targetKey: 'misconception:m1',
+          stage: 'PROMPT', priorValue: 0.8, startedAtTurn: 1, cycleTurnCount: 0, status: 'active',
         }),
-        fact('instructionalFocus.episode', {
-          focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
-        }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
         fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.6 }),
-      ],
+      ]),
     });
-
-    assert.equal(
-      expectationResult.find((entry) => entry.factType === 'learningObservation.targetProgress')?.slots?.madeProgress,
-      true,
-    );
-    assert.equal(
-      misconceptionResult.find((entry) => entry.factType === 'learningObservation.targetProgress')?.slots?.madeProgress,
-      false,
-    );
+    const progress = result.facts.find((entry) => entry.factType === 'instructional.progress');
+    assert.equal(progress?.slots?.gain, 0.2);
+    assert.equal(progress?.slots?.meaningfulGain, true);
   });
 
-  it('accepts misconception progress when contradictory evidence makes it inactive', function() {
-    const result = instantiateSparcAutoTutorInstructionalFacts({
-      selection: {
-        ...expectationSelection,
-        selectedTargetType: 'misconception',
-        selectedMisconceptionId: 'm1',
-      },
+  it('releases a misconception below its repair criterion', function() {
+    const result = projectSparcAutoTutorInstructionalFacts({
+      snapshotId: 'snapshot-4',
       config,
-      facts: [
-        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
-        fact('instructionalTarget.active', {
-          targetKey: 'misconception:m1', targetKind: 'misconception', targetId: 'm1', resolutionThreshold: 0.8,
+      facts: authoredFacts([
+        fact('autotutor.misconception', { id: 'm1' }),
+        fact('instructional.activeCycle', {
+          cycleId: 'cycle-m1', targetKind: 'misconception', targetId: 'm1', targetKey: 'misconception:m1',
+          stage: 'PROMPT', priorValue: 0.21, startedAtTurn: 1, cycleTurnCount: 1, status: 'active',
         }),
-        fact('instructionalFocus.episode', {
-          focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
-        }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.8 }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0 }),
-      ],
-    });
-    const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');
-    assert.equal(observation?.slots?.madeProgress, true);
-    assert.equal(observation?.slots?.newlyResolved, true);
-  });
-
-  it('accepts criterion-crossing progress even when the score delta is below minimumProgress', function() {
-    const expectationResult = instantiateSparcAutoTutorInstructionalFacts({
-      selection: expectationSelection,
-      config,
-      facts: [
-        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
-        fact('instructionalTarget.active', {
-          targetKey: 'expectation:kc-a', targetKind: 'expectation', targetId: 'kc-a', resolutionThreshold: 0.8,
-        }),
-        fact('instructionalFocus.episode', {
-          focusEpisodeId: 'episode-a', targetKey: 'expectation:kc-a', startedAtTurn: 1, status: 'active',
-        }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.65 }),
-        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.8 }),
-      ],
-    });
-    const misconceptionResult = instantiateSparcAutoTutorInstructionalFacts({
-      selection: {
-        ...expectationSelection,
-        selectedTargetType: 'misconception',
-        selectedMisconceptionId: 'm1',
-      },
-      config,
-      facts: [
-        fact('dialogue.thresholds', { coverageThreshold: 0.8 }),
-        fact('instructionalTarget.active', {
-          targetKey: 'misconception:m1', targetKind: 'misconception', targetId: 'm1', resolutionThreshold: 0.8,
-        }),
-        fact('instructionalFocus.episode', {
-          focusEpisodeId: 'episode-m1', targetKey: 'misconception:m1', startedAtTurn: 1, status: 'active',
-        }),
-        fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.21 }),
         fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.19 }),
-      ],
+      ]),
     });
+    assert.equal(result.facts.find((entry) => entry.factType === 'instructional.progress')?.slots?.goalReached, true);
+    assert.equal(result.facts.find((entry) => entry.factType === 'instructional.cycleStatus')?.slots?.continuable, false);
+  });
 
-    for (const result of [expectationResult, misconceptionResult]) {
-      const observation = result.find((entry) => entry.factType === 'learningObservation.targetProgress');
-      assert.equal(observation?.slots?.madeProgress, true);
-      assert.equal(observation?.slots?.newlyResolved, true);
-    }
+  it('projects pre-cutover focus state into one canonical cycle', function() {
+    const result = projectSparcAutoTutorInstructionalFacts({
+      snapshotId: 'snapshot-5',
+      config,
+      facts: authoredFacts([
+        fact('instructionalTarget.active', {
+          targetKind: 'expectation', targetId: 'kc-a', targetKey: 'expectation:kc-a', currentProgress: 0.2, status: 'active',
+        }),
+        fact('instructionalFocus.episode', {
+          focusEpisodeId: 'legacy-cycle', targetKey: 'expectation:kc-a', startedAtTurn: 1, status: 'active',
+        }),
+        fact('scaffold.state', { focusEpisodeId: 'legacy-cycle', stage: 'PUMP' }),
+        fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
+      ]),
+    });
+    const cycle = result.facts.find((entry) => entry.factType === 'instructional.activeCycle');
+    assert.equal(cycle?.slots?.cycleId, 'legacy-cycle');
+    assert.equal(cycle?.slots?.migratedFrom, 'pre-canonical-instructional-focus');
   });
 });

@@ -60,11 +60,13 @@ describe('createSparcUtteranceRequestFromFacts', function() {
         fact('dialogue.problemStatement', { text: 'Explain both ideas.' }),
         fact('autotutor.expectation', { clusterKC: 'kc-a', text: 'First idea.' }),
         fact('autotutor.expectation', { clusterKC: 'kc-b', text: 'Second idea.' }),
-        fact('instructionalTarget.active', {
+        fact('instructional.activeCycle', {
+          cycleId: 'expectation:kc-a:turn:0',
           targetKind: 'expectation',
           targetId: 'kc-a',
-          targetKey: 'expectation:kc-a',
-          focusEpisodeId: 'expectation:kc-a:turn:0',
+          stage: 'assertion',
+          status: 'active',
+          priorScore: 0.4,
         }),
         fact('controller.selectedAction', {
           targetType: 'expectation',

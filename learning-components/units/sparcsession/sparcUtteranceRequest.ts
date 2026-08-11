@@ -142,6 +142,8 @@ function targetContent(params: {
   const completionState = latestFact(params.facts, 'controller.completionState')?.slots ?? {};
   const coverageThresholdValue = Number(completionState.coverageThreshold);
   const coverageThreshold = Number.isFinite(coverageThresholdValue) ? coverageThresholdValue : 0.8;
+  const misconceptionThresholdValue = Number(completionState.misconceptionThreshold);
+  const misconceptionThreshold = Number.isFinite(misconceptionThresholdValue) ? misconceptionThresholdValue : 0.2;
   const expectationScores = new Map(factsByType(params.facts, 'learningTarget.score').flatMap((fact) => {
     const id = stringSlot(fact, 'clusterKC');
     const coverage = Number(fact.slots?.coverage);
@@ -171,7 +173,7 @@ function targetContent(params: {
         id,
         text: stringSlot(fact, 'text') ?? '',
         supportStrength,
-        status: supportStrength >= 1 - coverageThreshold ? 'active' : 'inactive',
+        status: supportStrength >= misconceptionThreshold ? 'active' : 'inactive',
       };
     }),
   };
@@ -224,10 +226,10 @@ function plannerState(facts: readonly SparcWorkingMemoryFact[]): unknown {
   return {
     expectations: latestByIdentity('learningTarget.score', 'clusterKC'),
     misconceptions: latestByIdentity('diagnostic.misconceptionScore', 'id'),
-    selectedTarget: latestFact(facts, 'learningTarget.selected')?.slots ?? null,
-    selectedMisconception: latestFact(facts, 'diagnostic.misconceptionSelected')?.slots ?? null,
+    activeCycle: latestFact(facts, 'instructional.activeCycle')?.slots ?? null,
+    decision: latestFact(facts, 'instructional.decision')?.slots ?? null,
     completionState: latestFact(facts, 'controller.completionState')?.slots ?? null,
-    candidates: factsByType(facts, 'learningTarget.candidate').map((fact) => fact.slots ?? {}),
+    candidates: factsByType(facts, 'instructional.candidate').map((fact) => fact.slots ?? {}),
   };
 }
 
@@ -245,7 +247,7 @@ function assertSelectedActionMatchesActiveTarget(params: {
   readonly targetType: string;
   readonly targetId: string;
 }): void {
-  const activeTarget = latestFact(params.facts, 'instructionalTarget.active');
+  const activeTarget = latestFact(params.facts, 'instructional.activeCycle');
   if (!activeTarget) return;
   const activeKind = stringSlot(activeTarget, 'targetKind');
   const activeId = stringSlot(activeTarget, 'targetId');

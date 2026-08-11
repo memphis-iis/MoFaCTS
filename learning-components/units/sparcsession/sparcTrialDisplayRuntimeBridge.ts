@@ -37,9 +37,9 @@ import type {
   SparcStateWrite,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
-import type { SparcLearningTargetSelectionOptions } from './sparcTargetSelection';
+import type { SparcInstructionalCandidateOptions } from './sparcInstructionalCandidates';
 import { assertSparcInstructionalControllerConfig } from './sparcInstructionalControl';
-import { assertCanonicalSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
+import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 
 type DisplayNodeRecord = {
   readonly id?: unknown;
@@ -336,8 +336,13 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
   if (display.unitType === 'sparc-autotutor-dialogue') {
-    assertCanonicalSparcProgressiveScaffoldingRules(directProductionRules);
+    if (directProductionRules.length > 0) {
+      throw new Error('SPARC AutoTutor production rules are runtime-owned; remove top-level productionRules from the display');
+    }
   }
+  const productionRules = display.unitType === 'sparc-autotutor-dialogue'
+    ? createSparcProgressiveScaffoldingRules()
+    : directProductionRules;
   const initialState = Array.isArray(display.initialState)
     ? display.initialState as readonly SparcStateWrite[]
     : [];
@@ -354,7 +359,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     ...(initialState.length > 0 ? { initialState } : {}),
     workingMemoryFacts: authoredFacts,
     ...(derivedFacts.length > 0 ? { derivedFacts } : {}),
-    productionRules: directProductionRules,
+    productionRules,
     root: {
       id: 'root',
       kind: 'document',
@@ -681,7 +686,7 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
   readonly replayState?: SparcReplayState;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
-  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 }): Promise<SparcTrialDisplayControllerDialogueTurnCommitResult> {
@@ -712,7 +717,7 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
     event,
     problemStatement,
     learnerResponseScore,
-    ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+    ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
     ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
     generateTutorUtterance: params.generateTutorUtterance,
     runtime: {

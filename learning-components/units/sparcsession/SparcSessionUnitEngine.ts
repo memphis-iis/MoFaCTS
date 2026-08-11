@@ -43,7 +43,7 @@ import type {
   SparcResponseOutcomeInput,
 } from './sparcResponseOutcomeProcessor';
 import type { SparcReplayState } from './sparcStateReplay';
-import type { SparcLearningTargetSelectionOptions } from './sparcTargetSelection';
+import type { SparcInstructionalCandidateOptions } from './sparcInstructionalCandidates';
 import type {
   SparcTrialDisplay,
   SparcTrialResult,
@@ -407,7 +407,7 @@ export type SparcControllerDialogueTurnRuntimeParams = {
   readonly problemStatement: string;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
-  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
@@ -434,7 +434,7 @@ export type SparcTrialDisplayControllerDialogueTurnRuntimeParams = {
   readonly replayState?: SparcReplayState;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
-  readonly targetSelectionOptions?: SparcLearningTargetSelectionOptions;
+  readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
@@ -529,7 +529,7 @@ export async function createSparcSessionUnitEngine(
         problemStatement: params.problemStatement,
         ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
         ...(params.learnerResponseScore ? { learnerResponseScore: params.learnerResponseScore } : {}),
-        ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+        ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
         ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
         generateTutorUtterance: params.generateTutorUtterance,
         runtime: {
@@ -570,7 +570,7 @@ export async function createSparcSessionUnitEngine(
         ...(params.replayState ? { replayState: params.replayState } : {}),
         scoreLearnerResponse: params.scoreLearnerResponse,
         generateTutorUtterance: params.generateTutorUtterance,
-        ...(params.targetSelectionOptions ? { targetSelectionOptions: params.targetSelectionOptions } : {}),
+        ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
         ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
         history: params.history,
       });
