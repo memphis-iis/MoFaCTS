@@ -461,7 +461,7 @@
 }
 
 .learning-dashboard-col-action {
-    width: 132px;
+    width: 148px;
 }
 
 .practice-table thead th {
@@ -741,14 +741,21 @@
 .learning-dashboard-action {
     display: flex;
     justify-content: center;
+    min-width: 0;
 }
 
 .learning-dashboard-action-group {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    min-width: 0;
+    gap: 4px;
     white-space: nowrap;
+}
+
+.practice-table tbody td.learning-dashboard-cell--action {
+    padding-right: var(--app-space-1-px);
+    padding-left: var(--app-space-1-px);
 }
 
 .learning-dashboard-action-button {
@@ -781,9 +788,14 @@
     outline: none;
 }
 
-.learning-dashboard-action-button.btn-outline-secondary {
-    width: var(--app-button-height);
-    height: var(--app-button-height);
+.practice-table .learning-dashboard-action-button {
+    min-height: 28px;
+    padding: calc(4px * var(--app-density-scale)) calc(7px * var(--app-density-scale));
+}
+
+.practice-table .learning-dashboard-action-button.btn-outline-secondary {
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -793,6 +805,27 @@
     background: var(--learning-card-surface-color);
     color: color-mix(in srgb, var(--app-text-color) 62%, transparent);
     font-size: 0;
+}
+
+.practice-table .learning-dashboard-action-button--blocks {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    align-items: center;
+    justify-content: center;
+    padding: var(--app-space-0);
+    border: 1px solid color-mix(in srgb, var(--app-accent-color) 70%, transparent);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
+    color: var(--app-accent-color);
+}
+
+.practice-table .learning-dashboard-action-button--blocks:hover,
+.practice-table .learning-dashboard-action-button--blocks:focus-visible {
+    background: color-mix(in srgb, var(--app-accent-color) 12%, var(--learning-card-surface-color));
+    color: var(--app-accent-color);
+    outline: none;
 }
 
 .learning-dashboard-action-button.btn-outline-secondary::before {
