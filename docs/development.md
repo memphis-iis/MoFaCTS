@@ -123,8 +123,10 @@ The repository defines test scripts in `mofacts/package.json`. Some local Meteor
 CI owns `npm run test:ci`. The workflow supplies an explicit checked-in test
 settings file and launches Chromium through the configured Meteor browser
 driver, so both server and client tests execute. A local invocation requires
-fresh maintainer authorization and the same explicit environment contract;
-never overwrite a private `settings.json` or describe a narrower local check as
+fresh maintainer authorization and the same explicit environment contract.
+The source-owned browser-test package makes that Playwright contract portable
+across the supported Linux CI job and an explicitly authorized Windows run.
+Never overwrite a private `settings.json` or describe a narrower local check as
 equivalent coverage.
 
 ## Modify Or Add A Unit Type

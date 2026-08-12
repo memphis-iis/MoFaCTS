@@ -83,6 +83,28 @@ test('pins the source-owned Meteor DDP session-removal correction', () => {
   assert.match(provenance, /14528/);
 });
 
+test('pins the source-owned cross-platform Playwright worker', () => {
+  const appRoot = path.resolve(__dirname, '..');
+  const packageRoot = path.join(appRoot, 'packages/browser-tests');
+  const packageManifest = fs.readFileSync(path.join(packageRoot, 'package.js'), 'utf8');
+  const server = fs.readFileSync(path.join(packageRoot, 'server.js'), 'utf8');
+  const worker = fs.readFileSync(
+    path.join(packageRoot, 'browser/playwright_worker.mjs'),
+    'utf8',
+  );
+  const runner = fs.readFileSync(path.join(appRoot, 'scripts/runMeteorCiTest.cjs'), 'utf8');
+  const provenance = fs.readFileSync(path.join(packageRoot, 'MOFACTS-OVERRIDE.md'), 'utf8');
+
+  assert.match(packageManifest, /name: 'meteortesting:browser-tests'/);
+  assert.match(packageManifest, /version: '1\.8\.0_1'/);
+  assert.match(server, /driver !== 'playwright'/);
+  assert.match(worker, /pathToFileURL/);
+  assert.match(worker, /node_modules', 'playwright', 'index\.mjs'/);
+  assert.doesNotMatch(worker, /`\$\{process\.cwd\(\)\}\/node_modules/);
+  assert.doesNotMatch(runner, /Refusing to run the Meteor Playwright client suite on Windows/);
+  assert.match(provenance, /b88bfb72822ce3d67aa2726c7c14f27a8f37fcb4/);
+});
+
 test('emits injected client bundles with a browser-owned library target', () => {
   const expectedOutput = {
     externalsType: 'commonjs2',

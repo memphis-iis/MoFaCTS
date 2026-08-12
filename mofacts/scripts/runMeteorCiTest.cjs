@@ -57,20 +57,6 @@ if (!Number.isSafeInteger(testRunTimeoutMs) || testRunTimeoutMs < 60000) {
 }
 
 const isWindows = process.platform === 'win32';
-if (
-  isWindows
-  && String(process.env.TEST_BROWSER_DRIVER || '').trim().toLowerCase() === 'playwright'
-) {
-  console.error(
-    [
-      'Refusing to run the Meteor Playwright client suite on Windows.',
-      'meteortesting:browser-tests@1.8.0 imports Playwright through a raw Windows drive path,',
-      'which Node 24 rejects with ERR_UNSUPPORTED_ESM_URL_SCHEME.',
-      'Run npm run test:ci in the supported Linux CI job.',
-    ].join('\n'),
-  );
-  process.exit(1);
-}
 
 const child = spawn(
   'meteor',
