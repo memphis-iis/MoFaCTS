@@ -54,4 +54,3 @@ describe('Wikipedia list-source extraction', function() {
     expect(entries[1]?.directImages.map(({ fileTitle }) => fileTitle)).to.deep.equal(['File:Bengal.jpg']);
   });
 });
-
