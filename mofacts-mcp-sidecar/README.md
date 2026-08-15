@@ -46,16 +46,27 @@ That starts:
 
 ## Local Hotfix Dev Target
 
-When testing the canonical MoFaCTS hotfix server at `http://localhost:3200`, start the sidecar with:
+When testing the canonical MoFaCTS hotfix server at `http://localhost:3200`, use the sidecar guard script:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.local-server.yml up -d
+mofacts-mcp-sidecar\scripts\check-localhost-sidecar.ps1 -Start
 ```
 
-That points Playwright MCP at `http://host.docker.internal:3200` and attaches
-Mongo MCP to the `deploy_mofacts` network. The private environment file remains
-the sole owner of the authenticated topology-capable MongoDB URI; the overlay
-does not replace it with a standalone URL.
+The script first inspects the named Docker Compose project without parsing the
+Compose configuration. If both sidecars are already running, it reports that
+state and does not run Compose. If a start or restart is actually needed, it
+uses the authenticated local Mongo configuration in `deploy/.env.local` to
+idempotently provision a dedicated, local-only `read` account. Its generated
+credentials and Compose environment remain ignored in
+`deploy/local-hotfix/sidecar-mcp.env`; no production or app credentials are
+given to the sidecar. If the local Mongo service is not running or its required
+configuration is absent, the script fails before it changes sidecar containers.
+
+The local-server overlay points Playwright MCP at
+`http://host.docker.internal:3200` and attaches Mongo MCP to the
+`deploy_mofacts` network. The private environment file remains the sole owner
+of the authenticated topology-capable MongoDB URI; the overlay does not replace
+it with a standalone URL.
 
 For Codex agents working in this repo, this sidecar is the authoritative browser automation path for MoFaCTS UI checks. Use the `mcp__mofacts_playwright__` tools exposed by `http://localhost:8931/mcp`. Do not use the bundled Browser `iab` registry or the Chrome extension backend as a substitute for this sidecar.
 
@@ -93,7 +104,13 @@ For a repeatable local check, run from the main repo:
 mofacts-mcp-sidecar\scripts\check-localhost-sidecar.ps1
 ```
 
-Use `-Start` or `-Restart` to start the hotfix sidecar before checking. The script reports the hotfix app endpoint, sidecar compose services, Playwright MCP endpoint, and the expected Codex namespace.
+Run the script without switches to inspect the hotfix app endpoint, sidecar
+container services, Playwright MCP endpoint, and expected Codex namespace.
+Use `-Start` only when the sidecar is not already running; it reports an
+already-running sidecar without invoking Compose. On a needed start, it
+provisions the local read-only Mongo account from `deploy/.env.local` before
+invoking Compose. `-Restart` performs the same preflight and then recreates the
+two sidecar containers.
 
 ## OpenAI Runner
 
