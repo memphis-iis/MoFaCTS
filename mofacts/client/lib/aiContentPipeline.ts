@@ -364,13 +364,32 @@ async function selectListRegion(
   regions: ExtractedWikipediaListRegion[],
 ): Promise<ExtractedWikipediaListRegion> {
   if (regions.length === 0) throw new Error('The selected Wikipedia page exposed no usable table, list, or gallery.');
-  if (regions.length === 1) {
-    const trace = startTrace(run, options, 'select-list-region', { intent, regions: regions.map(({ candidate }) => candidate) });
-    finishTrace(run, options, trace, 'succeeded', { selectedRegionId: regions[0]!.candidate.regionId, rationale: 'The page exposed exactly one usable list region.' });
-    return regions[0]!;
+  const requiresSourceFields = intent.promptType === 'text' && intent.textPairingStrategy === 'source-field-mapping';
+  const selectableRegions = requiresSourceFields
+    ? regions.filter(({ candidate }) => (candidate.fields?.length || 0) >= 2)
+    : regions;
+  if (selectableRegions.length === 0) {
+    throw new Error('The selected Wikipedia page exposes no table region with at least two source fields required for prompt-response mapping.');
+  }
+  const selectionInput = {
+    intent,
+    regions: selectableRegions.map(({ candidate }) => candidate),
+    excludedRegionIds: requiresSourceFields
+      ? regions.filter((region) => !selectableRegions.includes(region)).map(({ candidate }) => candidate.regionId)
+      : [],
+  };
+  if (selectableRegions.length === 1) {
+    const trace = startTrace(run, options, 'select-list-region', selectionInput);
+    finishTrace(run, options, trace, 'succeeded', {
+      selectedRegionId: selectableRegions[0]!.candidate.regionId,
+      rationale: requiresSourceFields
+        ? 'The page exposed exactly one region compatible with prompt-response field mapping.'
+        : 'The page exposed exactly one usable list region.',
+    });
+    return selectableRegions[0]!;
   }
   const settings = stageSettings(options, 'select-list-region');
-  const candidates = regions.map(({ candidate }) => candidate);
+  const candidates = selectableRegions.map(({ candidate }) => candidate);
   const execution = await executeAiStage(
     run,
     options,
@@ -378,12 +397,12 @@ async function selectListRegion(
     buildCandidateSelectionPrompt({ authorNotes: options.notes, intent }, candidates, settings.instructions),
     regionSelectionSchema(candidates.map(({ regionId }) => regionId), false),
     `mofacts_ai_content_list_region_v${AI_CONTENT_CONTRACT_VERSION}`,
-    { intent, regions: candidates },
+    selectionInput,
     (value) => validateRegionSelection(value, candidates.map(({ regionId }) => regionId), false),
   );
   const decision = execution.parsedContent;
   if (!decision.selectedRegionId) throw new Error('No structural region was accepted as the authoritative list.');
-  return regions.find(({ candidate }) => candidate.regionId === decision.selectedRegionId)!;
+  return selectableRegions.find(({ candidate }) => candidate.regionId === decision.selectedRegionId)!;
 }
 
 function provenance(entry: WikipediaListEntry, sourcePath: AiContentItemResolution['sourcePath']): AiContentPair['provenance'] {
