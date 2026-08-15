@@ -180,11 +180,11 @@ function setDraft(instance: PromptLabInstance, draft: AiContentPromptLabDraft, i
   if (invalidate) invalidateRun(instance);
 }
 
-function saveCheckpoint(instance: PromptLabInstance, automatic = false): void {
+function saveCheckpoint(instance: PromptLabInstance, automatic = false, labelOverride = ''): void {
   const checkpoint = promptLabCheckpoint(
     instance.draft.get(),
     new Date().toISOString(),
-    automatic ? `Run ${new Date().toLocaleString()}` : instance.checkpointLabel.get(),
+    labelOverride || (automatic ? `Run ${new Date().toLocaleString()}` : instance.checkpointLabel.get()),
   );
   instance.checkpoints.set([checkpoint, ...instance.checkpoints.get()].slice(0, AI_CONTENT_PROMPT_LAB_MAX_CHECKPOINTS));
   instance.checkpointLabel.set('');
@@ -372,6 +372,10 @@ Template.aiContentPromptLab.helpers({
   reasoningDisabled() {
     return selectedModel(Template.instance() as PromptLabInstance) ? {} : { disabled: true };
   },
+  resetCodeDefaultsDisabled() {
+    const instance = Template.instance() as PromptLabInstance;
+    return instance.pending.get() || !instance.baseline.get() ? { disabled: true } : {};
+  },
   checkpointLabel() { return (Template.instance() as PromptLabInstance).checkpointLabel.get(); },
   checkpointCount() { return (Template.instance() as PromptLabInstance).checkpoints.get().length; },
   hasCheckpoints() { return (Template.instance() as PromptLabInstance).checkpoints.get().length > 0; },
@@ -483,6 +487,22 @@ Template.aiContentPromptLab.events({
   'click .save-ai-content-prompt-lab-checkpoint'(event: Event, instance: PromptLabInstance) {
     event.preventDefault();
     saveCheckpoint(instance);
+  },
+  'click .reset-ai-content-prompt-lab-code-defaults'(event: Event, instance: PromptLabInstance) {
+    event.preventDefault();
+    if (instance.pending.get()) return;
+    const baseline = instance.baseline.get();
+    if (!baseline) {
+      instance.error.set('The Admin Control Panel configuration is still loading.');
+      return;
+    }
+    const current = instance.draft.get();
+    saveCheckpoint(instance, false, `Before reset to code defaults ${new Date().toLocaleString()}`);
+    const defaults = createAiContentPromptLabDraft({
+      model: current.model,
+      reasoningLevel: baseline.reasoningLevel,
+    });
+    setDraft(instance, { ...current, stages: defaults.stages });
   },
   'click .load-ai-content-prompt-lab-checkpoint'(event: Event, instance: PromptLabInstance) {
     event.preventDefault();
