@@ -112,6 +112,7 @@ describe('AI Content deterministic filename-pattern pipeline', function() {
       if (call.stage === 'interpret-request') return stageResult({
         promptType: 'image',
         responseType: 'text',
+        textPairingStrategy: 'not-applicable',
         subject: 'U.S. states',
         listSearchQuery: 'list of U.S. states outline maps',
         imageRequirement: 'plain outline map of the state in the United States',
@@ -164,6 +165,7 @@ describe('AI Content deterministic filename-pattern pipeline', function() {
       if (call.stage === 'interpret-request') return stageResult({
         promptType: 'image',
         responseType: 'text',
+        textPairingStrategy: 'not-applicable',
         subject: 'U.S. states',
         listSearchQuery: 'list of U.S. states outline maps',
         imageRequirement: 'plain outline map of the state in the United States',
@@ -216,6 +218,7 @@ describe('AI Content deterministic filename-pattern pipeline', function() {
       if (call.stage === 'interpret-request') return stageResult({
         promptType: 'image',
         responseType: 'text',
+        textPairingStrategy: 'not-applicable',
         subject: 'U.S. states',
         listSearchQuery: 'list of U.S. states outline maps',
         imageRequirement: 'plain outline map of the state in the United States',

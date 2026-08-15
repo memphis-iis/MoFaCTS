@@ -169,7 +169,7 @@ function phaseForStage(stage: AiContentStageName | undefined): AiContentPhase {
   if (!stage || stage === 'interpret-request') return 'interpreting';
   if (stage === 'search-wikipedia' || stage === 'select-list-page' || stage === 'fetch-list-page') return 'searching-source';
   if (stage === 'select-list-region' || stage === 'extract-list-entries') return 'extracting-items';
-  if (stage === 'generate-definition') return 'generating-prompts';
+  if (stage === 'generate-definition' || stage === 'select-source-fields') return 'generating-prompts';
   return 'resolving-images';
 }
 

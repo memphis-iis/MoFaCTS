@@ -37,14 +37,17 @@ import {
   buildCandidateSelectionPrompt,
   buildDefinitionPrompt,
   buildInterpretRequestPrompt,
+  buildSourceFieldSelectionPrompt,
   candidateSelectionSchema,
   imageCandidateDecisionSchema,
   regionSelectionSchema,
+  sourceFieldSelectionSchema,
   validateAiContentIntent,
   validateCandidateSelection,
   validateDefinition,
   validateImageCandidateDecision,
   validateRegionSelection,
+  validateSourceFieldSelection,
   type AiContentAiStageId,
   type AiContentStagePrompt,
 } from './aiContentPrompts';
@@ -128,11 +131,16 @@ function copyRun(run: AiContentPipelineRun): AiContentPipelineRun {
     ...run,
     request: { ...run.request },
     listCandidates: run.listCandidates.map((candidate) => ({ ...candidate })),
-    listRegions: run.listRegions.map((region) => ({ ...region, sampleEntries: [...region.sampleEntries] })),
+    listRegions: run.listRegions.map((region) => ({
+      ...region,
+      sampleEntries: [...region.sampleEntries],
+      ...(region.fields ? { fields: region.fields.map((field) => ({ ...field, sampleValues: [...field.sampleValues] })) } : {}),
+    })),
     entries: run.entries.map((entry) => ({
       ...entry,
       directImageCandidateIds: [...entry.directImageCandidateIds],
       detailLinkCandidateIds: [...entry.detailLinkCandidateIds],
+      ...(entry.sourceFields ? { sourceFields: entry.sourceFields.map((field) => ({ ...field })) } : {}),
     })),
     ...(run.imageFilenamePattern ? {
       imageFilenamePattern: {
@@ -143,6 +151,7 @@ function copyRun(run: AiContentPipelineRun): AiContentPipelineRun {
       },
     } : {}),
     resolutions: run.resolutions.map((resolution) => ({ ...resolution })),
+    ...(run.sourceFieldSelection ? { sourceFieldSelection: { ...run.sourceFieldSelection } } : {}),
     traces: run.traces.map((trace) => ({ ...trace })),
   };
 }
@@ -447,6 +456,88 @@ async function createTextItem(
       warning: `${item.displayedResponse}: ${reason}`,
     };
   }
+}
+
+async function selectSourceFields(
+  run: AiContentPipelineRun,
+  options: AiContentPipelineOptions,
+  intent: AiContentIntent,
+  region: ExtractedWikipediaListRegion,
+) {
+  const fields = region.candidate.fields || [];
+  if (fields.length < 2) {
+    throw new Error('The selected Wikipedia region does not expose at least two source fields for prompt-response mapping.');
+  }
+  const settings = stageSettings(options, 'select-source-fields');
+  const fieldIds = fields.map(({ fieldId }) => fieldId);
+  const execution = await executeAiStage(
+    run,
+    options,
+    'select-source-fields',
+    buildSourceFieldSelectionPrompt(options.notes, intent, fields, settings.instructions),
+    sourceFieldSelectionSchema(fieldIds),
+    `mofacts_ai_content_source_fields_v${AI_CONTENT_CONTRACT_VERSION}`,
+    { intent, fields },
+    (value) => validateSourceFieldSelection(value, fieldIds),
+  );
+  if (!execution.parsedContent.promptFieldId || !execution.parsedContent.responseFieldId) {
+    throw new Error('The selected Wikipedia region does not contain an unambiguous prompt-response field mapping.');
+  }
+  run.sourceFieldSelection = execution.parsedContent;
+  publish(run, options);
+  return execution.parsedContent as {
+    promptFieldId: string;
+    responseFieldId: string;
+    rationale: string;
+  };
+}
+
+function createSourceFieldMappedItems(
+  region: ExtractedWikipediaListRegion,
+  selection: { promptFieldId: string; responseFieldId: string },
+): { pairs: AiContentPair[]; resolutions: AiContentItemResolution[]; warnings: string[] } {
+  const extracted = region.entries.map((entry) => ({
+    entry,
+    prompt: entry.item.sourceFields?.find(({ fieldId }) => fieldId === selection.promptFieldId)?.value.trim() || '',
+    response: entry.item.sourceFields?.find(({ fieldId }) => fieldId === selection.responseFieldId)?.value.trim() || '',
+  }));
+  const promptCounts = new Map<string, number>();
+  extracted.forEach(({ prompt }) => {
+    if (!prompt) return;
+    const key = prompt.normalize('NFKC').toLocaleLowerCase();
+    promptCounts.set(key, (promptCounts.get(key) || 0) + 1);
+  });
+  const pairs: AiContentPair[] = [];
+  const resolutions: AiContentItemResolution[] = [];
+  const warnings: string[] = [];
+  extracted.forEach(({ entry, prompt, response }) => {
+    const duplicatePrompt = prompt
+      ? (promptCounts.get(prompt.normalize('NFKC').toLocaleLowerCase()) || 0) > 1
+      : false;
+    const issue = !prompt
+      ? 'The selected prompt field is empty in this source row.'
+      : (!response
+        ? 'The selected response field is empty in this source row.'
+        : (duplicatePrompt ? `The selected prompt value ${JSON.stringify(prompt)} occurs in more than one source row.` : ''));
+    const sourcePath: AiContentItemResolution['sourcePath'] = issue ? 'unresolved' : 'source-field-mapping';
+    pairs.push({
+      id: entry.item.itemId,
+      kind: 'text',
+      stimulus: duplicatePrompt ? '' : prompt,
+      response,
+      provenance: provenance(entry.item, sourcePath),
+    });
+    resolutions.push({
+      itemId: entry.item.itemId,
+      response,
+      promptType: 'text',
+      sourcePath,
+      ...(prompt ? { prompt } : {}),
+      ...(issue ? { unresolvedReason: issue } : {}),
+    });
+    if (issue) warnings.push(`${entry.item.displayedResponse}: ${issue}`);
+  });
+  return { pairs, resolutions, warnings };
 }
 
 async function evaluateImages(
@@ -1091,13 +1182,22 @@ export async function runAiContentPipeline(options: AiContentPipelineOptions): P
   const assets: AcquiredWikimediaAsset[] = [];
   const warnings: string[] = [];
   if (intent.promptType === 'text') {
-    for (const entry of selectedRegion.entries) {
-      options.assertCurrent?.();
-      const result = await createTextItem(run, options, intent, entry);
-      pairs.push(result.pair);
-      run.resolutions.push(result.resolution);
-      if (result.warning) warnings.push(result.warning);
+    if (intent.textPairingStrategy === 'source-field-mapping') {
+      const selection = await selectSourceFields(run, options, intent, selectedRegion);
+      const mapped = createSourceFieldMappedItems(selectedRegion, selection);
+      pairs.push(...mapped.pairs);
+      run.resolutions.push(...mapped.resolutions);
+      warnings.push(...mapped.warnings);
       publish(run, options);
+    } else {
+      for (const entry of selectedRegion.entries) {
+        options.assertCurrent?.();
+        const result = await createTextItem(run, options, intent, entry);
+        pairs.push(result.pair);
+        run.resolutions.push(result.resolution);
+        if (result.warning) warnings.push(result.warning);
+        publish(run, options);
+      }
     }
   } else {
     const imageResult = await resolveImageEntries(run, options, intent, selectedRegion.entries);

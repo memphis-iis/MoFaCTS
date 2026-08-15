@@ -6,7 +6,7 @@
 
 One retrieved Wikipedia list page defines the complete item set for every run. The model may interpret the author request and select opaque candidate IDs supplied by MoFaCTS, but it may not originate an item, page, link, URL, Wikimedia filename, license, or attribution record. After one individually evaluated and acquired image agrees with a response-bearing canonical filename found on another authoritative item page, MoFaCTS may predict later `File:` titles deterministically and accept only titles that Wikimedia resolves to canonical file records.
 
-A run has one universal prompt type, `text` or `image`; responses are always text. Every source entry reaches review, including entries whose definition or image remains unresolved.
+A run has one universal prompt type, `text` or `image`; responses are always text. A text run uses either per-item definitions or one source-field mapping. Every source entry reaches review, including entries whose definition, mapped field, or image remains unresolved.
 
 ## Data flow
 
@@ -18,7 +18,11 @@ author notes
   -> retrieve page by page ID
   -> parse/select one table, list, or gallery
   -> source-anchored entries
-       -> text: one strict definition call per entry
+       -> text definition: one strict definition call per entry
+       -> text source-field mapping
+            -> preserve table headings and exact row-cell values
+            -> select one supplied prompt field ID and one supplied response field ID
+            -> construct every row pair deterministically without per-item AI calls
        -> image: hydrate files contained in the entry
             -> canonical filename agrees with a validated image -> pattern pass
             -> otherwise evaluate direct files
@@ -39,7 +43,7 @@ author notes
   -> explicit final package save
 ```
 
-AI selection validators reject extra fields, invented IDs, duplicate rankings, and a selected image that is not first in the returned ranking. Text-definition validation rejects answer-revealing response terms and source aliases.
+AI selection validators reject extra fields, invented IDs, identical prompt/response field IDs, duplicate rankings, and a selected image that is not first in the returned ranking. Text-definition validation rejects answer-revealing response terms and source aliases. Source-field mapping preserves exact extracted values, rejects incomplete rows, and leaves duplicate prompts unresolved for review.
 
 Image evaluation is based on retrieved filenames, captions, alt text, surrounding text, metadata, and structural roles. It does not inspect pixels or perform cross-item family selection. Technical acquisition validates a canonical file-page ID, supported image type, dimensions, allowed machine-readable license, complete attribution, nonempty image response, source-size bound, and WebP conversion result.
 
@@ -49,7 +53,7 @@ After the first successful individual image, the filename-pattern path inspects 
 
 - `common/aiContentContract.ts`: v4 working/save data, provenance, stage traces, and save validators.
 - `client/lib/aiContentPrompts.ts`: editable bounded prompts, strict schemas, and semantic response validators.
-- `client/lib/aiContentWikipediaSource.ts`: Wikipedia request URLs, page retrieval, structural regions, entries, file references, and canonical detail links.
+- `client/lib/aiContentWikipediaSource.ts`: Wikipedia request URLs, page retrieval, structural regions, table field/row extraction, entries, file references, and canonical detail links.
 - `client/lib/aiContentWikimediaFiles.ts`: canonical file hydration, license/attribution checks, downloads, and conversion.
 - `client/lib/aiContentImageFilenamePattern.ts`: pure two-filename pattern inference and deterministic predicted-title construction.
 - `client/lib/aiContentPipeline.ts`: the single production/Lab orchestrator, revision guards, seeding, pattern resolution, queued exception routing, traces, resolutions, and final pairs.

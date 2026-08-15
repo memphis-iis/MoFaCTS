@@ -9,6 +9,7 @@ export const AI_CONTENT_WORKING_RECORD_KEY = 'mofacts.aiContentCreator.workingRe
 export type AiCreationMode = 'learning' | 'test';
 export type AiContentPromptType = 'text' | 'image';
 export type AiContentResponseType = 'text';
+export type AiContentTextPairingStrategy = 'definition' | 'source-field-mapping' | 'not-applicable';
 export type AiContentPhase =
   | 'input'
   | 'interpreting'
@@ -38,9 +39,22 @@ export type AiContentAuthorRequest = {
 export type AiContentIntent = {
   promptType: AiContentPromptType;
   responseType: AiContentResponseType;
+  textPairingStrategy?: AiContentTextPairingStrategy;
   subject: string;
   listSearchQuery: string;
   imageRequirement: string;
+};
+
+export type WikipediaListFieldCandidate = {
+  fieldId: string;
+  label: string;
+  sampleValues: string[];
+};
+
+export type WikipediaListSourceField = {
+  fieldId: string;
+  label: string;
+  value: string;
 };
 
 export type WikipediaListCandidate = {
@@ -64,6 +78,13 @@ export type WikipediaListRegionCandidate = {
   heading: string;
   entryCount: number;
   sampleEntries: string[];
+  fields?: WikipediaListFieldCandidate[];
+};
+
+export type AiContentSourceFieldSelection = {
+  promptFieldId: string | null;
+  responseFieldId: string | null;
+  rationale: string;
 };
 
 export type WikipediaDetailLinkCandidate = {
@@ -87,6 +108,7 @@ export type WikipediaListEntry = {
   normalizedResponseKey: string;
   directImageCandidateIds: string[];
   detailLinkCandidateIds: string[];
+  sourceFields?: WikipediaListSourceField[];
 };
 
 export type AiContentImageFilenamePattern = {
@@ -130,7 +152,7 @@ export type AiContentItemResolution = {
   itemId: string;
   response: string;
   promptType: AiContentPromptType;
-  sourcePath: 'text-definition' | 'list-page' | 'detail-page' | 'filename-pattern' | 'unresolved';
+  sourcePath: 'text-definition' | 'source-field-mapping' | 'list-page' | 'detail-page' | 'filename-pattern' | 'unresolved';
   prompt?: string;
   detailPageCandidateId?: string;
   selectedImageCandidateId?: string;
@@ -145,6 +167,7 @@ export type AiContentStageName =
   | 'fetch-list-page'
   | 'select-list-region'
   | 'extract-list-entries'
+  | 'select-source-fields'
   | 'generate-definition'
   | 'evaluate-direct-images'
   | 'hydrate-direct-images'
@@ -191,6 +214,7 @@ export type AiContentPipelineRun = {
   };
   listRegions: WikipediaListRegionCandidate[];
   selectedRegionId?: string;
+  sourceFieldSelection?: AiContentSourceFieldSelection;
   entries: WikipediaListEntry[];
   imageFilenamePattern?: AiContentImageFilenamePattern;
   resolutions: AiContentItemResolution[];
@@ -351,7 +375,7 @@ export function requireAiContentWorkingRecordVersion(value: unknown): AiContentW
         throw new Error(`AI Content Creator browser pair ${index + 1} has incomplete provenance.`);
       }
     }
-    if (!['text-definition', 'list-page', 'detail-page', 'filename-pattern', 'unresolved'].includes(String(pair.provenance.sourcePath))) {
+    if (!['text-definition', 'source-field-mapping', 'list-page', 'detail-page', 'filename-pattern', 'unresolved'].includes(String(pair.provenance.sourcePath))) {
       throw new Error(`AI Content Creator browser pair ${index + 1} has an invalid provenance path.`);
     }
     if (pair.provenance.filenamePatternId !== undefined

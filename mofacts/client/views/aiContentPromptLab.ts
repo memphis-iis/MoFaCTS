@@ -47,6 +47,7 @@ const AI_CONTENT_STAGE_DESCRIPTIONS: Record<AiContentStageName, string> = {
   'fetch-list-page': 'Retrieve the selected list page by its canonical page ID.',
   'select-list-region': 'Select the table, list, or gallery that supplies the authoritative items.',
   'extract-list-entries': 'Extract source-anchored responses, image references, and detail links.',
+  'select-source-fields': 'Select two real source fields for deterministic prompt-response mapping.',
   'generate-definition': 'Generate and validate one learner-facing definition for one response.',
   'evaluate-direct-images': 'Evaluate retrieved images structurally associated with one list entry.',
   'hydrate-direct-images': 'Resolve direct file references to canonical Wikimedia metadata.',

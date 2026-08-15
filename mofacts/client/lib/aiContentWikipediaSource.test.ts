@@ -53,4 +53,27 @@ describe('Wikipedia list-source extraction', function() {
     expect(entries[0]?.directImages.map(({ fileTitle }) => fileTitle)).to.deep.equal(['File:Abyssinian.jpg']);
     expect(entries[1]?.directImages.map(({ fileTitle }) => fileTitle)).to.deep.equal(['File:Bengal.jpg']);
   });
+
+  it('preserves table headings and row values as selectable source fields', function() {
+    const page: RetrievedWikipediaPage = {
+      pageId: 44,
+      title: 'List of capitals in the United States',
+      canonicalUrl: 'https://en.wikipedia.org/?curid=44',
+      html: `
+        <div class="mw-parser-output"><table class="wikitable">
+          <tr><th>State</th><th>Capital</th><th>Since</th></tr>
+          <tr><th scope="row"><a href="/wiki/Alabama">Alabama</a></th><td><a href="/wiki/Montgomery,_Alabama">Montgomery</a></td><td>1846</td></tr>
+          <tr><th scope="row"><a href="/wiki/Alaska">Alaska</a></th><td><a href="/wiki/Juneau,_Alaska">Juneau</a></td><td>1906</td></tr>
+        </table></div>`,
+    };
+
+    const region = extractWikipediaListRegions(page).regions[0]!;
+    expect(region.candidate.fields).to.deep.equal([
+      { fieldId: 'region-44-1-field-1', label: 'State', sampleValues: ['Alabama', 'Alaska'] },
+      { fieldId: 'region-44-1-field-2', label: 'Capital', sampleValues: ['Montgomery', 'Juneau'] },
+      { fieldId: 'region-44-1-field-3', label: 'Since', sampleValues: ['1846', '1906'] },
+    ]);
+    expect(region.entries[0]?.item.sourceFields?.map(({ value }) => value))
+      .to.deep.equal(['Alabama', 'Montgomery', '1846']);
+  });
 });

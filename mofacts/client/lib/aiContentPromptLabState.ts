@@ -33,11 +33,22 @@ function copySettings(settings: AiContentPipelineSettings): AiContentPipelineSet
   return Object.fromEntries(AI_CONTENT_AI_STAGE_IDS.map((stage) => [stage, { ...settings[stage] }])) as AiContentPipelineSettings;
 }
 
-function hasValidStageSettings(value: unknown): value is AiContentPipelineSettings {
-  if (!value || typeof value !== 'object') return false;
+const PRE_SOURCE_FIELD_STAGE_IDS = AI_CONTENT_AI_STAGE_IDS.filter((stage) => stage !== 'select-source-fields');
+
+function parsedStageSettings(value: unknown): AiContentPipelineSettings | null {
+  if (!value || typeof value !== 'object') return null;
   const settings = value as Partial<AiContentPipelineSettings>;
-  return AI_CONTENT_AI_STAGE_IDS.every((stage) => {
-    const entry = settings[stage];
+  if (!PRE_SOURCE_FIELD_STAGE_IDS.every((stage) => Boolean(settings[stage]))) return null;
+  const inheritedReasoning = Object.values(settings)
+    .map((entry) => entry?.reasoningLevel)
+    .find(isOpenRouterReasoningLevel) || 'none';
+  const defaults = createAiContentPipelineSettings(inheritedReasoning);
+  const migrated = Object.fromEntries(AI_CONTENT_AI_STAGE_IDS.map((stage) => [
+    stage,
+    settings[stage] ? { ...settings[stage] } : { ...defaults[stage] },
+  ])) as AiContentPipelineSettings;
+  const valid = AI_CONTENT_AI_STAGE_IDS.every((stage) => {
+    const entry = migrated[stage];
     if (!entry) return false;
     return typeof entry.systemPrompt === 'string'
       && typeof entry.instructions === 'string'
@@ -46,6 +57,7 @@ function hasValidStageSettings(value: unknown): value is AiContentPipelineSettin
       && entry.visibleOutputTokens > 0
       && isOpenRouterReasoningLevel(entry.reasoningLevel);
   });
+  return valid ? migrated : null;
 }
 
 function validCheckpoint(value: unknown): value is AiContentPromptLabCheckpoint {
@@ -56,7 +68,7 @@ function validCheckpoint(value: unknown): value is AiContentPromptLabCheckpoint 
     && typeof checkpoint.savedAt === 'string'
     && checkpoint.draft?.contractVersion === AI_CONTENT_CONTRACT_VERSION
     && typeof checkpoint.draft.authorNotes === 'string'
-    && hasValidStageSettings(checkpoint.draft.stages);
+    && Boolean(parsedStageSettings(checkpoint.draft.stages));
 }
 
 export function createAiContentPromptLabDraft(
@@ -110,14 +122,15 @@ export function parsePromptLabWorkspace(value: unknown): AiContentPromptLabWorks
   if (workspace.contractVersion !== AI_CONTENT_CONTRACT_VERSION) return null;
   if (!workspace.draft || workspace.draft.contractVersion !== AI_CONTENT_CONTRACT_VERSION) return null;
   if (!Array.isArray(workspace.checkpoints)) return null;
-  if (!hasValidStageSettings(workspace.draft.stages)) return null;
+  const draftStages = parsedStageSettings(workspace.draft.stages);
+  if (!draftStages) return null;
   return {
     contractVersion: AI_CONTENT_CONTRACT_VERSION,
     draft: {
       ...workspace.draft,
       model: String(workspace.draft.model || '').trim(),
       authorNotes: String(workspace.draft.authorNotes || ''),
-      stages: copySettings(workspace.draft.stages),
+      stages: copySettings(draftStages),
     },
     checkpoints: workspace.checkpoints
       .filter(validCheckpoint)
@@ -129,7 +142,7 @@ export function parsePromptLabWorkspace(value: unknown): AiContentPromptLabWorks
         draft: {
           contractVersion: AI_CONTENT_CONTRACT_VERSION,
           authorNotes: checkpoint.draft.authorNotes,
-          stages: copySettings(checkpoint.draft.stages),
+          stages: copySettings(parsedStageSettings(checkpoint.draft.stages)!),
         },
       })),
   };
@@ -140,6 +153,7 @@ export function promptLabStageLabel(stage: AiContentAiStageId): string {
     'interpret-request': 'Interpret request and construct list search',
     'select-list-page': 'Select Wikipedia list page',
     'select-list-region': 'Select authoritative list region',
+    'select-source-fields': 'Select prompt and response source fields',
     'generate-definition': 'Generate per-item definition',
     'evaluate-direct-images': 'Evaluate list-entry images',
     'select-detail-link': 'Select canonical detail page',

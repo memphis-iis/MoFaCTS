@@ -38,4 +38,23 @@ describe('AI Content Prompt Lab state', function() {
     expect(parsed?.checkpoints[0]?.draft).not.to.have.property('model');
     expect(parsePromptLabWorkspace({ contractVersion: 3, draft, checkpoints: [] })).to.equal(null);
   });
+
+  it('migrates existing checkpoints by adding the new source-field stage without discarding edits', function() {
+    const draft = createAiContentPromptLabDraft({ model: 'openai/test', reasoningLevel: 'medium' });
+    const { ['select-source-fields']: _newStage, ...priorStages } = draft.stages;
+    const parsed = parsePromptLabWorkspace({
+      contractVersion: AI_CONTENT_CONTRACT_VERSION,
+      draft: { ...draft, stages: priorStages },
+      checkpoints: [{
+        id: 'prior',
+        label: 'Prior checkpoint',
+        savedAt: '2026-08-15T00:00:00.000Z',
+        draft: { contractVersion: AI_CONTENT_CONTRACT_VERSION, authorNotes: 'Retained notes', stages: priorStages },
+      }],
+    });
+
+    expect(parsed?.draft.stages['select-source-fields'].reasoningLevel).to.equal('medium');
+    expect(parsed?.checkpoints[0]?.draft.authorNotes).to.equal('Retained notes');
+    expect(parsed?.checkpoints[0]?.draft.stages['select-source-fields'].systemPrompt).not.to.equal('');
+  });
 });

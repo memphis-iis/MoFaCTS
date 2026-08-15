@@ -28,6 +28,16 @@ const DETAIL_HTML = `
   </aside>
 </div>`;
 
+const CAPITAL_LIST_HTML = `
+<div class="mw-parser-output">
+  <h2>State capitals</h2>
+  <table class="wikitable">
+    <tr><th>State</th><th>Capital</th><th>Capital since</th></tr>
+    <tr><th scope="row"><a href="/wiki/Alabama">Alabama</a></th><td><a href="/wiki/Montgomery,_Alabama">Montgomery</a></td><td>1846</td></tr>
+    <tr><th scope="row"><a href="/wiki/Alaska">Alaska</a></th><td><a href="/wiki/Juneau,_Alaska">Juneau</a></td><td>1906</td></tr>
+  </table>
+</div>`;
+
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), {
     status: 200,
@@ -108,6 +118,27 @@ function fixtureFetcher(): typeof fetch {
   }) as typeof fetch;
 }
 
+function capitalFixtureFetcher(): typeof fetch {
+  return (async (input: RequestInfo | URL) => {
+    const url = new URL(String(input));
+    if (url.searchParams.get('generator') === 'search') {
+      return jsonResponse({
+        query: { pages: [{
+          pageid: 300,
+          title: 'List of capitals in the United States',
+          fullurl: 'https://en.wikipedia.org/?curid=300',
+          extract: 'A list of U.S. states and their capitals.',
+          index: 1,
+        }] },
+      });
+    }
+    if (url.searchParams.get('action') === 'parse') {
+      return jsonResponse({ parse: { pageid: 300, title: 'List of capitals in the United States', text: CAPITAL_LIST_HTML } });
+    }
+    throw new Error(`Unexpected capital fixture request: ${url.toString()}`);
+  }) as typeof fetch;
+}
+
 function stageResult(parsedContent: unknown) {
   return {
     parsedContent,
@@ -122,12 +153,55 @@ function stageResult(parsedContent: unknown) {
 }
 
 describe('AI Content list-source pipeline', function() {
+  it('maps real source columns once and skips per-item definition generation', async function() {
+    const calledStages: string[] = [];
+    const caller: AiContentStageCaller = async (call) => {
+      calledStages.push(call.stage);
+      if (call.stage === 'interpret-request') return stageResult({
+        promptType: 'text',
+        responseType: 'text',
+        textPairingStrategy: 'source-field-mapping',
+        subject: 'U.S. state capitals',
+        listSearchQuery: 'list of U.S. state capitals',
+        imageRequirement: '',
+      });
+      if (call.stage === 'select-source-fields') return stageResult({
+        promptFieldId: 'region-300-1-field-1',
+        responseFieldId: 'region-300-1-field-2',
+        rationale: 'The author requested state names as prompts and capitals as responses.',
+      });
+      throw new Error(`Unexpected AI stage ${call.stage}`);
+    };
+
+    const result = await runAiContentPipeline({
+      notes: 'Learn the fifty state capital names using the state as the prompt.',
+      mode: 'learning',
+      model: 'openai/test',
+      reasoningLevel: 'medium',
+      stageCaller: caller,
+      fetcher: capitalFixtureFetcher(),
+    });
+
+    expect(calledStages).to.deep.equal(['interpret-request', 'select-source-fields']);
+    expect(result.pairs.map(({ stimulus, response }) => ({ stimulus, response }))).to.deep.equal([
+      { stimulus: 'Alabama', response: 'Montgomery' },
+      { stimulus: 'Alaska', response: 'Juneau' },
+    ]);
+    expect(result.run.sourceFieldSelection).to.deep.include({
+      promptFieldId: 'region-300-1-field-1',
+      responseFieldId: 'region-300-1-field-2',
+    });
+    expect(result.run.resolutions.every(({ sourcePath }) => sourcePath === 'source-field-mapping')).to.equal(true);
+    expect(result.run.traces.some(({ stage }) => stage === 'generate-definition')).to.equal(false);
+  });
+
   it('uses direct table images and linked detail-page images in the same universal image run', async function() {
     const caller: AiContentStageCaller = async (call) => {
       if (call.stage === 'interpret-request') {
         return stageResult({
           promptType: 'image',
           responseType: 'text',
+          textPairingStrategy: 'not-applicable',
           subject: 'members',
           listSearchQuery: 'list of members outline maps or portraits',
           imageRequirement: 'an identifying portrait or plain outline map',
@@ -192,6 +266,7 @@ describe('AI Content list-source pipeline', function() {
         return stageResult({
           promptType: 'text',
           responseType: 'text',
+          textPairingStrategy: 'definition',
           subject: 'members',
           listSearchQuery: 'list of members',
           imageRequirement: '',
@@ -230,7 +305,7 @@ describe('AI Content list-source pipeline', function() {
   it('retries from an unchanged recorded stage while reusing validated upstream AI outputs', async function() {
     const firstCaller: AiContentStageCaller = async (call) => {
       if (call.stage === 'interpret-request') return stageResult({
-        promptType: 'text', responseType: 'text', subject: 'members', listSearchQuery: 'list of members', imageRequirement: '',
+        promptType: 'text', responseType: 'text', textPairingStrategy: 'definition', subject: 'members', listSearchQuery: 'list of members', imageRequirement: '',
       });
       if (call.stage === 'select-list-page') return stageResult({ selectedCandidateId: 'list-page-100', rationale: 'First result.' });
       if (call.stage === 'generate-definition') return stageResult({

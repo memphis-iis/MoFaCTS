@@ -11,6 +11,7 @@ export const AI_CONTENT_STAGE_DESCRIPTIONS: Record<AiContentStageName, string> =
   'fetch-list-page': 'Retrieve the selected Wikipedia list page.',
   'select-list-region': 'Select the table, list, or gallery containing the requested items.',
   'extract-list-entries': 'Extract the authoritative item list.',
+  'select-source-fields': 'Select the source fields used as learner prompts and correct responses.',
   'generate-definition': 'Generate and validate a learner-facing definition.',
   'evaluate-direct-images': 'Evaluate images contained directly in the list entry.',
   'hydrate-direct-images': 'Resolve direct image references through Wikimedia.',

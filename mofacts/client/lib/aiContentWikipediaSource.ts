@@ -1,8 +1,10 @@
 import type {
   WikipediaDetailLinkCandidate,
+  WikipediaListFieldCandidate,
   WikipediaListCandidate,
   WikipediaListEntry,
   WikipediaListRegionCandidate,
+  WikipediaListSourceField,
 } from '../../common/aiContentContract';
 
 const WIKIPEDIA_API_URL = 'https://en.wikipedia.org/w/api.php';
@@ -11,6 +13,7 @@ const MAX_REGIONS = 40;
 const MAX_ENTRIES_PER_REGION = 500;
 const MAX_FILE_REFERENCES_PER_ENTRY = 40;
 const MAX_DETAIL_LINKS_PER_ENTRY = 20;
+const MAX_SOURCE_FIELDS_PER_TABLE = 30;
 
 type WikipediaApiPage = {
   pageid?: number;
@@ -290,6 +293,35 @@ function sourceElements(region: Element, kind: WikipediaListRegionCandidate['kin
   return Array.from(region.querySelectorAll(':scope > li'));
 }
 
+function tableFields(table: Element, regionId: string): WikipediaListFieldCandidate[] {
+  const rows = Array.from(table.querySelectorAll('tr'));
+  const headerRow = rows.find((row) => row.querySelectorAll(':scope > th').length > 0
+    && row.querySelectorAll(':scope > td').length === 0)
+    || rows.find((row) => row.querySelectorAll(':scope > th').length > 0);
+  const headers = headerRow ? Array.from(headerRow.querySelectorAll(':scope > th')) : [];
+  const columnCount = Math.max(
+    headers.length,
+    ...rows.map((row) => row.querySelectorAll(':scope > th, :scope > td').length),
+  );
+  return Array.from({ length: Math.min(columnCount, MAX_SOURCE_FIELDS_PER_TABLE) }, (_, index) => ({
+    fieldId: `${regionId}-field-${index + 1}`,
+    label: headers[index] ? textWithoutReferences(headers[index]!) : `Column ${index + 1}`,
+    sampleValues: [],
+  }));
+}
+
+function sourceFields(
+  entry: Element,
+  fields: WikipediaListFieldCandidate[],
+): WikipediaListSourceField[] {
+  const cells = Array.from(entry.querySelectorAll(':scope > th, :scope > td'));
+  return fields.map((field, index) => ({
+    fieldId: field.fieldId,
+    label: field.label,
+    value: cells[index] ? textWithoutReferences(cells[index]!) : '',
+  }));
+}
+
 function regionElements(document: Document): Array<{ element: Element; kind: WikipediaListRegionCandidate['kind'] }> {
   const tables = Array.from(document.querySelectorAll('table'))
     .filter((element) => !excludedRegion(element) && element.querySelectorAll('tr td').length > 0)
@@ -310,6 +342,7 @@ export function extractWikipediaListRegions(page: RetrievedWikipediaPage): Wikip
   const regions: ExtractedWikipediaListRegion[] = [];
   regionElements(document).forEach(({ element, kind }, regionIndex) => {
     const regionId = `region-${page.pageId}-${regionIndex + 1}`;
+    const fields = kind === 'table' ? tableFields(element, regionId) : [];
     const entries: ExtractedWikipediaListEntry[] = [];
     const seen = new Set<string>();
     sourceElements(element, kind).slice(0, MAX_ENTRIES_PER_REGION).forEach((entryElement, entryIndex) => {
@@ -334,12 +367,20 @@ export function extractWikipediaListRegions(page: RetrievedWikipediaPage): Wikip
           normalizedResponseKey: responseKey,
           directImageCandidateIds: directImages.map(({ candidateId }) => candidateId),
           detailLinkCandidateIds: detailLinks.map(({ candidateId }) => candidateId),
+          ...(fields.length > 0 ? { sourceFields: sourceFields(entryElement, fields) } : {}),
         },
         directImages,
         detailLinks,
       });
     });
     if (entries.length < 1) return;
+    const fieldsWithSamples = fields.map((field) => ({
+      ...field,
+      sampleValues: entries
+        .map(({ item }) => item.sourceFields?.find(({ fieldId }) => fieldId === field.fieldId)?.value || '')
+        .filter(Boolean)
+        .slice(0, 8),
+    }));
     regions.push({
       candidate: {
         regionId,
@@ -347,6 +388,7 @@ export function extractWikipediaListRegions(page: RetrievedWikipediaPage): Wikip
         heading: headingBefore(element) || page.title,
         entryCount: entries.length,
         sampleEntries: entries.slice(0, 8).map(({ item }) => item.displayedResponse),
+        ...(fieldsWithSamples.length > 0 ? { fields: fieldsWithSamples } : {}),
       },
       entries,
     });
