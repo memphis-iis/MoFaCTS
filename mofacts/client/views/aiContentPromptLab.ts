@@ -41,7 +41,8 @@ import {
 } from '../../common/aiContentContract';
 
 const AI_CONTENT_STAGE_DESCRIPTIONS: Record<AiContentStageName, string> = {
-  'interpret-request': 'Interpret the author notes and construct one Wikipedia list-search intent.',
+  'interpret-request': 'Interpret the author notes and choose the content strategy.',
+  'generate-table': 'Generate or format one complete text prompt-response table.',
   'search-wikipedia': 'Search Wikipedia and retain at most three real list-page candidates.',
   'select-list-page': 'Select one supplied Wikipedia page candidate as the authoritative list.',
   'fetch-list-page': 'Retrieve the selected list page by its canonical page ID.',

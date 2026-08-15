@@ -5,7 +5,8 @@ import type {
 } from '../../common/aiContentContract';
 
 export const AI_CONTENT_STAGE_DESCRIPTIONS: Record<AiContentStageName, string> = {
-  'interpret-request': 'Understand the author request and construct one Wikipedia list-search intent.',
+  'interpret-request': 'Understand the author request and choose the content strategy.',
+  'generate-table': 'Generate or format the complete text prompt-response table.',
   'search-wikipedia': 'Search Wikipedia for authoritative list-page candidates.',
   'select-list-page': 'Select the authoritative Wikipedia list page.',
   'fetch-list-page': 'Retrieve the selected Wikipedia list page.',

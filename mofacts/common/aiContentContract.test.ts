@@ -53,6 +53,34 @@ describe('AI Content list-source contract', function() {
     expect(record.pairs[0]?.provenance.sourcePath).to.equal('filename-pattern');
   });
 
+  it('accepts v4 table provenance without fabricated Wikipedia fields', function() {
+    const record = requireAiContentWorkingRecordVersion({
+      contractVersion: 4,
+      phase: 'review',
+      notes: 'Format my table.',
+      mode: 'learning',
+      title: 'My facts',
+      model: 'openai/test',
+      reasoningLevel: 'medium',
+      promptType: 'text',
+      responseType: 'text',
+      pairs: [{
+        id: 'table-run-1-1',
+        kind: 'text',
+        stimulus: 'Prompt one',
+        response: 'Response one',
+        provenance: {
+          sourcePath: 'provided-table',
+          sourceLocator: 'Author-supplied table row 1',
+          generationTraceId: 'run-1:2:generate-table',
+        },
+      }],
+      warnings: [],
+      updatedAt: '2026-08-15T00:00:00.000Z',
+    });
+    expect(record.pairs[0]?.provenance.sourcePath).to.equal('provided-table');
+  });
+
   it('requires a pattern ID for filename-pattern provenance', function() {
     expect(() => requireAiContentWorkingRecordVersion({
       contractVersion: 4,

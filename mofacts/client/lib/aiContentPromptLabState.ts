@@ -33,12 +33,20 @@ function copySettings(settings: AiContentPipelineSettings): AiContentPipelineSet
   return Object.fromEntries(AI_CONTENT_AI_STAGE_IDS.map((stage) => [stage, { ...settings[stage] }])) as AiContentPipelineSettings;
 }
 
-const PRE_SOURCE_FIELD_STAGE_IDS = AI_CONTENT_AI_STAGE_IDS.filter((stage) => stage !== 'select-source-fields');
+const LEGACY_REQUIRED_STAGE_IDS: AiContentAiStageId[] = [
+  'interpret-request',
+  'select-list-page',
+  'select-list-region',
+  'generate-definition',
+  'evaluate-direct-images',
+  'select-detail-link',
+  'evaluate-detail-images',
+];
 
 function parsedStageSettings(value: unknown): AiContentPipelineSettings | null {
   if (!value || typeof value !== 'object') return null;
   const settings = value as Partial<AiContentPipelineSettings>;
-  if (!PRE_SOURCE_FIELD_STAGE_IDS.every((stage) => Boolean(settings[stage]))) return null;
+  if (!LEGACY_REQUIRED_STAGE_IDS.every((stage) => Boolean(settings[stage]))) return null;
   const inheritedReasoning = Object.values(settings)
     .map((entry) => entry?.reasoningLevel)
     .find(isOpenRouterReasoningLevel) || 'none';
@@ -150,7 +158,8 @@ export function parsePromptLabWorkspace(value: unknown): AiContentPromptLabWorks
 
 export function promptLabStageLabel(stage: AiContentAiStageId): string {
   const labels: Record<AiContentAiStageId, string> = {
-    'interpret-request': 'Interpret request and construct list search',
+    'interpret-request': 'Interpret request and choose content strategy',
+    'generate-table': 'Generate or format prompt-response table',
     'select-list-page': 'Select Wikipedia list page',
     'select-list-region': 'Select authoritative list region',
     'select-source-fields': 'Select prompt and response source fields',

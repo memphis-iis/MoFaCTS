@@ -1,6 +1,7 @@
 import type {
   AiContentIntent,
   AiContentSourceFieldSelection,
+  AiContentTableGeneration,
   ImageCandidateDecision,
   WikipediaListFieldCandidate,
   WikipediaListDecision,
@@ -9,6 +10,7 @@ import type { OpenRouterJsonSchema } from '../../common/lib/openRouterClient';
 
 export const AI_CONTENT_AI_STAGE_IDS = [
   'interpret-request',
+  'generate-table',
   'select-list-page',
   'select-list-region',
   'select-source-fields',
@@ -31,14 +33,21 @@ type AiContentStagePromptMap = Readonly<Record<AiContentAiStageId, AiContentStag
 export const AI_CONTENT_INTENT_SCHEMA: OpenRouterJsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['promptType', 'responseType', 'textPairingStrategy', 'subject', 'listSearchQuery', 'imageRequirement'],
+  required: [
+    'promptType', 'responseType', 'textPairingStrategy', 'subject', 'listSearchQuery', 'imageRequirement',
+    'tableInstructions', 'tableScopeSummary', 'expectedItemCount', 'tableIssue',
+  ],
   properties: {
     promptType: { type: 'string', enum: ['text', 'image'] },
     responseType: { type: 'string', enum: ['text'] },
-    textPairingStrategy: { type: 'string', enum: ['definition', 'source-field-mapping', 'not-applicable'] },
+    textPairingStrategy: { type: 'string', enum: ['definition', 'source-field-mapping', 'generated-table', 'provided-table', 'not-applicable'] },
     subject: { type: 'string', minLength: 1, maxLength: 180 },
-    listSearchQuery: { type: 'string', minLength: 1, maxLength: 300 },
+    listSearchQuery: { type: 'string', maxLength: 300 },
     imageRequirement: { type: 'string', maxLength: 300 },
+    tableInstructions: { type: 'string', maxLength: 1200 },
+    tableScopeSummary: { type: 'string', maxLength: 500 },
+    expectedItemCount: { type: ['integer', 'null'], minimum: 1, maximum: 250 },
+    tableIssue: { type: 'string', maxLength: 500 },
   },
 };
 
@@ -51,11 +60,25 @@ export const AI_CONTENT_DEFINITION_SCHEMA: OpenRouterJsonSchema = {
   },
 };
 
-const INTERPRET_SYSTEM = `Interpret one AI Content Creator author request and construct a Wikipedia list-search intent. Return only JSON matching the supplied schema.
+const INTERPRET_SYSTEM = `Interpret one AI Content Creator author request and choose exactly one content strategy. Return only JSON matching the supplied schema.
 
-The run has one universal prompt type: text or image. The response type is always text. Identify the requested subject and construct one concise Wikipedia search query for a pre-existing list page. The query must be a short topic search beginning with the concept of a list, such as "list Delphic maxims". Include only words needed to identify the core subject. Do not include the word "Wikipedia", source attribution, requested numbering or fields, prompt-response mapping, learning-task wording, or other instructions from the author notes. For an image run only, append the minimum image-role wording needed to locate the appropriate list page. Never enumerate, propose, infer, or return members of the set. Never return a page title, URL, link, filename, stimulus-response pair, definition, or image candidate.
+The run has one universal prompt type: text or image. The response type is always text. Never enumerate or return the requested rows during interpretation.
 
-For a text run, choose textPairingStrategy "source-field-mapping" when the author identifies one source field as the prompt and another source field as the response, such as state to capital, country to currency, or author to book. Choose "definition" when each list item is the response and the system must write an identifying definition as its prompt. For an image run, textPairingStrategy must be "not-applicable". For an image run, preserve the requested image role, modality, labels, context, style, and restrictions in one succinct image requirement. For a text run, imageRequirement must be the empty string.`;
+Choose "provided-table" first when the author notes contain a table to learn. Choose "not-applicable" for every image run. Choose a Wikipedia strategy when the author requests an external source or citation, canonical externally grounded coverage, or definitions for members of a canonical source list. Otherwise choose "generated-table" for a requested text-to-text table, including factual tables when the author does not require external verification. An explicit request to generate without a source permits "generated-table" for any text table. Never switch strategies later when the chosen route fails.
+
+For "generated-table" or "provided-table", return an empty listSearchQuery and imageRequirement. Supply concise tableInstructions and tableScopeSummary. Use expectedItemCount when the author requests "all", "every", an explicit quantity, or provides a table; otherwise it may be null. The count must not exceed 250. Interpret conventional division facts with products through 81 as the 81 inverse facts formed by divisors and quotients 1 through 9. Return an empty tableIssue when the table specification is executable. For a supplied table with unclear prompt-response direction, unexplained extra columns, or more than 250 data rows, describe that blocker in tableIssue and use a null expectedItemCount rather than guessing.
+
+For a Wikipedia text run, choose "source-field-mapping" when the source contains one requested prompt field and another requested response field. Choose "definition" when each source-list item is the response and the system must write its identifying prompt. Construct a short listSearchQuery beginning with the concept of a list and containing only the core subject, such as "list Delphic maxims". Do not include the word "Wikipedia", requested numbering or fields, mapping directions, or learning-task wording. Return empty table fields, a null expectedItemCount, and an empty tableIssue.
+
+For an image run, textPairingStrategy must be "not-applicable". Preserve the requested image role, modality, labels, context, style, and restrictions in imageRequirement; return empty table fields, a null expectedItemCount, and an empty tableIssue.`;
+
+const GENERATE_TABLE_SYSTEM = `Create or format one bounded text prompt-response table. Return only JSON matching the supplied schema.
+
+For generated-table, construct every requested row directly from the author notes and interpreted table specification. Preserve a useful pedagogical order. Do not claim external verification.
+
+For provided-table, format the complete author-supplied table. Accept Markdown, CSV, TSV, or clearly aligned text. Use explicit author directions or unambiguous headers to determine prompt and response columns; if extra columns or direction remain ambiguous, do not guess. Lightly clean spelling, capitalization, punctuation, and ordering, but do not add, omit, or semantically change supplied rows.
+
+Return only prompt and response for each row. Do not add commentary, citations, identifiers, images, alternate answers, or extra fields. Duplicate responses are allowed; duplicate prompts are not.`;
 
 const SELECT_LIST_SYSTEM = `Select the best pre-existing Wikipedia list page from application-supplied candidates. Return only JSON matching the supplied schema.
 
@@ -84,8 +107,13 @@ You may select only a supplied candidateId or null. Prefer the link whose anchor
 export const DEFAULT_AI_CONTENT_STAGE_PROMPTS: AiContentStagePromptMap = {
   'interpret-request': {
     systemPrompt: INTERPRET_SYSTEM,
-    instructions: 'Construct the shortest useful topic query beginning with the concept of a list. Keep only the core subject; omit Wikipedia, source attribution, numbering, requested fields, mapping directions, and learning-task wording. For an image request only, append the minimum requested image role needed to locate the list page.',
+    instructions: 'Choose the route before creating any items. Prefer a supplied table, keep image and externally grounded canonical-list requests on Wikipedia, and otherwise generate requested text-to-text tables directly.',
     visibleOutputTokens: 800,
+  },
+  'generate-table': {
+    systemPrompt: GENERATE_TABLE_SYSTEM,
+    instructions: 'Return the complete ordered table exactly once. Obey the interpreted scope and required count; do not add explanations or unsupported fields.',
+    visibleOutputTokens: 12000,
   },
   'select-list-page': {
     systemPrompt: SELECT_LIST_SYSTEM,
@@ -140,28 +168,59 @@ function requiredString(value: unknown, label: string): string {
 
 export function validateAiContentIntent(value: unknown): AiContentIntent {
   if (!isRecord(value)) throw new Error('AI Content intent must be an object.');
-  strictKeys(value, ['promptType', 'responseType', 'textPairingStrategy', 'subject', 'listSearchQuery', 'imageRequirement'], 'AI Content intent');
+  strictKeys(value, [
+    'promptType', 'responseType', 'textPairingStrategy', 'subject', 'listSearchQuery', 'imageRequirement',
+    'tableInstructions', 'tableScopeSummary', 'expectedItemCount', 'tableIssue',
+  ], 'AI Content intent');
   if (value.promptType !== 'text' && value.promptType !== 'image') throw new Error('AI Content promptType must be text or image.');
   if (value.responseType !== 'text') throw new Error('AI Content responseType must be text.');
   const subject = requiredString(value.subject, 'AI Content subject');
-  const listSearchQuery = requiredString(value.listSearchQuery, 'Wikipedia list search query');
+  const listSearchQuery = typeof value.listSearchQuery === 'string' ? value.listSearchQuery.trim() : '';
   const imageRequirement = typeof value.imageRequirement === 'string' ? value.imageRequirement.trim() : '';
+  const tableInstructions = typeof value.tableInstructions === 'string' ? value.tableInstructions.trim() : '';
+  const tableScopeSummary = typeof value.tableScopeSummary === 'string' ? value.tableScopeSummary.trim() : '';
+  const expectedItemCount = value.expectedItemCount === null || value.expectedItemCount === undefined
+    ? null
+    : (Number.isInteger(value.expectedItemCount) ? Number(value.expectedItemCount) : Number.NaN);
+  const tableIssue = typeof value.tableIssue === 'string' ? value.tableIssue.trim() : '';
   const textPairingStrategy = value.textPairingStrategy === undefined
     ? (value.promptType === 'text' ? 'definition' : 'not-applicable')
     : (value.textPairingStrategy === 'definition'
       || value.textPairingStrategy === 'source-field-mapping'
+      || value.textPairingStrategy === 'generated-table'
+      || value.textPairingStrategy === 'provided-table'
       || value.textPairingStrategy === 'not-applicable'
       ? value.textPairingStrategy
       : null);
   if (!textPairingStrategy) throw new Error('AI Content textPairingStrategy is invalid.');
-  if (!/\blist\b/i.test(listSearchQuery)) throw new Error('Wikipedia search intent must explicitly search for a list.');
+  const isTableStrategy = textPairingStrategy === 'generated-table' || textPairingStrategy === 'provided-table';
+  if (isTableStrategy) {
+    if (value.promptType !== 'text') throw new Error('AI-generated and author-supplied tables require text prompts.');
+    if (listSearchQuery) throw new Error('Table generation intent must not contain a Wikipedia search query.');
+    if (imageRequirement) throw new Error('Table generation intent must not contain an image requirement.');
+    if (tableIssue) throw new Error(`The requested table cannot be generated: ${tableIssue}`);
+    if (!tableInstructions) throw new Error('Table generation intent requires concise table instructions.');
+    if (!tableScopeSummary) throw new Error('Table generation intent requires a scope summary.');
+    if (expectedItemCount !== null
+      && (!Number.isInteger(expectedItemCount) || expectedItemCount < 1 || expectedItemCount > 250)) {
+      throw new Error('Table generation expected item count must be between 1 and 250.');
+    }
+    if (textPairingStrategy === 'provided-table' && expectedItemCount === null) {
+      throw new Error('An author-supplied table requires an exact expected item count.');
+    }
+  } else {
+    if (!/\blist\b/i.test(listSearchQuery)) throw new Error('Wikipedia search intent must explicitly search for a list.');
+    if (tableInstructions || tableScopeSummary || expectedItemCount !== null || tableIssue) {
+      throw new Error('Wikipedia intent must use empty table fields with a null expected item count.');
+    }
+  }
   if (value.promptType === 'image' && !imageRequirement) throw new Error('Image prompt intent requires a succinct image requirement.');
   if (value.promptType === 'text' && imageRequirement) throw new Error('Text prompt intent must use an empty image requirement.');
   if (value.promptType === 'image' && textPairingStrategy !== 'not-applicable') {
     throw new Error('Image prompt intent must use the not-applicable text pairing strategy.');
   }
   if (value.promptType === 'text' && textPairingStrategy === 'not-applicable') {
-    throw new Error('Text prompt intent requires a definition or source-field-mapping strategy.');
+    throw new Error('Text prompt intent requires a definition, source-field-mapping, generated-table, or provided-table strategy.');
   }
   return {
     promptType: value.promptType,
@@ -170,7 +229,72 @@ export function validateAiContentIntent(value: unknown): AiContentIntent {
     subject,
     listSearchQuery,
     imageRequirement,
+    tableInstructions,
+    tableScopeSummary,
+    expectedItemCount,
+    tableIssue,
   };
+}
+
+export function generatedTableSchema(expectedItemCount: number | null): OpenRouterJsonSchema {
+  const minItems = expectedItemCount ?? 1;
+  const maxItems = expectedItemCount ?? 250;
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['scopeSummary', 'pairs'],
+    properties: {
+      scopeSummary: { type: 'string', minLength: 1, maxLength: 500 },
+      pairs: {
+        type: 'array',
+        minItems,
+        maxItems,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['prompt', 'response'],
+          properties: {
+            prompt: { type: 'string', minLength: 1, maxLength: 600 },
+            response: { type: 'string', minLength: 1, maxLength: 300 },
+          },
+        },
+      },
+    },
+  };
+}
+
+export function validateGeneratedTable(
+  value: unknown,
+  expectedItemCount: number | null,
+): AiContentTableGeneration {
+  if (!isRecord(value)) throw new Error('Generated table response must be an object.');
+  strictKeys(value, ['scopeSummary', 'pairs'], 'Generated table response');
+  const scopeSummary = requiredString(value.scopeSummary, 'Generated table scope summary');
+  if (scopeSummary.length > 500) throw new Error('Generated table scope summary exceeds 500 characters.');
+  if (!Array.isArray(value.pairs)) throw new Error('Generated table pairs must be an array.');
+  if (value.pairs.length < 1 || value.pairs.length > 250) {
+    throw new Error('Generated table must contain between 1 and 250 rows.');
+  }
+  if (expectedItemCount !== null && value.pairs.length !== expectedItemCount) {
+    throw new Error(`Generated table returned ${value.pairs.length} rows; exactly ${expectedItemCount} were required.`);
+  }
+  const promptRows = new Map<string, number>();
+  const pairs = value.pairs.map((entry, index) => {
+    if (!isRecord(entry)) throw new Error(`Generated table row ${index + 1} must be an object.`);
+    strictKeys(entry, ['prompt', 'response'], `Generated table row ${index + 1}`);
+    const prompt = requiredString(entry.prompt, `Generated table row ${index + 1} prompt`);
+    const response = requiredString(entry.response, `Generated table row ${index + 1} response`);
+    if (prompt.length > 600) throw new Error(`Generated table row ${index + 1} prompt exceeds 600 characters.`);
+    if (response.length > 300) throw new Error(`Generated table row ${index + 1} response exceeds 300 characters.`);
+    const promptKey = prompt.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+    const earlierRow = promptRows.get(promptKey);
+    if (earlierRow !== undefined) {
+      throw new Error(`Generated table rows ${earlierRow} and ${index + 1} use the same prompt.`);
+    }
+    promptRows.set(promptKey, index + 1);
+    return { prompt, response };
+  });
+  return { scopeSummary, pairs };
 }
 
 export function sourceFieldSelectionSchema(fieldIds: string[]): OpenRouterJsonSchema {
@@ -259,6 +383,7 @@ export function imageCandidateDecisionSchema(candidateIds: string[]): OpenRouter
 
 export function aiContentStageSchemaPreview(stage: AiContentAiStageId): OpenRouterJsonSchema {
   if (stage === 'interpret-request') return AI_CONTENT_INTENT_SCHEMA;
+  if (stage === 'generate-table') return generatedTableSchema(null);
   if (stage === 'select-source-fields') return sourceFieldSelectionSchema([]);
   if (stage === 'generate-definition') return AI_CONTENT_DEFINITION_SCHEMA;
   if (stage === 'select-list-region') return regionSelectionSchema(['application-supplied-region-id'], false);
@@ -339,6 +464,20 @@ export function validateImageCandidateDecision(
 
 export function buildInterpretRequestPrompt(notes: string, instructions: string): string {
   return `AUTHOR NOTES:\n${String(notes || '').trim()}\n\nINSTRUCTIONS:\n${instructions.trim()}`;
+}
+
+export function buildGeneratedTablePrompt(
+  notes: string,
+  intent: AiContentIntent,
+  instructions: string,
+): string {
+  return `AUTHOR REQUEST AND ANY SUPPLIED TABLE:\n${String(notes || '').trim()}\n\nINTERPRETED TABLE SPECIFICATION:\n${JSON.stringify({
+    strategy: intent.textPairingStrategy,
+    subject: intent.subject,
+    tableInstructions: intent.tableInstructions,
+    tableScopeSummary: intent.tableScopeSummary,
+    expectedItemCount: intent.expectedItemCount,
+  }, null, 2)}\n\nINSTRUCTIONS:\n${instructions.trim()}`;
 }
 
 export function buildCandidateSelectionPrompt(

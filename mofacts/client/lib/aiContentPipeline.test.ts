@@ -152,7 +152,87 @@ function stageResult(parsedContent: unknown) {
   };
 }
 
-describe('AI Content list-source pipeline', function() {
+describe('AI Content shared pipeline', function() {
+  it('generates all 81 division facts in one AI call without touching Wikipedia', async function() {
+    const divisionPairs = Array.from({ length: 9 }, (_, divisorIndex) => Array.from({ length: 9 }, (_, quotientIndex) => ({
+      prompt: `${(divisorIndex + 1) * (quotientIndex + 1)} ÷ ${divisorIndex + 1}`,
+      response: String(quotientIndex + 1),
+    }))).flat();
+    const calledStages: string[] = [];
+    const caller: AiContentStageCaller = async (call) => {
+      calledStages.push(call.stage);
+      if (call.stage === 'interpret-request') return stageResult({
+        promptType: 'text',
+        responseType: 'text',
+        textPairingStrategy: 'generated-table',
+        subject: 'division facts through 9',
+        listSearchQuery: '',
+        imageRequirement: '',
+        tableInstructions: 'Generate the inverse facts for divisors and quotients 1 through 9.',
+        tableScopeSummary: 'The 81 inverse facts for the 1 through 9 multiplication table.',
+        expectedItemCount: 81,
+        tableIssue: '',
+      });
+      if (call.stage === 'generate-table') return stageResult({
+        scopeSummary: 'Divisors and quotients from 1 through 9.',
+        pairs: divisionPairs,
+      });
+      throw new Error(`Unexpected AI stage ${call.stage}`);
+    };
+
+    const result = await runAiContentPipeline({
+      notes: 'Create all division facts for products 81 and below.',
+      mode: 'learning',
+      model: 'openai/test',
+      reasoningLevel: 'medium',
+      stageCaller: caller,
+      fetcher: (async () => { throw new Error('Generated tables must not access Wikipedia.'); }) as typeof fetch,
+    });
+
+    expect(calledStages).to.deep.equal(['interpret-request', 'generate-table']);
+    expect(result.pairs).to.have.length(81);
+    expect(result.run.listCandidates).to.deep.equal([]);
+    expect(result.run.tableRun).to.deep.include({ strategy: 'generated-table', expectedItemCount: 81, actualItemCount: 81 });
+    expect(result.pairs.every(({ provenance }) => provenance.sourcePath === 'generated-table')).to.equal(true);
+    expect(result.warnings[0]).to.include('not verified against an external source');
+  });
+
+  it('formats one supplied table without fabricating Wikipedia provenance', async function() {
+    const calledStages: string[] = [];
+    const result = await runAiContentPipeline({
+      notes: 'Prompt,Response\nred,Red\nblue,Blue',
+      mode: 'learning',
+      model: 'openai/test',
+      reasoningLevel: 'medium',
+      fetcher: (async () => { throw new Error('Provided tables must not access Wikipedia.'); }) as typeof fetch,
+      stageCaller: async (call) => {
+        calledStages.push(call.stage);
+        if (call.stage === 'interpret-request') return stageResult({
+          promptType: 'text',
+          responseType: 'text',
+          textPairingStrategy: 'provided-table',
+          subject: 'color names',
+          listSearchQuery: '',
+          imageRequirement: '',
+          tableInstructions: 'Use Prompt as the learner prompt and Response as the answer.',
+          tableScopeSummary: 'Two author-supplied color rows.',
+          expectedItemCount: 2,
+          tableIssue: '',
+        });
+        if (call.stage === 'generate-table') return stageResult({
+          scopeSummary: 'Two author-supplied color rows.',
+          pairs: [{ prompt: 'Red', response: 'Red' }, { prompt: 'Blue', response: 'Blue' }],
+        });
+        throw new Error(`Unexpected AI stage ${call.stage}`);
+      },
+    });
+
+    expect(calledStages).to.deep.equal(['interpret-request', 'generate-table']);
+    expect(result.run.tableRun?.strategy).to.equal('provided-table');
+    expect(result.pairs[0]?.provenance).not.to.have.property('listPageId');
+    expect(result.warnings[0]).to.include('author-supplied table');
+  });
+
   it('maps real source columns once and skips per-item definition generation', async function() {
     const calledStages: string[] = [];
     const caller: AiContentStageCaller = async (call) => {

@@ -9,7 +9,13 @@ export const AI_CONTENT_WORKING_RECORD_KEY = 'mofacts.aiContentCreator.workingRe
 export type AiCreationMode = 'learning' | 'test';
 export type AiContentPromptType = 'text' | 'image';
 export type AiContentResponseType = 'text';
-export type AiContentTextPairingStrategy = 'definition' | 'source-field-mapping' | 'not-applicable';
+export type AiContentTextPairingStrategy =
+  | 'definition'
+  | 'source-field-mapping'
+  | 'generated-table'
+  | 'provided-table'
+  | 'not-applicable';
+export type AiContentTableStrategy = Extract<AiContentTextPairingStrategy, 'generated-table' | 'provided-table'>;
 export type AiContentPhase =
   | 'input'
   | 'interpreting'
@@ -43,6 +49,28 @@ export type AiContentIntent = {
   subject: string;
   listSearchQuery: string;
   imageRequirement: string;
+  tableInstructions?: string;
+  tableScopeSummary?: string;
+  expectedItemCount?: number | null;
+  tableIssue?: string;
+};
+
+export type AiContentTableRun = {
+  strategy: AiContentTableStrategy;
+  scopeSummary: string;
+  expectedItemCount: number | null;
+  actualItemCount: number;
+  generationTraceId: string;
+};
+
+export type AiContentTablePairDraft = {
+  prompt: string;
+  response: string;
+};
+
+export type AiContentTableGeneration = {
+  scopeSummary: string;
+  pairs: AiContentTablePairDraft[];
 };
 
 export type WikipediaListFieldCandidate = {
@@ -152,7 +180,7 @@ export type AiContentItemResolution = {
   itemId: string;
   response: string;
   promptType: AiContentPromptType;
-  sourcePath: 'text-definition' | 'source-field-mapping' | 'list-page' | 'detail-page' | 'filename-pattern' | 'unresolved';
+  sourcePath: 'text-definition' | 'source-field-mapping' | 'generated-table' | 'provided-table' | 'list-page' | 'detail-page' | 'filename-pattern' | 'unresolved';
   prompt?: string;
   detailPageCandidateId?: string;
   selectedImageCandidateId?: string;
@@ -162,6 +190,7 @@ export type AiContentItemResolution = {
 
 export type AiContentStageName =
   | 'interpret-request'
+  | 'generate-table'
   | 'search-wikipedia'
   | 'select-list-page'
   | 'fetch-list-page'
@@ -215,6 +244,7 @@ export type AiContentPipelineRun = {
   listRegions: WikipediaListRegionCandidate[];
   selectedRegionId?: string;
   sourceFieldSelection?: AiContentSourceFieldSelection;
+  tableRun?: AiContentTableRun;
   entries: WikipediaListEntry[];
   imageFilenamePattern?: AiContentImageFilenamePattern;
   resolutions: AiContentItemResolution[];
@@ -235,18 +265,26 @@ export type AiPairImage = {
   failureReason?: string;
 };
 
-export type AiContentPairProvenance = {
+export type AiContentWikipediaPairProvenance = {
   listPageId: number;
   listPageTitle: string;
   listPageUrl: string;
   regionId: string;
   sourceLocator: string;
-  sourcePath: AiContentItemResolution['sourcePath'];
+  sourcePath: Exclude<AiContentItemResolution['sourcePath'], AiContentTableStrategy>;
   detailPageTitle?: string;
   detailPageUrl?: string;
   selectedFileTitle?: string;
   filenamePatternId?: string;
 };
+
+export type AiContentTablePairProvenance = {
+  sourcePath: AiContentTableStrategy;
+  sourceLocator: string;
+  generationTraceId: string;
+};
+
+export type AiContentPairProvenance = AiContentWikipediaPairProvenance | AiContentTablePairProvenance;
 
 export type AiContentPair = {
   id: string;
@@ -365,17 +403,38 @@ export function requireAiContentWorkingRecordVersion(value: unknown): AiContentW
     if (!isRecord(pair.provenance)) throw new Error(`AI Content Creator browser pair ${index + 1} is missing provenance.`);
     rejectExtraFields(pair.provenance, [
       'listPageId', 'listPageTitle', 'listPageUrl', 'regionId', 'sourceLocator', 'sourcePath',
-      'detailPageTitle', 'detailPageUrl', 'selectedFileTitle', 'filenamePatternId',
+      'detailPageTitle', 'detailPageUrl', 'selectedFileTitle', 'filenamePatternId', 'generationTraceId',
     ], `AI Content Creator browser pair ${index + 1} provenance`);
-    if (!Number.isInteger(pair.provenance.listPageId) || Number(pair.provenance.listPageId) <= 0) {
-      throw new Error(`AI Content Creator browser pair ${index + 1} has an invalid list-page ID.`);
-    }
-    for (const field of ['listPageTitle', 'listPageUrl', 'regionId', 'sourceLocator'] as const) {
-      if (typeof pair.provenance[field] !== 'string' || !pair.provenance[field]) {
-        throw new Error(`AI Content Creator browser pair ${index + 1} has incomplete provenance.`);
+    const sourcePath = String(pair.provenance.sourcePath || '');
+    if (sourcePath === 'generated-table' || sourcePath === 'provided-table') {
+      if (pair.kind !== 'text') {
+        throw new Error(`AI Content Creator browser pair ${index + 1} table provenance requires a text pair.`);
+      }
+      for (const field of ['sourceLocator', 'generationTraceId'] as const) {
+        if (typeof pair.provenance[field] !== 'string' || !pair.provenance[field]) {
+          throw new Error(`AI Content Creator browser pair ${index + 1} has incomplete table provenance.`);
+        }
+      }
+      if ([
+        'listPageId', 'listPageTitle', 'listPageUrl', 'regionId', 'detailPageTitle', 'detailPageUrl',
+        'selectedFileTitle', 'filenamePatternId',
+      ].some((field) => pair.provenance[field] !== undefined)) {
+        throw new Error(`AI Content Creator browser pair ${index + 1} table provenance cannot contain Wikipedia source fields.`);
+      }
+    } else {
+      if (!Number.isInteger(pair.provenance.listPageId) || Number(pair.provenance.listPageId) <= 0) {
+        throw new Error(`AI Content Creator browser pair ${index + 1} has an invalid list-page ID.`);
+      }
+      for (const field of ['listPageTitle', 'listPageUrl', 'regionId', 'sourceLocator'] as const) {
+        if (typeof pair.provenance[field] !== 'string' || !pair.provenance[field]) {
+          throw new Error(`AI Content Creator browser pair ${index + 1} has incomplete provenance.`);
+        }
+      }
+      if (pair.provenance.generationTraceId !== undefined) {
+        throw new Error(`AI Content Creator browser pair ${index + 1} Wikipedia provenance cannot contain a table-generation trace ID.`);
       }
     }
-    if (!['text-definition', 'source-field-mapping', 'list-page', 'detail-page', 'filename-pattern', 'unresolved'].includes(String(pair.provenance.sourcePath))) {
+    if (!['text-definition', 'source-field-mapping', 'generated-table', 'provided-table', 'list-page', 'detail-page', 'filename-pattern', 'unresolved'].includes(sourcePath)) {
       throw new Error(`AI Content Creator browser pair ${index + 1} has an invalid provenance path.`);
     }
     if (pair.provenance.filenamePatternId !== undefined
@@ -433,6 +492,30 @@ export function requireAiContentWorkingRecordVersion(value: unknown): AiContentW
           || pattern[field].some((entry) => typeof entry !== 'string' || !entry)) {
           throw new Error(`AI Content Creator image filename pattern ${field} must contain two nonblank strings.`);
         }
+      }
+    }
+    if (value.pipelineRun.tableRun !== undefined) {
+      const tableRun = value.pipelineRun.tableRun;
+      if (!isRecord(tableRun)) throw new Error('AI Content Creator browser work contains an invalid table run.');
+      rejectExtraFields(tableRun, [
+        'strategy', 'scopeSummary', 'expectedItemCount', 'actualItemCount', 'generationTraceId',
+      ], 'AI Content Creator table run');
+      if (tableRun.strategy !== 'generated-table' && tableRun.strategy !== 'provided-table') {
+        throw new Error('AI Content Creator table run has an invalid strategy.');
+      }
+      if (typeof tableRun.scopeSummary !== 'string' || !tableRun.scopeSummary.trim()
+        || typeof tableRun.generationTraceId !== 'string' || !tableRun.generationTraceId.trim()) {
+        throw new Error('AI Content Creator table run has incomplete trace provenance.');
+      }
+      if (tableRun.expectedItemCount !== null
+        && (!Number.isInteger(tableRun.expectedItemCount) || Number(tableRun.expectedItemCount) < 1 || Number(tableRun.expectedItemCount) > 250)) {
+        throw new Error('AI Content Creator table run has an invalid expected item count.');
+      }
+      if (!Number.isInteger(tableRun.actualItemCount) || Number(tableRun.actualItemCount) < 1 || Number(tableRun.actualItemCount) > 250) {
+        throw new Error('AI Content Creator table run has an invalid actual item count.');
+      }
+      if (tableRun.expectedItemCount !== null && tableRun.expectedItemCount !== tableRun.actualItemCount) {
+        throw new Error('AI Content Creator table run actual item count does not match its required count.');
       }
     }
   }

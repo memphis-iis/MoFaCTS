@@ -167,6 +167,7 @@ async function localizeWikimediaAsset(
 
 function phaseForStage(stage: AiContentStageName | undefined): AiContentPhase {
   if (!stage || stage === 'interpret-request') return 'interpreting';
+  if (stage === 'generate-table') return 'generating-prompts';
   if (stage === 'search-wikipedia' || stage === 'select-list-page' || stage === 'fetch-list-page') return 'searching-source';
   if (stage === 'select-list-region' || stage === 'extract-list-entries') return 'extracting-items';
   if (stage === 'generate-definition' || stage === 'select-source-fields') return 'generating-prompts';
@@ -205,7 +206,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     revokeAssets(priorAssets);
     instance.localAssets.set([]);
     await persistSnapshot(instance, started);
-    setStatus(instance, 'info', 'Finding the authoritative Wikipedia list and creating content. Do not navigate away.');
+    setStatus(instance, 'info', 'Interpreting the request and creating content. Do not navigate away.');
 
     const result = await runAiContentPipeline({
       notes,
@@ -225,7 +226,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
           pipelineRun: run,
           ...(run.intent ? {
             promptType: run.intent.promptType,
-            title: aiContentSystemTitle(run.intent, run.entries.length, started.mode),
+            title: aiContentSystemTitle(run.intent, run.tableRun?.actualItemCount || run.entries.length, started.mode),
           } : {}),
         });
         instance.activeRecord.set(next);
@@ -238,7 +239,9 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     });
     if (instance.operationSequence !== operation) return;
 
-    setStatus(instance, 'info', `Preparing ${result.assets.length} resolved image${result.assets.length === 1 ? '' : 's'} for review.`);
+    setStatus(instance, 'info', result.assets.length > 0
+      ? `Preparing ${result.assets.length} resolved image${result.assets.length === 1 ? '' : 's'} for review.`
+      : `Preparing ${result.pairs.length} text pair${result.pairs.length === 1 ? '' : 's'} for review.`);
     let pairs = result.pairs;
     const localizedAssets: LocalAiContentAsset[] = [];
     const stagingWarnings: string[] = [];
@@ -360,17 +363,20 @@ async function replaceReviewImage(instance: AiCreatorInstance, pairId: string, s
     };
     const supersededAsset = instance.localAssets.get().find((asset) => asset.id === supersededAssetId);
     instance.localAssets.set([...retainedAssets, local]);
-    updatePair(instance, pairId, (pair) => ({
-      ...pair,
-      provenance: { ...pair.provenance, sourcePath: 'unresolved' },
-      image: {
-        status: 'resolved',
-        source: 'user-replacement',
-        assetId: local.id,
-        fileName: local.packageFileName,
-        previewUrl: local.previewUrl,
-      },
-    }));
+    updatePair(instance, pairId, (pair) => {
+      if (!('listPageId' in pair.provenance)) throw new Error('Only image-source rows support image replacement.');
+      return {
+        ...pair,
+        provenance: { ...pair.provenance, sourcePath: 'unresolved' },
+        image: {
+          status: 'resolved',
+          source: 'user-replacement',
+          assetId: local.id,
+          fileName: local.packageFileName,
+          previewUrl: local.previewUrl,
+        },
+      };
+    });
     await new Promise<void>((resolve) => Tracker.afterFlush(resolve));
     if (supersededAsset?.purpose === 'resolved') URL.revokeObjectURL(supersededAsset.previewUrl);
     await instance.workingSaveQueue.flush();

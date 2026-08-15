@@ -4,12 +4,14 @@ import {
   AI_CONTENT_INTENT_SCHEMA,
   DEFAULT_AI_CONTENT_STAGE_PROMPTS,
   candidateSelectionSchema,
+  generatedTableSchema,
   imageCandidateDecisionSchema,
   sourceFieldSelectionSchema,
   regionSelectionSchema,
   validateAiContentIntent,
   validateCandidateSelection,
   validateDefinition,
+  validateGeneratedTable,
   validateImageCandidateDecision,
   validateRegionSelection,
   validateSourceFieldSelection,
@@ -17,7 +19,7 @@ import {
 
 describe('AI Content bounded stage prompts', function() {
   it('defines one editable strict prompt for every AI stage', function() {
-    expect(AI_CONTENT_AI_STAGE_IDS).to.have.length(8);
+    expect(AI_CONTENT_AI_STAGE_IDS).to.have.length(9);
     AI_CONTENT_AI_STAGE_IDS.forEach((stage) => {
       expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS[stage].systemPrompt).to.be.a('string').and.not.empty;
       expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS[stage].instructions).to.be.a('string').and.not.empty;
@@ -64,6 +66,48 @@ describe('AI Content bounded stage prompts', function() {
     expect(() => validateSourceFieldSelection({
       promptFieldId: 'invented', responseFieldId: 'capital', rationale: 'guess',
     }, ['state', 'capital'])).to.throw('unknown prompt field');
+  });
+
+  it('validates one bounded generated table without duplicate prompts', function() {
+    const intent = validateAiContentIntent({
+      promptType: 'text',
+      responseType: 'text',
+      textPairingStrategy: 'generated-table',
+      subject: 'division facts through 9',
+      listSearchQuery: '',
+      imageRequirement: '',
+      tableInstructions: 'Generate divisors and quotients from 1 through 9.',
+      tableScopeSummary: 'The 81 inverse facts for the 1 through 9 multiplication table.',
+      expectedItemCount: 81,
+      tableIssue: '',
+    });
+    expect(intent.expectedItemCount).to.equal(81);
+    const schema = generatedTableSchema(2);
+    expect((schema.properties as any).pairs.minItems).to.equal(2);
+    expect((schema.properties as any).pairs.maxItems).to.equal(2);
+    expect(validateGeneratedTable({
+      scopeSummary: 'Two facts.',
+      pairs: [{ prompt: '2 ÷ 1', response: '2' }, { prompt: '2 ÷ 2', response: '1' }],
+    }, 2).pairs).to.have.length(2);
+    expect(() => validateGeneratedTable({
+      scopeSummary: 'Duplicate facts.',
+      pairs: [{ prompt: '2 ÷ 1', response: '2' }, { prompt: ' 2 ÷ 1 ', response: '2' }],
+    }, 2)).to.throw('same prompt');
+  });
+
+  it('requires an exact count and unambiguous direction for a supplied table', function() {
+    expect(() => validateAiContentIntent({
+      promptType: 'text',
+      responseType: 'text',
+      textPairingStrategy: 'provided-table',
+      subject: 'supplied facts',
+      listSearchQuery: '',
+      imageRequirement: '',
+      tableInstructions: 'Format the supplied table.',
+      tableScopeSummary: 'Author-supplied rows.',
+      expectedItemCount: null,
+      tableIssue: 'The prompt and response columns are ambiguous.',
+    })).to.throw('columns are ambiguous');
   });
 
   it('constrains selection schemas and validators to supplied opaque IDs', function() {
