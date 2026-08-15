@@ -94,14 +94,14 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       generateTutorUtterance: (request) => {
         assert.equal(request.problemStatement, problemStatement);
         assert.equal(request.targetType, 'learningTarget');
-        assert.equal(request.targetId, 'kc-a');
+        assert.equal(request.targetId, 'kc-b');
         assert.equal(request.action, 'pump');
-        assert.deepEqual(request.contentTexts, ['Return to A.']);
+        assert.deepEqual(request.contentTexts, ['Use the relationship between A and B.']);
         return { text: 'Think about how B depends on A.' };
       },
     });
 
-    assert.equal(result.planning.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-a');
+    assert.equal(result.planning.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-b');
     assert.ok(result.learnerResponseScoreFacts.some((fact) => (
       fact.factType === 'learningTarget.score'
       && fact.slots?.clusterKC === 'kc-b'
@@ -376,16 +376,16 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     assert.ok(facts.some((entry) => (
       entry.factType === 'dialogue.utterance'
       && entry.slots?.speaker === 'tutor'
-      && entry.slots?.targetId === 'kc-a'
+      && entry.slots?.targetId === 'kc-b'
     )));
     assert.ok(facts.some((entry) => (
       entry.factType === 'instructional.activeCycle'
-      && entry.slots?.targetId === 'kc-a'
+      && entry.slots?.targetId === 'kc-b'
     )));
     assert.ok(facts.some((entry) => (
       entry.factType === 'controller.selectedAction'
       && entry.slots?.action === 'pump'
-      && entry.slots.targetId === 'kc-a'
+      && entry.slots.targetId === 'kc-b'
     )));
     assert.ok(facts.some((entry) => (
       entry.factType === 'session.turnState'
@@ -462,18 +462,18 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
       generateTutorUtterance: (request) => {
         secondTurnUtteranceCalls += 1;
-        assert.equal(request.targetId, 'kc-a');
-        return 'Return to A.';
+        assert.equal(request.targetId, 'kc-b');
+        return 'Continue with B.';
       },
     });
 
     assert.equal(secondTurnUtteranceCalls, 1);
-    assert.equal(secondTurn.utteranceRequest.targetId, 'kc-a');
+    assert.equal(secondTurn.utteranceRequest.targetId, 'kc-b');
     assert.ok(secondTurn.transition.writes.some((write) => (
       write.value
       && typeof write.value === 'object'
       && (write.value as { factType?: string; slots?: { targetId?: string } }).factType === 'controller.selectedAction'
-      && (write.value as { slots?: { targetId?: string } }).slots?.targetId === 'kc-a'
+      && (write.value as { slots?: { targetId?: string } }).slots?.targetId === 'kc-b'
     )));
   });
 });

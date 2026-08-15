@@ -37,6 +37,13 @@ describe('createSparcUtteranceRequestFromFacts', function() {
         action: 'hint',
         sourceRuleId: 'paper-rule-06-hint',
       }),
+      fact('instructional.candidate', {
+        targetKind: 'expectation',
+        targetId: 'kc-a',
+        currentValue: 0.4,
+        goalValue: 0.8,
+        rankWithinKind: 1,
+      }),
     ]);
 
     assert.equal(request.targetType, 'learningTarget');
@@ -52,6 +59,12 @@ describe('createSparcUtteranceRequestFromFacts', function() {
     assert.equal(request.moveDefinition.moveId, 'hint');
     assert.equal(request.moveDefinition.promptId, 'autotutor.hint');
     assert.equal(request.sourceRuleId, 'paper-rule-06-hint');
+    assert.deepEqual(request.selectionDiagnostic, {
+      targetKind: 'expectation',
+      currentValue: 0.4,
+      goalValue: 0.8,
+      rankWithinKind: 1,
+    });
   });
 
   it('rejects an utterance action that does not match the active instructional target', function() {

@@ -16,6 +16,7 @@ import {
 } from './sparcControllerTurnPlanning';
 import {
   createSparcDialogueTurnTransition,
+  requireBoundedSparcDialogueMessage,
   type SparcDialogueTurnNodeOptions,
 } from './sparcDialogueTurnNodes';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
@@ -77,11 +78,11 @@ function learnerTextFromEvent(event: SparcInterfaceEvent): string {
   if (isRecord(event.payload)) {
     const input = event.payload.input;
     if (typeof input === 'string' && input.trim()) {
-      return input.trim();
+      return requireBoundedSparcDialogueMessage(input, 'SPARC learner dialogue text');
     }
     const responseValue = event.payload.responseValue;
     if (typeof responseValue === 'string' && responseValue.trim()) {
-      return responseValue.trim();
+      return requireBoundedSparcDialogueMessage(responseValue, 'SPARC learner dialogue text');
     }
   }
   throw new Error('SPARC dialogue turn requires event.payload.input or event.payload.responseValue');
@@ -89,10 +90,10 @@ function learnerTextFromEvent(event: SparcInterfaceEvent): string {
 
 function tutorTextFromGeneratedUtterance(value: SparcGeneratedUtterance): string {
   if (typeof value === 'string') {
-    return requireNonBlank(value, 'SPARC generated tutor utterance text');
+    return requireBoundedSparcDialogueMessage(value, 'SPARC generated tutor utterance text');
   }
   if (isRecord(value)) {
-    return requireNonBlank(value.text, 'SPARC generated tutor utterance text');
+    return requireBoundedSparcDialogueMessage(value.text, 'SPARC generated tutor utterance text');
   }
   throw new Error('SPARC utterance generator must return text or { text }');
 }
@@ -110,15 +111,23 @@ function transitionFactTypes(transition: SparcStateTransition): Set<string> {
 
 function hasTutorUtterance(transition: SparcStateTransition): boolean {
   return transition.writes.some((write) => {
+    if (write.key !== SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY) {
+      return false;
+    }
     const value = write.value;
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return false;
     }
-    const fact = value as { factType?: unknown; slots?: Record<string, unknown> };
+    const operation = value as { node?: unknown };
+    const node = operation.node;
+    if (!node || typeof node !== 'object' || Array.isArray(node)) {
+      return false;
+    }
+    const utterance = node as { atomType?: unknown; speaker?: unknown; turnEventId?: unknown };
     return (
-      fact.factType === 'dialogue.utterance'
-      && fact.slots?.speaker === 'tutor'
-      && fact.slots?.eventId === transition.event.eventId
+      utterance.atomType === 'dialogue-utterance'
+      && utterance.speaker === 'tutor'
+      && utterance.turnEventId === transition.event.eventId
     );
   });
 }

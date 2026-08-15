@@ -1,6 +1,5 @@
 import type { SparcControllerDisplay } from './sparcController';
-
-export const SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY = '__sparcDialogueProgressFacts';
+import { SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY } from './sparcDialogueRuntimeValues';
 const DEFAULT_COVERAGE_THRESHOLD = 0.8;
 
 type SparcFact = {
@@ -37,6 +36,17 @@ export type SparcAutoTutorProgressSnapshot = {
   readonly targets: readonly SparcAutoTutorProgressTarget[];
   readonly misconceptions: readonly SparcAutoTutorProgressMisconception[];
 };
+
+export function selectSparcAutoTutorProgressSnapshotForRender(params: {
+  readonly currentSnapshot: SparcAutoTutorProgressSnapshot;
+  readonly pendingSnapshot?: SparcAutoTutorProgressSnapshot | null;
+  readonly submissionPending: boolean;
+}): SparcAutoTutorProgressSnapshot {
+  if (params.submissionPending && params.pendingSnapshot) {
+    return params.pendingSnapshot;
+  }
+  return params.currentSnapshot;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);

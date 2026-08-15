@@ -20,10 +20,15 @@
   } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
   import SparcNode from './SparcNode.svelte';
   import SparcAutoTutorProgress from './SparcAutoTutorProgress.svelte';
-  import { buildSparcAutoTutorProgressSnapshot } from '../services/sparcAutoTutorProgress';
+  import {
+    buildSparcAutoTutorProgressSnapshot,
+    selectSparcAutoTutorProgressSnapshotForRender,
+  } from '../services/sparcAutoTutorProgress';
   import TrialInteractionPane from './TrialInteractionPane.svelte';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
+  import { clientConsole } from '../../../../lib/clientLogger';
+  import { redactOpenRouterSecretText } from '../../../../../common/lib/openRouterClient';
 
   const dispatch = createEventDispatcher();
   const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
@@ -67,6 +72,10 @@
   let activeNodeId = '';
   let feedbackFadeElement;
   let dialogueInputResetVersion = 0;
+  let dialogueSubmitPending = false;
+  let pendingAutoTutorProgressSnapshot = null;
+  let dialogueSubmitError = '';
+  let dialogueSubmitErrorDetail = '';
   let surfaceElement;
   let autoTutorChatElement;
   let lastFeedbackRevealSignature = '';
@@ -75,6 +84,25 @@
 
   function handleFeedbackContent(event) {
     dispatch('feedbackcontent', event.detail);
+  }
+
+  function dialogueSubmissionErrorDetail(error) {
+    const value = error && typeof error === 'object' ? error : {};
+    const code = typeof value.error === 'string' ? value.error.trim() : '';
+    const message = typeof value.reason === 'string' && value.reason.trim()
+      ? value.reason.trim()
+      : (error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : String(error || 'Unknown error'));
+    return redactOpenRouterSecretText(
+      `${code ? `${code}: ` : ''}${message}`
+        .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
+        .replace(/\b(?:mongodb(?:\+srv)?|postgres(?:ql)?):\/\/\S+/gi, '[redacted connection string]')
+        .replace(/\bAIza[0-9A-Za-z_-]{20,}\b/g, '[redacted API key]')
+        .replace(/\bsk-(?:or-v1-)?[0-9A-Za-z_-]{16,}\b/g, '[redacted API key]')
+        .replace(/\s+/g, ' ')
+        .slice(0, 800),
+    );
   }
 
   function buildInitialNodeValues(nodes = [], values = {}) {
@@ -218,6 +246,22 @@
     ));
   }
 
+  function dialogueInputValuePatch(nodes = [], values = {}) {
+    return dialogueInputNodes(nodes).reduce((patch, inputNode) => {
+      if (Object.prototype.hasOwnProperty.call(values, inputNode.id)) {
+        patch[inputNode.id] = values[inputNode.id];
+      }
+      return patch;
+    }, {});
+  }
+
+  function clearedDialogueInputValuePatch(nodes = []) {
+    return dialogueInputNodes(nodes).reduce((patch, inputNode) => ({
+      ...patch,
+      [inputNode.id]: '',
+    }), {});
+  }
+
   function handleNodeValueChange(nodeId, value) {
     nodeValues = {
       ...nodeValues,
@@ -252,14 +296,25 @@
   }
 
   function clearDialogueInputs() {
-    const inputIds = dialogueInputNodes(realizedSparcDisplay?.nodes).map((inputNode) => inputNode.id);
-    if (inputIds.length === 0) {
+    const clearedValues = clearedDialogueInputValuePatch(realizedSparcDisplay?.nodes);
+    if (Object.keys(clearedValues).length === 0) {
       return;
     }
-    nodeValues = inputIds.reduce((values, inputNodeId) => ({
+    nodeValues = {
+      ...nodeValues,
+      ...clearedValues,
+    };
+    dialogueInputResetVersion += 1;
+  }
+
+  function restoreDialogueInputs(values) {
+    if (Object.keys(values).length === 0) {
+      return;
+    }
+    nodeValues = {
+      ...nodeValues,
       ...values,
-      [inputNodeId]: '',
-    }), nodeValues);
+    };
     dialogueInputResetVersion += 1;
   }
 
@@ -280,7 +335,7 @@
       });
       return;
     }
-    void handleSparcSubmit({
+    const submission = {
       submittedNodes: hasProductionRules()
         ? {
             ...collectDefaultSubmissionValues(sparcDisplay?.nodes),
@@ -294,10 +349,12 @@
       triggeredBy: node?.id,
       focusedNodeId: activeNodeId || undefined,
       timestamp: Date.now(),
-    });
+    };
     if (isAutoTutorDialogueDisplay(sparcDisplay)) {
-      clearDialogueInputs();
+      void submitAutoTutorDialogue(submission);
+      return;
     }
+    void handleSparcSubmit(submission);
   }
 
   function handleNodeEnter(nodeId, value) {
@@ -316,7 +373,7 @@
       ...nodeValues,
       [nodeId]: learnerText,
     };
-    void handleSparcSubmit({
+    void submitAutoTutorDialogue({
       submittedNodes: {
         ...collectDefaultSubmissionValues(sparcDisplay?.nodes),
         ...collectAnswerSubmissionValues({
@@ -331,7 +388,6 @@
       focusedNodeId: activeNodeId || undefined,
       timestamp: Date.now(),
     });
-    clearDialogueInputs();
     return true;
   }
 
@@ -483,10 +539,13 @@
       const priorProgressiveOperations = currentSparcProgressiveNodeOperations();
       const optimisticOperations = buildOptimisticDialogueLearnerOperations(currentDisplay, sparcResult);
       if (optimisticOperations.length > 0) {
-        sendSparcProgressiveNodeOperations([
-          ...priorProgressiveOperations,
-          ...optimisticOperations,
-        ], sparcResult.timestamp);
+        dispatchSparcNodeValues({
+          [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: [
+            ...priorProgressiveOperations,
+            ...optimisticOperations,
+          ],
+          ...clearedDialogueInputValuePatch(currentDisplay.nodes),
+        }, sparcResult.timestamp);
       }
       let result;
       try {
@@ -564,6 +623,35 @@
       source: 'sparc',
       sparcResult,
     });
+  }
+
+  async function submitAutoTutorDialogue(detail) {
+    if (dialogueSubmitPending) {
+      return;
+    }
+    pendingAutoTutorProgressSnapshot = autoTutorProgressSnapshot;
+    dialogueSubmitPending = true;
+    dialogueSubmitError = '';
+    dialogueSubmitErrorDetail = '';
+    const submittedInputValues = dialogueInputValuePatch(
+      realizedSparcDisplay?.nodes,
+      detail?.submittedNodes,
+    );
+    clearDialogueInputs();
+    try {
+      await handleSparcSubmit(detail);
+    } catch (error) {
+      restoreDialogueInputs(submittedInputValues);
+      dispatchSparcNodeValues(submittedInputValues, detail?.timestamp);
+      dialogueSubmitError = platformText('autoTutor.serviceError');
+      dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
+      clientConsole(1, '[SPARC][Dialogue] submission failed', {
+        detail: dialogueSubmitErrorDetail,
+      });
+    } finally {
+      dialogueSubmitPending = false;
+      pendingAutoTutorProgressSnapshot = null;
+    }
   }
 
   function handleAutoTutorContinue() {
@@ -660,11 +748,16 @@
   );
   $: nodeValues = mergeRuntimeNodeValues(authoredNodeValues, runtimeNodeValues);
   $: autoTutorDialogueMode = isAutoTutorDialogueDisplay(sparcDisplay);
-  $: autoTutorProgressSnapshot = buildSparcAutoTutorProgressSnapshot({
+  $: currentAutoTutorProgressSnapshot = buildSparcAutoTutorProgressSnapshot({
     display: sparcDisplay,
     runtimeNodeValues: nodeValues,
   });
-  $: autoTutorDialogueCompleted = autoTutorDialogueMode && autoTutorProgressSnapshot.completed;
+  $: autoTutorProgressSnapshot = selectSparcAutoTutorProgressSnapshotForRender({
+    currentSnapshot: currentAutoTutorProgressSnapshot,
+    pendingSnapshot: pendingAutoTutorProgressSnapshot,
+    submissionPending: dialogueSubmitPending,
+  });
+  $: autoTutorDialogueCompleted = autoTutorDialogueMode && currentAutoTutorProgressSnapshot.completed;
   $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
   $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes) : [];
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
@@ -677,6 +770,12 @@
   }
   $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
   $: autoTutorDialogueSubmitNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-submit') : null;
+  $: autoTutorDialogueInputRenderNode = autoTutorDialogueInputNode && dialogueSubmitPending
+    ? { ...autoTutorDialogueInputNode, readOnly: true }
+    : autoTutorDialogueInputNode;
+  $: autoTutorDialogueSubmitRenderNode = autoTutorDialogueSubmitNode && dialogueSubmitPending
+    ? { ...autoTutorDialogueSubmitNode, readOnly: true }
+    : autoTutorDialogueSubmitNode;
   $: progressiveNodeOperationCount = progressiveNodeOperations.length;
   $: if (progressiveNodeOperationCount > observedProgressiveNodeOperationCount) {
     scrollAfterProgressiveNodeAdditions();
@@ -694,13 +793,14 @@
       <div class="sparc-auto-tutor-question">
         <h1>{autoTutorDialoguePrompt}</h1>
       </div>
-      <SparcAutoTutorProgress display={sparcDisplay} runtimeNodeValues={nodeValues} />
+      <SparcAutoTutorProgress snapshot={autoTutorProgressSnapshot} />
     </header>
 
     <section
       bind:this={autoTutorChatElement}
       class="sparc-auto-tutor-chat"
       aria-label={platformText('autoTutor.conversation')}
+      aria-busy={dialogueSubmitPending}
     >
       {#each autoTutorDialogueMessages as node (node.id)}
         <SparcNode
@@ -718,6 +818,23 @@
           onButtonActivate={handleButtonActivate}
         />
       {/each}
+      {#if dialogueSubmitPending}
+        <div
+          class="sparc-auto-tutor-pending-turn"
+          data-sparc-speaker="tutor"
+          role="status"
+          aria-label={platformText('common.loading')}
+        >
+          <div class="sparc-auto-tutor-pending-speaker" aria-hidden="true">Tutor</div>
+          <div class="sparc-auto-tutor-pending-bubble" aria-hidden="true">
+            <span class="sparc-auto-tutor-pending-swirl"></span>
+            <span class="sparc-auto-tutor-skeleton-lines">
+              <span class="sparc-auto-tutor-skeleton-line"></span>
+              <span class="sparc-auto-tutor-skeleton-line sparc-auto-tutor-skeleton-line-short"></span>
+            </span>
+          </div>
+        </div>
+      {/if}
     </section>
 
     <footer class="sparc-auto-tutor-input-bar">
@@ -733,7 +850,7 @@
         <div class="sparc-auto-tutor-input">
           {#key `${autoTutorDialogueInputNode.id}:${dialogueInputResetVersion}`}
           <SparcNode
-            node={autoTutorDialogueInputNode}
+            node={autoTutorDialogueInputRenderNode}
             {adminDiagnosticMode}
             {nodeValues}
             {learningProgressSnapshot}
@@ -753,7 +870,7 @@
       {#if !autoTutorDialogueCompleted && autoTutorDialogueSubmitNode}
         <div class="sparc-auto-tutor-submit">
           <SparcNode
-            node={autoTutorDialogueSubmitNode}
+            node={autoTutorDialogueSubmitRenderNode}
             {adminDiagnosticMode}
             {nodeValues}
             {learningProgressSnapshot}
@@ -769,6 +886,17 @@
         </div>
       {/if}
     </footer>
+    {#if dialogueSubmitError}
+      <p class="sparc-auto-tutor-submit-error" role="alert">
+        {dialogueSubmitError}
+      </p>
+      {#if dialogueSubmitErrorDetail}
+        <p class="sparc-auto-tutor-submit-error-detail">
+          <span>Technical detail:</span>
+          <code>{dialogueSubmitErrorDetail}</code>
+        </p>
+      {/if}
+    {/if}
   {:else if sparcDisplay?.topbar?.title}
     <div class="sparc-topbar">
       <div class="sparc-topbar-title">{sparcDisplay.topbar.title}</div>
@@ -1054,6 +1182,82 @@
     box-sizing: border-box;
   }
 
+  .sparc-auto-tutor-pending-turn {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-space-1);
+    max-width: min(78%, 42rem);
+    min-width: min(16rem, 100%);
+    align-self: flex-start;
+  }
+
+  .sparc-auto-tutor-pending-speaker {
+    color: var(--sparc-secondary-text-color);
+    font-size: var(--sparc-font-size-small);
+    font-weight: var(--app-font-weight-semibold, 600);
+  }
+
+  .sparc-auto-tutor-pending-bubble {
+    width: 100%;
+    min-height: 3.35rem;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--sparc-space-3);
+    align-items: center;
+    padding: var(--sparc-space-2) var(--sparc-space-3);
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-lg);
+    background: var(--sparc-control-surface-color);
+  }
+
+  .sparc-auto-tutor-pending-swirl {
+    width: 1.15rem;
+    height: 1.15rem;
+    box-sizing: border-box;
+    border: 2px solid color-mix(in srgb, var(--sparc-accent-color) 24%, transparent);
+    border-top-color: color-mix(in srgb, var(--sparc-accent-color) 68%, transparent);
+    border-radius: 50%;
+    opacity: 0.62;
+    animation: sparc-auto-tutor-pending-spin 1.15s linear infinite;
+  }
+
+  .sparc-auto-tutor-skeleton-lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sparc-space-2);
+    min-width: 0;
+  }
+
+  .sparc-auto-tutor-skeleton-line {
+    display: block;
+    width: 100%;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sparc-secondary-text-color) 19%, transparent);
+    animation: sparc-auto-tutor-skeleton-pulse 1.45s ease-in-out infinite;
+  }
+
+  .sparc-auto-tutor-skeleton-line-short {
+    width: 68%;
+    animation-delay: 160ms;
+  }
+
+  @keyframes sparc-auto-tutor-pending-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes sparc-auto-tutor-skeleton-pulse {
+    0%, 100% {
+      opacity: 0.42;
+    }
+    50% {
+      opacity: 0.78;
+    }
+  }
+
   .sparc-auto-tutor-input-bar {
     flex: 0 0 auto;
     display: grid;
@@ -1076,6 +1280,24 @@
 
   .sparc-auto-tutor-submit :global(.sparc-button) {
     text-align: center;
+  }
+
+  .sparc-auto-tutor-submit-error {
+    margin: var(--sparc-space-2) 0 0;
+    color: var(--sparc-error-color);
+  }
+
+  .sparc-auto-tutor-submit-error-detail {
+    margin: var(--sparc-space-1) 0 0;
+    color: var(--sparc-error-color);
+    font-size: var(--sparc-font-size-small);
+    overflow-wrap: anywhere;
+  }
+
+  .sparc-auto-tutor-submit-error-detail code {
+    margin-left: var(--sparc-space-1);
+    color: inherit;
+    font-family: var(--sparc-monospace-font-family);
   }
 
   .sparc-auto-tutor-continue {
@@ -1110,6 +1332,13 @@
 
     .sparc-auto-tutor-input-bar {
       grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sparc-auto-tutor-pending-swirl,
+    .sparc-auto-tutor-skeleton-line {
+      animation: none;
     }
   }
 </style>

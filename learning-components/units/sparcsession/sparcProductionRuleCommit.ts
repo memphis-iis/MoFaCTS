@@ -237,6 +237,36 @@ function firingWritesCorrectnessForEvent(
   ));
 }
 
+function executionWritesEventValue(
+  execution: SparcProductionRuleExecution,
+  event: SparcInterfaceEvent,
+): boolean {
+  return execution.firings.some((firing) => firing.writes.some((write) => (
+    write.key === 'value'
+    && write.target.pageKey === event.source.pageKey
+    && write.target.nodeId === event.source.nodeId
+  )));
+}
+
+function createSubmittedValueWrite(params: {
+  readonly event: SparcInterfaceEvent;
+  readonly execution: SparcProductionRuleExecution;
+}): SparcStateWrite[] {
+  if (
+    params.event.type !== 'response-submitted'
+    || params.event.payload?.sparcAnswerable !== true
+    || !eventHasNonEmptyInput(params.event)
+    || executionWritesEventValue(params.execution, params.event)
+  ) {
+    return [];
+  }
+  return [{
+    target: params.event.source,
+    key: 'value',
+    value: params.event.payload?.input,
+  }];
+}
+
 function createUnhandledIncorrectWrites(params: {
   readonly event: SparcInterfaceEvent;
   readonly execution: SparcProductionRuleExecution;
@@ -381,6 +411,10 @@ function createProductionRuleTransition(params: {
           });
     }),
   ]).concat(
+    createSubmittedValueWrite({
+      event: params.event,
+      execution: params.execution,
+    }),
     correctnessWrites,
     createCorrectFeedbackClearWrites({
       event: params.event,

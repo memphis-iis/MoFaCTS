@@ -255,6 +255,59 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     });
   });
 
+  it('routes default feedback to the message box in the answered exercise', function() {
+    const [event] = createSparcProductionRuleEventsFromTrialResult({
+      pageKey: 'doc-1',
+      display: {
+        schema: 'tutorscript-sparc/2.0',
+        nodes: [{
+          id: 'exercise-one',
+          nodeType: 'group',
+          children: [{
+            id: 'exercise-one-input',
+            nodeType: 'atomic',
+            atomType: 'dropdown',
+          }, {
+            id: 'exercise-one-feedback',
+            nodeType: 'atomic',
+            atomType: 'message-box',
+          }],
+        }, {
+          id: 'exercise-two',
+          nodeType: 'group',
+          children: [{
+            id: 'exercise-two-input',
+            nodeType: 'atomic',
+            atomType: 'dropdown',
+          }, {
+            id: 'exercise-two-feedback',
+            nodeType: 'atomic',
+            atomType: 'message-box',
+          }],
+        }],
+        behavior: {
+          steps: [{
+            id: 'exercise-two-response',
+            responses: [{
+              nodeRef: 'exercise-two-input',
+              selection: 'exercise-two',
+              action: 'UpdateComboBox',
+              input: 'dependent',
+            }],
+          }],
+        },
+      },
+      result: {
+        submittedNodes: {
+          'exercise-two-input': 'dependent',
+        },
+        timestamp: 2010,
+      },
+    });
+
+    assert.equal(event?.payload?.sparcDefaultIncorrectFeedbackNodeId, 'exercise-two-feedback');
+  });
+
   it('turns mapped SPARC button activations into production-rule events', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
       pageKey: 'doc-1',

@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 
 import { parseAutoTutorScoreEnvelope, parseAutoTutorUtteranceEnvelope, validateAutoTutorContent } from './autoTutorContract';
-import { createSparcProgressiveScaffoldingRules } from '../../../learning-components/units/sparcsession/sparcProgressiveScaffoldingRules';
 
 function buildValidTdf() {
   return {
@@ -152,7 +151,6 @@ function buildValidSparcAutoTutorStimuli() {
                 },
               ],
             },
-            productionRules: createSparcProgressiveScaffoldingRules(),
           },
         },
       ],
@@ -170,13 +168,27 @@ describe('AutoTutor content contract', function() {
     expect(result).to.deep.equal({ valid: true, errors: [] });
   });
 
-  it('accepts a clean SPARC AutoTutor TDF and stimulus pair', function() {
+  it('accepts a runtime-owned SPARC AutoTutor TDF and stimulus pair', function() {
     const result = validateAutoTutorContent({
       tdf: buildValidSparcAutoTutorTdf(),
       stimuli: buildValidSparcAutoTutorStimuli(),
     });
 
     expect(result).to.deep.equal({ valid: true, errors: [] });
+  });
+
+  it('rejects authored production rules in runtime-owned SPARC AutoTutor content', function() {
+    const stimuli = buildValidSparcAutoTutorStimuli();
+    const display = stimuli.setspec.sparcPages[0]!.display as Record<string, unknown>;
+    display.productionRules = [];
+
+    const result = validateAutoTutorContent({
+      tdf: buildValidSparcAutoTutorTdf(),
+      stimuli,
+    });
+
+    expect(result.valid).to.equal(false);
+    expect(result.errors).to.include('setspec.sparcPages[0].display.productionRules is runtime-owned and must be omitted');
   });
 
   it('rejects forbidden legacy target fields in SPARC AutoTutor content', function() {

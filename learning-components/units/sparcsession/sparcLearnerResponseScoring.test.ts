@@ -51,6 +51,12 @@ const event: SparcInterfaceEvent = {
   },
 };
 
+const citedLearnerEvidence = [{
+  source: 'learnerText' as const,
+  dialogueHistoryIndex: null,
+  quote: 'Learner answer.',
+}];
+
 describe('sparcLearnerResponseScoring', function() {
   it('reduces complete overlapping E1-E4 evidence and clears only contradicted misconceptions', function() {
     const facts = [
@@ -70,13 +76,14 @@ describe('sparcLearnerResponseScoring', function() {
           clusterKC,
           evidenceDirection: 'supports' as const,
           evidenceStrength: 1,
+          learnerEvidence: citedLearnerEvidence,
         })),
         diagnosticMisconceptionEvaluations: [{
-          id: 'M1', evidenceDirection: 'contradicts', evidenceStrength: 1,
+          id: 'M1', evidenceDirection: 'contradicts', evidenceStrength: 1, learnerEvidence: citedLearnerEvidence,
         }, {
-          id: 'M2', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+          id: 'M2', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
         }, {
-          id: 'M3', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+          id: 'M3', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
         }],
         learnerContribution: { type: 'answer' },
       },
@@ -97,12 +104,12 @@ describe('sparcLearnerResponseScoring', function() {
       facts: document.workingMemoryFacts ?? [],
       evidence: {
         learningTargetEvaluations: [{
-          clusterKC: 'kc-a', evidenceDirection: 'contradicts', evidenceStrength: 0.6,
+          clusterKC: 'kc-a', evidenceDirection: 'contradicts', evidenceStrength: 0.6, learnerEvidence: citedLearnerEvidence,
         }, {
-          clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+          clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
         }],
         diagnosticMisconceptionEvaluations: [{
-          id: 'm1', evidenceDirection: 'contradicts', evidenceStrength: 0.4,
+          id: 'm1', evidenceDirection: 'contradicts', evidenceStrength: 0.4, learnerEvidence: citedLearnerEvidence,
         }],
         learnerContribution: { type: 'answer' },
       },
@@ -117,12 +124,12 @@ describe('sparcLearnerResponseScoring', function() {
       facts: document.workingMemoryFacts ?? [],
       evidence: {
         learningTargetEvaluations: [{
-          clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.3,
+          clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.3, learnerEvidence: citedLearnerEvidence,
         }, {
-          clusterKC: 'kc-b', evidenceDirection: 'supports', evidenceStrength: 0.1,
+          clusterKC: 'kc-b', evidenceDirection: 'supports', evidenceStrength: 0.1, learnerEvidence: citedLearnerEvidence,
         }],
         diagnosticMisconceptionEvaluations: [{
-          id: 'm1', evidenceDirection: 'supports', evidenceStrength: 0.1,
+          id: 'm1', evidenceDirection: 'supports', evidenceStrength: 0.1, learnerEvidence: citedLearnerEvidence,
         }],
         learnerContribution: { type: 'answer' },
       },
@@ -141,10 +148,10 @@ describe('sparcLearnerResponseScoring', function() {
       ],
       evidence: {
         learningTargetEvaluations: [{
-          clusterKC: 'compound.e1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+          clusterKC: 'compound.e1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
         }],
         diagnosticMisconceptionEvaluations: [{
-          id: 'M3', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+          id: 'M3', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
         }],
         learnerContribution: { type: 'answer' },
       },
@@ -157,12 +164,12 @@ describe('sparcLearnerResponseScoring', function() {
   it('requires a complete exact set of authored evidence identifiers', function() {
     const completeEvidence: SparcLearnerResponseEvidenceEnvelope = {
       learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }, {
-        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       learnerContribution: { type: 'answer' },
     };
@@ -176,7 +183,7 @@ describe('sparcLearnerResponseScoring', function() {
       evidence: {
         ...completeEvidence,
         learningTargetEvaluations: [{
-          clusterKC: 'kc-a ', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+          clusterKC: 'kc-a ', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
         }, completeEvidence.learningTargetEvaluations[1]!],
       },
       message: /unknown learning target clusterKC "kc-a "/,
@@ -205,32 +212,32 @@ describe('sparcLearnerResponseScoring', function() {
   it('rejects inconsistent evidence directions and strengths', function() {
     const invalidEvidence = [{
       learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0,
+        clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0, learnerEvidence: citedLearnerEvidence,
       }, {
-        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       learnerContribution: { type: 'answer' },
     }, {
       learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'contradicts', evidenceStrength: 0,
+        clusterKC: 'kc-a', evidenceDirection: 'contradicts', evidenceStrength: 0, learnerEvidence: citedLearnerEvidence,
       }, {
-        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       learnerContribution: { type: 'answer' },
     }, {
       learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0.2,
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0.2, learnerEvidence: [],
       }, {
-        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       learnerContribution: { type: 'answer' },
     }] as SparcLearnerResponseEvidenceEnvelope[];
@@ -256,12 +263,12 @@ describe('sparcLearnerResponseScoring', function() {
       facts: document.workingMemoryFacts ?? [],
       evidence: {
         learningTargetEvaluations: [{
-          clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.4,
+          clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.4, learnerEvidence: citedLearnerEvidence,
         }, {
-          clusterKC: 'kc-b', evidenceDirection: 'supports', evidenceStrength: 0.1,
+          clusterKC: 'kc-b', evidenceDirection: 'supports', evidenceStrength: 0.1, learnerEvidence: citedLearnerEvidence,
         }],
         diagnosticMisconceptionEvaluations: [{
-          id: 'm1', evidenceDirection: 'supports', evidenceStrength: 0.2,
+          id: 'm1', evidenceDirection: 'supports', evidenceStrength: 0.2, learnerEvidence: citedLearnerEvidence,
         }],
         learnerContribution: { type: 'off-task' },
       },
@@ -275,25 +282,25 @@ describe('sparcLearnerResponseScoring', function() {
   it('rejects invalid evidence directions and nonnumeric strengths', function() {
     const baseEvidence = {
       learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }, {
-        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
+        id: 'm1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
       }],
       learnerContribution: { type: 'answer' },
     };
     const invalidDirection = {
       ...baseEvidence,
       learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'maybe', evidenceStrength: 0,
+        clusterKC: 'kc-a', evidenceDirection: 'maybe', evidenceStrength: 0, learnerEvidence: [],
       }, baseEvidence.learningTargetEvaluations[1]],
     } as unknown as SparcLearnerResponseEvidenceEnvelope;
     const nonnumericStrength = {
       ...baseEvidence,
       diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'supports', evidenceStrength: '0.5',
+        id: 'm1', evidenceDirection: 'supports', evidenceStrength: '0.5', learnerEvidence: citedLearnerEvidence,
       }],
     } as unknown as SparcLearnerResponseEvidenceEnvelope;
 
@@ -316,12 +323,12 @@ describe('sparcLearnerResponseScoring', function() {
   it('requires question metadata and ignores it for non-question contributions', function() {
     const baseEvidence = {
       learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0,
+        clusterKC: 'kc-a', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0, learnerEvidence: [],
       }, {
-        clusterKC: 'kc-b', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0,
+        clusterKC: 'kc-b', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0, learnerEvidence: [],
       }],
       diagnosticMisconceptionEvaluations: [{
-        id: 'm1', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0,
+        id: 'm1', evidenceDirection: 'unaddressed' as const, evidenceStrength: 0, learnerEvidence: [],
       }],
     };
     assert.throws(

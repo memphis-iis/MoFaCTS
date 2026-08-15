@@ -5,6 +5,7 @@ import type { CanonicalHistoryRecord } from '../../../../../../learning-componen
 import type { UnitEngineLike } from '../../../../../common/types';
 import { SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import { commitSparcProductionRulesForHistory } from './historyLogging';
+import { SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY } from './sparcDialogueRuntimeValues';
 import {
   clearSparcRuntimeState,
   ensureSparcRuntimeHistoryHydrated,
@@ -26,9 +27,22 @@ function historyRecord(params: {
   levelUnit?: number;
   value?: unknown;
   progressive?: boolean;
+  learningTargetScore?: { clusterKC: string; coverage: number };
 }): CanonicalHistoryRecord {
   const pageKey = params.pageKey ?? 'fractions-addition';
-  const write = params.progressive
+  const write = params.learningTargetScore
+    ? {
+        target: { pageKey, nodeId: 'root' },
+        key: `workingMemoryFactStable:${JSON.stringify({
+          factType: 'learningTarget.score',
+          identitySlots: { clusterKC: params.learningTargetScore.clusterKC },
+        })}`,
+        value: {
+          factType: 'learningTarget.score',
+          slots: params.learningTargetScore,
+        },
+      }
+    : params.progressive
       ? {
         target: { pageKey, nodeId: 'dialogue-root' },
         key: 'progressive-node-operation',
@@ -103,6 +117,28 @@ describe('SPARC runtime history and resume snapshot', function() {
     expect(snapshot.nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]).to.deep.equal(
       snapshot.progressiveNodeOperations,
     );
+  });
+
+  it('projects replayed dialogue progress facts into resumed node values', function() {
+    const scoredAttempt = historyRecord({
+      sessionID: 'attempt-1',
+      learningTargetScore: { clusterKC: 'kc-frequency', coverage: 0.75 },
+    });
+    hydrateSparcRuntimeHistory([scoredAttempt]);
+
+    const snapshot = readSparcResumeSnapshot({
+      userId: 'user-1',
+      TDFId: 'tdf-1',
+      levelUnit: 2,
+      pageKey: 'fractions-addition',
+      display,
+    });
+    const progressFacts = snapshot.nodeValues[SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY];
+
+    expect(progressFacts).to.deep.include({
+      factType: 'learningTarget.score',
+      slots: { clusterKC: 'kc-frequency', coverage: 0.75 },
+    });
   });
 
   it('keeps learner, TDF, unit, and page scopes independent while ignoring attempt identity', function() {

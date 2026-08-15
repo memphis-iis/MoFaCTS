@@ -7,6 +7,7 @@ import type {
   SparcProductionRuleExecution,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
 import type { SparcReplayState } from './sparcStateReplay';
 import {
@@ -144,6 +145,71 @@ function replayStateFacts(replayState: SparcReplayState): readonly SparcWorkingM
   });
 }
 
+function progressiveDialogueFacts(replayState: SparcReplayState): readonly SparcWorkingMemoryFact[] {
+  return replayState.transitions.flatMap((transition) => transition.writes.flatMap((write) => {
+    if (write.key !== SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY || !isRecord(write.value)) {
+      return [];
+    }
+    const operation = write.value;
+    if (
+      (operation.type !== 'append-node' && operation.type !== 'append-node-if-missing' && operation.type !== 'insert-node')
+      || !isRecord(operation.node)
+    ) {
+      return [];
+    }
+    const node = operation.node;
+    const id = typeof node.id === 'string' ? node.id.trim() : '';
+    const speaker = node.speaker === 'learner' || node.speaker === 'tutor' ? node.speaker : '';
+    const text = typeof node.value === 'string' ? node.value.trim() : '';
+    if (node.atomType !== 'dialogue-utterance' || !id || !speaker || !text) {
+      return [];
+    }
+    const optionalStringSlots = [
+      'action',
+      'targetType',
+      'targetId',
+      'productionRuleId',
+      'productionRuleName',
+      'selectionTargetKind',
+      'promptId',
+      'promptVersion',
+      'outputSchemaId',
+      'outputSchemaVersion',
+      'renderer',
+      'historyAction',
+    ] as const;
+    const optionalNumberSlots = [
+      'selectionCurrentValue',
+      'selectionGoalValue',
+      'selectionRankWithinKind',
+    ] as const;
+    const slots: Record<string, unknown> = {
+      utteranceId: id,
+      speaker,
+      text,
+      pageKey: transition.event.source.pageKey,
+      sourceNode: transition.event.source.nodeId,
+      eventId: transition.event.eventId,
+      time: transition.event.time,
+    };
+    for (const slot of optionalStringSlots) {
+      if (typeof node[slot] === 'string' && node[slot].trim()) {
+        slots[slot] = node[slot];
+      }
+    }
+    for (const slot of optionalNumberSlots) {
+      if (typeof node[slot] === 'number' && Number.isFinite(node[slot])) {
+        slots[slot] = node[slot];
+      }
+    }
+    return [{
+      factId: id,
+      factType: 'dialogue.utterance',
+      slots,
+    }];
+  }));
+}
+
 function eventFacts(event: SparcInterfaceEvent): readonly SparcWorkingMemoryFact[] {
   const payloadSlots = isRecord(event.payload) ? event.payload : {};
   const facts: SparcWorkingMemoryFact[] = [{
@@ -258,6 +324,9 @@ export function buildSparcWorkingMemoryFactsWithDerivations(
 
   if (input.replayState) {
     facts.push(...replayStateFacts(input.replayState));
+    // Dialogue nodes are the durable source of truth; working-memory facts are
+    // projected from their replayable operations rather than persisted twice.
+    facts.push(...progressiveDialogueFacts(input.replayState));
   }
   if (input.event) {
     facts.push(...eventFacts(input.event));

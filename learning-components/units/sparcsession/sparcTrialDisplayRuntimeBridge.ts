@@ -16,6 +16,7 @@ import {
   type SparcControllerDialogueTurnResult,
   type SparcUtteranceGenerator,
 } from './sparcControllerDialogueTurn';
+import { requireBoundedSparcDialogueMessage } from './sparcDialogueTurnNodes';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
   applySparcStateTransition,
@@ -521,6 +522,74 @@ function collectFirstMessageBoxId(nodes: readonly unknown[] | undefined): string
   return undefined;
 }
 
+function containsNodeId(nodes: readonly unknown[] | undefined, nodeId: string): boolean {
+  for (const node of nodes ?? []) {
+    if (!isRecord(node)) {
+      continue;
+    }
+    if (stringOrUndefined(node.id) === nodeId) {
+      return true;
+    }
+    if (containsNodeId(Array.isArray(node.children) ? node.children : [], nodeId)) {
+      return true;
+    }
+    for (const panel of Array.isArray(node.panels) ? node.panels : []) {
+      if (isRecord(panel) && containsNodeId(Array.isArray(panel.children) ? panel.children : [], nodeId)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function followingMessageBoxIdForNode(
+  nodes: readonly unknown[] | undefined,
+  nodeId: string,
+): string | undefined {
+  const siblings = nodes ?? [];
+  for (let index = 0; index < siblings.length; index += 1) {
+    if (!containsNodeId([siblings[index]], nodeId)) {
+      continue;
+    }
+    for (let followingIndex = index + 1; followingIndex < siblings.length; followingIndex += 1) {
+      const messageBoxId = collectFirstMessageBoxId([siblings[followingIndex]]);
+      if (messageBoxId) {
+        return messageBoxId;
+      }
+    }
+    return undefined;
+  }
+  return undefined;
+}
+
+function nearestMessageBoxIdForNode(
+  nodes: readonly unknown[] | undefined,
+  nodeId: string,
+): string | undefined {
+  for (const node of nodes ?? []) {
+    if (!isRecord(node)) {
+      continue;
+    }
+    const children = Array.isArray(node.children) ? node.children : [];
+    if (containsNodeId(children, nodeId)) {
+      return nearestMessageBoxIdForNode(children, nodeId)
+        || followingMessageBoxIdForNode(children, nodeId)
+        || collectFirstMessageBoxId(children);
+    }
+    for (const panel of Array.isArray(node.panels) ? node.panels : []) {
+      if (!isRecord(panel)) {
+        continue;
+      }
+      const panelChildren = Array.isArray(panel.children) ? panel.children : [];
+      if (containsNodeId(panelChildren, nodeId)) {
+        return nearestMessageBoxIdForNode(panelChildren, nodeId)
+          || collectFirstMessageBoxId(panelChildren);
+      }
+    }
+  }
+  return undefined;
+}
+
 function directSparcActionForNode(node: DisplayNodeRecord, submittedValue: unknown): {
   readonly selection: string;
   readonly action: string;
@@ -568,7 +637,6 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
 }): readonly SparcInterfaceEvent[] {
   const responsesByNode = collectResponseMappingsFromBehavior(params.display.behavior);
   const nodesById = collectDisplayNodesById(params.display.nodes);
-  const defaultIncorrectFeedbackNodeId = collectFirstMessageBoxId(params.display.nodes);
   const focusPayload = focusedNodePayload(params.result.focusedNodeId, responsesByNode);
   const events: SparcInterfaceEvent[] = [];
   let index = 0;
@@ -614,6 +682,7 @@ export function createSparcProductionRuleEventsFromTrialResult(params: {
     if (!selection || !action) {
       continue;
     }
+    const defaultIncorrectFeedbackNodeId = nearestMessageBoxIdForNode(params.display.nodes, nodeId);
     events.push({
       eventId: `${params.pageKey}:${nodeId}:${index}:trial-display`,
       type: 'response-submitted',
@@ -695,11 +764,15 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
     display: params.display,
   });
   const replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
-  const { event, learnerText } = createSparcDialogueEventFromTrialResult({
+  const { event, learnerText: submittedLearnerText } = createSparcDialogueEventFromTrialResult({
     pageKey: params.pageKey,
     display: params.display,
     result: params.result,
   });
+  const learnerText = requireBoundedSparcDialogueMessage(
+    submittedLearnerText,
+    'SPARC learner dialogue text',
+  );
   const problemStatement = requireSparcDialogueProblemStatement(params.display);
   const learnerResponseScore = await params.scoreLearnerResponse({
     document,

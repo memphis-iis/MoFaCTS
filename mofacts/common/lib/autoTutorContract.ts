@@ -475,25 +475,8 @@ function validateSparcAutoTutorContent(context: AutoTutorValidationContext, erro
     if (!Array.isArray(display.nodes) || display.nodes.length === 0) {
       errors.push(`${pagePrefix}.display.nodes must contain the AutoTutor dialogue nodes`);
     }
-    if (!Array.isArray(display.productionRules) || display.productionRules.length === 0) {
-      errors.push(`${pagePrefix}.display.productionRules must contain canonical SPARC AutoTutor rules`);
-    } else {
-      const ruleIds = display.productionRules
-        .filter(isRecord)
-        .map((rule) => rule.id)
-        .filter(nonEmptyString);
-      const expectedRuleIds = [
-        'dialogue.completion.summary',
-        'dialogue.question.defer',
-        'dialogue.question.scope-refusal',
-        'dialogue.scaffold.pump',
-        'dialogue.scaffold.prompt',
-        'dialogue.scaffold.hint',
-        'dialogue.scaffold.assertion',
-      ];
-      if (JSON.stringify(ruleIds) !== JSON.stringify(expectedRuleIds)) {
-        errors.push(`${pagePrefix}.display.productionRules must contain exactly the canonical progressive-scaffolding-v1 rules`);
-      }
+    if (Object.prototype.hasOwnProperty.call(display, 'productionRules')) {
+      errors.push(`${pagePrefix}.display.productionRules is runtime-owned and must be omitted`);
     }
     const instructionalController = isRecord(display.instructionalController)
       ? display.instructionalController

@@ -2,8 +2,9 @@ import { expect } from 'chai';
 import type { SparcControllerDisplay } from './sparcController';
 import {
   buildSparcAutoTutorProgressSnapshot,
-  SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY,
+  selectSparcAutoTutorProgressSnapshotForRender,
 } from './sparcAutoTutorProgress';
+import { SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY } from './sparcDialogueRuntimeValues';
 
 function displayWithMisconceptions(): SparcControllerDisplay {
   return {
@@ -22,6 +23,36 @@ function displayWithMisconceptions(): SparcControllerDisplay {
       }],
     },
   } as unknown as SparcControllerDisplay;
+}
+
+function displayWithExpectations(): SparcControllerDisplay {
+  return {
+    nodes: [],
+    autoTutorTargets: {
+      expectations: ['mechanism', 'growth', 'frequency'].map((clusterKC) => ({
+        clusterKC,
+        text: clusterKC,
+      })),
+      misconceptions: [],
+    },
+  } as unknown as SparcControllerDisplay;
+}
+
+function expectationRuntimeValues(scores: readonly number[]): Record<string, unknown> {
+  return {
+    [SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY]: [{
+      factType: 'dialogue.thresholds',
+      slots: {
+        coverageThreshold: 0.8,
+      },
+    }, ...['mechanism', 'growth', 'frequency'].map((clusterKC, index) => ({
+      factType: 'learningTarget.score',
+      slots: {
+        clusterKC,
+        coverage: scores[index],
+      },
+    }))],
+  };
 }
 
 describe('sparcAutoTutorProgress', function() {
@@ -111,5 +142,39 @@ describe('sparcAutoTutorProgress', function() {
     expect(snapshot.completed).to.equal(true);
     expect(snapshot.completionReason).to.equal('max-turns');
     expect(snapshot.turnCount).to.equal(25);
+  });
+
+  it('holds the pre-assertion snapshot until the pending turn commits atomically', function() {
+    const display = displayWithExpectations();
+    const beforeAssertion = buildSparcAutoTutorProgressSnapshot({
+      display,
+      runtimeNodeValues: expectationRuntimeValues([0.9, 0.9, 0.75]),
+    });
+    const incompleteIntermediateProjection = buildSparcAutoTutorProgressSnapshot({
+      display,
+      runtimeNodeValues: {},
+    });
+
+    const duringAssertion = selectSparcAutoTutorProgressSnapshotForRender({
+      currentSnapshot: incompleteIntermediateProjection,
+      pendingSnapshot: beforeAssertion,
+      submissionPending: true,
+    });
+
+    expect(beforeAssertion.coveredExpectations).to.equal(2.75);
+    expect(incompleteIntermediateProjection.coveredExpectations).to.equal(0);
+    expect(duringAssertion.coveredExpectations).to.equal(2.75);
+
+    const afterAssertionUptake = buildSparcAutoTutorProgressSnapshot({
+      display,
+      runtimeNodeValues: expectationRuntimeValues([0.9, 0.9, 0.9]),
+    });
+    const committed = selectSparcAutoTutorProgressSnapshotForRender({
+      currentSnapshot: afterAssertionUptake,
+      pendingSnapshot: beforeAssertion,
+      submissionPending: false,
+    });
+
+    expect(committed.coveredExpectations).to.equal(3);
   });
 });

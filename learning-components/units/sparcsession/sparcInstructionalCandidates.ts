@@ -309,7 +309,9 @@ export function projectSparcInstructionalCandidates(params: {
       frontierScore,
       centralityScore,
       structuralPriorityScore,
-      priorityScore: instructionalNeed + structuralPriorityScore,
+      // Prefer the most structurally ready expectation the learner is already
+      // closest to meeting; remaining need is a penalty, not a reward.
+      priorityScore: structuralPriorityScore - instructionalNeed,
       eligible: targetId !== excludeClusterKC && currentCoverage < coverageThreshold,
     };
   }));

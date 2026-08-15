@@ -12,9 +12,15 @@ import {
 import {
   commitSparcDialogueTurnTransition,
   createSparcDialogueTurnTransition,
+  SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES,
 } from './sparcDialogueTurnNodes';
 import { requireActiveSparcMoveDefinition } from './sparcMoveDefinitions';
+import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import type { SparcAuthoredDocument, SparcInterfaceEvent } from './sparcSessionContracts';
+import {
+  DEFAULT_HISTORY_EXTENSION_FIELD_BUDGET_BYTES,
+  getJsonUtf8ByteLength,
+} from '../../runtime/historyEnvelope';
 
 function document(): SparcAuthoredDocument {
   return {
@@ -59,6 +65,12 @@ const utteranceRequest = {
     sourceRuleId: 'paper-rule-06-hint',
   },
   sourceRuleId: 'paper-rule-06-hint',
+  selectionDiagnostic: {
+    targetKind: 'expectation' as const,
+    currentValue: 0.4,
+    goalValue: 0.8,
+    rankWithinKind: 1,
+  },
 };
 
 describe('createSparcDialogueTurnTransition', function() {
@@ -73,6 +85,11 @@ describe('createSparcDialogueTurnTransition', function() {
 
     const operations = collectSparcProgressiveNodeOperations([transition]);
     assert.equal(operations.length, 2);
+    assert.equal(transition.writes.filter((write) => (
+      write.value
+      && typeof write.value === 'object'
+      && (write.value as { factType?: unknown }).factType === 'dialogue.utterance'
+    )).length, 0);
 
     const nodes = applySparcProgressiveNodeOperations([], operations);
     assert.deepEqual(nodes.map((node) => (node as { id: string }).id), [
@@ -84,6 +101,10 @@ describe('createSparcDialogueTurnTransition', function() {
     assert.equal((nodes[1] as { action?: string }).action, 'hint');
     assert.equal((nodes[1] as { targetId?: string }).targetId, 'kc-evaporation');
     assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'paper-rule-06-hint');
+    assert.equal((nodes[1] as { selectionTargetKind?: string }).selectionTargetKind, 'expectation');
+    assert.equal((nodes[1] as { selectionCurrentValue?: number }).selectionCurrentValue, 0.4);
+    assert.equal((nodes[1] as { selectionGoalValue?: number }).selectionGoalValue, 0.8);
+    assert.equal((nodes[1] as { selectionRankWithinKind?: number }).selectionRankWithinKind, 1);
     assert.equal((nodes[1] as { promptId?: string }).promptId, 'autotutor.hint');
     assert.equal((nodes[1] as { promptVersion?: string }).promptVersion, 'v3');
     assert.equal((nodes[1] as { outputSchemaId?: string }).outputSchemaId, 'autotutor.chat_utterance');
@@ -114,6 +135,10 @@ describe('createSparcDialogueTurnTransition', function() {
     assert.equal(facts[1]?.slots?.targetType, 'learningTarget');
     assert.equal(facts[1]?.slots?.targetId, 'kc-evaporation');
     assert.equal(facts[1]?.slots?.productionRuleName, 'paper-rule-06-hint');
+    assert.equal(facts[1]?.slots?.selectionTargetKind, 'expectation');
+    assert.equal(facts[1]?.slots?.selectionCurrentValue, 0.4);
+    assert.equal(facts[1]?.slots?.selectionGoalValue, 0.8);
+    assert.equal(facts[1]?.slots?.selectionRankWithinKind, 1);
     assert.equal(facts[1]?.slots?.promptId, 'autotutor.hint');
     assert.equal(facts[1]?.slots?.promptVersion, 'v3');
     assert.equal(facts[1]?.slots?.outputSchemaId, 'autotutor.chat_utterance');
@@ -139,6 +164,42 @@ describe('createSparcDialogueTurnTransition', function() {
       }),
       /does not match document "sparc-dialogue-doc"/,
     );
+  });
+
+  it('rejects a dialogue message that cannot fit the durable per-message contract', function() {
+    assert.throws(
+      () => createSparcDialogueTurnTransition({
+        document: document(),
+        event,
+        learnerText: 'a'.repeat(SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES),
+        utteranceRequest,
+        tutorText: 'A tutor reply',
+      }),
+      /SPARC learner dialogue text exceeds 2048 JSON UTF-8 bytes/,
+    );
+  });
+
+  it('keeps maximum supported dialogue messages within the SPARC history extension budget', function() {
+    const message = 'a'.repeat(SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES - 2);
+    const transition = createSparcDialogueTurnTransition({
+      document: document(),
+      event,
+      learnerText: message,
+      utteranceRequest,
+      tutorText: message,
+    });
+    const record = createSparcStateTransitionHistoryRecord({
+      core: {
+        TDFId: 'tdf-dialogue',
+        sessionID: 'session-dialogue',
+        anonStudentId: 'anon-dialogue',
+        levelUnit: 1,
+      },
+      transition,
+      action: 'sparc-dialogue-turn',
+    });
+
+    assert.ok(getJsonUtf8ByteLength(record.sparc) <= DEFAULT_HISTORY_EXTENSION_FIELD_BUDGET_BYTES);
   });
 
   it('commits the dialogue turn as a canonical SPARC history record', async function() {

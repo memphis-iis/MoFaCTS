@@ -20,14 +20,16 @@ function baseFacts(): SparcWorkingMemoryFact[] {
 }
 
 describe('projectSparcInstructionalCandidates', function() {
-  it('projects transparent expectation candidates and a within-kind maximum without selecting a target', function() {
+  it('prefers the structurally ready expectation with less remaining need', function() {
     const result = projectSparcInstructionalCandidates({
       snapshotId: 'snapshot-1',
       facts: baseFacts(),
       options: { anchorClusterKC: 'kc-a' },
     });
-    assert.equal(result.maximumExpectation?.targetId, 'kc-a');
+    assert.equal(result.maximumExpectation?.targetId, 'kc-b');
     assert.equal(result.expectations.find((candidate) => candidate.targetId === 'kc-a')?.instructionalNeed, 0.75);
+    assert.equal(result.expectations.find((candidate) => candidate.targetId === 'kc-a')?.priorityScore, -0.055);
+    assert.equal(result.expectations.find((candidate) => candidate.targetId === 'kc-b')?.priorityScore, 0.2925);
     assert.equal(result.facts.filter((entry) => entry.factType === 'instructional.candidate').length, 2);
     assert.equal(result.facts.some((entry) => entry.factType === 'instructional.decision'), false);
     assert.equal(result.facts.some((entry) => entry.factType === 'instructional.activeCycle'), false);

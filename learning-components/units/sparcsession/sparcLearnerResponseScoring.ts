@@ -19,16 +19,24 @@ export type SparcDiagnosticMisconceptionScoreInput = {
 
 export type SparcEvidenceDirection = 'supports' | 'contradicts' | 'unaddressed';
 
+export type SparcLearnerEvidenceCitation = {
+  readonly source: 'dialogueHistory' | 'learnerText';
+  readonly dialogueHistoryIndex: number | null;
+  readonly quote: string;
+};
+
 export type SparcLearningTargetEvidence = {
   readonly clusterKC: string;
   readonly evidenceDirection: SparcEvidenceDirection;
   readonly evidenceStrength: number;
+  readonly learnerEvidence: readonly SparcLearnerEvidenceCitation[];
 };
 
 export type SparcDiagnosticMisconceptionEvidence = {
   readonly id: string;
   readonly evidenceDirection: SparcEvidenceDirection;
   readonly evidenceStrength: number;
+  readonly learnerEvidence: readonly SparcLearnerEvidenceCitation[];
 };
 
 export type SparcLearnerResponseEvidenceEnvelope = {
@@ -187,6 +195,7 @@ function completeEvidenceById<T>(params: {
 function validatedEvidence(params: {
   readonly direction: unknown;
   readonly strength: unknown;
+  readonly learnerEvidence: unknown;
   readonly label: string;
 }): {
   readonly direction: SparcEvidenceDirection;
@@ -199,6 +208,33 @@ function validatedEvidence(params: {
   }
   if (direction === 'unaddressed' && strength !== 0) {
     throw new Error(`${params.label} evidenceStrength must be 0 when evidenceDirection is unaddressed`);
+  }
+  if (!Array.isArray(params.learnerEvidence)) {
+    throw new Error(`${params.label} learnerEvidence must be an array`);
+  }
+  if (direction === 'unaddressed' && params.learnerEvidence.length !== 0) {
+    throw new Error(`${params.label} learnerEvidence must be empty when evidenceDirection is unaddressed`);
+  }
+  if (direction !== 'unaddressed' && params.learnerEvidence.length === 0) {
+    throw new Error(`${params.label} learnerEvidence must cite at least one learner-authored phrase when evidenceDirection is ${direction}`);
+  }
+  for (const [index, citation] of params.learnerEvidence.entries()) {
+    const citationLabel = `${params.label} learnerEvidence[${index}]`;
+    if (!citation || typeof citation !== 'object' || Array.isArray(citation)) {
+      throw new Error(`${citationLabel} must be an object`);
+    }
+    const evidenceCitation = citation as Record<string, unknown>;
+    if (evidenceCitation.source !== 'dialogueHistory' && evidenceCitation.source !== 'learnerText') {
+      throw new Error(`${citationLabel} source must be dialogueHistory or learnerText`);
+    }
+    if (evidenceCitation.source === 'dialogueHistory') {
+      if (!Number.isInteger(evidenceCitation.dialogueHistoryIndex) || Number(evidenceCitation.dialogueHistoryIndex) < 0) {
+        throw new Error(`${citationLabel} dialogueHistoryIndex must be a nonnegative integer for dialogueHistory evidence`);
+      }
+    } else if (evidenceCitation.dialogueHistoryIndex !== null) {
+      throw new Error(`${citationLabel} dialogueHistoryIndex must be null for learnerText evidence`);
+    }
+    requireNonBlank(evidenceCitation.quote, `${citationLabel} quote`);
   }
   return { direction, strength };
 }
@@ -231,6 +267,7 @@ export function reduceSparcLearnerResponseEvidence(params: {
     const evidence = validatedEvidence({
       direction: evaluation.evidenceDirection,
       strength: evaluation.evidenceStrength,
+      learnerEvidence: evaluation.learnerEvidence,
       label: `SPARC learning target evidence "${clusterKC}"`,
     });
     if (evidence.direction === 'supports' && evidence.strength > (previousCoverage.get(clusterKC) ?? 0)) {
@@ -243,6 +280,7 @@ export function reduceSparcLearnerResponseEvidence(params: {
     const evidence = validatedEvidence({
       direction: evaluation.evidenceDirection,
       strength: evaluation.evidenceStrength,
+      learnerEvidence: evaluation.learnerEvidence,
       label: `SPARC diagnostic misconception evidence "${id}"`,
     });
     const priorStrength = previousSupportStrength.get(id) ?? 0;

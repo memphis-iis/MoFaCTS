@@ -23,6 +23,12 @@ export type SparcUtteranceRequest = {
   readonly pedagogicalState?: Readonly<Record<string, unknown>>;
   readonly targetContent?: unknown;
   readonly plannerState?: unknown;
+  readonly selectionDiagnostic?: {
+    readonly targetKind: 'expectation' | 'misconception';
+    readonly currentValue: number;
+    readonly goalValue: number;
+    readonly rankWithinKind: number;
+  };
   readonly dialogueHistory?: readonly Readonly<Record<string, unknown>>[];
 };
 
@@ -77,6 +83,34 @@ function factsByType(facts: readonly SparcWorkingMemoryFact[], factType: string)
 
 function latestFact(facts: readonly SparcWorkingMemoryFact[], factType: string): SparcWorkingMemoryFact | undefined {
   return factsByType(facts, factType).at(-1);
+}
+
+function finiteSlot(fact: SparcWorkingMemoryFact, slotName: string): number | undefined {
+  const value = Number(fact.slots?.[slotName]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function selectionDiagnostic(params: {
+  readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly targetType: SparcUtteranceRequest['targetType'];
+  readonly targetId: string;
+}): SparcUtteranceRequest['selectionDiagnostic'] {
+  const targetKind = params.targetType === 'learningTarget'
+    ? 'expectation'
+    : params.targetType === 'misconception'
+      ? 'misconception'
+      : undefined;
+  if (!targetKind) return undefined;
+  const candidate = factsByType(params.facts, 'instructional.candidate').find((fact) => (
+    stringSlot(fact, 'targetKind') === targetKind
+    && stringSlot(fact, 'targetId') === params.targetId
+  ));
+  if (!candidate) return undefined;
+  const currentValue = finiteSlot(candidate, 'currentValue');
+  const goalValue = finiteSlot(candidate, 'goalValue');
+  const rankWithinKind = finiteSlot(candidate, 'rankWithinKind');
+  if (currentValue === undefined || goalValue === undefined || rankWithinKind === undefined) return undefined;
+  return { targetKind, currentValue, goalValue, rankWithinKind };
 }
 
 export function buildSparcDialogueHistory(
@@ -292,6 +326,7 @@ export function createSparcUtteranceRequestFromFacts(
   const sourceRuleId = stringSlot(selectedAction, 'sourceRuleId');
   const contribution = latestFact(facts, 'learnerResponse.contribution')?.slots;
   const selectedResponseModifiers = responseModifiers(facts);
+  const selectedDiagnostic = selectionDiagnostic({ facts, targetType, targetId });
 
   return {
     problemStatement,
@@ -306,6 +341,7 @@ export function createSparcUtteranceRequestFromFacts(
     pedagogicalState: pedagogicalState(selectedAction),
     targetContent: targetContent({ facts, targetType, targetId, contentTexts }),
     plannerState: plannerState(facts),
+    ...(selectedDiagnostic ? { selectionDiagnostic: selectedDiagnostic } : {}),
     dialogueHistory: buildSparcDialogueHistory(facts),
     ...(sourceRuleId ? { sourceRuleId } : {}),
   };

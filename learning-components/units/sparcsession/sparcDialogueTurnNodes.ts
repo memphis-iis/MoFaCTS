@@ -1,17 +1,20 @@
+import { getJsonUtf8ByteLength } from '../../runtime/historyEnvelope';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
-import { createSparcWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
 import type {
   SparcAuthoredDocument,
   SparcCanonicalHistoryRecord,
   SparcInterfaceEvent,
   SparcStateTransition,
   SparcStateWrite,
-  SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+
+export const SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES = 2 * 1024;
+export const SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS = 2 * 1024;
+export const SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS = 512;
 
 export type SparcDialogueTurnNodeOptions = {
   readonly boxId?: string;
@@ -35,6 +38,25 @@ function requireNonBlank(value: unknown, label: string): string {
   return normalized;
 }
 
+export function requireBoundedSparcDialogueMessage(
+  value: unknown,
+  label: string,
+): string {
+  const text = requireNonBlank(value, label);
+  if (text.length > SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS) {
+    throw new Error(
+      `${label} exceeds ${SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS} characters: ${text.length} characters`,
+    );
+  }
+  const bytes = getJsonUtf8ByteLength(text);
+  if (bytes > SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES) {
+    throw new Error(
+      `${label} exceeds ${SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES} JSON UTF-8 bytes: ${bytes} bytes`,
+    );
+  }
+  return text;
+}
+
 function utteranceNode(params: {
   readonly id: string;
   readonly speaker: 'learner' | 'tutor';
@@ -45,6 +67,10 @@ function utteranceNode(params: {
   readonly targetId?: string;
   readonly productionRuleId?: string;
   readonly productionRuleName?: string;
+  readonly selectionTargetKind?: 'expectation' | 'misconception';
+  readonly selectionCurrentValue?: number;
+  readonly selectionGoalValue?: number;
+  readonly selectionRankWithinKind?: number;
   readonly promptId?: string;
   readonly promptVersion?: string;
   readonly outputSchemaId?: string;
@@ -64,6 +90,10 @@ function utteranceNode(params: {
     ...(params.targetId ? { targetId: params.targetId } : {}),
     ...(params.productionRuleId ? { productionRuleId: params.productionRuleId } : {}),
     ...(params.productionRuleName ? { productionRuleName: params.productionRuleName } : {}),
+    ...(params.selectionTargetKind ? { selectionTargetKind: params.selectionTargetKind } : {}),
+    ...(params.selectionCurrentValue !== undefined ? { selectionCurrentValue: params.selectionCurrentValue } : {}),
+    ...(params.selectionGoalValue !== undefined ? { selectionGoalValue: params.selectionGoalValue } : {}),
+    ...(params.selectionRankWithinKind !== undefined ? { selectionRankWithinKind: params.selectionRankWithinKind } : {}),
     ...(params.promptId ? { promptId: params.promptId } : {}),
     ...(params.promptVersion ? { promptVersion: params.promptVersion } : {}),
     ...(params.outputSchemaId ? { outputSchemaId: params.outputSchemaId } : {}),
@@ -94,49 +124,6 @@ function appendDialogueNodeWrite(params: {
   };
 }
 
-function dialogueUtteranceFact(params: {
-  readonly id: string;
-  readonly speaker: 'learner' | 'tutor';
-  readonly text: string;
-  readonly event: SparcInterfaceEvent;
-  readonly action?: string;
-  readonly targetType?: string;
-  readonly targetId?: string;
-  readonly productionRuleId?: string;
-  readonly productionRuleName?: string;
-  readonly promptId?: string;
-  readonly promptVersion?: string;
-  readonly outputSchemaId?: string;
-  readonly outputSchemaVersion?: string;
-  readonly renderer?: string;
-  readonly historyAction?: string;
-}): SparcWorkingMemoryFact {
-  return {
-    factId: params.id,
-    factType: 'dialogue.utterance',
-    slots: {
-      utteranceId: params.id,
-      speaker: params.speaker,
-      text: params.text,
-      pageKey: params.event.source.pageKey,
-      sourceNode: params.event.source.nodeId,
-      eventId: params.event.eventId,
-      time: params.event.time,
-      ...(params.action ? { action: params.action } : {}),
-      ...(params.targetType ? { targetType: params.targetType } : {}),
-      ...(params.targetId ? { targetId: params.targetId } : {}),
-      ...(params.productionRuleId ? { productionRuleId: params.productionRuleId } : {}),
-      ...(params.productionRuleName ? { productionRuleName: params.productionRuleName } : {}),
-      ...(params.promptId ? { promptId: params.promptId } : {}),
-      ...(params.promptVersion ? { promptVersion: params.promptVersion } : {}),
-      ...(params.outputSchemaId ? { outputSchemaId: params.outputSchemaId } : {}),
-      ...(params.outputSchemaVersion ? { outputSchemaVersion: params.outputSchemaVersion } : {}),
-      ...(params.renderer ? { renderer: params.renderer } : {}),
-      ...(params.historyAction ? { historyAction: params.historyAction } : {}),
-    },
-  };
-}
-
 export function createSparcDialogueTurnTransition(params: {
   readonly document: SparcAuthoredDocument;
   readonly event: SparcInterfaceEvent;
@@ -152,8 +139,8 @@ export function createSparcDialogueTurnTransition(params: {
     );
   }
   const eventId = requireNonBlank(params.event.eventId, 'SPARC dialogue eventId');
-  const learnerText = requireNonBlank(params.learnerText, 'SPARC learner dialogue text');
-  const tutorText = requireNonBlank(params.tutorText, 'SPARC tutor dialogue text');
+  const learnerText = requireBoundedSparcDialogueMessage(params.learnerText, 'SPARC learner dialogue text');
+  const tutorText = requireBoundedSparcDialogueMessage(params.tutorText, 'SPARC tutor dialogue text');
   const boxId = requireNonBlank(params.options?.boxId ?? 'dialogue-flow', 'SPARC dialogue boxId');
   const productionRuleId = params.utteranceRequest.sourceRuleId;
   const productionRuleName = [
@@ -174,30 +161,15 @@ export function createSparcDialogueTurnTransition(params: {
     ...(productionRuleId ? { productionRuleId } : {}),
     ...(productionRuleName ? { productionRuleName } : {}),
   };
+  const selectionDiagnostic = params.utteranceRequest.selectionDiagnostic;
+  const selectionDiagnosticMetadata = selectionDiagnostic ? {
+    selectionTargetKind: selectionDiagnostic.targetKind,
+    selectionCurrentValue: selectionDiagnostic.currentValue,
+    selectionGoalValue: selectionDiagnostic.goalValue,
+    selectionRankWithinKind: selectionDiagnostic.rankWithinKind,
+  } : {};
   const learnerNodeId = `${eventId}:learner`;
   const tutorNodeId = `${eventId}:tutor`;
-  const learnerFact = dialogueUtteranceFact({
-    id: learnerNodeId,
-    speaker: 'learner',
-    text: learnerText,
-    event: params.event,
-  });
-  const tutorFact = dialogueUtteranceFact({
-    id: tutorNodeId,
-    speaker: 'tutor',
-    text: tutorText,
-    event: params.event,
-    action: params.utteranceRequest.action,
-    targetType: params.utteranceRequest.targetType,
-    targetId: params.utteranceRequest.targetId,
-    ...productionRuleMetadata,
-    ...moveDefinitionMetadata,
-  });
-  const rootTarget = {
-    pageKey,
-    nodeId: params.document.root.id,
-  };
-
   return {
     transitionId: `${eventId}:dialogue-turn`,
     event: params.event,
@@ -226,16 +198,9 @@ export function createSparcDialogueTurnTransition(params: {
           targetType: params.utteranceRequest.targetType,
           targetId: params.utteranceRequest.targetId,
           ...productionRuleMetadata,
+          ...selectionDiagnosticMetadata,
           ...moveDefinitionMetadata,
         }),
-      }),
-      createSparcWorkingMemoryFactStateWrite({
-        target: rootTarget,
-        fact: learnerFact,
-      }),
-      createSparcWorkingMemoryFactStateWrite({
-        target: rootTarget,
-        fact: tutorFact,
       }),
     ],
   };

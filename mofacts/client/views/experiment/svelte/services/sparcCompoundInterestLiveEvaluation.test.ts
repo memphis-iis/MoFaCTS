@@ -162,43 +162,46 @@ function evidenceForTurn(
         clusterKC,
         evidenceDirection: evidenceStrength > 0 ? 'supports' as const : 'unaddressed' as const,
         evidenceStrength,
+        learnerEvidence: evidenceStrength > 0
+          ? [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }]
+          : [],
       };
     }),
     diagnosticMisconceptionEvaluations: MISCONCEPTION_IDS.map((id) => {
       if (exactTurn === 0 && id === 'M1') {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.8 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.8, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn === 0 && id === 'M2') {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.5 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.5, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn === 1 && id === 'M2') {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.7 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.7, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn === 2 && id === 'M2') {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.8 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.8, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn === 3 && (id === 'M1' || id === 'M2')) {
-        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
+        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn === 4 && id === 'M3' && scenario.inferUnsupportedM3) {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.25 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.25, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn === 5 && id === 'M1' && scenario.keepM1ActiveAfterTurnSix) {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.5 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.5, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn === 6 && id === 'M3' && scenario.completeOnExactTurnSeven) {
-        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
+        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn < 0 && (id === 'M1' || id === 'M2')) {
-        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
+        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn < 0 && id === 'M3' && scenario.inferUnsupportedM3OnSynthesis) {
-        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.1 };
+        return { id, evidenceDirection: 'supports' as const, evidenceStrength: 0.1, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
       if (exactTurn < 0 && id === 'M3') {
-        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1 };
+        return { id, evidenceDirection: 'contradicts' as const, evidenceStrength: 1, learnerEvidence: [{ source: 'learnerText' as const, dialogueHistoryIndex: null, quote: learnerText }] };
       }
-      return { id, evidenceDirection: 'unaddressed' as const, evidenceStrength: 0 };
+      return { id, evidenceDirection: 'unaddressed' as const, evidenceStrength: 0, learnerEvidence: [] };
     }),
     learnerContribution: { type: contributionType },
     ...(contributionType === 'question'
@@ -290,7 +293,16 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(run.turns[0]?.effectiveScoringState.learningTargetScores.map((score) => score.clusterKC))
       .to.deep.equal([...EXPECTATION_IDS]);
     expect(run.turns[0]?.evidenceEnvelope.diagnosticMisconceptionEvaluations)
-      .to.deep.include({ id: 'M1', evidenceDirection: 'supports', evidenceStrength: 0.8 });
+      .to.deep.include({
+        id: 'M1',
+        evidenceDirection: 'supports',
+        evidenceStrength: 0.8,
+        learnerEvidence: [{
+          source: 'learnerText',
+          dialogueHistoryIndex: null,
+          quote: SPARC_COMPOUND_INTEREST_LIVE_EVALUATION_INPUTS[0],
+        }],
+      });
     expect(run.turns[0]?.effectiveScoringState.diagnosticMisconceptionScores)
       .to.deep.include({ id: 'M1', supportStrength: 0.8 });
     expect(run.turns[1]).to.deep.include({
@@ -333,6 +345,11 @@ describe('SPARC Compound Interest live evaluation harness', function() {
         clusterKC: EXPECTATION_IDS[2],
         evidenceDirection: 'supports',
         evidenceStrength: 1,
+        learnerEvidence: [{
+          source: 'learnerText',
+          dialogueHistoryIndex: null,
+          quote: run.turns[7]!.learnerText,
+        }],
       });
     expect(run.turns[7]).to.deep.include({
       productionRuleId: 'dialogue.completion.summary',

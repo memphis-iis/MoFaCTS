@@ -1,12 +1,8 @@
 <script>
-  import {
-    buildSparcAutoTutorProgressSnapshot,
-  } from '../services/sparcAutoTutorProgress';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
-  export let display = null;
-  export let runtimeNodeValues = {};
+  export let snapshot;
 
   function platformText(key, values) {
     return translatePlatformString(getActiveUiLocale(), key, values);
@@ -35,8 +31,6 @@
       ? platformText('autoTutor.oneTurn')
       : platformText('autoTutor.turnCount', { count: value });
   }
-
-  $: snapshot = buildSparcAutoTutorProgressSnapshot({ display, runtimeNodeValues });
 </script>
 
 <section class="sparc-auto-tutor-progress" aria-label={platformText('autoTutor.progress')}>

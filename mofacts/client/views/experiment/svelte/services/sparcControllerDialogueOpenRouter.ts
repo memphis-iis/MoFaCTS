@@ -7,6 +7,7 @@ import type { SparcControllerDisplay } from './sparcController';
 import {
   reduceSparcLearnerResponseEvidence,
   type SparcEvidenceDirection,
+  type SparcLearnerEvidenceCitation,
   type SparcLearnerResponseEvidenceEnvelope,
   type SparcLearnerResponseScoringResult,
 } from '../../../../../../learning-components/units/sparcsession/sparcLearnerResponseScoring';
@@ -16,6 +17,11 @@ import type {
 import type {
   SparcUtteranceGenerator,
 } from '../../../../../../learning-components/units/sparcsession/sparcControllerDialogueTurn';
+import {
+  requireBoundedSparcDialogueMessage,
+  SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,
+  SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
+} from '../../../../../../learning-components/units/sparcsession/sparcDialogueTurnNodes';
 import {
   buildSparcDialogueHistory,
   type SparcUtteranceRequest,
@@ -84,10 +90,23 @@ const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    tutorMessage: { type: 'string', minLength: 1 },
+    tutorMessage: {
+      type: 'string',
+      minLength: 1,
+      maxLength: SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,
+    },
   },
   required: ['tutorMessage'],
 };
+
+const SPARC_SCORING_TERMINAL_DIRECTIVE = [
+  'Evaluate learnerText as the latest and primary evidence for this state update.',
+  'Use dialogueHistory to resolve its meaning and to retain distinct evidence from earlier student turns; tutor turns are context only.',
+  'For misconceptions, the learner’s latest resolved stance supersedes conflicting earlier learner evidence.',
+  'For every supports or contradicts evaluation, cite exact learner-authored substrings in learnerEvidence; never cite tutor text.',
+  'For every unaddressed evaluation, return an empty learnerEvidence array.',
+  'Recompute from learner-authored evidence without inferring or preserving any prior model score.',
+].join(' ');
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -171,6 +190,19 @@ function buildSparcDialogueScoreJsonSchema(
   const targetIds = learningTargets.map((target) => String(target.clusterKC));
   const misconceptionIds = misconceptions.map((misconception) => String(misconception.id));
   const boundedEvidenceStrength = { type: 'number', minimum: 0, maximum: 1 };
+  const learnerEvidence = {
+    type: 'array',
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        source: { type: 'string', enum: ['dialogueHistory', 'learnerText'] },
+        dialogueHistoryIndex: { type: ['integer', 'null'], minimum: 0 },
+        quote: { type: 'string', minLength: 1 },
+      },
+      required: ['source', 'dialogueHistoryIndex', 'quote'],
+    },
+  };
   return {
     type: 'object',
     additionalProperties: false,
@@ -186,8 +218,9 @@ function buildSparcDialogueScoreJsonSchema(
             clusterKC: { type: 'string', enum: targetIds },
             evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
             evidenceStrength: boundedEvidenceStrength,
+            learnerEvidence,
           },
-          required: ['clusterKC', 'evidenceDirection', 'evidenceStrength'],
+          required: ['clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence'],
         },
       },
       diagnosticMisconceptionEvaluations: {
@@ -203,8 +236,9 @@ function buildSparcDialogueScoreJsonSchema(
               : { type: 'string' },
             evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
             evidenceStrength: boundedEvidenceStrength,
+            learnerEvidence,
           },
-          required: ['id', 'evidenceDirection', 'evidenceStrength'],
+          required: ['id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence'],
         },
       },
       learnerContribution: {
@@ -256,7 +290,63 @@ function evidenceObjects(value: unknown, label: string): readonly Record<string,
   });
 }
 
-function parseEvidenceEnvelope(value: unknown): SparcLearnerResponseEvidenceEnvelope {
+function parseLearnerEvidence(
+  value: unknown,
+  label: string,
+  dialogueHistory: readonly Readonly<Record<string, unknown>>[],
+  learnerText: string,
+): readonly SparcLearnerEvidenceCitation[] {
+  const citations = evidenceObjects(value, `${label} learnerEvidence`);
+  const seen = new Set<string>();
+  return citations.map((citation, index) => {
+    const citationLabel = `${label} learnerEvidence[${index}]`;
+    const source = citation.source;
+    if (source !== 'dialogueHistory' && source !== 'learnerText') {
+      throw new Error(`${citationLabel} source must be dialogueHistory or learnerText`);
+    }
+    const quote = nonBlankString(citation.quote);
+    if (!quote) {
+      throw new Error(`${citationLabel} quote is required`);
+    }
+    let dialogueHistoryIndex: number | null;
+    let sourceText: string;
+    if (source === 'dialogueHistory') {
+      if (!Number.isInteger(citation.dialogueHistoryIndex) || Number(citation.dialogueHistoryIndex) < 0) {
+        throw new Error(`${citationLabel} dialogueHistoryIndex must be a nonnegative integer for dialogueHistory evidence`);
+      }
+      dialogueHistoryIndex = Number(citation.dialogueHistoryIndex);
+      const dialogueEntry = dialogueHistory[dialogueHistoryIndex];
+      if (!dialogueEntry) {
+        throw new Error(`${citationLabel} dialogueHistoryIndex ${dialogueHistoryIndex} is out of range`);
+      }
+      if (dialogueEntry.role !== 'student') {
+        throw new Error(`${citationLabel} must reference a student dialogueHistory entry`);
+      }
+      sourceText = nonBlankString(dialogueEntry.text);
+    } else {
+      if (citation.dialogueHistoryIndex !== null) {
+        throw new Error(`${citationLabel} dialogueHistoryIndex must be null for learnerText evidence`);
+      }
+      dialogueHistoryIndex = null;
+      sourceText = learnerText;
+    }
+    if (!sourceText.includes(quote)) {
+      throw new Error(`${citationLabel} quote must be an exact contiguous substring of its learner-authored source`);
+    }
+    const identity = `${source}:${dialogueHistoryIndex ?? 'latest'}:${quote}`;
+    if (seen.has(identity)) {
+      throw new Error(`${label} learnerEvidence contains a duplicate citation`);
+    }
+    seen.add(identity);
+    return { source, dialogueHistoryIndex, quote };
+  });
+}
+
+function parseEvidenceEnvelope(
+  value: unknown,
+  dialogueHistory: readonly Readonly<Record<string, unknown>>[],
+  learnerText: string,
+): SparcLearnerResponseEvidenceEnvelope {
   if (!isRecord(value)) {
     throw new Error('SPARC dialogue scoring response must be an object');
   }
@@ -273,6 +363,12 @@ function parseEvidenceEnvelope(value: unknown): SparcLearnerResponseEvidenceEnve
       entry.evidenceStrength,
       `SPARC dialogue scoring learning target "${String(entry.clusterKC)}" evidenceStrength`,
     ),
+    learnerEvidence: parseLearnerEvidence(
+      entry.learnerEvidence,
+      `SPARC dialogue scoring learning target "${String(entry.clusterKC)}"`,
+      dialogueHistory,
+      learnerText,
+    ),
   }));
   const diagnosticMisconceptionEvaluations = evidenceObjects(
     value.diagnosticMisconceptionEvaluations,
@@ -286,6 +382,12 @@ function parseEvidenceEnvelope(value: unknown): SparcLearnerResponseEvidenceEnve
     evidenceStrength: evidenceStrength(
       entry.evidenceStrength,
       `SPARC dialogue scoring diagnostic misconception "${String(entry.id)}" evidenceStrength`,
+    ),
+    learnerEvidence: parseLearnerEvidence(
+      entry.learnerEvidence,
+      `SPARC dialogue scoring diagnostic misconception "${String(entry.id)}"`,
+      dialogueHistory,
+      learnerText,
     ),
   }));
   const contribution = isRecord(value.learnerContribution) ? value.learnerContribution : {};
@@ -316,7 +418,7 @@ function parseUtteranceEnvelope(value: unknown): string {
   if (!tutorMessage) {
     throw new Error('SPARC dialogue utterance response requires tutorMessage');
   }
-  return tutorMessage;
+  return requireBoundedSparcDialogueMessage(tutorMessage, 'SPARC dialogue utterance response tutorMessage');
 }
 
 const SPARC_AUTOTUTOR_UTTERANCE_ENVELOPE_SCHEMA = Object.freeze({
@@ -332,6 +434,7 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
   return [
     'Return JSON only. Do not wrap it in Markdown.',
     'Generate only tutorMessage. The application owns the selected target and dialogue move metadata.',
+    `Keep tutorMessage within ${SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS} characters.`,
     'Do not expose internal ids, rule ids, rubric labels, scoring fields, or planner metadata in tutorMessage.',
     'Use only the authored lesson content and dialogue context supplied in the user message.',
     'Follow the selected runtime move policy.',
@@ -428,6 +531,7 @@ export function createSparcDialogueOpenRouterProvider(
     const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
     const learningTargets = targetSummaries(display);
     const misconceptions = misconceptionSummaries(display);
+    const dialogueHistory = buildSparcDialogueHistory(runtimeFacts);
     const scoringRequest: Parameters<CallResolvedOpenRouterJson>[0] = {
         tdfId: options.tdfId ?? null,
         ...(options.sessionId ? { sessionId: options.sessionId } : {}),
@@ -442,6 +546,7 @@ export function createSparcDialogueOpenRouterProvider(
             '1. Classify the latest contribution. Use "answer" for an ordinary answer or explanation. Use "off-task" only when the response is unrelated to both the problem and the immediately preceding tutor message. A response that addresses the problem or answers the tutor cannot be off-task. Use "other" only when no other type fits.',
             '2. Use "question" when the learner’s primary conversational action genuinely requests information or confirmation. Use "answer" when the learner primarily offers an interpretation or attempted answer, even if it is hesitant or phrased with question-like intonation. A confirmation-shaped contribution such as "Are you saying Y?" or "Do we compute Y?" may be either a question or an answer; classify its function in context and score its instructional meaning the same either way. Include learnerQuestion with contentFocused true for a substantive content question; use contentFocused false only for an off-topic, rude, lewd, illicit, or otherwise inappropriate question.',
             '3. Return exactly one learningTargetEvaluations entry for every supplied learning target and exactly one diagnosticMisconceptionEvaluations entry for every supplied misconception. Evaluate every proposition independently and copy every clusterKC and id exactly.',
+            '3a. Every supports or contradicts evaluation must include at least one learnerEvidence citation. Copy each quote as an exact contiguous substring of a learner-authored source. Use source "dialogueHistory" with that entry’s zero-based dialogueHistoryIndex, or source "learnerText" with dialogueHistoryIndex null. Never cite tutor text. Every unaddressed evaluation must use an empty learnerEvidence array.',
             '4. Assess instructional evidence cumulatively from every learner-authored turn in dialogueHistory together with learnerText. Study the learner’s trajectory and improvement: combine distinct complementary learner statements across turns when they form one developing explanation, and give later clarification, worked application, or self-correction full weight. Do not average turns, sum per-turn scores, or increase coverage merely because the learner repeats the same meaning.',
             '4a. Interpret the latest learner contribution as an answer to the immediately preceding tutor question. Resolve ordinary contextual references and elliptical answers from that question. A short phrase, choice, number, or confirmation can fully establish the requested proposition when it unambiguously fills the slot or relation the tutor asked for; do not require the learner to restate the original problem or produce a standalone explanation before crediting that meaning.',
             '5. Tutor turns provide context for references, prompts, and the instructional trajectory, but tutor hints, assertions, corrections, and summaries are never learner evidence. Credit an idea supplied by the tutor only when the learner later adopts, explains, applies, or correctly confirms it.',
@@ -477,8 +582,9 @@ export function createSparcDialogueOpenRouterProvider(
             problemStatement,
             learningTargets,
             misconceptions,
-            dialogueHistory: buildSparcDialogueHistory(runtimeFacts),
+            dialogueHistory,
             learnerText,
+            evaluationDirective: SPARC_SCORING_TERMINAL_DIRECTIVE,
           }),
         }],
         intent: {
@@ -507,7 +613,7 @@ export function createSparcDialogueOpenRouterProvider(
       stage: 'provider-response',
       parsedContent: result.parsedContent,
     });
-    const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent);
+    const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent, dialogueHistory, learnerText);
     options.onLearnerResponseScoringTrace?.({
       stage: 'evidence-parsed',
       evidenceEnvelope,
@@ -536,6 +642,7 @@ export function createSparcDialogueOpenRouterProvider(
         tdfId: options.tdfId ?? null,
         ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         temperature: 0.15,
+        maxTokens: SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
         messages: [{
           role: 'system',
           content: buildSparcUtteranceSystemPrompt(request),

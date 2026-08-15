@@ -76,7 +76,7 @@ function isBlank(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === 'string' && value.trim().length === 0);
 }
 
-function getUtf8ByteLength(value: unknown): number {
+export function getJsonUtf8ByteLength(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).length;
 }
 
@@ -103,7 +103,7 @@ function assertBoundedComponentExtensionFields(
     if (!(fieldName in record) || record[fieldName] === undefined || record[fieldName] === null || record[fieldName] === '') {
       continue;
     }
-    const extensionFieldBytes = getUtf8ByteLength(record[fieldName]);
+    const extensionFieldBytes = getJsonUtf8ByteLength(record[fieldName]);
     if (extensionFieldBytes > maxExtensionFieldBytes) {
       throw new Error(
         `History extension field ${fieldName} exceeds ${maxExtensionFieldBytes} bytes: ${extensionFieldBytes} bytes`,
@@ -164,7 +164,7 @@ export function validateHistoryWirePayload(
   wireRecord: CanonicalHistoryRecord,
   options: HistoryEnvelopeValidationOptions = {},
 ): HistoryEnvelopeValidationResult {
-  const wirePayloadBytes = getUtf8ByteLength(wireRecord);
+  const wirePayloadBytes = getJsonUtf8ByteLength(wireRecord);
   const maxWirePayloadBytes = options.maxWirePayloadBytes ?? DEFAULT_HISTORY_WIRE_PAYLOAD_BUDGET_BYTES;
   if (wirePayloadBytes > maxWirePayloadBytes) {
     throw new Error(

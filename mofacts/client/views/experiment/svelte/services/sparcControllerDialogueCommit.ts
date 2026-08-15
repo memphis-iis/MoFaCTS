@@ -27,15 +27,13 @@ import {
   rememberSparcRuntimeHistoryRecord,
 } from './sparcRuntimeState';
 import {
-  buildSparcWorkingMemoryFacts,
-} from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
-import {
   applySparcStateTransition,
   replaySparcHistory,
 } from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
 import {
+  buildSparcDialogueProgressFacts,
   SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY,
-} from './sparcAutoTutorProgress';
+} from './sparcDialogueRuntimeValues';
 
 type SparcControllerDialogueDisplay = SparcControllerDisplay & {
   readonly pageKey: string;
@@ -128,17 +126,10 @@ function extractDialogueNodeValues(params: {
     const currentState = params.transition
       ? applySparcStateTransition(replayedState, params.transition)
       : replayedState;
-    values[SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY] = buildSparcWorkingMemoryFacts({
-      document: params.document as Parameters<typeof buildSparcWorkingMemoryFacts>[0]['document'],
+    values[SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY] = buildSparcDialogueProgressFacts({
+      document: params.document as Parameters<typeof buildSparcDialogueProgressFacts>[0]['document'],
       replayState: currentState,
-    }).filter((fact) => (
-      fact.factType === 'learningTarget.score'
-      || fact.factType === 'diagnostic.misconceptionScore'
-      || fact.factType === 'session.turnState'
-      || fact.factType === 'controller.completionState'
-      || fact.factType === 'learningTarget.selected'
-      || fact.factType === 'diagnostic.misconceptionSelected'
-    ));
+    });
   }
   return values;
 }

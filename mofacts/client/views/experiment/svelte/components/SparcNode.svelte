@@ -33,12 +33,53 @@
     });
   }
 
-  function buildRenderItems(children = []) {
+  function isMeaninglessExampleTitle(candidate, parent) {
+    const isExample = parent?.groupType === 'oli-example'
+      || parent?.layout?.visualPreset === 'example';
+    return isExample
+      && candidate?.atomType === 'html-block'
+      && /^\s*<p>\s*title\s*<\/p>\s*$/i.test(String(candidate?.value || ''));
+  }
+
+  function dropdownInputForRow(candidate) {
+    return (candidate?.children || []).find((child) => child?.atomType === 'dropdown') || null;
+  }
+
+  function latestAnsweredDropdownRowId(children = []) {
+    const orderedChildren = sortByPlacementOrder(children);
+    for (let index = orderedChildren.length - 1; index >= 0; index -= 1) {
+      const row = orderedChildren[index];
+      if (row?.groupType !== 'dropdown-row') {
+        continue;
+      }
+      const input = dropdownInputForRow(row);
+      if (input && (getNodeCorrectness(input) || String(getNodeValue(input) || '').trim())) {
+        return row.id || '';
+      }
+    }
+    return '';
+  }
+
+  function buildRenderItems(children = [], parent = null) {
     const items = [];
     const orderedChildren = sortByPlacementOrder(children);
+    const feedbackNodes = parent?.groupType === 'dropdown-exercise'
+      ? orderedChildren.filter((child) => child?.atomType === 'message-box')
+      : [];
+    const sharedFeedback = feedbackNodes.length === 1 ? feedbackNodes[0] : null;
+    const feedbackAnchorRowId = sharedFeedback ? latestAnsweredDropdownRowId(orderedChildren) : '';
     for (let index = 0; index < orderedChildren.length; index += 1) {
       const current = orderedChildren[index];
+      if (isMeaninglessExampleTitle(current, parent)) {
+        continue;
+      }
+      if (sharedFeedback?.id === current?.id && feedbackAnchorRowId) {
+        continue;
+      }
       items.push({ kind: 'node', node: current, key: current?.id || `node-${index}` });
+      if (sharedFeedback && current?.id === feedbackAnchorRowId) {
+        items.push({ kind: 'node', node: sharedFeedback, key: sharedFeedback.id || 'dropdown-feedback' });
+      }
     }
     return items;
   }
@@ -151,6 +192,30 @@
     return productionRuleName || productionRuleId;
   }
 
+  function compactDiagnosticNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? String(Math.round(number * 100) / 100) : '';
+  }
+
+  function dialogueSelectionLabel(candidate) {
+    if (!dialogueProductionRuleLabel(candidate)) {
+      return '';
+    }
+    const action = String(candidate?.action || '').trim();
+    const targetId = String(candidate?.targetId || '').trim();
+    const targetKind = String(candidate?.selectionTargetKind || '').trim();
+    if (!action || !targetId || !targetKind) {
+      return '';
+    }
+    const currentValue = compactDiagnosticNumber(candidate?.selectionCurrentValue);
+    const goalValue = compactDiagnosticNumber(candidate?.selectionGoalValue);
+    const rank = Number(candidate?.selectionRankWithinKind);
+    const metric = targetKind === 'expectation' ? 'coverage' : 'support';
+    const score = currentValue && goalValue ? ` · ${metric} ${currentValue}/${goalValue}` : '';
+    const ranking = Number.isInteger(rank) && rank > 0 ? ` · rank #${rank}` : '';
+    return `${action} → ${targetKind} ${targetId}${score}${ranking}`;
+  }
+
   function skillBarFill(candidate) {
     const fill = Number(candidate?.fill ?? 0);
     if (!Number.isFinite(fill)) {
@@ -205,7 +270,7 @@
   $: bodyChildren = node?.nodeType === 'group'
     ? (node.children || []).filter((child) => !isHeaderFeedbackNode(child) && nodeIsVisible(child))
     : [];
-  $: renderItems = node?.nodeType === 'group' ? buildRenderItems(bodyChildren) : [];
+  $: renderItems = node?.nodeType === 'group' ? buildRenderItems(bodyChildren, node) : [];
   $: isChoiceTabs = isChoiceTabsGroup(node);
   $: isFraction = isFractionGroup(node);
   $: fractionNumerator = isFraction ? fractionChild(node, 'numerator') : null;
@@ -452,6 +517,9 @@
         <div>{getNodeValue(node)}</div>
         {#if dialogueProductionRuleLabel(node)}
           <div class="sparc-dialogue-diagnostic">production: {dialogueProductionRuleLabel(node)}</div>
+          {#if dialogueSelectionLabel(node)}
+            <div class="sparc-dialogue-diagnostic sparc-dialogue-diagnostic-selection">selected: {dialogueSelectionLabel(node)}</div>
+          {/if}
         {/if}
       </div>
     </div>
@@ -663,6 +731,45 @@
     width: min(100%, var(--sparc-answer-list-width));
     align-self: center;
     align-items: stretch;
+  }
+
+  .sparc-group[data-sparc-glue="short-answer"],
+  .sparc-group-short-answer,
+  .sparc-group[data-sparc-glue="text-input-list"],
+  .sparc-group-text-input-exercise {
+    width: min(100%, var(--sparc-multiple-choice-width));
+  }
+
+  .sparc-group[data-sparc-glue="short-answer"] > .sparc-group-body,
+  .sparc-group-short-answer > .sparc-group-body,
+  .sparc-group[data-sparc-glue="text-input-list"] > .sparc-group-body,
+  .sparc-group-text-input-exercise > .sparc-group-body {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :global(.sparc-group[data-sparc-glue="short-answer"] > .sparc-group-body > .sparc-html-block),
+  :global(.sparc-group-short-answer > .sparc-group-body > .sparc-html-block),
+  :global(.sparc-group[data-sparc-glue="text-input-list"] > .sparc-group-body > .sparc-html-block),
+  :global(.sparc-group-text-input-exercise > .sparc-group-body > .sparc-html-block),
+  :global(.sparc-group[data-sparc-glue="short-answer"] > .sparc-group-body > .sparc-message-box),
+  :global(.sparc-group-short-answer > .sparc-group-body > .sparc-message-box),
+  :global(.sparc-group[data-sparc-glue="text-input-list"] > .sparc-group-body > .sparc-message-box),
+  :global(.sparc-group-text-input-exercise > .sparc-group-body > .sparc-message-box) {
+    width: 100%;
+  }
+
+  :global(.sparc-group[data-sparc-glue="short-answer"] > .sparc-group-body > .sparc-input-text-input),
+  :global(.sparc-group-short-answer > .sparc-group-body > .sparc-input-text-input),
+  :global(.sparc-group[data-sparc-glue="text-input-list"] > .sparc-group-body > .sparc-group-text-input-row),
+  :global(.sparc-group-text-input-exercise > .sparc-group-body > .sparc-group-text-input-row) {
+    width: min(100%, var(--sparc-answer-list-width));
+    align-self: center;
+  }
+
+  :global(.sparc-group-text-input-row > .sparc-group-body > .sparc-input-text-input) {
+    width: 100%;
   }
 
   .sparc-group[data-sparc-glue="intro-feedback"] > .sparc-group-body,
@@ -1126,6 +1233,12 @@
     font-size: calc(var(--sparc-font-size-small) * 0.86);
     line-height: 1.25;
     overflow-wrap: anywhere;
+  }
+
+  .sparc-dialogue-diagnostic-selection {
+    margin-top: var(--sparc-space-1);
+    padding-top: 0;
+    border-top: 0;
   }
 
   :global(.sparc-html-block .oli-definition),

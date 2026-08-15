@@ -17,6 +17,10 @@ import type {
   SparcAuthoredDocument,
 } from '../../../../../../learning-components/units/sparcsession/sparcSessionContracts';
 import type { SparcControllerDisplay } from './sparcController';
+import {
+  buildSparcDialogueProgressFacts,
+  SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY,
+} from './sparcDialogueRuntimeValues';
 
 type SparcDurableScopeInput = {
   readonly userId: unknown;
@@ -120,8 +124,12 @@ function createDisplaySignature(display: SparcControllerDisplay): string {
 }
 
 export function projectSparcReplayStateToNodeValues(
-  replayState: SparcReplayState,
+  params: {
+    readonly document: SparcAuthoredDocument;
+    readonly replayState: SparcReplayState;
+  },
 ): Record<string, unknown> {
+  const { document, replayState } = params;
   const nodeValues: Record<string, unknown> = {};
   for (const cell of Object.values(replayState.cells)) {
     const nodeId = nonBlankString(cell.address?.nodeId);
@@ -141,6 +149,10 @@ export function projectSparcReplayStateToNodeValues(
   if (progressiveNodeOperations.length > 0) {
     nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveNodeOperations;
   }
+  nodeValues[SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY] = buildSparcDialogueProgressFacts({
+    document,
+    replayState,
+  });
   return nodeValues;
 }
 
@@ -154,7 +166,7 @@ function buildSnapshot(
     display,
   });
   const replayState = replaySparcDocumentHistory(document, entry.retainedHistoryRecords);
-  const nodeValues = projectSparcReplayStateToNodeValues(replayState);
+  const nodeValues = projectSparcReplayStateToNodeValues({ document, replayState });
   const progressiveNodeOperations = (
     nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] as readonly Record<string, unknown>[] | undefined
   ) ?? [];
@@ -259,7 +271,10 @@ export function rememberSparcRuntimeHistoryRecord(record: CanonicalHistoryRecord
   entry.retainedHistoryRecords = [...entry.retainedHistoryRecords, record];
   if (entry.snapshot) {
     const replayState = applySparcHistoryRecord(entry.snapshot.replayState, record);
-    const nodeValues = projectSparcReplayStateToNodeValues(replayState);
+    const nodeValues = projectSparcReplayStateToNodeValues({
+      document: entry.snapshot.document,
+      replayState,
+    });
     entry.snapshot = {
       ...entry.snapshot,
       replayState,

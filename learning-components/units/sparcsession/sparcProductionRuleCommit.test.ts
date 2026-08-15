@@ -789,6 +789,10 @@ describe('sparcProductionRuleCommit', function() {
 
     assert.deepEqual(result.transition?.writes, [{
       target: sourceAddress,
+      key: 'value',
+      value: 12,
+    }, {
+      target: sourceAddress,
       key: 'correctness',
       value: 'correct',
     }, {
