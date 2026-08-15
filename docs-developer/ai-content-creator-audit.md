@@ -4,7 +4,7 @@
 
 ## Owning rule
 
-One retrieved Wikipedia list page defines the complete item set for every run. The model may interpret the author request and select opaque candidate IDs supplied by MoFaCTS, but it may not originate an item, page, link, URL, Wikimedia filename, license, or attribution record. After one individually evaluated and acquired image agrees with a response-bearing canonical filename found on another authoritative item page, MoFaCTS may predict later `File:` titles deterministically and accept only titles that Wikimedia resolves to canonical file records.
+One retrieved Wikipedia page containing the authoritative requested list defines the complete item set for every run; the article title does not need to begin with `List of`. When search and extraction supply candidates, the page- and region-selection stages must each choose exactly one supplied ID. Downstream structural and field validation then accepts or rejects that selected source without inventing content. The model may interpret the author request and select opaque candidate IDs supplied by MoFaCTS, but it may not originate an item, page, link, URL, Wikimedia filename, license, or attribution record. After one individually evaluated and acquired image agrees with a response-bearing canonical filename found on another authoritative item page, MoFaCTS may predict later `File:` titles deterministically and accept only titles that Wikimedia resolves to canonical file records.
 
 A run has one universal prompt type, `text` or `image`; responses are always text. A text run uses either per-item definitions or one source-field mapping. Every source entry reaches review, including entries whose definition, mapped field, or image remains unresolved.
 
