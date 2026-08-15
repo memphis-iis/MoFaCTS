@@ -1494,17 +1494,7 @@ Template.learningDashboard.events({
       if (Array.isArray(filteredList)) {
         instance.filteredTdfsList.set(applyProgressResetToDashboardList(filteredList, cacheTdfIds));
       }
-      const latest = instance.learnerConfigState.get() as LearnerConfigState;
-      instance.learnerConfigState.set({
-        ...latest,
-        resetConfirming: false,
-        resettingProgress: false,
-        error: null
-      });
-      instance.learnerConfigState.set({
-        ...(instance.learnerConfigState.get() as LearnerConfigState),
-        resultMessage: dashboardText('dashboard.progressResetComplete'),
-      });
+      closeLearnerConfigPanel(instance);
     } catch (error: any) {
       clientConsole(1, '[Dashboard Config] Failed to reset admin lesson progress:', error);
       const latest = instance.learnerConfigState.get() as LearnerConfigState;
