@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import JSZip from 'jszip';
 import sinon from 'sinon';
 import {
   buildSaveEntries,
@@ -136,10 +137,10 @@ describe('aiContentPackageSave', function() {
 
     renameDraftLesson(draft, 'New Name');
 
-    expect(draft.title).to.equal('New_Name');
-    expect((draft.generatedBaseline.tutor as any).setspec.lessonname).to.equal('New_Name');
+    expect(draft.title).to.equal('New Name');
+    expect((draft.generatedBaseline.tutor as any).setspec.lessonname).to.equal('New Name');
     expect((draft.generatedBaseline.tutor as any).setspec.stimulusfile).to.equal('New_Name_stims.json');
-    expect((draft.workingCopy.tutor as any).setspec.lessonname).to.equal('New_Name');
+    expect((draft.workingCopy.tutor as any).setspec.lessonname).to.equal('New Name');
     expect((draft.workingCopy.tutor as any).setspec.stimulusfile).to.equal('New_Name_stims.json');
   });
 
@@ -180,6 +181,24 @@ describe('aiContentPackageSave', function() {
     expect(callAsync.firstCall.args[1].packageFileName).to.equal('U.S._states.zip');
   });
 
+  it('keeps spaces in the packaged lesson name while using safe filenames', async function() {
+    const draft = buildDraft('Learn the 50 U.S. states');
+    const callAsync = sinon.stub();
+    callAsync.withArgs('saveAiGeneratedPackageContent').resolves([]);
+    const deps = {
+      ...buildDeps({ callAsync }),
+      promptForReplacementName: sinon.stub(),
+    };
+
+    const result = await buildUploadWithNameConflictRetry([draft], 'summary', deps, saveContract);
+    const zip = await JSZip.loadAsync(await result.builtPackage.zipBlob.arrayBuffer());
+    const tdfText = await zip.file('Learn_the_50_U.S._states_TDF.json')!.async('string');
+    const tdf = JSON.parse(tdfText);
+
+    expect(tdf.tutor.setspec.lessonname).to.equal('Learn the 50 U.S. states');
+    expect(tdf.tutor.setspec.stimulusfile).to.equal('Learn_the_50_U.S._states_stims.json');
+  });
+
   it('prompts for a new name, rebuilds, and retries when generated content name conflicts', async function() {
     const draft = buildDraft('Existing Name');
     const conflict = {
@@ -204,7 +223,7 @@ describe('aiContentPackageSave', function() {
     const result = await buildUploadWithNameConflictRetry([draft], 'summary', deps, saveContract);
 
     expect(promptForReplacementName.calledOnce).to.equal(true);
-    expect(draft.title).to.equal('Replacement_Name');
+    expect(draft.title).to.equal('Replacement Name');
     expect(callAsync.firstCall.args[0]).to.equal('saveAiGeneratedPackageContent');
     expect(callAsync.secondCall.args).to.deep.equal(['removeAssetById', 'asset-1']);
     expect(callAsync.thirdCall.args[0]).to.equal('saveAiGeneratedPackageContent');

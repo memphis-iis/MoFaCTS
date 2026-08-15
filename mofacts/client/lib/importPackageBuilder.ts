@@ -2,11 +2,18 @@ import JSZip from 'jszip';
 import type { BuiltImportPackage, ImportDraftLesson } from './normalizedImportTypes';
 import { getImportFileNames } from './importCompositionBuilder';
 
+type BuildImportPackageOptions = {
+  preserveLessonTitle?: boolean;
+};
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
-export async function buildImportPackageFromDraftLessons(lessons: ImportDraftLesson[]): Promise<BuiltImportPackage> {
+export async function buildImportPackageFromDraftLessons(
+  lessons: ImportDraftLesson[],
+  options: BuildImportPackageOptions = {},
+): Promise<BuiltImportPackage> {
   const zip = new JSZip();
   const manifest: Array<Record<string, unknown>> = [];
   let totalCards = 0;
@@ -22,12 +29,13 @@ export async function buildImportPackageFromDraftLessons(lessons: ImportDraftLes
     // workingCopy or this will double-wrap and break server-side TDF lookup.
     const lessonName = (lesson.workingCopy.tutor as any)?.setspec?.lessonname || lesson.title;
     const { stimFileName, tdfFileName, safeName } = getImportFileNames(lessonName);
+    const displayTitle = String(lesson.title || lessonName || safeName).replace(/\s+/g, ' ').trim() || safeName;
     const tutorDoc = { tutor: clone(lesson.workingCopy.tutor) };
     const stimuliDoc = clone(lesson.workingCopy.stimuli);
 
     if ((tutorDoc.tutor as any)?.setspec) {
       (tutorDoc.tutor as any).setspec.stimulusfile = stimFileName;
-      (tutorDoc.tutor as any).setspec.lessonname = safeName;
+      (tutorDoc.tutor as any).setspec.lessonname = options.preserveLessonTitle ? displayTitle : safeName;
     }
 
     zip.file(tdfFileName, JSON.stringify(tutorDoc, null, 2));

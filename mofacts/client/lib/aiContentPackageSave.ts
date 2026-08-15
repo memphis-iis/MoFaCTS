@@ -48,16 +48,17 @@ export function readGeneratedNameConflict(error: unknown): GeneratedNameConflict
 }
 
 export function renameDraftLesson(draft: ImportDraftLesson, newName: string): void {
-  const safeName = sanitizeImportName(newName, 'AI_Created_Lesson');
+  const displayTitle = String(newName || '').replace(/\s+/g, ' ').trim() || 'AI Created Lesson';
+  const safeName = sanitizeImportName(displayTitle, 'AI_Created_Lesson');
   const { stimFileName } = getImportFileNames(safeName);
-  draft.title = safeName;
+  draft.title = displayTitle;
   const generatedTutor = draft.generatedBaseline.tutor as { setspec?: Record<string, unknown> };
   const workingTutor = draft.workingCopy.tutor as { setspec?: Record<string, unknown> };
   generatedTutor.setspec = generatedTutor.setspec || {};
   workingTutor.setspec = workingTutor.setspec || {};
-  generatedTutor.setspec.lessonname = safeName;
+  generatedTutor.setspec.lessonname = displayTitle;
   generatedTutor.setspec.stimulusfile = stimFileName;
-  workingTutor.setspec.lessonname = safeName;
+  workingTutor.setspec.lessonname = displayTitle;
   workingTutor.setspec.stimulusfile = stimFileName;
 }
 
@@ -139,7 +140,7 @@ export async function buildUploadWithNameConflictRetry(
   if (drafts.length !== 1) throw new Error('AI Content Creator saves exactly one Learning or Test content system.');
   const maxAttempts = drafts.length + 3;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const builtPackage = await buildImportPackageFromDraftLessons(drafts);
+    const builtPackage = await buildImportPackageFromDraftLessons(drafts, { preserveLessonTitle: true });
     try {
       const outputs = await uploadBuiltPackage(builtPackage, creationSummary, deps, saveContract);
       return { builtPackage, outputs };

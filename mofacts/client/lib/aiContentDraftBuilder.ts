@@ -66,7 +66,15 @@ export function buildAiContentDraft(
   contract: AiContentSaveContract,
   assets: PreparedAiImageAsset[] = [],
 ): ImportDraftLesson {
+  const displayTitle = contract.title.replace(/\s+/g, ' ').trim();
   const draft = attachMedia(buildManualDraftLesson(buildState(contract)), contract, assets);
+  draft.title = displayTitle;
+  const generatedTutor = draft.generatedBaseline.tutor as { setspec?: Record<string, unknown> };
+  const workingTutor = draft.workingCopy.tutor as { setspec?: Record<string, unknown> };
+  generatedTutor.setspec = generatedTutor.setspec || {};
+  workingTutor.setspec = workingTutor.setspec || {};
+  generatedTutor.setspec.lessonname = displayTitle;
+  workingTutor.setspec.lessonname = displayTitle;
   draft.sourceConfig = {
     ...(draft.sourceConfig || {}),
     moduleId: contract.mode === 'test' ? 'assessmentSession' : 'learningSession',

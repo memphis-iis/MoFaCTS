@@ -24,6 +24,9 @@ describe('deterministic AI Content draft builder', function() {
     expect((test.workingCopy.tutor as any).unit[0].unitinstructions).to.contain(AI_TEST_INSTRUCTIONS);
     expect(learning.workingCopy.stimuli.setspec.clusters).to.have.length(2);
     expect(test.workingCopy.stimuli.setspec.clusters).to.have.length(2);
+    expect(learning.title).to.equal('Spanish Basics');
+    expect((learning.workingCopy.tutor as any).setspec.lessonname).to.equal('Spanish Basics');
+    expect((learning.workingCopy.tutor as any).setspec.stimulusfile).to.equal('Spanish_Basics_stims.json');
   });
 
   it('packages each resolved WebP under the exact reviewed filename', function() {
