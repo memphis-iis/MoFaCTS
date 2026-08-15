@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import {
   buildRowSummaryPresentation,
+  contentUploadAssetCount,
   normalizeContentUploadListResult,
   normalizeContentUploadSummaryMap,
   normalizeUploadQuotaStatus,
@@ -28,6 +29,12 @@ describe('contentUploadState', function() {
     ]);
     expect(Object.keys(map)).to.deep.equal(['tdf-a']);
     expect(map['tdf-a'].lessonName).to.equal('A');
+  });
+
+  it('uses the persisted asset count supplied by the server summary', function() {
+    expect(contentUploadAssetCount({ assetCount: 4 })).to.equal(4);
+    expect(contentUploadAssetCount({ assetCount: 0 })).to.equal(0);
+    expect(contentUploadAssetCount({})).to.equal(null);
   });
 
   it('keeps quota unresolved distinct from unlimited quota', function() {

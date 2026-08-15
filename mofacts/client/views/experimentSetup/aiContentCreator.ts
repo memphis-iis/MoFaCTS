@@ -1,10 +1,10 @@
 import { Meteor } from 'meteor/meteor';
-import { Random } from 'meteor/random';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
 import { Tracker } from 'meteor/tracker';
 import './aiContentCreator.html';
+import '../aiContentReview.html';
 import './aiContentCreator.css';
 import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
@@ -15,20 +15,14 @@ import {
   getAiContentSaveBlockingIssues,
   getAiContentSaveWarnings,
   imageStimulusForResponse,
-  validateGeneratedPairs,
   type AiContentPair,
+  type AiContentPhase,
   type AiContentSaveContract,
   type AiContentWorkingRecord,
   type AiCreationMode,
-  type GeneratedPair,
 } from '../../../common/aiContentContract';
-import { imageModalityIssues, notesExplicitlyRequestImages } from '../../lib/aiContentPrompts';
-import { callOpenRouterForPairRepair, callOpenRouterForPairs, type AiPairPromptImage } from '../../lib/aiContentOpenRouterClient';
-import {
-  discoverAuthoritativeWikimediaPairs,
-  discoverWikimediaImages,
-  type WikimediaDiscoveredAsset,
-} from '../../lib/aiContentImageSets';
+import { runAiContentPipeline } from '../../lib/aiContentPipeline';
+import type { AcquiredWikimediaAsset } from '../../lib/aiContentWikimediaFiles';
 import { buildAiContentDraft } from '../../lib/aiContentDraftBuilder';
 import {
   buildUploadWithNameConflictRetry,
@@ -62,7 +56,6 @@ type AiCreatorInstance = Blaze.TemplateInstance & {
   data?: { embedded?: boolean };
   creating: ReactiveVar<boolean>;
   discarding: ReactiveVar<boolean>;
-  processingImages: ReactiveVar<boolean>;
   notes: ReactiveVar<string>;
   mode: ReactiveVar<AiCreationMode>;
   localAssets: ReactiveVar<LocalAiContentAsset[]>;
@@ -70,11 +63,19 @@ type AiCreatorInstance = Blaze.TemplateInstance & {
   statusMessage: ReactiveVar<string>;
   statusKind: ReactiveVar<StatusKind>;
   saveBlockingIssues: ReactiveVar<string[]>;
+  replacingReviewImage: ReactiveVar<boolean>;
   openRouterCapability: ReactiveVar<OpenRouterCapability | null>;
   workingUserId: string;
   workingSaveQueue: AiContentWorkingSaveQueue;
   operationSequence: number;
 };
+
+class SupersededAiContentRunError extends Error {
+  constructor() {
+    super('This AI Content run was superseded by a newer operation.');
+    this.name = 'SupersededAiContentRunError';
+  }
+}
 
 function setStatus(instance: AiCreatorInstance, kind: StatusKind, message: string): void {
   instance.statusKind.set(kind);
@@ -90,12 +91,7 @@ function requireWorkingUser(instance: AiCreatorInstance): string {
 }
 
 function statusClass(kind: StatusKind): string {
-  if (kind === 'error') return 'danger';
-  return kind;
-}
-
-function inputAssets(instance: AiCreatorInstance): LocalAiContentAsset[] {
-  return instance.localAssets.get().filter((asset) => asset.purpose === 'input');
+  return kind === 'error' ? 'danger' : kind;
 }
 
 function revokeAssets(assets: LocalAiContentAsset[]): void {
@@ -103,9 +99,7 @@ function revokeAssets(assets: LocalAiContentAsset[]): void {
 }
 
 function deriveTitle(notes: string): string {
-  const firstLine = String(notes || '').split(/\r?\n/).map((line) => line.trim()).find(Boolean) || '';
-  const cleaned = firstLine.replace(/\b(with|using)\s+(image|images|image prompts|pictures|photos|diagrams)\b/gi, '').replace(/\s+/g, ' ').trim();
-  return cleaned;
+  return String(notes || '').split(/\r?\n/).map((line) => line.trim()).find(Boolean) || '';
 }
 
 async function refreshOpenRouterCapability(instance: AiCreatorInstance): Promise<OpenRouterCapability> {
@@ -125,14 +119,8 @@ function updatedRecord(record: AiContentWorkingRecord, patch: Partial<AiContentW
 }
 
 async function loadWorkingRecord(instance: AiCreatorInstance): Promise<void> {
-  const userId = requireWorkingUser(instance);
-  const snapshot = await loadAiContentWorkingSnapshot(userId);
+  const snapshot = await loadAiContentWorkingSnapshot(requireWorkingUser(instance));
   if (!snapshot) return;
-  if (snapshot.record.contractVersion !== AI_CONTENT_CONTRACT_VERSION) {
-    revokeAssets(snapshot.assets);
-    await clearAiContentWorkingSnapshot(userId);
-    return;
-  }
   instance.localAssets.set(snapshot.assets);
   instance.activeRecord.set(snapshot.record);
   instance.notes.set(snapshot.record.notes);
@@ -152,96 +140,23 @@ async function clearWorkingRecord(instance: AiCreatorInstance): Promise<void> {
   instance.saveBlockingIssues.set([]);
 }
 
-async function addImageSources(instance: AiCreatorInstance, sources: AiImageSourceFile[]): Promise<void> {
-  if (sources.length === 0) return;
-  instance.processingImages.set(true);
-  setStatus(instance, 'info', 'Preparing images...');
-  try {
-    const existing = instance.localAssets.get();
-    const prepared = await prepareAiImageAssets(sources, existing);
-    const additions: LocalAiContentAsset[] = prepared.map((asset) => ({
-      ...asset,
-      purpose: 'input',
-      previewUrl: URL.createObjectURL(new Blob([new Uint8Array(asset.bytes).buffer], { type: 'image/webp' })),
-    }));
-    instance.localAssets.set([...existing, ...additions]);
-    setStatus(instance, 'success', `Prepared ${additions.length} image${additions.length === 1 ? '' : 's'} as WebP.`);
-  } finally {
-    instance.processingImages.set(false);
-  }
-}
-
-function assetDataUrl(asset: PreparedAiImageAsset): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(reader.error || new Error(`Could not read ${asset.originalName}.`));
-    reader.readAsDataURL(new Blob([new Uint8Array(asset.bytes).buffer], { type: 'image/webp' }));
-  });
-}
-
-function validatePairResponse(value: unknown, notes: string, uploadCount: number): GeneratedPair[] {
-  const checked = validateGeneratedPairs(value);
-  const modality = imageModalityIssues(checked, notes, uploadCount);
-  if (modality.length > 0) throw new Error(modality.join(' '));
-  return checked;
-}
-
-async function generatePairs(
-  notes: string,
-  model: string,
-  images: AiPairPromptImage[],
-): Promise<GeneratedPair[]> {
-  const raw = await callOpenRouterForPairs(notes, model, images);
-  try {
-    return validatePairResponse(raw, notes, images.length);
-  } catch (validationError) {
-    const errors = [getErrorMessage(validationError)];
-    const repaired = await callOpenRouterForPairRepair(notes, model, images, raw, errors);
-    return validatePairResponse(repaired, notes, images.length);
-  }
-}
-
-function workingPairs(generatedPairs: GeneratedPair[], uploads: LocalAiContentAsset[]): AiContentPair[] {
-  let uploadIndex = 0;
-  return generatedPairs.map((pair) => {
-    const id = Random.id();
-    if (pair.kind === 'text') return { id, ...pair };
-    const upload = uploads[uploadIndex];
-    uploadIndex += 1;
-    return {
-      id,
-      ...pair,
-      image: upload ? {
-        status: 'resolved',
-        source: 'uploaded',
-        assetId: upload.id,
-        fileName: upload.packageFileName,
-        previewUrl: upload.previewUrl,
-      } : {
-        status: 'unresolved',
-        failureReason: 'No image has been selected yet.',
-      },
-    };
-  });
-}
-
 async function localizeWikimediaAsset(
-  discovered: WikimediaDiscoveredAsset,
+  acquired: AcquiredWikimediaAsset,
   existing: PreparedAiImageAsset[],
 ): Promise<LocalAiContentAsset> {
-  const packageFileName = uniqueAiImagePackageFileName(
-    discovered.sourceTitle,
-    existing.map((asset) => asset.packageFileName),
-  );
+  if (acquired.webpBytes.byteLength === 0 || !acquired.webpWidth || !acquired.webpHeight) {
+    throw new Error('The prepared WebP image is empty or has invalid dimensions.');
+  }
+  const sourceTitle = acquired.candidate.fileTitle.replace(/^File:/i, '').trim();
+  const packageFileName = uniqueAiImagePackageFileName(sourceTitle, existing.map((asset) => asset.packageFileName));
   const prepared: PreparedAiImageAsset = {
     id: packageFileName,
-    originalName: discovered.sourceTitle,
-    sourcePath: discovered.sourceUrl,
+    originalName: sourceTitle,
+    sourcePath: acquired.candidate.commonsUrl,
     packageFileName,
-    bytes: discovered.webpBytes,
-    width: discovered.webpWidth,
-    height: discovered.webpHeight,
+    bytes: acquired.webpBytes,
+    width: acquired.webpWidth,
+    height: acquired.webpHeight,
   };
   return {
     ...prepared,
@@ -250,115 +165,19 @@ async function localizeWikimediaAsset(
   };
 }
 
-async function resolveImages(
-  instance: AiCreatorInstance,
-  record: AiContentWorkingRecord,
-  operation: number,
-): Promise<AiContentWorkingRecord> {
-  const unresolved = record.pairs.filter((pair) => pair.kind === 'image' && pair.image?.status !== 'resolved');
-  if (unresolved.length === 0) return record;
-  const discovering = updatedRecord(record, { phase: 'discovering-media' });
-  await persistSnapshot(instance, discovering);
-  const result = await discoverWikimediaImages({
-    notes: record.notes,
-    pairs: record.pairs,
-    model: record.model,
-  });
-  if (instance.operationSequence !== operation) return discovering;
-  let pairs = discovering.pairs;
-  const localizedAssets: LocalAiContentAsset[] = [];
-  const conversionFailures: string[] = [];
-  for (const discovered of result.assets) {
-    try {
-      const local = await localizeWikimediaAsset(discovered, [...instance.localAssets.get(), ...localizedAssets]);
-      localizedAssets.push(local);
-      pairs = pairs.map((pair) => pair.id === discovered.pairId ? {
-        ...pair,
-        image: {
-          status: 'resolved',
-          source: 'wikimedia',
-          assetId: local.id,
-          fileName: local.packageFileName,
-          previewUrl: local.previewUrl,
-          sourceTitle: discovered.sourceTitle,
-          sourceUrl: discovered.sourceUrl,
-          familyKey: discovered.familyKey,
-          attribution: discovered.attribution,
-        },
-      } : pair);
-    } catch (error) {
-      conversionFailures.push(`${discovered.sourceTitle}: ${getErrorMessage(error)}`);
-    }
-  }
-  if (instance.operationSequence !== operation) {
-    revokeAssets(localizedAssets);
-    return discovering;
-  }
-  instance.localAssets.set([...instance.localAssets.get(), ...localizedAssets]);
-  const unresolvedCount = pairs.filter((pair) => pair.kind === 'image' && pair.image?.status !== 'resolved').length;
-  const warnings = [
-    ...(unresolvedCount > 0 ? [`${unresolvedCount} image${unresolvedCount === 1 ? '' : 's'} still need to be selected before saving.`] : []),
-    ...conversionFailures,
-  ];
-  return updatedRecord(discovering, { pairs, warnings });
-}
-
-async function createAuthoritativeWikipediaPairs(
-  instance: AiCreatorInstance,
-  record: AiContentWorkingRecord,
-  operation: number,
-): Promise<AiContentWorkingRecord> {
-  const discovering = updatedRecord(record, { phase: 'discovering-media' });
-  await persistSnapshot(instance, discovering);
-  const result = await discoverAuthoritativeWikimediaPairs({
-    notes: record.notes,
-    model: record.model,
-  });
-  if (instance.operationSequence !== operation) return discovering;
-  let pairs = result.pairs;
-  const localizedAssets: LocalAiContentAsset[] = [];
-  const conversionFailures: string[] = [];
-  for (const discovered of result.assets) {
-    try {
-      const local = await localizeWikimediaAsset(discovered, [...instance.localAssets.get(), ...localizedAssets]);
-      localizedAssets.push(local);
-      pairs = pairs.map((pair) => pair.id === discovered.pairId ? {
-        ...pair,
-        image: {
-          status: 'resolved',
-          source: 'wikimedia',
-          assetId: local.id,
-          fileName: local.packageFileName,
-          previewUrl: local.previewUrl,
-          sourceTitle: discovered.sourceTitle,
-          sourceUrl: discovered.sourceUrl,
-          familyKey: discovered.familyKey,
-          attribution: discovered.attribution,
-        },
-      } : pair);
-    } catch (error) {
-      conversionFailures.push(`${discovered.sourceTitle}: ${getErrorMessage(error)}`);
-    }
-  }
-  if (instance.operationSequence !== operation) {
-    revokeAssets(localizedAssets);
-    return discovering;
-  }
-  instance.localAssets.set([...instance.localAssets.get(), ...localizedAssets]);
-  const unresolvedCount = pairs.filter((pair) => pair.image?.status !== 'resolved').length;
-  const warnings = [
-    ...(unresolvedCount > 0 ? [`${unresolvedCount} Wikipedia image${unresolvedCount === 1 ? '' : 's'} still need to be selected before saving.`] : []),
-    ...conversionFailures,
-  ];
-  return updatedRecord(discovering, { pairs, warnings });
+function phaseForStage(stage: string | undefined): AiContentPhase {
+  if (!stage || stage === 'interpret-request') return 'interpreting';
+  if (stage === 'search-wikipedia' || stage === 'select-list-page' || stage === 'fetch-list-page') return 'searching-source';
+  if (stage === 'select-list-region' || stage === 'extract-list-entries') return 'extracting-items';
+  if (stage === 'generate-definition') return 'generating-prompts';
+  return 'resolving-images';
 }
 
 async function runCreation(instance: AiCreatorInstance): Promise<void> {
   if (instance.creating.get()) return;
   const notes = instance.notes.get().trim();
-  const uploads = inputAssets(instance);
-  if (!notes && uploads.length === 0) {
-    setStatus(instance, 'warning', 'Add notes or images before submitting.');
+  if (!notes) {
+    setStatus(instance, 'warning', 'Add author notes before submitting.');
     return;
   }
   instance.creating.set(true);
@@ -369,54 +188,99 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     if (!capability.configured || !capability.model) throw new Error('No OpenRouter model and key are configured for content creation.');
     const started: AiContentWorkingRecord = {
       contractVersion: AI_CONTENT_CONTRACT_VERSION,
-      phase: 'generating',
+      phase: 'interpreting',
       notes,
       mode: instance.mode.get(),
       title: deriveTitle(notes),
       model: capability.model,
-      inputAssetIds: uploads.map((asset) => asset.id),
+      reasoningLevel: capability.reasoningLevel,
+      responseType: 'text',
       pairs: [],
       warnings: [],
       failure: null,
       updatedAt: new Date().toISOString(),
     };
-    instance.activeRecord.set(started);
-    await new Promise<void>((resolve) => Tracker.afterFlush(resolve));
-    const supersededResolvedAssets = instance.localAssets.get().filter((asset) => asset.purpose === 'resolved');
-    revokeAssets(supersededResolvedAssets);
-    instance.localAssets.set(uploads);
+    const priorAssets = instance.localAssets.get();
+    revokeAssets(priorAssets);
+    instance.localAssets.set([]);
     await persistSnapshot(instance, started);
-    const wikipediaOwnsImageSet = uploads.length === 0 && notesExplicitlyRequestImages(notes);
-    setStatus(instance, 'info', wikipediaOwnsImageSet ? 'Finding the requested items and images on Wikipedia...' : 'Creating content...');
-    let record: AiContentWorkingRecord;
-    if (wikipediaOwnsImageSet) {
-      record = await createAuthoritativeWikipediaPairs(instance, started, operation);
-    } else {
-      const promptImages = await Promise.all(uploads.map(async (asset) => ({
-        id: asset.id,
-        originalName: asset.originalName,
-        dataUrl: await assetDataUrl(asset),
-      })));
-      const generatedPairs = await generatePairs(notes, capability.model, promptImages);
-      if (instance.operationSequence !== operation) return;
-      record = updatedRecord(started, { pairs: workingPairs(generatedPairs, uploads) });
-      await persistSnapshot(instance, record);
-      try {
-        record = await resolveImages(instance, record, operation);
-      } catch (error) {
-        record = updatedRecord(record, {
-          warnings: [`Automatic image discovery could not complete: ${getErrorMessage(error)}`],
+    setStatus(instance, 'info', 'Finding the authoritative Wikipedia list and creating content. Do not navigate away.');
+
+    const result = await runAiContentPipeline({
+      notes,
+      mode: started.mode,
+      model: capability.model,
+      reasoningLevel: capability.reasoningLevel,
+      revision: operation,
+      assertCurrent() {
+        if (instance.operationSequence !== operation) throw new SupersededAiContentRunError();
+      },
+      onRunUpdated(run) {
+        if (instance.operationSequence !== operation) return;
+        const current = instance.activeRecord.get() || started;
+        const latestStage = run.traces.at(-1)?.stage;
+        const next = updatedRecord(current, {
+          phase: phaseForStage(latestStage),
+          pipelineRun: run,
+          ...(run.intent ? { promptType: run.intent.promptType } : {}),
         });
+        instance.activeRecord.set(next);
+        void instance.workingSaveQueue.enqueue({ record: next, assets: instance.localAssets.get() })
+          .catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
+      },
+    });
+    if (instance.operationSequence !== operation) return;
+
+    let pairs = result.pairs;
+    const localizedAssets: LocalAiContentAsset[] = [];
+    const stagingWarnings: string[] = [];
+    for (const acquired of result.assets) {
+      try {
+        const local = await localizeWikimediaAsset(acquired, localizedAssets);
+        localizedAssets.push(local);
+        pairs = pairs.map((pair) => pair.id === acquired.candidate.itemId ? {
+          ...pair,
+          image: {
+            ...pair.image,
+            status: 'resolved',
+            source: 'wikimedia',
+            assetId: local.id,
+            fileName: local.packageFileName,
+            previewUrl: local.previewUrl,
+            sourceTitle: acquired.candidate.fileTitle.replace(/^File:/i, ''),
+            sourceUrl: acquired.candidate.commonsUrl,
+            attribution: acquired.candidate.attribution,
+          },
+        } : pair);
+      } catch (error) {
+        const reason = `The selected Wikimedia image could not be staged for review: ${getErrorMessage(error)}`;
+        stagingWarnings.push(`${acquired.candidate.itemId}: ${reason}`);
+        pairs = pairs.map((pair) => pair.id === acquired.candidate.itemId ? {
+          ...pair,
+          image: { status: 'unresolved', failureReason: reason },
+        } : pair);
       }
     }
-    if (instance.operationSequence !== operation) return;
-    record = updatedRecord(record, { phase: 'review', failure: null });
+    if (instance.operationSequence !== operation) {
+      revokeAssets(localizedAssets);
+      return;
+    }
+    instance.localAssets.set(localizedAssets);
+    const record = updatedRecord(instance.activeRecord.get() || started, {
+      phase: 'review',
+      pipelineRun: result.run,
+      ...(result.run.intent ? { promptType: result.run.intent.promptType } : {}),
+      pairs,
+      warnings: Array.from(new Set([...result.warnings, ...stagingWarnings])),
+      failure: null,
+    });
     await persistSnapshot(instance, record);
-    const missing = record.pairs.filter((pair) => pair.kind === 'image' && pair.image?.status !== 'resolved').length;
-    setStatus(instance, missing > 0 ? 'warning' : 'success', missing > 0
-      ? `Content is ready to review. ${missing} image${missing === 1 ? '' : 's'} still need to be selected.`
+    const unresolved = record.pairs.filter((pair) => !pair.stimulus.trim() || (pair.kind === 'image' && pair.image?.status !== 'resolved')).length;
+    setStatus(instance, unresolved > 0 ? 'warning' : 'success', unresolved > 0
+      ? `Content is ready to review. ${unresolved} item${unresolved === 1 ? '' : 's'} require manual completion.`
       : 'Content is ready to review.');
   } catch (error) {
+    if (error instanceof SupersededAiContentRunError) return;
     const message = getErrorMessage(error);
     const current = instance.activeRecord.get();
     if (current && instance.operationSequence === operation) {
@@ -471,32 +335,40 @@ function updatePair(instance: AiCreatorInstance, pairId: string, transform: (pai
   }));
 }
 
-async function replaceReviewImage(instance: AiCreatorInstance, pairId: string, source: AiImageSourceFile): Promise<void> {
+async function replaceReviewImage(instance: AiCreatorInstance, pairId: string, sources: AiImageSourceFile[]): Promise<void> {
+  if (instance.replacingReviewImage.get()) throw new Error('Wait for the current image replacement to finish.');
+  if (sources.length !== 1) throw new Error('Choose or drop exactly one image for each review slot.');
   const record = instance.activeRecord.get();
   const supersededAssetId = record?.pairs.find((pair) => pair.id === pairId)?.image?.assetId;
-  const prepared = (await prepareAiImageAssets([source], instance.localAssets.get()))[0];
-  if (!prepared) throw new Error('The selected image could not be converted to WebP.');
-  const local: LocalAiContentAsset = {
-    ...prepared,
-    purpose: 'resolved',
-    previewUrl: URL.createObjectURL(new Blob([new Uint8Array(prepared.bytes).buffer], { type: 'image/webp' })),
-  };
   const retainedAssets = instance.localAssets.get().filter((asset) => asset.id !== supersededAssetId);
-  const supersededAsset = instance.localAssets.get().find((asset) => asset.id === supersededAssetId);
-  instance.localAssets.set([...retainedAssets, local]);
-  updatePair(instance, pairId, (pair) => ({
-    ...pair,
-    image: {
-      status: 'resolved',
-      source: 'user-replacement',
-      assetId: local.id,
-      fileName: local.packageFileName,
-      previewUrl: local.previewUrl,
-    },
-  }));
-  await new Promise<void>((resolve) => Tracker.afterFlush(resolve));
-  if (supersededAsset?.purpose === 'resolved') URL.revokeObjectURL(supersededAsset.previewUrl);
-  await instance.workingSaveQueue.flush();
+  instance.replacingReviewImage.set(true);
+  try {
+    const prepared = await prepareAiImageAssets(sources, retainedAssets);
+    if (prepared.length !== 1) throw new Error('Choose or drop exactly one image for each review slot.');
+    const local: LocalAiContentAsset = {
+      ...prepared[0]!,
+      purpose: 'resolved',
+      previewUrl: URL.createObjectURL(new Blob([new Uint8Array(prepared[0]!.bytes).buffer], { type: 'image/webp' })),
+    };
+    const supersededAsset = instance.localAssets.get().find((asset) => asset.id === supersededAssetId);
+    instance.localAssets.set([...retainedAssets, local]);
+    updatePair(instance, pairId, (pair) => ({
+      ...pair,
+      provenance: { ...pair.provenance, sourcePath: 'unresolved' },
+      image: {
+        status: 'resolved',
+        source: 'user-replacement',
+        assetId: local.id,
+        fileName: local.packageFileName,
+        previewUrl: local.previewUrl,
+      },
+    }));
+    await new Promise<void>((resolve) => Tracker.afterFlush(resolve));
+    if (supersededAsset?.purpose === 'resolved') URL.revokeObjectURL(supersededAsset.previewUrl);
+    await instance.workingSaveQueue.flush();
+  } finally {
+    instance.replacingReviewImage.set(false);
+  }
 }
 
 async function saveReviewedContent(instance: AiCreatorInstance): Promise<void> {
@@ -538,7 +410,12 @@ async function saveReviewedContent(instance: AiCreatorInstance): Promise<void> {
   } catch (error) {
     const message = getErrorMessage(error);
     const current = instance.activeRecord.get();
-    if (current) await persistSnapshot(instance, updatedRecord(current, { phase: 'review', failure: { stage: 'saving', code: 'save-failed', message } })).catch(() => undefined);
+    if (current) {
+      await persistSnapshot(instance, updatedRecord(current, {
+        phase: 'review',
+        failure: { stage: 'saving', code: 'save-failed', message },
+      })).catch(() => undefined);
+    }
     setStatus(instance, 'error', message);
   } finally {
     instance.creating.set(false);
@@ -548,7 +425,6 @@ async function saveReviewedContent(instance: AiCreatorInstance): Promise<void> {
 Template.aiContentCreator.onCreated(function(this: AiCreatorInstance) {
   this.creating = new ReactiveVar(false);
   this.discarding = new ReactiveVar(false);
-  this.processingImages = new ReactiveVar(false);
   this.notes = new ReactiveVar('');
   this.mode = new ReactiveVar('learning');
   this.localAssets = new ReactiveVar([]);
@@ -556,6 +432,7 @@ Template.aiContentCreator.onCreated(function(this: AiCreatorInstance) {
   this.statusMessage = new ReactiveVar('');
   this.statusKind = new ReactiveVar('info');
   this.saveBlockingIssues = new ReactiveVar([]);
+  this.replacingReviewImage = new ReactiveVar(false);
   this.openRouterCapability = new ReactiveVar(null);
   const workingUserId = Meteor.userId();
   if (!workingUserId) throw new Error('AI Content Creator requires an authenticated user.');
@@ -578,25 +455,28 @@ Template.aiContentCreator.helpers({
   learningSelected() { return (Template.instance() as AiCreatorInstance).mode.get() === 'learning'; },
   testSelected() { return (Template.instance() as AiCreatorInstance).mode.get() === 'test'; },
   creating() { return (Template.instance() as AiCreatorInstance).creating.get(); },
-  processingImages() { return (Template.instance() as AiCreatorInstance).processingImages.get(); },
-  submitDisabled() {
-    const instance = Template.instance() as AiCreatorInstance;
-    return instance.creating.get() || instance.processingImages.get() ? { disabled: true } : {};
-  },
-  localImages() {
-    return inputAssets(Template.instance() as AiCreatorInstance).map((asset) => ({ ...asset }));
-  },
+  submitDisabled() { return (Template.instance() as AiCreatorInstance).creating.get() ? { disabled: true } : {}; },
   statusMessage() { return (Template.instance() as AiCreatorInstance).statusMessage.get(); },
   statusClass() { return statusClass((Template.instance() as AiCreatorInstance).statusKind.get()); },
   reviewTitle() { return (Template.instance() as AiCreatorInstance).activeRecord.get()?.title || ''; },
   reviewPairs() {
-    return ((Template.instance() as AiCreatorInstance).activeRecord.get()?.pairs || []).map((pair, index) => ({
+    const instance = Template.instance() as AiCreatorInstance;
+    const replacingReviewImage = instance.replacingReviewImage.get();
+    return (instance.activeRecord.get()?.pairs || []).map((pair, index) => ({
       ...pair,
       number: index + 1,
       isText: pair.kind === 'text',
       isImage: pair.kind === 'image',
+      editable: true,
+      promptLabel: 'Stimulus',
+      showImageRequirement: false,
       imageResolved: pair.kind === 'image' && pair.image?.status === 'resolved',
       imagePreviewUrl: pair.image?.previewUrl || '',
+      imageAlt: `Review image for pair ${index + 1}`,
+      imageFailureReason: pair.image?.failureReason || 'Drop or choose an image.',
+      imageReplacementInProgress: replacingReviewImage,
+      imageSourceUrl: pair.image?.sourceUrl || '',
+      hasImageSource: Boolean(pair.image?.sourceUrl),
     }));
   },
   reviewWarnings() { return (Template.instance() as AiCreatorInstance).activeRecord.get()?.warnings || []; },
@@ -612,35 +492,6 @@ Template.aiContentCreator.events({
     const mode = String((event.currentTarget as HTMLElement).dataset.mode || '');
     if (mode === 'learning' || mode === 'test') instance.mode.set(mode);
   },
-  'change #ai-image-files, change #ai-image-folder'(event: Event, instance: AiCreatorInstance) {
-    const input = event.currentTarget as HTMLInputElement;
-    if (input.files) {
-      void addImageSources(instance, sourcesFromFileList(input.files)).catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
-    }
-    input.value = '';
-  },
-  'dragenter .ai-image-picker, dragover .ai-image-picker'(event: BlazeDragEvent) {
-    event.preventDefault();
-    (event.currentTarget as HTMLElement).classList.add('is-drag-over');
-  },
-  'dragleave .ai-image-picker'(event: BlazeDragEvent) {
-    const current = event.currentTarget as HTMLElement;
-    const related = event.relatedTarget as Node | null;
-    if (!related || !current.contains(related)) current.classList.remove('is-drag-over');
-  },
-  'drop .ai-image-picker'(event: BlazeDragEvent, instance: AiCreatorInstance) {
-    event.preventDefault();
-    (event.currentTarget as HTMLElement).classList.remove('is-drag-over');
-    const transfer = event.originalEvent?.dataTransfer || event.dataTransfer;
-    if (transfer) void collectAiImageDropSources(transfer).then((sources) => addImageSources(instance, sources)).catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
-  },
-  'click .ai-remove-image'(event: Event, instance: AiCreatorInstance) {
-    event.preventDefault();
-    const id = String((event.currentTarget as HTMLElement).dataset.imageId || '');
-    const asset = instance.localAssets.get().find((candidate) => candidate.id === id);
-    if (asset) URL.revokeObjectURL(asset.previewUrl);
-    instance.localAssets.set(instance.localAssets.get().filter((candidate) => candidate.id !== id));
-  },
   'click #ai-submit'(event: Event, instance: AiCreatorInstance) {
     event.preventDefault();
     if (!hasPublicCreatorDisplayName(Meteor.user())) {
@@ -650,8 +501,7 @@ Template.aiContentCreator.events({
     void runCreation(instance);
   },
   'input #ai-review-title'(event: Event, instance: AiCreatorInstance) {
-    const title = (event.currentTarget as HTMLInputElement).value;
-    updateRecord(instance, (record) => ({ ...record, title }));
+    updateRecord(instance, (record) => ({ ...record, title: (event.currentTarget as HTMLInputElement).value }));
   },
   'input .ai-review-stimulus'(event: Event, instance: AiCreatorInstance) {
     const input = event.currentTarget as HTMLTextAreaElement;
@@ -667,11 +517,37 @@ Template.aiContentCreator.events({
   },
   'change .ai-review-image-input'(event: Event, instance: AiCreatorInstance) {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) void replaceReviewImage(instance, String(input.dataset.pairId || ''), { file, sourcePath: file.name })
-      .then(() => setStatus(instance, 'success', 'Replacement image prepared as WebP.'))
-      .catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
+    if (input.files?.length) {
+      setStatus(instance, 'info', 'Preparing replacement image...');
+      void replaceReviewImage(instance, String(input.dataset.pairId || ''), sourcesFromFileList(input.files))
+        .then(() => setStatus(instance, 'success', 'Replacement image prepared as WebP.'))
+        .catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
+    }
     input.value = '';
+  },
+  'dragenter .ai-review-image-drop-target, dragover .ai-review-image-drop-target'(event: BlazeDragEvent) {
+    event.preventDefault();
+    const transfer = event.originalEvent?.dataTransfer || event.dataTransfer;
+    if (transfer) transfer.dropEffect = 'copy';
+    (event.currentTarget as HTMLElement).classList.add('is-drag-over');
+  },
+  'dragleave .ai-review-image-drop-target'(event: BlazeDragEvent) {
+    const current = event.currentTarget as HTMLElement;
+    const related = event.relatedTarget as Node | null;
+    if (!related || !current.contains(related)) current.classList.remove('is-drag-over');
+  },
+  'drop .ai-review-image-drop-target'(event: BlazeDragEvent, instance: AiCreatorInstance) {
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).classList.remove('is-drag-over');
+    const transfer = event.originalEvent?.dataTransfer || event.dataTransfer;
+    const pairId = String((event.currentTarget as HTMLElement).dataset.pairId || '');
+    if (transfer) {
+      setStatus(instance, 'info', 'Preparing replacement image...');
+      void collectAiImageDropSources(transfer)
+        .then((sources) => replaceReviewImage(instance, pairId, sources))
+        .then(() => setStatus(instance, 'success', 'Replacement image prepared as WebP.'))
+        .catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
+    }
   },
   'click #ai-back'(event: Event, instance: AiCreatorInstance) {
     event.preventDefault();

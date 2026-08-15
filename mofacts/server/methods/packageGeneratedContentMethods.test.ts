@@ -17,7 +17,7 @@ function imageContract(mode: 'learning' | 'test' = 'learning'): AiContentSaveCon
       kind: 'image',
       stimulus: 'image: capitate',
       response: 'capitate',
-      image: { source: 'uploaded', fileName: 'capitate.webp' },
+      image: { source: 'user-replacement', fileName: 'capitate.webp' },
     }],
   };
 }

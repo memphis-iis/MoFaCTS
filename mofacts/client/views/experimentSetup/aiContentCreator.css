@@ -25,7 +25,7 @@
   font-size: clamp(2rem, 8vw, 5rem);
   font-weight: 700;
   line-height: 1;
-  opacity: 0.4;
+  opacity: 0.05;
   pointer-events: none;
   text-align: center;
   text-transform: uppercase;
@@ -66,7 +66,15 @@
 .ai-simple-form,
 .ai-review {
   display: grid;
+  min-width: 0;
   gap: 1rem;
+}
+
+.ai-review-warnings {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+  overflow-wrap: anywhere;
 }
 
 .ai-field-label,
@@ -80,149 +88,12 @@
   resize: vertical;
 }
 
-.ai-image-picker {
-  display: grid;
-  gap: 0.75rem;
-}
-
 .ai-form-actions,
 .ai-review-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.5rem;
-}
-
-.ai-image-count {
-  justify-self: end;
-  color: var(--app-secondary-text-color, #777);
-  font-size: 0.8rem;
-}
-
-.ai-image-drop-zone {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 6rem;
-  padding: 1rem;
-  border: 1.5px dashed var(--border-color, #777);
-  border-radius: 0.6rem;
-  background: color-mix(in srgb, var(--learning-card-surface-color, transparent) 92%, var(--app-muted-surface-color, transparent));
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.ai-image-picker.is-drag-over .ai-image-drop-zone {
-  border-color: var(--app-info-color, #6f42c1);
-  background: var(--app-info-surface-color, rgba(111, 66, 193, 0.1));
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-info-color, #6f42c1) 16%, transparent);
-}
-
-.ai-image-drop-zone.is-processing {
-  opacity: 0.72;
-  pointer-events: none;
-}
-
-.ai-image-drop-copy {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 0.6rem;
-  align-items: center;
-}
-
-.ai-image-drop-copy > i {
-  grid-row: 1 / span 2;
-  color: var(--app-info-color, #6f42c1);
-  font-size: 1.4rem;
-}
-
-.ai-image-drop-copy span {
-  color: var(--app-secondary-text-color, #777);
-  font-size: 0.8rem;
-}
-
-.ai-image-picker-actions {
-  flex-shrink: 0;
-  display: flex;
-  gap: 0.5rem;
-}
-
-.ai-image-picker-actions .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0;
-}
-
-.ai-image-file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.ai-image-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 0.5rem;
-  max-height: 14rem;
-  overflow-y: auto;
-}
-
-.ai-image-item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color, #666);
-  border-radius: 0.5rem;
-}
-
-.ai-image-item img {
-  width: 3rem;
-  height: 3rem;
-  object-fit: cover;
-  border-radius: 0.35rem;
-}
-
-.ai-image-item-copy {
-  min-width: 0;
-  display: grid;
-}
-
-.ai-image-item-copy strong,
-.ai-image-item-copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ai-image-item-copy span {
-  color: var(--app-secondary-text-color, #777);
-  font-size: 0.75rem;
-}
-
-.ai-remove-image {
-  width: 1.75rem;
-  height: 1.75rem;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--app-secondary-text-color, #777);
-  line-height: 1;
-}
-
-.ai-remove-image:hover,
-.ai-remove-image:focus-visible {
-  background: var(--app-danger-surface-color, rgba(220, 53, 69, 0.12));
-  color: var(--app-danger-color, #dc3545);
 }
 
 .ai-mode-selector {
@@ -273,6 +144,10 @@
   border-radius: 0.6rem;
 }
 
+.ai-pair-row.is-image {
+  grid-template-columns: 2rem 7.5rem minmax(0, 1fr);
+}
+
 .ai-pair-number {
   font-weight: 700;
   padding-top: 1.75rem;
@@ -282,29 +157,93 @@
 .ai-pair-stimulus,
 .ai-pair-response {
   display: grid;
+  min-width: 0;
   align-content: start;
   gap: 0.4rem;
+}
+
+.ai-pair-row.is-image .ai-pair-stimulus {
+  width: 7.5rem;
+}
+
+.ai-review-image-drop-target {
+  position: relative;
+  display: block;
+  width: 7.5rem;
+  height: 5rem;
+  margin: 0;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px dashed var(--border-color, #666);
+  border-radius: 0.45rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .ai-review-image,
 .ai-missing-image {
   width: 100%;
-  height: 180px;
-  border: 1px solid var(--border-color, #666);
-  border-radius: 0.4rem;
+  height: 100%;
+  border-radius: inherit;
   object-fit: contain;
 }
 
 .ai-missing-image {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.2rem;
   background: rgba(255, 193, 7, 0.08);
+  color: var(--app-secondary-text-color, #666);
+  font-size: 0.72rem;
+  line-height: 1.15;
+  text-align: center;
 }
 
-.ai-replace-image {
-  justify-self: start;
-  margin: 0;
+.ai-review-image-action {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.68);
+  color: #fff;
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.ai-review-image-drop-target.is-drag-over {
+  border-color: var(--app-info-color, #6f42c1);
+  background: var(--app-info-surface-color, rgba(111, 66, 193, 0.1));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-info-color, #6f42c1) 16%, transparent);
+}
+
+.ai-review-image-drop-target.is-drag-over::after {
+  content: 'Drop one image to replace';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border-radius: 0.4rem;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+
+.ai-review-image-drop-target.is-processing {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.ai-content-lab-trace textarea,
+.ai-content-lab-json {
+  max-height: 55vh;
+  overflow: auto;
+  resize: vertical;
 }
 
 @media (max-width: 700px) {
@@ -312,17 +251,23 @@
     padding: 0.5rem;
   }
 
-  .ai-pair-row {
+  .ai-pair-row.is-text {
     grid-template-columns: 1fr;
   }
 
-  .ai-image-drop-zone {
-    align-items: stretch;
-    flex-direction: column;
+  .ai-pair-row.is-image {
+    grid-template-columns: 1.5rem 6.25rem minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem;
   }
 
-  .ai-image-picker-actions {
-    flex-wrap: wrap;
+  .ai-pair-row.is-image .ai-pair-stimulus,
+  .ai-pair-row.is-image .ai-review-image-drop-target {
+    width: 6.25rem;
+  }
+
+  .ai-pair-row.is-image .ai-review-image-drop-target {
+    height: 4.5rem;
   }
 
   .ai-pair-number {

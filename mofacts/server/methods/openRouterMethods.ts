@@ -356,6 +356,15 @@ async function executeResolvedOpenRouterJson(
   if (!model) {
     throw new Meteor.Error('no-openrouter-model', 'No configured OpenRouter model is available');
   }
+  if (data.reasoningLevel !== undefined) {
+    const requestedReasoning = normalizeOpenRouterReasoningLevel(data.reasoningLevel, 'Requested OpenRouter reasoning level');
+    if (requestedReasoning !== reasoningLevel) {
+      throw new Meteor.Error(
+        'openrouter-reasoning-mismatch',
+        'The requested reasoning level does not match the configured OpenRouter reasoning level',
+      );
+    }
+  }
   const intent = isRecord(data.intent) ? data.intent : {};
   const title = normalizeString(intent.title) || 'MoFaCTS OpenRouter';
   const schemaName = normalizeString(intent.schemaName);
@@ -396,6 +405,9 @@ async function executeResolvedOpenRouterJson(
     }
     if (typeof data.maxTokens === 'number') {
       callOptions.maxTokens = expandOpenRouterCompletionBudget(data.maxTokens, reasoningLevel);
+    }
+    if (isRecord(data.provider)) {
+      callOptions.provider = data.provider;
     }
     if (isRecord(data.telemetry) || sessionId) {
       callOptions.telemetry = {
@@ -485,9 +497,13 @@ async function executeAdminOpenRouterRequest(
   assertSafeAdminRequest(request);
   const credentials = await resolveOpenRouterCredentials(deps, userId, null, 'admin');
   if (!credentials.apiKey) throw new Meteor.Error('no-api-key', 'No configured admin OpenRouter API key is available');
-  const model = normalizeString(request.model) || credentials.model;
+  const requestedModel = normalizeString(request.model);
+  if (requestedModel && requestedModel !== credentials.model) {
+    throw new Meteor.Error(400, 'Admin Tests Prompt Lab always uses the model configured in the Admin Control Panel');
+  }
+  const model = credentials.model;
   const reasoningLevel = adminLabReasoningLevel(request.reasoning);
-  await validateResolvedOpenRouterConfiguration(deps, { model, reasoningLevel });
+  const configuration = await validateResolvedOpenRouterConfiguration(deps, { model, reasoningLevel });
   const responseFormat = isRecord(request.response_format) ? request.response_format : null;
   const jsonSchema = responseFormat?.type === 'json_schema' && isRecord(responseFormat.json_schema)
     ? responseFormat.json_schema
@@ -514,11 +530,14 @@ async function executeAdminOpenRouterRequest(
       },
       telemetry: { surface: 'admin-tests', operation: 'ai-content-prompt-lab' },
     };
-    if (Array.isArray(credentials.supportedParameters)) {
-      options.supportedParameters = credentials.supportedParameters;
+    if (Array.isArray(configuration.supportedParameters)) {
+      options.supportedParameters = configuration.supportedParameters;
     }
     if (typeof request.temperature === 'number') options.temperature = request.temperature;
-    if (typeof request.max_tokens === 'number') options.maxTokens = request.max_tokens;
+    const visibleOutputTokens = typeof request.max_tokens === 'number' ? request.max_tokens : null;
+    if (visibleOutputTokens !== null) {
+      options.maxTokens = expandOpenRouterCompletionBudget(visibleOutputTokens, reasoningLevel);
+    }
     const result = await callOpenRouterJson(options);
     const parsedContent = result.value;
     const validationErrors = schema ? validateSchemaValue(parsedContent, schema) : [];
@@ -539,6 +558,13 @@ async function executeAdminOpenRouterRequest(
       requestedModel: model,
       model: resolvedModel,
       reasoningLevel,
+      execution: {
+        visibleOutputTokens,
+        providerMaxTokens: options.maxTokens ?? null,
+        providerReasoning: reasoningLevel === 'none'
+          ? null
+          : (reasoningLevel === 'default' ? { enabled: true } : { effort: reasoningLevel }),
+      },
     };
   } catch (error) {
     const summary = summarizeProviderError(error);

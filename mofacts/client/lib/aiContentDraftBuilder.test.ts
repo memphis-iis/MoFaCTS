@@ -31,7 +31,7 @@ describe('deterministic AI Content draft builder', function() {
       contractVersion: AI_CONTENT_CONTRACT_VERSION,
       mode: 'learning',
       title: 'Bird Photos',
-      pairs: [{ id: 'pair-1', kind: 'image', stimulus: 'A private warbler image description', response: 'warbler', image: { source: 'uploaded', fileName: 'warbler.webp' } }],
+      pairs: [{ id: 'pair-1', kind: 'image', stimulus: 'image: warbler', response: 'warbler', image: { source: 'user-replacement', fileName: 'warbler.webp' } }],
     };
     const bytes = new Uint8Array([1, 2, 3]);
     const draft = buildAiContentDraft(contract, [{ id: 'asset-1', originalName: 'bird.jpg', sourcePath: 'birds/bird.jpg', packageFileName: 'warbler.webp', bytes, width: 1280, height: 720 }]);
@@ -45,7 +45,7 @@ describe('deterministic AI Content draft builder', function() {
       contractVersion: AI_CONTENT_CONTRACT_VERSION,
       mode: 'test',
       title: 'Bird Photos',
-      pairs: [{ id: 'pair-1', kind: 'image', stimulus: 'Private discovery description', response: 'warbler', image: { source: 'uploaded', fileName: 'warbler.webp' } }],
+      pairs: [{ id: 'pair-1', kind: 'image', stimulus: 'image: warbler', response: 'warbler', image: { source: 'user-replacement', fileName: 'warbler.webp' } }],
     };
     expect(() => buildAiContentDraft(contract)).to.throw('unavailable');
   });

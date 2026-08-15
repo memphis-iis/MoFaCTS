@@ -4,6 +4,7 @@ import {
   AI_IMAGE_MAX_WIDTH,
   AI_IMAGE_WEBP_QUALITY,
   expandAiImageSources,
+  isSupportedAiImageFile,
   prepareAiImageAssets,
 } from './aiContentImageAssets';
 
@@ -11,6 +12,10 @@ describe('aiContentImageAssets', function() {
   it('uses the approved WebP conversion settings', function() {
     expect(AI_IMAGE_MAX_WIDTH).to.equal(1280);
     expect(AI_IMAGE_WEBP_QUALITY).to.equal(0.86);
+  });
+
+  it('accepts SVG source files for conversion to WebP', function() {
+    expect(isSupportedAiImageFile(new File(['<svg/>'], 'outline-map.svg', { type: 'image/svg+xml' }))).to.equal(true);
   });
 
   it('extracts supported images from ZIP files and ignores non-image entries', async function() {

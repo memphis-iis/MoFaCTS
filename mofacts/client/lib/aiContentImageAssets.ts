@@ -1,9 +1,9 @@
 import JSZip from 'jszip';
 import { sanitizeImportName } from './importCompositionBuilder';
 
-const IMAGE_EXTENSIONS = new Set(['avif', 'bmp', 'gif', 'jpeg', 'jpg', 'png', 'webp']);
+const IMAGE_EXTENSIONS = new Set(['avif', 'bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp']);
 const ZIP_EXTENSION = 'zip';
-const MAX_SOURCE_IMAGE_BYTES = 50 * 1024 * 1024;
+export const AI_IMAGE_MAX_SOURCE_BYTES = 50 * 1024 * 1024;
 export const AI_IMAGE_MAX_WIDTH = 1280;
 export const AI_IMAGE_WEBP_QUALITY = 0.86;
 
@@ -26,6 +26,10 @@ export type ConvertedImage = {
   bytes: Uint8Array;
   width: number;
   height: number;
+  visualProfile?: {
+    colorfulPixelRatio: number;
+    colorBucketCount: number;
+  };
 };
 
 type DroppedFileSystemEntry = {
@@ -52,6 +56,7 @@ function imageMimeType(name: string): string {
   if (extension === 'gif') return 'image/gif';
   if (extension === 'bmp') return 'image/bmp';
   if (extension === 'avif') return 'image/avif';
+  if (extension === 'svg') return 'image/svg+xml';
   return '';
 }
 
@@ -189,11 +194,38 @@ function canvasToWebp(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
+function canvasVisualProfile(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D): NonNullable<ConvertedImage['visualProfile']> {
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const sampleStride = Math.max(1, Math.floor(Math.max(canvas.width, canvas.height) / 96));
+  const colorBuckets = new Set<string>();
+  let visiblePixels = 0;
+  let colorfulPixels = 0;
+  for (let y = 0; y < canvas.height; y += sampleStride) {
+    for (let x = 0; x < canvas.width; x += sampleStride) {
+      const offset = ((y * canvas.width) + x) * 4;
+      const red = pixels[offset] || 0;
+      const green = pixels[offset + 1] || 0;
+      const blue = pixels[offset + 2] || 0;
+      const alpha = pixels[offset + 3] || 0;
+      if (alpha < 32) continue;
+      visiblePixels += 1;
+      const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
+      if (chroma < 36) continue;
+      colorfulPixels += 1;
+      colorBuckets.add(`${Math.floor(red / 48)}:${Math.floor(green / 48)}:${Math.floor(blue / 48)}`);
+    }
+  }
+  return {
+    colorfulPixelRatio: visiblePixels > 0 ? colorfulPixels / visiblePixels : 0,
+    colorBucketCount: colorBuckets.size,
+  };
+}
+
 export async function convertAiImageToWebp(file: File): Promise<ConvertedImage> {
   if (!isSupportedAiImageFile(file)) {
     throw new Error(`Unsupported image file: ${file.name}`);
   }
-  if (file.size > MAX_SOURCE_IMAGE_BYTES) {
+  if (file.size > AI_IMAGE_MAX_SOURCE_BYTES) {
     throw new Error(`Image "${file.name}" is larger than 50 MB.`);
   }
   if (typeof createImageBitmap !== 'function') {
@@ -214,11 +246,13 @@ export async function convertAiImageToWebp(file: File): Promise<ConvertedImage> 
       throw new Error('This browser could not prepare the image conversion canvas.');
     }
     context.drawImage(bitmap, 0, 0, width, height);
+    const visualProfile = canvasVisualProfile(canvas, context);
     const webp = await canvasToWebp(canvas);
     return {
       bytes: new Uint8Array(await webp.arrayBuffer()),
       width,
       height,
+      visualProfile,
     };
   } finally {
     bitmap.close();
@@ -246,7 +280,7 @@ export async function prepareAiImageAssets(
 ): Promise<PreparedAiImageAsset[]> {
   const expanded = await expandAiImageSources(sources);
   if (expanded.length === 0) {
-    throw new Error('No supported images were found. Use JPEG, PNG, WebP, GIF, BMP, or AVIF files.');
+    throw new Error('No supported images were found. Use JPEG, PNG, WebP, GIF, BMP, AVIF, or SVG files.');
   }
   const reservedNames = existingAssets.map((asset) => asset.packageFileName);
   const prepared: PreparedAiImageAsset[] = [];
@@ -265,13 +299,4 @@ export async function prepareAiImageAssets(
     });
   }
   return prepared;
-}
-
-export function aiImageAssetDataUrl(asset: PreparedAiImageAsset): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error(`Could not prepare "${asset.originalName}" for visual analysis.`));
-    reader.readAsDataURL(new Blob([new Uint8Array(asset.bytes).buffer], { type: 'image/webp' }));
-  });
 }

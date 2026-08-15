@@ -178,12 +178,15 @@ describe('management interface baseline', function() {
       path.join(findAppRoot(), 'client', 'views', 'experimentSetup', 'aiContentCreator.html'),
       'utf8',
     );
+    const sharedReviewMarkup = fs.readFileSync(
+      path.join(findAppRoot(), 'client', 'views', 'aiContentReview.html'),
+      'utf8',
+    );
     const input = sourceBlock(creatorMarkup, '{{#if showInput}}', '{{/if}}\n\n      {{#if showReview}}');
     const review = sourceBlock(creatorMarkup, '{{#if showReview}}', '{{/if}}\n    </section>');
 
     expect(input).to.include('id="ai-notes"');
-    expect(input).to.include('id="ai-image-files"');
-    expect(input).to.include('id="ai-image-folder"');
+    expect(input).not.to.include('type="file"');
     expect(input).to.include('data-mode="learning"');
     expect(input).to.include('data-mode="test"');
     expect(input).to.include('id="ai-submit"');
@@ -192,29 +195,34 @@ describe('management interface baseline', function() {
     }
 
     expect(review).to.include('id="ai-review-title"');
-    expect(review).to.include('ai-review-stimulus');
-    expect(review).to.include('ai-review-response');
-    expect(review).to.include('Replace image');
-    expect(review).to.include('Image needed');
+    expect(review).to.include('{{> aiContentReviewPairs pairs=reviewPairs}}');
+    expect(sharedReviewMarkup).to.include('ai-review-stimulus');
+    expect(sharedReviewMarkup).to.include('ai-review-response');
+    expect(sharedReviewMarkup).to.include('ai-review-image-input');
+    expect(sharedReviewMarkup).to.include('View Wikimedia source');
     for (const forbidden of ['learner instructions', 'quota', 'distractor', 'suggested response', 'approve & generate', 'blueprint']) {
       expect(review.toLocaleLowerCase()).not.to.include(forbidden);
     }
   });
 
-  it('keeps both no-retention AI Content labs on Admin Tests', function() {
+  it('keeps one complete no-retention AI Content Prompt Lab on Admin Tests', function() {
     const testMarkup = fs.readFileSync(
       path.join(findAppRoot(), 'client', 'views', 'testRunner.html'),
       'utf8',
     );
+    const labMarkup = fs.readFileSync(
+      path.join(findAppRoot(), 'client', 'views', 'aiContentPromptLab.html'),
+      'utf8',
+    );
     expect(testMarkup).to.include('run-openrouter-strict-preflight');
-    expect(testMarkup).to.include('id="ai-content-prompt-lab-request"');
-    expect(testMarkup).to.include('run-ai-content-prompt-lab');
-    expect(testMarkup).to.include('id="ai-content-prompt-lab-pairs"');
-    expect(testMarkup).to.include('id="wikimedia-lab-notes"');
-    expect(testMarkup).not.to.include('id="wikimedia-lab-pairs"');
-    expect(testMarkup).not.to.include('copy-prompt-lab-pairs-to-discovery');
-    expect(testMarkup).to.include('run-wikimedia-discovery-lab');
-    expect(testMarkup).to.include('Run Discovery');
+    expect(testMarkup).to.include('{{> aiContentPromptLab}}');
+    expect(labMarkup).to.include('run-ai-content-prompt-lab');
+    expect(labMarkup).to.include('retry-ai-content-prompt-stage');
+    expect(labMarkup).to.include('Strict response schema preview');
+    expect(labMarkup).to.include('Complete pipeline run object');
+    expect(labMarkup).to.include('{{> aiContentReviewPairs pairs=reviewPairs}}');
+    expect(testMarkup + labMarkup).not.to.include('Wikimedia Discovery Lab');
+    expect(testMarkup + labMarkup).not.to.include('run-wikimedia-discovery-lab');
   });
 
   it('keeps AI working state browser-owned and stale-operation guarded', function() {

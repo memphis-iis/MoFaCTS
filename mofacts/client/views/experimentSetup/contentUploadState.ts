@@ -50,6 +50,10 @@ export function normalizeContentUploadSummaryMap(summaries: any): ContentUploadS
   return map;
 }
 
+export function contentUploadAssetCount(summary: any): number | null {
+  return typeof summary?.assetCount === 'number' ? summary.assetCount : null;
+}
+
 export function normalizeUploadQuotaStatus(status: any): UploadQuotaStatus {
   return {
     unlimited: status?.unlimited === true,

@@ -33,6 +33,7 @@ import './apkgWizard';
 import './imsccWizard';
 import {
   buildRowSummaryPresentation,
+  contentUploadAssetCount,
   normalizeContentUploadListResult,
   normalizeContentUploadSummaryMap,
   normalizeUploadQuotaStatus,
@@ -792,7 +793,7 @@ Template.contentUpload.helpers({
             const assetsReady = assetSub ? assetSub.ready() : false;
             thisTdf.assetsReady = !!assetsReady;
             thisTdf.assets = [];
-            thisTdf.assetsCount = typeof thisTdf.assetCount === 'number' ? thisTdf.assetCount : null;
+            thisTdf.assetsCount = contentUploadAssetCount(summary);
 
             if (assetsReady && thisTdf.stimuliSetId) {
               const assetDocs = DynamicAssetsCollection.find({ 'meta.stimuliSetId': thisTdf.stimuliSetId }).fetch();

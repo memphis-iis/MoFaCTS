@@ -167,6 +167,75 @@ describe('openRouterMethods Admin Tests configuration', function() {
     }
   });
 
+  it('requires the production request reasoning to match configuration and forwards no-fallback routing', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch').resolves(new Response(JSON.stringify({
+      choices: [{ message: { content: '{"ok":true}' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const method = createOpenRouterMethods(adminDeps()).callAdminTestResolvedOpenRouterJson;
+    await method.call({ userId: 'admin-user' }, {
+      reasoningLevel: 'high',
+      messages: [{ role: 'user', content: 'Return ok.' }],
+      provider: { require_parameters: true, allow_fallbacks: false },
+      intent: { title: 'AI Content stage' },
+    });
+    const sentBody = JSON.parse(String((fetchStub.firstCall.args[1] as RequestInit).body));
+    expect(sentBody.reasoning).to.deep.equal({ effort: 'high' });
+    expect(sentBody.provider).to.deep.equal({ require_parameters: true, allow_fallbacks: false });
+
+    try {
+      await method.call({ userId: 'admin-user' }, {
+        reasoningLevel: 'low',
+        messages: [{ role: 'user', content: 'Return ok.' }],
+        intent: { title: 'AI Content stage' },
+      });
+      throw new Error('Expected configured reasoning mismatch to fail');
+    } catch (error) {
+      expect(String((error as { reason?: unknown }).reason || (error as Error).message)).to.contain('does not match');
+    }
+    expect(fetchStub.callCount).to.equal(1);
+  });
+
+  it('honors the Lab reasoning selection and expands its visible-output token budget like the creator', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch').resolves(new Response(JSON.stringify({
+      model: 'openai/admin-model',
+      choices: [{ message: { content: '{"pairs":[]}' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const methods = createOpenRouterMethods(adminDeps());
+    const result = await methods.callAdminTestOpenRouterRequest.call({ userId: 'admin-user' }, {
+      model: 'openai/admin-model',
+      messages: [{ role: 'user', content: 'Return a pair response.' }],
+      reasoning: { effort: 'high' },
+      max_tokens: 80,
+      stream: false,
+    });
+    const sentBody = JSON.parse(String((fetchStub.firstCall.args[1] as RequestInit).body));
+
+    expect(sentBody.reasoning).to.deep.equal({ effort: 'high' });
+    expect(sentBody.max_tokens).to.equal(400);
+    expect(result.reasoningLevel).to.equal('high');
+    expect(result.execution).to.deep.equal({
+      visibleOutputTokens: 80,
+      providerMaxTokens: 400,
+      providerReasoning: { effort: 'high' },
+    });
+  });
+
+  it('does not let the Prompt Lab override the Admin Control Panel model', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch');
+    const methods = createOpenRouterMethods(adminDeps());
+    try {
+      await methods.callAdminTestOpenRouterRequest.call({ userId: 'admin-user' }, {
+        model: 'openai/other-model',
+        messages: [{ role: 'user', content: 'Return a pair response.' }],
+        stream: false,
+      });
+      throw new Error('Expected the configured-model guard to reject the request');
+    } catch (error) {
+      expect(String((error as { reason?: unknown }).reason || (error as Error).message)).to.contain('Admin Control Panel');
+    }
+    expect(fetchStub.callCount).to.equal(0);
+  });
+
   it('does not allow non-admins to run Prompt Lab requests', async function() {
     const methods = createOpenRouterMethods(adminDeps(false));
     try {

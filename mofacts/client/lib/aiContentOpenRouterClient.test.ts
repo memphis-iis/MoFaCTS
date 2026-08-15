@@ -1,9 +1,30 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { Meteor } from 'meteor/meteor';
-import { callOpenRouterForPairRepair, callOpenRouterForPairs } from './aiContentOpenRouterClient';
+import {
+  buildAdminAiContentStageRequest,
+  callAdminLabAiContentStage,
+  callProductionAiContentStage,
+  type AiContentStageCall,
+} from './aiContentOpenRouterClient';
 
-describe('AI Content OpenRouter pair client', function() {
+const call: AiContentStageCall = {
+  stage: 'interpret-request',
+  model: 'openai/test-model',
+  systemPrompt: 'Return JSON.',
+  userPrompt: 'Interpret this.',
+  schemaName: 'intent',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['ok'],
+    properties: { ok: { type: 'boolean' } },
+  },
+  visibleOutputTokens: 321,
+  reasoningLevel: 'high',
+};
+
+describe('AI Content OpenRouter stage client', function() {
   let callAsync: sinon.SinonStub;
 
   beforeEach(function() {
@@ -14,42 +35,37 @@ describe('AI Content OpenRouter pair client', function() {
     callAsync.restore();
   });
 
-  it('requests one strict pair set and supplies uploaded images as vision content', async function() {
-    const pairs = [{ kind: 'image' as const, stimulus: 'image: Scaphoid', response: 'Scaphoid' }];
-    callAsync.resolves({ parsedContent: { pairs } });
-    expect(await callOpenRouterForPairs('hand bones with images', 'openai/test-model', [{ id: 'asset-1', originalName: 'hand.png', dataUrl: 'data:image/webp;base64,AAAA' }])).to.deep.equal(pairs);
+  it('builds an explicit no-fallback Admin request with model, reasoning, schema, and budget', function() {
+    const request = buildAdminAiContentStageRequest(call);
+    expect(request.model).to.equal(call.model);
+    expect(request.max_tokens).to.equal(321);
+    expect(request.reasoning).to.deep.equal({ effort: 'high' });
+    expect(request.provider).to.deep.equal({ require_parameters: true, allow_fallbacks: false });
+    expect((request.response_format as any).json_schema.schema).to.equal(call.schema);
+  });
+
+  it('routes Lab calls through the authorized Admin transport', async function() {
+    callAsync.resolves({
+      parsedContent: { ok: true },
+      requestWithoutCredentials: { model: call.model },
+      rawContent: '{"ok":true}',
+      model: call.model,
+      reasoningLevel: 'high',
+    });
+    const result = await callAdminLabAiContentStage(call);
+    expect(callAsync.firstCall.args[0]).to.equal('callAdminTestOpenRouterRequest');
+    expect(callAsync.firstCall.args[1].provider.allow_fallbacks).to.equal(false);
+    expect(result.parsedContent).to.deep.equal({ ok: true });
+    expect(result.reasoningLevel).to.equal('high');
+  });
+
+  it('routes production calls with explicit no-fallback provider settings', async function() {
+    callAsync.resolves({ parsedContent: { ok: true }, model: call.model, reasoningLevel: 'high' });
+    await callProductionAiContentStage(call);
     const payload = callAsync.firstCall.args[1];
-    expect(payload.maxTokens).to.equal(12000);
-    expect(payload).not.to.have.property('temperature');
-    expect(payload.intent.strictSchema).to.equal(true);
-    expect(payload.intent.schema.type).to.equal('object');
-    expect(payload.intent.schema.properties.pairs.items.additionalProperties).to.equal(false);
-    expect(payload.messages[1].content[2]).to.deep.equal({ type: 'image_url', image_url: { url: 'data:image/webp;base64,AAAA' } });
-  });
-
-  it('deterministically canonicalizes the redundant image stimulus marker', async function() {
-    callAsync.resolves({ parsedContent: { pairs: [{ kind: 'image', stimulus: 'a highlighted carpal bone', response: 'Scaphoid' }] } });
-    expect(await callOpenRouterForPairs('hand bones with images', 'openai/test-model')).to.deep.equal([
-      { kind: 'image', stimulus: 'image: Scaphoid', response: 'Scaphoid' },
-    ]);
-  });
-
-  it('sends a single failure-specific repair without changing the schema', async function() {
-    callAsync.resolves({ parsedContent: { pairs: [{ kind: 'image', stimulus: 'image: Scaphoid', response: 'Scaphoid' }] } });
-    await callOpenRouterForPairRepair('hand bones with images', 'openai/test-model', [], [], ['Missing pairs']);
-    const payload = callAsync.firstCall.args[1];
-    expect(payload.telemetry.operation).to.equal('pair-repair');
-    expect(payload.messages[1].content).to.contain('Missing pairs');
-    expect(payload.intent.strictSchema).to.equal(true);
-  });
-
-  it('rejects a response without parsed strict content', async function() {
-    callAsync.resolves({});
-    try {
-      await callOpenRouterForPairs('text facts', 'openai/test-model');
-      throw new Error('Expected missing parsed content failure');
-    } catch (error) {
-      expect((error as Error).message).to.equal('The AI provider response must be an object containing pairs.');
-    }
+    expect(callAsync.firstCall.args[0]).to.equal('callResolvedOpenRouterJson');
+    expect(payload.provider).to.deep.equal({ require_parameters: true, allow_fallbacks: false });
+    expect(payload.reasoningLevel).to.equal('high');
+    expect(payload.telemetry.operation).to.equal('interpret-request');
   });
 });

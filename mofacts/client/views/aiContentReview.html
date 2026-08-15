@@ -1,0 +1,56 @@
+<template name="aiContentReviewPairs">
+  <div class="ai-pair-list">
+    {{#each pairs}}
+    <article class="ai-pair-row {{#if isImage}}is-image{{else}}is-text{{/if}}">
+      <div class="ai-pair-number">{{number}}</div>
+      <div class="ai-pair-stimulus">
+        {{#if isText}}
+          <label for="ai-stimulus-{{id}}">{{promptLabel}}</label>
+          {{#if editable}}
+            <textarea id="ai-stimulus-{{id}}" class="form-control ai-review-stimulus" data-pair-id="{{id}}" rows="3">{{stimulus}}</textarea>
+          {{else}}
+            <textarea id="ai-stimulus-{{id}}" class="form-control ai-review-stimulus" rows="3" readonly>{{stimulus}}</textarea>
+          {{/if}}
+        {{else}}
+          <span class="ai-field-label">Image</span>
+          {{#if editable}}
+            <label class="ai-review-image-drop-target {{#if imageReplacementInProgress}}is-processing{{/if}}" data-pair-id="{{id}}" aria-label="Image for pair {{number}}. Drop or choose one replacement image." title="{{imageFailureReason}}">
+              {{#if imageResolved}}
+                <img class="ai-review-image" src="{{imagePreviewUrl}}" alt="{{imageAlt}}">
+                <span class="ai-review-image-action">Replace</span>
+              {{else}}
+                <span class="ai-missing-image" role="status">Drop or choose</span>
+              {{/if}}
+              <input class="sr-only ai-review-image-input" data-pair-id="{{id}}" type="file" accept="image/*">
+            </label>
+          {{else}}
+            <div class="ai-review-image-drop-target" title="{{imageFailureReason}}">
+              {{#if imageResolved}}
+                <img class="ai-review-image" src="{{imagePreviewUrl}}" alt="{{imageAlt}}">
+              {{else}}
+                <span class="ai-missing-image">No image found</span>
+              {{/if}}
+            </div>
+          {{/if}}
+          {{#if hasImageSource}}
+            <a href="{{imageSourceUrl}}" target="_blank" rel="noopener noreferrer" class="small">View Wikimedia source</a>
+          {{/if}}
+        {{/if}}
+      </div>
+      <div class="ai-pair-response">
+        <label for="ai-response-{{id}}">Correct response</label>
+        {{#if editable}}
+          <input id="ai-response-{{id}}" class="form-control ai-review-response" data-pair-id="{{id}}" type="text" value="{{response}}">
+        {{else}}
+          <input id="ai-response-{{id}}" class="form-control ai-review-response" type="text" value="{{response}}" readonly>
+        {{/if}}
+        {{#if showImageRequirement}}
+          <label for="ai-image-requirement-{{id}}">Shared image requirement</label>
+          <textarea id="ai-image-requirement-{{id}}" class="form-control ai-review-stimulus" rows="3" readonly>{{imageRequirement}}</textarea>
+          <div class="small">Source path: {{sourcePath}}</div>
+        {{/if}}
+      </div>
+    </article>
+    {{/each}}
+  </div>
+</template>

@@ -1,95 +1,116 @@
 import { Meteor } from 'meteor/meteor';
-import {
-  AI_CONTENT_CONTRACT_VERSION,
-  AI_GENERATED_PAIR_RESPONSE_SCHEMA,
-  canonicalizeGeneratedImageStimuli,
-  validateGeneratedPairResponse,
-} from '../../common/aiContentContract';
-import type { OpenRouterRequestMessage } from './openRouterClient';
-import {
-  AI_CONTENT_SYSTEM_PROMPT,
-  buildPairGenerationPrompt,
-  buildPairRepairPrompt,
-  type AiPromptUpload,
-} from './aiContentPrompts';
+import { AI_CONTENT_CONTRACT_VERSION } from '../../common/aiContentContract';
+import type { OpenRouterJsonSchema, OpenRouterRequestMessage } from '../../common/lib/openRouterClient';
+import type { OpenRouterReasoningLevel } from '../../common/lib/openRouterModelCatalog';
+import type { AiContentAiStageId } from './aiContentPrompts';
 
 const MeteorAny = Meteor as typeof Meteor & {
   callAsync: (name: string, ...args: any[]) => Promise<any>;
 };
 
-export type AiPairPromptImage = AiPromptUpload & {
-  dataUrl: string;
+export type AiContentStageCall = {
+  stage: AiContentAiStageId;
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  schemaName: string;
+  schema: OpenRouterJsonSchema;
+  visibleOutputTokens: number;
+  reasoningLevel: OpenRouterReasoningLevel;
+  itemId?: string;
 };
 
-function userMessage(prompt: string, images: AiPairPromptImage[]): OpenRouterRequestMessage {
-  if (images.length === 0) return { role: 'user', content: prompt };
+export type AiContentStageCallResult = {
+  parsedContent: unknown;
+  request: unknown;
+  rawContent: string;
+  responseBody: unknown;
+  usage: unknown;
+  costUsd: number | null;
+  model: string;
+  reasoningLevel: OpenRouterReasoningLevel;
+  source?: string;
+  validation?: unknown;
+  execution?: unknown;
+};
+
+export type AiContentStageCaller = (call: AiContentStageCall) => Promise<AiContentStageCallResult>;
+
+function messages(call: AiContentStageCall): OpenRouterRequestMessage[] {
+  return [
+    { role: 'system', content: call.systemPrompt },
+    { role: 'user', content: call.userPrompt },
+  ];
+}
+
+export function buildAdminAiContentStageRequest(call: AiContentStageCall): Record<string, unknown> {
   return {
-    role: 'user',
-    content: [
-      { type: 'text', text: prompt },
-      ...images.flatMap((image) => [
-        { type: 'text' as const, text: `Uploaded image ${image.id}: ${image.originalName}` },
-        { type: 'image_url' as const, image_url: { url: image.dataUrl } },
-      ]),
-    ],
+    model: call.model,
+    reasoningLevel: call.reasoningLevel,
+    messages: messages(call),
+    max_tokens: call.visibleOutputTokens,
+    reasoning: call.reasoningLevel === 'default'
+      ? { enabled: true }
+      : { effort: call.reasoningLevel },
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: call.schemaName,
+        strict: true,
+        schema: call.schema,
+      },
+    },
+    provider: { require_parameters: true, allow_fallbacks: false },
+    stream: false,
   };
 }
 
-async function callPairRequest(
-  model: string,
-  messages: OpenRouterRequestMessage[],
-  operation: 'pair-generation' | 'pair-repair',
-): Promise<unknown> {
-  try {
-    const result = await MeteorAny.callAsync('callResolvedOpenRouterJson', {
-      model,
-      messages,
-      maxTokens: 12000,
-      telemetry: {
-        surface: 'ai-content-creator',
-        operation,
-        contractVersion: AI_CONTENT_CONTRACT_VERSION,
-      },
-      intent: {
-        title: operation === 'pair-generation' ? 'MoFaCTS AI Content Pairs' : 'MoFaCTS AI Content Pair Repair',
-        schemaName: `mofacts_ai_content_pairs_v${AI_CONTENT_CONTRACT_VERSION}`,
-        schema: AI_GENERATED_PAIR_RESPONSE_SCHEMA,
-        strictSchema: true,
-        missingContentMessage: 'OpenRouter did not return stimulus-response pairs.',
-      },
-    });
-    return validateGeneratedPairResponse(canonicalizeGeneratedImageStimuli(result?.parsedContent));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('HTTP 404') && message.includes('No endpoints found that can handle the requested parameters')) {
-      throw new Error(`OpenRouter pair request failed for model ${JSON.stringify(model)} because none of its current endpoints support every required strict-schema parameter. Run the Admin Tests OpenRouter preflight or select a schema-capable model. ${message}`);
-    }
-    throw error;
-  }
-}
+export const callProductionAiContentStage: AiContentStageCaller = async (call) => {
+  const result = await MeteorAny.callAsync('callResolvedOpenRouterJson', {
+    model: call.model,
+    messages: messages(call),
+    maxTokens: call.visibleOutputTokens,
+    provider: { require_parameters: true, allow_fallbacks: false },
+    telemetry: {
+      surface: 'ai-content-creator',
+      operation: call.stage,
+      contractVersion: AI_CONTENT_CONTRACT_VERSION,
+      ...(call.itemId ? { itemId: call.itemId } : {}),
+    },
+    intent: {
+      title: `MoFaCTS AI Content ${call.stage}`,
+      schemaName: call.schemaName,
+      schema: call.schema,
+      strictSchema: true,
+      missingContentMessage: `OpenRouter did not return AI Content ${call.stage} output.`,
+    },
+  });
+  return {
+    parsedContent: result?.parsedContent,
+    request: result?.request,
+    rawContent: String(result?.rawContent || ''),
+    responseBody: result?.responseBody,
+    usage: result?.usage,
+    costUsd: typeof result?.costUsd === 'number' ? result.costUsd : null,
+    model: String(result?.model || call.model),
+    reasoningLevel: result?.reasoningLevel as OpenRouterReasoningLevel,
+    source: String(result?.source || ''),
+    validation: result?.validation,
+    execution: result?.execution,
+  };
+};
 
-export async function callOpenRouterForPairs(
-  notes: string,
-  model: string,
-  images: AiPairPromptImage[] = [],
-): Promise<unknown> {
-  const uploadReferences = images.map(({ id, originalName }) => ({ id, originalName }));
-  return callPairRequest(model, [
-    { role: 'system', content: AI_CONTENT_SYSTEM_PROMPT },
-    userMessage(buildPairGenerationPrompt(notes, uploadReferences), images),
-  ], 'pair-generation');
-}
-
-export async function callOpenRouterForPairRepair(
-  notes: string,
-  model: string,
-  images: AiPairPromptImage[],
-  rejected: unknown,
-  validationErrors: string[],
-): Promise<unknown> {
-  const uploadReferences = images.map(({ id, originalName }) => ({ id, originalName }));
-  return callPairRequest(model, [
-    { role: 'system', content: `${AI_CONTENT_SYSTEM_PROMPT}\n\nRepair the supplied candidate without changing requested image pairs into text.` },
-    userMessage(buildPairRepairPrompt(notes, uploadReferences, rejected, validationErrors), images),
-  ], 'pair-repair');
-}
+export const callAdminLabAiContentStage: AiContentStageCaller = async (call) => {
+  const result = await MeteorAny.callAsync('callAdminTestOpenRouterRequest', buildAdminAiContentStageRequest(call));
+  return {
+    parsedContent: result?.parsedContent,
+    request: result?.requestWithoutCredentials,
+    rawContent: String(result?.rawContent || ''),
+    responseBody: result?.responseBody,
+    usage: result?.usage,
+    costUsd: typeof result?.costUsd === 'number' ? result.costUsd : null,
+    model: String(result?.model || call.model),
+    reasoningLevel: result?.reasoningLevel as OpenRouterReasoningLevel,
+    source: String(result?.source || ''),
+  };
+};

@@ -18,46 +18,6 @@
       <form class="ai-simple-form">
         <textarea id="ai-notes" class="form-control ai-notes" rows="7" aria-label="Content input" placeholder="Paste notes, learning objectives, quiz items, or a short topic. Add what learners should practice, any examples to preserve, and anything that should become flashcards or a quiz.">{{notes}}</textarea>
 
-        <section class="ai-image-picker" aria-label="Images">
-          {{#if localImages.length}}<span class="ai-image-count">{{localImages.length}} image(s) ready</span>{{/if}}
-          <div class="ai-image-drop-zone {{#if processingImages}}is-processing{{/if}}">
-            <div class="ai-image-drop-copy">
-              <i class="fa fa-cloud-upload" aria-hidden="true"></i>
-              <strong>Drop images, a folder, or a ZIP here</strong>
-              <span>Images are converted to WebP at a maximum width of 1280 pixels.</span>
-            </div>
-            <div class="ai-image-picker-actions">
-              <label class="btn btn-outline-primary btn-sm" for="ai-image-files">
-                <i class="fa fa-picture-o" aria-hidden="true"></i>
-                Choose images
-              </label>
-              <label class="btn btn-outline-primary btn-sm" for="ai-image-folder">
-                <i class="fa fa-folder-open" aria-hidden="true"></i>
-                Choose folder
-              </label>
-            </div>
-            <input id="ai-image-files" class="ai-image-file-input" type="file" accept="image/*,.zip,application/zip" multiple {{submitDisabled}}>
-            <input id="ai-image-folder" class="ai-image-file-input" type="file" accept="image/*" multiple webkitdirectory directory {{submitDisabled}}>
-          </div>
-
-          {{#if localImages.length}}
-          <div class="ai-image-grid" role="list" aria-label="Selected images">
-            {{#each localImages}}
-            <article class="ai-image-item" role="listitem">
-              <img src="{{previewUrl}}" alt="{{originalName}}">
-              <div class="ai-image-item-copy">
-                <strong title="{{sourcePath}}">{{originalName}}</strong>
-                <span>{{width}} × {{height}} · WebP</span>
-              </div>
-              <button type="button" class="ai-remove-image" data-image-id="{{id}}" aria-label="Remove {{originalName}}">
-                <i class="fa fa-times" aria-hidden="true"></i>
-              </button>
-            </article>
-            {{/each}}
-          </div>
-          {{/if}}
-        </section>
-
         <fieldset class="ai-mode-selector">
           <legend>Session type</legend>
           <button type="button" class="ai-mode-option {{#if learningSelected}}selected{{/if}}" data-mode="learning" aria-pressed="{{learningSelected}}">Learn it (Learning session)</button>
@@ -80,40 +40,12 @@
         <input id="ai-review-title" class="form-control ai-review-title" type="text" value="{{reviewTitle}}" required>
 
         {{#if reviewWarnings.length}}
-        <div class="alert alert-warning" role="status">
+        <div class="alert alert-warning ai-review-warnings" role="status">
           {{#each reviewWarnings}}<div>{{this}}</div>{{/each}}
         </div>
         {{/if}}
 
-        <div class="ai-pair-list">
-          {{#each reviewPairs}}
-          <article class="ai-pair-row">
-            <div class="ai-pair-number">{{number}}</div>
-            <div class="ai-pair-stimulus">
-              {{#if isText}}
-                <label for="ai-stimulus-{{id}}">Stimulus</label>
-                <textarea id="ai-stimulus-{{id}}" class="form-control ai-review-stimulus" data-pair-id="{{id}}" rows="3">{{stimulus}}</textarea>
-              {{/if}}
-              {{#if isImage}}
-                <span class="ai-field-label">Image</span>
-                {{#if imageResolved}}
-                  <img class="ai-review-image" src="{{imagePreviewUrl}}" alt="Review image for pair {{number}}">
-                {{else}}
-                  <div class="ai-missing-image" role="status">Image needed</div>
-                {{/if}}
-                <label class="btn btn-secondary ai-replace-image">
-                  Replace image
-                  <input class="sr-only ai-review-image-input" data-pair-id="{{id}}" type="file" accept="image/*">
-                </label>
-              {{/if}}
-            </div>
-            <div class="ai-pair-response">
-              <label for="ai-response-{{id}}">Correct response</label>
-              <input id="ai-response-{{id}}" class="form-control ai-review-response" data-pair-id="{{id}}" type="text" value="{{response}}">
-            </div>
-          </article>
-          {{/each}}
-        </div>
+        {{> aiContentReviewPairs pairs=reviewPairs}}
 
         {{#if saveBlockingIssues.length}}
         <div class="alert alert-danger" role="alert" aria-live="assertive">

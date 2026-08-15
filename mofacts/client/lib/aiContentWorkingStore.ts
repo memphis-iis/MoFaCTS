@@ -1,4 +1,8 @@
-import { AI_CONTENT_WORKING_RECORD_KEY, type AiContentWorkingRecord } from '../../common/aiContentContract';
+import {
+  AI_CONTENT_WORKING_RECORD_KEY,
+  requireAiContentWorkingRecordVersion,
+  type AiContentWorkingRecord,
+} from '../../common/aiContentContract';
 import type { PreparedAiImageAsset } from './aiContentImageAssets';
 
 const DATABASE_NAME = 'mofacts-ai-content-creator';
@@ -6,7 +10,7 @@ const DATABASE_VERSION = 1;
 const STORE_NAME = 'working-records';
 
 export type LocalAiContentAsset = PreparedAiImageAsset & {
-  purpose: 'input' | 'resolved';
+  purpose: 'resolved';
   previewUrl: string;
 };
 
@@ -22,7 +26,7 @@ export type AiContentWorkingSnapshot = {
   assets: LocalAiContentAsset[];
 };
 
-export function aiContentWorkingRecordKey(userId: string): string {
+function aiContentWorkingRecordKey(userId: string): string {
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId) {
     throw new Error('AI Content Creator browser storage requires an authenticated user.');
@@ -113,9 +117,10 @@ export async function loadAiContentWorkingSnapshot(userId: string): Promise<AiCo
   const key = aiContentWorkingRecordKey(userId);
   const stored = await transactionRequest<StoredAiContentSnapshot | undefined>('readonly', (store) => store.get(key));
   if (!stored) return null;
+  const record = requireAiContentWorkingRecordVersion(stored.record);
   const assets = stored.assets.map(restoredAsset);
   return {
-    record: restoredRecord(stored.record, assets),
+    record: restoredRecord(record, assets),
     assets,
   };
 }
@@ -123,7 +128,7 @@ export async function loadAiContentWorkingSnapshot(userId: string): Promise<AiCo
 export async function saveAiContentWorkingSnapshot(userId: string, snapshot: AiContentWorkingSnapshot): Promise<void> {
   const key = aiContentWorkingRecordKey(userId);
   const stored: StoredAiContentSnapshot = {
-    record: storedRecord(snapshot.record),
+    record: storedRecord(requireAiContentWorkingRecordVersion(snapshot.record)),
     assets: snapshot.assets.map(storedAsset),
   };
   await transactionRequest('readwrite', (store) => store.put(stored, key));
