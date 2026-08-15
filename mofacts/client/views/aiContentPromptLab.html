@@ -30,8 +30,13 @@
           </div>
         </div>
 
-        <h6 class="admin-form-row-top">Live stage prompts and execution settings</h6>
-        <div class="text-muted small">Each AI stage has explicit reasoning and a visible-output budget. Editing any stage invalidates the displayed run.</div>
+        <div class="admin-header-action-row admin-form-row-top">
+          <div>
+            <h6>Live stage prompts and execution settings</h6>
+            <div class="text-muted small">Each AI stage has explicit reasoning and a visible-output budget. Lab edits stay in this browser; Creator uses the defaults stored in code. Resetting automatically saves the current draft as a checkpoint and retains the author notes.</div>
+          </div>
+          <button type="button" class="btn btn-outline-secondary reset-ai-content-prompt-lab-code-defaults" {{resetCodeDefaultsDisabled}}>Reset to code defaults</button>
+        </div>
         {{#each stageRows}}
           <details class="admin-form-row-top ai-content-lab-stage-settings">
             <summary>{{number}}. {{label}} — reasoning: {{reasoningLevel}}, visible tokens: {{visibleOutputTokens}}</summary>
