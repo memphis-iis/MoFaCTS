@@ -59,11 +59,11 @@ For a text run, choose textPairingStrategy "source-field-mapping" when the autho
 
 const SELECT_LIST_SYSTEM = `Select the best pre-existing Wikipedia list page from application-supplied candidates. Return only JSON matching the supplied schema.
 
-You may select only a supplied candidateId or null. Normally favor the earliest-ranked result. Depart from rank only when the supplied title, snippet, or lead excerpt shows that another candidate is materially more likely to be the authoritative list requested. Never invent or rewrite an item, page title, URL, link, or candidate.`;
+You must select exactly one supplied candidateId. A Wikipedia article that contains the authoritative requested list is a valid list page even when its title does not begin with "List of". Normally favor the earliest-ranked result. Accept rank 1 when its title names the requested subject and its snippet or lead excerpt describes that subject, even if the embedded list is not summarized in the lead. Depart from rank only when the supplied evidence shows that another candidate is materially more likely to contain the authoritative requested list. Never invent or rewrite an item, page title, URL, link, or candidate.`;
 
 const SELECT_REGION_SYSTEM = `Select the one structural region on the retrieved Wikipedia page that contains the authoritative requested list. Return only JSON matching the supplied schema.
 
-You may select only a supplied regionId or null. Use headings, region kind, entry count, and supplied samples. Reject navigation, references, unrelated sidebars, and ancillary tables. Never enumerate or rewrite list members.`;
+You must select exactly one supplied regionId. Use headings, region kind, entry count, and supplied samples to choose the region most likely to contain the authoritative requested list. Reject navigation, references, unrelated sidebars, and ancillary tables in favor of the best available authoritative region. Never invent a region or enumerate or rewrite list members.`;
 
 const SELECT_SOURCE_FIELDS_SYSTEM = `Select the prompt and response fields from one application-extracted source table. Return only JSON matching the supplied schema.
 
