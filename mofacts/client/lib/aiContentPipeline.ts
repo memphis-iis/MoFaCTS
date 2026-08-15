@@ -345,10 +345,10 @@ async function selectListPage(
     options,
     'select-list-page',
     buildCandidateSelectionPrompt({ authorNotes: options.notes, intent }, publicCandidates, settings.instructions),
-    candidateSelectionSchema(candidates.map(({ candidateId }) => candidateId)),
+    candidateSelectionSchema(candidates.map(({ candidateId }) => candidateId), false),
     `mofacts_ai_content_list_page_v${AI_CONTENT_CONTRACT_VERSION}`,
     { intent, candidates: publicCandidates },
-    (value) => validateCandidateSelection(value, candidates.map(({ candidateId }) => candidateId), 'Wikipedia list-page decision'),
+    (value) => validateCandidateSelection(value, candidates.map(({ candidateId }) => candidateId), 'Wikipedia list-page decision', false),
   );
   const decision = execution.parsedContent;
   run.listDecision = decision;
@@ -376,10 +376,10 @@ async function selectListRegion(
     options,
     'select-list-region',
     buildCandidateSelectionPrompt({ authorNotes: options.notes, intent }, candidates, settings.instructions),
-    regionSelectionSchema(candidates.map(({ regionId }) => regionId)),
+    regionSelectionSchema(candidates.map(({ regionId }) => regionId), false),
     `mofacts_ai_content_list_region_v${AI_CONTENT_CONTRACT_VERSION}`,
     { intent, regions: candidates },
-    (value) => validateRegionSelection(value, candidates.map(({ regionId }) => regionId)),
+    (value) => validateRegionSelection(value, candidates.map(({ regionId }) => regionId), false),
   );
   const decision = execution.parsedContent;
   if (!decision.selectedRegionId) throw new Error('No structural region was accepted as the authoritative list.');
