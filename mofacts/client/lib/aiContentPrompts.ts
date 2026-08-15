@@ -138,13 +138,22 @@ function requiredString(value: unknown, label: string): string {
   return value.trim();
 }
 
+function sourceFieldMappingSearchQuery(subject: string): string {
+  const conciseSubject = subject
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/^(?:the\s+)?(?:list\s+of\s+)?/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return `list ${conciseSubject}`;
+}
+
 export function validateAiContentIntent(value: unknown): AiContentIntent {
   if (!isRecord(value)) throw new Error('AI Content intent must be an object.');
   strictKeys(value, ['promptType', 'responseType', 'textPairingStrategy', 'subject', 'listSearchQuery', 'imageRequirement'], 'AI Content intent');
   if (value.promptType !== 'text' && value.promptType !== 'image') throw new Error('AI Content promptType must be text or image.');
   if (value.responseType !== 'text') throw new Error('AI Content responseType must be text.');
   const subject = requiredString(value.subject, 'AI Content subject');
-  const listSearchQuery = requiredString(value.listSearchQuery, 'Wikipedia list search query');
+  const suppliedListSearchQuery = requiredString(value.listSearchQuery, 'Wikipedia list search query');
   const imageRequirement = typeof value.imageRequirement === 'string' ? value.imageRequirement.trim() : '';
   const textPairingStrategy = value.textPairingStrategy === undefined
     ? (value.promptType === 'text' ? 'definition' : 'not-applicable')
@@ -154,6 +163,9 @@ export function validateAiContentIntent(value: unknown): AiContentIntent {
       ? value.textPairingStrategy
       : null);
   if (!textPairingStrategy) throw new Error('AI Content textPairingStrategy is invalid.');
+  const listSearchQuery = textPairingStrategy === 'source-field-mapping'
+    ? sourceFieldMappingSearchQuery(subject)
+    : suppliedListSearchQuery;
   if (!/\blist\b/i.test(listSearchQuery)) throw new Error('Wikipedia search intent must explicitly search for a list.');
   if (value.promptType === 'image' && !imageRequirement) throw new Error('Image prompt intent requires a succinct image requirement.');
   if (value.promptType === 'text' && imageRequirement) throw new Error('Text prompt intent must use an empty image requirement.');
