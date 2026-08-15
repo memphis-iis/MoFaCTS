@@ -6,12 +6,10 @@ import {
   candidateSelectionSchema,
   imageCandidateDecisionSchema,
   sourceFieldSelectionSchema,
-  regionSelectionSchema,
   validateAiContentIntent,
   validateCandidateSelection,
   validateDefinition,
   validateImageCandidateDecision,
-  validateRegionSelection,
   validateSourceFieldSelection,
 } from './aiContentPrompts';
 
@@ -23,8 +21,6 @@ describe('AI Content bounded stage prompts', function() {
       expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS[stage].instructions).to.be.a('string').and.not.empty;
       expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS[stage].visibleOutputTokens).to.be.greaterThan(0);
     });
-    expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS['select-list-page'].systemPrompt)
-      .to.include('even when its title does not begin with "List of"');
     expect(AI_CONTENT_INTENT_SCHEMA.additionalProperties).to.equal(false);
   });
 
@@ -69,10 +65,6 @@ describe('AI Content bounded stage prompts', function() {
   it('constrains selection schemas and validators to supplied opaque IDs', function() {
     expect((candidateSelectionSchema(['candidate-1']).properties as any).selectedCandidateId.enum)
       .to.deep.equal(['candidate-1', null]);
-    expect((candidateSelectionSchema(['candidate-1'], false).properties as any).selectedCandidateId)
-      .to.deep.equal({ type: 'string', enum: ['candidate-1'] });
-    expect((regionSelectionSchema(['region-1'], false).properties as any).selectedRegionId)
-      .to.deep.equal({ type: 'string', enum: ['region-1'] });
     const rankedCandidateSchema = (imageCandidateDecisionSchema(['image-1']).properties as any).rankedCandidateIds;
     expect(rankedCandidateSchema.items.enum)
       .to.deep.equal(['image-1']);
@@ -82,17 +74,6 @@ describe('AI Content bounded stage prompts', function() {
       ['candidate-1'],
       'List choice',
     )).to.throw('unknown candidate ID');
-    expect(() => validateCandidateSelection(
-      { selectedCandidateId: null, rationale: 'none' },
-      ['candidate-1'],
-      'List choice',
-      false,
-    )).to.throw('must select one supplied candidate ID');
-    expect(() => validateRegionSelection(
-      { selectedRegionId: null, rationale: 'none' },
-      ['region-1'],
-      false,
-    )).to.throw('must select one supplied region ID');
     expect(() => validateImageCandidateDecision(
       { rankedCandidateIds: ['image-2'], selectedCandidateId: 'image-2', rationale: 'guess' },
       ['image-1'],

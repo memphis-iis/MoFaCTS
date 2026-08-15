@@ -80,12 +80,6 @@ export type AiContentPipelineStageSettings = AiContentStagePrompt & {
 
 export type AiContentPipelineSettings = Record<AiContentAiStageId, AiContentPipelineStageSettings>;
 
-export type AiContentPipelineConfiguration = Readonly<{
-  model: string;
-  reasoningLevel: OpenRouterReasoningLevel;
-  settings: AiContentPipelineSettings;
-}>;
-
 export type AiContentPipelineResult = {
   run: AiContentPipelineRun;
   pairs: AiContentPair[];
@@ -126,21 +120,6 @@ export function createAiContentPipelineSettings(
     stage,
     { ...prompt, reasoningLevel },
   ])) as AiContentPipelineSettings;
-}
-
-export function createAiContentPipelineConfiguration(options: {
-  model: string;
-  reasoningLevel: OpenRouterReasoningLevel;
-  settings?: AiContentPipelineSettings;
-}): AiContentPipelineConfiguration {
-  const model = options.model.trim();
-  if (!model) throw new Error('AI Content execution requires a configured model.');
-  const sourceSettings = options.settings || createAiContentPipelineSettings(options.reasoningLevel);
-  const settings = Object.fromEntries(Object.entries(sourceSettings).map(([stage, value]) => [
-    stage,
-    { ...value },
-  ])) as AiContentPipelineSettings;
-  return { model, reasoningLevel: options.reasoningLevel, settings };
 }
 
 function now(): string {
@@ -366,10 +345,10 @@ async function selectListPage(
     options,
     'select-list-page',
     buildCandidateSelectionPrompt({ authorNotes: options.notes, intent }, publicCandidates, settings.instructions),
-    candidateSelectionSchema(candidates.map(({ candidateId }) => candidateId), false),
+    candidateSelectionSchema(candidates.map(({ candidateId }) => candidateId)),
     `mofacts_ai_content_list_page_v${AI_CONTENT_CONTRACT_VERSION}`,
     { intent, candidates: publicCandidates },
-    (value) => validateCandidateSelection(value, candidates.map(({ candidateId }) => candidateId), 'Wikipedia list-page decision', false),
+    (value) => validateCandidateSelection(value, candidates.map(({ candidateId }) => candidateId), 'Wikipedia list-page decision'),
   );
   const decision = execution.parsedContent;
   run.listDecision = decision;
@@ -397,10 +376,10 @@ async function selectListRegion(
     options,
     'select-list-region',
     buildCandidateSelectionPrompt({ authorNotes: options.notes, intent }, candidates, settings.instructions),
-    regionSelectionSchema(candidates.map(({ regionId }) => regionId), false),
+    regionSelectionSchema(candidates.map(({ regionId }) => regionId)),
     `mofacts_ai_content_list_region_v${AI_CONTENT_CONTRACT_VERSION}`,
     { intent, regions: candidates },
-    (value) => validateRegionSelection(value, candidates.map(({ regionId }) => regionId), false),
+    (value) => validateRegionSelection(value, candidates.map(({ regionId }) => regionId)),
   );
   const decision = execution.parsedContent;
   if (!decision.selectedRegionId) throw new Error('No structural region was accepted as the authoritative list.');

@@ -7,7 +7,6 @@ import './experimentSetup/aiContentCreator.css';
 import { getErrorMessage } from '../lib/errorUtils';
 import {
   aiContentAiStageOutputKey,
-  createAiContentPipelineConfiguration,
   runAiContentPipeline,
   type AiContentPipelineResult,
 } from '../lib/aiContentPipeline';
@@ -267,15 +266,12 @@ async function runLab(instance: PromptLabInstance, retryTraceId?: string): Promi
   instance.pending.set(true);
   instance.error.set('');
   try {
-    const pipelineConfiguration = createAiContentPipelineConfiguration({
+    const result = await runAiContentPipeline({
+      notes: draft.authorNotes,
+      mode: 'learning',
       model: draft.model,
       reasoningLevel: instance.baseline.get()?.reasoningLevel || 'none',
       settings: draft.stages,
-    });
-    const result = await runAiContentPipeline({
-      ...pipelineConfiguration,
-      notes: draft.authorNotes,
-      mode: 'learning',
       stageCaller: callAdminLabAiContentStage,
       revision: operation,
       assertCurrent() {

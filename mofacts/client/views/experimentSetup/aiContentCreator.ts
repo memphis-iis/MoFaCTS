@@ -23,10 +23,7 @@ import {
   type AiContentWorkingRecord,
   type AiCreationMode,
 } from '../../../common/aiContentContract';
-import {
-  createAiContentPipelineConfiguration,
-  runAiContentPipeline,
-} from '../../lib/aiContentPipeline';
+import { runAiContentPipeline } from '../../lib/aiContentPipeline';
 import { aiContentPipelineProgressMessage } from '../../lib/aiContentStagePresentation';
 import { aiContentSystemTitle } from '../../lib/aiContentTitle';
 import type { AcquiredWikimediaAsset } from '../../lib/aiContentWikimediaFiles';
@@ -210,14 +207,11 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
     await persistSnapshot(instance, started);
     setStatus(instance, 'info', 'Finding the authoritative Wikipedia list and creating content. Do not navigate away.');
 
-    const pipelineConfiguration = createAiContentPipelineConfiguration({
-      model: capability.model,
-      reasoningLevel: capability.reasoningLevel,
-    });
     const result = await runAiContentPipeline({
-      ...pipelineConfiguration,
       notes,
       mode: started.mode,
+      model: capability.model,
+      reasoningLevel: capability.reasoningLevel,
       revision: operation,
       assertCurrent() {
         if (instance.operationSequence !== operation) throw new SupersededAiContentRunError();
