@@ -98,7 +98,8 @@ export function uploadBuiltPackage(
     const firstManifest = Array.isArray(builtPackage.manifest) && builtPackage.manifest.length > 0
       ? builtPackage.manifest[0]
       : null;
-    const fileName = firstManifest ? `${firstManifest.tdfName}.zip` : 'MoFaCTS_AI_Content.zip';
+    const archiveName = sanitizeImportName(firstManifest?.tdfName, 'MoFaCTS_AI_Content');
+    const fileName = `${archiveName}.zip`;
     const makeFile = deps.makeFile || ((parts, name, options) => new File(parts, name, options));
     const file = makeFile([builtPackage.zipBlob], fileName, { type: 'application/zip' });
     const { asset, integrity: uploadIntegrity } = await uploadPackageAsset({

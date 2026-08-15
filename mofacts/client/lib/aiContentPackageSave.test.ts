@@ -162,6 +162,24 @@ describe('aiContentPackageSave', function() {
     expect(callAsync.calledWith('removeAssetById', 'asset-1')).to.equal(true);
   });
 
+  it('creates an upload-safe archive name when the authored title ends in punctuation', async function() {
+    const callAsync = sinon.stub();
+    callAsync.withArgs('saveAiGeneratedPackageContent').resolves([]);
+    const makeFile = sinon.spy((parts: BlobPart[], name: string, fileOptions: FilePropertyBag): File => ({
+      parts,
+      name,
+      type: fileOptions.type,
+    }) as unknown as File);
+    const deps = { ...buildDeps({ callAsync }), makeFile };
+    const builtPackage = buildPackage(buildDraft('U.S. states...'));
+
+    await uploadBuiltPackage(builtPackage, 'summary', deps, saveContract);
+
+    expect(makeFile.firstCall.args[1]).to.equal('U.S._states.zip');
+    expect(makeFile.firstCall.args[1]).not.to.include('..');
+    expect(callAsync.firstCall.args[1].packageFileName).to.equal('U.S._states.zip');
+  });
+
   it('prompts for a new name, rebuilds, and retries when generated content name conflicts', async function() {
     const draft = buildDraft('Existing Name');
     const conflict = {

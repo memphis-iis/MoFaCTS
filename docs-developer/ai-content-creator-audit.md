@@ -72,6 +72,8 @@ The Lab always uses the Admin Control Panel model. Every AI stage exposes its sy
 
 The Creator uses the same Admin configuration and request semantics through its scoped adapter. Its green progress region reports the latest trace stage and item while the shared orchestrator is running. The Creator remains a distinct product surface only for author input, browser-owned working state, editable review, image replacement/localization, and package save.
 
+The Creator title is deterministic rather than a second AI request: it combines the interpretation stage's existing structured `subject`, the authoritative extracted-entry count, and the selected Learning/Test mode. Upload filenames pass through the shared import-name sanitizer, which removes trailing or repeated periods before the `.zip` extension so authored punctuation cannot trigger the traversal guard.
+
 The trace also records Wikipedia/Wikimedia request URLs, supplied candidates and IDs, structural extraction, direct/detail route, filename-pattern inference and predicted canonical titles, queued exceptions, file hydration and rejection, acquisition/conversion, and unresolved reasons. Retrying a recorded AI stage reuses only validated upstream AI outputs, verifies that the target input is unchanged, and rebuilds all downstream results. Editing any draft setting supersedes the active revision and clears prior output.
 
 Drafts and up to 30 named checkpoints are browser-local. Checkpoint snapshots can be expanded for comparison and restore author notes and every stage setting. They neither store nor override the configured Admin model.

@@ -20,7 +20,8 @@ export function sanitizeImportName(rawName: unknown, fallback = 'Imported_Lesson
     .replace(/[<>:"/\\|?*]/g, '_')
     .replace(/\s+/g, '_')
     .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/\.{2,}/g, '_')
+    .replace(/^[._]+|[._]+$/g, '');
   return value || fallback;
 }
 

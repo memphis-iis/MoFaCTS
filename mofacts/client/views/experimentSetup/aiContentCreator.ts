@@ -25,6 +25,7 @@ import {
 } from '../../../common/aiContentContract';
 import { runAiContentPipeline } from '../../lib/aiContentPipeline';
 import { aiContentPipelineProgressMessage } from '../../lib/aiContentStagePresentation';
+import { aiContentSystemTitle } from '../../lib/aiContentTitle';
 import type { AcquiredWikimediaAsset } from '../../lib/aiContentWikimediaFiles';
 import { buildAiContentDraft } from '../../lib/aiContentDraftBuilder';
 import {
@@ -99,10 +100,6 @@ function statusClass(kind: StatusKind): string {
 
 function revokeAssets(assets: LocalAiContentAsset[]): void {
   assets.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
-}
-
-function deriveTitle(notes: string): string {
-  return String(notes || '').split(/\r?\n/).map((line) => line.trim()).find(Boolean) || '';
 }
 
 async function refreshOpenRouterCapability(instance: AiCreatorInstance): Promise<OpenRouterCapability> {
@@ -195,7 +192,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
       phase: 'interpreting',
       notes,
       mode: instance.mode.get(),
-      title: deriveTitle(notes),
+      title: 'AI Created Content',
       model: capability.model,
       reasoningLevel: capability.reasoningLevel,
       responseType: 'text',
@@ -226,7 +223,10 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
         const next = updatedRecord(current, {
           phase: phaseForStage(latestStage),
           pipelineRun: run,
-          ...(run.intent ? { promptType: run.intent.promptType } : {}),
+          ...(run.intent ? {
+            promptType: run.intent.promptType,
+            title: aiContentSystemTitle(run.intent, run.entries.length, started.mode),
+          } : {}),
         });
         instance.activeRecord.set(next);
         if (instance.statusKind.get() !== 'error') {
