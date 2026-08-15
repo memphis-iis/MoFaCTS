@@ -80,6 +80,12 @@ export type AiContentPipelineStageSettings = AiContentStagePrompt & {
 
 export type AiContentPipelineSettings = Record<AiContentAiStageId, AiContentPipelineStageSettings>;
 
+export type AiContentPipelineConfiguration = Readonly<{
+  model: string;
+  reasoningLevel: OpenRouterReasoningLevel;
+  settings: AiContentPipelineSettings;
+}>;
+
 export type AiContentPipelineResult = {
   run: AiContentPipelineRun;
   pairs: AiContentPair[];
@@ -120,6 +126,21 @@ export function createAiContentPipelineSettings(
     stage,
     { ...prompt, reasoningLevel },
   ])) as AiContentPipelineSettings;
+}
+
+export function createAiContentPipelineConfiguration(options: {
+  model: string;
+  reasoningLevel: OpenRouterReasoningLevel;
+  settings?: AiContentPipelineSettings;
+}): AiContentPipelineConfiguration {
+  const model = options.model.trim();
+  if (!model) throw new Error('AI Content execution requires a configured model.');
+  const sourceSettings = options.settings || createAiContentPipelineSettings(options.reasoningLevel);
+  const settings = Object.fromEntries(Object.entries(sourceSettings).map(([stage, value]) => [
+    stage,
+    { ...value },
+  ])) as AiContentPipelineSettings;
+  return { model, reasoningLevel: options.reasoningLevel, settings };
 }
 
 function now(): string {
