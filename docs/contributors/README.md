@@ -23,7 +23,7 @@ Run commands from `mofacts/` unless a guide says otherwise. Choose the checks th
 - Lintable TypeScript, JavaScript, or Svelte changes: `npm run lint`.
 - TDF field registry or schema changes: `npm run generate:schemas`, followed by an inspection of generated schema diffs.
 - UI/runtime behavior changes: canonical localhost hotfix server plus browser smoke testing at `http://localhost:3200`.
-- Meteor integration or client contract coverage: CI owns `npm run test:ci` with an explicit test-settings file and browser driver. A local invocation requires fresh maintainer authorization; do not overwrite private settings or describe a narrower check as equivalent.
+- Meteor integration or client contract coverage: CI owns `npm run test:ci` with an explicit test-settings file. The runner forces the fixed test database identity, Change Streams, SockJS, Playwright/Chromium, and non-self-hosted/no-Redis mode; Meteor or CI owns `MONGO_URL`. A local invocation requires fresh maintainer authorization; do not overwrite private settings or describe a narrower check as equivalent.
 - Docker build, push, or deploy verification: only when explicitly requested by a maintainer.
 
 See `docs/development.md` for setup requirements and common development commands.

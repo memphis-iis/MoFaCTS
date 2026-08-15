@@ -10,6 +10,7 @@ import {
   type AiContentStageName,
   type AiContentStageTrace,
   type AiContentTableStrategy,
+  type AiContentWikipediaPairProvenance,
   type AiCreationMode,
   type ImageCandidateDecision,
   type WikimediaImageCandidate,
@@ -477,7 +478,7 @@ async function selectListRegion(
 function provenance(
   entry: WikipediaListEntry,
   sourcePath: Exclude<AiContentItemResolution['sourcePath'], AiContentTableStrategy>,
-): AiContentPair['provenance'] {
+): AiContentWikipediaPairProvenance {
   return {
     listPageId: entry.sourcePageId,
     listPageTitle: entry.sourcePageTitle,

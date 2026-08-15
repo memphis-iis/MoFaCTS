@@ -122,8 +122,12 @@ The repository defines test scripts in `mofacts/package.json`. Some local Meteor
 
 CI owns `npm run test:ci`. The workflow supplies an explicit checked-in test
 settings file and launches Chromium through the configured Meteor browser
-driver, so both server and client tests execute. A local invocation requires
-fresh maintainer authorization and the same explicit environment contract.
+driver, so both server and client tests execute. The test runner owns the fixed
+test-process contract: database name `meteor`,
+`METEOR_REACTIVITY_ORDER=changeStreams`, `DDP_TRANSPORT=sockjs`,
+Playwright/Chromium, and non-self-hosted/no-Redis mode. `MONGO_URL` remains
+owned by Meteor's local test database or CI's replica-set container. A local
+invocation requires fresh maintainer authorization.
 The source-owned browser-test package makes that Playwright contract portable
 across the supported Linux CI job and an explicitly authorized Windows run.
 Never overwrite a private `settings.json` or describe a narrower local check as

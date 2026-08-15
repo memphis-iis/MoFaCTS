@@ -102,6 +102,13 @@ test('pins the source-owned cross-platform Playwright worker', () => {
   assert.match(worker, /node_modules', 'playwright', 'index\.mjs'/);
   assert.doesNotMatch(worker, /`\$\{process\.cwd\(\)\}\/node_modules/);
   assert.doesNotMatch(runner, /Refusing to run the Meteor Playwright client suite on Windows/);
+  assert.match(runner, /meteorTestEnv\.EXPECTED_MONGO_DB_NAME = 'meteor'/);
+  assert.match(runner, /meteorTestEnv\.METEOR_REACTIVITY_ORDER = 'changeStreams'/);
+  assert.match(runner, /meteorTestEnv\.DDP_TRANSPORT = 'sockjs'/);
+  assert.match(runner, /meteorTestEnv\.MOFACTS_SELF_HOSTED = 'false'/);
+  assert.match(runner, /meteorTestEnv\.MOFACTS_REQUIRE_REDIS = 'false'/);
+  assert.match(runner, /meteorTestEnv\.TEST_BROWSER_DRIVER = 'playwright'/);
+  assert.match(runner, /meteorTestEnv\.PLAYWRIGHT_BROWSER = 'chromium'/);
   assert.match(provenance, /b88bfb72822ce3d67aa2726c7c14f27a8f37fcb4/);
 });
 

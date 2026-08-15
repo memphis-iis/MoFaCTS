@@ -401,47 +401,48 @@ export function requireAiContentWorkingRecordVersion(value: unknown): AiContentW
       if (typeof pair[field] !== 'string') throw new Error(`AI Content Creator browser pair ${index + 1} ${field} must be a string.`);
     }
     if (!isRecord(pair.provenance)) throw new Error(`AI Content Creator browser pair ${index + 1} is missing provenance.`);
-    rejectExtraFields(pair.provenance, [
+    const pairProvenance = pair.provenance;
+    rejectExtraFields(pairProvenance, [
       'listPageId', 'listPageTitle', 'listPageUrl', 'regionId', 'sourceLocator', 'sourcePath',
       'detailPageTitle', 'detailPageUrl', 'selectedFileTitle', 'filenamePatternId', 'generationTraceId',
     ], `AI Content Creator browser pair ${index + 1} provenance`);
-    const sourcePath = String(pair.provenance.sourcePath || '');
+    const sourcePath = String(pairProvenance.sourcePath || '');
     if (sourcePath === 'generated-table' || sourcePath === 'provided-table') {
       if (pair.kind !== 'text') {
         throw new Error(`AI Content Creator browser pair ${index + 1} table provenance requires a text pair.`);
       }
       for (const field of ['sourceLocator', 'generationTraceId'] as const) {
-        if (typeof pair.provenance[field] !== 'string' || !pair.provenance[field]) {
+        if (typeof pairProvenance[field] !== 'string' || !pairProvenance[field]) {
           throw new Error(`AI Content Creator browser pair ${index + 1} has incomplete table provenance.`);
         }
       }
       if ([
         'listPageId', 'listPageTitle', 'listPageUrl', 'regionId', 'detailPageTitle', 'detailPageUrl',
         'selectedFileTitle', 'filenamePatternId',
-      ].some((field) => pair.provenance[field] !== undefined)) {
+      ].some((field) => pairProvenance[field] !== undefined)) {
         throw new Error(`AI Content Creator browser pair ${index + 1} table provenance cannot contain Wikipedia source fields.`);
       }
     } else {
-      if (!Number.isInteger(pair.provenance.listPageId) || Number(pair.provenance.listPageId) <= 0) {
+      if (!Number.isInteger(pairProvenance.listPageId) || Number(pairProvenance.listPageId) <= 0) {
         throw new Error(`AI Content Creator browser pair ${index + 1} has an invalid list-page ID.`);
       }
       for (const field of ['listPageTitle', 'listPageUrl', 'regionId', 'sourceLocator'] as const) {
-        if (typeof pair.provenance[field] !== 'string' || !pair.provenance[field]) {
+        if (typeof pairProvenance[field] !== 'string' || !pairProvenance[field]) {
           throw new Error(`AI Content Creator browser pair ${index + 1} has incomplete provenance.`);
         }
       }
-      if (pair.provenance.generationTraceId !== undefined) {
+      if (pairProvenance.generationTraceId !== undefined) {
         throw new Error(`AI Content Creator browser pair ${index + 1} Wikipedia provenance cannot contain a table-generation trace ID.`);
       }
     }
     if (!['text-definition', 'source-field-mapping', 'generated-table', 'provided-table', 'list-page', 'detail-page', 'filename-pattern', 'unresolved'].includes(sourcePath)) {
       throw new Error(`AI Content Creator browser pair ${index + 1} has an invalid provenance path.`);
     }
-    if (pair.provenance.filenamePatternId !== undefined
-      && (typeof pair.provenance.filenamePatternId !== 'string' || !pair.provenance.filenamePatternId)) {
+    if (pairProvenance.filenamePatternId !== undefined
+      && (typeof pairProvenance.filenamePatternId !== 'string' || !pairProvenance.filenamePatternId)) {
       throw new Error(`AI Content Creator browser pair ${index + 1} has an invalid filename-pattern ID.`);
     }
-    if (pair.provenance.sourcePath === 'filename-pattern' && !pair.provenance.filenamePatternId) {
+    if (pairProvenance.sourcePath === 'filename-pattern' && !pairProvenance.filenamePatternId) {
       throw new Error(`AI Content Creator browser pair ${index + 1} is missing its filename-pattern ID.`);
     }
     if (pair.kind === 'text' && pair.image !== undefined) throw new Error(`AI Content Creator browser text pair ${index + 1} cannot contain image state.`);

@@ -40,6 +40,16 @@ if (!existsSync(testSettingsFile)) {
 const meteorTestEnv = { ...process.env };
 delete meteorTestEnv.FORCE_COLOR;
 delete meteorTestEnv.NO_COLOR;
+// Own the fixed Meteor test runtime contract here so every CI or explicitly
+// authorized invocation receives the same application and browser settings.
+// MONGO_URL remains owned by Meteor's test MongoDB or the CI replica-set job.
+meteorTestEnv.EXPECTED_MONGO_DB_NAME = 'meteor';
+meteorTestEnv.METEOR_REACTIVITY_ORDER = 'changeStreams';
+meteorTestEnv.DDP_TRANSPORT = 'sockjs';
+meteorTestEnv.MOFACTS_SELF_HOSTED = 'false';
+meteorTestEnv.MOFACTS_REQUIRE_REDIS = 'false';
+meteorTestEnv.TEST_BROWSER_DRIVER = 'playwright';
+meteorTestEnv.PLAYWRIGHT_BROWSER = 'chromium';
 // meteortesting:browser-tests uses PWD as the Playwright worker cwd. Windows
 // does not define PWD, so provide the exact project directory explicitly.
 meteorTestEnv.PWD = process.cwd();

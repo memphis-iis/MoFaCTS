@@ -245,6 +245,10 @@ describe('AI Content shared pipeline', function() {
         listSearchQuery: 'list of U.S. state capitals',
         imageRequirement: '',
       });
+      if (call.stage === 'select-list-page') return stageResult({
+        selectedCandidateId: 'list-page-300',
+        rationale: 'The search result is the authoritative list of U.S. state capitals.',
+      });
       if (call.stage === 'select-source-fields') return stageResult({
         promptFieldId: 'region-300-1-field-1',
         responseFieldId: 'region-300-1-field-2',
@@ -262,7 +266,7 @@ describe('AI Content shared pipeline', function() {
       fetcher: capitalFixtureFetcher(),
     });
 
-    expect(calledStages).to.deep.equal(['interpret-request', 'select-source-fields']);
+    expect(calledStages).to.deep.equal(['interpret-request', 'select-list-page', 'select-source-fields']);
     expect(result.pairs.map(({ stimulus, response }) => ({ stimulus, response }))).to.deep.equal([
       { stimulus: 'Alabama', response: 'Montgomery' },
       { stimulus: 'Alaska', response: 'Juneau' },
