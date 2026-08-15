@@ -248,8 +248,13 @@ test('enforces one canonical hotfix server on localhost', () => {
   assert.match(hotfixManager, /@\("rm", "-f", "mofacts"\)/);
   assert.match(hotfixManager, /Remove-Item Env:MOFACTS_CHANGE_STREAMS_ENABLED/);
   assert.match(hotfixManager, /\$env:METEOR_REACTIVITY_ORDER = "changeStreams"/);
-  assert.match(hotfixManager, /-FilePath \$meteorTool\.ToolBat/);
-  assert.match(hotfixManager, /"--settings", \$resolvedSettingsPath, "--port", \$port/);
+  assert.match(hotfixManager, /-FilePath \$meteorTool\.NodeExe/);
+  assert.match(hotfixManager, /"--require=\$\(\$meteorTool\.WarningModule\)"/);
+  assert.match(hotfixManager, /\$meteorTool\.ToolEntry/);
+  assert.match(hotfixManager, /\$env:NODE_PATH = \$meteorTool\.NodePath/);
+  assert.match(hotfixManager, /\$env:BABEL_CACHE_DIR = \$meteorTool\.BabelCacheDir/);
+  assert.match(hotfixManager, /Stop-OwnedRspackProcesses/);
+  assert.match(hotfixManager, /catch \{\s*Stop-HotfixDev\s*throw\s*\}/);
   assert.match(hotfixManager, /Get-HotfixDevClientBundleState/);
   assert.match(hotfixManager, /__mofactsRspackClient/);
   assert.match(hotfixManager, /module\\\.exports\\s\*=\\s\*__webpack_exports__/);

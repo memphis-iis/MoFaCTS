@@ -17,3 +17,9 @@ This workflow owns the only supported localhost application server. Run it
 through `deploy/hotfix-local.ps1`; that script owns the native Meteor/Rspack
 watcher while Docker owns MongoDB. Do not introduce another application process
 or Compose overlay for port 3200. It is local verification, not release confidence.
+
+The manager launches the pinned Meteor tool through its bundled Node executable
+so `meteor.pid` names the durable CLI process instead of a transient Windows
+batch launcher. Start, restart, and failed-start cleanup also remove only Rspack
+process trees whose command lines identify this application and its configured
+HMR port.

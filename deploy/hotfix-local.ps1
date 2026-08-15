@@ -80,16 +80,26 @@ function Get-ProjectMeteorTool {
     $meteorInstall = Join-Path $env:LOCALAPPDATA ".meteor"
     $toolVersion = if ($version -match '^\d+\.\d+$') { "$version.0" } else { $version }
     $toolDir = Join-Path $meteorInstall "packages\meteor-tool\$toolVersion\mt-os.windows.x86_64"
-    $toolBat = Join-Path $toolDir "meteor.bat"
-    if (-not (Test-Path $toolBat)) {
-        throw "Project requires Meteor $version (tool $toolVersion), but the matching tool is missing at $toolBat"
+    $nodeExe = Join-Path $toolDir "dev_bundle\bin\node.exe"
+    $warningModule = Join-Path $toolDir "tools\node-process-warnings.js"
+    $toolEntry = Join-Path $toolDir "tools\index.js"
+    $nodePath = Join-Path $toolDir "dev_bundle\lib\node_modules"
+    $babelCacheDir = Join-Path $toolDir ".babel-cache"
+    foreach ($requiredPath in @($nodeExe, $warningModule, $toolEntry, $nodePath)) {
+        if (-not (Test-Path $requiredPath)) {
+            throw "Project requires Meteor $version (tool $toolVersion), but the pinned tool is incomplete at $requiredPath"
+        }
     }
 
     return @{
         Version = $version
         InstallDir = $meteorInstall
         ToolDir = $toolDir
-        ToolBat = $toolBat
+        NodeExe = $nodeExe
+        WarningModule = $warningModule
+        ToolEntry = $toolEntry
+        NodePath = $nodePath
+        BabelCacheDir = $babelCacheDir
     }
 }
 
@@ -635,7 +645,39 @@ function Get-HotfixDevClientBundleState {
     }
 }
 
-function Stop-OwnedRspackDevPortListener {
+function Test-OwnedRspackProcess {
+    param($Process)
+
+    if ($null -eq $Process) {
+        return $false
+    }
+
+    $commandLine = [string]$Process.CommandLine
+    return $commandLine -like "*$appDir*" -and
+        $commandLine -match "rspack(\.js)?['`" ]+(serve|build)" -and
+        $commandLine -match "devServerPort=($rspackDevServerPort)|[: ]$rspackDevServerPort(\s|$)"
+}
+
+function Stop-OwnedRspackProcesses {
+    $ownedProcesses = @(Get-CimInstance Win32_Process | Where-Object { Test-OwnedRspackProcess -Process $_ })
+    if ($ownedProcesses.Count -eq 0) {
+        return
+    }
+
+    $ownedIds = @{}
+    foreach ($ownedProcess in $ownedProcesses) {
+        $ownedIds[[int]$ownedProcess.ProcessId] = $true
+    }
+
+    $roots = @($ownedProcesses | Where-Object { -not $ownedIds.ContainsKey([int]$_.ParentProcessId) })
+    foreach ($root in $roots) {
+        $rootProcessId = [int]$root.ProcessId
+        Write-Host "Stopping stale MoFaCTS Rspack process tree PID $rootProcessId."
+        Stop-ProcessTree -RootProcessId $rootProcessId
+    }
+}
+
+function Assert-RspackDevPortAvailable {
     $listeners = @(Get-NetTCPConnection -LocalPort ([int]$rspackDevServerPort) -State Listen -ErrorAction SilentlyContinue)
     foreach ($listener in $listeners) {
         $ownerProcessId = [int]$listener.OwningProcess
@@ -644,16 +686,7 @@ function Stop-OwnedRspackDevPortListener {
             continue
         }
 
-        $commandLine = [string]$ownerProcess.CommandLine
-        $isOwnedRspack = $commandLine -like "*$appDir*" -and
-            $commandLine -match "rspack(\.js)?['`" ]+serve|webpack-dev-server" -and
-            $commandLine -match "devServerPort=($rspackDevServerPort)|[: ]$rspackDevServerPort(\s|$)"
-        if (-not $isOwnedRspack) {
-            throw "Rspack HMR port $rspackDevServerPort is occupied by unrelated PID $ownerProcessId. Stop that process or configure a different port before starting hotfix dev."
-        }
-
-        Write-Host "Stopping stale MoFaCTS Rspack dev-server listener PID $ownerProcessId on port $rspackDevServerPort."
-        Stop-ProcessTree -RootProcessId $ownerProcessId
+        throw "Rspack HMR port $rspackDevServerPort is occupied by unrelated PID $ownerProcessId. Stop that process or configure a different port before starting hotfix dev."
     }
 }
 
@@ -716,7 +749,8 @@ function Start-HotfixDev {
     }
 
     Remove-StaleLocalBuild
-    Stop-OwnedRspackDevPortListener
+    Stop-OwnedRspackProcesses
+    Assert-RspackDevPortAvailable
 
     Remove-RspackDevBuild
     Ensure-RspackDevBootstrap
@@ -754,6 +788,8 @@ function Start-HotfixDev {
     $previousDdpTransport = $env:DDP_TRANSPORT
     $previousPath = $env:PATH
     $previousMeteorInstallation = $env:METEOR_INSTALLATION
+    $previousNodePath = $env:NODE_PATH
+    $previousBabelCacheDir = $env:BABEL_CACHE_DIR
 
     try {
         $env:MONGO_URL = $nativeMongoUrl
@@ -766,6 +802,8 @@ function Start-HotfixDev {
         $env:DDP_TRANSPORT = "sockjs"
         $env:METEOR_INSTALLATION = "$($meteorTool.InstallDir)\"
         $env:PATH = "$($meteorTool.ToolDir);$previousPath"
+        $env:NODE_PATH = $meteorTool.NodePath
+        $env:BABEL_CACHE_DIR = $meteorTool.BabelCacheDir
 
         Set-Content -Path $pidPath -Value ([string]$PID)
 
@@ -780,9 +818,18 @@ function Start-HotfixDev {
 
         Set-Content -Path $watcherPidPath -Value ([string]$watcher.Id)
 
+        $meteorArguments = @(
+            "--no-wasm-code-gc",
+            "--require=$($meteorTool.WarningModule)",
+            $meteorTool.ToolEntry,
+            "--settings",
+            $resolvedSettingsPath,
+            "--port",
+            $port
+        )
         $process = Start-Process `
-            -FilePath $meteorTool.ToolBat `
-            -ArgumentList @("--settings", $resolvedSettingsPath, "--port", $port) `
+            -FilePath $meteorTool.NodeExe `
+            -ArgumentList $meteorArguments `
             -WorkingDirectory $appDir `
             -RedirectStandardOutput $stdoutPath `
             -RedirectStandardError $stderrPath `
@@ -809,9 +856,16 @@ function Start-HotfixDev {
         $env:DDP_TRANSPORT = $previousDdpTransport
         $env:PATH = $previousPath
         $env:METEOR_INSTALLATION = $previousMeteorInstallation
+        $env:NODE_PATH = $previousNodePath
+        $env:BABEL_CACHE_DIR = $previousBabelCacheDir
     }
 
-    Wait-HotfixDevReady
+    try {
+        Wait-HotfixDevReady
+    } catch {
+        Stop-HotfixDev
+        throw
+    }
     $createdLocalAdmin = Ensure-LocalAdminAccount
     if ($createdLocalAdmin) {
         Write-Host "Local admin was created for the first time; restarting once so startup sees the owner/admin account."
@@ -838,11 +892,13 @@ function Stop-HotfixDev {
         if (Test-Path $pidPath) {
             Remove-Item -LiteralPath $pidPath
         }
+        Stop-OwnedRspackProcesses
         return
     }
 
     Stop-ProcessTree -RootProcessId $existing.Id
     Remove-Item -LiteralPath $pidPath -ErrorAction SilentlyContinue
+    Stop-OwnedRspackProcesses
     Write-Host "Stopped hotfix dev server PID $($existing.Id)."
 }
 
