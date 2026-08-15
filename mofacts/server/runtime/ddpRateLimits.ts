@@ -19,6 +19,7 @@ let rateLimitsRegistered = false;
 
 export function isRateLimitedOpenRouterMethod(name: string): boolean {
   return [
+    'callAiContentOpenRouterRequest',
     'callResolvedOpenRouterJson',
     'callResolvedOpenRouterEmbeddings'
   ].includes(name);
@@ -116,6 +117,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
         'updateOwnOpenRouterSettings',
         'getOwnOpenRouterSettings',
         'getOpenRouterCapability',
+        'getAiContentOpenRouterCapability',
         'getOpenRouterModelCatalog',
         'deleteOwnOpenRouterKey',
         'testOwnOpenRouterSettings'

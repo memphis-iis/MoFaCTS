@@ -3,8 +3,10 @@ import sinon from 'sinon';
 import { Meteor } from 'meteor/meteor';
 import {
   buildAdminAiContentStageRequest,
+  buildAiContentStageRequest,
   callAdminLabAiContentStage,
-  callProductionAiContentStage,
+  callAiContentStage,
+  getAiContentOpenRouterCapability,
   type AiContentStageCall,
 } from './aiContentOpenRouterClient';
 
@@ -13,7 +15,7 @@ const call: AiContentStageCall = {
   model: 'openai/test-model',
   systemPrompt: 'Return JSON.',
   userPrompt: 'Interpret this.',
-  schemaName: 'intent',
+  schemaName: 'mofacts_ai_content_intent_v4',
   schema: {
     type: 'object',
     additionalProperties: false,
@@ -42,9 +44,10 @@ describe('AI Content OpenRouter stage client', function() {
     expect(request.reasoning).to.deep.equal({ effort: 'high' });
     expect(request.provider).to.deep.equal({ require_parameters: true, allow_fallbacks: false });
     expect((request.response_format as any).json_schema.schema).to.equal(call.schema);
+    expect(buildAiContentStageRequest(call)).to.deep.equal(request);
   });
 
-  it('routes Lab calls through the authorized Admin transport', async function() {
+  it('preserves the Prompt Lab on its proven Admin Tests transport', async function() {
     callAsync.resolves({
       parsedContent: { ok: true },
       requestWithoutCredentials: { model: call.model },
@@ -54,18 +57,33 @@ describe('AI Content OpenRouter stage client', function() {
     });
     const result = await callAdminLabAiContentStage(call);
     expect(callAsync.firstCall.args[0]).to.equal('callAdminTestOpenRouterRequest');
+    expect(callAsync.firstCall.args[1]).to.deep.equal(buildAdminAiContentStageRequest(call));
+    expect(result.parsedContent).to.deep.equal({ ok: true });
+  });
+
+  it('routes every AI Content stage through the shared Admin-configured transport', async function() {
+    callAsync.resolves({
+      parsedContent: { ok: true },
+      requestWithoutCredentials: { model: call.model },
+      rawContent: '{"ok":true}',
+      model: call.model,
+      reasoningLevel: 'high',
+    });
+    const result = await callAiContentStage(call);
+    expect(callAsync.firstCall.args[0]).to.equal('callAiContentOpenRouterRequest');
     expect(callAsync.firstCall.args[1].provider.allow_fallbacks).to.equal(false);
     expect(result.parsedContent).to.deep.equal({ ok: true });
     expect(result.reasoningLevel).to.equal('high');
   });
 
-  it('routes production calls with explicit no-fallback provider settings', async function() {
-    callAsync.resolves({ parsedContent: { ok: true }, model: call.model, reasoningLevel: 'high' });
-    await callProductionAiContentStage(call);
-    const payload = callAsync.firstCall.args[1];
-    expect(callAsync.firstCall.args[0]).to.equal('callResolvedOpenRouterJson');
-    expect(payload.provider).to.deep.equal({ require_parameters: true, allow_fallbacks: false });
-    expect(payload.reasoningLevel).to.equal('high');
-    expect(payload.telemetry.operation).to.equal('interpret-request');
+  it('reads the one Admin-configured AI Content capability', async function() {
+    callAsync.resolves({ configured: true, source: 'admin', model: ' openai/test-model ', reasoningLevel: 'high' });
+    expect(await getAiContentOpenRouterCapability()).to.deep.equal({
+      configured: true,
+      source: 'admin',
+      model: 'openai/test-model',
+      reasoningLevel: 'high',
+    });
+    expect(callAsync.firstCall.args[0]).to.equal('getAiContentOpenRouterCapability');
   });
 });

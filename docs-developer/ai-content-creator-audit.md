@@ -53,12 +53,12 @@ After the first successful individual image, the filename-pattern path inspects 
 - `client/lib/aiContentWikimediaFiles.ts`: canonical file hydration, license/attribution checks, downloads, and conversion.
 - `client/lib/aiContentImageFilenamePattern.ts`: pure two-filename pattern inference and deterministic predicted-title construction.
 - `client/lib/aiContentPipeline.ts`: the single production/Lab orchestrator, revision guards, seeding, pattern resolution, queued exception routing, traces, resolutions, and final pairs.
-- `client/lib/aiContentOpenRouterClient.ts`: explicit model, reasoning, schema, output budget, and no-fallback provider transport.
+- `client/lib/aiContentOpenRouterClient.ts`: the single AI Content capability lookup and stage caller, forcing the Admin Control Panel model/key while supplying each stage's explicit reasoning, schema, output budget, and no-fallback provider request.
 - `client/views/experimentSetup/aiContentCreator.ts`: author input, progress, review edits, review-time image replacement, persistence, and save.
 - `client/views/aiContentPromptLab.ts`: editable stage settings, local checkpoints, complete runs, recorded-stage retry, trace rendering, and review preview.
 - `client/views/aiContentReview.html`: the shared pair-review surface rendered by both the Creator and the Lab; the Creator enables editing and replacement while the Lab renders the same rows read-only.
 
-The Creator and Prompt Lab import the same `runAiContentPipeline` function. There is no separate Discovery Lab or second image-discovery owner.
+The Creator and Prompt Lab import the same `runAiContentPipeline` function. The proven Lab boundary remains fixed on `getAdminTestOpenRouterCapability` and its explicit `callAdminLabAiContentStage` adapter. The Creator uses an AI-Content-scoped adapter built from the same request builder and server executor without changing the Lab. There is no separate Discovery Lab, production algorithm, or second image-discovery owner.
 
 ## Persistence and save
 
@@ -69,6 +69,8 @@ Initial image uploads no longer generate or define pairs. File selection and dra
 ## Prompt Lab
 
 The Lab always uses the Admin Control Panel model. Every AI stage exposes its system instructions, stage instructions, strict schema, reasoning level, and visible-output token budget. Every executed call records effective model and reasoning, the non-secret request, parsed/provider output, usage, and cost when returned.
+
+The Creator uses the same Admin configuration and request semantics through its scoped adapter. Its green progress region reports the latest trace stage and item while the shared orchestrator is running. The Creator remains a distinct product surface only for author input, browser-owned working state, editable review, image replacement/localization, and package save.
 
 The trace also records Wikipedia/Wikimedia request URLs, supplied candidates and IDs, structural extraction, direct/detail route, filename-pattern inference and predicted canonical titles, queued exceptions, file hydration and rejection, acquisition/conversion, and unresolved reasons. Retrying a recorded AI stage reuses only validated upstream AI outputs, verifies that the target input is unchanged, and rebuilds all downstream results. Editing any draft setting supersedes the active revision and clears prior output.
 

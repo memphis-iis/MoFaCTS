@@ -488,6 +488,44 @@ function assertSafeAdminRequest(value: UnknownRecord): void {
   if (value.stream !== false) throw new Meteor.Error(400, 'Admin Tests OpenRouter requests must set stream to false');
 }
 
+function assertAiContentOpenRouterRequest(value: UnknownRecord): void {
+  assertSafeAdminRequest(value);
+  if (!normalizeString(value.model)) throw new Meteor.Error(400, 'AI Content OpenRouter model is required');
+  const messages = Array.isArray(value.messages) ? value.messages : [];
+  if (messages.length !== 2
+    || !isRecord(messages[0])
+    || messages[0].role !== 'system'
+    || !normalizeString(messages[0].content)
+    || !isRecord(messages[1])
+    || messages[1].role !== 'user'
+    || !normalizeString(messages[1].content)) {
+    throw new Meteor.Error(400, 'AI Content requests require exactly one system message followed by one user message');
+  }
+  if (!isRecord(value.reasoning)) throw new Meteor.Error(400, 'AI Content reasoning must be supplied explicitly');
+  const declaredReasoning = normalizeOpenRouterReasoningLevel(value.reasoningLevel, 'AI Content declared reasoning level');
+  const providerReasoning = adminLabReasoningLevel(value.reasoning);
+  if (declaredReasoning !== providerReasoning) {
+    throw new Meteor.Error(400, 'AI Content declared reasoning must match the provider reasoning request');
+  }
+  if (typeof value.max_tokens !== 'number' || !Number.isInteger(value.max_tokens) || value.max_tokens <= 0) {
+    throw new Meteor.Error(400, 'AI Content visible-output token budget must be a positive integer');
+  }
+  const responseFormat = isRecord(value.response_format) ? value.response_format : null;
+  const jsonSchema = responseFormat?.type === 'json_schema' && isRecord(responseFormat.json_schema)
+    ? responseFormat.json_schema
+    : null;
+  if (!jsonSchema
+    || jsonSchema.strict !== true
+    || !normalizeString(jsonSchema.name).startsWith('mofacts_ai_content_')
+    || !isRecord(jsonSchema.schema)) {
+    throw new Meteor.Error(400, 'AI Content requests require a strict, named AI Content JSON schema');
+  }
+  const provider = isRecord(value.provider) ? value.provider : null;
+  if (provider?.require_parameters !== true || provider.allow_fallbacks !== false) {
+    throw new Meteor.Error(400, 'AI Content requests require supported parameters and disallow provider fallbacks');
+  }
+}
+
 async function executeAdminOpenRouterRequest(
   deps: OpenRouterMethodsDeps,
   userId: string,
@@ -590,6 +628,11 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
       return resolveOpenRouterCapability(deps, userId, null, 'admin');
     },
 
+    getAiContentOpenRouterCapability: async function(this: MethodContext) {
+      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to create AI content', 401);
+      return resolveOpenRouterCapability(deps, userId, null, 'admin');
+    },
+
     callResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter', 401);
       return executeResolvedOpenRouterJson(deps, userId, params, 'json');
@@ -612,6 +655,13 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
         notLoggedInMessage: 'Must be logged in to run the Admin Tests Prompt Lab',
         forbiddenMessage: 'Only admins can run the Admin Tests Prompt Lab',
       });
+      return executeAdminOpenRouterRequest(deps, userId, request);
+    },
+
+    callAiContentOpenRouterRequest: async function(this: MethodContext, request: unknown) {
+      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to create AI content', 401);
+      if (!isRecord(request)) throw new Meteor.Error(400, 'AI Content OpenRouter request must be an object');
+      assertAiContentOpenRouterRequest(request);
       return executeAdminOpenRouterRequest(deps, userId, request);
     },
 

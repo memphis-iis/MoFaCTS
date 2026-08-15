@@ -9,7 +9,8 @@ import './aiContentCreator.css';
 import { clientConsole } from '../..';
 import { getErrorMessage } from '../../lib/errorUtils';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
-import { getOpenRouterCapability, type OpenRouterCapability } from '../../lib/openRouterClientProfile';
+import type { OpenRouterCapability } from '../../lib/openRouterClientProfile';
+import { getAiContentOpenRouterCapability } from '../../lib/aiContentOpenRouterClient';
 import {
   AI_CONTENT_CONTRACT_VERSION,
   getAiContentSaveBlockingIssues,
@@ -18,10 +19,12 @@ import {
   type AiContentPair,
   type AiContentPhase,
   type AiContentSaveContract,
+  type AiContentStageName,
   type AiContentWorkingRecord,
   type AiCreationMode,
 } from '../../../common/aiContentContract';
 import { runAiContentPipeline } from '../../lib/aiContentPipeline';
+import { aiContentPipelineProgressMessage } from '../../lib/aiContentStagePresentation';
 import type { AcquiredWikimediaAsset } from '../../lib/aiContentWikimediaFiles';
 import { buildAiContentDraft } from '../../lib/aiContentDraftBuilder';
 import {
@@ -103,7 +106,7 @@ function deriveTitle(notes: string): string {
 }
 
 async function refreshOpenRouterCapability(instance: AiCreatorInstance): Promise<OpenRouterCapability> {
-  const capability = await getOpenRouterCapability();
+  const capability = await getAiContentOpenRouterCapability();
   instance.openRouterCapability.set(capability);
   return capability;
 }
@@ -165,7 +168,7 @@ async function localizeWikimediaAsset(
   };
 }
 
-function phaseForStage(stage: string | undefined): AiContentPhase {
+function phaseForStage(stage: AiContentStageName | undefined): AiContentPhase {
   if (!stage || stage === 'interpret-request') return 'interpreting';
   if (stage === 'search-wikipedia' || stage === 'select-list-page' || stage === 'fetch-list-page') return 'searching-source';
   if (stage === 'select-list-region' || stage === 'extract-list-entries') return 'extracting-items';
@@ -182,6 +185,7 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
   }
   instance.creating.set(true);
   instance.saveBlockingIssues.set([]);
+  setStatus(instance, 'info', 'Starting content creation and checking the configured AI service.');
   const operation = ++instance.operationSequence;
   try {
     const capability = await refreshOpenRouterCapability(instance);
@@ -225,12 +229,16 @@ async function runCreation(instance: AiCreatorInstance): Promise<void> {
           ...(run.intent ? { promptType: run.intent.promptType } : {}),
         });
         instance.activeRecord.set(next);
+        if (instance.statusKind.get() !== 'error') {
+          setStatus(instance, 'info', aiContentPipelineProgressMessage(run));
+        }
         void instance.workingSaveQueue.enqueue({ record: next, assets: instance.localAssets.get() })
           .catch((error) => setStatus(instance, 'error', getErrorMessage(error)));
       },
     });
     if (instance.operationSequence !== operation) return;
 
+    setStatus(instance, 'info', `Preparing ${result.assets.length} resolved image${result.assets.length === 1 ? '' : 's'} for review.`);
     let pairs = result.pairs;
     const localizedAssets: LocalAiContentAsset[] = [];
     const stagingWarnings: string[] = [];

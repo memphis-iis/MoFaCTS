@@ -225,6 +225,32 @@ describe('management interface baseline', function() {
     expect(testMarkup + labMarkup).not.to.include('run-wikimedia-discovery-lab');
   });
 
+  it('keeps the proven Prompt Lab boundary fixed while adapting Creator to the shared pipeline', function() {
+    const appRoot = findAppRoot();
+    const creatorSource = fs.readFileSync(
+      path.join(appRoot, 'client', 'views', 'experimentSetup', 'aiContentCreator.ts'),
+      'utf8',
+    );
+    const labSource = fs.readFileSync(
+      path.join(appRoot, 'client', 'views', 'aiContentPromptLab.ts'),
+      'utf8',
+    );
+    const pipelineSource = fs.readFileSync(
+      path.join(appRoot, 'client', 'lib', 'aiContentPipeline.ts'),
+      'utf8',
+    );
+
+    expect(creatorSource).to.include('getAiContentOpenRouterCapability');
+    expect(creatorSource).to.include('runAiContentPipeline({');
+    expect(creatorSource).not.to.include('stageCaller:');
+    expect(creatorSource).not.to.include('getOpenRouterCapability(');
+    expect(labSource).to.include("MeteorAny.callAsync('getAdminTestOpenRouterCapability')");
+    expect(labSource).to.include('stageCaller: callAdminLabAiContentStage');
+    expect(labSource).to.include('runAiContentPipeline({');
+    expect(pipelineSource).to.include('options.stageCaller || callAiContentStage');
+    expect(pipelineSource).not.to.include('callProductionAiContentStage');
+  });
+
   it('keeps AI working state browser-owned and stale-operation guarded', function() {
     const appRoot = findAppRoot();
     const creatorSource = fs.readFileSync(

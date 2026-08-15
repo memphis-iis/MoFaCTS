@@ -8,6 +8,7 @@ describe('DDP rate limits', function() {
   });
 
   it('retains limits for ordinary authenticated OpenRouter methods', function() {
+    assert.equal(isRateLimitedOpenRouterMethod('callAiContentOpenRouterRequest'), true);
     assert.equal(isRateLimitedOpenRouterMethod('callResolvedOpenRouterJson'), true);
     assert.equal(isRateLimitedOpenRouterMethod('callResolvedOpenRouterEmbeddings'), true);
   });

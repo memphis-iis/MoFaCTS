@@ -220,6 +220,84 @@ describe('openRouterMethods Admin Tests configuration', function() {
     });
   });
 
+  it('exposes the same Admin-configured AI Content capability to an authenticated Creator user', async function() {
+    const methods = createOpenRouterMethods(adminDeps(false));
+
+    const capability = await methods.getAiContentOpenRouterCapability.call({ userId: 'creator-user' });
+
+    expect(capability).to.deep.equal({
+      configured: true,
+      source: 'admin',
+      model: 'openai/admin-model',
+      reasoningLevel: 'high',
+    });
+  });
+
+  it('runs Creator and Lab AI Content stages through the same scoped Admin-configured request contract', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch').resolves(new Response(JSON.stringify({
+      model: 'openai/admin-model',
+      choices: [{ message: { content: '{"ok":true}' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const methods = createOpenRouterMethods(adminDeps(false));
+    const request = {
+      model: 'openai/admin-model',
+      reasoningLevel: 'high',
+      messages: [
+        { role: 'system', content: 'Return strict JSON.' },
+        { role: 'user', content: 'Interpret this author request.' },
+      ],
+      max_tokens: 80,
+      reasoning: { effort: 'high' },
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'mofacts_ai_content_intent_v4',
+          strict: true,
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['ok'],
+            properties: { ok: { type: 'boolean' } },
+          },
+        },
+      },
+      provider: { require_parameters: true, allow_fallbacks: false },
+      stream: false,
+    };
+
+    const result = await methods.callAiContentOpenRouterRequest.call({ userId: 'creator-user' }, request);
+    const fetchOptions = fetchStub.firstCall.args[1] as RequestInit;
+    const sentBody = JSON.parse(String(fetchOptions.body));
+
+    expect((fetchOptions.headers as Record<string, string>).Authorization).to.equal('Bearer admin-key');
+    expect(sentBody).to.deep.include({
+      model: 'openai/admin-model',
+      reasoning: { effort: 'high' },
+      provider: { require_parameters: true, allow_fallbacks: false },
+    });
+    expect(sentBody.max_tokens).to.equal(400);
+    expect(result.parsedContent).to.deep.equal({ ok: true });
+    expect(result.reasoningLevel).to.equal('high');
+    expect(result.source).to.equal('admin');
+  });
+
+  it('rejects non-pipeline requests at the shared AI Content boundary', async function() {
+    const fetchStub = sinon.stub(globalThis, 'fetch');
+    const method = createOpenRouterMethods(adminDeps(false)).callAiContentOpenRouterRequest;
+
+    try {
+      await method.call({ userId: 'creator-user' }, {
+        model: 'openai/admin-model',
+        messages: [{ role: 'user', content: 'Use the Admin key for an arbitrary request.' }],
+        stream: false,
+      });
+      throw new Error('Expected the AI Content request contract to reject the request');
+    } catch (error) {
+      expect(String((error as { reason?: unknown }).reason || (error as Error).message)).to.contain('exactly one system message');
+    }
+    expect(fetchStub.callCount).to.equal(0);
+  });
+
   it('does not let the Prompt Lab override the Admin Control Panel model', async function() {
     const fetchStub = sinon.stub(globalThis, 'fetch');
     const methods = createOpenRouterMethods(adminDeps());

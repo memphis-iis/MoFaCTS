@@ -1,7 +1,10 @@
 import { Meteor } from 'meteor/meteor';
-import { AI_CONTENT_CONTRACT_VERSION } from '../../common/aiContentContract';
 import type { OpenRouterJsonSchema, OpenRouterRequestMessage } from '../../common/lib/openRouterClient';
-import type { OpenRouterReasoningLevel } from '../../common/lib/openRouterModelCatalog';
+import {
+  normalizeOpenRouterReasoningLevel,
+  type OpenRouterReasoningLevel,
+} from '../../common/lib/openRouterModelCatalog';
+import type { OpenRouterCapability } from './openRouterClientProfile';
 import type { AiContentAiStageId } from './aiContentPrompts';
 
 const MeteorAny = Meteor as typeof Meteor & {
@@ -65,29 +68,28 @@ export function buildAdminAiContentStageRequest(call: AiContentStageCall): Recor
   };
 }
 
-export const callProductionAiContentStage: AiContentStageCaller = async (call) => {
-  const result = await MeteorAny.callAsync('callResolvedOpenRouterJson', {
-    model: call.model,
-    messages: messages(call),
-    maxTokens: call.visibleOutputTokens,
-    provider: { require_parameters: true, allow_fallbacks: false },
-    telemetry: {
-      surface: 'ai-content-creator',
-      operation: call.stage,
-      contractVersion: AI_CONTENT_CONTRACT_VERSION,
-      ...(call.itemId ? { itemId: call.itemId } : {}),
-    },
-    intent: {
-      title: `MoFaCTS AI Content ${call.stage}`,
-      schemaName: call.schemaName,
-      schema: call.schema,
-      strictSchema: true,
-      missingContentMessage: `OpenRouter did not return AI Content ${call.stage} output.`,
-    },
-  });
+export function buildAiContentStageRequest(call: AiContentStageCall): Record<string, unknown> {
+  return buildAdminAiContentStageRequest(call);
+}
+
+export async function getAiContentOpenRouterCapability(): Promise<OpenRouterCapability> {
+  const result = await MeteorAny.callAsync('getAiContentOpenRouterCapability');
+  return {
+    configured: Boolean(result?.configured),
+    source: result?.source === 'admin' ? 'admin' : null,
+    model: String(result?.model || '').trim(),
+    reasoningLevel: normalizeOpenRouterReasoningLevel(
+      result?.reasoningLevel,
+      'AI Content OpenRouter reasoning level',
+    ),
+  };
+}
+
+export const callAiContentStage: AiContentStageCaller = async (call) => {
+  const result = await MeteorAny.callAsync('callAiContentOpenRouterRequest', buildAiContentStageRequest(call));
   return {
     parsedContent: result?.parsedContent,
-    request: result?.request,
+    request: result?.requestWithoutCredentials,
     rawContent: String(result?.rawContent || ''),
     responseBody: result?.responseBody,
     usage: result?.usage,
@@ -95,8 +97,6 @@ export const callProductionAiContentStage: AiContentStageCaller = async (call) =
     model: String(result?.model || call.model),
     reasoningLevel: result?.reasoningLevel as OpenRouterReasoningLevel,
     source: String(result?.source || ''),
-    validation: result?.validation,
-    execution: result?.execution,
   };
 };
 

@@ -26,7 +26,7 @@ import {
   type AiContentImagePatternSeed,
 } from './aiContentImageFilenamePattern';
 import {
-  callProductionAiContentStage,
+  callAiContentStage,
   type AiContentStageCallResult,
   type AiContentStageCaller,
 } from './aiContentOpenRouterClient';
@@ -237,7 +237,7 @@ async function executeAiStage<T>(
       && JSON.stringify(options.retryTarget.input) !== JSON.stringify(input)) {
       throw new Error('The recorded stage input no longer matches the current source objects; start a complete run instead.');
     }
-    const result = await (options.stageCaller || callProductionAiContentStage)({
+    const result = await (options.stageCaller || callAiContentStage)({
       stage,
       model: options.model,
       systemPrompt: settings.systemPrompt,

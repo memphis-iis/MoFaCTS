@@ -8,7 +8,7 @@
       </header>
 
       {{#if statusMessage}}
-      <div class="alert alert-{{statusClass}} ai-create-status" role="status" aria-live="polite">
+      <div class="alert alert-{{statusClass}} ai-create-status" role="status" aria-live="polite" aria-atomic="true">
         {{#if creating}}<i class="fa fa-refresh fa-spin" aria-hidden="true"></i>{{/if}}
         {{statusMessage}}
       </div>
