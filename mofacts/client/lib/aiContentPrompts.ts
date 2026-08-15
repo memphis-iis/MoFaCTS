@@ -53,7 +53,7 @@ export const AI_CONTENT_DEFINITION_SCHEMA: OpenRouterJsonSchema = {
 
 const INTERPRET_SYSTEM = `Interpret one AI Content Creator author request and construct a Wikipedia list-search intent. Return only JSON matching the supplied schema.
 
-The run has one universal prompt type: text or image. The response type is always text. Identify the requested subject and construct one concise Wikipedia search query for a pre-existing list page. Never enumerate, propose, infer, or return members of the set. Never return a page title, URL, link, filename, stimulus-response pair, definition, or image candidate.
+The run has one universal prompt type: text or image. The response type is always text. Identify the requested subject and construct one concise Wikipedia search query for a pre-existing list page. The query must be a short topic search beginning with the concept of a list, such as "list Delphic maxims". Include only words needed to identify the core subject. Do not include the word "Wikipedia", source attribution, requested numbering or fields, prompt-response mapping, learning-task wording, or other instructions from the author notes. For an image run only, append the minimum image-role wording needed to locate the appropriate list page. Never enumerate, propose, infer, or return members of the set. Never return a page title, URL, link, filename, stimulus-response pair, definition, or image candidate.
 
 For a text run, choose textPairingStrategy "source-field-mapping" when the author identifies one source field as the prompt and another source field as the response, such as state to capital, country to currency, or author to book. Choose "definition" when each list item is the response and the system must write an identifying definition as its prompt. For an image run, textPairingStrategy must be "not-applicable". For an image run, preserve the requested image role, modality, labels, context, style, and restrictions in one succinct image requirement. For a text run, imageRequirement must be the empty string.`;
 
@@ -84,7 +84,7 @@ You may select only a supplied candidateId or null. Prefer the link whose anchor
 export const DEFAULT_AI_CONTENT_STAGE_PROMPTS: AiContentStagePromptMap = {
   'interpret-request': {
     systemPrompt: INTERPRET_SYSTEM,
-    instructions: 'Use the author notes to determine the universal prompt type and construct one search beginning with the concept of a list of the requested subject. For image requests, append only the succinct requested image role needed to locate an appropriate list page.',
+    instructions: 'Construct the shortest useful topic query beginning with the concept of a list. Keep only the core subject; omit Wikipedia, source attribution, numbering, requested fields, mapping directions, and learning-task wording. For an image request only, append the minimum requested image role needed to locate the list page.',
     visibleOutputTokens: 800,
   },
   'select-list-page': {
