@@ -27,26 +27,30 @@ describe('AI Content bounded stage prompts', function() {
     });
     expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS['select-list-page'].systemPrompt)
       .to.include('even when its title does not begin with "List of"');
+    expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS['interpret-request'].systemPrompt)
+      .to.include('return only the core list subject in subject');
+    expect(DEFAULT_AI_CONTENT_STAGE_PROMPTS['interpret-request'].systemPrompt)
+      .to.include('application constructs the Wikipedia list search deterministically');
     expect(AI_CONTENT_INTENT_SCHEMA.additionalProperties).to.equal(false);
+    expect(AI_CONTENT_INTENT_SCHEMA.properties).not.to.have.property('listSearchQuery');
   });
 
-  it('requires one universal prompt type and a list-search intent', function() {
+  it('keeps list-search construction outside the AI-owned intent', function() {
     expect(validateAiContentIntent({
       promptType: 'image',
       responseType: 'text',
       textPairingStrategy: 'not-applicable',
       subject: 'U.S. states',
-      listSearchQuery: 'list of U.S. states outline maps',
       imageRequirement: 'plain outline map',
     }).promptType).to.equal('image');
     expect(() => validateAiContentIntent({
-      promptType: 'text',
+      promptType: 'image',
       responseType: 'text',
-      textPairingStrategy: 'definition',
-      subject: 'states',
+      textPairingStrategy: 'not-applicable',
+      subject: 'U.S. states',
       listSearchQuery: 'U.S. states',
-      imageRequirement: '',
-    })).to.throw('explicitly search for a list');
+      imageRequirement: 'plain outline map',
+    })).to.throw('unsupported fields: listSearchQuery');
   });
 
   it('recognizes source-field mapping and constrains both selected columns', function() {
@@ -55,7 +59,6 @@ describe('AI Content bounded stage prompts', function() {
       responseType: 'text',
       textPairingStrategy: 'source-field-mapping',
       subject: 'U.S. state capitals',
-      listSearchQuery: 'list of U.S. state capitals',
       imageRequirement: '',
     }).textPairingStrategy).to.equal('source-field-mapping');
     const schema = sourceFieldSelectionSchema(['state', 'capital']);
@@ -74,7 +77,6 @@ describe('AI Content bounded stage prompts', function() {
       responseType: 'text',
       textPairingStrategy: 'generated-table',
       subject: 'division facts through 9',
-      listSearchQuery: '',
       imageRequirement: '',
       tableInstructions: 'Generate divisors and quotients from 1 through 9.',
       tableScopeSummary: 'The 81 inverse facts for the 1 through 9 multiplication table.',
@@ -101,7 +103,6 @@ describe('AI Content bounded stage prompts', function() {
       responseType: 'text',
       textPairingStrategy: 'provided-table',
       subject: 'supplied facts',
-      listSearchQuery: '',
       imageRequirement: '',
       tableInstructions: 'Format the supplied table.',
       tableScopeSummary: 'Author-supplied rows.',

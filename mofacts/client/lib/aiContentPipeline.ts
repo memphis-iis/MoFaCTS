@@ -343,6 +343,12 @@ function tableStrategy(intent: AiContentIntent): AiContentTableStrategy | null {
     : null;
 }
 
+function wikipediaListSearchQuery(subject: string): string {
+  const coreSubject = subject.trim().replace(/^list(?:\s+of)?\s+/i, '');
+  if (!coreSubject) throw new Error('Wikipedia list search requires a core subject.');
+  return `list ${coreSubject}`;
+}
+
 async function createTableContent(
   run: AiContentPipelineRun,
   options: AiContentPipelineOptions,
@@ -1225,12 +1231,13 @@ export async function runAiContentPipeline(options: AiContentPipelineOptions): P
   }
 
   const fetcher = options.fetcher || globalThis.fetch;
+  const listSearchQuery = wikipediaListSearchQuery(intent.subject);
   const candidates = await executeDeterministicStage(
     run,
     options,
     'search-wikipedia',
-    { query: intent.listSearchQuery, requestUrl: wikipediaListSearchRequestUrl(intent.listSearchQuery) },
-    () => searchWikipediaListCandidates(intent.listSearchQuery, fetcher),
+    { query: listSearchQuery, requestUrl: wikipediaListSearchRequestUrl(listSearchQuery) },
+    () => searchWikipediaListCandidates(listSearchQuery, fetcher),
   );
   run.listCandidates = candidates;
   publish(run, options);

@@ -166,7 +166,6 @@ describe('AI Content shared pipeline', function() {
         responseType: 'text',
         textPairingStrategy: 'generated-table',
         subject: 'division facts through 9',
-        listSearchQuery: '',
         imageRequirement: '',
         tableInstructions: 'Generate the inverse facts for divisors and quotients 1 through 9.',
         tableScopeSummary: 'The 81 inverse facts for the 1 through 9 multiplication table.',
@@ -212,7 +211,6 @@ describe('AI Content shared pipeline', function() {
           responseType: 'text',
           textPairingStrategy: 'provided-table',
           subject: 'color names',
-          listSearchQuery: '',
           imageRequirement: '',
           tableInstructions: 'Use Prompt as the learner prompt and Response as the answer.',
           tableScopeSummary: 'Two author-supplied color rows.',
@@ -242,7 +240,6 @@ describe('AI Content shared pipeline', function() {
         responseType: 'text',
         textPairingStrategy: 'source-field-mapping',
         subject: 'U.S. state capitals',
-        listSearchQuery: 'list of U.S. state capitals',
         imageRequirement: '',
       });
       if (call.stage === 'select-list-page') return stageResult({
@@ -287,7 +284,6 @@ describe('AI Content shared pipeline', function() {
           responseType: 'text',
           textPairingStrategy: 'not-applicable',
           subject: 'members',
-          listSearchQuery: 'list of members outline maps or portraits',
           imageRequirement: 'an identifying portrait or plain outline map',
         });
       }
@@ -352,7 +348,6 @@ describe('AI Content shared pipeline', function() {
           responseType: 'text',
           textPairingStrategy: 'definition',
           subject: 'members',
-          listSearchQuery: 'list of members',
           imageRequirement: '',
         });
       }
@@ -389,7 +384,7 @@ describe('AI Content shared pipeline', function() {
   it('retries from an unchanged recorded stage while reusing validated upstream AI outputs', async function() {
     const firstCaller: AiContentStageCaller = async (call) => {
       if (call.stage === 'interpret-request') return stageResult({
-        promptType: 'text', responseType: 'text', textPairingStrategy: 'definition', subject: 'members', listSearchQuery: 'list of members', imageRequirement: '',
+        promptType: 'text', responseType: 'text', textPairingStrategy: 'definition', subject: 'members', imageRequirement: '',
       });
       if (call.stage === 'select-list-page') return stageResult({ selectedCandidateId: 'list-page-100', rationale: 'First result.' });
       if (call.stage === 'generate-definition') return stageResult({

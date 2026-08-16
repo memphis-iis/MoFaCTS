@@ -34,7 +34,7 @@ export const AI_CONTENT_INTENT_SCHEMA: OpenRouterJsonSchema = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'promptType', 'responseType', 'textPairingStrategy', 'subject', 'listSearchQuery', 'imageRequirement',
+    'promptType', 'responseType', 'textPairingStrategy', 'subject', 'imageRequirement',
     'tableInstructions', 'tableScopeSummary', 'expectedItemCount', 'tableIssue',
   ],
   properties: {
@@ -42,7 +42,6 @@ export const AI_CONTENT_INTENT_SCHEMA: OpenRouterJsonSchema = {
     responseType: { type: 'string', enum: ['text'] },
     textPairingStrategy: { type: 'string', enum: ['definition', 'source-field-mapping', 'generated-table', 'provided-table', 'not-applicable'] },
     subject: { type: 'string', minLength: 1, maxLength: 180 },
-    listSearchQuery: { type: 'string', maxLength: 300 },
     imageRequirement: { type: 'string', maxLength: 300 },
     tableInstructions: { type: 'string', maxLength: 1200 },
     tableScopeSummary: { type: 'string', maxLength: 500 },
@@ -66,9 +65,11 @@ The run has one universal prompt type: text or image. The response type is alway
 
 Choose "provided-table" first when the author notes contain a table to learn. Choose "not-applicable" for every image run. Choose a Wikipedia strategy when the author requests an external source or citation, canonical externally grounded coverage, or definitions for members of a canonical source list. Otherwise choose "generated-table" for a requested text-to-text table, including factual tables when the author does not require external verification. An explicit request to generate without a source permits "generated-table" for any text table. Never switch strategies later when the chosen route fails.
 
-For "generated-table" or "provided-table", return an empty listSearchQuery and imageRequirement. Supply concise tableInstructions and tableScopeSummary. Use expectedItemCount when the author requests "all", "every", an explicit quantity, or provides a table; otherwise it may be null. The count must not exceed 250. Interpret conventional division facts with products through 81 as the 81 inverse facts formed by divisors and quotients 1 through 9. Return an empty tableIssue when the table specification is executable. For a supplied table with unclear prompt-response direction, unexplained extra columns, or more than 250 data rows, describe that blocker in tableIssue and use a null expectedItemCount rather than guessing.
+For "generated-table" or "provided-table", return an empty imageRequirement. Supply concise tableInstructions and tableScopeSummary. Use expectedItemCount when the author requests "all", "every", an explicit quantity, or provides a table; otherwise it may be null. The count must not exceed 250. Interpret conventional division facts with products through 81 as the 81 inverse facts formed by divisors and quotients 1 through 9. Return an empty tableIssue when the table specification is executable. For a supplied table with unclear prompt-response direction, unexplained extra columns, or more than 250 data rows, describe that blocker in tableIssue and use a null expectedItemCount rather than guessing.
 
-For a Wikipedia text run, choose "source-field-mapping" when the source contains one requested prompt field and another requested response field. Choose "definition" when each source-list item is the response and the system must write its identifying prompt. Construct a short listSearchQuery beginning with the concept of a list and containing only the core subject, such as "list Delphic maxims". Do not include the word "Wikipedia", requested numbering or fields, mapping directions, or learning-task wording. Return empty table fields, a null expectedItemCount, and an empty tableIssue.
+For every Wikipedia run, including every image run, return only the core list subject in subject, such as "Delphic maxims" or "U.S. states". Do not include the word "Wikipedia", list-search wording, requested numbering or fields, mapping directions, image-role wording, or learning-task wording. The application constructs the Wikipedia list search deterministically from subject.
+
+For a Wikipedia text run, choose "source-field-mapping" when the source contains one requested prompt field and another requested response field. Choose "definition" when each source-list item is the response and the system must write its identifying prompt. Return empty table fields, a null expectedItemCount, and an empty tableIssue.
 
 For an image run, textPairingStrategy must be "not-applicable". Preserve the requested image role, modality, labels, context, style, and restrictions in imageRequirement; return empty table fields, a null expectedItemCount, and an empty tableIssue.`;
 
@@ -169,13 +170,12 @@ function requiredString(value: unknown, label: string): string {
 export function validateAiContentIntent(value: unknown): AiContentIntent {
   if (!isRecord(value)) throw new Error('AI Content intent must be an object.');
   strictKeys(value, [
-    'promptType', 'responseType', 'textPairingStrategy', 'subject', 'listSearchQuery', 'imageRequirement',
+    'promptType', 'responseType', 'textPairingStrategy', 'subject', 'imageRequirement',
     'tableInstructions', 'tableScopeSummary', 'expectedItemCount', 'tableIssue',
   ], 'AI Content intent');
   if (value.promptType !== 'text' && value.promptType !== 'image') throw new Error('AI Content promptType must be text or image.');
   if (value.responseType !== 'text') throw new Error('AI Content responseType must be text.');
   const subject = requiredString(value.subject, 'AI Content subject');
-  const listSearchQuery = typeof value.listSearchQuery === 'string' ? value.listSearchQuery.trim() : '';
   const imageRequirement = typeof value.imageRequirement === 'string' ? value.imageRequirement.trim() : '';
   const tableInstructions = typeof value.tableInstructions === 'string' ? value.tableInstructions.trim() : '';
   const tableScopeSummary = typeof value.tableScopeSummary === 'string' ? value.tableScopeSummary.trim() : '';
@@ -196,7 +196,6 @@ export function validateAiContentIntent(value: unknown): AiContentIntent {
   const isTableStrategy = textPairingStrategy === 'generated-table' || textPairingStrategy === 'provided-table';
   if (isTableStrategy) {
     if (value.promptType !== 'text') throw new Error('AI-generated and author-supplied tables require text prompts.');
-    if (listSearchQuery) throw new Error('Table generation intent must not contain a Wikipedia search query.');
     if (imageRequirement) throw new Error('Table generation intent must not contain an image requirement.');
     if (tableIssue) throw new Error(`The requested table cannot be generated: ${tableIssue}`);
     if (!tableInstructions) throw new Error('Table generation intent requires concise table instructions.');
@@ -208,11 +207,8 @@ export function validateAiContentIntent(value: unknown): AiContentIntent {
     if (textPairingStrategy === 'provided-table' && expectedItemCount === null) {
       throw new Error('An author-supplied table requires an exact expected item count.');
     }
-  } else {
-    if (!/\blist\b/i.test(listSearchQuery)) throw new Error('Wikipedia search intent must explicitly search for a list.');
-    if (tableInstructions || tableScopeSummary || expectedItemCount !== null || tableIssue) {
-      throw new Error('Wikipedia intent must use empty table fields with a null expected item count.');
-    }
+  } else if (tableInstructions || tableScopeSummary || expectedItemCount !== null || tableIssue) {
+    throw new Error('Wikipedia intent must use empty table fields with a null expected item count.');
   }
   if (value.promptType === 'image' && !imageRequirement) throw new Error('Image prompt intent requires a succinct image requirement.');
   if (value.promptType === 'text' && imageRequirement) throw new Error('Text prompt intent must use an empty image requirement.');
@@ -227,7 +223,6 @@ export function validateAiContentIntent(value: unknown): AiContentIntent {
     responseType: 'text',
     textPairingStrategy,
     subject,
-    listSearchQuery,
     imageRequirement,
     tableInstructions,
     tableScopeSummary,

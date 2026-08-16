@@ -3,8 +3,8 @@ import {
   type OpenRouterReasoningLevel,
 } from './lib/openRouterModelCatalog';
 
-export const AI_CONTENT_CONTRACT_VERSION = 4 as const;
-export const AI_CONTENT_WORKING_RECORD_KEY = 'mofacts.aiContentCreator.workingRecord';
+export const AI_CONTENT_CONTRACT_VERSION = 5 as const;
+export const AI_CONTENT_WORKING_RECORD_KEY = `mofacts.aiContentCreator.workingRecord.v${AI_CONTENT_CONTRACT_VERSION}`;
 
 export type AiCreationMode = 'learning' | 'test';
 export type AiContentPromptType = 'text' | 'image';
@@ -47,7 +47,6 @@ export type AiContentIntent = {
   responseType: AiContentResponseType;
   textPairingStrategy?: AiContentTextPairingStrategy;
   subject: string;
-  listSearchQuery: string;
   imageRequirement: string;
   tableInstructions?: string;
   tableScopeSummary?: string;

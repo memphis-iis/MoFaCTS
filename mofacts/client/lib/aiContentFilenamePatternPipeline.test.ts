@@ -114,7 +114,6 @@ describe('AI Content deterministic filename-pattern pipeline', function() {
         responseType: 'text',
         textPairingStrategy: 'not-applicable',
         subject: 'U.S. states',
-        listSearchQuery: 'list of U.S. states outline maps',
         imageRequirement: 'plain outline map of the state in the United States',
       });
       if (call.stage === 'select-list-page') {
@@ -150,6 +149,8 @@ describe('AI Content deterministic filename-pattern pipeline', function() {
     });
     expect(result.run.imageFilenamePattern?.seedResponses).to.deep.equal(['Georgia', 'Alabama']);
     expect(result.run.resolutions[2]?.filenamePatternId).to.equal(result.run.imageFilenamePattern?.patternId);
+    const searchTrace = result.run.traces.find(({ stage }) => stage === 'search-wikipedia');
+    expect((searchTrace?.input as any)?.query).to.equal('list U.S. states');
     const arizonaMatch = result.run.traces.find(({ stage, itemId }) => stage === 'match-image-filename-pattern' && itemId === 'item-100-1-3');
     const alaskaFallback = result.run.traces.find(({ stage, itemId }) => stage === 'queue-pattern-fallback' && itemId === 'item-100-1-4');
     expect(arizonaMatch?.status).to.equal('succeeded');
@@ -167,7 +168,6 @@ describe('AI Content deterministic filename-pattern pipeline', function() {
         responseType: 'text',
         textPairingStrategy: 'not-applicable',
         subject: 'U.S. states',
-        listSearchQuery: 'list of U.S. states outline maps',
         imageRequirement: 'plain outline map of the state in the United States',
       });
       if (call.stage === 'select-list-page') {
@@ -220,7 +220,6 @@ describe('AI Content deterministic filename-pattern pipeline', function() {
         responseType: 'text',
         textPairingStrategy: 'not-applicable',
         subject: 'U.S. states',
-        listSearchQuery: 'list of U.S. states outline maps',
         imageRequirement: 'plain outline map of the state in the United States',
       });
       if (call.stage === 'select-list-page') {

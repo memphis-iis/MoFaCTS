@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import {
   AI_CONTENT_CONTRACT_VERSION,
+  AI_CONTENT_WORKING_RECORD_KEY,
   getAiContentSaveBlockingIssues,
   imageStimulusForResponse,
   requireAiContentWorkingRecordVersion,
@@ -8,19 +9,20 @@ import {
 } from './aiContentContract';
 
 describe('AI Content list-source contract', function() {
-  it('uses v4 and rejects obsolete browser records explicitly', function() {
-    expect(AI_CONTENT_CONTRACT_VERSION).to.equal(4);
-    expect(() => requireAiContentWorkingRecordVersion({ contractVersion: 3 })).to.throw('obsolete contract');
-    expect(() => requireAiContentWorkingRecordVersion({ contractVersion: 4, phase: 'input' })).to.throw('invalid mode');
+  it('uses v5 and rejects obsolete browser records explicitly', function() {
+    expect(AI_CONTENT_CONTRACT_VERSION).to.equal(5);
+    expect(AI_CONTENT_WORKING_RECORD_KEY).to.equal('mofacts.aiContentCreator.workingRecord.v5');
+    expect(() => requireAiContentWorkingRecordVersion({ contractVersion: 4 })).to.throw('obsolete contract');
+    expect(() => requireAiContentWorkingRecordVersion({ contractVersion: 5, phase: 'input' })).to.throw('invalid mode');
   });
 
   it('keeps image stimuli deterministic and response-owned', function() {
     expect(imageStimulusForResponse('Alabama')).to.equal('image: Alabama');
   });
 
-  it('accepts backward-compatible filename-pattern provenance in v4 browser work', function() {
+  it('accepts filename-pattern provenance in v5 browser work', function() {
     const record = requireAiContentWorkingRecordVersion({
-      contractVersion: 4,
+      contractVersion: 5,
       phase: 'review',
       notes: 'State maps',
       mode: 'learning',
@@ -49,13 +51,13 @@ describe('AI Content list-source contract', function() {
       warnings: [],
       updatedAt: '2026-08-15T00:00:00.000Z',
     });
-    expect(record.contractVersion).to.equal(4);
+    expect(record.contractVersion).to.equal(5);
     expect(record.pairs[0]?.provenance.sourcePath).to.equal('filename-pattern');
   });
 
-  it('accepts v4 table provenance without fabricated Wikipedia fields', function() {
+  it('accepts v5 table provenance without fabricated Wikipedia fields', function() {
     const record = requireAiContentWorkingRecordVersion({
-      contractVersion: 4,
+      contractVersion: 5,
       phase: 'review',
       notes: 'Format my table.',
       mode: 'learning',
@@ -83,7 +85,7 @@ describe('AI Content list-source contract', function() {
 
   it('requires a pattern ID for filename-pattern provenance', function() {
     expect(() => requireAiContentWorkingRecordVersion({
-      contractVersion: 4,
+      contractVersion: 5,
       phase: 'review',
       notes: 'State maps',
       mode: 'learning',
@@ -115,14 +117,14 @@ describe('AI Content list-source contract', function() {
 
   it('rejects extra save fields and invalid image source ownership', function() {
     expect(() => validateAiContentSaveContract({
-      contractVersion: 4,
+      contractVersion: 5,
       mode: 'learning',
       title: 'States',
       pairs: [],
       pipelineRun: {},
     })).to.throw('unsupported fields: pipelineRun');
     expect(() => validateAiContentSaveContract({
-      contractVersion: 4,
+      contractVersion: 5,
       mode: 'learning',
       title: 'States',
       pairs: [{
@@ -137,7 +139,7 @@ describe('AI Content list-source contract', function() {
 
   it('blocks mixed prompt types and incomplete Wikimedia provenance', function() {
     const contract = validateAiContentSaveContract({
-      contractVersion: 4,
+      contractVersion: 5,
       mode: 'learning',
       title: 'Mixed',
       pairs: [

@@ -7,7 +7,6 @@ function intent(subject: string): AiContentIntent {
     promptType: 'image',
     responseType: 'text',
     subject,
-    listSearchQuery: `list of ${subject}`,
     imageRequirement: 'A map.',
   };
 }
