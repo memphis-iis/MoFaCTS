@@ -1,10 +1,29 @@
 import { expect } from 'chai';
 import {
   buildContentSurfaceRuntimeSnapshot,
+  shouldShowBlocksSessionSurface,
   startVideoInstructionTimer,
 } from './contentSurfaceRuntime';
 
 describe('content surface runtime', function() {
+  it('uses initialized machine mode as the sole owner of the Blocks render branch', function() {
+    const flashcardSurface = buildContentSurfaceRuntimeSnapshot({
+      currentTdfUnit: { learningsession: {} },
+      curUnitInstructionsSeen: false,
+      videoInstructionDismissed: false,
+      sanitizeInstructionHtml: (value) => value,
+    }).sessionContentSurface;
+
+    expect(shouldShowBlocksSessionSurface({
+      machinePracticeLaunchMode: 'blocks',
+      sessionContentSurface: flashcardSurface,
+    })).to.equal(true);
+    expect(shouldShowBlocksSessionSurface({
+      machinePracticeLaunchMode: 'normal',
+      sessionContentSurface: flashcardSurface,
+    })).to.equal(false);
+  });
+
   it('builds a flashcard snapshot from explicit session inputs', function() {
     const snapshot = buildContentSurfaceRuntimeSnapshot({
       currentTdfUnit: { learningsession: {} },

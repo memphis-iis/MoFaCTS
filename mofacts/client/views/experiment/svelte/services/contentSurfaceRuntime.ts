@@ -24,6 +24,14 @@ export interface ContentSurfaceRuntimeSnapshot {
   videoInstructionsSeen: boolean;
 }
 
+export function shouldShowBlocksSessionSurface(params: {
+  machinePracticeLaunchMode: 'normal' | 'blocks';
+  sessionContentSurface: SessionContentSurface;
+}): boolean {
+  return params.machinePracticeLaunchMode === 'blocks' &&
+    params.sessionContentSurface.showFlashcardSession;
+}
+
 export function buildContentSurfaceRuntimeSnapshot(params: {
   currentTdfUnit: UnitWithInstructions | null | undefined;
   curUnitInstructionsSeen: unknown;

@@ -30,6 +30,9 @@ Template.content.onRendered(function (this: ContentTemplateInstance) {
   template.isDestroyed = false;
   setLaunchLoadingMessage(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'));
   markLaunchLoadingTiming('contentRoute:entered');
+  // Launch mode is an input to this runtime instance. Once START initializes
+  // the machine, the machine context owns the mode for the rest of the run.
+  const initialPracticeLaunchMode = getPracticeLaunchMode();
   const mountContentSurface = () => {
     const target = template.$('#content-root')[0];
     if (!target) {
@@ -45,7 +48,6 @@ Template.content.onRendered(function (this: ContentTemplateInstance) {
         engineIndices: Session.get('engineIndices'),
         experimentTarget: Session.get('experimentTarget'),
         experimentXCond: Session.get('experimentXCond'),
-        practiceLaunchMode: getPracticeLaunchMode(),
       };
     };
     clientConsole(2, '[Content Route] Mounting content surface identity', {
@@ -60,7 +62,12 @@ Template.content.onRendered(function (this: ContentTemplateInstance) {
       markLaunchLoadingTiming('contentRoute:loadContentSurface:complete');
       if (template.isDestroyed || template.svelteMount || !target.isConnected) return;
       try {
-        template.svelteMount = createBlazeMount(target, ContentSurface, {}, getReactiveProps);
+        template.svelteMount = createBlazeMount(
+          target,
+          ContentSurface,
+          { practiceLaunchMode: initialPracticeLaunchMode },
+          getReactiveProps,
+        );
       } catch (error) {
         markLaunchLoadingTiming('contentRoute:mount:failed');
         finishLaunchLoading('content-mount-failed');

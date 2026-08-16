@@ -28,12 +28,52 @@
   let clearingCells = new Map();
   let clearAnimationTimer = null;
   let blocksAudioContext = null;
+  let drillMounted = showDrill;
+  let retainedFlashcardProps = flashcardProps;
+  let drillCleanupPending = false;
 
   $: preview = dragging && boardCellAt(dragging.clientX, dragging.clientY, dragging.anchorRow, dragging.anchorCol);
   $: previewIsLegal = Boolean(preview && canPlaceBlocksPiece(game.board, dragging.piece, preview.row, preview.col));
   $: previewCells = preview && previewIsLegal
     ? new Set(dragging.piece.cells.map(([row, col]) => `${preview.row + row}:${preview.col + col}`))
     : new Set();
+
+  // On mobile the board behaves as a moving cover. Keep the completed drill
+  // frozen underneath it until the board's upward transition has finished;
+  // otherwise the flashcard tears down in the still-visible part of the screen.
+  $: syncDrillPresentation(showDrill, boardActive, flashcardProps);
+
+  function syncDrillPresentation(nextShowDrill, nextBoardActive, nextFlashcardProps) {
+    if (nextShowDrill) {
+      retainedFlashcardProps = nextFlashcardProps;
+      drillMounted = true;
+      drillCleanupPending = false;
+      return;
+    }
+    if (!drillMounted) return;
+    if (
+      nextBoardActive &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 899px)').matches
+    ) {
+      drillCleanupPending = true;
+      return;
+    }
+    drillMounted = false;
+    drillCleanupPending = false;
+  }
+
+  function finishBoardCover(event) {
+    if (
+      event.target !== event.currentTarget ||
+      event.propertyName !== 'transform' ||
+      !drillCleanupPending ||
+      !boardActive ||
+      showDrill
+    ) return;
+    drillMounted = false;
+    drillCleanupPending = false;
+  }
 
   // Returning to the board after the required question awards exactly one tray.
   // The machine token, rather than surface visibility, is the ownership boundary.
@@ -207,7 +247,12 @@
 
 <svelte:window on:pointermove={moveDrag} on:pointerup={finishDrag} on:pointercancel={cancelDrag} />
 
-<section class="blocks-session" aria-label="Blocks practice game">
+<section
+  class="blocks-session"
+  class:blocks-session--board-active={boardActive}
+  class:blocks-session--drill-active={showDrill}
+  aria-label="Blocks practice game"
+>
   <div class="blocks-session__drill">
     {#if game.gate === 'game-over'}
       <div class="blocks-session__complete" role="status">
@@ -215,8 +260,8 @@
         <p>Final score: {game.score}</p>
         <button type="button" class="btn btn-success" on:click={leaveGame}>Return to practice</button>
       </div>
-    {:else if showDrill}
-      <FlashcardSessionSurface {...flashcardProps}
+    {:else if drillMounted}
+      <FlashcardSessionSurface {...retainedFlashcardProps}
         bind:trialContentFadeElement
         on:transitionrun={(event) => forward('transitionrun', event.detail)}
         on:transitionstart={(event) => forward('transitionstart', event.detail)}
@@ -242,7 +287,14 @@
     {/if}
   </div>
 
-  <aside class="blocks-session__game" aria-label="Blocks board and pieces" data-blocks-gate={game.gate} data-tray-generation={trayGeneration} data-applied-tray-generation={appliedTrayGeneration}>
+  <aside
+    class="blocks-session__game"
+    aria-label="Blocks board and pieces"
+    data-blocks-gate={game.gate}
+    data-tray-generation={trayGeneration}
+    data-applied-tray-generation={appliedTrayGeneration}
+    on:transitionend={finishBoardCover}
+  >
     <header class="blocks-session__header">
       <div>
         <span class="blocks-session__label">Blocks score</span>
@@ -331,6 +383,55 @@
   .blocks-drag-preview span { min-width: var(--piece-cell-size); min-height: var(--piece-cell-size); }
   .blocks-board__cell--clearing { animation: blocks-clear-pop 320ms ease-out both; animation-delay: calc(var(--clear-index, 0) * 32ms); }
   @keyframes blocks-clear-pop { 35% { transform: scale(1.16); filter: brightness(1.28); } 100% { transform: scale(.08); opacity: 0; } }
-  @media (max-width: 899px) { .blocks-session { grid-template-columns: 1fr; } .blocks-session__drill { min-height: 22rem; } .blocks-session__game { order: 2; } }
-  @media (prefers-reduced-motion: reduce) { .blocks-board__cell--clearing { animation-duration: 1ms; } }
+  @media (max-width: 899px) {
+    .blocks-session {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      gap: 0;
+      position: relative;
+    }
+    .blocks-session__drill,
+    .blocks-session__game {
+      grid-column: 1;
+      grid-row: 1;
+      width: 100%;
+    }
+    .blocks-session__drill {
+      min-height: 0;
+      overflow: auto;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .blocks-session__game {
+      align-self: start;
+      background: var(--app-background-color);
+      transform: translateY(0);
+      transition:
+        transform 520ms cubic-bezier(.22, 1, .36, 1),
+        visibility 0s linear 520ms;
+      will-change: transform;
+      z-index: 2;
+    }
+    .blocks-session--drill-active .blocks-session__drill {
+      pointer-events: auto;
+    }
+    .blocks-session--drill-active .blocks-session__game {
+      pointer-events: none;
+      transform: translateY(calc(100dvh + var(--app-space-2)));
+      visibility: hidden;
+    }
+    .blocks-session--board-active .blocks-session__game {
+      pointer-events: auto;
+      transform: translateY(0);
+      transition-delay: 0s;
+      visibility: visible;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .blocks-board__cell--clearing { animation-duration: 1ms; }
+    .blocks-session__game {
+      transition-duration: 1ms;
+      transition-delay: 0s;
+    }
+  }
 </style>

@@ -84,6 +84,7 @@
   } from '../services/contentSurfaceActivation';
   import {
     buildContentSurfaceRuntimeSnapshot,
+    shouldShowBlocksSessionSurface,
     startVideoInstructionTimer,
   } from '../services/contentSurfaceRuntime';
   import {
@@ -533,7 +534,12 @@
   };
   $: showSparcSessionSurface = sessionContentSurface.showSparcSession &&
     flashcardControllerProps.subsetKind !== 'none';
-  $: showBlocksSessionSurface = practiceLaunchMode === 'blocks' && sessionContentSurface.showFlashcardSession;
+  // The prop is launch input only. Runtime surface selection must use the same
+  // initialized machine context that owns Blocks transitions.
+  $: showBlocksSessionSurface = shouldShowBlocksSessionSurface({
+    machinePracticeLaunchMode: state.context.practiceLaunchMode,
+    sessionContentSurface,
+  });
   $: blocksBoardActive = state.matches(`presenting.${STATES.BLOCKS_BOARD}`);
   $: blocksShowDrill = !blocksBoardActive && !state.matches('error');
   $: blocksTrayGeneration = state.context.blocksTrayGeneration;
