@@ -841,6 +841,10 @@
     outline: none;
 }
 
+.learning-dashboard-blocks-icon {
+    color: var(--app-text-color);
+}
+
 .practice-empty-state {
     padding: var(--app-space-4);
     color: var(--app-text-color);
@@ -1134,19 +1138,6 @@
         margin-top: calc(0.35rem * var(--app-density-scale));
     }
 
-    .learning-dashboard-card-features-row {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        width: 100%;
-        box-sizing: border-box;
-        padding-right: var(--app-space-0) !important;
-        padding-top: var(--app-space-0) !important;
-        padding-bottom: var(--app-space-0) !important;
-        min-height: 0;
-        line-height: 1;
-    }
-
     .learning-dashboard-card .badge {
         display: inline-flex;
         align-items: center;
@@ -1161,6 +1152,10 @@
         vertical-align: middle;
     }
 
+    .learning-dashboard-card-status {
+        margin-left: calc(0.3rem * var(--app-density-scale));
+    }
+
     .learning-dashboard-card-feature-icons {
         display: flex !important;
         align-items: center !important;
@@ -1168,11 +1163,6 @@
         gap: var(--app-space-1) !important;
         min-height: 0;
         line-height: 1;
-    }
-
-.learning-dashboard-card-feature-icons .badge {
-        margin-left: var(--app-space-1);
-        align-self: center;
     }
 
     .learning-dashboard-card-feature-icons .fa {
@@ -1199,10 +1189,15 @@
     }
 
     .card-expand-icon {
-        margin-left: var(--app-space-1);
-        font-size: calc(var(--app-font-size-base) * 0.75);
+        display: inline-block;
+        width: 0.5em;
+        height: 0.5em;
+        flex: 0 0 auto;
+        margin-left: calc(0.35rem * var(--app-density-scale));
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: translateY(-0.08em) rotate(45deg);
         transition: transform var(--app-transition-smooth) ease;
-        vertical-align: middle;
     }
 
 .learning-dashboard-card-badge-text {
@@ -1243,7 +1238,7 @@
     }
 
     button[aria-expanded="true"] .card-expand-icon {
-        transform: rotate(180deg);
+        transform: translateY(0.08em) rotate(225deg);
     }
 
     .lesson-card-unused {

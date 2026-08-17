@@ -257,7 +257,7 @@
                           data-currentstimulisetid="{{this.currentStimuliSetId}}"
                           data-ismultitdf="{{this.isMultiTdf}}"
                           aria-label="{{t 'dashboard.blocks'}}"
-                          title="{{t 'dashboard.blocks'}}"><span class="fa fa-th" aria-hidden="true"></span></button>
+                          title="{{t 'dashboard.blocks'}}"><span class="fa fa-th learning-dashboard-blocks-icon" aria-hidden="true"></span></button>
                       {{/if}}
                       {{#if showSettingsButton}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
@@ -277,7 +277,7 @@
                           data-currentstimulisetid="{{this.currentStimuliSetId}}"
                           data-ismultitdf="{{this.isMultiTdf}}"
                           aria-label="{{t 'dashboard.blocks'}}"
-                          title="{{t 'dashboard.blocks'}}"><span class="fa fa-th" aria-hidden="true"></span></button>
+                          title="{{t 'dashboard.blocks'}}"><span class="fa fa-th learning-dashboard-blocks-icon" aria-hidden="true"></span></button>
                       {{/if}}
                       {{#if showSettingsButton}}
                         <button class="btn btn-sm btn-outline-secondary learning-dashboard-action-button configure-lesson" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
@@ -378,6 +378,11 @@
         {{#if this.creatorDisplayName}}
           <span class="learning-dashboard-card-title__creator">({{> learningDashboardCreator}})</span>
         {{/if}}
+        {{#if this.isUsed}}
+          <span class="badge {{accuracyBadgeClass}} learning-dashboard-card-status"><span class="learning-dashboard-card-badge-text">{{accuracyBadgeLabel}}</span></span>
+        {{else}}
+          <span class="badge bg-secondary learning-dashboard-card-status"><span class="learning-dashboard-card-badge-text">{{t 'dashboard.new'}}</span></span>
+        {{/if}}
         {{#if this.conditions}}
           <select class="form-select form-select-sm condition-tdf-selector"
             data-roottdfid="{{this.TDFId}}">
@@ -396,7 +401,7 @@
         </div>
       {{/if}}
 
-      <div class="d-flex align-items-center learning-dashboard-card-features-row">
+      <div class="learning-dashboard-card-actions">
         <div class="learning-dashboard-card-feature-icons">
           {{#if firstContentUnitIconClass}}
             <span class="fa {{firstContentUnitIconClass}} content-unit-icon" title="{{firstContentUnitIconTitle}}"></span>
@@ -414,25 +419,15 @@
               {{/unless}}
             {{/unless}}
           {{/unless}}
-
-          {{#if this.isUsed}}
-            <span class="badge {{accuracyBadgeClass}}"><span class="learning-dashboard-card-badge-text">{{accuracyBadgeLabel}}</span></span>
-          {{else}}
-            <span class="badge bg-secondary"><span class="learning-dashboard-card-badge-text">{{t 'dashboard.new'}}</span></span>
-          {{/if}}
         </div>
-      </div>
 
-      {{#if this.conditions}}
-        {{!-- Owner of a condition-pool root TDF: selector is in the card title; just show Start --}}
-        <div class="learning-dashboard-card-actions">
+        {{#if this.conditions}}
+          {{!-- Owner of a condition-pool root TDF: selector is in the card title; just show Start --}}
           <button class="btn btn-sm btn-success start-condition-root learning-dashboard-card-button">{{t 'dashboard.start'}}</button>
           {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">{{t 'dashboard.settings'}}</button>
           {{/if}}
-        </div>
-      {{else if this.isUsed}}
-        <div class="learning-dashboard-card-actions">
+        {{else if this.isUsed}}
           <button class="btn btn-sm btn-primary continue-lesson learning-dashboard-card-button"
             data-tdfid="{{this.TDFId}}"
             data-lessonname="{{this.displayName}}"
@@ -445,7 +440,9 @@
               data-tdfid="{{this.TDFId}}"
               data-lessonname="{{this.displayName}}"
               data-currentstimulisetid="{{this.currentStimuliSetId}}"
-              data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.blocks'}}</button>
+              data-ismultitdf="{{this.isMultiTdf}}"
+              aria-label="{{t 'dashboard.blocks'}}"
+              title="{{t 'dashboard.blocks'}}"><span class="fa fa-th learning-dashboard-blocks-icon" aria-hidden="true"></span></button>
           {{/if}}
           <button class="btn btn-sm btn-primary learning-dashboard-card-button"
             type="button"
@@ -454,16 +451,14 @@
             aria-expanded="false"
             aria-controls="details-{{this.TDFId}}">
             {{t 'dashboard.details'}}
-            <span class="fa fa-chevron-down card-expand-icon"></span>
+            <span class="card-expand-icon" aria-hidden="true"></span>
           </button>
           {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
               {{t 'dashboard.settings'}}
             </button>
           {{/if}}
-        </div>
-      {{else}}
-        <div class="learning-dashboard-card-actions">
+        {{else}}
           <button class="btn btn-sm btn-success start-lesson learning-dashboard-card-button"
             data-tdfid="{{this.TDFId}}"
             data-lessonname="{{this.displayName}}"
@@ -476,15 +471,17 @@
               data-tdfid="{{this.TDFId}}"
               data-lessonname="{{this.displayName}}"
               data-currentstimulisetid="{{this.currentStimuliSetId}}"
-              data-ismultitdf="{{this.isMultiTdf}}">{{t 'dashboard.blocks'}}</button>
+              data-ismultitdf="{{this.isMultiTdf}}"
+              aria-label="{{t 'dashboard.blocks'}}"
+              title="{{t 'dashboard.blocks'}}"><span class="fa fa-th learning-dashboard-blocks-icon" aria-hidden="true"></span></button>
           {{/if}}
           {{#if showSettingsButton}}
             <button class="btn btn-sm btn-outline-secondary configure-lesson learning-dashboard-card-button" data-tdfid="{{this.TDFId}}">
               {{t 'dashboard.settings'}}
             </button>
           {{/if}}
-        </div>
-      {{/if}}
+        {{/if}}
+      </div>
 
       {{#if launchFeedback}}
         <div class="admin-inline-feedback learning-dashboard-command-feedback">
