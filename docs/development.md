@@ -31,6 +31,11 @@ installed locally.
 The only supported contributor server is the source-watching hotfix server at
 `http://localhost:3200`, managed by `deploy/hotfix-local.ps1`.
 
+Startup requires four consecutive checks of MongoDB's configured writable
+replica-set primary and both authenticated users. A startup-only MongoDB pool
+loss is cleaned up, archived, and retried once; there is no recurring restart
+loop that can conceal a persistent database or host failure.
+
 1. Install dependencies and run the baseline check:
 
    ```powershell
@@ -69,8 +74,10 @@ The only supported contributor server is the source-watching hotfix server at
    .\hotfix-local.ps1 logs
    ```
 
-   The command returns after the app and Rspack watcher are ready. Source edits
-   then rebuild and reload automatically. Open:
+   The command returns after the supervised Meteor/Rspack process tree is ready.
+   Source edits then rebuild and reload automatically. `status` distinguishes
+   process ownership from app, bundle, HMR, and Change Stream readiness, while
+   previous run logs remain under ignored `deploy/local-hotfix/runs/`. Open:
 
    ```text
    http://localhost:3200

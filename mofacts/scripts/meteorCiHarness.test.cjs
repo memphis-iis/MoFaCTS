@@ -232,6 +232,14 @@ test('enforces one canonical hotfix server on localhost', () => {
     path.join(deployRoot, 'hotfix-local.ps1'),
     'utf8',
   );
+  const rspackBuildContext = fs.readFileSync(
+    path.join(appRoot, 'packages/rspack/lib/build-context.js'),
+    'utf8',
+  );
+  const rspackConfig = fs.readFileSync(
+    path.join(appRoot, 'rspack.config.js'),
+    'utf8',
+  );
   const qualificationCompose = fs.readFileSync(
     path.join(deployRoot, 'docker-compose.change-streams-qualification.yml'),
     'utf8',
@@ -260,12 +268,35 @@ test('enforces one canonical hotfix server on localhost', () => {
   assert.match(hotfixManager, /\$meteorTool\.ToolEntry/);
   assert.match(hotfixManager, /\$env:NODE_PATH = \$meteorTool\.NodePath/);
   assert.match(hotfixManager, /\$env:BABEL_CACHE_DIR = \$meteorTool\.BabelCacheDir/);
-  assert.match(hotfixManager, /Stop-OwnedRspackProcesses/);
-  assert.match(hotfixManager, /catch \{\s*Stop-HotfixDev\s*throw\s*\}/);
+  assert.match(hotfixManager, /-Action", "__supervise"/);
+  assert.match(hotfixManager, /New-HotfixProcessJob/);
+  assert.match(hotfixManager, /JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/);
+  assert.match(hotfixManager, /AssignProcessToJobObject/);
+  assert.match(hotfixManager, /Test-TrackedProcess/);
+  assert.match(hotfixManager, /Stop-ObsoleteCommonJsGuardProcesses/);
+  assert.match(hotfixManager, /Archive-HotfixRunLogs/);
+  assert.match(hotfixManager, /Get-HotfixFailureSummary/);
+  assert.match(hotfixManager, /Ensure-CommonJsBoundary/);
+  assert.match(hotfixManager, /Reset-RspackDevContext/);
+  assert.match(hotfixManager, /Remove-Item -LiteralPath \$mainDevDir -Recurse -Force/);
+  assert.match(hotfixManager, /Refusing to reset Rspack development context outside \$buildRoot/);
+  assert.doesNotMatch(hotfixManager, /Get-CimInstance|LastWriteTime\s*=|Ensure-CommonJsBuildMarker|Remove-RspackDevBuild/);
+  assert.match(hotfixManager, /\$RequiredStableChecks = 4/);
+  assert.match(hotfixManager, /\$stableChecks \+= 1\s*if \(\$stableChecks -ge \$RequiredStableChecks\)/);
+  assert.match(hotfixManager, /\$startupError = \$_/);
+  assert.match(hotfixManager, /Set-HotfixRunStateStatus -Status "startup-failed"/);
+  assert.match(hotfixManager, /\$RecoveryAttempt -eq 0 -and \$failureSummary -eq "Meteor lost its MongoDB connection pool\."/);
+  assert.match(hotfixManager, /Start-HotfixDev -RecoveryAttempt 1/);
+  assert.match(hotfixManager, /throw \$startupError/);
   assert.match(hotfixManager, /Get-HotfixDevClientBundleState/);
   assert.match(hotfixManager, /__mofactsRspackClient/);
   assert.match(hotfixManager, /module\\\.exports\\s\*=\\s\*__webpack_exports__/);
   assert.match(hotfixManager, /assert-change-streams\.sh/);
+  assert.equal(fs.existsSync(path.join(deployRoot, 'hotfix/ensure-commonjs-build.ps1')), false);
+  assert.match(rspackBuildContext, /function writeFileAtomically/);
+  assert.match(rspackBuildContext, /shouldPreserveMainDevelopmentContext/);
+  assert.match(rspackBuildContext, /!shouldPreserveMainDevelopmentContext \? \[mainClientPath, mainServerPath\] : \[\]/);
+  assert.match(rspackConfig, /Meteor\.isDevelopment && !Meteor\.isTest && !Meteor\.isNative && Meteor\.setCache\("memory"\)/);
   assert.equal(fs.existsSync(path.join(deployRoot, 'mongodb/assert-change-streams.js')), true);
   assert.equal(fs.existsSync(path.join(deployRoot, 'mongodb/assert-change-streams.sh')), true);
   assert.match(agentGuide, /There is exactly one localhost application server/);

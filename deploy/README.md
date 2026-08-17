@@ -188,10 +188,13 @@ cd deploy
 ```
 
 That command validates the pinned Meteor tool and Compose configuration before
-cleanup, starts the local MongoDB replica set, and launches the native
-Meteor/Rspack watcher. It waits for the app and HMR endpoints and creates or
-verifies the local admin. Subsequent source edits rebuild and reload
-automatically; rerun the command only to restart the watcher itself.
+cleanup, starts the local MongoDB replica set, and launches one supervisor for
+the native Meteor/Rspack process tree. MongoDB must first pass four consecutive
+writable-primary and authenticated-access checks. A MongoDB pool loss during
+Meteor startup gets exactly one clean, archived retry; recurring failures stay
+visible. The manager then waits for the app and HMR endpoints
+and creates or verifies the local admin. Subsequent source edits rebuild and
+reload automatically; rerun the command only to restart the watcher itself.
 
 Its management actions are:
 
@@ -201,8 +204,10 @@ Its management actions are:
 .\hotfix-local.ps1 stop
 ```
 
-`status` reports the owning Meteor process and both the app and Rspack watcher
-ports. Local admin credentials are stored only in ignored
+`status` reports the supervisor and Meteor ownership, stale PID or obsolete
+helper state, app and bundle readiness, HMR, Change Streams, and a
+bounded summary of the last recognized failure. Previous run logs are retained
+under ignored `deploy/local-hotfix/runs/`. Local admin credentials are stored only in ignored
 `deploy/local-hotfix/agent-secrets.env`. This workflow is local verification,
 not release confidence; production remains a separately authorized path.
 

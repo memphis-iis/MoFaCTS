@@ -23,6 +23,11 @@ function getDevServerAllowedHosts() {
 
 export default defineConfig((Meteor) => {
   return {
+    // A disk-restored development module graph can outlive an interrupted
+    // Meteor/Rspack process tree and has produced native Rspack panics for
+    // otherwise valid Meteor externals. Keep incremental caching inside the
+    // live watcher, but start each development run with a new graph.
+    ...(Meteor.isDevelopment && !Meteor.isTest && !Meteor.isNative && Meteor.setCache("memory")),
     // The pinned Rspack package serves and injects every web client bundle
     // directly, including development/HMR. The stable npm config defaults
     // those bundles to commonjs2, whose final `module.exports` crashes in a

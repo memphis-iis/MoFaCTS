@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("start", "restart", "stop", "status", "logs")]
+    [ValidateSet("start", "restart", "stop", "status", "logs", "__supervise")]
     [string]$Action = "restart",
     [int]$LogTail = 120
 )
@@ -7,19 +7,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$deployDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$managerScriptPath = $MyInvocation.MyCommand.Path
+$deployDir = Split-Path -Parent $managerScriptPath
 $appDir = (Resolve-Path (Join-Path $deployDir "..\mofacts")).Path
 $localDevDir = Join-Path $deployDir "local-hotfix"
 $staleLocalBuildDir = Join-Path $deployDir "local-build"
 $pidPath = Join-Path $localDevDir "meteor.pid"
-$watcherPidPath = Join-Path $localDevDir "commonjs-watcher.pid"
+$supervisorPidPath = Join-Path $localDevDir "supervisor.pid"
+$runStatePath = Join-Path $localDevDir "run-state.json"
+$stopRequestPath = Join-Path $localDevDir "stop.requested"
+$runHistoryDir = Join-Path $localDevDir "runs"
 $stdoutPath = Join-Path $localDevDir "meteor.stdout.log"
 $stderrPath = Join-Path $localDevDir "meteor.stderr.log"
-$watcherStdoutPath = Join-Path $localDevDir "commonjs-watcher.stdout.log"
-$watcherStderrPath = Join-Path $localDevDir "commonjs-watcher.stderr.log"
+$supervisorStdoutPath = Join-Path $localDevDir "supervisor.stdout.log"
+$supervisorStderrPath = Join-Path $localDevDir "supervisor.stderr.log"
 $resolvedSettingsPath = ""
 $localDataHome = Join-Path $deployDir "local-data"
-$commonJsWatcherScript = Join-Path $deployDir "hotfix\ensure-commonjs-build.ps1"
 $localAdminScript = Join-Path $deployDir "hotfix\ensure-local-admin.cjs"
 $localAgentSecretsPath = Join-Path $localDevDir "agent-secrets.env"
 $meteorReleasePath = Join-Path $appDir ".meteor\release"
@@ -41,6 +44,111 @@ function Test-WindowsHost {
     return [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
         [System.Runtime.InteropServices.OSPlatform]::Windows
     )
+}
+
+function New-HotfixProcessJob {
+    if (-not (Test-WindowsHost)) {
+        throw "The canonical hotfix supervisor requires Windows Job Objects."
+    }
+
+    if (-not ("MoFaCTS.HotfixProcessJob" -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+namespace MoFaCTS {
+    public sealed class HotfixProcessJob : IDisposable {
+        private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+        private IntPtr handle;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct IO_COUNTERS {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public uint LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+            public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+            public IO_COUNTERS IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateJobObject(IntPtr attributes, string name);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetInformationJobObject(
+            IntPtr job,
+            int informationClass,
+            ref JOBOBJECT_EXTENDED_LIMIT_INFORMATION information,
+            uint informationLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        public HotfixProcessJob(string name) {
+            handle = CreateJobObject(IntPtr.Zero, name);
+            if (handle == IntPtr.Zero) {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to create the hotfix process job.");
+            }
+
+            var information = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
+            information.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            if (!SetInformationJobObject(handle, 9, ref information, (uint)Marshal.SizeOf(information))) {
+                int error = Marshal.GetLastWin32Error();
+                CloseHandle(handle);
+                handle = IntPtr.Zero;
+                throw new Win32Exception(error, "Unable to configure the hotfix process job.");
+            }
+        }
+
+        public void AddProcess(int processId) {
+            using (var process = Process.GetProcessById(processId)) {
+                if (!AssignProcessToJobObject(handle, process.Handle)) {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to assign Meteor to the hotfix process job.");
+                }
+            }
+        }
+
+        public void Dispose() {
+            if (handle != IntPtr.Zero) {
+                CloseHandle(handle);
+                handle = IntPtr.Zero;
+            }
+            GC.SuppressFinalize(this);
+        }
+    }
+}
+'@
+    }
+
+    return [MoFaCTS.HotfixProcessJob]::new("MoFaCTS-Hotfix-$([string]$env:MOFACTS_HOTFIX_RUN_ID)")
 }
 
 function Resolve-ExternalCommandName {
@@ -230,14 +338,16 @@ function Wait-ForMongo {
         [string]$DockerComposeBinary,
         [string[]]$ComposeArgs,
         [int]$TimeoutSeconds = 120,
-        [int]$DelayMilliseconds = 500
+        [int]$DelayMilliseconds = 500,
+        [int]$RequiredStableChecks = 4,
+        [int]$StabilityIntervalMilliseconds = 2000
     )
 
     function Test-MongoCommand {
         param([ValidateSet("root", "app")][string]$CredentialSet)
 
         $mongoCommand = if ($CredentialSet -eq "root") {
-            'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval ''db.adminCommand({ ping: 1 }).ok'''
+            'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval ''const h = db.adminCommand({ hello: 1 }); print(h.ok === 1 && h.setName === process.env.MOFACTS_MONGO_REPLICA_SET_NAME && h.isWritablePrimary === true ? 1 : 0)'''
         } else {
             'mongosh --quiet --username "$MOFACTS_MONGO_APP_USERNAME" --password "$MOFACTS_MONGO_APP_PASSWORD" --authenticationDatabase "$MOFACTS_MONGO_APP_DATABASE" --eval ''db.runCommand({ ping: 1 }).ok'''
         }
@@ -275,8 +385,10 @@ function Wait-ForMongo {
     }
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $stableChecks = 0
     while ($true) {
         if (-not (Test-MongoTcp)) {
+            $stableChecks = 0
             if ((Get-Date) -ge $deadline) {
                 throw "Timed out waiting for MongoDB TCP listener at ${HostName}:${Port} after ${TimeoutSeconds}s"
             }
@@ -286,6 +398,7 @@ function Wait-ForMongo {
         }
 
         if (-not (Test-MongoCommand -CredentialSet "root")) {
+            $stableChecks = 0
             if ((Get-Date) -ge $deadline) {
                 throw "Timed out waiting for MongoDB root auth at ${HostName}:${Port} after ${TimeoutSeconds}s"
             }
@@ -294,6 +407,7 @@ function Wait-ForMongo {
         }
 
         if (-not (Test-MongoCommand -CredentialSet "app")) {
+            $stableChecks = 0
             if ((Get-Date) -ge $deadline) {
                 throw "Timed out waiting for MongoDB app user auth at ${HostName}:${Port} after ${TimeoutSeconds}s"
             }
@@ -301,7 +415,12 @@ function Wait-ForMongo {
             continue
         }
 
-        return
+        $stableChecks += 1
+        if ($stableChecks -ge $RequiredStableChecks) {
+            return
+        }
+
+        Start-Sleep -Milliseconds $StabilityIntervalMilliseconds
     }
 }
 
@@ -379,22 +498,18 @@ function Ensure-LocalAgentSecrets {
     }
 }
 
-function Ensure-CommonJsBuildMarker {
+function Ensure-CommonJsBoundary {
     $localMeteorDir = Join-Path $appDir ".meteor\local"
-    $buildDir = Join-Path $appDir ".meteor\local\build"
     $packageJson = "{`"type`":`"commonjs`"}"
 
     if (-not (Test-Path $localMeteorDir)) {
         New-Item -ItemType Directory -Path $localMeteorDir | Out-Null
     }
 
+    # This stable ancestor owns the module boundary for every generated Meteor
+    # build below .meteor/local. Do not poll generated build directories or
+    # touch application source to force a second rebuild.
     Set-Content -Path (Join-Path $localMeteorDir "package.json") -Value $packageJson -NoNewline
-
-    if (-not (Test-Path $buildDir)) {
-        New-Item -ItemType Directory -Path $buildDir | Out-Null
-    }
-
-    Set-Content -Path (Join-Path $buildDir "package.json") -Value $packageJson -NoNewline
 }
 
 function Wait-HotfixDevReady {
@@ -404,7 +519,15 @@ function Wait-HotfixDevReady {
     do {
         $existing = Get-HotfixDevProcess
         if ($null -eq $existing) {
-            throw "Hotfix dev server exited before it became ready"
+            $supervisor = Get-HotfixSupervisorProcess
+            if ($null -ne $supervisor) {
+                Start-Sleep -Seconds 1
+                continue
+            }
+
+            $failureSummary = Get-HotfixFailureSummary
+            $detail = if ($failureSummary) { " $failureSummary" } else { "" }
+            throw "Hotfix supervisor exited before Meteor became ready.$detail"
         }
 
         if (Test-Path $stdoutPath) {
@@ -479,37 +602,271 @@ function Ensure-LocalAdminAccount {
     }
 }
 
-function Get-HotfixDevProcess {
-    if (-not (Test-Path $pidPath)) {
+function Get-TrackedProcessId {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
         return $null
     }
 
-    $pidContent = Get-Content $pidPath -Raw -ErrorAction SilentlyContinue
+    $pidContent = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
     if ($null -eq $pidContent) {
         return $null
     }
 
     $rawPid = $pidContent.Trim()
-    if (-not $rawPid) {
+    if ($rawPid -notmatch '^\d+$') {
         return $null
     }
 
-    $processId = [int]$rawPid
-    return Get-Process -Id $processId -ErrorAction SilentlyContinue
+    return [int]$rawPid
+}
+
+function Test-TrackedProcess {
+    param(
+        $Process,
+        [string]$TrackingPath,
+        [string]$ExpectedExecutablePath
+    )
+
+    if ($null -eq $Process -or -not (Test-Path -LiteralPath $TrackingPath)) {
+        return $false
+    }
+
+    $trackedAtUtc = (Get-Item -LiteralPath $TrackingPath).LastWriteTimeUtc
+    $startedAtUtc = $Process.StartTime.ToUniversalTime()
+    $expectedPath = [IO.Path]::GetFullPath($ExpectedExecutablePath)
+    $actualPath = [IO.Path]::GetFullPath($Process.Path)
+    return [Math]::Abs(($trackedAtUtc - $startedAtUtc).TotalSeconds) -le 30 -and
+        $actualPath.Equals($expectedPath, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-HotfixDevProcess {
+    $processId = Get-TrackedProcessId -Path $pidPath
+    if ($null -eq $processId) {
+        return $null
+    }
+
+    $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+    $meteorTool = Get-ProjectMeteorTool
+    if (-not (Test-TrackedProcess -Process $process -TrackingPath $pidPath -ExpectedExecutablePath $meteorTool.NodeExe)) {
+        return $null
+    }
+
+    return $process
+}
+
+function Get-HotfixSupervisorProcess {
+    $processId = Get-TrackedProcessId -Path $supervisorPidPath
+    if ($null -eq $processId) {
+        return $null
+    }
+
+    $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+    $powershellPath = (Get-Command powershell -ErrorAction Stop).Source
+    if (-not (Test-TrackedProcess -Process $process -TrackingPath $supervisorPidPath -ExpectedExecutablePath $powershellPath)) {
+        return $null
+    }
+
+    return $process
 }
 
 function Stop-ProcessTree {
     param([int]$RootProcessId)
 
-    $children = Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $RootProcessId }
-    foreach ($child in $children) {
-        Stop-ProcessTree -RootProcessId ([int]$child.ProcessId)
+    $process = Get-Process -Id $RootProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $process) {
+        return
     }
 
-    $process = Get-Process -Id $RootProcessId -ErrorAction SilentlyContinue
+    & taskkill.exe /PID $RootProcessId /T /F 2>$null | Out-Null
+}
+
+function Stop-OwnedSupervisorProcesses {
+    $process = Get-HotfixSupervisorProcess
     if ($null -ne $process) {
-        Stop-Process -Id $RootProcessId -Force
+        Write-Host "Stopping stale MoFaCTS hotfix supervisor PID $($process.Id)."
+        Stop-ProcessTree -RootProcessId $process.Id
     }
+}
+
+function Get-ObsoleteCommonJsGuardProcesses {
+    $obsoletePidPath = Join-Path $localDevDir "commonjs-watcher.pid"
+    $processId = Get-TrackedProcessId -Path $obsoletePidPath
+    if ($null -eq $processId) {
+        return @()
+    }
+
+    $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+    $powershellPath = (Get-Command powershell -ErrorAction Stop).Source
+    if (Test-TrackedProcess -Process $process -TrackingPath $obsoletePidPath -ExpectedExecutablePath $powershellPath) {
+        return @($process)
+    }
+
+    return @()
+}
+
+function Stop-ObsoleteCommonJsGuardProcesses {
+    foreach ($process in @(Get-ObsoleteCommonJsGuardProcesses)) {
+        Write-Host "Stopping obsolete MoFaCTS CommonJS guard PID $($process.Id)."
+        Stop-ProcessTree -RootProcessId $process.Id
+    }
+    Remove-Item -LiteralPath (Join-Path $localDevDir "commonjs-watcher.pid") -ErrorAction SilentlyContinue
+}
+
+function Write-HotfixRunState {
+    param(
+        [string]$Status,
+        $MeteorProcessId = $null,
+        $ExitCode = $null
+    )
+
+    if (-not (Test-Path -LiteralPath $localDevDir)) {
+        New-Item -ItemType Directory -Path $localDevDir | Out-Null
+    }
+
+    $state = [ordered]@{
+        runId = [string]$env:MOFACTS_HOTFIX_RUN_ID
+        status = $Status
+        startedAtUtc = [string]$env:MOFACTS_HOTFIX_STARTED_AT_UTC
+        updatedAtUtc = [DateTime]::UtcNow.ToString("o")
+        supervisorPid = $PID
+        meteorPid = $MeteorProcessId
+        exitCode = $ExitCode
+    }
+    $temporaryPath = "$runStatePath.$PID.tmp"
+    $state | ConvertTo-Json | Set-Content -LiteralPath $temporaryPath
+    Move-Item -LiteralPath $temporaryPath -Destination $runStatePath -Force
+}
+
+function Set-HotfixRunStateStatus {
+    param([string]$Status)
+
+    if (-not (Test-Path -LiteralPath $runStatePath)) {
+        return
+    }
+
+    $state = Get-Content -LiteralPath $runStatePath -Raw | ConvertFrom-Json
+    $state.status = $Status
+    $state.updatedAtUtc = [DateTime]::UtcNow.ToString("o")
+    $temporaryPath = "$runStatePath.$PID.tmp"
+    $state | ConvertTo-Json | Set-Content -LiteralPath $temporaryPath
+    Move-Item -LiteralPath $temporaryPath -Destination $runStatePath -Force
+}
+
+function Archive-HotfixRunLogs {
+    $paths = @($stdoutPath, $stderrPath, $supervisorStdoutPath, $supervisorStderrPath, $runStatePath)
+    if (-not ($paths | Where-Object { Test-Path -LiteralPath $_ })) {
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $runHistoryDir)) {
+        New-Item -ItemType Directory -Path $runHistoryDir | Out-Null
+    }
+
+    $archivePrefix = [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmssfff")
+    foreach ($path in $paths) {
+        if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
+
+        $item = Get-Item -LiteralPath $path
+        if ($item.Length -eq 0) {
+            Remove-Item -LiteralPath $path
+            continue
+        }
+
+        $destination = Join-Path $runHistoryDir "$archivePrefix-$($item.Name)"
+        Move-Item -LiteralPath $path -Destination $destination
+    }
+}
+
+function Get-HotfixFailureSummary {
+    $stdout = if (Test-Path -LiteralPath $stdoutPath) {
+        [string](Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue)
+    } else { "" }
+    $stderr = if (Test-Path -LiteralPath $stderrPath) {
+        [string](Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue)
+    } else { "" }
+    $combined = "$stdout`n$stderr"
+
+    if ($combined -match 'ERR_IPC_CHANNEL_CLOSED') {
+        return "Meteor IPC channel closed during a rebuild."
+    }
+    if ($combined -match "Module not found: Can't resolve .*_build\\main-dev\\client-entry\.js") {
+        return "Rspack lost the generated development client entry during a rebuild."
+    }
+    if ($combined -match 'ModuleGraphModule .* not found') {
+        return "Rspack failed inside its module graph."
+    }
+    if ($combined -match 'PoolClearedOnNetworkError|MongoNetworkTimeoutError|MongoTopologyClosedError|MongoServerSelectionError') {
+        return "Meteor lost its MongoDB connection pool."
+    }
+    if ($combined -match '=> Your application is crashing') {
+        return "Meteor reported an application crash."
+    }
+
+    return ""
+}
+
+function Invoke-HotfixSupervisor {
+    $meteorTool = Get-ProjectMeteorTool
+    $settingsPath = Resolve-HotfixDevSettingsPath
+    $meteorProcess = $null
+    $processJob = $null
+    $exitCode = 1
+
+    Set-Content -LiteralPath $supervisorPidPath -Value ([string]$PID)
+    Remove-Item -LiteralPath $stopRequestPath -ErrorAction SilentlyContinue
+
+    try {
+        $processJob = New-HotfixProcessJob
+        $meteorArguments = @(
+            "--no-wasm-code-gc",
+            "--require=$($meteorTool.WarningModule)",
+            $meteorTool.ToolEntry,
+            "--settings",
+            $settingsPath,
+            "--port",
+            $port
+        )
+        $meteorProcess = Start-Process `
+            -FilePath $meteorTool.NodeExe `
+            -ArgumentList $meteorArguments `
+            -WorkingDirectory $appDir `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath `
+            -WindowStyle Hidden `
+            -PassThru
+
+        $processJob.AddProcess($meteorProcess.Id)
+        Set-Content -LiteralPath $pidPath -Value ([string]$meteorProcess.Id)
+        Write-HotfixRunState -Status "running" -MeteorProcessId $meteorProcess.Id
+        Wait-Process -Id $meteorProcess.Id
+        $meteorProcess.Refresh()
+        $exitCode = $meteorProcess.ExitCode
+        $status = if (Test-Path -LiteralPath $stopRequestPath) { "stopped" } else { "exited" }
+        Write-HotfixRunState -Status $status -MeteorProcessId $meteorProcess.Id -ExitCode $exitCode
+    } catch {
+        Write-HotfixRunState -Status "failed" -MeteorProcessId $(if ($null -ne $meteorProcess) { $meteorProcess.Id } else { $null }) -ExitCode $exitCode
+        Write-Error "Hotfix supervisor failed: $($_.Exception.Message)" -ErrorAction Continue
+    } finally {
+        if ($null -ne $meteorProcess) {
+            Stop-ProcessTree -RootProcessId $meteorProcess.Id
+        }
+        if ($null -ne $processJob) {
+            $processJob.Dispose()
+        }
+        Remove-Item -LiteralPath $pidPath -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stopRequestPath -ErrorAction SilentlyContinue
+
+        $trackedSupervisorId = Get-TrackedProcessId -Path $supervisorPidPath
+        if ($trackedSupervisorId -eq $PID) {
+            Remove-Item -LiteralPath $supervisorPidPath -ErrorAction SilentlyContinue
+        }
+    }
+
+    return $exitCode
 }
 
 function Assert-RequiredFiles {
@@ -525,10 +882,6 @@ function Assert-RequiredFiles {
 
     if (-not (Test-Path $localDataHome)) {
         throw "Missing local-data directory in $deployDir"
-    }
-
-    if (-not (Test-Path $commonJsWatcherScript)) {
-        throw "Missing CommonJS build guard script at $commonJsWatcherScript"
     }
 
     if (-not (Test-Path $localAdminScript)) {
@@ -645,65 +998,17 @@ function Get-HotfixDevClientBundleState {
     }
 }
 
-function Test-OwnedRspackProcess {
-    param($Process)
-
-    if ($null -eq $Process) {
-        return $false
-    }
-
-    $commandLine = [string]$Process.CommandLine
-    return $commandLine -like "*$appDir*" -and
-        $commandLine -match "rspack(\.js)?['`" ]+(serve|build)" -and
-        $commandLine -match "devServerPort=($rspackDevServerPort)|[: ]$rspackDevServerPort(\s|$)"
-}
-
-function Stop-OwnedRspackProcesses {
-    $ownedProcesses = @(Get-CimInstance Win32_Process | Where-Object { Test-OwnedRspackProcess -Process $_ })
-    if ($ownedProcesses.Count -eq 0) {
-        return
-    }
-
-    $ownedIds = @{}
-    foreach ($ownedProcess in $ownedProcesses) {
-        $ownedIds[[int]$ownedProcess.ProcessId] = $true
-    }
-
-    $roots = @($ownedProcesses | Where-Object { -not $ownedIds.ContainsKey([int]$_.ParentProcessId) })
-    foreach ($root in $roots) {
-        $rootProcessId = [int]$root.ProcessId
-        Write-Host "Stopping stale MoFaCTS Rspack process tree PID $rootProcessId."
-        Stop-ProcessTree -RootProcessId $rootProcessId
-    }
-}
-
 function Assert-RspackDevPortAvailable {
     $listeners = @(Get-NetTCPConnection -LocalPort ([int]$rspackDevServerPort) -State Listen -ErrorAction SilentlyContinue)
     foreach ($listener in $listeners) {
         $ownerProcessId = [int]$listener.OwningProcess
-        $ownerProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $ownerProcessId" -ErrorAction SilentlyContinue
+        $ownerProcess = Get-Process -Id $ownerProcessId -ErrorAction SilentlyContinue
         if ($null -eq $ownerProcess) {
             continue
         }
 
         throw "Rspack HMR port $rspackDevServerPort is occupied by unrelated PID $ownerProcessId. Stop that process or configure a different port before starting hotfix dev."
     }
-}
-
-function Remove-RspackDevBuild {
-    $mainDevDir = Join-Path $appDir "_build\main-dev"
-    if (-not (Test-Path $mainDevDir)) {
-        return
-    }
-
-    $resolvedAppDir = (Resolve-Path $appDir).Path
-    $resolvedMainDevDir = (Resolve-Path $mainDevDir).Path
-    if (-not $resolvedMainDevDir.StartsWith($resolvedAppDir, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to remove Rspack dev build outside app directory: $resolvedMainDevDir"
-    }
-
-    Write-Host "Removing generated Rspack dev bundle directory: $resolvedMainDevDir"
-    Remove-Item -LiteralPath $resolvedMainDevDir -Recurse -Force
 }
 
 function Ensure-RspackDevBootstrap {
@@ -717,8 +1022,6 @@ function Ensure-RspackDevBootstrap {
         "server-entry.js" = "import '../../server/main.ts';`n"
         "client-meteor.js" = "/* Rspack dev-server serves the client bundle during hotfix dev. */`n"
         "server-meteor.js" = "import './server-rspack.js';`n"
-        "client-rspack.js" = "/* Placeholder until Rspack writes the client bundle. */`n"
-        "server-rspack.js" = "/* Placeholder until Rspack writes the server bundle. */`n"
     }
 
     foreach ($entry in $bootstrapFiles.GetEnumerator()) {
@@ -729,7 +1032,35 @@ function Ensure-RspackDevBootstrap {
     }
 }
 
+function Reset-RspackDevContext {
+    $buildRoot = [IO.Path]::GetFullPath((Join-Path $appDir "_build"))
+    $mainDevDir = [IO.Path]::GetFullPath((Join-Path $buildRoot "main-dev"))
+    $expectedPrefix = $buildRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    if (-not $mainDevDir.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to reset Rspack development context outside $buildRoot"
+    }
+
+    # A complete cold-start reset is safe only here, after every owned process
+    # has stopped and before either watcher starts. During a live run the
+    # Rspack plugin preserves these files so no watcher observes a missing
+    # entry or bridge file.
+    if (Test-Path -LiteralPath $mainDevDir) {
+        Remove-Item -LiteralPath $mainDevDir -Recurse -Force
+    }
+    Ensure-RspackDevBootstrap
+
+    $outputFiles = @{
+        "client-rspack.js" = "/* Placeholder until Rspack writes the client bundle. */`n"
+        "server-rspack.js" = "/* Placeholder until Rspack writes the server bundle. */`n"
+    }
+    foreach ($entry in $outputFiles.GetEnumerator()) {
+        Set-Content -LiteralPath (Join-Path $mainDevDir $entry.Key) -Value $entry.Value -NoNewline
+    }
+}
+
 function Start-HotfixDev {
+    param([ValidateRange(0, 1)][int]$RecoveryAttempt = 0)
+
     Assert-RequiredFiles
 
     $dockerExe = Resolve-ExternalCommandName -CommandName "docker"
@@ -737,24 +1068,25 @@ function Start-HotfixDev {
     Invoke-ExternalChecked -CommandLine (@($dockerExe) + $composeArgs + @("config", "--quiet")) -WorkingDirectory $deployDir
 
     $existing = Get-HotfixDevProcess
+    $existingSupervisor = Get-HotfixSupervisorProcess
     if ($null -ne $existing) {
-        if (Test-HotfixDevEndpoints) {
-            Write-Host "Hotfix dev server is already running with PID $($existing.Id)."
+        if ($null -ne $existingSupervisor -and (Test-HotfixDevEndpoints)) {
+            Write-Host "Hotfix dev server is already running with PID $($existing.Id) under supervisor PID $($existingSupervisor.Id)."
             Write-Host "URL: $rootUrl"
             return
         }
 
-        Write-Host "Hotfix dev server PID $($existing.Id) is running but app/HMR ports are not both reachable; rebuilding generated dev bundles."
+        Write-Host "Hotfix dev server PID $($existing.Id) lacks a healthy supervised runtime; rebuilding generated dev bundles."
         Stop-HotfixDev
     }
 
     Remove-StaleLocalBuild
-    Stop-OwnedRspackProcesses
+    Stop-ObsoleteCommonJsGuardProcesses
+    Stop-OwnedSupervisorProcesses
     Assert-RspackDevPortAvailable
 
-    Remove-RspackDevBuild
-    Ensure-RspackDevBootstrap
-    Ensure-CommonJsBuildMarker
+    Reset-RspackDevContext
+    Ensure-CommonJsBoundary
 
     if (-not (Test-Path $localDevDir)) {
         New-Item -ItemType Directory -Path $localDevDir | Out-Null
@@ -775,8 +1107,11 @@ function Start-HotfixDev {
         -ComposeArgs $composeArgs | Out-Null
     Ensure-LocalAgentSecrets | Out-Null
 
+    Archive-HotfixRunLogs
     Set-Content -Path $stdoutPath -Value ""
     Set-Content -Path $stderrPath -Value ""
+    Set-Content -Path $supervisorStdoutPath -Value ""
+    Set-Content -Path $supervisorStderrPath -Value ""
 
     $previousMongoUrl = $env:MONGO_URL
     $previousExpectedMongoDbName = $env:EXPECTED_MONGO_DB_NAME
@@ -790,6 +1125,8 @@ function Start-HotfixDev {
     $previousMeteorInstallation = $env:METEOR_INSTALLATION
     $previousNodePath = $env:NODE_PATH
     $previousBabelCacheDir = $env:BABEL_CACHE_DIR
+    $previousHotfixRunId = $env:MOFACTS_HOTFIX_RUN_ID
+    $previousHotfixStartedAt = $env:MOFACTS_HOTFIX_STARTED_AT_UTC
 
     try {
         $env:MONGO_URL = $nativeMongoUrl
@@ -804,40 +1141,20 @@ function Start-HotfixDev {
         $env:PATH = "$($meteorTool.ToolDir);$previousPath"
         $env:NODE_PATH = $meteorTool.NodePath
         $env:BABEL_CACHE_DIR = $meteorTool.BabelCacheDir
+        $env:MOFACTS_HOTFIX_RUN_ID = [Guid]::NewGuid().ToString("N")
+        $env:MOFACTS_HOTFIX_STARTED_AT_UTC = [DateTime]::UtcNow.ToString("o")
 
-        Set-Content -Path $pidPath -Value ([string]$PID)
-
-        $watcher = Start-Process `
+        $supervisor = Start-Process `
             -FilePath "powershell" `
-            -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $commonJsWatcherScript, "-AppDir", $appDir, "-PidPath", $pidPath) `
+            -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $managerScriptPath, "-Action", "__supervise") `
             -WorkingDirectory $deployDir `
-            -RedirectStandardOutput $watcherStdoutPath `
-            -RedirectStandardError $watcherStderrPath `
+            -RedirectStandardOutput $supervisorStdoutPath `
+            -RedirectStandardError $supervisorStderrPath `
             -WindowStyle Hidden `
             -PassThru
 
-        Set-Content -Path $watcherPidPath -Value ([string]$watcher.Id)
-
-        $meteorArguments = @(
-            "--no-wasm-code-gc",
-            "--require=$($meteorTool.WarningModule)",
-            $meteorTool.ToolEntry,
-            "--settings",
-            $resolvedSettingsPath,
-            "--port",
-            $port
-        )
-        $process = Start-Process `
-            -FilePath $meteorTool.NodeExe `
-            -ArgumentList $meteorArguments `
-            -WorkingDirectory $appDir `
-            -RedirectStandardOutput $stdoutPath `
-            -RedirectStandardError $stderrPath `
-            -WindowStyle Hidden `
-            -PassThru
-
-        Set-Content -Path $pidPath -Value ([string]$process.Id)
-        Write-Host "Started canonical source-watching hotfix server with PID $($process.Id) using Meteor $($meteorTool.Version)."
+        Set-Content -Path $supervisorPidPath -Value ([string]$supervisor.Id)
+        Write-Host "Started canonical hotfix supervisor PID $($supervisor.Id) using Meteor $($meteorTool.Version)."
         Write-Host "URL: $rootUrl"
         Write-Host "Stdout: $stdoutPath"
         Write-Host "Stderr: $stderrPath"
@@ -858,13 +1175,23 @@ function Start-HotfixDev {
         $env:METEOR_INSTALLATION = $previousMeteorInstallation
         $env:NODE_PATH = $previousNodePath
         $env:BABEL_CACHE_DIR = $previousBabelCacheDir
+        $env:MOFACTS_HOTFIX_RUN_ID = $previousHotfixRunId
+        $env:MOFACTS_HOTFIX_STARTED_AT_UTC = $previousHotfixStartedAt
     }
 
     try {
         Wait-HotfixDevReady
     } catch {
+        $startupError = $_
+        $failureSummary = Get-HotfixFailureSummary
         Stop-HotfixDev
-        throw
+        Set-HotfixRunStateStatus -Status "startup-failed"
+        if ($RecoveryAttempt -eq 0 -and $failureSummary -eq "Meteor lost its MongoDB connection pool.") {
+            Write-Host "Meteor lost MongoDB during startup; retrying the canonical supervised run once after the stable writable-primary gate."
+            Start-HotfixDev -RecoveryAttempt 1
+            return
+        }
+        throw $startupError
     }
     $createdLocalAdmin = Ensure-LocalAdminAccount
     if ($createdLocalAdmin) {
@@ -875,57 +1202,80 @@ function Start-HotfixDev {
 }
 
 function Stop-HotfixDev {
-    if (Test-Path $watcherPidPath) {
-        $rawWatcherPid = (Get-Content $watcherPidPath -Raw).Trim()
-        if ($rawWatcherPid) {
-            $watcherProcess = Get-Process -Id ([int]$rawWatcherPid) -ErrorAction SilentlyContinue
-            if ($null -ne $watcherProcess) {
-                Stop-ProcessTree -RootProcessId $watcherProcess.Id
-            }
-        }
-        Remove-Item -LiteralPath $watcherPidPath -ErrorAction SilentlyContinue
-    }
-
+    Stop-ObsoleteCommonJsGuardProcesses
     $existing = Get-HotfixDevProcess
-    if ($null -eq $existing) {
+    $supervisor = Get-HotfixSupervisorProcess
+    if ($null -eq $existing -and $null -eq $supervisor) {
         Write-Host "Hotfix dev server is not running."
-        if (Test-Path $pidPath) {
-            Remove-Item -LiteralPath $pidPath
-        }
-        Stop-OwnedRspackProcesses
+        Remove-Item -LiteralPath $pidPath -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $supervisorPidPath -ErrorAction SilentlyContinue
+        Stop-OwnedSupervisorProcesses
         return
     }
 
-    Stop-ProcessTree -RootProcessId $existing.Id
+    Set-Content -LiteralPath $stopRequestPath -Value ([DateTime]::UtcNow.ToString("o"))
+    if ($null -ne $existing) {
+        Stop-ProcessTree -RootProcessId $existing.Id
+    }
+    if ($null -ne $supervisor) {
+        Wait-Process -Id $supervisor.Id -Timeout 10 -ErrorAction SilentlyContinue
+        Stop-ProcessTree -RootProcessId $supervisor.Id
+    }
+    Stop-OwnedSupervisorProcesses
     Remove-Item -LiteralPath $pidPath -ErrorAction SilentlyContinue
-    Stop-OwnedRspackProcesses
-    Write-Host "Stopped hotfix dev server PID $($existing.Id)."
+    Remove-Item -LiteralPath $supervisorPidPath -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $stopRequestPath -ErrorAction SilentlyContinue
+    Set-HotfixRunStateStatus -Status "stopped"
+    Write-Host "Stopped the canonical hotfix process tree."
 }
 
 function Show-HotfixDevStatus {
     $dockerExe = Resolve-ExternalCommandName -CommandName "docker"
     $existing = Get-HotfixDevProcess
+    $supervisor = Get-HotfixSupervisorProcess
+    $obsoleteGuards = @(Get-ObsoleteCommonJsGuardProcesses)
+
     if ($null -eq $existing) {
         Write-Host "Hotfix dev server is not running."
-        return
+    } else {
+        Write-Host "Hotfix dev server is running with PID $($existing.Id)."
+        Write-Host "URL: $rootUrl"
+        Write-Host "App health endpoint ready: $(Test-HotfixDevAppHealth)"
+        Write-Host "Rspack HMR port $rspackDevServerPort reachable: $(Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort))"
+        $clientBundleState = Get-HotfixDevClientBundleState
+        Write-Host "Browser client bundle ready: $($clientBundleState.Ready)"
+        if (-not $clientBundleState.Ready) {
+            Write-Host "Browser client bundle issue: $($clientBundleState.Reason)"
+        }
+        try {
+            $activeChangeStreams = Get-ActiveChangeStreamCount -DockerComposeBinary $dockerExe -ComposeArgs $composeArgs
+            Write-Host "Active MongoDB Change Streams: $activeChangeStreams"
+        } catch {
+            Write-Host "Active MongoDB Change Streams: unavailable ($($_.Exception.Message))"
+        }
     }
 
-    Write-Host "Hotfix dev server is running with PID $($existing.Id)."
-    Write-Host "URL: $rootUrl"
-    Write-Host "App health endpoint ready: $(Test-HotfixDevAppHealth)"
-    Write-Host "Rspack HMR port $rspackDevServerPort reachable: $(Test-TcpPortOpen -HostName "127.0.0.1" -PortNumber ([int]$rspackDevServerPort))"
-    $clientBundleState = Get-HotfixDevClientBundleState
-    Write-Host "Browser client bundle ready: $($clientBundleState.Ready)"
-    if (-not $clientBundleState.Ready) {
-        Write-Host "Browser client bundle issue: $($clientBundleState.Reason)"
+    if ($null -ne $supervisor) {
+        Write-Host "Hotfix supervisor PID: $($supervisor.Id)"
+    } elseif (Test-Path -LiteralPath $supervisorPidPath) {
+        Write-Host "Hotfix supervisor PID file is stale or belongs to another process."
     }
-    $activeChangeStreams = Get-ActiveChangeStreamCount -DockerComposeBinary $dockerExe -ComposeArgs $composeArgs
-    Write-Host "Active MongoDB Change Streams: $activeChangeStreams"
+    if ((Test-Path -LiteralPath $pidPath) -and $null -eq $existing) {
+        Write-Host "Meteor PID file is stale or belongs to another process."
+    }
+    Write-Host "Hotfix supervisor active: $($null -ne $supervisor)"
+    Write-Host "Obsolete CommonJS guards: $($obsoleteGuards.Count)"
+
+    if (Test-Path -LiteralPath $runStatePath) {
+        $state = Get-Content -LiteralPath $runStatePath -Raw | ConvertFrom-Json
+        Write-Host "Last run state: $($state.status) at $($state.updatedAtUtc); exit code: $($state.exitCode)"
+    }
+    $failureSummary = Get-HotfixFailureSummary
+    if ($failureSummary) {
+        Write-Host "Last failure: $failureSummary"
+    }
     Write-Host "Stdout: $stdoutPath"
     Write-Host "Stderr: $stderrPath"
-    if (Test-Path $watcherPidPath) {
-        Write-Host "CommonJS build guard PID: $((Get-Content $watcherPidPath -Raw).Trim())"
-    }
 }
 
 function Show-HotfixDevLogs {
@@ -941,9 +1291,9 @@ function Show-HotfixDevLogs {
         Get-Content -Path $stderrPath -Tail $LogTail
     }
 
-    if (Test-Path $watcherStderrPath) {
-        Write-Host "---- CommonJS build guard stderr tail ----"
-        Get-Content -Path $watcherStderrPath -Tail $LogTail
+    if (Test-Path $supervisorStderrPath) {
+        Write-Host "---- supervisor stderr tail ----"
+        Get-Content -Path $supervisorStderrPath -Tail $LogTail
     }
 }
 
@@ -954,7 +1304,6 @@ switch ($Action) {
     "restart" {
         Stop-HotfixDev
         Assert-RequiredFiles
-        Remove-RspackDevBuild
         Start-HotfixDev
     }
     "stop" {
@@ -965,5 +1314,8 @@ switch ($Action) {
     }
     "logs" {
         Show-HotfixDevLogs
+    }
+    "__supervise" {
+        exit (Invoke-HotfixSupervisor)
     }
 }
