@@ -63,6 +63,10 @@
   margin: 0;
 }
 
+.ai-create-status .fa-spin {
+  margin-inline-end: 1ch;
+}
+
 .ai-simple-form,
 .ai-review {
   display: grid;
