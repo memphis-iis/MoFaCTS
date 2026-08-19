@@ -11,9 +11,11 @@ import { cleanupAudioRecorder } from './speechRecognitionService';
 import { stopTtsPlayback } from './ttsService';
 import { completeCleanup } from '../utils/lifecycleCleanup';
 import type { NavigationDestination } from '../../../../../common/types/svelteServices';
+import { buildActiveLessonRouteLocation } from '../../../../lib/activeLessonRoute';
+import { isLessonRoutePath, type LessonRouteSurface } from '../../../../lib/lessonRoute';
 
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
-  FlowRouter: { go(path: string): void };
+  FlowRouter: { go(path: string, params?: Record<string, unknown>, queryParams?: Record<string, unknown>): void };
 };
 
 let isNavigatingAway = false;
@@ -34,6 +36,9 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
   if (isNavigatingAway) {
     return;
   }
+  const lessonDestination = dest === '/content' || dest === '/instructions'
+    ? buildActiveLessonRouteLocation(dest as LessonRouteSurface)
+    : null;
   isNavigatingAway = true;
   stopStimDisplayTypeMapVersionSync('svelte leavePage');
   stopCardAudioNow();
@@ -42,7 +47,11 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
     cleanupAudioRecorder();
 
     // Full cleanup when leaving the learner flow (not /content or /instructions).
-    if (dest !== '/content' && dest !== '/instructions' && document.location.pathname !== '/instructions') {
+    if (
+      dest !== '/content'
+      && dest !== '/instructions'
+      && !isLessonRoutePath(document.location.pathname, '/instructions')
+    ) {
       // Clear experiment state
       ExperimentStateStore.clear();
 
@@ -60,7 +69,11 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
     clientConsole(1, '[Navigation] Cleanup error (continuing navigation):', error);
   } finally {
     // Navigate regardless of cleanup success
-    FlowRouter.go(dest);
+    FlowRouter.go(
+      lessonDestination?.path || dest,
+      {},
+      lessonDestination?.queryParams || {},
+    );
 
     // Reset flag after navigation completes
     setTimeout(() => {

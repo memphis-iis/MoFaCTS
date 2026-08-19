@@ -25,6 +25,7 @@ import {
   createDisclosureController,
   type DisclosureController,
 } from '../../lib/adminUi/disclosureController';
+import { isLessonRoutePath } from '../../lib/lessonRoute';
 import './home.html';
 import './home.css';
 import '../shared/adminUi/adminUi';
@@ -214,7 +215,7 @@ function scrollHomeToTop(): void {
 }
 
 async function leavePracticeFor(route: string): Promise<void> {
-  if (document.location.pathname === '/content' || document.location.pathname === '/instructions') {
+  if (isLessonRoutePath(document.location.pathname)) {
     const { leavePage } = await import('../experiment/svelte/services/navigationCleanup');
     await leavePage(route);
     return;

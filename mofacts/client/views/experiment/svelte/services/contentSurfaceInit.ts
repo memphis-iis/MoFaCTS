@@ -61,6 +61,8 @@ import {
   shouldUseProgressBootstrapForEntryIntent,
 } from '../../../../lib/cardEntryIntent';
 import { restoreCourseAssignmentLaunchContextFromState } from '../../../../lib/courseAssignmentLaunchContext';
+import { buildActiveLessonRouteLocation } from '../../../../lib/activeLessonRoute';
+import { isLessonRoutePath } from '../../../../lib/lessonRoute';
 import {
   describeContentEntryBootstrapMode,
   resolveContentEntryBootstrap,
@@ -770,7 +772,8 @@ async function initializeStandardCardEntry(
 
   if (shouldShowInstructions && !canInlineVideoInstructions) {
     setLaunchLoadingMessage(translatePlatformString(getActiveUiLocale(), 'common.loadingInstructions'));
-    FlowRouter.go('/instructions');
+    const location = buildActiveLessonRouteLocation('/instructions');
+    FlowRouter.go(location.path, {}, location.queryParams);
     return { redirected: true };
   }
 
@@ -900,7 +903,7 @@ export async function initializeContentSurface(): Promise<ContentSurfaceInitResu
 
   if (!cardPopstateHandler) {
     cardPopstateHandler = function(_event: PopStateEvent) {
-      if (document.location.pathname === '/content') {
+      if (isLessonRoutePath(document.location.pathname, '/content')) {
         setCardEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD, {
           source: 'contentSurfaceInit.popstate',
         });

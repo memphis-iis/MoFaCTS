@@ -26,6 +26,7 @@ import {
   CARD_RUNTIME_SESSION_DEFAULTS,
   FULL_LAUNCH_SESSION_DEFAULTS,
 } from "./sessionCleanupRegistry";
+import { isLessonRoutePath } from "./lessonRoute";
 declare const Session: any;
 declare const Meteor: any;
 declare const GlobalExperimentStates: any;
@@ -119,7 +120,7 @@ function shouldPreserveUnitStateForContent() {
   const fromInstructions = Session.get('fromInstructions');
   const contentBootstrapInProgress = Session.get('contentBootstrapInProgress') === true;
   const targetPath = document?.location?.pathname;
-  return targetPath === '/content' && (fromInstructions || contentBootstrapInProgress);
+  return isLessonRoutePath(targetPath, '/content') && (fromInstructions || contentBootstrapInProgress);
 }
 
 function sessionCleanUp() {

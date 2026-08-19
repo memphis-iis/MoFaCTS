@@ -28,6 +28,8 @@ import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getAudioPromptMode } from '../../lib/state/audioState';
 import { isAudioPromptModeEnabled, resolveUnitAudioPromptMode } from '../../../common/lib/audioPromptMode';
+import { buildActiveLessonRouteLocation } from '../../lib/activeLessonRoute';
+import { isLessonRoutePath, type LessonRouteSurface } from '../../lib/lessonRoute';
 import { resolveUnitSpeechRecognitionEnabled } from '../../lib/speechRecognitionConfig';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 
@@ -153,11 +155,21 @@ function leavePage(dest: any) {
   if (typeof dest === 'function') {
     dest();
   } else {
-    if (dest == '/content' && document.location.pathname == '/content') {
+    const lessonDestination = dest === '/content' || dest === '/instructions'
+      ? buildActiveLessonRouteLocation(dest as LessonRouteSurface)
+      : null;
+    if (dest === '/content' && isLessonRoutePath(document.location.pathname, '/content')) {
       // Force a same-route refresh when already on /content.
-      FlowRouter.go('/content', {}, { refreshContent: Date.now() });
+      FlowRouter.go(lessonDestination!.path, {}, {
+        ...lessonDestination!.queryParams,
+        refreshContent: Date.now(),
+      });
     } else {
-      FlowRouter.go(dest);
+      FlowRouter.go(
+        lessonDestination?.path || dest,
+        {},
+        lessonDestination?.queryParams || {},
+      );
     }
   }
 }

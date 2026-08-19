@@ -15,6 +15,8 @@ import { setCourseAssignmentLaunchContext } from './courseAssignmentLaunchContex
 import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
+import { buildActiveLessonRouteLocation } from './activeLessonRoute';
+import { setPracticeLaunchMode, type PracticeLaunchMode } from './practiceLaunchMode';
 import {
   setAudioEnabled,
   setAudioEnabledView,
@@ -40,7 +42,13 @@ type SetSpecLike = Record<string, any>;
 
 type LessonLaunchOptions = {
   courseAssignment?: CourseAssignmentHistoryContext | null;
+  practiceLaunchMode?: PracticeLaunchMode;
 };
+
+function goToActiveLessonSurface(surface: '/content' | '/instructions'): void {
+  const location = buildActiveLessonRouteLocation(surface);
+  FlowRouter.go(location.path, {}, location.queryParams);
+}
 
 async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY) {
   const experimentState: any = await getExperimentState();
@@ -60,7 +68,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
     setCardEntryIntent(entryIntent, {
       source: 'lessonLaunch.navigateForMultiTdf',
     });
-    FlowRouter.go('/content');
+    goToActiveLessonSurface('/content');
   } else {
     FlowRouter.go('/multiTdfSelect');
   }
@@ -83,6 +91,7 @@ export async function selectTdf(
     'stimuliSetId:', currentStimuliSetId, 'isMultiTdf:', isMultiTdf, 'source:', how);
 
   sessionCleanUp();
+  setPracticeLaunchMode(options.practiceLaunchMode ?? 'normal');
   setCourseAssignmentLaunchContext(options.courseAssignment ?? null);
   Session.set('uiMessage', null);
 
@@ -203,7 +212,7 @@ export async function selectTdf(
         Session.set('currentTdfUnit', entryRoute.currentTdfUnit);
         Session.set('curUnitInstructionsSeen', entryRoute.curUnitInstructionsSeen);
       }
-      FlowRouter.go(entryRoute.route);
+      goToActiveLessonSurface(entryRoute.route);
     }
   }
 }

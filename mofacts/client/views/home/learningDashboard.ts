@@ -47,6 +47,7 @@ import {
   type ProfileAvatarType,
 } from '../../../common/profileAvatar';
 import { clearPracticeLaunchMode, setPracticeLaunchMode } from '../../lib/practiceLaunchMode';
+import { buildActiveLessonRouteLocation } from '../../lib/activeLessonRoute';
 
 declare const Template: any;
 declare const Meteor: any;
@@ -1708,6 +1709,11 @@ async function checkAndWarmupAudioIfNeeded() {
 }
 
 // Actual logic for selecting and starting a TDF
+function goToActiveLessonSurface(surface: '/content' | '/instructions'): void {
+  const location = buildActiveLessonRouteLocation(surface);
+  FlowRouter.go(location.path, {}, location.queryParams);
+}
+
 async function safeSelectTdf(...args: Parameters<typeof selectTdf>) {
   const tdfId = String(args[0] || '');
   clearLessonCommandFeedback(tdfId);
@@ -1869,7 +1875,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
         Session.set('currentTdfUnit', entryRoute.currentTdfUnit);
         Session.set('curUnitInstructionsSeen', entryRoute.curUnitInstructionsSeen);
       }
-      FlowRouter.go(entryRoute.route);
+      goToActiveLessonSurface(entryRoute.route);
     }
   }
 }
@@ -1898,7 +1904,7 @@ async function navigateForMultiTdf(entryIntent: CardEntryIntent = CARD_ENTRY_INT
     setCardEntryIntent(entryIntent, {
       source: 'practiceMenu.navigateForMultiTdf',
     });
-    FlowRouter.go('/content');
+    goToActiveLessonSurface('/content');
   } else {
     finishLaunchLoading('multi-tdf-select');
     FlowRouter.go('/multiTdfSelect');

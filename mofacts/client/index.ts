@@ -49,6 +49,7 @@ import { getErrorMessage } from './lib/errorUtils';
 import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
 import { getPracticeLaunchMode } from './lib/practiceLaunchMode';
+import { isLessonRoutePath } from './lib/lessonRoute';
 
 // =============================================================================
 // Blaze Template Registration
@@ -111,7 +112,7 @@ type AuthenticatedChromeMode = 'none' | 'app' | 'practice';
 
 async function leavePracticeForHome(): Promise<boolean> {
   const currentPath = document.location.pathname;
-  if (currentPath !== '/content' && currentPath !== '/instructions') {
+  if (!isLessonRoutePath(currentPath)) {
     return false;
   }
 
@@ -185,7 +186,7 @@ function isMobilePracticeDisplay(): boolean {
 }
 
 function isPracticeRoutePath(path: string): boolean {
-  return path === '/content' || path === '/instructions';
+  return isLessonRoutePath(path);
 }
 
 async function returnMobilePracticeDisplayToMenu(reason: string): Promise<void> {
@@ -684,14 +685,11 @@ Template.DefaultLayout.onRendered(function(this: any) {
       if (!isEnterKeyLocked()) {
         setEnterKeyLock(true);
         clientConsole(2, 'grabbed enterKeyLock on global enter handler');
-        switch (curPage) {
-          case '/instructions':
-            e.preventDefault();
-            instructContinue();
-            break;
-          case '/content':
-            // Enter key on the content route is handled by the content runtime.
-            break;
+        if (isLessonRoutePath(curPage, '/instructions')) {
+          e.preventDefault();
+          instructContinue();
+        } else if (isLessonRoutePath(curPage, '/content')) {
+          // Enter key on the content route is handled by the content runtime.
         }
       }
     }

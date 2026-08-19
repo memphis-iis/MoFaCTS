@@ -60,8 +60,8 @@ describe('sessionUtils mapping cleanup', function() {
 
   it('clears mapping and signature in the fromInstructions guard branch', function() {
     Session.set('fromInstructions', true);
-    // Simulate navigating to /content so the guard branch executes
-    setTestPath('/content');
+    // Simulate navigating to a descriptor-bearing content route so the guard branch executes
+    setTestPath('/content/root-a');
 
     sessionCleanUp();
 
@@ -72,7 +72,7 @@ describe('sessionUtils mapping cleanup', function() {
   it('clears mapping and signature in the card bootstrap guard branch', function() {
     Session.set('fromInstructions', false);
     Session.set('contentBootstrapInProgress', true);
-    setTestPath('/content');
+    setTestPath('/content/root-a');
 
     sessionCleanUp();
 
@@ -94,7 +94,7 @@ describe('sessionUtils mapping cleanup', function() {
       currentTdfId: 'tdf-a',
       unitNumber: 2,
     });
-    setTestPath('/content');
+    setTestPath('/content/root-a');
 
     sessionCleanUp();
 

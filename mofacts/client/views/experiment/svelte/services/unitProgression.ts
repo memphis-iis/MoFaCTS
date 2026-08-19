@@ -28,9 +28,10 @@ import { translatePlatformString } from '../../../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { resolveRuntimeEngine } from './cardRuntimeState';
 import { resetQuestionIndex } from './trialProgressionState';
+import { buildActiveLessonRouteLocation } from '../../../../lib/activeLessonRoute';
 
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
-  FlowRouter: { go(path: string): void };
+  FlowRouter: { go(path: string, params?: Record<string, unknown>, queryParams?: Record<string, unknown>): void };
 };
 
 type TdfFileState = Record<string, unknown> & {
@@ -323,5 +324,6 @@ export async function revisitUnit(unitNumber: string | number): Promise<void> {
     videoPendingQuestionIndex: null,
   });
 
-  FlowRouter.go('/instructions');
+  const location = buildActiveLessonRouteLocation('/instructions');
+  FlowRouter.go(location.path, {}, location.queryParams);
 }

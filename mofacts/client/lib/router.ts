@@ -34,6 +34,12 @@ import {
   LEARNING_ANALYTICS_DESTINATION,
   type NormalLoginReturnDestination,
 } from './normalLoginDestination';
+import {
+  getCourseAssignmentLaunchContext,
+  setCourseAssignmentLaunchContext,
+} from './courseAssignmentLaunchContext';
+import { getPracticeLaunchMode, setPracticeLaunchMode } from './practiceLaunchMode';
+import { resolveLessonRouteRequest, type LessonRouteRequest } from './lessonRoute';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const Tdfs: any = (globalThis as any).Tdfs;
 const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
@@ -1145,80 +1151,116 @@ FlowRouter.route('/classEdit', {
     }, getRouteAccessPolicy('client.classEdit'));
   }
 });
-FlowRouter.route('/content', {
+
+async function bootstrapLessonRoute(
+  controller: any,
+  routeRequest: LessonRouteRequest,
+  preserveColdContentBootstrap: boolean,
+): Promise<boolean> {
+  const tdfId = routeRequest.rootTdfId;
+  let tdf: any = null;
+  try {
+    tdf = await meteorCallAsync('getTdfById', tdfId, {
+      courseAssignment: routeRequest.courseAssignment,
+    });
+  } catch (error: unknown) {
+    const message = (error as { reason?: string })?.reason || getErrorMessage(error);
+    if (message === COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON) {
+      clientConsole(2, '[Router] Lesson route requires its course launch descriptor; redirecting to Courses', { tdfId });
+      FlowRouter.go('/courses');
+      return false;
+    }
+    throw error;
+  }
+
+  if (!tdf) {
+    FlowRouter.go('/');
+    return false;
+  }
+
+  const setspec = tdf.content.tdfs.tutor.setspec ? tdf.content.tdfs.tutor.setspec : null;
+  const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
+  const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback
+    ? setspec.speechOutOfGrammarFeedback
+    : translatePlatformString(getActiveUiLocale(), 'speech.outOfGrammarFeedback');
+
+  renderLayout(controller, 'customLoading');
+  Session.set('contentBootstrapInProgress', preserveColdContentBootstrap);
+  try {
+    await selectTdf(
+      tdfId,
+      setspec.lessonname,
+      tdf.stimuliSetId,
+      ignoreOutOfGrammarResponses,
+      speechOutOfGrammarFeedback,
+      'Lesson route bootstrap',
+      tdf.content.isMultiTdf,
+      setspec,
+      false,
+      true,
+      {
+        courseAssignment: routeRequest.courseAssignment,
+        practiceLaunchMode: routeRequest.practiceLaunchMode,
+      },
+    );
+  } finally {
+    Session.set('contentBootstrapInProgress', false);
+  }
+  setCardEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD, {
+    source: 'router.lessonRoute.bootstrap',
+  });
+  return true;
+}
+
+FlowRouter.route('/content/:tdfId?', {
   name: 'client.content',
-  action: async function contentRouteAction() {
+  action: async function contentRouteAction(params: any) {
     const userId = Meteor.userId();
     const user = Meteor.user();
     if (!userId || !user) {
       const controller = this;
       waitForAuthenticatedRoute(this, 'client.content', async () => {
-        await contentRouteAction.call(controller);
+        await contentRouteAction.call(controller, params);
       });
       return;
     }
-    assertIdInvariants('router.content.entry', { requireCurrentTdfId: false, requireStimuliSetId: false });
-    ensureStimuliSetIdSessionInvariant();
+
+    let routeRequest: LessonRouteRequest;
+    try {
+      const queryParams = FlowRouter.current()?.queryParams || {};
+      routeRequest = resolveLessonRouteRequest({
+        routeTdfId: params?.tdfId,
+        routeMode: queryParams.mode,
+        routeCourseId: queryParams.courseId,
+        routeAssignmentId: queryParams.assignmentId,
+        activeRootTdfId: Session.get('currentRootTdfId'),
+        activeCurrentTdfId: Session.get('currentTdfId'),
+        activePracticeLaunchMode: getPracticeLaunchMode(),
+        activeCourseAssignment: getCourseAssignmentLaunchContext(),
+      });
+    } catch (error) {
+      clientConsole(1, '[Router] Refusing content route without a valid lesson descriptor:', getErrorMessage(error));
+      FlowRouter.go('/home');
+      return;
+    }
+
     Session.set('suppressAuthenticatedChrome', false);
     clearAppLoadingUnlessLaunch();
     const refreshContentRequested = Boolean(FlowRouter.current()?.queryParams?.refreshContent);
-    if(!Session.get('currentTdfId')){
-      const userId = Meteor.userId();
-      const tdfId =  await meteorCallAsync('getLastTDFAccessed', userId);
-      if (!tdfId) {
-        FlowRouter.go('/');
+    if (routeRequest.requiresBootstrap) {
+      const preserveColdContentBootstrap = !Session.get('currentTdfId');
+      if (!await bootstrapLessonRoute(this, routeRequest, preserveColdContentBootstrap)) {
         return;
       }
-      let tdf: any = null;
-      try {
-        tdf = await meteorCallAsync('getTdfById', tdfId);
-      } catch (error: unknown) {
-        const message = (error as { reason?: string })?.reason || getErrorMessage(error);
-        if (message === COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON) {
-          clientConsole(2, '[Router] Content reload lost course launch context; redirecting to Courses', { tdfId });
-          FlowRouter.go('/courses');
-          return;
-        }
-        throw error;
-      }
-      if(tdf) {
-        const setspec = tdf.content.tdfs.tutor.setspec ? tdf.content.tdfs.tutor.setspec : null;
-        const ignoreOutOfGrammarResponses = resolveSpeechIgnoreOutOfGrammarResponses(setspec);
-        const speechOutOfGrammarFeedback = setspec.speechOutOfGrammarFeedback ?
-        setspec.speechOutOfGrammarFeedback : translatePlatformString(getActiveUiLocale(), 'speech.outOfGrammarFeedback');
-
-        // Render a loading template while selectTdf processes
-        renderLayout(this, 'customLoading');
-
-        Session.set('contentBootstrapInProgress', true);
-        try {
-          await selectTdf(
-            tdfId,
-            setspec.lessonname,
-            tdf.stimuliSetId,
-            ignoreOutOfGrammarResponses,
-            speechOutOfGrammarFeedback,
-            'User button click',
-            tdf.content.isMultiTdf,
-            setspec,
-            false,
-            true);
-        } finally {
-          Session.set('contentBootstrapInProgress', false);
-        }
-        setCardEntryIntent(CARD_ENTRY_INTENT.CARD_REFRESH_REBUILD, {
-          source: 'router.content.bootstrapMissingCurrentTdfId',
-        });
-        // Re-enter the authenticated content action so the canonical content and
-        // asset subscriptions reach readiness before the surface is mounted.
-        await contentRouteAction.call(this);
-        return;
-      } else {
-        // No TDF found, redirect to home
-        FlowRouter.go('/');
-        return;
-      }
+      // Re-enter the authenticated content action so the canonical content and
+      // asset subscriptions reach readiness before the surface is mounted.
+      await contentRouteAction.call(this, params);
+      return;
     } else {
+      setPracticeLaunchMode(routeRequest.practiceLaunchMode);
+      setCourseAssignmentLaunchContext(routeRequest.courseAssignment ?? null);
+      assertIdInvariants('router.content.entry', { requireCurrentTdfId: true, requireStimuliSetId: false });
+      ensureStimuliSetIdSessionInvariant();
       const subs = [
         Meteor.subscribe('files.assets.all'),
         Meteor.subscribe('currentTdf', Session.get('currentTdfId')),
@@ -1283,18 +1325,48 @@ FlowRouter.route('/content', {
 // We track the start time for instructions, which means we need to track
 // them here at the instruction route level
 Session.set('instructionClientStart', 0);
-FlowRouter.route('/instructions', {
+FlowRouter.route('/instructions/:tdfId?', {
   name: 'client.instructions',
-  action: function() {
+  action: async function instructionsRouteAction(params: any) {
     const userId = Meteor.userId();
     const user = Meteor.user();
     if (!userId || !user) {
-      waitForAuthenticatedRoute(this, 'client.instructions', () => {
-        FlowRouter.go('/instructions');
+      const controller = this;
+      waitForAuthenticatedRoute(this, 'client.instructions', async () => {
+        await instructionsRouteAction.call(controller, params);
       });
       return;
     }
 
+    let routeRequest: LessonRouteRequest;
+    try {
+      const queryParams = FlowRouter.current()?.queryParams || {};
+      routeRequest = resolveLessonRouteRequest({
+        routeTdfId: params?.tdfId,
+        routeMode: queryParams.mode,
+        routeCourseId: queryParams.courseId,
+        routeAssignmentId: queryParams.assignmentId,
+        activeRootTdfId: Session.get('currentRootTdfId'),
+        activeCurrentTdfId: Session.get('currentTdfId'),
+        activePracticeLaunchMode: getPracticeLaunchMode(),
+        activeCourseAssignment: getCourseAssignmentLaunchContext(),
+      });
+    } catch (error) {
+      clientConsole(1, '[Router] Refusing instructions route without a valid lesson descriptor:', getErrorMessage(error));
+      FlowRouter.go('/home');
+      return;
+    }
+
+    if (routeRequest.requiresBootstrap) {
+      if (!await bootstrapLessonRoute(this, routeRequest, false)) {
+        return;
+      }
+      await instructionsRouteAction.call(this, params);
+      return;
+    }
+
+    setPracticeLaunchMode(routeRequest.practiceLaunchMode);
+    setCourseAssignmentLaunchContext(routeRequest.courseAssignment ?? null);
     assertIdInvariants('router.instructions.entry', { requireCurrentTdfId: true, requireStimuliSetId: false });
     ensureStimuliSetIdSessionInvariant();
     Meteor.subscribe('files.assets.all');

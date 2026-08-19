@@ -1,5 +1,6 @@
 import { createExperimentState } from './svelte/services/experimentState';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from '../../lib/cardEntryIntent';
+import { buildActiveLessonRouteLocation } from '../../lib/activeLessonRoute';
 import './multiTdfSelect.html';
 
 declare const Template: any;
@@ -11,7 +12,7 @@ type SubTdf = {
   clusterList: unknown;
 };
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
-  FlowRouter: { go(path: string): void };
+  FlowRouter: { go(path: string, params?: Record<string, unknown>, queryParams?: Record<string, unknown>): void };
 };
 
 Template.multiTdfSelect.helpers({
@@ -75,6 +76,7 @@ async function selectSubTdf(lessonName: string, clusterList: unknown, subTdfInde
   setCardEntryIntent(CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY, {
     source: 'multiTdfSelect.selectSubTdf',
   });
-  FlowRouter.go('/content');
+  const location = buildActiveLessonRouteLocation('/content');
+  FlowRouter.go(location.path, {}, location.queryParams);
 }
 
