@@ -1,0 +1,102 @@
+# Periodic Confidentiality and Account-Compromise Audit
+
+MoFaCTS has an observation-only security audit for `https://mofacts.optimallearning.org`. It records evidence about confidentiality, authentication, public and internal exposure, and source security. A red report does not stop services, block traffic, alter a firewall or proxy, deploy code, or change real accounts.
+
+This assessment intentionally excludes backup, restore, uptime, disk health, capacity, and disaster recovery. It also runs independently of the normal application build and deployment procedure: no audit environment variable, ingestion endpoint, source label, or clean working tree is required to deploy MoFaCTS.
+
+## Schedule and result semantics
+
+`.github/workflows/production-security-audit.yml` runs:
+
+- Daily at 06:00 UTC: external and host exposure controls.
+- Monday at 06:00 UTC: all four sections, adding production authentication and repository/image controls.
+- Manually with an `exposure` or `full` scope.
+
+The workflow uses the protected `production-security-audit` GitHub environment, has only `contents:read`, and serializes runs without cancelling an active audit. Every run assembles a bounded, sanitized JSON report and encrypts it before uploading it as a 90-day Actions artifact. Plaintext reports and raw scanner output remain ephemeral and are removed from the runner.
+
+An audit with security findings still completes successfully. Missing tools, malformed scanner output, unavailable fixtures, or incomplete controls are recorded as `ERROR`; the encrypted report is uploaded first, and then the workflow fails to signal that authoritative evidence was incomplete. Public workflow output contains only generic execution messages and encrypted-artifact metadata.
+
+## Protected GitHub environment
+
+Create a protected environment named `production-security-audit`. Restrict its administrators and add these environment secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `AUDIT_SSH_HOST` | Production host name or address. |
+| `AUDIT_SSH_USER` | Dedicated account whose key is forced to the audit command. |
+| `AUDIT_SSH_PRIVATE_KEY` | Restricted key; it must not be accepted for a shell. |
+| `AUDIT_SSH_KNOWN_HOSTS` | Pinned host-key line, created and reviewed out of band. |
+| `AUDIT_AUTH_FIXTURES_JSON` | Dedicated synthetic tenant/account IDs and deterministic authorization probes. |
+| `AUDIT_IMAPS_PASSWORD` | Password for the dedicated reset-test mailbox only. |
+
+Add `AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY` as a protected environment variable. It is an RSA public key, not a secret. The matching private key must remain solely with authorized operators and must never be placed in GitHub, the production server, the application settings, or source control.
+
+Generate the encryption key pair on an operator-controlled machine:
+
+```powershell
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out mofacts-security-audit-private.pem
+openssl pkey -in mofacts-security-audit-private.pem -pubout -out mofacts-security-audit-public.pem
+```
+
+Copy the complete public PEM into `AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY`. Protect the private key with the same care as an administrative credential. Report encryption uses RSA-OAEP-SHA256 to wrap a random AES-256-GCM content key; the private key is never available to the runner.
+
+Do not put real administrator, teacher, or learner credentials in the protected environment. The browser runner may use only the audit tenant and synthetic identities. The Sidecar is not invoked by the workflow.
+
+`AUDIT_AUTH_FIXTURES_JSON` must describe two learners, two teachers, a synthetic audit administrator, reset, expiry, and lockout identities; an existing incomplete passwordless-study participant; IMAPS host/user/mailbox; method, publication, route, and download authorization probes; canary values; at least 12 unique connection-throttle identifiers; and at least 21 unique IP-throttle identifiers. The reset identity has two audit-only passwords and alternates between them across runs.
+
+## Restricted host command
+
+Install the tracked script as a root-owned executable and its configuration as root-only data:
+
+```bash
+sudo install -o root -g root -m 0755 deploy/security-audit/host-exposure-audit.sh /usr/local/sbin/mofacts-host-exposure-audit
+sudo install -d -o root -g root -m 0700 /etc/mofacts
+sudo install -o root -g root -m 0600 deploy/security-audit/security-audit.conf.example /etc/mofacts/security-audit.conf
+sudoedit /etc/mofacts/security-audit.conf
+```
+
+Replace every example value. Configure exact management CIDRs, current container names, the expected MongoDB replica set and database, scoped app/Sidecar MongoDB users, a MongoDB audit credential, the Redis audit password, and the active Caddyfile. Missing settings or tools produce audit errors.
+
+Restrict the dedicated SSH public key to the forced command:
+
+```text
+restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,command="sudo -n /usr/local/sbin/mofacts-host-exposure-audit" ssh-ed25519 PUBLIC_KEY audit
+```
+
+Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, adapted Caddy route, UFW, MongoDB, Redis, running-image, and connectivity information. It does not print container environments or credentials and does not change state.
+
+The host must provide `bash`, `jq`, `ss`, Docker, UFW, and Caddy. MongoDB and Redis probes execute their clients inside the configured containers. Sidecar ports must be absent or exactly `127.0.0.1:8931` and `127.0.0.1:8932`.
+
+## Synthetic production fixtures
+
+Create a dedicated audit tenant with no real learner data. Provision two learners, two teachers, one synthetic audit administrator, reset/session, expiry, and lockout users plus one existing incomplete passwordless-study participant. Assign only the minimum courses, histories, dashboard state, settings, routes, and exports needed by the configured probes. Seed recognizable non-secret canaries in these synthetic records so the runner can detect cross-user payload and logging leakage without retaining raw responses.
+
+The authorization probe matrix must cover anonymous, self, other learner, teacher, and admin-only behavior across methods, publications, routes, downloads, courses, histories, dashboards, experiment state, settings, and admin surfaces. Brute-force probes run last and may affect only the lockout canary and unique synthetic throttle identifiers.
+
+The IMAPS mailbox must be dedicated to the reset identity. It retains the previous run's reset message long enough to test token expiry, while the current message proves one-time use and replay rejection. Never reuse a personal or production-support mailbox.
+
+## Source and scanner contracts
+
+`npm run security:surfaces` compares every discovered Meteor method, publication, HTTP handler, export, and management route with `mofacts/security-surface-contract.json`. New or removed server surfaces fail until their access classification is reviewed. `npm run security:test:source` tests canonical hashing, redaction, scanner parsers, encryption integrity, malformed/missing evidence handling, and canary detection.
+
+The regular Security workflow performs a redacted full-history Gitleaks scan, both npm lockfile audits, and the source contract tests. The Monday audit additionally scans an image built from the audited checkout with pinned Trivy. The running production image digest is recorded as informational evidence when the restricted host command can observe it; it does not alter or gate the production deployment.
+
+The report's `sourceRevision` identifies the audit workflow checkout, not a claim that a clean Git tree was deployed to production.
+
+## Retrieve and verify a report
+
+Download the encrypted artifact from the completed Actions run and decrypt it locally from `mofacts/` into a new file:
+
+```powershell
+node scripts/security-audit/decrypt-report.mjs C:\path\report.encrypted.json C:\path\report.json C:\secure\mofacts-security-audit-private.pem
+```
+
+The decryptor refuses to overwrite an existing output file, authenticates the AES-GCM ciphertext, and verifies the canonical report SHA-256 before writing the plaintext with restrictive permissions where the operating system supports them. Delete decrypted copies when the review is complete.
+
+## First run and interpretation
+
+Do not start the first manual full run until the restricted SSH command, explicit UFW management CIDRs, encryption public key, dedicated mailbox, and complete synthetic fixtures exist.
+
+The first strict report may be red. Expected initial findings include anonymous token issuance for an existing passwordless participant, unauthenticated Redis, missing HSTS or CSP, a session lifetime above 30 days, and authentication paths that log email identifiers. These are evidence for separately approved remediation; the audit does not change those behaviors.
+
+Treat an `ERROR` as missing authoritative evidence, never as a passing control. The encrypted artifact is the retained machine-generated record; Codex or an operator may interpret its findings after authorized local decryption.

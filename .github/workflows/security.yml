@@ -1,5 +1,8 @@
 name: Security
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [main]
@@ -14,11 +17,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
 
       - name: Run gitleaks
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/repo" \
             ghcr.io/gitleaks/gitleaks:v8.30.1 \
-            dir --verbose --redact --config /repo/.gitleaks.toml /repo
+            git --redact --config /repo/.gitleaks.toml /repo
+
+  source-contracts:
+    name: Security surface and dependency contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Use pinned Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.15.0'
+          cache: npm
+          cache-dependency-path: mofacts/package-lock.json
+
+      - name: Install source-test dependencies
+        working-directory: mofacts
+        run: npm ci --ignore-scripts
+
+      - name: Verify classified server surfaces
+        working-directory: mofacts
+        run: node scripts/security-audit/check-security-surfaces.mjs
+
+      - name: Test sanitized report and scanner contracts
+        working-directory: mofacts
+        run: node --test scripts/security-audit/source-security.test.mjs
+
+      - name: Audit application dependencies
+        working-directory: mofacts
+        run: npm audit --package-lock-only --audit-level=high
+
+      - name: Audit Sidecar Mongo dependencies
+        working-directory: mofacts-mcp-sidecar/services/mongo-mcp
+        run: npm audit --package-lock-only --audit-level=high

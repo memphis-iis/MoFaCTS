@@ -23,6 +23,7 @@ This folder contains executable deployment examples and scripts for MoFaCTS. Hum
 - `SERVER_IMAGE_DEPLOY_RUNBOOK.md`: server deployment runbook.
 - `../docs/deployment/mongodb-replica-set-conversion.md`: maintenance, recovery, and future-expansion runbook for the in-place replica-set conversion.
 - `server-deploy-validate.sh`: remote rollout validation helper.
+- `security-audit/`: root-owned, read-only forced-command host audit and protected configuration example. See `../docs/deployment/security-audit.md`.
 - `start-lan-https.ps1`, `stop-lan-https.ps1`, `Caddyfile.local`: local LAN HTTPS helpers.
 - `build-timed.ps1`: optional timing wrapper around Docker Compose builds.
 

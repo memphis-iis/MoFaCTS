@@ -177,6 +177,8 @@
     "prepare": "node scripts/prepare-husky.cjs",
     "precommit:lint-staged": "lint-staged",
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",
+    "security:surfaces": "node scripts/security-audit/check-security-surfaces.mjs",
+    "security:test:source": "node --test scripts/security-audit/source-security.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:vendor": "tsc --noEmit -p tsconfig.vendor-check.json",
     "knip": "knip --include files,dependencies,unlisted,binaries,unresolved,duplicates --no-config-hints",

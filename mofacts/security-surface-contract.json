@@ -1,0 +1,1137 @@
+{
+  "schema": "MoFaCTSSecuritySurfaceContractV1",
+  "methods": [
+    {
+      "name": "addCourse",
+      "access": "role-checked"
+    },
+    {
+      "name": "addUserDueDateException",
+      "access": "role-checked"
+    },
+    {
+      "name": "addUserToTeachersClass",
+      "access": "role-checked"
+    },
+    {
+      "name": "admin.backups.config",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.backups.create",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.backups.delete",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.backups.downloadToken",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.backups.get",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.backups.list",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.backups.restore",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.backups.verify",
+      "access": "admin-only"
+    },
+    {
+      "name": "adminCreateOrUpdateUser",
+      "access": "admin-only"
+    },
+    {
+      "name": "applyDashboardHistoryRecord",
+      "access": "role-checked"
+    },
+    {
+      "name": "assignAccessors",
+      "access": "role-checked"
+    },
+    {
+      "name": "auditPublicAssetsWithoutSharedTdf",
+      "access": "admin-only"
+    },
+    {
+      "name": "callAdminTestOpenRouterRequest",
+      "access": "admin-only"
+    },
+    {
+      "name": "callAdminTestResolvedOpenRouterJson",
+      "access": "admin-only"
+    },
+    {
+      "name": "callAiContentOpenRouterRequest",
+      "access": "role-checked"
+    },
+    {
+      "name": "callResolvedOpenRouterEmbeddings",
+      "access": "role-checked"
+    },
+    {
+      "name": "callResolvedOpenRouterJson",
+      "access": "role-checked"
+    },
+    {
+      "name": "cancelPackageUpload",
+      "access": "role-checked"
+    },
+    {
+      "name": "checkForTDFData",
+      "access": "role-checked"
+    },
+    {
+      "name": "checkForUserException",
+      "access": "role-checked"
+    },
+    {
+      "name": "cleanupExpiredPasswordResetTokens",
+      "access": "admin-only"
+    },
+    {
+      "name": "cleanupOrphanDynamicAssets",
+      "access": "admin-only"
+    },
+    {
+      "name": "clearLoginData",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "confirmPackageUpload",
+      "access": "role-checked"
+    },
+    {
+      "name": "copyTdf",
+      "access": "role-checked"
+    },
+    {
+      "name": "createExperimentState",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "createThemeFromBase",
+      "access": "role-checked"
+    },
+    {
+      "name": "debugLog",
+      "access": "role-checked"
+    },
+    {
+      "name": "deleteAdminApiKeyAlternative",
+      "access": "admin-only"
+    },
+    {
+      "name": "deleteAllFiles",
+      "access": "admin-only"
+    },
+    {
+      "name": "deleteCourse",
+      "access": "role-checked"
+    },
+    {
+      "name": "deleteManualContentDraft",
+      "access": "role-checked"
+    },
+    {
+      "name": "deleteOwnOpenRouterKey",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "deletePackageFile",
+      "access": "role-checked"
+    },
+    {
+      "name": "deleteTheme",
+      "access": "role-checked"
+    },
+    {
+      "name": "deleteUserSpeechAPIKey",
+      "access": "role-checked"
+    },
+    {
+      "name": "deploymentReadiness",
+      "access": "admin-only"
+    },
+    {
+      "name": "downloadDataByClass",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "downloadDataByFile",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "downloadDataById",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "downloadDataByTeacher",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "downloadOwnHistoryAcrossTdfs",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "duplicateTheme",
+      "access": "role-checked"
+    },
+    {
+      "name": "editCourse",
+      "access": "role-checked"
+    },
+    {
+      "name": "editCourseAssignments",
+      "access": "role-checked"
+    },
+    {
+      "name": "ensureDashboardCacheCurrent",
+      "access": "role-checked"
+    },
+    {
+      "name": "exportThemeFile",
+      "access": "role-checked"
+    },
+    {
+      "name": "generateFaviconsFromLogo",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAccessableTDFSForUser",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAccessors",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAccessorsTDFID",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAdaptiveOutcomeRows",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAdminApiKeyAlternativeMetadata",
+      "access": "admin-only"
+    },
+    {
+      "name": "getAdminTestOpenRouterCapability",
+      "access": "admin-only"
+    },
+    {
+      "name": "getAdminTestSparcCompoundInterestSource",
+      "access": "admin-only"
+    },
+    {
+      "name": "getAdminTestSparcCompoundInterestSources",
+      "access": "admin-only"
+    },
+    {
+      "name": "getAiContentOpenRouterCapability",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAllCourseAssignmentsForInstructor",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAllCourseSections",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAllCourses",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAllCoursesForInstructor",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAllTeachers",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAssessmentCompletedTrialCountFromHistory",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAssignableTDFSForUser",
+      "access": "role-checked"
+    },
+    {
+      "name": "getAuthClientConfig",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "getAutoTutorHistoryForUnit",
+      "access": "role-checked"
+    },
+    {
+      "name": "getClassPerformanceByTDF",
+      "access": "role-checked"
+    },
+    {
+      "name": "getContentUploadListIds",
+      "access": "role-checked"
+    },
+    {
+      "name": "getContentUploadSummariesForIds",
+      "access": "role-checked"
+    },
+    {
+      "name": "getCourseAssignmentEditorSnapshot",
+      "access": "role-checked"
+    },
+    {
+      "name": "getCurrentUserRoleFlags",
+      "access": "role-checked"
+    },
+    {
+      "name": "getCustomHelpPage",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "getCustomHelpPageStatus",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "getExperimentState",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getHiddenStimulusKCsFromHistory",
+      "access": "role-checked"
+    },
+    {
+      "name": "getHistoryByTDFID",
+      "access": "role-checked"
+    },
+    {
+      "name": "getLastTDFAccessed",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getLearnerAnalyticsOverview",
+      "access": "role-checked"
+    },
+    {
+      "name": "getLearnerCoursesSnapshot",
+      "access": "role-checked"
+    },
+    {
+      "name": "getLearnerProgressSignals",
+      "access": "role-checked"
+    },
+    {
+      "name": "getLearningHistoryForUnit",
+      "access": "role-checked"
+    },
+    {
+      "name": "getManualContentDraft",
+      "access": "role-checked"
+    },
+    {
+      "name": "getMaxResponseKC",
+      "access": "role-checked"
+    },
+    {
+      "name": "getNumDroppedItemsByUserIDAndTDFId",
+      "access": "role-checked"
+    },
+    {
+      "name": "getOpenRouterCapability",
+      "access": "role-checked"
+    },
+    {
+      "name": "getOpenRouterModelCatalog",
+      "access": "role-checked"
+    },
+    {
+      "name": "getOutcomesForAdaptiveLearning",
+      "access": "role-checked"
+    },
+    {
+      "name": "getOwnOpenRouterSettings",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getPackageDownloadLink",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getPasswordHashRuntimeInfo",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "getPracticeDashboardSnapshot",
+      "access": "role-checked"
+    },
+    {
+      "name": "getResponseKCMapForTdf",
+      "access": "role-checked"
+    },
+    {
+      "name": "getServerStatus",
+      "access": "admin-only"
+    },
+    {
+      "name": "getSourceSentences",
+      "access": "role-checked"
+    },
+    {
+      "name": "getSparcHistoryForUnit",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStimDisplayTypeMap",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStimDisplayTypeMapVersion",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStimSetFromLearningSessionByClusterList",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getStimuliFileForTdf",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStimuliSetById",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStimulusCrowdStatsForDeck",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStudentPerformanceByIdAndTDFIdFromHistory",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStudentPerformanceForClassAndTdfId",
+      "access": "role-checked"
+    },
+    {
+      "name": "getStudentPerformanceForUnitFromHistory",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfAssignmentsByCourseIdMap",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfByExperimentTarget",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfByFileName",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfById",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfNamesAssignedByInstructor",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfNamesByOwnerId",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getTdfOwnersMap",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getTdfSpeechAPIKey",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfTTSAPIKey",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfsAssignedToStudent",
+      "access": "role-checked"
+    },
+    {
+      "name": "getTdfsByOwnerId",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getTurkWorkflowExperiments",
+      "access": "role-checked"
+    },
+    {
+      "name": "getUploadQuotaStatus",
+      "access": "role-checked"
+    },
+    {
+      "name": "getUserAssetByName",
+      "access": "role-checked"
+    },
+    {
+      "name": "getUserLastFeedbackTypeFromHistory",
+      "access": "role-checked"
+    },
+    {
+      "name": "getUserPreference",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getUserRecentTDFs",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getUserSpeechAPIKey",
+      "access": "role-checked"
+    },
+    {
+      "name": "getUsersByExperimentId",
+      "access": "role-checked"
+    },
+    {
+      "name": "getVideoCompletedCheckpointQuestionCountFromHistory",
+      "access": "role-checked"
+    },
+    {
+      "name": "hasUserPersonalKeys",
+      "access": "role-checked"
+    },
+    {
+      "name": "importPrivateRepoTdfBatch",
+      "access": "role-checked"
+    },
+    {
+      "name": "importThemeFile",
+      "access": "role-checked"
+    },
+    {
+      "name": "incrementTdfConditionCount",
+      "access": "role-checked"
+    },
+    {
+      "name": "initializeCustomTheme",
+      "access": "role-checked"
+    },
+    {
+      "name": "initializeDashboardCache",
+      "access": "role-checked"
+    },
+    {
+      "name": "insertHistory",
+      "access": "role-checked"
+    },
+    {
+      "name": "insertNewUsers",
+      "access": "role-checked"
+    },
+    {
+      "name": "invalidateCourseSnapshotForUser",
+      "access": "role-checked"
+    },
+    {
+      "name": "invalidateCourseSnapshotsForAssignment",
+      "access": "role-checked"
+    },
+    {
+      "name": "invalidateCourseSnapshotsForCourse",
+      "access": "role-checked"
+    },
+    {
+      "name": "isUserSpeechAPIKeySetup",
+      "access": "role-checked"
+    },
+    {
+      "name": "listManualContentDrafts",
+      "access": "role-checked"
+    },
+    {
+      "name": "logUserAgentAndLoginTime",
+      "access": "role-checked"
+    },
+    {
+      "name": "makeGoogleSpeechAPICall",
+      "access": "role-checked"
+    },
+    {
+      "name": "makeGoogleTTSApiCall",
+      "access": "role-checked"
+    },
+    {
+      "name": "normalizeOptionalString",
+      "access": "role-checked"
+    },
+    {
+      "name": "persistAutoTutorExpectationRelationships",
+      "access": "role-checked"
+    },
+    {
+      "name": "populateSSOProfile",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "processPackageUpload",
+      "access": "role-checked"
+    },
+    {
+      "name": "provisionExperimentUser",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "recordSessionRevocation",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "refreshCourseSnapshotAfterPractice",
+      "access": "role-checked"
+    },
+    {
+      "name": "refreshDashboardCache",
+      "access": "role-checked"
+    },
+    {
+      "name": "refreshLearnerLessonAnalytics",
+      "access": "role-checked"
+    },
+    {
+      "name": "refreshUserAdminUsageCaches",
+      "access": "admin-only"
+    },
+    {
+      "name": "removeAssetById",
+      "access": "role-checked"
+    },
+    {
+      "name": "removeCustomHelpPage",
+      "access": "role-checked"
+    },
+    {
+      "name": "removeMultipleAssets",
+      "access": "role-checked"
+    },
+    {
+      "name": "removeTdfFromCache",
+      "access": "role-checked"
+    },
+    {
+      "name": "removeTurkById",
+      "access": "role-checked"
+    },
+    {
+      "name": "removeUserDueDateException",
+      "access": "role-checked"
+    },
+    {
+      "name": "renameTheme",
+      "access": "role-checked"
+    },
+    {
+      "name": "repairAiGeneratedPackageMedia",
+      "access": "role-checked"
+    },
+    {
+      "name": "requestPasswordReset",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "resendVerificationEmail",
+      "access": "role-checked"
+    },
+    {
+      "name": "resetLearnerTdfConfig",
+      "access": "role-checked"
+    },
+    {
+      "name": "resetOwnLessonProgress",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "resetPasswordWithToken",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "resetTdfConditionCounts",
+      "access": "role-checked"
+    },
+    {
+      "name": "resolveAssignedRootTdfIdsForUser",
+      "access": "role-checked"
+    },
+    {
+      "name": "resolveUsersForTdf",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveAdminApiKeyAlternative",
+      "access": "admin-only"
+    },
+    {
+      "name": "saveAiGeneratedPackageContent",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveAudioSettings",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "saveCourseAssignments",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveLearnerTdfConfig",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveManualContentDraft",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveTdfContent",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveTdfStimuli",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveUserAWSData",
+      "access": "role-checked"
+    },
+    {
+      "name": "saveUserSpeechAPIKey",
+      "access": "role-checked"
+    },
+    {
+      "name": "sendEmail",
+      "access": "role-checked"
+    },
+    {
+      "name": "sendErrorReportSummaries",
+      "access": "admin-only"
+    },
+    {
+      "name": "sendUserErrorReport",
+      "access": "role-checked"
+    },
+    {
+      "name": "serverLog",
+      "access": "role-checked"
+    },
+    {
+      "name": "setActiveTheme",
+      "access": "role-checked"
+    },
+    {
+      "name": "setClientVerbosity",
+      "access": "admin-only"
+    },
+    {
+      "name": "setCustomHelpPage",
+      "access": "role-checked"
+    },
+    {
+      "name": "setCustomThemeProperty",
+      "access": "role-checked"
+    },
+    {
+      "name": "setExperimentState",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "setLockoutTimeStamp",
+      "access": "role-checked"
+    },
+    {
+      "name": "setTdfUserSelect",
+      "access": "role-checked"
+    },
+    {
+      "name": "setUserLoginData",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "setUserPreference",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "setUserSessionId",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "setVerbosity",
+      "access": "admin-only"
+    },
+    {
+      "name": "signUpUser",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "testOwnOpenRouterSettings",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "toggleCustomTheme",
+      "access": "role-checked"
+    },
+    {
+      "name": "transferDataOwnership",
+      "access": "admin-only"
+    },
+    {
+      "name": "turkBonus",
+      "access": "role-checked"
+    },
+    {
+      "name": "turkGetAssignment",
+      "access": "role-checked"
+    },
+    {
+      "name": "turkPay",
+      "access": "role-checked"
+    },
+    {
+      "name": "turkScheduleLockoutMessage",
+      "access": "role-checked"
+    },
+    {
+      "name": "turkSendMessage",
+      "access": "role-checked"
+    },
+    {
+      "name": "turkTest",
+      "access": "role-checked"
+    },
+    {
+      "name": "turkUserLogStatus",
+      "access": "role-checked"
+    },
+    {
+      "name": "updateExperimentState",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "updateOwnOpenRouterSettings",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "updateOwnProfile",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "updateOwnUiLocale",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "updateStimDisplayTypeMap",
+      "access": "role-checked"
+    },
+    {
+      "name": "updateTdfConditionCounts",
+      "access": "role-checked"
+    },
+    {
+      "name": "upsertStimFile",
+      "access": "role-checked"
+    },
+    {
+      "name": "userAdminDeleteUser",
+      "access": "admin-only"
+    },
+    {
+      "name": "userAdminNewsEmailRecipients",
+      "access": "admin-only"
+    },
+    {
+      "name": "userAdminRoleChange",
+      "access": "admin-only"
+    }
+  ],
+  "publications": [
+    {
+      "name": "<default>",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "Assignments",
+      "access": "role-checked"
+    },
+    {
+      "name": "allTdfsListing",
+      "access": "role-checked"
+    },
+    {
+      "name": "assets",
+      "access": "role-checked"
+    },
+    {
+      "name": "clientRuntimeSettings",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "contentUploadOwners",
+      "access": "role-checked"
+    },
+    {
+      "name": "currentTdf",
+      "access": "role-checked"
+    },
+    {
+      "name": "dashboardCache",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "dashboardTdfsListing",
+      "access": "role-checked"
+    },
+    {
+      "name": "files.assets.all",
+      "access": "role-checked"
+    },
+    {
+      "name": "filteredUsers",
+      "access": "role-checked"
+    },
+    {
+      "name": "filteredUsersCount",
+      "access": "role-checked"
+    },
+    {
+      "name": "ownedTdfs",
+      "access": "role-checked"
+    },
+    {
+      "name": "pagedTdfsListing",
+      "access": "role-checked"
+    },
+    {
+      "name": "settings",
+      "access": "role-checked"
+    },
+    {
+      "name": "tdfByExperimentTarget",
+      "access": "role-checked"
+    },
+    {
+      "name": "tdfByIds",
+      "access": "role-checked"
+    },
+    {
+      "name": "tdfForContentUploadDetails",
+      "access": "role-checked"
+    },
+    {
+      "name": "tdfForEdit",
+      "access": "role-checked"
+    },
+    {
+      "name": "tdfForEditMetadata",
+      "access": "role-checked"
+    },
+    {
+      "name": "theme",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "themeLibrary",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "userAdminDashboardUsage",
+      "access": "role-checked"
+    },
+    {
+      "name": "userAudioSettings",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "userExperimentState",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "userHistory",
+      "access": "authenticated-self"
+    }
+  ],
+  "httpRoutes": [
+    {
+      "name": "/admin/backups/download",
+      "access": "single-use-download"
+    },
+    {
+      "name": "/data-download/own-history",
+      "access": "single-use-download"
+    },
+    {
+      "name": "/dynamic-assets",
+      "access": "role-checked"
+    },
+    {
+      "name": "/health",
+      "access": "public-rate-limited"
+    }
+  ],
+  "exports": [
+    {
+      "name": "http:/admin/backups/download",
+      "access": "single-use-download"
+    },
+    {
+      "name": "http:/data-download/own-history",
+      "access": "single-use-download"
+    },
+    {
+      "name": "method:admin.backups.downloadToken",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:cancelPackageUpload",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:confirmPackageUpload",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:deletePackageFile",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:downloadDataByClass",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:downloadDataByFile",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:downloadDataById",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:downloadDataByTeacher",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:downloadOwnHistoryAcrossTdfs",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "method:exportThemeFile",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:getPackageDownloadLink",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:processPackageUpload",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:repairAiGeneratedPackageMedia",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:saveAiGeneratedPackageContent",
+      "access": "role-checked"
+    }
+  ],
+  "managementRoutes": [
+    {
+      "name": "client.adminBackups|/admin/backups",
+      "access": "admin-only"
+    },
+    {
+      "name": "client.adminControls|/adminControls",
+      "access": "admin-only"
+    },
+    {
+      "name": "client.adminTests|/admin/tests",
+      "access": "admin-only"
+    },
+    {
+      "name": "client.aiContentCreator|/aiContentCreate",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.audioSettings|/audioSettings",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "client.classEdit|/classEdit",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.classSelection|/classSelection",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.contentEdit|/contentEdit/:tdfId",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.contentUpload|/contentUpload",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.courses|/courses",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.dataDownload|/dataDownload",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.help|/help",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.instructorReporting|/instructorReporting",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.manualContentCreator|/contentCreate",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.profile|/profile",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "client.tdfAssignmentEdit|/tdfAssignmentEdit",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.tdfEdit|/tdfEdit/:tdfId",
+      "access": "role-checked"
+    },
+    {
+      "name": "client.theme|/theme",
+      "access": "admin-only"
+    },
+    {
+      "name": "client.turkWorkflow|/turkWorkflow",
+      "access": "admin-only"
+    },
+    {
+      "name": "client.userAdmin|/userAdmin",
+      "access": "admin-only"
+    }
+  ]
+}

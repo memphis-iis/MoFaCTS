@@ -1,0 +1,17 @@
+# Install as /etc/mofacts/security-audit.conf with root:root ownership and mode 0600.
+MOFACTS_APP_CONTAINER=mofacts-app
+MOFACTS_MONGO_CONTAINER=mofacts-mongodb
+MOFACTS_REDIS_CONTAINER=mofacts-redis
+MOFACTS_MONGO_DB=MoFACT-meteor3
+MOFACTS_MONGO_REPLICA_SET=mofacts-rs
+MOFACTS_MONGO_ADMIN_USER=replace-with-audit-admin-user
+MOFACTS_MONGO_ADMIN_PASSWORD=replace-with-audit-admin-password
+MOFACTS_MONGO_APP_USER=replace-with-application-user
+MOFACTS_MONGO_APP_PASSWORD=replace-with-application-password
+MOFACTS_MONGO_APP_ROLE=readWrite
+MOFACTS_MONGO_SIDECAR_USER=replace-with-sidecar-readonly-user
+MOFACTS_MONGO_SIDECAR_PASSWORD=replace-with-sidecar-readonly-password
+MOFACTS_MONGO_SIDECAR_ROLE=read
+MOFACTS_REDIS_PASSWORD=replace-with-redis-password
+MOFACTS_MANAGEMENT_CIDRS=192.0.2.0/24,2001:db8::/48
+CADDY_CONFIG_FILE=/etc/caddy/Caddyfile

@@ -9,6 +9,7 @@ Self-Hosted MoFaCTS runs the app, authenticated MongoDB, Redis, and local dynami
 - `deploy/settings.self-hosted.example.json`: private Meteor settings template.
 - `deploy/Caddyfile.self-hosted.example`: HTTPS reverse proxy example.
 - `docs/deployment/settings-inventory.md`: release-readiness classification for settings and environment variables.
+- `docs/deployment/security-audit.md`: protected periodic confidentiality and account-compromise audit setup.
 
 ## Configure
 

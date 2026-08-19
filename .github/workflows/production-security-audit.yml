@@ -1,0 +1,201 @@
+name: Production confidentiality audit
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      audit_type:
+        description: Audit scope
+        required: true
+        default: exposure
+        type: choice
+        options:
+          - exposure
+          - full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-confidentiality-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    environment: production-security-audit
+    timeout-minutes: 180
+    env:
+      AUDIT_TARGET: https://mofacts.optimallearning.org
+    steps:
+      - name: Checkout the audited source revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Use the pinned Node runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.15.0'
+          cache: npm
+          cache-dependency-path: mofacts/package-lock.json
+
+      - name: Select scope and protected workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit_dir="${RUNNER_TEMP}/mofacts-security-audit"
+          install -d -m 700 "$audit_dir"
+          if [[ "${{ github.event_name }}" == workflow_dispatch ]]; then
+            audit_type="${{ inputs.audit_type }}"
+          elif [[ "${{ github.event.schedule }}" == '0 6 * * 1' ]]; then
+            audit_type=full
+          else
+            audit_type=exposure
+          fi
+          printf 'AUDIT_TYPE=%s\nAUDIT_DIR=%s\nAUDIT_STARTED_AT=%s\nAUDIT_REPORT_ID=%s\n' \
+            "$audit_type" "$audit_dir" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
+            "audit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${audit_type}" >> "$GITHUB_ENV"
+
+      - name: Install pinned deterministic scanners
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq nmap openssh-client curl
+          curl --fail --silent --show-error --location \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          curl --fail --silent --show-error --location \
+            https://github.com/aquasecurity/trivy/releases/download/v0.69.3/trivy_0.69.3_Linux-64bit.tar.gz \
+            | sudo tar -xz -C /usr/local/bin trivy
+
+      - name: Install deterministic browser dependencies for a full audit
+        if: env.AUDIT_TYPE == 'full'
+        continue-on-error: true
+        working-directory: mofacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          ./node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Configure forced-command SSH identity
+        continue-on-error: true
+        shell: bash
+        env:
+          AUDIT_SSH_PRIVATE_KEY: ${{ secrets.AUDIT_SSH_PRIVATE_KEY }}
+          AUDIT_SSH_KNOWN_HOSTS: ${{ secrets.AUDIT_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$AUDIT_DIR/ssh"
+          printf '%s\n' "$AUDIT_SSH_PRIVATE_KEY" > "$AUDIT_DIR/ssh/id_ed25519"
+          printf '%s\n' "$AUDIT_SSH_KNOWN_HOSTS" > "$AUDIT_DIR/ssh/known_hosts"
+          chmod 600 "$AUDIT_DIR/ssh/id_ed25519" "$AUDIT_DIR/ssh/known_hosts"
+
+      - name: Run external perimeter controls
+        shell: bash
+        working-directory: mofacts
+        run: |
+          set +e
+          node scripts/security-audit/external-audit.mjs "$AUDIT_DIR/external.json" >/dev/null 2>&1
+          exit 0
+
+      - name: Run forced-command host exposure controls
+        shell: bash
+        env:
+          AUDIT_SSH_HOST: ${{ secrets.AUDIT_SSH_HOST }}
+          AUDIT_SSH_USER: ${{ secrets.AUDIT_SSH_USER }}
+        run: |
+          set +e
+          ssh -F /dev/null -i "$AUDIT_DIR/ssh/id_ed25519" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$AUDIT_DIR/ssh/known_hosts" \
+            -o ConnectTimeout=20 -o ConnectionAttempts=1 \
+            "${AUDIT_SSH_USER}@${AUDIT_SSH_HOST}" \
+            > "$AUDIT_DIR/internal.json" 2>/dev/null
+          rm -f -- "$AUDIT_DIR/ssh/id_ed25519" "$AUDIT_DIR/ssh/known_hosts"
+          rmdir -- "$AUDIT_DIR/ssh" 2>/dev/null
+          exit 0
+
+      - name: Run deterministic production authentication controls
+        if: env.AUDIT_TYPE == 'full'
+        shell: bash
+        working-directory: mofacts
+        env:
+          AUDIT_AUTH_FIXTURES_JSON: ${{ secrets.AUDIT_AUTH_FIXTURES_JSON }}
+          AUDIT_IMAPS_PASSWORD: ${{ secrets.AUDIT_IMAPS_PASSWORD }}
+        run: |
+          set +e
+          node scripts/security-audit/production-auth-audit.mjs "$AUDIT_DIR/authentication.json" >/dev/null 2>&1
+          exit 0
+
+      - name: Build the pinned runtime image for repository scanning
+        if: env.AUDIT_TYPE == 'full'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="mofacts-security-audit:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build --quiet --tag "$image" . \
+            > "$AUDIT_DIR/docker-build.log" 2>&1
+          printf 'AUDIT_RUNTIME_IMAGE=%s\n' "$image" >> "$GITHUB_ENV"
+
+      - name: Run repository and image controls
+        if: env.AUDIT_TYPE == 'full'
+        shell: bash
+        working-directory: mofacts
+        run: |
+          set +e
+          node scripts/security-audit/repository-audit.mjs "$AUDIT_DIR/repository.json" >/dev/null 2>&1
+          exit 0
+
+      - name: Assemble the sanitized canonical report
+        shell: bash
+        working-directory: mofacts
+        run: |
+          set -euo pipefail
+          tool_versions="$(jq -cn \
+            --arg node "$(node --version 2>/dev/null || echo unavailable)" \
+            --arg nmap "$(nmap --version 2>/dev/null | head -n1 || echo unavailable)" \
+            --arg gitleaks "$(gitleaks version 2>/dev/null || echo unavailable)" \
+            --arg trivy "$(trivy --version 2>/dev/null | head -n1 || echo unavailable)" \
+            --arg playwright "1.60.0" \
+            '{node:$node,nmap:$nmap,gitleaks:$gitleaks,trivy:$trivy,playwright:$playwright}')"
+          AUDIT_TOOL_VERSIONS_JSON="$tool_versions" \
+            node scripts/security-audit/assemble-report.mjs "$AUDIT_TYPE" \
+              "$AUDIT_DIR/external.json" "$AUDIT_DIR/internal.json" \
+              "$AUDIT_DIR/authentication.json" "$AUDIT_DIR/repository.json" \
+              "$AUDIT_DIR/report.json"
+
+      - name: Encrypt the report for private retention
+        shell: bash
+        working-directory: mofacts
+        env:
+          AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY: ${{ vars.AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY }}
+        run: node scripts/security-audit/encrypt-report.mjs "$AUDIT_DIR/report.json" "$AUDIT_DIR/report.encrypted.json"
+
+      - name: Retain only the encrypted report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mofacts-security-audit-${{ env.AUDIT_REPORT_ID }}
+          path: ${{ env.AUDIT_DIR }}/report.encrypted.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+      - name: Fail only for audit execution errors
+        shell: bash
+        working-directory: mofacts
+        run: node scripts/security-audit/assert-execution-complete.mjs "$AUDIT_DIR/report.json"
+
+      - name: Remove ephemeral audit material
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${AUDIT_DIR:-}" && "$AUDIT_DIR" == "${RUNNER_TEMP}/mofacts-security-audit" ]]; then
+            rm -rf -- "$AUDIT_DIR"
+          fi
