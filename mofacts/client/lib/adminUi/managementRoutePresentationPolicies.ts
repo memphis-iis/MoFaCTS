@@ -29,6 +29,7 @@ const MANAGEMENT_ROUTE_PRESENTATION_POLICIES = [
   { routeName: 'client.help', path: '/help', template: 'help', titleKey: 'home.help', chromeMode: 'app', requiresAuth: false, load: () => import('../../views/help') },
   { routeName: 'client.adminControls', path: '/adminControls', template: 'adminControls', titleKey: 'home.adminControlPanel', chromeMode: 'app', requiresAuth: true, allowedRoles: 'admin', load: () => import('../../views/adminControls') },
   { routeName: 'client.adminBackups', path: '/admin/backups', template: 'adminBackups', titleKey: 'home.backups', chromeMode: 'app', requiresAuth: true, allowedRoles: 'admin', load: () => import('../../views/adminBackups') },
+  { routeName: 'client.adminSecurityAudits', path: '/admin/security-audits', template: 'adminSecurityAudits', titleKey: 'home.securityAudits', chromeMode: 'app', requiresAuth: true, allowedRoles: 'admin', load: () => import('../../views/adminSecurityAudits') },
   { routeName: 'client.userAdmin', path: '/userAdmin', template: 'userAdmin', titleKey: 'home.userAdmin', chromeMode: 'app', requiresAuth: true, allowedRoles: 'admin', load: () => import('../../views/userAdmin') },
   { routeName: 'client.turkWorkflow', path: '/turkWorkflow', template: 'turkWorkflow', titleKey: 'home.mechanicalTurk', chromeMode: 'app', requiresAuth: true, allowedRoles: 'admin', load: () => import('../../views/turkWorkflow') },
   { routeName: 'client.theme', path: '/theme', template: 'theme', titleKey: 'home.theme', chromeMode: 'app', requiresAuth: true, allowedRoles: 'admin', load: () => import('../../views/theme') },
@@ -71,4 +72,3 @@ export function getManagementRoutePolicyByTemplate(
 ): ManagementRoutePresentationPolicy | undefined {
   return POLICIES_BY_TEMPLATE.get(template);
 }
-

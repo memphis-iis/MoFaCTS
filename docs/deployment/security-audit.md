@@ -2,7 +2,7 @@
 
 MoFaCTS has an observation-only security audit for `https://mofacts.optimallearning.org`. It records evidence about confidentiality, authentication, public and internal exposure, and source security. A red report does not stop services, block traffic, alter a firewall or proxy, deploy code, or change real accounts.
 
-This assessment intentionally excludes backup, restore, uptime, disk health, capacity, and disaster recovery. It also runs independently of the normal application build and deployment procedure: no audit environment variable, ingestion endpoint, source label, or clean working tree is required to deploy MoFaCTS.
+This assessment intentionally excludes backup, restore, uptime, disk health, capacity, and disaster recovery. The scanners remain independent of application deployment, but the application now receives their sanitized reports through one authenticated endpoint so administrators can review them at `/admin/security-audits`.
 
 ## Schedule and result semantics
 
@@ -12,9 +12,9 @@ This assessment intentionally excludes backup, restore, uptime, disk health, cap
 - Monday at 06:00 UTC: all four sections, adding production authentication and repository/image controls.
 - Manually with an `exposure` or `full` scope.
 
-The workflow uses the protected `production-security-audit` GitHub environment, has only `contents:read`, and serializes runs without cancelling an active audit. Every run assembles a bounded, sanitized JSON report and encrypts it before uploading it as a 90-day Actions artifact. Plaintext reports and raw scanner output remain ephemeral and are removed from the runner.
+The workflow uses the protected `production-security-audit` GitHub environment, has only `contents:read`, and serializes runs without cancelling an active audit. Every run assembles a bounded, sanitized JSON report, sends it to the application, and encrypts it before uploading it as a 90-day recovery artifact. Plaintext reports and raw scanner output remain ephemeral and are removed from the runner.
 
-An audit with security findings still completes successfully. Missing tools, malformed scanner output, unavailable fixtures, or incomplete controls are recorded as `ERROR`; the encrypted report is uploaded first, and then the workflow fails to signal that authoritative evidence was incomplete. Public workflow output contains only generic execution messages and encrypted-artifact metadata.
+An audit with security findings still completes successfully. Missing tools, malformed scanner output, unavailable fixtures, or incomplete controls are recorded as `ERROR`; the report is stored and the encrypted artifact is uploaded before the workflow fails to signal that authoritative evidence was incomplete. Failure to store the report also fails the workflow. Public workflow output contains only generic execution messages and encrypted-artifact metadata.
 
 ## Protected GitHub environment
 
@@ -28,6 +28,7 @@ Create a protected environment named `production-security-audit`. Restrict its a
 | `AUDIT_SSH_KNOWN_HOSTS` | Pinned host-key line, created and reviewed out of band. |
 | `AUDIT_AUTH_FIXTURES_JSON` | Dedicated synthetic tenant/account IDs and deterministic authorization probes. |
 | `AUDIT_IMAPS_PASSWORD` | Password for the dedicated reset-test mailbox only. |
+| `AUDIT_REPORT_INGEST_SECRET` | HMAC key shared only with the production application. |
 
 Add `AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY` as a protected environment variable. It is an RSA public key, not a secret. The matching private key must remain solely with authorized operators and must never be placed in GitHub, the production server, the application settings, or source control.
 
@@ -41,6 +42,14 @@ openssl pkey -in mofacts-security-audit-private.pem -pubout -out mofacts-securit
 Copy the complete public PEM into `AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY`. Protect the private key with the same care as an administrative credential. Report encryption uses RSA-OAEP-SHA256 to wrap a random AES-256-GCM content key; the private key is never available to the runner.
 
 Do not put real administrator, teacher, or learner credentials in the protected environment. The browser runner may use only the audit tenant and synthetic identities. The Sidecar is not invoked by the workflow.
+
+Generate the ingestion key on an operator-controlled machine and place the same value in the protected GitHub environment as `AUDIT_REPORT_INGEST_SECRET` and in the production app environment as `MOFACTS_SECURITY_AUDIT_INGEST_SECRET`:
+
+```powershell
+openssl rand -base64 48
+```
+
+Do not put the value in source control, workflow logs, application settings JSON, or shell history. The endpoint accepts only `application/json`, limits requests to 2 MiB, requires an HMAC-SHA256 signature over the timestamp, nonce, and body digest, rejects timestamps outside five minutes, and rejects reused nonces, report IDs, and report digests.
 
 `AUDIT_AUTH_FIXTURES_JSON` must describe two learners, two teachers, a synthetic audit administrator, reset, expiry, and lockout identities; an existing incomplete passwordless-study participant; IMAPS host/user/mailbox; method, publication, route, and download authorization probes; canary values; at least 12 unique connection-throttle identifiers; and at least 21 unique IP-throttle identifiers. The reset identity has two audit-only passwords and alternates between them across runs.
 
@@ -83,9 +92,13 @@ The regular Security workflow performs a redacted full-history Gitleaks scan, bo
 
 The report's `sourceRevision` identifies the audit workflow checkout, not a claim that a clean Git tree was deployed to production.
 
-## Retrieve and verify a report
+## Review and download reports
 
-Download the encrypted artifact from the completed Actions run and decrypt it locally from `mofacts/` into a new file:
+Administrators review summaries at `/admin/security-audits`. The page shows the latest exposure and full reports, freshness warnings after 36 hours and eight days respectively, section status, severity counts, target, source revision, production image identity, and the recent 90-day history. The collection is never published; full findings are not sent to the page.
+
+JSON and standalone escaped HTML downloads use five-minute, single-use tokens. Every response uses `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and exact-body SHA-256 headers. The JSON contains the canonical report and its report digest.
+
+The encrypted Actions artifact remains a recovery copy. To inspect that copy, download it from the completed Actions run and decrypt it locally from `mofacts/` into a new file:
 
 ```powershell
 node scripts/security-audit/decrypt-report.mjs C:\path\report.encrypted.json C:\path\report.json C:\secure\mofacts-security-audit-private.pem
@@ -99,4 +112,4 @@ Do not start the first manual full run until the restricted SSH command, explici
 
 The first strict report may be red. Expected initial findings include anonymous token issuance for an existing passwordless participant, unauthenticated Redis, missing HSTS or CSP, a session lifetime above 30 days, and authentication paths that log email identifiers. These are evidence for separately approved remediation; the audit does not change those behaviors.
 
-Treat an `ERROR` as missing authoritative evidence, never as a passing control. The encrypted artifact is the retained machine-generated record; Codex or an operator may interpret its findings after authorized local decryption.
+Treat an `ERROR` as missing authoritative evidence, never as a passing control. The application report history is the primary administrator view; the encrypted artifact is the independent recovery copy. Codex or an operator may interpret findings, but neither path remediates production automatically.

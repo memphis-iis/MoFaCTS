@@ -46,6 +46,18 @@
       "access": "admin-only"
     },
     {
+      "name": "admin.securityAudits.downloadToken",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.securityAudits.get",
+      "access": "admin-only"
+    },
+    {
+      "name": "admin.securityAudits.list",
+      "access": "admin-only"
+    },
+    {
       "name": "adminCreateOrUpdateUser",
       "access": "admin-only"
     },
@@ -974,6 +986,14 @@
       "access": "single-use-download"
     },
     {
+      "name": "/admin/security-audits/download",
+      "access": "single-use-download"
+    },
+    {
+      "name": "/internal/security-audits/v1",
+      "access": "signed-ingestion"
+    },
+    {
       "name": "/data-download/own-history",
       "access": "single-use-download"
     },
@@ -992,11 +1012,19 @@
       "access": "single-use-download"
     },
     {
+      "name": "http:/admin/security-audits/download",
+      "access": "single-use-download"
+    },
+    {
       "name": "http:/data-download/own-history",
       "access": "single-use-download"
     },
     {
       "name": "method:admin.backups.downloadToken",
+      "access": "role-checked"
+    },
+    {
+      "name": "method:admin.securityAudits.downloadToken",
       "access": "role-checked"
     },
     {
@@ -1055,6 +1083,10 @@
   "managementRoutes": [
     {
       "name": "client.adminBackups|/admin/backups",
+      "access": "admin-only"
+    },
+    {
+      "name": "client.adminSecurityAudits|/admin/security-audits",
       "access": "admin-only"
     },
     {

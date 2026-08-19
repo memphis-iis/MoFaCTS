@@ -1088,6 +1088,15 @@ FlowRouter.route('/admin/backups', {
   }
 })
 
+FlowRouter.route('/admin/security-audits', {
+  name: 'client.adminSecurityAudits',
+  action: async function() {
+    waitForAuthenticatedRoute(this, 'client.adminSecurityAudits', async () => {
+      await renderRouteTemplate(this, 'adminSecurityAudits');
+    }, getRouteAccessPolicy('client.adminSecurityAudits'));
+  }
+})
+
 FlowRouter.route('/theme', {
   name: 'client.theme',
   action: async function() {
@@ -1407,7 +1416,6 @@ FlowRouter.route('/instructions/:tdfId?', {
     }
   }],
 });
-
 
 
 

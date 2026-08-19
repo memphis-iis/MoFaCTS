@@ -88,6 +88,7 @@ const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
   themeButton: '/theme',
   adminTestsButton: '/admin/tests',
   adminBackupsButton: '/admin/backups',
+  adminSecurityAuditsButton: '/admin/security-audits',
 };
 
 const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
@@ -105,6 +106,7 @@ const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
   theme: '/theme',
   adminTests: '/admin/tests',
   adminBackups: '/admin/backups',
+  adminSecurityAudits: '/admin/security-audits',
 };
 
 const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
@@ -122,6 +124,7 @@ const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
   theme: ['/theme'],
   adminTests: ['/admin/tests'],
   adminBackups: ['/admin/backups'],
+  adminSecurityAudits: ['/admin/security-audits'],
 };
 
 const HOME_TOUR_STEPS: HomeTourStep[] = [
@@ -972,4 +975,3 @@ Template.home.onDestroyed(function(this: any) {
   }
   hideMainMenuReturnTour(this);
 });
-

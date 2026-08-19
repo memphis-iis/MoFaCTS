@@ -56,6 +56,7 @@ This inventory classifies the self-hosted configuration surface used by applicat
 | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` | required, deployment secret | MongoDB bootstrap | Compose MongoDB init |
 | `MOFACTS_MONGO_APP_DATABASE`, `MOFACTS_MONGO_APP_USERNAME`, `MOFACTS_MONGO_APP_PASSWORD` | required, deployment secret | MongoDB app user bootstrap | Mongo init script and Compose |
 | `REDIS_URL` | required, private-server, secret-capable | when Redis is required | Redis boundary and readiness |
+| `MOFACTS_SECURITY_AUDIT_INGEST_SECRET` | required in production, private-server, secret | security audit report ingestion | HMAC authentication for `/internal/security-audits/v1` |
 | `MOFACTS_REQUIRE_REDIS` | optional, private-server | env override for Redis requirement | settings validation and Redis boundary |
 | `MOFACTS_DEFAULT_THEME_DIR`, `MOFACTS_THEME_DIR` | optional, private-server | theme customization | theme registry |
 | `MOFACTS_INSERT_HISTORY_TIMING` | development-only/private-server | server diagnostics | bounded history-write timing, size, schema, field-presence, and event-category metadata; never raw learner-history values |

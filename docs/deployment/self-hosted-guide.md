@@ -58,6 +58,7 @@ Back up all of these together:
 - MongoDB data volume.
 - MongoDB replica-set keyfile and database-scoped users/roles.
 - `.env.self-hosted` and private settings JSON.
+- A private `MOFACTS_SECURITY_AUDIT_INGEST_SECRET` value when scheduled audit reports will be shown in the admin interface.
 - Dynamic assets mounted at `/dynamic-assets`.
 - SAML/OAuth certificate or key material when configured.
 - Backup archives stored in `MOFACTS_BACKUP_HOST_PATH`; copy these off-server.

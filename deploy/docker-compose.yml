@@ -63,6 +63,7 @@ services:
       MOFACTS_SELF_HOSTED: 'true'
       MOFACTS_REQUIRE_REDIS: 'true'
       REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      MOFACTS_SECURITY_AUDIT_INGEST_SECRET: ${MOFACTS_SECURITY_AUDIT_INGEST_SECRET:-}
     networks:
       - mofacts
 
@@ -154,5 +155,4 @@ volumes:
 networks:
   mofacts:
     driver: bridge
-
 

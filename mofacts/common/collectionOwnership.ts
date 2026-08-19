@@ -170,6 +170,13 @@ export const COLLECTION_OWNERSHIP = {
     owner: 'open-core-backups',
     purpose: 'Admin-only backup, verification, restore, and deletion job registry.',
   },
+  SecurityAuditReports: {
+    mongoName: 'security_audit_reports',
+    globalName: 'SecurityAuditReports',
+    owner: 'security-audit',
+    purpose: 'Private retained confidentiality and account-compromise audit reports.',
+    notes: 'Server-only. Never publish this collection or add it to the legacy global bridge.',
+  },
   TdfMutationJobs: {
     mongoName: 'tdf_mutation_jobs',
     globalName: 'TdfMutationJobs',

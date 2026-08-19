@@ -40,6 +40,7 @@ services:
       PORT: ${PORT:-3000}
       WAIT_HOSTS: mongodb:27017
       METEOR_SETTINGS_FILE: /run/mofacts/settings.json
+      MOFACTS_SECURITY_AUDIT_INGEST_SECRET: ${MOFACTS_SECURITY_AUDIT_INGEST_SECRET:-}
     networks:
       - mofacts
 
@@ -115,5 +116,4 @@ volumes:
 networks:
   mofacts:
     driver: bridge
-
 

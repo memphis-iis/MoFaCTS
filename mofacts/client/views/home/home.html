@@ -99,6 +99,10 @@
               <span class="fa fa-archive" aria-hidden="true"></span>
               <span>{{t 'home.backups'}}</span>
             </button>
+            <button type="button" class="nav-item {{sidebarActiveClass 'adminSecurityAudits'}}" data-label="{{t 'home.securityAudits'}}" id="adminSecurityAuditsButton">
+              <span class="fa fa-shield" aria-hidden="true"></span>
+              <span>{{t 'home.securityAudits'}}</span>
+            </button>
           </div>
         {{/if}}
       </nav>
@@ -222,6 +226,7 @@
         <button type="button" data-practice-menu-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> {{t 'home.theme'}}</button>
         <button type="button" data-practice-menu-action="adminTests"><span class="fa fa-flask" aria-hidden="true"></span> {{t 'home.adminTests'}}</button>
         <button type="button" data-practice-menu-action="adminBackups"><span class="fa fa-archive" aria-hidden="true"></span> {{t 'home.backups'}}</button>
+        <button type="button" data-practice-menu-action="adminSecurityAudits"><span class="fa fa-shield" aria-hidden="true"></span> {{t 'home.securityAudits'}}</button>
       {{/if}}
     </div>
   </aside>

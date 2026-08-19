@@ -1,0 +1,97 @@
+<template name="adminSecurityAudits">
+  <div class="admin-security-audits-page">
+    {{#if isInRole 'admin'}}
+      <div class="security-audit-announcement" aria-live="polite" aria-atomic="true">{{auditAnnouncement}}</div>
+      {{#if auditLoading}}
+        {{> adminStatus variant="info" text=(auditText 'common.loading')}}
+      {{else}}
+        {{#if auditLoadError}}
+          {{> adminStatus variant="error" text=auditLoadError urgent=true}}
+          <button type="button" class="btn btn-outline-danger securityAuditRetry">{{auditText 'common.tryAgain'}}</button>
+        {{else}}
+          <div class="security-audit-latest-grid">
+            {{> securityAuditLatestCard report=latestExposure title=(auditText 'securityAudits.latestExposure') missing=(auditText 'securityAudits.noExposureReport')}}
+            {{> securityAuditLatestCard report=latestFull title=(auditText 'securityAudits.latestFull') missing=(auditText 'securityAudits.noFullReport')}}
+          </div>
+
+          <section class="admin-section" aria-labelledby="security-audit-history-heading">
+            <div class="card admin-card"><div class="card-body">
+              <div class="admin-section-heading">
+                <i class="fa fa-history admin-section-icon" aria-hidden="true"></i>
+                <h5 id="security-audit-history-heading">{{auditText 'securityAudits.history'}}</h5>
+              </div>
+              {{#if hasAuditReports}}
+                <div class="security-audit-history-list">
+                  {{#each auditReports}}
+                    <article class="security-audit-history-row" aria-label="{{auditText 'securityAudits.reportLabel' id=reportId}}">
+                      <div class="security-audit-history-main">
+                        <div class="security-audit-report-title">{{reportTypeText reportType}} · {{formatAuditDate completedAt}}</div>
+                        <div class="security-audit-report-meta">
+                          <span class="admin-badge admin-badge-{{auditStatusClass overallStatus}}">{{auditStatusText overallStatus}}</span>
+                          <span>{{target}}</span>
+                        </div>
+                        <dl class="security-audit-metadata">
+                          <dt>{{auditText 'securityAudits.sourceRevision'}}</dt><dd>{{sourceRevision}}</dd>
+                          <dt>{{auditText 'securityAudits.productionImage'}}</dt><dd>{{productionImage}}</dd>
+                          <dt>{{auditText 'securityAudits.digest'}}</dt><dd>{{digestSha256}}</dd>
+                        </dl>
+                        <div class="security-audit-section-list" aria-label="{{auditText 'securityAudits.sections'}}">
+                          {{#each (auditSectionRows this)}}
+                            <span>{{label}}: <strong>{{statusText}}</strong></span>
+                          {{/each}}
+                        </div>
+                        <div class="security-audit-count-list" aria-label="{{auditText 'securityAudits.findingCounts'}}">
+                          {{#each (auditCountRows this)}}<span>{{label}}: {{value}}</span>{{/each}}
+                        </div>
+                      </div>
+                      <div class="security-audit-actions">
+                        <button type="button" class="btn btn-secondary btn-sm securityAuditDownload" data-report-id="{{reportId}}" data-format="json">
+                          <i class="fa fa-download" aria-hidden="true"></i> {{auditText 'securityAudits.downloadJson'}}
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm securityAuditDownload" data-report-id="{{reportId}}" data-format="html">
+                          <i class="fa fa-download" aria-hidden="true"></i> {{auditText 'securityAudits.downloadHtml'}}
+                        </button>
+                      </div>
+                    </article>
+                  {{/each}}
+                </div>
+              {{else}}
+                {{> adminEmptyState text=(auditText 'securityAudits.noHistory') icon="fa-shield"}}
+              {{/if}}
+            </div></div>
+          </section>
+        {{/if}}
+      {{/if}}
+    {{else}}
+      {{> adminStatus variant="error" text=(auditText 'securityAudits.adminRequired') urgent=true}}
+    {{/if}}
+  </div>
+</template>
+
+<template name="securityAuditLatestCard">
+  <section class="card admin-card" aria-label="{{title}}">
+    <div class="card-body">
+      <div class="admin-section-heading">
+        <i class="fa fa-shield admin-section-icon" aria-hidden="true"></i>
+        <h5>{{title}}</h5>
+      </div>
+      {{#if report}}
+        <p><span class="admin-badge admin-badge-{{auditStatusClass report.overallStatus}}">{{auditStatusText report.overallStatus}}</span></p>
+        <p>{{formatAuditDate report.completedAt}}</p>
+        <div class="security-audit-section-list" aria-label="{{auditText 'securityAudits.sections'}}">
+          {{#each (auditSectionRows report)}}<span>{{label}}: <strong>{{statusText}}</strong></span>{{/each}}
+        </div>
+        <div class="security-audit-count-list" aria-label="{{auditText 'securityAudits.findingCounts'}}">
+          {{#each (auditCountRows report)}}<span>{{label}}: {{value}}</span>{{/each}}
+        </div>
+        {{#if (auditIsStale report)}}
+          {{> adminStatus variant="warning" text=(auditText 'securityAudits.staleWarning')}}
+        {{else}}
+          {{> adminStatus variant="success" text=(auditText 'securityAudits.fresh')}}
+        {{/if}}
+      {{else}}
+        {{> adminStatus variant="warning" text=missing}}
+      {{/if}}
+    </div>
+  </section>
+</template>

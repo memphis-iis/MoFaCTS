@@ -78,6 +78,8 @@ values are missing.
 
 Keep private settings and secrets out of commits. Use local environment files and local settings files for deployment-specific values.
 
+Production security-audit report ingestion requires `MOFACTS_SECURITY_AUDIT_INGEST_SECRET` in the private app environment. It must exactly match the protected GitHub environment secret `AUDIT_REPORT_INGEST_SECRET`; never place either value in a tracked file.
+
 For local Docker Compose validation, start from the tracked template:
 
 ```bash

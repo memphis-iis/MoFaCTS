@@ -1,0 +1,12 @@
+.admin-security-audits-page { display: grid; gap: var(--app-space-4); }
+.security-audit-announcement { block-size: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); inline-size: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
+.security-audit-latest-grid { display: grid; gap: var(--app-space-3); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.security-audit-history-list { display: grid; gap: var(--app-space-3); }
+.security-audit-history-row { border: 1px solid var(--border-color); border-radius: var(--app-border-radius-sm); display: flex; gap: var(--app-space-4); justify-content: space-between; padding: var(--app-space-3); }
+.security-audit-history-main { min-inline-size: 0; }
+.security-audit-report-title { font-weight: 600; }
+.security-audit-report-meta, .security-audit-section-list, .security-audit-count-list { align-items: center; display: flex; flex-wrap: wrap; gap: var(--app-space-2); margin-top: var(--app-space-2); }
+.security-audit-metadata { display: grid; font-size: calc(var(--app-font-size-base) * 0.85); gap: var(--app-space-1) var(--app-space-2); grid-template-columns: max-content minmax(0, 1fr); margin: var(--app-space-2) 0 0; }
+.security-audit-metadata dd { font-family: monospace; margin: 0; overflow-wrap: anywhere; }
+.security-audit-actions { align-content: start; display: flex; flex-wrap: wrap; gap: var(--app-space-2); }
+@media (max-width: 720px) { .security-audit-history-row { flex-direction: column; } }

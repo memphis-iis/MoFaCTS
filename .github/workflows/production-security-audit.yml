@@ -171,6 +171,15 @@ jobs:
               "$AUDIT_DIR/authentication.json" "$AUDIT_DIR/repository.json" \
               "$AUDIT_DIR/report.json"
 
+      - name: Store the report in the application
+        id: ingest
+        continue-on-error: true
+        shell: bash
+        working-directory: mofacts
+        env:
+          AUDIT_REPORT_INGEST_SECRET: ${{ secrets.AUDIT_REPORT_INGEST_SECRET }}
+        run: node scripts/security-audit/upload-report.mjs "$AUDIT_DIR/report.json"
+
       - name: Encrypt the report for private retention
         shell: bash
         working-directory: mofacts
@@ -190,7 +199,14 @@ jobs:
       - name: Fail only for audit execution errors
         shell: bash
         working-directory: mofacts
-        run: node scripts/security-audit/assert-execution-complete.mjs "$AUDIT_DIR/report.json"
+        env:
+          AUDIT_INGEST_OUTCOME: ${{ steps.ingest.outcome }}
+        run: |
+          node scripts/security-audit/assert-execution-complete.mjs "$AUDIT_DIR/report.json"
+          if [[ "$AUDIT_INGEST_OUTCOME" != success ]]; then
+            echo "Security audit report storage did not complete." >&2
+            exit 1
+          fi
 
       - name: Remove ephemeral audit material
         if: always()

@@ -50,7 +50,9 @@ import { createDashboardCacheMethods } from './methods/dashboardCacheMethods';
 import { createLearnerAnalyticsMethods } from './methods/learnerAnalyticsMethods';
 import { createDeploymentReadinessMethods } from './methods/deploymentReadinessMethods';
 import { createBackupMethods, createBackupRegistry } from './methods/backupMethods';
+import { createSecurityAuditMethods } from './methods/securityAuditMethods';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
+import { ensureSecurityAuditIndexes, SecurityAuditReports } from './securityAudit/securityAuditStorage';
 import { createExperimentMethods } from './methods/experimentMethods';
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
 import { createPackageMethods } from './methods/packageMethods';
@@ -1126,6 +1128,11 @@ export const asyncMethods: Record<string, unknown> = {
     auditLog: AuditLog,
     requireAdminUser: authSupport.requireAdminUser,
   }),
+
+  ...createSecurityAuditMethods({
+    reports: SecurityAuditReports,
+    requireAdminUser: authSupport.requireAdminUser,
+  }),
 }
 
 // Server-side startup logic
@@ -1139,6 +1146,7 @@ registerServerRuntime({
 });
 
 Meteor.startup(async function() {
+  await ensureSecurityAuditIndexes();
   const interruptedBackupCount = await reconcileInterruptedBackupJobs({
     backupJobs: createBackupRegistry(BackupJobs),
   });
