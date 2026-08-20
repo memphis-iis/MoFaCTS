@@ -289,10 +289,15 @@ try {
   await Promise.all([...authorizationSessions.values()].map((session) => session.context.close()));
 
   const resume = await callMethod(anonymous.page, 'provisionExperimentUser', [config.passwordless.experimentTarget, config.passwordless.participantId]);
-  const issuedToken = resume.ok && typeof resume.value?.loginToken === 'string';
-  controls.push(control('authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token',
-    issuedToken ? 'FAIL' : 'PASS', 'CRITICAL',
-    issuedToken ? 'Anonymous re-provisioning returned authentication material for an existing participant.' : 'Anonymous re-provisioning did not return authentication material.'));
+  if (!resume.ok) {
+    controls.push(errorControl('authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token',
+      `The passwordless re-provisioning probe failed with code ${resume.code}.`));
+  } else {
+    const issuedToken = typeof resume.value?.loginToken === 'string';
+    controls.push(control('authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token',
+      issuedToken ? 'FAIL' : 'PASS', 'CRITICAL',
+      issuedToken ? 'Anonymous re-provisioning returned authentication material for an existing participant.' : 'Anonymous re-provisioning did not return authentication material.'));
+  }
 
   const pageContent = await expirySession.page.locator('body').innerText().catch(() => '');
   const cookies = await expirySession.context.cookies();

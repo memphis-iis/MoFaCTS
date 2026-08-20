@@ -73,15 +73,21 @@ jobs:
             https://github.com/aquasecurity/trivy/releases/download/v0.69.3/trivy_0.69.3_Linux-64bit.tar.gz \
             | sudo tar -xz -C /usr/local/bin trivy
 
-      - name: Install deterministic browser dependencies for a full audit
+      - name: Install application dependencies for a full audit
         if: env.AUDIT_TYPE == 'full'
         continue-on-error: true
+        timeout-minutes: 10
         working-directory: mofacts
         shell: bash
-        run: |
-          set -euo pipefail
-          npm ci --ignore-scripts
-          ./node_modules/.bin/playwright install --with-deps chromium
+        run: npm ci
+
+      - name: Install the deterministic browser for a full audit
+        if: env.AUDIT_TYPE == 'full'
+        continue-on-error: true
+        timeout-minutes: 20
+        working-directory: mofacts
+        shell: bash
+        run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Configure forced-command SSH identity
         continue-on-error: true
@@ -148,6 +154,8 @@ jobs:
         if: env.AUDIT_TYPE == 'full'
         shell: bash
         working-directory: mofacts
+        env:
+          AUDIT_AUTH_FIXTURES_JSON: ${{ secrets.AUDIT_AUTH_FIXTURES_JSON }}
         run: |
           set +e
           node scripts/security-audit/repository-audit.mjs "$AUDIT_DIR/repository.json" >/dev/null 2>&1
