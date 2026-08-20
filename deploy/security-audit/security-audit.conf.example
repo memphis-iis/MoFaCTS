@@ -14,4 +14,4 @@ MOFACTS_MONGO_SIDECAR_PASSWORD=replace-with-sidecar-readonly-password
 MOFACTS_MONGO_SIDECAR_ROLE=read
 MOFACTS_REDIS_PASSWORD=replace-with-redis-password
 MOFACTS_MANAGEMENT_CIDRS=192.0.2.0/24,2001:db8::/48
-CADDY_CONFIG_FILE=/etc/caddy/Caddyfile
+APACHE_HTTPS_SITE_FILE=/etc/apache2/sites-enabled/000-default-le-ssl.conf

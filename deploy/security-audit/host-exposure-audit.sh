@@ -47,7 +47,7 @@ required_vars=(
   MOFACTS_MONGO_APP_USER MOFACTS_MONGO_APP_PASSWORD MOFACTS_MONGO_SIDECAR_USER MOFACTS_MONGO_SIDECAR_PASSWORD
   MOFACTS_MONGO_APP_ROLE MOFACTS_MONGO_SIDECAR_ROLE
   MOFACTS_REDIS_PASSWORD
-  MOFACTS_MANAGEMENT_CIDRS CADDY_CONFIG_FILE
+  MOFACTS_MANAGEMENT_CIDRS APACHE_HTTPS_SITE_FILE
 )
 missing=0
 for name in "${required_vars[@]}"; do
@@ -65,7 +65,7 @@ else
   error_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' 'Protected audit configuration is incomplete.'
   error_control internal.docker-ports 'Docker publishes only approved loopback ports' 'Protected audit configuration is incomplete.'
   error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'Protected audit configuration is incomplete.'
-  error_control internal.caddy-routes 'Caddy routes only the production host to the loopback app' 'Protected audit configuration is incomplete.'
+  error_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' 'Protected audit configuration is incomplete.'
   error_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' 'Protected audit configuration is incomplete.'
   error_control internal.redis-auth 'Redis requires authentication and remains private' 'Protected audit configuration is incomplete.'
   printf '%s\n' "$(jq -cn --argjson controls "$controls" \
@@ -155,24 +155,41 @@ else
   error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'ufw is unavailable.'
 fi
 
-if command -v caddy >/dev/null 2>&1 && [[ -f "${CADDY_CONFIG_FILE:-}" ]]; then
-  caddy_json="$(caddy adapt --config "$CADDY_CONFIG_FILE" 2>/dev/null)" || caddy_json=''
-  if jq -e . >/dev/null 2>&1 <<<"$caddy_json"; then
-    route_hosts="$(jq '[.. | objects | .host? // empty | arrays | .[] | select(. == "mofacts.optimallearning.org")] | length' <<<"$caddy_json")"
-    invalid_hosts="$(jq '[.. | objects | .host? // empty | arrays | .[] | select(. != "mofacts.optimallearning.org")] | length' <<<"$caddy_json")"
-    upstreams="$(jq -c '[.. | objects | .upstreams? // empty | arrays | .[] | .dial? // empty]' <<<"$caddy_json")"
-    invalid_upstreams="$(jq '[.[] | select(. != "127.0.0.1:3000")] | length' <<<"$upstreams")"
-    upstream_count="$(jq 'length' <<<"$upstreams")"
-    if [[ "$route_hosts" -ge 1 && "$invalid_hosts" -eq 0 && "$upstream_count" -ge 1 && "$invalid_upstreams" -eq 0 ]]; then
-      add_control internal.caddy-routes 'Caddy routes only the production host to the loopback app' PASS CRITICAL 'All adapted reverse-proxy upstreams target 127.0.0.1:3000 and the production host matcher is present.'
-    else
-      add_control internal.caddy-routes 'Caddy routes only the production host to the loopback app' FAIL CRITICAL 'The adapted Caddy host or upstream routes do not match the single approved production route.'
-    fi
+if command -v apache2ctl >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1 \
+  && [[ -f "${APACHE_HTTPS_SITE_FILE:-}" ]]; then
+  apache_active="$(systemctl is-active apache2 2>/dev/null || true)"
+  apache_syntax="$(apache2ctl configtest 2>&1 || true)"
+  apache_vhosts="$(apache2ctl -S 2>&1 || true)"
+  configured_vhost_count="$(grep -Ec '^<VirtualHost[[:space:]]+\*:443>$' "$APACHE_HTTPS_SITE_FILE" || true)"
+  active_vhost_count="$(grep -E '^\*:443[[:space:]]+mofacts\.optimallearning\.org[[:space:]]+' <<<"$apache_vhosts" \
+    | grep -Fc "($APACHE_HTTPS_SITE_FILE:" || true)"
+  invalid_hosts="$(awk '
+    { directive=tolower($1) }
+    directive=="servername" || directive=="serveralias" {
+      for (i=2; i<=NF; i++) if ($i != "mofacts.optimallearning.org") invalid++
+    }
+    END { print invalid+0 }
+  ' "$APACHE_HTTPS_SITE_FILE")"
+  proxy_targets="$(awk '
+    { directive=tolower($1) }
+    directive=="proxypass" || directive=="proxypassmatch" || directive=="proxypassreverse" {
+      for (i=2; i<=NF; i++) if ($i ~ /^(http|ws)s?:\/\//) print $i
+    }
+  ' "$APACHE_HTTPS_SITE_FILE")"
+  upstream_count="$(grep -c . <<<"$proxy_targets" || true)"
+  invalid_upstreams="$(grep -Evc '^(http|ws)://127\.0\.0\.1:3000(/|$)' <<<"$proxy_targets" || true)"
+  syntax_valid=0
+  if [[ "$apache_syntax" == 'Syntax OK' ]]; then syntax_valid=1; fi
+  if [[ "$apache_active" == active && "$syntax_valid" -eq 1 \
+    && "$configured_vhost_count" -eq 1 && "$active_vhost_count" -eq 1 \
+    && "$invalid_hosts" -eq 0 && "$upstream_count" -ge 1 && "$invalid_upstreams" -eq 0 ]]; then
+    add_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' PASS CRITICAL 'The active Apache HTTPS virtual host routes every HTTP and WebSocket upstream to 127.0.0.1:3000.'
   else
-    error_control internal.caddy-routes 'Caddy routes only the production host to the loopback app' 'Caddy configuration could not be adapted to valid JSON.'
+    add_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' FAIL CRITICAL \
+      "Apache route policy failed: active=$([[ "$apache_active" == active ]] && echo 1 || echo 0), syntaxValid=$syntax_valid, configuredHttpsVhosts=$configured_vhost_count, activeProductionVhosts=$active_vhost_count, invalidHosts=$invalid_hosts, upstreams=$upstream_count, invalidUpstreams=$invalid_upstreams."
   fi
 else
-  error_control internal.caddy-routes 'Caddy routes only the production host to the loopback app' 'Caddy or its configured file is unavailable.'
+  error_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' 'Apache or its configured enabled HTTPS site is unavailable.'
 fi
 
 mongo_exec=(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017)
@@ -217,10 +234,10 @@ status="$(jq -r 'if any(.[]; .status=="ERROR") then "ERROR" elif any(.[]; .statu
 production_image="$(docker inspect --format '{{.Image}}' "${MOFACTS_APP_CONTAINER:-}" 2>/dev/null || true)"
 tool_versions="$(jq -cn \
   --arg docker "$(docker --version 2>/dev/null | head -n1 || echo unavailable)" \
-  --arg caddy "$(caddy version 2>/dev/null | head -n1 || echo unavailable)" \
+  --arg apache "$(apache2ctl -v 2>/dev/null | head -n1 || echo unavailable)" \
   --arg mongosh "$(docker exec "${MOFACTS_MONGO_CONTAINER:-}" mongosh --version 2>/dev/null | head -n1 || echo unavailable)" \
   --arg redisCli "$(docker exec "${MOFACTS_REDIS_CONTAINER:-}" redis-cli --version 2>/dev/null | head -n1 || echo unavailable)" \
-  '{docker:$docker,caddy:$caddy,mongosh:$mongosh,"redis-cli":$redisCli}')"
+  '{docker:$docker,apache:$apache,mongosh:$mongosh,"redis-cli":$redisCli}')"
 printf '%s\n' "$(jq -cn --arg status "$status" --argjson controls "$controls" \
   --arg productionImage "${production_image:-unknown}" --argjson toolVersions "$tool_versions" \
   '{sectionId:"internal",status:$status,controls:$controls,productionImage:$productionImage,toolVersions:$toolVersions}')"

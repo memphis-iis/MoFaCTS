@@ -38,7 +38,7 @@ const expected = {
     ['internal.sidecar-loopback', 'Sidecar ports are absent or loopback-only'],
     ['internal.docker-ports', 'Docker publishes only approved loopback ports'],
     ['internal.firewall', 'UFW is default-deny with scoped SSH and public web only'],
-    ['internal.caddy-routes', 'Caddy routes only the production host to the loopback app'],
+    ['internal.reverse-proxy-routes', 'The active reverse proxy routes only the production host to the loopback app'],
     ['internal.mongodb-auth', 'MongoDB authentication, replica set, and scoped roles are enforced'],
     ['internal.redis-auth', 'Redis requires authentication and remains private'],
   ],
@@ -112,7 +112,7 @@ if (internalRaw?.toolVersions && typeof internalRaw.toolVersions === 'object') {
 }
 const allowedToolNames = new Set([
   'node', 'nmap', 'openssl', 'gitleaks', 'trivy', 'playwright', 'curl', 'ssh',
-  'docker', 'caddy', 'mongosh', 'redis-cli',
+  'docker', 'apache', 'mongosh', 'redis-cli',
 ]);
 toolVersions = Object.fromEntries(Object.entries(toolVersions)
   .filter(([name, version]) => allowedToolNames.has(name) && typeof version === 'string')

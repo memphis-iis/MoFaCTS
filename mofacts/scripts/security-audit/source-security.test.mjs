@@ -110,6 +110,17 @@ test('public Caddy example sends a one-year HSTS policy', () => {
   assert.match(source, /header Strict-Transport-Security "max-age=31536000"/);
 });
 
+test('host exposure audit inspects the active Apache HTTPS site rather than inactive Caddy configuration', () => {
+  const source = fs.readFileSync(new URL('../../../deploy/security-audit/host-exposure-audit.sh', import.meta.url), 'utf8');
+  const config = fs.readFileSync(new URL('../../../deploy/security-audit/security-audit.conf.example', import.meta.url), 'utf8');
+  assert.match(config, /^APACHE_HTTPS_SITE_FILE=\/etc\/apache2\/sites-enabled\/000-default-le-ssl\.conf$/m);
+  assert.match(source, /systemctl is-active apache2/);
+  assert.match(source, /apache2ctl configtest/);
+  assert.match(source, /internal\.reverse-proxy-routes/);
+  assert.match(source, /127\\\.0\\\.0\\\.1:3000/);
+  assert.doesNotMatch(source, /CADDY_CONFIG_FILE|internal\.caddy-routes|caddy adapt/);
+});
+
 test('encrypted report retention round-trips and detects tampering', () => {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 3072 });
   const sections = Object.fromEntries(['external', 'authentication', 'internal', 'repository'].map((sectionId) => [

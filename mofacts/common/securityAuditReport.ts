@@ -66,7 +66,7 @@ const REPORT_KEYS = [
 const COUNT_KEYS = ['pass', 'fail', 'error', 'notApplicable', 'info', 'low', 'medium', 'high', 'critical'] as const;
 const TOOL_NAMES = new Set([
   'node', 'nmap', 'openssl', 'gitleaks', 'trivy', 'playwright', 'curl', 'ssh',
-  'docker', 'caddy', 'mongosh', 'redis-cli',
+  'docker', 'apache', 'mongosh', 'redis-cli',
 ]);
 
 function isRecord(value: unknown): value is UnknownRecord {

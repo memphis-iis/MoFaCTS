@@ -64,7 +64,7 @@ sudo install -o root -g root -m 0600 deploy/security-audit/security-audit.conf.e
 sudoedit /etc/mofacts/security-audit.conf
 ```
 
-Replace every example value. Configure exact management CIDRs, current container names, the expected MongoDB replica set and database, scoped app/Sidecar MongoDB users, a MongoDB audit credential, the Redis audit password, and the active Caddyfile. Missing settings or tools produce audit errors.
+Replace every example value. Configure exact management CIDRs, current container names, the expected MongoDB replica set and database, scoped app/Sidecar MongoDB users, a MongoDB audit credential, the Redis audit password, and the active enabled Apache HTTPS site. Missing settings or tools produce audit errors.
 
 Restrict the dedicated SSH public key to the forced command:
 
@@ -72,9 +72,9 @@ Restrict the dedicated SSH public key to the forced command:
 restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,command="sudo -n /usr/local/sbin/mofacts-host-exposure-audit" ssh-ed25519 PUBLIC_KEY audit
 ```
 
-Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, adapted Caddy route, UFW, MongoDB, Redis, running-image, and connectivity information. It does not print container environments or credentials and does not change state.
+Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. It does not print container environments or credentials and does not change state.
 
-The host must provide `bash`, `jq`, `ss`, Docker, UFW, and Caddy. MongoDB and Redis probes execute their clients inside the configured containers. Sidecar ports must be absent or exactly `127.0.0.1:8931` and `127.0.0.1:8932`.
+The host must provide `bash`, `jq`, `ss`, Docker, UFW, Apache (`apache2ctl` and its systemd unit), and the active enabled HTTPS site configured by `APACHE_HTTPS_SITE_FILE`. MongoDB and Redis probes execute their clients inside the configured containers. Sidecar ports must be absent or exactly `127.0.0.1:8931` and `127.0.0.1:8932`.
 
 ## Synthetic production fixtures
 
