@@ -28,7 +28,7 @@ const expected = {
     ['authentication.session-lifetime', 'Sessions expire within 30 days'],
     ['authentication.material-leakage', 'Authentication material does not enter client-observable channels'],
     ['authentication.authorization', 'Anonymous and cross-user authorization is enforced'],
-    ['authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token'],
+    ['authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target'],
     ['authentication.throttling', 'Login throttles cover connection, identifier, and IP'],
   ],
   internal: [

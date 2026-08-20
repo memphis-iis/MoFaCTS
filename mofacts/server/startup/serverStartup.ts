@@ -278,13 +278,11 @@ function getExistingAccountMethod(user: any): 'password' | 'google' | 'microsoft
   return 'different-method';
 }
 
-function throwOAuthExistingAccountError(existingUser: any, attemptedProvider: string, emailCanonical: string, deps: RunServerStartupDeps) {
+function throwOAuthExistingAccountError(existingUser: any, attemptedProvider: string, deps: RunServerStartupDeps) {
   const existingMethod = getExistingAccountMethod(existingUser);
   deps.serverConsole('[ACCOUNTS] OAuth sign-in blocked by existing account method', {
     attemptedProvider,
-    emailCanonical,
     existingMethod,
-    existingUserId: existingUser?._id || null,
   });
   if (existingMethod === 'password') {
     throw new Meteor.Error('oauth-account-exists-password', 'This email is already registered with a password. Sign in with your password or reset it.');
@@ -301,18 +299,12 @@ function throwOAuthExistingAccountError(existingUser: any, attemptedProvider: st
   throw new Meteor.Error('oauth-account-exists-different-method', 'This email is already registered with a different sign-in method.');
 }
 
-function summarizeUserLookupForLog(user: any) {
+function summarizeAccountLookupForLog(user: any) {
   if (!user) {
     return null;
   }
   return {
-    _id: user?._id || null,
-    username: user?.username || null,
-    emailCanonical: user?.email_canonical || null,
-    emailOriginal: user?.email_original || null,
-    emails: Array.isArray(user?.emails)
-      ? user.emails.map((entry: any) => ({ address: entry?.address || null, verified: !!entry?.verified }))
-      : [],
+    found: true,
     services: user?.services ? Object.keys(user.services).sort() : [],
     existingMethod: getExistingAccountMethod(user),
   };
@@ -470,7 +462,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   }) => {
     deps.serverConsole('[ACCOUNTS.ONLOGIN] Login detected:', {
       type: loginInfo.type,
-      userId: loginInfo.user?._id,
       methodName: loginInfo.methodName,
       allowed: loginInfo.allowed,
     });
@@ -483,13 +474,13 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     const normalizedUserEmail = typeof userEmail === 'string' ? userEmail.trim().toLowerCase() : '';
     const isOAuthLogin = loginInfo.type === 'google' || loginInfo.type === 'microsoft' || loginInfo.type === 'memphisSaml';
 
-    deps.serverConsole('[ACCOUNTS.ONLOGIN] Processing login for user:', userId, 'email:', userEmail);
+    deps.serverConsole('[ACCOUNTS.ONLOGIN] Processing allowed login:', { type: loginInfo.type });
     if (userId) {
       try {
         await deps.enforceCanonicalEmailIdentity(userId, userEmail, { actorUserId: userId, source: 'accounts.onLogin' });
         await deps.syncUserAuthState(userId, isOAuthLogin ? String(loginInfo.type || 'password') : 'password');
-      } catch (error: unknown) {
-        deps.serverConsole('[ACCOUNTS.ONLOGIN] Failed to enforce canonical email identity:', error);
+      } catch {
+        deps.serverConsole('[ACCOUNTS.ONLOGIN] Failed to enforce canonical account identity');
       }
     }
 
@@ -498,19 +489,19 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       const admins = (initRoles?.admins || []).map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean);
       const teachers = (initRoles?.teachers || []).map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean);
       if (admins.includes(normalizedUserEmail)) {
-        deps.serverConsole('[ACCOUNTS.ONLOGIN] User', normalizedUserEmail, 'found in initRoles.admins - assigning admin role');
+        deps.serverConsole('[ACCOUNTS.ONLOGIN] Matching initRoles.admins entry found; assigning admin role');
         try {
           await Roles.addUsersToRolesAsync(userId, 'admin');
-          deps.serverConsole('[ACCOUNTS.ONLOGIN] Admin role assigned successfully to', normalizedUserEmail);
+          deps.serverConsole('[ACCOUNTS.ONLOGIN] Admin role assigned successfully');
         } catch (error: unknown) {
           deps.serverConsole('[ACCOUNTS.ONLOGIN] ERROR assigning admin role:', error);
         }
       }
       if (teachers.includes(normalizedUserEmail)) {
-        deps.serverConsole('[ACCOUNTS.ONLOGIN] User', normalizedUserEmail, 'found in initRoles.teachers - assigning teacher role');
+        deps.serverConsole('[ACCOUNTS.ONLOGIN] Matching initRoles.teachers entry found; assigning teacher role');
         try {
           await Roles.addUsersToRolesAsync(userId, 'teacher');
-          deps.serverConsole('[ACCOUNTS.ONLOGIN] Teacher role assigned successfully to', normalizedUserEmail);
+          deps.serverConsole('[ACCOUNTS.ONLOGIN] Teacher role assigned successfully');
         } catch (error: unknown) {
           deps.serverConsole('[ACCOUNTS.ONLOGIN] ERROR assigning teacher role:', error);
         }
@@ -520,12 +511,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     await deps.writeAuditLog('auth.loginSuccess', userId || null, userId || null, {
       loginType: loginInfo.type || 'password',
       ip: deps.getAuthClientIp(loginInfo),
-      identifier: normalizedUserEmail,
     });
 
     if (isOAuthLogin && userId) {
       const loginMode = String(loginInfo.type || 'password');
-      deps.serverConsole('[ACCOUNTS.ONLOGIN] Setting OAuth loginParams for user:', userId, 'mode:', loginMode);
+      deps.serverConsole('[ACCOUNTS.ONLOGIN] Setting OAuth loginParams:', { mode: loginMode });
       try {
         await deps.usersCollection.updateAsync(
           { _id: userId },
@@ -538,7 +528,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
             },
           }
         );
-        deps.serverConsole('[ACCOUNTS.ONLOGIN] loginParams set successfully for user:', userId);
+        deps.serverConsole('[ACCOUNTS.ONLOGIN] loginParams set successfully');
       } catch (error: unknown) {
         deps.serverConsole('[ACCOUNTS.ONLOGIN] ERROR setting loginParams:', error);
       }
@@ -601,9 +591,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
         void deps.writeAuditLog('auth.loginFailure', attempt.user?._id || null, attempt.user?._id || null, {
           loginType: attempt.type || 'password',
           ip: clientIp,
-          identifier,
           errorCode: attempt.error?.error || '',
-          errorReason: attempt.error?.reason || attempt.error?.message || '',
         });
       });
       return false;
@@ -622,7 +610,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   const adminUserId = adminUser?._id || '';
   if (adminUserId) {
     await Roles.addUsersToRolesAsync(adminUserId, 'admin');
-    deps.serverConsole('Admin User Found ID:', adminUserId, 'with obj:', _.pick(adminUser, '_id', 'username', 'email'));
+    deps.serverConsole('Configured owner account found and assigned the admin role');
   } else if (deps.isProd) {
     deps.serverConsole('Warning: configured owner account could not be found. adminUser=', displayify(adminUser || 'null'));
     deps.serverConsole('Warning: no owner is available for system TDFs until the configured owner account exists');
@@ -638,11 +626,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       const user = await findUserByName(deps, String(username || ''));
       if (!user || !user._id) {
         const messagePrefix = deps.isProd ? 'Warning: role assignment target missing' : 'Role assignment target not present yet';
-        deps.serverConsole(messagePrefix, { user: username, role: roleName });
+        deps.serverConsole(messagePrefix, { role: roleName });
         continue;
       }
       await Roles.addUsersToRolesAsync(user._id, roleName);
-      deps.serverConsole('Added user', username, 'to role', roleName);
+      deps.serverConsole('Configured role assignment completed:', { role: roleName });
     }
   };
   await roleAdd('admins', 'admin');
@@ -665,12 +653,11 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     deps.serverConsole('[ACCOUNTS] onCreateUser called');
     deps.serverConsole('[ACCOUNTS] User services:', Object.keys(user.services || {}));
 
-    const dispUsr = (currentUser: Meteor.User) => _.pick(currentUser, '_id', 'username', 'emails', 'profile');
     if (options.profile) {
       user.profile = _.extend(user.profile || {}, options.profile as Record<string, unknown>);
     }
     if (user.profile?.experiment) {
-      deps.serverConsole('Experiment participant user created:', dispUsr(user));
+      deps.serverConsole('Experiment participant account created');
       return user;
     }
 
@@ -689,23 +676,12 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       const msOidcEmail = user.services.microsoft.email;
       email = (msOidcEmail || msEmail || msUserPrincipalName || '').trim().toLowerCase();
       emailVerified = true;
-      deps.serverConsole('[ACCOUNTS] Microsoft user data:', {
-        email: msOidcEmail,
-        mail: msEmail,
-        userPrincipalName: msUserPrincipalName,
-        extractedEmail: email,
-      });
+      deps.serverConsole('[ACCOUNTS] Microsoft account profile received');
     } else if (user.services?.memphisSaml) {
       serviceName = 'memphisSaml';
       email = extractMemphisSamlEmail(user.services.memphisSaml);
       emailVerified = true;
-      deps.serverConsole('[ACCOUNTS] Memphis SAML user data:', {
-        email: user.services.memphisSaml.email,
-        mail: user.services.memphisSaml.mail,
-        eduPersonPrincipalName: user.services.memphisSaml.eduPersonPrincipalName,
-        nameID: user.services.memphisSaml.nameID,
-        extractedEmail: email,
-      });
+      deps.serverConsole('[ACCOUNTS] Memphis SAML account profile received');
     } else if (user.services?.password) {
       const userRecord = user as unknown as UnknownRecord;
       const passwordEmailSource = user.emails?.[0]?.address || userRecord.email_canonical || userRecord.email_original || user.username || '';
@@ -714,7 +690,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
 
     if (!email) {
       deps.serverConsole('[ACCOUNTS] WARNING: No email found for account creation branch:', serviceName);
-      deps.serverConsole('[ACCOUNTS] User object:', JSON.stringify(user, null, 2));
       if (serviceName === 'password') {
         throw new Meteor.Error('password-email-missing', 'No email found for password account creation');
       }
@@ -732,14 +707,13 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       } = findExistingUserByCanonicalEmail(normalizedEmail.canonical);
       deps.serverConsole('[ACCOUNTS] OAuth existing-account lookup', {
         attemptedProvider: serviceName,
-        normalizedEmailCanonical: normalizedEmail.canonical,
-        accountsUserByEmail: summarizeUserLookupForLog(accountsUserByEmail),
-        accountsUserByUsername: summarizeUserLookupForLog(accountsUserByUsername),
-        existingUserByEmail: summarizeUserLookupForLog(existingUserByEmail),
-        existingUserByUsername: summarizeUserLookupForLog(existingUserByUsername),
+        accountsEmailMatch: summarizeAccountLookupForLog(accountsUserByEmail),
+        accountsNameMatch: summarizeAccountLookupForLog(accountsUserByUsername),
+        appEmailMatch: summarizeAccountLookupForLog(existingUserByEmail),
+        appNameMatch: summarizeAccountLookupForLog(existingUserByUsername),
       });
       if (existingUser && !(existingUser as any)?.services?.[serviceName]) {
-        throwOAuthExistingAccountError(existingUser, serviceName, normalizedEmail.canonical, deps);
+        throwOAuthExistingAccountError(existingUser, serviceName, deps);
       }
     }
 
@@ -751,7 +725,7 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     user.profile = user.profile || {};
     user.profile.username = normalizedEmail.canonical;
     userRecord.authState = deps.buildAccountAuthState(user, serviceName?.toLowerCase() || 'password');
-    deps.serverConsole(`[ACCOUNTS] Creating new ${serviceName} user:`, dispUsr(user));
+    deps.serverConsole(`[ACCOUNTS] Creating new ${serviceName} account`);
 
     const normalizedUsername = user.username || '';
     if (normalizedUsername) {
@@ -761,7 +735,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   });
 
   (Accounts as any).config({
-    loginExpirationInDays: 90,
+    loginExpirationInDays: 30,
+    ambiguousErrorMessages: true,
     argon2Enabled: deps.isArgon2Enabled(),
   });
   deps.serverConsole('Password hash runtime info:', deps.getPasswordHashRuntimeInfo());

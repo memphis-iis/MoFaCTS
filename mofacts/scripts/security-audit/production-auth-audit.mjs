@@ -22,7 +22,8 @@ const configuredProbeActors = new Set([
 ].map((probe) => probe.actor));
 const configReady = config && requiredUsers.every((name) => config.users?.[name]?.username && config.users?.[name]?.password)
   && config.users.reset.newPassword
-  && config.passwordless?.experimentTarget && config.passwordless?.participantId
+  && config.passwordless?.experimentTarget && config.passwordless?.otherExperimentTarget
+  && config.passwordless?.participantId
   && Array.isArray(config.authorizationProbes) && config.authorizationProbes.length > 0
   && Array.isArray(config.publicationProbes) && config.publicationProbes.length > 0
   && Array.isArray(config.routeProbes) && config.routeProbes.length > 0
@@ -41,7 +42,7 @@ if (!configReady) {
     ['authentication.session-lifetime', 'Sessions expire within 30 days'],
     ['authentication.material-leakage', 'Authentication material does not enter client-observable channels'],
     ['authentication.authorization', 'Anonymous and cross-user authorization is enforced'],
-    ['authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token'],
+    ['authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target'],
     ['authentication.throttling', 'Login throttles cover connection, identifier, and IP'],
   ];
   for (const [id, title] of ids) controls.push(errorControl(id, title, 'The protected synthetic fixture or IMAPS configuration is incomplete'));
@@ -82,6 +83,14 @@ async function login(page, username, password) {
       resolve(error ? { ok: false, code: String(error.error || error.code || 'error') } : { ok: true });
     });
   }), { loginName: username, loginPassword: password });
+}
+
+async function loginWithToken(page, token) {
+  return await page.evaluate((loginToken) => new Promise((resolve) => {
+    globalThis.Meteor.loginWithToken(loginToken, (error) => resolve(error
+      ? { ok: false, code: String(error?.error || error?.code || 'error') }
+      : { ok: true }));
+  }), token);
 }
 
 async function logout(page) {
@@ -288,15 +297,91 @@ try {
     { metrics: { probeCount: authorizationProbeCount } }));
   await Promise.all([...authorizationSessions.values()].map((session) => session.context.close()));
 
-  const resume = await callMethod(anonymous.page, 'provisionExperimentUser', [config.passwordless.experimentTarget, config.passwordless.participantId]);
+  const resume = await callMethod(anonymous.page, 'provisionExperimentUser', [
+    config.passwordless.experimentTarget,
+    config.passwordless.participantId,
+  ]);
   if (!resume.ok) {
-    controls.push(errorControl('authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token',
+    controls.push(errorControl('authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target',
       `The passwordless re-provisioning probe failed with code ${resume.code}.`));
   } else {
-    const issuedToken = typeof resume.value?.loginToken === 'string';
-    controls.push(control('authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token',
-      issuedToken ? 'FAIL' : 'PASS', 'CRITICAL',
-      issuedToken ? 'Anonymous re-provisioning returned authentication material for an existing participant.' : 'Anonymous re-provisioning did not return authentication material.'));
+    const issuedToken = typeof resume.value?.loginToken === 'string' ? resume.value.loginToken : '';
+    const participant = await newPage();
+    const tokenLogin = issuedToken ? await loginWithToken(participant.page, issuedToken) : { ok: false };
+    if (tokenLogin.ok) {
+      await participant.page.waitForFunction(
+        (expectedTarget) => globalThis.Meteor.user?.()?.profile?.experimentTarget === expectedTarget,
+        config.passwordless.experimentTarget,
+        { timeout: 30000 },
+      ).catch(() => {});
+    }
+    const participantIdentity = tokenLogin.ok ? await participant.page.evaluate(() => {
+      const user = globalThis.Meteor.user?.();
+      return {
+        userId: globalThis.Meteor.userId?.() || null,
+        experiment: user?.profile?.experiment,
+        experimentTarget: user?.profile?.experimentTarget || null,
+      };
+    }) : { userId: null, experiment: null, experimentTarget: null };
+    const mismatchedTarget = await callMethod(anonymous.page, 'provisionExperimentUser', [
+      config.passwordless.otherExperimentTarget,
+      config.passwordless.participantId,
+    ]);
+    const adminAccess = tokenLogin.ok
+      ? await callMethod(participant.page, 'admin.securityAudits.list')
+      : { ok: false };
+    const ordinaryAccountAccess = tokenLogin.ok
+      ? await callMethod(participant.page, 'getOwnOpenRouterSettings')
+      : { ok: false };
+    const assignedExperimentAccess = tokenLogin.ok
+      ? await callMethod(participant.page, 'getTdfByExperimentTarget', [config.passwordless.experimentTarget])
+      : { ok: false };
+    const crossUserProbe = config.authorizationProbes.find((probe) =>
+      probe.actor === 'learnerA' && probe.expectDenied && probe.method === 'getStudentPerformanceByIdAndTDFIdFromHistory');
+    const crossUserAccess = tokenLogin.ok && crossUserProbe
+      ? await callMethod(participant.page, crossUserProbe.method, crossUserProbe.args || [])
+      : { ok: false };
+    const otherUserPublicationProbe = config.publicationProbes.find((probe) =>
+      probe.actor === 'learnerB' && probe.publication === 'userHistory');
+    const otherUserPublication = tokenLogin.ok && otherUserPublicationProbe
+      ? await publicationProbe(
+        participant.page,
+        otherUserPublicationProbe.publication,
+        otherUserPublicationProbe.args || [],
+        otherUserPublicationProbe.otherUserCanary,
+      )
+      : { leakedCanary: true };
+    const participantText = await participant.page.locator('body').innerText().catch(() => '');
+    const participantCookies = await participant.context.cookies();
+    const tokenLeaked = issuedToken
+      ? participantText.includes(issuedToken)
+        || participant.page.url().includes(issuedToken)
+        || participantCookies.some((cookie) => cookie.value.includes(issuedToken))
+      : false;
+    const containmentPass = Boolean(
+      issuedToken
+      && tokenLogin.ok
+      && participantIdentity.userId === resume.value?.userId
+      && (participantIdentity.experiment === true || participantIdentity.experiment === 'true')
+      && participantIdentity.experimentTarget === config.passwordless.experimentTarget
+      && !mismatchedTarget.ok
+      && !adminAccess.ok
+      && !ordinaryAccountAccess.ok
+      && assignedExperimentAccess.ok
+      && Boolean(assignedExperimentAccess.value)
+      && Boolean(crossUserProbe)
+      && !crossUserAccess.ok
+      && Boolean(otherUserPublicationProbe)
+      && !otherUserPublication.leakedCanary
+      && !tokenLeaked,
+    );
+    controls.push(control('authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target',
+      containmentPass ? 'PASS' : 'FAIL', 'CRITICAL',
+      containmentPass
+        ? 'Valid passwordless resume issued a session while modified-target, cross-user, admin, and token-leakage probes were denied.'
+        : 'Passwordless resume or experiment-session containment did not match policy.',
+      { metrics: { containmentProbeCount: 9 } }));
+    await participant.context.close();
   }
 
   const pageContent = await expirySession.page.locator('body').innerText().catch(() => '');
@@ -391,7 +476,7 @@ try {
     ['authentication.session-lifetime', 'Sessions expire within 30 days'],
     ['authentication.material-leakage', 'Authentication material does not enter client-observable channels'],
     ['authentication.authorization', 'Anonymous and cross-user authorization is enforced'],
-    ['authentication.passwordless-resume', 'Existing passwordless participants receive no anonymous login token'],
+    ['authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target'],
     ['authentication.throttling', 'Login throttles cover connection, identifier, and IP'],
   ]) if (!existingIds.has(id)) controls.push(errorControl(id, title, error));
 } finally {

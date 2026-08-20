@@ -1,10 +1,12 @@
 mofacts.example.org {
-  encode zstd gzip
+	encode zstd gzip
 
-  reverse_proxy 127.0.0.1:3000 {
-    header_up Host {host}
-    header_up X-Real-IP {remote_host}
-    header_up X-Forwarded-For {remote_host}
-    header_up X-Forwarded-Proto {scheme}
-  }
+	header Strict-Transport-Security "max-age=31536000"
+
+	reverse_proxy 127.0.0.1:3000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
 }

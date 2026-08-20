@@ -424,7 +424,7 @@ Template.signIn.events({
 
     clientConsole(2, '[MS-LOGIN] Microsoft Login Button Clicked');
     clientConsole(2, '[MS-LOGIN] Current loginMode:', Session.get('loginMode'));
-    clientConsole(2, '[MS-LOGIN] Current user:', Meteor.userId());
+    clientConsole(2, '[MS-LOGIN] Existing session present:', !!Meteor.userId());
 
     // Check if OAuth service configuration is ready
     const msConfig = ServiceConfiguration.configurations.findOne({service: 'microsoft'});
@@ -450,7 +450,7 @@ Template.signIn.events({
       });
 
       clientConsole(2, '[MS-LOGIN] Login successful!');
-      clientConsole(2, '[MS-LOGIN] User after login:', Meteor.userId());
+      clientConsole(2, '[MS-LOGIN] Session established:', !!Meteor.userId());
 
       //if we are not in a class and we log in, we need to disable embedded API keys.
       if(!Session.get('curClass')){
@@ -516,7 +516,7 @@ Template.signIn.events({
 
     clientConsole(2, '[MEMPHIS-SAML] Memphis SAML Login Button Clicked');
     clientConsole(2, '[MEMPHIS-SAML] Current loginMode:', Session.get('loginMode'));
-    clientConsole(2, '[MEMPHIS-SAML] Current user:', Meteor.userId());
+    clientConsole(2, '[MEMPHIS-SAML] Existing session present:', !!Meteor.userId());
 
     Session.set('loginMode', 'memphisSaml');
 
@@ -529,7 +529,7 @@ Template.signIn.events({
       });
 
       clientConsole(2, '[MEMPHIS-SAML] Login successful!');
-      clientConsole(2, '[MEMPHIS-SAML] User after login:', Meteor.userId());
+      clientConsole(2, '[MEMPHIS-SAML] Session established:', !!Meteor.userId());
 
       if(!Session.get('curClass')){
         Session.set('useEmbeddedAPIKeys', false);
@@ -610,7 +610,7 @@ Template.signIn.events({
 
     clientConsole(2, '[GOOGLE-LOGIN] Google Login Button Clicked');
     clientConsole(2, '[GOOGLE-LOGIN] Current loginMode:', Session.get('loginMode'));
-    clientConsole(2, '[GOOGLE-LOGIN] Current user:', Meteor.userId());
+    clientConsole(2, '[GOOGLE-LOGIN] Existing session present:', !!Meteor.userId());
 
     // Check if OAuth service configuration is ready
     const googleConfig = ServiceConfiguration.configurations.findOne({service: 'google'});
@@ -641,7 +641,7 @@ Template.signIn.events({
       await loginWithGoogleAsync(options);
 
       clientConsole(2, '[GOOGLE-LOGIN] Login successful!');
-      clientConsole(2, '[GOOGLE-LOGIN] User after login:', Meteor.userId());
+      clientConsole(2, '[GOOGLE-LOGIN] Session established:', !!Meteor.userId());
 
       if(!Session.get('curClass')){
         //If we are not in a class and we log in, we need to disable embedded API keys.
@@ -675,9 +675,7 @@ Template.signIn.events({
       }
 
       if (Session.get('debugging')) {
-        const currentUser = Meteor.users.findOne({ _id: Meteor.userId() as string });
-        const username = currentUser?.username || Meteor.userId();
-        clientConsole(2, '[GOOGLE-LOGIN] ' + username + ' was logged in successfully! Current route is ', getCurrentRouteName());
+        clientConsole(2, '[GOOGLE-LOGIN] Sign-in succeeded; current route is', getCurrentRouteName());
         MeteorAny.callAsync('debugLog', 'Sign in was successful');
       }
 
@@ -852,8 +850,7 @@ async function signInNotify(
   normalLoginDestination: NormalLoginDestination = DEFAULT_NORMAL_LOGIN_DESTINATION
 ) {
   if (Session.get('debugging')) {
-    const currentUser = (Meteor.users.findOne({ _id: Meteor.userId() as string }) as any)?.username;
-    clientConsole(2, currentUser + ' was logged in successfully! Current route is ', getCurrentRouteName());
+    clientConsole(2, 'Sign-in succeeded; current route is', getCurrentRouteName());
     MeteorAny.callAsync('debugLog', 'Sign in was successful');
     MeteorAny.callAsync('logUserAgentAndLoginTime', Meteor.userId(), navigator.userAgent);
   }

@@ -11,6 +11,14 @@ ROOT_URL=https://mofacts.example.org
 
 Use `deploy/Caddyfile.self-hosted.example` as the starting point. Caddy's `reverse_proxy` supports Meteor WebSocket upgrades by default. Keep `Host`, `X-Forwarded-For`, and `X-Forwarded-Proto` headers so Meteor sees the correct public request context.
 
+For a public hostname that is permanently HTTPS-only, send HSTS on HTTPS responses:
+
+```caddyfile
+header Strict-Transport-Security "max-age=31536000"
+```
+
+Validate and reload Caddy after changing the active host configuration. Do not add `includeSubDomains` or `preload` unless every subdomain is covered by permanent HTTPS and the operator has intentionally accepted those wider commitments.
+
 Cases:
 
 - Local HTTP: `http://localhost:3200`, no public learners.

@@ -159,10 +159,8 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       deps.serverConsole('setUserLoginData called with:', entryPoint, loginMode, curTeacher, curClass, assignedTdfs);
 
       const userId = requireCurrentUserId(this.userId, 'Must be logged in to set login data');
-      deps.serverConsole('setUserLoginData initial userId:', userId);
-
       const user = await deps.usersCollection.findOneAsync({ _id: userId });
-      deps.serverConsole('setUserLoginData found user:', !!user, 'username:', user?.username);
+      deps.serverConsole('setUserLoginData account lookup completed:', { found: !!user });
 
       if (!user) {
         throw new Meteor.Error('user-not-found', 'User document not found');
@@ -243,13 +241,11 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
             'This link expires in 1 hour.\n\n' +
             'If you did not request this reset, you can ignore this email.'
         );
-      } catch (emailErr: unknown) {
-        deps.serverConsole('Failed to send password reset email:', emailErr);
+      } catch {
+        deps.serverConsole('Failed to send password reset message');
       }
 
-      await deps.writeAuditLog('auth.passwordResetRequested', this.userId || null, user._id, {
-        emailCanonical: normalizedEmail,
-      });
+      await deps.writeAuditLog('auth.passwordResetRequested', this.userId || null, user._id);
 
       return { success: true };
     },
@@ -288,13 +284,11 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
       });
       await deps.syncUserAuthState(resetRecord.userId, 'password');
 
-      await deps.writeAuditLog('auth.passwordResetCompleted', this.userId || null, resetRecord.userId, {
-        emailCanonical: normalizedEmail,
-      });
+      await deps.writeAuditLog('auth.passwordResetCompleted', this.userId || null, resetRecord.userId);
       await deps.writeAuditLog('auth.sessionRevoked', this.userId || null, resetRecord.userId, {
         reason: 'password-reset',
       });
-      deps.serverConsole('Password successfully reset for user:', normalizedEmail);
+      deps.serverConsole('Password reset completed successfully');
       return { success: true };
     },
 
@@ -503,7 +497,7 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
     },
 
     setUserSessionId: async function(this: MethodContext, sessionId: string, sessionIdTimestamp: number) {
-      deps.serverConsole('setUserSessionId', sessionId, sessionIdTimestamp);
+      deps.serverConsole('setUserSessionId request received');
       const userId = typeof this.userId === 'string' ? this.userId.trim() : '';
       if (!userId) {
         return;

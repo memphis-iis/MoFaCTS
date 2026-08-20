@@ -250,7 +250,7 @@ async function sendScheduledTurkMessages() {
       });
       if (markedRecord) {
         sendCount++;
-        serverConsole('Finished requested email:', nextJob._id);
+        serverConsole('Finished requested participant message');
       }
     } else {
       const safeError = makePlainObject(senderr);
@@ -471,7 +471,7 @@ Meteor.methods({
         'requestParams': requestParams,
       };
 
-      serverConsole('About to log email sched entry for Turk', JSON.stringify(schedLogEntry, null, 2));
+      serverConsole('Writing scheduled participant-message event:', { success: schedLogEntry.success });
       writeUserLogEntries(experiment, [schedLogEntry], workerUserId);
     }
 

@@ -660,7 +660,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
     },
 
     userAdminRoleChange: async function(this: MethodContext, targetUserId: string, roleAction: string, roleName: string) {
-      deps.serverConsole('userAdminRoleChange', targetUserId, roleAction, roleName);
+      deps.serverConsole('userAdminRoleChange request received:', { roleAction, roleName });
       await deps.requireAdminUser(this.userId, 'You are not authorized to do that', 'not-authorized');
 
       const normalizedTargetUserId = trimString(targetUserId);
@@ -695,7 +695,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         teacher: await Roles.userIsInRoleAsync(normalizedTargetUserId, ['teacher']),
       };
 
-      deps.serverConsole('Role change complete:', normalizedRoleAction, normalizedRoleName, 'for', targetUsername);
+      deps.serverConsole('Role change complete:', normalizedRoleAction, normalizedRoleName);
 
       return {
         RESULT: 'SUCCESS',
@@ -832,12 +832,12 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
           });
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
-          deps.serverConsole('Error creating user ' + username + ':', error);
+          deps.serverConsole('Bulk user creation failed for one row');
           allErrors.push({ username, error: message });
         }
       }
 
-      deps.serverConsole('allErrors: ' + JSON.stringify(allErrors));
+      deps.serverConsole('Bulk user creation error count:', allErrors.length);
       await deps.writeAuditLog('admin.bulkImportUsers', this.userId || null, null, {
         fileName: filename,
         rowCount: rows.length,

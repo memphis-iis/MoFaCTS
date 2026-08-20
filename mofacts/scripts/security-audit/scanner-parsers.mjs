@@ -39,7 +39,8 @@ export function findCanaryLeaks(channels, canaries) {
 export function countPotentialSensitiveLogStatements(sourceText) {
   if (typeof sourceText !== 'string') throw new Error('source text is required');
   const statements = sourceText.match(/(?:serverConsole|clientConsole|console\.(?:log|info|warn|error|debug))\s*\([\s\S]{0,600}?\);/g) || [];
-  return statements.filter((statement) =>
-    /\b(?:email|username|password|token|cookie|sessionId|userRecord|dispUsr|normalizedEmail)\b/i.test(statement)
-  ).length;
+  return statements.filter((statement) => {
+    const expressionsOnly = statement.replace(/(['"`])(?:\\.|(?!\1)[\s\S])*\1/g, '');
+    return /\b(?:email|username|password|token|cookie|sessionId|userRecord|dispUsr|normalizedEmail)\b/i.test(expressionsOnly);
+  }).length;
 }

@@ -392,7 +392,6 @@ function renderContentSubscriptionWaitOnlyWhenCold(controller: any): void {
 function renderHomeForUser(controller: any, user: any) {
   const loginMode = getUserLoginMode(user);
   clientConsole(2, '[ROUTER] renderHomeForUser - loginMode:', loginMode);
-  clientConsole(2, '[ROUTER] renderHomeForUser - user:', user?.username);
 
   if (loginMode === 'experiment') {
     clientConsole(2, '[ROUTER] Experiment mode detected, redirecting to signIn');
@@ -1416,7 +1415,6 @@ FlowRouter.route('/instructions/:tdfId?', {
     }
   }],
 });
-
 
 
 

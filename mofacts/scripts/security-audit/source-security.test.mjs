@@ -66,8 +66,20 @@ test('canary scanning detects retained secrets without emitting their values', (
 
 test('sensitive log scanning distinguishes safe summaries from personal identifiers', () => {
   assert.equal(countPotentialSensitiveLogStatements("serverConsole('count', resultCount);"), 0);
+  assert.equal(countPotentialSensitiveLogStatements("serverConsole('Password reset completed successfully');"), 0);
   assert.equal(countPotentialSensitiveLogStatements("serverConsole('reset', normalizedEmail.canonical);"), 1);
   assert.throws(() => countPotentialSensitiveLogStatements(null));
+});
+
+test('production authentication policy uses ambiguous errors and a 30-day session maximum', () => {
+  const source = fs.readFileSync(new URL('../../server/startup/serverStartup.ts', import.meta.url), 'utf8');
+  assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?loginExpirationInDays:\s*30,/);
+  assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?ambiguousErrorMessages:\s*true,/);
+});
+
+test('public Caddy example sends a one-year HSTS policy', () => {
+  const source = fs.readFileSync(new URL('../../../deploy/Caddyfile.self-hosted.example', import.meta.url), 'utf8');
+  assert.match(source, /header Strict-Transport-Security "max-age=31536000"/);
 });
 
 test('encrypted report retention round-trips and detects tampering', () => {
@@ -94,5 +106,6 @@ test('production authentication probes honor session-scoped credentials and fail
   assert.match(source, /sessionStorage\.getItem\('Meteor\.loginToken'\)/);
   assert.match(source, /sessionStorage\.setItem\('Meteor\.loginToken', stored\.token\)/);
   assert.doesNotMatch(source, /localStorage\.(?:getItem|setItem)\('Meteor\.(?:loginToken|userId|loginTokenExpires)'/);
-  assert.match(source, /if \(!resume\.ok\) \{[\s\S]*?errorControl\('authentication\.passwordless-resume'/);
+  assert.match(source, /if \(!resume\.ok\) \{[\s\S]*?errorControl\('authentication\.passwordless-containment'/);
+  assert.match(source, /issuedToken[\s\S]*?tokenLogin\.ok[\s\S]*?!mismatchedTarget\.ok[\s\S]*?!adminAccess\.ok[\s\S]*?!crossUserAccess\.ok/);
 });

@@ -515,7 +515,7 @@ export function createAuthSupport(deps: AuthSupportDeps) {
         if (/User creation race condition/i.test(errorMessage)) {
           const recoveredUser = await deps.usersCollection.findOneAsync({ username });
           if (recoveredUser?._id) {
-            deps.serverConsole('Recovered user after persistence race by username lookup:', username, recoveredUser._id);
+            deps.serverConsole('Recovered account after persistence race');
             return recoveredUser._id;
           }
 
