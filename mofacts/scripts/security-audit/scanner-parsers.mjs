@@ -1,15 +1,58 @@
-export function parseNmapOpenPorts(xml) {
+export function parseNmapPortStates(xml) {
   if (typeof xml !== 'string' || !xml.includes('<nmaprun') || !xml.includes('</nmaprun>')) {
     throw new Error('nmap XML is missing or malformed');
   }
   const ports = [];
   const hostPattern = /<host[\s\S]*?<address addr="([^"]+)"[^>]*addrtype="(?:ipv4|ipv6)"[^>]*\/>[\s\S]*?<ports>([\s\S]*?)<\/ports>[\s\S]*?<\/host>/g;
   for (const hostMatch of xml.matchAll(hostPattern)) {
-    for (const portMatch of hostMatch[2].matchAll(/<port protocol="([^"]+)" portid="(\d+)">[\s\S]*?<state state="open(?:\|filtered)?"/g)) {
-      ports.push(`${hostMatch[1]}/${portMatch[1]}/${portMatch[2]}`);
+    for (const portMatch of hostMatch[2].matchAll(/<port protocol="([^"]+)" portid="(\d+)">[\s\S]*?<state state="([^"]+)"/g)) {
+      ports.push({
+        endpoint: `${hostMatch[1]}/${portMatch[1]}/${portMatch[2]}`,
+        state: portMatch[3].toLowerCase(),
+      });
     }
   }
   return ports;
+}
+
+export function parseNmapOpenPorts(xml) {
+  return parseNmapPortStates(xml)
+    .filter((entry) => entry.state === 'open')
+    .map((entry) => entry.endpoint);
+}
+
+export function classifyUdpPortStates(entries, expectedResultCount) {
+  if (!Array.isArray(entries) || !Number.isSafeInteger(expectedResultCount) || expectedResultCount < 1
+    || entries.some((entry) => !entry || typeof entry.endpoint !== 'string' || typeof entry.state !== 'string')) {
+    throw new Error('UDP port-state input is invalid');
+  }
+  const openPortCount = entries.filter((entry) => entry.state === 'open').length;
+  const inconclusivePortCount = entries.filter((entry) => entry.state !== 'open' && entry.state !== 'closed').length;
+  const uniqueResultCount = new Set(entries.map((entry) => entry.endpoint)).size;
+  const complete = entries.length === expectedResultCount && uniqueResultCount === expectedResultCount;
+  return {
+    status: openPortCount > 0 ? 'FAIL' : inconclusivePortCount > 0 || !complete ? 'ERROR' : 'PASS',
+    openPortCount,
+    inconclusivePortCount,
+    observedResultCount: entries.length,
+    expectedResultCount,
+  };
+}
+
+export function parseNmapTlsCipherReport(output) {
+  if (typeof output !== 'string' || !/ssl-enum-ciphers:/i.test(output)) {
+    throw new Error('TLS cipher enumeration output is missing or malformed');
+  }
+  const ciphers = [];
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.match(/^\s*\|?\s*(TLS_[A-Z0-9_]+)\b.*?\s-\s([A-F])\s*$/i);
+    if (match) ciphers.push({ name: match[1].toUpperCase(), grade: match[2].toUpperCase() });
+  }
+  if (ciphers.length === 0) throw new Error('TLS cipher enumeration contained no cipher entries');
+  const weak = ciphers.filter(({ name, grade }) =>
+    /(?:3DES|RC4|_NULL_|_ANON_|(?:^|_)ADH_|AECDH|EXPORT|DES_CBC)/i.test(name)
+      || ['C', 'D', 'F'].includes(grade));
+  return { cipherCount: ciphers.length, weakCipherCount: weak.length };
 }
 
 export function parseNpmAuditVulnerabilityCount(value) {

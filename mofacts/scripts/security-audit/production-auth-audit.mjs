@@ -157,6 +157,14 @@ function resetLinks(messages, recipient) {
     }).filter(Boolean);
 }
 
+function numberedProbeId(kind, index) {
+  return `authorization.${kind}.${String(index + 1).padStart(3, '0')}`;
+}
+
+function outcomeObservation(probeId, passed, failureText) {
+  return `${probeId}: ${passed ? 'PASS' : `FAIL - ${failureText}`}`;
+}
+
 try {
   const anonymous = await newPage();
   const existingLogin = [];
@@ -225,9 +233,19 @@ try {
     await login(sessionB.page, config.users.reset.username, resetCurrentPassword);
     const reset = await callMethod(anonymous.page, 'resetPasswordWithToken', [newest.email, newest.token, resetNextPassword]);
     const replay = await callMethod(anonymous.page, 'resetPasswordWithToken', [newest.email, newest.token, resetCurrentPassword]);
+    const resetOutcomes = [
+      { id: 'reset.prior-run-rejected', passed: !expired.ok, failure: 'prior-run token was accepted' },
+      { id: 'reset.current-single-use', passed: reset.ok, failure: 'current token was rejected on first use' },
+      { id: 'reset.replay-rejected', passed: !replay.ok, failure: 'used token was accepted again' },
+    ];
+    const resetTokenPass = resetOutcomes.every((outcome) => outcome.passed);
     controls.push(control('authentication.reset-token', 'Reset tokens expire and are one-time',
-      !expired.ok && reset.ok && !replay.ok ? 'PASS' : 'FAIL', 'CRITICAL',
-      !expired.ok && reset.ok && !replay.ok ? 'Prior-run and replayed reset tokens were rejected; the current token worked once.' : 'Reset-token expiry or one-time-use policy failed.'));
+      resetTokenPass ? 'PASS' : 'FAIL', 'CRITICAL',
+      resetTokenPass ? 'Prior-run and replayed reset tokens were rejected; the current token worked once.' : 'One or more reset-token policy probes failed.',
+      {
+        observations: resetOutcomes.map((outcome) => outcomeObservation(outcome.id, outcome.passed, outcome.failure)),
+        metrics: { probeCount: resetOutcomes.length, failedProbeCount: resetOutcomes.filter((outcome) => !outcome.passed).length },
+      }));
     const revokedA = await callMethod(sessionA.page, 'getOwnOpenRouterSettings');
     const revokedB = await callMethod(sessionB.page, 'getOwnOpenRouterSettings');
     const oldPassword = await login(anonymous.page, config.users.reset.username, resetCurrentPassword);
@@ -251,7 +269,7 @@ try {
     Number.isFinite(lifetimeDays) ? `Observed a maximum session lifetime of approximately ${Math.ceil(lifetimeDays)} days.` : 'Session expiration could not be read after login.',
     { metrics: { lifetimeDays: Number.isFinite(lifetimeDays) ? Math.ceil(lifetimeDays) : -1 } }));
 
-  let authorizationPass = true;
+  const authorizationFailures = [];
   const authorizationSessions = new Map();
   async function getAuthorizationSession(actorName) {
     if (authorizationSessions.has(actorName)) return authorizationSessions.get(actorName);
@@ -265,36 +283,53 @@ try {
     authorizationSessions.set(actorName, session);
     return session;
   }
-  for (const probe of config.authorizationProbes) {
+  for (const [index, probe] of config.authorizationProbes.entries()) {
     const probeSession = await getAuthorizationSession(probe.actor);
     const result = await callMethod(probeSession.page, probe.method, probe.args || []);
-    if (probe.expectDenied ? result.ok : !result.ok) authorizationPass = false;
+    const passed = probe.expectDenied ? !result.ok : result.ok;
+    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('method', index), false,
+      probe.expectDenied ? 'request was unexpectedly allowed' : 'request was unexpectedly denied'));
   }
-  for (const probe of config.routeProbes) {
+  for (const [index, probe] of config.routeProbes.entries()) {
     const probeSession = await getAuthorizationSession(probe.actor);
     await probeSession.page.goto(new URL(probe.path, target).toString(), { waitUntil: 'domcontentloaded' });
     const denied = /(?:accessDenied|signIn|auth\/login)/i.test(probeSession.page.url());
-    if (probe.expectDenied ? !denied : denied) authorizationPass = false;
+    const passed = probe.expectDenied ? denied : !denied;
+    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('route', index), false,
+      probe.expectDenied ? 'route was unexpectedly accessible' : 'route was unexpectedly denied'));
   }
-  for (const probe of config.publicationProbes) {
+  for (const [index, probe] of config.publicationProbes.entries()) {
     const probeSession = await getAuthorizationSession(probe.actor);
     const result = await publicationProbe(probeSession.page, probe.publication, probe.args || [], probe.otherUserCanary);
-    if (result.leakedCanary || (probe.expectError && !result.error)) authorizationPass = false;
+    const passed = !result.leakedCanary && (!probe.expectError || result.error);
+    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('publication', index), false,
+      result.leakedCanary ? 'another user payload was observable' : 'publication was unexpectedly available'));
   }
-  for (const probe of config.downloadProbes) {
+  for (const [index, probe] of config.downloadProbes.entries()) {
     const probeSession = await getAuthorizationSession(probe.actor);
     const status = await probeSession.page.evaluate(async (pathValue) => {
       const response = await fetch(pathValue, { credentials: 'include', redirect: 'manual' });
       return response.status;
     }, probe.path);
-    if (probe.expectDenied ? ![401, 403, 404].includes(status) : status >= 400) authorizationPass = false;
+    const passed = probe.expectDenied ? [401, 403, 404].includes(status) : status < 400;
+    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('download', index), false,
+      probe.expectDenied ? 'download was unexpectedly accessible' : 'download was unexpectedly denied'));
   }
   const authorizationProbeCount = config.authorizationProbes.length + config.publicationProbes.length
     + config.routeProbes.length + config.downloadProbes.length;
+  const authorizationPass = authorizationFailures.length === 0;
   controls.push(control('authentication.authorization', 'Anonymous and cross-user authorization is enforced',
     authorizationPass ? 'PASS' : 'FAIL', 'CRITICAL',
-    authorizationPass ? `All ${authorizationProbeCount} configured method, publication, route, and download probes matched policy.` : 'At least one configured authorization probe violated policy.',
-    { metrics: { probeCount: authorizationProbeCount } }));
+    authorizationPass ? `All ${authorizationProbeCount} configured method, publication, route, and download probes matched policy.`
+      : `${authorizationFailures.length} configured authorization probes violated policy.`,
+    {
+      observations: authorizationFailures,
+      metrics: {
+        probeCount: authorizationProbeCount,
+        failedProbeCount: authorizationFailures.length,
+        omittedFailureCount: Math.max(0, authorizationFailures.length - 12),
+      },
+    }));
   await Promise.all([...authorizationSessions.values()].map((session) => session.context.close()));
 
   const resume = await callMethod(anonymous.page, 'provisionExperimentUser', [
@@ -461,9 +496,19 @@ try {
       if (/too-many|thrott|lock/i.test(result.code || '')) ipThrottled = true;
     }
   }
+  const throttleOutcomes = [
+    { id: 'throttle.connection', passed: connectionThrottled, failure: 'connection limit was not observed' },
+    { id: 'throttle.identifier', passed: identifierThrottled, failure: 'identifier limit was not observed' },
+    { id: 'throttle.ip', passed: ipThrottled, failure: 'IP limit was not observed' },
+  ];
+  const throttlingPass = throttleOutcomes.every((outcome) => outcome.passed);
   controls.push(control('authentication.throttling', 'Login throttles cover connection, identifier, and IP',
-    connectionThrottled && identifierThrottled && ipThrottled ? 'PASS' : 'FAIL', 'CRITICAL',
-    connectionThrottled && identifierThrottled && ipThrottled ? 'Connection, identifier, and IP brute-force probes were each throttled.' : 'One or more configured brute-force dimensions were not observably throttled.'));
+    throttlingPass ? 'PASS' : 'FAIL', 'CRITICAL',
+    throttlingPass ? 'Connection, identifier, and IP brute-force probes were each throttled.' : 'One or more configured brute-force dimensions were not observably throttled.',
+    {
+      observations: throttleOutcomes.map((outcome) => outcomeObservation(outcome.id, outcome.passed, outcome.failure)),
+      metrics: { probeCount: throttleOutcomes.length, failedProbeCount: throttleOutcomes.filter((outcome) => !outcome.passed).length },
+    }));
   await throttleSession.context.close();
   await anonymous.context.close();
 } catch (error) {

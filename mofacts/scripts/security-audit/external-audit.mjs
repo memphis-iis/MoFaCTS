@@ -3,7 +3,7 @@ import net from 'node:net';
 import tls from 'node:tls';
 import { randomBytes } from 'node:crypto';
 import { control, errorControl, runCommand, section, writeJsonFile } from './audit-lib.mjs';
-import { parseNmapOpenPorts } from './scanner-parsers.mjs';
+import { classifyUdpPortStates, parseNmapPortStates, parseNmapTlsCipherReport } from './scanner-parsers.mjs';
 
 const target = new URL(process.env.AUDIT_TARGET || 'https://mofacts.optimallearning.org');
 const outputPath = process.argv[2];
@@ -65,7 +65,7 @@ async function nmapEveryAddress(args, timeoutMs, useSudo = true) {
       ? await runCommand('sudo', ['nmap', ...addressArgs], { timeoutMs })
       : await runCommand('nmap', addressArgs, { timeoutMs });
     if (!result.ok) return { ok: false, reason: result.reason };
-    try { ports.push(...parseNmapOpenPorts(result.stdout)); } catch { return { ok: false, reason: 'nmap output was malformed' }; }
+    try { ports.push(...parseNmapPortStates(result.stdout)); } catch { return { ok: false, reason: 'nmap output was malformed' }; }
   }
   return { ok: true, ports };
 }
@@ -86,26 +86,47 @@ if (addresses.length) {
   if (!tcpScan.ok) {
     controls.push(errorControl('external.public-tcp-ports', 'Only TCP 80 and 443 are public', tcpScan.reason));
   } else {
-    const open = tcpScan.ports;
-    const unexpected = open.filter((entry) => !entry.endsWith('/tcp/80') && !entry.endsWith('/tcp/443'));
-    const perAddress = addresses.every((address) => open.includes(`${address}/tcp/80`) && open.includes(`${address}/tcp/443`));
-    controls.push(control('external.public-tcp-ports', 'Only TCP 80 and 443 are public',
-      unexpected.length === 0 && perAddress ? 'PASS' : 'FAIL', 'CRITICAL',
-      unexpected.length ? `Found ${unexpected.length} unexpected public TCP ports.` : perAddress
-        ? 'Every resolved address exposes TCP 80 and 443 only.'
-        : 'One or more resolved addresses did not expose the required TCP ports.',
-      { metrics: { addressCount: addresses.length, unexpectedPortCount: unexpected.length } }));
+    const inconclusive = tcpScan.ports.filter((entry) => entry.state === 'open|filtered');
+    if (inconclusive.length) {
+      controls.push(errorControl('external.public-tcp-ports', 'Only TCP 80 and 443 are public',
+        `${inconclusive.length} TCP results were inconclusive`));
+    } else {
+      const open = tcpScan.ports.filter((entry) => entry.state === 'open').map((entry) => entry.endpoint);
+      const unexpected = open.filter((entry) => !entry.endsWith('/tcp/80') && !entry.endsWith('/tcp/443'));
+      const perAddress = addresses.every((address) => open.includes(`${address}/tcp/80`) && open.includes(`${address}/tcp/443`));
+      controls.push(control('external.public-tcp-ports', 'Only TCP 80 and 443 are public',
+        unexpected.length === 0 && perAddress ? 'PASS' : 'FAIL', 'CRITICAL',
+        unexpected.length ? `Found ${unexpected.length} unexpected public TCP ports.` : perAddress
+          ? 'Every resolved address exposes TCP 80 and 443 only.'
+          : 'One or more resolved addresses did not expose the required TCP ports.',
+        { metrics: { addressCount: addresses.length, unexpectedPortCount: unexpected.length } }));
+    }
   }
 
   const udpPorts = '53,123,443,27017,6379,8931,8932';
-  const udpScan = await nmapEveryAddress(['-Pn', '-n', '-sU', '-p', udpPorts, '--open', '-oX', '-'], 30 * 60 * 1000);
+  const udpScan = await nmapEveryAddress(['-Pn', '-n', '-sU', '-p', udpPorts, '-oX', '-'], 30 * 60 * 1000);
   if (!udpScan.ok) {
     controls.push(errorControl('external.public-udp-ports', 'Selected UDP ports are closed', udpScan.reason));
   } else {
-    const open = udpScan.ports;
-    controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', open.length ? 'FAIL' : 'PASS', 'CRITICAL',
-      open.length ? `Found ${open.length} selected UDP ports reported open.` : 'No selected UDP port was reported open.',
-      { metrics: { openSelectedUdpPortCount: open.length } }));
+    const expectedResultCount = addresses.length * udpPorts.split(',').length;
+    const classification = classifyUdpPortStates(udpScan.ports, expectedResultCount);
+    if (classification.status === 'FAIL') {
+      controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', 'FAIL', 'CRITICAL',
+        `Found ${classification.openPortCount} selected UDP ports confirmed open.`,
+        { metrics: { openSelectedUdpPortCount: classification.openPortCount, inconclusivePortCount: classification.inconclusivePortCount } }));
+    } else if (classification.status === 'ERROR') {
+      controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', 'ERROR', 'HIGH',
+        'The UDP scan did not conclusively report every selected port closed.',
+        { metrics: {
+          inconclusivePortCount: classification.inconclusivePortCount,
+          observedResultCount: classification.observedResultCount,
+          expectedResultCount: classification.expectedResultCount,
+        } }));
+    } else {
+      controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', 'PASS', 'CRITICAL',
+        'Every selected UDP port was conclusively reported closed.',
+        { metrics: { closedSelectedUdpPortCount: classification.observedResultCount } }));
+    }
   }
 } else {
   controls.push(errorControl('external.public-tcp-ports', 'Only TCP 80 and 443 are public', 'DNS resolution did not complete'));
@@ -152,19 +173,28 @@ if (addresses.length) {
   }
 
   let cipherError = '';
-  let weak = false;
+  let cipherCount = 0;
+  let weakCipherCount = 0;
   for (const address of addresses) {
     const result = await runCommand('nmap', [
       ...(address.includes(':') ? ['-6'] : []), '-Pn', '-n', '-p', '443', '--script', 'ssl-enum-ciphers', address,
     ], { timeoutMs: 20 * 60 * 1000 });
     if (!result.ok) { cipherError = result.reason; break; }
-    if (/(?:3DES|RC4|NULL|anon|EXPORT|least strength:\s*[FCD])/i.test(result.stdout)) weak = true;
+    try {
+      const parsed = parseNmapTlsCipherReport(result.stdout);
+      cipherCount += parsed.cipherCount;
+      weakCipherCount += parsed.weakCipherCount;
+    } catch {
+      cipherError = 'TLS cipher enumeration output was malformed';
+      break;
+    }
   }
   if (cipherError) {
     controls.push(errorControl('external.tls-ciphers', 'No weak TLS cipher is accepted', cipherError));
   } else {
-    controls.push(control('external.tls-ciphers', 'No weak TLS cipher is accepted', weak ? 'FAIL' : 'PASS', 'HIGH',
-      weak ? 'The cipher enumeration reported a prohibited cipher or grade.' : 'The cipher enumeration did not report prohibited ciphers or grades.'));
+    controls.push(control('external.tls-ciphers', 'No weak TLS cipher is accepted', weakCipherCount ? 'FAIL' : 'PASS', 'HIGH',
+      weakCipherCount ? 'The cipher enumeration reported a prohibited cipher or grade.' : 'Every enumerated cipher met the approved policy.',
+      { metrics: { cipherCount, weakCipherCount } }));
   }
 
   try {

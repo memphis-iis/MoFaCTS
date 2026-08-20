@@ -88,6 +88,8 @@ The IMAPS mailbox must be dedicated to the reset identity. It retains the previo
 
 `npm run security:surfaces` compares every discovered Meteor method, publication, HTTP handler, export, and management route with `mofacts/security-surface-contract.json`. New or removed server surfaces fail until their access classification is reviewed. `npm run security:test:source` tests canonical hashing, redaction, scanner parsers, encryption integrity, malformed/missing evidence handling, and canary detection.
 
+UDP results are fail-closed without overstating uncertainty: an exact `open` state is a finding, every selected port must be reported `closed` to pass, and `open|filtered`, another inconclusive state, duplicate evidence, or missing results produce `ERROR`. TLS cipher review parses only enumerated cipher entries and their grades; a normal `compressors: NULL` line is not a weak cipher. Failed reset-token and throttle subprobes use fixed non-secret IDs. Failed authorization probes use deterministic category-and-position IDs, retain at most 12 sanitized observations, and record how many additional failures were omitted.
+
 The regular Security workflow performs a redacted full-history Gitleaks scan, both npm lockfile audits, and the source contract tests. The Monday audit additionally scans an image built from the audited checkout with pinned Trivy. The running production image digest is recorded as informational evidence when the restricted host command can observe it; it does not alter or gate the production deployment.
 
 The report's `sourceRevision` identifies the audit workflow checkout, not a claim that a clean Git tree was deployed to production.
@@ -110,6 +112,6 @@ The decryptor refuses to overwrite an existing output file, authenticates the AE
 
 Do not start the first manual full run until the restricted SSH command, explicit UFW management CIDRs, encryption public key, dedicated mailbox, and complete synthetic fixtures exist.
 
-The first strict report may be red. Expected initial findings include anonymous token issuance for an existing passwordless participant, unauthenticated Redis, missing HSTS or CSP, a session lifetime above 30 days, and authentication paths that log email identifiers. These are evidence for separately approved remediation; the audit does not change those behaviors.
+The first strict report may be red. Passwordless experiment sessions are expected to receive anonymous resume tokens; the control tests that those sessions remain contained to the sealed experiment target and cannot reach ordinary-account, cross-user, or administrative surfaces. Other initial findings may include unauthenticated Redis or missing CSP. These are evidence for separately approved remediation; the audit does not change those behaviors.
 
 Treat an `ERROR` as missing authoritative evidence, never as a passing control. The application report history is the primary administrator view; the encrypted artifact is the independent recovery copy. Codex or an operator may interpret findings, but neither path remediates production automatically.

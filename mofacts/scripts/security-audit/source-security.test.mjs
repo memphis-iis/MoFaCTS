@@ -4,9 +4,12 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { canonicalJson, finalizeReport, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
 import {
+  classifyUdpPortStates,
   findCanaryLeaks,
   countPotentialSensitiveLogStatements,
   parseNmapOpenPorts,
+  parseNmapPortStates,
+  parseNmapTlsCipherReport,
   parseNpmAuditVulnerabilityCount,
   parseTrivyHighCritical,
 } from './scanner-parsers.mjs';
@@ -45,8 +48,33 @@ test('nmap parser handles passing, vulnerable, malformed, and missing output', (
   const prefix = '<?xml version="1.0"?><nmaprun><host><address addr="192.0.2.2" addrtype="ipv4"/><ports>';
   assert.deepEqual(parseNmapOpenPorts(`${prefix}</ports></host></nmaprun>`), []);
   assert.deepEqual(parseNmapOpenPorts(`${prefix}<port protocol="tcp" portid="6379"><state state="open"/></port></ports></host></nmaprun>`), ['192.0.2.2/tcp/6379']);
+  const udp = parseNmapPortStates(`${prefix}<port protocol="udp" portid="53"><state state="open|filtered"/></port><port protocol="udp" portid="443"><state state="closed"/></port></ports></host></nmaprun>`);
+  assert.deepEqual(udp, [
+    { endpoint: '192.0.2.2/udp/53', state: 'open|filtered' },
+    { endpoint: '192.0.2.2/udp/443', state: 'closed' },
+  ]);
+  assert.deepEqual(parseNmapOpenPorts(`${prefix}<port protocol="udp" portid="53"><state state="open|filtered"/></port></ports></host></nmaprun>`), []);
   assert.throws(() => parseNmapOpenPorts('<nmaprun>'));
   assert.throws(() => parseNmapOpenPorts(undefined));
+});
+
+test('TLS cipher parser ignores NULL compression but rejects weak cipher entries and malformed output', () => {
+  const strong = `| ssl-enum-ciphers:\n|   TLSv1.2:\n|     ciphers:\n|       TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (ecdh_x25519) - A\n|     compressors:\n|       NULL\n|_  least strength: A`;
+  assert.deepEqual(parseNmapTlsCipherReport(strong), { cipherCount: 1, weakCipherCount: 0 });
+  const weak = `| ssl-enum-ciphers:\n|   TLSv1.2:\n|     ciphers:\n|       TLS_RSA_WITH_NULL_SHA (rsa 2048) - F\n|_  least strength: F`;
+  assert.deepEqual(parseNmapTlsCipherReport(weak), { cipherCount: 1, weakCipherCount: 1 });
+  assert.throws(() => parseNmapTlsCipherReport('| ssl-enum-ciphers:\n| compressors:\n| NULL'));
+  assert.throws(() => parseNmapTlsCipherReport(undefined));
+});
+
+test('UDP classification distinguishes closed, open, inconclusive, and incomplete scans', () => {
+  const closed = [{ endpoint: '192.0.2.2/udp/53', state: 'closed' }];
+  assert.equal(classifyUdpPortStates(closed, 1).status, 'PASS');
+  assert.equal(classifyUdpPortStates([{ ...closed[0], state: 'open' }], 1).status, 'FAIL');
+  assert.equal(classifyUdpPortStates([{ ...closed[0], state: 'open|filtered' }], 1).status, 'ERROR');
+  assert.equal(classifyUdpPortStates([], 1).status, 'ERROR');
+  assert.equal(classifyUdpPortStates([closed[0], closed[0]], 2).status, 'ERROR');
+  assert.throws(() => classifyUdpPortStates(null, 1));
 });
 
 test('dependency parsers never turn incomplete evidence into a pass', () => {
@@ -108,4 +136,8 @@ test('production authentication probes honor session-scoped credentials and fail
   assert.doesNotMatch(source, /localStorage\.(?:getItem|setItem)\('Meteor\.(?:loginToken|userId|loginTokenExpires)'/);
   assert.match(source, /if \(!resume\.ok\) \{[\s\S]*?errorControl\('authentication\.passwordless-containment'/);
   assert.match(source, /issuedToken[\s\S]*?tokenLogin\.ok[\s\S]*?!mismatchedTarget\.ok[\s\S]*?!adminAccess\.ok[\s\S]*?!crossUserAccess\.ok/);
+  assert.match(source, /reset\.prior-run-rejected[\s\S]*?reset\.current-single-use[\s\S]*?reset\.replay-rejected/);
+  assert.match(source, /numberedProbeId\('method'[\s\S]*?numberedProbeId\('route'[\s\S]*?numberedProbeId\('publication'[\s\S]*?numberedProbeId\('download'/);
+  assert.match(source, /observations:\s*authorizationFailures[\s\S]*?omittedFailureCount:/);
+  assert.match(source, /throttle\.connection[\s\S]*?throttle\.identifier[\s\S]*?throttle\.ip/);
 });
