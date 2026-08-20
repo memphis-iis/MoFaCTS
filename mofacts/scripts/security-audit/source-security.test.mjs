@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import test from 'node:test';
 import { canonicalJson, finalizeReport, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
 import {
@@ -86,4 +87,12 @@ test('encrypted report retention round-trips and detects tampering', () => {
   assert.deepEqual(verifyCanonicalReportDigest(decrypted), report);
   const tampered = { ...encrypted, ciphertext: `${encrypted.ciphertext.slice(0, -4)}AAAA` };
   assert.throws(() => decryptReportEnvelope(tampered, privateKey.export({ type: 'pkcs8', format: 'pem' })));
+});
+
+test('production authentication probes honor session-scoped credentials and fail closed', () => {
+  const source = fs.readFileSync(new URL('./production-auth-audit.mjs', import.meta.url), 'utf8');
+  assert.match(source, /sessionStorage\.getItem\('Meteor\.loginToken'\)/);
+  assert.match(source, /sessionStorage\.setItem\('Meteor\.loginToken', stored\.token\)/);
+  assert.doesNotMatch(source, /localStorage\.(?:getItem|setItem)\('Meteor\.(?:loginToken|userId|loginTokenExpires)'/);
+  assert.match(source, /if \(!resume\.ok\) \{[\s\S]*?errorControl\('authentication\.passwordless-resume'/);
 });

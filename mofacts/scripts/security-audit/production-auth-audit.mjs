@@ -231,9 +231,9 @@ try {
   const expirySession = await newPage();
   const expiryLogin = await login(expirySession.page, config.users.expiry.username, config.users.expiry.password);
   const expirySessionStorage = expiryLogin.ok ? await expirySession.page.evaluate(() => ({
-    token: localStorage.getItem('Meteor.loginToken'),
-    userId: localStorage.getItem('Meteor.userId'),
-    expiresAt: localStorage.getItem('Meteor.loginTokenExpires'),
+    token: sessionStorage.getItem('Meteor.loginToken'),
+    userId: sessionStorage.getItem('Meteor.userId'),
+    expiresAt: sessionStorage.getItem('Meteor.loginTokenExpires'),
   })) : { token: null, userId: null, expiresAt: null };
   const expiryValue = expirySessionStorage.expiresAt;
   const lifetimeDays = expiryValue ? (new Date(expiryValue).getTime() - Date.now()) / 86400000 : NaN;
@@ -322,9 +322,9 @@ try {
     }
     logoutClone = await newPage();
     await logoutClone.page.evaluate((stored) => {
-      localStorage.setItem('Meteor.loginToken', stored.token);
-      localStorage.setItem('Meteor.userId', stored.userId);
-      if (stored.expiresAt) localStorage.setItem('Meteor.loginTokenExpires', stored.expiresAt);
+      sessionStorage.setItem('Meteor.loginToken', stored.token);
+      sessionStorage.setItem('Meteor.userId', stored.userId);
+      if (stored.expiresAt) sessionStorage.setItem('Meteor.loginTokenExpires', stored.expiresAt);
     }, expirySessionStorage);
     await logoutClone.page.reload({ waitUntil: 'domcontentloaded' });
     await logoutClone.page.waitForFunction(() => globalThis.Meteor?.userId?.() !== null, null, { timeout: 30000 });
