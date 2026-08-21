@@ -1,0 +1,6 @@
+# Exact historical fingerprints reviewed as synthetic test literals or generated vendor code.
+f349bb93001acb5d93fcd9b7b31bdabff0e6bf4e:mofacts/client/views/turkWorkflowState.test.ts:generic-api-key:29
+34498a9a5cd0bd92361547ecbcb0de68980cf742:mofacts/public/h5p-standalone/main.bundle.js:generic-api-key:2
+443c3b6649de0c3268e8797eb9c6a2c1f36149f8:mofacts/server/lib/openCoreSettingsValidation.test.ts:generic-api-key:15
+443c3b6649de0c3268e8797eb9c6a2c1f36149f8:mofacts/server/methods/deploymentReadinessMethods.test.ts:generic-api-key:94
+808e32eeb784504b74df3c56e30719df55f54c6f:mofacts/server/methods/speechMethods.test.ts:generic-api-key:30

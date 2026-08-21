@@ -53,6 +53,8 @@ Do not put the value in source control, workflow logs, application settings JSON
 
 `AUDIT_AUTH_FIXTURES_JSON` must describe two learners, two teachers, a synthetic audit administrator, reset, expiry, and lockout identities; an existing incomplete passwordless-study participant; IMAPS host/user/mailbox; method, publication, route, and download authorization probes; canary values; at least 12 unique connection-throttle identifiers; and at least 21 unique IP-throttle identifiers. The reset identity has two audit-only passwords and alternates between them across runs.
 
+Authorization evidence uses stable actor-and-surface probe IDs. Passwordless containment reports each sealed-target boundary separately and treats anonymous resume-token issuance as required behavior. Throttling evidence recognizes the server's `rate-limit` response category and records bounded final categories without identifiers or credentials.
+
 ## Restricted host command
 
 Install the tracked script as a root-owned executable and its configuration as root-only data:

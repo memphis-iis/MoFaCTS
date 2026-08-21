@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { canonicalJson, finalizeReport, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
 import {
+  boundedGitleaksObservations,
+  boundedNpmAuditObservations,
+  boundedTrivyObservations,
   classifyUdpPortStates,
   findCanaryLeaks,
   countPotentialSensitiveLogStatements,
@@ -18,6 +21,14 @@ import {
   encryptReportBuffer,
   verifyCanonicalReportDigest,
 } from './report-crypto.mjs';
+import {
+  assertUniqueSemanticProbeIds,
+  passwordlessContainmentOutcomes,
+  routeProbePassed,
+  semanticAuthorizationProbeId,
+  throttleResultCategory,
+  throttleWasObserved,
+} from './authentication-probes.mjs';
 
 test('canonical reports hash deterministically and exclude the digest from its payload', () => {
   const sections = Object.fromEntries(['external', 'authentication', 'internal', 'repository'].map((sectionId) => [
@@ -86,6 +97,27 @@ test('dependency parsers never turn incomplete evidence into a pass', () => {
   assert.throws(() => parseTrivyHighCritical({}));
 });
 
+test('repository findings expose bounded identifiers without raw scanner evidence', () => {
+  assert.deepEqual(boundedGitleaksObservations([
+    { RuleID: 'generic-api-key', File: 'mofacts/server/example.test.ts', Secret: 'must-not-appear' },
+  ]), ['gitleaks.generic-api-key: mofacts/server/example.test.ts']);
+  assert.deepEqual(boundedNpmAuditObservations({
+    vulnerabilities: {
+      transitive: { severity: 'moderate', isDirect: false },
+      direct: { severity: 'high', isDirect: true },
+    },
+  }), [
+    'npm.direct: severity=high, direct=yes',
+    'npm.transitive: severity=moderate, direct=no',
+  ]);
+  assert.deepEqual(boundedTrivyObservations([
+    { VulnerabilityID: 'CVE-2026-1234', PkgName: 'runtime-lib', Severity: 'HIGH', FixedVersion: '2.0.0' },
+  ]), ['trivy.CVE-2026-1234: package=runtime-lib, severity=HIGH, fixed=yes']);
+  assert.throws(() => boundedGitleaksObservations([{ RuleID: 'generic-api-key' }]));
+  assert.throws(() => boundedNpmAuditObservations({}));
+  assert.throws(() => boundedTrivyObservations([{ VulnerabilityID: 'CVE-2026-1234' }]));
+});
+
 test('canary scanning detects retained secrets without emitting their values', () => {
   const canary = 'AUDIT-CANARY-123456';
   assert.equal(findCanaryLeaks(['safe', `payload:${canary}`], [canary]).length, 1);
@@ -121,6 +153,20 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   assert.doesNotMatch(source, /CADDY_CONFIG_FILE|internal\.caddy-routes|caddy adapt/);
 });
 
+test('production hardening assets preserve reviewed findings and remove unnecessary runtime tooling', () => {
+  const ignore = fs.readFileSync(new URL('../../../.gitleaksignore', import.meta.url), 'utf8');
+  const ignoredFingerprints = ignore.split(/\r?\n/).filter((line) => line && !line.startsWith('#'));
+  assert.equal(ignoredFingerprints.length, 5);
+  assert.doesNotMatch(ignore, /settings\.local\.json/);
+  const dockerfile = fs.readFileSync(new URL('../../../Dockerfile', import.meta.url), 'utf8');
+  assert.match(dockerfile, /apk update && apk upgrade --no-cache && apk add --no-cache/);
+  assert.match(dockerfile, /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx/);
+  const apache = fs.readFileSync(new URL('../../../deploy/maintenance/apache-mofacts-maintenance.conf', import.meta.url), 'utf8');
+  assert.match(apache, /ProxyPass \/websocket ws:\/\/127\.0\.0\.1:3000\/websocket/);
+  assert.match(apache, /Content-Security-Policy-Report-Only/);
+  assert.doesNotMatch(apache, /ws:\/\/localhost:3000/);
+});
+
 test('encrypted report retention round-trips and detects tampering', () => {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 3072 });
   const sections = Object.fromEntries(['external', 'authentication', 'internal', 'repository'].map((sectionId) => [
@@ -146,9 +192,57 @@ test('production authentication probes honor session-scoped credentials and fail
   assert.match(source, /sessionStorage\.setItem\('Meteor\.loginToken', stored\.token\)/);
   assert.doesNotMatch(source, /localStorage\.(?:getItem|setItem)\('Meteor\.(?:loginToken|userId|loginTokenExpires)'/);
   assert.match(source, /if \(!resume\.ok\) \{[\s\S]*?errorControl\('authentication\.passwordless-containment'/);
-  assert.match(source, /issuedToken[\s\S]*?tokenLogin\.ok[\s\S]*?!mismatchedTarget\.ok[\s\S]*?!adminAccess\.ok[\s\S]*?!crossUserAccess\.ok/);
+  assert.match(source, /passwordlessContainmentOutcomes\([\s\S]*?issuedToken[\s\S]*?modifiedTargetRejected[\s\S]*?crossUserMethodDenied/);
   assert.match(source, /reset\.prior-run-rejected[\s\S]*?reset\.current-single-use[\s\S]*?reset\.replay-rejected/);
-  assert.match(source, /numberedProbeId\('method'[\s\S]*?numberedProbeId\('route'[\s\S]*?numberedProbeId\('publication'[\s\S]*?numberedProbeId\('download'/);
+  assert.match(source, /semanticAuthorizationProbeId\('method'[\s\S]*?semanticAuthorizationProbeId\('route'[\s\S]*?semanticAuthorizationProbeId\('publication'[\s\S]*?semanticAuthorizationProbeId\('download'/);
+  assert.doesNotMatch(source, /numberedProbeId/);
   assert.match(source, /observations:\s*authorizationFailures[\s\S]*?omittedFailureCount:/);
   assert.match(source, /throttle\.connection[\s\S]*?throttle\.identifier[\s\S]*?throttle\.ip/);
+  assert.match(source, /index < 11/);
+});
+
+test('authentication probe helpers produce stable bounded diagnostics', () => {
+  const routeProbe = { actor: 'learnerA', path: '/admin/security-audits', expectDenied: true };
+  assert.equal(
+    semanticAuthorizationProbeId('route', routeProbe),
+    semanticAuthorizationProbeId('route', { ...routeProbe }),
+  );
+  assert.match(semanticAuthorizationProbeId('route', routeProbe), /^authorization\.route\.learnera-admin-security-audits-[a-f0-9]{8}$/);
+  assert.match(
+    semanticAuthorizationProbeId('download', { actor: 'anonymous', path: `/download/${'a'.repeat(40)}` }),
+    /anonymous-download-parameter-/,
+  );
+  assert.equal(assertUniqueSemanticProbeIds({ route: [routeProbe, { ...routeProbe }] }), false);
+  assert.equal(throttleWasObserved({ ok: false, code: 'rate-limit' }), true);
+  assert.equal(throttleResultCategory({ ok: false, code: 403 }), 'invalid-credentials');
+  assert.equal(routeProbePassed({
+    actor: 'learnerA', requestedPath: '/admin/security-audits', finalPath: '/home', expectDenied: true, authReady: true,
+  }), true);
+  assert.equal(routeProbePassed({
+    actor: 'anonymous', requestedPath: '/profile', finalPath: '/profile', expectDenied: true, authReady: true,
+  }), false);
+});
+
+test('passwordless containment accepts token issuance and identifies the exact failing boundary', () => {
+  const passingState = {
+    issuedToken: true,
+    tokenLogin: true,
+    identityMatches: true,
+    experimentFlag: true,
+    targetMatches: true,
+    modifiedTargetRejected: true,
+    adminDenied: true,
+    ordinaryAccountDenied: true,
+    assignedExperimentAllowed: true,
+    crossUserMethodDenied: true,
+    crossUserPublicationContained: true,
+    tokenNotLeaked: true,
+  };
+  const passing = passwordlessContainmentOutcomes(passingState);
+  assert.equal(passing.length, 12);
+  assert.equal(passing.every((outcome) => outcome.passed), true);
+  const failing = passwordlessContainmentOutcomes({ ...passingState, modifiedTargetRejected: false });
+  assert.deepEqual(failing.filter((outcome) => !outcome.passed).map((outcome) => outcome.id), [
+    'passwordless.modified-target-rejected',
+  ]);
 });

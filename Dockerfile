@@ -124,7 +124,7 @@ RUN set -eux; \
       printf '%s\n' \
         "${mirror}/${ALPINE_BRANCH}/main" \
         "${mirror}/${ALPINE_BRANCH}/community" > /etc/apk/repositories; \
-      apk update && apk add --no-cache bash ca-certificates font-dejavu imagemagick; \
+      apk update && apk upgrade --no-cache && apk add --no-cache bash ca-certificates font-dejavu imagemagick; \
     }; \
     install_with_mirror "$ALPINE_PRIMARY_MIRROR" || install_with_mirror "$ALPINE_FALLBACK_MIRROR"
 
@@ -138,7 +138,8 @@ COPY --from=bundle_deps_builder $APP_BUNDLE_FOLDER/bundle $APP_BUNDLE_FOLDER/bun
 RUN rm -rf $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-darwin* \
            $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-linux-x64-gnu \
            $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-win32* && \
-    find $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules -type d -name "*darwin*" -exec rm -rf {} + 2>/dev/null || true
+    find $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules -type d -name "*darwin*" -exec rm -rf {} + 2>/dev/null || true; \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Start app
 ENTRYPOINT ["/docker/entrypoint.sh"]

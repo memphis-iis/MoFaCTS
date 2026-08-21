@@ -3,6 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { control, errorControl, runCommand, section, writeJsonFile } from './audit-lib.mjs';
 import {
+  boundedGitleaksObservations,
+  boundedNpmAuditObservations,
+  boundedTrivyObservations,
   countPotentialSensitiveLogStatements,
   parseNpmAuditVulnerabilityCount,
   parseTrivyHighCritical,
@@ -39,10 +42,15 @@ try {
       'Pinned Gitleaks completed a redacted full-history scan without a finding.'));
   } else if (gitleaks.exitCode === 1) {
     let findingCount = -1;
-    try { findingCount = JSON.parse(await fs.readFile(gitleaksReport, 'utf8')).length; } catch { /* parser error handled below */ }
+    let observations = [];
+    try {
+      const findings = JSON.parse(await fs.readFile(gitleaksReport, 'utf8'));
+      findingCount = findings.length;
+      observations = boundedGitleaksObservations(findings);
+    } catch { /* parser error handled below */ }
     controls.push(findingCount >= 0
       ? control('repository.git-history-secrets', 'Git history contains no detected secrets', 'FAIL', 'CRITICAL',
-        `Gitleaks reported ${findingCount} potential secret findings.`, { metrics: { findingCount } })
+        `Gitleaks reported ${findingCount} potential secret findings.`, { observations, metrics: { findingCount } })
       : errorControl('repository.git-history-secrets', 'Git history contains no detected secrets', 'Gitleaks finding output was malformed'));
   } else {
     controls.push(errorControl('repository.git-history-secrets', 'Git history contains no detected secrets', gitleaks.reason));
@@ -57,13 +65,15 @@ try {
     let parsed;
     try { parsed = JSON.parse(result.stdout || '{}'); } catch { parsed = null; }
     let count = null;
+    let observations = [];
     try { count = parsed ? parseNpmAuditVulnerabilityCount(parsed) : null; } catch { count = null; }
+    try { observations = parsed ? boundedNpmAuditObservations(parsed) : []; } catch { count = null; }
     controls.push(count === null
       ? errorControl(`repository.dependencies-${lockfile.name}`, `${lockfile.name} dependencies have no known vulnerability`, 'npm audit output was missing or malformed')
       : control(`repository.dependencies-${lockfile.name}`, `${lockfile.name} dependencies have no known vulnerability`,
         count === 0 ? 'PASS' : 'FAIL', count > 0 ? 'HIGH' : 'INFO',
         count === 0 ? 'npm audit reported no vulnerabilities.' : `npm audit reported ${count} vulnerabilities.`,
-        { metrics: { vulnerabilityCount: count } }));
+        { observations, metrics: { vulnerabilityCount: count } }));
   }
 
   const surface = await runCommand('node', [path.join(toolAppRoot, 'scripts', 'security-audit', 'check-security-surfaces.mjs')], { cwd: toolAppRoot });
@@ -102,16 +112,18 @@ try {
       controls.push(errorControl('repository.runtime-image-vulnerabilities', 'Built runtime image has no high or critical vulnerability', trivy.reason));
     } else {
       let vulnerabilities = null;
+      let observations = [];
       try {
         const json = JSON.parse(await fs.readFile(trivyPath, 'utf8'));
         vulnerabilities = parseTrivyHighCritical(json);
+        observations = boundedTrivyObservations(vulnerabilities);
       } catch { /* malformed output becomes ERROR */ }
       controls.push(vulnerabilities === null
         ? errorControl('repository.runtime-image-vulnerabilities', 'Built runtime image has no high or critical vulnerability', 'Trivy output was malformed')
         : control('repository.runtime-image-vulnerabilities', 'Built runtime image has no high or critical vulnerability',
           vulnerabilities.length ? 'FAIL' : 'PASS', vulnerabilities.some((entry) => entry.Severity === 'CRITICAL') ? 'CRITICAL' : 'HIGH',
           vulnerabilities.length ? `Trivy reported ${vulnerabilities.length} high or critical vulnerabilities.` : 'Trivy reported no high or critical vulnerabilities.',
-          { metrics: { vulnerabilityCount: vulnerabilities.length } }));
+          { observations, metrics: { vulnerabilityCount: vulnerabilities.length } }));
     }
   }
 

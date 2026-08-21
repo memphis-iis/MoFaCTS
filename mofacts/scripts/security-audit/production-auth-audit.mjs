@@ -3,6 +3,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { control, errorControl, runCommand, section, writeJsonFile } from './audit-lib.mjs';
+import {
+  assertUniqueSemanticProbeIds,
+  expectedDeniedRoute,
+  passwordlessContainmentOutcomes,
+  routeProbePassed,
+  semanticAuthorizationProbeId,
+  throttleResultCategory,
+  throttleWasObserved,
+} from './authentication-probes.mjs';
 
 const outputPath = process.argv[2];
 if (!outputPath) throw new Error('output path is required');
@@ -20,6 +29,12 @@ const configuredProbeActors = new Set([
   ...(config?.authorizationProbes || []), ...(config?.publicationProbes || []),
   ...(config?.routeProbes || []), ...(config?.downloadProbes || []),
 ].map((probe) => probe.actor));
+const semanticProbeIdsUnique = assertUniqueSemanticProbeIds({
+  method: config?.authorizationProbes,
+  publication: config?.publicationProbes,
+  route: config?.routeProbes,
+  download: config?.downloadProbes,
+});
 const configReady = config && requiredUsers.every((name) => config.users?.[name]?.username && config.users?.[name]?.password)
   && config.users.reset.newPassword
   && config.passwordless?.experimentTarget && config.passwordless?.otherExperimentTarget
@@ -28,6 +43,7 @@ const configReady = config && requiredUsers.every((name) => config.users?.[name]
   && Array.isArray(config.publicationProbes) && config.publicationProbes.length > 0
   && Array.isArray(config.routeProbes) && config.routeProbes.length > 0
   && Array.isArray(config.downloadProbes) && config.downloadProbes.length > 0
+  && semanticProbeIdsUnique
   && ['anonymous', 'learnerA', 'learnerB', 'teacherA', 'teacherB', 'admin'].every((actor) => configuredProbeActors.has(actor))
   && Array.isArray(config.connectionThrottleIdentifiers) && config.connectionThrottleIdentifiers.length >= 12
   && Array.isArray(config.ipThrottleIdentifiers) && config.ipThrottleIdentifiers.length >= 21
@@ -157,10 +173,6 @@ function resetLinks(messages, recipient) {
     }).filter(Boolean);
 }
 
-function numberedProbeId(kind, index) {
-  return `authorization.${kind}.${String(index + 1).padStart(3, '0')}`;
-}
-
 function outcomeObservation(probeId, passed, failureText) {
   return `${probeId}: ${passed ? 'PASS' : `FAIL - ${failureText}`}`;
 }
@@ -187,7 +199,8 @@ try {
   const sameResetShape = JSON.stringify(resetExisting) === JSON.stringify(resetMissing);
   controls.push(control('authentication.enumeration', 'Login and reset responses resist account enumeration',
     sameLoginCode && sameResetShape ? 'PASS' : 'FAIL', 'HIGH',
-    sameLoginCode && sameResetShape ? 'Existing and nonexistent identifiers produced indistinguishable result shapes.' : 'Existing and nonexistent identifiers produced distinguishable results.'));
+    sameLoginCode && sameResetShape ? 'Existing and nonexistent identifiers produced indistinguishable result shapes.' : 'Existing and nonexistent identifiers produced distinguishable results.',
+    { metrics: { loginCodeMatch: sameLoginCode, resetShapeMatch: sameResetShape } }));
   const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
   const existingMedian = median(existingLogin.map((entry) => entry.elapsed));
   const missingMedian = median(missingLogin.map((entry) => entry.elapsed));
@@ -283,36 +296,51 @@ try {
     authorizationSessions.set(actorName, session);
     return session;
   }
-  for (const [index, probe] of config.authorizationProbes.entries()) {
+  for (const probe of config.authorizationProbes) {
     const probeSession = await getAuthorizationSession(probe.actor);
     const result = await callMethod(probeSession.page, probe.method, probe.args || []);
     const passed = probe.expectDenied ? !result.ok : result.ok;
-    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('method', index), false,
+    if (!passed) authorizationFailures.push(outcomeObservation(semanticAuthorizationProbeId('method', probe), false,
       probe.expectDenied ? 'request was unexpectedly allowed' : 'request was unexpectedly denied'));
   }
-  for (const [index, probe] of config.routeProbes.entries()) {
+  for (const probe of config.routeProbes) {
     const probeSession = await getAuthorizationSession(probe.actor);
-    await probeSession.page.goto(new URL(probe.path, target).toString(), { waitUntil: 'domcontentloaded' });
-    const denied = /(?:accessDenied|signIn|auth\/login)/i.test(probeSession.page.url());
-    const passed = probe.expectDenied ? denied : !denied;
-    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('route', index), false,
+    const requestedUrl = new URL(probe.path, target);
+    await probeSession.page.goto(requestedUrl.toString(), { waitUntil: 'domcontentloaded' });
+    await probeSession.page.waitForFunction(() => globalThis.Session?.get?.('authReady') === true, null, { timeout: 10000 }).catch(() => {});
+    if (probe.expectDenied) {
+      const deniedPath = expectedDeniedRoute(probe.actor);
+      await probeSession.page.waitForURL((url) => url.pathname === deniedPath, { timeout: 5000 }).catch(() => {});
+    }
+    const routeState = await probeSession.page.evaluate(() => ({
+      authReady: globalThis.Session?.get?.('authReady') === true,
+      path: globalThis.location.pathname,
+    }));
+    const passed = routeProbePassed({
+      actor: probe.actor,
+      requestedPath: requestedUrl.pathname,
+      finalPath: routeState.path,
+      expectDenied: probe.expectDenied,
+      authReady: routeState.authReady,
+    });
+    if (!passed) authorizationFailures.push(outcomeObservation(semanticAuthorizationProbeId('route', probe), false,
       probe.expectDenied ? 'route was unexpectedly accessible' : 'route was unexpectedly denied'));
   }
-  for (const [index, probe] of config.publicationProbes.entries()) {
+  for (const probe of config.publicationProbes) {
     const probeSession = await getAuthorizationSession(probe.actor);
     const result = await publicationProbe(probeSession.page, probe.publication, probe.args || [], probe.otherUserCanary);
     const passed = !result.leakedCanary && (!probe.expectError || result.error);
-    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('publication', index), false,
+    if (!passed) authorizationFailures.push(outcomeObservation(semanticAuthorizationProbeId('publication', probe), false,
       result.leakedCanary ? 'another user payload was observable' : 'publication was unexpectedly available'));
   }
-  for (const [index, probe] of config.downloadProbes.entries()) {
+  for (const probe of config.downloadProbes) {
     const probeSession = await getAuthorizationSession(probe.actor);
     const status = await probeSession.page.evaluate(async (pathValue) => {
       const response = await fetch(pathValue, { credentials: 'include', redirect: 'manual' });
       return response.status;
     }, probe.path);
     const passed = probe.expectDenied ? [401, 403, 404].includes(status) : status < 400;
-    if (!passed) authorizationFailures.push(outcomeObservation(numberedProbeId('download', index), false,
+    if (!passed) authorizationFailures.push(outcomeObservation(semanticAuthorizationProbeId('download', probe), false,
       probe.expectDenied ? 'download was unexpectedly accessible' : 'download was unexpectedly denied'));
   }
   const authorizationProbeCount = config.authorizationProbes.length + config.publicationProbes.length
@@ -393,29 +421,33 @@ try {
         || participant.page.url().includes(issuedToken)
         || participantCookies.some((cookie) => cookie.value.includes(issuedToken))
       : false;
-    const containmentPass = Boolean(
-      issuedToken
-      && tokenLogin.ok
-      && participantIdentity.userId === resume.value?.userId
-      && (participantIdentity.experiment === true || participantIdentity.experiment === 'true')
-      && participantIdentity.experimentTarget === config.passwordless.experimentTarget
-      && !mismatchedTarget.ok
-      && !adminAccess.ok
-      && !ordinaryAccountAccess.ok
-      && assignedExperimentAccess.ok
-      && Boolean(assignedExperimentAccess.value)
-      && Boolean(crossUserProbe)
-      && !crossUserAccess.ok
-      && Boolean(otherUserPublicationProbe)
-      && !otherUserPublication.leakedCanary
-      && !tokenLeaked,
-    );
+    const containmentOutcomes = passwordlessContainmentOutcomes({
+      issuedToken,
+      tokenLogin: tokenLogin.ok,
+      identityMatches: participantIdentity.userId === resume.value?.userId,
+      experimentFlag: participantIdentity.experiment === true || participantIdentity.experiment === 'true',
+      targetMatches: participantIdentity.experimentTarget === config.passwordless.experimentTarget,
+      modifiedTargetRejected: !mismatchedTarget.ok,
+      adminDenied: !adminAccess.ok,
+      ordinaryAccountDenied: !ordinaryAccountAccess.ok,
+      assignedExperimentAllowed: assignedExperimentAccess.ok && Boolean(assignedExperimentAccess.value),
+      crossUserMethodDenied: Boolean(crossUserProbe) && !crossUserAccess.ok,
+      crossUserPublicationContained: Boolean(otherUserPublicationProbe) && !otherUserPublication.leakedCanary,
+      tokenNotLeaked: !tokenLeaked,
+    });
+    const containmentPass = containmentOutcomes.every((outcome) => outcome.passed);
     controls.push(control('authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target',
       containmentPass ? 'PASS' : 'FAIL', 'CRITICAL',
       containmentPass
         ? 'Valid passwordless resume issued a session while modified-target, cross-user, admin, and token-leakage probes were denied.'
         : 'Passwordless resume or experiment-session containment did not match policy.',
-      { metrics: { containmentProbeCount: 9 } }));
+      {
+        observations: containmentOutcomes.map((outcome) => outcomeObservation(outcome.id, outcome.passed, outcome.failure)),
+        metrics: {
+          containmentProbeCount: containmentOutcomes.length,
+          failedProbeCount: containmentOutcomes.filter((outcome) => !outcome.passed).length,
+        },
+      }));
     await participant.context.close();
   }
 
@@ -474,26 +506,28 @@ try {
   // Brute-force checks deliberately run last so their state can affect only the lockout canary.
   const throttleSession = await newPage();
   const identifierResults = [];
-  for (let index = 0; index < 10; index += 1) {
+  for (let index = 0; index < 11; index += 1) {
     const identifierSession = await newPage();
     identifierResults.push(await login(identifierSession.page, config.users.lockout.username, `invalid-lockout-${index}`));
     await identifierSession.context.close();
   }
-  const identifierThrottled = identifierResults.some((result) => /too-many|thrott|lock/i.test(result.code || ''));
+  const identifierThrottled = identifierResults.some(throttleWasObserved);
   let connectionThrottled = false;
   if (Array.isArray(config.connectionThrottleIdentifiers) && config.connectionThrottleIdentifiers.length >= 12) {
     for (const [index, identifier] of config.connectionThrottleIdentifiers.slice(0, 12).entries()) {
       const result = await login(throttleSession.page, identifier, `invalid-connection-${index}`);
-      if (/too-many|thrott|lock/i.test(result.code || '')) connectionThrottled = true;
+      if (throttleWasObserved(result)) connectionThrottled = true;
     }
   }
   let ipThrottled = false;
+  const ipThrottleResults = [];
   if (Array.isArray(config.ipThrottleIdentifiers) && config.ipThrottleIdentifiers.length >= 21) {
     for (const [index, identifier] of config.ipThrottleIdentifiers.entries()) {
       const ipSession = await newPage();
       const result = await login(ipSession.page, identifier, `invalid-ip-${index}`);
+      ipThrottleResults.push(result);
       await ipSession.context.close();
-      if (/too-many|thrott|lock/i.test(result.code || '')) ipThrottled = true;
+      if (throttleWasObserved(result)) ipThrottled = true;
     }
   }
   const throttleOutcomes = [
@@ -507,7 +541,14 @@ try {
     throttlingPass ? 'Connection, identifier, and IP brute-force probes were each throttled.' : 'One or more configured brute-force dimensions were not observably throttled.',
     {
       observations: throttleOutcomes.map((outcome) => outcomeObservation(outcome.id, outcome.passed, outcome.failure)),
-      metrics: { probeCount: throttleOutcomes.length, failedProbeCount: throttleOutcomes.filter((outcome) => !outcome.passed).length },
+      metrics: {
+        probeCount: throttleOutcomes.length,
+        failedProbeCount: throttleOutcomes.filter((outcome) => !outcome.passed).length,
+        identifierAttemptCount: identifierResults.length,
+        identifierFinalCategory: throttleResultCategory(identifierResults.at(-1)),
+        ipAttemptCount: config.ipThrottleIdentifiers.length,
+        ipFinalCategory: throttleResultCategory(ipThrottleResults.at(-1)),
+      },
     }));
   await throttleSession.context.close();
   await anonymous.context.close();

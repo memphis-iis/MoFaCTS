@@ -67,10 +67,66 @@ export function parseNpmAuditVulnerabilityCount(value) {
   return counts.reduce((sum, count) => sum + count, 0);
 }
 
+function safeIdentifier(value, maxLength = 100) {
+  return String(value || '').replace(/[^A-Za-z0-9@._/+:-]/g, '-').slice(0, maxLength) || 'unknown';
+}
+
+export function boundedGitleaksObservations(value, limit = 12) {
+  if (!Array.isArray(value)) throw new Error('Gitleaks JSON is malformed');
+  return value.slice(0, limit).map((finding) => {
+    if (!finding || typeof finding.RuleID !== 'string' || typeof finding.File !== 'string') {
+      throw new Error('Gitleaks finding is malformed');
+    }
+    return `gitleaks.${safeIdentifier(finding.RuleID, 48)}: ${safeIdentifier(finding.File)}`;
+  });
+}
+
+export function boundedNpmAuditObservations(value, limit = 12) {
+  if (!value?.vulnerabilities || typeof value.vulnerabilities !== 'object') {
+    throw new Error('npm audit JSON is missing vulnerability details');
+  }
+  const severityOrder = { critical: 0, high: 1, moderate: 2, low: 3, info: 4 };
+  return Object.entries(value.vulnerabilities)
+    .map(([name, vulnerability]) => {
+      if (!vulnerability || typeof vulnerability.severity !== 'string') {
+        throw new Error('npm audit vulnerability is malformed');
+      }
+      return {
+        name: safeIdentifier(name, 80),
+        severity: safeIdentifier(vulnerability.severity.toLowerCase(), 16),
+        direct: vulnerability.isDirect === true,
+      };
+    })
+    .sort((a, b) => (severityOrder[a.severity] ?? 5) - (severityOrder[b.severity] ?? 5)
+      || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map((entry) => `npm.${entry.name}: severity=${entry.severity}, direct=${entry.direct ? 'yes' : 'no'}`);
+}
+
 export function parseTrivyHighCritical(value) {
   if (!value || !Array.isArray(value.Results)) throw new Error('Trivy JSON is missing Results');
   return value.Results.flatMap((result) => Array.isArray(result.Vulnerabilities) ? result.Vulnerabilities : [])
     .filter((vulnerability) => vulnerability.Severity === 'HIGH' || vulnerability.Severity === 'CRITICAL');
+}
+
+export function boundedTrivyObservations(vulnerabilities, limit = 12) {
+  if (!Array.isArray(vulnerabilities)) throw new Error('Trivy vulnerability list is malformed');
+  return vulnerabilities
+    .map((entry) => {
+      if (!entry || typeof entry.VulnerabilityID !== 'string' || typeof entry.PkgName !== 'string'
+        || !['HIGH', 'CRITICAL'].includes(entry.Severity)) {
+        throw new Error('Trivy vulnerability is malformed');
+      }
+      return {
+        id: safeIdentifier(entry.VulnerabilityID, 48),
+        packageName: safeIdentifier(entry.PkgName, 80),
+        severity: entry.Severity,
+        fixed: typeof entry.FixedVersion === 'string' && entry.FixedVersion.trim() !== '',
+      };
+    })
+    .sort((a, b) => (a.severity === b.severity ? a.id.localeCompare(b.id) : a.severity === 'CRITICAL' ? -1 : 1))
+    .slice(0, limit)
+    .map((entry) => `trivy.${entry.id}: package=${entry.packageName}, severity=${entry.severity}, fixed=${entry.fixed ? 'yes' : 'no'}`);
 }
 
 export function findCanaryLeaks(channels, canaries) {
