@@ -201,6 +201,17 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   assert.doesNotMatch(source, /CADDY_CONFIG_FILE|internal\.caddy-routes|caddy adapt/);
 });
 
+test('production audit reaches the host through a pinned ephemeral Tailscale identity', () => {
+  const workflow = fs.readFileSync(new URL('../../../.github/workflows/production-security-audit.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /tailscale\/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4/);
+  assert.match(workflow, /oauth-client-id: \$\{\{ secrets\.TS_OAUTH_CLIENT_ID \}\}/);
+  assert.match(workflow, /oauth-secret: \$\{\{ secrets\.TS_OAUTH_SECRET \}\}/);
+  assert.match(workflow, /tags: tag:ci/);
+  assert.match(workflow, /version: 1\.102\.3/);
+  assert.match(workflow, /ping: \$\{\{ secrets\.AUDIT_SSH_HOST \}\}/);
+  assert.doesNotMatch(workflow, /pull_request_target/);
+});
+
 function executablePath(fileUrl) {
   const nativePath = fileURLToPath(fileUrl);
   if (process.platform !== 'win32') return nativePath;
@@ -271,7 +282,19 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   const apache = fs.readFileSync(new URL('../../../deploy/maintenance/apache-mofacts-maintenance.conf', import.meta.url), 'utf8');
   assert.match(apache, /ProxyPass \/websocket ws:\/\/127\.0\.0\.1:3000\/websocket/);
   assert.match(apache, /Content-Security-Policy-Report-Only/);
+  assert.match(apache, /style-src 'self' https:\/\/fonts\.googleapis\.com/);
+  assert.match(apache, /font-src 'self' data: https:\/\/fonts\.gstatic\.com/);
+  assert.match(apache, /media-src 'self' blob: data:/);
+  assert.doesNotMatch(apache, /(?:script-src|style-src)[^;]*(?:'unsafe-inline'|'unsafe-eval')/);
   assert.doesNotMatch(apache, /ws:\/\/localhost:3000/);
+  const auditAdmin = fs.readFileSync(new URL('../../client/views/adminSecurityAudits.ts', import.meta.url), 'utf8');
+  assert.match(auditAdmin, /auditText\(key, options\?\.hash\)/);
+  const studentPerformance = fs.readFileSync(new URL('../../client/lib/studentPerformanceRuntime.ts', import.meta.url), 'utf8');
+  assert.match(studentPerformance, /clientConsole\(2, 'setStudentPerformance:start'\)/);
+  assert.doesNotMatch(studentPerformance, /clientConsole\([^\n]*student(?:ID|Username)/);
+  const probabilityCalculation = fs.readFileSync(new URL('../../../learning-components/models/adaptive-logistic/probabilityCalculation.ts', import.meta.url), 'utf8');
+  assert.match(probabilityCalculation, /calculateCardProbabilities:complete[\s\S]*stimulusCount: count/);
+  assert.doesNotMatch(probabilityCalculation, /JSON\.stringify\(ptemp\)/);
   const compose = fs.readFileSync(new URL('../../../deploy/docker-compose.yml', import.meta.url), 'utf8');
   assert.match(compose, /REDIS_URL: "redis:\/\/:\$\{MOFACTS_REDIS_PASSWORD:\?[^}]+\}@redis:6379\/0"/);
   assert.match(compose, /redis-server --appendonly yes --requirepass \\"\$\$MOFACTS_REDIS_PASSWORD\\"/);

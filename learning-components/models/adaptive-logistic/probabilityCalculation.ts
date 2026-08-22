@@ -134,7 +134,6 @@ export interface CalculateCardProbabilitiesParams {
 export function calculateCardProbabilities(params: CalculateCardProbabilitiesParams): void {
   let count = 0;
   let parms;
-  const ptemp: any = [];
   const tdfDebugLog: any = [];
 
   for (const clusterIndex of params.unitClusterList) {
@@ -170,9 +169,8 @@ export function calculateCardProbabilities(params: CalculateCardProbabilitiesPar
       if (typeof stim.probabilityEstimate !== "number") {
         throw 'Error: Probability Estimate is undefined or NaN.';
       }
-      ptemp[count] = Math.round(10000 * parms.probability) / 10000;
       count++;
     }
   }
-  params.log('calculateCardProbabilities', JSON.stringify(ptemp));
+  params.log('calculateCardProbabilities:complete', { stimulusCount: count });
 }

@@ -181,7 +181,7 @@ export async function setStudentPerformance(
   unitNumber = Number(Session.get('currentUnitNumber')),
   unitScopedOnly = Boolean((deliverySettingsStore.get() as Record<string, unknown>)?.resetStudentPerformance)
 ) {
-  clientConsole(2, 'setStudentPerformance:', studentID, studentUsername, tdfId);
+  clientConsole(2, 'setStudentPerformance:start');
   const historyPerformance = await meteorCallAsync<Record<string, unknown> | null>(
     'getStudentPerformanceForUnitFromHistory',
     studentID,

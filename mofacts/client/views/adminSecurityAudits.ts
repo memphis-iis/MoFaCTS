@@ -70,7 +70,10 @@ Template.adminSecurityAudits.onDestroyed(function(this: AdminSecurityAuditsInsta
 });
 
 const helpers = {
-  auditText,
+  auditText: (
+    key: Parameters<typeof translatePlatformString>[1],
+    options?: { hash?: Parameters<typeof translatePlatformString>[2] }
+  ) => auditText(key, options?.hash),
   auditAnnouncement: () => instance().announcement.get(),
   auditLoading: () => instance().viewState.get().status === 'loading',
   auditLoadError: () => instance().viewState.get().message || '',
