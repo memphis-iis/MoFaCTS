@@ -59,6 +59,18 @@ jobs:
             "$audit_type" "$audit_dir" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
             "audit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${audit_type}" >> "$GITHUB_ENV"
 
+      - name: Connect the audit runner to the production tailnet
+        continue-on-error: true
+        uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          version: 1.102.3
+          ping: ${{ secrets.AUDIT_SSH_HOST }}
+          hostname: mofacts-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          log-mode: quiet
+
       - name: Install pinned deterministic scanners
         continue-on-error: true
         shell: bash
