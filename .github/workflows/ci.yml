@@ -117,7 +117,7 @@ jobs:
           docker run --rm \
             --entrypoint /bin/sh \
             mofacts-ci:meteor-3.5-amd64 \
-            -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.15.0 && test "$(node --version)" = v24.15.0 && test "$(npm --version)" = 11.12.1'
+            -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.15.0 && test "$(node --version)" = v24.15.0 && ! command -v npm && ! command -v npx'
 
       - name: Reject standalone MongoDB topology
         run: |

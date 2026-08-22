@@ -57,7 +57,7 @@ must not be copied into source control.
 - The official updater completed unsuppressed and a clean rerun reported the app already at Meteor 3.5.
 - `meteor --version`, `meteor node --version`, and `meteor npm --version` resolved to Meteor 3.5, Node 24.15.0, and npm 11.12.1.
 - `npm run typecheck`, `npm run typecheck:vendor`, and `npm run lint` passed both locally and in an isolated pinned Node 24.15.0/npm 11.12.1 container.
-- A clean `linux/amd64` image built from the pinned OCI indexes. Its bundle declared Node `v24.15.0`; its runtime reported Node `v24.15.0` and npm `11.12.1`.
+- A clean `linux/amd64` image built from the pinned OCI indexes. Its bundle declared Node `v24.15.0`; its runtime reported Node `v24.15.0`, with npm and npx intentionally absent from the hardened final image.
 - The verified amd64 image passed an isolated `/health` smoke test against an isolated MongoDB service. The deployment contract keeps `ROOT_URL=http://localhost:3200` while the container listens internally on port 3000; CI is configured to exercise that same split. Startup logs confirmed polling reactivity, SockJS, and disconnect grace period zero. The user's active localhost service was not replaced solely to repeat this evidence.
 - The existing production-shaped hotfix container was inspected without a
   restart on 2026-07-31. It was healthy after 14 hours, exposed host port 3200
