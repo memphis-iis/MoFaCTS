@@ -27,7 +27,9 @@ private replica-set keyfile named by `MONGO_REPLICA_SET_KEYFILE_HOST_PATH`, and
 make `MONGO_URL` include the same `replicaSet` value as
 `MOFACTS_MONGO_REPLICA_SET_NAME`. The app fails startup when required settings
 are missing, examples are still present, MongoDB is unauthenticated or connected
-to the wrong replica set, or Redis is required but unavailable.
+to the wrong replica set, or Redis is required, unauthenticated, or unavailable.
+Set `MOFACTS_REDIS_PASSWORD` to a URL-safe random value of at least 32 characters;
+Compose uses that one value for Redis and the application's private connection URL.
 
 For an existing standalone data volume, follow
 `docs/deployment/mongodb-replica-set-conversion.md` rather than treating normal
@@ -58,6 +60,7 @@ Back up all of these together:
 - MongoDB data volume.
 - MongoDB replica-set keyfile and database-scoped users/roles.
 - `.env.self-hosted` and private settings JSON.
+- The private `MOFACTS_REDIS_PASSWORD` used by Redis and the application.
 - A private `MOFACTS_SECURITY_AUDIT_INGEST_SECRET` value when scheduled audit reports will be shown in the admin interface.
 - Dynamic assets mounted at `/dynamic-assets`.
 - SAML/OAuth certificate or key material when configured.

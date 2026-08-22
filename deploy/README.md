@@ -71,8 +71,11 @@ host failover. Its explicit set/member configuration supports adding members or
 migrating to a parallel replica-set target later.
 
 The app validates settings, MongoDB authentication, the exact replica-set
-identity, Redis configuration, and storage paths and fails clearly when required
-values are missing.
+identity, authenticated Redis configuration, and storage paths and fails clearly
+when required values are missing. `MOFACTS_REDIS_PASSWORD` is the single
+operator-owned Redis credential: Compose uses it for Redis `requirepass`, its
+authenticated healthcheck, and the private application `REDIS_URL`. Generate a
+URL-safe random value of at least 32 characters and never commit it.
 
 ## Local Settings
 

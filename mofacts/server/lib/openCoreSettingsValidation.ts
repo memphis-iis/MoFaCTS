@@ -173,6 +173,9 @@ function validateRedis(issues: SettingsValidationIssue[], settings: UnknownRecor
     if (parsed.protocol !== 'redis:' && parsed.protocol !== 'rediss:') {
       addIssue(issues, 'REDIS_URL', 'must use redis:// or rediss://');
     }
+    if (!parsed.password) {
+      addIssue(issues, 'REDIS_URL', 'must include Redis authentication credentials');
+    }
   } catch {
     addIssue(issues, 'REDIS_URL', 'must be a valid Redis URL');
   }

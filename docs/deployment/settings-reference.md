@@ -34,7 +34,9 @@ Required environment:
   and all alternate reactive observer drivers. Incompatible reactive cursors
   must be redesigned or made explicitly non-reactive.
 - `DDP_TRANSPORT`: must be `sockjs` for the contained Meteor 3.5 base.
-- `REDIS_URL`: Redis connection string when Redis is required.
+- `MOFACTS_REDIS_PASSWORD`: URL-safe random Redis credential of at least 32
+  characters. Compose uses it to require Redis authentication and construct the
+  private application `REDIS_URL`; do not maintain a second password in the URL.
 - `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD`: Mongo root bootstrap credentials.
 - `MOFACTS_MONGO_APP_USERNAME` and `MOFACTS_MONGO_APP_PASSWORD`: app database user credentials.
 - `MOFACTS_BACKUP_HOST_PATH`: host directory mounted into the app container as `/backups`. Defaults to `/backups/mofacts`.

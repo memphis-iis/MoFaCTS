@@ -17,7 +17,12 @@ MongoDB failures:
 
 Redis failures:
 
-- `REDIS_URL` is required when `openCore.requireRedis` is true.
+- `MOFACTS_REDIS_PASSWORD` must be present in the private Compose environment;
+  Compose uses it for Redis `requirepass`, the authenticated healthcheck, and
+  the application's password-bearing `REDIS_URL`.
+- An unauthenticated `redis-cli ping` must fail, while
+  `REDISCLI_AUTH="$MOFACTS_REDIS_PASSWORD" redis-cli --no-auth-warning ping`
+  must return `PONG` inside the Redis container.
 - Dashboard cache refreshes use Redis locks and fail clearly when Redis is unavailable.
 
 Storage failures:

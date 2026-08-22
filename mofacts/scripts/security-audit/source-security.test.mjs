@@ -185,6 +185,12 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   assert.match(source, /internal\.reverse-proxy-routes/);
   assert.match(source, /mongodb\.unauthenticated-denied/);
   assert.match(source, /redis\.unauthenticated-denied/);
+  assert.match(source, /unauth_redis_output=.*redis-cli --no-auth-warning --raw PING/);
+  assert.match(source, /grep -Eq '\^NOAUTH\(\[\[:space:\]\]\|\$\)'/);
+  assert.match(source, /unauth_redis=2/);
+  assert.match(source, /redis\.application-authenticated-connectivity/);
+  assert.match(source, /applicationConnectivityProbeExit/);
+  assert.doesNotMatch(source, /redis-cli --no-auth-warning PING >\/dev\/null 2>&1; echo \$\?/);
   assert.match(source, /firewall\.default-deny/);
   assert.match(source, /unexpected_socket_observations/);
   assert.match(source, /host-listener-policy\.awk/);
@@ -237,6 +243,10 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(apache, /ProxyPass \/websocket ws:\/\/127\.0\.0\.1:3000\/websocket/);
   assert.match(apache, /Content-Security-Policy-Report-Only/);
   assert.doesNotMatch(apache, /ws:\/\/localhost:3000/);
+  const compose = fs.readFileSync(new URL('../../../deploy/docker-compose.yml', import.meta.url), 'utf8');
+  assert.match(compose, /REDIS_URL: "redis:\/\/:\$\{MOFACTS_REDIS_PASSWORD:\?[^}]+\}@redis:6379\/0"/);
+  assert.match(compose, /redis-server --appendonly yes --requirepass \\"\$\$MOFACTS_REDIS_PASSWORD\\"/);
+  assert.match(compose, /REDISCLI_AUTH=\\"\$\$MOFACTS_REDIS_PASSWORD\\" redis-cli --no-auth-warning ping/);
 });
 
 test('encrypted report retention round-trips and detects tampering', () => {

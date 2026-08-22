@@ -55,7 +55,8 @@ This inventory classifies the self-hosted configuration surface used by applicat
 | `DDP_TRANSPORT` | required, runtime behavior | Meteor 3.5 contained base | DDP transport selection; must be `sockjs` |
 | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` | required, deployment secret | MongoDB bootstrap | Compose MongoDB init |
 | `MOFACTS_MONGO_APP_DATABASE`, `MOFACTS_MONGO_APP_USERNAME`, `MOFACTS_MONGO_APP_PASSWORD` | required, deployment secret | MongoDB app user bootstrap | Mongo init script and Compose |
-| `REDIS_URL` | required, private-server, secret-capable | when Redis is required | Redis boundary and readiness |
+| `MOFACTS_REDIS_PASSWORD` | required, private-server, secret | self-hosted Redis | Compose Redis `requirepass`, authenticated healthcheck, and application URL construction |
+| `REDIS_URL` | generated private-server runtime value | when Redis is required | Redis boundary and readiness; Compose constructs it from `MOFACTS_REDIS_PASSWORD` |
 | `MOFACTS_SECURITY_AUDIT_INGEST_SECRET` | required in production, private-server, secret | security audit report ingestion | HMAC authentication for `/internal/security-audits/v1` |
 | `MOFACTS_REQUIRE_REDIS` | optional, private-server | env override for Redis requirement | settings validation and Redis boundary |
 | `MOFACTS_DEFAULT_THEME_DIR`, `MOFACTS_THEME_DIR` | optional, private-server | theme customization | theme registry |

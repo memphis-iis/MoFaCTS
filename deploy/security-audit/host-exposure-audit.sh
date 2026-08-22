@@ -265,24 +265,55 @@ else
 fi
 
 if command -v docker >/dev/null 2>&1 && [[ "$missing" -eq 0 ]]; then
-  unauth_redis="$(docker exec "$MOFACTS_REDIS_CONTAINER" redis-cli --no-auth-warning PING >/dev/null 2>&1; echo $?)"
-  auth_redis="$(docker exec -e REDISCLI_AUTH="$MOFACTS_REDIS_PASSWORD" "$MOFACTS_REDIS_CONTAINER" redis-cli --no-auth-warning PING >/dev/null 2>&1; echo $?)"
+  unauth_redis_output="$(docker exec "$MOFACTS_REDIS_CONTAINER" redis-cli --no-auth-warning --raw PING 2>&1 || true)"
+  if [[ "$unauth_redis_output" == 'PONG' ]]; then
+    unauth_redis=0
+  elif grep -Eq '^NOAUTH([[:space:]]|$)' <<<"$unauth_redis_output"; then
+    unauth_redis=1
+  else
+    unauth_redis=2
+  fi
+  auth_redis_output="$(docker exec -e REDISCLI_AUTH="$MOFACTS_REDIS_PASSWORD" "$MOFACTS_REDIS_CONTAINER" redis-cli --no-auth-warning --raw PING 2>&1 || true)"
+  if [[ "$auth_redis_output" == 'PONG' ]]; then auth_redis=0; else auth_redis=1; fi
+  app_redis="$(docker exec "$MOFACTS_APP_CONTAINER" node -e '
+    const net = require("net");
+    const parsed = new URL(process.env.REDIS_URL || "");
+    if (parsed.protocol !== "redis:" || !parsed.password) process.exit(2);
+    const password = decodeURIComponent(parsed.password);
+    const username = decodeURIComponent(parsed.username || "");
+    const auth = username ? ["AUTH", username, password] : ["AUTH", password];
+    const encode = (parts) => Buffer.from(`*${parts.length}\r\n${parts.map((part) => `$${Buffer.byteLength(part)}\r\n${part}\r\n`).join("")}`);
+    const socket = net.connect({ host: parsed.hostname, port: Number(parsed.port || 6379) });
+    let response = "";
+    const timer = setTimeout(() => process.exit(3), 5000);
+    socket.on("connect", () => socket.write(Buffer.concat([encode(auth), encode(["PING"])])));
+    socket.on("data", (chunk) => {
+      response += chunk.toString("utf8");
+      if (response.includes("+PONG\r\n")) {
+        clearTimeout(timer);
+        socket.destroy();
+        process.exit(response.startsWith("+OK\r\n") ? 0 : 4);
+      }
+    });
+    socket.on("error", () => process.exit(5));
+  ' >/dev/null 2>&1; echo $?)"
   redis_publication="$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$MOFACTS_REDIS_CONTAINER" 2>/dev/null | jq '[to_entries[] | .value[]?] | length' 2>/dev/null || echo 1)"
   redis_observations="$(jq -cn \
-    --arg unauth "$([[ "$unauth_redis" -ne 0 ]] && echo PASS || echo FAIL)" \
+    --arg unauth "$([[ "$unauth_redis" -eq 1 ]] && echo PASS || { [[ "$unauth_redis" -eq 0 ]] && echo FAIL || echo ERROR; })" \
     --arg auth "$([[ "$auth_redis" -eq 0 ]] && echo PASS || echo ERROR)" \
+    --arg app "$([[ "$app_redis" -eq 0 ]] && echo PASS || echo ERROR)" \
     --arg publication "$([[ "$redis_publication" -eq 0 ]] && echo PASS || echo FAIL)" \
-    '["redis.unauthenticated-denied: " + $unauth, "redis.authenticated-connectivity: " + $auth, "redis.no-host-publication: " + $publication]')"
+    '["redis.unauthenticated-denied: " + $unauth, "redis.authenticated-connectivity: " + $auth, "redis.application-authenticated-connectivity: " + $app, "redis.no-host-publication: " + $publication]')"
   redis_metrics="$(jq -cn --argjson unauthExit "$unauth_redis" --argjson authenticatedExit "$auth_redis" \
-    --argjson hostPublicationCount "$redis_publication" \
-    '{unauthenticatedProbeExit:$unauthExit,authenticatedProbeExit:$authenticatedExit,hostPublicationCount:$hostPublicationCount}')"
+    --argjson applicationExit "$app_redis" --argjson hostPublicationCount "$redis_publication" \
+    '{unauthenticatedProbeExit:$unauthExit,authenticatedProbeExit:$authenticatedExit,applicationConnectivityProbeExit:$applicationExit,hostPublicationCount:$hostPublicationCount}')"
   if [[ "$unauth_redis" -eq 0 || "$redis_publication" -ne 0 ]]; then
     add_control internal.redis-auth 'Redis requires authentication and remains private' FAIL CRITICAL 'Redis accepted an unauthenticated command or has a host-published port.' "$redis_observations" "$redis_metrics"
-  elif [[ "$auth_redis" -ne 0 ]]; then
+  elif [[ "$unauth_redis" -ne 1 || "$auth_redis" -ne 0 || "$app_redis" -ne 0 ]]; then
     redis_metrics="$(jq '. + {inconclusive:true}' <<<"$redis_metrics")"
-    add_control internal.redis-auth 'Redis requires authentication and remains private' ERROR HIGH 'Unauthenticated Redis was denied, but authenticated connectivity could not be confirmed.' "$redis_observations" "$redis_metrics"
+    add_control internal.redis-auth 'Redis requires authentication and remains private' ERROR HIGH 'Unauthenticated Redis was denied, but host-audit or application authenticated connectivity could not be confirmed.' "$redis_observations" "$redis_metrics"
   else
-    add_control internal.redis-auth 'Redis requires authentication and remains private' PASS CRITICAL 'Unauthenticated Redis was denied, authenticated connectivity succeeded, and no host publication exists.' "$redis_observations" "$redis_metrics"
+    add_control internal.redis-auth 'Redis requires authentication and remains private' PASS CRITICAL 'Unauthenticated Redis was denied, host-audit and application authenticated connectivity succeeded, and no host publication exists.' "$redis_observations" "$redis_metrics"
   fi
 else
   error_control internal.redis-auth 'Redis requires authentication and remains private' 'Docker or protected Redis audit configuration is unavailable.'

@@ -54,7 +54,7 @@ const completeEnv = {
   METEOR_REACTIVITY_ORDER: 'changeStreams',
   DDP_TRANSPORT: 'sockjs',
   MOFACTS_SELF_HOSTED: 'true',
-  REDIS_URL: 'redis://redis:6379/0',
+  REDIS_URL: 'redis://:redis-validation-password@redis:6379/0',
 };
 
 describe('open-core settings validation', function() {
@@ -159,6 +159,18 @@ describe('open-core settings validation', function() {
     });
     expect(result.ok).to.equal(false);
     expect(result.issues.map((issue) => issue.path)).to.include('REDIS_URL');
+  });
+
+  it('requires Redis authentication when open-core Redis is enabled', function() {
+    const result = validateOpenCoreSettings(completeSettings, {
+      ...completeEnv,
+      REDIS_URL: 'redis://redis:6379/0',
+    });
+    expect(result.ok).to.equal(false);
+    expect(result.issues).to.deep.include({
+      path: 'REDIS_URL',
+      message: 'must include Redis authentication credentials',
+    });
   });
 
   it('requires an authenticated sender address when email is enabled', function() {

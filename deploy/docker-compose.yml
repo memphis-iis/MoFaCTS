@@ -62,7 +62,7 @@ services:
       MOFACTS_BACKUP_LOCAL_PATH: /backups
       MOFACTS_SELF_HOSTED: 'true'
       MOFACTS_REQUIRE_REDIS: 'true'
-      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      REDIS_URL: "redis://:${MOFACTS_REDIS_PASSWORD:?MOFACTS_REDIS_PASSWORD is required}@redis:6379/0"
       MOFACTS_SECURITY_AUDIT_INGEST_SECRET: ${MOFACTS_SECURITY_AUDIT_INGEST_SECRET:-}
     networks:
       - mofacts
@@ -135,11 +135,13 @@ services:
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      MOFACTS_REDIS_PASSWORD: ${MOFACTS_REDIS_PASSWORD:?MOFACTS_REDIS_PASSWORD is required}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$MOFACTS_REDIS_PASSWORD\""]
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$MOFACTS_REDIS_PASSWORD\" redis-cli --no-auth-warning ping"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -155,4 +157,3 @@ volumes:
 networks:
   mofacts:
     driver: bridge
-
