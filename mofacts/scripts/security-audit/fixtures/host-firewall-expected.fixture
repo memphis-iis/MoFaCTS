@@ -1,0 +1,5 @@
+Added user rules (see 'ufw status' for running firewall):
+ufw allow in on tailscale0 from 100.64.0.0/10 to any port 22 proto tcp comment 'MoFaCTS tailnet SSH IPv4'
+ufw allow 80/tcp comment 'MoFaCTS public HTTP'
+ufw allow 443/tcp comment 'MoFaCTS public HTTPS'
+ufw allow in on tailscale0 from fd7a:115c:a1e0::/48 to any port 22 proto tcp comment 'MoFaCTS tailnet SSH IPv6'

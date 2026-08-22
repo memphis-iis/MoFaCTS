@@ -192,6 +192,9 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   assert.match(source, /applicationConnectivityProbeExit/);
   assert.doesNotMatch(source, /redis-cli --no-auth-warning PING >\/dev\/null 2>&1; echo \$\?/);
   assert.match(source, /firewall\.default-deny/);
+  assert.match(source, /ufw show added/);
+  assert.match(source, /host-firewall-policy\.awk/);
+  assert.match(config, /^MOFACTS_SSH_MANAGEMENT_INTERFACE=tailscale0$/m);
   assert.match(source, /unexpected_socket_observations/);
   assert.match(source, /host-listener-policy\.awk/);
   assert.match(source, /127\\\.0\\\.0\\\.1:3000/);
@@ -216,6 +219,20 @@ function classifyHostListenerFixture(fixtureName) {
   return execFileSync(executable, args, { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
 }
 
+function classifyHostFirewallFixture(fixtureName) {
+  const policy = executablePath(new URL('../../../deploy/security-audit/host-firewall-policy.awk', import.meta.url));
+  const fixture = executablePath(new URL(`./fixtures/${fixtureName}`, import.meta.url));
+  const executable = process.platform === 'win32' ? 'wsl.exe' : 'awk';
+  const policyArgs = [
+    '-v', 'management_interface=tailscale0',
+    '-v', 'management_cidrs=100.64.0.0/10,fd7a:115c:a1e0::/48',
+    '-f', policy,
+    fixture,
+  ];
+  const args = process.platform === 'win32' ? ['--exec', 'awk', ...policyArgs] : policyArgs;
+  return execFileSync(executable, args, { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
+}
+
 test('host listener policy accepts only reviewed loopback, DHCP, web, and SSH fixtures', () => {
   assert.deepEqual(classifyHostListenerFixture('host-listeners-expected.fixture'), []);
 
@@ -226,6 +243,18 @@ test('host listener policy accepts only reviewed loopback, DHCP, web, and SSH fi
   assert.ok(dangerous.some((line) => line.includes('0.0.0.0:3000')));
   assert.ok(dangerous.some((line) => line.includes('[::]:27017')));
   assert.ok(dangerous.some((line) => line.includes('*:6379')));
+});
+
+test('host firewall policy accepts only private-interface SSH and public web rules', () => {
+  assert.deepEqual(classifyHostFirewallFixture('host-firewall-expected.fixture'), []);
+
+  const dangerous = classifyHostFirewallFixture('host-firewall-dangerous.fixture');
+  assert.equal(dangerous.length, 5);
+  assert.ok(dangerous.some((line) => line.includes('ufw allow 22/tcp')));
+  assert.ok(dangerous.some((line) => line.includes('on eth0')));
+  assert.ok(dangerous.some((line) => line.includes('ufw allow 3000/tcp')));
+  assert.ok(dangerous.some((line) => line.includes('fd7a:115c:a1e0::/48=0')));
+  assert.ok(dangerous.some((line) => line.includes('443/tcp=0')));
 });
 
 test('production hardening assets preserve reviewed findings and remove unnecessary runtime tooling', () => {

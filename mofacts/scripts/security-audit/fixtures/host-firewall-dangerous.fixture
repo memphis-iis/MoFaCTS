@@ -1,0 +1,6 @@
+Added user rules (see 'ufw status' for running firewall):
+ufw allow 22/tcp comment 'Public SSH is forbidden'
+ufw allow in on eth0 from 100.64.0.0/10 to any port 22 proto tcp
+ufw allow in on tailscale0 from 100.64.0.0/10 to any port 22 proto tcp
+ufw allow 80/tcp
+ufw allow 3000/tcp

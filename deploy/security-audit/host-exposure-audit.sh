@@ -5,6 +5,7 @@ set -u
 
 CONFIG_FILE=/etc/mofacts/security-audit.conf
 LISTENER_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
+FIREWALL_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-firewall-policy.awk
 controls='[]'
 
 add_control() {
@@ -55,7 +56,7 @@ required_vars=(
   MOFACTS_MONGO_APP_USER MOFACTS_MONGO_APP_PASSWORD MOFACTS_MONGO_SIDECAR_USER MOFACTS_MONGO_SIDECAR_PASSWORD
   MOFACTS_MONGO_APP_ROLE MOFACTS_MONGO_SIDECAR_ROLE
   MOFACTS_REDIS_PASSWORD
-  MOFACTS_MANAGEMENT_CIDRS APACHE_HTTPS_SITE_FILE
+  MOFACTS_MANAGEMENT_CIDRS MOFACTS_SSH_MANAGEMENT_INTERFACE APACHE_HTTPS_SITE_FILE
 )
 missing=0
 for name in "${required_vars[@]}"; do
@@ -149,40 +150,42 @@ fi
 
 if command -v ufw >/dev/null 2>&1; then
   ufw_status="$(ufw status verbose 2>/dev/null || true)"
+  ufw_added="$(ufw show added 2>/dev/null || true)"
+  active="$(grep -Eic '^Status:[[:space:]]+active$' <<<"$ufw_status" || true)"
   default_deny="$(grep -Eic 'Default: deny \(incoming\)' <<<"$ufw_status" || true)"
-  broad_ssh="$(grep -Eic '^22(/tcp)?([[:space:]]+\(v6\))?[[:space:]]+ALLOW IN[[:space:]]+Anywhere' <<<"$ufw_status" || true)"
-  ssh_allow_rules="$(grep -E '^22(/tcp)?([[:space:]]+\(v6\))?[[:space:]]+ALLOW IN' <<<"$ufw_status" || true)"
-  cidr_missing=0
-  unauthorized_ssh=0
-  IFS=',' read -r -a management_cidrs <<<"${MOFACTS_MANAGEMENT_CIDRS:-}"
-  for cidr in "${management_cidrs[@]}"; do
-    if ! grep -Fq "$cidr" <<<"$ssh_allow_rules"; then cidr_missing=$((cidr_missing + 1)); fi
-  done
-  while IFS= read -r rule; do
-    [[ -z "$rule" ]] && continue
-    matched=0
-    for cidr in "${management_cidrs[@]}"; do
-      if [[ "$rule" == *"$cidr"* ]]; then matched=1; break; fi
-    done
-    if [[ "$matched" -eq 0 ]]; then unauthorized_ssh=$((unauthorized_ssh + 1)); fi
-  done <<<"$ssh_allow_rules"
-  web_rules="$(grep -Ec '^(80|443)(/tcp)?([[:space:]]+\(v6\))?[[:space:]]+ALLOW IN[[:space:]]+Anywhere' <<<"$ufw_status" || true)"
-  unexpected_allow_rules="$(awk '$0 ~ /ALLOW IN/ && $1 !~ /^(22|80|443)(\/tcp)?$/ {count++} END{print count+0}' <<<"$ufw_status")"
-  firewall_observations="$(jq -cn \
-    --arg defaultDeny "$([[ "$default_deny" -ge 1 ]] && echo PASS || echo FAIL)" \
-    --arg sshScope "$([[ "$broad_ssh" -eq 0 && "$cidr_missing" -eq 0 && "$unauthorized_ssh" -eq 0 ]] && echo PASS || echo FAIL)" \
-    --arg webRules "$([[ "$web_rules" -ge 2 ]] && echo PASS || echo FAIL)" \
-    --arg unexpectedRules "$([[ "$unexpected_allow_rules" -eq 0 ]] && echo PASS || echo FAIL)" \
-    '["firewall.default-deny: " + $defaultDeny, "firewall.ssh-management-scope: " + $sshScope, "firewall.public-web-rules: " + $webRules, "firewall.unexpected-allow-rules: " + $unexpectedRules]')"
-  firewall_metrics="$(jq -cn --arg managementCidrs "$MOFACTS_MANAGEMENT_CIDRS" \
-    --argjson broadSsh "$broad_ssh" --argjson missingCidrs "$cidr_missing" \
-    --argjson unauthorizedSsh "$unauthorized_ssh" --argjson webRules "$web_rules" \
-    --argjson unexpectedAllowRules "$unexpected_allow_rules" \
-    '{configuredManagementCidrs:$managementCidrs,broadSshRuleCount:$broadSsh,missingManagementCidrCount:$missingCidrs,unauthorizedSshRuleCount:$unauthorizedSsh,publicWebRuleCount:$webRules,unexpectedAllowRuleCount:$unexpectedAllowRules}')"
-  if [[ "$default_deny" -ge 1 && "$broad_ssh" -eq 0 && "$cidr_missing" -eq 0 && "$unauthorized_ssh" -eq 0 && "$web_rules" -ge 2 && "$unexpected_allow_rules" -eq 0 ]]; then
-    add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' PASS HIGH 'UFW has default-deny inbound, web allow rules, and only configured management CIDRs for SSH.' "$firewall_observations" "$firewall_metrics"
+  if [[ ! -r "$FIREWALL_POLICY_FILE" ]]; then
+    error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'The root-owned firewall policy is unavailable.'
   else
-    add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' FAIL HIGH 'UFW policy does not match one or more explicitly reported firewall sub-probes.' "$firewall_observations" "$firewall_metrics"
+    firewall_violations="$(awk -v management_interface="$MOFACTS_SSH_MANAGEMENT_INTERFACE" \
+      -v management_cidrs="$MOFACTS_MANAGEMENT_CIDRS" -f "$FIREWALL_POLICY_FILE" <<<"$ufw_added")"
+    firewall_policy_exit=$?
+    if [[ "$firewall_policy_exit" -ne 0 ]]; then
+      error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'The protected firewall configuration or policy is invalid.'
+    else
+      policy_violation_count="$(grep -c . <<<"$firewall_violations" || true)"
+      missing_cidrs="$(grep -Ec '^firewall\.ssh-rule-count:' <<<"$firewall_violations" || true)"
+      unauthorized_ssh="$(grep -Ec '^firewall\.unapproved-rule:.*(port 22|22/tcp)' <<<"$firewall_violations" || true)"
+      web_rules="$(grep -Ec '^ufw allow (80|443)/tcp([[:space:]]|$)' <<<"$ufw_added" || true)"
+      unexpected_allow_rules="$(grep -Ec '^firewall\.unapproved-rule:' <<<"$firewall_violations" || true)"
+      violation_observations="$(head -n 12 <<<"$firewall_violations" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+      firewall_observations="$(jq -cn \
+        --arg active "$([[ "$active" -eq 1 ]] && echo PASS || echo FAIL)" \
+        --arg defaultDeny "$([[ "$default_deny" -ge 1 ]] && echo PASS || echo FAIL)" \
+        --arg policy "$([[ "$policy_violation_count" -eq 0 ]] && echo PASS || echo FAIL)" \
+        --argjson violations "$violation_observations" \
+        '["firewall.active: " + $active, "firewall.default-deny: " + $defaultDeny, "firewall.saved-rule-policy: " + $policy] + $violations')"
+      firewall_metrics="$(jq -cn --arg managementCidrs "$MOFACTS_MANAGEMENT_CIDRS" \
+        --arg managementInterface "$MOFACTS_SSH_MANAGEMENT_INTERFACE" \
+        --argjson missingCidrs "$missing_cidrs" --argjson unauthorizedSsh "$unauthorized_ssh" \
+        --argjson webRules "$web_rules" --argjson unexpectedAllowRules "$unexpected_allow_rules" \
+        --argjson policyViolations "$policy_violation_count" \
+        '{configuredManagementCidrs:$managementCidrs,managementInterface:$managementInterface,missingManagementCidrCount:$missingCidrs,unauthorizedSshRuleCount:$unauthorizedSsh,publicWebRuleCount:$webRules,unexpectedAllowRuleCount:$unexpectedAllowRules,policyViolationCount:$policyViolations}')"
+      if [[ "$active" -eq 1 && "$default_deny" -ge 1 && "$policy_violation_count" -eq 0 ]]; then
+        add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' PASS HIGH 'UFW is active with default-deny inbound, public web rules, and SSH restricted to the configured private management interface and tailnet ranges.' "$firewall_observations" "$firewall_metrics"
+      else
+        add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' FAIL HIGH 'UFW policy does not match one or more explicitly reported firewall sub-probes.' "$firewall_observations" "$firewall_metrics"
+      fi
+    fi
   fi
 else
   error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'ufw is unavailable.'

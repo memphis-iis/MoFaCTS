@@ -13,5 +13,6 @@ MOFACTS_MONGO_SIDECAR_USER=replace-with-sidecar-readonly-user
 MOFACTS_MONGO_SIDECAR_PASSWORD=replace-with-sidecar-readonly-password
 MOFACTS_MONGO_SIDECAR_ROLE=read
 MOFACTS_REDIS_PASSWORD=replace-with-redis-password
-MOFACTS_MANAGEMENT_CIDRS=192.0.2.0/24,2001:db8::/48
+MOFACTS_MANAGEMENT_CIDRS=100.64.0.0/10,fd7a:115c:a1e0::/48
+MOFACTS_SSH_MANAGEMENT_INTERFACE=tailscale0
 APACHE_HTTPS_SITE_FILE=/etc/apache2/sites-enabled/000-default-le-ssl.conf

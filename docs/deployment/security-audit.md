@@ -22,13 +22,15 @@ Create a protected environment named `production-security-audit`. Restrict its a
 
 | Secret | Purpose |
 | --- | --- |
-| `AUDIT_SSH_HOST` | Production host name or address. |
+| `AUDIT_SSH_HOST` | Production host's stable Tailscale MagicDNS name. |
 | `AUDIT_SSH_USER` | Dedicated account whose key is forced to the audit command. |
 | `AUDIT_SSH_PRIVATE_KEY` | Restricted key; it must not be accepted for a shell. |
 | `AUDIT_SSH_KNOWN_HOSTS` | Pinned host-key line, created and reviewed out of band. |
 | `AUDIT_AUTH_FIXTURES_JSON` | Dedicated synthetic tenant/account IDs and deterministic authorization probes. |
 | `AUDIT_IMAPS_PASSWORD` | Password for the dedicated reset-test mailbox only. |
 | `AUDIT_REPORT_INGEST_SECRET` | HMAC key shared only with the production application. |
+| `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client limited to creating `tag:ci` auth keys. |
+| `TS_OAUTH_SECRET` | Secret for the limited Tailscale OAuth client. |
 
 Add `AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY` as a protected environment variable. It is an RSA public key, not a secret. The matching private key must remain solely with authorized operators and must never be placed in GitHub, the production server, the application settings, or source control.
 
@@ -62,13 +64,14 @@ Install the tracked script as a root-owned executable and its configuration as r
 ```bash
 sudo install -d -o root -g root -m 0755 /usr/local/libexec/mofacts-security-audit
 sudo install -o root -g root -m 0644 deploy/security-audit/host-listener-policy.awk /usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
+sudo install -o root -g root -m 0644 deploy/security-audit/host-firewall-policy.awk /usr/local/libexec/mofacts-security-audit/host-firewall-policy.awk
 sudo install -o root -g root -m 0755 deploy/security-audit/host-exposure-audit.sh /usr/local/sbin/mofacts-host-exposure-audit
 sudo install -d -o root -g root -m 0700 /etc/mofacts
 sudo install -o root -g root -m 0600 deploy/security-audit/security-audit.conf.example /etc/mofacts/security-audit.conf
 sudoedit /etc/mofacts/security-audit.conf
 ```
 
-Replace every example value. Configure exact management CIDRs, current container names, the expected MongoDB replica set and database, scoped app/Sidecar MongoDB users, a MongoDB audit credential, the Redis audit password, and the active enabled Apache HTTPS site. Missing settings or tools produce audit errors.
+Replace every example value. Configure the private SSH management interface and tailnet ranges, current container names, the expected MongoDB replica set and database, scoped app/Sidecar MongoDB users, a MongoDB audit credential, the Redis audit password, and the active enabled Apache HTTPS site. Missing settings or tools produce audit errors.
 
 Restrict the dedicated SSH public key to the forced command:
 
@@ -76,7 +79,9 @@ Restrict the dedicated SSH public key to the forced command:
 restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,command="sudo -n /usr/local/sbin/mofacts-host-exposure-audit" ssh-ed25519 PUBLIC_KEY audit
 ```
 
-Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. The root-owned listener policy recognizes IPv4/IPv6 loopback infrastructure and a concrete-interface UDP 68 listener owned by `systemd-networkd`; wildcard DHCP listeners and the same port under any other process remain findings. Reports identify unexpected listener endpoints and process labels plus stable firewall, MongoDB, and Redis sub-probe outcomes and exit categories. The script does not print container environments or credentials and does not change state. Reinstall both tracked host-audit files after scanner updates before relying on the new host evidence format.
+Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. The root-owned listener policy recognizes IPv4/IPv6 loopback infrastructure and a concrete-interface UDP 68 listener owned by `systemd-networkd`; wildcard DHCP listeners and the same port under any other process remain findings. The firewall policy reads UFW's canonical saved commands and requires exactly one SSH rule per configured tailnet range on the configured private interface, exactly one public TCP 80 rule and one public TCP 443 rule, active UFW, and default-deny inbound. Reports identify unexpected listener endpoints and process labels plus stable firewall, MongoDB, and Redis sub-probe outcomes and exit categories. The script does not print container environments or credentials and does not change state. Reinstall the host command and both root-owned policy files after scanner updates before relying on the new host evidence format.
+
+Production operator and audit SSH use Tailscale; the EC2 public address is not the management endpoint. Enroll the production host with a stable MagicDNS name and enroll the scheduled GitHub runner ephemerally as `tag:ci`. Tailnet grants must allow the operator identity and `tag:ci` to reach only production TCP 22. Before enabling UFW, prove an operator login and the forced audit command through the MagicDNS name while retaining an existing public SSH maintenance session. Stage UFW rules in this order: SSH on `tailscale0` from `100.64.0.0/10` and `fd7a:115c:a1e0::/48`, public TCP 80, and public TCP 443; then enable default-deny inbound. Only close the maintenance session after a second private operator login, a private forced-command audit, HTTPS/WSS checks, and an external port scan all pass.
 
 The host must provide `bash`, `jq`, `ss`, Docker, UFW, Apache (`apache2ctl` and its systemd unit), and the active enabled HTTPS site configured by `APACHE_HTTPS_SITE_FILE`. MongoDB and Redis probes execute their clients inside the configured containers. Sidecar ports must be absent or exactly `127.0.0.1:8931` and `127.0.0.1:8932`.
 
@@ -118,7 +123,7 @@ The decryptor refuses to overwrite an existing output file, authenticates the AE
 
 ## First run and interpretation
 
-Do not start the first manual full run until the restricted SSH command, explicit UFW management CIDRs, encryption public key, dedicated mailbox, and complete synthetic fixtures exist.
+Do not start the first manual full run until the restricted SSH command works through the stable Tailscale host name, the private-interface UFW policy is active, the encryption public key is configured, and the dedicated mailbox and complete synthetic fixtures exist.
 
 The first strict report may be red. Passwordless experiment sessions are expected to receive anonymous resume tokens; the control tests that those sessions remain contained to the sealed experiment target and cannot reach ordinary-account, cross-user, or administrative surfaces. Other initial findings may include unauthenticated Redis or missing CSP. These are evidence for separately approved remediation; the audit does not change those behaviors.
 
