@@ -76,6 +76,39 @@ describe('security audit report ingestion', function() {
     expect(authenticated.nonce).to.equal(nonce);
   });
 
+  it('accepts signed reports whose execution errors do not inflate vulnerability severity counts', function() {
+    const report = reportFixture();
+    report.sections.external.status = 'ERROR';
+    report.sections.external.controls[0]!.status = 'ERROR';
+    report.sections.external.controls[0]!.severity = 'HIGH';
+    report.executionErrors = ['The external probe did not complete.'];
+    report.counts = {
+      pass: 3, fail: 0, error: 1, notApplicable: 0,
+      info: 0, low: 0, medium: 0, high: 0, critical: 0,
+    };
+    report.digestSha256 = crypto.createHash('sha256')
+      .update(canonicalJson(reportPayloadForDigest(report)))
+      .digest('hex');
+
+    const body = Buffer.from(canonicalJson(report));
+    const timestamp = '1787137200';
+    const nonce = 'errorreportnoncevalue22';
+    const secret = 's'.repeat(48);
+    const authenticated = authenticateSecurityAuditRequest({
+      body,
+      secret,
+      now: new Date(Number(timestamp) * 1000),
+      headers: {
+        timestamp,
+        nonce,
+        signature: signSecurityAuditRequest(secret, timestamp, nonce, body),
+      },
+    });
+
+    expect(authenticated.report.counts).to.deep.equal(report.counts);
+    expect(authenticated.report.executionErrors).to.have.length(1);
+  });
+
   it('rejects stale timestamps, changed bodies, oversized bodies, and invalid report digests', function() {
     const report = reportFixture();
     const body = Buffer.from(canonicalJson(report));

@@ -176,7 +176,7 @@ function calculateCounts(sections: Record<SecurityAuditSectionId, SecurityAuditS
         ? 'notApplicable'
         : control.status.toLowerCase() as 'pass' | 'fail' | 'error';
       counts[statusKey] += 1;
-      if (control.status === 'FAIL' || control.status === 'ERROR') {
+      if (control.status === 'FAIL') {
         counts[control.severity.toLowerCase() as 'info' | 'low' | 'medium' | 'high' | 'critical'] += 1;
       }
     }
