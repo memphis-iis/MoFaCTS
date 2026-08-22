@@ -142,6 +142,32 @@ async function validateOpenRouterModelReasoningSelection(
   }
 }
 
+async function requireOrdinaryOpenRouterAccount(
+  deps: Pick<ProfileMethodsDeps, 'usersCollection'>,
+  userId: string | null | undefined,
+  action: string,
+): Promise<string> {
+  const authenticatedUserId = requireAuthenticatedUser(userId, `Must be logged in to ${action}`, 401);
+  const user = await deps.usersCollection.findOneAsync({ _id: authenticatedUserId }, {
+    fields: {
+      'profile.experiment': 1,
+      'profile.experimentTarget': 1,
+      'profile.createdBy': 1,
+    },
+  });
+  const experimentOnly = user?.profile?.experiment === true
+    || user?.profile?.experiment === 'true'
+    || user?.profile?.createdBy === 'provisionExperimentUser'
+    || (typeof user?.profile?.experimentTarget === 'string' && user.profile.experimentTarget.trim() !== '');
+  if (experimentOnly) {
+    throw new Meteor.Error(
+      'experiment-account-restricted',
+      'Passwordless experiment participants cannot access ordinary account settings',
+    );
+  }
+  return authenticatedUserId;
+}
+
 function validateAvatarImageData(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Meteor.Error('invalid-avatar-image', 'Avatar image is required');
@@ -262,7 +288,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         model: Match.Maybe(String),
         reasoningLevel: Match.Maybe(String),
       });
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to update OpenRouter settings', 401);
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'update OpenRouter settings');
       const data = params as { apiKey?: string; model?: string; reasoningLevel?: OpenRouterReasoningLevel };
       const apiKey = normalizeOpenRouterKey(data.apiKey);
       const model = normalizeOpenRouterModel(data.model);
@@ -298,7 +324,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
     },
 
     getOwnOpenRouterSettings: async function(this: MethodContext) {
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to read OpenRouter settings', 401);
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'read OpenRouter settings');
       const user = await deps.usersCollection.findOneAsync({ _id: userId }, {
         fields: {
           'profile.openRouterDefaultModel': 1,
@@ -318,7 +344,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
     },
 
     deleteOwnOpenRouterKey: async function(this: MethodContext) {
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to delete your OpenRouter key', 401);
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'delete your OpenRouter key');
       await deps.usersCollection.updateAsync({ _id: userId }, {
         $set: {
           'profile.openRouterHasKey': false,
@@ -339,7 +365,7 @@ export function createProfileMethods(deps: ProfileMethodsDeps) {
         model: Match.Maybe(String),
         reasoningLevel: Match.Maybe(String),
       });
-      const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to test OpenRouter settings', 401);
+      const userId = await requireOrdinaryOpenRouterAccount(deps, this.userId, 'test OpenRouter settings');
       void userId;
       const data = params as { apiKey?: string; model?: string; reasoningLevel?: OpenRouterReasoningLevel };
       const apiKey = normalizeOpenRouterKey(data.apiKey);

@@ -28,12 +28,18 @@ export function classifyUdpPortStates(entries, expectedResultCount) {
   }
   const openPortCount = entries.filter((entry) => entry.state === 'open').length;
   const inconclusivePortCount = entries.filter((entry) => entry.state !== 'open' && entry.state !== 'closed').length;
+  const openEndpoints = entries.filter((entry) => entry.state === 'open').map((entry) => entry.endpoint);
+  const inconclusiveEndpoints = entries
+    .filter((entry) => entry.state !== 'open' && entry.state !== 'closed')
+    .map((entry) => `${entry.endpoint} state=${entry.state}`);
   const uniqueResultCount = new Set(entries.map((entry) => entry.endpoint)).size;
   const complete = entries.length === expectedResultCount && uniqueResultCount === expectedResultCount;
   return {
     status: openPortCount > 0 ? 'FAIL' : inconclusivePortCount > 0 || !complete ? 'ERROR' : 'PASS',
     openPortCount,
     inconclusivePortCount,
+    openEndpoints,
+    inconclusiveEndpoints,
     observedResultCount: entries.length,
     expectedResultCount,
   };
@@ -77,15 +83,16 @@ export function boundedGitleaksObservations(value, limit = 12) {
     if (!finding || typeof finding.RuleID !== 'string' || typeof finding.File !== 'string') {
       throw new Error('Gitleaks finding is malformed');
     }
-    return `gitleaks.${safeIdentifier(finding.RuleID, 48)}: ${safeIdentifier(finding.File)}`;
+    const commit = typeof finding.Commit === 'string' ? safeIdentifier(finding.Commit.slice(0, 12), 12) : 'unknown';
+    const line = Number.isSafeInteger(finding.StartLine) && finding.StartLine > 0 ? finding.StartLine : 'unknown';
+    return `gitleaks.${safeIdentifier(finding.RuleID, 48)}: ${safeIdentifier(finding.File)}:${line} commit=${commit}`;
   });
 }
 
-export function boundedNpmAuditObservations(value, limit = 12) {
+export function npmAuditFindings(value) {
   if (!value?.vulnerabilities || typeof value.vulnerabilities !== 'object') {
     throw new Error('npm audit JSON is missing vulnerability details');
   }
-  const severityOrder = { critical: 0, high: 1, moderate: 2, low: 3, info: 4 };
   return Object.entries(value.vulnerabilities)
     .map(([name, vulnerability]) => {
       if (!vulnerability || typeof vulnerability.severity !== 'string') {
@@ -96,11 +103,29 @@ export function boundedNpmAuditObservations(value, limit = 12) {
         severity: safeIdentifier(vulnerability.severity.toLowerCase(), 16),
         direct: vulnerability.isDirect === true,
       };
-    })
+    });
+}
+
+export function boundedNpmFindings(findings, limit = 12) {
+  if (!Array.isArray(findings)) throw new Error('npm audit finding list is malformed');
+  const severityOrder = { critical: 0, high: 1, moderate: 2, low: 3, info: 4 };
+  return [...findings]
     .sort((a, b) => (severityOrder[a.severity] ?? 5) - (severityOrder[b.severity] ?? 5)
       || a.name.localeCompare(b.name))
     .slice(0, limit)
     .map((entry) => `npm.${entry.name}: severity=${entry.severity}, direct=${entry.direct ? 'yes' : 'no'}`);
+}
+
+export function developmentOnlyNpmFindings(allFindings, runtimeFindings) {
+  if (!Array.isArray(allFindings) || !Array.isArray(runtimeFindings)) {
+    throw new Error('npm audit finding lists are malformed');
+  }
+  const runtimePackages = new Set(runtimeFindings.map((finding) => finding?.name));
+  return allFindings.filter((finding) => !runtimePackages.has(finding?.name));
+}
+
+export function boundedNpmAuditObservations(value, limit = 12) {
+  return boundedNpmFindings(npmAuditFindings(value), limit);
 }
 
 export function parseTrivyHighCritical(value) {
@@ -121,12 +146,14 @@ export function boundedTrivyObservations(vulnerabilities, limit = 12) {
         id: safeIdentifier(entry.VulnerabilityID, 48),
         packageName: safeIdentifier(entry.PkgName, 80),
         severity: entry.Severity,
-        fixed: typeof entry.FixedVersion === 'string' && entry.FixedVersion.trim() !== '',
+        installedVersion: safeIdentifier(entry.InstalledVersion, 48),
+        fixedVersion: typeof entry.FixedVersion === 'string' && entry.FixedVersion.trim() !== ''
+          ? safeIdentifier(entry.FixedVersion, 80) : 'unavailable',
       };
     })
     .sort((a, b) => (a.severity === b.severity ? a.id.localeCompare(b.id) : a.severity === 'CRITICAL' ? -1 : 1))
     .slice(0, limit)
-    .map((entry) => `trivy.${entry.id}: package=${entry.packageName}, severity=${entry.severity}, fixed=${entry.fixed ? 'yes' : 'no'}`);
+    .map((entry) => `trivy.${entry.id}: package=${entry.packageName}, installed=${entry.installedVersion}, fixed=${entry.fixedVersion}, severity=${entry.severity}`);
 }
 
 export function findCanaryLeaks(channels, canaries) {

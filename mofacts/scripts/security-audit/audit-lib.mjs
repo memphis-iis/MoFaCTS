@@ -59,6 +59,10 @@ export function section(sectionId, controls) {
   return { sectionId, status, controls };
 }
 
+export function isExecutionErrorControl(value) {
+  return value?.status === 'ERROR' && value?.evidence?.metrics?.inconclusive !== true;
+}
+
 export function notApplicableSection(sectionId, reason) {
   return section(sectionId, [control(
     `${sectionId}.not-applicable`,
@@ -102,7 +106,7 @@ export function calculateCounts(sections) {
     for (const result of auditSection.controls) {
       const statusKey = result.status === 'NOT_APPLICABLE' ? 'notApplicable' : result.status.toLowerCase();
       counts[statusKey] += 1;
-      if (result.status === 'FAIL' || result.status === 'ERROR') counts[result.severity.toLowerCase()] += 1;
+      if (result.status === 'FAIL') counts[result.severity.toLowerCase()] += 1;
     }
   }
   return counts;

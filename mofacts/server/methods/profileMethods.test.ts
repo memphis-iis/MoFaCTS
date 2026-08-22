@@ -223,4 +223,32 @@ describe('profile methods', function() {
       hasOpenRouterKey: true,
     });
   });
+
+  it('denies passwordless experiment participants every ordinary OpenRouter settings method', async function() {
+    const updateCalls: UpdateCall[] = [];
+    const methods = createProfileMethods(createDeps(updateCalls, {
+      profile: { experiment: true, experimentTarget: 'sealed-study' },
+    }));
+    const probes = [
+      () => methods.getOwnOpenRouterSettings.call({ userId: 'participant-1' }),
+      () => methods.updateOwnOpenRouterSettings.call({ userId: 'participant-1' }, {
+        model: 'openai/test-model', reasoningLevel: 'none',
+      }),
+      () => methods.deleteOwnOpenRouterKey.call({ userId: 'participant-1' }),
+      () => methods.testOwnOpenRouterSettings.call({ userId: 'participant-1' }, {
+        model: 'openai/test-model', reasoningLevel: 'none',
+      }),
+    ];
+
+    for (const probe of probes) {
+      let thrown: any;
+      try {
+        await probe();
+      } catch (error: unknown) {
+        thrown = error;
+      }
+      expect(thrown?.error).to.equal('experiment-account-restricted');
+    }
+    expect(updateCalls).to.have.length(0);
+  });
 });

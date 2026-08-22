@@ -2,18 +2,21 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import test from 'node:test';
-import { canonicalJson, finalizeReport, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
+import { canonicalJson, finalizeReport, isExecutionErrorControl, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
 import {
   boundedGitleaksObservations,
   boundedNpmAuditObservations,
+  boundedNpmFindings,
   boundedTrivyObservations,
   classifyUdpPortStates,
+  developmentOnlyNpmFindings,
   findCanaryLeaks,
   countPotentialSensitiveLogStatements,
   parseNmapOpenPorts,
   parseNmapPortStates,
   parseNmapTlsCipherReport,
   parseNpmAuditVulnerabilityCount,
+  npmAuditFindings,
   parseTrivyHighCritical,
 } from './scanner-parsers.mjs';
 import {
@@ -25,6 +28,7 @@ import {
   assertUniqueSemanticProbeIds,
   passwordlessContainmentOutcomes,
   routeProbePassed,
+  selectExpiredResetLink,
   semanticAuthorizationProbeId,
   throttleResultCategory,
   throttleWasObserved,
@@ -83,9 +87,23 @@ test('UDP classification distinguishes closed, open, inconclusive, and incomplet
   assert.equal(classifyUdpPortStates(closed, 1).status, 'PASS');
   assert.equal(classifyUdpPortStates([{ ...closed[0], state: 'open' }], 1).status, 'FAIL');
   assert.equal(classifyUdpPortStates([{ ...closed[0], state: 'open|filtered' }], 1).status, 'ERROR');
+  assert.deepEqual(classifyUdpPortStates([{ ...closed[0], state: 'open|filtered' }], 1).inconclusiveEndpoints,
+    ['192.0.2.2/udp/53 state=open|filtered']);
   assert.equal(classifyUdpPortStates([], 1).status, 'ERROR');
   assert.equal(classifyUdpPortStates([closed[0], closed[0]], 2).status, 'ERROR');
   assert.throws(() => classifyUdpPortStates(null, 1));
+});
+
+test('inconclusive controls remain visible without becoming execution failures or severity findings', () => {
+  const inconclusive = {
+    status: 'ERROR', severity: 'HIGH', evidence: { summary: 'No conclusive response.', metrics: { inconclusive: true } },
+  };
+  assert.equal(isExecutionErrorControl(inconclusive), false);
+  assert.equal(isExecutionErrorControl({ ...inconclusive, evidence: { summary: 'Tool failed.' } }), true);
+  const sections = { external: { controls: [inconclusive] } };
+  const report = finalizeReport({ sections });
+  assert.equal(report.counts.error, 1);
+  assert.equal(report.counts.high, 0);
 });
 
 test('dependency parsers never turn incomplete evidence into a pass', () => {
@@ -100,7 +118,7 @@ test('dependency parsers never turn incomplete evidence into a pass', () => {
 test('repository findings expose bounded identifiers without raw scanner evidence', () => {
   assert.deepEqual(boundedGitleaksObservations([
     { RuleID: 'generic-api-key', File: 'mofacts/server/example.test.ts', Secret: 'must-not-appear' },
-  ]), ['gitleaks.generic-api-key: mofacts/server/example.test.ts']);
+  ]), ['gitleaks.generic-api-key: mofacts/server/example.test.ts:unknown commit=unknown']);
   assert.deepEqual(boundedNpmAuditObservations({
     vulnerabilities: {
       transitive: { severity: 'moderate', isDirect: false },
@@ -110,12 +128,26 @@ test('repository findings expose bounded identifiers without raw scanner evidenc
     'npm.direct: severity=high, direct=yes',
     'npm.transitive: severity=moderate, direct=no',
   ]);
+  assert.deepEqual(boundedNpmFindings(npmAuditFindings({
+    vulnerabilities: { direct: { severity: 'high', isDirect: true } },
+  })), ['npm.direct: severity=high, direct=yes']);
   assert.deepEqual(boundedTrivyObservations([
-    { VulnerabilityID: 'CVE-2026-1234', PkgName: 'runtime-lib', Severity: 'HIGH', FixedVersion: '2.0.0' },
-  ]), ['trivy.CVE-2026-1234: package=runtime-lib, severity=HIGH, fixed=yes']);
+    { VulnerabilityID: 'CVE-2026-1234', PkgName: 'runtime-lib', InstalledVersion: '1.0.0', Severity: 'HIGH', FixedVersion: '2.0.0' },
+  ]), ['trivy.CVE-2026-1234: package=runtime-lib, installed=1.0.0, fixed=2.0.0, severity=HIGH']);
   assert.throws(() => boundedGitleaksObservations([{ RuleID: 'generic-api-key' }]));
   assert.throws(() => boundedNpmAuditObservations({}));
   assert.throws(() => boundedTrivyObservations([{ VulnerabilityID: 'CVE-2026-1234' }]));
+});
+
+test('development dependency findings exclude runtime packages without mutating source order', () => {
+  const all = [
+    { name: 'dev-only', severity: 'high', direct: true },
+    { name: 'runtime', severity: 'moderate', direct: false },
+  ];
+  const runtime = [{ name: 'runtime', severity: 'moderate', direct: false }];
+  assert.deepEqual(developmentOnlyNpmFindings(all, runtime), [all[0]]);
+  boundedNpmFindings(all);
+  assert.deepEqual(all.map((finding) => finding.name), ['dev-only', 'runtime']);
 });
 
 test('canary scanning detects retained secrets without emitting their values', () => {
@@ -149,6 +181,10 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   assert.match(source, /systemctl is-active apache2/);
   assert.match(source, /apache2ctl configtest/);
   assert.match(source, /internal\.reverse-proxy-routes/);
+  assert.match(source, /mongodb\.unauthenticated-denied/);
+  assert.match(source, /redis\.unauthenticated-denied/);
+  assert.match(source, /firewall\.default-deny/);
+  assert.match(source, /unexpected_socket_observations/);
   assert.match(source, /127\\\.0\\\.0\\\.1:3000/);
   assert.doesNotMatch(source, /CADDY_CONFIG_FILE|internal\.caddy-routes|caddy adapt/);
 });
@@ -191,9 +227,9 @@ test('production authentication probes honor session-scoped credentials and fail
   assert.match(source, /sessionStorage\.getItem\('Meteor\.loginToken'\)/);
   assert.match(source, /sessionStorage\.setItem\('Meteor\.loginToken', stored\.token\)/);
   assert.doesNotMatch(source, /localStorage\.(?:getItem|setItem)\('Meteor\.(?:loginToken|userId|loginTokenExpires)'/);
-  assert.match(source, /if \(!resume\.ok\) \{[\s\S]*?errorControl\('authentication\.passwordless-containment'/);
+  assert.match(source, /if \(!resume\.ok\) \{[\s\S]*?passwordlessContainmentOutcomes\(\{\}\)[\s\S]*?errorControl\(outcome\.id/);
   assert.match(source, /passwordlessContainmentOutcomes\([\s\S]*?issuedToken[\s\S]*?modifiedTargetRejected[\s\S]*?crossUserMethodDenied/);
-  assert.match(source, /reset\.prior-run-rejected[\s\S]*?reset\.current-single-use[\s\S]*?reset\.replay-rejected/);
+  assert.match(source, /reset-token\.expired-rejected[\s\S]*?reset-token\.current-single-use[\s\S]*?reset-token\.replay-rejected/);
   assert.match(source, /semanticAuthorizationProbeId\('method'[\s\S]*?semanticAuthorizationProbeId\('route'[\s\S]*?semanticAuthorizationProbeId\('publication'[\s\S]*?semanticAuthorizationProbeId\('download'/);
   assert.doesNotMatch(source, /numberedProbeId/);
   assert.match(source, /observations:\s*authorizationFailures[\s\S]*?omittedFailureCount:/);
@@ -243,6 +279,18 @@ test('passwordless containment accepts token issuance and identifies the exact f
   assert.equal(passing.every((outcome) => outcome.passed), true);
   const failing = passwordlessContainmentOutcomes({ ...passingState, modifiedTargetRejected: false });
   assert.deepEqual(failing.filter((outcome) => !outcome.passed).map((outcome) => outcome.id), [
-    'passwordless.modified-target-rejected',
+    'authentication.passwordless.modified-target-rejected',
   ]);
+});
+
+test('reset expiration probes select only links older than the configured lifetime', () => {
+  const now = Date.parse('2026-08-21T12:00:00Z');
+  const links = [
+    { token: 'recent', issuedAtMs: now - 30 * 60 * 1000 },
+    { token: 'expired', issuedAtMs: now - 90 * 60 * 1000 },
+    { token: 'invalid-date', issuedAtMs: Number.NaN },
+  ];
+  assert.equal(selectExpiredResetLink(links, now, 60 * 60 * 1000)?.token, 'expired');
+  assert.equal(selectExpiredResetLink(links.slice(0, 1), now, 60 * 60 * 1000), null);
+  assert.throws(() => selectExpiredResetLink(null, now, 60 * 60 * 1000));
 });

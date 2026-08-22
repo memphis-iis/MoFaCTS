@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
-import { control, errorControl, finalizeReport, notApplicableSection, sanitizedText, section, writeJsonFile } from './audit-lib.mjs';
+import { control, errorControl, finalizeReport, isExecutionErrorControl, notApplicableSection, sanitizedText, section, writeJsonFile } from './audit-lib.mjs';
+import { passwordlessContainmentOutcomes } from './authentication-probes.mjs';
 
 const [mode, externalPath, internalPath, authenticationPath, repositoryPath, outputPath] = process.argv.slice(2);
 if (!['exposure', 'full'].includes(mode) || !externalPath || !internalPath || !outputPath) {
@@ -23,12 +24,14 @@ const expected = {
   authentication: [
     ['authentication.enumeration', 'Login and reset responses resist account enumeration'],
     ['authentication.timing', 'Authentication timing resists account enumeration'],
-    ['authentication.reset-token', 'Reset tokens expire and are one-time'],
+    ['authentication.reset-token.expired-rejected', 'An expired reset token is rejected'],
+    ['authentication.reset-token.current-single-use', 'A current reset token works exactly once'],
+    ['authentication.reset-token.replay-rejected', 'A used reset token cannot be replayed'],
     ['authentication.session-revocation', 'Logout and password reset revoke sessions'],
     ['authentication.session-lifetime', 'Sessions expire within 30 days'],
     ['authentication.material-leakage', 'Authentication material does not enter client-observable channels'],
     ['authentication.authorization', 'Anonymous and cross-user authorization is enforced'],
-    ['authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target'],
+    ...passwordlessContainmentOutcomes({}).map((outcome) => [outcome.id, outcome.title]),
     ['authentication.throttling', 'Login throttles cover connection, identifier, and IP'],
   ],
   internal: [
@@ -44,8 +47,10 @@ const expected = {
   ],
   repository: [
     ['repository.git-history-secrets', 'Git history contains no detected secrets'],
-    ['repository.dependencies-application', 'application dependencies have no known vulnerability'],
-    ['repository.dependencies-sidecar-mongo', 'sidecar-mongo dependencies have no known vulnerability'],
+    ['repository.dependencies-application-runtime', 'application runtime dependencies have no known vulnerable packages'],
+    ['repository.dependencies-application-development', 'application development dependencies have no known vulnerable packages'],
+    ['repository.dependencies-sidecar-mongo-runtime', 'sidecar-mongo runtime dependencies have no known vulnerable packages'],
+    ['repository.dependencies-sidecar-mongo-development', 'sidecar-mongo development dependencies have no known vulnerable packages'],
     ['repository.security-surface-contract', 'Every server surface has an access classification'],
     ['repository.sensitive-logging', 'Potential credentials and personal identifiers are absent from log calls'],
     ['repository.source-security-tests', 'Source security contract tests pass'],
@@ -77,7 +82,9 @@ async function loadSection(sectionId, filePath) {
       executionErrors.push(`${id} did not return valid structured evidence.`);
       return errorControl(id, title, 'Control evidence was missing or malformed');
     }
-    if (value.status === 'ERROR') executionErrors.push(`${id} did not complete.`);
+    if (isExecutionErrorControl(value)) {
+      executionErrors.push(`${id} did not complete.`);
+    }
     return control(id, title, value.status, value.severity, value.evidence.summary, {
       observations: Array.isArray(value.evidence.observations) ? value.evidence.observations : undefined,
       metrics: value.evidence.metrics && typeof value.evidence.metrics === 'object' ? value.evidence.metrics : undefined,

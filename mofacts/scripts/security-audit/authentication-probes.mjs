@@ -57,18 +57,34 @@ export function routeProbePassed({ actor, requestedPath, finalPath, expectDenied
 }
 
 export function passwordlessContainmentOutcomes(state) {
-  return [
-    ['passwordless.resume-token-issued', Boolean(state.issuedToken), 'anonymous resume did not issue a token'],
-    ['passwordless.token-login', Boolean(state.tokenLogin), 'issued token did not establish a session'],
-    ['passwordless.participant-identity', Boolean(state.identityMatches), 'session identity did not match the participant'],
-    ['passwordless.experiment-flag', Boolean(state.experimentFlag), 'session was not marked as an experiment participant'],
-    ['passwordless.sealed-target-binding', Boolean(state.targetMatches), 'session was not bound to the sealed experiment target'],
-    ['passwordless.modified-target-rejected', Boolean(state.modifiedTargetRejected), 'modified experiment target was accepted'],
-    ['passwordless.admin-denied', Boolean(state.adminDenied), 'participant reached an admin method'],
-    ['passwordless.ordinary-account-denied', Boolean(state.ordinaryAccountDenied), 'participant reached an ordinary-account method'],
-    ['passwordless.assigned-experiment-allowed', Boolean(state.assignedExperimentAllowed), 'assigned experiment was unavailable'],
-    ['passwordless.cross-user-method-denied', Boolean(state.crossUserMethodDenied), 'cross-user method was available'],
-    ['passwordless.cross-user-publication-contained', Boolean(state.crossUserPublicationContained), 'another user payload was observable'],
-    ['passwordless.token-not-leaked', Boolean(state.tokenNotLeaked), 'issued token appeared in a client-observable channel'],
-  ].map(([id, passed, failure]) => ({ id, passed, failure }));
+  const definitions = [
+    ['authentication.passwordless.resume-token-issued', 'Anonymous sealed-link resume issues a login token', 'INFO', 'issuedToken', 'anonymous resume did not issue a token'],
+    ['authentication.passwordless.token-login', 'The issued passwordless token establishes its participant session', 'HIGH', 'tokenLogin', 'issued token did not establish a session'],
+    ['authentication.passwordless.participant-identity', 'The passwordless session retains the expected participant identity', 'HIGH', 'identityMatches', 'session identity did not match the participant'],
+    ['authentication.passwordless.experiment-flag', 'The passwordless session is marked as an experiment participant', 'MEDIUM', 'experimentFlag', 'session was not marked as an experiment participant'],
+    ['authentication.passwordless.sealed-target-binding', 'The passwordless session remains bound to its sealed experiment target', 'CRITICAL', 'targetMatches', 'session was not bound to the sealed experiment target'],
+    ['authentication.passwordless.modified-target-rejected', 'A passwordless participant cannot switch to a modified experiment target', 'CRITICAL', 'modifiedTargetRejected', 'modified experiment target was accepted'],
+    ['authentication.passwordless.admin-denied', 'A passwordless participant cannot call an admin method', 'CRITICAL', 'adminDenied', 'participant reached an admin method'],
+    ['authentication.passwordless.ordinary-account-denied', 'A passwordless participant cannot call an ordinary-account settings method', 'MEDIUM', 'ordinaryAccountDenied', 'participant reached getOwnOpenRouterSettings'],
+    ['authentication.passwordless.assigned-experiment-allowed', 'A passwordless participant can access the assigned experiment', 'INFO', 'assignedExperimentAllowed', 'assigned experiment was unavailable'],
+    ['authentication.passwordless.cross-user-method-denied', 'A passwordless participant cannot call a cross-user method', 'CRITICAL', 'crossUserMethodDenied', 'cross-user method was available'],
+    ['authentication.passwordless.cross-user-publication-contained', 'A passwordless participant cannot observe another user publication payload', 'CRITICAL', 'crossUserPublicationContained', 'another user payload was observable'],
+    ['authentication.passwordless.token-not-leaked', 'The issued passwordless token is absent from client-observable channels', 'CRITICAL', 'tokenNotLeaked', 'issued token appeared in a client-observable channel'],
+  ];
+  return definitions.map(([id, title, severity, stateKey, failure]) => ({
+    id,
+    title,
+    severity,
+    passed: Boolean(state[stateKey]),
+    failure,
+  }));
+}
+
+export function selectExpiredResetLink(links, nowMs, lifetimeMs) {
+  if (!Array.isArray(links) || !Number.isFinite(nowMs) || !Number.isFinite(lifetimeMs) || lifetimeMs <= 0) {
+    throw new Error('reset-link expiry input is invalid');
+  }
+  return links
+    .filter((link) => link && Number.isFinite(link.issuedAtMs) && nowMs - link.issuedAtMs > lifetimeMs)
+    .sort((a, b) => b.issuedAtMs - a.issuedAtMs)[0] || null;
 }

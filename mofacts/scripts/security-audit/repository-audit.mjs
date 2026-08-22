@@ -4,10 +4,12 @@ import path from 'node:path';
 import { control, errorControl, runCommand, section, writeJsonFile } from './audit-lib.mjs';
 import {
   boundedGitleaksObservations,
-  boundedNpmAuditObservations,
+  boundedNpmFindings,
   boundedTrivyObservations,
   countPotentialSensitiveLogStatements,
+  developmentOnlyNpmFindings,
   parseNpmAuditVulnerabilityCount,
+  npmAuditFindings,
   parseTrivyHighCritical,
 } from './scanner-parsers.mjs';
 
@@ -61,19 +63,40 @@ try {
     { name: 'sidecar-mongo', cwd: path.join(repoRoot, 'mofacts-mcp-sidecar', 'services', 'mongo-mcp') },
   ];
   for (const lockfile of lockfiles) {
-    const result = await runCommand('npm', ['audit', '--json', '--package-lock-only'], { cwd: lockfile.cwd });
-    let parsed;
-    try { parsed = JSON.parse(result.stdout || '{}'); } catch { parsed = null; }
-    let count = null;
-    let observations = [];
-    try { count = parsed ? parseNpmAuditVulnerabilityCount(parsed) : null; } catch { count = null; }
-    try { observations = parsed ? boundedNpmAuditObservations(parsed) : []; } catch { count = null; }
-    controls.push(count === null
-      ? errorControl(`repository.dependencies-${lockfile.name}`, `${lockfile.name} dependencies have no known vulnerability`, 'npm audit output was missing or malformed')
-      : control(`repository.dependencies-${lockfile.name}`, `${lockfile.name} dependencies have no known vulnerability`,
-        count === 0 ? 'PASS' : 'FAIL', count > 0 ? 'HIGH' : 'INFO',
-        count === 0 ? 'npm audit reported no vulnerabilities.' : `npm audit reported ${count} vulnerabilities.`,
-        { observations, metrics: { vulnerabilityCount: count } }));
+    const [runtimeResult, allResult] = await Promise.all([
+      runCommand('npm', ['audit', '--json', '--package-lock-only', '--omit=dev'], { cwd: lockfile.cwd }),
+      runCommand('npm', ['audit', '--json', '--package-lock-only'], { cwd: lockfile.cwd }),
+    ]);
+    let runtimeFindings = null;
+    let developmentFindings = null;
+    try {
+      const runtimeParsed = JSON.parse(runtimeResult.stdout || '{}');
+      const allParsed = JSON.parse(allResult.stdout || '{}');
+      parseNpmAuditVulnerabilityCount(runtimeParsed);
+      parseNpmAuditVulnerabilityCount(allParsed);
+      runtimeFindings = npmAuditFindings(runtimeParsed);
+      developmentFindings = developmentOnlyNpmFindings(npmAuditFindings(allParsed), runtimeFindings);
+    } catch { /* malformed output becomes two explicit ERROR controls */ }
+    for (const graph of [
+      { id: 'runtime', findings: runtimeFindings },
+      { id: 'development', findings: developmentFindings },
+    ]) {
+      const controlId = `repository.dependencies-${lockfile.name}-${graph.id}`;
+      const title = `${lockfile.name} ${graph.id} dependencies have no known vulnerable packages`;
+      if (!graph.findings) {
+        controls.push(errorControl(controlId, title, 'npm audit output was missing or malformed'));
+        continue;
+      }
+      const highest = graph.findings.some((finding) => finding.severity === 'critical') ? 'CRITICAL'
+        : graph.findings.some((finding) => finding.severity === 'high') ? 'HIGH'
+          : graph.findings.some((finding) => finding.severity === 'moderate') ? 'MEDIUM' : 'LOW';
+      controls.push(control(controlId, title, graph.findings.length === 0 ? 'PASS' : 'FAIL',
+        graph.findings.length === 0 ? 'INFO' : highest,
+        graph.findings.length === 0
+          ? `npm audit reported no vulnerable packages in the ${graph.id} dependency graph.`
+          : `npm audit reported ${graph.findings.length} vulnerable packages unique to the ${graph.id} dependency graph.`,
+        { observations: boundedNpmFindings(graph.findings), metrics: { vulnerablePackageCount: graph.findings.length } }));
+    }
   }
 
   const surface = await runCommand('node', [path.join(toolAppRoot, 'scripts', 'security-audit', 'check-security-surfaces.mjs')], { cwd: toolAppRoot });

@@ -8,6 +8,7 @@ import {
   expectedDeniedRoute,
   passwordlessContainmentOutcomes,
   routeProbePassed,
+  selectExpiredResetLink,
   semanticAuthorizationProbeId,
   throttleResultCategory,
   throttleWasObserved,
@@ -17,6 +18,19 @@ const outputPath = process.argv[2];
 if (!outputPath) throw new Error('output path is required');
 const target = process.env.AUDIT_TARGET || 'https://mofacts.optimallearning.org';
 const controls = [];
+const authenticationControlDefinitions = [
+  ['authentication.enumeration', 'Login and reset responses resist account enumeration'],
+  ['authentication.timing', 'Authentication timing resists account enumeration'],
+  ['authentication.reset-token.expired-rejected', 'An expired reset token is rejected'],
+  ['authentication.reset-token.current-single-use', 'A current reset token works exactly once'],
+  ['authentication.reset-token.replay-rejected', 'A used reset token cannot be replayed'],
+  ['authentication.session-revocation', 'Logout and password reset revoke sessions'],
+  ['authentication.session-lifetime', 'Sessions expire within 30 days'],
+  ['authentication.material-leakage', 'Authentication material does not enter client-observable channels'],
+  ['authentication.authorization', 'Anonymous and cross-user authorization is enforced'],
+  ...passwordlessContainmentOutcomes({}).map((outcome) => [outcome.id, outcome.title]),
+  ['authentication.throttling', 'Login throttles cover connection, identifier, and IP'],
+];
 let config;
 try {
   config = JSON.parse(process.env.AUDIT_AUTH_FIXTURES_JSON || '');
@@ -50,18 +64,9 @@ const configReady = config && requiredUsers.every((name) => config.users?.[name]
   && config.imaps?.host && config.imaps?.username && process.env.AUDIT_IMAPS_PASSWORD;
 
 if (!configReady) {
-  const ids = [
-    ['authentication.enumeration', 'Login and reset responses resist account enumeration'],
-    ['authentication.timing', 'Authentication timing resists account enumeration'],
-    ['authentication.reset-token', 'Reset tokens expire and are one-time'],
-    ['authentication.session-revocation', 'Logout and password reset revoke sessions'],
-    ['authentication.session-lifetime', 'Sessions expire within 30 days'],
-    ['authentication.material-leakage', 'Authentication material does not enter client-observable channels'],
-    ['authentication.authorization', 'Anonymous and cross-user authorization is enforced'],
-    ['authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target'],
-    ['authentication.throttling', 'Login throttles cover connection, identifier, and IP'],
-  ];
-  for (const [id, title] of ids) controls.push(errorControl(id, title, 'The protected synthetic fixture or IMAPS configuration is incomplete'));
+  for (const [id, title] of authenticationControlDefinitions) {
+    controls.push(errorControl(id, title, 'The protected synthetic fixture or IMAPS configuration is incomplete'));
+  }
   await writeJsonFile(outputPath, section('authentication', controls));
   process.exit(0);
 }
@@ -161,16 +166,19 @@ async function imapMessages(recipient) {
 }
 
 function resetLinks(messages, recipient) {
-  return messages.flatMap((message) => [...message.replace(/=\r?\n/g, '').replace(/=3D/gi, '=').matchAll(/https:\/\/[^\s<>]+\/auth\/reset-password\?[^\s<>]+/g)])
+  return messages.flatMap((message) => {
+    const issuedAtMs = Date.parse(message.match(/^Date:\s*(.+)$/mi)?.[1] || '');
+    return [...message.replace(/=\r?\n/g, '').replace(/=3D/gi, '=').matchAll(/https:\/\/[^\s<>]+\/auth\/reset-password\?[^\s<>]+/g)]
     .map((match) => match[0].replace(/&amp;/g, '&'))
     .map((value) => {
       try {
         const url = new URL(value);
         return url.searchParams.get('email') === recipient && url.searchParams.get('token')
-          ? { email: recipient, token: url.searchParams.get('token') }
+          ? { email: recipient, token: url.searchParams.get('token'), issuedAtMs }
           : null;
       } catch { return null; }
     }).filter(Boolean);
+  });
 }
 
 function outcomeObservation(probeId, passed, failureText) {
@@ -181,12 +189,13 @@ try {
   const anonymous = await newPage();
   const existingLogin = [];
   const missingLogin = [];
+  const missingLoginIdentifier = `missing-enumeration-${config.runNamespace}@audit.invalid`;
   for (let index = 0; index < 3; index += 1) {
     let started = performance.now();
     const existing = await login(anonymous.page, config.users.expiry.username, `invalid-${index}`);
     existingLogin.push({ result: existing, elapsed: performance.now() - started });
     started = performance.now();
-    const missing = await login(anonymous.page, `missing-${index}-${config.runNamespace}@audit.invalid`, `invalid-${index}`);
+    const missing = await login(anonymous.page, missingLoginIdentifier, `invalid-${index}`);
     missingLogin.push({ result: missing, elapsed: performance.now() - started });
   }
   let resetStarted = performance.now();
@@ -200,7 +209,10 @@ try {
   controls.push(control('authentication.enumeration', 'Login and reset responses resist account enumeration',
     sameLoginCode && sameResetShape ? 'PASS' : 'FAIL', 'HIGH',
     sameLoginCode && sameResetShape ? 'Existing and nonexistent identifiers produced indistinguishable result shapes.' : 'Existing and nonexistent identifiers produced distinguishable results.',
-    { metrics: { loginCodeMatch: sameLoginCode, resetShapeMatch: sameResetShape } }));
+    {
+      observations: existingLogin.map((entry, index) => `enumeration.attempt-${index + 1}: existing=${entry.result.code}, missing=${missingLogin[index].result.code}`),
+      metrics: { loginCodeMatch: sameLoginCode, resetShapeMatch: sameResetShape },
+    }));
   const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
   const existingMedian = median(existingLogin.map((entry) => entry.elapsed));
   const missingMedian = median(missingLogin.map((entry) => entry.elapsed));
@@ -233,32 +245,41 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     links = resetLinks(await imapMessages(config.users.reset.username), config.users.reset.username);
   }
-  const newest = links.at(-1);
-  const prior = priorLinks.at(-1);
-  if (!newest || !prior) {
-    controls.push(errorControl('authentication.reset-token', 'Reset tokens expire and are one-time', 'The dedicated mailbox did not contain both prior-run and current reset links'));
+  const priorTokens = new Set(priorLinks.map((link) => link.token));
+  const newest = links.find((link) => !priorTokens.has(link.token));
+  const resetTokenLifetimeMs = 60 * 60 * 1000;
+  const prior = selectExpiredResetLink(priorLinks, Date.now(), resetTokenLifetimeMs);
+  if (!newest) {
+    controls.push(errorControl('authentication.reset-token.current-single-use', 'A current reset token works exactly once', 'The dedicated mailbox did not contain a newly issued reset link'));
+    controls.push(errorControl('authentication.reset-token.replay-rejected', 'A used reset token cannot be replayed', 'A current reset token was unavailable'));
+    controls.push(control('authentication.reset-token.expired-rejected', 'An expired reset token is rejected', 'ERROR', 'HIGH',
+      'No current reset token was available, so expiration behavior could not be isolated.',
+      { metrics: { inconclusive: true, configuredLifetimeMinutes: 60 } }));
     resetRevocationError = 'A current reset token was unavailable';
   } else {
-    const expired = await callMethod(anonymous.page, 'resetPasswordWithToken', [prior.email, prior.token, resetNextPassword]);
+    const expired = prior
+      ? await callMethod(anonymous.page, 'resetPasswordWithToken', [prior.email, prior.token, resetNextPassword])
+      : null;
     const sessionA = await newPage();
     const sessionB = await newPage();
     await login(sessionA.page, config.users.reset.username, resetCurrentPassword);
     await login(sessionB.page, config.users.reset.username, resetCurrentPassword);
     const reset = await callMethod(anonymous.page, 'resetPasswordWithToken', [newest.email, newest.token, resetNextPassword]);
     const replay = await callMethod(anonymous.page, 'resetPasswordWithToken', [newest.email, newest.token, resetCurrentPassword]);
-    const resetOutcomes = [
-      { id: 'reset.prior-run-rejected', passed: !expired.ok, failure: 'prior-run token was accepted' },
-      { id: 'reset.current-single-use', passed: reset.ok, failure: 'current token was rejected on first use' },
-      { id: 'reset.replay-rejected', passed: !replay.ok, failure: 'used token was accepted again' },
-    ];
-    const resetTokenPass = resetOutcomes.every((outcome) => outcome.passed);
-    controls.push(control('authentication.reset-token', 'Reset tokens expire and are one-time',
-      resetTokenPass ? 'PASS' : 'FAIL', 'CRITICAL',
-      resetTokenPass ? 'Prior-run and replayed reset tokens were rejected; the current token worked once.' : 'One or more reset-token policy probes failed.',
-      {
-        observations: resetOutcomes.map((outcome) => outcomeObservation(outcome.id, outcome.passed, outcome.failure)),
-        metrics: { probeCount: resetOutcomes.length, failedProbeCount: resetOutcomes.filter((outcome) => !outcome.passed).length },
-      }));
+    controls.push(prior
+      ? control('authentication.reset-token.expired-rejected', 'An expired reset token is rejected',
+        !expired.ok ? 'PASS' : 'FAIL', 'CRITICAL',
+        !expired.ok ? 'A reset token older than the configured one-hour lifetime was rejected.' : 'A reset token older than the configured one-hour lifetime was accepted.',
+        { metrics: { tokenAgeMinutes: Math.floor((Date.now() - prior.issuedAtMs) / 60000), configuredLifetimeMinutes: 60 } })
+      : control('authentication.reset-token.expired-rejected', 'An expired reset token is rejected', 'ERROR', 'HIGH',
+        'No mailbox reset link was old enough to test the configured one-hour expiration policy.',
+        { metrics: { inconclusive: true, configuredLifetimeMinutes: 60 } }));
+    controls.push(control('authentication.reset-token.current-single-use', 'A current reset token works exactly once',
+      reset.ok ? 'PASS' : 'FAIL', 'CRITICAL',
+      reset.ok ? 'The newly issued reset token worked on its first use.' : `The newly issued reset token failed with category ${reset.code || 'other-error'}.`));
+    controls.push(control('authentication.reset-token.replay-rejected', 'A used reset token cannot be replayed',
+      !replay.ok ? 'PASS' : 'FAIL', 'CRITICAL',
+      !replay.ok ? 'The used reset token was rejected on replay.' : 'The used reset token was accepted a second time.'));
     const revokedA = await callMethod(sessionA.page, 'getOwnOpenRouterSettings');
     const revokedB = await callMethod(sessionB.page, 'getOwnOpenRouterSettings');
     const oldPassword = await login(anonymous.page, config.users.reset.username, resetCurrentPassword);
@@ -365,8 +386,10 @@ try {
     config.passwordless.participantId,
   ]);
   if (!resume.ok) {
-    controls.push(errorControl('authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target',
-      `The passwordless re-provisioning probe failed with code ${resume.code}.`));
+    for (const outcome of passwordlessContainmentOutcomes({})) {
+      controls.push(errorControl(outcome.id, outcome.title,
+        `The passwordless re-provisioning probe failed with code ${resume.code}.`));
+    }
   } else {
     const issuedToken = typeof resume.value?.loginToken === 'string' ? resume.value.loginToken : '';
     const participant = await newPage();
@@ -435,19 +458,10 @@ try {
       crossUserPublicationContained: Boolean(otherUserPublicationProbe) && !otherUserPublication.leakedCanary,
       tokenNotLeaked: !tokenLeaked,
     });
-    const containmentPass = containmentOutcomes.every((outcome) => outcome.passed);
-    controls.push(control('authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target',
-      containmentPass ? 'PASS' : 'FAIL', 'CRITICAL',
-      containmentPass
-        ? 'Valid passwordless resume issued a session while modified-target, cross-user, admin, and token-leakage probes were denied.'
-        : 'Passwordless resume or experiment-session containment did not match policy.',
-      {
-        observations: containmentOutcomes.map((outcome) => outcomeObservation(outcome.id, outcome.passed, outcome.failure)),
-        metrics: {
-          containmentProbeCount: containmentOutcomes.length,
-          failedProbeCount: containmentOutcomes.filter((outcome) => !outcome.passed).length,
-        },
-      }));
+    for (const outcome of containmentOutcomes) {
+      controls.push(control(outcome.id, outcome.title, outcome.passed ? 'PASS' : 'FAIL', outcome.severity,
+        outcome.passed ? 'The probe matched the passwordless experiment-session contract.' : outcome.failure));
+    }
     await participant.context.close();
   }
 
@@ -554,17 +568,9 @@ try {
   await anonymous.context.close();
 } catch (error) {
   const existingIds = new Set(controls.map((entry) => entry.controlId));
-  for (const [id, title] of [
-    ['authentication.enumeration', 'Login and reset responses resist account enumeration'],
-    ['authentication.timing', 'Authentication timing resists account enumeration'],
-    ['authentication.reset-token', 'Reset tokens expire and are one-time'],
-    ['authentication.session-revocation', 'Logout and password reset revoke sessions'],
-    ['authentication.session-lifetime', 'Sessions expire within 30 days'],
-    ['authentication.material-leakage', 'Authentication material does not enter client-observable channels'],
-    ['authentication.authorization', 'Anonymous and cross-user authorization is enforced'],
-    ['authentication.passwordless-containment', 'Passwordless experiment sessions remain bound to their authorized target'],
-    ['authentication.throttling', 'Login throttles cover connection, identifier, and IP'],
-  ]) if (!existingIds.has(id)) controls.push(errorControl(id, title, error));
+  for (const [id, title] of authenticationControlDefinitions) {
+    if (!existingIds.has(id)) controls.push(errorControl(id, title, error));
+  }
 } finally {
   await browser.close();
 }

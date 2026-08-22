@@ -8,9 +8,16 @@ controls='[]'
 
 add_control() {
   local id="$1" title="$2" status="$3" severity="$4" summary="$5"
+  local observations='[]' metrics='{}'
+  if [[ $# -ge 6 ]]; then observations="$6"; fi
+  if [[ $# -ge 7 ]]; then metrics="$7"; fi
   controls="$(jq -cn --argjson existing "$controls" --arg id "$id" --arg title "$title" \
     --arg status "$status" --arg severity "$severity" --arg summary "$summary" \
-    '$existing + [{controlId:$id,title:$title,status:$status,severity:$severity,evidence:{summary:$summary}}]')"
+    --argjson observations "$observations" --argjson metrics "$metrics" \
+    '$existing + [{controlId:$id,title:$title,status:$status,severity:$severity,evidence:
+      ({summary:$summary}
+      + (if ($observations | length) > 0 then {observations:$observations} else {} end)
+      + (if ($metrics | length) > 0 then {metrics:$metrics} else {} end))}]')"
 }
 
 error_control() {
@@ -76,13 +83,17 @@ fi
 if command -v ss >/dev/null 2>&1; then
   sockets="$(ss -H -lntup 2>/dev/null || true)"
   public_unexpected="$(awk '$1=="tcp" || $1=="udp" {local=$5; sub(/^.*:/,"",local); addr=$5; sub(/:[^:]*$/,"",addr); if (addr!="127.0.0.1" && addr!="[::1]" && addr!="::1" && addr!="localhost" && addr!="127.0.0.53%lo") {if (!(($1=="tcp") && (local=="80" || local=="443" || local=="22"))) count++}} END{print count+0}' <<<"$sockets")"
+  unexpected_socket_lines="$(awk '$1=="tcp" || $1=="udp" {local=$5; port=local; sub(/^.*:/,"",port); addr=local; sub(/:[^:]*$/,"",addr); if (addr!="127.0.0.1" && addr!="[::1]" && addr!="::1" && addr!="localhost" && addr!="127.0.0.53%lo" && !(($1=="tcp") && (port=="80" || port=="443" || port=="22"))) print "listener." $1 ": endpoint=" local ", process=" $NF}' <<<"$sockets")"
+  unexpected_socket_observations="$(head -n 12 <<<"$unexpected_socket_lines" | jq -Rsc 'split("\n") | map(select(length > 0))')"
   app_count="$(grep -Ec '127\.0\.0\.1:3000\b' <<<"$sockets" || true)"
   sidecar_bad="$(awk '$5 ~ /:(8931|8932)$/ && $5 !~ /^127\.0\.0\.1:/ {count++} END{print count+0}' <<<"$sockets")"
   sidecar_count="$(grep -Ec '127\.0\.0\.1:(8931|8932)\b' <<<"$sockets" || true)"
   if [[ "$public_unexpected" -eq 0 ]]; then
-    add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS CRITICAL 'No unexpected non-loopback listener was found; SSH is evaluated with firewall scope separately.'
+    add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS HIGH 'No unexpected non-loopback listener was found; SSH is evaluated with firewall scope separately.' '[]' '{"unexpectedListenerCount":0}'
   else
-    add_control internal.listening-sockets 'Host listening sockets match the approved exposure' FAIL CRITICAL "$public_unexpected unexpected non-loopback listeners were found."
+    listener_severity=HIGH
+    if grep -Eq ':(3000|27017|6379|8931|8932)([,[:space:]]|$)' <<<"$unexpected_socket_lines"; then listener_severity=CRITICAL; fi
+    add_control internal.listening-sockets 'Host listening sockets match the approved exposure' FAIL "$listener_severity" "$public_unexpected unexpected non-loopback listeners were found." "$unexpected_socket_observations" "{\"unexpectedListenerCount\":$public_unexpected}"
   fi
   if [[ "$app_count" -ge 1 ]]; then
     add_control internal.app-loopback 'Application listens on loopback port 3000' PASS HIGH 'The application listener is present on 127.0.0.1:3000.'
@@ -146,10 +157,21 @@ if command -v ufw >/dev/null 2>&1; then
   done <<<"$ssh_allow_rules"
   web_rules="$(grep -Ec '^(80|443)(/tcp)?([[:space:]]+\(v6\))?[[:space:]]+ALLOW IN[[:space:]]+Anywhere' <<<"$ufw_status" || true)"
   unexpected_allow_rules="$(awk '$0 ~ /ALLOW IN/ && $1 !~ /^(22|80|443)(\/tcp)?$/ {count++} END{print count+0}' <<<"$ufw_status")"
+  firewall_observations="$(jq -cn \
+    --arg defaultDeny "$([[ "$default_deny" -ge 1 ]] && echo PASS || echo FAIL)" \
+    --arg sshScope "$([[ "$broad_ssh" -eq 0 && "$cidr_missing" -eq 0 && "$unauthorized_ssh" -eq 0 ]] && echo PASS || echo FAIL)" \
+    --arg webRules "$([[ "$web_rules" -ge 2 ]] && echo PASS || echo FAIL)" \
+    --arg unexpectedRules "$([[ "$unexpected_allow_rules" -eq 0 ]] && echo PASS || echo FAIL)" \
+    '["firewall.default-deny: " + $defaultDeny, "firewall.ssh-management-scope: " + $sshScope, "firewall.public-web-rules: " + $webRules, "firewall.unexpected-allow-rules: " + $unexpectedRules]')"
+  firewall_metrics="$(jq -cn --arg managementCidrs "$MOFACTS_MANAGEMENT_CIDRS" \
+    --argjson broadSsh "$broad_ssh" --argjson missingCidrs "$cidr_missing" \
+    --argjson unauthorizedSsh "$unauthorized_ssh" --argjson webRules "$web_rules" \
+    --argjson unexpectedAllowRules "$unexpected_allow_rules" \
+    '{configuredManagementCidrs:$managementCidrs,broadSshRuleCount:$broadSsh,missingManagementCidrCount:$missingCidrs,unauthorizedSshRuleCount:$unauthorizedSsh,publicWebRuleCount:$webRules,unexpectedAllowRuleCount:$unexpectedAllowRules}')"
   if [[ "$default_deny" -ge 1 && "$broad_ssh" -eq 0 && "$cidr_missing" -eq 0 && "$unauthorized_ssh" -eq 0 && "$web_rules" -ge 2 && "$unexpected_allow_rules" -eq 0 ]]; then
-    add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' PASS CRITICAL 'UFW has default-deny inbound, web allow rules, and only configured management CIDRs for SSH.'
+    add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' PASS HIGH 'UFW has default-deny inbound, web allow rules, and only configured management CIDRs for SSH.' "$firewall_observations" "$firewall_metrics"
   else
-    add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' FAIL CRITICAL 'UFW default policy, web rules, or SSH management-CIDR scope does not match policy.'
+    add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' FAIL HIGH 'UFW policy does not match one or more explicitly reported firewall sub-probes.' "$firewall_observations" "$firewall_metrics"
   fi
 else
   error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'ufw is unavailable.'
@@ -207,10 +229,25 @@ if command -v docker >/dev/null 2>&1 && [[ "$missing" -eq 0 ]]; then
   sidecar_mongo="$(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017 \
     --username "$MOFACTS_MONGO_SIDECAR_USER" --password "$MOFACTS_MONGO_SIDECAR_PASSWORD" --authenticationDatabase "$MOFACTS_MONGO_DB" \
     --eval "quit(db.getSiblingDB('$MOFACTS_MONGO_DB').runCommand({find:'tdfs',filter:{},limit:1}).ok ? 0 : 5)" >/dev/null 2>&1; echo $?)"
-  if [[ "$unauth_mongo" -ne 0 && "$auth_mongo" -eq 0 && "$role_mongo" -eq 0 && "$app_mongo" -eq 0 && "$sidecar_mongo" -eq 0 ]]; then
-    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' PASS CRITICAL 'Unauthenticated access was denied; authenticated replica-set and scoped-role probes succeeded.'
+  mongo_observations="$(jq -cn \
+    --arg unauth "$([[ "$unauth_mongo" -ne 0 ]] && echo PASS || echo FAIL)" \
+    --arg replica "$([[ "$auth_mongo" -eq 0 ]] && echo PASS || echo ERROR)" \
+    --arg roles "$([[ "$role_mongo" -eq 0 ]] && echo PASS || { [[ "$role_mongo" -eq 3 ]] && echo FAIL || echo ERROR; })" \
+    --arg app "$([[ "$app_mongo" -eq 0 ]] && echo PASS || echo ERROR)" \
+    --arg sidecar "$([[ "$sidecar_mongo" -eq 0 ]] && echo PASS || echo ERROR)" \
+    '["mongodb.unauthenticated-denied: " + $unauth, "mongodb.replica-set-and-admin-auth: " + $replica, "mongodb.roles-scoped: " + $roles, "mongodb.app-authenticated-connectivity: " + $app, "mongodb.sidecar-authenticated-connectivity: " + $sidecar]')"
+  mongo_metrics="$(jq -cn --argjson unauthExit "$unauth_mongo" --argjson adminReplicaExit "$auth_mongo" \
+    --argjson roleExit "$role_mongo" --argjson appExit "$app_mongo" --argjson sidecarExit "$sidecar_mongo" \
+    '{unauthenticatedProbeExit:$unauthExit,adminReplicaProbeExit:$adminReplicaExit,roleScopeProbeExit:$roleExit,appConnectivityProbeExit:$appExit,sidecarConnectivityProbeExit:$sidecarExit}')"
+  if [[ "$unauth_mongo" -eq 0 ]]; then
+    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' FAIL CRITICAL 'MongoDB accepted an unauthenticated data query.' "$mongo_observations" "$mongo_metrics"
+  elif [[ "$role_mongo" -eq 3 ]]; then
+    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' FAIL HIGH 'MongoDB denied unauthenticated access, but configured application or Sidecar roles exceeded or differed from policy.' "$mongo_observations" "$mongo_metrics"
+  elif [[ "$auth_mongo" -ne 0 || "$role_mongo" -ne 0 || "$app_mongo" -ne 0 || "$sidecar_mongo" -ne 0 ]]; then
+    mongo_metrics="$(jq '. + {inconclusive:true}' <<<"$mongo_metrics")"
+    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' ERROR HIGH 'Unauthenticated access was denied, but one or more authenticated MongoDB probes were inconclusive.' "$mongo_observations" "$mongo_metrics"
   else
-    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' FAIL CRITICAL 'One or more MongoDB authentication, replica-set, or role-scope probes failed policy.'
+    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' PASS CRITICAL 'Unauthenticated access was denied; authenticated replica-set and scoped-role probes succeeded.' "$mongo_observations" "$mongo_metrics"
   fi
 else
   error_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' 'Docker or protected MongoDB audit configuration is unavailable.'
@@ -220,11 +257,21 @@ if command -v docker >/dev/null 2>&1 && [[ "$missing" -eq 0 ]]; then
   unauth_redis="$(docker exec "$MOFACTS_REDIS_CONTAINER" redis-cli --no-auth-warning PING >/dev/null 2>&1; echo $?)"
   auth_redis="$(docker exec -e REDISCLI_AUTH="$MOFACTS_REDIS_PASSWORD" "$MOFACTS_REDIS_CONTAINER" redis-cli --no-auth-warning PING >/dev/null 2>&1; echo $?)"
   redis_publication="$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$MOFACTS_REDIS_CONTAINER" 2>/dev/null | jq '[to_entries[] | .value[]?] | length' 2>/dev/null || echo 1)"
-  app_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$MOFACTS_APP_CONTAINER" 2>/dev/null || true)"
-  if [[ "$unauth_redis" -ne 0 && "$auth_redis" -eq 0 && "$redis_publication" -eq 0 && "$app_health" == healthy ]]; then
-    add_control internal.redis-auth 'Redis requires authentication and remains private' PASS CRITICAL 'Unauthenticated Redis was denied, authenticated connectivity succeeded, and no host publication exists.'
+  redis_observations="$(jq -cn \
+    --arg unauth "$([[ "$unauth_redis" -ne 0 ]] && echo PASS || echo FAIL)" \
+    --arg auth "$([[ "$auth_redis" -eq 0 ]] && echo PASS || echo ERROR)" \
+    --arg publication "$([[ "$redis_publication" -eq 0 ]] && echo PASS || echo FAIL)" \
+    '["redis.unauthenticated-denied: " + $unauth, "redis.authenticated-connectivity: " + $auth, "redis.no-host-publication: " + $publication]')"
+  redis_metrics="$(jq -cn --argjson unauthExit "$unauth_redis" --argjson authenticatedExit "$auth_redis" \
+    --argjson hostPublicationCount "$redis_publication" \
+    '{unauthenticatedProbeExit:$unauthExit,authenticatedProbeExit:$authenticatedExit,hostPublicationCount:$hostPublicationCount}')"
+  if [[ "$unauth_redis" -eq 0 || "$redis_publication" -ne 0 ]]; then
+    add_control internal.redis-auth 'Redis requires authentication and remains private' FAIL CRITICAL 'Redis accepted an unauthenticated command or has a host-published port.' "$redis_observations" "$redis_metrics"
+  elif [[ "$auth_redis" -ne 0 ]]; then
+    redis_metrics="$(jq '. + {inconclusive:true}' <<<"$redis_metrics")"
+    add_control internal.redis-auth 'Redis requires authentication and remains private' ERROR HIGH 'Unauthenticated Redis was denied, but authenticated connectivity could not be confirmed.' "$redis_observations" "$redis_metrics"
   else
-    add_control internal.redis-auth 'Redis requires authentication and remains private' FAIL CRITICAL 'Redis authentication, authenticated connectivity, or private publication policy failed.'
+    add_control internal.redis-auth 'Redis requires authentication and remains private' PASS CRITICAL 'Unauthenticated Redis was denied, authenticated connectivity succeeded, and no host publication exists.' "$redis_observations" "$redis_metrics"
   fi
 else
   error_control internal.redis-auth 'Redis requires authentication and remains private' 'Docker or protected Redis audit configuration is unavailable.'

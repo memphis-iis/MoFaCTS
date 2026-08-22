@@ -95,11 +95,15 @@ if (addresses.length) {
       const unexpected = open.filter((entry) => !entry.endsWith('/tcp/80') && !entry.endsWith('/tcp/443'));
       const perAddress = addresses.every((address) => open.includes(`${address}/tcp/80`) && open.includes(`${address}/tcp/443`));
       controls.push(control('external.public-tcp-ports', 'Only TCP 80 and 443 are public',
-        unexpected.length === 0 && perAddress ? 'PASS' : 'FAIL', 'CRITICAL',
+        unexpected.length === 0 && perAddress ? 'PASS' : 'FAIL',
+        unexpected.some((entry) => /\/tcp\/(?:3000|27017|6379|8931|8932)$/.test(entry)) ? 'CRITICAL' : 'HIGH',
         unexpected.length ? `Found ${unexpected.length} unexpected public TCP ports.` : perAddress
           ? 'Every resolved address exposes TCP 80 and 443 only.'
           : 'One or more resolved addresses did not expose the required TCP ports.',
-        { metrics: { addressCount: addresses.length, unexpectedPortCount: unexpected.length } }));
+        {
+          observations: unexpected.map((entry) => `unexpected-public-endpoint: ${entry}`),
+          metrics: { addressCount: addresses.length, unexpectedPortCount: unexpected.length },
+        }));
     }
   }
 
@@ -111,17 +115,24 @@ if (addresses.length) {
     const expectedResultCount = addresses.length * udpPorts.split(',').length;
     const classification = classifyUdpPortStates(udpScan.ports, expectedResultCount);
     if (classification.status === 'FAIL') {
-      controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', 'FAIL', 'CRITICAL',
+      controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', 'FAIL', 'HIGH',
         `Found ${classification.openPortCount} selected UDP ports confirmed open.`,
-        { metrics: { openSelectedUdpPortCount: classification.openPortCount, inconclusivePortCount: classification.inconclusivePortCount } }));
+        {
+          observations: classification.openEndpoints.map((entry) => `confirmed-open-endpoint: ${entry}`),
+          metrics: { openSelectedUdpPortCount: classification.openPortCount, inconclusivePortCount: classification.inconclusivePortCount },
+        }));
     } else if (classification.status === 'ERROR') {
       controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', 'ERROR', 'HIGH',
         'The UDP scan did not conclusively report every selected port closed.',
-        { metrics: {
-          inconclusivePortCount: classification.inconclusivePortCount,
-          observedResultCount: classification.observedResultCount,
-          expectedResultCount: classification.expectedResultCount,
-        } }));
+        {
+          observations: classification.inconclusiveEndpoints.map((entry) => `inconclusive-endpoint: ${entry}`),
+          metrics: {
+            inconclusive: true,
+            inconclusivePortCount: classification.inconclusivePortCount,
+            observedResultCount: classification.observedResultCount,
+            expectedResultCount: classification.expectedResultCount,
+          },
+        }));
     } else {
       controls.push(control('external.public-udp-ports', 'Selected UDP ports are closed', 'PASS', 'CRITICAL',
         'Every selected UDP port was conclusively reported closed.',
