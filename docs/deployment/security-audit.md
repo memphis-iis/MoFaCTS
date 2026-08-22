@@ -60,6 +60,8 @@ Authorization evidence uses stable actor-and-surface probe IDs. Passwordless con
 Install the tracked script as a root-owned executable and its configuration as root-only data:
 
 ```bash
+sudo install -d -o root -g root -m 0755 /usr/local/libexec/mofacts-security-audit
+sudo install -o root -g root -m 0644 deploy/security-audit/host-listener-policy.awk /usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
 sudo install -o root -g root -m 0755 deploy/security-audit/host-exposure-audit.sh /usr/local/sbin/mofacts-host-exposure-audit
 sudo install -d -o root -g root -m 0700 /etc/mofacts
 sudo install -o root -g root -m 0600 deploy/security-audit/security-audit.conf.example /etc/mofacts/security-audit.conf
@@ -74,7 +76,7 @@ Restrict the dedicated SSH public key to the forced command:
 restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,command="sudo -n /usr/local/sbin/mofacts-host-exposure-audit" ssh-ed25519 PUBLIC_KEY audit
 ```
 
-Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. Reports identify unexpected listener endpoints and process labels plus stable firewall, MongoDB, and Redis sub-probe outcomes and exit categories. The script does not print container environments or credentials and does not change state. Reinstall the tracked forced-command script after scanner updates before relying on the new host evidence format.
+Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. The root-owned listener policy recognizes IPv4/IPv6 loopback infrastructure and a concrete-interface UDP 68 listener owned by `systemd-networkd`; wildcard DHCP listeners and the same port under any other process remain findings. Reports identify unexpected listener endpoints and process labels plus stable firewall, MongoDB, and Redis sub-probe outcomes and exit categories. The script does not print container environments or credentials and does not change state. Reinstall both tracked host-audit files after scanner updates before relying on the new host evidence format.
 
 The host must provide `bash`, `jq`, `ss`, Docker, UFW, Apache (`apache2ctl` and its systemd unit), and the active enabled HTTPS site configured by `APACHE_HTTPS_SITE_FILE`. MongoDB and Redis probes execute their clients inside the configured containers. Sidecar ports must be absent or exactly `127.0.0.1:8931` and `127.0.0.1:8932`.
 
@@ -93,6 +95,10 @@ The IMAPS mailbox must be dedicated to the reset identity. It retains the previo
 UDP results are fail-closed without overstating uncertainty: an exact `open` state is a finding, every selected port must be reported `closed` to pass, and `open|filtered`, another inconclusive state, duplicate evidence, or missing results produce `ERROR`. Inconclusive completed probes remain visible in section posture and counts but do not enter `executionErrors` or vulnerability-severity counts. TCP and UDP evidence names the observed address, protocol, port, and state. TLS cipher review parses only enumerated cipher entries and their grades; a normal `compressors: NULL` line is not a weak cipher. Failed reset-token and throttle subprobes use fixed non-secret IDs. Failed authorization probes use deterministic semantic IDs, retain at most 12 sanitized observations, and record how many additional failures were omitted.
 
 The regular Security workflow performs a redacted full-history Gitleaks scan, both npm lockfiles' runtime and development-only dependency graphs, and the source contract tests. Gitleaks evidence includes rule, path, line, and abbreviated commit without the secret value. The Monday audit additionally scans an image built from the audited checkout with pinned Trivy and reports installed and fixed package versions. The running production image digest is recorded as informational evidence when the restricted host command can observe it; it does not alter or gate the production deployment.
+
+Exact Gitleaks fingerprints may be added to `.gitleaksignore` only after a value-independent provenance review proves that the occurrence is synthetic, generated vendor content, a false positive, or retired non-production material. Keep the classification visible in this section and never use a path-wide or rule-wide exception.
+
+The two `generic-api-key` detections at `mofacts/.deploy/settings.local.json:4` in commits `403ea082da296f5d7e476cfa99786bfb99ec3015` and `bbb9400da27cc4c74c3024c4d1597a31173a298c` were reviewed on 2026-08-22. They are the same retired local-development encryption key. Historical Compose wiring mounted that file only through `docker-compose.local.yml`; the value differs from the current production, staging, and ignored local encryption keys. It is not an authentication credential, is not used by the deployed application, and cannot be tested against or accepted by a service. No production rotation or history rewrite is required. The two exact fingerprints are ignored so this reviewed local-only material does not obscure new findings; any different commit, line, path, or rule remains reportable.
 
 The report's `sourceRevision` identifies the audit workflow checkout, not a claim that a clean Git tree was deployed to production.
 

@@ -4,6 +4,7 @@
 set -u
 
 CONFIG_FILE=/etc/mofacts/security-audit.conf
+LISTENER_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
 controls='[]'
 
 add_control() {
@@ -82,18 +83,28 @@ fi
 
 if command -v ss >/dev/null 2>&1; then
   sockets="$(ss -H -lntup 2>/dev/null || true)"
-  public_unexpected="$(awk '$1=="tcp" || $1=="udp" {local=$5; sub(/^.*:/,"",local); addr=$5; sub(/:[^:]*$/,"",addr); if (addr!="127.0.0.1" && addr!="[::1]" && addr!="::1" && addr!="localhost" && addr!="127.0.0.53%lo") {if (!(($1=="tcp") && (local=="80" || local=="443" || local=="22"))) count++}} END{print count+0}' <<<"$sockets")"
-  unexpected_socket_lines="$(awk '$1=="tcp" || $1=="udp" {local=$5; port=local; sub(/^.*:/,"",port); addr=local; sub(/:[^:]*$/,"",addr); if (addr!="127.0.0.1" && addr!="[::1]" && addr!="::1" && addr!="localhost" && addr!="127.0.0.53%lo" && !(($1=="tcp") && (port=="80" || port=="443" || port=="22"))) print "listener." $1 ": endpoint=" local ", process=" $NF}' <<<"$sockets")"
-  unexpected_socket_observations="$(head -n 12 <<<"$unexpected_socket_lines" | jq -Rsc 'split("\n") | map(select(length > 0))')"
   app_count="$(grep -Ec '127\.0\.0\.1:3000\b' <<<"$sockets" || true)"
   sidecar_bad="$(awk '$5 ~ /:(8931|8932)$/ && $5 !~ /^127\.0\.0\.1:/ {count++} END{print count+0}' <<<"$sockets")"
   sidecar_count="$(grep -Ec '127\.0\.0\.1:(8931|8932)\b' <<<"$sockets" || true)"
-  if [[ "$public_unexpected" -eq 0 ]]; then
-    add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS HIGH 'No unexpected non-loopback listener was found; SSH is evaluated with firewall scope separately.' '[]' '{"unexpectedListenerCount":0}'
+
+  if [[ ! -r "$LISTENER_POLICY_FILE" ]]; then
+    error_control internal.listening-sockets 'Host listening sockets match the approved exposure' 'The root-owned listener policy is unavailable.'
   else
-    listener_severity=HIGH
-    if grep -Eq ':(3000|27017|6379|8931|8932)([,[:space:]]|$)' <<<"$unexpected_socket_lines"; then listener_severity=CRITICAL; fi
-    add_control internal.listening-sockets 'Host listening sockets match the approved exposure' FAIL "$listener_severity" "$public_unexpected unexpected non-loopback listeners were found." "$unexpected_socket_observations" "{\"unexpectedListenerCount\":$public_unexpected}"
+    unexpected_socket_lines="$(awk -f "$LISTENER_POLICY_FILE" <<<"$sockets")"
+    listener_policy_exit=$?
+    if [[ "$listener_policy_exit" -ne 0 ]]; then
+      error_control internal.listening-sockets 'Host listening sockets match the approved exposure' 'The listener policy could not classify host sockets.'
+    else
+      public_unexpected="$(grep -c . <<<"$unexpected_socket_lines" || true)"
+      unexpected_socket_observations="$(head -n 12 <<<"$unexpected_socket_lines" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+      if [[ "$public_unexpected" -eq 0 ]]; then
+        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS HIGH 'No unexpected listener was found; loopback infrastructure and the system DHCP client are local host services, and SSH is evaluated with firewall scope separately.' '[]' '{"unexpectedListenerCount":0}'
+      else
+        listener_severity=HIGH
+        if grep -Eq ':(3000|27017|6379|8931|8932)([,[:space:]]|$)' <<<"$unexpected_socket_lines"; then listener_severity=CRITICAL; fi
+        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' FAIL "$listener_severity" "$public_unexpected unexpected listeners were found." "$unexpected_socket_observations" "{\"unexpectedListenerCount\":$public_unexpected}"
+      fi
+    fi
   fi
   if [[ "$app_count" -ge 1 ]]; then
     add_control internal.app-loopback 'Application listens on loopback port 3000' PASS HIGH 'The application listener is present on 127.0.0.1:3000.'

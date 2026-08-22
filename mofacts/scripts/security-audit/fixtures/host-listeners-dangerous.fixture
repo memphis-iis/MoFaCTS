@@ -1,0 +1,5 @@
+udp UNCONN 0 0 0.0.0.0:68 0.0.0.0:* users:(("systemd-network",pid=201,fd=20))
+udp UNCONN 0 0 172.31.21.59%ens5:68 0.0.0.0:* users:(("rogue-dhcp",pid=202,fd=21))
+tcp LISTEN 0 4096 0.0.0.0:3000 0.0.0.0:* users:(("docker-proxy",pid=203,fd=22))
+tcp LISTEN 0 4096 [::]:27017 [::]:* users:(("mongod",pid=204,fd=23))
+udp UNCONN 0 0 *:6379 *:* users:(("redis-server",pid=205,fd=24))

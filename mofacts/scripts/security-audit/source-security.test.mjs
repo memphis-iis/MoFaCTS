@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { canonicalJson, finalizeReport, isExecutionErrorControl, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
 import {
   boundedGitleaksObservations,
@@ -185,15 +187,49 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   assert.match(source, /redis\.unauthenticated-denied/);
   assert.match(source, /firewall\.default-deny/);
   assert.match(source, /unexpected_socket_observations/);
+  assert.match(source, /host-listener-policy\.awk/);
   assert.match(source, /127\\\.0\\\.0\\\.1:3000/);
   assert.doesNotMatch(source, /CADDY_CONFIG_FILE|internal\.caddy-routes|caddy adapt/);
+});
+
+function executablePath(fileUrl) {
+  const nativePath = fileURLToPath(fileUrl);
+  if (process.platform !== 'win32') return nativePath;
+  const match = /^([A-Za-z]):\\(.*)$/.exec(nativePath);
+  assert.ok(match, `Cannot map fixture path into WSL: ${nativePath}`);
+  return `/mnt/${match[1].toLowerCase()}/${match[2].replaceAll('\\', '/')}`;
+}
+
+function classifyHostListenerFixture(fixtureName) {
+  const policy = executablePath(new URL('../../../deploy/security-audit/host-listener-policy.awk', import.meta.url));
+  const fixture = executablePath(new URL(`./fixtures/${fixtureName}`, import.meta.url));
+  const executable = process.platform === 'win32' ? 'wsl.exe' : 'awk';
+  const args = process.platform === 'win32'
+    ? ['--exec', 'awk', '-f', policy, fixture]
+    : ['-f', policy, fixture];
+  return execFileSync(executable, args, { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
+}
+
+test('host listener policy accepts only reviewed loopback, DHCP, web, and SSH fixtures', () => {
+  assert.deepEqual(classifyHostListenerFixture('host-listeners-expected.fixture'), []);
+
+  const dangerous = classifyHostListenerFixture('host-listeners-dangerous.fixture');
+  assert.equal(dangerous.length, 5);
+  assert.ok(dangerous.some((line) => line.includes('0.0.0.0:68')));
+  assert.ok(dangerous.some((line) => line.includes('ens5:68')));
+  assert.ok(dangerous.some((line) => line.includes('0.0.0.0:3000')));
+  assert.ok(dangerous.some((line) => line.includes('[::]:27017')));
+  assert.ok(dangerous.some((line) => line.includes('*:6379')));
 });
 
 test('production hardening assets preserve reviewed findings and remove unnecessary runtime tooling', () => {
   const ignore = fs.readFileSync(new URL('../../../.gitleaksignore', import.meta.url), 'utf8');
   const ignoredFingerprints = ignore.split(/\r?\n/).filter((line) => line && !line.startsWith('#'));
-  assert.equal(ignoredFingerprints.length, 5);
-  assert.doesNotMatch(ignore, /settings\.local\.json/);
+  assert.equal(ignoredFingerprints.length, 7);
+  assert.deepEqual(ignoredFingerprints.filter((line) => line.includes('mofacts/.deploy/settings.local.json')), [
+    '403ea082da296f5d7e476cfa99786bfb99ec3015:mofacts/.deploy/settings.local.json:generic-api-key:4',
+    'bbb9400da27cc4c74c3024c4d1597a31173a298c:mofacts/.deploy/settings.local.json:generic-api-key:4',
+  ]);
   const dockerfile = fs.readFileSync(new URL('../../../Dockerfile', import.meta.url), 'utf8');
   assert.match(dockerfile, /apk update && apk upgrade --no-cache && apk add --no-cache/);
   assert.match(dockerfile, /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx/);
