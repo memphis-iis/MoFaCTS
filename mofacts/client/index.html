@@ -25,14 +25,10 @@
     <link rel="icon" type="image/png" href="/images/themes/brain-logo.png">
 
     <!-- Apply only the locally selected user's background before first paint. -->
-    <script>
-    (()=>{try{const raw=localStorage.getItem('mofacts.userThemeSelection.v1.deviceBootstrap');if(!raw)return;const saved=JSON.parse(raw);const color=typeof saved.backgroundColor==='string'?saved.backgroundColor.trim():'';if(color&&CSS.supports('color',color)){document.documentElement.style.setProperty('--app-background-color',color);const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',color);}}catch(_error){}})();
-    </script>
+    <script src="/theme-bootstrap.js"></script>
 
-    <!-- Critical CSS - Inlined for instant first paint (prevents FOUC) -->
-    <style>
-    html,body{margin:0;padding:0;background:var(--app-background-color,#F2F2F2);color:#000;}.theme-bootstrap{visibility:hidden;}.theme-bootstrap.theme-bootstrap-ready{visibility:visible;}.page-loading{opacity:1;visibility:visible;}.page-loaded{opacity:1;visibility:visible;transition:opacity 0.15s ease-in;}
-    </style>
+    <!-- Critical CSS is same-origin and render-blocking to prevent FOUC. -->
+    <link href="/styles/critical.css" rel="stylesheet">
 
   <!-- Same-origin vendor resources - Bootstrap loaded first -->
   <link href="/vendor/bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">

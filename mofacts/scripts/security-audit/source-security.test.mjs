@@ -6,6 +6,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { canonicalJson, finalizeReport, isExecutionErrorControl, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
 import {
+  INTERNAL_CONTROL_DEFINITIONS,
+  INTERNAL_EXECUTION_CATEGORIES,
+  internalExecutionError,
+} from './internal-audit-contract.mjs';
+import {
   boundedGitleaksObservations,
   boundedNpmAuditObservations,
   boundedNpmFindings,
@@ -28,6 +33,7 @@ import {
 } from './report-crypto.mjs';
 import {
   assertUniqueSemanticProbeIds,
+  classifyEnumeration,
   passwordlessContainmentOutcomes,
   routeProbePassed,
   selectExpiredResetLink,
@@ -113,7 +119,9 @@ test('dependency parsers never turn incomplete evidence into a pass', () => {
   assert.equal(parseNpmAuditVulnerabilityCount({ metadata: { vulnerabilities: { high: 2, critical: 1 } } }), 3);
   assert.throws(() => parseNpmAuditVulnerabilityCount({}));
   assert.deepEqual(parseTrivyHighCritical({ Results: [{ Vulnerabilities: [] }] }), []);
-  assert.equal(parseTrivyHighCritical({ Results: [{ Vulnerabilities: [{ Severity: 'CRITICAL' }] }] }).length, 1);
+  assert.deepEqual(parseTrivyHighCritical({ Results: [{ Target: '/app/package-lock.json', Class: 'lang-pkgs', Vulnerabilities: [{ Severity: 'CRITICAL' }] }] }), [
+    { Severity: 'CRITICAL', auditTarget: '/app/package-lock.json', auditClass: 'lang-pkgs' },
+  ]);
   assert.throws(() => parseTrivyHighCritical({}));
 });
 
@@ -134,8 +142,8 @@ test('repository findings expose bounded identifiers without raw scanner evidenc
     vulnerabilities: { direct: { severity: 'high', isDirect: true } },
   })), ['npm.direct: severity=high, direct=yes']);
   assert.deepEqual(boundedTrivyObservations([
-    { VulnerabilityID: 'CVE-2026-1234', PkgName: 'runtime-lib', InstalledVersion: '1.0.0', Severity: 'HIGH', FixedVersion: '2.0.0' },
-  ]), ['trivy.CVE-2026-1234: package=runtime-lib, installed=1.0.0, fixed=2.0.0, severity=HIGH']);
+    { VulnerabilityID: 'CVE-2026-1234', PkgName: 'runtime-lib', InstalledVersion: '1.0.0', Severity: 'HIGH', FixedVersion: '2.0.0', auditTarget: '/app/package-lock.json', auditClass: 'lang-pkgs' },
+  ]), ['trivy.CVE-2026-1234: package=runtime-lib, installed=1.0.0, fixed=2.0.0, severity=HIGH, class=lang-pkgs, target=/app/package-lock.json']);
   assert.throws(() => boundedGitleaksObservations([{ RuleID: 'generic-api-key' }]));
   assert.throws(() => boundedNpmAuditObservations({}));
   assert.throws(() => boundedTrivyObservations([{ VulnerabilityID: 'CVE-2026-1234' }]));
@@ -209,7 +217,35 @@ test('production audit reaches the host through a pinned ephemeral Tailscale ide
   assert.match(workflow, /tags: tag:ci/);
   assert.match(workflow, /version: 1\.102\.3/);
   assert.match(workflow, /ping: \$\{\{ secrets\.AUDIT_SSH_HOST \}\}/);
+  assert.doesNotMatch(workflow, /log-mode:/);
+  assert.match(workflow, /AUDIT_TAILNET_OUTCOME: \$\{\{ steps\.tailnet\.outcome \}\}/);
+  assert.match(workflow, /AUDIT_SSH_IDENTITY_OUTCOME: \$\{\{ steps\.ssh_identity\.outcome \}\}/);
+  assert.match(workflow, /write-internal-execution-error\.mjs/);
   assert.doesNotMatch(workflow, /pull_request_target/);
+});
+
+test('internal transport failures produce complete sanitized section evidence', () => {
+  assert.deepEqual(INTERNAL_EXECUTION_CATEGORIES, [
+    'tailnet-connection-failed',
+    'ssh-identity-configuration-failed',
+    'ssh-transport-failed',
+    'forced-command-rejected',
+    'host-output-invalid',
+  ]);
+  for (const category of INTERNAL_EXECUTION_CATEGORIES) {
+    const result = internalExecutionError(category);
+    assert.equal(result.sectionId, 'internal');
+    assert.equal(result.status, 'ERROR');
+    assert.equal(result.productionImage, 'unknown');
+    assert.equal(result.controls.length, INTERNAL_CONTROL_DEFINITIONS.length);
+    assert.deepEqual(
+      result.controls.map((control) => control.controlId),
+      INTERNAL_CONTROL_DEFINITIONS.map(([controlId]) => controlId),
+    );
+    assert.ok(result.controls.every((control) => control.status === 'ERROR'));
+    assert.ok(result.controls.every((control) => control.evidence.metrics.executionCategory === category));
+  }
+  assert.throws(() => internalExecutionError('unbounded-raw-ssh-error'));
 });
 
 function executablePath(fileUrl) {
@@ -244,16 +280,19 @@ function classifyHostFirewallFixture(fixtureName) {
   return execFileSync(executable, args, { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
 }
 
-test('host listener policy accepts only reviewed loopback, DHCP, web, and SSH fixtures', () => {
+test('host listener policy accepts reviewed loopback, DHCP, Tailscale, web, and SSH fixtures', () => {
   assert.deepEqual(classifyHostListenerFixture('host-listeners-expected.fixture'), []);
 
   const dangerous = classifyHostListenerFixture('host-listeners-dangerous.fixture');
-  assert.equal(dangerous.length, 5);
+  assert.equal(dangerous.length, 8);
   assert.ok(dangerous.some((line) => line.includes('0.0.0.0:68')));
   assert.ok(dangerous.some((line) => line.includes('ens5:68')));
   assert.ok(dangerous.some((line) => line.includes('0.0.0.0:3000')));
   assert.ok(dangerous.some((line) => line.includes('[::]:27017')));
   assert.ok(dangerous.some((line) => line.includes('*:6379')));
+  assert.ok(dangerous.some((line) => line.includes('rogue-tunnel')));
+  assert.ok(dangerous.some((line) => line.includes('52.89.109.53:39580')));
+  assert.ok(dangerous.some((line) => line.includes('100.69.46.68:27017')));
 });
 
 test('host firewall policy accepts only private-interface SSH and public web rules', () => {
@@ -279,13 +318,24 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   const dockerfile = fs.readFileSync(new URL('../../../Dockerfile', import.meta.url), 'utf8');
   assert.match(dockerfile, /apk update && apk upgrade --no-cache && apk add --no-cache/);
   assert.match(dockerfile, /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx/);
+  assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$MOFACTS_SOURCE_REVISION/);
   const apache = fs.readFileSync(new URL('../../../deploy/maintenance/apache-mofacts-maintenance.conf', import.meta.url), 'utf8');
   assert.match(apache, /ProxyPass \/websocket ws:\/\/127\.0\.0\.1:3000\/websocket/);
-  assert.match(apache, /Content-Security-Policy-Report-Only/);
+  assert.match(apache, /Header always set Content-Security-Policy "/);
+  assert.doesNotMatch(apache, /Content-Security-Policy-Report-Only/);
   assert.match(apache, /style-src 'self' https:\/\/fonts\.googleapis\.com/);
   assert.match(apache, /font-src 'self' data: https:\/\/fonts\.gstatic\.com/);
   assert.match(apache, /media-src 'self' blob: data:/);
-  assert.doesNotMatch(apache, /(?:script-src|style-src)[^;]*(?:'unsafe-inline'|'unsafe-eval')/);
+  assert.doesNotMatch(apache, /script-src[^;]*(?:'unsafe-inline'|'unsafe-eval')/);
+  assert.doesNotMatch(apache, /(?:^|;\s*)style-src\s+[^;]*(?:'unsafe-inline'|'unsafe-eval')/m);
+  assert.match(apache, /style-src-attr 'unsafe-inline'/);
+  const index = fs.readFileSync(new URL('../../client/index.html', import.meta.url), 'utf8');
+  const serverMain = fs.readFileSync(new URL('../../server/main.ts', import.meta.url), 'utf8');
+  const cspRuntime = fs.readFileSync(new URL('../../server/runtime/contentSecurityPolicy.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(index, /<script(?![^>]*\bsrc=)[^>]*>/i);
+  assert.doesNotMatch(index, /<style\b/i);
+  assert.match(serverMain, /runtime\/contentSecurityPolicy/);
+  assert.match(cspRuntime, /setInlineScriptsAllowed\(false\)/);
   assert.doesNotMatch(apache, /ws:\/\/localhost:3000/);
   const auditAdmin = fs.readFileSync(new URL('../../client/views/adminSecurityAudits.ts', import.meta.url), 'utf8');
   assert.match(auditAdmin, /auditText\(key, options\?\.hash\)/);
@@ -296,6 +346,7 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(probabilityCalculation, /calculateCardProbabilities:complete[\s\S]*stimulusCount: count/);
   assert.doesNotMatch(probabilityCalculation, /JSON\.stringify\(ptemp\)/);
   const compose = fs.readFileSync(new URL('../../../deploy/docker-compose.yml', import.meta.url), 'utf8');
+  assert.match(compose, /MOFACTS_SOURCE_REVISION: \$\{MOFACTS_SOURCE_REVISION:-unknown\}/);
   assert.match(compose, /REDIS_URL: "redis:\/\/:\$\{MOFACTS_REDIS_PASSWORD:\?[^}]+\}@redis:6379\/0"/);
   assert.match(compose, /redis-server --appendonly yes --requirepass \\"\$\$MOFACTS_REDIS_PASSWORD\\"/);
   assert.match(compose, /REDISCLI_AUTH=\\"\$\$MOFACTS_REDIS_PASSWORD\\" redis-cli --no-auth-warning ping/);
@@ -349,6 +400,15 @@ test('authentication probe helpers produce stable bounded diagnostics', () => {
   assert.equal(assertUniqueSemanticProbeIds({ route: [routeProbe, { ...routeProbe }] }), false);
   assert.equal(throttleWasObserved({ ok: false, code: 'rate-limit' }), true);
   assert.equal(throttleResultCategory({ ok: false, code: 403 }), 'invalid-credentials');
+  assert.deepEqual(
+    classifyEnumeration([{ code: '403' }], [{ code: '403' }], true),
+    { status: 'PASS', loginCodeMatch: true, resetShapeMatch: true, rateLimitedAttemptCount: 0 },
+  );
+  assert.equal(classifyEnumeration([{ code: '403' }], [{ code: '404' }], true).status, 'FAIL');
+  assert.deepEqual(
+    classifyEnumeration([{ code: '403' }], [{ code: 'rate-limit' }], true),
+    { status: 'ERROR', loginCodeMatch: false, resetShapeMatch: true, rateLimitedAttemptCount: 1 },
+  );
   assert.equal(routeProbePassed({
     actor: 'learnerA', requestedPath: '/admin/security-audits', finalPath: '/home', expectDenied: true, authReady: true,
   }), true);

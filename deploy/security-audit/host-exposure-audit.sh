@@ -99,7 +99,7 @@ if command -v ss >/dev/null 2>&1; then
       public_unexpected="$(grep -c . <<<"$unexpected_socket_lines" || true)"
       unexpected_socket_observations="$(head -n 12 <<<"$unexpected_socket_lines" | jq -Rsc 'split("\n") | map(select(length > 0))')"
       if [[ "$public_unexpected" -eq 0 ]]; then
-        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS HIGH 'No unexpected listener was found; loopback infrastructure and the system DHCP client are local host services, and SSH is evaluated with firewall scope separately.' '[]' '{"unexpectedListenerCount":0}'
+        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS HIGH 'No unexpected listener was found; loopback infrastructure, the system DHCP client, and narrowly classified Tailscale listeners matched policy, while SSH is evaluated with firewall scope separately.' '[]' '{"unexpectedListenerCount":0}'
       else
         listener_severity=HIGH
         if grep -Eq ':(3000|27017|6379|8931|8932)([,[:space:]]|$)' <<<"$unexpected_socket_lines"; then listener_severity=CRITICAL; fi

@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { control, errorControl, runCommand, section, writeJsonFile } from './audit-lib.mjs';
 import {
   assertUniqueSemanticProbeIds,
+  classifyEnumeration,
   expectedDeniedRoute,
   passwordlessContainmentOutcomes,
   routeProbePassed,
@@ -204,14 +205,27 @@ try {
   resetStarted = performance.now();
   const resetMissing = await callMethod(anonymous.page, 'requestPasswordReset', [`missing-reset-${config.runNamespace}@audit.invalid`]);
   const resetMissingElapsed = performance.now() - resetStarted;
-  const sameLoginCode = existingLogin.every((entry, index) => entry.result.code === missingLogin[index].result.code);
   const sameResetShape = JSON.stringify(resetExisting) === JSON.stringify(resetMissing);
+  const enumeration = classifyEnumeration(
+    existingLogin.map((entry) => entry.result),
+    missingLogin.map((entry) => entry.result),
+    sameResetShape,
+  );
   controls.push(control('authentication.enumeration', 'Login and reset responses resist account enumeration',
-    sameLoginCode && sameResetShape ? 'PASS' : 'FAIL', 'HIGH',
-    sameLoginCode && sameResetShape ? 'Existing and nonexistent identifiers produced indistinguishable result shapes.' : 'Existing and nonexistent identifiers produced distinguishable results.',
+    enumeration.status, 'HIGH',
+    enumeration.status === 'PASS'
+      ? 'Existing and nonexistent identifiers produced indistinguishable result shapes.'
+      : enumeration.status === 'ERROR'
+        ? 'Login throttling prevented a valid account-enumeration comparison.'
+        : 'Existing and nonexistent identifiers produced distinguishable results.',
     {
       observations: existingLogin.map((entry, index) => `enumeration.attempt-${index + 1}: existing=${entry.result.code}, missing=${missingLogin[index].result.code}`),
-      metrics: { loginCodeMatch: sameLoginCode, resetShapeMatch: sameResetShape },
+      metrics: {
+        loginCodeMatch: enumeration.loginCodeMatch,
+        resetShapeMatch: enumeration.resetShapeMatch,
+        rateLimitedAttemptCount: enumeration.rateLimitedAttemptCount,
+        inconclusive: enumeration.status === 'ERROR',
+      },
     }));
   const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
   const existingMedian = median(existingLogin.map((entry) => entry.elapsed));
@@ -220,9 +234,14 @@ try {
   const resetDifferential = Math.abs(resetExistingElapsed - resetMissingElapsed);
   const timingPass = loginDifferential <= Math.max(150, Math.min(existingMedian, missingMedian) * 0.5)
     && resetDifferential <= Math.max(250, Math.min(resetExistingElapsed, resetMissingElapsed) * 0.75);
-  controls.push(control('authentication.timing', 'Authentication timing resists account enumeration', timingPass ? 'PASS' : 'FAIL', 'MEDIUM',
-    timingPass ? 'Login and reset timing differentials stayed within the approved bounds.' : 'A login or reset timing differential exceeded the approved bound.',
-    { metrics: { loginDifferentialMs: Math.round(loginDifferential), resetDifferentialMs: Math.round(resetDifferential), sampleCountPerIdentifier: 3 } }));
+  const timingStatus = enumeration.status === 'ERROR' ? 'ERROR' : timingPass ? 'PASS' : 'FAIL';
+  controls.push(control('authentication.timing', 'Authentication timing resists account enumeration', timingStatus, 'MEDIUM',
+    timingStatus === 'PASS'
+      ? 'Login and reset timing differentials stayed within the approved bounds.'
+      : timingStatus === 'ERROR'
+        ? 'Login throttling prevented a valid authentication-timing comparison.'
+        : 'A login or reset timing differential exceeded the approved bound.',
+    { metrics: { loginDifferentialMs: Math.round(loginDifferential), resetDifferentialMs: Math.round(resetDifferential), sampleCountPerIdentifier: 3, inconclusive: timingStatus === 'ERROR' } }));
 
   const passwordProbe = await newPage();
   let resetCurrentPassword = config.users.reset.password;

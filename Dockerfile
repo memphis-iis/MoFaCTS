@@ -111,6 +111,9 @@ RUN bash $SCRIPTS_FOLDER/build-meteor-npm-dependencies.sh && \
 # See previous FROM line; this must match
 FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS runtime
 
+ARG MOFACTS_SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.revision=$MOFACTS_SOURCE_REVISION
+
 ENV APP_BUNDLE_FOLDER /opt/bundle
 ENV SCRIPTS_FOLDER /docker
 ARG ALPINE_PRIMARY_MIRROR=https://dl-cdn.alpinelinux.org/alpine

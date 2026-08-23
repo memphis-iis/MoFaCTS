@@ -1,0 +1,1 @@
+html,body{margin:0;padding:0;background:var(--app-background-color,#F2F2F2);color:#000;}.theme-bootstrap{visibility:hidden;}.theme-bootstrap.theme-bootstrap-ready{visibility:visible;}.page-loading{opacity:1;visibility:visible;}.page-loaded{opacity:1;visibility:visible;transition:opacity 0.15s ease-in;}

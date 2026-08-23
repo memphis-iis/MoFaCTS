@@ -60,6 +60,7 @@ jobs:
             "audit-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${audit_type}" >> "$GITHUB_ENV"
 
       - name: Connect the audit runner to the production tailnet
+        id: tailnet
         continue-on-error: true
         uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4
         with:
@@ -69,7 +70,6 @@ jobs:
           version: 1.102.3
           ping: ${{ secrets.AUDIT_SSH_HOST }}
           hostname: mofacts-audit-${{ github.run_id }}-${{ github.run_attempt }}
-          log-mode: quiet
 
       - name: Install pinned deterministic scanners
         continue-on-error: true
@@ -102,6 +102,7 @@ jobs:
         run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Configure forced-command SSH identity
+        id: ssh_identity
         continue-on-error: true
         shell: bash
         env:
@@ -127,14 +128,43 @@ jobs:
         env:
           AUDIT_SSH_HOST: ${{ secrets.AUDIT_SSH_HOST }}
           AUDIT_SSH_USER: ${{ secrets.AUDIT_SSH_USER }}
+          AUDIT_TAILNET_OUTCOME: ${{ steps.tailnet.outcome }}
+          AUDIT_SSH_IDENTITY_OUTCOME: ${{ steps.ssh_identity.outcome }}
         run: |
           set +e
-          ssh -F /dev/null -i "$AUDIT_DIR/ssh/id_ed25519" \
-            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$AUDIT_DIR/ssh/known_hosts" \
-            -o ConnectTimeout=20 -o ConnectionAttempts=1 \
-            "${AUDIT_SSH_USER}@${AUDIT_SSH_HOST}" \
-            > "$AUDIT_DIR/internal.json" 2>/dev/null
+          write_internal_error() {
+            node mofacts/scripts/security-audit/write-internal-execution-error.mjs \
+              "$AUDIT_DIR/internal.json" "$1" >/dev/null 2>&1
+          }
+          if [[ "$AUDIT_TAILNET_OUTCOME" != success ]]; then
+            write_internal_error tailnet-connection-failed
+          elif [[ "$AUDIT_SSH_IDENTITY_OUTCOME" != success ]]; then
+            write_internal_error ssh-identity-configuration-failed
+          else
+            ssh -F /dev/null -i "$AUDIT_DIR/ssh/id_ed25519" \
+              -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$AUDIT_DIR/ssh/known_hosts" \
+              -o ConnectTimeout=20 -o ConnectionAttempts=1 \
+              "${AUDIT_SSH_USER}@${AUDIT_SSH_HOST}" \
+              > "$AUDIT_DIR/internal.candidate.json" 2>/dev/null
+            ssh_exit=$?
+            if [[ "$ssh_exit" -ne 0 ]]; then
+              if [[ "$ssh_exit" -eq 64 || "$ssh_exit" -eq 69 || "$ssh_exit" -eq 77 ]]; then
+                write_internal_error forced-command-rejected
+              else
+                write_internal_error ssh-transport-failed
+              fi
+            elif node -e '
+              const fs = require("fs");
+              const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              if (value?.sectionId !== "internal" || !Array.isArray(value.controls)) process.exit(1);
+            ' "$AUDIT_DIR/internal.candidate.json" >/dev/null 2>&1; then
+              mv -- "$AUDIT_DIR/internal.candidate.json" "$AUDIT_DIR/internal.json"
+            else
+              write_internal_error host-output-invalid
+            fi
+          fi
+          rm -f -- "$AUDIT_DIR/internal.candidate.json"
           rm -f -- "$AUDIT_DIR/ssh/id_ed25519" "$AUDIT_DIR/ssh/known_hosts"
           rmdir -- "$AUDIT_DIR/ssh" 2>/dev/null
           exit 0

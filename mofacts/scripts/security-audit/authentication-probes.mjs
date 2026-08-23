@@ -46,6 +46,29 @@ export function throttleWasObserved(result) {
   return throttleResultCategory(result) === 'rate-limited';
 }
 
+export function classifyEnumeration(existingResults, missingResults, resetShapeMatch) {
+  const paired = Array.isArray(existingResults) && Array.isArray(missingResults)
+    && existingResults.length > 0 && existingResults.length === missingResults.length;
+  if (!paired || typeof resetShapeMatch !== 'boolean') {
+    return { status: 'ERROR', loginCodeMatch: false, resetShapeMatch: false, rateLimitedAttemptCount: 0 };
+  }
+
+  const rateLimitedAttemptCount = [...existingResults, ...missingResults]
+    .filter((result) => throttleWasObserved(result)).length;
+  const loginCodeMatch = existingResults.every((result, index) => (
+    String(result?.code || '') === String(missingResults[index]?.code || '')
+  ));
+  if (rateLimitedAttemptCount > 0) {
+    return { status: 'ERROR', loginCodeMatch, resetShapeMatch, rateLimitedAttemptCount };
+  }
+  return {
+    status: loginCodeMatch && resetShapeMatch ? 'PASS' : 'FAIL',
+    loginCodeMatch,
+    resetShapeMatch,
+    rateLimitedAttemptCount,
+  };
+}
+
 export function expectedDeniedRoute(actor) {
   return actor === 'anonymous' ? '/auth/login' : '/home';
 }

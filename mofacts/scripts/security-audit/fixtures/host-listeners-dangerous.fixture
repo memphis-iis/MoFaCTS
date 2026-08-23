@@ -3,3 +3,6 @@ udp UNCONN 0 0 172.31.21.59%ens5:68 0.0.0.0:* users:(("rogue-dhcp",pid=202,fd=21
 tcp LISTEN 0 4096 0.0.0.0:3000 0.0.0.0:* users:(("docker-proxy",pid=203,fd=22))
 tcp LISTEN 0 4096 [::]:27017 [::]:* users:(("mongod",pid=204,fd=23))
 udp UNCONN 0 0 *:6379 *:* users:(("redis-server",pid=205,fd=24))
+udp UNCONN 0 0 0.0.0.0:41641 0.0.0.0:* users:(("rogue-tunnel",pid=206,fd=25))
+tcp LISTEN 0 4096 52.89.109.53:39580 0.0.0.0:* users:(("tailscaled",pid=207,fd=26))
+tcp LISTEN 0 4096 100.69.46.68:27017 0.0.0.0:* users:(("mongod",pid=208,fd=27))

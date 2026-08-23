@@ -130,7 +130,13 @@ export function boundedNpmAuditObservations(value, limit = 12) {
 
 export function parseTrivyHighCritical(value) {
   if (!value || !Array.isArray(value.Results)) throw new Error('Trivy JSON is missing Results');
-  return value.Results.flatMap((result) => Array.isArray(result.Vulnerabilities) ? result.Vulnerabilities : [])
+  return value.Results.flatMap((result) => Array.isArray(result.Vulnerabilities)
+    ? result.Vulnerabilities.map((vulnerability) => ({
+      ...vulnerability,
+      auditTarget: typeof result.Target === 'string' ? result.Target : 'unknown',
+      auditClass: typeof result.Class === 'string' ? result.Class : 'unknown',
+    }))
+    : [])
     .filter((vulnerability) => vulnerability.Severity === 'HIGH' || vulnerability.Severity === 'CRITICAL');
 }
 
@@ -149,11 +155,13 @@ export function boundedTrivyObservations(vulnerabilities, limit = 12) {
         installedVersion: safeIdentifier(entry.InstalledVersion, 48),
         fixedVersion: typeof entry.FixedVersion === 'string' && entry.FixedVersion.trim() !== ''
           ? safeIdentifier(entry.FixedVersion, 80) : 'unavailable',
+        target: safeIdentifier(entry.auditTarget, 120),
+        targetClass: safeIdentifier(entry.auditClass, 40),
       };
     })
     .sort((a, b) => (a.severity === b.severity ? a.id.localeCompare(b.id) : a.severity === 'CRITICAL' ? -1 : 1))
     .slice(0, limit)
-    .map((entry) => `trivy.${entry.id}: package=${entry.packageName}, installed=${entry.installedVersion}, fixed=${entry.fixedVersion}, severity=${entry.severity}`);
+    .map((entry) => `trivy.${entry.id}: package=${entry.packageName}, installed=${entry.installedVersion}, fixed=${entry.fixedVersion}, severity=${entry.severity}, class=${entry.targetClass}, target=${entry.target}`);
 }
 
 export function findCanaryLeaks(channels, canaries) {

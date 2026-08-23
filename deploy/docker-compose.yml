@@ -6,6 +6,8 @@ services:
     build:
       context: ../
       dockerfile: Dockerfile
+      args:
+        MOFACTS_SOURCE_REVISION: ${MOFACTS_SOURCE_REVISION:-unknown}
     volumes:
       # Runtime override directory for deploy-time assets that should not be baked
       # into the image, including Memphis SAML PEM files.

@@ -146,7 +146,14 @@ try {
         : control('repository.runtime-image-vulnerabilities', 'Built runtime image has no high or critical vulnerability',
           vulnerabilities.length ? 'FAIL' : 'PASS', vulnerabilities.some((entry) => entry.Severity === 'CRITICAL') ? 'CRITICAL' : 'HIGH',
           vulnerabilities.length ? `Trivy reported ${vulnerabilities.length} high or critical vulnerabilities.` : 'Trivy reported no high or critical vulnerabilities.',
-          { observations, metrics: { vulnerabilityCount: vulnerabilities.length } }));
+          {
+            observations,
+            metrics: {
+              vulnerabilityCount: vulnerabilities.length,
+              operatingSystemVulnerabilityCount: vulnerabilities.filter((entry) => entry.auditClass === 'os-pkgs').length,
+              libraryVulnerabilityCount: vulnerabilities.filter((entry) => entry.auditClass === 'lang-pkgs').length,
+            },
+          }));
     }
   }
 
