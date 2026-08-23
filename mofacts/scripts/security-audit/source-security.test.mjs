@@ -175,8 +175,12 @@ test('sensitive log scanning distinguishes safe summaries from personal identifi
 
 test('production authentication policy uses ambiguous errors and a 30-day session maximum', () => {
   const source = fs.readFileSync(new URL('../../server/startup/serverStartup.ts', import.meta.url), 'utf8');
+  const timingDefense = fs.readFileSync(new URL('../../server/lib/passwordTimingDefense.ts', import.meta.url), 'utf8');
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?loginExpirationInDays:\s*30,/);
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?ambiguousErrorMessages:\s*true,/);
+  assert.match(source, /!attempt\.user[\s\S]*?verifyUnknownPasswordAttempt/);
+  assert.match(timingDefense, /argon2\.verify\(decoyHash,/);
+  assert.doesNotMatch(timingDefense, /setTimeout|sleep/);
 });
 
 test('public Caddy example sends a one-year HSTS policy', () => {
@@ -316,9 +320,18 @@ test('production hardening assets preserve reviewed findings and remove unnecess
     'bbb9400da27cc4c74c3024c4d1597a31173a298c:mofacts/.deploy/settings.local.json:generic-api-key:4',
   ]);
   const dockerfile = fs.readFileSync(new URL('../../../Dockerfile', import.meta.url), 'utf8');
+  const runtimeNpmHardening = fs.readFileSync(new URL('../../../deploy/docker/harden-runtime-npm-dependencies.sh', import.meta.url), 'utf8');
+  const mongoReadiness = fs.readFileSync(new URL('../../../deploy/docker/connect-to-mongo.sh', import.meta.url), 'utf8');
   assert.match(dockerfile, /apk update && apk upgrade --no-cache && apk add --no-cache/);
+  assert.match(dockerfile, /harden-runtime-npm-dependencies\.sh/);
+  assert.match(dockerfile, /rm -rf \/docker\/node_modules \/docker\/package\.json \/docker\/package-lock\.json/);
   assert.match(dockerfile, /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx/);
   assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$MOFACTS_SOURCE_REVISION/);
+  assert.match(runtimeNpmHardening, /bcrypt@6\.0\.0 argon2@0\.41\.1 node-gyp-build@4\.8\.4/);
+  assert.match(runtimeNpmHardening, /openpgp@5\.11\.3/);
+  assert.match(runtimeNpmHardening, /assert_package_version/);
+  assert.match(mongoReadiness, /meteor\/npm-mongo\/node_modules\/mongodb/);
+  assert.doesNotMatch(mongoReadiness, /require\('mongodb'\)/);
   const apache = fs.readFileSync(new URL('../../../deploy/maintenance/apache-mofacts-maintenance.conf', import.meta.url), 'utf8');
   assert.match(apache, /ProxyPass \/websocket ws:\/\/127\.0\.0\.1:3000\/websocket/);
   assert.match(apache, /Header always set Content-Security-Policy "/);

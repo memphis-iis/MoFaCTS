@@ -102,6 +102,7 @@ RUN cd $APP_BUNDLE_FOLDER/bundle/programs/server && \
 # can use prebuilt binaries, while source rebuilds make the image build depend
 # on external Node header downloads.
 RUN bash $SCRIPTS_FOLDER/build-meteor-npm-dependencies.sh && \
+    bash $SCRIPTS_FOLDER/harden-runtime-npm-dependencies.sh && \
     echo "[Function] Install bundle npm dependencies and audit" && \
     cd $APP_BUNDLE_FOLDER/bundle/programs/server && \
     npm audit --audit-level=high
@@ -142,6 +143,7 @@ RUN rm -rf $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-
            $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-linux-x64-gnu \
            $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules/@swc/core-win32* && \
     find $APP_BUNDLE_FOLDER/bundle/programs/server/npm/node_modules -type d -name "*darwin*" -exec rm -rf {} + 2>/dev/null || true; \
+    rm -rf /docker/node_modules /docker/package.json /docker/package-lock.json; \
     rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Start app

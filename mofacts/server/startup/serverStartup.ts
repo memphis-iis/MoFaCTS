@@ -29,6 +29,7 @@ import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
 import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery';
 import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
 import { applyDdpContainment } from '../lib/ddpContainment';
+import { createPasswordTimingDefense, extractPasswordFromLoginArguments } from '../lib/passwordTimingDefense';
 
 const LEGACY_AI_CONTENT_DRAFT_TYPE = 'ai-content-creator';
 
@@ -562,12 +563,20 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     },
   };
 
+  (Accounts as any).config({
+    loginExpirationInDays: 30,
+    ambiguousErrorMessages: true,
+    argon2Enabled: deps.isArgon2Enabled(),
+  });
+  const passwordTimingDefense = await createPasswordTimingDefense();
+
   Accounts.validateLoginAttempt(async (attempt: {
     allowed?: boolean;
     type?: string;
     user?: { _id?: string };
     connection?: { clientAddress?: string | null };
     error?: { error?: string; reason?: string; message?: string };
+    methodArguments?: unknown[];
   }) => {
     const identifier = deps.extractLoginAttemptIdentifier(attempt);
     const clientIp = deps.getAuthClientIp(attempt);
@@ -580,6 +589,12 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     }
     if (!attempt.allowed) {
       if (attempt.type === 'password') {
+        if (!attempt.user) {
+          const password = extractPasswordFromLoginArguments(attempt.methodArguments);
+          if (password) {
+            await passwordTimingDefense.verifyUnknownPasswordAttempt(password);
+          }
+        }
         await deps.recordAuthThrottle(`login:ip:${clientIp}`);
         if (identifier) {
           const failureBucket = `login:id:${identifier}`;
@@ -734,11 +749,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     return user;
   });
 
-  (Accounts as any).config({
-    loginExpirationInDays: 30,
-    ambiguousErrorMessages: true,
-    argon2Enabled: deps.isArgon2Enabled(),
-  });
   deps.serverConsole('Password hash runtime info:', deps.getPasswordHashRuntimeInfo());
 
   await deps.ScheduledTurkMessages.rawCollection().createIndex({ sent: 1, scheduled: 1 });

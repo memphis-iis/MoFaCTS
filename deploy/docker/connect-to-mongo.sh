@@ -6,7 +6,12 @@ cd $SCRIPTS_FOLDER
 
 echo 'Connecting to MongoDB...'
 node <<'EOJS'
-const { MongoClient } = require('mongodb');
+const path = require('node:path');
+const bundledMongoDriver = path.join(
+  process.env.APP_BUNDLE_FOLDER,
+  'bundle/programs/server/npm/node_modules/meteor/npm-mongo/node_modules/mongodb',
+);
+const { MongoClient } = require(bundledMongoDriver);
 
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const deadline = Date.now() + 120_000;
