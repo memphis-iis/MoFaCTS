@@ -382,6 +382,9 @@ test('production authentication probes honor session-scoped credentials and fail
   assert.match(source, /semanticAuthorizationProbeId\('method'[\s\S]*?semanticAuthorizationProbeId\('route'[\s\S]*?semanticAuthorizationProbeId\('publication'[\s\S]*?semanticAuthorizationProbeId\('download'/);
   assert.doesNotMatch(source, /numberedProbeId/);
   assert.match(source, /observations:\s*authorizationFailures[\s\S]*?omittedFailureCount:/);
+  assert.match(source, /const existingSession = await newPage\(\);[\s\S]*?const missingSession = await newPage\(\);/);
+  assert.match(source, /login\(existingSession\.page[\s\S]*?login\(missingSession\.page/);
+  assert.match(source, /existingSession\.context\.close\(\)[\s\S]*?missingSession\.context\.close\(\)/);
   assert.match(source, /throttle\.connection[\s\S]*?throttle\.identifier[\s\S]*?throttle\.ip/);
   assert.match(source, /index < 11/);
 });

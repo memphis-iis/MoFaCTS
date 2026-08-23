@@ -192,12 +192,22 @@ try {
   const missingLogin = [];
   const missingLoginIdentifier = `missing-enumeration-${config.runNamespace}@audit.invalid`;
   for (let index = 0; index < 3; index += 1) {
-    let started = performance.now();
-    const existing = await login(anonymous.page, config.users.expiry.username, `invalid-${index}`);
-    existingLogin.push({ result: existing, elapsed: performance.now() - started });
-    started = performance.now();
-    const missing = await login(anonymous.page, missingLoginIdentifier, `invalid-${index}`);
-    missingLogin.push({ result: missing, elapsed: performance.now() - started });
+    // Meteor Accounts permits five account operations per connection in ten
+    // seconds. Keep each comparison on independent connections so the sixth
+    // sample cannot turn a valid enumeration probe into a limiter probe.
+    const existingSession = await newPage();
+    const missingSession = await newPage();
+    try {
+      let started = performance.now();
+      const existing = await login(existingSession.page, config.users.expiry.username, `invalid-${index}`);
+      existingLogin.push({ result: existing, elapsed: performance.now() - started });
+      started = performance.now();
+      const missing = await login(missingSession.page, missingLoginIdentifier, `invalid-${index}`);
+      missingLogin.push({ result: missing, elapsed: performance.now() - started });
+    } finally {
+      await existingSession.context.close();
+      await missingSession.context.close();
+    }
   }
   let resetStarted = performance.now();
   const resetExisting = await callMethod(anonymous.page, 'requestPasswordReset', [config.users.reset.username]);
