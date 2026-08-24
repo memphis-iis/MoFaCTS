@@ -329,6 +329,8 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$MOFACTS_SOURCE_REVISION/);
   assert.match(runtimeNpmHardening, /bcrypt@6\.0\.0 argon2@0\.41\.1 node-gyp-build@4\.8\.4/);
   assert.match(runtimeNpmHardening, /openpgp@5\.11\.3/);
+  assert.match(runtimeNpmHardening, /tmp@0\.2\.7 lodash@4\.18\.1 postcss@8\.5\.18 nanoid@3\.3\.18 svgo@2\.8\.3 nodemailer@9\.0\.1/);
+  assert.match(runtimeNpmHardening, /Patched nodemailer failed its runtime load check/);
   assert.match(runtimeNpmHardening, /assert_package_version/);
   assert.match(mongoReadiness, /meteor\/npm-mongo\/node_modules\/mongodb/);
   assert.doesNotMatch(mongoReadiness, /require\('mongodb'\)/);
