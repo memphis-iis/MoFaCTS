@@ -108,7 +108,9 @@ if (addresses.length) {
   }
 
   const udpPorts = '53,123,443,27017,6379,8931,8932';
-  const udpScan = await nmapEveryAddress(['-Pn', '-n', '-sU', '-p', udpPorts, '-oX', '-'], 30 * 60 * 1000);
+  // Retain Nmap's bounded reason category. A firewall DROP commonly remains
+  // open|filtered and must stay inconclusive rather than being forced to pass.
+  const udpScan = await nmapEveryAddress(['-Pn', '-n', '-sU', '--reason', '-p', udpPorts, '-oX', '-'], 30 * 60 * 1000);
   if (!udpScan.ok) {
     controls.push(errorControl('external.public-udp-ports', 'Selected UDP ports are closed', udpScan.reason));
   } else {

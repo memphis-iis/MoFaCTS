@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { control, errorControl, runCommand, section, writeJsonFile } from './audit-lib.mjs';
 import {
   assertUniqueSemanticProbeIds,
+  classifyAuthenticationTiming,
   classifyEnumeration,
   expectedDeniedRoute,
   passwordlessContainmentOutcomes,
@@ -191,31 +192,81 @@ try {
   const existingLogin = [];
   const missingLogin = [];
   const missingLoginIdentifier = `missing-enumeration-${config.runNamespace}@audit.invalid`;
-  for (let index = 0; index < 3; index += 1) {
+  const loginTimingSampleCount = 7;
+  const resetTimingSampleCount = 3;
+  // Discard one warm-up pair so connection and module initialization do not
+  // masquerade as an identifier-dependent timing difference.
+  const warmExisting = await newPage();
+  const warmMissing = await newPage();
+  try {
+    await login(warmExisting.page, config.users.expiry.username, 'invalid-warmup');
+    await login(warmMissing.page, missingLoginIdentifier, 'invalid-warmup');
+  } finally {
+    await warmExisting.context.close();
+    await warmMissing.context.close();
+  }
+  for (let index = 0; index < loginTimingSampleCount; index += 1) {
     // Meteor Accounts permits five account operations per connection in ten
-    // seconds. Keep each comparison on independent connections so the sixth
-    // sample cannot turn a valid enumeration probe into a limiter probe.
+    // seconds. Keep every comparison on independent connections so sampling
+    // cannot turn a valid enumeration probe into a connection-limiter probe.
     const existingSession = await newPage();
     const missingSession = await newPage();
     try {
-      let started = performance.now();
-      const existing = await login(existingSession.page, config.users.expiry.username, `invalid-${index}`);
-      existingLogin.push({ result: existing, elapsed: performance.now() - started });
-      started = performance.now();
-      const missing = await login(missingSession.page, missingLoginIdentifier, `invalid-${index}`);
-      missingLogin.push({ result: missing, elapsed: performance.now() - started });
+      const measureExisting = async () => {
+        const started = performance.now();
+        const result = await login(existingSession.page, config.users.expiry.username, `invalid-${index}`);
+        existingLogin.push({ result, elapsed: performance.now() - started });
+      };
+      const measureMissing = async () => {
+        const started = performance.now();
+        const result = await login(missingSession.page, missingLoginIdentifier, `invalid-${index}`);
+        missingLogin.push({ result, elapsed: performance.now() - started });
+      };
+      // Alternate request order to cancel systematic first/second-request bias.
+      if (index % 2 === 0) {
+        await measureExisting();
+        await measureMissing();
+      } else {
+        await measureMissing();
+        await measureExisting();
+      }
     } finally {
       await existingSession.context.close();
       await missingSession.context.close();
     }
   }
-  let resetStarted = performance.now();
-  const resetExisting = await callMethod(anonymous.page, 'requestPasswordReset', [config.users.reset.username]);
-  const resetExistingElapsed = performance.now() - resetStarted;
-  resetStarted = performance.now();
-  const resetMissing = await callMethod(anonymous.page, 'requestPasswordReset', [`missing-reset-${config.runNamespace}@audit.invalid`]);
-  const resetMissingElapsed = performance.now() - resetStarted;
-  const sameResetShape = JSON.stringify(resetExisting) === JSON.stringify(resetMissing);
+  const resetExisting = [];
+  const resetMissing = [];
+  const missingResetIdentifier = `missing-reset-${config.runNamespace}@audit.invalid`;
+  for (let index = 0; index < resetTimingSampleCount; index += 1) {
+    const existingSession = await newPage();
+    const missingSession = await newPage();
+    try {
+      const measureExisting = async () => {
+        const started = performance.now();
+        const result = await callMethod(existingSession.page, 'requestPasswordReset', [config.users.reset.username]);
+        resetExisting.push({ result, elapsed: performance.now() - started });
+      };
+      const measureMissing = async () => {
+        const started = performance.now();
+        const result = await callMethod(missingSession.page, 'requestPasswordReset', [missingResetIdentifier]);
+        resetMissing.push({ result, elapsed: performance.now() - started });
+      };
+      if (index % 2 === 0) {
+        await measureExisting();
+        await measureMissing();
+      } else {
+        await measureMissing();
+        await measureExisting();
+      }
+    } finally {
+      await existingSession.context.close();
+      await missingSession.context.close();
+    }
+  }
+  const sameResetShape = resetExisting.every((entry, index) => (
+    JSON.stringify(entry.result) === JSON.stringify(resetMissing[index].result)
+  ));
   const enumeration = classifyEnumeration(
     existingLogin.map((entry) => entry.result),
     missingLogin.map((entry) => entry.result),
@@ -237,21 +288,40 @@ try {
         inconclusive: enumeration.status === 'ERROR',
       },
     }));
-  const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-  const existingMedian = median(existingLogin.map((entry) => entry.elapsed));
-  const missingMedian = median(missingLogin.map((entry) => entry.elapsed));
-  const loginDifferential = Math.abs(existingMedian - missingMedian);
-  const resetDifferential = Math.abs(resetExistingElapsed - resetMissingElapsed);
-  const timingPass = loginDifferential <= Math.max(150, Math.min(existingMedian, missingMedian) * 0.5)
-    && resetDifferential <= Math.max(250, Math.min(resetExistingElapsed, resetMissingElapsed) * 0.75);
-  const timingStatus = enumeration.status === 'ERROR' ? 'ERROR' : timingPass ? 'PASS' : 'FAIL';
+  const timing = classifyAuthenticationTiming(
+    existingLogin.map((entry) => entry.elapsed),
+    missingLogin.map((entry) => entry.elapsed),
+    resetExisting.map((entry) => entry.elapsed),
+    resetMissing.map((entry) => entry.elapsed),
+  );
+  const timingStatus = enumeration.status === 'ERROR' ? 'ERROR' : timing.status;
   controls.push(control('authentication.timing', 'Authentication timing resists account enumeration', timingStatus, 'MEDIUM',
     timingStatus === 'PASS'
       ? 'Login and reset timing differentials stayed within the approved bounds.'
       : timingStatus === 'ERROR'
-        ? 'Login throttling prevented a valid authentication-timing comparison.'
+        ? enumeration.status === 'ERROR'
+          ? 'Login throttling prevented a valid authentication-timing comparison.'
+          : 'Timing samples were too inconsistent to support a security conclusion.'
         : 'A login or reset timing differential exceeded the approved bound.',
-    { metrics: { loginDifferentialMs: Math.round(loginDifferential), resetDifferentialMs: Math.round(resetDifferential), sampleCountPerIdentifier: 3, inconclusive: timingStatus === 'ERROR' } }));
+    {
+      metrics: {
+        loginDifferentialMs: Math.round(timing.login.differentialMs),
+        loginApprovedBoundMs: Math.round(timing.login.approvedBoundMs),
+        loginExistingMedianMs: Math.round(timing.login.existingMedianMs),
+        loginMissingMedianMs: Math.round(timing.login.missingMedianMs),
+        loginSampleCountPerIdentifier: loginTimingSampleCount,
+        loginDominantDirectionCount: timing.login.dominantDirectionCount,
+        loginRequiredDirectionCount: timing.login.requiredDirectionCount,
+        resetDifferentialMs: Math.round(timing.reset.differentialMs),
+        resetApprovedBoundMs: Math.round(timing.reset.approvedBoundMs),
+        resetExistingMedianMs: Math.round(timing.reset.existingMedianMs),
+        resetMissingMedianMs: Math.round(timing.reset.missingMedianMs),
+        resetSampleCountPerIdentifier: resetTimingSampleCount,
+        resetDominantDirectionCount: timing.reset.dominantDirectionCount,
+        resetRequiredDirectionCount: timing.reset.requiredDirectionCount,
+        inconclusive: timingStatus === 'ERROR',
+      },
+    }));
 
   const passwordProbe = await newPage();
   let resetCurrentPassword = config.users.reset.password;

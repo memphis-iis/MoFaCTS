@@ -5,10 +5,12 @@ export function parseNmapPortStates(xml) {
   const ports = [];
   const hostPattern = /<host[\s\S]*?<address addr="([^"]+)"[^>]*addrtype="(?:ipv4|ipv6)"[^>]*\/>[\s\S]*?<ports>([\s\S]*?)<\/ports>[\s\S]*?<\/host>/g;
   for (const hostMatch of xml.matchAll(hostPattern)) {
-    for (const portMatch of hostMatch[2].matchAll(/<port protocol="([^"]+)" portid="(\d+)">[\s\S]*?<state state="([^"]+)"/g)) {
+    for (const portMatch of hostMatch[2].matchAll(/<port protocol="([^"]+)" portid="(\d+)">[\s\S]*?<state state="([^"]+)"([^>]*)/g)) {
+      const reason = portMatch[4].match(/\breason="([^"]+)"/)?.[1]?.toLowerCase();
       ports.push({
         endpoint: `${hostMatch[1]}/${portMatch[1]}/${portMatch[2]}`,
         state: portMatch[3].toLowerCase(),
+        ...(reason ? { reason } : {}),
       });
     }
   }
@@ -31,7 +33,7 @@ export function classifyUdpPortStates(entries, expectedResultCount) {
   const openEndpoints = entries.filter((entry) => entry.state === 'open').map((entry) => entry.endpoint);
   const inconclusiveEndpoints = entries
     .filter((entry) => entry.state !== 'open' && entry.state !== 'closed')
-    .map((entry) => `${entry.endpoint} state=${entry.state}`);
+    .map((entry) => `${entry.endpoint} state=${entry.state}${entry.reason ? ` reason=${entry.reason}` : ''}`);
   const uniqueResultCount = new Set(entries.map((entry) => entry.endpoint)).size;
   const complete = entries.length === expectedResultCount && uniqueResultCount === expectedResultCount;
   return {

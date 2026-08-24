@@ -33,6 +33,7 @@ import {
 } from './report-crypto.mjs';
 import {
   assertUniqueSemanticProbeIds,
+  classifyAuthenticationTiming,
   classifyEnumeration,
   passwordlessContainmentOutcomes,
   routeProbePassed,
@@ -71,9 +72,9 @@ test('nmap parser handles passing, vulnerable, malformed, and missing output', (
   const prefix = '<?xml version="1.0"?><nmaprun><host><address addr="192.0.2.2" addrtype="ipv4"/><ports>';
   assert.deepEqual(parseNmapOpenPorts(`${prefix}</ports></host></nmaprun>`), []);
   assert.deepEqual(parseNmapOpenPorts(`${prefix}<port protocol="tcp" portid="6379"><state state="open"/></port></ports></host></nmaprun>`), ['192.0.2.2/tcp/6379']);
-  const udp = parseNmapPortStates(`${prefix}<port protocol="udp" portid="53"><state state="open|filtered"/></port><port protocol="udp" portid="443"><state state="closed"/></port></ports></host></nmaprun>`);
+  const udp = parseNmapPortStates(`${prefix}<port protocol="udp" portid="53"><state state="open|filtered" reason="no-response"/></port><port protocol="udp" portid="443"><state state="closed"/></port></ports></host></nmaprun>`);
   assert.deepEqual(udp, [
-    { endpoint: '192.0.2.2/udp/53', state: 'open|filtered' },
+    { endpoint: '192.0.2.2/udp/53', state: 'open|filtered', reason: 'no-response' },
     { endpoint: '192.0.2.2/udp/443', state: 'closed' },
   ]);
   assert.deepEqual(parseNmapOpenPorts(`${prefix}<port protocol="udp" portid="53"><state state="open|filtered"/></port></ports></host></nmaprun>`), []);
@@ -97,9 +98,39 @@ test('UDP classification distinguishes closed, open, inconclusive, and incomplet
   assert.equal(classifyUdpPortStates([{ ...closed[0], state: 'open|filtered' }], 1).status, 'ERROR');
   assert.deepEqual(classifyUdpPortStates([{ ...closed[0], state: 'open|filtered' }], 1).inconclusiveEndpoints,
     ['192.0.2.2/udp/53 state=open|filtered']);
+  assert.deepEqual(classifyUdpPortStates([{ ...closed[0], state: 'open|filtered', reason: 'no-response' }], 1).inconclusiveEndpoints,
+    ['192.0.2.2/udp/53 state=open|filtered reason=no-response']);
   assert.equal(classifyUdpPortStates([], 1).status, 'ERROR');
   assert.equal(classifyUdpPortStates([closed[0], closed[0]], 2).status, 'ERROR');
   assert.throws(() => classifyUdpPortStates(null, 1));
+});
+
+test('authentication timing classification uses paired robust samples and rejects malformed evidence', () => {
+  const passing = classifyAuthenticationTiming(
+    [900, 910, 920, 930, 940, 950, 960],
+    [880, 900, 910, 920, 930, 940, 950],
+    [100, 110, 120],
+    [105, 115, 125],
+  );
+  assert.equal(passing.status, 'PASS');
+  assert.equal(passing.login.differentialMs, 10);
+  const failing = classifyAuthenticationTiming(
+    [900, 910, 920, 930, 940, 950, 960],
+    [80, 90, 100, 110, 120, 130, 140],
+    [100, 110, 120],
+    [105, 115, 125],
+  );
+  assert.equal(failing.status, 'FAIL');
+  const inconclusive = classifyAuthenticationTiming(
+    [1000, 1000, 1000, 1000, 10, 10, 10],
+    [0, 0, 0, 0, 900, 900, 900],
+    [100, 110, 120],
+    [105, 115, 125],
+  );
+  assert.equal(inconclusive.status, 'ERROR');
+  assert.equal(inconclusive.login.dominantDirectionCount, 4);
+  assert.equal(inconclusive.login.requiredDirectionCount, 6);
+  assert.throws(() => classifyAuthenticationTiming([1], [1], [1], [1]));
 });
 
 test('inconclusive controls remain visible without becoming execution failures or severity findings', () => {
@@ -403,6 +434,14 @@ test('production authentication probes honor session-scoped credentials and fail
   assert.match(source, /existingSession\.context\.close\(\)[\s\S]*?missingSession\.context\.close\(\)/);
   assert.match(source, /throttle\.connection[\s\S]*?throttle\.identifier[\s\S]*?throttle\.ip/);
   assert.match(source, /index < 11/);
+});
+
+test('external UDP probes retain uncertainty without adding heavier service detection', () => {
+  const source = fs.readFileSync(new URL('./external-audit.mjs', import.meta.url), 'utf8');
+  assert.match(source, /'-sU', '--reason', '-p', udpPorts/);
+  assert.doesNotMatch(source, /'-sV'|'--max-retries'/);
+  assert.match(source, /classification\.status === 'ERROR'/);
+  assert.match(source, /inconclusive: true/);
 });
 
 test('authentication probe helpers produce stable bounded diagnostics', () => {
