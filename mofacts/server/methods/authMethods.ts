@@ -20,6 +20,15 @@ type AccountsPasswordApi = {
   setPassword?: (userId: string, newPassword: string) => unknown;
 };
 
+const PASSWORD_RESET_RESPONSE_FLOOR_MS = 1000;
+
+async function waitForPasswordResetResponseFloor(startedAtMs: number) {
+  const remainingMs = PASSWORD_RESET_RESPONSE_FLOOR_MS - (Date.now() - startedAtMs);
+  if (remainingMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, remainingMs));
+  }
+}
+
 type AuthMethodsDeps = {
   serverConsole: Logger;
   ownerEmail: string;
@@ -201,53 +210,57 @@ export function createAuthMethods(deps: AuthMethodsDeps) {
         identifierLimit: 3,
         windowMs: 60 * 60 * 1000,
       });
-
-      const recentResets = await deps.PasswordResetTokens.find({
-        email: normalizedEmail,
-        createdAt: { $gt: new Date(Date.now() - 60000) },
-      }).countAsync();
-
-      if (recentResets >= 3) {
-        throw new Meteor.Error('rate-limit', 'Too many reset requests. Please wait a minute.');
-      }
-
-      const user = await deps.findNormalAccountUserByCanonicalEmail(normalizedEmail);
-      if (!user) {
-        return { success: true };
-      }
-
-      const token = randomBytes(32).toString('hex');
-      const tokenHash = createHash('sha256').update(token).digest('hex');
-      const expiresAt = new Date(Date.now() + 3600000);
-      await deps.PasswordResetTokens.insertAsync({
-        email: normalizedEmail,
-        userId: user._id,
-        tokenHash,
-        createdAt: new Date(),
-        expiresAt,
-        used: false,
-      });
-
-      const resetUrl = (Meteor.settings.ROOT_URL || Meteor.absoluteUrl()).replace(/\/$/, '') +
-        '/auth/reset-password?email=' + encodeURIComponent(normalizedEmail) +
-        '&token=' + encodeURIComponent(token);
+      const responseStartedAtMs = Date.now();
       try {
-        deps.sendEmail(
-          normalizedEmail,
-          deps.emailFrom,
-          'MoFaCTS Password Reset',
-          'You requested a password reset.\n\n' +
-            'Open this link to set a new password:\n' + resetUrl + '\n\n' +
-            'This link expires in 1 hour.\n\n' +
-            'If you did not request this reset, you can ignore this email.'
-        );
-      } catch {
-        deps.serverConsole('Failed to send password reset message');
+        const recentResets = await deps.PasswordResetTokens.find({
+          email: normalizedEmail,
+          createdAt: { $gt: new Date(Date.now() - 60000) },
+        }).countAsync();
+
+        if (recentResets >= 3) {
+          throw new Meteor.Error('rate-limit', 'Too many reset requests. Please wait a minute.');
+        }
+
+        const user = await deps.findNormalAccountUserByCanonicalEmail(normalizedEmail);
+        if (!user) {
+          return { success: true };
+        }
+
+        const token = randomBytes(32).toString('hex');
+        const tokenHash = createHash('sha256').update(token).digest('hex');
+        const expiresAt = new Date(Date.now() + 3600000);
+        await deps.PasswordResetTokens.insertAsync({
+          email: normalizedEmail,
+          userId: user._id,
+          tokenHash,
+          createdAt: new Date(),
+          expiresAt,
+          used: false,
+        });
+
+        const resetUrl = (Meteor.settings.ROOT_URL || Meteor.absoluteUrl()).replace(/\/$/, '') +
+          '/auth/reset-password?email=' + encodeURIComponent(normalizedEmail) +
+          '&token=' + encodeURIComponent(token);
+        try {
+          deps.sendEmail(
+            normalizedEmail,
+            deps.emailFrom,
+            'MoFaCTS Password Reset',
+            'You requested a password reset.\n\n' +
+              'Open this link to set a new password:\n' + resetUrl + '\n\n' +
+              'This link expires in 1 hour.\n\n' +
+              'If you did not request this reset, you can ignore this email.'
+          );
+        } catch {
+          deps.serverConsole('Failed to send password reset message');
+        }
+
+        await deps.writeAuditLog('auth.passwordResetRequested', this.userId || null, user._id);
+
+        return { success: true };
+      } finally {
+        await waitForPasswordResetResponseFloor(responseStartedAtMs);
       }
-
-      await deps.writeAuditLog('auth.passwordResetRequested', this.userId || null, user._id);
-
-      return { success: true };
     },
 
     resetPasswordWithToken: async function(this: MethodContext, email: string, token: string, newPassword: string) {

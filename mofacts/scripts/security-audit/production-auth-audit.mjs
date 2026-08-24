@@ -192,8 +192,10 @@ try {
   const existingLogin = [];
   const missingLogin = [];
   const missingLoginIdentifier = `missing-enumeration-${config.runNamespace}@audit.invalid`;
-  const loginTimingSampleCount = 7;
-  const resetTimingSampleCount = 3;
+  // Stay below the eight-failure soft lock and preserve one of the five hourly
+  // reset requests for the token lifecycle probe later in this audit.
+  const loginTimingSampleCount = 5;
+  const resetTimingSampleCount = 2;
   // Discard one warm-up pair so connection and module initialization do not
   // masquerade as an identifier-dependent timing difference.
   const warmExisting = await newPage();
@@ -271,13 +273,14 @@ try {
     existingLogin.map((entry) => entry.result),
     missingLogin.map((entry) => entry.result),
     sameResetShape,
+    [...resetExisting, ...resetMissing].map((entry) => entry.result),
   );
   controls.push(control('authentication.enumeration', 'Login and reset responses resist account enumeration',
     enumeration.status, 'HIGH',
     enumeration.status === 'PASS'
       ? 'Existing and nonexistent identifiers produced indistinguishable result shapes.'
       : enumeration.status === 'ERROR'
-        ? 'Login throttling prevented a valid account-enumeration comparison.'
+        ? 'Authentication throttling prevented a valid account-enumeration comparison.'
         : 'Existing and nonexistent identifiers produced distinguishable results.',
     {
       observations: existingLogin.map((entry, index) => `enumeration.attempt-${index + 1}: existing=${entry.result.code}, missing=${missingLogin[index].result.code}`),
@@ -300,7 +303,7 @@ try {
       ? 'Login and reset timing differentials stayed within the approved bounds.'
       : timingStatus === 'ERROR'
         ? enumeration.status === 'ERROR'
-          ? 'Login throttling prevented a valid authentication-timing comparison.'
+          ? 'Authentication throttling prevented a valid authentication-timing comparison.'
           : 'Timing samples were too inconsistent to support a security conclusion.'
         : 'A login or reset timing differential exceeded the approved bound.',
     {
@@ -397,10 +400,23 @@ try {
   })) : { token: null, userId: null, expiresAt: null };
   const expiryValue = expirySessionStorage.expiresAt;
   const lifetimeDays = expiryValue ? (new Date(expiryValue).getTime() - Date.now()) / 86400000 : NaN;
+  const lifetimeStatus = !expiryLogin.ok
+    ? 'ERROR'
+    : Number.isFinite(lifetimeDays) && lifetimeDays <= 30.05 ? 'PASS' : 'FAIL';
   controls.push(control('authentication.session-lifetime', 'Sessions expire within 30 days',
-    Number.isFinite(lifetimeDays) && lifetimeDays <= 30.05 ? 'PASS' : 'FAIL', 'HIGH',
-    Number.isFinite(lifetimeDays) ? `Observed a maximum session lifetime of approximately ${Math.ceil(lifetimeDays)} days.` : 'Session expiration could not be read after login.',
-    { metrics: { lifetimeDays: Number.isFinite(lifetimeDays) ? Math.ceil(lifetimeDays) : -1 } }));
+    lifetimeStatus, 'HIGH',
+    lifetimeStatus === 'ERROR'
+      ? 'The synthetic expiry identity could not log in, so session lifetime was inconclusive.'
+      : Number.isFinite(lifetimeDays)
+        ? `Observed a maximum session lifetime of approximately ${Math.ceil(lifetimeDays)} days.`
+        : 'The authenticated session did not expose a parseable expiration.',
+    {
+      metrics: {
+        lifetimeDays: Number.isFinite(lifetimeDays) ? Math.ceil(lifetimeDays) : -1,
+        inconclusive: lifetimeStatus === 'ERROR',
+        loginCategory: lifetimeStatus === 'ERROR' ? throttleResultCategory(expiryLogin) : 'success',
+      },
+    }));
 
   const authorizationFailures = [];
   const authorizationSessions = new Map();

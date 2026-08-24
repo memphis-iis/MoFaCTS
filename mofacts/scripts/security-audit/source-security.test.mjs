@@ -107,29 +107,29 @@ test('UDP classification distinguishes closed, open, inconclusive, and incomplet
 
 test('authentication timing classification uses paired robust samples and rejects malformed evidence', () => {
   const passing = classifyAuthenticationTiming(
-    [900, 910, 920, 930, 940, 950, 960],
-    [880, 900, 910, 920, 930, 940, 950],
-    [100, 110, 120],
-    [105, 115, 125],
+    [900, 910, 920, 930, 940],
+    [880, 900, 910, 920, 930],
+    [100, 110],
+    [105, 115],
   );
   assert.equal(passing.status, 'PASS');
   assert.equal(passing.login.differentialMs, 10);
   const failing = classifyAuthenticationTiming(
-    [900, 910, 920, 930, 940, 950, 960],
-    [80, 90, 100, 110, 120, 130, 140],
-    [100, 110, 120],
-    [105, 115, 125],
+    [900, 910, 920, 930, 940],
+    [80, 90, 100, 110, 120],
+    [100, 110],
+    [105, 115],
   );
   assert.equal(failing.status, 'FAIL');
   const inconclusive = classifyAuthenticationTiming(
-    [1000, 1000, 1000, 1000, 10, 10, 10],
-    [0, 0, 0, 0, 900, 900, 900],
-    [100, 110, 120],
-    [105, 115, 125],
+    [1000, 1000, 1000, 10, 10],
+    [0, 0, 0, 900, 900],
+    [100, 110],
+    [105, 115],
   );
   assert.equal(inconclusive.status, 'ERROR');
-  assert.equal(inconclusive.login.dominantDirectionCount, 4);
-  assert.equal(inconclusive.login.requiredDirectionCount, 6);
+  assert.equal(inconclusive.login.dominantDirectionCount, 3);
+  assert.equal(inconclusive.login.requiredDirectionCount, 4);
   assert.throws(() => classifyAuthenticationTiming([1], [1], [1], [1]));
 });
 
@@ -207,11 +207,14 @@ test('sensitive log scanning distinguishes safe summaries from personal identifi
 test('production authentication policy uses ambiguous errors and a 30-day session maximum', () => {
   const source = fs.readFileSync(new URL('../../server/startup/serverStartup.ts', import.meta.url), 'utf8');
   const timingDefense = fs.readFileSync(new URL('../../server/lib/passwordTimingDefense.ts', import.meta.url), 'utf8');
+  const authMethods = fs.readFileSync(new URL('../../server/methods/authMethods.ts', import.meta.url), 'utf8');
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?loginExpirationInDays:\s*30,/);
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?ambiguousErrorMessages:\s*true,/);
-  assert.match(source, /_checkPasswordAsync[\s\S]*?!attempt\.user[\s\S]*?verifyUnknownPasswordAttempt/);
-  assert.match(timingDefense, /checkPasswordAsync\(DECOY_USER, password\)/);
+  assert.match(source, /_checkPasswordAsync[\s\S]*?equalizeFailedPasswordAttempt\(attempt\.user, password\)/);
+  assert.match(timingDefense, /checkPasswordAsync\(DECOY_BCRYPT_USER, password\)[\s\S]*?checkPasswordAsync\(DECOY_ARGON2_USER, password\)/);
   assert.doesNotMatch(timingDefense, /setTimeout|sleep/);
+  assert.match(authMethods, /PASSWORD_RESET_RESPONSE_FLOOR_MS = 1000/);
+  assert.match(authMethods, /requestPasswordReset:[\s\S]*?try \{[\s\S]*?finally \{[\s\S]*?waitForPasswordResetResponseFloor/);
 });
 
 test('public Caddy example sends a one-year HSTS policy', () => {
@@ -466,6 +469,10 @@ test('authentication probe helpers produce stable bounded diagnostics', () => {
   assert.deepEqual(
     classifyEnumeration([{ code: '403' }], [{ code: 'rate-limit' }], true),
     { status: 'ERROR', loginCodeMatch: false, resetShapeMatch: true, rateLimitedAttemptCount: 1 },
+  );
+  assert.deepEqual(
+    classifyEnumeration([{ code: '403' }], [{ code: '403' }], false, [{ code: 'rate-limit' }]),
+    { status: 'ERROR', loginCodeMatch: true, resetShapeMatch: false, rateLimitedAttemptCount: 1 },
   );
   assert.equal(routeProbePassed({
     actor: 'learnerA', requestedPath: '/admin/security-audits', finalPath: '/home', expectDenied: true, authReady: true,

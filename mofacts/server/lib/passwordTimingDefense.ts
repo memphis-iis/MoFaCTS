@@ -4,18 +4,30 @@ export type MeteorPasswordValue = string | {
 };
 
 type MeteorPasswordVerifier = (
-  user: { _id: string; services: { password: { argon2: string } } },
+  user: { _id: string; services: { password: { bcrypt?: string; argon2?: string } } },
   password: MeteorPasswordValue,
 ) => Promise<unknown>;
 
-// This is deliberately not a credential. It is a fixed decoy hash whose only
-// purpose is to make an unknown-account attempt traverse Meteor's existing
-// Argon2 verifier with the same parameters as a real password account.
+export type MeteorPasswordAttemptUser = {
+  _id?: string;
+  services?: { password?: { bcrypt?: string; argon2?: string } };
+};
+
+// These are deliberately not credentials. Together they let every failed
+// password attempt traverse one bcrypt and one Argon2 verification regardless
+// of whether the account is missing or stores either supported hash generation.
 const DECOY_ARGON2_HASH = '$argon2id$v=19$m=19456,t=2,p=1$lh2Wz5zkGQzo1oYKM+jiSg$10tMEfN3SL49/GK6UMPbauINBZQPAFxV7kJTt3DfG3k';
-const DECOY_USER = Object.freeze({
-  _id: 'password-timing-decoy',
+const DECOY_ARGON2_USER = Object.freeze({
+  _id: 'password-timing-decoy-argon2',
   services: Object.freeze({
     password: Object.freeze({ argon2: DECOY_ARGON2_HASH }),
+  }),
+});
+const DECOY_BCRYPT_HASH = '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+const DECOY_BCRYPT_USER = Object.freeze({
+  _id: 'password-timing-decoy-bcrypt',
+  services: Object.freeze({
+    password: Object.freeze({ bcrypt: DECOY_BCRYPT_HASH }),
   }),
 });
 
@@ -41,8 +53,19 @@ export function extractPasswordFromLoginArguments(methodArguments: unknown[] | u
 
 export function createPasswordTimingDefense(checkPasswordAsync: MeteorPasswordVerifier) {
   return Object.freeze({
-    async verifyUnknownPasswordAttempt(password: MeteorPasswordValue): Promise<void> {
-      await checkPasswordAsync(DECOY_USER, password);
+    async equalizeFailedPasswordAttempt(
+      user: MeteorPasswordAttemptUser | null | undefined,
+      password: MeteorPasswordValue,
+    ): Promise<void> {
+      const passwordService = user?.services?.password;
+      const hasBcrypt = typeof passwordService?.bcrypt === 'string';
+      const hasArgon2 = typeof passwordService?.argon2 === 'string';
+      if (!hasBcrypt || hasArgon2) {
+        await checkPasswordAsync(DECOY_BCRYPT_USER, password);
+      }
+      if (!hasArgon2 || hasBcrypt) {
+        await checkPasswordAsync(DECOY_ARGON2_USER, password);
+      }
     },
   });
 }

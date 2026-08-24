@@ -46,14 +46,15 @@ export function throttleWasObserved(result) {
   return throttleResultCategory(result) === 'rate-limited';
 }
 
-export function classifyEnumeration(existingResults, missingResults, resetShapeMatch) {
+export function classifyEnumeration(existingResults, missingResults, resetShapeMatch, resetResults = []) {
   const paired = Array.isArray(existingResults) && Array.isArray(missingResults)
-    && existingResults.length > 0 && existingResults.length === missingResults.length;
+    && existingResults.length > 0 && existingResults.length === missingResults.length
+    && Array.isArray(resetResults);
   if (!paired || typeof resetShapeMatch !== 'boolean') {
     return { status: 'ERROR', loginCodeMatch: false, resetShapeMatch: false, rateLimitedAttemptCount: 0 };
   }
 
-  const rateLimitedAttemptCount = [...existingResults, ...missingResults]
+  const rateLimitedAttemptCount = [...existingResults, ...missingResults, ...resetResults]
     .filter((result) => throttleWasObserved(result)).length;
   const loginCodeMatch = existingResults.every((result, index) => (
     String(result?.code || '') === String(missingResults[index]?.code || '')
@@ -101,8 +102,9 @@ function timingMetrics(existingSamples, missingSamples, minimumBoundMs, relative
 
 export function classifyAuthenticationTiming(existingLoginMs, missingLoginMs, existingResetMs, missingResetMs) {
   const sampleSets = [existingLoginMs, missingLoginMs, existingResetMs, missingResetMs];
-  if (sampleSets.some((samples) => !Array.isArray(samples) || samples.length < 3
+  if (sampleSets.some((samples) => !Array.isArray(samples)
     || samples.some((value) => !Number.isFinite(value) || value < 0))
+    || existingLoginMs.length < 5 || existingResetMs.length < 2
     || existingLoginMs.length !== missingLoginMs.length
     || existingResetMs.length !== missingResetMs.length) {
     throw new Error('authentication timing samples are invalid');

@@ -579,7 +579,10 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   Accounts.validateLoginAttempt(async (attempt: {
     allowed?: boolean;
     type?: string;
-    user?: { _id?: string };
+    user?: {
+      _id?: string;
+      services?: { password?: { bcrypt?: string; argon2?: string } };
+    };
     connection?: { clientAddress?: string | null };
     error?: { error?: string; reason?: string; message?: string };
     methodArguments?: unknown[];
@@ -595,11 +598,9 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     }
     if (!attempt.allowed) {
       if (attempt.type === 'password') {
-        if (!attempt.user) {
-          const password = extractPasswordFromLoginArguments(attempt.methodArguments);
-          if (password) {
-            await passwordTimingDefense.verifyUnknownPasswordAttempt(password);
-          }
+        const password = extractPasswordFromLoginArguments(attempt.methodArguments);
+        if (password) {
+          await passwordTimingDefense.equalizeFailedPasswordAttempt(attempt.user, password);
         }
         await deps.recordAuthThrottle(`login:ip:${clientIp}`);
         if (identifier) {

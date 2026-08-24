@@ -17,17 +17,29 @@ describe('password timing defense', function() {
     expect(extractPasswordFromLoginArguments([])).to.equal(null);
   });
 
-  it('uses Meteor password verification against a decoy Argon2 account', async () => {
-    let observedUser: { _id: string; services: { password: { argon2: string } } } | undefined;
+  it('equalizes unknown, bcrypt, and Argon2 failures with the missing verifier work', async () => {
+    const observedUsers: Array<{ _id: string; services: { password: { bcrypt?: string; argon2?: string } } }> = [];
     let observedPassword: unknown;
     const defense = createPasswordTimingDefense(async (user, password) => {
-      observedUser = user;
+      observedUsers.push(user);
       observedPassword = password;
       return { error: new Error('Incorrect password') };
     });
-    expect(await defense.verifyUnknownPasswordAttempt('incorrect password')).to.equal(undefined);
-    expect(observedUser?._id).to.equal('password-timing-decoy');
-    expect(observedUser?.services.password.argon2).to.match(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
+    expect(await defense.equalizeFailedPasswordAttempt(null, 'incorrect password')).to.equal(undefined);
+    expect(observedUsers.map((user) => user._id)).to.deep.equal([
+      'password-timing-decoy-bcrypt',
+      'password-timing-decoy-argon2',
+    ]);
+    expect(observedUsers[0]!.services.password.bcrypt).to.match(/^\$2b\$10\$/);
+    expect(observedUsers[1]!.services.password.argon2).to.match(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
     expect(observedPassword).to.equal('incorrect password');
+
+    observedUsers.length = 0;
+    await defense.equalizeFailedPasswordAttempt({ services: { password: { bcrypt: 'stored' } } }, 'incorrect password');
+    expect(observedUsers.map((user) => user._id)).to.deep.equal(['password-timing-decoy-argon2']);
+
+    observedUsers.length = 0;
+    await defense.equalizeFailedPasswordAttempt({ services: { password: { argon2: 'stored' } } }, 'incorrect password');
+    expect(observedUsers.map((user) => user._id)).to.deep.equal(['password-timing-decoy-bcrypt']);
   });
 });
