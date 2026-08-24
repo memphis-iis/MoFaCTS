@@ -336,11 +336,6 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   const directProductionRules = Array.isArray(display.productionRules)
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
-  if (display.unitType === 'sparc-autotutor-dialogue') {
-    if (directProductionRules.length > 0) {
-      throw new Error('SPARC AutoTutor production rules are runtime-owned; remove top-level productionRules from the display');
-    }
-  }
   const productionRules = display.unitType === 'sparc-autotutor-dialogue'
     ? createSparcProgressiveScaffoldingRules()
     : directProductionRules;

@@ -167,9 +167,6 @@ function assertCompletedDialogueReplayState(replayState: SparcReplayState | unde
 
 function stableFactIdentitySlots(fact: SparcWorkingMemoryFact): Readonly<Record<string, unknown>> {
   const slots = fact.slots ?? {};
-  if (fact.factType === 'instructional.candidate') {
-    return { targetKind: slots.targetKind, targetId: slots.targetId };
-  }
   if (fact.factType === 'learningTarget.score') {
     return { clusterKC: slots.clusterKC };
   }
@@ -189,18 +186,6 @@ function stableFactIdentitySlots(fact: SparcWorkingMemoryFact): Readonly<Record<
     return {};
   }
   if (fact.factType === 'controller.selectedAction') {
-    return {};
-  }
-  if (fact.factType === 'instructional.assessmentSnapshot') {
-    return {};
-  }
-  if (fact.factType === 'instructional.thresholds') {
-    return {};
-  }
-  if (fact.factType === 'instructional.progress') {
-    return { cycleId: slots.cycleId };
-  }
-  if (fact.factType === 'instructional.cycleStatus') {
     return {};
   }
   if (fact.factType === 'instructional.activeCycle') {
@@ -228,14 +213,8 @@ function createStableControllerStateWrites(params: {
       || fact.factType === 'instructional.activeCycle'
       || fact.factType === 'instructional.decision'
     ));
-  const projectedFacts = params.planning.instructionalProjection.facts.filter((fact) => (
-    fact.factType !== 'instructional.activeCycle'
-    && fact.factType !== 'controller.selectedAction'
-    && fact.factType !== 'instructional.decision'
-  ));
   const facts = [
     ...params.planning.derivedFacts,
-    ...projectedFacts,
     ...assertedControllerFacts,
   ];
   return facts.map((fact) => createSparcStableWorkingMemoryFactStateWrite({

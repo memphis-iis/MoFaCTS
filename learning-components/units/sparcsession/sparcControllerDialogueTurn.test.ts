@@ -391,6 +391,10 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       entry.factType === 'session.turnState'
       && entry.slots?.turnCount === 2
     )));
+    assert.equal(
+      facts.some((entry) => entry.factType === 'instructional.candidate'),
+      false,
+    );
     assert.equal(facts.some((entry) => entry.factType === 'controller.moveSelectionAudit'), false);
   });
 

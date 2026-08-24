@@ -750,31 +750,34 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     );
   });
 
-  it('rejects AutoTutor production rules supplied by content because the policy is runtime-owned', function() {
+  it('ignores stored AutoTutor production rules and uses the runtime-owned policy', function() {
     const rules = [...createSparcProgressiveScaffoldingRules()];
     rules[1] = { ...rules[1]!, salience: 1 };
-    assert.throws(
-      () => createSparcAuthoredDocumentFromTrialDisplay({
-        pageKey: 'sparc-autotutor-invalid-policy',
-        display: {
-          schema: 'tutorscript-sparc/2.0',
-          unitType: 'sparc-autotutor-dialogue',
-          instructionalController: {
-            adapterId: 'sparc-autotutor-v1',
-            policyId: 'progressive-scaffolding-v1',
-            policyVersion: 1,
-          },
-          nodes: [{ id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' }],
-          clusterTargets: [{ clusterIndex: 0, clusterKC: 'kc-a' }],
-          autoTutorTargets: {
-            expectations: [{ clusterKC: 'kc-a', text: 'Expectation A.' }],
-            misconceptions: [],
-          },
-          productionRules: rules,
+    const document = createSparcAuthoredDocumentFromTrialDisplay({
+      pageKey: 'sparc-autotutor-stored-policy',
+      display: {
+        schema: 'tutorscript-sparc/2.0',
+        unitType: 'sparc-autotutor-dialogue',
+        instructionalController: {
+          adapterId: 'sparc-autotutor-v1',
+          policyId: 'progressive-scaffolding-v1',
+          policyVersion: 1,
         },
-      }),
-      /production rules are runtime-owned/,
+        nodes: [{ id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' }],
+        clusterTargets: [{ clusterIndex: 0, clusterKC: 'kc-a' }],
+        autoTutorTargets: {
+          expectations: [{ clusterKC: 'kc-a', text: 'Expectation A.' }],
+          misconceptions: [],
+        },
+        productionRules: rules,
+      },
+    });
+
+    assert.deepEqual(
+      document.productionRules,
+      createSparcProgressiveScaffoldingRules(),
     );
+    assert.notEqual(document.productionRules?.[1]?.salience, 1);
   });
 
   it('commits a correct LCD action as model practice for the fractions LCD stimulus', async function() {
