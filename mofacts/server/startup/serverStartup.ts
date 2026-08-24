@@ -568,7 +568,13 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     ambiguousErrorMessages: true,
     argon2Enabled: deps.isArgon2Enabled(),
   });
-  const passwordTimingDefense = await createPasswordTimingDefense();
+  const meteorPasswordVerifier = (Accounts as unknown as {
+    _checkPasswordAsync?: Parameters<typeof createPasswordTimingDefense>[0];
+  })._checkPasswordAsync;
+  if (typeof meteorPasswordVerifier !== 'function') {
+    throw new Error('Meteor accounts-password verifier is unavailable');
+  }
+  const passwordTimingDefense = createPasswordTimingDefense(meteorPasswordVerifier);
 
   Accounts.validateLoginAttempt(async (attempt: {
     allowed?: boolean;

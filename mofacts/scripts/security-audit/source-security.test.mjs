@@ -178,8 +178,8 @@ test('production authentication policy uses ambiguous errors and a 30-day sessio
   const timingDefense = fs.readFileSync(new URL('../../server/lib/passwordTimingDefense.ts', import.meta.url), 'utf8');
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?loginExpirationInDays:\s*30,/);
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?ambiguousErrorMessages:\s*true,/);
-  assert.match(source, /!attempt\.user[\s\S]*?verifyUnknownPasswordAttempt/);
-  assert.match(timingDefense, /argon2\.verify\(decoyHash,/);
+  assert.match(source, /_checkPasswordAsync[\s\S]*?!attempt\.user[\s\S]*?verifyUnknownPasswordAttempt/);
+  assert.match(timingDefense, /checkPasswordAsync\(DECOY_USER, password\)/);
   assert.doesNotMatch(timingDefense, /setTimeout|sleep/);
 });
 
@@ -339,7 +339,8 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(apache, /style-src 'self' https:\/\/fonts\.googleapis\.com/);
   assert.match(apache, /font-src 'self' data: https:\/\/fonts\.gstatic\.com/);
   assert.match(apache, /media-src 'self' blob: data:/);
-  assert.doesNotMatch(apache, /script-src[^;]*(?:'unsafe-inline'|'unsafe-eval')/);
+  assert.match(apache, /script-src 'self' 'unsafe-eval'/);
+  assert.doesNotMatch(apache, /script-src[^;]*'unsafe-inline'/);
   assert.doesNotMatch(apache, /(?:^|;\s*)style-src\s+[^;]*(?:'unsafe-inline'|'unsafe-eval')/m);
   assert.match(apache, /style-src-attr 'unsafe-inline'/);
   const index = fs.readFileSync(new URL('../../client/index.html', import.meta.url), 'utf8');

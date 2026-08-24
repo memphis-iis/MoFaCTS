@@ -1,27 +1,23 @@
-import { createHash, randomBytes } from 'node:crypto';
-import * as argon2 from 'argon2';
-
 export type MeteorPasswordValue = string | {
   digest: string;
   algorithm: 'sha-256';
 };
 
-const ARGON2_OPTIONS = Object.freeze({
-  type: argon2.argon2id,
-  timeCost: 2,
-  memoryCost: 19456,
-  parallelism: 1,
-});
+type MeteorPasswordVerifier = (
+  user: { _id: string; services: { password: { argon2: string } } },
+  password: MeteorPasswordValue,
+) => Promise<unknown>;
 
-export function formatMeteorPasswordForVerification(password: MeteorPasswordValue): string {
-  if (typeof password === 'string') {
-    return createHash('sha256').update(password, 'utf8').digest('hex');
-  }
-  if (password.algorithm !== 'sha-256') {
-    throw new Error('Invalid password hash algorithm. Only sha-256 is allowed.');
-  }
-  return password.digest;
-}
+// This is deliberately not a credential. It is a fixed decoy hash whose only
+// purpose is to make an unknown-account attempt traverse Meteor's existing
+// Argon2 verifier with the same parameters as a real password account.
+const DECOY_ARGON2_HASH = '$argon2id$v=19$m=19456,t=2,p=1$lh2Wz5zkGQzo1oYKM+jiSg$10tMEfN3SL49/GK6UMPbauINBZQPAFxV7kJTt3DfG3k';
+const DECOY_USER = Object.freeze({
+  _id: 'password-timing-decoy',
+  services: Object.freeze({
+    password: Object.freeze({ argon2: DECOY_ARGON2_HASH }),
+  }),
+});
 
 export function extractPasswordFromLoginArguments(methodArguments: unknown[] | undefined): MeteorPasswordValue | null {
   const loginOptions = methodArguments?.[0];
@@ -43,13 +39,10 @@ export function extractPasswordFromLoginArguments(methodArguments: unknown[] | u
   return null;
 }
 
-export async function createPasswordTimingDefense() {
-  const decoyPassword = randomBytes(32).toString('hex');
-  const decoyHash = await argon2.hash(decoyPassword, ARGON2_OPTIONS);
-
+export function createPasswordTimingDefense(checkPasswordAsync: MeteorPasswordVerifier) {
   return Object.freeze({
     async verifyUnknownPasswordAttempt(password: MeteorPasswordValue): Promise<void> {
-      await argon2.verify(decoyHash, formatMeteorPasswordForVerification(password));
+      await checkPasswordAsync(DECOY_USER, password);
     },
   });
 }
