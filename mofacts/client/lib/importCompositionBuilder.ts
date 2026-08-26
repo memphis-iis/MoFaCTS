@@ -1,5 +1,6 @@
 import { CALCULATE_PROBABILITY_FORMULA, cloneImportParameterDefaults } from './importParameterDefaults';
 import type { ImportDraftLesson, NormalizedImportItem, SourceKind } from './normalizedImportTypes';
+import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
 
 type BuildImportLessonDraftOptions = {
   id: string;
@@ -89,7 +90,7 @@ export function buildTutorFromNormalizedItems(
   const cardCount = items.length;
   const clusterRange = cardCount > 0 ? `0-${cardCount - 1}` : '0-0';
 
-  return {
+  const tutorDocument = {
     tutor: {
       setspec: {
         lessonname: safeName,
@@ -119,6 +120,8 @@ export function buildTutorFromNormalizedItems(
       ]
     }
   };
+  assertValidTdfExpressions(tutorDocument, 'generated.tdfs.tutor');
+  return tutorDocument;
 }
 
 export function buildImportLessonDraft(options: BuildImportLessonDraftOptions): ImportDraftLesson {

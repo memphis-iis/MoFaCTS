@@ -3,7 +3,9 @@ import os from 'os';
 import path from 'path';
 import { Meteor } from 'meteor/meteor';
 import { expect } from 'chai';
-import { createDeploymentReadinessMethods } from './deploymentReadinessMethods';
+import { createDeploymentReadinessMethods, inspectTdfExpressions } from './deploymentReadinessMethods';
+
+const emptyTdfCursor = () => ({ fetchAsync: async () => [] });
 
 const validSelfHostedMongoUrl = [
   'mongodb://',
@@ -58,7 +60,7 @@ describe('deploymentReadinessMethods', function() {
   it('requires a logged-in admin', async function() {
     const methods = createDeploymentReadinessMethods({
       Roles: { userIsInRoleAsync: async () => false },
-      Tdfs: { rawDatabase: () => ({ command: async () => undefined }) },
+      Tdfs: { rawDatabase: () => ({ command: async () => undefined }), find: emptyTdfCursor },
       usersCollection: { findOneAsync: async () => null },
       redisBoundary: { enabled: false, async ping() { return undefined; } },
     });
@@ -75,7 +77,7 @@ describe('deploymentReadinessMethods', function() {
   it('rejects logged-in non-admin users', async function() {
     const methods = createDeploymentReadinessMethods({
       Roles: { userIsInRoleAsync: async () => false },
-      Tdfs: { rawDatabase: () => ({ command: async () => undefined }) },
+      Tdfs: { rawDatabase: () => ({ command: async () => undefined }), find: emptyTdfCursor },
       usersCollection: { findOneAsync: async () => null },
       redisBoundary: { enabled: false, async ping() { return undefined; } },
     });
@@ -87,6 +89,30 @@ describe('deploymentReadinessMethods', function() {
       expect(error).to.be.instanceOf(Meteor.Error);
       expect((error as Meteor.Error).error).to.equal('not-authorized');
     }
+  });
+
+  it('batches the live TDF expression inventory and returns bounded paths without formula text', async function() {
+    const docs = Array.from({ length: 201 }, (_, index) => ({
+      _id: `tdf-${String(index).padStart(3, '0')}`,
+      content: { tdfs: { tutor: { unit: index === 200 ? [{ learningsession: {
+        calculateProbability: 'p.probability = process.env.SECRET; return p',
+      } }] : [] } } },
+    }));
+    const Tdfs = {
+      find(selector: any, options: any) {
+        const after = selector?._id?.$gt;
+        const selected = docs.filter((doc) => after === undefined || doc._id > after).slice(0, options.limit);
+        return { fetchAsync: async () => selected };
+      },
+    };
+    const result = await inspectTdfExpressions(Tdfs);
+    expect(result).to.include({ tdfCount: 201, expressionCount: 1, failureCount: 1 });
+    expect(result.failures).to.have.length(1);
+    expect(result.failures[0]).to.include({
+      tdfId: 'tdf-200',
+      fieldPath: 'tdfs.tutor.unit[0].learningsession.calculateProbability',
+    });
+    expect(JSON.stringify(result.failures)).not.to.include('SECRET');
   });
 
   it('returns passing checks for a valid session-storage self-hosted configuration', async function() {
@@ -128,6 +154,7 @@ describe('deploymentReadinessMethods', function() {
     const methods = createDeploymentReadinessMethods({
       Roles: { userIsInRoleAsync: async () => true },
       Tdfs: {
+        find: emptyTdfCursor,
         rawDatabase: () => ({
           databaseName: 'MoFACT-meteor3',
           command: async (command: Record<string, unknown>) => {
@@ -160,6 +187,7 @@ describe('deploymentReadinessMethods', function() {
       'mongo.connection',
       'mongo.reactivity',
       'firstAdmin.account',
+      'tdf.expressions',
       'storage.local.dynamicAssetsPath',
     ]);
   });

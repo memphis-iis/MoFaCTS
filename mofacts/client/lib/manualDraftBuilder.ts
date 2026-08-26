@@ -1,6 +1,7 @@
 import { buildImportLessonDraft } from './importCompositionBuilder';
 import { CALCULATE_PROBABILITY_FORMULA, cloneImportParameterDefaults } from './importParameterDefaults';
 import type { ImportDraftLesson, NormalizedImportItem, PromptAttribution } from './normalizedImportTypes';
+import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
 
 export type LessonStructure =
   | 'learning-only'
@@ -395,6 +396,7 @@ export function buildManualDraftLesson(state: ManualCreatorState): ImportDraftLe
 
   draft.generatedBaseline.tutor = tutor as Record<string, unknown>;
   draft.workingCopy.tutor = clone(tutor) as Record<string, unknown>;
+  assertValidTdfExpressions({ tutor: draft.workingCopy.tutor }, 'generated.tdfs.tutor');
 
   return draft;
 }

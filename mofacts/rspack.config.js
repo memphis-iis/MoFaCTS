@@ -4,6 +4,7 @@ const require = createRequire(import.meta.url);
 const { defineConfig } = require("@meteorjs/rspack");
 const sveltePreprocess = require("svelte-preprocess");
 const svelteLoaderPath = require.resolve("./scripts/loaders/svelte-loader-wrapper.cjs");
+const acornRuntimePath = require.resolve("acorn");
 const smithyTypesRuntimePath = require.resolve("@smithy/types/dist-cjs/index.js");
 const { rspackClientOutputContract } = require("./scripts/rspackClientOutputContract.cjs");
 
@@ -105,6 +106,10 @@ export default defineConfig((Meteor) => {
       mainFields: ["svelte", "browser", "module", "main"],
       conditionNames: ["svelte", "..."],
       alias: {
+        // learning-components is a root-level source tree outside the Meteor
+        // app directory. Resolve its app-owned parser dependency explicitly so
+        // client/server bundles use the exact package pinned by this app.
+        "acorn$": acornRuntimePath,
         "@smithy/types$": smithyTypesRuntimePath,
       },
       byDependency: {

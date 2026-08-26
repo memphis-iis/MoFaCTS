@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import {
   buildAdaptiveOutcomes,
+  compileAdaptiveRule,
   evaluateAdaptiveRule,
   getAdaptiveScheduleQuestions,
 } from '../../learning-components/units/shared/adaptiveRuleEvaluation';
@@ -43,11 +44,16 @@ describe('adaptive rule evaluation', function() {
 
   it('fails clearly for invalid adaptive tokens and schedule items', function() {
     expect(() => evaluateAdaptiveRule('IF C2S0 THEN nope', { '2:0': true }))
-      .to.throw('Invalid action: nope');
+      .to.throw('invalid action');
     expect(() => evaluateAdaptiveRule('IF bad THEN C3S1', {}))
-      .to.throw('Invalid token: bad');
+      .to.throw('condition identifier "bad" is not allowed');
     expect(() => getAdaptiveScheduleQuestions([{ clusterIndex: 'bad' }]))
       .to.throw('Adaptive rule produced a scheduled question without a valid clusterIndex');
+  });
+
+  it('validates adaptive rules before entering the Stage 1 runtime evaluator', function() {
+    expect(() => evaluateAdaptiveRule('IF 1globalThis THEN C3S1', {})).to.throw();
+    expect(() => evaluateAdaptiveRule('IF true THEN C3S1; process.exit()', {})).to.throw();
   });
 
   it('normalizes adaptive history rows and fills unseen stimuli defaults', function() {
@@ -70,6 +76,14 @@ describe('adaptive rule evaluation', function() {
       '3:0': false,
       '4:0': false,
     });
+  });
+
+  it('rejects numeric-prefix injection, trailing input, missing checkpoint time, and excessive actions', function() {
+    expect(() => compileAdaptiveRule('IF 1globalThis THEN C3S1')).to.throw();
+    expect(() => compileAdaptiveRule('IF true THEN C3S1; process.exit()')).to.throw();
+    expect(() => compileAdaptiveRule('IF true THEN CHECKPOINT C3S1')).to.throw('requires an AT time');
+    const actions = Array.from({ length: 257 }, (_, index) => `C${index}S0`).join(',');
+    expect(() => compileAdaptiveRule(`IF true THEN (${actions})`)).to.throw('exceeds 256 scheduled actions');
   });
 
   it('keeps condition-side stimulus slots distinct within the same cluster', function() {

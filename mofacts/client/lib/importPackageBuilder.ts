@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import type { BuiltImportPackage, ImportDraftLesson } from './normalizedImportTypes';
 import { getImportFileNames } from './importCompositionBuilder';
+import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
 
 type BuildImportPackageOptions = {
   preserveLessonTitle?: boolean;
@@ -37,6 +38,8 @@ export async function buildImportPackageFromDraftLessons(
       (tutorDoc.tutor as any).setspec.stimulusfile = stimFileName;
       (tutorDoc.tutor as any).setspec.lessonname = options.preserveLessonTitle ? displayTitle : safeName;
     }
+
+    assertValidTdfExpressions(tutorDoc, `${tdfFileName}.tdfs.tutor`);
 
     zip.file(tdfFileName, JSON.stringify(tutorDoc, null, 2));
     zip.file(stimFileName, JSON.stringify(stimuliDoc, null, 2));

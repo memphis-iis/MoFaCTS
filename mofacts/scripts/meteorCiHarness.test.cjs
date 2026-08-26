@@ -253,6 +253,8 @@ test('enforces one canonical hotfix server on localhost', () => {
     );
 
   assert.match(baseCompose, /MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'false'/);
+  assert.match(rspackConfig, /const acornRuntimePath = require\.resolve\("acorn"\)/);
+  assert.match(rspackConfig, /"acorn\$": acornRuntimePath/);
   assert.match(baseCompose, /METEOR_REACTIVITY_ORDER: changeStreams/);
   assert.doesNotMatch(localCompose, /^\s{2}mofacts:/m);
   assert.deepEqual(composeFilesPublishingLocalhost, []);

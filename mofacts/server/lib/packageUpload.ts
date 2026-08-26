@@ -15,6 +15,7 @@ import { processParsedPackageTdfs } from './packageUploadPersistence';
 import { postProcessUploadedTdfs } from './packageUploadPostProcess';
 import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
 import { preflightPackageTdfIdentities } from './packageTdfIdentity';
+import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
 
 const INCOMPLETE_UPLOAD_MESSAGE = 'The uploaded ZIP appears incomplete or truncated. Please upload the file again.';
 
@@ -248,6 +249,10 @@ export async function processPackageUploadWorkflow(
     await mirrorPackageAssetToS3(fileObj, deps);
     unzippedFiles = await parsePackageZip(zipPath, packageFile, deps.serverConsole);
     await policy.prepareParsedPackage?.({ unzippedFiles, owner, isTeacherOrAdmin });
+    for (const tdfFile of unzippedFiles.filter((file) => file.type === 'tdf')) {
+      const contents = typeof tdfFile.contents === 'string' ? JSON.parse(tdfFile.contents) : tdfFile.contents;
+      assertValidTdfExpressions({ tutor: (contents as { tutor?: unknown })?.tutor }, `${tdfFile.name}.tutor`);
+    }
 
     failureStage = 'identity preflight';
     const identityPlan = await preflightPackageTdfIdentities({

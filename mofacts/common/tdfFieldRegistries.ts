@@ -499,8 +499,8 @@ export const LEARNING_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     },
   }),
   calculateProbability: simpleField(textareaField(''), {
-    brief: 'Custom probability function.',
-    verbose: 'JavaScript function body used to customize item probability calculations.'
+    brief: 'Bounded mathematical probability formula.',
+    verbose: 'JavaScript-like mathematical body validated for the safe formula interpreter. Supports numeric locals, bounded conditionals, approved p inputs, Math primitives, pFunc helpers, diagnostics, and a terminal return p; arbitrary JavaScript, globals, loops, functions, and randomness are rejected.'
   }),
   stimulusfile: simpleField(stringField('', 12), {
     brief: 'Learning-session stimulus file.',
@@ -662,8 +662,8 @@ export const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     verbose: 'Learning engine unit mode used by mixed video/question sessions.'
   }),
   calculateProbability: simpleField(textareaField(''), {
-    brief: 'Custom probability function.',
-    verbose: 'Probability function used by adaptive video question selection.'
+    brief: 'Bounded mathematical probability formula.',
+    verbose: 'Mathematical body validated for safe adaptive video question selection. It may compose approved p inputs, Math primitives, and pFunc helpers but cannot use arbitrary JavaScript.'
   }),
   adaptiveLogic: simpleField({
     anyOf: [
@@ -683,7 +683,7 @@ export const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     ],
   }, {
     brief: 'Adaptive video question logic.',
-    verbose: 'Adaptive logic rules used by video sessions to select or insert questions/checkpoints.'
+    verbose: 'Typed IF/THEN rules using C<cluster>S<stimulus> outcomes, Boolean operators, optional AT time, and optional CHECKPOINT action; action text is never executed as JavaScript.'
   }, {
     surfaces: { learnerConfig: false },
   }),

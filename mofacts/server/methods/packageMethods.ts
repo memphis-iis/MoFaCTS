@@ -16,6 +16,7 @@ import {
   reconcileConditionCountsByChildId,
   validateConditionFamilyTutor,
 } from '../../common/lib/tdfIdentityContract';
+import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -782,6 +783,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       throw new Meteor.Error(500, 'Package asset id missing during package upsert');
     }
     const Tdf = packageJSON.tdfs;
+    assertValidTdfExpressions(Tdf, `${packageJSON.fileName}.tdfs.tutor`);
     const lessonName = deps.legacyTrim(Tdf.tutor.setspec.lessonname);
     const prev = await deps.Tdfs.findOneAsync({ _id: tdfId });
     if (prev?._id && !(await deps.userCanManageTdf(ownerId, prev))) {
@@ -913,6 +915,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     );
     const crypto = Npm.require('crypto');
     const entries = records.map((record) => {
+      assertValidTdfExpressions(record.tdfs, `${record.sourceFileName}.tdfs.tutor`);
       const previous = existingByKey.get(record.sourceKey);
       return {
         record,
@@ -1079,6 +1082,11 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     }
 
     const tdfContentToSave = mergeEditorContentPreservingSourceShape(tdf.content, tdfContent);
+    try {
+      assertValidTdfExpressions(tdfContentToSave, 'tdfs.tutor');
+    } catch (error: unknown) {
+      throw new Meteor.Error('invalid-tdf-expression', error instanceof Error ? error.message : String(error));
+    }
     const tutorToSave = tdfContentToSave.tdfs?.tutor;
     if (tutorToSave) {
       for (const path of removedTutorPaths) {
