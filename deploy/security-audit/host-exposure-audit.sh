@@ -97,13 +97,14 @@ if command -v ss >/dev/null 2>&1; then
       error_control internal.listening-sockets 'Host listening sockets match the approved exposure' 'The listener policy could not classify host sockets.'
     else
       public_unexpected="$(grep -c . <<<"$unexpected_socket_lines" || true)"
+      unexpected_udp_listeners="$(grep -Ec '^listener\.udp:' <<<"$unexpected_socket_lines" || true)"
       unexpected_socket_observations="$(head -n 12 <<<"$unexpected_socket_lines" | jq -Rsc 'split("\n") | map(select(length > 0))')"
       if [[ "$public_unexpected" -eq 0 ]]; then
-        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS HIGH 'No unexpected listener was found; loopback infrastructure, the system DHCP client, and narrowly classified Tailscale listeners matched policy, while SSH is evaluated with firewall scope separately.' '[]' '{"unexpectedListenerCount":0}'
+        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' PASS HIGH 'No unexpected listener was found; loopback infrastructure, the system DHCP client, and narrowly classified Tailscale listeners matched policy, while SSH is evaluated with firewall scope separately.' '[]' '{"unexpectedListenerCount":0,"unexpectedUdpListenerCount":0}'
       else
         listener_severity=HIGH
         if grep -Eq ':(3000|27017|6379|8931|8932)([,[:space:]]|$)' <<<"$unexpected_socket_lines"; then listener_severity=CRITICAL; fi
-        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' FAIL "$listener_severity" "$public_unexpected unexpected listeners were found." "$unexpected_socket_observations" "{\"unexpectedListenerCount\":$public_unexpected}"
+        add_control internal.listening-sockets 'Host listening sockets match the approved exposure' FAIL "$listener_severity" "$public_unexpected unexpected listeners were found." "$unexpected_socket_observations" "{\"unexpectedListenerCount\":$public_unexpected,\"unexpectedUdpListenerCount\":$unexpected_udp_listeners}"
       fi
     fi
   fi
@@ -138,10 +139,12 @@ if command -v docker >/dev/null 2>&1 && [[ -n "${MOFACTS_APP_CONTAINER:-}" ]]; t
       '[.[] | .container as $container | .ports // {} | to_entries[] | .key as $containerPort | .value[]? | select((.HostIp != "127.0.0.1") or $container == $mongo or $container == $redis or ($container == $app and ($containerPort != "3000/tcp" or .HostPort != "3000")))] | length' <<<"$docker_ports")"
     app_bind_count="$(jq --arg app "$MOFACTS_APP_CONTAINER" '[.[] | select(.container == $app) | .ports["3000/tcp"][]? | select(.HostIp == "127.0.0.1" and .HostPort == "3000")] | length' <<<"$docker_ports")"
     invalid_networks="$(jq '[.[] | select(.networkMode == "host" or .networkMode == "none" or .networkMode == "default" or .networkMode == "bridge")] | length' <<<"$docker_ports")"
+    unexpected_udp_publications="$(jq '[.[] | .ports // {} | to_entries[] | select(.key | endswith("/udp")) | .value[]?] | length' <<<"$docker_ports")"
+    docker_metrics="$(jq -cn --argjson unexpectedUdpPublicationCount "$unexpected_udp_publications" '{unexpectedUdpPublicationCount:$unexpectedUdpPublicationCount}')"
     if [[ "$invalid" -eq 0 && "$invalid_networks" -eq 0 && "$app_bind_count" -eq 1 ]]; then
-      add_control internal.docker-ports 'Docker publishes only approved loopback ports' PASS CRITICAL 'MongoDB and Redis have no host publication, and all other inspected publications are loopback-only.'
+      add_control internal.docker-ports 'Docker publishes only approved loopback ports' PASS CRITICAL 'MongoDB and Redis have no host publication, and all other inspected publications are loopback-only.' '[]' "$docker_metrics"
     else
-      add_control internal.docker-ports 'Docker publishes only approved loopback ports' FAIL CRITICAL 'Docker host publications or private network modes do not match policy.'
+      add_control internal.docker-ports 'Docker publishes only approved loopback ports' FAIL CRITICAL 'Docker host publications or private network modes do not match policy.' '[]' "$docker_metrics"
     fi
   fi
 else
@@ -167,6 +170,7 @@ if command -v ufw >/dev/null 2>&1; then
       unauthorized_ssh="$(grep -Ec '^firewall\.unapproved-rule:.*(port 22|22/tcp)' <<<"$firewall_violations" || true)"
       web_rules="$(grep -Ec '^ufw allow (80|443)/tcp([[:space:]]|$)' <<<"$ufw_added" || true)"
       unexpected_allow_rules="$(grep -Ec '^firewall\.unapproved-rule:' <<<"$firewall_violations" || true)"
+      unexpected_udp_allow_rules="$(awk '/^firewall\.unapproved-rule:/ && $0 !~ /\/tcp([[:space:]]|$)/ && $0 !~ /proto[[:space:]]+tcp([[:space:]]|$)/ {count++} END {print count+0}' <<<"$firewall_violations")"
       violation_observations="$(head -n 12 <<<"$firewall_violations" | jq -Rsc 'split("\n") | map(select(length > 0))')"
       firewall_observations="$(jq -cn \
         --arg active "$([[ "$active" -eq 1 ]] && echo PASS || echo FAIL)" \
@@ -178,8 +182,11 @@ if command -v ufw >/dev/null 2>&1; then
         --arg managementInterface "$MOFACTS_SSH_MANAGEMENT_INTERFACE" \
         --argjson missingCidrs "$missing_cidrs" --argjson unauthorizedSsh "$unauthorized_ssh" \
         --argjson webRules "$web_rules" --argjson unexpectedAllowRules "$unexpected_allow_rules" \
+        --argjson unexpectedUdpAllowRules "$unexpected_udp_allow_rules" \
         --argjson policyViolations "$policy_violation_count" \
-        '{configuredManagementCidrs:$managementCidrs,managementInterface:$managementInterface,missingManagementCidrCount:$missingCidrs,unauthorizedSshRuleCount:$unauthorizedSsh,publicWebRuleCount:$webRules,unexpectedAllowRuleCount:$unexpectedAllowRules,policyViolationCount:$policyViolations}')"
+        --argjson firewallActive "$([[ "$active" -eq 1 ]] && echo true || echo false)" \
+        --argjson defaultDenyInbound "$([[ "$default_deny" -ge 1 ]] && echo true || echo false)" \
+        '{configuredManagementCidrs:$managementCidrs,managementInterface:$managementInterface,missingManagementCidrCount:$missingCidrs,unauthorizedSshRuleCount:$unauthorizedSsh,publicWebRuleCount:$webRules,unexpectedAllowRuleCount:$unexpectedAllowRules,unexpectedUdpAllowRuleCount:$unexpectedUdpAllowRules,policyViolationCount:$policyViolations,firewallActive:$firewallActive,defaultDenyInbound:$defaultDenyInbound}')"
       if [[ "$active" -eq 1 && "$default_deny" -ge 1 && "$policy_violation_count" -eq 0 ]]; then
         add_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' PASS HIGH 'UFW is active with default-deny inbound, public web rules, and SSH restricted to the configured private management interface and tailnet ranges.' "$firewall_observations" "$firewall_metrics"
       else

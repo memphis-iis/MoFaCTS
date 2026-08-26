@@ -4,7 +4,16 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { canonicalJson, finalizeReport, isExecutionErrorControl, sanitizedMetrics, sanitizedText } from './audit-lib.mjs';
+import {
+  canonicalJson,
+  control,
+  finalizeReport,
+  isExecutionErrorControl,
+  sanitizedMetrics,
+  sanitizedText,
+  section,
+} from './audit-lib.mjs';
+import { resolveCompositeUdpExposure } from './composite-exposure.mjs';
 import {
   INTERNAL_CONTROL_DEFINITIONS,
   INTERNAL_EXECUTION_CATEGORIES,
@@ -103,6 +112,58 @@ test('UDP classification distinguishes closed, open, inconclusive, and incomplet
   assert.equal(classifyUdpPortStates([], 1).status, 'ERROR');
   assert.equal(classifyUdpPortStates([closed[0], closed[0]], 2).status, 'ERROR');
   assert.throws(() => classifyUdpPortStates(null, 1));
+});
+
+test('composite UDP exposure resolves silence only with complete host evidence', () => {
+  const externalUdp = (status, metrics = {}) => section('external', [control(
+    'external.public-udp-ports',
+    'Selected UDP ports are closed',
+    status,
+    'HIGH',
+    status === 'ERROR' ? 'External UDP probes were inconclusive.' : 'External UDP probe result.',
+    { observations: ['inconclusive-endpoint: 192.0.2.2/udp/53 state=open|filtered reason=no-response'], metrics },
+  )]);
+  const internalUdp = ({ listeners = 0, firewallAllows = 0, publications = 0, active = true, deny = true } = {}) => (
+    section('internal', [
+      control('internal.listening-sockets', 'listeners', listeners ? 'FAIL' : 'PASS', 'HIGH', 'listener evidence', {
+        metrics: { unexpectedUdpListenerCount: listeners },
+      }),
+      control('internal.firewall', 'firewall', active && deny && !firewallAllows ? 'PASS' : 'FAIL', 'HIGH', 'firewall evidence', {
+        metrics: { unexpectedUdpAllowRuleCount: firewallAllows, firewallActive: active, defaultDenyInbound: deny },
+      }),
+      control('internal.docker-ports', 'docker', publications ? 'FAIL' : 'PASS', 'HIGH', 'Docker evidence', {
+        metrics: { unexpectedUdpPublicationCount: publications },
+      }),
+    ])
+  );
+
+  const silent = externalUdp('ERROR', { inconclusive: true, inconclusivePortCount: 7 });
+  const resolved = resolveCompositeUdpExposure(silent, internalUdp());
+  assert.equal(resolved.status, 'PASS');
+  assert.equal(resolved.controls[0].status, 'PASS');
+  assert.equal(resolved.controls[0].evidence.metrics.inconclusivePortCount, 7);
+  assert.equal(resolved.controls[0].evidence.metrics.internalEvidenceComplete, true);
+
+  assert.equal(resolveCompositeUdpExposure(silent, internalUdp({ listeners: 1 })).controls[0].status, 'FAIL');
+  assert.equal(resolveCompositeUdpExposure(silent, internalUdp({ firewallAllows: 1 })).controls[0].status, 'FAIL');
+  assert.equal(resolveCompositeUdpExposure(silent, internalUdp({ publications: 1 })).controls[0].status, 'FAIL');
+  assert.equal(resolveCompositeUdpExposure(silent, internalUdp({ active: false })).controls[0].status, 'FAIL');
+
+  const externallyClosedButContradicted = resolveCompositeUdpExposure(
+    externalUdp('PASS', { closedSelectedUdpPortCount: 7 }),
+    internalUdp({ deny: false }),
+  );
+  assert.equal(externallyClosedButContradicted.controls[0].status, 'FAIL');
+
+  const missingHostEvidence = resolveCompositeUdpExposure(silent, section('internal', []));
+  assert.equal(missingHostEvidence.controls[0].status, 'ERROR');
+  assert.equal(missingHostEvidence.controls[0].evidence.metrics.internalEvidenceComplete, false);
+
+  const confirmedOpen = externalUdp('FAIL', { openSelectedUdpPortCount: 1 });
+  assert.equal(resolveCompositeUdpExposure(confirmedOpen, internalUdp()).controls[0].status, 'FAIL');
+
+  const scannerFailure = externalUdp('ERROR', { inconclusive: false });
+  assert.equal(resolveCompositeUdpExposure(scannerFailure, internalUdp()).controls[0].status, 'ERROR');
 });
 
 test('authentication timing classification uses paired robust samples and rejects malformed evidence', () => {
@@ -210,7 +271,8 @@ test('production authentication policy uses ambiguous errors and a 30-day sessio
   const authMethods = fs.readFileSync(new URL('../../server/methods/authMethods.ts', import.meta.url), 'utf8');
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?loginExpirationInDays:\s*30,/);
   assert.match(source, /Accounts as any\)\.config\(\{[\s\S]*?ambiguousErrorMessages:\s*true,/);
-  assert.match(source, /_checkPasswordAsync[\s\S]*?equalizeFailedPasswordAttempt\(attempt\.user, password\)/);
+  assert.match(source, /_selectorForFastCaseInsensitiveLookup[\s\S]*?fields: \{ _id: 1 \}[\s\S]*?limit: 2/);
+  assert.match(source, /_checkPasswordAsync[\s\S]*?equalizeFailedPasswordAttempt\(attempt\.user, password, loginQuery\)/);
   assert.match(timingDefense, /checkPasswordAsync\(DECOY_BCRYPT_USER, password\)[\s\S]*?checkPasswordAsync\(DECOY_ARGON2_USER, password\)/);
   assert.doesNotMatch(timingDefense, /setTimeout|sleep/);
   assert.match(authMethods, /PASSWORD_RESET_RESPONSE_FLOOR_MS = 1000/);
@@ -439,12 +501,20 @@ test('production authentication probes honor session-scoped credentials and fail
   assert.match(source, /index < 11/);
 });
 
-test('external UDP probes retain uncertainty without adding heavier service detection', () => {
+test('external UDP probes retain raw uncertainty and assembly resolves it with bounded host facts', () => {
   const source = fs.readFileSync(new URL('./external-audit.mjs', import.meta.url), 'utf8');
+  const assembly = fs.readFileSync(new URL('./assemble-report.mjs', import.meta.url), 'utf8');
+  const host = fs.readFileSync(new URL('../../../deploy/security-audit/host-exposure-audit.sh', import.meta.url), 'utf8');
   assert.match(source, /'-sU', '--reason', '-p', udpPorts/);
   assert.doesNotMatch(source, /'-sV'|'--max-retries'/);
   assert.match(source, /classification\.status === 'ERROR'/);
   assert.match(source, /inconclusive: true/);
+  assert.match(assembly, /resolveCompositeUdpExposure\(external, internal\)/);
+  assert.match(host, /unexpectedUdpListenerCount/);
+  assert.match(host, /unexpectedUdpPublicationCount/);
+  assert.match(host, /unexpectedUdpAllowRuleCount/);
+  assert.match(host, /firewallActive/);
+  assert.match(host, /defaultDenyInbound/);
 });
 
 test('authentication probe helpers produce stable bounded diagnostics', () => {

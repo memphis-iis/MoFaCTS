@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { control, errorControl, finalizeReport, isExecutionErrorControl, notApplicableSection, sanitizedText, section, writeJsonFile } from './audit-lib.mjs';
 import { passwordlessContainmentOutcomes } from './authentication-probes.mjs';
+import { resolveCompositeUdpExposure } from './composite-exposure.mjs';
 import { INTERNAL_CONTROL_DEFINITIONS } from './internal-audit-contract.mjs';
 
 const [mode, externalPath, internalPath, authenticationPath, repositoryPath, outputPath] = process.argv.slice(2);
@@ -84,9 +85,10 @@ async function loadSection(sectionId, filePath) {
   return section(sectionId, controls);
 }
 
-const external = await loadSection('external', externalPath);
+let external = await loadSection('external', externalPath);
 const internalRaw = await fs.readFile(internalPath, 'utf8').then(JSON.parse).catch(() => null);
 const internal = await loadSection('internal', internalPath);
+external = resolveCompositeUdpExposure(external, internal);
 const authentication = mode === 'full'
   ? await loadSection('authentication', authenticationPath)
   : notApplicableSection('authentication', 'Authentication controls run in the Monday full audit.');

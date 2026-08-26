@@ -8,6 +8,10 @@ type MeteorPasswordVerifier = (
   password: MeteorPasswordValue,
 ) => Promise<unknown>;
 
+export type MeteorPasswordLoginQuery = { email: string } | { username: string };
+
+type CaseInsensitivePasswordUserLookup = (query: MeteorPasswordLoginQuery) => Promise<void>;
+
 export type MeteorPasswordAttemptUser = {
   _id?: string;
   services?: { password?: { bcrypt?: string; argon2?: string } };
@@ -51,12 +55,45 @@ export function extractPasswordFromLoginArguments(methodArguments: unknown[] | u
   return null;
 }
 
-export function createPasswordTimingDefense(checkPasswordAsync: MeteorPasswordVerifier) {
+export function extractPasswordLoginQuery(
+  methodArguments: unknown[] | undefined,
+): MeteorPasswordLoginQuery | null {
+  const loginOptions = methodArguments?.[0];
+  if (!loginOptions || typeof loginOptions !== 'object') {
+    return null;
+  }
+  const user = (loginOptions as { user?: unknown }).user;
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+  const email = (user as { email?: unknown }).email;
+  if (typeof email === 'string' && email.length > 0) {
+    return { email };
+  }
+  const username = (user as { username?: unknown }).username;
+  if (typeof username === 'string' && username.length > 0) {
+    return { username };
+  }
+  return null;
+}
+
+export function createPasswordTimingDefense(
+  checkPasswordAsync: MeteorPasswordVerifier,
+  runCaseInsensitivePasswordUserLookup: CaseInsensitivePasswordUserLookup,
+) {
   return Object.freeze({
     async equalizeFailedPasswordAttempt(
       user: MeteorPasswordAttemptUser | null | undefined,
       password: MeteorPasswordValue,
+      loginQuery: MeteorPasswordLoginQuery | null,
     ): Promise<void> {
+      // Meteor's password handler performs a second, case-insensitive lookup
+      // only when its initial exact lookup finds no user. Repeat that candidate
+      // query for an exact-match account so failed existing and missing account
+      // paths perform the same database lookup classes.
+      if (user && loginQuery) {
+        await runCaseInsensitivePasswordUserLookup(loginQuery);
+      }
       const passwordService = user?.services?.password;
       const hasBcrypt = typeof passwordService?.bcrypt === 'string';
       const hasArgon2 = typeof passwordService?.argon2 === 'string';

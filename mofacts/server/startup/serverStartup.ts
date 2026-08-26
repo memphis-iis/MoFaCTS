@@ -29,7 +29,12 @@ import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
 import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery';
 import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
 import { applyDdpContainment } from '../lib/ddpContainment';
-import { createPasswordTimingDefense, extractPasswordFromLoginArguments } from '../lib/passwordTimingDefense';
+import {
+  createPasswordTimingDefense,
+  extractPasswordFromLoginArguments,
+  extractPasswordLoginQuery,
+  type MeteorPasswordLoginQuery,
+} from '../lib/passwordTimingDefense';
 
 const LEGACY_AI_CONTENT_DRAFT_TYPE = 'ai-content-creator';
 
@@ -574,7 +579,25 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   if (typeof meteorPasswordVerifier !== 'function') {
     throw new Error('Meteor accounts-password verifier is unavailable');
   }
-  const passwordTimingDefense = createPasswordTimingDefense(meteorPasswordVerifier);
+  const meteorAccounts = Accounts as unknown as {
+    _selectorForFastCaseInsensitiveLookup?: (fieldName: string, value: string) => UnknownRecord;
+  };
+  if (typeof meteorAccounts._selectorForFastCaseInsensitiveLookup !== 'function') {
+    throw new Error('Meteor case-insensitive account selector is unavailable');
+  }
+  const runCaseInsensitivePasswordUserLookup = async (query: MeteorPasswordLoginQuery) => {
+    const fieldName = 'email' in query ? 'emails.address' : 'username';
+    const fieldValue = 'email' in query ? query.email : query.username;
+    const selector = meteorAccounts._selectorForFastCaseInsensitiveLookup!(fieldName, fieldValue);
+    await deps.usersCollection.find(selector, {
+      fields: { _id: 1 },
+      limit: 2,
+    }).fetchAsync();
+  };
+  const passwordTimingDefense = createPasswordTimingDefense(
+    meteorPasswordVerifier,
+    runCaseInsensitivePasswordUserLookup,
+  );
 
   Accounts.validateLoginAttempt(async (attempt: {
     allowed?: boolean;
@@ -600,7 +623,8 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       if (attempt.type === 'password') {
         const password = extractPasswordFromLoginArguments(attempt.methodArguments);
         if (password) {
-          await passwordTimingDefense.equalizeFailedPasswordAttempt(attempt.user, password);
+          const loginQuery = extractPasswordLoginQuery(attempt.methodArguments);
+          await passwordTimingDefense.equalizeFailedPasswordAttempt(attempt.user, password, loginQuery);
         }
         await deps.recordAuthThrottle(`login:ip:${clientIp}`);
         if (identifier) {
