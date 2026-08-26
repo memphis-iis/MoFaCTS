@@ -1,10 +1,12 @@
 <script>
   import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { Meteor } from 'meteor/meteor';
   import 'deep-chat';
   import { createAutoTutorRuntime } from '../services/autoTutorClient';
   import { clientConsole } from '../../../../lib/clientLogger';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
+  import { publicExperienceText } from '../../../publicExperience/publicExperienceI18n';
 
   const dispatch = createEventDispatcher();
   const MOBILE_LAYOUT_QUERY = '(max-width: 768px)';
@@ -32,6 +34,7 @@
   let isMobileLayout = false;
   let runtimeReady = false;
   let chatReady = false;
+  let isPublicTeacherDemo = false;
 
   function platformText(key, values) {
     return translatePlatformString(getActiveUiLocale(), key, values);
@@ -132,6 +135,12 @@
       return 0;
     }
     return Math.max(0, Math.min(100, (value / total) * 100));
+  }
+
+  function handlePublicDemoExit() {
+    Meteor.logout(() => {
+      window.location.assign('/');
+    });
   }
 
   function formatProgressCount(value) {
@@ -274,6 +283,9 @@
   }
 
   onMount(() => {
+    const currentUser = Meteor.user();
+    isPublicTeacherDemo = currentUser?.profile?.createdBy === 'publicDemo'
+      && currentUser?.profile?.publicDemoKind === 'teacher';
     const mobileLayoutQuery = window.matchMedia(MOBILE_LAYOUT_QUERY);
     isMobileLayout = mobileLayoutQuery.matches;
     const handleLayoutChange = (event) => {
@@ -372,7 +384,7 @@
 
   {#if errorMessage}
     <div class="auto-tutor-error" role="alert">
-      {errorMessage}
+      {isPublicTeacherDemo ? platformText('autoTutor.unavailable') : errorMessage}
     </div>
   {/if}
 
@@ -436,6 +448,15 @@
         {formatTurnCount(turnCount)}
       </div>
     </div>
+    {#if isPublicTeacherDemo && !completed}
+      <button
+        type="button"
+        class="btn btn-secondary auto-tutor-exit-button"
+        on:click={handlePublicDemoExit}
+      >
+        {publicExperienceText(getActiveUiLocale(), 'returnOverview')}
+      </button>
+    {/if}
     <button
       type="button"
       class="btn btn-primary auto-tutor-continue-button"
@@ -583,6 +604,10 @@
 
   .auto-tutor-chat-disabled {
     opacity: 0.72;
+  }
+
+  .auto-tutor-exit-button {
+    flex: 0 0 auto;
   }
 
   .auto-tutor-loading {

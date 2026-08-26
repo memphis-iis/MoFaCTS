@@ -32,6 +32,7 @@ import { getActiveUiLocale } from './interfaceLocaleState';
 import { hasPublicCreatorDisplayName } from './contentCreatorIdentity';
 import {
   LEARNING_ANALYTICS_DESTINATION,
+  resolveNormalLoginDestination,
   type NormalLoginReturnDestination,
 } from './normalLoginDestination';
 import {
@@ -40,6 +41,7 @@ import {
 } from './courseAssignmentLaunchContext';
 import { getPracticeLaunchMode, setPracticeLaunchMode } from './practiceLaunchMode';
 import { resolveLessonRouteRequest, type LessonRouteRequest } from './lessonRoute';
+import { publicExperienceText } from '../views/publicExperience/publicExperienceI18n';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const Tdfs: any = (globalThis as any).Tdfs;
 const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
@@ -436,7 +438,7 @@ function handleIndexRoute(controller: any, user: any) {
   Cookie.set('experimentTarget', '', 1);
   Cookie.set('experimentXCond', '', 1);
   Session.set('curModule', 'signinoauth');
-  renderLayout(controller, 'signIn');
+  renderLayout(controller, 'publicLanding');
 }
 
 function routeToSignin(returnTo?: NormalLoginReturnDestination) {
@@ -660,7 +662,8 @@ function waitForAuthenticatedRoute(
       if (shouldWaitForAuthHydration()) return;
       pendingAuthRouteHandles[routeName]?.stop();
       delete pendingAuthRouteHandles[routeName];
-      routeToSignin(signInReturnDestination);
+      const currentPath = (FlowRouter.current() as { path?: string } | undefined)?.path;
+      routeToSignin(signInReturnDestination ?? resolveNormalLoginDestination(currentPath));
     }
   });
 }
@@ -711,10 +714,10 @@ for (const route of restrictedRoutes) {
   });
 }
 
-function renderSignInRoute(controller: any) {
+async function renderSignInRoute(controller: any) {
   if (shouldWaitForAuthHydration()) {
     waitForPublicAuthHydration(controller, 'client.authLogin', () => {
-      renderSignInRoute(controller);
+      void renderSignInRoute(controller);
     });
     return;
   }
@@ -723,8 +726,19 @@ function renderSignInRoute(controller: any) {
   const user = Meteor.user();
   if (userId && !user) {
     waitForPublicAuthHydration(controller, 'client.authLogin', () => {
-      renderSignInRoute(controller);
+      void renderSignInRoute(controller);
     });
+    return;
+  }
+  if (user?.profile?.createdBy === 'publicDemo') {
+    await new Promise<void>((resolve) => Meteor.logout(() => resolve()));
+    Cookie.set('isExperiment', '0', 1);
+    Cookie.set('experimentTarget', '', 1);
+    Cookie.set('experimentXCond', '', 1);
+    Session.set('loginMode', 'normal');
+    window.sessionStorage.removeItem('mofacts.publicDemo.v1');
+    Session.set('curModule', 'signinoauth');
+    renderLayout(controller, 'signIn');
     return;
   }
   if (user && getUserLoginMode(user) !== 'experiment') {
@@ -759,7 +773,7 @@ FlowRouter.route('/auth/signup', {
 FlowRouter.route('/auth/login', {
   name: 'client.authLogin',
   action: function() {
-    renderSignInRoute(this);
+    void renderSignInRoute(this);
   }
 });
 
@@ -792,9 +806,42 @@ FlowRouter.route('/auth/logout', {
     } catch (error) {
       clientConsole(1, '[AUTH] Failed to record logout revocation event:', getErrorMessage(error));
     }
-    Meteor.logout();
+    await new Promise<void>((resolve) => Meteor.logout(() => resolve()));
     Session.set('loginMode', 'normal');
-    FlowRouter.go('/auth/login');
+    Cookie.set('isExperiment', '0', 1);
+    Cookie.set('experimentTarget', '', 1);
+    Cookie.set('experimentXCond', '', 1);
+    window.sessionStorage.removeItem('mofacts.publicDemo.v1');
+    FlowRouter.go('/');
+  }
+});
+
+FlowRouter.route('/demo/:kind', {
+  name: 'client.publicDemo',
+  action: function(params: any) {
+    const kind = String(params?.kind || '');
+    if (!['student', 'teacher', 'researcher'].includes(kind)) {
+      FlowRouter.go('/');
+      return;
+    }
+    const renderDemo = () => {
+      const user = Meteor.user() as any;
+      if (user && user?.profile?.createdBy !== 'publicDemo') {
+        Session.set('uiMessage', {
+          variant: 'info',
+          text: publicExperienceText(getActiveUiLocale(), 'demoSignedIn'),
+        });
+        FlowRouter.go('/home');
+        return;
+      }
+      Session.set('curModule', 'publicDemo');
+      renderLayout(this, 'publicDemoLaunch');
+    };
+    if (shouldWaitForAuthHydration()) {
+      waitForPublicAuthHydration(this, 'client.publicDemo', renderDemo);
+      return;
+    }
+    renderDemo();
   }
 });
 
@@ -1415,8 +1462,3 @@ FlowRouter.route('/instructions/:tdfId?', {
     }
   }],
 });
-
-
-
-
-

@@ -6,6 +6,7 @@ import { openRouterSessionCorrelationId } from '../lib/openRouterPrefixCaching';
 function adminDeps(isAdmin = true, openRouterPrefixCachingEnabled?: boolean) {
   return {
     serverConsole: () => undefined,
+    assertPublicDemoAiQuota: async () => undefined,
     getMethodAuthorizationDeps: () => ({
       userIsInRoleAsync: async () => isAdmin,
     }),

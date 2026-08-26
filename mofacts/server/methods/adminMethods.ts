@@ -13,6 +13,7 @@ import {
   type AdminApiKeyProvider,
   type AdminApiKeySettingsDoc,
 } from '../lib/apiKeyResolution';
+import { removeUserOwnedData } from '../lib/userDeletion';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -348,20 +349,6 @@ async function getUserDeletionBlockingReasons(deps: AdminMethodsDeps, targetUser
   }
 
   return reasons;
-}
-
-async function removeUserAdminScopedData(deps: AdminMethodsDeps, targetUserId: string) {
-  await Promise.all([
-    deps.Histories.removeAsync({ userId: targetUserId }),
-    deps.GlobalExperimentStates.removeAsync({ userId: targetUserId }),
-    deps.SectionUserMap.removeAsync({ userId: targetUserId }),
-    deps.UserTimesLog.removeAsync({ userId: targetUserId }),
-    deps.UserMetrics.removeAsync({ _id: targetUserId }),
-    deps.PasswordResetTokens.removeAsync({ userId: targetUserId }),
-    deps.UserDashboardCache.removeAsync({ userId: targetUserId }),
-    deps.LearnerUnitAnalyticsCache.removeAsync({ userId: targetUserId }),
-    deps.UserUploadQuota.removeAsync({ userId: targetUserId }),
-  ]);
 }
 
 async function upsertManagedUser(
@@ -731,7 +718,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
         );
       }
 
-      await removeUserAdminScopedData(deps, normalizedTargetUserId);
+      await removeUserOwnedData(deps, normalizedTargetUserId);
       await Roles.setUserRolesAsync(normalizedTargetUserId, []);
       await deps.usersCollection.removeAsync({ _id: normalizedTargetUserId });
       deps.syncUsernameCaches(normalizedTargetUserId, '', String(targetUser?.username || ''));

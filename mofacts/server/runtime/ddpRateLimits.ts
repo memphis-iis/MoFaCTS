@@ -69,6 +69,12 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
 
   DDPRateLimiter.addRule({
     type: 'method',
+    name: 'startPublicDemo',
+    connectionId() { return true; }
+  }, 10, 3600000);
+
+  DDPRateLimiter.addRule({
+    type: 'method',
     name(name: string) {
       return [
         'processPackageUpload',

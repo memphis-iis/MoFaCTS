@@ -41,6 +41,7 @@ type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
   userId?: string | null;
   unblock?: () => void;
+  connection?: { clientAddress?: string | null } | null;
 };
 
 type OpenRouterMethodsDeps = {
@@ -48,6 +49,7 @@ type OpenRouterMethodsDeps = {
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   openRouterModelCatalogService: OpenRouterModelCatalogService;
   serverConsole: (...args: unknown[]) => void;
+  assertPublicDemoAiQuota: (userId: string, clientAddress: string) => Promise<void>;
 };
 
 type OpenRouterResolutionMode = 'preferred' | 'admin';
@@ -635,6 +637,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
 
     callResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter', 401);
+      await deps.assertPublicDemoAiQuota(userId, String(this.connection?.clientAddress || 'unknown'));
       return executeResolvedOpenRouterJson(deps, userId, params, 'json');
     },
 
@@ -667,6 +670,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
 
     callResolvedOpenRouterEmbeddings: async function(this: MethodContext, params: unknown) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter embeddings', 401);
+      await deps.assertPublicDemoAiQuota(userId, String(this.connection?.clientAddress || 'unknown'));
       check(params, Match.ObjectIncluding({
         input: Array,
       }));

@@ -294,6 +294,21 @@ export function createStimSchemaFromRegistry(): Record<string, unknown> {
             title: 'Clusters',
             items: createStimClusterSchema(),
           },
+          sparcPages: {
+            type: 'array',
+            title: 'SPARC Pages',
+            minItems: 1,
+            items: {
+              type: 'object',
+              title: 'SPARC Page',
+              required: ['pageId', 'display'],
+              additionalProperties: false,
+              properties: {
+                pageId: { type: 'string', minLength: 1 },
+                display: { type: 'object' },
+              },
+            },
+          },
         },
       },
     },

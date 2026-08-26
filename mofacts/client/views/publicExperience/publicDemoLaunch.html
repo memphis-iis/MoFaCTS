@@ -1,0 +1,29 @@
+<template name="publicDemoLaunch">
+  <div class="public-experience-page public-demo-launch-page">
+    <header class="public-site-header">
+      <a class="public-brand" href="/" aria-label="{{systemName}}">
+        {{#if currentTheme.properties.brand_logo_url}}<span class="public-brand-logo" aria-hidden="true" style="--public-brand-logo-image: url('{{currentTheme.properties.brand_logo_url}}');"></span>{{/if}}
+        <span><strong>{{systemName}}</strong><small>{{pt 'brandTagline'}}</small></span>
+      </a>
+      <a class="public-back-link" href="/"><span class="public-back-arrow" aria-hidden="true">←</span> {{pt 'demoExit'}}</a>
+    </header>
+    <main class="public-demo-launch-main">
+      <section class="public-demo-intro" aria-labelledby="publicDemoTitle">
+        <p class="public-eyebrow">{{pt 'demoTemporary'}}</p>
+        <h1 id="publicDemoTitle">{{demoTitle}}</h1>
+        <p class="public-demo-lead">{{demoDescription}}</p>
+        {{#if isResearcher}}<div class="public-study-matrix" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span></div><p class="public-demo-detail">{{pt 'researchDesign'}}</p>{{/if}}
+        {{#if isTeacher}}<p class="public-demo-detail"><span class="fa fa-circle-info" aria-hidden="true"></span> {{pt 'liveAi'}}</p>{{/if}}
+        <div class="public-demo-privacy"><span class="fa fa-clock-o" aria-hidden="true"></span><div><strong>{{pt 'demoEnglish'}}</strong><p>{{pt 'demoPrivacy'}}</p></div></div>
+        {{#if launchError}}<p class="alert alert-danger" role="alert">{{launchError}}</p>{{/if}}
+        {{#if expiredMessage}}<p class="alert alert-warning" role="status">{{expiredMessage}}</p>{{/if}}
+        {{#if signedInMessage}}<p class="alert alert-info" role="status">{{signedInMessage}}</p>{{/if}}
+        <div class="public-demo-launch-actions">
+          <button class="btn btn-primary btn-lg" type="button" data-public-demo-start disabled={{startDisabled}}>{{startLabel}}</button>
+          <a class="btn btn-outline-secondary btn-lg" href="/">{{pt 'demoExit'}}</a>
+        </div>
+        <p class="public-demo-status" aria-live="polite">{{launchStatus}}</p>
+      </section>
+    </main>
+  </div>
+</template>

@@ -2834,6 +2834,15 @@
                           "grid_columns": 4
                         }
                       },
+                      "maxTrials": {
+                        "title": "Maximum scored responses.",
+                        "description": "Ends the learning session after this many scored responses. A value of 0 leaves the response count unbounded.",
+                        "type": "integer",
+                        "default": 0,
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
                       "calculateProbability": {
                         "title": "Custom probability function.",
                         "description": "JavaScript function body used to customize item probability calculations.",
@@ -2874,6 +2883,15 @@
                         "description": "Unit engine mode used when selecting the next learning item.",
                         "type": "string",
                         "default": "",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "maxTrials": {
+                        "title": "Maximum scored responses.",
+                        "description": "Ends the learning session after this many scored responses. A value of 0 leaves the response count unbounded.",
+                        "type": "integer",
+                        "default": 0,
                         "options": {
                           "grid_columns": 4
                         }
@@ -5247,6 +5265,15 @@
                       "grid_columns": 4
                     }
                   },
+                  "maxTrials": {
+                    "title": "Maximum scored responses.",
+                    "description": "Ends the learning session after this many scored responses. A value of 0 leaves the response count unbounded.",
+                    "type": "integer",
+                    "default": 0,
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
                   "calculateProbability": {
                     "title": "Custom probability function.",
                     "description": "JavaScript function body used to customize item probability calculations.",
@@ -5287,6 +5314,15 @@
                     "description": "Unit engine mode used when selecting the next learning item.",
                     "type": "string",
                     "default": "",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "maxTrials": {
+                    "title": "Maximum scored responses.",
+                    "description": "Ends the learning session after this many scored responses. A value of 0 leaves the response count unbounded.",
+                    "type": "integer",
+                    "default": 0,
                     "options": {
                       "grid_columns": 4
                     }

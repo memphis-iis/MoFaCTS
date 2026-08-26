@@ -2,6 +2,7 @@ import {
   enumStringField,
   GOOGLE_STT_LANGUAGE_CODES,
   GOOGLE_TTS_LANGUAGE_CODES,
+  integerField,
   integerArrayField,
   legacyBooleanField,
   numberArrayField,
@@ -486,6 +487,16 @@ export const LEARNING_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
   unitMode: simpleField(stringField('', 4), {
     brief: 'Item-selection algorithm.',
     verbose: 'Unit engine mode used when selecting the next learning item.'
+  }),
+  maxTrials: simpleField(integerField(0, 4), {
+    brief: 'Maximum scored responses.',
+    verbose: 'Ends the learning session after this many scored responses. A value of 0 leaves the response count unbounded.'
+  }, {
+    validation: {
+      validators: [{ type: 'nonNegativeInteger', message: 'Must be a non-negative integer' }],
+      severity: 'error',
+      breaking: true,
+    },
   }),
   calculateProbability: simpleField(textareaField(''), {
     brief: 'Custom probability function.',

@@ -2,8 +2,19 @@ import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { check } from 'meteor/check';
 import { randomBytes } from 'crypto';
+import {
+  parsePublicDemoRequest,
+  PUBLIC_DEMO_DEFINITIONS,
+  publicDemoExpiresAt,
+  type PublicDemoKind,
+} from '../../common/publicDemoContract';
 
 type UnknownRecord = Record<string, unknown>;
+
+export function generatePublicDemoUsername(kind: PublicDemoKind): string {
+  const kindCode = kind === 'student' ? 'S' : kind === 'teacher' ? 'T' : 'R';
+  return `DEMO-${kindCode}-${randomBytes(12).toString('hex').toUpperCase()}`;
+}
 type MethodContext = {
   userId?: string | null;
   unblock?: () => void;
@@ -68,6 +79,24 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
       deps.serverConsole('getTdfByExperimentTarget ERROR,', experimentTarget, ',', e);
       throw e;
     }
+  }
+
+  async function createPasswordlessExperimentUser(
+    username: string,
+    experimentTarget: string,
+    profile: UnknownRecord,
+  ): Promise<string> {
+    const internalAccountPassword = randomBytes(24).toString('hex');
+    return await deps.createUserWithRetry(
+      username,
+      internalAccountPassword,
+      {
+        experiment: true,
+        experimentTarget,
+        ...profile,
+      },
+      { includeEmail: false },
+    );
   }
 
   async function hasCompletedExperimentTarget(userId: string, tdf: any) {
@@ -217,16 +246,12 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
 
         let createdId: string;
         try {
-          const internalAccountPassword = randomBytes(24).toString('hex');
-          createdId = await deps.createUserWithRetry(
+          createdId = await createPasswordlessExperimentUser(
             normalizedUserName,
-            internalAccountPassword,
+            normalizedTarget,
             {
-              experiment: true,
-              experimentTarget: normalizedTarget,
               createdBy: 'provisionExperimentUser'
             },
-            { includeEmail: false }
           );
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
@@ -258,8 +283,60 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
     }
   }
 
+  async function startPublicDemo(this: MethodContext, params: unknown) {
+    check(params, Object);
+    const kind = parsePublicDemoRequest(params);
+    if (!kind) {
+      throw new Meteor.Error('invalid-public-demo-kind', 'Public demo kind must be student, teacher, or researcher');
+    }
+    if (this.userId) {
+      throw new Meteor.Error('public-demo-account-active', 'Sign out before starting a public demonstration');
+    }
+
+    const definition = PUBLIC_DEMO_DEFINITIONS[kind as PublicDemoKind];
+    const tdf = await getTdfByExperimentTarget(definition.experimentTarget);
+    if (!tdf) {
+      throw new Meteor.Error('public-demo-unavailable', 'The requested public demonstration is not configured');
+    }
+    const requiresPassword = tdf?.content?.tdfs?.tutor?.setspec?.experimentPasswordRequired;
+    if (requiresPassword === true || requiresPassword === 'true') {
+      throw new Meteor.Error('public-demo-password-invalid', 'Public demonstrations cannot require participant credentials');
+    }
+
+    const createdAt = new Date();
+    const expiresAt = publicDemoExpiresAt(createdAt);
+    const username = generatePublicDemoUsername(kind);
+    let createdId: string;
+    try {
+      createdId = await createPasswordlessExperimentUser(username, definition.experimentTarget, {
+        createdBy: 'publicDemo',
+        publicDemoKind: kind,
+        demoCreatedAt: createdAt,
+        demoExpiresAt: expiresAt,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/username already exists|duplicate key|E11000/i.test(message)) {
+        throw new Meteor.Error('public-demo-id-collision', 'A public demo identity collision occurred; retry the launch');
+      }
+      throw error;
+    }
+
+    await deps.writeAuditLog('publicDemo.started', null, createdId, {
+      kind,
+      experimentTarget: definition.experimentTarget,
+      expiresAt,
+    });
+    return {
+      loginToken: await issueLoginToken(createdId),
+      launchPath: definition.launchPath,
+      expiresAt,
+    };
+  }
+
   return {
     getTdfByExperimentTarget,
     provisionExperimentUser,
+    startPublicDemo,
   };
 }

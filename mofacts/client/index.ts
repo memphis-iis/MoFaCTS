@@ -18,6 +18,7 @@ import { setDisplayFeedback } from './views/experiment/svelte/services/feedbackR
 import { ExperimentStateStore } from './lib/state/experimentStateStore';
 import {instructContinue} from './views/experiment/instructions';
 import {routeToSignin} from './lib/router';
+import { resolveNormalLoginDestination } from './lib/normalLoginDestination';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { Tracker } from 'meteor/tracker';
 import {
@@ -69,6 +70,7 @@ import './views/login/signIn';
 import './views/login/signUp';
 import './views/login/resetPassword';
 import './views/login/verifyEmail';
+import './views/publicExperience/publicExperience';
 import './views/footer.html';
 import './views/termsOfService';
 
@@ -513,7 +515,7 @@ function handleUnexpectedLogout(currentPath: string) {
   Session.set('currentTemplate', 'signIn');
   Session.set('appLoading', false);
   sessionCleanUp();
-  routeToSignin();
+  routeToSignin(isExperiment ? undefined : resolveNormalLoginDestination(currentPath));
 }
 
 let lastKnownUserId: string | null = null;

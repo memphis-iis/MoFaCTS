@@ -72,6 +72,25 @@
                   "type": "object",
                   "title": "Stim",
                   "properties": {
+                    "clusterKC": {
+                      "title": "Stimulus KC identity.",
+                      "description": "Knowledge-component identity used by SPARC and other authored stimulus controllers.",
+                      "type": "string",
+                      "default": "",
+                      "options": {
+                        "grid_columns": 6
+                      }
+                    },
+                    "text": {
+                      "title": "Controller stimulus text.",
+                      "description": "Plain authored proposition text used by controller-backed stimulus formats such as SPARC.",
+                      "type": "string",
+                      "default": "",
+                      "format": "textarea",
+                      "options": {
+                        "grid_columns": 12
+                      }
+                    },
                     "parameter": {
                       "title": "Stimulus parameter metadata.",
                       "description": "Comma-separated optional parameters for advanced scoring algorithms. The second value is reserved for the item-specific optimal difficulty threshold.",
@@ -759,6 +778,29 @@
               }
             },
             "additionalProperties": false
+          }
+        },
+        "sparcPages": {
+          "type": "array",
+          "title": "SPARC Pages",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "title": "SPARC Page",
+            "required": [
+              "pageId",
+              "display"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "pageId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "display": {
+                "type": "object"
+              }
+            }
           }
         }
       }

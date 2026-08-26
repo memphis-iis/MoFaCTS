@@ -1,0 +1,81 @@
+<template name="publicLanding">
+  <div class="public-experience-page">
+    <header class="public-site-header">
+      <a class="public-brand" href="/" aria-label="{{systemName}}">
+        {{#if currentTheme.properties.brand_logo_url}}
+          <span class="public-brand-logo" aria-hidden="true" style="--public-brand-logo-image: url('{{currentTheme.properties.brand_logo_url}}');"></span>
+        {{/if}}
+        <span><strong>{{systemName}}</strong><small>{{pt 'brandTagline'}}</small></span>
+      </a>
+      <nav class="public-site-nav" aria-label="{{pt 'capabilitiesTitle'}}">
+        <a href="#students" data-public-audience="student" aria-current="{{audienceCurrent 'student'}}">{{pt 'navStudents'}}</a>
+        <a href="#teachers" data-public-audience="teacher" aria-current="{{audienceCurrent 'teacher'}}">{{pt 'navTeachers'}}</a>
+        <a href="#researchers" data-public-audience="researcher" aria-current="{{audienceCurrent 'researcher'}}">{{pt 'navResearchers'}}</a>
+      </nav>
+      <div class="public-site-actions">
+        <a class="btn btn-outline-secondary" href="/auth/signup">{{pt 'createAccount'}}</a>
+        <a class="btn btn-primary" href="/auth/login">{{pt 'signIn'}}</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="public-hero" aria-labelledby="publicHeroTitle">
+        <div class="public-hero-copy">
+          <p class="public-eyebrow">{{pt 'eyebrow'}}</p>
+          <h1 id="publicHeroTitle">{{pt 'heroTitle'}}</h1>
+          <p>{{pt 'heroCopy'}}</p>
+          <div class="public-hero-actions">
+            <a class="btn btn-primary btn-lg" href="#students" data-public-audience="student">{{pt 'tryMofacts'}}</a>
+            <a class="btn btn-outline-secondary btn-lg" href="/auth/login">{{pt 'signIn'}}</a>
+          </div>
+        </div>
+        <div class="public-hero-visual" aria-hidden="true">
+          <div class="public-visual-orbit public-visual-orbit-one"></div>
+          <div class="public-visual-orbit public-visual-orbit-two"></div>
+          <div class="public-visual-card public-visual-card-primary"><span class="fa fa-refresh"></span></div>
+          <div class="public-visual-card public-visual-card-secondary"><span class="fa fa-bar-chart"></span></div>
+        </div>
+      </section>
+
+      <section class="public-audience-explorer" id="publicAudiences" aria-labelledby="publicAudienceTitle">
+        <div class="public-audience-tabs" role="tablist" aria-label="{{pt 'demosTitle'}}">
+          <button type="button" role="tab" id="publicAudienceStudent" aria-controls="publicAudiencePanel" aria-selected="{{audienceSelected 'student'}}" tabindex="{{audienceTabIndex 'student'}}" data-public-audience="student"><span class="fa fa-graduation-cap" aria-hidden="true"></span>{{pt 'navStudents'}}</button>
+          <button type="button" role="tab" id="publicAudienceTeacher" aria-controls="publicAudiencePanel" aria-selected="{{audienceSelected 'teacher'}}" tabindex="{{audienceTabIndex 'teacher'}}" data-public-audience="teacher"><span class="fa fa-comments" aria-hidden="true"></span>{{pt 'navTeachers'}}</button>
+          <button type="button" role="tab" id="publicAudienceResearcher" aria-controls="publicAudiencePanel" aria-selected="{{audienceSelected 'researcher'}}" tabindex="{{audienceTabIndex 'researcher'}}" data-public-audience="researcher"><span class="fa fa-flask" aria-hidden="true"></span>{{pt 'navResearchers'}}</button>
+        </div>
+
+        <div class="public-audience-panel" id="publicAudiencePanel" role="tabpanel" aria-labelledby="{{activeAudienceTabId}}">
+          <div class="public-audience-copy" aria-live="polite">
+            <p class="public-eyebrow">{{activeAudienceLabel}}</p>
+            <h2 id="publicAudienceTitle">{{activeAudienceTitle}}</h2>
+            <p class="public-audience-lead">{{activeAudienceCopy}}</p>
+            <div class="public-audience-capability">
+              <span class="fa {{activeAudienceIcon}}" aria-hidden="true"></span>
+              <p>{{pt 'capabilitiesCopy'}}</p>
+            </div>
+            <p class="public-demo-disclosure">{{pt 'demosCopy'}}</p>
+            <a class="btn btn-primary btn-lg" href="{{activeAudiencePath}}">{{activeAudienceAction}} <span aria-hidden="true">→</span></a>
+          </div>
+
+          <div class="public-role-preview" aria-hidden="true">
+            <div class="public-role-preview-bar"><span></span><span></span><span></span><strong>{{systemName}}</strong></div>
+            <div class="public-role-preview-body">
+              <aside><span class="fa {{activeAudienceIcon}}"></span><i></i><i></i><i></i></aside>
+              <div class="public-role-preview-content">
+                <small>{{activeAudienceLabel}}</small>
+                <h3>{{activeAudienceTitle}}</h3>
+                <div class="public-role-preview-card public-role-preview-card-primary"><span class="fa {{activeAudienceIcon}}"></span><div><strong>{{activeAudienceAction}}</strong><small>{{activeAudienceCopy}}</small></div></div>
+                <div class="public-role-preview-card"><span class="fa {{activePreviewSecondaryIcon}}"></span><div><strong>{{pt 'capabilitiesTitle'}}</strong><small>{{pt 'capabilitiesCopy'}}</small></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="public-site-footer">
+      <span>© 2026 University of Memphis · MoFaCTS</span>
+      <nav aria-label="Footer"><a href="https://www.optimallearning.org/mofacts" rel="noopener">{{pt 'project'}}</a><a href="https://github.com/memphis-iis/mofacts" rel="noopener">{{pt 'source'}}</a><a href="/terms-of-service">{{pt 'terms'}}</a></nav>
+    </footer>
+  </div>
+</template>

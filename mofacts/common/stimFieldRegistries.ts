@@ -151,6 +151,14 @@ export const STIM_RESPONSE_FIELD_REGISTRY: SectionFieldRegistry = {
 
 
 export const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
+  clusterKC: simpleField(stringField('', 6), {
+    brief: 'Stimulus KC identity.',
+    verbose: 'Knowledge-component identity used by SPARC and other authored stimulus controllers.'
+  }),
+  text: simpleField(textareaField(''), {
+    brief: 'Controller stimulus text.',
+    verbose: 'Plain authored proposition text used by controller-backed stimulus formats such as SPARC.'
+  }),
   parameter: simpleField(stringField('', 6), {
     brief: 'Stimulus parameter metadata.',
     verbose: 'Comma-separated optional parameters for advanced scoring algorithms. The second value is reserved for the item-specific optimal difficulty threshold.'

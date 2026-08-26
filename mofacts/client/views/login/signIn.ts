@@ -894,7 +894,7 @@ async function resolveExperimentTargetForLogin() {
   };
 }
 
-async function completeExperimentSignIn(template?: any) {
+export async function completeExperimentSignIn(template?: any) {
   beginExperimentLaunchTransition(template);
 
   try {

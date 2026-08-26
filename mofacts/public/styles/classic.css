@@ -547,18 +547,46 @@ input[type="file"]::file-selector-button:hover,
 
 .auth-page {
     max-width: 100%;
-    margin: clamp(var(--app-space-4), 5vw, calc(4rem * var(--app-density-scale))) auto 0;
-    padding: var(--app-space-0) var(--app-space-3);
+    min-height: 100svh;
+    margin: 0;
+    padding: 0 var(--app-space-3) var(--app-space-4);
+    background:
+        radial-gradient(circle at 12% 22%, color-mix(in srgb, var(--app-accent-color) 16%, transparent), transparent 31rem),
+        color-mix(in srgb, var(--app-background-color) 96%, var(--learning-card-surface-color));
 }
+
+.auth-public-header {
+    width: min(78rem, 100%);
+    min-height: 4.75rem;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-space-3);
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
+}
+
+.auth-public-brand,
+.auth-public-back {
+    color: var(--app-text-color);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.auth-public-brand { display: inline-flex; align-items: center; gap: .7rem; font-family: var(--app-heading-font-family); font-size: 1.15rem; }
+.auth-public-brand .navbar-brand-icon { width: 2.4rem; height: 2.4rem; }
+.auth-public-back { color: color-mix(in srgb, var(--app-text-color) 72%, transparent); }
+.auth-public-back:hover, .auth-public-back:focus-visible { color: var(--app-accent-color); }
 
 .auth-shell {
     max-width: 34rem;
-    margin: 0 auto;
+    margin: clamp(2rem, 7vh, 5rem) auto 0;
 }
 
 .auth-card {
     border: 1px solid color-mix(in srgb, var(--app-text-color) 12%, transparent);
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--app-text-color) 10%, transparent);
+    box-shadow: 0 22px 56px color-mix(in srgb, var(--app-text-color) 13%, transparent);
+    border-radius: var(--app-border-radius-lg);
 }
 
 .auth-card-body {
@@ -608,7 +636,7 @@ input[type="file"]::file-selector-button:hover,
     min-height: 100svh;
     display: flex;
     flex-direction: column;
-    margin: clamp(calc(0.75rem * var(--app-density-scale)), 3vw, calc(2rem * var(--app-density-scale))) auto 0;
+    margin: 0;
 }
 
 #signInContainer .auth-shell {
@@ -616,8 +644,9 @@ input[type="file"]::file-selector-button:hover,
     flex: 1 1 auto;
     width: 100%;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    padding-top: clamp(2rem, 6vh, 4.5rem);
 }
 
 #signInContainer .auth-card {
@@ -634,8 +663,16 @@ input[type="file"]::file-selector-button:hover,
 }
 
 #signInContainer .sign-in-title {
-    font-size: clamp(calc(var(--app-font-size-base) * 1.05), 2.15vw, calc(var(--app-font-size-base) * 1.3));
+    font-size: clamp(calc(var(--app-font-size-base) * 1.45), 2.6vw, calc(var(--app-font-size-base) * 1.8));
     line-height: 1.05;
+}
+
+.auth-back-arrow {
+    display: inline-block;
+}
+
+[dir="rtl"] .auth-back-arrow {
+    transform: scaleX(-1);
 }
 
 #signInContainer .auth-description {
@@ -826,9 +863,12 @@ input[type="file"]::file-selector-button:hover,
 
     #signInContainer.auth-page {
         min-height: 100dvh;
-        margin-top: 0.5rem;
+        margin-top: 0;
         padding: var(--app-space-0) calc(0.55rem * var(--app-density-scale));
     }
+
+    .auth-public-header { min-height: 4rem; }
+    .auth-public-back { font-size: .9rem; }
 
     #signInContainer .auth-card-body {
         padding: calc(0.8rem * var(--app-density-scale));

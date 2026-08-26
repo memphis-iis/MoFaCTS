@@ -99,7 +99,7 @@ function collectFailures() {
   const stimValidatorMap = createStimValidatorMap();
   const nestedSchemaKeys = {
     'tutor.setspec': ['unitTemplate'],
-    'tutor.unit[]': ['deliverySettings', 'learningsession', 'assessmentsession', 'videosession', 'autotutorsession'],
+    'tutor.unit[]': ['deliverySettings', 'learningsession', 'sparcsession', 'assessmentsession', 'videosession', 'autotutorsession'],
     'tutor.unit[].assessmentsession': ['conditiontemplatesbygroup'],
     'setspec.clusters[]': ['stims'],
     'setspec.clusters[].stims[]': ['display', 'response'],

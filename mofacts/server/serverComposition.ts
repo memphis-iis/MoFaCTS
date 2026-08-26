@@ -112,6 +112,7 @@ import {
   shouldEmitLogMessage,
 } from '../common/loggingSettings';
 import { createServerVerbosityObserverCallbacks } from './lib/serverVerbosityObserver';
+import { ensurePublicDemoCleanupIndex, purgeExpiredPublicDemoUsers } from './lib/publicDemoCleanup';
 
 const MeteorAny = Meteor as any;
 
@@ -132,6 +133,7 @@ export { getTdfByFileName, getTdfById, getHistoryByTDFID, getStimuliSetById, ser
 // for creating some MongoDB queries
 let serverVerbosityLevel: LoggingVerbosityLevel = SERVER_VERBOSITY_SETTING.defaultValue;
 let serverVerbosityObserverHandle: { stop(): void } | undefined;
+let publicDemoCleanupInterval: ReturnType<typeof setInterval> | undefined;
 
 function setServerVerbosityLevel(value: unknown): void {
   serverVerbosityLevel = parseLoggingVerbosityLevel(value);
@@ -1106,6 +1108,24 @@ export const asyncMethods: Record<string, unknown> = {
     getApiKeyResolutionDeps,
     getMethodAuthorizationDeps,
     openRouterModelCatalogService,
+    assertPublicDemoAiQuota: async (userId: string, clientAddress: string) => {
+      const user = await MeteorAny.users.findOneAsync(
+        { _id: userId },
+        { fields: { 'profile.createdBy': 1, 'profile.demoExpiresAt': 1 } },
+      );
+      if (user?.profile?.createdBy !== 'publicDemo') return;
+      const expiresAt = user?.profile?.demoExpiresAt instanceof Date
+        ? user.profile.demoExpiresAt
+        : new Date(user?.profile?.demoExpiresAt);
+      if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+        throw new Meteor.Error('public-demo-expired', 'This public demonstration has expired');
+      }
+      await applyMethodRateLimit('public-demo-openrouter', clientAddress, userId, {
+        ipLimit: 60,
+        identifierLimit: 60,
+        windowMs: 60 * 60 * 1000,
+      });
+    },
   }),
 
   ...createOpenRouterCatalogMethods(openRouterModelCatalogService),
@@ -1147,6 +1167,29 @@ registerServerRuntime({
 
 Meteor.startup(async function() {
   await ensureSecurityAuditIndexes();
+  const publicDemoCleanupDeps = {
+    usersCollection: MeteorAny.users,
+    Histories,
+    GlobalExperimentStates,
+    SectionUserMap,
+    UserTimesLog,
+    UserMetrics,
+    PasswordResetTokens,
+    UserDashboardCache,
+    LearnerUnitAnalyticsCache,
+    UserUploadQuota,
+    AuditLog,
+    syncUsernameCaches,
+    writeAuditLog,
+    serverConsole,
+  };
+  await ensurePublicDemoCleanupIndex(publicDemoCleanupDeps);
+  await purgeExpiredPublicDemoUsers(publicDemoCleanupDeps);
+  publicDemoCleanupInterval = setInterval(() => {
+    void purgeExpiredPublicDemoUsers(publicDemoCleanupDeps).catch((error: unknown) => {
+      serverConsole('[PUBLIC-DEMO] expiration cleanup failed', error instanceof Error ? error.message : String(error));
+    });
+  }, 60 * 60 * 1000);
   const interruptedBackupCount = await reconcileInterruptedBackupJobs({
     backupJobs: createBackupRegistry(BackupJobs),
   });
@@ -1219,5 +1262,9 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     serverVerbosityObserverHandle?.stop();
     serverVerbosityObserverHandle = undefined;
+    if (publicDemoCleanupInterval) {
+      clearInterval(publicDemoCleanupInterval);
+      publicDemoCleanupInterval = undefined;
+    }
   });
 }
