@@ -273,6 +273,32 @@ describe('package upload identity confirmation integration', function() {
     assert.deepEqual(state.removedAssetIds, ['asset-cancel']);
   });
 
+  it('rolls back a create when another upload claims the supplied id after preflight', async function() {
+    zipPath = await writeIdentityPackage('concurrent-id');
+    const state: IntegrationState = { contentWrites: 0, removedAssetIds: [], storedTdf: null };
+    const deps = createWorkflowDeps(state);
+    deps.upsertPackage = async () => {
+      const error = new Error('E11000 duplicate key error collection: Tdfs index: _id_ dup key');
+      (error as any).code = 11000;
+      throw error;
+    };
+    const asset = {
+      _id: 'asset-concurrent',
+      path: zipPath,
+      userId: 'owner-1',
+      ext: 'zip',
+      name: 'identity-package.zip',
+      size: fs.statSync(zipPath).size,
+    };
+
+    await assert.rejects(
+      () => processPackageUploadWorkflow({ userId: 'owner-1' }, asset, 'owner-1', false, deps),
+      /duplicate key/i,
+    );
+    assert.equal(state.contentWrites, 0);
+    assert.equal(state.mutationJob.status, 'rolled-back');
+  });
+
   it('rolls an applied update back before rethrowing a package-domain failure', async function() {
     zipPath = await writeIdentityPackage('known-tdf-id');
     const state: IntegrationState = { contentWrites: 0, removedAssetIds: [], storedTdf: null };

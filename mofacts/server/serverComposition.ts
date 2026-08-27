@@ -65,6 +65,7 @@ import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
 import { createTurkWorkflowMethods } from './methods/turkWorkflowMethods';
+import { createTdfIdentityMigrationMethods } from './methods/tdfIdentityMigrationMethods';
 import {
   createThemeMethods,
   createUpdateActiveThemeDocument,
@@ -124,7 +125,7 @@ const PapaAny = (globalThis as unknown as {
 
 
 
-export { getTdfByFileName, getTdfById, getHistoryByTDFID, getStimuliSetById, serverConsole, decryptData };
+export { getTdfById, getHistoryByTDFID, getStimuliSetById, serverConsole, decryptData };
 
 /* jshint sub:true*/
 
@@ -341,7 +342,7 @@ const {
   invalidateCourseSnapshotsForCourse: _invalidateCourseSnapshotsForCourse,
   invalidateCourseSnapshotsForAssignment: _invalidateCourseSnapshotsForAssignment,
   refreshCourseSnapshotAfterPractice: refreshCourseSnapshotAfterPracticeMethod,
-  getTdfNamesByOwnerId: getTdfNamesByOwnerIdMethod,
+  getTdfIdsByOwnerId: getTdfIdsByOwnerIdMethod,
   getSourceSentences: _getSourceSentences,
   checkForTDFData: _checkForTDFData,
   ...publicCourseMethods
@@ -350,7 +351,7 @@ const resolveAssignedRootTdfIdsForUser = resolveAssignedRootTdfIdsForUserMethod 
 const invalidateCourseSnapshotsForCourse = _invalidateCourseSnapshotsForCourse as (courseId: string, reason: string) => Promise<unknown>;
 const invalidateCourseSnapshotsForAssignment = _invalidateCourseSnapshotsForAssignment as (assignmentId: string, reason: string) => Promise<unknown>;
 const refreshCourseSnapshotAfterPractice = refreshCourseSnapshotAfterPracticeMethod as (userId: string, TDFId: string) => Promise<void>;
-const getTdfNamesByOwnerId = getTdfNamesByOwnerIdMethod as (ownerId: string) => Promise<string[] | null>;
+const getTdfIdsByOwnerId = getTdfIdsByOwnerIdMethod as (ownerId: string) => Promise<string[] | null>;
 
 const {
   deleteTdfRuntimeData,
@@ -381,9 +382,6 @@ const tdfLookupHelpers = createTdfLookupHelpers({
 });
 const {
   getTdfById,
-  getTdfByFileName,
-  getTdfAccessByFileName,
-  getTdfsByFileNameOrId,
   userCanManageTdf,
   assertUserOwnsTdfs,
 } = tdfLookupHelpers;
@@ -422,8 +420,6 @@ const packageMethods = createPackageMethods({
   userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
   normalizeCanonicalId,
   getResponseKCAnswerKey,
-  getTdfByFileName,
-  getTdfsByFileNameOrId,
   getStimuliSetIdByFilename,
   userCanManageTdf,
   allocateNextStimuliSetId: () => {
@@ -528,10 +524,9 @@ const analyticsMethods = createAnalyticsMethods({
   createExperimentExport,
   createExperimentExportByTdfIds,
   createExperimentExportFromHistories,
-  getTdfNamesByOwnerId,
+  getTdfIdsByOwnerId,
   assertUserOwnsTdfs,
   canDownloadOwnedTdfData,
-  getTdfByFileName,
   getClassPerformanceByTdfWorkflow,
   getStimuliSetById,
   hasMeaningfulProgressSignal,
@@ -913,19 +908,6 @@ async function persistAutoTutorExpectationRelationships(
   return { success: true, stimuliCount: stimuli.length };
 }
 
-async function getTdfByFileNamePublic(this: MethodContext, filename: string) {
-  const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to access TDF content', 401);
-  const tdf = await getTdfAccessByFileName(filename);
-  if (!tdf) {
-    return null;
-  }
-  const tdfId = normalizeCanonicalId(tdf?._id);
-  if (!tdfId) {
-    throw new Meteor.Error(404, 'TDF not found');
-  }
-  return await getTdfById.call({ userId }, tdfId);
-}
-
 function buildPublicExperimentEntry(tdf: any) {
   const tutor = isPlainRecord(tdf?.content?.tdfs?.tutor)
     ? tdf.content.tdfs.tutor
@@ -1076,7 +1058,14 @@ async function getStimDisplayTypeMapVersionPublic() {
 }
 
 export const asyncMethods: Record<string, unknown> = {
-  getTdfByFileName: getTdfByFileNamePublic,
+  ...createTdfIdentityMigrationMethods({
+    Tdfs,
+    UserTimesLog,
+    ScheduledTurkMessages,
+    AuditLog,
+    userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
+    serverConsole,
+  }),
   getTdfByExperimentTarget: getTdfByExperimentTargetPublic,
   ...turkWorkflowMethods,
 

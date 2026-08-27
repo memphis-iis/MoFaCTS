@@ -41,7 +41,6 @@ type PackageGeneratedContentDeps = {
   DynamicAssets: any;
   normalizeCanonicalId: (value: unknown) => string | null;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
-  getTdfByFileName: (filename: string) => Promise<any>;
   legacyTrim: (value: unknown) => string;
   updateStimDisplayTypeMap: (stimuliSetIds: unknown[] | null) => Promise<unknown>;
 };

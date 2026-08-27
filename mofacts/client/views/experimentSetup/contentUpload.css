@@ -445,6 +445,13 @@
     margin-top: var(--app-space-3);
 }
 
+.content-upload-load-more .btn {
+    width: 100%;
+    max-width: 36rem;
+    padding-block: var(--app-space-2);
+    font-weight: 700;
+}
+
 .content-package-upload-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);

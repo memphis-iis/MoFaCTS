@@ -24,7 +24,6 @@
  * */
 
 import {
-  getTdfByFileName,
   getTdfById,
   getStimuliSetById,
   getHistoryByTDFID,
@@ -146,7 +145,7 @@ async function createExperimentExport(expName: any, _requestingUserId: any) {
   }
 
   for (expName of expNames) {
-    const tdf = await getTdfByFileName(expName) || await getTdfById(expName);
+    const tdf = await getTdfById(expName);
     if (!tdf) {
       continue;
     }

@@ -429,14 +429,14 @@ function validateConditionCounts(
   });
 }
 
-function getConditionIndexOrThrow(conditions: string[], conditionFileName: unknown, source: string) {
-  const normalizedConditionFileName = typeof conditionFileName === 'string' ? conditionFileName.trim() : '';
-  if (!normalizedConditionFileName) {
-    throw new Error(`${source}: current condition TDF fileName is missing.`);
+function getConditionIndexOrThrow(conditionTdfIds: string[], conditionTdfId: unknown, source: string) {
+  const normalizedConditionTdfId = typeof conditionTdfId === 'string' ? conditionTdfId.trim() : '';
+  if (!normalizedConditionTdfId) {
+    throw new Error(`${source}: current condition TDF id is missing.`);
   }
-  const conditionIndex = conditions.indexOf(normalizedConditionFileName);
+  const conditionIndex = conditionTdfIds.indexOf(normalizedConditionTdfId);
   if (conditionIndex < 0) {
-    throw new Error(`${source}: condition "${normalizedConditionFileName}" is not listed in the root TDF condition array.`);
+    throw new Error(`${source}: condition TDF "${normalizedConditionTdfId}" is not listed in the root TDF conditionTdfIds array.`);
   }
   return conditionIndex;
 }
@@ -539,27 +539,23 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       const prevCondition = curExperimentState.conditionTdfId;
       const preselectedCondition = Session.get('preselectedConditionTdfId');
       const resolvedConditionIds = Array.isArray(setspec.conditionTdfIds) ? setspec.conditionTdfIds : [];
+      if (resolvedConditionIds.length !== conditionOptions.length) {
+        throw new Error(`Root TDF "${Session.get('currentRootTdfId')}" has no complete canonical condition ID mapping`);
+      }
 
       const loadConditionTdf = async (conditionFileName: string): Promise<TdfDocumentLike | null> => {
         const conditionIndex = conditionOptions.indexOf(conditionFileName);
         const canonicalConditionId = typeof resolvedConditionIds[conditionIndex] === 'string'
           ? resolvedConditionIds[conditionIndex]
           : null;
-        if (resolvedConditionIds.length > 0 && !canonicalConditionId) {
+        if (!canonicalConditionId) {
           throw new Error(`Condition "${conditionFileName}" has no canonical TDF id in root TDF "${Session.get('currentRootTdfId')}"`);
         }
-        if (canonicalConditionId) {
-          let conditionTdf = findTdf({ _id: canonicalConditionId });
-          if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
-            conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', canonicalConditionId, {
-              courseAssignment: getCourseAssignmentLaunchContext(),
-            });
-          }
-          return conditionTdf;
-        }
-        let conditionTdf = findTdf({ 'content.fileName': conditionFileName });
+        let conditionTdf = findTdf({ _id: canonicalConditionId });
         if (!conditionTdf || !isValidConditionTdf(conditionTdf)) {
-          conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfByFileName', conditionFileName);
+          conditionTdf = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', canonicalConditionId, {
+            courseAssignment: getCourseAssignmentLaunchContext(),
+          });
         }
         return conditionTdf;
       };
@@ -686,19 +682,15 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
           }
           if (rootTDFBoxed && rootTDFBoxed.conditionCounts) {
             const conditions = rootTDF.tdfs.tutor.setspec.condition ?? [];
+            const conditionTdfIds = Array.isArray(rootTDF.tdfs.tutor.setspec.conditionTdfIds)
+              ? rootTDF.tdfs.tutor.setspec.conditionTdfIds.filter((id): id is string => typeof id === 'string')
+              : [];
             validateConditionCounts(
               rootTDFBoxed.conditionCounts,
               conditions,
               'resume.condition.count-beginning'
             );
-            let conditionTdfForFileName = findTdf({ _id: conditionTdfId });
-            if (!conditionTdfForFileName || !conditionTdfForFileName.content) {
-              conditionTdfForFileName = await meteorCallAsync<TdfDocumentLike | null>('getTdfById', conditionTdfId, {
-                courseAssignment: getCourseAssignmentLaunchContext(),
-              });
-            }
-            const conditionFileName = conditionTdfForFileName?.content?.fileName;
-            const conditionIndex = getConditionIndexOrThrow(conditions, conditionFileName, 'resume.condition.count-beginning');
+            const conditionIndex = getConditionIndexOrThrow(conditionTdfIds, conditionTdfId, 'resume.condition.count-beginning');
             if (!Session.get('ownerDashboardLaunch')) {
               await meteorCallAsync('incrementTdfConditionCount', Session.get('currentRootTdfId'), conditionIndex);
             }

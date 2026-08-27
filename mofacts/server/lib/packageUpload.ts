@@ -14,7 +14,7 @@ import { uploadParsedPackageMedia } from './packageUploadMedia';
 import { processParsedPackageTdfs } from './packageUploadPersistence';
 import { postProcessUploadedTdfs } from './packageUploadPostProcess';
 import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
-import { preflightPackageTdfIdentities } from './packageTdfIdentity';
+import { preflightPackageTdfIdentities, type PackageTdfIdentityMode } from './packageTdfIdentity';
 import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
 
 const INCOMPLETE_UPLOAD_MESSAGE = 'The uploaded ZIP appears incomplete or truncated. Please upload the file again.';
@@ -29,6 +29,7 @@ export type PackageUploadPolicy = {
   confirmedIdentityFingerprint?: string | null;
   expectedArchiveSha256?: string | null;
   mutationJobId?: string | null;
+  identityMode?: PackageTdfIdentityMode;
 };
 
 const UPLOAD_PLAN_TTL_MS = 30 * 60 * 1000;
@@ -260,6 +261,7 @@ export async function processPackageUploadWorkflow(
       packageAssetId,
       ownerId: owner,
       deps,
+      ...(policy.identityMode ? { identityMode: policy.identityMode } : {}),
     });
     state.identityPlan = identityPlan;
     if (!state.mutationJobId) {
@@ -274,6 +276,7 @@ export async function processPackageUploadWorkflow(
         packageAssetId,
         archiveSha256,
         identityFingerprint: identityPlan.fingerprint,
+        identityMode: policy.identityMode || 'preserve',
         operations: identityPlan.entries,
         creates: identityPlan.creates,
         updates: identityPlan.updates,
@@ -336,6 +339,9 @@ export async function processPackageUploadWorkflow(
       .filter((tdfId): tdfId is string => typeof tdfId === 'string' && tdfId.length > 0);
     const terminalResult = {
       status: 'complete',
+      identityMode: policy.identityMode || 'preserve',
+      creates: identityPlan.creates,
+      updates: identityPlan.updates,
       tdfIds,
       routes: tdfIds.map((tdfId) => `/content/${encodeURIComponent(tdfId)}`),
       results,
@@ -367,6 +373,24 @@ export async function processPackageUploadWorkflow(
           $unset: { confirmationExpiresAt: '' },
         },
       );
+    }
+    const supersededPackageAssetIds = new Set(
+      identityPlan.entries
+        .map((entry) => deps.normalizeCanonicalId(entry.beforeImage?.packageAssetId))
+        .filter((assetId): assetId is string => Boolean(assetId) && assetId !== packageAssetId),
+    );
+    for (const supersededAssetId of supersededPackageAssetIds) {
+      try {
+        const remainingReferences = await deps.Tdfs.find(
+          { packageAssetId: supersededAssetId },
+          { fields: { _id: 1 } },
+        ).fetchAsync();
+        if (remainingReferences.length === 0 && typeof deps.DynamicAssets.removeAsync === 'function') {
+          await deps.DynamicAssets.removeAsync({ _id: supersededAssetId });
+        }
+      } catch (cleanupError) {
+        deps.serverConsole('Superseded package asset cleanup failed:', supersededAssetId, cleanupError);
+      }
     }
     return terminalResult;
   } catch (error: unknown) {

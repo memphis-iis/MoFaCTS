@@ -80,14 +80,14 @@ db.tdfs.find(
 
 ### Condition TDF Lookup
 
-- Call path: `getContentUploadSummariesForIds` to `getTdfsByFileNameOrId`, `mofacts/server/methods/contentMethods.ts:250`
-- Selector shape: `{ $or: [{ _id: { $in: KEYS } }, { 'content.fileName': { $in: KEYS } }] }`
-- Projection: enough to resolve `_id` and `content.fileName`
-- Index coverage: default `_id_`, `perf_fileName`
+- Call path: `getContentUploadSummariesForIds`, `mofacts/server/methods/contentMethods.ts`
+- Selector shape: `{ _id: { $in: CONDITION_TDF_IDS } }`
+- Projection: `_id`, owner, and display filename for alignment and presentation
+- Index coverage: default `_id_`
 
 ```javascript
 db.tdfs.find(
-  { $or: [{ _id: { $in: CONDITION_KEYS } }, { 'content.fileName': { $in: CONDITION_KEYS } }] },
+  { _id: { $in: CONDITION_TDF_IDS } },
   { _id: 1, 'content.fileName': 1 }
 ).explain('executionStats')
 ```

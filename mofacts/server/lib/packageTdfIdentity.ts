@@ -21,6 +21,8 @@ export type PackageTdfIdentityEntry = {
   beforeImage: Record<string, unknown> | null;
 };
 
+export type PackageTdfIdentityMode = 'preserve' | 'copy';
+
 export type PackageTdfIdentityPlan = {
   fingerprint: string;
   entries: PackageTdfIdentityEntry[];
@@ -40,6 +42,10 @@ type IdentityDeps = {
 
 function hashValue(value: unknown) {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function packageEntryKey(value: string) {
+  return value.replace(/\\/g, '/').replace(/^\.\//, '').trim().toLowerCase();
 }
 
 function readIncomingTdfId(file: UploadedPackageFile): string | null {
@@ -101,21 +107,34 @@ function readLessonName(file: UploadedPackageFile) {
   return String((file.contents as any)?.tutor?.setspec?.lessonname || '').trim();
 }
 
+function readExperimentTarget(file: UploadedPackageFile) {
+  return String((file.contents as any)?.tutor?.setspec?.experimentTarget || '').trim().toLowerCase();
+}
+
 function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
   const tdfFiles = unzippedFiles.filter((file) => file.type === 'tdf');
   if (tdfFiles.length === 0) {
     throw new Meteor.Error('package-has-no-tdf', 'Package does not contain a TDF JSON file.');
   }
 
-  const stimuliByName = new Map<string, UploadedPackageFile>();
-  for (const stimulus of unzippedFiles.filter((file) => file.type === 'stim')) {
-    if (stimuliByName.has(stimulus.name)) {
+  const packageEntriesByName = new Map<string, UploadedPackageFile>();
+  for (const file of unzippedFiles) {
+    const key = packageEntryKey(file.name);
+    if (!key) {
+      throw new Meteor.Error('invalid-package-filename', 'Package contains an empty filename.');
+    }
+    if (packageEntriesByName.has(key)) {
       throw new Meteor.Error(
-        'duplicate-package-stimulus-filename',
-        `Package contains more than one stimulus file named "${stimulus.name}".`
+        'duplicate-package-filename',
+        `Package contains more than one entry named "${file.name}" when compared case-insensitively.`
       );
     }
-    stimuliByName.set(stimulus.name, stimulus);
+    packageEntriesByName.set(key, file);
+  }
+
+  const stimuliByName = new Map<string, UploadedPackageFile>();
+  for (const stimulus of unzippedFiles.filter((file) => file.type === 'stim')) {
+    stimuliByName.set(packageEntryKey(stimulus.name), stimulus);
   }
 
   for (const tdf of tdfFiles) {
@@ -132,7 +151,7 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
     if (!stimulusFileName) {
       throw new Meteor.Error('invalid-package-tdf', `TDF "${tdf.name}" has no stimulusfile.`);
     }
-    const stimulus = stimuliByName.get(stimulusFileName);
+    const stimulus = stimuliByName.get(packageEntryKey(stimulusFileName));
     if (!stimulus) {
       throw new Meteor.Error(
         'missing-package-stimulus',
@@ -162,12 +181,10 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
 
 async function allocateUnusedTdfId(
   deps: IdentityDeps,
-  reservedIds: Set<string>,
-  packageAssetId: string,
-  fileName: string
+  reservedIds: Set<string>
 ) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    const candidate = `tdf_${hashValue({ packageAssetId, fileName, attempt }).slice(0, 24)}`;
+    const candidate = `tdf_${crypto.randomBytes(12).toString('hex')}`;
     if (!TDF_ID_PATTERN.test(candidate) || reservedIds.has(candidate)) continue;
     const existing = await deps.Tdfs.findOneAsync({ _id: candidate }, { fields: { _id: 1 } });
     if (!existing) return candidate;
@@ -180,8 +197,9 @@ export async function preflightPackageTdfIdentities(args: {
   packageAssetId: string;
   ownerId: string;
   deps: IdentityDeps;
+  identityMode?: PackageTdfIdentityMode;
 }): Promise<PackageTdfIdentityPlan> {
-  const { unzippedFiles, packageAssetId, ownerId, deps } = args;
+  const { unzippedFiles, packageAssetId, ownerId, deps, identityMode = 'preserve' } = args;
   validatePackageContent(unzippedFiles);
   const tdfFiles = unzippedFiles.filter((file) => file.type === 'tdf');
   const filesByName = new Map<string, UploadedPackageFile>();
@@ -190,10 +208,11 @@ export async function preflightPackageTdfIdentities(args: {
   const referencedConditionIds = new Set<string>();
 
   for (const file of tdfFiles) {
-    if (filesByName.has(file.name)) {
+    const fileKey = packageEntryKey(file.name);
+    if (filesByName.has(fileKey)) {
       throw new Meteor.Error('duplicate-package-tdf-filename', `Package contains more than one TDF named "${file.name}".`);
     }
-    filesByName.set(file.name, file);
+    filesByName.set(fileKey, file);
     const incomingTdfId = readIncomingTdfId(file);
     if (incomingTdfId) {
       if (incomingIds.has(incomingTdfId)) {
@@ -202,26 +221,18 @@ export async function preflightPackageTdfIdentities(args: {
       incomingIds.add(incomingTdfId);
     }
     for (const conditionTdfId of readConditionIds(file)) {
-      if (conditionTdfId) referencedConditionIds.add(conditionTdfId);
+      if (conditionTdfId && identityMode === 'preserve') referencedConditionIds.add(conditionTdfId);
     }
-    incomingIdByFile.set(file, incomingTdfId);
+    incomingIdByFile.set(file, identityMode === 'copy' ? null : incomingTdfId);
   }
 
-  const suppliedIds = new Set([...incomingIds, ...referencedConditionIds]);
+  const suppliedIds = identityMode === 'preserve'
+    ? new Set([...incomingIds, ...referencedConditionIds])
+    : new Set<string>();
   const existingDocs = suppliedIds.size > 0
     ? await deps.Tdfs.find({ _id: { $in: Array.from(suppliedIds) } }).fetchAsync()
     : [];
   const existingById = new Map(existingDocs.map((doc: any) => [String(doc._id), doc]));
-
-  for (const file of tdfFiles) {
-    const incomingTdfId = incomingIdByFile.get(file);
-    if (incomingTdfId && !existingById.has(incomingTdfId)) {
-      throw new Meteor.Error(
-        'unknown-tdf-id',
-        `TDF "${file.name}" supplies tdfId "${incomingTdfId}", but that TDF does not exist. Remove all package identity fields to create new content.`
-      );
-    }
-  }
 
   for (const existing of existingDocs) {
     if (!(await deps.userCanManageTdf(ownerId, existing))) {
@@ -239,7 +250,7 @@ export async function preflightPackageTdfIdentities(args: {
 
   for (const file of tdfFiles) {
     const incomingTdfId = incomingIdByFile.get(file) || null;
-    const tdfId = incomingTdfId || await allocateUnusedTdfId(deps, reservedIds, packageAssetId, file.name);
+    const tdfId = incomingTdfId || await allocateUnusedTdfId(deps, reservedIds);
     reservedIds.add(tdfId);
     const entry: PackageTdfIdentityEntry = {
       fileName: file.name,
@@ -269,8 +280,39 @@ export async function preflightPackageTdfIdentities(args: {
       } : null,
     };
     entries.push(entry);
-    entryByFileName.set(entry.fileName, entry);
+    entryByFileName.set(packageEntryKey(entry.fileName), entry);
     entryByTdfId.set(entry.tdfId, entry);
+  }
+
+  const targetOwners = new Map<string, PackageTdfIdentityEntry>();
+  for (const file of tdfFiles) {
+    const target = readExperimentTarget(file);
+    if (!target) continue;
+    const entry = entryByFileName.get(packageEntryKey(file.name))!;
+    const prior = targetOwners.get(target);
+    if (prior && prior.tdfId !== entry.tdfId) {
+      throw new Meteor.Error(
+        'duplicate-package-experiment-target',
+        `Package contains more than one TDF using experiment target "${target}".`
+      );
+    }
+    targetOwners.set(target, entry);
+  }
+  if (targetOwners.size > 0) {
+    const existingTargets = await deps.Tdfs.find({
+      'content.tdfs.tutor.setspec.experimentTarget': { $in: [...targetOwners.keys()] },
+      tdfAvailability: 'available',
+    }, { fields: { _id: 1, 'content.tdfs.tutor.setspec.experimentTarget': 1 } }).fetchAsync();
+    for (const existing of existingTargets) {
+      const target = String(existing?.content?.tdfs?.tutor?.setspec?.experimentTarget || '').trim().toLowerCase();
+      const planned = targetOwners.get(target);
+      if (planned && String(existing?._id || '') !== planned.tdfId) {
+        throw new Meteor.Error(
+          'ambiguous-experiment-target',
+          `Experiment target "${target}" is already assigned to another available TDF.`
+        );
+      }
+    }
   }
 
   for (const file of tdfFiles) {
@@ -285,14 +327,14 @@ export async function preflightPackageTdfIdentities(args: {
   }
 
   for (const file of tdfFiles) {
-    const entry = entryByFileName.get(file.name)!;
+    const entry = entryByFileName.get(packageEntryKey(file.name))!;
     const conditions = readConditions(file);
     const suppliedConditionIds = readConditionIds(file);
     entry.conditionTdfIds = [];
     for (let index = 0; index < conditions.length; index += 1) {
       const conditionName = conditions[index]!;
-      const suppliedConditionId = suppliedConditionIds[index] || null;
-      const localByName = entryByFileName.get(conditionName) || null;
+      const suppliedConditionId = identityMode === 'copy' ? null : suppliedConditionIds[index] || null;
+      const localByName = entryByFileName.get(packageEntryKey(conditionName)) || null;
       const localById = suppliedConditionId ? entryByTdfId.get(suppliedConditionId) || null : null;
 
       if (suppliedConditionId) {
@@ -343,6 +385,7 @@ export async function preflightPackageTdfIdentities(args: {
 
   const fingerprint = hashValue({
     packageAssetId,
+    identityMode,
     entries: entries
       .map((entry) => {
         const existing = existingById.get(entry.tdfId);

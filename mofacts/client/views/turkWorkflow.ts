@@ -691,12 +691,11 @@ Template.turkWorkflow.events({
     const scope = `row:${rec.idx}`;
     await instance.rowCommandRegistry.run(scope, async () => {
       try {
-        const experimentFileName = rec.experimentFileName || rec.experiment;
-        const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName);
-        if (!exp?._id) throw new Error(turkText('turk.cannotDetermineExperiment'));
+        const experimentTdfId = legacyTrim(rec.experiment);
+        if (!experimentTdfId) throw new Error(turkText('turk.cannotDetermineExperiment'));
         $('#turkModalMessage').text(turkText('turk.approvingAssignment'));
         showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
-        const result = await (Meteor as any).callAsync('turkPay', rec.userId, exp._id, turkText('turk.approvalWorkerMessage'));
+        const result = await (Meteor as any).callAsync('turkPay', rec.userId, experimentTdfId, turkText('turk.approvalWorkerMessage'));
         rec.turkpayDetails = { msg: turkText('turk.refreshViewDetailsServer'), details: result || turkText('turk.noneAvailable') };
         rec.turkpay = result ? turkText('turk.failed') : turkText('turk.complete');
         turkExperimentLog.remove({'idx': rec.idx});
@@ -730,13 +729,12 @@ Template.turkWorkflow.events({
     const scope = `row:${rec.idx}`;
     await instance.rowCommandRegistry.run(scope, async () => {
       try {
-        const experimentFileName = rec.experimentFileName || rec.experiment;
-        const exp: any = await meteorCallAsync('getTdfByFileName', experimentFileName);
-        if (!exp?._id) throw new Error(turkText('turk.cannotDetermineExperiment'));
-        const expFile = legacyTrim(experimentFileName).replace(/\./g, '_');
+        const experimentTdfId = legacyTrim(rec.experiment);
+        if (!experimentTdfId) throw new Error(turkText('turk.cannotDetermineExperiment'));
+        const expFile = experimentTdfId.replace(/\./g, '_');
         $('#turkModalMessage').text(turkText('turk.sendingBonus'));
         showBootstrapModal('turkModal', { backdrop: 'static', keyboard: false });
-        const result = await (Meteor as any).callAsync('turkBonus', rec.userId, expFile, exp._id);
+        const result = await (Meteor as any).callAsync('turkBonus', rec.userId, expFile, experimentTdfId);
         rec.turkbonusDetails = { msg: turkText('turk.refreshViewDetailsServer'), details: result || turkText('turk.noneAvailable') };
         rec.turkbonus = result ? turkText('turk.failed') : turkText('turk.complete');
         turkExperimentLog.remove({'idx': rec.idx});

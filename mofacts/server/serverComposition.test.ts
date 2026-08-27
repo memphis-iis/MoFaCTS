@@ -605,75 +605,8 @@ describe('public TDF and stimulus method authorization', function() {
     }
   });
 
-  it('denies unrelated user public TDF lookup by filename', async function() {
-    await TdfsAny.insertAsync({
-      _id: 'filename-private-tdf',
-      ownerId: 'owner-user',
-      stimuliSetId: 103,
-      content: {
-        fileName: 'filename-private.json',
-        tdfs: { tutor: { setspec: { lessonname: 'Filename Private', userselect: 'false' } } },
-      },
-    });
-
-    try {
-      await (asyncMethods.getTdfByFileName as any).call({ userId: 'other-user' }, 'filename-private.json');
-      expect.fail('Expected unrelated user TDF lookup to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
-
-  it('loads pre-canonical TDF records by their durable top-level filename', async function() {
-    await TdfsAny.insertAsync({
-      _id: 'legacy-filename-tdf',
-      ownerId: 'owner-user',
-      stimuliSetId: 104,
-      tdfFileName: 'legacy-filename.json',
-      content: {
-        tdfs: { tutor: { setspec: { lessonname: 'Legacy Filename', userselect: 'true' } } },
-      },
-    });
-
-    const tdf = await (asyncMethods.getTdfByFileName as any).call(
-      { userId: 'owner-user' },
-      'legacy-filename.json',
-    );
-
-    expect(tdf._id).to.equal('legacy-filename-tdf');
-    expect(tdf.stimuliSetId).to.equal(104);
-  });
-
-  it('rejects ambiguous canonical and pre-canonical filename matches', async function() {
-    await TdfsAny.insertAsync({
-      _id: 'legacy-duplicate-filename-tdf',
-      ownerId: 'owner-user',
-      stimuliSetId: 105,
-      tdfFileName: 'duplicate-filename.json',
-      content: {
-        tdfs: { tutor: { setspec: { lessonname: 'Legacy Duplicate', userselect: 'true' } } },
-      },
-    });
-    await TdfsAny.insertAsync({
-      _id: 'canonical-duplicate-filename-tdf',
-      ownerId: 'owner-user',
-      stimuliSetId: 106,
-      tdfFileName: 'duplicate-filename.json',
-      content: {
-        fileName: 'duplicate-filename.json',
-        tdfs: { tutor: { setspec: { lessonname: 'Canonical Duplicate', userselect: 'true' } } },
-      },
-    });
-
-    try {
-      await (asyncMethods.getTdfByFileName as any).call(
-        { userId: 'owner-user' },
-        'duplicate-filename.json',
-      );
-      expect.fail('Expected duplicate filename lookup to be rejected');
-    } catch (error: any) {
-      expect(error.error).to.equal('duplicate-tdf-filename');
-    }
+  it('does not expose a public filename-based TDF lookup method', function() {
+    expect(asyncMethods.getTdfByFileName).to.equal(undefined);
   });
 
   it('requires course context when an enrolled student loads condition children of an assigned root', async function() {
@@ -734,14 +667,6 @@ describe('public TDF and stimulus method authorization', function() {
     try {
       await (asyncMethods.getTdfById as any).call({ userId: 'assigned-student' }, 'assigned-condition');
       expect.fail('Expected assigned condition-child lookup without course context to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-      expect(error.reason).to.equal('Launch this TDF through its active course assignment');
-    }
-
-    try {
-      await (asyncMethods.getTdfByFileName as any).call({ userId: 'assigned-student' }, 'AssignedCondition.json');
-      expect.fail('Expected assigned condition-child filename lookup without course context to be denied');
     } catch (error: any) {
       expect(error.error).to.equal(403);
       expect(error.reason).to.equal('Launch this TDF through its active course assignment');
@@ -995,7 +920,7 @@ describe('public TDF and stimulus method authorization', function() {
     expect(asyncMethods.getUserLastFeedbackTypeFromHistory).to.equal(undefined);
     expect(asyncMethods.getSourceSentences).to.equal(undefined);
     expect(asyncMethods.checkForTDFData).to.equal(undefined);
-    expect(asyncMethods.getTdfNamesByOwnerId).to.equal(undefined);
+    expect(asyncMethods.getTdfIdsByOwnerId).to.equal(undefined);
     expect(asyncMethods.resolveAssignedRootTdfIdsForUser).to.equal(undefined);
     expect(asyncMethods.applyDashboardHistoryRecord).to.equal(undefined);
   });
@@ -2326,7 +2251,7 @@ describe('course method authorization', function() {
     try {
       await (asyncMethods.editCourseAssignments as any).call({ userId: 'teacher-b' }, {
         courseId: 'course-owned-by-a',
-        tdfs: [],
+        tdfIds: [],
       });
       expect.fail('Expected cross-course assignment edit to be denied');
     } catch (error: any) {

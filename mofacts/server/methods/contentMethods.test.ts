@@ -103,9 +103,6 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
     isPlainRecord: (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value),
     cloneJsonLike: <T>(value: T) => JSON.parse(JSON.stringify(value)),
     normalizeCanonicalId: (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null,
-    getTdfsByFileNameOrId: async () => [
-      { _id: 'condition-a', content: { fileName: 'condition-a.json' } }
-    ],
     canAccessContentUploadTdf: async () => true,
     getOrBuildCurrentPackageAsset: async () => ({ link: '/package.zip' }),
     parseLocalMediaReference: () => ({}),

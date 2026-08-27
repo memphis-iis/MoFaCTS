@@ -31,11 +31,11 @@ export function normalizeTurkWorkflowExperiments(tdfs: unknown): TurkWorkflowExp
     const name = normalizeOptionalString(setspec?.lessonname);
     const fileName = normalizeOptionalString(tdfObject?.fileName);
     const expTarget = normalizeOptionalString(setspec?.experimentTarget);
-    if (!tdfObject || !setspec || !name || !fileName || !expTarget) {
+    const tdfId = normalizeOptionalString(tdf?._id);
+    if (!tdfObject || !setspec || !name || !fileName || !expTarget || !tdfId) {
       return;
     }
 
-    const tdfId = normalizeOptionalString(tdf?._id) || fileName;
     experiments.push({
       _id: tdfId,
       selectorKey: tdfId,

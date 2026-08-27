@@ -38,6 +38,12 @@
                                 {{t 'content.emailUploadSummary'}}
                             </label>
                         </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="importPackageAsCopy">
+                            <label class="form-check-label" for="importPackageAsCopy">
+                                {{t 'content.importAsCopy'}}
+                            </label>
+                        </div>
 
                         {{#with packageUploadMessage}}
                           {{> adminStatus variant=level text=text}}
@@ -158,6 +164,11 @@
                                             </div>
 
                                             {{#unless isPending}}
+                                                <div class="asset-identity-metadata text-muted small">
+                                                    <span><b>{{t 'content.identityFilename'}}:</b> {{fileName}}</span>
+                                                    <span><b>{{t 'content.identityTdfId'}}:</b> {{shortTdfId}}</span>
+                                                    {{#if experimentTarget}}<span><b>{{t 'content.identityExperimentTarget'}}:</b> {{experimentTarget}}</span>{{/if}}
+                                                </div>
                                                 {{#if languageMetadataRows}}
                                                 <div class="asset-language-metadata text-muted small">
                                                     {{#each languageMetadataRows}}
@@ -539,8 +550,8 @@
             </div>
             <div class="content-upload-load-more">
                 {{#if canLoadMore}}
-                <button class="btn btn-outline-secondary" id="load-more-tdfs">
-                    <i class="fa fa-plus"></i> {{t 'content.loadMore'}}
+                <button class="btn btn-primary" id="load-more-tdfs">
+                    <i class="fa fa-plus" aria-hidden="true"></i> {{t 'content.loadMore'}}
                 </button>
                 {{/if}}
             </div>

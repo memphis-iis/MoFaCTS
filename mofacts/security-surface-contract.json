@@ -178,10 +178,6 @@
       "access": "authenticated-self"
     },
     {
-      "name": "downloadDataByFile",
-      "access": "authenticated-self"
-    },
-    {
       "name": "downloadDataById",
       "access": "authenticated-self"
     },
@@ -450,10 +446,6 @@
       "access": "role-checked"
     },
     {
-      "name": "getTdfByFileName",
-      "access": "role-checked"
-    },
-    {
       "name": "getTdfById",
       "access": "role-checked"
     },
@@ -462,7 +454,7 @@
       "access": "role-checked"
     },
     {
-      "name": "getTdfNamesByOwnerId",
+      "name": "getTdfIdsByOwnerId",
       "access": "authenticated-self"
     },
     {
@@ -584,6 +576,10 @@
     {
       "name": "makeGoogleTTSApiCall",
       "access": "role-checked"
+    },
+    {
+      "name": "migrateFilenameTdfReferences",
+      "access": "admin-only"
     },
     {
       "name": "normalizeOptionalString",
@@ -728,6 +724,10 @@
     {
       "name": "saveUserSpeechAPIKey",
       "access": "role-checked"
+    },
+    {
+      "name": "startPublicDemo",
+      "access": "public-rate-limited"
     },
     {
       "name": "sendEmail",
@@ -1041,10 +1041,6 @@
     },
     {
       "name": "method:downloadDataByClass",
-      "access": "role-checked"
-    },
-    {
-      "name": "method:downloadDataByFile",
       "access": "role-checked"
     },
     {

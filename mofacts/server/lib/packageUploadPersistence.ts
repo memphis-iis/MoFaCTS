@@ -10,6 +10,10 @@ import {
   type SaveContentResult,
 } from './packageUploadShared';
 
+function packageEntryKey(value: string) {
+  return value.replace(/\\/g, '/').replace(/^\.\//, '').trim().toLowerCase();
+}
+
 export async function processParsedPackageTdfs(args: {
   unzippedFiles: UploadedPackageFile[];
   fileObj: DynamicAssetLike;
@@ -37,7 +41,7 @@ export async function processParsedPackageTdfs(args: {
   const results: SaveContentResult[] = [];
   const childUserSelectByFileName = new Map<string, string>();
   const identityByFileName = new Map(
-    (state.identityPlan?.entries || []).map((entry) => [entry.fileName, entry])
+    (state.identityPlan?.entries || []).map((entry) => [packageEntryKey(entry.fileName), entry])
   );
 
   for (const rootCandidate of unzippedFiles.filter((file) => file.type === 'tdf')) {
@@ -62,11 +66,12 @@ export async function processParsedPackageTdfs(args: {
         throw new Error(`Root TDF "${rootCandidate.name}" has an invalid condition reference.`);
       }
       const conditionFileName = condition.trim();
-      const previous = childUserSelectByFileName.get(conditionFileName);
+      const conditionKey = packageEntryKey(conditionFileName);
+      const previous = childUserSelectByFileName.get(conditionKey);
       if (previous && previous !== rootUserSelect) {
         throw new Error(`Condition TDF "${conditionFileName}" is referenced by roots with conflicting public/private settings.`);
       }
-      childUserSelectByFileName.set(conditionFileName, rootUserSelect);
+      childUserSelectByFileName.set(conditionKey, rootUserSelect);
     }
   }
 
@@ -88,11 +93,12 @@ export async function processParsedPackageTdfs(args: {
           };
         };
       };
-      const identity = identityByFileName.get(tdf.name);
+      const identity = identityByFileName.get(packageEntryKey(tdf.name));
       if (!identity) {
         throw new Error(`Package identity preflight did not assign an id to TDF "${tdf.name}".`);
       }
-      const stim = unzippedFiles.find((file) => file.name === tdfContents.tutor.setspec.stimulusfile);
+      const stimulusKey = packageEntryKey(tdfContents.tutor.setspec.stimulusfile);
+      const stim = unzippedFiles.find((file) => file.type === 'stim' && packageEntryKey(file.name) === stimulusKey);
       deps.serverConsole(
         'Processing stimFileName:',
         stimFileName,
@@ -125,7 +131,7 @@ export async function processParsedPackageTdfs(args: {
       if (!isTeacherOrAdmin) {
         tdfContents.tutor.setspec.userselect = 'false';
       }
-      const inheritedUserSelect = childUserSelectByFileName.get(tdf.name);
+      const inheritedUserSelect = childUserSelectByFileName.get(packageEntryKey(tdf.name));
       if (inheritedUserSelect) {
         tdfContents.tutor.setspec.userselect = inheritedUserSelect;
       }

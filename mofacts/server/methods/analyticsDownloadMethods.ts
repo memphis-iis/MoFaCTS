@@ -29,10 +29,9 @@ type AnalyticsDownloadDeps = {
   createExperimentExport: (keys: unknown[], userId: string) => Promise<string>;
   createExperimentExportByTdfIds: (tdfIds: string[], userId: string) => Promise<string>;
   createExperimentExportFromHistories: (histories: any[]) => Promise<string>;
-  getTdfNamesByOwnerId: (ownerId: string) => Promise<string[] | null>;
+  getTdfIdsByOwnerId: (ownerId: string) => Promise<string[] | null>;
   assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
   canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
-  getTdfByFileName: (filename: string) => Promise<any>;
 };
 
 function sanitizeFileNameSegment(value: unknown, defaultValue: string) {
@@ -56,7 +55,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
         forbiddenCode: 403,
       });
 
-      const ownedTdfs = await deps.getTdfNamesByOwnerId(targetUserId);
+      const ownedTdfs = await deps.getTdfIdsByOwnerId(targetUserId);
       if (!ownedTdfs) {
         throw new Meteor.Error(500, 'Failed to resolve owned TDFs for download');
       }
@@ -109,60 +108,9 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
       throw new Meteor.Error(403, 'Class-based data download is not allowed in this flow');
     },
 
-    downloadDataByFile: async function(this: MethodContext, fileName: string) {
-      check(fileName, String);
-
-      if (!this.userId) {
-        throw new Meteor.Error(401, 'Must be logged in');
-      }
-      if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
-        throw new Meteor.Error(400, 'Invalid file name');
-      }
-
-      const downloadFileName = fileName.split('.json')[0] + '-data.tsv';
-      const tdf = await deps.getTdfByFileName(fileName);
-      if (!tdf) {
-        throw new Meteor.Error(404, 'TDF not found');
-      }
-      if (!deps.canDownloadOwnedTdfData(this.userId, tdf)) {
-        throw new Meteor.Error(403, 'Not authorized to download data for this TDF');
-      }
-      const exportTdfIds = new Set<string>([String(tdf._id)]);
-      const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
-      if (familyValidation.errors.length > 0) {
-        throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
-      }
-      if (familyValidation.conditionTdfIds.length > 0) {
-        const ownedConditionDocs = await deps.Tdfs.find(
-          { _id: { $in: familyValidation.conditionTdfIds }, ownerId: tdf.ownerId },
-          { fields: { _id: 1, 'content.fileName': 1 } }
-        ).fetchAsync();
-        const childFileNameById = new Map<string, string>(ownedConditionDocs.map((doc: any) => [
-          String(doc._id),
-          typeof doc?.content?.fileName === 'string' ? doc.content.fileName.trim() : '',
-        ]));
-        if (
-          ownedConditionDocs.length !== familyValidation.conditionTdfIds.length
-          || assertConditionFilenameIdAlignment(
-            familyValidation.conditionFileNames,
-            familyValidation.conditionTdfIds,
-            childFileNameById,
-          ).length > 0
-        ) {
-          throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
-        }
-        for (const ownedCondition of ownedConditionDocs) {
-          exportTdfIds.add(String(ownedCondition._id));
-        }
-      }
-
-      const tsvContent = await deps.createExperimentExportByTdfIds(Array.from(exportTdfIds), this.userId);
-
-      return { fileName: downloadFileName, contentType: 'text/tab-separated-values', content: tsvContent };
-    },
-
-    downloadDataById: async function(this: MethodContext, tdfId: string) {
+    downloadDataById: async function(this: MethodContext, tdfId: string, includeConditions: boolean = false) {
       check(tdfId, String);
+      check(includeConditions, Boolean);
 
       if (!this.userId) {
         throw new Meteor.Error(401, 'Must be logged in');
@@ -179,7 +127,36 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
       const lessonName = tdf.content?.tdfs?.tutor?.setspec?.lessonname || `tdf-${tdfId}`;
       const fileName = `${sanitizeFileNameSegment(lessonName, `tdf-${tdfId}`)}-data.tsv`;
 
-      const tsvContent = await deps.createExperimentExportByTdfIds([tdfId], this.userId);
+      const exportTdfIds = new Set<string>([tdfId]);
+      if (includeConditions) {
+        const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
+        if (familyValidation.errors.length > 0) {
+          throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
+        }
+        const ownedConditionDocs = familyValidation.conditionTdfIds.length > 0
+          ? await deps.Tdfs.find(
+              { _id: { $in: familyValidation.conditionTdfIds }, ownerId: tdf.ownerId },
+              { fields: { _id: 1, 'content.fileName': 1 } }
+            ).fetchAsync()
+          : [];
+        const childFileNameById = new Map<string, string>(ownedConditionDocs.map((doc: any) => [
+          String(doc._id),
+          typeof doc?.content?.fileName === 'string' ? doc.content.fileName.trim() : '',
+        ]));
+        if (
+          ownedConditionDocs.length !== familyValidation.conditionTdfIds.length
+          || assertConditionFilenameIdAlignment(
+            familyValidation.conditionFileNames,
+            familyValidation.conditionTdfIds,
+            childFileNameById,
+          ).length > 0
+        ) {
+          throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
+        }
+        for (const child of ownedConditionDocs) exportTdfIds.add(String(child._id));
+      }
+
+      const tsvContent = await deps.createExperimentExportByTdfIds([...exportTdfIds], this.userId);
       return { fileName, contentType: 'text/tab-separated-values', content: tsvContent };
     },
   };

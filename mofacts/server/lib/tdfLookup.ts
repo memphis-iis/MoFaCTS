@@ -99,7 +99,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       : [];
   }
 
-  async function getTdfsByFileNameOrId(keys: unknown[]) {
+  async function getTdfsByIds(keys: unknown[]) {
     const normalizedKeys = normalizeTdfKeys(keys);
     if (normalizedKeys.length === 0) {
       return [];
@@ -107,19 +107,13 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
 
     return await deps.Tdfs.find(
       {
-        $or: [
-          { _id: { $in: normalizedKeys } },
-          { 'content.fileName': { $in: normalizedKeys } },
-          { tdfFileName: { $in: normalizedKeys } },
-        ]
+        _id: { $in: normalizedKeys }
       },
       {
         fields: {
           _id: 1,
           ownerId: 1,
-          accessors: 1,
-          tdfFileName: 1,
-          'content.fileName': 1
+          accessors: 1
         }
       }
     ).fetchAsync();
@@ -327,49 +321,6 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     throw new Meteor.Error(403, 'Not authorized to access this TDF');
   }
 
-  async function getTdfByFileName(filename: string) {
-    const normalizedFilename = typeof filename === 'string' ? filename.trim() : '';
-    if (!normalizedFilename) {
-      return null;
-    }
-    const matches = await deps.Tdfs.find({
-      $or: [
-        { 'content.fileName': normalizedFilename },
-        { tdfFileName: normalizedFilename },
-      ],
-    }).fetchAsync();
-    if (matches.length > 1) {
-      throw new Meteor.Error(
-        'duplicate-tdf-filename',
-        `More than one TDF uses the filename "${normalizedFilename}"; resolve the duplicate records before updating content.`,
-      );
-    }
-    return matches[0] ?? null;
-  }
-
-  async function getTdfAccessByFileName(filename: string) {
-    const normalizedFilename = typeof filename === 'string' ? filename.trim() : '';
-    if (!normalizedFilename) {
-      return null;
-    }
-    const matches = await deps.Tdfs.find(
-      {
-        $or: [
-          { 'content.fileName': normalizedFilename },
-          { tdfFileName: normalizedFilename },
-        ],
-      },
-      { fields: TDF_ACCESS_FIELDS },
-    ).fetchAsync();
-    if (matches.length > 1) {
-      throw new Meteor.Error(
-        'duplicate-tdf-filename',
-        `More than one TDF uses the filename "${normalizedFilename}"; resolve the duplicate records before loading content.`,
-      );
-    }
-    return matches[0] ?? null;
-  }
-
   async function userCanAccessContentUploadTdf(userId: string, tdf: TdfAccessDoc | null | undefined) {
     return deps.canAccessContentUploadTdf(userId, tdf);
   }
@@ -391,18 +342,11 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       throw new Meteor.Error(400, 'No TDFs specified');
     }
 
-    const tdfs = await getTdfsByFileNameOrId(normalizedKeys);
+    const tdfs = await getTdfsByIds(normalizedKeys);
     const tdfByKey = new Map();
     for (const tdf of tdfs) {
       if (tdf?._id) {
         tdfByKey.set(tdf._id, tdf);
-      }
-      const fileName = tdf?.content?.fileName;
-      if (fileName) {
-        tdfByKey.set(fileName, tdf);
-      }
-      if (tdf?.tdfFileName) {
-        tdfByKey.set(tdf.tdfFileName, tdf);
       }
     }
 
@@ -419,9 +363,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
 
   return {
     getTdfById,
-    getTdfByFileName,
-    getTdfAccessByFileName,
-    getTdfsByFileNameOrId,
+    getTdfsByIds,
     userCanAccessContentUploadTdf,
     userCanManageTdf,
     assertUserOwnsTdfs,

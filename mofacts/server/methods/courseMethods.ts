@@ -770,26 +770,17 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return await getCourseAssignmentEditorSnapshot.call(this, String(course._id));
   }
 
-  async function editCourseAssignments(this: MethodContext, newCourseAssignment: { courseId: string; tdfs: string[] }) {
+  async function editCourseAssignments(this: MethodContext, newCourseAssignment: { courseId: string; tdfIds: string[] }) {
     try {
       await assertCanManageCourse(this, newCourseAssignment.courseId);
-      if (!Array.isArray(newCourseAssignment.tdfs)) {
-        throw new Meteor.Error(400, 'Legacy assignment payload requires a tdfs array');
+      if (!Array.isArray(newCourseAssignment.tdfIds)) {
+        throw new Meteor.Error(400, 'Assignment payload requires a tdfIds array');
       }
-      const fileNames = newCourseAssignment.tdfs.map((fileName) => String(fileName || '').trim()).filter(Boolean);
-      const tdfs = await deps.Tdfs.find(
-        { 'content.fileName': { $in: fileNames } },
-        { fields: { _id: 1, 'content.fileName': 1 } }
-      ).fetchAsync();
-      const tdfIdByFileName = new Map(tdfs.map((tdf: any) => [String(tdf?.content?.fileName || ''), String(tdf?._id || '')]));
-      const missingFileNames = fileNames.filter((fileName) => !tdfIdByFileName.get(fileName));
-      if (missingFileNames.length > 0) {
-        throw new Meteor.Error(400, `Could not resolve TDF file name(s): ${missingFileNames.join(', ')}`);
-      }
+      const tdfIds = [...new Set(newCourseAssignment.tdfIds.map((tdfId) => String(tdfId || '').trim()).filter(Boolean))];
       const result = await saveCourseAssignments.call(this, {
         courseId: newCourseAssignment.courseId,
-        assignments: fileNames.map((fileName, order) => ({
-          TDFId: tdfIdByFileName.get(fileName)!,
+        assignments: tdfIds.map((tdfId, order) => ({
+          TDFId: tdfId,
           order,
           releaseAt: null,
           dueAt: null,
@@ -805,7 +796,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   async function getTdfAssignmentsByCourseIdMap(this: MethodContext, instructorId: string) {
     instructorId = await resolveInstructorForCaller(this, instructorId);
     deps.serverConsole('getTdfAssignmentsByCourseIdMap', instructorId);
-    const assignmentTdfFileNamesRet = await deps.Assignments.rawCollection().aggregate([
+    const assignmentTdfs = await deps.Assignments.rawCollection().aggregate([
       {
         $lookup: {
           from: 'course',
@@ -845,22 +836,22 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         },
       },
     ]).toArray();
-    deps.serverConsole('Found', assignmentTdfFileNamesRet.length, 'assigned TDFs');
+    deps.serverConsole('Found', assignmentTdfs.length, 'assigned TDFs');
 
-    const assignmentTdfFileNamesByCourseIdMap: Record<string, Array<{ assignmentId: string; TDFId: string; displayName: string; dueAt: unknown }>> = {};
-    for (const assignment of assignmentTdfFileNamesRet) {
+    const assignmentsByCourseId: Record<string, Array<{ assignmentId: string; TDFId: string; displayName: string; dueAt: unknown }>> = {};
+    for (const assignment of assignmentTdfs) {
       const courseId = String(assignment.courseId);
-      if (!assignmentTdfFileNamesByCourseIdMap[courseId]) {
-        assignmentTdfFileNamesByCourseIdMap[courseId] = [];
+      if (!assignmentsByCourseId[courseId]) {
+        assignmentsByCourseId[courseId] = [];
       }
-      assignmentTdfFileNamesByCourseIdMap[courseId]!.push({
+      assignmentsByCourseId[courseId]!.push({
         assignmentId: assignment._id || assignment.assignmentId,
         TDFId: assignment.TDFId,
         displayName: assignment.content.tdfs.tutor.setspec.lessonname,
         dueAt: assignment.dueAt || null,
       });
     }
-    return assignmentTdfFileNamesByCourseIdMap;
+    return assignmentsByCourseId;
   }
 
   async function resolveAssignedRootTdfIdsForUser(userId: string) {
@@ -1064,15 +1055,15 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     }
   }
 
-  async function getTdfNamesByOwnerId(ownerId: string) {
-    deps.serverConsole('getTdfNamesByOwnerId', ownerId);
+  async function getTdfIdsByOwnerId(ownerId: string) {
+    deps.serverConsole('getTdfIdsByOwnerId', ownerId);
     try {
       const tdfs = await deps.Tdfs.find({ ownerId }).fetchAsync();
-      const ownedTdfFileNames = tdfs.map((tdf: { content?: { fileName?: string }; _id: string }) => tdf.content?.fileName || tdf._id);
-      deps.serverConsole('ownedTdfFileNames count:', ownedTdfFileNames.length);
-      return ownedTdfFileNames;
+      const ownedTdfIds = tdfs.map((tdf: { _id: string }) => String(tdf._id));
+      deps.serverConsole('ownedTdfIds count:', ownedTdfIds.length);
+      return ownedTdfIds;
     } catch (e: unknown) {
-      throwLoggedCourseOperationError(deps, 'getTdfNamesByOwnerId', e);
+      throwLoggedCourseOperationError(deps, 'getTdfIdsByOwnerId', e);
     }
   }
 
@@ -1369,7 +1360,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     refreshCourseSnapshotAfterPractice,
     getTdfsAssignedToStudent,
     getTdfNamesAssignedByInstructor,
-    getTdfNamesByOwnerId,
+    getTdfIdsByOwnerId,
     getAllTeachers,
     addCourse,
     editCourse,

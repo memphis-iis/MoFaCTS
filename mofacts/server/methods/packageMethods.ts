@@ -117,8 +117,6 @@ type PackageMethodsDeps = {
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   normalizeCanonicalId: (value: unknown) => string | null;
   getResponseKCAnswerKey: (answer: unknown) => string;
-  getTdfByFileName: (filename: string) => Promise<any>;
-  getTdfsByFileNameOrId: (keys: unknown[]) => Promise<any[]>;
   getStimuliSetIdByFilename: (stimFileName: string) => Promise<string | number | null | undefined>;
   userCanManageTdf: (userId: string, tdf: any) => Promise<boolean> | boolean;
   allocateNextStimuliSetId: () => number;
@@ -272,13 +270,32 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     };
   }
 
-  async function processPackageUpload(this: MethodContext, fileObjOrId: string | DynamicAssetLike, _owner: string, _zipLink: string, emailToggle: boolean, integrity?: PackageUploadIntegrity){
+  async function processPackageUpload(
+    this: MethodContext,
+    fileObjOrId: string | DynamicAssetLike,
+    _owner: string,
+    _zipLink: string,
+    emailToggle: boolean,
+    integrity?: PackageUploadIntegrity,
+    identityMode: 'preserve' | 'copy' = 'preserve'
+  ){
     const actingUserId = deps.normalizeCanonicalId(this.userId);
     if (!actingUserId) {
       throw new Meteor.Error(401, 'Must be logged in');
     }
     await requireContentCreatorDisplayName(deps.usersCollection, actingUserId);
-    return processPackageUploadWorkflow(this, fileObjOrId, actingUserId, emailToggle, getPackageUploadDeps(), integrity);
+    if (identityMode !== 'preserve' && identityMode !== 'copy') {
+      throw new Meteor.Error('invalid-package-identity-mode', 'Package identity mode must be preserve or copy.');
+    }
+    return processPackageUploadWorkflow(
+      this,
+      fileObjOrId,
+      actingUserId,
+      emailToggle,
+      getPackageUploadDeps(),
+      integrity,
+      { identityMode }
+    );
   }
 
   async function confirmPackageUpload(
@@ -327,6 +344,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
           confirmedIdentityFingerprint: job.identityFingerprint,
           expectedArchiveSha256: job.archiveSha256,
           mutationJobId: uploadPlanId,
+          identityMode: job.identityMode === 'copy' ? 'copy' : 'preserve',
         }
       );
       await deps.TdfMutationJobs.updateAsync(

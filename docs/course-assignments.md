@@ -580,7 +580,7 @@ Performance rules:
 
 - Keep temporarily only for confirmed old callers, but new UI must call `saveCourseAssignments`.
 - If retained, implement it as a thin compatibility wrapper around `saveCourseAssignments` that converts the old file-name array into assignment rows.
-- The wrapper must fail clearly when a file name cannot be resolved to a TDF id.
+- Assignment writers accept TDF IDs directly and fail clearly when an ID is missing or inaccessible; filenames are presentation metadata only.
 - Do not maintain two independent assignment-save paths.
 
 ## Course Management UI

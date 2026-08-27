@@ -1,5 +1,5 @@
 import {Roles} from 'meteor/alanning:roles';
-import {getTdfById, getTdfByFileName, serverConsole} from './serverComposition';
+import {getTdfById, serverConsole} from './serverComposition';
 import {turk} from './turk';
 import {displayify} from '../common/globalHelpers';
 
@@ -85,7 +85,7 @@ async function userLogGetTdfId(userid: string, experiment: string) {
 
     // Only need to see the tdf select event once to get the key
     if (action === 'expcondition' || action === 'condition-notify') {
-      id = legacyDisplay(rec.currentTdfName);
+      id = legacyDisplay(rec.currentTdfId || rec.TDFId);
       if (id) {
         break;
       }
@@ -93,9 +93,9 @@ async function userLogGetTdfId(userid: string, experiment: string) {
   }
 
   if (id) {
-    const tdf = await getTdfByFileName(id);
+    const tdf = await getTdfById(id);
     if (tdf) {
-      return tdf.content._id;
+      return tdf._id;
     }
   }
 
@@ -749,10 +749,7 @@ Meteor.methods({
       throw new Meteor.Error('Experiment key is required');
     }
 
-    let expTDF = await getTdfByFileName(experimentKey);
-    if (!expTDF) {
-      expTDF = await getTdfById(experimentKey);
-    }
+    const expTDF = await getTdfById(experimentKey);
     if (!expTDF || !expTDF._id) {
       throw new Meteor.Error('Could not find experiment TDF for ' + experimentKey);
     }
@@ -762,7 +759,6 @@ Meteor.methods({
     }
 
     const expTDFId = expTDF._id;
-    const expTDFFileName = legacyTrim((expTDF as any)?.content?.fileName || '');
     const familyValidation = validateConditionFamilyTutor((expTDF as any)?.content?.tdfs?.tutor, { requireCanonicalIds: true });
     if (familyValidation.isConditionRoot && familyValidation.errors.length > 0) {
       throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair before it can be used.');
@@ -796,11 +792,6 @@ Meteor.methods({
         .map((entry) => legacyTrim(String(entry || '')))
         .filter((entry) => entry.length > 0)
     )];
-    const scopedFileNames = [...new Set(
-      [expTDFFileName, ...conditionDocs.map((tdf: any) => legacyTrim(tdf?.content?.fileName || ''))]
-        .map((entry) => legacyTrim(String(entry || '')))
-        .filter((entry) => entry.length > 0)
-    )];
     const records: any[] = [];
 
     // Omnibus scope:
@@ -809,13 +800,8 @@ Meteor.methods({
     const allExperimentStates = await GlobalExperimentStates.find({
       TDFId: {$in: scopedTdfIds}
     }).fetchAsync();
-    const messageExperimentKeys = [...new Set([
-      experimentKey,
-      ...scopedTdfIds,
-      ...scopedFileNames
-    ])];
     const scheduledMessages = await ScheduledTurkMessages.find({
-      experiment: {$in: messageExperimentKeys}
+      experiment: {$in: scopedTdfIds}
     }).fetchAsync();
     const userTimeScopeQuery = scopedTdfIds.length > 0
       ? { $or: scopedTdfIds.map((tdfId: string) => ({ [tdfId]: { $exists: true } })) }
@@ -841,7 +827,6 @@ Meteor.methods({
     const scheduledMessagesForUsers = scheduledMessages.filter((entry: any) => allUserIds.includes(entry?.workerUserId));
 
     const tdfFileNameById: Record<string, string> = {};
-    const tdfIdByFileName: Record<string, string> = {};
     const posttestUnitByTdfId: Record<string, number> = {};
     const getNormalizedUnitName = (unit: any) => {
       const raw = Array.isArray(unit?.unitname) ? unit.unitname[0] : unit?.unitname;
@@ -854,9 +839,6 @@ Meteor.methods({
         continue;
       }
       tdfFileNameById[tdfId] = fileName || tdfId;
-      if (fileName) {
-        tdfIdByFileName[fileName] = tdfId;
-      }
       const units = Array.isArray((tdf as any)?.content?.tdfs?.tutor?.unit)
         ? (tdf as any).content.tdfs.tutor.unit
         : [];
@@ -868,14 +850,12 @@ Meteor.methods({
       const key = legacyTrim(String(rawKey || ''));
       if (!key) return null;
       if (scopedTdfIds.includes(key)) return key;
-      if (tdfIdByFileName[key]) return tdfIdByFileName[key];
       return null;
     };
-    const historyTdfKeys = [...new Set([...scopedTdfIds, ...scopedFileNames])];
     const scopedHistories = await Histories.find(
       {
         userId: { $in: allUserIds },
-        TDFId: { $in: historyTdfKeys }
+        TDFId: { $in: scopedTdfIds }
       },
       {
         fields: {
@@ -955,7 +935,7 @@ Meteor.methods({
       Object.keys(experimentStatesByUserTdf[userId] || {}).forEach((tdfId) => rowTdfIds.add(tdfId));
       Object.keys(latestScheduledByUserTdf[userId] || {}).forEach((tdfId) => rowTdfIds.add(tdfId));
       if (userTimes) {
-        for (const key of [...scopedTdfIds, ...scopedFileNames]) {
+        for (const key of scopedTdfIds) {
           const tdfId = resolveScopedTdfId(key);
           if (!tdfId) {
             continue;

@@ -52,12 +52,7 @@ export function createTurkWorkflowMethods(deps: TurkWorkflowMethodsDeps) {
     }
 
     const experiment = await deps.Tdfs.findOneAsync(
-      {
-        $or: [
-          { _id: normalizedExperimentId },
-          { 'content.fileName': normalizedExperimentId },
-        ],
-      },
+      { _id: normalizedExperimentId },
       {
         fields: {
           _id: 1,
@@ -141,12 +136,7 @@ export function createTurkWorkflowMethods(deps: TurkWorkflowMethodsDeps) {
 
     getUsersByExperimentId: async function(this: MethodContext, experimentId: string){
       const { experiment } = await assertCanManageExperiment(this, experimentId);
-      const experimentKeys = [
-        experiment._id,
-        experiment.content?.fileName,
-      ].filter((key) => typeof key === 'string' && key.trim().length > 0);
-
-      const messages =  await deps.ScheduledTurkMessages.find({experiment: { $in: experimentKeys }}).fetchAsync();
+      const messages = await deps.ScheduledTurkMessages.find({ experiment: experiment._id }).fetchAsync();
       const userIds = messages.map((x: { workerUserId?: string }) => x.workerUserId).filter((id: unknown): id is string => typeof id === 'string');
       const uniqueUserIds = Array.from(new Set(userIds));
       const users = await deps.usersCollection.find(

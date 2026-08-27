@@ -22,6 +22,7 @@ type PackageProcessingOptions = {
   callAsync: (method: string, ...args: unknown[]) => Promise<any>;
   userId: string | null;
   emailOnCompletion?: boolean;
+  identityMode?: 'preserve' | 'copy';
   confirmUpdates?: (plan: {
     uploadPlanId: string;
     expiresAt: Date | string;
@@ -101,6 +102,7 @@ export async function processUploadedPackage(options: PackageProcessingOptions &
     link,
     options.emailOnCompletion === true,
     integrity,
+    options.identityMode || 'preserve',
   );
   if (processing?.status === 'confirmation-required') {
     const confirmed = await options.confirmUpdates?.(processing) ?? false;

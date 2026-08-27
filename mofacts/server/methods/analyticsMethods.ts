@@ -71,10 +71,9 @@ type AnalyticsMethodsDeps = {
   createExperimentExport: (keys: unknown[], userId: string) => Promise<string>;
   createExperimentExportByTdfIds: (tdfIds: string[], userId: string) => Promise<string>;
   createExperimentExportFromHistories: (histories: any[]) => Promise<string>;
-  getTdfNamesByOwnerId: (ownerId: string) => Promise<string[] | null>;
+  getTdfIdsByOwnerId: (ownerId: string) => Promise<string[] | null>;
   assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
   canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
-  getTdfByFileName: (filename: string) => Promise<any>;
   getClassPerformanceByTdfWorkflow: (
     classId: string,
     tdfId: string,

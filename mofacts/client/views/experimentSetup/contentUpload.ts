@@ -685,7 +685,9 @@ Template.contentUpload.helpers({
       const conditionTargets = new Set();
       for (const summary of (Object.values(summaryMap as Record<string, any>) as any[])) {
         if (Array.isArray(summary?.conditions)) {
-          summary.conditions.forEach((c: any) => conditionTargets.add(c.condition));
+          summary.conditions.forEach((c: any) => {
+            if (c.tdfId) conditionTargets.add(c.tdfId);
+          });
         }
       }
 
@@ -716,6 +718,8 @@ Template.contentUpload.helpers({
             thisTdf.stimFileInfo = [];
             thisTdf.stimFilesCount = null;
             thisTdf.fileName = summary?.fileName || 'unknown.xml';
+            thisTdf.shortTdfId = tdfId.length > 18 ? `${tdfId.slice(0, 10)}…${tdfId.slice(-6)}` : tdfId;
+            thisTdf.experimentTarget = summary?.experimentTarget || '';
             thisTdf.languageMetadataRows = buildLanguageMetadataRows(summary);
 
             thisTdf.isOwnTdf = summary?.ownerId === Meteor.userId();
@@ -743,7 +747,7 @@ Template.contentUpload.helpers({
               thisTdf.errors.push('Package asset ID is missing from stored metadata. Rebuild or re-upload this package before managing it.');
             }
             const isConditionalTarget = summary
-              ? (conditionTargets.has(thisTdf.fileName) || conditionTargets.has(tdfId))
+              ? conditionTargets.has(tdfId)
               : false;
             if (isConditionalTarget) {
               continue;
@@ -1541,7 +1545,7 @@ Template.contentUpload.events({
       const packageFile = event.currentTarget.getAttribute('data-package-file');
       const fileName = event.currentTarget.getAttribute('data-filename') || 'this package';
       const row = $(event.currentTarget).closest('tr');
-      const tdfId = row.find('#content-edit-btn').attr('value') || packageAssetId || fileName;
+      const tdfId = row.find('#content-edit-btn').attr('value') || packageAssetId;
 
       const confirmed = await requestContentConfirmation(template, {
         placement: assetActionPlacement(String(tdfId || '')),
@@ -2067,33 +2071,7 @@ async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template
 
 
 async function doPackageUpload(file: any, template: any): Promise<{ fileName: string; error?: string; skipped?: boolean }>{
-  let existingFile = null;
-  try {
-    existingFile = await MeteorAny.callAsync('getUserAssetByName', file.name);
-  } catch (error: any) {
-    clientConsole(1, '[UPLOAD] Failed to check existing package:', error);
-    setUploadMessage(template, contentText('content.existingPackageCheckError', { error: uploadErrorText(error) }), 'error');
-    return { fileName: file.name, error: uploadErrorText(error) };
-  }
-
-  if (existingFile) {
-    const confirmed = await requestContentConfirmation(template, {
-      placement: 'upload-package',
-      title: contentText('content.overwriteExistingPackage'),
-      message: contentText('content.packageOverwriteMessage', { filename: file.name }),
-      confirmLabel: contentText('content.overwritePackage'),
-      cancelLabel: contentText('content.cancel'),
-      level: 'warning'
-    });
-    if (confirmed) {
-      // Security: Use server method instead of direct client remove
-      await MeteorAny.callAsync('removeAssetById', existingFile._id);
-    } else {
-      setUploadMessage(template, contentText('content.uploadCanceledPackage', { filename: file.name }), 'warning');
-      return { fileName: file.name, skipped: true };
-    }
-  }
-
+  const identityMode = $('#importPackageAsCopy').is(':checked') ? 'copy' : 'preserve';
   // OPTIMISTIC UI: Create pending entry immediately
   const tempId = Random.id();
   template.pendingUploads.set(tempId, {
@@ -2251,6 +2229,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                 callAsync: MeteorAny.callAsync.bind(MeteorAny),
                 userId: Meteor.userId(),
                 emailOnCompletion: emailToggle,
+                identityMode,
                 confirmUpdates: async (plan) => requestContentConfirmation(template, {
                   placement: 'upload-package',
                   title: contentText('content.overwriteExistingContent'),

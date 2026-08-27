@@ -178,22 +178,18 @@ Template.dataDownload.events({
   },
   'click .data-download-link'(event: any, instance: DataDownloadInstance) {
     event.preventDefault();
-    const fileName = event.currentTarget.getAttribute('data-fileName');
     const fileId = event.currentTarget.getAttribute('data-fileId');
-    if (fileName) {
-      makeDataDownloadMethodCall(instance, `tdf:${fileId}`, 'downloadDataByFile', fileName);
-    } else {
+    if (fileId) {
       makeDataDownloadMethodCall(instance, `tdf:${fileId}`, 'downloadDataById', fileId);
     }
   },
   'click .root-omnibus-download-link'(event: any, instance: DataDownloadInstance) {
     event.preventDefault();
-    const fileName = event.currentTarget.getAttribute('data-fileName');
     const fileId = event.currentTarget.getAttribute('data-fileId');
-    if (!fileName) {
+    if (!fileId) {
       return;
     }
-    makeDataDownloadMethodCall(instance, `tdf:${fileId}`, 'downloadDataByFile', fileName);
+    makeDataDownloadMethodCall(instance, `tdf:${fileId}`, 'downloadDataById', fileId, true);
   },
   'click #userDataDownloadLink'(event: any, instance: DataDownloadInstance) {
     event.preventDefault();
