@@ -1,26 +1,22 @@
 <template name="signIn">
     <div class="auth-page page-loading" id="signInContainer">
-        {{#unless isExperiment}}
-        <header class="auth-public-header">
-            <a class="auth-public-brand" href="/">
-                {{#if currentTheme.properties.brand_logo_url}}<span class="navbar-brand-icon" aria-hidden="true" style="--navbar-brand-icon-image: url('{{currentTheme.properties.brand_logo_url}}');"></span>{{/if}}
-                <span>{{systemName}}</span>
-            </a>
-            <a class="auth-public-back" href="/"><span class="auth-back-arrow" aria-hidden="true">←</span> {{t 'auth.backToOverview'}}</a>
-        </header>
-        {{/unless}}
         <div class="auth-shell">
             <div class="auth-card card">
                 <div class="card-body auth-card-body">
                     <div class="auth-brand">
-                        <h2 class="auth-system-name">
-                            {{#if currentTheme.properties.brand_logo_url}}
-                                <span class="navbar-brand-icon"
-                                      aria-hidden="true"
-                                      style="--navbar-brand-icon-image: url('{{currentTheme.properties.brand_logo_url}}');"></span>
-                            {{/if}}
-                            <span>{{systemName}}</span>
-                        </h2>
+                        <div class="auth-card-heading">
+                            <h2 class="auth-system-name">
+                                {{#if currentTheme.properties.brand_logo_url}}
+                                    <span class="navbar-brand-icon"
+                                          aria-hidden="true"
+                                          style="--navbar-brand-icon-image: url('{{currentTheme.properties.brand_logo_url}}');"></span>
+                                {{/if}}
+                                <span>{{systemName}}</span>
+                            </h2>
+                            {{#unless isExperiment}}
+                                <a class="auth-public-back auth-card-overview-link" href="/"><span class="auth-back-arrow" aria-hidden="true">←</span> {{t 'auth.backToOverview'}}</a>
+                            {{/unless}}
+                        </div>
                         {{#if isExperiment}}
                             <h1 class="auth-title experiment-portal-title">{{t 'auth.experimentPortal'}}</h1>
                         {{else}}

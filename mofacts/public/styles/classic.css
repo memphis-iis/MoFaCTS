@@ -643,10 +643,11 @@ input[type="file"]::file-selector-button:hover,
     max-width: 33rem;
     flex: 1 1 auto;
     width: 100%;
+    margin: 0 auto;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
-    padding-top: clamp(2rem, 6vh, 4.5rem);
+    padding-block: clamp(0.75rem, 3vh, 2rem);
 }
 
 #signInContainer .auth-card {
@@ -660,6 +661,19 @@ input[type="file"]::file-selector-button:hover,
 
 #signInContainer .auth-brand {
     gap: calc(0.45rem * var(--app-density-scale));
+}
+
+#signInContainer .auth-card-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-space-3);
+}
+
+#signInContainer .auth-card-overview-link {
+    flex: 0 0 auto;
+    font-size: calc(var(--app-font-size-base) * 0.9);
+    white-space: nowrap;
 }
 
 #signInContainer .sign-in-title {
@@ -867,6 +881,10 @@ input[type="file"]::file-selector-button:hover,
         padding: var(--app-space-0) calc(0.55rem * var(--app-density-scale));
     }
 
+    #signInContainer .auth-shell {
+        padding-block: calc(0.55rem * var(--app-density-scale));
+    }
+
     .auth-public-header { min-height: 4rem; }
     .auth-public-back { font-size: .9rem; }
 
@@ -882,6 +900,15 @@ input[type="file"]::file-selector-button:hover,
     #signInContainer .auth-system-name .navbar-brand-icon {
         width: 2rem;
         height: 2rem;
+    }
+
+    #signInContainer .auth-card-heading {
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    #signInContainer .auth-card-overview-link {
+        font-size: calc(var(--app-font-size-base) * 0.82);
     }
 
     #signInContainer .auth-description {
