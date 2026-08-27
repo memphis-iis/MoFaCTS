@@ -20,6 +20,7 @@ describe('publicDemoContract', function() {
     for (const definition of Object.values(PUBLIC_DEMO_DEFINITIONS)) {
       expect(definition.launchPath).to.equal(`/experiment/${definition.experimentTarget}`);
     }
+    expect(PUBLIC_DEMO_DEFINITIONS.teacher.experimentTarget).to.equal('public-demo-teacher-autotutor');
   });
 
   it('expires exactly 24 hours after creation', function() {
