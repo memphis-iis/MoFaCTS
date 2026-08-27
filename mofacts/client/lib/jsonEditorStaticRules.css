@@ -1,0 +1,44 @@
+/*
+ * Static form of the default and Bootstrap 5 rules bundled with
+ * @json-editor/json-editor 2.15.2. JSONEditor's runtime CSSOM injection is
+ * disabled by jsonEditorLoader.ts so these rules work under production CSP.
+ */
+.json-editor-btntype-toggle { margin: 0 10px 0 0; }
+.je-array-control-btn { width: 100%; text-align: left; margin-bottom: 3px; }
+.choices > * { box-sizing: border-box; }
+.je-object__title { display: inline-block; }
+.je-object__controls { margin: 0 0 0 10px; }
+.je-object__container { position: relative; }
+.je-object__property-checkbox { margin: 0; height: auto; }
+.property-selector { width: 295px; max-height: 160px; padding: 5px 0 5px 5px; overflow-y: auto; overflow-x: hidden; }
+.property-selector-input { width: 220px; margin-bottom: 0; display: inline-block; }
+.je-edit-json--textarea { height: 170px; width: 300px; display: block; }
+.starrating { direction: rtl; display: inline-block; white-space: nowrap; }
+.starrating > input { display: none; }
+.starrating > label::before { content: '\2606'; margin: 1px; font: 400 18px/1 Arial; display: inline-block; }
+.starrating > label { color: #888; cursor: pointer; margin: 8px 0 2px; }
+.starrating > label.starrating-display-enabled { margin: 1px 0 0; }
+.starrating > input:checked ~ label,
+.starrating:not(.readonly) > input:hover ~ label { color: #ffca08; }
+.starrating > input:checked ~ label::before,
+.starrating:not(.readonly) > input:hover ~ label::before { content: '\2605'; text-shadow: 0 0 1px rgba(0, 20, 20, 1); }
+.starrating .starrating-display { position: relative; direction: rtl; text-align: center; font-size: 10px; line-height: 0; }
+
+div[data-theme='bootstrap5'] .form-group { margin-bottom: 1rem; }
+div[data-theme='bootstrap5'] .form-text { display: block; }
+div[data-theme='bootstrap5'] .jsoneditor-twbs5-text-button { background: none; padding: 0; border: 0; color: currentColor; }
+div[data-theme='bootstrap5'] td > .form-group { margin-bottom: 0; }
+div[data-theme='bootstrap5'] .json-editor-btn-upload { margin-top: 1rem; }
+div[data-theme='bootstrap5'] .je-noindent .card { padding: 0; border: 0; }
+div[data-theme='bootstrap5'] .je-tooltip:hover::before { display: block; position: absolute; font-size: 0.8em; color: #fff; border-radius: 0.2em; content: attr(title); background-color: #000; margin-top: -2.5em; padding: 0.3em; }
+div[data-theme='bootstrap5'] .je-tooltip:hover::after { display: block; position: absolute; font-size: 0.8em; color: #fff; }
+div[data-theme='bootstrap5'] .select2-container--default .select2-selection--single { height: calc(1.5em + 0.75rem + 2px); }
+div[data-theme='bootstrap5'] .select2-container--default .select2-selection--single .select2-selection__arrow { height: calc(1.5em + 0.75rem + 2px); }
+div[data-theme='bootstrap5'] .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: calc(1.5em + 0.75rem + 2px); }
+div[data-theme='bootstrap5'] .selectize-control.form-control { padding: 0; }
+div[data-theme='bootstrap5'] .selectize-dropdown.form-control { padding: 0; height: auto; }
+div[data-theme='bootstrap5'] .je-upload-preview img { float: left; margin: 0 0.5rem 0.5rem 0; max-width: 100%; max-height: 5rem; }
+div[data-theme='bootstrap5'] .je-dropzone { position: relative; margin: 0.5rem 0; border: 2px dashed #000; width: 100%; height: 60px; background: teal; transition: all 0.5s; }
+div[data-theme='bootstrap5'] .je-dropzone::before { position: absolute; content: attr(data-text); color: rgba(0, 0, 0, 0.6); left: 50%; top: 50%; transform: translate(-50%, -50%); }
+div[data-theme='bootstrap5'] .je-dropzone.valid-dropzone { background: green; }
+div[data-theme='bootstrap5'] .je-dropzone.invalid-dropzone { background: red; }
