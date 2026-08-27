@@ -12,6 +12,10 @@ import {
   npmAuditFindings,
   parseTrivyHighCritical,
 } from './scanner-parsers.mjs';
+import {
+  boundedBuildExposureObservations,
+  classifyDevelopmentDependencyPosture,
+} from './dependency-posture.mjs';
 
 const outputPath = process.argv[2];
 if (!outputPath) throw new Error('output path is required');
@@ -21,6 +25,13 @@ const repoRoot = toolRepoRoot;
 const appRoot = path.join(repoRoot, 'mofacts');
 const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-security-audit-'));
 const controls = [];
+let developmentExposurePolicy = null;
+try {
+  developmentExposurePolicy = JSON.parse(await fs.readFile(
+    path.join(toolAppRoot, 'scripts', 'security-audit', 'development-dependency-exposure.json'),
+    'utf8',
+  ));
+} catch { /* each development control reports the missing policy below */ }
 
 async function sourceFiles(directory) {
   const entries = await fs.readdir(directory, { withFileTypes: true });
@@ -82,9 +93,49 @@ try {
       { id: 'development', findings: developmentFindings },
     ]) {
       const controlId = `repository.dependencies-${lockfile.name}-${graph.id}`;
-      const title = `${lockfile.name} ${graph.id} dependencies have no known vulnerable packages`;
+      const title = graph.id === 'runtime'
+        ? `${lockfile.name} runtime dependencies have no known vulnerable packages`
+        : `${lockfile.name} development advisories have no confirmed production build exposure`;
       if (!graph.findings) {
         controls.push(errorControl(controlId, title, 'npm audit output was missing or malformed'));
+        continue;
+      }
+      if (graph.id === 'development') {
+        let posture = null;
+        try {
+          posture = classifyDevelopmentDependencyPosture(
+            graph.findings,
+            developmentExposurePolicy,
+            lockfile.name,
+          );
+        } catch { /* malformed or missing policy becomes an explicit ERROR */ }
+        if (!posture) {
+          controls.push(errorControl(controlId, title, 'development dependency exposure policy was missing or malformed'));
+          continue;
+        }
+        const observations = [
+          ...boundedBuildExposureObservations(posture.confirmed),
+          ...boundedNpmFindings(graph.findings),
+        ].slice(0, 12);
+        controls.push(control(
+          controlId,
+          title,
+          posture.status,
+          posture.severity,
+          posture.status === 'FAIL'
+            ? `${posture.confirmed.length} development dependency advisories have a reviewed build or CI exploitation path.`
+            : graph.findings.length === 0
+              ? 'npm audit reported no advisories unique to the development dependency graph.'
+              : `npm audit reported ${graph.findings.length} advisory packages unique to the development dependency graph; they remain visible as maintenance evidence and have no confirmed build or CI exploitation path.`,
+          {
+            observations,
+            metrics: {
+              maintenanceAdvisoryPackageCount: posture.maintenanceAdvisoryPackageCount,
+              confirmedBuildExposureCount: posture.confirmed.length,
+              productionDependencyGraphReachable: false,
+            },
+          },
+        ));
         continue;
       }
       const highest = graph.findings.some((finding) => finding.severity === 'critical') ? 'CRITICAL'

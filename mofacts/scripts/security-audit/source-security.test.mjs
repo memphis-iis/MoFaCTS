@@ -15,6 +15,10 @@ import {
 } from './audit-lib.mjs';
 import { resolveCompositeUdpExposure } from './composite-exposure.mjs';
 import {
+  boundedBuildExposureObservations,
+  classifyDevelopmentDependencyPosture,
+} from './dependency-posture.mjs';
+import {
   INTERNAL_CONTROL_DEFINITIONS,
   INTERNAL_EXECUTION_CATEGORIES,
   internalExecutionError,
@@ -231,8 +235,19 @@ test('repository findings expose bounded identifiers without raw scanner evidenc
     'npm.transitive: severity=moderate, direct=no',
   ]);
   assert.deepEqual(boundedNpmFindings(npmAuditFindings({
-    vulnerabilities: { direct: { severity: 'high', isDirect: true } },
+    vulnerabilities: {
+      direct: {
+        severity: 'high',
+        isDirect: true,
+        via: [{ source: 1234567, title: 'bounded advisory metadata' }, 'transitive-package'],
+      },
+    },
   })), ['npm.direct: severity=high, direct=yes']);
+  assert.deepEqual(npmAuditFindings({
+    vulnerabilities: {
+      direct: { severity: 'high', isDirect: true, via: [{ source: 1234567 }, { source: 'GHSA-test' }] },
+    },
+  })[0].advisoryIds, ['1234567', 'GHSA-test']);
   assert.deepEqual(boundedTrivyObservations([
     { VulnerabilityID: 'CVE-2026-1234', PkgName: 'runtime-lib', InstalledVersion: '1.0.0', Severity: 'HIGH', FixedVersion: '2.0.0', auditTarget: '/app/package-lock.json', auditClass: 'lang-pkgs' },
   ]), ['trivy.CVE-2026-1234: package=runtime-lib, installed=1.0.0, fixed=2.0.0, severity=HIGH, class=lang-pkgs, target=/app/package-lock.json']);
@@ -243,13 +258,58 @@ test('repository findings expose bounded identifiers without raw scanner evidenc
 
 test('development dependency findings exclude runtime packages without mutating source order', () => {
   const all = [
-    { name: 'dev-only', severity: 'high', direct: true },
-    { name: 'runtime', severity: 'moderate', direct: false },
+    { name: 'dev-only', severity: 'high', direct: true, advisoryIds: ['1234567'] },
+    { name: 'runtime', severity: 'moderate', direct: false, advisoryIds: ['7654321'] },
   ];
-  const runtime = [{ name: 'runtime', severity: 'moderate', direct: false }];
+  const runtime = [{ name: 'runtime', severity: 'moderate', direct: false, advisoryIds: ['7654321'] }];
   assert.deepEqual(developmentOnlyNpmFindings(all, runtime), [all[0]]);
   boundedNpmFindings(all);
   assert.deepEqual(all.map((finding) => finding.name), ['dev-only', 'runtime']);
+});
+
+test('development advisories are informational unless a reviewed build exposure matches exactly', () => {
+  const findings = [{ name: '@rspack/cli', severity: 'moderate', direct: true, advisoryIds: ['1234567'] }];
+  const emptyPolicy = { schema: 'DevelopmentDependencyExposurePolicyV1', confirmedBuildExposures: [] };
+  assert.deepEqual(classifyDevelopmentDependencyPosture(findings, emptyPolicy, 'application'), {
+    status: 'PASS',
+    severity: 'INFO',
+    confirmed: [],
+    maintenanceAdvisoryPackageCount: 1,
+  });
+
+  const reviewedPolicy = {
+    schema: 'DevelopmentDependencyExposurePolicyV1',
+    confirmedBuildExposures: [{
+      lockfile: 'application',
+      package: '@rspack/cli',
+      advisoryId: '1234567',
+      rationaleId: 'ci-untrusted-input-rce',
+    }],
+  };
+  const confirmed = classifyDevelopmentDependencyPosture(findings, reviewedPolicy, 'application');
+  assert.equal(confirmed.status, 'FAIL');
+  assert.equal(confirmed.severity, 'MEDIUM');
+  assert.deepEqual(boundedBuildExposureObservations(confirmed.confirmed), [
+    'confirmed-build-exposure.@rspack/cli: advisory=1234567, rationale=ci-untrusted-input-rce',
+  ]);
+  assert.equal(classifyDevelopmentDependencyPosture(findings, reviewedPolicy, 'sidecar-mongo').status, 'PASS');
+  assert.throws(() => classifyDevelopmentDependencyPosture(findings, {}, 'application'));
+  assert.throws(() => classifyDevelopmentDependencyPosture(
+    findings,
+    { schema: 'DevelopmentDependencyExposurePolicyV1', confirmedBuildExposures: [{}] },
+    'application',
+  ));
+  assert.throws(() => classifyDevelopmentDependencyPosture(
+    findings,
+    {
+      ...reviewedPolicy,
+      confirmedBuildExposures: [
+        reviewedPolicy.confirmedBuildExposures[0],
+        reviewedPolicy.confirmedBuildExposures[0],
+      ],
+    },
+    'application',
+  ));
 });
 
 test('canary scanning detects retained secrets without emitting their values', () => {

@@ -40,9 +40,9 @@ const expected = {
   repository: [
     ['repository.git-history-secrets', 'Git history contains no detected secrets'],
     ['repository.dependencies-application-runtime', 'application runtime dependencies have no known vulnerable packages'],
-    ['repository.dependencies-application-development', 'application development dependencies have no known vulnerable packages'],
+    ['repository.dependencies-application-development', 'application development advisories have no confirmed production build exposure'],
     ['repository.dependencies-sidecar-mongo-runtime', 'sidecar-mongo runtime dependencies have no known vulnerable packages'],
-    ['repository.dependencies-sidecar-mongo-development', 'sidecar-mongo development dependencies have no known vulnerable packages'],
+    ['repository.dependencies-sidecar-mongo-development', 'sidecar-mongo development advisories have no confirmed production build exposure'],
     ['repository.security-surface-contract', 'Every server surface has an access classification'],
     ['repository.sensitive-logging', 'Potential credentials and personal identifiers are absent from log calls'],
     ['repository.source-security-tests', 'Source security contract tests pass'],

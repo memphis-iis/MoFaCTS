@@ -104,6 +104,10 @@ export function npmAuditFindings(value) {
         name: safeIdentifier(name, 80),
         severity: safeIdentifier(vulnerability.severity.toLowerCase(), 16),
         direct: vulnerability.isDirect === true,
+        advisoryIds: [...new Set((Array.isArray(vulnerability.via) ? vulnerability.via : [])
+          .filter((entry) => entry && typeof entry === 'object'
+            && (typeof entry.source === 'number' || typeof entry.source === 'string'))
+          .map((entry) => safeIdentifier(String(entry.source), 80)))],
       };
     });
 }
