@@ -17,6 +17,7 @@ import {
 import { setDisplayFeedback } from './views/experiment/svelte/services/feedbackRuntimeState';
 import { ExperimentStateStore } from './lib/state/experimentStateStore';
 import {instructContinue} from './views/experiment/instructions';
+import { shouldSuppressAuthenticatedChrome } from './lib/authenticatedChromePolicy';
 import {routeToSignin} from './lib/router';
 import { resolveNormalLoginDestination } from './lib/normalLoginDestination';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
@@ -51,6 +52,8 @@ import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
 import { getPracticeLaunchMode } from './lib/practiceLaunchMode';
 import { isLessonRoutePath } from './lib/lessonRoute';
+import { clearStoredPublicDemoSession, readStoredPublicDemoSession } from './lib/publicDemoSession';
+import { publicExperienceText } from './views/publicExperience/publicExperienceI18n';
 
 // =============================================================================
 // Blaze Template Registration
@@ -133,10 +136,12 @@ function getAuthenticatedChromeMode(): AuthenticatedChromeMode {
   if (Meteor.userId() === null) {
     return 'none';
   }
-  if (Session.get('suppressAuthenticatedChrome') === true) {
-    return 'none';
-  }
-  if (Session.get('loginMode') === 'experiment') {
+  const user = Meteor.user() as any;
+  if (shouldSuppressAuthenticatedChrome({
+    explicitlySuppressed: Session.get('suppressAuthenticatedChrome') === true,
+    loginMode: Session.get('loginMode'),
+    userCreatedBy: user?.profile?.createdBy,
+  })) {
     return 'none';
   }
 
@@ -498,6 +503,24 @@ function isPublicLogoutPath(path: string | null | undefined) {
 
 function handleUnexpectedLogout(currentPath: string) {
   if (isPublicLogoutPath(currentPath)) {
+    return;
+  }
+
+  if (readStoredPublicDemoSession()) {
+    clientConsole(1, '[AUTH] Public demo session ended, returning to overview from', currentPath);
+    Session.set('loginMode', 'normal');
+    Cookie.set('isExperiment', '0', 1);
+    Cookie.set('experimentTarget', '', 1);
+    Cookie.set('experimentXCond', '', 1);
+    clearStoredPublicDemoSession();
+    Session.set('curModule', 'signinoauth');
+    Session.set('appLoading', false);
+    sessionCleanUp();
+    Session.set('uiMessage', {
+      variant: 'warning',
+      text: publicExperienceText(getActiveUiLocale(), 'demoExpired'),
+    });
+    FlowRouter.go('/');
     return;
   }
 

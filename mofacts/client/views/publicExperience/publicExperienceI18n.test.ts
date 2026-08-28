@@ -26,4 +26,20 @@ describe('publicExperienceI18n', function() {
       expect(publicExperienceText(locale, 'demoResume')).not.to.equal(publicExperienceText('en', 'demoResume'));
     }
   });
+
+  it('describes the expiring session without calling the demo temporary or anonymous', function() {
+    const demoCopy = [
+      publicExperienceText('en', 'demosCopy'),
+      publicExperienceText('en', 'demoTemporary'),
+      publicExperienceText('en', 'demoPrivacy'),
+      publicExperienceText('en', 'demoStarting'),
+      publicExperienceText('en', 'demoExpired'),
+    ].join(' ');
+
+    expect(demoCopy).not.to.match(/\btemporary\b/i);
+    expect(demoCopy).not.to.match(/\banonymous\b/i);
+    expect(publicExperienceText('en', 'demoTemporary')).to.equal('Interactive demo');
+    expect(publicExperienceText('en', 'demosCopy')).to.contain('Demo sessions last 24 hours.');
+    expect(publicExperienceText('en', 'demoPrivacy')).to.contain('learning data are deleted after 24 hours.');
+  });
 });

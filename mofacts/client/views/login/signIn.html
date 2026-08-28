@@ -1,5 +1,5 @@
 <template name="signIn">
-    <div class="auth-page page-loading" id="signInContainer">
+    <div class="auth-page page-loading {{#unless isExperiment}}public-theme-context{{/unless}}" id="signInContainer">
         <div class="auth-shell">
             <div class="auth-card card">
                 <div class="card-body auth-card-body">

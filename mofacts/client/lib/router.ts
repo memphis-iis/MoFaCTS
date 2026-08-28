@@ -42,6 +42,8 @@ import {
 import { getPracticeLaunchMode, setPracticeLaunchMode } from './practiceLaunchMode';
 import { resolveLessonRouteRequest, type LessonRouteRequest } from './lessonRoute';
 import { publicExperienceText } from '../views/publicExperience/publicExperienceI18n';
+import { isPublicDemoKind } from '../../common/publicDemoContract';
+import { clearStoredPublicDemoSession, isPublicDemoAccount, publicDemoOverviewPath } from './publicDemoSession';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const Tdfs: any = (globalThis as any).Tdfs;
 const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
@@ -392,6 +394,12 @@ function renderContentSubscriptionWaitOnlyWhenCold(controller: any): void {
 }
 
 function renderHomeForUser(controller: any, user: any) {
+  if (isPublicDemoAccount(user)) {
+    clientConsole(2, '[ROUTER] Public demo completed or exited, returning to overview');
+    FlowRouter.go('/auth/logout');
+    return;
+  }
+
   const loginMode = getUserLoginMode(user);
   clientConsole(2, '[ROUTER] renderHomeForUser - loginMode:', loginMode);
 
@@ -424,6 +432,10 @@ function renderHomeForUser(controller: any, user: any) {
 
 function handleIndexRoute(controller: any, user: any) {
   if (user) {
+    if (isPublicDemoAccount(user)) {
+      FlowRouter.go('/auth/logout');
+      return;
+    }
     if (getUserLoginMode(user) === 'experiment') {
       routeToSignin();
       return;
@@ -731,14 +743,7 @@ async function renderSignInRoute(controller: any) {
     return;
   }
   if (user?.profile?.createdBy === 'publicDemo') {
-    await new Promise<void>((resolve) => Meteor.logout(() => resolve()));
-    Cookie.set('isExperiment', '0', 1);
-    Cookie.set('experimentTarget', '', 1);
-    Cookie.set('experimentXCond', '', 1);
-    Session.set('loginMode', 'normal');
-    window.sessionStorage.removeItem('mofacts.publicDemo.v1');
-    Session.set('curModule', 'signinoauth');
-    renderLayout(controller, 'signIn');
+    FlowRouter.go('/auth/logout');
     return;
   }
   if (user && getUserLoginMode(user) !== 'experiment') {
@@ -811,7 +816,7 @@ FlowRouter.route('/auth/logout', {
     Cookie.set('isExperiment', '0', 1);
     Cookie.set('experimentTarget', '', 1);
     Cookie.set('experimentXCond', '', 1);
-    window.sessionStorage.removeItem('mofacts.publicDemo.v1');
+    clearStoredPublicDemoSession();
     FlowRouter.go('/');
   }
 });
@@ -819,14 +824,14 @@ FlowRouter.route('/auth/logout', {
 FlowRouter.route('/demo/:kind', {
   name: 'client.publicDemo',
   action: function(params: any) {
-    const kind = String(params?.kind || '');
-    if (!['student', 'teacher', 'researcher'].includes(kind)) {
+    const kind = params?.kind;
+    if (!isPublicDemoKind(kind)) {
       FlowRouter.go('/');
       return;
     }
     const renderDemo = () => {
-      const user = Meteor.user() as any;
-      if (user && user?.profile?.createdBy !== 'publicDemo') {
+      const user = Meteor.user();
+      if (user && !isPublicDemoAccount(user)) {
         Session.set('uiMessage', {
           variant: 'info',
           text: publicExperienceText(getActiveUiLocale(), 'demoSignedIn'),
@@ -834,8 +839,11 @@ FlowRouter.route('/demo/:kind', {
         FlowRouter.go('/home');
         return;
       }
-      Session.set('curModule', 'publicDemo');
-      renderLayout(this, 'publicDemoLaunch');
+      if (isPublicDemoAccount(user)) {
+        FlowRouter.go('/auth/logout');
+        return;
+      }
+      FlowRouter.go(publicDemoOverviewPath(kind));
     };
     if (shouldWaitForAuthHydration()) {
       waitForPublicAuthHydration(this, 'client.publicDemo', renderDemo);

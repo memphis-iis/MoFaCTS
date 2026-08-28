@@ -4,7 +4,7 @@ import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { resolveThemeBrandLabel } from '../../../common/themeBranding';
-import { isPublicDemoKind, PUBLIC_DEMO_DEFINITIONS, type PublicDemoKind } from '../../../common/publicDemoContract';
+import { PUBLIC_DEMO_DEFINITIONS, type PublicDemoKind } from '../../../common/publicDemoContract';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { meteorCallAsync } from '../../lib/meteorAsync';
 import { getErrorMessage } from '../../lib/errorUtils';
@@ -12,21 +12,20 @@ import { clientConsole } from '../../lib/clientLogger';
 import { Cookie } from '../../lib/cookies';
 import { setExperimentParticipantContext } from '../../lib/idContext';
 import { completeExperimentSignIn } from '../login/signIn';
+import {
+  clearStoredPublicDemoSession,
+  isPublicDemoAccount,
+  readStoredPublicDemoSession,
+  writeStoredPublicDemoSession,
+} from '../../lib/publicDemoSession';
 import { publicExperienceText, type PublicExperienceKey } from './publicExperienceI18n';
 import './publicLanding.html';
-import './publicDemoLaunch.html';
 import './publicExperience.css';
 
 type PublicDemoLaunchResult = {
   loginToken: string;
   launchPath: string;
   expiresAt: Date | string;
-};
-
-type StoredPublicDemo = {
-  kind: PublicDemoKind;
-  experimentTarget: string;
-  expiresAt: string;
 };
 
 const PUBLIC_AUDIENCES = ['student', 'teacher', 'researcher'] as const;
@@ -37,16 +36,15 @@ type PublicAudiencePresentation = {
   titleKey: PublicExperienceKey;
   copyKey: PublicExperienceKey;
   actionKey: PublicExperienceKey;
-  path: string;
   tabId: string;
   icon: string;
   secondaryIcon: string;
 };
 
 const PUBLIC_AUDIENCE_PRESENTATIONS: Record<PublicAudience, PublicAudiencePresentation> = {
-  student: { labelKey: 'navStudents', titleKey: 'studentTitle', copyKey: 'studentCopy', actionKey: 'studentAction', path: '/demo/student', tabId: 'publicAudienceStudent', icon: 'fa-graduation-cap', secondaryIcon: 'fa-line-chart' },
-  teacher: { labelKey: 'navTeachers', titleKey: 'teacherTitle', copyKey: 'teacherCopy', actionKey: 'teacherAction', path: '/demo/teacher', tabId: 'publicAudienceTeacher', icon: 'fa-comments', secondaryIcon: 'fa-pencil' },
-  researcher: { labelKey: 'navResearchers', titleKey: 'researcherTitle', copyKey: 'researcherCopy', actionKey: 'researcherAction', path: '/demo/researcher', tabId: 'publicAudienceResearcher', icon: 'fa-flask', secondaryIcon: 'fa-table' },
+  student: { labelKey: 'navStudents', titleKey: 'studentTitle', copyKey: 'studentCopy', actionKey: 'studentAction', tabId: 'publicAudienceStudent', icon: 'fa-graduation-cap', secondaryIcon: 'fa-line-chart' },
+  teacher: { labelKey: 'navTeachers', titleKey: 'teacherTitle', copyKey: 'teacherCopy', actionKey: 'teacherAction', tabId: 'publicAudienceTeacher', icon: 'fa-comments', secondaryIcon: 'fa-pencil' },
+  researcher: { labelKey: 'navResearchers', titleKey: 'researcherTitle', copyKey: 'researcherCopy', actionKey: 'researcherAction', tabId: 'publicAudienceResearcher', icon: 'fa-flask', secondaryIcon: 'fa-table' },
 };
 
 function isPublicAudience(value: unknown): value is PublicAudience {
@@ -66,22 +64,6 @@ function audienceHash(audience: PublicAudience): string {
   return '#students';
 }
 
-function readStoredPublicDemo(): StoredPublicDemo | null {
-  const raw = window.sessionStorage.getItem('mofacts.publicDemo.v1');
-  if (!raw) return null;
-  try {
-    const value = JSON.parse(raw) as Partial<StoredPublicDemo>;
-    if (!isPublicDemoKind(value.kind) || typeof value.experimentTarget !== 'string' || typeof value.expiresAt !== 'string') {
-      window.sessionStorage.removeItem('mofacts.publicDemo.v1');
-      return null;
-    }
-    return value as StoredPublicDemo;
-  } catch {
-    window.sessionStorage.removeItem('mofacts.publicDemo.v1');
-    return null;
-  }
-}
-
 function currentPublicText(key: PublicExperienceKey): string {
   return publicExperienceText(getActiveUiLocale(), key);
 }
@@ -90,23 +72,18 @@ function systemName(): string {
   return resolveThemeBrandLabel(Session.get('curTheme'), Meteor.settings.public?.systemName);
 }
 
-function currentDemoKind(): PublicDemoKind | null {
-  const kind = (FlowRouter.current() as { params?: { kind?: unknown } } | undefined)?.params?.kind;
-  return isPublicDemoKind(kind) ? kind : null;
-}
-
-function demoCopy(kind: PublicDemoKind | null): { title: string; description: string } {
-  if (kind === 'teacher') return { title: currentPublicText('teacherTitle'), description: currentPublicText('teacherCopy') };
-  if (kind === 'researcher') return { title: currentPublicText('researcherTitle'), description: currentPublicText('researcherCopy') };
-  return { title: currentPublicText('studentTitle'), description: currentPublicText('studentCopy') };
-}
-
 Template.publicLanding.onCreated(function(this: any) {
   this.selectedAudience = new ReactiveVar<PublicAudience>(audienceFromHash());
+  this.launching = new ReactiveVar(false);
+  this.launchError = new ReactiveVar('');
+  const stored = readStoredPublicDemoSession();
+  this.expired = new ReactiveVar(Boolean(stored && new Date(stored.expiresAt).getTime() <= Date.now()));
+  if (this.expired.get()) clearStoredPublicDemoSession();
 });
 
 Template.publicLanding.helpers({
   systemName,
+  currentYear() { return new Date().getFullYear(); },
   pt(key: PublicExperienceKey) { return currentPublicText(key); },
   audienceCurrent(audience: PublicAudience) { return (Template.instance() as any).selectedAudience.get() === audience ? 'page' : false; },
   audienceSelected(audience: PublicAudience) { return (Template.instance() as any).selectedAudience.get() === audience ? 'true' : 'false'; },
@@ -116,16 +93,38 @@ Template.publicLanding.helpers({
   activeAudienceTitle() { return currentPublicText(PUBLIC_AUDIENCE_PRESENTATIONS[(Template.instance() as any).selectedAudience.get() as PublicAudience].titleKey); },
   activeAudienceCopy() { return currentPublicText(PUBLIC_AUDIENCE_PRESENTATIONS[(Template.instance() as any).selectedAudience.get() as PublicAudience].copyKey); },
   activeAudienceAction() { return currentPublicText(PUBLIC_AUDIENCE_PRESENTATIONS[(Template.instance() as any).selectedAudience.get() as PublicAudience].actionKey); },
-  activeAudiencePath() { return PUBLIC_AUDIENCE_PRESENTATIONS[(Template.instance() as any).selectedAudience.get() as PublicAudience].path; },
   activeAudienceIcon() { return PUBLIC_AUDIENCE_PRESENTATIONS[(Template.instance() as any).selectedAudience.get() as PublicAudience].icon; },
   activePreviewSecondaryIcon() { return PUBLIC_AUDIENCE_PRESENTATIONS[(Template.instance() as any).selectedAudience.get() as PublicAudience].secondaryIcon; },
+  launchError() { return (Template.instance() as any).launchError.get(); },
+  expiredMessage() { return (Template.instance() as any).expired.get() ? currentPublicText('demoExpired') : ''; },
+  startDisabled() {
+    const instance = Template.instance() as any;
+    const user = Meteor.user();
+    return instance.launching.get() || Boolean(user && !isPublicDemoAccount(user));
+  },
+  startLabel() {
+    const instance = Template.instance() as any;
+    if (instance.launching.get()) return currentPublicText('demoStarting');
+    const audience = instance.selectedAudience.get() as PublicAudience;
+    const user = Meteor.user() as any;
+    if (isPublicDemoAccount(user) && user?.profile?.publicDemoKind === audience) {
+      return currentPublicText('demoResume');
+    }
+    return currentPublicText(PUBLIC_AUDIENCE_PRESENTATIONS[audience].actionKey);
+  },
+  launchStatus() { return (Template.instance() as any).launching.get() ? currentPublicText('demoStarting') : ''; },
 });
 
 function selectPublicAudience(template: any, audience: PublicAudience, shouldScroll: boolean): void {
   template.selectedAudience.set(audience);
+  template.launchError.set('');
+  template.expired.set(false);
   window.history.replaceState(window.history.state, '', audienceHash(audience));
   if (shouldScroll) {
-    document.getElementById('publicAudiences')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('publicAudiences')?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
   }
 }
 
@@ -141,66 +140,29 @@ Template.publicLanding.events({
     event.preventDefault();
     const selected = template.selectedAudience.get() as PublicAudience;
     const currentIndex = PUBLIC_AUDIENCES.indexOf(selected);
+    const inlineDirection = document.documentElement.dir === 'rtl' ? -1 : 1;
+    const arrowOffset = event.key === 'ArrowRight' ? inlineDirection : -inlineDirection;
     const nextIndex = event.key === 'Home'
       ? 0
       : event.key === 'End'
         ? PUBLIC_AUDIENCES.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + PUBLIC_AUDIENCES.length) % PUBLIC_AUDIENCES.length;
+        : (currentIndex + arrowOffset + PUBLIC_AUDIENCES.length) % PUBLIC_AUDIENCES.length;
     const nextAudience = PUBLIC_AUDIENCES[nextIndex]!;
     selectPublicAudience(template, nextAudience, false);
     requestAnimationFrame(() => {
       document.getElementById(PUBLIC_AUDIENCE_PRESENTATIONS[nextAudience].tabId)?.focus();
     });
   },
-});
-
-Template.publicDemoLaunch.onCreated(function(this: any) {
-  this.launching = new ReactiveVar(false);
-  this.launchError = new ReactiveVar('');
-  const stored = readStoredPublicDemo();
-  this.expired = new ReactiveVar(Boolean(stored && new Date(stored.expiresAt).getTime() <= Date.now()));
-  if (this.expired.get()) window.sessionStorage.removeItem('mofacts.publicDemo.v1');
-});
-
-Template.publicDemoLaunch.helpers({
-  systemName,
-  pt(key: PublicExperienceKey) { return currentPublicText(key); },
-  demoTitle() { return demoCopy(currentDemoKind()).title; },
-  demoDescription() { return demoCopy(currentDemoKind()).description; },
-  isTeacher() { return currentDemoKind() === 'teacher'; },
-  isResearcher() { return currentDemoKind() === 'researcher'; },
-  launchError() { return (Template.instance() as any).launchError.get(); },
-  expiredMessage() { return (Template.instance() as any).expired.get() ? currentPublicText('demoExpired') : ''; },
-  signedInMessage() {
-    const user = Meteor.user() as any;
-    return user && user?.profile?.createdBy !== 'publicDemo' ? currentPublicText('demoSignedIn') : '';
-  },
-  startDisabled() {
-    const instance = Template.instance() as any;
-    const user = Meteor.user() as any;
-    return instance.launching.get() || Boolean(user && user?.profile?.createdBy !== 'publicDemo');
-  },
-  startLabel() {
-    if ((Template.instance() as any).launching.get()) return currentPublicText('demoStarting');
-    const user = Meteor.user() as any;
-    return user?.profile?.createdBy === 'publicDemo' && user?.profile?.publicDemoKind === currentDemoKind()
-      ? currentPublicText('demoResume')
-      : currentPublicText('demoStart');
-  },
-  launchStatus() { return (Template.instance() as any).launching.get() ? currentPublicText('demoStarting') : ''; },
-});
-
-Template.publicDemoLaunch.events({
   async 'click [data-public-demo-start]'(_event: Event, template: any) {
-    const kind = currentDemoKind();
-    if (!kind || template.launching.get()) return;
+    const kind = template.selectedAudience.get() as PublicDemoKind;
+    if (template.launching.get()) return;
     const currentUser = Meteor.user() as any;
-    if (currentUser && currentUser?.profile?.createdBy !== 'publicDemo') {
+    if (currentUser && !isPublicDemoAccount(currentUser)) {
       FlowRouter.go('/home');
       return;
     }
     const definition = PUBLIC_DEMO_DEFINITIONS[kind];
-    if (currentUser?.profile?.createdBy === 'publicDemo') {
+    if (isPublicDemoAccount(currentUser)) {
       if (currentUser?.profile?.publicDemoKind === kind) {
         FlowRouter.go(definition.launchPath);
       } else {
@@ -210,6 +172,7 @@ Template.publicDemoLaunch.events({
     }
     template.launching.set(true);
     template.launchError.set('');
+    template.expired.set(false);
     try {
       const result = await meteorCallAsync<PublicDemoLaunchResult>('startPublicDemo', { kind });
       if (!result?.loginToken) throw new Error(currentPublicText('demoFailed'));
@@ -225,7 +188,7 @@ Template.publicDemoLaunch.events({
       Cookie.set('isExperiment', '1', 1);
       Cookie.set('experimentTarget', definition.experimentTarget, 1);
       Cookie.set('experimentXCond', '', 1);
-      window.sessionStorage.setItem('mofacts.publicDemo.v1', JSON.stringify({ kind, experimentTarget: definition.experimentTarget, expiresAt: result.expiresAt }));
+      writeStoredPublicDemoSession({ kind, experimentTarget: definition.experimentTarget, expiresAt: String(result.expiresAt) });
       const loginWithTokenAsync = (Meteor as any).promisify((Meteor as any).loginWithToken);
       await loginWithTokenAsync(result.loginToken);
       await completeExperimentSignIn();

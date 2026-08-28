@@ -100,15 +100,6 @@ const LIGHT_TARGET_LUMINANCE: Record<string, number> = {
   learning_card_primary_action_text_color: 0.0048,
   practice_menu_accuracy_bar_fill_color: 0.3411,
   practice_menu_accuracy_bar_track_color: 0.7203,
-  public_page_surface_color: 0.9600,
-  public_alt_surface_color: 0.9000,
-  public_card_surface_color: 0.9827,
-  public_text_color: 0.0094,
-  public_muted_text_color: 0.1600,
-  public_border_color: 0.6500,
-  public_primary_action_surface_color: 0.3411,
-  public_primary_action_text_color: 0.0048,
-  public_hero_decoration_color: 0.5313,
 };
 
 const DARK_TARGET_LUMINANCE: Record<string, number> = {
@@ -132,15 +123,6 @@ const DARK_TARGET_LUMINANCE: Record<string, number> = {
   learning_card_primary_action_text_color: 0.8891,
   practice_menu_accuracy_bar_fill_color: 0.3022,
   practice_menu_accuracy_bar_track_color: 0.0298,
-  public_page_surface_color: 0.0134,
-  public_alt_surface_color: 0.0197,
-  public_card_surface_color: 0.0235,
-  public_text_color: 0.7710,
-  public_muted_text_color: 0.4200,
-  public_border_color: 0.0900,
-  public_primary_action_surface_color: 0.3022,
-  public_primary_action_text_color: 0.8891,
-  public_hero_decoration_color: 0.1206,
 };
 function sortedByLuminance(colors: PaletteColor[]) {
   return [...colors].sort((a, b) => a.luminance - b.luminance);
@@ -233,15 +215,6 @@ function luminanceMappedRoleColors(colors: PaletteColor[], polarity: ThemePolari
     learning_card_primary_action_text_color: textSource,
     practice_menu_accuracy_bar_fill_color: accentSource,
     practice_menu_accuracy_bar_track_color: surfaceSource,
-    public_page_surface_color: surfaceSource,
-    public_alt_surface_color: surfaceSource,
-    public_card_surface_color: surfaceSource,
-    public_text_color: textSource,
-    public_muted_text_color: textSource,
-    public_border_color: surfaceSource,
-    public_primary_action_surface_color: accentSource,
-    public_primary_action_text_color: textSource,
-    public_hero_decoration_color: accentSource,
   };
 
   return Object.fromEntries(
@@ -487,15 +460,6 @@ export function generateTheme(options: ThemeGenerationOptions): GeneratedTheme {
     learning_card_primary_action_text_color: roleColors.learning_card_primary_action_text_color?.hex,
     practice_menu_accuracy_bar_fill_color: rgbToHex(fill),
     practice_menu_accuracy_bar_track_color: rgbToHex(track),
-    public_page_surface_color: roleColors.public_page_surface_color?.hex,
-    public_alt_surface_color: roleColors.public_alt_surface_color?.hex,
-    public_card_surface_color: roleColors.public_card_surface_color?.hex,
-    public_text_color: roleColors.public_text_color?.hex,
-    public_muted_text_color: roleColors.public_muted_text_color?.hex,
-    public_border_color: roleColors.public_border_color?.hex,
-    public_primary_action_surface_color: roleColors.public_primary_action_surface_color?.hex,
-    public_primary_action_text_color: roleColors.public_primary_action_text_color?.hex,
-    public_hero_decoration_color: roleColors.public_hero_decoration_color?.hex,
     media_video_overlay_surface_color: 'color-mix(in srgb, var(--learning-card-surface-color) 98%, transparent)',
     media_video_overlay_backdrop_color: 'color-mix(in srgb, var(--app-text-color) 60%, transparent)',
     app_surface_shadow: '0 4px 12px color-mix(in srgb, var(--app-text-color) 18%, transparent)',

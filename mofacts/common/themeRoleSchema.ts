@@ -36,15 +36,6 @@ export const THEME_GENERATOR_ROLE_PROPERTIES = [
   'learning_card_primary_action_text_color',
   'practice_menu_accuracy_bar_fill_color',
   'practice_menu_accuracy_bar_track_color',
-  'public_page_surface_color',
-  'public_alt_surface_color',
-  'public_card_surface_color',
-  'public_text_color',
-  'public_muted_text_color',
-  'public_border_color',
-  'public_primary_action_surface_color',
-  'public_primary_action_text_color',
-  'public_hero_decoration_color',
 ] as const;
 
 export const THEME_GENERATOR_DERIVED_PROPERTIES = [
@@ -81,10 +72,6 @@ export function buildThemeContrastSchema(
     text('learning_card_primary_action_text_color', 'learning_card_primary_action_surface_color'),
     text('feedback_correct_color', 'learning_card_surface_color'),
     text('feedback_error_color', 'learning_card_surface_color'),
-    text('public_text_color', 'public_page_surface_color'),
-    text('public_text_color', 'public_card_surface_color'),
-    text('public_muted_text_color', 'public_page_surface_color'),
-    text('public_primary_action_text_color', 'public_primary_action_surface_color'),
     {
       foreground: 'practice_menu_accuracy_bar_fill_color',
       background: 'app_background_color',
@@ -118,6 +105,4 @@ export const THEME_GENERATOR_DISTINCTNESS_PAIRS: ThemeDistinctnessPair[] = [
   { first: 'feedback_error_color', second: 'app_accent_color', minimumDeltaE: 10 },
   { first: 'navigation_surface_color', second: 'app_background_color', minimumDeltaE: 3 },
   { first: 'practice_menu_accuracy_bar_fill_color', second: 'practice_menu_accuracy_bar_track_color', minimumDeltaE: 10 },
-  { first: 'public_page_surface_color', second: 'public_card_surface_color', minimumDeltaE: 3 },
-  { first: 'public_primary_action_surface_color', second: 'public_page_surface_color', minimumDeltaE: 10 },
 ];

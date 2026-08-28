@@ -1,5 +1,5 @@
 <template name="publicLanding">
-  <div class="public-experience-page">
+  <div class="public-theme-context public-experience-page">
     <header class="public-site-header">
       <a class="public-brand" href="/" aria-label="{{systemName}}">
         {{#if currentTheme.properties.brand_logo_url}}
@@ -7,7 +7,7 @@
         {{/if}}
         <span><strong>{{systemName}}</strong><small>{{pt 'brandTagline'}}</small></span>
       </a>
-      <nav class="public-site-nav" aria-label="{{pt 'capabilitiesTitle'}}">
+      <nav class="public-site-nav" aria-label="{{pt 'demosTitle'}}">
         <a href="#students" data-public-audience="student" aria-current="{{audienceCurrent 'student'}}">{{pt 'navStudents'}}</a>
         <a href="#teachers" data-public-audience="teacher" aria-current="{{audienceCurrent 'teacher'}}">{{pt 'navTeachers'}}</a>
         <a href="#researchers" data-public-audience="researcher" aria-current="{{audienceCurrent 'researcher'}}">{{pt 'navResearchers'}}</a>
@@ -53,8 +53,13 @@
               <span class="fa {{activeAudienceIcon}}" aria-hidden="true"></span>
               <p>{{pt 'capabilitiesCopy'}}</p>
             </div>
-            <p class="public-demo-disclosure">{{pt 'demosCopy'}}</p>
-            <a class="btn btn-primary btn-lg" href="{{activeAudiencePath}}">{{activeAudienceAction}} <span aria-hidden="true">→</span></a>
+            <p class="public-demo-disclosure"><span>{{pt 'demoEnglish'}}</span> <span>{{pt 'demoPrivacy'}}</span></p>
+            {{#if expiredMessage}}<div class="alert alert-warning public-demo-inline-message" role="status">{{expiredMessage}}</div>{{/if}}
+            {{#if launchError}}<div class="alert alert-danger public-demo-inline-message" role="alert">{{launchError}}</div>{{/if}}
+            <button class="btn btn-primary btn-lg" type="button" data-public-demo-start disabled="{{startDisabled}}">
+              {{startLabel}} <span class="public-forward-arrow" aria-hidden="true">→</span>
+            </button>
+            <p class="public-demo-status" aria-live="polite">{{launchStatus}}</p>
           </div>
 
           <div class="public-role-preview" aria-hidden="true">
@@ -62,10 +67,9 @@
             <div class="public-role-preview-body">
               <aside><span class="fa {{activeAudienceIcon}}"></span><i></i><i></i><i></i></aside>
               <div class="public-role-preview-content">
-                <small>{{activeAudienceLabel}}</small>
-                <h3>{{activeAudienceTitle}}</h3>
-                <div class="public-role-preview-card public-role-preview-card-primary"><span class="fa {{activeAudienceIcon}}"></span><div><strong>{{activeAudienceAction}}</strong><small>{{activeAudienceCopy}}</small></div></div>
-                <div class="public-role-preview-card"><span class="fa {{activePreviewSecondaryIcon}}"></span><div><strong>{{pt 'capabilitiesTitle'}}</strong><small>{{pt 'capabilitiesCopy'}}</small></div></div>
+                <div class="public-role-preview-heading"><span></span><span></span></div>
+                <div class="public-role-preview-card public-role-preview-card-primary"><span class="fa {{activeAudienceIcon}}"></span><div class="public-role-preview-lines"><i></i><i></i></div></div>
+                <div class="public-role-preview-card"><span class="fa {{activePreviewSecondaryIcon}}"></span><div class="public-role-preview-lines"><i></i><i></i></div></div>
               </div>
             </div>
           </div>
@@ -74,8 +78,8 @@
     </main>
 
     <footer class="public-site-footer">
-      <span>© 2026 University of Memphis · MoFaCTS</span>
-      <nav aria-label="Footer"><a href="https://www.optimallearning.org/mofacts" rel="noopener">{{pt 'project'}}</a><a href="https://github.com/memphis-iis/mofacts" rel="noopener">{{pt 'source'}}</a><a href="/terms-of-service">{{pt 'terms'}}</a></nav>
+      <span>© {{currentYear}} University of Memphis · {{systemName}}</span>
+      <nav aria-label="Footer"><a href="https://optimallearning.org/mofacts" rel="noopener">{{pt 'project'}}</a><a href="https://github.com/memphis-iis/mofacts" rel="noopener">{{pt 'source'}}</a><a href="/terms-of-service">{{pt 'terms'}}</a></nav>
     </footer>
   </div>
 </template>

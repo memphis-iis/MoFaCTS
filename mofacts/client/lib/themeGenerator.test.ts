@@ -116,6 +116,31 @@ describe('theme generator', function() {
     expect(relationships).to.include('feedback_error_color vs learning_card_surface_color');
   });
 
+  it('keeps public and authenticated surfaces on one application theme contract', function() {
+    expect(THEME_GENERATOR_ROLE_PROPERTIES.filter((property) => property.startsWith('public_'))).to.deep.equal([]);
+
+    const palette = parseThemeColorList('#171A1D\n#F5F2EB\n#C48A3A\n#A84D45').colors;
+    const generated = generateTheme({
+      name: 'Single Contract Theme',
+      baseThemeId: 'dark-industrial',
+      baseProperties: defaultTheme.properties,
+      palette,
+      polarity: 'dark',
+      densityPercent: 100,
+      contrastPriority: 0.5,
+      expansion: {
+        allowTints: true,
+        allowShades: true,
+        allowMutedVariants: true,
+        allowGeneratedCompanions: true,
+        maxGeneratedPerColor: 3,
+      },
+      skippedCssValues: [],
+    });
+
+    expect(Object.keys(generated.properties).filter((property) => property.startsWith('public_'))).to.deep.equal([]);
+  });
+
   it('constructs secondary surfaces against the chosen primary action color', function() {
     const palette = parseThemeColorList('#BA5ACE\n#F9E5FF\n#2C241B\n#ECE165').colors;
     const generated = generateTheme({
