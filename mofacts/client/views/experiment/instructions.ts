@@ -981,8 +981,17 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
 
   startLaunchLoading(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'), 'instructions');
   markLaunchLoadingTiming('instructionContinue:pressed', { forceBypassLockout });
-  await recordCurrentInstructionContinue(timeRendered);
-  await instructContinue();
+  try {
+    await recordCurrentInstructionContinue(timeRendered);
+    await instructContinue();
+  } catch (error) {
+    finishLaunchLoading('instruction-continue-action-failed');
+    clientConsole(1, '[Instructions] Continue action failed', error);
+    Session.set('uiMessage', {
+      variant: 'danger',
+      text: translatePlatformString(getActiveUiLocale(), 'dashboard.unableToLoadSelectedLesson'),
+    });
+  }
 }
 
 async function handleInstructionSkipUnitAction() {
