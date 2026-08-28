@@ -38,6 +38,17 @@
   --public-disabled-action-border: color-mix(in srgb, var(--public-action-border) 56%, var(--public-border));
   --public-disabled-action-text: color-mix(in srgb, var(--public-action-text) 72%, var(--public-copy));
   --public-focus-shadow: color-mix(in srgb, var(--public-action) 25%, transparent);
+  font-family: var(--app-font-family);
+  font-size: var(--app-font-size-base);
+  line-height: var(--app-line-height-normal);
+}
+
+.public-theme-context :where(button, input, select, textarea) {
+  font-family: var(--app-font-family);
+}
+
+.public-theme-context :where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--app-heading-font-family);
 }
 
 /* Keep the landing-linked authentication shell tokenized without changing the experiment portal. */
@@ -92,9 +103,6 @@
   flex-direction: column;
   color: var(--public-copy);
   background: var(--public-page-surface);
-  font-family: var(--app-font-family);
-  font-size: var(--app-font-size-base);
-  line-height: var(--app-line-height-normal);
 }
 
 .public-experience-page > main {
@@ -321,7 +329,7 @@
 }
 
 .public-hero {
-  min-height: 610px;
+  min-height: calc(610px * var(--app-density-scale));
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
   align-items: center;
@@ -375,7 +383,7 @@
 
 .public-hero-visual {
   position: relative;
-  min-height: 420px;
+  min-height: calc(420px * var(--app-density-scale));
 }
 
 .public-visual-orbit {
@@ -490,7 +498,7 @@
 }
 
 .public-audience-panel {
-  min-height: 540px;
+  min-height: calc(540px * var(--app-density-scale));
   display: grid;
   grid-template-columns: minmax(280px, 0.78fr) minmax(440px, 1.22fr);
   align-items: center;
@@ -847,7 +855,7 @@
   }
 
   .public-hero-visual {
-    min-height: 360px;
+    min-height: calc(360px * var(--app-density-scale));
   }
 
   .public-audience-panel {
@@ -920,7 +928,7 @@
   }
 
   .public-hero-visual {
-    min-height: 320px;
+    min-height: calc(320px * var(--app-density-scale));
   }
 
   .public-visual-card {
