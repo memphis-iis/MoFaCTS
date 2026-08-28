@@ -205,7 +205,24 @@
         <tr class="{{rowClass}}">
           <td>{{name}}</td>
           <td>{{displayStatus}}</td>
-          <td><div class="admin-table-feedback">{{message}}</div></td>
+          <td>
+            <div class="admin-table-feedback">
+              <div>{{message}}</div>
+              {{#if expressionFailures.length}}
+                <ul class="mb-0 mt-2 ps-3 small" aria-label="{{expressionFailureListLabel}}">
+                  {{#each expressionFailures}}
+                    <li>
+                      <span class="visually-hidden">{{accessibleLabel}}</span>
+                      <span aria-hidden="true"><code>{{tdfId}}</code> — <code>{{fieldPath}}</code></span>
+                    </li>
+                  {{/each}}
+                </ul>
+              {{/if}}
+              {{#if omittedFailureMessage}}
+                <div class="small text-muted mt-1">{{omittedFailureMessage}}</div>
+              {{/if}}
+            </div>
+          </td>
         </tr>
       {{/each}}
     </tbody>

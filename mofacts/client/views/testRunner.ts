@@ -238,13 +238,26 @@ Template.testRunner.helpers({
           statusLabel: testText('adminTests.status'),
           messageLabel: testText('adminTests.message'),
           emptyText: testText('adminTests.noChecksReturned'),
-          checks: state.result.checks.map((check) => ({
-            ...check,
-            rowClass: check.status === 'pass' ? 'table-success' : 'table-danger',
-            displayStatus: check.status === 'pass'
-              ? testText('adminTests.pass')
-              : testText('adminTests.fail'),
-          })),
+          checks: state.result.checks.map((check) => {
+            const expressionFailures = check.details?.failures.map((failure) => ({
+              ...failure,
+              accessibleLabel: testText('adminTests.expressionFailureLocation', failure),
+            })) ?? [];
+            return {
+              ...check,
+              rowClass: check.status === 'pass' ? 'table-success' : 'table-danger',
+              displayStatus: check.status === 'pass'
+                ? testText('adminTests.pass')
+                : testText('adminTests.fail'),
+              expressionFailures,
+              expressionFailureListLabel: testText('adminTests.invalidExpressionLocations'),
+              omittedFailureMessage: check.details?.omittedFailureCount
+                ? testText('adminTests.additionalExpressionLocationsOmitted', {
+                  count: check.details.omittedFailureCount,
+                })
+                : '',
+            };
+          }),
         },
       };
     }
