@@ -9,6 +9,8 @@
   --public-action: var(--app-primary-action-surface-color);
   --public-action-text: var(--app-primary-action-text-color);
   --public-decoration: var(--app-accent-color);
+  /* Raw accent colors may be decorative-only; blend toward theme text for readable foreground use. */
+  --public-foreground-accent: color-mix(in srgb, var(--public-decoration) 45%, var(--public-copy));
   --public-action-border: color-mix(
     in srgb,
     var(--public-action) calc((100 - var(--app-button-border-darkness)) * 1%),
@@ -37,7 +39,7 @@
   --public-disabled-action: color-mix(in srgb, var(--public-action) 56%, var(--public-alt-surface));
   --public-disabled-action-border: color-mix(in srgb, var(--public-action-border) 56%, var(--public-border));
   --public-disabled-action-text: color-mix(in srgb, var(--public-action-text) 72%, var(--public-copy));
-  --public-focus-shadow: color-mix(in srgb, var(--public-action) 25%, transparent);
+  --public-focus-shadow: color-mix(in srgb, var(--public-foreground-accent) 25%, transparent);
   font-family: var(--app-font-family);
   font-size: var(--app-font-size-base);
   line-height: var(--app-line-height-normal);
@@ -194,7 +196,7 @@
 .public-back-link:hover,
 .public-back-link:focus-visible,
 .public-site-nav a[aria-current="page"] {
-  color: var(--public-action);
+  color: var(--public-foreground-accent);
 }
 
 .public-site-nav a[aria-current="page"] {
@@ -235,7 +237,7 @@
 }
 
 .public-theme-context .btn:focus-visible {
-  outline: calc(var(--app-border-width) * 3) solid var(--focus-ring-color);
+  outline: calc(var(--app-border-width) * 3) solid var(--public-foreground-accent);
   outline-offset: calc(var(--app-border-width) * 2);
   box-shadow: 0 0 0 calc(var(--app-border-width) * 3) var(--public-focus-shadow);
 }
@@ -346,7 +348,7 @@
 
 .public-eyebrow {
   margin: var(--app-space-0) var(--app-space-0) calc(0.8rem * var(--app-density-scale));
-  color: color-mix(in srgb, var(--public-action) 80%, var(--public-copy));
+  color: var(--public-foreground-accent);
   font-size: calc(var(--app-font-size-base) * 0.78);
   font-weight: var(--app-font-weight-heavy);
   line-height: var(--app-line-height-tight);
@@ -413,7 +415,7 @@
 }
 
 .public-visual-card .fa {
-  color: var(--public-decoration);
+  color: var(--public-foreground-accent);
   font-size: clamp(
     calc(var(--app-font-size-base) * 4),
     9vw,
@@ -485,7 +487,7 @@
 
 .public-audience-tabs button:focus-visible {
   border-color: var(--public-action);
-  outline: calc(var(--app-border-width) * 3) solid var(--focus-ring-color);
+  outline: calc(var(--app-border-width) * 3) solid var(--public-foreground-accent);
   outline-offset: calc(var(--app-border-width) * 2);
   box-shadow: 0 0 0 calc(var(--app-border-width) * 3) var(--public-focus-shadow);
 }
@@ -542,13 +544,13 @@
   display: flex;
   align-items: flex-start;
   gap: calc(0.85rem * var(--app-density-scale));
-  border-inline-start: calc(var(--app-border-width) * 3) solid var(--public-decoration);
+  border-inline-start: calc(var(--app-border-width) * 3) solid var(--public-foreground-accent);
   background: color-mix(in srgb, var(--public-card-surface) 75%, transparent);
 }
 
 .public-audience-capability .fa {
   margin-top: calc(0.22rem * var(--app-density-scale));
-  color: var(--public-action);
+  color: var(--public-foreground-accent);
   font-size: calc(var(--app-font-size-base) * 1.2);
 }
 
@@ -692,7 +694,7 @@
   display: grid;
   place-items: center;
   border-radius: var(--app-border-radius-sm);
-  color: var(--public-action);
+  color: var(--public-foreground-accent);
   background: var(--public-alt-surface);
   font-size: calc(var(--app-font-size-base) * 1.15);
 }
@@ -778,7 +780,7 @@
 .public-demo-privacy .fa,
 .public-demo-detail .fa {
   margin-top: calc(0.2rem * var(--app-density-scale));
-  color: var(--public-action);
+  color: var(--public-foreground-accent);
   font-size: calc(var(--app-font-size-base) * 1.05);
 }
 
@@ -919,6 +921,18 @@
     width: 100%;
   }
 
+  .public-hero {
+    gap: var(--app-space-4);
+    padding:
+      calc(2.5rem * var(--app-density-scale))
+      calc(1.25rem * var(--app-density-scale))
+      calc(2rem * var(--app-density-scale));
+  }
+
+  .public-hero-copy > p:not(.public-eyebrow) {
+    margin-block: var(--app-space-3);
+  }
+
   .public-hero h1 {
     font-size: clamp(
       calc(var(--app-font-size-base) * 2.6),
@@ -928,23 +942,45 @@
   }
 
   .public-hero-visual {
-    min-height: calc(320px * var(--app-density-scale));
+    min-height: calc(270px * var(--app-density-scale));
   }
 
   .public-visual-card {
-    width: 88%;
+    width: 86%;
+    padding: var(--app-space-3);
+  }
+
+  .public-audience-explorer {
+    padding:
+      calc(2.75rem * var(--app-density-scale))
+      calc(1.25rem * var(--app-density-scale))
+      calc(3rem * var(--app-density-scale));
   }
 
   .public-audience-tabs {
     grid-template-columns: 1fr;
+    margin-bottom: var(--app-space-4);
   }
 
   .public-audience-tabs button {
     min-height: max(var(--app-button-height), calc(3.25rem * var(--app-density-scale)));
   }
 
+  .public-audience-panel {
+    gap: var(--app-space-4);
+  }
+
+  .public-audience-lead,
+  .public-audience-capability {
+    margin-block: var(--app-space-3);
+  }
+
+  .public-demo-disclosure {
+    margin-bottom: var(--app-space-3);
+  }
+
   .public-role-preview-body {
-    min-height: calc(390px * var(--app-density-scale));
+    min-height: calc(340px * var(--app-density-scale));
     grid-template-columns: calc(58px * var(--app-density-scale)) 1fr;
   }
 
@@ -953,7 +989,7 @@
   }
 
   .public-role-preview-content {
-    padding: calc(1.35rem * var(--app-density-scale));
+    padding: var(--app-space-3);
   }
 
   .public-role-preview-card {
