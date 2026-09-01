@@ -282,9 +282,8 @@
     display: block;
     width: 100%;
     min-height: 0;
-    border-inline-start: 1px solid color-mix(in srgb, var(--app-accent-color) 72%, var(--app-text-color));
-    background-color: color-mix(in srgb, var(--app-accent-color) 64%, var(--app-background-color));
-    background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--app-background-color) 26%, transparent) 4px 7px);
+    border-inline-start: 1px solid var(--app-text-color);
+    background-color: var(--app-text-color);
   }
 
   .histogram-bars li > span:not(.has-count) {
