@@ -16,7 +16,7 @@ describe('adaptive rule evaluation', function() {
     expect(result).to.deep.equal({
       condition: 'C2S0 AND true',
       conditionExpression: 'true&&true',
-      actions: '12  (C3S1,C4S2)',
+      actions: '(C3S1,C4S2)',
       conditionResult: true,
       questions: [3, 4],
       schedule: [
@@ -51,7 +51,7 @@ describe('adaptive rule evaluation', function() {
       .to.throw('Adaptive rule produced a scheduled question without a valid clusterIndex');
   });
 
-  it('validates adaptive rules before entering the Stage 1 runtime evaluator', function() {
+  it('rejects unsafe adaptive rules before bounded interpretation', function() {
     expect(() => evaluateAdaptiveRule('IF 1globalThis THEN C3S1', {})).to.throw();
     expect(() => evaluateAdaptiveRule('IF true THEN C3S1; process.exit()', {})).to.throw();
   });

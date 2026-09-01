@@ -1,4 +1,5 @@
 import { compileAdaptiveRule, type ParsedAdaptiveRuleAction } from '../../content/adaptiveRuleCompilation';
+import { interpretSafeBooleanExpression } from '../../safe-expression/safeExpressionEngine';
 
 export type AdaptiveOutcomes = Record<string, boolean>;
 export type AdaptiveOutcomeRow = { stimulusKC?: number | string; outcome?: string };
@@ -17,45 +18,11 @@ export type AdaptiveRuleEvaluationResult = {
   readonly checkpoints?: AdaptiveRuleCheckpoint[];
 };
 
-const LEGACY_ADAPTIVE_OPERATORS: Record<string, string> = { NOT: '!', AND: '&&', OR: '||' };
-const LEGACY_ADAPTIVE_MATH_OPERATORS = '+-*/%()=';
-
-function parseLegacyClusterStimToken(token: string, fieldName: string): ParsedAdaptiveRuleAction {
-  if (!token.startsWith('C')) throw new Error(`Invalid ${fieldName}: ${token}`);
-  const [, tokenBody = ''] = token.split('C');
-  const [clusterPart = '', stimulusPart = ''] = tokenBody.split('S');
-  const clusterIndex = parseInt(clusterPart);
-  const stimIndex = parseInt(stimulusPart);
-  if (!Number.isInteger(clusterIndex) || !Number.isInteger(stimIndex)) throw new Error(`Invalid ${fieldName}: ${token}`);
-  return { clusterIndex, stimIndex };
-}
-
-function translateLegacyConditionToken(token: string, adaptiveOutcomes: AdaptiveOutcomes): string {
-  if (LEGACY_ADAPTIVE_OPERATORS[token]) return LEGACY_ADAPTIVE_OPERATORS[token];
-  if (token.toLowerCase() === 'true') return 'true';
-  if (token.toLowerCase() === 'false') return 'false';
-  if (token.startsWith('C')) {
-    const { clusterIndex, stimIndex } = parseLegacyClusterStimToken(token, 'token');
-    return String(adaptiveOutcomes[`${clusterIndex}:${stimIndex}`] ?? false);
-  }
-  if (Number.isInteger(parseInt(token))) return token;
-  let expression = '';
-  for (const char of token) {
-    if (LEGACY_ADAPTIVE_MATH_OPERATORS.includes(char) || Number.isInteger(parseInt(char))) expression += char;
-    else throw new Error(`Invalid token: ${token}`);
-  }
-  return expression;
-}
-
-function parseLegacyActions(actions: string, isCheckpoint: boolean, when: number | null) {
+function parseActions(actions: readonly ParsedAdaptiveRuleAction[], isCheckpoint: boolean, when: number | null) {
   const schedule: AdaptiveRuleScheduleItem[] = [];
   const questions: number[] = [];
   const checkpoints: AdaptiveRuleCheckpoint[] = [];
-  const tokens = actions.includes('(')
-    ? actions.substring(actions.indexOf('(') + 1, actions.indexOf(')')).split(',')
-    : [actions];
-  for (const token of tokens) {
-    const action = parseLegacyClusterStimToken(token, 'action');
+  for (const action of actions) {
     schedule.push({ ...action, isCheckpoint });
     questions.push(action.clusterIndex);
     if (isCheckpoint && when !== null) checkpoints.push({ ...action, time: when });
@@ -67,25 +34,34 @@ export function evaluateAdaptiveRule(
   logicString: string,
   adaptiveOutcomes: AdaptiveOutcomes,
 ): AdaptiveRuleEvaluationResult {
-  // Stage 1 validates at runtime loading while retaining the established
-  // evaluator until the live compatibility inventory permits Stage 2.
-  compileAdaptiveRule(logicString);
-  const [, whenSegment = ''] = logicString.split('AT');
-  const when = logicString.includes('AT') ? parseInt(whenSegment.trim()) : null;
-  const isCheckpoint = logicString.includes('CHECKPOINT');
-  const parts = logicString.replace('IF', '').replace('AT', '').replace('CHECKPOINT', '').split('THEN');
-  const condition = (parts[0] ?? '').trim();
-  const actions = (parts[1] ?? '').trim();
-  if (!condition || !actions) return { condition, action: actions, conditionResult: false };
-  const conditionExpression = condition.split(' ')
-    .map((token) => translateLegacyConditionToken(token, adaptiveOutcomes)).join('');
-  const conditionFunction: Function = new Function(`return ${conditionExpression}`);
-  const conditionResult = Boolean(conditionFunction());
-  if (!conditionResult) {
-    return { condition, conditionExpression, actions, conditionResult: false };
+  const compiled = compileAdaptiveRule(logicString);
+  const outcomeValues = Object.create(null) as Record<string, boolean>;
+  for (const outcomeName of compiled.outcomeNames) {
+    const match = /^C(\d+)S(\d+)$/.exec(outcomeName);
+    if (!match) throw new Error(`${compiled.fieldPath}: invalid compiled outcome reference "${outcomeName}"`);
+    outcomeValues[outcomeName] = adaptiveOutcomes[`${match[1]}:${match[2]}`] ?? false;
   }
-  const parsed = parseLegacyActions(actions, isCheckpoint, when);
-  return { condition, conditionExpression, actions, conditionResult: true, ...parsed, when };
+  const conditionExpression = compiled.conditionExpression
+    .replace(/\bC\d+S\d+\b/g, (name) => String(outcomeValues[name] ?? false))
+    .replace(/\s+/g, '');
+  const conditionResult = interpretSafeBooleanExpression(compiled.conditionProgram, outcomeValues);
+  if (!conditionResult) {
+    return {
+      condition: compiled.condition,
+      conditionExpression,
+      actions: compiled.actionsText,
+      conditionResult: false,
+    };
+  }
+  const parsed = parseActions(compiled.actions, compiled.isCheckpoint, compiled.when);
+  return {
+    condition: compiled.condition,
+    conditionExpression,
+    actions: compiled.actionsText,
+    conditionResult: true,
+    ...parsed,
+    when: compiled.when,
+  };
 }
 
 export function getAdaptiveScheduleQuestions(schedule: Array<{ clusterIndex?: unknown }>): number[] {

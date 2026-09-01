@@ -173,6 +173,18 @@ function isStaticallyApprovedArray(node: AstNode): boolean {
   return false;
 }
 
+function expressionMayProduceArray(node: AstNode): boolean {
+  if (isStaticallyApprovedArray(node)) return true;
+  if (node.type === 'ConditionalExpression') {
+    return expressionMayProduceArray(node.consequent) || expressionMayProduceArray(node.alternate);
+  }
+  if (node.type === 'LogicalExpression') {
+    return expressionMayProduceArray(node.left) || expressionMayProduceArray(node.right);
+  }
+  if (node.type === 'AssignmentExpression') return expressionMayProduceArray(node.right);
+  return false;
+}
+
 function validateMember(node: AstNode, context: ValidationContext): void {
   const property = staticPropertyName(node, context.fieldPath);
   const object = node.object as AstNode;
@@ -289,6 +301,9 @@ function validateStatement(node: AstNode, context: ValidationContext, topLevel: 
         if (declaration.id?.type !== 'Identifier' || !declaration.init) fail('locals require a simple name and initializer', context.fieldPath, declaration);
         if (['p', 'pFunc', 'Math'].includes(declaration.id.name) || context.locals.has(declaration.id.name)) {
           fail(`local "${declaration.id.name}" is reserved or duplicated`, context.fieldPath, declaration.id);
+        }
+        if (expressionMayProduceArray(declaration.init)) {
+          fail('locals must be finite numbers; use approved array operations inline', context.fieldPath, declaration.init);
         }
         context.locals.set(declaration.id.name, node.kind);
         validateExpression(declaration.init, context);
@@ -481,7 +496,7 @@ function evaluateExpression(node: AstNode, context: RuntimeContext): any {
     }
     case 'AssignmentExpression': {
       const value = evaluateExpression(node.right, context);
-      if (node.left.type === 'Identifier') context.locals[node.left.name] = value;
+      if (node.left.type === 'Identifier') context.locals[node.left.name] = requireFiniteNumericResult(value, context, node.right);
       else context.p[staticPropertyName(node.left, context.program.fieldPath)] = value;
       return value;
     }

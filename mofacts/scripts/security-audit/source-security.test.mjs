@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import {
   canonicalJson,
   control,
@@ -55,6 +57,44 @@ import {
   throttleResultCategory,
   throttleWasObserved,
 } from './authentication-probes.mjs';
+
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+function runtimeSourceFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return runtimeSourceFiles(absolutePath);
+    if (!/\.(?:[cm]?js|tsx?|svelte)$/.test(entry.name) || /\.(?:test|spec)\.[^.]+$/.test(entry.name)) return [];
+    return [absolutePath];
+  });
+}
+
+function scriptBodies(filePath, source) {
+  if (!filePath.endsWith('.svelte')) return [source];
+  return [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1] || '');
+}
+
+function dynamicEvaluationSites(filePath) {
+  const source = fs.readFileSync(filePath, 'utf8');
+  const findings = [];
+  for (const body of scriptBodies(filePath, source)) {
+    const sourceFile = ts.createSourceFile(filePath, body, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node) => {
+      if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
+        findings.push(`${path.relative(repositoryRoot, filePath)}:new Function`);
+      }
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
+        findings.push(`${path.relative(repositoryRoot, filePath)}:Function`);
+      }
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'eval') {
+        findings.push(`${path.relative(repositoryRoot, filePath)}:eval`);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+  }
+  return findings;
+}
 
 test('canonical reports hash deterministically and exclude the digest from its payload', () => {
   const sections = Object.fromEntries(['external', 'authentication', 'internal', 'repository'].map((sectionId) => [
@@ -467,6 +507,17 @@ test('host firewall policy accepts only private-interface SSH and public web rul
   assert.ok(dangerous.some((line) => line.includes('443/tcp=0')));
 });
 
+test('first-party runtime code and production CSP prohibit dynamic JavaScript evaluation', () => {
+  const runtimeRoots = [
+    'learning-components',
+    'mofacts/client',
+    'mofacts/server',
+    'mofacts/common',
+  ].map((relativePath) => path.join(repositoryRoot, relativePath));
+  const findings = runtimeRoots.flatMap(runtimeSourceFiles).flatMap(dynamicEvaluationSites);
+  assert.deepEqual(findings, []);
+});
+
 test('production hardening assets preserve reviewed findings and remove unnecessary runtime tooling', () => {
   const ignore = fs.readFileSync(new URL('../../../.gitleaksignore', import.meta.url), 'utf8');
   const ignoredFingerprints = ignore.split(/\r?\n/).filter((line) => line && !line.startsWith('#'));
@@ -497,7 +548,8 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(apache, /style-src 'self' https:\/\/fonts\.googleapis\.com/);
   assert.match(apache, /font-src 'self' data: https:\/\/fonts\.gstatic\.com/);
   assert.match(apache, /media-src 'self' blob: data:/);
-  assert.match(apache, /script-src 'self' 'unsafe-eval'/);
+  assert.match(apache, /script-src 'self'(?:;|$)/);
+  assert.doesNotMatch(apache, /unsafe-eval/);
   assert.doesNotMatch(apache, /script-src[^;]*'unsafe-inline'/);
   assert.doesNotMatch(apache, /(?:^|;\s*)style-src\s+[^;]*(?:'unsafe-inline'|'unsafe-eval')/m);
   assert.match(apache, /style-src-attr 'unsafe-inline'/);

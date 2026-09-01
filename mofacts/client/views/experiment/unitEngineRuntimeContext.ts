@@ -53,12 +53,6 @@ export interface AppUnitEngineRuntimeContext extends CreateUnitEngineDeps {
 const readKeySet = new Set<string>(UNIT_ENGINE_SESSION_READ_KEYS);
 const writeKeySet = new Set<string>(UNIT_ENGINE_SESSION_WRITE_KEYS);
 
-// Must be global: legacy TDF calculateProbability snippets call getRandomInt() via eval.
-function getRandomInt(max: any) {
-  return Math.floor(Math.random() * max);
-}
-(globalThis as { getRandomInt?: (max: any) => number }).getRandomInt = getRandomInt;
-
 function assertAllowedSessionReadKey(key: string): asserts key is UnitEngineSessionReadKey {
   if (!readKeySet.has(key)) {
     throw new Error(`[Unit Engine Runtime] Component session read is not allowed for key "${key}"`);

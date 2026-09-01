@@ -60,6 +60,19 @@ describe('safe probability expression engine', function() {
       .to.throw('member access .SECRET is not allowed');
   });
 
+  it('executes authored probability formulas without dynamic JavaScript evaluation', function() {
+    const originalFunction = globalThis.Function;
+    try {
+      (globalThis as { Function: FunctionConstructor }).Function = function blockedDynamicFunction(): never {
+        throw new Error('dynamic Function construction is blocked');
+      } as unknown as FunctionConstructor;
+      const runtimeFunction = createTdfProbabilityFunction(DEFAULT_PROBABILITY_EXPRESSION);
+      expect(runtimeFunction(modelInput(), helpers).probability).to.be.closeTo(0.9679774688292543, 1e-12);
+    } finally {
+      (globalThis as { Function: FunctionConstructor }).Function = originalFunction;
+    }
+  });
+
   it('matches the standard logistic result and returns only the typed model snapshot plus diagnostics', function() {
     const input = { ...modelInput(), stim: { secret: true }, resp: { secret: true } };
     const result = interpretProbabilityExpression(compileProbabilityExpression(DEFAULT_PROBABILITY_EXPRESSION), input, helpers);
@@ -120,7 +133,7 @@ describe('safe probability expression engine', function() {
         )
       );
       const recentOutcomeCount = Math.min(p.overallOutcomeHistory.length, 60);
-      const average = recentOutcomeSum / recentOutcomeCount;
+      const average = recentOutcomeCount === 0 ? 0 : recentOutcomeSum / recentOutcomeCount;
       p.probability = 1 / (1 + Math.exp(-p.y));
       if (
         p.overallStudyHistory &&
@@ -157,6 +170,21 @@ describe('safe probability expression engine', function() {
 
     expect(result.y).to.be.closeTo(expectedY, 1e-12);
     expect(result.probability).to.be.closeTo(expectedProbability, 1e-12);
+
+    const initialResult = interpretProbabilityExpression(
+      compileProbabilityExpression(source),
+      { ...modelInput(), overallOutcomeHistory: [], overallStudyHistory: [] },
+      helpers,
+    );
+    expect(initialResult.probability).to.be.a('number').and.within(0, 1);
+  });
+
+  it('rejects array-valued locals during readiness validation rather than only at runtime', function() {
+    expect(() => compileProbabilityExpression(`
+      const recentOutcomes = p.overallOutcomeHistory.slice(0, 10);
+      p.probability = pFunc.arrSum(recentOutcomes) / recentOutcomes.length;
+      return p;
+    `)).to.throw('locals must be finite numbers');
   });
 
   for (const [name, source] of Object.entries({
