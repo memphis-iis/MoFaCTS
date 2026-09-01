@@ -6,8 +6,8 @@ import {
 import {
   createProbabilityFunctionHelpers,
   DEFAULT_PROBABILITY_EXPRESSION,
-  PROBABILITY_FUNCTION_HELPER_NAMES,
 } from '../../learning-components/models/adaptive-logistic/probabilityFunctions';
+import { PROBABILITY_FUNCTION_HELPER_NAMES } from '../../learning-components/content/probabilityExpressionContract';
 import { createTdfProbabilityFunction } from '../../learning-components/models/adaptive-logistic/tdfProbabilityFunction';
 import { validateTdfExpressions } from '../../learning-components/content/tdfExpressionValidation';
 
@@ -99,6 +99,64 @@ describe('safe probability expression engine', function() {
     const result = interpretProbabilityExpression(compileProbabilityExpression(source), modelInput(), helpers);
     expect(result.ppes).to.be.a('number');
     expect(result.probability).to.be.within(0, 1);
+  });
+
+  it('supports the fitted flashcard model without JavaScript callbacks', function() {
+    const source = `
+      p.y = -0.4448196 +
+        0.7304212 * pFunc.logitdec(
+          p.overallOutcomeHistory.slice(
+            Math.max(p.overallOutcomeHistory.length - 60, 0),
+            p.overallOutcomeHistory.length
+          ),
+          0.9489045
+        ) +
+        0.5195620 * Math.log(1 + p.stimSuccessCount) +
+        2.1722273 * pFunc.recency(p.stimSecsSinceLastShown, 0.2978028);
+      const recentOutcomeSum = pFunc.arrSum(
+        p.overallOutcomeHistory.slice(
+          Math.max(p.overallOutcomeHistory.length - 60, 0),
+          p.overallOutcomeHistory.length
+        )
+      );
+      const recentOutcomeCount = Math.min(p.overallOutcomeHistory.length, 60);
+      const average = recentOutcomeSum / recentOutcomeCount;
+      p.probability = 1 / (1 + Math.exp(-p.y));
+      if (
+        p.overallStudyHistory &&
+        p.overallStudyHistory.length % 4 !== 0 &&
+        average > p.stimParameters[1] &&
+        p.probability > p.stimParameters[1]
+      ) {
+        p.probability = 1 / (
+          1 + Math.exp(-(Math.log(p.probability / (1 - p.probability)) + 20))
+        );
+      }
+      return p;
+    `;
+    const input = modelInput();
+    const result = interpretProbabilityExpression(compileProbabilityExpression(source), input, helpers);
+    const recentOutcomes = input.overallOutcomeHistory.slice(-60);
+    const recentAverage = helpers.arrSum(recentOutcomes) / recentOutcomes.length;
+    const masteryThreshold = input.stimParameters[1];
+    if (masteryThreshold === undefined) throw new Error('fitted flashcard fixture requires a mastery threshold');
+    const expectedY = -0.4448196
+      + 0.7304212 * helpers.logitdec(recentOutcomes, 0.9489045)
+      + 0.5195620 * Math.log(1 + input.stimSuccessCount)
+      + 2.1722273 * helpers.recency(input.stimSecsSinceLastShown, 0.2978028);
+    let expectedProbability = 1 / (1 + Math.exp(-expectedY));
+    if (
+      input.overallStudyHistory.length % 4 !== 0
+      && recentAverage > masteryThreshold
+      && expectedProbability > masteryThreshold
+    ) {
+      expectedProbability = 1 / (
+        1 + Math.exp(-(Math.log(expectedProbability / (1 - expectedProbability)) + 20))
+      );
+    }
+
+    expect(result.y).to.be.closeTo(expectedY, 1e-12);
+    expect(result.probability).to.be.closeTo(expectedProbability, 1e-12);
   });
 
   for (const [name, source] of Object.entries({

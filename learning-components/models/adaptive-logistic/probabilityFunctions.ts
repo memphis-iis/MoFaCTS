@@ -7,37 +7,6 @@ export const DEFAULT_PROBABILITY_EXPRESSION = `
   return p;
 `;
 
-/**
- * Authoritative API exposed to authored calculateProbability bodies as pFunc.
- *
- * Keep this manifest and createProbabilityFunctionHelpers in lockstep. The safe
- * interpreter consumes this manifest directly, and its contract tests compare
- * it with the helper factory so a source-level helper cannot be omitted merely
- * because no currently tracked TDF happens to call it.
- */
-export const PROBABILITY_FUNCTION_HELPER_NAMES = Object.freeze([
-  'testFunction',
-  'mul',
-  'logitdec',
-  'recency',
-  'quaddiffcor',
-  'quaddiffincor',
-  'linediffcor',
-  'linediffincor',
-  'arrSum',
-  'errlist',
-  'componentSpacing',
-  'spacingLagged',
-  'ppew',
-  'ppet',
-  'ppetw',
-  'slideppetw',
-  'ppes',
-  'ppesFromTimes',
-] as const);
-
-export type ProbabilityFunctionHelperName = typeof PROBABILITY_FUNCTION_HELPER_NAMES[number];
-
 export function defaultProbFunction(p: any, pFunc: any): any {
   const recentHistory = p.overallOutcomeHistory.slice(
     Math.max(p.overallOutcomeHistory.length - 60, 0),

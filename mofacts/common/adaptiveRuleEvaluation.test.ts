@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import {
   buildAdaptiveOutcomes,
-  compileAdaptiveRule,
   evaluateAdaptiveRule,
   getAdaptiveScheduleQuestions,
 } from '../../learning-components/units/shared/adaptiveRuleEvaluation';
+import { compileAdaptiveRule } from '../../learning-components/content/adaptiveRuleCompilation';
 
 describe('adaptive rule evaluation', function() {
   it('evaluates adaptive conditions and schedules component-owned question actions', function() {

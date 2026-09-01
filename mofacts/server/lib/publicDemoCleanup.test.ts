@@ -11,7 +11,7 @@ describe('publicDemoCleanup', function() {
     const collections = {
       Histories: removable(), GlobalExperimentStates: removable(), SectionUserMap: removable(),
       UserTimesLog: removable(), UserMetrics: removable(), PasswordResetTokens: removable(),
-      UserDashboardCache: removable(), LearnerUnitAnalyticsCache: removable(), UserUploadQuota: removable(),
+      UserDashboardCache: removable(), UserUploadQuota: removable(),
       AuditLog: removable(),
     };
     const writeAuditLog = sinon.stub().resolves();
@@ -45,7 +45,7 @@ describe('publicDemoCleanup', function() {
     const deps: any = {
       Histories: removable(), GlobalExperimentStates: removable(), SectionUserMap: removable(),
       UserTimesLog: removable(), UserMetrics: removable(), PasswordResetTokens: removable(),
-      UserDashboardCache: removable(), LearnerUnitAnalyticsCache: removable(), UserUploadQuota: removable(),
+      UserDashboardCache: removable(), UserUploadQuota: removable(),
       AuditLog: removable(),
       usersCollection: {
         find: () => ({ fetchAsync: async () => [] }),

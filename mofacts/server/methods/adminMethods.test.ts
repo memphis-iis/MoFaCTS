@@ -69,7 +69,6 @@ function createAdminDeps(
     UserMetrics: { removeAsync: async () => 0 },
     PasswordResetTokens: { removeAsync: async () => 0 },
     UserDashboardCache: { removeAsync: async () => 0 },
-    LearnerUnitAnalyticsCache: { removeAsync: async () => 0 },
     UserUploadQuota: { removeAsync: async () => 0 },
     requireAdminUser: async () => undefined,
     normalizeCanonicalEmail: (rawEmail: unknown) => {

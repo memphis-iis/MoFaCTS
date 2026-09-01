@@ -1,5 +1,6 @@
 import type {
   LearnerAnalyticsActivityDay,
+  LearnerAnalyticsHistogramBin,
   LearnerAnalyticsPeriod,
   LearnerLessonAnalyticsSnapshot,
 } from '../../../../common/learnerAnalytics.contracts';
@@ -16,10 +17,11 @@ export type ModelProgressSnapshot = {
   atTarget: number;
   belowTarget: number;
   targetProbability: number;
-  itemProbabilities: number[];
+  modeledItemCount: number;
+  histogramBins: LearnerAnalyticsHistogramBin[];
 };
 
-export type ProbabilityHistogramBin = { start: number; end: number; count: number };
+export type ProbabilityHistogramBin = LearnerAnalyticsHistogramBin;
 export type ActivityDay = LearnerAnalyticsActivityDay;
 export type ActivityWeekSummary = {
   weekNumber: number;
@@ -29,30 +31,6 @@ export type ActivityWeekSummary = {
   attempts: number;
   activeMinutes: number;
 };
-
-export function buildProbabilityHistogram(
-  probabilities: readonly number[],
-  binCount = 10,
-): ProbabilityHistogramBin[] {
-  if (!Number.isInteger(binCount) || binCount <= 0) {
-    throw new Error('Probability histogram requires a positive integer bin count.');
-  }
-  const bins = Array.from({ length: binCount }, (_, index) => ({
-    start: index / binCount,
-    end: (index + 1) / binCount,
-    count: 0,
-  }));
-  for (const probability of probabilities) {
-    if (!Number.isFinite(probability) || probability < 0 || probability > 1) {
-      throw new Error('Modeled probabilities must be between 0 and 1.');
-    }
-    const index = probability === 1 ? binCount - 1 : Math.floor(probability * binCount);
-    const bin = bins[index];
-    if (!bin) throw new Error(`Cannot resolve probability bin ${index}.`);
-    bin.count += 1;
-  }
-  return bins;
-}
 
 export function buildActivitySummary(activity: readonly ActivityDay[]) {
   if (activity.length !== 28) {
@@ -92,7 +70,8 @@ export function buildLearningAnalyticsViewModel(
         atTarget: snapshot.modelProgress.reachedChallengeTargetCount,
         belowTarget: snapshot.modelProgress.belowChallengeTargetCount,
         targetProbability: snapshot.modelProgress.challengeTarget,
-        itemProbabilities: snapshot.modelProgress.itemProbabilities,
+        modeledItemCount: snapshot.modelProgress.modeledItemCount,
+        histogramBins: snapshot.modelProgress.histogramBins,
       }
     : undefined;
   const headlineFactors: HeadlineAnalyticsFactor[] = [

@@ -140,12 +140,6 @@ export const COLLECTION_OWNERSHIP = {
     owner: 'analytics',
     purpose: 'Cached dashboard aggregates keyed by learner/content.',
   },
-  LearnerUnitAnalyticsCache: {
-    mongoName: 'learner_unit_analytics_cache',
-    globalName: 'LearnerUnitAnalyticsCache',
-    owner: 'analytics',
-    purpose: 'Refresh-on-view learner analytics snapshots keyed by learner, root TDF, and unit.',
-  },
   CourseLearnerSnapshotCache: {
     mongoName: 'course_learner_snapshot_cache',
     globalName: 'CourseLearnerSnapshotCache',

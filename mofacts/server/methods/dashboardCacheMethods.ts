@@ -50,7 +50,6 @@ type DashboardCacheDeps = {
   Sections?: any;
   SectionUserMap?: any;
   UserDashboardCache: any;
-  LearnerUnitAnalyticsCache?: any;
   usersCollection: any;
   DynamicSettings: any;
   decryptData?: (value: string) => string;
@@ -293,7 +292,6 @@ export function createDashboardCacheMethods({
   Sections,
   SectionUserMap,
   UserDashboardCache,
-  LearnerUnitAnalyticsCache,
   usersCollection,
   DynamicSettings,
   decryptData,
@@ -836,10 +834,6 @@ export function createDashboardCacheMethods({
       if (!GlobalExperimentStates) {
         throw new Meteor.Error('server-misconfigured', 'Experiment state collection is unavailable');
       }
-      if (!LearnerUnitAnalyticsCache) {
-        throw new Meteor.Error('server-misconfigured', 'Learner analytics cache collection is unavailable');
-      }
-
       const normalizedTdfId = typeof tdfId === 'string' ? tdfId.trim() : '';
       if (!normalizedTdfId) {
         throw new Meteor.Error('invalid-args', 'TDF ID is required');
@@ -865,10 +859,6 @@ export function createDashboardCacheMethods({
         ]
       });
       const cacheChanged = await removeLessonProgressFromCache(this.userId, scope.cacheTdfIds);
-      await LearnerUnitAnalyticsCache.removeAsync({
-        userId: this.userId,
-        rootTdfId: { $in: scope.cacheTdfIds },
-      });
 
       return {
         success: true,

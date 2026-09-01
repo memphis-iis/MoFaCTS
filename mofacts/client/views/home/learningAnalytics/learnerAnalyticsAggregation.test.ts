@@ -6,7 +6,6 @@ describe('learnerAnalyticsAggregation', function() {
     const result = buildLearnerAnalyticsAggregates({
       nowMs: Date.parse('2026-08-08T12:00:00.000Z'),
       timeZone: 'UTC',
-      computePracticeTimeMs: (end, feedback) => Number(end || 0) + Number(feedback || 0),
       rows: [
         { _id: '1', TDFId: 'lesson', levelUnit: 0, levelUnitType: 'model', recordedServerTime: '2026-08-07T12:00:00.000Z', outcome: 'correct', stimuliSetId: 'set', stimulusKC: 'a', CFEndLatency: 60_000 },
         { _id: '2', TDFId: 'lesson', levelUnit: 0, levelUnitType: 'model', recordedServerTime: '2026-08-01T12:00:00.000Z', outcome: 'incorrect', stimuliSetId: 'set', stimulusKC: 'b', CFEndLatency: 120_000 },
@@ -26,9 +25,21 @@ describe('learnerAnalyticsAggregation', function() {
     const result = buildLearnerAnalyticsAggregates({
       nowMs: Date.parse('2026-08-08T12:00:00.000Z'),
       timeZone: 'UTC',
-      computePracticeTimeMs: () => 60_000,
-      rows: [{ TDFId: 'auto', levelUnit: 0, levelUnitType: 'autotutor', KCId: 'kc', recordedServerTime: '2026-08-08T12:00:00.000Z' }],
+      rows: [{ _id: '1', TDFId: 'auto', levelUnit: 0, levelUnitType: 'autotutor', KCId: 'kc', recordedServerTime: '2026-08-08T12:00:00.000Z', CFEndLatency: 60_000 }],
     });
     expect(result.periods['7d'].accuracy).to.equal(undefined);
+  });
+
+  it('uses the learner timezone for practice-day boundaries', function() {
+    const result = buildLearnerAnalyticsAggregates({
+      nowMs: Date.parse('2026-08-08T08:00:00.000Z'),
+      timeZone: 'America/Chicago',
+      rows: [
+        { _id: '1', TDFId: 'lesson', levelUnitType: 'model', recordedServerTime: '2026-08-08T04:30:00.000Z', outcome: 'correct', stimulusKC: 'a' },
+        { _id: '2', TDFId: 'lesson', levelUnitType: 'model', recordedServerTime: '2026-08-08T05:30:00.000Z', outcome: 'correct', stimulusKC: 'b' },
+      ],
+    });
+    expect(result.periods.all.practiceDays).to.equal(2);
+    expect(result.latest28Days.slice(-2).map((day) => day.attempts)).to.deep.equal([1, 1]);
   });
 });

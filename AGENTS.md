@@ -165,6 +165,7 @@ The local hotfix loop under `deploy/` is the fast source-watching application wo
 ## Server Method Design
 
 - Keep the server minimized; the client should do as much processor work as safely possible.
+- The normal lint workflow enforces that production server modules cannot directly or transitively import learner-executable code under `learning-components/models/` or `learning-components/units/`; type-only server-interface imports are ignored.
 - Add server methods only for database access, authentication or authorization enforcement, encryption, secrets, or external API calls that cannot safely run on the client.
 - Do not add pure-compute methods to `mofacts/server/methods.ts`.
 - Minimize database round-trips. Prefer batched queries or aggregation pipelines over N+1 loops.

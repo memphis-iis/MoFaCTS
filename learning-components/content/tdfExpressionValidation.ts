@@ -1,5 +1,5 @@
 import { compileProbabilityExpression, SafeExpressionError } from '../safe-expression/safeExpressionEngine';
-import { compileAdaptiveRule } from '../units/shared/adaptiveRuleEvaluation';
+import { compileAdaptiveRule } from './adaptiveRuleCompilation';
 
 type UnknownRecord = Record<string, unknown>;
 

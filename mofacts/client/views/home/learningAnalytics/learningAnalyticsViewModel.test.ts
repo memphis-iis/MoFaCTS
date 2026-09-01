@@ -45,7 +45,7 @@ describe('learningAnalyticsViewModel', function() {
 
   it('consolidates model probability and counts into one headline factor', function() {
     const view = buildLearningAnalyticsViewModel(snapshot({
-      modelProgress: { meanProbability: 0.79, challengeTarget: 0.8, reachedChallengeTargetCount: 31, belowChallengeTargetCount: 11, histogramBins: [], itemProbabilities: [0.7, 0.88] },
+      modelProgress: { meanProbability: 0.79, challengeTarget: 0.8, reachedChallengeTargetCount: 31, belowChallengeTargetCount: 11, histogramBins: [], modeledItemCount: 42 },
       availability: { accuracy: true, modelProgress: true },
     }), '30d');
     expect(view.headlineFactors).to.have.length(5);

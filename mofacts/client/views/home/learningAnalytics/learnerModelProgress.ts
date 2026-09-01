@@ -1,27 +1,27 @@
-import { applyLearnerTdfConfig, type LearnerTdfConfig } from '../../common/lib/learnerTdfConfig';
-import { reconstructLearningStateFromHistory } from '../../common/lib/historyReconstruction';
+import { applyLearnerTdfConfig } from '../../../../common/lib/learnerTdfConfig';
+import { reconstructLearningStateFromHistory } from '../../../../common/lib/historyReconstruction';
 import type {
-  LearnerAnalyticsHistogramBin,
+  LearnerAnalyticsHistoryRow,
+  LearnerAnalyticsModelInput,
   LearnerAnalyticsModelProgress,
-} from '../../common/learnerAnalytics.contracts';
-import { legacyFloat } from '../../common/underscoreCompat';
-import { interpretRuntimeStimulusClusters } from '../../../learning-components/content/tdf/runtimeStimulusInterpretation';
-import { displayResponseAnswer } from '../../../learning-components/content/response-assessment/responseAssessment';
-import { stripSpacesAndLowerCase } from '../../../learning-components/content/response-normalization/responseKey';
-import { parseUnitClusterList } from '../../../learning-components/content/tdf/clusterListParser';
-import { createInitialModelState } from '../../../learning-components/models/adaptive-logistic/modelStateFactory';
-import { applyStimulusCrowdStatsToCards, type StimulusCrowdStat } from '../../../learning-components/models/adaptive-logistic/stimulusCrowdStatsModel';
-import { applyResumeModelState } from '../../../learning-components/models/adaptive-logistic/resumeModelState';
-import { calculateCardProbabilities } from '../../../learning-components/models/adaptive-logistic/probabilityCalculation';
-import { createTdfProbabilityFunction } from '../../../learning-components/models/adaptive-logistic/tdfProbabilityFunction';
-import { buildAdaptiveLogisticModelProgressItems } from '../../../learning-components/models/adaptive-logistic/modelProgressProvider';
+} from '../../../../common/learnerAnalytics.contracts';
+import { legacyFloat } from '../../../../common/underscoreCompat';
+import { interpretRuntimeStimulusClusters } from '../../../../../learning-components/content/tdf/runtimeStimulusInterpretation';
+import { displayResponseAnswer } from '../../../../../learning-components/content/response-assessment/responseAssessment';
+import { stripSpacesAndLowerCase } from '../../../../../learning-components/content/response-normalization/responseKey';
+import { parseUnitClusterList } from '../../../../../learning-components/content/tdf/clusterListParser';
+import { createInitialModelState } from '../../../../../learning-components/models/adaptive-logistic/modelStateFactory';
+import { applyStimulusCrowdStatsToCards } from '../../../../../learning-components/models/adaptive-logistic/stimulusCrowdStatsModel';
+import { applyResumeModelState } from '../../../../../learning-components/models/adaptive-logistic/resumeModelState';
+import { calculateCardProbabilities } from '../../../../../learning-components/models/adaptive-logistic/probabilityCalculation';
+import { createTdfProbabilityFunction } from '../../../../../learning-components/models/adaptive-logistic/tdfProbabilityFunction';
+import { buildAdaptiveLogisticModelProgressItems } from '../../../../../learning-components/models/adaptive-logistic/modelProgressProvider';
 import {
   resolveLearningSessionModelPreparationClusterListSource,
   resolveLearningSessionProbabilitySource,
-} from '../../../learning-components/units/learning-session/learningSessionRuntimeConfig';
-import { getHistoryResponseKey } from '../../../learning-components/content/response-normalization/historyResponseKey';
-
-type HistoryRow = Record<string, any>;
+} from '../../../../../learning-components/units/learning-session/learningSessionRuntimeConfig';
+import { getHistoryResponseKey } from '../../../../../learning-components/content/response-normalization/historyResponseKey';
+import { buildProbabilityHistogram } from './probabilityHistogram';
 
 export type LearnerUnitModelSnapshot = {
   unitIndex: number;
@@ -48,39 +48,20 @@ function challengeTarget(settings: Record<string, unknown>): number {
   return Number.isFinite(value) && value > 0 && value < 1 ? value : 0.8;
 }
 
-function histogram(probabilities: number[]): LearnerAnalyticsHistogramBin[] {
-  const bins = Array.from({ length: 10 }, (_, index) => ({
-    start: index / 10,
-    end: (index + 1) / 10,
-    count: 0,
-  }));
-  for (const probability of probabilities) {
-    const index = Math.min(9, Math.floor(probability * 10));
-    const bin = bins[index];
-    if (bin) bin.count += 1;
-  }
-  return bins;
-}
-
-function hiddenStimulusKeys(rows: HistoryRow[]): Set<string> {
+function hiddenStimulusKeys(rows: LearnerAnalyticsHistoryRow[]): Set<string> {
   return new Set(rows
     .filter((row) => row.levelUnitType === 'model' && row.CFItemRemoved === true)
     .map((row) => String(row.stimulusKC ?? ''))
     .filter(Boolean));
 }
 
-export function buildLearnerUnitModelSnapshots(params: {
-  tdfDoc: any;
-  flatStimuli: any[];
-  historyRows: HistoryRow[];
-  learnerConfig?: LearnerTdfConfig | null;
-  responseKCMap: Record<string, unknown>;
-  crowdStats: StimulusCrowdStat[];
+export function buildLearnerUnitModelSnapshots(params: LearnerAnalyticsModelInput & {
+  historyRows: LearnerAnalyticsHistoryRow[];
   nowMs: number;
 }): LearnerUnitModelSnapshot[] {
   const configuredContent = applyLearnerTdfConfig(
     params.tdfDoc?.content,
-    params.learnerConfig || undefined,
+    params.learnerConfig as any || undefined,
   ).tdf as any;
   const tutor = configuredContent?.tdfs?.tutor;
   const units = Array.isArray(tutor?.unit) ? tutor.unit : [];
@@ -200,8 +181,8 @@ export function consolidateLearnerModelProgress(
       challengeTarget: target,
       reachedChallengeTargetCount: reached,
       belowChallengeTargetCount: itemProbabilities.length - reached,
-      histogramBins: histogram(itemProbabilities),
-      itemProbabilities,
+      histogramBins: buildProbabilityHistogram(itemProbabilities),
+      modeledItemCount: itemProbabilities.length,
     },
   };
 }

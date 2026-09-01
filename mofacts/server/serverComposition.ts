@@ -28,7 +28,7 @@ if (typeof underscoreAny.display !== 'function') {
     return val == null ? '' : String(val);
   };
 }
-import { BackupJobs, LearnerUnitAnalyticsCache, TdfMutationJobs } from '../common/Collections';
+import { BackupJobs, TdfMutationJobs } from '../common/Collections';
 import { runServerStartup } from './startup/serverStartup';
 import { createStorageBoundary, getLocalStoragePaths } from './lib/storageBoundary';
 import { createRedisBoundary } from './lib/redisBoundary';
@@ -359,7 +359,6 @@ const {
   Assignments,
   Histories,
   GlobalExperimentStates,
-  LearnerUnitAnalyticsCache,
   invalidateCourseSnapshotsForCourse,
   invalidateCourseSnapshotsForAssignment,
 });
@@ -468,7 +467,6 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   Sections,
   SectionUserMap,
   UserDashboardCache,
-  LearnerUnitAnalyticsCache,
   usersCollection: MeteorAny.users,
   DynamicSettings,
   decryptData,
@@ -487,15 +485,11 @@ const learnerAnalyticsMethods = createLearnerAnalyticsMethods({
   Tdfs,
   Histories,
   StimulusCrowdStats,
-  LearnerUnitAnalyticsCache,
-  computePracticeTimeMs,
   getPracticeDashboardSnapshot: async (context) => (
     await dashboardCacheMethods.getPracticeDashboardSnapshot.call(context)
   ),
   getStimuliSetById,
   getResponseKCMapForTdf,
-  serverConsole,
-  redisBoundary,
   now: () => Date.now(),
 });
 
@@ -687,7 +681,6 @@ export const methods: any = {
     UserMetrics,
     PasswordResetTokens,
     UserDashboardCache,
-    LearnerUnitAnalyticsCache,
     UserUploadQuota,
     requireAdminUser,
     normalizeCanonicalEmail,
@@ -1165,7 +1158,6 @@ Meteor.startup(async function() {
     UserMetrics,
     PasswordResetTokens,
     UserDashboardCache,
-    LearnerUnitAnalyticsCache,
     UserUploadQuota,
     AuditLog,
     syncUsernameCaches,

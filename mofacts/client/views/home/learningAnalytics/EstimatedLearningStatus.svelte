@@ -2,7 +2,6 @@
   import { formatInterfaceNumber, formatInterfacePercent } from '../../../../common/lib/interfaceFormatting';
   import type { TargetUiLocale } from '../../../../common/lib/interfaceLocales';
   import {
-    buildProbabilityHistogram,
     type ModelProgressSnapshot,
     type ProbabilityHistogramBin,
   } from './learningAnalyticsViewModel';
@@ -18,16 +17,16 @@
   $: meanLabel = formatInterfacePercent(uiLocale, progress.meanProbability);
   $: targetLabel = formatInterfacePercent(uiLocale, progress.targetProbability);
   $: targetExplanation = interpolateLearningAnalyticsString(strings.targetExplanation, { target: targetLabel });
-  $: histogramBins = buildProbabilityHistogram(progress.itemProbabilities);
+  $: histogramBins = progress.histogramBins;
   $: largestBinCount = Math.max(1, ...histogramBins.map((bin) => bin.count));
   $: histogramDescription = interpolateLearningAnalyticsString(strings.histogramDescription, {
-    count: formatInterfaceNumber(uiLocale, progress.itemProbabilities.length),
+    count: formatInterfaceNumber(uiLocale, progress.modeledItemCount),
     mean: meanLabel,
   });
 
   function formatProbability(value: number): string {
-    return formatInterfaceNumber(uiLocale, value, {
-      minimumFractionDigits: 1,
+    return formatInterfacePercent(uiLocale, value, {
+      minimumFractionDigits: value * 100 % 1 === 0 ? 0 : 1,
       maximumFractionDigits: 1,
     });
   }
@@ -71,10 +70,13 @@
     {#if showHistogram}
       <div class="histogram-visual" role="group" aria-label={`${histogramDescription} ${targetExplanation}`}>
         <div class="histogram-chart" aria-hidden="true">
-          <ol class="histogram-bars">
+          <ol
+            class="histogram-bars"
+            style={`grid-template-columns: repeat(${histogramBins.length}, minmax(0, 1fr))`}
+          >
             {#each histogramBins as bin}
               <li>
-                <span style={`height: ${bin.count / largestBinCount * 100}%`}></span>
+                <span class:has-count={bin.count > 0} style={`height: ${bin.count / largestBinCount * 100}%`}></span>
               </li>
             {/each}
           </ol>
@@ -262,9 +264,8 @@
 
   .histogram-bars {
     display: grid;
-    grid-template-columns: repeat(10, minmax(0, 1fr));
     align-items: end;
-    gap: clamp(2px, 0.5vw, 5px);
+    gap: 0;
     height: 100%;
     margin: 0;
     padding: 0;
@@ -280,10 +281,15 @@
   .histogram-bars li > span {
     display: block;
     width: 100%;
-    min-height: 2px;
-    border: 1px solid color-mix(in srgb, var(--app-accent-color) 72%, var(--app-text-color));
+    min-height: 0;
+    border-inline-start: 1px solid color-mix(in srgb, var(--app-accent-color) 72%, var(--app-text-color));
     background-color: color-mix(in srgb, var(--app-accent-color) 64%, var(--app-background-color));
     background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--app-background-color) 26%, transparent) 4px 7px);
+  }
+
+  .histogram-bars li > span:not(.has-count) {
+    border: 0;
+    background: transparent;
   }
 
   .histogram-mean {

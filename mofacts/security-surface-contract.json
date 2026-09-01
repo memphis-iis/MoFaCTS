@@ -614,8 +614,12 @@
       "access": "role-checked"
     },
     {
-      "name": "refreshLearnerLessonAnalytics",
-      "access": "role-checked"
+      "name": "getLearnerLessonAnalyticsHistoryPage",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "getLearnerLessonAnalyticsSource",
+      "access": "authenticated-self"
     },
     {
       "name": "refreshUserAdminUsageCaches",

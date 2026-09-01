@@ -380,19 +380,6 @@ export async function createPerformanceIndexes() {
     );
     serverConsole('  Created: UserDashboardCache.usageSummary.lastActivityDate');
 
-    serverConsole('Creating indexes for LearnerUnitAnalyticsCache collection...');
-    await LearnerUnitAnalyticsCache.rawCollection().createIndex(
-      { userId: 1, rootTdfId: 1, unitIndex: 1 },
-      { name: 'learner_unit_analytics_identity', background: true, unique: true }
-    );
-    serverConsole('  Created: LearnerUnitAnalyticsCache.identity');
-
-    await LearnerUnitAnalyticsCache.rawCollection().createIndex(
-      { calculatedAt: 1 },
-      { name: 'learner_unit_analytics_calculated_at', background: true }
-    );
-    serverConsole('  Created: LearnerUnitAnalyticsCache.calculatedAt');
-
     serverConsole('Creating indexes for CourseLearnerSnapshotCache collection...');
     await CourseLearnerSnapshotCache.rawCollection().createIndex(
       { userId: 1, version: 1 },

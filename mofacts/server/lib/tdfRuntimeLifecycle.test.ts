@@ -32,12 +32,6 @@ describe('tdfRuntimeLifecycle', function() {
           return 2;
         },
       },
-      LearnerUnitAnalyticsCache: {
-        removeAsync: async (selector) => {
-          removedSelectors.push({ collection: 'LearnerUnitAnalyticsCache', selector });
-          return 1;
-        },
-      },
       invalidateCourseSnapshotsForAssignment: async (assignmentId, reason) => {
         invalidatedAssignments.push({ assignmentId, reason });
       },
@@ -52,7 +46,6 @@ describe('tdfRuntimeLifecycle', function() {
       { collection: 'Assignments', selector: { TDFId: 'tdf-1' } },
       { collection: 'Histories', selector: { TDFId: 'tdf-1' } },
       { collection: 'GlobalExperimentStates', selector: { TDFId: 'tdf-1' } },
-      { collection: 'LearnerUnitAnalyticsCache', selector: { rootTdfId: 'tdf-1' } },
     ]);
     expect(invalidatedAssignments).to.deep.equal([
       { assignmentId: 'assignment-a', reason: 'tdf-deleted' },

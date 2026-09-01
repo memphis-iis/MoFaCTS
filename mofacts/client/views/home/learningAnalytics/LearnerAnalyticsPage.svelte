@@ -7,7 +7,7 @@
     LearnerAnalyticsPeriod,
     LearnerAnalyticsLaunchDescriptor,
     LearnerLessonAnalyticsSnapshot,
-    RefreshLearnerLessonAnalyticsRequest,
+    GetLearnerLessonAnalyticsSourceRequest,
   } from '../../../../common/learnerAnalytics.contracts';
   import ActivityStrip from './ActivityStrip.svelte';
   import EstimatedLearningStatus from './EstimatedLearningStatus.svelte';
@@ -30,7 +30,7 @@
 
   export let uiLocale: TargetUiLocale;
   export let loadOverview: () => Promise<LearnerAnalyticsOverview>;
-  export let refreshLesson: (request: RefreshLearnerLessonAnalyticsRequest) => Promise<LearnerLessonAnalyticsSnapshot>;
+  export let loadLesson: (request: GetLearnerLessonAnalyticsSourceRequest & { timeZone: string }) => Promise<LearnerLessonAnalyticsSnapshot>;
   export let continuePractice: (launch: LearnerAnalyticsLaunchDescriptor) => Promise<void>;
 
   const periods: LearnerAnalyticsPeriod[] = ['7d', '30d', 'all'];
@@ -87,7 +87,7 @@
     refreshing = true;
     errorMessage = '';
     try {
-      const next = await refreshLesson({
+      const next = await loadLesson({
         rootTdfId: selectedLessonId,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });

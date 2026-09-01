@@ -70,7 +70,6 @@ type AdminMethodsDeps = {
   UserMetrics: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   PasswordResetTokens: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   UserDashboardCache: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
-  LearnerUnitAnalyticsCache: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   UserUploadQuota: { removeAsync: (selector: UnknownRecord) => Promise<unknown> };
   requireAdminUser: (
     userId: string | null | undefined,

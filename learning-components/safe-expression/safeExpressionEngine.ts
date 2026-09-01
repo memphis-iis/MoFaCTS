@@ -1,7 +1,7 @@
 import { parse } from 'acorn';
 import {
   PROBABILITY_FUNCTION_HELPER_NAMES,
-} from '../models/adaptive-logistic/probabilityFunctions';
+} from '../content/probabilityExpressionContract';
 
 type AstNode = {
   type: string;

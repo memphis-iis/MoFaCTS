@@ -22,6 +22,7 @@ import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migra
 import { migrateSparcHistoryPageIdentity } from '../migrations/migrate_sparc_history_page_identity';
 import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_authored_page_identity';
 import { migrateDynamicAssetLocalPaths } from '../migrations/migrate_dynamic_asset_local_paths';
+import { purgeLearnerUnitAnalyticsCache } from '../migrations/purge_learner_unit_analytics_cache';
 import { getLocalStoragePaths, getStorageBackend } from '../lib/storageBoundary';
 import { sendScheduledTurkMessages } from '../turk_methods';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
@@ -95,6 +96,7 @@ type RunServerStartupDeps = {
     rawDatabase: () => {
       databaseName?: string;
       command(command: UnknownRecord): Promise<UnknownRecord>;
+      dropCollection(name: string): Promise<boolean>;
     };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     find: (selector?: UnknownRecord, options?: UnknownRecord) => {
@@ -349,6 +351,12 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
 
   const mongoConnection = await validateMongoConnection(deps.Tdfs.rawDatabase(), process.env);
   deps.serverConsole(1, `[MongoDB] ${formatMongoConnectionValidation(mongoConnection)}`);
+
+  await purgeLearnerUnitAnalyticsCache({
+    database: deps.Tdfs.rawDatabase(),
+    DynamicSettings: deps.DynamicSettings,
+    serverConsole: deps.serverConsole,
+  });
 
   await migrateDynamicAssetLocalPaths({
     DynamicAssets: deps.DynamicAssets,

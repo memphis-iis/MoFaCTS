@@ -15,9 +15,6 @@ type TdfRuntimeLifecycleDeps = {
   GlobalExperimentStates: {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
-  LearnerUnitAnalyticsCache: {
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
-  };
   invalidateCourseSnapshotsForCourse: (courseId: string, reason: string) => Promise<unknown>;
   invalidateCourseSnapshotsForAssignment: (assignmentId: string, reason: string) => Promise<unknown>;
 };
@@ -51,7 +48,6 @@ export function createTdfRuntimeLifecycleHelpers(deps: TdfRuntimeLifecycleDeps) 
     await deps.Assignments.removeAsync({ TDFId: normalizedTdfId });
     await deps.Histories.removeAsync({ TDFId: normalizedTdfId });
     await deps.GlobalExperimentStates.removeAsync({ TDFId: normalizedTdfId });
-    await deps.LearnerUnitAnalyticsCache.removeAsync({ rootTdfId: normalizedTdfId });
 
     for (const assignmentId of affectedAssignmentIds) {
       await deps.invalidateCourseSnapshotsForAssignment(assignmentId, 'tdf-deleted');

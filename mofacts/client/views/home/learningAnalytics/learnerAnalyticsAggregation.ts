@@ -1,24 +1,9 @@
 import type {
   LearnerAnalyticsActivityDay,
+  LearnerAnalyticsHistoryRow,
   LearnerAnalyticsPeriodSnapshot,
-} from '../../common/learnerAnalytics.contracts';
-
-export type LearnerAnalyticsHistoryRow = {
-  _id?: unknown;
-  TDFId?: unknown;
-  levelUnit?: unknown;
-  levelUnitType?: unknown;
-  modelEvidenceSource?: unknown;
-  outcome?: unknown;
-  recordedServerTime?: unknown;
-  time?: unknown;
-  CFEndLatency?: unknown;
-  CFFeedbackLatency?: unknown;
-  stimuliSetId?: unknown;
-  stimulusKC?: unknown;
-  KCId?: unknown;
-  KCDefault?: unknown;
-};
+} from '../../../../common/learnerAnalytics.contracts';
+import { computePracticeTimeMs } from '../../../../lib/practiceTime';
 
 type AggregationResult = {
   periods: {
@@ -90,7 +75,6 @@ function summarize(
   rows: LearnerAnalyticsHistoryRow[],
   dateKeys: Set<string> | null,
   timeZone: string,
-  computePracticeTimeMs: (end: unknown, feedback: unknown) => number,
 ): LearnerAnalyticsPeriodSnapshot {
   let attempts = 0;
   let correct = 0;
@@ -130,7 +114,6 @@ export function buildLearnerAnalyticsAggregates(params: {
   rows: LearnerAnalyticsHistoryRow[];
   nowMs: number;
   timeZone: string;
-  computePracticeTimeMs: (end: unknown, feedback: unknown) => number;
 }): AggregationResult {
   const rows = params.rows.filter(countable);
   const dates30 = recentDateKeys(params.nowMs, params.timeZone, 30);
@@ -149,16 +132,15 @@ export function buildLearnerAnalyticsAggregates(params: {
 
   return {
     periods: {
-      '7d': summarize(rows, new Set(dates7), params.timeZone, params.computePracticeTimeMs),
-      '30d': summarize(rows, new Set(dates30), params.timeZone, params.computePracticeTimeMs),
-      all: summarize(rows, null, params.timeZone, params.computePracticeTimeMs),
+      '7d': summarize(rows, new Set(dates7), params.timeZone),
+      '30d': summarize(rows, new Set(dates30), params.timeZone),
+      all: summarize(rows, null, params.timeZone),
     },
     latest28Days: dates28.map((date) => {
       const summary = summarize(
         activityByDate.get(date) || [],
         new Set([date]),
         params.timeZone,
-        params.computePracticeTimeMs,
       );
       return { date, attempts: summary.attempts, activeMinutes: summary.activeMinutes };
     }),
