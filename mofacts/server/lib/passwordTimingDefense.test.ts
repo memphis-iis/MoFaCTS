@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import {
+  createFailedPasswordResponseEnvelope,
   createPasswordTimingDefense,
   extractPasswordFromLoginArguments,
   extractPasswordLoginQuery,
+  wrapPasswordLoginMethodWithResponseEnvelope,
 } from './passwordTimingDefense';
 
 describe('password timing defense', function() {
@@ -71,5 +73,76 @@ describe('password timing defense', function() {
     );
     expect(observedLookups).to.deep.equal([{ username: 'existing-user' }]);
     expect(observedUsers.map((user) => user._id)).to.deep.equal(['password-timing-decoy-bcrypt']);
+  });
+
+  it('holds failed password responses to an outcome-independent target', async () => {
+    const waits: number[] = [];
+    const samples: unknown[] = [];
+    const clock = [100, 500];
+    const failure = new Error('Incorrect password');
+    const envelope = createFailedPasswordResponseEnvelope({
+      now: () => clock.shift()!,
+      randomInt: (minimum, maximum) => {
+        expect([minimum, maximum]).to.deep.equal([1100, 1301]);
+        return 1200;
+      },
+      wait: async (delayMs) => { waits.push(delayMs); },
+      onFailureComplete: (sample) => { samples.push(sample); },
+    });
+
+    let observed: unknown;
+    try {
+      await envelope.protect(async () => { throw failure; });
+    } catch (error) {
+      observed = error;
+    }
+    expect(observed).to.equal(failure);
+    expect(waits).to.deep.equal([800]);
+    expect(samples).to.deep.equal([{
+      delayedMs: 800,
+      envelopeExceeded: false,
+      targetMs: 1200,
+      workElapsedMs: 400,
+    }]);
+  });
+
+  it('does not delay successful password logins or non-password login methods', async () => {
+    const waits: number[] = [];
+    const envelope = createFailedPasswordResponseEnvelope({
+      now: () => 100,
+      randomInt: () => 1200,
+      wait: async (delayMs) => { waits.push(delayMs); },
+    });
+    const calls: unknown[][] = [];
+    const invocation = { connection: 'synthetic-ddp-invocation' };
+    const wrapped = wrapPasswordLoginMethodWithResponseEnvelope(async function(...args) {
+      expect(this).to.equal(invocation);
+      calls.push(args);
+      return 'success';
+    }, envelope);
+
+    expect(await wrapped.call(invocation, { user: { email: 'user@example.invalid' }, password: 'correct' }))
+      .to.equal('success');
+    expect(await wrapped.call(invocation, { resume: 'token' })).to.equal('success');
+    expect(calls).to.have.length(2);
+    expect(waits).to.deep.equal([]);
+  });
+
+  it('reports rather than masking work that exceeds the selected envelope', async () => {
+    const waits: number[] = [];
+    const samples: Array<{ envelopeExceeded: boolean }> = [];
+    const clock = [100, 1500];
+    const envelope = createFailedPasswordResponseEnvelope({
+      now: () => clock.shift()!,
+      randomInt: () => 1100,
+      wait: async (delayMs) => { waits.push(delayMs); },
+      onFailureComplete: (sample) => { samples.push(sample); },
+    });
+
+    try {
+      await envelope.protect(async () => { throw new Error('Incorrect password'); });
+    } catch { /* expected authentication failure */ }
+    expect(waits).to.deep.equal([]);
+    expect(samples).to.deep.equal([{ delayedMs: 0, envelopeExceeded: true, targetMs: 1100, workElapsedMs: 1400 }]);
   });
 });

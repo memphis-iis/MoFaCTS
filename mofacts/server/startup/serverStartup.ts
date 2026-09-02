@@ -31,10 +31,12 @@ import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery'
 import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
 import { applyDdpContainment } from '../lib/ddpContainment';
 import {
+  createFailedPasswordResponseEnvelope,
   createPasswordTimingDefense,
   extractPasswordFromLoginArguments,
   extractPasswordLoginQuery,
   type MeteorPasswordLoginQuery,
+  wrapPasswordLoginMethodWithResponseEnvelope,
 } from '../lib/passwordTimingDefense';
 
 const LEGACY_AI_CONTENT_DRAFT_TYPE = 'ai-content-creator';
@@ -581,6 +583,35 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     ambiguousErrorMessages: true,
     argon2Enabled: deps.isArgon2Enabled(),
   });
+  const meteorMethodHandlers = (Meteor as unknown as {
+    server?: {
+      method_handlers?: Record<string, (this: unknown, ...methodArguments: unknown[]) => Promise<unknown>>;
+    };
+  }).server?.method_handlers;
+  const passwordLoginMethod = meteorMethodHandlers?.login;
+  if (!meteorMethodHandlers || typeof passwordLoginMethod !== 'function') {
+    throw new Error('Meteor login method handler is unavailable');
+  }
+  let failedPasswordEnvelopeCount = 0;
+  let failedPasswordEnvelopeOverrunCount = 0;
+  const failedPasswordResponseEnvelope = createFailedPasswordResponseEnvelope({
+    onFailureComplete(sample) {
+      failedPasswordEnvelopeCount += 1;
+      if (!sample.envelopeExceeded) return;
+      failedPasswordEnvelopeOverrunCount += 1;
+      if (failedPasswordEnvelopeOverrunCount === 1 || failedPasswordEnvelopeOverrunCount % 100 === 0) {
+        deps.serverConsole('[AUTH] Failed-password timing envelope overrun aggregate', {
+          failedPasswordEnvelopeCount,
+          failedPasswordEnvelopeOverrunCount,
+        });
+      }
+    },
+  });
+  meteorMethodHandlers.login = wrapPasswordLoginMethodWithResponseEnvelope(
+    passwordLoginMethod,
+    failedPasswordResponseEnvelope,
+  );
+  deps.serverConsole('Failed-password response timing envelope registered');
   const meteorPasswordVerifier = (Accounts as unknown as {
     _checkPasswordAsync?: Parameters<typeof createPasswordTimingDefense>[0];
   })._checkPasswordAsync;

@@ -1,3 +1,6 @@
+import { randomInt as cryptoRandomInt } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+
 export type MeteorPasswordValue = string | {
   digest: string;
   algorithm: 'sha-256';
@@ -16,6 +19,25 @@ export type MeteorPasswordAttemptUser = {
   _id?: string;
   services?: { password?: { bcrypt?: string; argon2?: string } };
 };
+
+export const FAILED_PASSWORD_RESPONSE_MIN_MS = 1100;
+export const FAILED_PASSWORD_RESPONSE_MAX_MS = 1300;
+
+type FailedPasswordResponseEnvelopeSample = {
+  delayedMs: number;
+  envelopeExceeded: boolean;
+  targetMs: number;
+  workElapsedMs: number;
+};
+
+type FailedPasswordResponseEnvelopeDeps = {
+  now?: () => number;
+  randomInt?: (minimumInclusive: number, maximumExclusive: number) => number;
+  wait?: (delayMs: number) => Promise<void>;
+  onFailureComplete?: (sample: FailedPasswordResponseEnvelopeSample) => void;
+};
+
+type PasswordLoginMethod = (this: unknown, ...methodArguments: unknown[]) => Promise<unknown>;
 
 // These are deliberately not credentials. Together they let every failed
 // password attempt traverse one bcrypt and one Argon2 verification regardless
@@ -105,4 +127,49 @@ export function createPasswordTimingDefense(
       }
     },
   });
+}
+
+export function createFailedPasswordResponseEnvelope({
+  now = () => performance.now(),
+  randomInt = cryptoRandomInt,
+  wait = (delayMs) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)),
+  onFailureComplete = () => undefined,
+}: FailedPasswordResponseEnvelopeDeps = {}) {
+  return Object.freeze({
+    async protect<T>(operation: () => Promise<T>): Promise<T> {
+      const startedAt = now();
+      const targetMs = randomInt(
+        FAILED_PASSWORD_RESPONSE_MIN_MS,
+        FAILED_PASSWORD_RESPONSE_MAX_MS + 1,
+      );
+      try {
+        return await operation();
+      } catch (error) {
+        const workElapsedMs = Math.max(0, now() - startedAt);
+        const delayedMs = Math.max(0, targetMs - workElapsedMs);
+        if (delayedMs > 0) {
+          await wait(delayedMs);
+        }
+        onFailureComplete({
+          delayedMs,
+          envelopeExceeded: workElapsedMs > targetMs,
+          targetMs,
+          workElapsedMs,
+        });
+        throw error;
+      }
+    },
+  });
+}
+
+export function wrapPasswordLoginMethodWithResponseEnvelope(
+  loginMethod: PasswordLoginMethod,
+  envelope: ReturnType<typeof createFailedPasswordResponseEnvelope>,
+): PasswordLoginMethod {
+  return async function wrappedPasswordLoginMethod(...methodArguments: unknown[]) {
+    if (!extractPasswordFromLoginArguments(methodArguments)) {
+      return loginMethod.apply(this, methodArguments);
+    }
+    return envelope.protect(() => loginMethod.apply(this, methodArguments));
+  };
 }
