@@ -48,6 +48,7 @@ Keep `docs/` focused on software consortium, repository, user, author, operator,
 - `feedback-pipeline-cleanup-plan.md`: feedback pipeline cleanup plan.
 - `playwright-mcp-operations.md`: Playwright MCP operations guide.
 - `production-smoke-load-test.md`: production smoke load-test notes.
+- `security-audit-durable-redesign-plan.md`: durable control-catalog, authorization-evidence, runtime-surface, verification, and cutover plan for the security-audit system.
 - `tdf-schema-source-of-truth-plan.md`: TDF and stimulus schema source-of-truth plan.
 - `video-session-state-machine-audit-plan.md`: video session state-machine audit and fix plan.
 - `tutorscript.schema.json`: TutorScript canonical JSON schema for SPARC plans.
