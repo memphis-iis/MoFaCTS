@@ -145,7 +145,7 @@ describe('learner TDF config', function() {
     expect((result.tdf.tdfs.tutor.unit[0]!.deliverySettings as any).displayTimeoutBar).to.equal(true);
   });
 
-  it('offers set-spec audio fields and the minimal unit delivery settings in learner config definitions', function() {
+  it('offers the allowlisted set-spec and unit fields in learner config definitions', function() {
     expect(LEARNER_TDF_FIELD_DEFINITIONS.map((definition) => definition.id)).to.deep.equal([
       'setspec.audioPromptMode',
       'setspec.audioInputEnabled',
@@ -156,7 +156,9 @@ describe('learner TDF config', function() {
       'unit[].deliverySettings.displayUserAnswerInFeedback',
       'unit[].deliverySettings.optimalThreshold',
       'unit[].deliverySettings.fontsize',
-      'unit[].deliverySettings.studyFirst'
+      'unit[].deliverySettings.studyFirst',
+      'unit[].deliverySettings.drill',
+      'unit[].deliverySettings.reviewstudy'
     ]);
 
     const speechRecognitionField = LEARNER_TDF_FIELD_DEFINITIONS.find((definition) =>
@@ -191,6 +193,22 @@ describe('learner TDF config', function() {
     expect(optimalThresholdField?.displaySuffix).to.equal('%');
     expect(optimalThresholdField?.lowerLabel).to.equal('More new items');
     expect(optimalThresholdField?.upperLabel).to.equal('Mastery first');
+
+    const drillField = LEARNER_TDF_FIELD_DEFINITIONS.find((definition) =>
+      definition.id === 'unit[].deliverySettings.drill'
+    );
+    expect(drillField?.label).to.equal('Answer timeout in milliseconds.');
+    expect(drillField?.control).to.equal('number');
+    expect(drillField?.min).to.equal(0);
+    expect(drillField?.step).to.equal(1);
+
+    const reviewStudyField = LEARNER_TDF_FIELD_DEFINITIONS.find((definition) =>
+      definition.id === 'unit[].deliverySettings.reviewstudy'
+    );
+    expect(reviewStudyField?.label).to.equal('Incorrect-review duration in milliseconds.');
+    expect(reviewStudyField?.control).to.equal('number');
+    expect(reviewStudyField?.min).to.equal(0);
+    expect(reviewStudyField?.step).to.equal(1);
   });
 
   it('keeps current learner-config unit fields scoped to learning sessions, not AutoTutor', function() {

@@ -188,6 +188,14 @@ function deliveryFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTd
   const isBoolean = registry.authoring.type === 'booleanString';
   const isNumber = registry.authoring.type === 'integer' || registry.authoring.type === 'number';
   const validator = firstNumericValidator(tdfPath);
+  const validationMin = registry.validation.kind === 'nonNegativeInteger'
+    ? 0
+    : registry.validation.kind === 'range'
+      ? registry.validation.min
+      : validator?.min;
+  const validationMax = registry.validation.kind === 'range'
+    ? registry.validation.max
+    : validator?.max;
   const defaultValue = DELIVERY_SETTINGS_DEFAULTS[key];
   const safeDefault = typeof defaultValue === 'string' || typeof defaultValue === 'number' || typeof defaultValue === 'boolean'
     ? defaultValue
@@ -206,8 +214,8 @@ function deliveryFieldDefinition(scope: LearnerTdfScope, key: string): LearnerTd
     control: isBoolean ? 'toggle' : enumValues.length ? 'select' : isNumber ? 'number' : 'text',
     defaultValue: safeDefault,
     ...(enumValues.length ? { options: enumValues.map((value) => ({ value, label: humanizeKey(value) })) } : {}),
-    ...(isNumber && typeof validator?.min === 'number' ? { min: validator.min } : {}),
-    ...(isNumber && typeof validator?.max === 'number' ? { max: validator.max } : {}),
+    ...(isNumber && typeof validationMin === 'number' ? { min: validationMin } : {}),
+    ...(isNumber && typeof validationMax === 'number' ? { max: validationMax } : {}),
     ...(isNumber ? { step: registry.authoring.type === 'integer' ? 1 : 0.1 } : {}),
     ...(DELIVERY_SETTINGS_APPLICABILITY[key] ? { appliesToUnitTypes: DELIVERY_SETTINGS_APPLICABILITY[key] } : {})
   };
@@ -260,6 +268,8 @@ const LEARNER_TDF_UNIT_DELIVERY_SETTING_KEYS = Object.freeze([
   'optimalThreshold',
   'fontsize',
   'studyFirst',
+  'drill',
+  'reviewstudy',
 ] as const);
 
 const LEARNER_TDF_UNIT_DISPLAY_SETTING_KEYS = Object.freeze([
