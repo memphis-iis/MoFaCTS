@@ -35,7 +35,7 @@ export function createTdfRuntimeLifecycleHelpers(deps: TdfRuntimeLifecycleDeps) 
     }
 
     const assignmentRows = await deps.Assignments.find(
-      { TDFId: normalizedTdfId },
+      { $or: [{ TDFId: normalizedTdfId }, { memberTdfIds: normalizedTdfId }] },
       { fields: { _id: 1, courseId: 1 } },
     ).fetchAsync();
     const affectedAssignmentIds = [
@@ -45,7 +45,7 @@ export function createTdfRuntimeLifecycleHelpers(deps: TdfRuntimeLifecycleDeps) 
       ...new Set(assignmentRows.map((row) => nonEmptyString(row?.courseId)).filter((id): id is string => !!id)),
     ];
 
-    await deps.Assignments.removeAsync({ TDFId: normalizedTdfId });
+    await deps.Assignments.removeAsync({ $or: [{ TDFId: normalizedTdfId }, { memberTdfIds: normalizedTdfId }] });
     await deps.Histories.removeAsync({ TDFId: normalizedTdfId });
     await deps.GlobalExperimentStates.removeAsync({ TDFId: normalizedTdfId });
 

@@ -7,6 +7,19 @@ type StimulusRecord = Record<string, unknown> & {
 
 type UnknownRecord = Record<string, unknown>;
 
+export function prepareStimuliSetForRuntime(tdf: any): StimulusRecord[] {
+  if (!Array.isArray(tdf?.stimuli)) return [];
+  const repairedStimuli = repairFormattedStimuliResponsesFromRaw(
+    tdf.stimuli as StimulusRecord[],
+    tdf.rawStimuliFile,
+  ) || [];
+  return [...repairedStimuli].sort((left, right) => {
+    const leftStimulusKC = typeof left?.stimulusKC === 'number' ? left.stimulusKC : Number(left?.stimulusKC ?? 0);
+    const rightStimulusKC = typeof right?.stimulusKC === 'number' ? right.stimulusKC : Number(right?.stimulusKC ?? 0);
+    return leftStimulusKC - rightStimulusKC;
+  });
+}
+
 type StimulusLookupDeps = {
   Tdfs: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
@@ -51,19 +64,7 @@ export function createStimulusLookupHelpers(deps: StimulusLookupDeps) {
       { stimuliSetId: stimuliSetId },
       { fields: { stimuli: 1, rawStimuliFile: 1 } }
     );
-    if (!Array.isArray(tdf?.stimuli)) {
-      return [];
-    }
-
-    const repairedStimuli = repairFormattedStimuliResponsesFromRaw(
-      tdf.stimuli as StimulusRecord[],
-      tdf.rawStimuliFile
-    ) || [];
-    return [...repairedStimuli].sort((left, right) => {
-      const leftStimulusKC = typeof left?.stimulusKC === 'number' ? left.stimulusKC : Number(left?.stimulusKC ?? 0);
-      const rightStimulusKC = typeof right?.stimulusKC === 'number' ? right.stimulusKC : Number(right?.stimulusKC ?? 0);
-      return leftStimulusKC - rightStimulusKC;
-    });
+    return prepareStimuliSetForRuntime(tdf);
   }
 
   async function getStimuliSetByFileName(stimulusFileName: string) {

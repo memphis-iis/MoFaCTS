@@ -1,7 +1,7 @@
 import { createInitialModelState } from './modelStateFactory';
 import {
   applyStimulusCrowdStatsToCards,
-  collectStimulusKCsForCrowdStats,
+  collectStimulusIdentitiesForCrowdStats,
   type StimulusCrowdStat,
 } from './stimulusCrowdStatsModel';
 
@@ -12,7 +12,7 @@ export interface InitializeLearningModelStateParams {
   readonly currentUnitNumber: any;
   readonly stimClusters: any[];
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
-  readonly getStimulusCrowdStatsForDeck: (tdfId: any, stimulusKCs: Array<string | number>) => Promise<StimulusCrowdStat[]>;
+  readonly getStimulusCrowdStatsForDeck: (tdfId: any, stimulusIdentities: Array<{ stimuliSetId: string | number; stimulusKC: string | number }>) => Promise<StimulusCrowdStat[]>;
   readonly setResponseKCMap: (responseKCMap: Record<string, unknown>) => void;
   readonly getStimParameterArrayFromCluster: (cluster: any, whichStim: number) => unknown[];
   readonly normalizeResponseText: (rawResponse: unknown) => string;
@@ -28,15 +28,15 @@ export async function initializeLearningModelState(
   params: InitializeLearningModelStateParams,
 ): Promise<void> {
   params.log(1, 'initializeLogisticModelState', params.numQuestions);
-  const stimulusKCs = collectStimulusKCsForCrowdStats(params.stimClusters);
+  const stimulusIdentities = collectStimulusIdentitiesForCrowdStats(params.stimClusters);
   const [responseKCMap, crowdStats] = await Promise.all([
     params.getResponseKCMapForTdf(params.currentTdfId),
-    params.getStimulusCrowdStatsForDeck(params.currentTdfId, stimulusKCs),
+    params.getStimulusCrowdStatsForDeck(params.currentTdfId, stimulusIdentities),
   ]);
   params.setResponseKCMap(responseKCMap);
   params.log(2, 'initializeLogisticModelState,responseKCMap', responseKCMap);
   params.log(2, 'initializeLogisticModelState,stimulusCrowdStats', {
-    requested: stimulusKCs.length,
+    requested: stimulusIdentities.length,
     returned: crowdStats.length,
   });
 

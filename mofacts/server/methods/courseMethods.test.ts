@@ -139,6 +139,8 @@ function createDeps(overrides: Record<string, any> = {}) {
     sendEmail: () => undefined,
     emailFrom: 'noreply@example.test',
     thisServerUrl: 'https://mofacts.example.test',
+    getStimuliSetById: async () => [],
+    removeRuntimeTdfSecrets: <T>(value: T) => value,
     ...overrides,
   };
 }
@@ -257,7 +259,7 @@ describe('course assignment metadata methods', function() {
     const courses = createMemoryCollection([{ _id: 'course-1', courseName: 'Intro Course', teacherUserId: 'teacher-user', semester: 'current' }]);
     const sections = createMemoryCollection([{ _id: 'section-1', courseId: 'course-1', sectionName: '001' }]);
     const sectionUserMap = createMemoryCollection([{ _id: 'enrollment-1', sectionId: 'section-1', userId: 'student-user' }]);
-    const assignments = createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', TDFId: 'tdf-1' }]);
+    const assignments = createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', assignmentType: 'lesson', TDFId: 'tdf-1' }]);
     const histories = {
       rows: [{ _id: 'history-1', userId: 'student-user', courseAssignment: { courseId: 'course-1' } }],
       async findOneAsync() {
@@ -317,7 +319,7 @@ describe('course assignment metadata methods', function() {
       Courses: createMemoryCollection([{ _id: 'course-1', courseName: 'Course One', teacherUserId: 'teacher-1', semester: 'current', timezone: 'America/Chicago' }]),
       Sections: createMemoryCollection([{ _id: 'section-1', courseId: 'course-1', sectionName: 'Section A' }]),
       SectionUserMap: sectionUserMap,
-      Assignments: createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', TDFId: 'tdf-1' }]),
+      Assignments: createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', assignmentType: 'lesson', TDFId: 'tdf-1' }]),
       usersCollection: users,
       CourseLearnerSnapshotCache: createMemoryCollection(),
       UserDashboardCache: createMemoryCollection(),
@@ -351,7 +353,7 @@ describe('course assignment metadata methods', function() {
       ]),
       SectionUserMap: sectionUserMap,
       Assignments: createMemoryCollection([
-        { _id: 'assignment-1', courseId: 'course-public', TDFId: 'tdf-1', order: 0, required: true },
+        { _id: 'assignment-1', courseId: 'course-public', assignmentType: 'lesson', TDFId: 'tdf-1', order: 0, required: true },
       ]),
       Tdfs: createMemoryCollection([
         { _id: 'tdf-1', ownerId: 'teacher-1', stimuliSetId: 'stim-1', content: { fileName: 'lesson.json', tdfs: { tutor: { setspec: { lessonname: 'Lesson One' } } } } },
@@ -402,7 +404,7 @@ describe('course assignment metadata methods', function() {
       ]),
       SectionUserMap: createMemoryCollection(),
       Assignments: createMemoryCollection([
-        { _id: 'assignment-1', courseId: 'course-private', TDFId: 'tdf-1', order: 0, required: true },
+        { _id: 'assignment-1', courseId: 'course-private', assignmentType: 'lesson', TDFId: 'tdf-1', order: 0, required: true },
       ]),
       Tdfs: createMemoryCollection([
         { _id: 'tdf-1', ownerId: 'teacher-user', stimuliSetId: 'stim-1', content: { fileName: 'lesson.json', tdfs: { tutor: { setspec: { lessonname: 'Lesson One' } } } } },
@@ -426,5 +428,87 @@ describe('course assignment metadata methods', function() {
     if (!teacherCourse) throw new Error('Expected teacher course');
     expect(teacherCourse.membership).to.equal('teacher');
     expect(teacherCourse.assignments[0]?.availability).to.equal('available');
+  });
+
+  it('saves and launches the current ordered progressive prefix without creating aggregate progress', async function() {
+    const progressiveMember = (id: string, stimuliSetId: string) => ({
+      _id: id,
+      ownerId: 'teacher-user',
+      stimuliSetId,
+      content: {
+        fileName: `${id}.json`,
+        tdfs: {
+          tutor: {
+            setspec: { lessonname: id },
+            unit: [
+              { unitname: 'Instructions', unitinstructions: '<p>Read</p>' },
+              { unitname: `${id} practice`, learningsession: { clusterlist: '0', maxTrials: 0 } },
+            ],
+          },
+        },
+      },
+      rawStimuliFile: {
+        setspec: {
+          clusters: [{
+            clusterKC: `${id}-cluster`,
+            stims: [{ stimulusKC: `${id}-stim`, response: { correctResponse: id } }],
+          }],
+        },
+      },
+      stimuli: [{
+        stimuliSetId,
+        clusterKC: `${id}-cluster`,
+        stimulusKC: `${id}-stim`,
+        correctResponse: id,
+      }],
+    });
+    const assignments = createMemoryCollection();
+    const methods = createCourseMethods(createDeps({
+      Courses: createMemoryCollection([{
+        _id: 'course-progressive',
+        courseName: 'Progressive Course',
+        teacherUserId: 'teacher-user',
+        semester: 'current',
+        visibility: 'private',
+        timezone: 'America/Chicago',
+      }]),
+      Sections: createMemoryCollection(),
+      SectionUserMap: createMemoryCollection(),
+      Assignments: assignments,
+      Tdfs: createMemoryCollection([
+        progressiveMember('lesson-1', 'set-1'),
+        progressiveMember('lesson-2', 'set-2'),
+        progressiveMember('lesson-3', 'set-3'),
+      ]),
+      CourseLearnerSnapshotCache: createMemoryCollection(),
+      UserDashboardCache: createMemoryCollection([{ userId: 'teacher-user', tdfStats: {} }]),
+      usersCollection: createMemoryCollection([{ _id: 'teacher-user', username: 'Teacher' }]),
+    }));
+
+    const saved = await methods.saveCourseAssignments.call({ userId: 'teacher-user' }, {
+      courseId: 'course-progressive',
+      assignments: [{
+        assignmentType: 'progressive',
+        title: 'Cumulative sequence',
+        memberTdfIds: ['lesson-1', 'lesson-2', 'lesson-3'],
+        order: 0,
+        releaseAt: null,
+        dueAt: null,
+        required: true,
+      }],
+    });
+    const progressive = saved.assignments[0];
+    expect(progressive).to.include({ assignmentType: 'progressive', title: 'Cumulative sequence' });
+    expect((progressive as any).memberTdfIds).to.deep.equal(['lesson-1', 'lesson-2', 'lesson-3']);
+    expect((progressive as any).progress).to.equal(undefined);
+
+    const launch = await methods.getProgressiveAssignmentLaunch.call(
+      { userId: 'teacher-user' },
+      String(progressive?.assignmentId),
+      'lesson-2',
+    );
+    expect(launch.memberTdfIds).to.deep.equal(['lesson-1', 'lesson-2']);
+    expect(launch.tdfs.map((tdf: any) => tdf._id)).to.deep.equal(['lesson-1', 'lesson-2']);
+    expect(launch.tdfs.map((tdf: any) => tdf.stimuli[0].stimuliSetId)).to.deep.equal(['set-1', 'set-2']);
   });
 });

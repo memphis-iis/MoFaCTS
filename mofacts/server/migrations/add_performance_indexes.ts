@@ -130,6 +130,7 @@ export async function createPerformanceIndexes() {
     const duplicateAssignments = await Assignments.rawCollection().aggregate([
       {
         $match: {
+          assignmentType: 'lesson',
           courseId: { $exists: true, $ne: null },
           TDFId: { $exists: true, $ne: null },
         },
@@ -160,11 +161,34 @@ export async function createPerformanceIndexes() {
     );
     serverConsole('  Created: Assignments.assignment_course_order');
 
+    const assignmentCollection = Assignments.rawCollection();
+    const assignmentIndexes = await assignmentCollection.indexes() as IndexInfo[];
+    const oldUniqueIndex = assignmentIndexes.find((index) => index.name === 'assignment_course_tdf_unique');
+    if (oldUniqueIndex && !(oldUniqueIndex as any).partialFilterExpression) {
+      await assignmentCollection.dropIndex('assignment_course_tdf_unique');
+      serverConsole('  Replaced: Assignments.assignment_course_tdf_unique');
+    }
+
     await Assignments.rawCollection().createIndex(
       { courseId: 1, TDFId: 1 },
-      { name: 'assignment_course_tdf_unique', unique: true, background: true }
+      {
+        name: 'assignment_course_tdf_unique',
+        unique: true,
+        background: true,
+        partialFilterExpression: { assignmentType: 'lesson' },
+      }
     );
     serverConsole('  Created: Assignments.assignment_course_tdf_unique');
+
+    await Assignments.rawCollection().createIndex(
+      { courseId: 1, memberTdfIds: 1 },
+      {
+        name: 'assignment_course_progressive_members',
+        background: true,
+        partialFilterExpression: { assignmentType: 'progressive' },
+      }
+    );
+    serverConsole('  Created: Assignments.assignment_course_progressive_members');
 
     await Assignments.rawCollection().createIndex(
       { courseId: 1, releaseAt: 1 },

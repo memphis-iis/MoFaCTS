@@ -21,11 +21,22 @@ export function readCourseAssignmentLaunchContext(value: unknown): CourseAssignm
   if (record.launchSource !== 'courses') {
     throw new Error('[CourseLaunch] Invalid course assignment launch context: launchSource must be courses');
   }
+  if (record.launchMode !== 'individual' && record.launchMode !== 'progressive') {
+    throw new Error('[CourseLaunch] Invalid course assignment launch context: launchMode must be individual or progressive');
+  }
+  const progressiveEndpointTdfId = record.launchMode === 'progressive'
+    ? requireNonEmptyString(record.progressiveEndpointTdfId, 'progressiveEndpointTdfId')
+    : undefined;
+  if (record.launchMode === 'individual' && record.progressiveEndpointTdfId !== undefined) {
+    throw new Error('[CourseLaunch] Individual launch context must not contain progressiveEndpointTdfId');
+  }
   return {
     assignmentId: requireNonEmptyString(record.assignmentId, 'assignmentId'),
     courseId: requireNonEmptyString(record.courseId, 'courseId'),
     TDFId: requireNonEmptyString(record.TDFId, 'TDFId'),
     launchSource: 'courses',
+    launchMode: record.launchMode,
+    ...(progressiveEndpointTdfId ? { progressiveEndpointTdfId } : {}),
   };
 }
 
@@ -78,6 +89,16 @@ export function applyCourseAssignmentLaunchContext<T extends Record<string, unkn
   const currentTdfId = String(Session.get('currentTdfId') || rootTdfId);
   const matchesAssignedTdf = tdfId === context.TDFId;
   const matchesActiveResolvedTdf = rootTdfId === context.TDFId && tdfId === currentTdfId;
+  if (context.launchMode === 'progressive') {
+    if (!tdfId) throw new Error('[CourseLaunch] Progressive history record requires source TDFId');
+    return {
+      ...historyRecord,
+      courseAssignment: {
+        ...context,
+        TDFId: tdfId,
+      },
+    };
+  }
   if (!matchesAssignedTdf && !matchesActiveResolvedTdf) {
     throw new Error('[CourseLaunch] History TDFId does not match course assignment launch context');
   }

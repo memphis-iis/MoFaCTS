@@ -2,11 +2,19 @@ import { Meteor } from 'meteor/meteor';
 import { curSemester } from '../../common/Definitions';
 import type {
   CourseAssignmentEditorSnapshot,
+  CourseAssignmentAvailability,
   CourseAssignmentSummary,
+  CourseAssignmentTdfSummary,
   CourseVisibility,
   LearnerCoursesSnapshot,
+  ProgressiveAssignmentLaunchPayload,
   SaveCourseAssignmentsInput,
 } from '../../common/courseAssignments.contracts';
+import {
+  assignmentMemberTdfIds,
+  MIN_PROGRESSIVE_MEMBERS,
+  progressiveTdfIneligibilityReasons,
+} from '../../common/progressiveAssignments';
 import { getCourse } from '../orm';
 import { normalizeOptionalString } from './dashboardCacheShared';
 import {
@@ -17,6 +25,7 @@ import {
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import { createCourseLearnerSnapshotCacheHelpers } from '../lib/courseLearnerSnapshotCache';
+import { prepareStimuliSetForRuntime } from '../lib/stimulusLookup';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -77,6 +86,7 @@ type CourseMethodsDeps = {
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   getUserDisplayIdentifier: (user: any) => string;
   normalizeCanonicalId: (value: unknown) => string | null;
+  removeRuntimeTdfSecrets: <T>(tdf: T) => T;
 };
 
 function normalizeCourseVisibility(value: unknown): CourseVisibility {
@@ -188,6 +198,7 @@ function getTdfSummary(tdf: any) {
     TDFId: String(tdf?._id || ''),
     fileName,
     displayName,
+    title: displayName,
     tags: Array.isArray(setspec.tags) ? setspec.tags : [],
     contentLanguage,
     recommendedUiLocales,
@@ -207,25 +218,52 @@ function getPrimaryUserEmail(user: any): string | null {
   return firstEmail;
 }
 
-function normalizeAssignmentRow(row: any, index: number, tdfTitleById: Map<string, string>, now = new Date()): CourseAssignmentSummary | null {
+function normalizeAssignmentRow(
+  row: any,
+  index: number,
+  tdfSummaryById: Map<string, CourseAssignmentTdfSummary>,
+  now = new Date(),
+): CourseAssignmentSummary | null {
   const assignmentId = normalizeOptionalString(row?._id);
   const courseId = normalizeOptionalString(row?.courseId);
-  const TDFId = normalizeOptionalString(row?.TDFId);
-  if (!assignmentId || !courseId || !TDFId) return null;
+  const assignmentType = row?.assignmentType;
+  if (!assignmentId || !courseId || (assignmentType !== 'lesson' && assignmentType !== 'progressive')) return null;
   const releaseAt = parseNullablePersistedDate(row?.releaseAt);
   const rawOrder = Number(row?.order);
-  return {
+  const base = {
     assignmentId,
     courseId,
-    TDFId,
-    title: tdfTitleById.get(TDFId) || TDFId,
+    assignmentType,
+    title: '',
     order: Number.isInteger(rawOrder) && rawOrder >= 0 ? rawOrder : index,
     releaseAt,
     dueAt: parseNullablePersistedDate(row?.dueAt),
     required: row?.required !== false,
-    availability: releaseAt && releaseAt.getTime() > now.getTime() ? 'scheduled' : 'available',
+    availability: (releaseAt && releaseAt.getTime() > now.getTime() ? 'scheduled' : 'available') as CourseAssignmentAvailability,
     createdAt: parseNullablePersistedDate(row?.createdAt),
     updatedAt: parseNullablePersistedDate(row?.updatedAt),
+  };
+  if (assignmentType === 'lesson') {
+    const TDFId = normalizeOptionalString(row?.TDFId);
+    if (!TDFId) return null;
+    return {
+      ...base,
+      assignmentType: 'lesson',
+      TDFId,
+      title: tdfSummaryById.get(TDFId)?.title || TDFId,
+    };
+  }
+  const memberTdfIds = assignmentMemberTdfIds(row);
+  const title = normalizeOptionalString(row?.title);
+  if (!title || memberTdfIds.length < MIN_PROGRESSIVE_MEMBERS) return null;
+  const members = memberTdfIds.map((tdfId) => tdfSummaryById.get(tdfId)).filter((summary): summary is CourseAssignmentTdfSummary => !!summary);
+  if (members.length !== memberTdfIds.length) return null;
+  return {
+    ...base,
+    assignmentType: 'progressive',
+    title,
+    memberTdfIds,
+    members,
   };
 }
 
@@ -233,8 +271,8 @@ function assignmentLanguageMetadata(summary: {
   contentLanguage?: string;
   recommendedUiLocales?: string[];
   translationStatus?: string;
-}): Pick<CourseAssignmentSummary, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> {
-  const metadata: Pick<CourseAssignmentSummary, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> = {};
+}): { contentLanguage?: string; recommendedUiLocales?: string[]; translationStatus?: string } {
+  const metadata: { contentLanguage?: string; recommendedUiLocales?: string[]; translationStatus?: string } = {};
   if (typeof summary.contentLanguage === 'string') {
     metadata.contentLanguage = summary.contentLanguage;
   }
@@ -408,14 +446,14 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   async function fetchNormalizedAssignmentSummaries(courseId: string) {
     const rows = await deps.Assignments.find(
       { courseId },
-      { fields: { _id: 1, courseId: 1, TDFId: 1, order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1 } }
+      { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, title: 1, memberTdfIds: 1, order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1 } }
     ).fetchAsync();
-    const summariesById = await getTdfSummariesByIds(rows.map((row: any) => String(row?.TDFId || '')).filter(Boolean));
-    const titleById = new Map(Array.from(summariesById.entries()).map(([tdfId, summary]) => [tdfId, summary.displayName]));
+    const summariesById = await getTdfSummariesByIds(rows.flatMap(assignmentMemberTdfIds));
     return rows
       .map((row: any, index: number): CourseAssignmentSummary | null => {
-        const normalized = normalizeAssignmentRow(row, index, titleById);
+        const normalized = normalizeAssignmentRow(row, index, summariesById);
         if (!normalized) return null;
+        if (normalized.assignmentType === 'progressive') return normalized;
         const summary = summariesById.get(normalized.TDFId);
         return {
           ...normalized,
@@ -524,9 +562,21 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       deps.serverConsole('getAllCourseAssignmentsForInstructor:' + instructorId);
       return await deps.Assignments.rawCollection().aggregate([
         {
+          $set: {
+            effectiveTdfIds: {
+              $cond: [
+                { $eq: ['$assignmentType', 'progressive'] },
+                '$memberTdfIds',
+                ['$TDFId'],
+              ],
+            },
+          },
+        },
+        { $unwind: '$effectiveTdfIds' },
+        {
           $lookup: {
             from: 'tdfs',
-            localField: 'TDFId',
+            localField: 'effectiveTdfIds',
             foreignField: '_id',
             as: 'TDF',
           },
@@ -617,12 +667,20 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           _id: 1,
           ownerId: 1,
           accessors: 1,
+          stimuliSetId: 1,
+          tdfAvailability: 1,
           'content.fileName': 1,
+          'content.isMultiTdf': 1,
           'content.tdfs.tutor.setspec.lessonname': 1,
           'content.tdfs.tutor.setspec.tags': 1,
           'content.tdfs.tutor.setspec.contentLanguage': 1,
           'content.tdfs.tutor.setspec.recommendedUiLocales': 1,
           'content.tdfs.tutor.setspec.translationStatus': 1,
+          'content.tdfs.tutor.setspec.condition': 1,
+          'content.tdfs.tutor.setspec.conditionTdfIds': 1,
+          'content.tdfs.tutor.deliverySettings': 1,
+          'content.tdfs.tutor.unit': 1,
+          'rawStimuliFile.setspec.clusters': 1,
         },
       }
     ).fetchAsync();
@@ -646,6 +704,14 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           recommendedUiLocales: tdf.recommendedUiLocales,
           translationStatus: tdf.translationStatus,
           ownerId: tdf.ownerId,
+          currentStimuliSetId: tdf.currentStimuliSetId,
+          title: tdf.displayName,
+          progressiveEligible: progressiveTdfIneligibilityReasons(
+            assignableTdfs.find((rawTdf: any) => String(rawTdf?._id || '') === tdf.TDFId),
+          ).length === 0,
+          progressiveIneligibilityReasons: progressiveTdfIneligibilityReasons(
+            assignableTdfs.find((rawTdf: any) => String(rawTdf?._id || '') === tdf.TDFId),
+          ),
         }))
         .sort((a: any, b: any) => a.displayName.localeCompare(b.displayName) || a.fileName.localeCompare(b.fileName)),
     };
@@ -656,9 +722,10 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       throw new Meteor.Error(400, `Assignment row ${index + 1} must be an object`);
     }
     const row = raw as UnknownRecord;
-    assertKnownFields(row, ['assignmentId', 'TDFId', 'order', 'releaseAt', 'dueAt', 'required'], `Assignment row ${index + 1}`);
-    const TDFId = normalizeOptionalString(row.TDFId);
-    if (!TDFId) throw new Meteor.Error(400, `Assignment row ${index + 1} requires TDFId`);
+    assertKnownFields(row, ['assignmentId', 'assignmentType', 'TDFId', 'title', 'memberTdfIds', 'order', 'releaseAt', 'dueAt', 'required'], `Assignment row ${index + 1}`);
+    if (row.assignmentType !== 'lesson' && row.assignmentType !== 'progressive') {
+      throw new Meteor.Error(400, `Assignment row ${index + 1} requires assignmentType lesson or progressive`);
+    }
     const releaseAt = parseDateLike(row.releaseAt ?? null, `Assignment row ${index + 1} release date`, timezone);
     const dueAt = parseDateLike(row.dueAt ?? null, `Assignment row ${index + 1} due date`, timezone);
     if (releaseAt && dueAt && dueAt.getTime() < releaseAt.getTime()) {
@@ -671,14 +738,42 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     if (row.required !== true && row.required !== false) {
       throw new Meteor.Error(400, `Assignment row ${index + 1} required must be true or false`);
     }
-    return {
+    const base = {
       assignmentId: normalizeOptionalString(row.assignmentId),
-      TDFId,
       order: index,
       releaseAt,
       dueAt,
       required: row.required === true,
     };
+    if (row.assignmentType === 'lesson') {
+      if (row.title !== undefined || row.memberTdfIds !== undefined) {
+        throw new Meteor.Error(400, `Lesson assignment row ${index + 1} must not contain progressive fields`);
+      }
+      const TDFId = normalizeOptionalString(row.TDFId);
+      if (!TDFId) throw new Meteor.Error(400, `Assignment row ${index + 1} requires TDFId`);
+      return { ...base, assignmentType: 'lesson' as const, TDFId };
+    }
+    if (row.TDFId !== undefined) {
+      throw new Meteor.Error(400, `Progressive assignment row ${index + 1} must not contain TDFId`);
+    }
+    const title = normalizeOptionalString(row.title);
+    if (!title) throw new Meteor.Error(400, `Progressive assignment row ${index + 1} requires a title`);
+    if (title.length > 160) throw new Meteor.Error(400, `Progressive assignment row ${index + 1} title is too long`);
+    if (!Array.isArray(row.memberTdfIds)) {
+      throw new Meteor.Error(400, `Progressive assignment row ${index + 1} requires memberTdfIds`);
+    }
+    const memberTdfIds = row.memberTdfIds.map((value) => normalizeOptionalString(value));
+    if (memberTdfIds.some((value) => !value)) {
+      throw new Meteor.Error(400, `Progressive assignment row ${index + 1} contains an invalid member TDF id`);
+    }
+    const normalizedMemberIds = memberTdfIds as string[];
+    if (normalizedMemberIds.length < MIN_PROGRESSIVE_MEMBERS) {
+      throw new Meteor.Error(400, `Progressive assignment row ${index + 1} requires at least ${MIN_PROGRESSIVE_MEMBERS} lessons`);
+    }
+    if (new Set(normalizedMemberIds).size !== normalizedMemberIds.length) {
+      throw new Meteor.Error(400, `Progressive assignment row ${index + 1} cannot contain the same lesson more than once`);
+    }
+    return { ...base, assignmentType: 'progressive' as const, title, memberTdfIds: normalizedMemberIds };
   }
 
   async function saveCourseAssignments(this: MethodContext, input: SaveCourseAssignmentsInput) {
@@ -695,41 +790,55 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       throw new Meteor.Error(400, `A course can have at most ${MAX_ASSIGNMENTS_PER_COURSE} assignments`);
     }
     const normalizedRows = input.assignments.map((row: unknown, index: number) => validateAssignmentInput(row, index, timezone));
-    const duplicateTdfIds = normalizedRows
-      .map((row) => row.TDFId)
+    const allTdfIds = normalizedRows.flatMap(assignmentMemberTdfIds);
+    const duplicateTdfIds = allTdfIds
       .filter((tdfId, index, all) => all.indexOf(tdfId) !== index);
     if (duplicateTdfIds.length > 0) {
       throw new Meteor.Error(400, `Duplicate TDF assignments are not allowed: ${[...new Set(duplicateTdfIds)].join(', ')}`);
     }
-    const tdfSummaries = await getTdfSummariesByIds(normalizedRows.map((row) => row.TDFId));
-    for (const row of normalizedRows) {
-      if (!tdfSummaries.has(row.TDFId)) {
-        throw new Meteor.Error(404, `Assignable TDF not found: ${row.TDFId}`);
+    const tdfSummaries = await getTdfSummariesByIds(allTdfIds);
+    for (const tdfId of allTdfIds) {
+      if (!tdfSummaries.has(tdfId)) throw new Meteor.Error(404, `Assignable TDF not found: ${tdfId}`);
+    }
+    const progressiveTdfIds = [...new Set(normalizedRows
+      .filter((row) => row.assignmentType === 'progressive')
+      .flatMap(assignmentMemberTdfIds))];
+    const progressiveTdfs = progressiveTdfIds.length > 0
+      ? await deps.Tdfs.find({ _id: { $in: progressiveTdfIds } }).fetchAsync()
+      : [];
+    const progressiveTdfById = new Map(progressiveTdfs.map((tdf: any) => [String(tdf?._id || ''), tdf]));
+    for (const tdfId of progressiveTdfIds) {
+      const reasons = progressiveTdfIneligibilityReasons(progressiveTdfById.get(tdfId));
+      if (reasons.length > 0) {
+        const lessonTitle = tdfSummaries.get(tdfId)?.displayName || tdfId;
+        throw new Meteor.Error(400, `${lessonTitle} cannot be used in a progressive assignment: ${reasons.join(' ')}`);
       }
     }
     const existingRows = await deps.Assignments.find(
       { courseId: String(course._id) },
-      { fields: { _id: 1, courseId: 1, TDFId: 1 } }
+      { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
     ).fetchAsync();
     const existingById = new Map(existingRows.map((row: any) => [String(row._id), row]));
-    const existingByTdfId = new Map(existingRows.map((row: any) => [String(row.TDFId), row]));
     const keepIds = new Set<string>();
     const now = new Date();
     const changedAssignmentIds = new Set<string>();
 
     for (const row of normalizedRows) {
-      const existing = row.assignmentId ? existingById.get(row.assignmentId) : existingByTdfId.get(row.TDFId);
+      const existing = row.assignmentId ? existingById.get(row.assignmentId) : undefined;
       if (row.assignmentId && !existing) {
         throw new Meteor.Error(400, `Assignment id does not belong to this course: ${row.assignmentId}`);
       }
       if (existing) {
         keepIds.add(String(existing._id));
         changedAssignmentIds.add(String(existing._id));
+        const assignmentFields = row.assignmentType === 'lesson'
+          ? { assignmentType: 'lesson', TDFId: row.TDFId }
+          : { assignmentType: 'progressive', title: row.title, memberTdfIds: row.memberTdfIds };
         await deps.Assignments.updateAsync(
           { _id: existing._id, courseId: String(course._id) },
           {
             $set: {
-              TDFId: row.TDFId,
+              ...assignmentFields,
               order: row.order,
               releaseAt: row.releaseAt,
               dueAt: row.dueAt,
@@ -739,12 +848,18 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
             $setOnInsert: {
               createdAt: now,
             },
+            $unset: row.assignmentType === 'lesson'
+              ? { title: '', memberTdfIds: '' }
+              : { TDFId: '' },
           }
         );
       } else {
+        const assignmentFields = row.assignmentType === 'lesson'
+          ? { assignmentType: 'lesson', TDFId: row.TDFId }
+          : { assignmentType: 'progressive', title: row.title, memberTdfIds: row.memberTdfIds };
         const insertedId = await deps.Assignments.insertAsync({
           courseId: String(course._id),
-          TDFId: row.TDFId,
+          ...assignmentFields,
           order: row.order,
           releaseAt: row.releaseAt,
           dueAt: row.dueAt,
@@ -780,6 +895,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       const result = await saveCourseAssignments.call(this, {
         courseId: newCourseAssignment.courseId,
         assignments: tdfIds.map((tdfId, order) => ({
+          assignmentType: 'lesson' as const,
           TDFId: tdfId,
           order,
           releaseAt: null,
@@ -812,9 +928,23 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         },
       },
       {
+        $set: {
+          effectiveTdfIds: {
+            $cond: [
+              { $eq: ['$assignmentType', 'progressive'] },
+              '$memberTdfIds',
+              ['$TDFId'],
+            ],
+          },
+        },
+      },
+      {
+        $unwind: '$effectiveTdfIds',
+      },
+      {
         $lookup: {
           from: 'tdfs',
-          localField: 'TDFId',
+          localField: 'effectiveTdfIds',
           foreignField: '_id',
           as: 'TDF',
         },
@@ -830,7 +960,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
           _id: 0,
           assignmentId: '$_id',
           content: '$TDF.content',
-          TDFId: 1,
+          TDFId: '$effectiveTdfIds',
           courseId: 1,
           dueAt: 1,
         },
@@ -891,13 +1021,13 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
 
     const assignmentRows = await deps.Assignments.find(
       { courseId: { $in: activeCourseIds } },
-      { fields: { TDFId: 1 } }
+      { fields: { assignmentType: 1, TDFId: 1, memberTdfIds: 1 } }
     ).fetchAsync();
     const assignedIdSet = new Set<string>();
     for (const row of assignmentRows) {
-      const normalizedId = deps.normalizeCanonicalId((row as any)?.TDFId);
-      if (normalizedId) {
-        assignedIdSet.add(normalizedId);
+      for (const rawId of assignmentMemberTdfIds(row)) {
+        const normalizedId = deps.normalizeCanonicalId(rawId);
+        if (normalizedId) assignedIdSet.add(normalizedId);
       }
     }
     return Array.from(assignedIdSet);
@@ -906,6 +1036,81 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   async function getLearnerCoursesSnapshot(this: MethodContext): Promise<LearnerCoursesSnapshot> {
     const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
     return await getCourseSnapshotCache().ensureLearnerCoursesSnapshot(userId);
+  }
+
+  async function getProgressiveAssignmentLaunch(
+    this: MethodContext,
+    assignmentId: string,
+    endpointTdfId: string,
+  ): Promise<ProgressiveAssignmentLaunchPayload> {
+    const userId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+    const normalizedAssignmentId = deps.normalizeCanonicalId(assignmentId);
+    const normalizedEndpointId = deps.normalizeCanonicalId(endpointTdfId);
+    if (!normalizedAssignmentId || !normalizedEndpointId) {
+      throw new Meteor.Error(400, 'Progressive assignment and endpoint lesson are required');
+    }
+    const snapshot = await getCourseSnapshotCache().ensureLearnerCoursesSnapshot(userId);
+    const visibleAssignments = [...snapshot.assignedCourses, ...snapshot.publicCourses]
+      .flatMap((course) => course.assignments);
+    const visibleAssignment = visibleAssignments.find((assignment) => assignment.assignmentId === normalizedAssignmentId);
+    if (!visibleAssignment || visibleAssignment.assignmentType !== 'progressive') {
+      throw new Meteor.Error(403, 'Progressive assignment is not available for this user');
+    }
+    if (visibleAssignment.availability !== 'available') {
+      throw new Meteor.Error(403, 'Progressive assignment has not been released');
+    }
+    const assignment = await deps.Assignments.findOneAsync(
+      { _id: normalizedAssignmentId, courseId: visibleAssignment.courseId, assignmentType: 'progressive' },
+      { fields: { _id: 1, courseId: 1, assignmentType: 1, title: 1, memberTdfIds: 1, releaseAt: 1 } },
+    );
+    if (!assignment) throw new Meteor.Error(404, 'Progressive assignment no longer exists');
+    const releaseAt = parseNullablePersistedDate(assignment.releaseAt);
+    if (releaseAt && releaseAt.getTime() > Date.now()) {
+      throw new Meteor.Error(403, 'Progressive assignment has not been released');
+    }
+    const memberTdfIds = assignmentMemberTdfIds(assignment);
+    const endpointIndex = memberTdfIds.indexOf(normalizedEndpointId);
+    if (endpointIndex < 1) {
+      throw new Meteor.Error(400, 'Progressive practice requires the second or a later member lesson');
+    }
+    const prefixTdfIds = memberTdfIds.slice(0, endpointIndex + 1);
+    const tdfs = await deps.Tdfs.find({ _id: { $in: prefixTdfIds } }).fetchAsync();
+    const tdfById = new Map(tdfs.map((tdf: any) => [String(tdf?._id || ''), tdf]));
+    const orderedTdfs = prefixTdfIds.map((tdfId) => tdfById.get(tdfId));
+    if (orderedTdfs.some((tdf) => !tdf)) {
+      throw new Meteor.Error(404, 'A progressive assignment member lesson no longer exists');
+    }
+    for (const [index, tdf] of orderedTdfs.entries()) {
+      const reasons = progressiveTdfIneligibilityReasons(tdf);
+      if (reasons.length > 0) {
+        throw new Meteor.Error(400, `Progressive member ${index + 1} is no longer eligible: ${reasons.join(' ')}`);
+      }
+    }
+    const launchTdfs = orderedTdfs.map((tdf: any) => {
+      const stimuliSetId = tdf.stimuliSetId;
+      if (stimuliSetId === undefined || stimuliSetId === null || String(stimuliSetId).trim() === '') {
+        throw new Meteor.Error(400, `Progressive member ${String(tdf._id)} is missing stimuliSetId`);
+      }
+      const stimuli = prepareStimuliSetForRuntime(tdf);
+      if (!Array.isArray(stimuli) || stimuli.length === 0) {
+        throw new Meteor.Error(400, `Progressive member ${String(tdf._id)} has no stimulus records`);
+      }
+      return deps.removeRuntimeTdfSecrets({
+        _id: tdf._id,
+        stimuliSetId,
+        content: tdf.content,
+        rawStimuliFile: tdf.rawStimuliFile,
+        stimuli,
+      });
+    });
+    return {
+      assignmentId: normalizedAssignmentId,
+      courseId: visibleAssignment.courseId,
+      title: String(assignment.title),
+      endpointTdfId: normalizedEndpointId,
+      memberTdfIds: prefixTdfIds,
+      tdfs: launchTdfs,
+    };
   }
 
   async function getTdfsAssignedToStudent(this: MethodContext, userId: string, curSectionId: string) {
@@ -976,7 +1181,9 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
         $project: {
           'course.teacherUserId': 1,
           enrollment: 1,
+          'assignments.assignmentType': 1,
           'assignments.TDFId': 1,
+          'assignments.memberTdfIds': 1,
         },
       },
     ];
@@ -1001,8 +1208,10 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const assignments = Array.isArray(result.assignments) ? result.assignments : [];
     const assignedIdSet = new Set<string>();
     for (const row of assignments) {
-      const id = deps.normalizeCanonicalId(row?.TDFId);
-      if (id) assignedIdSet.add(id);
+      for (const rawId of assignmentMemberTdfIds(row)) {
+        const id = deps.normalizeCanonicalId(rawId);
+        if (id) assignedIdSet.add(id);
+      }
     }
     return Array.from(assignedIdSet);
   }
@@ -1235,10 +1444,19 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   async function resolveAssignmentForDueDateException(this: MethodContext, classId: string, tdfId: string, assignmentId?: string | null) {
     await assertCanManageCourse(this, classId);
     const selector = assignmentId
-      ? { _id: assignmentId, courseId: classId, TDFId: tdfId }
-      : { courseId: classId, TDFId: tdfId };
-    const assignment = await deps.Assignments.findOneAsync(selector, { fields: { _id: 1, courseId: 1, TDFId: 1 } });
-    if (!assignment) {
+      ? { _id: assignmentId, courseId: classId }
+      : {
+        courseId: classId,
+        $or: [
+          { TDFId: tdfId },
+          { assignmentType: 'progressive', memberTdfIds: tdfId },
+        ],
+      };
+    const assignment = await deps.Assignments.findOneAsync(
+      selector,
+      { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1 } },
+    );
+    if (!assignment || !assignmentMemberTdfIds(assignment).includes(tdfId)) {
       throw new Meteor.Error(404, 'Course assignment not found for due date exception');
     }
     return assignment;
@@ -1301,7 +1519,10 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const user = await deps.usersCollection.findOneAsync({ _id: userId });
     if (user.dueDateExceptions) {
       const exceptions = user.dueDateExceptions as DueDateException[];
-      const assignment = await deps.Assignments.findOneAsync({ TDFId: tdfId }, { fields: { _id: 1 } });
+      const assignment = await deps.Assignments.findOneAsync(
+        { $or: [{ TDFId: tdfId }, { assignmentType: 'progressive', memberTdfIds: tdfId }] },
+        { fields: { _id: 1 } },
+      );
       const exception = exceptions.find((item: DueDateException) => (
         (assignment && item.assignmentId === String(assignment._id)) ||
         item.tdfId == tdfId ||
@@ -1325,7 +1546,13 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const user = await deps.usersCollection.findOneAsync({ _id: userId });
     if (user.dueDateExceptions) {
       const assignment = classId
-        ? await deps.Assignments.findOneAsync({ courseId: classId, TDFId: tdfId }, { fields: { _id: 1 } })
+        ? await deps.Assignments.findOneAsync(
+          {
+            courseId: classId,
+            $or: [{ TDFId: tdfId }, { assignmentType: 'progressive', memberTdfIds: tdfId }],
+          },
+          { fields: { _id: 1 } },
+        )
         : null;
       const resolvedAssignmentId = assignmentId || (assignment ? String(assignment._id) : null);
       const exceptionIndex = (user.dueDateExceptions as DueDateException[]).findIndex((item: DueDateException) => (
@@ -1354,6 +1581,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     getTdfAssignmentsByCourseIdMap,
     resolveAssignedRootTdfIdsForUser,
     getLearnerCoursesSnapshot,
+    getProgressiveAssignmentLaunch,
     invalidateCourseSnapshotForUser,
     invalidateCourseSnapshotsForCourse,
     invalidateCourseSnapshotsForAssignment,

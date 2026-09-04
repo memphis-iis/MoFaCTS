@@ -1,32 +1,37 @@
 import { expect } from 'chai';
 import {
   applyStimulusCrowdStatsToCards,
-  collectStimulusKCsForCrowdStats,
+  collectStimulusIdentitiesForCrowdStats,
 } from '../../learning-components/models/adaptive-logistic/stimulusCrowdStatsModel';
 import { calculateSingleProbability } from '../../learning-components/models/adaptive-logistic/probabilityCalculation';
 import { applyAnswerUpdate } from '../../learning-components/models/adaptive-logistic/answerUpdates';
 
 describe('learning-session crowd stats integration', function() {
   it('collects each stimulus KC once for the startup batch read', function() {
-    const stimulusKCs = collectStimulusKCsForCrowdStats([
-      { stims: [{ stimulusKC: 1001 }, { stimulusKC: 1002 }] },
-      { stims: [{ stimulusKC: 1001 }, { stimulusKC: '1003' }] },
+    const stimulusKCs = collectStimulusIdentitiesForCrowdStats([
+      { stims: [{ stimuliSetId: 1, stimulusKC: 1001 }, { stimuliSetId: 1, stimulusKC: 1002 }] },
+      { stims: [{ stimuliSetId: 1, stimulusKC: 1001 }, { stimuliSetId: 2, stimulusKC: '1003' }] },
     ]);
 
-    expect(stimulusKCs).to.deep.equal([1001, 1002, '1003']);
+    expect(stimulusKCs).to.deep.equal([
+      { stimuliSetId: 1, stimulusKC: 1001 },
+      { stimuliSetId: 1, stimulusKC: 1002 },
+      { stimuliSetId: 2, stimulusKC: '1003' },
+    ]);
   });
 
   it('attaches returned crowd counts and uses zeros for missing aggregate rows', function() {
     const cards = [{
       stims: [
-        { stimulusKC: 1001 },
-        { stimulusKC: 1002 },
+        { stimuliSetId: 1, stimulusKC: 1001 },
+        { stimuliSetId: 1, stimulusKC: 1002 },
       ],
     }];
 
     applyStimulusCrowdStatsToCards({
       cards,
       crowdStats: [{
+        stimuliSetId: 1,
         stimulusKC: 1001,
         correctCount: 3,
         incorrectCount: 2,
@@ -48,8 +53,9 @@ describe('learning-session crowd stats integration', function() {
 
   it('rejects malformed aggregate totals instead of using them in probability calculations', function() {
     expect(() => applyStimulusCrowdStatsToCards({
-      cards: [{ stims: [{ stimulusKC: 1001 }] }],
+      cards: [{ stims: [{ stimuliSetId: 1, stimulusKC: 1001 }] }],
       crowdStats: [{
+        stimuliSetId: 1,
         stimulusKC: 1001,
         correctCount: 3,
         incorrectCount: 2,

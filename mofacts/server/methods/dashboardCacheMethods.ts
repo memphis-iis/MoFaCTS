@@ -408,8 +408,8 @@ export function createDashboardCacheMethods({
       );
     }
     const assignmentRows = await Assignments.find(
-      { TDFId: { $in: scope.tdfIds } },
-      { fields: { _id: 1, courseId: 1, TDFId: 1 } }
+      { $or: [{ TDFId: { $in: scope.tdfIds } }, { memberTdfIds: { $in: scope.tdfIds } }] },
+      { fields: { _id: 1, courseId: 1, TDFId: 1, memberTdfIds: 1 } }
     ).fetchAsync();
     const assignedCourseIds = [...new Set(
       assignmentRows

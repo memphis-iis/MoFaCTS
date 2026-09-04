@@ -22,6 +22,7 @@ import {
 } from './dashboardCacheShared';
 import { ADMIN_API_KEY_SETTINGS_KEY } from '../lib/apiKeyResolution';
 import { validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
+import { assignmentMemberTdfIds } from '../../common/progressiveAssignments';
 
 type DashboardPracticeSnapshotDeps = {
   Meteor: any;
@@ -72,10 +73,15 @@ async function resolveAssignedRootTdfIdsForUser({
 
   const assignmentRows = await Assignments.find(
     { courseId: { $in: [...new Set(courseIds)] } },
-    { fields: { TDFId: 1 } }
+    { fields: { assignmentType: 1, TDFId: 1, memberTdfIds: 1, releaseAt: 1 } }
   ).fetchAsync();
   return assignmentRows
-    .map((row: any) => normalizeOptionalString(row?.TDFId))
+    .flatMap((row: any) => {
+      const releaseAt = row.assignmentType === 'progressive' && row.releaseAt ? new Date(row.releaseAt) : null;
+      if (releaseAt && Number.isFinite(releaseAt.getTime()) && releaseAt.getTime() > Date.now()) return [];
+      return assignmentMemberTdfIds(row);
+    })
+    .map((id: string) => normalizeOptionalString(id))
     .filter((id: string | null): id is string => !!id);
 }
 

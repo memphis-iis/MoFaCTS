@@ -207,11 +207,11 @@ SPARC actions are equivalent to ordinary correct and incorrect model trials for 
 Sharing scope is determined by launch context, not by a separate TDF compatibility flag.
 
 - If the student launches a TDF through a course assignment, matching `clusterKC` values share within that course.
-- If an active course assignment for that student includes a TDF, direct practice-menu launch of that TDF is blocked for that student while the course assignment is active.
+- A released progressive assignment makes each member TDF available from the Practice page as an individual launch. Direct launches stay TDF-scoped and can reuse all rows carrying that source `TDFId`, including rows originally produced by a progressive launch.
 - Direct-launch blocking must be enforced by the server-side launch/readiness/access path, with the practice menu using the same server-derived state for UX. Hiding or disabling a menu button alone is not sufficient.
-- If a card-route reload loses in-memory course launch context for an assigned TDF, it must not bootstrap that TDF as a direct launch. Redirect back to the course assignment surface unless an explicit course-assignment context can be restored.
+- A card-route reload restores serialized course launch context, including progressive mode and endpoint. It must not silently reinterpret a course launch as direct practice.
 - If another user is not assigned that TDF through an active course, public/direct visibility continues to work normally for that other user.
-- If the assigned course is completed or no longer active for that student, the TDF may become available through the direct practice menus again, and direct-launch behavior is TDF-local.
+- Direct-launch behavior is TDF-local regardless of course membership. Course-context sharing occurs only when the learner launches from the Courses page.
 - If the student launches a TDF outside of any active course assignment, behavior stays TDF-local.
 - If the student is not enrolled in the relevant course assignment, behavior stays TDF-local.
 
@@ -227,7 +227,7 @@ Two lessons share a learner cluster model when all of these match:
 
 They do not need the same TDF, same stimulus file, same stimulus-set ID, same stimulus KC, same cluster index, same lesson order, or same stimulus count.
 
-The same `clusterKC` in a different course does not share with this course. The same `clusterKC` in a direct TDF-local launch is scoped to that TDF. Direct launch is blocked for a student while that TDF is part of an active assigned course for that student, which avoids ambiguous direct-vs-course model context during the active assignment.
+The same `clusterKC` in a different course does not share with this course. A direct TDF-local launch reads all model-practice rows carrying that TDF's source identity, even if they were written from a course or progressive launch, but it does not add other TDFs merely because their `clusterKC` matches.
 
 ## Runtime Behavior
 
@@ -259,7 +259,9 @@ Course-assigned model-practice history writes must include course context, prefe
   launchSource: "courses",
   assignmentId,
   courseId,
-  TDFId
+  TDFId,
+  launchMode: "individual" | "progressive",
+  progressiveEndpointTdfId?
 }
 ```
 
@@ -267,9 +269,15 @@ Course-scoped history reads should query stamped course context rather than infe
 
 The implementation should keep the existing learning-session reconstruction pipeline and extend its history read contract with resolved model context. Course context changes which rows are available to reconstruction; it does not introduce a second hydration pipeline.
 
-For a course context, the server read filters by `userId`, `courseAssignment.courseId`, and `levelUnitType: "model"`. The client/unit engine then derives active cluster scope from the launched unit and filters returned model-practice rows by `clusterKC` before reconstruction. The server does not filter by `TDFId`, `levelUnit`, `stimuliSetId`, `stimulusKC`, `KCId`, `KCDefault`, or caller-supplied current-unit cluster lists.
+For an individual course launch, the server returns model rows carrying the launched source `TDFId` in any context plus rows in the same course whose normalized `clusterKC` matches the launched lesson. For a progressive launch, the server returns rows carrying a source `TDFId` in the current ordered prefix through the selected endpoint. Rows from other TDFs outside that prefix are excluded even when their cluster names match.
 
-For a TDF-local context, this implementation preserves the existing cumulative TDF/unit model-history read. Direct launches use the same client-side active-cluster filtering before reconstruction, preserving local progress semantics while introducing course-scoped sharing.
+For a TDF-local context, the cumulative model-history read remains source-`TDFId` scoped. Progressive trials preserve their original member `TDFId`, `stimuliSetId`, `stimulusKC`, `clusterKC`, and Unit 2 name, so later direct or individual launches can reconstruct the correct member model and item history.
+
+## Progressive Course Launches
+
+A progressive assignment is an ordered group of at least two compatible learning-session TDFs. Selecting the progressive action on member N composes members 1 through N. The endpoint member supplies Unit 1 instructions and the Unit 2 learning model/settings; selected clusters from the prefix are merged by normalized `clusterKC`, while distinct stimuli remain keyed by `stimuliSetId + stimulusKC`.
+
+Progressive practice is unbounded: it has no positive `maxTrials` or `practiceseconds`, no group completion state, and no shared `GlobalExperimentStates` record. Teachers may insert, remove, or reorder members. New launches use the current order, an already-open session keeps its initial composition, and current membership is revalidated on every history write so removal revokes future writes without deleting prior history.
 
 Existing unit-history reads such as SPARC interface-state replay, assessment position counting, dashboard progress, hidden-item tracking, and crowd statistics should keep their current item/session scoping unless a specific call site is deliberately moved to course-scoped cluster history. SPARC history rows can replay SPARC document/interface state because they carry SPARC-specific event fields. Non-SPARC model-practice rows do not imply SPARC document state; they only feed the shared cluster model through `levelUnitType: "model"` evidence. Learning-session resume/model hydration is deliberately moved to the shared scoped history set in course context so model state and progress move together for matching `clusterKC` values.
 
@@ -309,14 +317,14 @@ Fail clearly when invariants break:
 - A history write claims course context but the assignment/TDF/course relationship is invalid.
 - The same run attempts to mix incompatible course and TDF-local contexts for the same model update.
 - A shared model query attempts to match course-scoped cluster models by `stimuliSetId`, `stimulusKC`, `KCId`, or `KCDefault`.
-- A direct practice-menu launch is requested for a TDF that is currently active in that student's course assignments.
+- A progressive launch requests a member outside the assignment's current ordered prefix or supplies an item identity outside that prefix.
 - A shared model key is built from an unnormalized semantic `clusterKC`.
 
 Do not silently fall back from course context to TDF-local context for a course-context launch.
 
 ## Migration Strategy
 
-Existing TDF-local behavior remains the default for direct launches and for students without an active matching course context. While a TDF is actively assigned to a student through a course, that student's direct practice-menu access to the TDF should be blocked so direct launches cannot accidentally write TDF-local history for course-assigned work.
+Existing TDF-local behavior remains the default for direct launches. Released progressive membership also grants direct Practice-page access to member TDFs, and source-stamped progressive rows participate in that TDF-local reconstruction without broadening it to other TDFs.
 
 Existing numeric `clusterKC` values remain valid. Courses that need intentional cross-TDF sharing should use semantic `clusterKC` strings for shared clusters.
 
@@ -365,10 +373,10 @@ No giant stimulus file is required. Each lesson keeps its own stimulus file. Clu
    - in TDF-local context, normal reconstruction remains TDF-scoped
 15. Add `modelEvidenceSource` to model-practice writes for learning, assessment, and SPARC evidence.
 16. Keep assessment sessions API-compatible and ensure assessment model-practice history events write to the resolved model context without requiring assessments to read from it.
-17. Block direct practice-menu launch for a student while the TDF is in that student's active assigned course:
-   - server-side launch/readiness/access method rejects the direct launch
-   - practice dashboard/menu shows the blocked state from server-derived assignment data
-   - users without that active assignment can still use public/direct access
+17. Allow direct practice-menu launch for a member of a released progressive assignment:
+   - server-side access recognizes current progressive membership
+   - direct history remains scoped to the member's source `TDFId`
+   - progressive-origin trials reappear because they retain that same source identity
 18. Block destructive reset paths in course context while preserving display-only progress reset behavior.
 19. Add validation for shared cluster model invariants.
 20. Migrate SPARC content that used legacy `clustername`, `clusterid`, or `stimulusid` as KC/position metadata to the standard nested shape with cluster-level `clusterKC`.
@@ -379,8 +387,8 @@ No giant stimulus file is required. Each lesson keeps its own stimulus file. Clu
    - no sharing across different courses
    - different students completing lessons in different orders
    - direct TDF launch remaining TDF-local
-   - direct TDF launch being blocked for a student while the TDF is in that student's active course
-   - direct TDF launch becoming TDF-local again after the student's course assignment is no longer active
+   - direct TDF launch of a released progressive member remaining TDF-local
+   - progressive-origin rows hydrating the original member without importing other prefix members
    - public/direct visibility remaining available to users who are not assigned the TDF through an active course
    - non-enrolled student remaining TDF-local
    - semantic KC trim-and-lowercase normalization

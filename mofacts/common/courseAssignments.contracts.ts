@@ -2,25 +2,49 @@ import type { PracticeDashboardProgressStats } from '../server/methods/dashboard
 
 export type CourseVisibility = 'private' | 'public';
 export type CourseAssignmentAvailability = 'available' | 'scheduled' | 'unavailable';
+export type CourseAssignmentType = 'lesson' | 'progressive';
 
-export interface CourseAssignmentInput {
+interface CourseAssignmentInputBase {
   assignmentId?: string;
-  TDFId: string;
   order: number;
   releaseAt?: string | Date | null;
   dueAt?: string | Date | null;
   required: boolean;
 }
 
+export interface LessonCourseAssignmentInput extends CourseAssignmentInputBase {
+  assignmentType: 'lesson';
+  TDFId: string;
+}
+
+export interface ProgressiveCourseAssignmentInput extends CourseAssignmentInputBase {
+  assignmentType: 'progressive';
+  title: string;
+  memberTdfIds: string[];
+}
+
+export type CourseAssignmentInput = LessonCourseAssignmentInput | ProgressiveCourseAssignmentInput;
+
 export interface SaveCourseAssignmentsInput {
   courseId: string;
   assignments: CourseAssignmentInput[];
 }
 
-export interface CourseAssignmentSummary {
+export interface CourseAssignmentTdfSummary {
+  TDFId: string;
+  title: string;
+  fileName: string;
+  tags: string[];
+  currentStimuliSetId: string | number | null;
+  contentLanguage?: string;
+  recommendedUiLocales?: string[];
+  translationStatus?: string;
+}
+
+interface CourseAssignmentSummaryBase {
   assignmentId: string;
   courseId: string;
-  TDFId: string;
+  assignmentType: CourseAssignmentType;
   title: string;
   order: number;
   releaseAt: Date | null;
@@ -29,12 +53,25 @@ export interface CourseAssignmentSummary {
   availability: CourseAssignmentAvailability;
   createdAt: Date | null;
   updatedAt: Date | null;
+}
+
+export interface LessonCourseAssignmentSummary extends CourseAssignmentSummaryBase {
+  assignmentType: 'lesson';
+  TDFId: string;
   contentLanguage?: string;
   recommendedUiLocales?: string[];
   translationStatus?: string;
 }
 
-export interface LearnerCourseSnapshotAssignment extends CourseAssignmentSummary {
+export interface ProgressiveCourseAssignmentSummary extends CourseAssignmentSummaryBase {
+  assignmentType: 'progressive';
+  memberTdfIds: string[];
+  members: CourseAssignmentTdfSummary[];
+}
+
+export type CourseAssignmentSummary = LessonCourseAssignmentSummary | ProgressiveCourseAssignmentSummary;
+
+export interface LearnerCourseSnapshotLessonAssignment extends LessonCourseAssignmentSummary {
   fileName: string;
   tags: string[];
   currentStimuliSetId: string | number | null;
@@ -42,6 +79,20 @@ export interface LearnerCourseSnapshotAssignment extends CourseAssignmentSummary
   isUsed: boolean;
   hasBeenAttempted: boolean;
 }
+
+export interface LearnerProgressiveAssignmentMember extends CourseAssignmentTdfSummary {
+  progress: PracticeDashboardProgressStats;
+  isUsed: boolean;
+  hasBeenAttempted: boolean;
+}
+
+export interface LearnerCourseSnapshotProgressiveAssignment extends ProgressiveCourseAssignmentSummary {
+  members: LearnerProgressiveAssignmentMember[];
+}
+
+export type LearnerCourseSnapshotAssignment =
+  | LearnerCourseSnapshotLessonAssignment
+  | LearnerCourseSnapshotProgressiveAssignment;
 
 export interface LearnerCourseSnapshotCourse {
   courseId: string;
@@ -61,7 +112,7 @@ export interface LearnerCourseSnapshotCourse {
 }
 
 export interface LearnerCoursesSnapshot {
-  version: 2;
+  version: 3;
   userId: string;
   generatedAt: number;
   assignedCourses: LearnerCourseSnapshotCourse[];
@@ -79,15 +130,11 @@ export interface CourseAssignmentEditorSnapshot {
     timezone: string;
   };
   assignments: CourseAssignmentSummary[];
-  assignableTdfs: Array<{
-    TDFId: string;
-    fileName: string;
+  assignableTdfs: Array<CourseAssignmentTdfSummary & {
     displayName: string;
-    tags: string[];
-    contentLanguage?: string;
-    recommendedUiLocales?: string[];
-    translationStatus?: string;
     ownerId: string;
+    progressiveEligible: boolean;
+    progressiveIneligibilityReasons: string[];
   }>;
 }
 
@@ -96,4 +143,15 @@ export interface CourseAssignmentHistoryContext {
   courseId: string;
   TDFId: string;
   launchSource: 'courses';
+  launchMode: 'individual' | 'progressive';
+  progressiveEndpointTdfId?: string;
+}
+
+export interface ProgressiveAssignmentLaunchPayload {
+  assignmentId: string;
+  courseId: string;
+  title: string;
+  endpointTdfId: string;
+  memberTdfIds: string[];
+  tdfs: any[];
 }

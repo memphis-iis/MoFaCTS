@@ -18,6 +18,7 @@ describe('unitEngineServerMethods', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
     Session.set('courseAssignmentLaunchContext', courseAssignment);
     const serverMethods = createUnitEngineServerMethods({
@@ -28,7 +29,7 @@ describe('unitEngineServerMethods', function() {
     });
 
     await serverMethods.getResponseKCMapForTdf('tdf-1');
-    await serverMethods.getStimulusCrowdStatsForDeck('tdf-1', ['kc-1']);
+    await serverMethods.getStimulusCrowdStatsForDeck('tdf-1', [{ stimuliSetId: 'set-1', stimulusKC: 'kc-1' }]);
     await serverMethods.getLearningHistoryForUnit('user-1', 'tdf-1', 0, false);
 
     expect(calls).to.deep.equal([{
@@ -36,7 +37,7 @@ describe('unitEngineServerMethods', function() {
       args: ['tdf-1', { courseAssignment }],
     }, {
       name: 'getStimulusCrowdStatsForDeck',
-      args: ['tdf-1', ['kc-1'], { courseAssignment }],
+      args: ['tdf-1', [{ stimuliSetId: 'set-1', stimulusKC: 'kc-1' }], { courseAssignment }],
     }, {
       name: 'getLearningHistoryForUnit',
       args: ['user-1', 'tdf-1', 0, false, { courseAssignment }],

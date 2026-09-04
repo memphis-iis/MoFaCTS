@@ -20,6 +20,7 @@ describe('launchReadyTdf course assignment context', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
     setCourseAssignmentLaunchContext(context);
 
@@ -32,6 +33,7 @@ describe('launchReadyTdf course assignment context', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses',
+          launchMode: 'individual',
     });
 
     expect(courseAssignmentContextForLaunchReadyTdf({ courseAssignment: null })).to.equal(null);
@@ -43,12 +45,14 @@ describe('launchReadyTdf course assignment context', function() {
       courseId: 'course-session',
       TDFId: 'tdf-session',
       launchSource: 'courses',
+          launchMode: 'individual',
     });
     const explicitContext = {
       assignmentId: 'assignment-explicit',
       courseId: 'course-explicit',
       TDFId: 'tdf-explicit',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
 
     expect(courseAssignmentContextForLaunchReadyTdf({ courseAssignment: explicitContext }))

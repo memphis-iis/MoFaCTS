@@ -202,7 +202,7 @@ async function resolveModelInput(params: {
     params.deps.getResponseKCMapForTdf(modelTdfId),
     params.deps.StimulusCrowdStats.find(
       { stimuliSetId: modelTdfDoc.stimuliSetId },
-      { fields: { _id: 0, stimulusKC: 1, correctCount: 1, incorrectCount: 1, totalCount: 1 } },
+      { fields: { _id: 0, stimuliSetId: 1, stimulusKC: 1, correctCount: 1, incorrectCount: 1, totalCount: 1 } },
     ).fetchAsync(),
   ]);
   return {

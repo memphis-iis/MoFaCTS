@@ -75,8 +75,9 @@ export type AdaptiveLogisticServerMethods = {
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
   readonly getStimulusCrowdStatsForDeck: (
     tdfId: any,
-    stimulusKCs: Array<string | number>,
+    stimulusIdentities: Array<{ stimuliSetId: string | number; stimulusKC: string | number }>,
   ) => Promise<Array<{
+    stimuliSetId: string | number;
     stimulusKC: string | number;
     correctCount: number;
     incorrectCount: number;

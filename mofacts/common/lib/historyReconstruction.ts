@@ -1,6 +1,7 @@
 import { computePracticeTimeMs } from '../../lib/practiceTime';
 import { isBlankIdentityValue } from '../historyEnvelope';
 import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
+import { createStimulusKey } from '../../../learning-components/runtime/historyStimulusIdentity';
 
 export type LearningOutcome = 'study' | 'correct' | 'incorrect';
 
@@ -347,7 +348,11 @@ export function reconstructLearningStateFromHistory(
     const outcome = row.outcome as LearningOutcome;
     const time = row.time as number;
     const clusterKey = requireLearningHistoryIdentityKey(row, 'clusterKC', 'KCCluster');
-    const stimulusKey = requireLearningHistoryIdentityKey(row, 'stimulusKC', 'KCId');
+    const stimulusKC = requireLearningHistoryIdentityKey(row, 'stimulusKC', 'KCId');
+    const stimulusKey = createStimulusKey({
+      stimuliSetId: requireKey(row.stimuliSetId, 'stimuliSetId'),
+      stimulusKC,
+    });
     const responseKey = resolveLearningHistoryResponseKey(row, options);
     const practiceTimeMs = requireLearningHistoryPracticeTimeMs(row, options);
 

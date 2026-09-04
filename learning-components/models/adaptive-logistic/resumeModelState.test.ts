@@ -27,6 +27,7 @@ function createCardProbabilities(): any {
       clusterKC: 'fractions.lcd',
       canUse: true,
       stims: [{
+        stimuliSetId: 'set-local',
         stimulusKC: 'local-stimulus',
         clusterKC: 'fractions.lcd',
         canUse: true,
@@ -51,7 +52,7 @@ describe('applyResumeModelState shared cluster hydration', function() {
           'fractions.lcd': createAggregate({ priorCorrect: 2, priorStudy: 1 }),
         },
         stimulusState: {
-          'remote-stimulus': createAggregate({ priorCorrect: 2 }),
+          'set-remote:remote-stimulus': createAggregate({ priorCorrect: 2 }),
         },
         responseState: {},
         numQuestionsAnswered: 2,
@@ -80,7 +81,7 @@ describe('applyResumeModelState shared cluster hydration', function() {
           'fractions.lcd': createAggregate({ priorCorrect: 2 }),
         },
         stimulusState: {
-          'local-stimulus': {
+          'set-local:local-stimulus': {
             ...createAggregate({ priorCorrect: 1 }),
             curSessionPriorCorrect: 1,
             curSessionPriorIncorrect: 0,

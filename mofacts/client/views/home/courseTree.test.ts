@@ -6,6 +6,7 @@ function assignment(overrides: any): LearnerCourseSnapshotAssignment {
   return {
     assignmentId: overrides.assignmentId,
     courseId: overrides.courseId,
+    assignmentType: 'lesson',
     TDFId: overrides.TDFId || `${overrides.assignmentId}-tdf`,
     title: overrides.title,
     order: overrides.order ?? 0,
@@ -37,7 +38,7 @@ function assignment(overrides: any): LearnerCourseSnapshotAssignment {
 
 function snapshot(): LearnerCoursesSnapshot {
   return {
-    version: 2,
+    version: 3,
     userId: 'student-1',
     generatedAt: 1,
     invalidatedAt: null,
@@ -137,5 +138,48 @@ describe('course tree rows', function() {
 
     expect(dueRows.map((row) => row.courseName)).to.deep.equal(['Algebra', 'Biology']);
     expect(recentRows.map((row) => row.courseName)).to.deep.equal(['Biology', 'Algebra']);
+  });
+
+  it('expands progressive groups into ordered member rows with member-only progress', function() {
+    const data = snapshot();
+    const biology = data.assignedCourses[0]!;
+    const first = assignment({ assignmentId: 'p-first', courseId: biology.courseId, TDFId: 'tdf-first', title: 'First', attempts: 4 });
+    const second = assignment({ assignmentId: 'p-second', courseId: biology.courseId, TDFId: 'tdf-second', title: 'Second', attempts: 7 });
+    biology.assignments = [{
+      assignmentId: 'progressive-1',
+      courseId: biology.courseId,
+      assignmentType: 'progressive',
+      title: 'Cumulative review',
+      memberTdfIds: ['tdf-first', 'tdf-second'],
+      members: [first, second].map((member: any) => ({
+        TDFId: member.TDFId,
+        title: member.title,
+        fileName: member.fileName,
+        tags: member.tags,
+        currentStimuliSetId: member.currentStimuliSetId,
+        progress: member.progress,
+        isUsed: member.isUsed,
+        hasBeenAttempted: member.hasBeenAttempted,
+      })),
+      order: 0,
+      releaseAt: null,
+      dueAt: null,
+      required: true,
+      availability: 'available',
+      createdAt: null,
+      updatedAt: null,
+    }];
+
+    const rows = buildCourseTreeRows(data, 'assignedCourses', {
+      query: '',
+      sort: 'course',
+      expandedCourseIds: new Set([biology.courseId]),
+    });
+    const result = rows.find((row) => row.courseId === biology.courseId)!;
+    expect(result.assignmentCount).to.equal(2);
+    expect(result.assignments.map((row) => [row.title, row.progress.attempts, row.progressiveMemberIndex])).to.deep.equal([
+      ['First', 4, 0],
+      ['Second', 7, 1],
+    ]);
   });
 });

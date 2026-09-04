@@ -334,6 +334,7 @@ const courseMethods = createCourseMethods({
   getMethodAuthorizationDeps,
   getUserDisplayIdentifier,
   normalizeCanonicalId,
+  removeRuntimeTdfSecrets,
 });
 
 const {

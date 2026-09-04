@@ -316,8 +316,32 @@ Template.tdfAssignmentEdit.helpers({
   },
   rowControlId(prefix: string) {
     const row = this as AssignmentEditorRow;
-    const safeTdfId = String(row.TDFId || 'assignment').replace(/[^A-Za-z0-9_-]/g, '-');
+    const safeTdfId = String(row.assignmentType === 'lesson' ? row.TDFId : row.assignmentId || row.title || 'progressive').replace(/[^A-Za-z0-9_-]/g, '-');
     return `${prefix}-${safeTdfId}-${row.order}`;
+  },
+  isProgressiveAssignment() {
+    return (this as AssignmentEditorRow).assignmentType === 'progressive';
+  },
+  progressiveMembers() {
+    const row = this as AssignmentEditorRow;
+    if (row.assignmentType !== 'progressive') return [];
+    const tdfById = new Map((Template.instance() as AssignmentEditorInstance).assignableTdfs.get().map((tdf) => [tdf.TDFId, tdf]));
+    return row.memberTdfIds.map((tdfId, memberIndex) => ({
+      ...(tdfById.get(tdfId) || { TDFId: tdfId, displayName: tdfId, fileName: '' }),
+      memberIndex,
+      memberPosition: memberIndex + 1,
+    }));
+  },
+  progressiveEligibleTdfs() {
+    const instance = Template.instance() as AssignmentEditorInstance;
+    const row = this as AssignmentEditorRow;
+    const selectedElsewhere = new Set(readRows(instance).flatMap((candidate) => {
+      if (candidate === row) return [];
+      return candidate.assignmentType === 'lesson' ? [candidate.TDFId] : candidate.memberTdfIds;
+    }));
+    const selectedHere = new Set(row.assignmentType === 'progressive' ? row.memberTdfIds : []);
+    return instance.assignableTdfs.get().filter((tdf) =>
+      tdf.progressiveEligible && !selectedElsewhere.has(tdf.TDFId) && !selectedHere.has(tdf.TDFId));
   },
 });
 
@@ -341,6 +365,7 @@ Template.tdfAssignmentEdit.events({
     rows.push({
       assignmentId: '',
       courseId: instance.selectedCourseId.get(),
+      assignmentType: 'lesson',
       TDFId,
       title: tdf.displayName,
       fileName: tdf.fileName,
@@ -353,6 +378,74 @@ Template.tdfAssignmentEdit.events({
       createdAt: null,
       updatedAt: null,
     });
+    writeRows(instance, rows);
+  },
+
+  'click .add-progressive-assignment'(_event: Event, instance: AssignmentEditorInstance) {
+    const rows = readRows(instance);
+    rows.push({
+      assignmentId: '',
+      courseId: instance.selectedCourseId.get(),
+      assignmentType: 'progressive',
+      title: 'New progressive lesson',
+      memberTdfIds: [],
+      members: [],
+      order: rows.length,
+      releaseAt: null,
+      dueAt: null,
+      required: true,
+      availability: 'available',
+      createdAt: null,
+      updatedAt: null,
+    });
+    writeRows(instance, rows);
+  },
+
+  'input .progressive-assignment-title'(event: Event, instance: AssignmentEditorInstance) {
+    const index = rowIndexFromEvent(event);
+    const rows = readRows(instance);
+    const row = rows[index];
+    if (!row || row.assignmentType !== 'progressive') return;
+    rows[index] = { ...row, title: String((event.currentTarget as HTMLInputElement).value || '') };
+    writeRows(instance, rows);
+  },
+
+  'click .add-progressive-member'(event: Event, instance: AssignmentEditorInstance) {
+    const index = rowIndexFromEvent(event);
+    const rows = readRows(instance);
+    const row = rows[index];
+    if (!row || row.assignmentType !== 'progressive') return;
+    const container = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-assignment-index]');
+    const select = container?.querySelector<HTMLSelectElement>('.progressive-member-select');
+    const tdfId = String(select?.value || '');
+    const tdf = instance.assignableTdfs.get().find((candidate) => candidate.TDFId === tdfId && candidate.progressiveEligible);
+    if (!tdf || row.memberTdfIds.includes(tdfId)) return;
+    rows[index] = { ...row, memberTdfIds: [...row.memberTdfIds, tdfId] };
+    writeRows(instance, rows);
+  },
+
+  'click .remove-progressive-member'(event: Event, instance: AssignmentEditorInstance) {
+    const index = rowIndexFromEvent(event);
+    const memberIndex = Number((event.currentTarget as HTMLElement).dataset.memberIndex);
+    const rows = readRows(instance);
+    const row = rows[index];
+    if (!row || row.assignmentType !== 'progressive') return;
+    rows[index] = { ...row, memberTdfIds: row.memberTdfIds.filter((_id, candidateIndex) => candidateIndex !== memberIndex) };
+    writeRows(instance, rows);
+  },
+
+  'click .move-progressive-member-up, .move-progressive-member-down'(event: Event, instance: AssignmentEditorInstance) {
+    const index = rowIndexFromEvent(event);
+    const memberIndex = Number((event.currentTarget as HTMLElement).dataset.memberIndex);
+    const rows = readRows(instance);
+    const row = rows[index];
+    if (!row || row.assignmentType !== 'progressive') return;
+    const direction = (event.currentTarget as HTMLElement).classList.contains('move-progressive-member-up') ? -1 : 1;
+    const targetIndex = memberIndex + direction;
+    if (targetIndex < 0 || targetIndex >= row.memberTdfIds.length) return;
+    const memberTdfIds = [...row.memberTdfIds];
+    [memberTdfIds[memberIndex], memberTdfIds[targetIndex]] = [memberTdfIds[targetIndex]!, memberTdfIds[memberIndex]!];
+    rows[index] = { ...row, memberTdfIds };
     writeRows(instance, rows);
   },
 
@@ -426,9 +519,19 @@ Template.tdfAssignmentEdit.events({
     }
     const payload: SaveCourseAssignmentsInput = {
       courseId,
-      assignments: rows.map((row, order) => ({
+      assignments: rows.map((row, order) => row.assignmentType === 'lesson' ? ({
         ...(row.assignmentId ? { assignmentId: row.assignmentId } : {}),
+        assignmentType: 'lesson' as const,
         TDFId: row.TDFId,
+        order,
+        releaseAt: row.releaseAt ? String(row.releaseAt) : null,
+        dueAt: row.dueAt ? String(row.dueAt) : null,
+        required: row.required,
+      }) : ({
+        ...(row.assignmentId ? { assignmentId: row.assignmentId } : {}),
+        assignmentType: 'progressive' as const,
+        title: row.title,
+        memberTdfIds: row.memberTdfIds,
         order,
         releaseAt: row.releaseAt ? String(row.releaseAt) : null,
         dueAt: row.dueAt ? String(row.dueAt) : null,

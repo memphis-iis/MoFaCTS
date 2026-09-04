@@ -11,6 +11,8 @@ type CourseAssignmentLaunchContext = {
   courseId: string;
   TDFId: string;
   launchSource: 'courses';
+  launchMode: 'individual' | 'progressive';
+  progressiveEndpointTdfId?: string;
 };
 type TdfLookupOptions = {
   courseAssignment?: CourseAssignmentLaunchContext | null;
@@ -44,6 +46,7 @@ type TdfLookupDeps = {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
   };
   Assignments: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   Courses: {
@@ -154,7 +157,15 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     const assignmentId = deps.normalizeCanonicalId(context.assignmentId);
     const courseId = deps.normalizeCanonicalId(context.courseId);
     const contextTdfId = deps.normalizeCanonicalId(context.TDFId);
-    if (context.launchSource !== 'courses' || !assignmentId || !courseId || !contextTdfId) {
+    const launchMode = context.launchMode;
+    const endpointTdfId = deps.normalizeCanonicalId(context.progressiveEndpointTdfId);
+    if (
+      context.launchSource !== 'courses'
+      || (launchMode !== 'individual' && launchMode !== 'progressive')
+      || !assignmentId
+      || !courseId
+      || !contextTdfId
+    ) {
       throw new Meteor.Error(400, 'Course assignment launch context is incomplete');
     }
     const requestedIsAssignedTdf = contextTdfId === requestedTdfId;
@@ -164,13 +175,57 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       throw new Meteor.Error(400, 'Course assignment launch context does not match requested TDF');
     }
     const assignment = await deps.Assignments.findOneAsync(
-      { _id: assignmentId, courseId, TDFId: contextTdfId },
-      { fields: { _id: 1 } },
+      { _id: assignmentId, courseId },
+      { fields: { _id: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1, releaseAt: 1 } },
     );
     if (!assignment) {
       throw new Meteor.Error(400, 'Course assignment launch context does not match an assignment');
     }
+    const isLessonAssignment = assignment.assignmentType === 'lesson' && String(assignment.TDFId || '') === contextTdfId;
+    const memberTdfIds = assignment.assignmentType === 'progressive' && Array.isArray(assignment.memberTdfIds)
+      ? assignment.memberTdfIds.map((id: unknown) => String(id || '').trim()).filter(Boolean)
+      : [];
+    const isProgressiveMember = memberTdfIds.includes(contextTdfId);
+    if (!isLessonAssignment && !isProgressiveMember) {
+      throw new Meteor.Error(400, 'Course assignment launch context does not contain requested TDF');
+    }
+    if (launchMode === 'individual' && endpointTdfId) {
+      throw new Meteor.Error(400, 'Individual course launch must not include a progressive endpoint');
+    }
+    if (launchMode === 'progressive' && (
+      !endpointTdfId
+      || endpointTdfId !== contextTdfId
+      || !memberTdfIds.includes(endpointTdfId)
+    )) {
+      throw new Meteor.Error(400, 'Progressive assignment endpoint is no longer a member');
+    }
+    const releaseAt = assignment.releaseAt ? new Date(assignment.releaseAt) : null;
+    if (releaseAt && Number.isFinite(releaseAt.getTime()) && releaseAt.getTime() > Date.now()) {
+      throw new Meteor.Error(403, 'Course assignment has not been released');
+    }
     await requireUserEnrollmentForCourseContext(userId, courseId);
+  }
+
+  async function userHasReleasedProgressiveAccess(userId: string, requestedTdfId: string): Promise<boolean> {
+    const rows = await deps.Assignments.find(
+      {
+        assignmentType: 'progressive',
+        memberTdfIds: requestedTdfId,
+        $or: [{ releaseAt: null }, { releaseAt: { $exists: false } }, { releaseAt: { $lte: new Date() } }],
+      },
+      { fields: { courseId: 1 } },
+    ).fetchAsync();
+    for (const row of rows) {
+      const courseId = deps.normalizeCanonicalId(row?.courseId);
+      if (!courseId) continue;
+      try {
+        await requireUserEnrollmentForCourseContext(userId, courseId);
+        return true;
+      } catch (error) {
+        if (!(error instanceof Meteor.Error) || error.error !== 403) throw error;
+      }
+    }
+    return false;
   }
 
   async function requireUserEnrollmentForCourseContext(userId: string, courseId: string) {
@@ -227,6 +282,9 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
     const normalizedRequestedTdfId = deps.normalizeCanonicalId(TDFId);
     if (normalizedRequestedTdfId && options.courseAssignment) {
       await requireMatchingCourseAssignmentContext(this.userId, normalizedRequestedTdfId, options);
+      return await loadFullTdf();
+    }
+    if (normalizedRequestedTdfId && await userHasReleasedProgressiveAccess(this.userId, normalizedRequestedTdfId)) {
       return await loadFullTdf();
     }
     if (normalizedRequestedTdfId && assignedRootIds.has(normalizedRequestedTdfId)) {
@@ -317,7 +375,6 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
         return await loadFullTdf();
       }
     }
-
     throw new Meteor.Error(403, 'Not authorized to access this TDF');
   }
 

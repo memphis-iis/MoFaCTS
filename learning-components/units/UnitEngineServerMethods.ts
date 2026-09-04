@@ -4,6 +4,8 @@ export type LearningHistoryReadOptions = {
     readonly courseId: string;
     readonly TDFId: string;
     readonly launchSource: 'courses';
+    readonly launchMode: 'individual' | 'progressive';
+    readonly progressiveEndpointTdfId?: string;
   } | null;
 };
 
@@ -29,8 +31,9 @@ export type UnitEngineServerMethods = {
   readonly getResponseKCMapForTdf: (tdfId: any) => Promise<Record<string, unknown>>;
   readonly getStimulusCrowdStatsForDeck: (
     tdfId: any,
-    stimulusKCs: Array<string | number>,
+    stimulusIdentities: Array<{ stimuliSetId: string | number; stimulusKC: string | number }>,
   ) => Promise<Array<{
+    stimuliSetId: string | number;
     stimulusKC: string | number;
     correctCount: number;
     incorrectCount: number;

@@ -28,6 +28,9 @@
 
             <div class="col-lg-4 col-12">
               <label for="assignmentSearch" class="form-label fw-bold">{{assignmentText 'courseAssignments.addLesson'}}</label>
+              <button type="button" class="btn btn-outline-primary w-100 mb-2 add-progressive-assignment" disabled="{{editorBusy}}">
+                <span class="fa fa-layer-group" aria-hidden="true"></span> New progressive lesson
+              </button>
               <input id="assignmentSearch" class="form-control" type="search" placeholder="{{assignmentText 'courseAssignments.searchPlaceholder'}}" disabled="{{editorBusy}}">
               <div class="assignment-picker-list">
                 {{#each filteredAssignableTdfs}}
@@ -62,8 +65,34 @@
                           </button>
                         </div>
                         <div class="assignment-row-main">
-                          <div class="assignment-row-title">{{this.title}}</div>
-                          <div class="assignment-row-meta">{{this.fileName}}</div>
+                          {{#if isProgressiveAssignment}}
+                            <label class="form-label fw-bold" for="{{rowControlId 'progressive-title'}}">Progressive lesson name</label>
+                            <input id="{{rowControlId 'progressive-title'}}" class="form-control progressive-assignment-title" type="text" value="{{this.title}}" maxlength="160" disabled="{{editorBusy}}">
+                            <div class="assignment-row-meta">Ordered progression</div>
+                            <div class="progressive-member-list">
+                              {{#each progressiveMembers}}
+                                <div class="progressive-member-row">
+                                  <span class="progressive-member-position">{{memberPosition}}</span>
+                                  <span><b>{{displayName}}</b><br><span class="assignment-row-meta">{{fileName}}</span></span>
+                                  <button type="button" class="btn btn-sm btn-outline-secondary move-progressive-member-up" data-member-index="{{memberIndex}}" aria-label="Move member up" disabled="{{editorBusy}}"><span class="fa fa-arrow-up" aria-hidden="true"></span></button>
+                                  <button type="button" class="btn btn-sm btn-outline-secondary move-progressive-member-down" data-member-index="{{memberIndex}}" aria-label="Move member down" disabled="{{editorBusy}}"><span class="fa fa-arrow-down" aria-hidden="true"></span></button>
+                                  <button type="button" class="btn btn-sm btn-outline-danger remove-progressive-member" data-member-index="{{memberIndex}}" aria-label="Remove member" disabled="{{editorBusy}}"><span class="fa fa-times" aria-hidden="true"></span></button>
+                                </div>
+                              {{/each}}
+                            </div>
+                            <div class="input-group input-group-sm mt-2">
+                              <select class="form-select progressive-member-select" aria-label="Lesson to add" disabled="{{editorBusy}}">
+                                <option value="">Select eligible lesson</option>
+                                {{#each progressiveEligibleTdfs}}
+                                  <option value="{{TDFId}}">{{displayName}}</option>
+                                {{/each}}
+                              </select>
+                              <button type="button" class="btn btn-outline-primary add-progressive-member" disabled="{{editorBusy}}">Add to progression</button>
+                            </div>
+                          {{else}}
+                            <div class="assignment-row-title">{{this.title}}</div>
+                            <div class="assignment-row-meta">{{this.fileName}}</div>
+                          {{/if}}
                           <div class="assignment-row-controls">
                             <div class="form-check form-switch assignment-required-wrap">
                               <input id="{{rowControlId 'assignment-required'}}" class="form-check-input assignment-required" type="checkbox" checked="{{isRequiredChecked}}" disabled="{{editorBusy}}">

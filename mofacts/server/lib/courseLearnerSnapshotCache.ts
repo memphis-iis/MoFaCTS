@@ -1,10 +1,12 @@
 import type {
   CourseAssignmentSummary,
+  CourseAssignmentTdfSummary,
   CourseVisibility,
   LearnerCourseSnapshotAssignment,
   LearnerCourseSnapshotCourse,
   LearnerCoursesSnapshot,
 } from '../../common/courseAssignments.contracts';
+import { assignmentMemberTdfIds } from '../../common/progressiveAssignments';
 import { buildDashboardStatsProjection, normalizeOptionalString } from '../methods/dashboardCacheShared';
 import { getUserRoleFlags, type MethodAuthorizationDeps } from './methodAuthorization';
 
@@ -22,8 +24,9 @@ type CollectionLike = {
 
 type TdfSummary = {
   TDFId: string;
-  fileName: string;
+  title: string;
   displayName: string;
+  fileName: string;
   tags: string[];
   contentLanguage?: string;
   recommendedUiLocales?: string[];
@@ -34,7 +37,7 @@ type TdfSummary = {
 type CourseAssignmentSummaryNormalizer = (
   row: any,
   index: number,
-  tdfTitleById: Map<string, string>,
+  tdfSummaryById: Map<string, CourseAssignmentTdfSummary>,
   now?: Date,
 ) => CourseAssignmentSummary | null;
 
@@ -59,7 +62,7 @@ export type CourseLearnerSnapshotCacheDeps = {
   getTdfSummariesByIds: (tdfIds: string[]) => Promise<Map<string, TdfSummary>>;
 };
 
-export const COURSE_SNAPSHOT_VERSION = 2 as const;
+export const COURSE_SNAPSHOT_VERSION = 3 as const;
 
 function courseIsDateVisible(parseNullablePersistedDate: (value: unknown) => Date | null, course: any, now = new Date()) {
   const beginDate = parseNullablePersistedDate(course?.beginDate);
@@ -76,8 +79,8 @@ function updateCount(result: unknown): unknown {
   return result;
 }
 
-function assignmentLanguageMetadata(tdf: TdfSummary): Pick<LearnerCourseSnapshotAssignment, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> {
-  const metadata: Pick<LearnerCourseSnapshotAssignment, 'contentLanguage' | 'recommendedUiLocales' | 'translationStatus'> = {};
+function assignmentLanguageMetadata(tdf: TdfSummary): { contentLanguage?: string; recommendedUiLocales?: string[]; translationStatus?: string } {
+  const metadata: { contentLanguage?: string; recommendedUiLocales?: string[]; translationStatus?: string } = {};
   if (typeof tdf.contentLanguage === 'string') {
     metadata.contentLanguage = tdf.contentLanguage;
   }
@@ -203,7 +206,7 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
     const assignmentRows = courseIds.length > 0
       ? await deps.Assignments.find(
         { courseId: { $in: courseIds } },
-        { fields: { _id: 1, courseId: 1, TDFId: 1, order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1 } }
+        { fields: { _id: 1, courseId: 1, assignmentType: 1, TDFId: 1, title: 1, memberTdfIds: 1, order: 1, releaseAt: 1, dueAt: 1, required: 1, createdAt: 1, updatedAt: 1 } }
       ).fetchAsync()
       : [];
     const visibleSections = courseIds.length > 0
@@ -227,18 +230,14 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
     for (const [courseId, sections] of sectionsByCourseId.entries()) {
       sectionsByCourseId.set(courseId, sections.sort((a, b) => a.sectionName.localeCompare(b.sectionName)));
     }
-    const tdfSummaries = await deps.getTdfSummariesByIds(assignmentRows.map((row: any) => String(row?.TDFId || '')).filter(Boolean));
-    const titleById = new Map(Array.from(tdfSummaries.entries()).map(([tdfId, summary]) => [tdfId, summary.displayName]));
+    const tdfSummaries = await deps.getTdfSummariesByIds(assignmentRows.flatMap(assignmentMemberTdfIds));
     const dashboardCache = await deps.UserDashboardCache.findOneAsync({ userId });
     const assignmentsByCourseId = new Map<string, LearnerCourseSnapshotAssignment[]>();
     const visibleCourseById = new Map(visibleCourses.map((course: any) => [String(course._id), course]));
     const enrolledCourseIdSet = new Set(enrolledCourseIds);
     for (const row of assignmentRows) {
-      const summary = deps.normalizeAssignmentRow(row, 0, titleById, now);
+      const summary = deps.normalizeAssignmentRow(row, 0, tdfSummaries, now);
       if (!summary) continue;
-      const tdf = tdfSummaries.get(summary.TDFId);
-      if (!tdf) continue;
-      const progressProjection = buildDashboardStatsProjection(dashboardCache?.tdfStats?.[summary.TDFId], null);
       const releaseAt = summary.releaseAt;
       const course = visibleCourseById.get(summary.courseId);
       const ordinaryLearner = !roleFlags.admin && String(course?.teacherUserId || '') !== userId;
@@ -246,15 +245,29 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       const availability: LearnerCourseSnapshotAssignment['availability'] = !canLaunchCourseAssignment
         ? 'unavailable'
         : releaseAt && releaseAt.getTime() > now.getTime() && ordinaryLearner ? 'scheduled' : 'available';
-      const enriched: LearnerCourseSnapshotAssignment = {
-        ...summary,
-        availability,
-        fileName: tdf.fileName,
-        tags: tdf.tags,
-        ...assignmentLanguageMetadata(tdf),
-        currentStimuliSetId: tdf.currentStimuliSetId,
-        ...progressProjection,
-      };
+      let enriched: LearnerCourseSnapshotAssignment;
+      if (summary.assignmentType === 'progressive') {
+        enriched = {
+          ...summary,
+          availability,
+          members: summary.members.map((member) => ({
+            ...member,
+            ...buildDashboardStatsProjection(dashboardCache?.tdfStats?.[member.TDFId], null),
+          })),
+        };
+      } else {
+        const tdf = tdfSummaries.get(summary.TDFId);
+        if (!tdf) continue;
+        enriched = {
+          ...summary,
+          availability,
+          fileName: tdf.fileName,
+          tags: tdf.tags,
+          ...assignmentLanguageMetadata(tdf),
+          currentStimuliSetId: tdf.currentStimuliSetId,
+          ...buildDashboardStatsProjection(dashboardCache?.tdfStats?.[summary.TDFId], null),
+        };
+      }
       const list = assignmentsByCourseId.get(summary.courseId) || [];
       list.push(enriched);
       assignmentsByCourseId.set(summary.courseId, list);
@@ -311,7 +324,7 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
           assignedCourseIds: snapshot.assignedCourses.map((course) => course.courseId),
           publicCourseIds: snapshot.publicCourses.map((course) => course.courseId),
           assignmentIds: [...new Set([...snapshot.assignedCourses, ...snapshot.publicCourses].flatMap((course) => course.assignments.map((assignment) => assignment.assignmentId)))],
-          tdfIds: [...new Set([...snapshot.assignedCourses, ...snapshot.publicCourses].flatMap((course) => course.assignments.map((assignment) => assignment.TDFId)))],
+          tdfIds: [...new Set([...snapshot.assignedCourses, ...snapshot.publicCourses].flatMap((course) => course.assignments.flatMap(assignmentMemberTdfIds)))],
           snapshot,
           rebuildReason: reason,
         },

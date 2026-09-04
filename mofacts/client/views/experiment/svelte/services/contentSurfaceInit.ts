@@ -60,7 +60,10 @@ import {
   setCardEntryIntent,
   shouldUseProgressBootstrapForEntryIntent,
 } from '../../../../lib/cardEntryIntent';
-import { restoreCourseAssignmentLaunchContextFromState } from '../../../../lib/courseAssignmentLaunchContext';
+import {
+  getCourseAssignmentLaunchContext,
+  restoreCourseAssignmentLaunchContextFromState,
+} from '../../../../lib/courseAssignmentLaunchContext';
 import { buildActiveLessonRouteLocation } from '../../../../lib/activeLessonRoute';
 import { isLessonRoutePath } from '../../../../lib/lessonRoute';
 import {
@@ -329,7 +332,23 @@ export function stampAndValidateStandardStimuliIdentity(
   });
 }
 
+function validateProgressiveStimuliIdentity(stimuliSet: unknown[]): Array<Record<string, unknown>> {
+  return stimuliSet.map((stim, index) => {
+    if (!stim || typeof stim !== 'object' || Array.isArray(stim)) {
+      throw new Error(`[Content Surface Init] Progressive stimulus ${index} must be an object`);
+    }
+    const stimulus = stim as Record<string, unknown>;
+    for (const field of ['stimuliSetId', 'stimulusKC', 'clusterKC', 'progressiveSourceTdfId', 'progressiveSourceUnitName']) {
+      if (isBlankIdentityValue(stimulus[field])) {
+        throw new Error(`[Content Surface Init] Progressive stimulus ${index} is missing ${field}`);
+      }
+    }
+    return stimulus;
+  });
+}
+
 async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLike): Promise<void> {
+  const progressiveLaunch = getCourseAssignmentLaunchContext()?.launchMode === 'progressive';
   const currentScopeId = normalizeStimuliScopeId(Session.get('currentStimuliSetId'));
   const tdfScopeId = normalizeStimuliScopeId(tdfFile.stimuliSetId);
   const expectedScopeId = tdfScopeId || currentScopeId;
@@ -347,7 +366,7 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
       sessionStimuliSet,
       tdfFile.rawStimuliFile
     );
-    const scopedToExpectedId = isStimuliSetScopedToExpectedId(
+    const scopedToExpectedId = progressiveLaunch || isStimuliSetScopedToExpectedId(
       repairedSessionStimuliSet as unknown[],
       expectedScopeId
     );
@@ -360,10 +379,9 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
       });
       Session.set('currentStimuliSet', undefined);
     } else {
-      const identityCheckedSessionStimuliSet = stampAndValidateStandardStimuliIdentity(
-        repairedSessionStimuliSet as unknown[],
-        expectedScopeId,
-      );
+      const identityCheckedSessionStimuliSet = progressiveLaunch
+        ? validateProgressiveStimuliIdentity(repairedSessionStimuliSet as unknown[])
+        : stampAndValidateStandardStimuliIdentity(repairedSessionStimuliSet as unknown[], expectedScopeId);
       if (identityCheckedSessionStimuliSet !== sessionStimuliSet) {
         Session.set('currentStimuliSet', identityCheckedSessionStimuliSet);
       }
@@ -385,10 +403,9 @@ async function ensureCanonicalStimuliSetLoadedForStandardInit(tdfFile: TdfFileLi
       inlineStimuliSet as Record<string, unknown>[],
       tdfFile.rawStimuliFile
     );
-    Session.set(
-      'currentStimuliSet',
-      stampAndValidateStandardStimuliIdentity(repairedInlineStimuliSet as unknown[], expectedScopeId)
-    );
+    Session.set('currentStimuliSet', progressiveLaunch
+      ? validateProgressiveStimuliIdentity(repairedInlineStimuliSet as unknown[])
+      : stampAndValidateStandardStimuliIdentity(repairedInlineStimuliSet as unknown[], expectedScopeId));
   } else {
     const stimuliSetId = Session.get('currentStimuliSetId') || tdfFile.stimuliSetId;
     if (!stimuliSetId) {

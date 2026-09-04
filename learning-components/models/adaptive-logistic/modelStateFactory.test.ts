@@ -18,6 +18,7 @@ describe('modelStateFactory', function() {
     const state = createInitialModelState(createDeps([{
       clusterKC: 0,
       stims: [{
+        stimuliSetId: 'set-1',
         clusterKC: 0,
         stimulusKC: 1,
         correctResponse: '__SPARC_COMPLETED__',
@@ -48,6 +49,7 @@ describe('modelStateFactory', function() {
     const state = createInitialModelState(createDeps([{
       clusterKC: 'fractions.lcd',
       stims: [{
+        stimuliSetId: 'set-1',
         clusterKC: 10000,
         stimulusKC: 10001,
         correctResponse: '__SPARC_COMPLETED__',
@@ -63,6 +65,7 @@ describe('modelStateFactory', function() {
   it('preserves legacy numeric stim-level clusterKC when cluster-level identity is absent', function() {
     const state = createInitialModelState(createDeps([{
       stims: [{
+        stimuliSetId: 'set-1',
         clusterKC: 10000,
         stimulusKC: 10001,
         correctResponse: '__SPARC_COMPLETED__',

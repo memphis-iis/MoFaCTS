@@ -87,6 +87,7 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
       updateAsync: async () => true,
     },
     Assignments: {
+      find: () => ({ fetchAsync: async () => [] }),
       findOneAsync: async () => null,
     },
     Courses: {
@@ -370,7 +371,49 @@ describe('analyticsMethods', function() {
     }
   });
 
-  it('getLearningHistoryForUnit loads all course model history without requiring current-unit clusterKCs', async function() {
+  it('allows direct history writes and reads for a released progressive member while keeping TDF scope', async function() {
+    let capturedSelector: Record<string, unknown> | null = null;
+    const { deps, insertedHistory } = createAssignedRootDeps({
+      Assignments: {
+        find: () => ({ fetchAsync: async () => [{ courseId: 'course-1' }] }),
+        findOneAsync: async () => null,
+      },
+      Courses: {
+        find: () => ({ fetchAsync: async () => [{ _id: 'course-1', visibility: 'public' }] }),
+      },
+      Histories: {
+        find: (selector: Record<string, unknown>) => {
+          capturedSelector = selector;
+          return { fetchAsync: async () => [], countAsync: async () => 0 };
+        },
+        findOneAsync: async () => null,
+        insertAsync: async (document: Record<string, unknown>) => {
+          insertedHistory.push(document);
+          return 'history-id';
+        },
+        rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
+      },
+    });
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord({ TDFId: 'root-tdf' }));
+    await methods.getLearningHistoryForUnit.call(
+      { userId: 'learner-1' },
+      'learner-1',
+      'root-tdf',
+      1,
+    );
+
+    expect(insertedHistory).to.have.length(1);
+    expect(capturedSelector).to.deep.equal({
+      userId: 'learner-1',
+      TDFId: 'root-tdf',
+      levelUnitType: 'model',
+      levelUnit: { $lte: 1 },
+    });
+  });
+
+  it('getLearningHistoryForUnit always includes exact source-TDF history for an individual course launch', async function() {
     const courseRows = [
       createHistoryRecord({
         _id: 'history-1',
@@ -402,9 +445,8 @@ describe('analyticsMethods', function() {
       Assignments: {
         findOneAsync: async (selector: Record<string, unknown>) => (
           selector._id === 'assignment-1' &&
-          selector.courseId === 'course-1' &&
-          selector.TDFId === 'root-tdf'
-            ? { _id: 'assignment-1' }
+          selector.courseId === 'course-1'
+            ? { _id: 'assignment-1', assignmentType: 'lesson', TDFId: 'root-tdf' }
             : null
         ),
       },
@@ -426,6 +468,7 @@ describe('analyticsMethods', function() {
           courseId: 'course-1',
           TDFId: 'root-tdf',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       },
     );
@@ -434,7 +477,7 @@ describe('analyticsMethods', function() {
     expect(capturedSelector).to.deep.equal({
       userId: 'learner-1',
       levelUnitType: 'model',
-      'courseAssignment.courseId': 'course-1',
+      $or: [{ TDFId: { $in: ['root-tdf'] } }],
     });
     expect(capturedFindOptions).to.deep.include({
       sort: { time: 1 },
@@ -454,19 +497,96 @@ describe('analyticsMethods', function() {
     }
   });
 
-  it('getStimulusCrowdStatsForDeck rejects assigned TDF reads without course context before dashboard visibility', async function() {
+  it('getStimulusCrowdStatsForDeck rejects an ordinary assigned TDF without course context', async function() {
     const { deps } = createAssignedRootDeps({
       canViewDashboardTdf: async () => true,
     });
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
 
     try {
-      await methods.getStimulusCrowdStatsForDeck.call({ userId: 'learner-1' }, 'root-tdf', ['101']);
-      expect.fail('Expected assigned crowd stats read without course context to fail');
+      await methods.getStimulusCrowdStatsForDeck.call(
+        { userId: 'learner-1' },
+        'root-tdf',
+        [{ stimuliSetId: 'stim-set-1', stimulusKC: '101' }],
+      );
+      expect.fail('Expected ordinary assigned crowd stats read without course context to fail');
     } catch (error: any) {
       expect(error.error).to.equal(403);
       expect(error.reason).to.equal('Course-assigned crowd stats require courseAssignment context');
     }
+  });
+
+  it('scopes progressive history to exact prefix TDFs and excludes future same-cluster lessons', async function() {
+    let capturedSelector: Record<string, unknown> | null = null;
+    const { deps } = createAnalyticsDeps({
+      Histories: {
+        find: (selector: Record<string, unknown>) => {
+          capturedSelector = selector;
+          return { fetchAsync: async () => [], countAsync: async () => 0 };
+        },
+        findOneAsync: async () => null,
+        insertAsync: async () => 'history-id',
+        rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
+      },
+      Assignments: {
+        find: () => ({ fetchAsync: async () => [] }),
+        findOneAsync: async () => ({
+          _id: 'progressive-1',
+          courseId: 'course-1',
+          assignmentType: 'progressive',
+          memberTdfIds: ['lesson-1', 'lesson-2', 'lesson-3'],
+          releaseAt: null,
+        }),
+      },
+      Courses: {
+        find: () => ({ fetchAsync: async () => [{ _id: 'course-1', visibility: 'public' }] }),
+      },
+      Tdfs: {
+        find: () => ({
+          fetchAsync: async () => [
+            {
+              _id: 'lesson-1',
+              content: { tdfs: { tutor: { unit: [{}, { learningsession: { clusterlist: '0' } }] } } },
+              rawStimuliFile: { setspec: { clusters: [{ clusterKC: ' Cluster-A ' }] } },
+            },
+            {
+              _id: 'lesson-2',
+              content: { tdfs: { tutor: { unit: [{}, { learningsession: { clusterlist: '0' } }] } } },
+              rawStimuliFile: { setspec: { clusters: [{ clusterKC: 'cluster-b' }] } },
+            },
+          ],
+        }),
+        findOneAsync: async () => null,
+        updateAsync: async () => true,
+      },
+    });
+    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
+
+    await methods.getLearningHistoryForUnit.call(
+      { userId: 'learner-1' },
+      'learner-1',
+      'lesson-2',
+      1,
+      false,
+      {
+        courseAssignment: {
+          assignmentId: 'progressive-1',
+          courseId: 'course-1',
+          TDFId: 'lesson-2',
+          launchSource: 'courses',
+          launchMode: 'progressive',
+          progressiveEndpointTdfId: 'lesson-2',
+        },
+      },
+    );
+
+    expect(capturedSelector).to.deep.equal({
+      userId: 'learner-1',
+      levelUnitType: 'model',
+      $or: [
+        { TDFId: { $in: ['lesson-1', 'lesson-2'] } },
+      ],
+    });
   });
 
   it('insertHistory accepts course history for a resolved child of the assigned root TDF', async function() {
@@ -513,9 +633,8 @@ describe('analyticsMethods', function() {
       Assignments: {
         findOneAsync: async (selector: Record<string, unknown>) => (
           selector._id === 'assignment-1' &&
-          selector.courseId === 'course-1' &&
-          selector.TDFId === 'root-tdf'
-            ? { _id: 'assignment-1' }
+          selector.courseId === 'course-1'
+            ? { _id: 'assignment-1', assignmentType: 'lesson', TDFId: 'root-tdf' }
             : null
         ),
       },
@@ -532,6 +651,7 @@ describe('analyticsMethods', function() {
         courseId: 'course-1',
         TDFId: 'root-tdf',
         launchSource: 'courses',
+          launchMode: 'individual',
       },
     }));
 

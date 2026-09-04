@@ -1,5 +1,6 @@
 import type {
   LearnerCourseSnapshotAssignment,
+  LearnerCourseSnapshotLessonAssignment,
   LearnerCourseSnapshotCourse,
   LearnerCoursesSnapshot,
 } from '../../../common/courseAssignments.contracts';
@@ -7,7 +8,11 @@ import type {
 export type CourseTreeSection = 'assignedCourses' | 'publicCourses';
 export type CourseTreeSort = 'course' | 'due' | 'recent';
 
-export type CourseAssignmentDisplayRow = LearnerCourseSnapshotAssignment & {
+export type CourseAssignmentDisplayRow = Omit<LearnerCourseSnapshotLessonAssignment, 'assignmentType'> & {
+  assignmentType: 'lesson' | 'progressive';
+  progressiveGroupTitle?: string;
+  progressiveMemberIndex?: number;
+  progressiveMemberCount?: number;
   rowType: 'assignment';
   rowId: string;
   parentRowId: string;
@@ -48,14 +53,71 @@ function courseSearchText(course: LearnerCourseSnapshotCourse) {
 }
 
 function assignmentSearchText(assignment: LearnerCourseSnapshotAssignment) {
+  const members = assignment.assignmentType === 'progressive' ? assignment.members : [];
   return [
     assignment.title,
-    assignment.fileName,
-    (assignment.tags || []).join(' '),
-    assignment.contentLanguage || '',
-    (assignment.recommendedUiLocales || []).join(' '),
-    assignment.translationStatus || '',
+    ...members.flatMap((member) => [member.title, member.fileName, ...(member.tags || [])]),
+    ...(assignment.assignmentType === 'lesson' ? [
+      assignment.fileName,
+      (assignment.tags || []).join(' '),
+      assignment.contentLanguage || '',
+      (assignment.recommendedUiLocales || []).join(' '),
+      assignment.translationStatus || '',
+    ] : []),
   ].join(' ').toLowerCase();
+}
+
+function assignmentDisplayRows(
+  assignment: LearnerCourseSnapshotAssignment,
+  course: LearnerCourseSnapshotCourse,
+  parentRowId: string,
+): CourseAssignmentDisplayRow[] {
+  const courseFields = {
+    rowType: 'assignment' as const,
+    parentRowId,
+    courseName: course.courseName,
+    teacherDisplayName: course.teacherDisplayName,
+    visibility: course.visibility,
+    beginDate: course.beginDate,
+    endDate: course.endDate,
+    timezone: course.timezone,
+    membership: course.membership,
+  };
+  if (assignment.assignmentType === 'lesson') {
+    return [{
+      ...assignment,
+      ...courseFields,
+      rowId: `${parentRowId}-assignment-${assignment.assignmentId}`,
+    }];
+  }
+  return assignment.members.map((member, memberIndex) => ({
+    assignmentId: assignment.assignmentId,
+    courseId: assignment.courseId,
+    assignmentType: 'progressive' as const,
+    progressiveGroupTitle: assignment.title,
+    progressiveMemberIndex: memberIndex,
+    progressiveMemberCount: assignment.members.length,
+    TDFId: member.TDFId,
+    title: member.title,
+    fileName: member.fileName,
+    tags: member.tags,
+    currentStimuliSetId: member.currentStimuliSetId,
+    ...(member.contentLanguage !== undefined ? { contentLanguage: member.contentLanguage } : {}),
+    ...(member.recommendedUiLocales !== undefined ? { recommendedUiLocales: member.recommendedUiLocales } : {}),
+    ...(member.translationStatus !== undefined ? { translationStatus: member.translationStatus } : {}),
+    progress: member.progress,
+    isUsed: member.isUsed,
+    hasBeenAttempted: member.hasBeenAttempted,
+    order: assignment.order,
+    releaseAt: assignment.releaseAt,
+    dueAt: assignment.dueAt,
+    required: assignment.required,
+    availability: assignment.availability,
+    createdAt: assignment.createdAt,
+    updatedAt: assignment.updatedAt,
+    ...courseFields,
+    rowId: `${parentRowId}-assignment-${assignment.assignmentId}-member-${member.TDFId}`,
+  }));
 }
 
 function dateTime(value: unknown, emptyValue: number) {
@@ -93,9 +155,16 @@ export function buildCourseTreeRows(
   const courses = snapshot?.[section] || [];
   const rows = courses.flatMap((course): CourseTreeCourseRow[] => {
     const courseMatches = Boolean(query && courseSearchText(course).includes(query));
+    const assignmentCount = course.assignments.reduce(
+      (count, assignment) => count + (assignment.assignmentType === 'progressive' ? assignment.members.length : 1),
+      0,
+    );
     const visibleAssignments = course.assignments
       .filter((assignment) => !query || courseMatches || assignmentSearchText(assignment).includes(query))
-      .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
+      .flatMap((assignment) => assignmentDisplayRows(assignment, course, `course-tree-${section}-${course.courseId}`))
+      .sort((a, b) => a.order - b.order
+        || Number(a.progressiveMemberIndex ?? -1) - Number(b.progressiveMemberIndex ?? -1)
+        || a.title.localeCompare(b.title));
 
     if (query && !courseMatches && visibleAssignments.length === 0) {
       return [];
@@ -117,22 +186,10 @@ export function buildCourseTreeRows(
       membership: course.membership,
       joinableSections: course.joinableSections || [],
       expanded: Boolean(query) || options.expandedCourseIds.has(course.courseId),
-      assignmentCount: course.assignments.length,
+      assignmentCount,
       visibleAssignmentCount: visibleAssignments.length,
-      assignmentCountLabel: assignmentCountLabel(visibleAssignments.length, course.assignments.length, query),
-      assignments: visibleAssignments.map((assignment): CourseAssignmentDisplayRow => ({
-        ...assignment,
-        rowType: 'assignment',
-        rowId: `${rowId}-assignment-${assignment.assignmentId}`,
-        parentRowId: rowId,
-        courseName: course.courseName,
-        teacherDisplayName: course.teacherDisplayName,
-        visibility: course.visibility,
-        beginDate: course.beginDate,
-        endDate: course.endDate,
-        timezone: course.timezone,
-        membership: course.membership,
-      })),
+      assignmentCountLabel: assignmentCountLabel(visibleAssignments.length, assignmentCount, query),
+      assignments: visibleAssignments,
     }];
   });
 

@@ -223,6 +223,9 @@
     <td class="learning-dashboard-cell course-assignment-cell--assignment" data-label="{{t 'courses.assignment'}}">
       <div class="learning-dashboard-cell__value course-assignment-lesson">
         <span class="course-assignment-title" title="{{title}}">{{title}}</span>
+        {{#if progressiveGroupLabel}}
+          <span class="course-assignment-subline">{{progressiveGroupLabel}}</span>
+        {{/if}}
         {{#if hasReleaseLabel}}
           <span class="course-assignment-subline">{{releaseLabel}}</span>
         {{/if}}
@@ -245,6 +248,16 @@
           disabled="{{#if isLocked}}disabled{{/if}}">
           {{actionLabel}}
         </button>
+        {{#if hasProgressiveAction}}
+          <button type="button" class="btn btn-sm btn-outline-primary launch-progressive-assignment"
+            data-assignmentid="{{assignmentId}}"
+            data-courseid="{{courseId}}"
+            data-tdfid="{{TDFId}}"
+            aria-label="{{progressiveActionLabel}}"
+            disabled="{{#if isLocked}}disabled{{/if}}">
+            {{progressiveActionLabel}}
+          </button>
+        {{/if}}
       </div>
     </td>
     <td class="learning-dashboard-cell course-assignment-cell--status" data-label="{{t 'courses.status'}}">
@@ -344,6 +357,7 @@
   <div class="learning-dashboard-card course-assignment-card border rounded shadow-sm {{#if isLocked}}course-assignment-row--locked{{/if}}">
     <div class="learning-dashboard-card-title course-assignment-card-title">
       <span>{{title}}</span>
+      {{#if progressiveGroupLabel}}<span class="course-assignment-card-meta">{{progressiveGroupLabel}}</span>{{/if}}
       <span class="course-assignment-card-meta">{{statusLabel}}</span>
     </div>
     <div class="course-assignment-card-meta">
@@ -391,6 +405,16 @@
         disabled="{{#if isLocked}}disabled{{/if}}">
         {{actionLabel}}
       </button>
+      {{#if hasProgressiveAction}}
+        <button type="button" class="btn btn-sm btn-outline-primary launch-progressive-assignment"
+          data-assignmentid="{{assignmentId}}"
+          data-courseid="{{courseId}}"
+          data-tdfid="{{TDFId}}"
+          aria-label="{{progressiveActionLabel}}"
+          disabled="{{#if isLocked}}disabled{{/if}}">
+          {{progressiveActionLabel}}
+        </button>
+      {{/if}}
     </div>
     {{#if launchFeedback}}
       <div class="admin-inline-feedback course-command-feedback">

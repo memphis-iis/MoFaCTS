@@ -5,9 +5,9 @@
 Add first-class course visibility, scheduled assignment metadata, and a learner-facing Courses page without changing the core MoFaCTS lesson ontology:
 
 - A course has many assignments.
-- An assignment is a scheduled course-specific pointer to one existing reusable TDF/lesson.
+- An assignment is either a scheduled pointer to one reusable TDF/lesson or an ordered progressive group of reusable TDFs.
 - A TDF remains singular and reusable; assignments do not copy lesson content.
-- Learner progress remains keyed by `TDFId` and is read from the existing dashboard cache wherever possible.
+- Learner progress remains keyed by each source `TDFId`; progressive groups do not introduce aggregate completion or progress state.
 - Course browsing must not request full TDF documents when field-limited course, assignment, TDF-summary, and cached progress data are sufficient.
 - Course browsing must use a persisted course snapshot/cache. Bounded live queries are not sufficient for v1.
 
@@ -16,7 +16,7 @@ The v1 user-facing result is:
 - Class Management can mark a course `private` or `public`.
 - Course Assignments replaces the current dual-select Chapter Assignments workflow with an ordered assignment metadata editor.
 - Learners get an authenticated `/courses` route and a **Courses** item in the Practice/Home navigation.
-- The Courses page shows course assignment rows with Practice-page progress metrics and launches the same underlying `TDFId` through the existing lesson launch path.
+- The Courses page shows each lesson with its own Practice-page progress metrics. Progressive members after the first also expose a prefix launch that combines the first member through the selected member.
 
 ## Current Code Surfaces
 
@@ -89,10 +89,25 @@ Rules:
 Extend `Assignments` documents in Mongo collection `assessments` with:
 
 ```ts
-interface CourseAssignmentDocument {
+interface LessonCourseAssignmentDocument {
   _id: string;
   courseId: string;
+  assignmentType: 'lesson';
   TDFId: string;
+  order: number;
+  releaseAt?: Date | null;
+  dueAt?: Date | null;
+  required: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ProgressiveCourseAssignmentDocument {
+  _id: string;
+  courseId: string;
+  assignmentType: 'progressive';
+  title: string;
+  memberTdfIds: string[];
   order: number;
   releaseAt?: Date | null;
   dueAt?: Date | null;
@@ -105,7 +120,7 @@ interface CourseAssignmentDocument {
 Rules:
 
 - `courseId` must reference an existing course.
-- `TDFId` must reference an existing TDF that the acting teacher/admin can assign.
+- A lesson assignment's `TDFId`, and every progressive `memberTdfIds` entry, must reference an existing TDF that the acting teacher/admin can assign.
 - `order` is zero-based, contiguous, and unique within a course after save.
 - `required` defaults to `true` for legacy rows.
 - `releaseAt` and `dueAt` are optional. Missing, `undefined`, and explicit clear actions normalize to `null`.
@@ -113,19 +128,22 @@ Rules:
 - `dueAt` controls deadline/status display and reporting; it does not block launch.
 - Legacy rows missing `order`, `required`, `createdAt`, or `updatedAt` are read with deterministic normalized values. Save operations should write the full normalized shape.
 - Assignment `_id` is first-class identity in contracts and UI payloads.
-- Duplicate `(courseId, TDFId)` rows are forbidden.
+- A TDF may occur only once across all lesson assignments and progressive groups in one course.
 - Learner progress summaries can still aggregate by `TDFId`, but history records must include assignment context when launched from a course assignment.
+- Progressive groups require at least two ordered members. Teachers may insert, remove, or reorder members at any time; the next launch uses the saved order.
+- Progressive members must contain exactly two units: Unit 1 instructions and Unit 2 a named learning session. Unit 2 must have a valid cluster list, canonical cluster/stimulus identity, and no positive `maxTrials` or `practiceseconds` limit.
+- Progressive practice is intentionally unbounded and has no group completion state. Removing a member does not remove its learner history.
 
 ### Assignment Titles
 
-V1 assignment rows display the live TDF lesson name from field-limited TDF summary metadata. Course-specific assignment title overrides are deferred out of v1.
+Lesson assignment rows display the live TDF lesson name from field-limited TDF summary metadata. Progressive groups have a teacher-authored group title; member rows still display their live TDF lesson names.
 
 Rules:
 
-- Assignment save payloads must not include a title field.
+- Lesson assignment save payloads must not include a title field. Progressive assignment payloads require one.
 - Assignment snapshots expose `title`, computed from the current TDF lesson name.
 - Renaming the TDF updates assignment display title after the relevant course snapshot cache is invalidated or rebuilt.
-- A future title override feature may add a course-specific assignment label, but it must not mutate the TDF title.
+- Progressive titles label the group and never mutate member TDF titles.
 
 ### Dates And Timezones
 
@@ -156,7 +174,7 @@ Add a dedicated persisted cache collection for learner course browsing. Common c
 interface CourseLearnerSnapshotCacheDocument {
   _id: string;
   userId: string;
-  version: 1;
+  version: 3;
   generatedAt: Date;
   invalidatedAt: Date | null;
   assignedCourseIds: string[];
@@ -191,6 +209,8 @@ interface CourseAssignmentHistoryContext {
   courseId: string;
   TDFId: string;
   launchSource: 'courses';
+  launchMode: 'individual' | 'progressive';
+  progressiveEndpointTdfId?: string;
 }
 ```
 
@@ -198,9 +218,11 @@ Rules:
 
 - `assignmentId` is required when launch source is `/courses`.
 - `courseId` and `TDFId` are included for query convenience and historical readability.
-- Runtime code must validate that the assignment id belongs to the launched `courseId` and `TDFId`.
+- Runtime code validates that the assignment is released, belongs to the course, still contains the launched/source TDF, and—on a progressive launch—still contains the endpoint.
 - Public course launch context must be recorded even when the learner is not enrolled.
 - Existing non-course Practice launches continue without assignment context.
+- Progressive trial rows use the original member `TDFId`, original `stimuliSetId`, original item and cluster identities, and the original Unit 2 name. This lets an individual member launch replay trials previously completed in the progressive runtime.
+- An individual course launch reads all history for its TDF plus same-course rows from other TDFs with matching `clusterKC`. A progressive launch reads all history whose source `TDFId` is in the current ordered prefix. Identical cluster names outside that prefix are excluded, while exact source-TDF history remains reusable across contexts.
 - Reporting should prefer `assignmentId` for assignment-specific reporting and may use `courseId`/`TDFId` for legacy compatibility.
 
 ## Indexes
@@ -220,7 +242,21 @@ Assignments.rawCollection().createIndex(
 
 Assignments.rawCollection().createIndex(
   { courseId: 1, TDFId: 1 },
-  { name: 'assignment_course_tdf_unique', unique: true, background: true }
+  {
+    name: 'assignment_course_tdf_unique',
+    unique: true,
+    background: true,
+    partialFilterExpression: { assignmentType: 'lesson' }
+  }
+);
+
+Assignments.rawCollection().createIndex(
+  { courseId: 1, memberTdfIds: 1 },
+  {
+    name: 'assignment_course_progressive_members',
+    background: true,
+    partialFilterExpression: { assignmentType: 'progressive' }
+  }
 );
 
 Assignments.rawCollection().createIndex(
@@ -244,27 +280,27 @@ SectionUserMap.rawCollection().createIndex(
 );
 
 CourseLearnerSnapshotCache.rawCollection().createIndex(
-  { userId: 1, version: 1 },
+  { userId: 1, version: 3 },
   { name: 'course_snapshot_user_version', unique: true, background: true }
 );
 
 CourseLearnerSnapshotCache.rawCollection().createIndex(
-  { userId: 1, version: 1, invalidatedAt: 1 },
+  { userId: 1, version: 3, invalidatedAt: 1 },
   { name: 'course_snapshot_user_version_invalidated', background: true }
 );
 
 CourseLearnerSnapshotCache.rawCollection().createIndex(
-  { assignedCourseIds: 1, version: 1 },
+  { assignedCourseIds: 1, version: 3 },
   { name: 'course_snapshot_assigned_course_version', background: true }
 );
 
 CourseLearnerSnapshotCache.rawCollection().createIndex(
-  { publicCourseIds: 1, version: 1 },
+  { publicCourseIds: 1, version: 3 },
   { name: 'course_snapshot_public_course_version', background: true }
 );
 
 CourseLearnerSnapshotCache.rawCollection().createIndex(
-  { assignmentIds: 1, version: 1 },
+  { assignmentIds: 1, version: 3 },
   { name: 'course_snapshot_assignment_version', background: true }
 );
 
@@ -283,7 +319,8 @@ Create shared contracts in `mofacts/common/courseAssignments.contracts.ts`.
 ```ts
 export type CourseVisibility = 'private' | 'public';
 
-export interface CourseAssignmentInput {
+export interface LessonCourseAssignmentInput {
+  assignmentType: 'lesson';
   assignmentId?: string;
   TDFId: string;
   order: number;
@@ -291,6 +328,21 @@ export interface CourseAssignmentInput {
   dueAt?: string | Date | null;
   required: boolean;
 }
+
+export interface ProgressiveCourseAssignmentInput {
+  assignmentType: 'progressive';
+  assignmentId?: string;
+  title: string;
+  memberTdfIds: string[];
+  order: number;
+  releaseAt?: string | Date | null;
+  dueAt?: string | Date | null;
+  required: boolean;
+}
+
+export type CourseAssignmentInput =
+  | LessonCourseAssignmentInput
+  | ProgressiveCourseAssignmentInput;
 
 export interface SaveCourseAssignmentsInput {
   courseId: string;
@@ -335,7 +387,7 @@ export interface LearnerCourseSnapshotAssignment extends CourseAssignmentSummary
 }
 
 export interface LearnerCoursesSnapshot {
-  version: 1;
+  version: 3;
   userId: string;
   generatedAt: number;
   assignedCourses: LearnerCourseSnapshotCourse[];
@@ -404,6 +456,8 @@ interface CourseAssignmentEditorSnapshot {
     displayName: string;
     tags: string[];
     ownerId: string;
+    progressiveEligible: boolean;
+    progressiveIneligibilityReasons: string[];
   }>;
 }
 ```
@@ -411,9 +465,9 @@ interface CourseAssignmentEditorSnapshot {
 Query requirements:
 
 - Course query fields: `_id`, `courseName`, `visibility`, `teacherUserId`, `beginDate`, `endDate`, `timezone`.
-- Assignment query fields: `_id`, `courseId`, `TDFId`, `order`, `releaseAt`, `dueAt`, `required`, `createdAt`, `updatedAt`.
-- TDF query fields only: `_id`, `ownerId`, `accessors`, `content.fileName`, `content.tdfs.tutor.setspec.lessonname`, `content.tdfs.tutor.setspec.tags`.
-- No `content.tdfs.tutor.unit`, `stimuli`, raw stimuli, or runtime secret fields.
+- Assignment query fields include the discriminant plus either `TDFId` or `title` and ordered `memberTdfIds`, along with schedule and audit metadata.
+- The server inspects projected tutor units, delivery settings, identity availability, `stimuliSetId`, and raw cluster structure to calculate progressive eligibility.
+- The client receives only summary metadata and eligibility reasons. It does not receive tutor units, stimuli, raw clusters, or runtime secret fields in this editor response.
 
 ### `saveCourseAssignments(input)`
 
@@ -481,7 +535,7 @@ Cache rebuild query strategy:
 
 Snapshot response:
 
-- `version: 1`
+- `version: 3`
 - `userId`
 - `generatedAt`
 - `assignedCourses`, sorted above public courses when non-empty.
@@ -621,6 +675,13 @@ Each assignment row includes:
 - Remove button.
 - Status text for invalid local row state.
 
+A progressive row additionally includes:
+
+- A group title.
+- An ordered list of at least two eligible lessons, with add, remove, move-up, and move-down controls.
+- The same group-level required, release, and due controls as an ordinary assignment.
+- Inline eligibility enforcement; incompatible TDF structures cannot be added.
+
 Date controls:
 
 - Use native `datetime-local` inputs in a compact popover or inline expandable panel.
@@ -687,6 +748,8 @@ Assignment row fields:
 - Time.
 - Last practice.
 - Start/Continue action.
+- For each progressive member, its own metrics and ordinary individual launch action.
+- For progressive member 2 and later, a second action that practices the ordered prefix through that member. Member 1 has no redundant progressive action.
 
 Launch behavior:
 
@@ -694,6 +757,8 @@ Launch behavior:
 - Pass `assignmentId` and `courseId` into launch context when launching from `/courses`.
 - Runtime history insertion must persist that assignment context.
 - If launch is blocked because `releaseAt` is in the future, show inline disabled state before launch.
+- A progressive launch fetches the currently authorized prefix in one server operation, then composes it on the client. It uses the endpoint lesson's Unit 1 instructions and Unit 2 learning model/settings while merging all prefix stimuli by normalized `clusterKC` and preserving distinct item identities.
+- The composed runtime has no positive trial or practice-time limit and does not create a shared progressive experiment/completion state.
 
 ## Instructor Reporting
 
@@ -832,7 +897,7 @@ UI verification:
 - Public course browsing does not enroll the learner.
 - Launching from `/courses` records assignment context in history.
 - Assignment `_id` is the durable assignment identity for history, reporting, due-date exceptions, cache entries, and client payloads.
-- Duplicate `(courseId, TDFId)` assignments are forbidden.
+- A TDF may appear only once across a course's ordinary and progressive assignments.
 - Unreleased assignments are visible as locked rows.
 - Teachers and admins can see unreleased assignments in `/courses`.
 - Course timezone owns course dates and assignment dates.
@@ -843,4 +908,6 @@ UI verification:
 - `Chapter Assignments` is renamed to `Course Assignments`.
 - All teachers can edit course visibility immediately for courses they own.
 - Public courses are discoverable by signed-in learners, teachers, and admins; learners join a section before launching course assignments.
-- Course-specific assignment title overrides are deferred out of v1.
+- Ordinary assignment title overrides remain deferred; progressive groups have their own label.
+- Progressive practice has no aggregate completion state. Per-member history and metrics remain authoritative even when teachers later insert, remove, or reorder members.
+- A new progressive launch uses the current saved order, while an already-open composed session keeps the content with which it started. Removing a member revokes subsequent course-context history writes for that removed member without deleting existing history.

@@ -88,6 +88,7 @@ export type LearnerAnalyticsHistoryRow = {
 };
 
 export type LearnerAnalyticsCrowdStat = {
+  stimuliSetId: string | number;
   stimulusKC: string | number;
   correctCount: number;
   incorrectCount: number;

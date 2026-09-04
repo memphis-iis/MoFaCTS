@@ -1,4 +1,5 @@
 import { normalizeClusterKC } from '../../runtime/sharedModelPracticeIdentity';
+import { createStimulusKey } from '../../runtime/historyStimulusIdentity';
 
 export interface ApplyResumeModelStateParams {
   readonly cardProbabilities: any;
@@ -46,7 +47,10 @@ export function applyResumeModelState(params: ApplyResumeModelStateParams): numb
 
     for (let stimIndex = 0; stimIndex < card.stims.length; stimIndex++) {
       const stim = card.stims[stimIndex];
-      const stimulusState = params.reconstructed.stimulusState[String(stim.stimulusKC)];
+      const stimulusState = params.reconstructed.stimulusState[createStimulusKey({
+        stimuliSetId: stim.stimuliSetId,
+        stimulusKC: stim.stimulusKC,
+      })];
       if (stimulusState) {
         Object.assign(stim, stimulusState);
       } else {

@@ -12,12 +12,13 @@ function message(key: string, values?: Record<string, unknown>): string {
 }
 
 function assignmentRow(
-  overrides: Partial<AssignmentEditorRow> & Pick<AssignmentEditorRow, 'TDFId'>,
+  overrides: Partial<Extract<AssignmentEditorRow, { assignmentType: 'lesson' }>> & { TDFId: string },
 ): AssignmentEditorRow {
   const { TDFId, ...rest } = overrides;
   return {
     assignmentId: `assignment-${TDFId}`,
     courseId: 'course-1',
+    assignmentType: 'lesson',
     TDFId,
     title: 'Lesson',
     order: 0,
@@ -41,6 +42,7 @@ describe('tdfAssignmentEditState', function() {
       assignments: [{
         assignmentId: 'assignment-1',
         courseId: 'course-1',
+        assignmentType: 'lesson',
         TDFId: 'tdf-1',
         title: 'Lesson',
         order: 7,
@@ -90,5 +92,28 @@ describe('tdfAssignmentEditState', function() {
       assignmentRow({ TDFId: 'tdf-1', title: 'B' }),
     ];
     expect(validateAssignmentRows(duplicateRows, message)).to.equal('courseAssignments.duplicateLesson:B');
+  });
+
+  it('requires two progressive members and prevents reuse across assignment types', function() {
+    const progressive = {
+      assignmentId: 'progressive-1',
+      courseId: 'course-1',
+      assignmentType: 'progressive' as const,
+      title: 'Cumulative review',
+      memberTdfIds: ['tdf-1'],
+      members: [],
+      order: 0,
+      releaseAt: null,
+      dueAt: null,
+      required: true,
+      availability: 'available' as const,
+      createdAt: null,
+      updatedAt: null,
+    };
+    expect(validateAssignmentRows([progressive], message)).to.equal('Cumulative review requires at least two member lessons.');
+
+    const twoMembers = { ...progressive, memberTdfIds: ['tdf-1', 'tdf-2'] };
+    expect(validateAssignmentRows([twoMembers, assignmentRow({ TDFId: 'tdf-2', title: 'Repeated' })], message))
+      .to.equal('courseAssignments.duplicateLesson:Repeated');
   });
 });

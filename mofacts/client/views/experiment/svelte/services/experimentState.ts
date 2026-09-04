@@ -15,7 +15,12 @@ import type { ExperimentState } from '../../../../../common/types/experiment';
 import { assertIdInvariants, getCanonicalIdContext, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import {
   courseAssignmentContextForStateWrite,
+  getCourseAssignmentLaunchContext,
 } from '../../../../lib/courseAssignmentLaunchContext';
+
+function isProgressiveCourseLaunch(): boolean {
+  return getCourseAssignmentLaunchContext()?.launchMode === 'progressive';
+}
 
 interface ExperimentStateServiceEvent {
   stateUpdate?: ExperimentState;
@@ -110,6 +115,11 @@ type ExperimentStateWriteOptions = {
  * Loads state into ExperimentStateStore for reactive access.
  */
 export async function getExperimentState(): Promise<ExperimentState> {
+  if (isProgressiveCourseLaunch()) {
+    const transientState: ExperimentState = {};
+    ExperimentStateStore.set(transientState);
+    return transientState;
+  }
   const idCtx = getCanonicalIdContext();
   if (!idCtx.currentRootTdfId) {
     logIdInvariantBreachOnce('experimentState.get:missing-currentRootTdfId');
@@ -133,6 +143,11 @@ export async function createExperimentState(
   partialState: ExperimentState,
   options: ExperimentStateWriteOptions = {},
 ): Promise<string | undefined> {
+  if (isProgressiveCourseLaunch()) {
+    const transientState = mergeExperimentState(ExperimentStateStore.get(), partialState);
+    ExperimentStateStore.set(transientState);
+    return transientState.currentTdfId as string | undefined;
+  }
   assertIdInvariants('experimentState.create', { requireCurrentTdfId: true, requireStimuliSetId: false });
 
   const existingState = options.replaceExistingState ? undefined : ExperimentStateStore.get();

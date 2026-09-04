@@ -338,6 +338,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
   it('inherits model-progress provider capability from the adaptive logistic engine', async function() {
     const cluster = {
       stims: [{
+        stimuliSetId: 'stim-set-1',
         clusterKC: 'cluster-1',
         stimulusKC: 'kc-1',
         correctResponse: 'Answer',
@@ -524,7 +525,7 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
             },
           },
           stimulusState: {
-            'kc-definitions-local-item': {
+            'kc-definitions-stim-set:kc-definitions-local-item': {
               firstSeen: 1000,
               lastSeen: 1000,
               priorCorrect: 1,

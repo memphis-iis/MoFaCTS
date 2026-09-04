@@ -14,7 +14,6 @@ import { DelayedLoadingVisibility } from '../../lib/delayedLoadingVisibility';
 import type { AsyncCommandState } from '../../lib/adminUi/asyncCommandState';
 import { createScopedAsyncCommandRegistry, type ScopedAsyncCommandRegistry } from '../../lib/adminUi/scopedAsyncCommandRegistry';
 import type {
-  LearnerCourseSnapshotAssignment,
   LearnerCourseSnapshotCourse,
   LearnerCoursesSnapshot,
 } from '../../../common/courseAssignments.contracts';
@@ -135,8 +134,8 @@ function getCourseRows(snapshot: LearnerCoursesSnapshot | null, section: CourseT
     assignments: course.assignments.map((assignment) => ({
       ...assignment,
       launchFeedback: courseCommandPresentation(
-        states[`course:launch:${assignment.assignmentId}`],
-        `course-launch-feedback-${assignment.assignmentId}`,
+        states[`course:launch:${assignment.assignmentId}:${assignment.TDFId}`],
+        `course-launch-feedback-${assignment.assignmentId}-${assignment.TDFId}`,
       ),
     })),
   }));
@@ -158,7 +157,7 @@ function setCourseCommandError(instance: CoursesTemplateInstance, scope: string,
   instance.commandStates.set({ ...instance.commandStates.get(), [scope]: { status: 'error', message } });
 }
 
-function currentCourseFromAssignment(instance: CoursesTemplateInstance, assignment: LearnerCourseSnapshotAssignment): LearnerCourseSnapshotCourse | null {
+function currentCourseFromAssignment(instance: CoursesTemplateInstance, assignment: { courseId: string }): LearnerCourseSnapshotCourse | null {
   const snapshot = instance.snapshot.get();
   return [...(snapshot?.assignedCourses || []), ...(snapshot?.publicCourses || [])]
     .find((course) => course.courseId === assignment.courseId) || null;
@@ -340,6 +339,15 @@ const courseAssignmentDisplayHelpers = {
   actionButtonClass(this: CourseAssignmentDisplayRow) {
     return this.isUsed ? 'btn-primary' : 'btn-success';
   },
+  progressiveGroupLabel(this: CourseAssignmentDisplayRow) {
+    return this.progressiveGroupTitle || '';
+  },
+  hasProgressiveAction(this: CourseAssignmentDisplayRow) {
+    return this.assignmentType === 'progressive' && Number(this.progressiveMemberIndex) > 0;
+  },
+  progressiveActionLabel(this: CourseAssignmentDisplayRow) {
+    return `Progressive Practice through ${this.title}`;
+  },
 };
 
 const courseTreeCourseRowHelpers = {
@@ -416,19 +424,20 @@ Template.courses.events({
     setExpandedCourseIds(expandedIds);
   },
   'click .launch-course-assignment': async function(event: Event, instance: CoursesTemplateInstance) {
-    const assignment = this as LearnerCourseSnapshotAssignment;
+    const assignment = this as CourseAssignmentDisplayRow;
     if (assignment.availability !== 'available') return;
     const course = currentCourseFromAssignment(instance, assignment);
     if (!course) {
-      setCourseCommandError(instance, `course:launch:${assignment.assignmentId}`, 'Course context was not found for this assignment.');
+      setCourseCommandError(instance, `course:launch:${assignment.assignmentId}:${assignment.TDFId}`, 'Course context was not found for this assignment.');
       return;
     }
-    await instance.commandRegistry.run(`course:launch:${assignment.assignmentId}`, async () => {
+    await instance.commandRegistry.run(`course:launch:${assignment.assignmentId}:${assignment.TDFId}`, async () => {
       const launchContext = {
         assignmentId: assignment.assignmentId,
         courseId: assignment.courseId,
         TDFId: assignment.TDFId,
         launchSource: 'courses' as const,
+        launchMode: 'individual' as const,
       };
       const tdf: any = await meteorCallAsync('getTdfById', assignment.TDFId, {
         courseAssignment: launchContext,
@@ -442,6 +451,46 @@ Template.courses.events({
         setspec.speechOutOfGrammarFeedback || translatePlatformString(getActiveUiLocale(), 'speech.outOfGrammarFeedback'),
         'Course assignment launch',
         Boolean(tdf?.content?.isMultiTdf),
+        setspec,
+        false,
+        false,
+        { courseAssignment: launchContext },
+      );
+      return { message: '' };
+    }, {
+      getErrorMessage: (error: any) => error?.reason || error?.message || String(error),
+      onFailure: () => setCourseAssignmentLaunchContext(null),
+    });
+  },
+  'click .launch-progressive-assignment': async function(_event: Event, instance: CoursesTemplateInstance) {
+    const assignment = this as CourseAssignmentDisplayRow;
+    if (assignment.assignmentType !== 'progressive' || Number(assignment.progressiveMemberIndex) < 1) return;
+    if (assignment.availability !== 'available') return;
+    const scope = `course:launch:${assignment.assignmentId}:${assignment.TDFId}`;
+    const course = currentCourseFromAssignment(instance, assignment);
+    if (!course) {
+      setCourseCommandError(instance, scope, 'Course context was not found for this assignment.');
+      return;
+    }
+    await instance.commandRegistry.run(scope, async () => {
+      const launchContext = {
+        assignmentId: assignment.assignmentId,
+        courseId: assignment.courseId,
+        TDFId: assignment.TDFId,
+        launchSource: 'courses' as const,
+        launchMode: 'progressive' as const,
+        progressiveEndpointTdfId: assignment.TDFId,
+      };
+      const tdf: any = await meteorCallAsync('getTdfById', assignment.TDFId, { courseAssignment: launchContext });
+      const setspec = tdf?.content?.tdfs?.tutor?.setspec || {};
+      await selectTdf(
+        assignment.TDFId,
+        assignment.progressiveGroupTitle || assignment.title,
+        assignment.currentStimuliSetId,
+        resolveSpeechIgnoreOutOfGrammarResponses(setspec),
+        setspec.speechOutOfGrammarFeedback || translatePlatformString(getActiveUiLocale(), 'speech.outOfGrammarFeedback'),
+        'Progressive course assignment launch',
+        false,
         setspec,
         false,
         false,

@@ -7,7 +7,6 @@ import {
 import { decompressHistoryRecord } from '../../common/historyCompression';
 import { assertCanonicalHistoryEnvelope, validateHistoryWirePayload } from '../../common/historyEnvelope';
 import {
-  buildStimulusCrowdStatKeys,
   recordStimulusCrowdOutcome,
   type StimulusCrowdStatsCollection,
 } from '../lib/stimulusCrowdStats';
@@ -16,6 +15,8 @@ import { createAnalyticsDownloadMethods } from './analyticsDownloadMethods';
 import type { LearningHistoryReadOptions } from '../../../learning-components/units/UnitEngineServerMethods';
 import { curSemester } from '../../common/Definitions';
 import { collectLessonFamilyRefs, createLessonFamilyResolver } from '../lib/tdfLessonFamilyResolver';
+import { createStimulusKey } from '../../../learning-components/runtime/historyStimulusIdentity';
+import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -46,6 +47,7 @@ type AnalyticsMethodsDeps = {
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
   Assignments: {
+    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   Courses: {
@@ -192,7 +194,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
   async function validateCourseAssignmentHistoryContext(historyRecord: UnknownRecord, tdfId: string, userId: string) {
     const context = historyRecord.courseAssignment;
-    if (context === undefined || context === null) return;
+    if (context === undefined || context === null) return null;
     if (!context || typeof context !== 'object' || Array.isArray(context)) {
       throw new Meteor.Error(400, 'Course assignment history context must be an object');
     }
@@ -200,20 +202,82 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const assignmentId = deps.normalizeCanonicalId(record.assignmentId);
     const courseId = deps.normalizeCanonicalId(record.courseId);
     const contextTdfId = deps.normalizeCanonicalId(record.TDFId);
-    if (record.launchSource !== 'courses' || !assignmentId || !courseId || !contextTdfId) {
+    const launchMode = record.launchMode;
+    const endpointTdfId = deps.normalizeCanonicalId(record.progressiveEndpointTdfId);
+    if (
+      record.launchSource !== 'courses'
+      || (launchMode !== 'individual' && launchMode !== 'progressive')
+      || !assignmentId
+      || !courseId
+      || !contextTdfId
+    ) {
       throw new Meteor.Error(400, 'Course assignment history context is incomplete');
     }
-    if (!await tdfBelongsToAssignedRoot(contextTdfId, tdfId)) {
-      throw new Meteor.Error(400, 'Course assignment history TDFId does not match launched TDFId');
-    }
     const assignment = await deps.Assignments.findOneAsync(
-      { _id: assignmentId, courseId, TDFId: contextTdfId },
-      { fields: { _id: 1 } }
+      { _id: assignmentId, courseId },
+      { fields: { _id: 1, assignmentType: 1, TDFId: 1, memberTdfIds: 1, releaseAt: 1 } }
     );
     if (!assignment) {
       throw new Meteor.Error(400, 'Course assignment history context does not match an assignment');
     }
+    const memberTdfIds = assignment.assignmentType === 'progressive' && Array.isArray(assignment.memberTdfIds)
+      ? assignment.memberTdfIds.map((id: unknown) => String(id || '').trim()).filter(Boolean)
+      : [];
+    if (launchMode === 'individual' && endpointTdfId) {
+      throw new Meteor.Error(400, 'Individual course history must not include a progressive endpoint');
+    }
+    if (assignment.assignmentType === 'lesson') {
+      const assignedTdfId = deps.normalizeCanonicalId(assignment.TDFId);
+      if (!assignedTdfId || assignedTdfId !== contextTdfId || !await tdfBelongsToAssignedRoot(assignedTdfId, tdfId)) {
+        throw new Meteor.Error(400, 'Course assignment history TDFId does not match launched TDFId');
+      }
+      if (launchMode !== 'individual') throw new Meteor.Error(400, 'Lesson assignments do not support progressive launch mode');
+    } else if (assignment.assignmentType === 'progressive') {
+      if (!memberTdfIds.includes(contextTdfId) || !memberTdfIds.includes(tdfId)) {
+        throw new Meteor.Error(400, 'Progressive assignment no longer contains the source TDF');
+      }
+      if (launchMode === 'progressive' && (!endpointTdfId || !memberTdfIds.includes(endpointTdfId))) {
+        throw new Meteor.Error(400, 'Progressive assignment endpoint is no longer a member');
+      }
+    } else {
+      throw new Meteor.Error(400, 'Course assignment has an invalid assignment type');
+    }
+    const releaseAt = assignment.releaseAt ? new Date(assignment.releaseAt) : null;
+    if (releaseAt && Number.isFinite(releaseAt.getTime()) && releaseAt.getTime() > Date.now()) {
+      throw new Meteor.Error(403, 'Course assignment has not been released');
+    }
     await validateCourseEnrollmentForUser(userId, courseId);
+    return { assignment, courseId, contextTdfId, endpointTdfId, launchMode, memberTdfIds };
+  }
+
+  async function clusterKcsForTdfIds(tdfIds: string[]): Promise<string[]> {
+    if (tdfIds.length === 0) return [];
+    const tdfs = await deps.Tdfs.find(
+      { _id: { $in: [...new Set(tdfIds)] } },
+      { fields: { _id: 1, 'content.tdfs.tutor.unit': 1, 'rawStimuliFile.setspec.clusters': 1 } },
+    ).fetchAsync();
+    const clusterKcs = new Set<string>();
+    for (const tdf of tdfs) {
+      const clusterList = tdf?.content?.tdfs?.tutor?.unit?.[1]?.learningsession?.clusterlist;
+      if (typeof clusterList !== 'string') continue;
+      const indexes: number[] = [];
+      for (const token of clusterList.trim().split(/\s+/)) {
+        const [startRaw, endRaw] = token.split('-');
+        const start = Number(startRaw);
+        const end = endRaw === undefined ? start : Number(endRaw);
+        if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) continue;
+        for (let index = start; index <= end; index += 1) indexes.push(index);
+      }
+      const clusters = tdf?.rawStimuliFile?.setspec?.clusters;
+      if (!Array.isArray(clusters)) continue;
+      for (const index of indexes) {
+        const clusterKC = clusters[index]?.clusterKC;
+        if (clusterKC !== undefined && clusterKC !== null && String(clusterKC).trim()) {
+          clusterKcs.add(normalizeClusterKC(clusterKC));
+        }
+      }
+    }
+    return [...clusterKcs];
   }
 
   async function buildCourseLearningHistoryScopeMatch(
@@ -225,15 +289,26 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!context || typeof context !== 'object' || Array.isArray(context)) {
       throw new Meteor.Error(400, 'Course-scoped learning history requires courseAssignment context');
     }
-    await validateCourseAssignmentHistoryContext({ courseAssignment: context }, TDFId, userId);
-    const courseId = deps.normalizeCanonicalId(context.courseId);
-    if (!courseId) {
-      throw new Meteor.Error(400, 'Course-scoped learning history requires courseId');
+    const validated = await validateCourseAssignmentHistoryContext({ courseAssignment: context }, TDFId, userId);
+    if (!validated) throw new Meteor.Error(400, 'Course-scoped learning history requires a valid assignment');
+    const sourceTdfIds = validated.launchMode === 'progressive'
+      ? validated.memberTdfIds.slice(0, validated.memberTdfIds.indexOf(validated.endpointTdfId!) + 1)
+      : [validated.contextTdfId];
+    const scopeTerms: UnknownRecord[] = [{ TDFId: { $in: sourceTdfIds } }];
+    if (validated.launchMode === 'individual') {
+      const clusterKcs = await clusterKcsForTdfIds(sourceTdfIds);
+      if (clusterKcs.length === 0) {
+        return { userId, levelUnitType: 'model', $or: scopeTerms };
+      }
+      scopeTerms.push({
+        'courseAssignment.courseId': validated.courseId,
+        clusterKC: { $in: clusterKcs },
+      });
     }
     return {
       userId,
       levelUnitType: 'model',
-      'courseAssignment.courseId': courseId,
+      $or: scopeTerms,
     };
   }
 
@@ -246,6 +321,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (context !== undefined && context !== null) {
       return;
     }
+    if (await userHasReleasedProgressiveAccess(userId, tdfId)) {
+      return;
+    }
     const assignedRootTdfIds = await deps.resolveAssignedRootTdfIdsForUser(userId);
     for (const assignedRootTdfId of assignedRootTdfIds) {
       const normalizedAssignedRootTdfId = deps.normalizeCanonicalId(assignedRootTdfId);
@@ -256,6 +334,28 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         throw new Meteor.Error(403, reason);
       }
     }
+  }
+
+  async function userHasReleasedProgressiveAccess(userId: string, tdfId: string): Promise<boolean> {
+    const rows = await deps.Assignments.find(
+      {
+        assignmentType: 'progressive',
+        memberTdfIds: tdfId,
+        $or: [{ releaseAt: null }, { releaseAt: { $exists: false } }, { releaseAt: { $lte: new Date() } }],
+      },
+      { fields: { courseId: 1 } },
+    ).fetchAsync();
+    for (const row of rows) {
+      const courseId = deps.normalizeCanonicalId(row?.courseId);
+      if (!courseId) continue;
+      try {
+        await validateCourseEnrollmentForUser(userId, courseId);
+        return true;
+      } catch (error) {
+        if (!(error instanceof Meteor.Error) || error.error !== 403) throw error;
+      }
+    }
+    return false;
   }
 
   const validatedExperimentAccessCache = new Map<string, number>();
@@ -620,7 +720,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   async function getStimulusCrowdStatsForDeck(
     this: MethodContext,
     TDFId: string,
-    stimulusKCs: unknown[],
+    stimulusIdentities: unknown[],
     options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {},
   ) {
     const actorUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
@@ -628,32 +728,60 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!normalizedTdfId) {
       throw new Meteor.Error(400, 'Invalid TDFId');
     }
-    if (!Array.isArray(stimulusKCs)) {
-      throw new Meteor.Error(400, 'stimulusKCs must be an array');
+    if (!Array.isArray(stimulusIdentities)) {
+      throw new Meteor.Error(400, 'stimulusIdentities must be an array');
     }
 
-    const normalizedStimulusKCs = Array.from(new Set(
-      stimulusKCs.map((value) => {
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          return value;
-        }
-        if (typeof value === 'string' && value.trim().length > 0) {
-          return value.trim();
-        }
-        throw new Meteor.Error(400, 'stimulusKCs must contain only non-blank string or number values');
-      })
-    ));
-    if (normalizedStimulusKCs.length === 0) {
+    const normalizedIdentities = stimulusIdentities.map((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Meteor.Error(400, 'stimulusIdentities must contain identity objects');
+      }
+      const record = value as UnknownRecord;
+      const stimuliSetId = typeof record.stimuliSetId === 'number' && Number.isFinite(record.stimuliSetId)
+        ? record.stimuliSetId
+        : deps.normalizeOptionalString(record.stimuliSetId);
+      const stimulusKC = typeof record.stimulusKC === 'number' && Number.isFinite(record.stimulusKC)
+        ? record.stimulusKC
+        : deps.normalizeOptionalString(record.stimulusKC);
+      if (stimuliSetId === null || stimulusKC === null) {
+        throw new Meteor.Error(400, 'Stimulus identities require stimuliSetId and stimulusKC');
+      }
+      return { stimuliSetId, stimulusKC };
+    });
+    if (normalizedIdentities.length === 0) {
       return [];
     }
 
     const tdf = await assertCrowdStatsReadAccess(actorUserId, normalizedTdfId, options);
-    const stimuliSetId = tdf?.stimuliSetId;
-    if (stimuliSetId === undefined || stimuliSetId === null || (typeof stimuliSetId === 'string' && stimuliSetId.trim().length === 0)) {
+    const anchorStimuliSetId = tdf?.stimuliSetId;
+    if (anchorStimuliSetId === undefined || anchorStimuliSetId === null || (typeof anchorStimuliSetId === 'string' && anchorStimuliSetId.trim().length === 0)) {
       throw new Meteor.Error(400, 'TDF is missing stimuliSetId for stimulus crowd stats');
     }
-
-    const stimulusKeys = buildStimulusCrowdStatKeys(stimuliSetId, normalizedStimulusKCs);
+    const allowedStimuliSetIds = new Set([String(anchorStimuliSetId)]);
+    if (options.courseAssignment?.launchMode === 'progressive') {
+      const validated = await validateCourseAssignmentHistoryContext(
+        { courseAssignment: options.courseAssignment },
+        normalizedTdfId,
+        actorUserId,
+      );
+      if (!validated) throw new Meteor.Error(400, 'Progressive crowd stats require a valid assignment');
+      const prefixIds = validated.memberTdfIds.slice(0, validated.memberTdfIds.indexOf(validated.endpointTdfId!) + 1);
+      const prefixTdfs = await deps.Tdfs.find(
+        { _id: { $in: prefixIds } },
+        { fields: { stimuliSetId: 1 } },
+      ).fetchAsync();
+      for (const prefixTdf of prefixTdfs) {
+        if (prefixTdf?.stimuliSetId !== undefined && prefixTdf?.stimuliSetId !== null) {
+          allowedStimuliSetIds.add(String(prefixTdf.stimuliSetId));
+        }
+      }
+    }
+    for (const identity of normalizedIdentities) {
+      if (!allowedStimuliSetIds.has(String(identity.stimuliSetId))) {
+        throw new Meteor.Error(403, 'Stimulus identity is outside the authorized lesson scope');
+      }
+    }
+    const stimulusKeys = [...new Set(normalizedIdentities.map(createStimulusKey))];
     const stats = await deps.StimulusCrowdStats.find(
       { stimulusKey: { $in: stimulusKeys } },
       {
@@ -695,6 +823,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
     if (options.courseAssignment) {
       await validateCourseAssignmentHistoryContext({ courseAssignment: options.courseAssignment }, tdfId, actorUserId);
+      return tdf;
+    }
+    if (await userHasReleasedProgressiveAccess(actorUserId, tdfId)) {
       return tdf;
     }
     await rejectMissingCourseAssignmentContextForAssignedTdf(

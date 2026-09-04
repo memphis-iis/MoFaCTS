@@ -6,8 +6,8 @@ import type {
 export type AssignableTdf = CourseAssignmentEditorSnapshot['assignableTdfs'][number];
 
 export type AssignmentEditorRow = CourseAssignmentSummary & {
-  fileName: string;
-  tags: string[];
+  fileName?: string;
+  tags?: string[];
 };
 
 export function assignmentToEditorRow(
@@ -16,8 +16,10 @@ export function assignmentToEditorRow(
 ): AssignmentEditorRow {
   return {
     ...assignment,
-    fileName: tdf?.fileName || '',
-    tags: tdf?.tags || [],
+    ...(assignment.assignmentType === 'lesson' ? {
+      fileName: tdf?.fileName || '',
+      tags: tdf?.tags || [],
+    } : {}),
     releaseAt: assignment.releaseAt ? new Date(assignment.releaseAt) : null,
     dueAt: assignment.dueAt ? new Date(assignment.dueAt) : null,
   };
@@ -26,7 +28,7 @@ export function assignmentToEditorRow(
 export function rowsFromAssignmentSnapshot(snapshot: CourseAssignmentEditorSnapshot): AssignmentEditorRow[] {
   const tdfById = new Map(snapshot.assignableTdfs.map((tdf) => [tdf.TDFId, tdf]));
   return snapshot.assignments.map((assignment, order) => ({
-    ...assignmentToEditorRow(assignment, tdfById.get(assignment.TDFId)),
+    ...assignmentToEditorRow(assignment, assignment.assignmentType === 'lesson' ? tdfById.get(assignment.TDFId) : undefined),
     order,
   }));
 }
@@ -41,10 +43,15 @@ export function validateAssignmentRows(
 ): string | null {
   const seen = new Set<string>();
   for (const row of rows) {
-    if (seen.has(row.TDFId)) {
-      return message('courseAssignments.duplicateLesson', { title: row.title });
+    const memberIds = row.assignmentType === 'lesson' ? [row.TDFId] : row.memberTdfIds;
+    if (row.assignmentType === 'progressive') {
+      if (!row.title.trim()) return 'Progressive assignments require a title.';
+      if (row.memberTdfIds.length < 2) return `${row.title} requires at least two member lessons.`;
     }
-    seen.add(row.TDFId);
+    for (const tdfId of memberIds) {
+      if (seen.has(tdfId)) return message('courseAssignments.duplicateLesson', { title: row.title });
+      seen.add(tdfId);
+    }
     const releaseTime = row.releaseAt ? new Date(row.releaseAt).getTime() : null;
     const dueTime = row.dueAt ? new Date(row.dueAt).getTime() : null;
     if (releaseTime !== null && !Number.isFinite(releaseTime)) {
@@ -66,7 +73,7 @@ export function filterAssignableTdfs(
   query: string,
 ): AssignableTdf[] {
   const normalizedQuery = query.toLowerCase();
-  const selected = new Set(rows.map((row) => row.TDFId));
+  const selected = new Set(rows.flatMap((row) => row.assignmentType === 'lesson' ? [row.TDFId] : row.memberTdfIds));
   return assignableTdfs
     .filter((tdf) => !selected.has(tdf.TDFId))
     .filter((tdf) => {

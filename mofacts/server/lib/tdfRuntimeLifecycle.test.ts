@@ -43,7 +43,10 @@ describe('tdfRuntimeLifecycle', function() {
     await helpers.deleteTdfRuntimeData('tdf-1');
 
     expect(removedSelectors).to.deep.equal([
-      { collection: 'Assignments', selector: { TDFId: 'tdf-1' } },
+      {
+        collection: 'Assignments',
+        selector: { $or: [{ TDFId: 'tdf-1' }, { memberTdfIds: 'tdf-1' }] },
+      },
       { collection: 'Histories', selector: { TDFId: 'tdf-1' } },
       { collection: 'GlobalExperimentStates', selector: { TDFId: 'tdf-1' } },
     ]);

@@ -331,6 +331,7 @@ describe('public TDF and stimulus method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-direct-block',
       courseId: 'course-direct-block',
+      assignmentType: 'lesson',
       TDFId: 'assigned-direct-tdf',
     });
     await TdfsAny.insertAsync({
@@ -371,6 +372,7 @@ describe('public TDF and stimulus method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-launch-context',
       courseId: 'course-launch-context',
+      assignmentType: 'lesson',
       TDFId: 'assigned-context-tdf',
     });
     await TdfsAny.insertAsync({
@@ -392,6 +394,7 @@ describe('public TDF and stimulus method authorization', function() {
           courseId: 'course-launch-context',
           TDFId: 'assigned-context-tdf',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       },
     );
@@ -417,6 +420,7 @@ describe('public TDF and stimulus method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-condition-direct-block',
       courseId: 'course-condition-direct-block',
+      assignmentType: 'lesson',
       TDFId: 'assigned-condition-root',
     });
     await TdfsAny.insertAsync({
@@ -475,6 +479,7 @@ describe('public TDF and stimulus method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-condition-launch-context',
       courseId: 'course-condition-launch-context',
+      assignmentType: 'lesson',
       TDFId: 'assigned-condition-context-root',
     });
     await TdfsAny.insertAsync({
@@ -514,11 +519,53 @@ describe('public TDF and stimulus method authorization', function() {
           courseId: 'course-condition-launch-context',
           TDFId: 'assigned-condition-context-root',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       },
     );
 
     expect(tdf._id).to.equal('assigned-condition-context-child');
+  });
+
+  it('allows direct TDF lookup for a member of a released progressive assignment', async function() {
+    await CoursesAny.insertAsync({
+      _id: 'course-progressive-direct',
+      teacherUserId: 'teacher-user',
+      semester: 'SU_2022',
+    });
+    await SectionsAny.insertAsync({
+      _id: 'section-progressive-direct',
+      courseId: 'course-progressive-direct',
+    });
+    await SectionUserMapAny.insertAsync({
+      _id: 'enrollment-progressive-direct',
+      userId: 'assigned-student',
+      sectionId: 'section-progressive-direct',
+    });
+    await AssignmentsAny.insertAsync({
+      _id: 'assignment-progressive-direct',
+      courseId: 'course-progressive-direct',
+      assignmentType: 'progressive',
+      title: 'Progressive direct access',
+      memberTdfIds: ['progressive-direct-one', 'progressive-direct-two'],
+      releaseAt: null,
+    });
+    await TdfsAny.insertAsync({
+      _id: 'progressive-direct-one',
+      ownerId: 'teacher-user',
+      stimuliSetId: 116,
+      content: {
+        fileName: 'ProgressiveDirectOne.json',
+        tdfs: { tutor: { setspec: { lessonname: 'Progressive Direct One', userselect: 'false' } } },
+      },
+    });
+
+    const tdf = await (asyncMethods.getTdfById as any).call(
+      { userId: 'assigned-student' },
+      'progressive-direct-one',
+    );
+
+    expect(tdf._id).to.equal('progressive-direct-one');
   });
 
   it('allows public course-assignment TDF lookup without section enrollment', async function() {
@@ -531,6 +578,7 @@ describe('public TDF and stimulus method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-launch-public',
       courseId: 'course-launch-public',
+      assignmentType: 'lesson',
       TDFId: 'assigned-public-tdf',
     });
     await TdfsAny.insertAsync({
@@ -552,6 +600,7 @@ describe('public TDF and stimulus method authorization', function() {
           courseId: 'course-launch-public',
           TDFId: 'assigned-public-tdf',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       },
     );
@@ -572,6 +621,7 @@ describe('public TDF and stimulus method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-launch-unenrolled',
       courseId: 'course-launch-unenrolled',
+      assignmentType: 'lesson',
       TDFId: 'assigned-unenrolled-tdf',
     });
     await TdfsAny.insertAsync({
@@ -595,6 +645,7 @@ describe('public TDF and stimulus method authorization', function() {
             courseId: 'course-launch-unenrolled',
             TDFId: 'assigned-unenrolled-tdf',
             launchSource: 'courses',
+          launchMode: 'individual',
           },
         },
       );
@@ -627,6 +678,7 @@ describe('public TDF and stimulus method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assigned-row',
       courseId: 'assigned-course',
+      assignmentType: 'lesson',
       TDFId: 'assigned-root',
     });
     await TdfsAny.insertAsync({
@@ -681,6 +733,7 @@ describe('public TDF and stimulus method authorization', function() {
           courseId: 'assigned-course',
           TDFId: 'assigned-root',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       },
     );
@@ -1287,7 +1340,7 @@ describe('learner analytics method authorization', function() {
     expect(unitScopedRows.map((row: any) => row.time)).to.deep.equal([2000]);
   });
 
-  it('returns course-scoped learning history across assigned TDFs without server-side cluster filtering', async function() {
+  it('returns exact source-TDF history for an individual course launch', async function() {
     await CoursesAny.insertAsync({
       _id: 'course-a',
       teacherUserId: 'teacher-user',
@@ -1305,6 +1358,7 @@ describe('learner analytics method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-a',
       courseId: 'course-a',
+      assignmentType: 'lesson',
       TDFId: 'tdf-current',
       order: 0,
       required: true,
@@ -1331,6 +1385,7 @@ describe('learner analytics method authorization', function() {
         courseId: 'course-a',
         TDFId: 'tdf-current',
         launchSource: 'courses',
+          launchMode: 'individual',
       },
     });
     await HistoriesAny.insertAsync({
@@ -1347,6 +1402,7 @@ describe('learner analytics method authorization', function() {
         courseId: 'course-a',
         TDFId: 'tdf-prior',
         launchSource: 'courses',
+          launchMode: 'individual',
       },
     });
     await HistoriesAny.insertAsync({
@@ -1362,6 +1418,7 @@ describe('learner analytics method authorization', function() {
         courseId: 'course-a',
         TDFId: 'tdf-current',
         launchSource: 'courses',
+          launchMode: 'individual',
       },
     });
     await HistoriesAny.insertAsync({
@@ -1375,6 +1432,7 @@ describe('learner analytics method authorization', function() {
         courseId: 'course-b',
         TDFId: 'tdf-other-course',
         launchSource: 'courses',
+          launchMode: 'individual',
       },
     });
 
@@ -1390,21 +1448,16 @@ describe('learner analytics method authorization', function() {
           courseId: 'course-a',
           TDFId: 'tdf-current',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       }
     );
 
     expect(rows.map((row: any) => row._id)).to.deep.equal([
-      'course-prior-tdf-same-cluster',
       'course-other-cluster',
       'course-current-tdf',
     ]);
-    expect(rows.map((row: any) => row.TDFId)).to.deep.equal(['tdf-prior', 'tdf-current', 'tdf-current']);
-    expect(rows[0]).to.deep.include({
-      stimuliSetId: 'other-set',
-      stimulusKC: 'other-stim',
-      clusterKC: 'fractions.lcd',
-    });
+    expect(rows.map((row: any) => row.TDFId)).to.deep.equal(['tdf-current', 'tdf-current']);
   });
 
   it('allows course-scoped learning history without caller-provided cluster KCs', async function() {
@@ -1425,6 +1478,7 @@ describe('learner analytics method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-a',
       courseId: 'course-a',
+      assignmentType: 'lesson',
       TDFId: 'tdf-current',
       order: 0,
       required: true,
@@ -1442,6 +1496,7 @@ describe('learner analytics method authorization', function() {
           courseId: 'course-a',
           TDFId: 'tdf-current',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       }
     );
@@ -1459,6 +1514,7 @@ describe('learner analytics method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-public-history',
       courseId: 'course-public-history',
+      assignmentType: 'lesson',
       TDFId: 'tdf-public-history',
       order: 0,
       required: true,
@@ -1476,6 +1532,7 @@ describe('learner analytics method authorization', function() {
           courseId: 'course-public-history',
           TDFId: 'tdf-public-history',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       }
     );
@@ -1496,6 +1553,7 @@ describe('learner analytics method authorization', function() {
     await AssignmentsAny.insertAsync({
       _id: 'assignment-unenrolled-history',
       courseId: 'course-unenrolled-history',
+      assignmentType: 'lesson',
       TDFId: 'tdf-unenrolled-history',
       order: 0,
       required: true,
@@ -1514,6 +1572,7 @@ describe('learner analytics method authorization', function() {
             courseId: 'course-unenrolled-history',
             TDFId: 'tdf-unenrolled-history',
             launchSource: 'courses',
+          launchMode: 'individual',
           },
         }
       );
@@ -2015,7 +2074,10 @@ describe('condition count method authorization', function() {
     const stats = await (asyncMethods.getStimulusCrowdStatsForDeck as any).call(
       { userId: 'current-user' },
       'history-crowd-read',
-      ['kc-1', 'missing-kc']
+      [
+        { stimuliSetId: 'set-1', stimulusKC: 'kc-1' },
+        { stimuliSetId: 'set-1', stimulusKC: 'missing-kc' },
+      ]
     );
 
     expect(stats).to.deep.equal([{
@@ -2049,7 +2111,7 @@ describe('condition count method authorization', function() {
       await (asyncMethods.getStimulusCrowdStatsForDeck as any).call(
         { userId: 'current-user' },
         'private-crowd-read',
-        ['kc-1']
+        [{ stimuliSetId: 'set-1', stimulusKC: 'kc-1' }]
       );
       expect.fail('Expected inaccessible crowd stats read to be denied');
     } catch (error: any) {

@@ -25,6 +25,7 @@ describe('lesson route', function() {
         courseId: 'course-1',
         TDFId: 'tdf-1',
         launchSource: 'courses',
+          launchMode: 'individual',
       },
     })).to.deep.equal({
       path: '/instructions/tdf-1',
@@ -77,6 +78,7 @@ describe('lesson route', function() {
         courseId: 'course-1',
         TDFId: 'root-tdf',
         launchSource: 'courses',
+          launchMode: 'individual',
       },
     }).requiresBootstrap).to.equal(true);
   });

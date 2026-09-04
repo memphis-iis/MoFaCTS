@@ -27,12 +27,14 @@ function normalizeIdentity(value: unknown, fieldName: string): string | number {
 
 function createInitialCardStim(params: {
   readonly clusterKC: string | number;
+  readonly stimuliSetId: string | number;
   readonly stimKC: string | number;
   readonly stimIndex: number;
   readonly parameter: unknown[];
 }) {
   return {
     clusterKC: params.clusterKC,
+    stimuliSetId: params.stimuliSetId,
     stimIndex: params.stimIndex,
     stimulusKC: params.stimKC,
     priorCorrect: 0,
@@ -98,12 +100,14 @@ export function createInitialModelState(
         ? resolvedClusterKC
         : normalizeIdentity(clusterStim.clusterKC, `clusterKC for stim ${j} in cluster index ${i}`);
       const stimKC = normalizeIdentity(clusterStim.stimulusKC, `stimulusKC for stim ${j} in cluster index ${i}`);
+      const stimuliSetId = normalizeIdentity(clusterStim.stimuliSetId, `stimuliSetId for stim ${j} in cluster index ${i}`);
       if (String(stimClusterKC) !== String(resolvedClusterKC)) {
         throw new Error(`[Unit Engine] Inconsistent clusterKC in cluster index ${i}: cluster=${resolvedClusterKC}, stim=${stimClusterKC}.`);
       }
       const parameter = dependencies.getStimParameterArrayFromCluster(cluster, j);
       card.stims.push(createInitialCardStim({
         clusterKC: stimClusterKC,
+        stimuliSetId,
         stimKC,
         stimIndex: j,
         parameter,
@@ -119,7 +123,7 @@ export function createInitialModelState(
       const response = dependencies.normalizeResponseText(rawResponse);
       if (!(response in initResponses)) {
         initResponses[response] = {
-          KCId: dependencies.responseKCMap[response],
+          KCId: clusterStim.responseKC ?? dependencies.responseKCMap[response],
           priorCorrect: 0,
           allTimeCorrect: 0,
           allTimeIncorrect: 0,

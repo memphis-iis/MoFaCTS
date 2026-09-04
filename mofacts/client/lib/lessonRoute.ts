@@ -66,6 +66,12 @@ export function buildLessonRouteLocation(
     }
     queryParams.courseId = requireNonEmptyRouteValue(descriptor.courseAssignment.courseId, 'course id');
     queryParams.assignmentId = requireNonEmptyRouteValue(descriptor.courseAssignment.assignmentId, 'assignment id');
+    if (descriptor.courseAssignment.launchMode === 'progressive') {
+      if (descriptor.courseAssignment.progressiveEndpointTdfId !== rootTdfId) {
+        throw new Error('[Lesson Route] Progressive endpoint does not match the route root TDF');
+      }
+      queryParams.progressive = '1';
+    }
   }
 
   return {
@@ -79,6 +85,7 @@ export function resolveLessonRouteRequest(input: {
   routeMode: unknown;
   routeCourseId: unknown;
   routeAssignmentId: unknown;
+  routeProgressive?: unknown;
   activeRootTdfId: unknown;
   activeCurrentTdfId: unknown;
   activePracticeLaunchMode: PracticeLaunchMode;
@@ -88,6 +95,10 @@ export function resolveLessonRouteRequest(input: {
   const practiceLaunchMode = readPracticeLaunchMode(input.routeMode);
   const courseId = readOptionalQueryValue(input.routeCourseId, 'course id');
   const assignmentId = readOptionalQueryValue(input.routeAssignmentId, 'assignment id');
+  const progressiveValue = readOptionalQueryValue(input.routeProgressive, 'progressive');
+  if (progressiveValue !== null && progressiveValue !== '1') {
+    throw new Error('[Lesson Route] Progressive query value must be 1');
+  }
 
   if (Boolean(courseId) !== Boolean(assignmentId)) {
     throw new Error('[Lesson Route] Course id and assignment id must be supplied together');
@@ -99,6 +110,8 @@ export function resolveLessonRouteRequest(input: {
         courseId,
         TDFId: rootTdfId,
         launchSource: 'courses',
+        launchMode: progressiveValue === '1' ? 'progressive' : 'individual',
+        ...(progressiveValue === '1' ? { progressiveEndpointTdfId: rootTdfId } : {}),
       }
     : null;
   const activeRootTdfId = typeof input.activeRootTdfId === 'string'
@@ -114,6 +127,10 @@ export function resolveLessonRouteRequest(input: {
       && activeCourseAssignment.assignmentId === courseAssignment.assignmentId
       && activeCourseAssignment.courseId === courseAssignment.courseId
       && activeCourseAssignment.TDFId === courseAssignment.TDFId;
+    if (courseAssignmentMatches) {
+      courseAssignmentMatches = activeCourseAssignment!.launchMode === courseAssignment.launchMode
+        && activeCourseAssignment!.progressiveEndpointTdfId === courseAssignment.progressiveEndpointTdfId;
+    }
   }
 
   return {

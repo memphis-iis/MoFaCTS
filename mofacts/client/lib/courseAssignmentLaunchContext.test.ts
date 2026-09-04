@@ -28,6 +28,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
     setCourseAssignmentLaunchContext(context);
 
@@ -46,6 +47,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-1',
       TDFId: 'root-tdf',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
     setCourseAssignmentLaunchContext(context);
     Session.set('currentRootTdfId', 'root-tdf');
@@ -65,6 +67,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses',
+          launchMode: 'individual',
     });
 
     expect(() => applyCourseAssignmentLaunchContext<Record<string, unknown>>({
@@ -80,6 +83,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: '',
       TDFId: 'tdf-1',
       launchSource: 'courses',
+          launchMode: 'individual',
     });
 
     expect(
@@ -93,6 +97,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
 
     const restored = restoreCourseAssignmentLaunchContextFromState({
@@ -109,6 +114,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
     setCourseAssignmentLaunchContext(context);
 
@@ -126,6 +132,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-1',
       TDFId: 'tdf-1',
       launchSource: 'courses',
+          launchMode: 'individual',
     });
 
     const restored = restoreCourseAssignmentLaunchContextFromState({
@@ -142,6 +149,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-active',
       TDFId: 'tdf-active',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
     setCourseAssignmentLaunchContext(activeContext);
 
@@ -152,6 +160,7 @@ describe('courseAssignmentLaunchContext', function() {
           courseId: 'course-old',
           TDFId: 'tdf-old',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       },
       partialState: {
@@ -168,6 +177,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-old',
       TDFId: 'tdf-old',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
 
     const resolved = courseAssignmentContextForStateWrite({
@@ -189,6 +199,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-old',
       TDFId: 'tdf-old',
       launchSource: 'courses' as const,
+      launchMode: 'individual' as const,
     };
 
     const resolved = courseAssignmentContextForStateWrite({
@@ -209,6 +220,7 @@ describe('courseAssignmentLaunchContext', function() {
       courseId: 'course-active',
       TDFId: 'tdf-active',
       launchSource: 'courses',
+          launchMode: 'individual',
     });
 
     const resolved = courseAssignmentContextForStateWrite({
@@ -218,6 +230,7 @@ describe('courseAssignmentLaunchContext', function() {
           courseId: 'course-old',
           TDFId: 'tdf-old',
           launchSource: 'courses',
+          launchMode: 'individual',
         },
       },
       partialState: {

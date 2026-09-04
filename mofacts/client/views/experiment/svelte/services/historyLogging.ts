@@ -112,6 +112,8 @@ type HistoryStimLike = {
   clusterKC?: string | number;
   stimulusKC?: string | number;
   responseKC?: string | number;
+  progressiveSourceTdfId?: string;
+  progressiveSourceUnitName?: string;
 };
 function getTrialSelection(wasButtonTrial: boolean): string {
   return wasButtonTrial ? 'multiple choice' : 'answer';
@@ -634,7 +636,15 @@ export function createHistoryRecord({
     ? truncateToFiveDecimals(cardInfo.probabilityEstimate)
     : cardInfo.probabilityEstimate;
   const cluster = getStimCluster(clusterIndex) as HistoryClusterLike;
-  const { stimuliSetId, clusterKC, stimulusKC, responseKC } = cluster.stims[whichStim] || {};
+  const activeStimulus = cluster.stims[whichStim] || {};
+  const {
+    stimuliSetId,
+    clusterKC,
+    stimulusKC,
+    responseKC,
+    progressiveSourceTdfId,
+    progressiveSourceUnitName,
+  } = activeStimulus;
   const resolvedClusterKC = normalizeClusterKC(clusterKC);
 
   // Get TDF info
@@ -708,7 +718,7 @@ export function createHistoryRecord({
     ...responseIdentityFields,
     'KCId': stimulusKC,
     'userId': Meteor.userId(),
-    'TDFId': Session.get('currentTdfId'),
+    'TDFId': progressiveSourceTdfId || Session.get('currentTdfId'),
 
     // Trial outcome
     'outcome': outcome,
@@ -742,8 +752,8 @@ export function createHistoryRecord({
     'responseDuration': null,
 
     // Unit/problem context
-    'levelUnit': unitNumber,
-    'levelUnitName': unitName,
+    'levelUnit': progressiveSourceTdfId ? 1 : unitNumber,
+    'levelUnitName': progressiveSourceTdfId ? legacyTrim(progressiveSourceUnitName || '') : unitName,
     'levelUnitType': unitType,
     ...(modelEvidenceSource ? { modelEvidenceSource } : {}),
     'problemName': problemName,

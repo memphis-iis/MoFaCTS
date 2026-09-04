@@ -90,6 +90,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
   it('loads prior SPARC model history into a later flashcard learning session for the same cluster model', async function() {
     const clusters = [{
       stims: [{
+        stimuliSetId: 'stim-set-1',
         clusterKC: 'cluster-1',
         stimulusKC: 'kc-1',
         correctResponse: 'Answer',
@@ -97,6 +98,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
       }],
     }, {
       stims: [{
+        stimuliSetId: 'stim-set-1',
         clusterKC: 'other-cluster',
         stimulusKC: 'other-kc',
         correctResponse: 'Other',
@@ -202,7 +204,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
             },
           },
           stimulusState: {
-            'kc-1': {
+            'stim-set-1:kc-1': {
               firstSeen: 1000,
               lastSeen: 1000,
               priorCorrect: 1,
@@ -269,6 +271,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
   it('hydrates a local stimulus from shared cluster history when stimulus identities differ across systems', async function() {
     const cluster = {
       stims: [{
+        stimuliSetId: 'kc-definitions-stim-set',
         clusterKC: 'fractions.lcd',
         stimulusKC: 'kc-definitions-local-item',
         correctResponse: 'LCD',
@@ -367,7 +370,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
             },
           },
           stimulusState: {
-            'sparc-local-item': {
+            'sparc-stim-set:sparc-local-item': {
               firstSeen: 1000,
               lastSeen: 1000,
               priorCorrect: 1,
@@ -418,6 +421,7 @@ describe('LearningSessionUnitEngine model practice updates', function() {
   it('applies canonical model-practice updates through the shared adaptive-logistic engine state', async function() {
     const cluster = {
       stims: [{
+        stimuliSetId: 'stim-set-1',
         clusterKC: 'cluster-1',
         stimulusKC: 'kc-1',
         correctResponse: 'Answer',

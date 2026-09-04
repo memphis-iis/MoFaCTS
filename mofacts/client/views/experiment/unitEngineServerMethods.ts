@@ -58,6 +58,7 @@ export function createUnitEngineServerMethods(
       stimulusKCs,
       withActiveCourseAssignment(),
     ) as Array<{
+      stimuliSetId: string | number;
       stimulusKC: string | number;
       correctCount: number;
       incorrectCount: number;

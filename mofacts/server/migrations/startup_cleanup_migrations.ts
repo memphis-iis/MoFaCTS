@@ -44,6 +44,7 @@ const LEGACY_HELP_MIGRATION_KEY = 'migration.legacyHelpPageToTheme.v1';
 const IMPERSONATION_FIELD_CLEANUP_KEY = 'migration.removeImpersonationFields.v1';
 const SECRET_KEY_FIELD_CLEANUP_KEY = 'migration.removeSecretKeyFields.v1';
 const COURSE_ASSIGNMENT_METADATA_MIGRATION_KEY = 'migration.courseAssignmentMetadata.v1';
+const COURSE_ASSIGNMENT_SHAPE_MIGRATION_KEY = 'migration.courseAssignmentShape.v1';
 const LEGACY_COURSE_TIMEZONE = 'America/Chicago';
 
 async function runLegacyHelpPageMigration(deps: StartupCleanupMigrationDeps) {
@@ -264,6 +265,37 @@ async function runCourseAssignmentMetadataMigration(deps: StartupCleanupMigratio
   });
 }
 
+async function runCourseAssignmentShapeMigration(deps: StartupCleanupMigrationDeps) {
+  const completed = await deps.DynamicSettings.findOneAsync({ key: COURSE_ASSIGNMENT_SHAPE_MIGRATION_KEY });
+  if (completed) return;
+  const rows = await deps.Assignments.find(
+    { assignmentType: { $exists: false } },
+    { fields: { _id: 1, TDFId: 1 } },
+  ).fetchAsync();
+  const updatedIds: string[] = [];
+  for (const row of rows) {
+    const tdfId = typeof row?.TDFId === 'string' ? row.TDFId.trim() : '';
+    if (!tdfId) throw new Error(`Assignment ${String(row?._id || '')} cannot be migrated because TDFId is missing`);
+    await deps.Assignments.updateAsync(
+      { _id: row._id, assignmentType: { $exists: false } },
+      { $set: { assignmentType: 'lesson', updatedAt: new Date() } },
+    );
+    updatedIds.push(String(row._id));
+  }
+  if (updatedIds.length > 0) {
+    await deps.CourseLearnerSnapshotCache.updateAsync(
+      {},
+      { $set: { invalidatedAt: new Date(), rebuildReason: 'assignment-shape-migrated' } },
+      { multi: true },
+    );
+  }
+  await deps.DynamicSettings.upsertAsync(
+    { key: COURSE_ASSIGNMENT_SHAPE_MIGRATION_KEY },
+    { $set: { value: { completedAt: new Date().toISOString(), updatedIds } } },
+  );
+  deps.serverConsole('Migrated assignment documents to the discriminated assignment shape', { assignments: updatedIds.length });
+}
+
 export async function runStartupCleanupMigrations(deps: StartupCleanupMigrationDeps) {
   try {
     await runLegacyHelpPageMigration(deps);
@@ -291,5 +323,12 @@ export async function runStartupCleanupMigrations(deps: StartupCleanupMigrationD
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     deps.serverConsole('Warning: Failed course-assignment metadata migration:', message);
+  }
+
+  try {
+    await runCourseAssignmentShapeMigration(deps);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    deps.serverConsole('Warning: Failed course-assignment shape migration:', message);
   }
 }

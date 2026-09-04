@@ -122,6 +122,7 @@ describe('sessionUtils mapping cleanup', function() {
       courseId: 'course-1',
       TDFId: 'tdf-a',
       launchSource: 'courses',
+          launchMode: 'individual',
     });
     setTestPath('/experimentList');
 

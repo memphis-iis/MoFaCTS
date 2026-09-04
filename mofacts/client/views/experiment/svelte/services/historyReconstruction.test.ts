@@ -51,7 +51,7 @@ describe('history reconstruction', function() {
 
     const cluster1000 = result.clusterState['1000'];
     const cluster2000 = result.clusterState['2000'];
-    const stimulusKC1 = result.stimulusState['KC-1'];
+    const stimulusKC1 = result.stimulusState['set-a:KC-1'];
     const responseAlpha = result.responseState.Alpha;
 
     expect(cluster1000).to.not.equal(undefined);
@@ -165,8 +165,8 @@ describe('history reconstruction', function() {
 
     expect(result.clusterState['cluster-a']?.otherPracticeTime).to.equal(100);
     expect(result.clusterState['cluster-b']?.otherPracticeTime).to.equal(0);
-    expect(result.stimulusState['stim-a']?.otherPracticeTime).to.equal(100);
-    expect(result.stimulusState['stim-b']?.otherPracticeTime).to.equal(0);
+    expect(result.stimulusState['set-a:stim-a']?.otherPracticeTime).to.equal(100);
+    expect(result.stimulusState['set-a:stim-b']?.otherPracticeTime).to.equal(0);
   });
 
   it('uses explicit stimulus identity for replay state keys', function() {
@@ -184,7 +184,35 @@ describe('history reconstruction', function() {
     ]);
 
     expect(result.clusterState['cluster-a']).to.not.equal(undefined);
-    expect(result.stimulusState['stim-a']).to.not.equal(undefined);
+    expect(result.stimulusState['set-a:stim-a']).to.not.equal(undefined);
+  });
+
+  it('keeps the same stimulusKC distinct across source stimulus sets', function() {
+    const result = reconstructLearningStateFromHistory([
+      {
+        time: 1000,
+        outcome: 'correct',
+        stimuliSetId: 'set-a',
+        stimulusKC: 'shared-item',
+        clusterKC: 'cluster-a',
+        CFCorrectAnswer: 'Alpha',
+        responseDuration: 100,
+      },
+      {
+        time: 2000,
+        outcome: 'incorrect',
+        stimuliSetId: 'set-b',
+        stimulusKC: 'shared-item',
+        clusterKC: 'cluster-a',
+        CFCorrectAnswer: 'Alpha',
+        responseDuration: 100,
+      },
+    ]);
+
+    expect(result.stimulusState['set-a:shared-item']?.priorCorrect).to.equal(1);
+    expect(result.stimulusState['set-a:shared-item']?.priorIncorrect).to.equal(0);
+    expect(result.stimulusState['set-b:shared-item']?.priorCorrect).to.equal(0);
+    expect(result.stimulusState['set-b:shared-item']?.priorIncorrect).to.equal(1);
   });
 
   it('replays SPARC model-linked history rows through shared model-practice fields', function() {
@@ -226,7 +254,7 @@ describe('history reconstruction', function() {
     expect(result.overallOutcomeHistory).to.deep.equal([1]);
     expect(result.clusterState['cluster-a']?.priorCorrect).to.equal(1);
     expect(result.clusterState['cluster-a']?.totalPracticeDuration).to.equal(375);
-    expect(result.stimulusState['stim-a']?.timesSeen).to.equal(1);
+    expect(result.stimulusState['set-a:stim-a']?.timesSeen).to.equal(1);
     expect(result.responseState.Alpha?.priorCorrect).to.equal(1);
     expect(result.responseState.Alpha?.totalPracticeDuration).to.equal(375);
   });
@@ -239,6 +267,7 @@ describe('history reconstruction', function() {
         time: 1000,
         problemStartTime: 500,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
         stimulusKC: 'fractions.lcd',
         clusterKC: 'fractions.addition',
         KCId: 'fractions.lcd',
@@ -260,8 +289,8 @@ describe('history reconstruction', function() {
     expect(result.overallOutcomeHistory).to.deep.equal([1]);
     expect(result.clusterState['fractions.addition']?.priorCorrect).to.equal(1);
     expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(420);
-    expect(result.stimulusState['fractions.lcd']?.timesSeen).to.equal(1);
-    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(420);
+    expect(result.stimulusState['set-a:fractions.lcd']?.timesSeen).to.equal(1);
+    expect(result.stimulusState['set-a:fractions.lcd']?.totalPracticeDuration).to.equal(420);
     expect(result.responseState).to.deep.equal({});
   });
 
@@ -273,6 +302,7 @@ describe('history reconstruction', function() {
         time: 1000,
         problemStartTime: 500,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
         stimulusKC: 'fractions.lcd',
         clusterKC: 'fractions.addition',
         KCId: 'fractions.lcd',
@@ -292,7 +322,7 @@ describe('history reconstruction', function() {
 
     expect(result.numQuestionsAnswered).to.equal(1);
     expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(640);
-    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(640);
+    expect(result.stimulusState['set-a:fractions.lcd']?.totalPracticeDuration).to.equal(640);
     expect(result.responseState['12']?.totalPracticeDuration).to.equal(640);
   });
 
@@ -304,6 +334,7 @@ describe('history reconstruction', function() {
         time: 1000,
         problemStartTime: 500,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
         stimulusKC: 'fractions.lcd',
         clusterKC: 'fractions.addition',
         KCId: 'fractions.lcd',
@@ -316,7 +347,7 @@ describe('history reconstruction', function() {
 
     expect(result.numQuestionsAnswered).to.equal(1);
     expect(result.clusterState['fractions.addition']?.totalPracticeDuration).to.equal(0);
-    expect(result.stimulusState['fractions.lcd']?.totalPracticeDuration).to.equal(0);
+    expect(result.stimulusState['set-a:fractions.lcd']?.totalPracticeDuration).to.equal(0);
     expect(result.responseState['12']?.totalPracticeDuration).to.equal(0);
   });
 
@@ -328,6 +359,7 @@ describe('history reconstruction', function() {
         time: 1000,
         problemStartTime: 500,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
         stimulusKC: 'stim-a',
         clusterKC: ' Fractions.LCD ',
         KCId: 'stim-a',
@@ -349,6 +381,7 @@ describe('history reconstruction', function() {
         levelUnitType: 'model',
         time: 1000,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
         stimulusKC: 'fractions.lcd',
         clusterKC: 'fractions.addition',
         responseDuration: 375,
@@ -363,6 +396,7 @@ describe('history reconstruction', function() {
         levelUnitType: 'model',
         time: 1000,
         outcome: 'correct',
+        stimuliSetId: 'set-a',
         stimulusKC: 'fractions.lcd',
         clusterKC: 'fractions.addition',
         responseKey: '12',

@@ -4,6 +4,8 @@ import { meteorCallAsync } from './meteorAsync';
 import { clientConsole } from './clientLogger';
 import { getCourseAssignmentLaunchContext } from './courseAssignmentLaunchContext';
 import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
+import type { ProgressiveAssignmentLaunchPayload } from '../../common/courseAssignments.contracts';
+import { composeProgressiveLesson } from './progressiveLessonComposer';
 import {
   hasLaunchReadyTutorUnits,
   isConditionRootWithoutUnitArray,
@@ -100,6 +102,23 @@ export async function loadLaunchReadyTdf(
 
   if (!currentTdfId) {
     throw new Error(`[${source}] Cannot load launch-ready TDF without a TDF id`);
+  }
+
+  if (courseAssignment?.launchMode === 'progressive') {
+    if (courseAssignment.progressiveEndpointTdfId !== currentTdfId) {
+      throw new Error(`[${source}] Progressive endpoint must match the route TDF`);
+    }
+    const payload = await meteorCallAsync<ProgressiveAssignmentLaunchPayload>(
+      'getProgressiveAssignmentLaunch',
+      courseAssignment.assignmentId,
+      currentTdfId,
+    );
+    const tdfDoc = composeProgressiveLesson(payload);
+    const content = tdfDoc.content;
+    if (!isLaunchReadyContent(content, false)) {
+      throw new Error(`[${source}] ${describeLaunchReadyFailure(currentTdfId, content)}`);
+    }
+    return { tdfDoc, content, isConditionRoot: false };
   }
 
   const subscription = Meteor.subscribe('currentTdf', currentTdfId);

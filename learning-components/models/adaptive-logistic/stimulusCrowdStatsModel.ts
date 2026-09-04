@@ -1,4 +1,7 @@
+import { createStimulusKey, type StimulusItemIdentity } from '../../runtime/historyStimulusIdentity';
+
 export type StimulusCrowdStat = {
+  readonly stimuliSetId: string | number;
   readonly stimulusKC: string | number;
   readonly correctCount: number;
   readonly incorrectCount: number;
@@ -6,21 +9,12 @@ export type StimulusCrowdStat = {
 };
 
 type StimLike = {
+  stimuliSetId?: unknown;
   stimulusKC?: unknown;
   crowdStimSuccessCount?: number;
   crowdStimFailureCount?: number;
   crowdStimTotalTests?: number;
 };
-
-function normalizeIdentity(value: unknown): string {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value);
-  }
-  if (typeof value === 'string' && value.trim().length > 0) {
-    return value.trim();
-  }
-  throw new Error('Stimulus crowd stats require non-blank stimulusKC');
-}
 
 function normalizeCount(value: unknown, fieldName: string): number {
   const numeric = Number(value);
@@ -30,19 +24,26 @@ function normalizeCount(value: unknown, fieldName: string): number {
   return numeric;
 }
 
-export function collectStimulusKCsForCrowdStats(stimClusters: any[]): Array<string | number> {
+function requireIdentityValue(value: unknown, fieldName: string): string | number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  throw new Error(`Stimulus crowd stats require non-blank ${fieldName}`);
+}
+
+export function collectStimulusIdentitiesForCrowdStats(stimClusters: any[]): StimulusItemIdentity[] {
   const seen = new Set<string>();
-  const values: Array<string | number> = [];
+  const values: StimulusItemIdentity[] = [];
   for (const cluster of stimClusters) {
     const stims = Array.isArray(cluster?.stims) ? cluster.stims : [];
     for (const stim of stims) {
-      const stimulusKC = (stim as StimLike).stimulusKC;
-      const key = normalizeIdentity(stimulusKC);
+      const stimulusKC = requireIdentityValue((stim as StimLike).stimulusKC, 'stimulusKC');
+      const stimuliSetId = requireIdentityValue((stim as StimLike).stimuliSetId, 'stimuliSetId');
+      const key = createStimulusKey({ stimuliSetId, stimulusKC });
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
-      values.push(stimulusKC as string | number);
+      values.push({ stimuliSetId, stimulusKC });
     }
   }
   return values;
@@ -54,9 +55,10 @@ export function applyStimulusCrowdStatsToCards(params: {
 }): void {
   const statsByStimulusKC = new Map<string, StimulusCrowdStat>();
   for (const stat of params.crowdStats) {
-    const key = normalizeIdentity(stat.stimulusKC);
+    const key = createStimulusKey(stat);
     statsByStimulusKC.set(key, {
       stimulusKC: stat.stimulusKC,
+      stimuliSetId: stat.stimuliSetId,
       correctCount: normalizeCount(stat.correctCount, 'correctCount'),
       incorrectCount: normalizeCount(stat.incorrectCount, 'incorrectCount'),
       totalCount: normalizeCount(stat.totalCount, 'totalCount'),
@@ -66,7 +68,10 @@ export function applyStimulusCrowdStatsToCards(params: {
   for (const card of params.cards) {
     const stims = Array.isArray(card?.stims) ? card.stims : [];
     for (const stim of stims as StimLike[]) {
-      const stat = statsByStimulusKC.get(normalizeIdentity(stim.stimulusKC));
+      const stat = statsByStimulusKC.get(createStimulusKey({
+        stimuliSetId: requireIdentityValue(stim.stimuliSetId, 'stimuliSetId'),
+        stimulusKC: requireIdentityValue(stim.stimulusKC, 'stimulusKC'),
+      }));
       const correctCount = stat?.correctCount || 0;
       const incorrectCount = stat?.incorrectCount || 0;
       const totalCount = stat?.totalCount || 0;
