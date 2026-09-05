@@ -64,7 +64,7 @@ RUN cd $APP_SOURCE_FOLDER && \
 
 
 # Use the exact Node ABI bundled by Meteor 3.5.
-FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS bundle_deps_builder
+FROM node:26.5.1-alpine@sha256:233761595746769ebfdb6090f44fc7cdf818ae0ce62d2b37e0367723b9823e36 AS bundle_deps_builder
 
 ENV APP_BUNDLE_FOLDER /opt/bundle
 ENV SCRIPTS_FOLDER /docker
@@ -110,7 +110,7 @@ RUN bash $SCRIPTS_FOLDER/build-meteor-npm-dependencies.sh && \
 
 # Start another Docker stage, so that the final image doesn't contain the layer with the build dependencies
 # See previous FROM line; this must match
-FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS runtime
+FROM node:26.5.1-alpine@sha256:233761595746769ebfdb6090f44fc7cdf818ae0ce62d2b37e0367723b9823e36 AS runtime
 
 ARG MOFACTS_SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$MOFACTS_SOURCE_REVISION
