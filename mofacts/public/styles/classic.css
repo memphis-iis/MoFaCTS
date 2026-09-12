@@ -144,14 +144,16 @@
     --app-sparc-answer-list-width: calc(var(--app-text-input-height) * 24);
     --app-sparc-feedback-width-min: calc(var(--app-text-input-height) * 12);
     --app-sparc-feedback-width-max: calc(var(--app-text-input-height) * 16);
-    --app-sparc-term-table-min-width: calc(var(--app-text-input-height) * 26);
-    --app-sparc-term-column-width-wide: calc(var(--app-text-input-height) * 5.25);
-    --app-sparc-term-column-width-medium: calc(var(--app-text-input-height) * 4.75);
-    --app-sparc-term-column-width-narrow: calc(var(--app-text-input-height) * 4.5);
-    --app-sparc-term-value-width: calc(var(--app-text-input-height) * 1.75);
-    --app-sparc-term-unit-width: calc(var(--app-text-input-height) * 1.35);
-    --app-sparc-term-substance-width: calc(var(--app-text-input-height) * 2.15);
-    --app-sparc-term-cancel-width: calc(var(--app-text-input-height) * 0.45);
+    /* Keep each term at least as wide as its controls, padding, and gaps.
+       Narrow screens use the term table's existing horizontal scroll area. */
+    --app-sparc-term-table-min-width: calc(var(--app-sparc-term-column-width-wide) + var(--app-sparc-term-column-width-medium) * 2 + var(--app-sparc-term-column-width-narrow) * 2 + var(--app-space-2) * 4);
+    --app-sparc-term-column-width-wide: calc(var(--app-sparc-term-value-width) + var(--app-sparc-term-unit-width) + var(--app-sparc-term-substance-width) + var(--app-sparc-term-cancel-width) + var(--app-space-1) * 3);
+    --app-sparc-term-column-width-medium: var(--app-sparc-term-column-width-wide);
+    --app-sparc-term-column-width-narrow: var(--app-sparc-term-column-width-wide);
+    --app-sparc-term-value-width: calc(5ch + var(--app-space-3) * 2 + var(--app-border-width) * 6);
+    --app-sparc-term-unit-width: calc(4ch + var(--app-space-3) * 2 + var(--app-border-width) * 6 + 1.5em);
+    --app-sparc-term-substance-width: calc(5ch + var(--app-space-3) * 2 + var(--app-border-width) * 6 + 1.5em);
+    --app-sparc-term-cancel-width: max(1rem, calc(var(--app-text-input-height) * 0.45));
     --app-sparc-hint-min-height: calc(var(--app-text-input-height) * 4);
     --app-sparc-hint-button-min-width: calc(var(--app-text-input-height) * 4);
     --app-sparc-table-column-min-width: calc(var(--app-text-input-height) * 2);
