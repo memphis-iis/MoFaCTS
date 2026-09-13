@@ -27,6 +27,9 @@ import {
   type SparcUtteranceRequest,
 } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
+import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
+import { clientConsole } from '../../../../lib/clientLogger';
+import type { RecoverableWarning } from '../../../../../common/recoverableWarnings';
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -77,6 +80,7 @@ export type SparcDialogueLearnerResponseScoringTraceEvent =
     }>;
 
 export type SparcDialogueOpenRouterProviderOptions = {
+  readonly reportWarning?: (warning: RecoverableWarning) => void | Promise<void>;
   readonly tdfId?: string | null;
   readonly sessionId?: string;
   readonly callResolvedOpenRouterJson?: CallResolvedOpenRouterJson;
@@ -295,6 +299,7 @@ function parseLearnerEvidence(
   label: string,
   dialogueHistory: readonly Readonly<Record<string, unknown>>[],
   learnerText: string,
+  onMismatch: () => void,
 ): readonly SparcLearnerEvidenceCitation[] {
   const citations = evidenceObjects(value, `${label} learnerEvidence`);
   const seen = new Set<string>();
@@ -330,8 +335,13 @@ function parseLearnerEvidence(
       dialogueHistoryIndex = null;
       sourceText = learnerText;
     }
+    if (!sourceText.trim()) {
+      throw new Error(`${citationLabel} learner-authored source must not be empty`);
+    }
     if (!sourceText.includes(quote)) {
-      throw new Error(`${citationLabel} quote must be an exact contiguous substring of its learner-authored source`);
+      // A quotation is diagnostic evidence. Its spelling does not change the
+      // provider's score, and must not prevent an otherwise valid learner turn.
+      onMismatch();
     }
     const identity = `${source}:${dialogueHistoryIndex ?? 'latest'}:${quote}`;
     if (seen.has(identity)) {
@@ -346,6 +356,7 @@ function parseEvidenceEnvelope(
   value: unknown,
   dialogueHistory: readonly Readonly<Record<string, unknown>>[],
   learnerText: string,
+  onMismatch: () => void,
 ): SparcLearnerResponseEvidenceEnvelope {
   if (!isRecord(value)) {
     throw new Error('SPARC dialogue scoring response must be an object');
@@ -368,6 +379,7 @@ function parseEvidenceEnvelope(
       `SPARC dialogue scoring learning target "${String(entry.clusterKC)}"`,
       dialogueHistory,
       learnerText,
+      onMismatch,
     ),
   }));
   const diagnosticMisconceptionEvaluations = evidenceObjects(
@@ -388,6 +400,7 @@ function parseEvidenceEnvelope(
       `SPARC dialogue scoring diagnostic misconception "${String(entry.id)}"`,
       dialogueHistory,
       learnerText,
+      onMismatch,
     ),
   }));
   const contribution = isRecord(value.learnerContribution) ? value.learnerContribution : {};
@@ -613,7 +626,10 @@ export function createSparcDialogueOpenRouterProvider(
       stage: 'provider-response',
       parsedContent: result.parsedContent,
     });
-    const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent, dialogueHistory, learnerText);
+    let mismatchCount = 0;
+    const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent, dialogueHistory, learnerText, () => {
+      mismatchCount += 1;
+    });
     options.onLearnerResponseScoringTrace?.({
       stage: 'evidence-parsed',
       evidenceEnvelope,
@@ -625,6 +641,17 @@ export function createSparcDialogueOpenRouterProvider(
         evidence: evidenceEnvelope,
       }),
     };
+    if (mismatchCount > 0) {
+      // One bounded event per valid scoring response; diagnostic failure must
+      // never become a student-visible lesson failure or an unhandled rejection.
+      void Promise.resolve().then(() => (options.reportWarning ?? reportRecoverableWarning)({
+        code: 'autotutor.citationMismatch',
+        tdfId: options.tdfId ?? null,
+        mismatchCount,
+      })).catch(() => {
+        clientConsole(1, '[RECOVERABLE WARNING] Unable to persist AutoTutor citation warning.');
+      });
+    }
     options.onLearnerResponseScoringTrace?.({
       stage: 'evaluation-completed',
       evaluation,

@@ -46,6 +46,9 @@ type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
 
 type RunServerStartupDeps = {
+  AuditLog: {
+    rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
+  };
   serverConsole: Logger;
   DynamicSettings: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
@@ -825,6 +828,10 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   deps.serverConsole('Password hash runtime info:', deps.getPasswordHashRuntimeInfo());
 
   await deps.ScheduledTurkMessages.rawCollection().createIndex({ sent: 1, scheduled: 1 });
+  await deps.AuditLog.rawCollection().createIndex(
+    { action: 1, createdAt: -1, _id: -1 },
+    { name: 'audit_action_created_id' },
+  );
   await deps.AuthThrottleState.rawCollection().createIndex({ key: 1 }, { unique: true });
   await deps.AuthThrottleState.rawCollection().createIndex({ updatedAt: 1 });
   await deps.ManualContentDrafts.rawCollection().createIndex({ ownerId: 1, updatedAt: -1 });

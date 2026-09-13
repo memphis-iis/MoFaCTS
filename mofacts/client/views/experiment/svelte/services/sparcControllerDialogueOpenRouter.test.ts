@@ -641,13 +641,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
     }]);
   });
 
-  it('requires every directional citation to identify exact learner-authored evidence', async function() {
+  it('requires directional citations to identify a valid learner-authored source', async function() {
     const invalidCitations = [{
       learnerEvidence: dialogueLearnerEvidence(1, 'Tutor claim.'),
       message: 'must reference a student dialogueHistory entry',
-    }, {
-      learnerEvidence: dialogueLearnerEvidence(0, 'fabricated quote'),
-      message: 'quote must be an exact contiguous substring',
     }, {
       learnerEvidence: [],
       message: 'must cite at least one learner-authored phrase',
@@ -698,6 +695,64 @@ describe('SPARC dialogue OpenRouter provider', function() {
       }
       expect(error).to.be.instanceOf(Error);
       expect((error as Error).message).to.contain(invalid.message);
+    }
+  });
+
+  it('keeps scores unchanged for quotation mismatches and reports one text-free warning per response', async function() {
+    const warnings: unknown[] = [];
+    const score = async (quote: string) => createSparcDialogueOpenRouterProvider({
+      tdfId: 'tdf-demo',
+      reportWarning: (warning) => { warnings.push(warning); },
+      async callResolvedOpenRouterJson() {
+        return { parsedContent: {
+          learningTargetEvaluations: [{
+            clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
+            learnerEvidence: latestLearnerEvidence(quote),
+          }],
+          diagnosticMisconceptionEvaluations: [{
+            id: 'mis-1', evidenceDirection: 'contradicts', evidenceStrength: 0.4,
+            learnerEvidence: latestLearnerEvidence(quote),
+          }],
+          learnerContribution: { type: 'answer' },
+        } };
+      },
+    }).scoreLearnerResponse({
+      display: dialogueDisplay(), learnerText: 'I think A matters.', ...scorerContext(),
+    } as Parameters<ReturnType<typeof createSparcDialogueOpenRouterProvider>['scoreLearnerResponse']>[0]);
+    const exact = await score('I think A matters.');
+    expect(warnings).to.deep.equal([]);
+    const mismatched = await score('A matters to me.');
+    expect(mismatched).to.deep.equal(exact);
+    expect(warnings).to.deep.equal([{
+      code: 'autotutor.citationMismatch', tdfId: 'tdf-demo', mismatchCount: 2,
+    }]);
+  });
+
+  it('continues scoring when warning delivery throws or rejects', async function() {
+    for (const reportWarning of [
+      () => { throw new Error('diagnostic unavailable'); },
+      () => Promise.reject(new Error('diagnostic unavailable')),
+    ]) {
+      const provider = createSparcDialogueOpenRouterProvider({
+        reportWarning,
+        async callResolvedOpenRouterJson() {
+          return { parsedContent: {
+            learningTargetEvaluations: [{
+              clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
+              learnerEvidence: latestLearnerEvidence('Paraphrased evidence.'),
+            }],
+            diagnosticMisconceptionEvaluations: [{
+              id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
+            }],
+            learnerContribution: { type: 'answer' },
+          } };
+        },
+      });
+      const result = await provider.scoreLearnerResponse({
+        display: dialogueDisplay(), learnerText: 'I think A matters.', ...scorerContext(),
+      } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+      expect(result.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
   });
 

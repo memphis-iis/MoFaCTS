@@ -3,6 +3,7 @@ import { ReactiveVar } from 'meteor/reactive-var';
 import { Template } from 'meteor/templating';
 import './testRunner.html';
 import './aiContentPromptLab';
+import './recoverableWarningLog';
 import './shared/adminUi/adminUi';
 import {
   createAsyncCommandController,

@@ -1,0 +1,42 @@
+<template name="recoverableWarningLog">
+  <section class="admin-section" aria-labelledby="recoverable-warning-heading">
+    <div class="card admin-card">
+      <div class="card-body">
+        <div class="admin-header-action-row">
+          <div>
+            <h5 id="recoverable-warning-heading">{{warningText 'adminTests.warningTitle'}}</h5>
+            <p class="text-muted small">{{warningText 'adminTests.warningDescription'}}</p>
+          </div>
+          <button type="button" class="btn btn-outline-primary refresh-recoverable-warnings" disabled={{pending}}>
+            {{warningText 'adminTests.warningRefresh'}}
+          </button>
+        </div>
+        <div aria-live="polite" aria-busy="{{pending}}">
+          {{#if pending}}<p role="status">{{warningText 'common.loading'}}</p>{{/if}}
+          {{#if failed}}
+            <p role="alert">{{warningText 'adminTests.warningLoadFailed'}}</p>
+          {{else}}
+            {{#unless pending}}
+              <ul class="list-unstyled">
+                {{#each rows}}
+                  <li class="border-bottom py-3">
+                    <div><time>{{warningTime createdAt}}</time> · <code>{{details.code}}</code></div>
+                    <p>{{warningMessage details.mismatchCount}}</p>
+                    {{#if details.tdfId}}<code class="text-break">{{details.tdfId}}</code>{{/if}}
+                  </li>
+                {{else}}
+                  <li>{{warningText 'adminTests.warningEmpty'}}</li>
+                {{/each}}
+              </ul>
+            {{/unless}}
+          {{/if}}
+        </div>
+        {{#if hasOlder}}
+          <button type="button" class="btn btn-outline-primary older-recoverable-warnings" disabled={{pending}}>
+            {{warningText 'adminTests.warningOlder'}}
+          </button>
+        {{/if}}
+      </div>
+    </div>
+  </section>
+</template>

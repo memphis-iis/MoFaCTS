@@ -64,6 +64,7 @@ import { createOpenRouterMethods } from './methods/openRouterMethods';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
+import { createRecoverableWarningMethods } from './methods/recoverableWarningMethods';
 import { createTurkWorkflowMethods } from './methods/turkWorkflowMethods';
 import { createTdfIdentityMigrationMethods } from './methods/tdfIdentityMigrationMethods';
 import {
@@ -641,6 +642,7 @@ function normalizeCanonicalId(value: unknown): string | null {
 }
 
 export const methods: any = {
+  ...createRecoverableWarningMethods({ auditLog: AuditLog, requireAdminUser }),
   ...createSystemMethods({
     serverConsole,
     ScheduledTurkMessages,
@@ -1186,6 +1188,7 @@ Meteor.startup(async function() {
     serverConsole(0, `[Backups] Marked ${interruptedBackupCount} interrupted backup job(s) as failed after server startup.`);
   }
   await runServerStartup({
+    AuditLog,
     serverConsole,
     DynamicSettings,
     Courses,

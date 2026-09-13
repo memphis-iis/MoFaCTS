@@ -160,6 +160,8 @@ function getCurrentUnitStimulusCount(): number {
 
   const nestedClusters = getNestedStimulusClustersFromTdfFile({
     tdfFile: Session.get('currentTdfFile'),
+    // Course launches load this document by method; it need not exist in Minimongo.
+    currentTdfDoc: Session.get('currentTdfDoc'),
     currentStimuliSet,
     currentStimuliSetId: Session.get('currentStimuliSetId'),
     currentTdfId: Session.get('currentTdfId'),

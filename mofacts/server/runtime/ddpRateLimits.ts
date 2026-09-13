@@ -33,6 +33,18 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
 
   DDPRateLimiter.addRule({
     type: 'method',
+    name: 'reportRecoverableWarning',
+    userId() { return true; }
+  }, 30, 60000);
+
+  DDPRateLimiter.addRule({
+    type: 'method',
+    name: 'getRecoverableWarnings',
+    userId() { return true; }
+  }, 30, 60000);
+
+  DDPRateLimiter.addRule({
+    type: 'method',
     name: 'requestPasswordReset',
     connectionId() { return true; }
   }, 3, 3600000);
