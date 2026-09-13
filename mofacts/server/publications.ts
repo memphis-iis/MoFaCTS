@@ -63,6 +63,10 @@ Meteor.publish(null, function() {
 
 export const DYNAMIC_ASSET_PUBLICATION_FIELDS = {
     _id: 1,
+    // FilesCollection.link reads these persisted routing fields from each document.
+    _downloadRoute: 1,
+    _collectionName: 1,
+    public: 1,
     name: 1,
     fileName: 1,
     type: 1,

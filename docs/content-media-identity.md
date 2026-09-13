@@ -5,6 +5,13 @@ uploads copy that value from the content summary, not an HTML attribute. The
 server checks the same value and type after enforcing upload authorization.
 Media listing and duplicate-name detection use that exact identifier.
 
+Asset publications also retain `_downloadRoute`, `_collectionName`, and the
+top-level `public` routing flag consumed by `FilesCollection.link`. Omitting those
+fields produces an invalid preview URL even when the asset is correctly listed.
+The library's `public` routing flag is distinct from `meta.public`, which the
+application uses for access visibility. Publishing the flag does not change it
+or grant access. Preview and editor links use the same projected asset documents.
+
 Previously, file selection read an HTML attribute (always text), while the media
 list used the TDF's numeric identifier. Drag-and-drop used jQuery's automatic
 conversion, so the two upload paths could persist different types. Both paths

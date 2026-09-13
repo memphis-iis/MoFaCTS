@@ -163,6 +163,9 @@ describe('contentMethods content upload summaries', function() {
   it('keeps asset publications limited to fields needed by client link and metadata views', function() {
     expect(DYNAMIC_ASSET_PUBLICATION_FIELDS).to.deep.equal({
       _id: 1,
+      _downloadRoute: 1,
+      _collectionName: 1,
+      public: 1,
       name: 1,
       fileName: 1,
       type: 1,
@@ -179,6 +182,25 @@ describe('contentMethods content upload summaries', function() {
       isVideo: 1,
       versions: 1
     });
+  });
+
+  it('preserves the routing fields consumed by the real FilesCollection link formatter', function() {
+    const original = {
+      _id: 'preview-asset', name: 'practice-cycle.png', extension: 'png',
+      _downloadRoute: '/cdn/storage', _collectionName: 'Assets', public: false,
+      versions: { original: { extension: 'png' } },
+    };
+    for (const isPublic of [false, true]) {
+      const stored: Record<string, unknown> = { ...original, public: isPublic };
+      const projected = Object.fromEntries(Object.keys(DYNAMIC_ASSET_PUBLICATION_FIELDS)
+        .filter(key => Object.hasOwn(stored, key)).map(key => [key, stored[key]]));
+      const link = (globalThis as any).DynamicAssets.link(projected);
+      const expectedPath = isPublic
+        ? '/cdn/storage/preview-asset.png'
+        : '/cdn/storage/Assets/preview-asset/original/preview-asset.png';
+      expect(new URL(link).pathname).to.equal(expectedPath);
+      expect(link).not.to.include('undefined');
+    }
   });
 
   it('dry-runs orphan DynamicAssets cleanup against active TDF references', async function() {
