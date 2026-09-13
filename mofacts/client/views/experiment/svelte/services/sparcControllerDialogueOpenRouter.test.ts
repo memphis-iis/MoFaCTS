@@ -695,6 +695,15 @@ describe('SPARC dialogue OpenRouter provider', function() {
       }
       expect(error).to.be.instanceOf(Error);
       expect((error as Error).message).to.contain(invalid.message);
+      if (invalid.message === 'must reference a student dialogueHistory entry') {
+        const diagnostic = JSON.parse((error as Error).message.split('; citation=')[1]!);
+        expect(diagnostic.index).to.equal(1);
+        expect(diagnostic.referencedRole).to.equal('tutor');
+        expect(diagnostic.matchingTutorIndices).to.deep.equal([1]);
+        expect(diagnostic.matchingStudentCount).to.equal(0);
+        expect((error as Error).message).not.to.contain('Tutor claim.');
+        expect((error as Error).message).not.to.contain('Learner evidence.');
+      }
     }
   });
 

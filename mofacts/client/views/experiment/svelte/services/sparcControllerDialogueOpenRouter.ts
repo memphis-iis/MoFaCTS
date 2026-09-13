@@ -30,6 +30,7 @@ import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-compone
 import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { RecoverableWarning } from '../../../../../common/recoverableWarnings';
+import { describeSparcCitation } from './sparcCitationDiagnostics';
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -299,53 +300,58 @@ function parseLearnerEvidence(
   label: string,
   dialogueHistory: readonly Readonly<Record<string, unknown>>[],
   learnerText: string,
-  onMismatch: () => void,
+  onMismatch: (diagnostic: ReturnType<typeof describeSparcCitation>) => void,
 ): readonly SparcLearnerEvidenceCitation[] {
   const citations = evidenceObjects(value, `${label} learnerEvidence`);
   const seen = new Set<string>();
   return citations.map((citation, index) => {
     const citationLabel = `${label} learnerEvidence[${index}]`;
+    const citationError = (message: string) => {
+      const diagnostic = describeSparcCitation(citation, dialogueHistory, learnerText);
+      clientConsole(1, '[SPARC][Dialogue] citation validation failed', JSON.stringify(diagnostic));
+      return new Error(`${message}; citation=${JSON.stringify(diagnostic.summary)}`);
+    };
     const source = citation.source;
     if (source !== 'dialogueHistory' && source !== 'learnerText') {
-      throw new Error(`${citationLabel} source must be dialogueHistory or learnerText`);
+      throw citationError(`${citationLabel} source must be dialogueHistory or learnerText`);
     }
     const quote = nonBlankString(citation.quote);
     if (!quote) {
-      throw new Error(`${citationLabel} quote is required`);
+      throw citationError(`${citationLabel} quote is required`);
     }
     let dialogueHistoryIndex: number | null;
     let sourceText: string;
     if (source === 'dialogueHistory') {
       if (!Number.isInteger(citation.dialogueHistoryIndex) || Number(citation.dialogueHistoryIndex) < 0) {
-        throw new Error(`${citationLabel} dialogueHistoryIndex must be a nonnegative integer for dialogueHistory evidence`);
+        throw citationError(`${citationLabel} dialogueHistoryIndex must be a nonnegative integer for dialogueHistory evidence`);
       }
       dialogueHistoryIndex = Number(citation.dialogueHistoryIndex);
       const dialogueEntry = dialogueHistory[dialogueHistoryIndex];
       if (!dialogueEntry) {
-        throw new Error(`${citationLabel} dialogueHistoryIndex ${dialogueHistoryIndex} is out of range`);
+        throw citationError(`${citationLabel} dialogueHistoryIndex ${dialogueHistoryIndex} is out of range`);
       }
       if (dialogueEntry.role !== 'student') {
-        throw new Error(`${citationLabel} must reference a student dialogueHistory entry`);
+        throw citationError(`${citationLabel} must reference a student dialogueHistory entry`);
       }
       sourceText = nonBlankString(dialogueEntry.text);
     } else {
       if (citation.dialogueHistoryIndex !== null) {
-        throw new Error(`${citationLabel} dialogueHistoryIndex must be null for learnerText evidence`);
+        throw citationError(`${citationLabel} dialogueHistoryIndex must be null for learnerText evidence`);
       }
       dialogueHistoryIndex = null;
       sourceText = learnerText;
     }
     if (!sourceText.trim()) {
-      throw new Error(`${citationLabel} learner-authored source must not be empty`);
+      throw citationError(`${citationLabel} learner-authored source must not be empty`);
     }
     if (!sourceText.includes(quote)) {
       // A quotation is diagnostic evidence. Its spelling does not change the
       // provider's score, and must not prevent an otherwise valid learner turn.
-      onMismatch();
+      onMismatch(describeSparcCitation(citation, dialogueHistory, learnerText));
     }
     const identity = `${source}:${dialogueHistoryIndex ?? 'latest'}:${quote}`;
     if (seen.has(identity)) {
-      throw new Error(`${label} learnerEvidence contains a duplicate citation`);
+      throw citationError(`${label} learnerEvidence contains a duplicate citation`);
     }
     seen.add(identity);
     return { source, dialogueHistoryIndex, quote };
@@ -356,7 +362,7 @@ function parseEvidenceEnvelope(
   value: unknown,
   dialogueHistory: readonly Readonly<Record<string, unknown>>[],
   learnerText: string,
-  onMismatch: () => void,
+  onMismatch: (diagnostic: ReturnType<typeof describeSparcCitation>) => void,
 ): SparcLearnerResponseEvidenceEnvelope {
   if (!isRecord(value)) {
     throw new Error('SPARC dialogue scoring response must be an object');
@@ -627,8 +633,11 @@ export function createSparcDialogueOpenRouterProvider(
       parsedContent: result.parsedContent,
     });
     let mismatchCount = 0;
-    const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent, dialogueHistory, learnerText, () => {
+    const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent, dialogueHistory, learnerText, (diagnostic) => {
       mismatchCount += 1;
+      if (mismatchCount <= 3) {
+        clientConsole(1, '[SPARC][Dialogue] citation quotation mismatch', JSON.stringify(diagnostic));
+      }
     });
     options.onLearnerResponseScoringTrace?.({
       stage: 'evidence-parsed',

@@ -28,7 +28,7 @@
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { clientConsole } from '../../../../lib/clientLogger';
-  import { redactOpenRouterSecretText } from '../../../../../common/lib/openRouterClient';
+  import { redactSparcDialogueDiagnosticText } from '../services/sparcCitationDiagnostics';
 
   const dispatch = createEventDispatcher();
   const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
@@ -94,15 +94,9 @@
       : (error instanceof Error && error.message.trim()
         ? error.message.trim()
         : String(error || 'Unknown error'));
-    return redactOpenRouterSecretText(
+    return redactSparcDialogueDiagnosticText(
       `${code ? `${code}: ` : ''}${message}`
-        .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
-        .replace(/\b(?:mongodb(?:\+srv)?|postgres(?:ql)?):\/\/\S+/gi, '[redacted connection string]')
-        .replace(/\bAIza[0-9A-Za-z_-]{20,}\b/g, '[redacted API key]')
-        .replace(/\bsk-(?:or-v1-)?[0-9A-Za-z_-]{16,}\b/g, '[redacted API key]')
-        .replace(/\s+/g, ' ')
-        .slice(0, 800),
-    );
+    ).replace(/\s+/g, ' ').slice(0, 800);
   }
 
   function buildInitialNodeValues(nodes = [], values = {}) {
