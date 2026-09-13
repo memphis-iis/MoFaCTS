@@ -16,6 +16,14 @@ export type DynamicAssetUploadFile = {
   meta?: DynamicAssetUploadMeta;
 };
 
+// The lesson owns this identity. Preserve its BSON type; DOM attributes do not.
+export function contentMediaStimuliSetId(tdf: { stimuliSetId?: unknown } | null | undefined): string | number | null {
+  const value = tdf?.stimuliSetId;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) return value;
+  return null;
+}
+
 const ZIP_MIME_TYPES = new Set(['application/zip', 'application/x-zip-compressed', 'application/octet-stream']);
 const CONTENT_MEDIA_MIME_BY_EXTENSION: Record<string, ReadonlySet<string>> = {
   jpg: new Set(['image/jpeg']),
@@ -68,7 +76,7 @@ export function validateDynamicAssetUpload(file: DynamicAssetUploadFile): true |
   }
 
   if (purpose === 'content-media') {
-    if (!String(file.meta?.tdfId || '').trim() || file.meta?.stimuliSetId === undefined || file.meta?.stimuliSetId === null) {
+    if (!String(file.meta?.tdfId || '').trim() || contentMediaStimuliSetId(file.meta) === null) {
       return 'Content media uploads require a TDF and stimuli set';
     }
     return true;

@@ -23,6 +23,7 @@ import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migra
 import { migrateSparcHistoryPageIdentity } from '../migrations/migrate_sparc_history_page_identity';
 import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_authored_page_identity';
 import { migrateDynamicAssetLocalPaths } from '../migrations/migrate_dynamic_asset_local_paths';
+import { repairContentMediaIdentity } from '../migrations/repair_content_media_identity';
 import { purgeLearnerUnitAnalyticsCache } from '../migrations/purge_learner_unit_analytics_cache';
 import { getLocalStoragePaths, getStorageBackend } from '../lib/storageBoundary';
 import { sendScheduledTurkMessages } from '../turk_methods';
@@ -48,6 +49,7 @@ type Logger = (...args: unknown[]) => void;
 type RunServerStartupDeps = {
   AuditLog: {
     rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
+    upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
   serverConsole: Logger;
   DynamicSettings: {
@@ -382,6 +384,13 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   if (recovery.scanned > 0) {
     deps.serverConsole('[TDF mutation recovery] startup reconciliation', recovery);
   }
+  await repairContentMediaIdentity({
+    DynamicAssets: deps.DynamicAssets,
+    Tdfs: deps.Tdfs,
+    DynamicSettings: deps.DynamicSettings,
+    AuditLog: deps.AuditLog,
+    serverConsole: deps.serverConsole,
+  });
   registerSecurityHeaders();
   await themeRegistry.initialize();
   await ensurePublishedDeploymentBrandProfile();

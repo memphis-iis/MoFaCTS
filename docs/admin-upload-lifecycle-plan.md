@@ -40,6 +40,10 @@ The duplicated upload code causes inconsistent progress labels, confirmation beh
 
 ## Invariants
 
+- Separate media uploads use the selected lesson's exact stimulus-set identifier
+  value and type. See [Content media identity and repair](content-media-identity.md)
+  for the upload boundary and startup repair of existing mismatched links.
+
 - `MOFACTS_CONFIG_REPO`, if present, must resolve to `C:\dev\mofacts_config`.
 - Package processing continues to use the supported server method boundary.
 - Server methods remain responsible for database access, authorization, persistence, and package processing.

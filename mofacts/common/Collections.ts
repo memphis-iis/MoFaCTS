@@ -3,7 +3,7 @@ import { Mongo } from 'meteor/mongo';
 import { Roles } from 'meteor/alanning:roles';
 import { FilesCollection } from 'meteor/ostrio:files';
 import { collectionMongoName } from './collectionOwnership';
-import { validateDynamicAssetUpload, type DynamicAssetUploadMeta } from './fileUploadPolicy';
+import { contentMediaStimuliSetId, validateDynamicAssetUpload, type DynamicAssetUploadMeta } from './fileUploadPolicy';
 
 /*
  * Collection declarations are the persistence boundary for MoFaCTS.
@@ -84,7 +84,8 @@ const DynamicAssets = new FilesCollection({
       if (!tdf || (!isAdmin && (tdf as any).ownerId !== userId && !hasSharedAccess)) {
         throw new Meteor.Error('not-authorized', 'You cannot upload media for this content');
       }
-      if (String((tdf as any).stimuliSetId) !== String(meta.stimuliSetId)) {
+      const stimuliSetId = contentMediaStimuliSetId(tdf);
+      if (stimuliSetId === null || stimuliSetId !== meta.stimuliSetId) {
         throw new Meteor.Error('invalid-upload-target', 'The media stimuli set does not match the selected content');
       }
     }

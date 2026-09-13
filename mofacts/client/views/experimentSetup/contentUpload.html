@@ -273,7 +273,7 @@
                                                 <i class="fa fa-file-o" aria-hidden="true"></i> {{t 'content.files'}}
                                                 {{#if detailsReady}}({{stimFilesCount}}){{else}}(...){{/if}}
                                             </button>
-                                            <button type="button" class="manage-media-btn asset-disclosure-button asset-meta-item" data-tdfid="{{this._id}}" data-stimsetid="{{this.stimuliSetId}}" aria-controls="media-manager-{{this._id}}" aria-expanded="false">
+                                            <button type="button" class="manage-media-btn asset-disclosure-button asset-meta-item" data-tdfid="{{this._id}}" aria-controls="media-manager-{{this._id}}" aria-expanded="false">
                                                 <i class="fa fa-folder-open" aria-hidden="true"></i> {{t 'content.manageMedia'}}
                                                 {{#if assetsCount}}({{assetsCount}}){{else}}(0){{/if}}
                                             </button>
@@ -293,10 +293,10 @@
                                             </div>
                                             <div hidden id="media-manager-{{this._id}}" class="media-manager-panel">
                                                 <!-- Drop Zone -->
-                                                <label class="media-drop-zone" for="media-file-input-{{this._id}}" data-tdfid="{{this._id}}" data-stimsetid="{{this.stimuliSetId}}">
+                                                <label class="media-drop-zone" for="media-file-input-{{this._id}}" data-tdfid="{{this._id}}">
                                                     <div class="drop-icon"><i class="fa fa-cloud-upload" aria-hidden="true"></i></div>
                                                     <div class="drop-text">{{t 'content.dropFilesBrowse'}}</div>
-                                                    <input type="file" id="media-file-input-{{this._id}}" class="media-file-input" data-tdfid="{{this._id}}" data-stimsetid="{{this.stimuliSetId}}" multiple accept="image/*,audio/*,video/*">
+                                                    <input type="file" id="media-file-input-{{this._id}}" class="media-file-input" data-tdfid="{{this._id}}" multiple accept="image/*,audio/*,video/*">
                                                 </label>
 
                                                 <!-- Upload Progress (shown during uploads) -->

@@ -1,7 +1,19 @@
 import { expect } from 'chai';
-import { validateDynamicAssetUpload } from './fileUploadPolicy';
+import { contentMediaStimuliSetId, validateDynamicAssetUpload } from './fileUploadPolicy';
 
 describe('Dynamic asset upload policy', function() {
+  it('preserves the lesson identifier type rather than a DOM string or numeric guess', function() {
+    expect(contentMediaStimuliSetId({ stimuliSetId: 346 })).to.equal(346);
+    expect(contentMediaStimuliSetId({ stimuliSetId: '346' })).to.equal('346');
+    expect(contentMediaStimuliSetId({ stimuliSetId: '007' })).to.equal('007');
+    expect(contentMediaStimuliSetId({ stimuliSetId: 'sparc:selection' })).to.equal('sparc:selection');
+    expect(contentMediaStimuliSetId({ stimuliSetId: 0 })).to.equal(0);
+    for (const stimuliSetId of [null, undefined, '', ' ', NaN, Infinity, {}, []]) {
+      expect(contentMediaStimuliSetId({ stimuliSetId })).to.equal(null);
+      expect(validateDynamicAssetUpload({ name: 'map.png', type: 'image/png',
+        meta: { uploadPurpose: 'content-media', tdfId: 'tdf-1', stimuliSetId } as any })).not.to.equal(true);
+    }
+  });
   it('accepts package ZIPs and rejects persisted APKG and IMSCC files', function() {
     expect(validateDynamicAssetUpload({ name: 'lesson.zip', extension: 'zip', type: 'application/zip', meta: { uploadPurpose: 'package' } })).to.equal(true);
     expect(validateDynamicAssetUpload({ name: 'deck.apkg', extension: 'apkg', type: 'application/zip', meta: { uploadPurpose: 'package' } })).to.equal('Package uploads must be ZIP files');

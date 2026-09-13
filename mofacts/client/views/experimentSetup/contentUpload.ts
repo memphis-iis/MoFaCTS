@@ -11,6 +11,7 @@ import { Tracker } from 'meteor/tracker';
 import { Random } from 'meteor/random';
 import { currentUserHasRole } from '../../lib/roleUtils';
 import { getUploadIntegrity } from '../../lib/uploadIntegrity';
+import { contentMediaStimuliSetId } from '../../../common/fileUploadPolicy';
 import { processUploadedPackage } from '../../lib/packageUploadClient';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
@@ -713,7 +714,7 @@ Template.contentUpload.helpers({
             thisTdf.packageFile = summary?.packageFile || null;
             thisTdf.packageAssetId = summary?.packageAssetId || null;
             thisTdf._id = tdfId;
-            thisTdf.stimuliSetId = summary?.stimuliSetId || null;
+            thisTdf.stimuliSetId = contentMediaStimuliSetId(summary);
             thisTdf.errors = [...summaryPresentation.errors];
             thisTdf.stimFileInfo = [];
             thisTdf.stimFilesCount = null;
@@ -799,7 +800,7 @@ Template.contentUpload.helpers({
             thisTdf.assets = [];
             thisTdf.assetsCount = contentUploadAssetCount(summary);
 
-            if (assetsReady && thisTdf.stimuliSetId) {
+            if (assetsReady && thisTdf.stimuliSetId !== null) {
               const assetDocs = DynamicAssetsCollection.find({ 'meta.stimuliSetId': thisTdf.stimuliSetId }).fetch();
               thisTdf.assets = assetDocs.map((asset: any) => {
                 const name = asset.name || '';
@@ -1055,7 +1056,7 @@ Template.contentUpload.helpers({
       clientConsole(1, '[CONTENT UPLOAD] Missing TDF ID for asset subscription.');
       return;
     }
-    if (!stimSetId) {
+    if (stimSetId === null || stimSetId === undefined) {
       clientConsole(1, '[CONTENT UPLOAD] Missing stimuliSetId for asset subscription.', tdfId);
       return;
     }
@@ -1752,8 +1753,7 @@ Template.contentUpload.events({
   'click .manage-media-btn': function(event: any, template: any) {
     event.preventDefault();
     const tdfId = event.currentTarget.getAttribute('data-tdfid');
-    const stimSetIdRaw = event.currentTarget.getAttribute('data-stimsetid');
-    const stimSetId = stimSetIdRaw && stimSetIdRaw.trim().length > 0 ? stimSetIdRaw.trim() : null;
+    const stimSetId = contentMediaStimuliSetId(summaryMapValue(template)[tdfId]);
     const panel = $(`#media-manager-${tdfId}`);
     if (panel.attr('hidden')) {
       template.ensureAssetsSubscription(tdfId, stimSetId);
@@ -1788,11 +1788,10 @@ Template.contentUpload.events({
     dropZone.removeClass('drag-over');
 
     const tdfId = dropZone.data('tdfid');
-    const stimSetId = dropZone.data('stimsetid');
     const files = event.originalEvent.dataTransfer.files;
 
     if (files.length > 0) {
-      await uploadMediaFiles(files, tdfId, stimSetId, template);
+      await uploadMediaFiles(files, tdfId, template);
     }
   },
 
@@ -1800,11 +1799,10 @@ Template.contentUpload.events({
   'change .media-file-input': async function(event: any, template: any) {
     const input = event.currentTarget;
     const tdfId = input.getAttribute('data-tdfid');
-    const stimSetId = input.getAttribute('data-stimsetid');
     const files = input.files;
 
     if (files.length > 0) {
-      await uploadMediaFiles(files, tdfId, stimSetId, template);
+      await uploadMediaFiles(files, tdfId, template);
     }
 
     // Clear the input so the same file can be selected again
@@ -1961,13 +1959,14 @@ function updateDeleteButtonState(tdfId: any) {
 }
 
 // Upload media files to a TDF
-async function uploadMediaFiles(files: any, tdfId: any, stimSetId: any, template: any) {
+async function uploadMediaFiles(files: any, tdfId: any, template: any) {
   const progressContainer = $(`#upload-progress-${tdfId}`);
   const progressBar = progressContainer.find('.progress-bar');
   const statusText = progressContainer.find('.upload-status');
 
   const assetSub = template.assetSubs ? template.assetSubs.get(tdfId) : null;
-  if (!assetSub || !assetSub.ready()) {
+  const stimSetId = contentMediaStimuliSetId(summaryMapValue(template)[tdfId]);
+  if (stimSetId === null || !assetSub || !assetSub.ready()) {
     setUploadMessage(template, contentText('content.mediaListLoading'), 'warning', `media:${tdfId}`);
     return;
   }
