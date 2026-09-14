@@ -386,6 +386,10 @@
       "access": "authenticated-self"
     },
     {
+      "name": "getRecoverableWarnings",
+      "access": "admin-only"
+    },
+    {
       "name": "getPasswordHashRuntimeInfo",
       "access": "public-rate-limited"
     },
@@ -680,6 +684,10 @@
     {
       "name": "repairAiGeneratedPackageMedia",
       "access": "role-checked"
+    },
+    {
+      "name": "reportRecoverableWarning",
+      "access": "authenticated-self"
     },
     {
       "name": "requestPasswordReset",

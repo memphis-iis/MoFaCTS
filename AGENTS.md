@@ -52,6 +52,7 @@ When instructions compete, use this order:
 - App directory: `cd mofacts`
 - Typecheck from `mofacts/`: `npm run typecheck`
 - Lint from `mofacts/`: `npm run lint`
+- Lint also checks the security surface contract. When server methods, publications, HTTP handlers, exports, or management routes change, review authorization and update `mofacts/security-surface-contract.json` in the same change; do not automatically classify discovered surfaces.
 - Generate schemas from `mofacts/`: `npm run generate:schemas`
 
 ## Repo Map

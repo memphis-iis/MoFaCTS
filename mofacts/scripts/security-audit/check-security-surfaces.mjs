@@ -128,10 +128,21 @@ if (process.argv.includes('--discover')) {
     .filter(([, entries]) => Array.isArray(entries))
     .flatMap(([kind, entries]) => entries.filter((entry) =>
       !['public', 'public-rate-limited', 'authenticated-self', 'role-checked', 'admin-only', 'signed-ingestion', 'single-use-download'].includes(entry.access))
-      .map((entry) => `${kind}:${entry.name}`));
+      .map((entry) => ({ kind, name: entry.name, access: entry.access })));
   const failures = comparisons.filter((comparison) => comparison.missing.length || comparison.removed.length);
   if (failures.length || invalidPolicies.length) {
     process.stderr.write('Security surface contract is out of date or contains an invalid access classification.\n');
+    for (const { kind, missing, removed } of failures) {
+      for (const [label, entries] of [['Missing classifications', missing], ['Removed surfaces', removed]]) {
+        if (!entries.length) continue;
+        process.stderr.write(`${kind}: ${label} (${entries.length}): ${JSON.stringify(entries.slice(0, 20).map((name) => name.slice(0, 200)))}\n`);
+        if (entries.length > 20) process.stderr.write(`  ${entries.length - 20} additional entries omitted.\n`);
+      }
+    }
+    for (const { kind, name, access } of invalidPolicies.slice(0, 20)) {
+      process.stderr.write(`Invalid access classification: ${JSON.stringify({ kind, name: String(name).slice(0, 200), access: String(access).slice(0, 200) })}\n`);
+    }
+    if (invalidPolicies.length > 20) process.stderr.write(`${invalidPolicies.length - 20} additional invalid classifications omitted.\n`);
     process.exitCode = 1;
   } else {
     process.stdout.write(`Security surface contract covers ${Object.values(actual).flat().length} surfaces.\n`);

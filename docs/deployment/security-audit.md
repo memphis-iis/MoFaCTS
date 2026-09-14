@@ -103,7 +103,7 @@ The IMAPS mailbox must be dedicated to the reset identity. It retains the previo
 
 ## Source and scanner contracts
 
-`npm run security:surfaces` compares every discovered Meteor method, publication, HTTP handler, export, and management route with `mofacts/security-surface-contract.json`. New or removed server surfaces fail until their access classification is reviewed. `npm run security:test:source` tests canonical hashing, redaction, scanner parsers, encryption integrity, malformed/missing evidence handling, and canary detection.
+`npm run security:surfaces` compares every discovered Meteor method, publication, HTTP handler, export, and management route with `mofacts/security-surface-contract.json`. The normal `npm run lint` workflow also runs this check. New or removed server surfaces fail until their access classification is reviewed and the contract is updated in the same change. Review the actual server authorization before assigning a classification; discovery does not approve access. Failures list bounded source identifiers for missing classifications, removed surfaces, and invalid access classifications. `npm run security:test:source` tests canonical hashing, redaction, scanner parsers, encryption integrity, malformed/missing evidence handling, and canary detection.
 
 Surface labels describe intended access; they do not enforce it. `public` means intentional anonymous access without a rate-limit claim; `public-rate-limited` additionally requires verified throttling. A passing surface check proves agreement with the current source-discovery patterns, not complete runtime coverage or correct authorization. See the [code-local maintenance notes](../../mofacts/scripts/security-audit/README.md).
 
