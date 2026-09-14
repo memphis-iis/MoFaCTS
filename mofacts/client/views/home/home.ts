@@ -573,7 +573,7 @@ Template.appAccountMenu.events({
       return;
     }
     if (action === 'documentation') {
-      FlowRouter.go('/help');
+      window.open('https://github.com/memphis-iis/mofacts/wiki', '_blank', 'noopener,noreferrer');
       return;
     }
     if (action === 'logout') {
