@@ -4,6 +4,8 @@ This repository contains MoFaCTS, the Mobile Fact and Concept Training System. M
 
 This file is intentionally root-level and self-contained for critical behavior. Longer operational procedures may live in the public documentation linked here; do not rely on nested agent files for critical rules unless the user explicitly asks to introduce them.
 
+Consult [CHATGPT_CONTEXT.md](CHATGPT_CONTEXT.md) when project background, requirements, design rationale, terminology, or historical decisions are relevant. It is the maintained context document; the original ChatGPT export is a preserved source, not authority for current implementation. Verify implementation claims against current repository evidence.
+
 ## Decision Priority
 
 When instructions compete, use this order:
