@@ -104,6 +104,7 @@
     "svelte": "^5.55.0",
     "underscore": "^1.13.8",
     "unzipper": "^0.12.3",
+    "webgazer": "3.5.3",
     "wildemitter": "^1.2.1",
     "xstate": "^5.31.0"
   },
@@ -176,7 +177,7 @@
     "convert:config-delivery-settings": "node --experimental-strip-types scripts/convertConfigDeliverySettings.ts",
     "convert:sparc-autotutor-target-schema": "node --experimental-strip-types scripts/convertSparcAutoTutorTargetSchema.ts",
     "check:sparc-autotutor-runtime-cleanup": "node scripts/checkSparcAutoTutorRuntimeCleanup.cjs",
-    "postinstall": "node scripts/hardenBundledDependencies.cjs",
+    "postinstall": "node scripts/hardenBundledDependencies.cjs && node scripts/prepareWebGazerAssets.cjs",
     "prepare": "node scripts/prepare-husky.cjs",
     "precommit:lint-staged": "lint-staged",
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",

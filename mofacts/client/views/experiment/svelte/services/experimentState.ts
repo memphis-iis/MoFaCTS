@@ -51,6 +51,7 @@ function mergeExperimentState(
     'subTdfIndex',
     'schedule',
     'scheduleUnitNumber',
+    'adaptiveUnitSequence',
     'currentRootTdfId',
     'currentTdfId',
     'currentUnitNumber',

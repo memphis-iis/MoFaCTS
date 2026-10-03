@@ -25,8 +25,11 @@ import {
   VIDEO_SESSION_UNIT_TYPE,
 } from './video-session/manifest';
 
+import { gazeCalibrationUnitComponentManifest } from './gaze-calibration/manifest';
+
 export const defaultUnitComponentManifests: readonly LearningComponentManifest<CreateUnitEngineDeps>[] = [
   instructionUnitComponentManifest,
+  gazeCalibrationUnitComponentManifest,
   learningSessionUnitComponentManifest,
   sparcSessionUnitComponentManifest,
   assessmentSessionUnitComponentManifest,

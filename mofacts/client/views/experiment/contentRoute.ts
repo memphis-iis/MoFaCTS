@@ -13,7 +13,7 @@ let ContentSurfaceModule: unknown = null;
 
 async function loadContentSurface() {
   if (!ContentSurfaceModule) {
-    const mod = await import('./svelte/components/ContentSurface.svelte');
+    const mod = await import('./svelte/components/ContentRouteSurface.svelte');
     ContentSurfaceModule = mod.default;
   }
   return ContentSurfaceModule;

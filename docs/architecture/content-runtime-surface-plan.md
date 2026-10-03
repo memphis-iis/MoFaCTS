@@ -2,6 +2,10 @@
 
 ## Status
 
+Direct unit transitions to `/content` restart the route's `ContentSurface` instance after progress is saved and the outgoing runtime is cleaned up. A URL change is not required: consecutive assessment/video units can share the same lesson URL.
+
+Adaptive progression saves `adaptiveUnitSequence` (version, condition TDF ID, and generated units) in experiment state together with the next unit cursor. Launch and resume restore it before interpreting that cursor. Templates remain unchanged; question schedules are built separately for each target. Resume does not reevaluate completed branches from later responses. Attempts that completed an adaptive unit before this artifact was saved require administrator review; missing or mismatched artifacts produce an error rather than selecting a different authored unit. No existing histories are migrated or reset.
+
 Implemented for the learner-runtime surface boundary. This document now records the target shape, the migration that was performed, and historical work that was deliberately outside this pass.
 
 Explicit exclusions:

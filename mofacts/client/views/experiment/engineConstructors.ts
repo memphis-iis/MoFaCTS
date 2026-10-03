@@ -5,6 +5,7 @@ import { createUnitEngineByType, getCreatableUnitEngineTypes } from './unitEngin
 type CurExperimentData = Record<string, unknown>;
 
 interface EngineUnitLike {
+  gazecalibrationsession?: unknown;
   unitname?: unknown;
   assessmentsession?: unknown;
   learningsession?: unknown;
@@ -27,6 +28,7 @@ function getAvailableUnitShapes(unit: EngineUnitLike | null | undefined): string
   }
 
   const shapes: string[] = [];
+  if (unit.gazecalibrationsession) shapes.push('gazecalibrationsession');
   if (unit.assessmentsession) shapes.push('assessmentsession');
   if (unit.learningsession) shapes.push('learningsession');
   if (unit.sparcsession) shapes.push('sparcsession');
@@ -47,7 +49,8 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
   }
 
   const runnableSessionShapes = getAvailableUnitShapes(unit).filter((shape) => (
-    shape === 'assessmentsession'
+    shape === 'gazecalibrationsession'
+    || shape === 'assessmentsession'
     || shape === 'learningsession'
     || shape === 'sparcsession'
     || shape === 'videosession'
@@ -61,6 +64,7 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
     );
   }
 
+  if (unit.gazecalibrationsession) return 'gaze-calibration';
   if (unit.assessmentsession) return SCHEDULE_UNIT;
   if (unit.videosession) return VIDEO_UNIT;
   if (unit.sparcsession) return SPARC_UNIT;

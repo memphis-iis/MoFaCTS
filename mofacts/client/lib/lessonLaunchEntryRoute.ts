@@ -17,7 +17,7 @@ type TdfContentLike = {
 };
 
 export type LessonLaunchEntryRoute =
-  | { route: '/content' }
+  | { route: '/content'; currentUnitNumber?: number; currentTdfUnit?: TdfUnitLike; curUnitInstructionsSeen?: boolean }
   | {
       route: '/instructions';
       currentUnitNumber: number;
@@ -32,7 +32,7 @@ export function initializeLessonLaunchEntry(
   setSession: (key: string, value: unknown) => void,
 ): LessonLaunchEntryRoute {
   const entry = resolveLessonLaunchEntryRoute(params);
-  if (entry.route === '/instructions') {
+  if (entry.route === '/instructions' || entry.currentUnitNumber !== undefined) {
     setSession('currentUnitNumber', entry.currentUnitNumber);
     setSession('currentTdfUnit', entry.currentTdfUnit);
     setSession('curUnitInstructionsSeen', entry.curUnitInstructionsSeen);
@@ -46,6 +46,7 @@ function resolveUnitEntrySurface(unit: TdfUnitLike, unitType: UnitType): UnitEnt
     unit.picture
   );
 
+  if (unitType === 'gaze-calibration') return 'content';
   return unitType === 'instruction-only' || instructionSurfaceIsPresent
     ? 'instructions'
     : 'content';
@@ -74,6 +75,7 @@ export function resolveLessonLaunchEntryRoute(params: {
   }
 
   const unitType = resolveUnitEngineTypeForUnit(firstUnit, 'lessonLaunch.entryRoute');
+  if (unitType === 'gaze-calibration') return { route: '/content', currentUnitNumber: 0, currentTdfUnit: firstUnit, curUnitInstructionsSeen: true };
   const entrySurface = resolveUnitEntrySurface(firstUnit, unitType);
 
   return entrySurface === 'instructions'

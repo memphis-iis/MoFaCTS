@@ -1,4 +1,4 @@
-export type TdfUnitType = 'learning' | 'assessment' | 'video' | 'instructions' | 'autotutor' | 'sparc';
+export type TdfUnitType = 'learning' | 'assessment' | 'video' | 'instructions' | 'autotutor' | 'sparc' | 'gaze-calibration';
 
 export const INTERACTIVE_TDF_UNIT_TYPES: readonly TdfUnitType[] = Object.freeze([
   'learning',
@@ -13,6 +13,7 @@ export function detectTdfUnitType(unit: unknown): TdfUnitType | null {
     return null;
   }
   const record = unit as Record<string, unknown>;
+  if (record.gazecalibrationsession && typeof record.gazecalibrationsession === 'object') return 'gaze-calibration';
   if (record.videosession && typeof record.videosession === 'object') {
     return 'video';
   }

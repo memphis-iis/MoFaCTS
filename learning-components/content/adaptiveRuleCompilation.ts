@@ -41,6 +41,8 @@ function parseActionToken(token: string, fieldPath: string): ParsedAdaptiveRuleA
 function normalizeCondition(condition: string): { expression: string; outcomeNames: Set<string> } {
   const outcomeNames = new Set(condition.match(/\bC\d+S\d+\b/g) || []);
   const expression = condition
+    .replace(/\btrue\b/gi, 'true')
+    .replace(/\bfalse\b/gi, 'false')
     .replace(/\bNOT\b/gi, '!')
     .replace(/\bAND\b/gi, '&&')
     .replace(/\bOR\b/gi, '||');

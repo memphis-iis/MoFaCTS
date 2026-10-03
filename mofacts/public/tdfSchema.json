@@ -917,6 +917,19 @@
                 "type": "object",
                 "title": "Unit Template",
                 "properties": {
+                  "gazeTracking": {
+                    "title": "Show webcam gaze estimates during this unit.",
+                    "description": "Requires session calibration. Visual prototype only; no gaze data is saved.",
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "gazecalibrationsession": {
+                    "title": "Gaze calibration unit.",
+                    "description": "Calibrate the webcam tracker before units with gazeTracking enabled. Cannot coexist with another session selector.",
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  },
                   "unitname": {
                     "title": "Unit name for tracking.",
                     "description": "Tracking/display name for this unit.",
@@ -3331,7 +3344,52 @@
                     "additionalProperties": false
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "gazecalibrationsession"
+                      ]
+                    },
+                    "then": {
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "learningsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "assessmentsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "sparcsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "videosession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "autotutorsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "adaptive"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
               }
             }
           },
@@ -3348,6 +3406,19 @@
             "type": "object",
             "title": "Unit",
             "properties": {
+              "gazeTracking": {
+                "title": "Show webcam gaze estimates during this unit.",
+                "description": "Requires session calibration. Visual prototype only; no gaze data is saved.",
+                "type": "boolean",
+                "default": false
+              },
+              "gazecalibrationsession": {
+                "title": "Gaze calibration unit.",
+                "description": "Calibrate the webcam tracker before units with gazeTracking enabled. Cannot coexist with another session selector.",
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              },
               "unitname": {
                 "title": "Unit name for tracking.",
                 "description": "Tracking/display name for this unit.",
@@ -5762,7 +5833,52 @@
                 "additionalProperties": false
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "gazecalibrationsession"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "learningsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "assessmentsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "sparcsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "videosession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "autotutorsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "adaptive"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
           }
         },
         "deliverySettings": {

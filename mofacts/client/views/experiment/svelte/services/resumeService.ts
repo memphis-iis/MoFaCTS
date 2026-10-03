@@ -7,6 +7,7 @@
 
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
+import { restoreAdaptiveUnitSequence } from '../../../../../common/adaptiveUnitSequence';
 import '../../../../../common/Collections';
 import { createExperimentState, getExperimentState } from './experimentState';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
@@ -880,6 +881,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     clientConsole(2, '[Resume Service] Restored currentUnitNumber:', Session.get('currentUnitNumber'));
 
     resolvedTdfFile = curTdf?.content ?? null;
+    restoreAdaptiveUnitSequence(resolvedTdfFile, curExperimentState, Session.get('currentTdfId'));
     if (resolvedTdfFile) {
       if (curTdf) {
         curTdf.content = resolvedTdfFile;

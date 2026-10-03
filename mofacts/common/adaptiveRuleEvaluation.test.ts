@@ -7,6 +7,13 @@ import {
 import { compileAdaptiveRule } from '../../learning-components/content/adaptiveRuleCompilation';
 
 describe('adaptive rule evaluation', function() {
+  it('accepts Boolean literals in any case without permitting other identifiers', function() {
+    for (const literal of ['TRUE', 'True', 'true']) {
+      expect(evaluateAdaptiveRule(`IF ${literal} AND NOT FaLsE THEN C3S0`, {}).conditionResult).to.equal(true);
+    }
+    expect(evaluateAdaptiveRule('IF FALSE THEN C3S0', {}).conditionResult).to.equal(false);
+    expect(() => compileAdaptiveRule('IF TRUEish THEN C3S0')).to.throw('is not allowed');
+  });
   it('evaluates adaptive conditions and schedules component-owned question actions', function() {
     const result = evaluateAdaptiveRule(
       'IF C2S0 AND true THEN AT 12 CHECKPOINT (C3S1,C4S2)',

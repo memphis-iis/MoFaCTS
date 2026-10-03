@@ -63,6 +63,7 @@ export function hasLaunchReadyTutorUnits(tdfContent: any): boolean {
       return false;
     }
     return Boolean(
+      unit.gazecalibrationsession ||
       unit.assessmentsession ||
       unit.learningsession ||
       unit.sparcsession ||

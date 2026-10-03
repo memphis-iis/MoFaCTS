@@ -175,6 +175,11 @@ function createAutoTutorSessionSchema(): Record<string, unknown> {
 
 function createUnitSchema(title = 'Unit'): Record<string, unknown> {
   const schema = createClosedObjectSchema(title, UNIT_FIELD_REGISTRY);
+  schema.allOf = [{
+    if: { required: ['gazecalibrationsession'] },
+    then: { not: { anyOf: ['learningsession', 'assessmentsession', 'sparcsession', 'videosession', 'autotutorsession', 'adaptive']
+      .map(field => ({ required: [field] })) } },
+  }];
   (schema.properties as Record<string, unknown>).deliverySettings = createUnitDeliverySettingsSchema();
   (schema.properties as Record<string, unknown>).learningsession = createLearningSessionSchema();
   (schema.properties as Record<string, unknown>).sparcsession = createSparcSessionSchema();

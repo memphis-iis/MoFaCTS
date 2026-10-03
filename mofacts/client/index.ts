@@ -1000,6 +1000,7 @@ Template.registerHelper('and',(a: unknown, b: unknown)=>{
 Template.registerHelper('or',(a: unknown, b: unknown)=>{
   return a || b;
 });
+Template.registerHelper('equals', (a: unknown, b: unknown) => a === b);
 
 // Global app loading state for elegant transitions (dashboard → first trial)
 Template.registerHelper('appLoading', function() {

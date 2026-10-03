@@ -3,6 +3,7 @@ import { createUnitEngine, createUnitEngineForUnit, resolveUnitEngineTypeForUnit
 
 describe('unit engine creation contracts', function() {
   it('derives unit engine types from runnable unit shape in one shared boundary', function() {
+    expect(resolveUnitEngineTypeForUnit({ gazecalibrationsession: {} }, 'unit-engine-contract-test')).to.equal('gaze-calibration');
     expect(resolveUnitEngineTypeForUnit({ assessmentsession: {} }, 'unit-engine-contract-test')).to.equal('schedule');
     expect(resolveUnitEngineTypeForUnit({ videosession: {} }, 'unit-engine-contract-test')).to.equal('video');
     expect(resolveUnitEngineTypeForUnit({ learningsession: {} }, 'unit-engine-contract-test')).to.equal('model');

@@ -4,6 +4,7 @@
    * Route-mounted learner runtime shell that orchestrates session surfaces and the XState machine.
    */
   import { onMount, onDestroy, tick } from 'svelte';
+  import { setGazePhase } from '../services/gazeTracking';
   import {
     cleanupAudioRecorder,
     startRecording as startSrRecording,
@@ -429,6 +430,7 @@
     isQuestionState,
     isStudyState,
   });
+  $: setGazePhase(baseTrialSubsetKind);
   $: sparcSessionOwnsCurrentResponse = sessionContentSurface.showSparcSession && baseTrialSubsetKind === 'question';
   let studyInteractionText = '';
   $: if (!isStudyState && studyInteractionText) {

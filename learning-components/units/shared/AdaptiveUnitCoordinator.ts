@@ -113,6 +113,7 @@ export class AdaptiveUnitCoordinator {
     const adaptiveOutcomes = await this.getAdaptiveOutcomes();
     let countCompletion = currentUnit.countcompletion;
     for (const adaptiveUnitIndex of Object.keys(adaptive)) {
+      this.schedule.length = 0;
       const adaptiveEntry = String(adaptive[adaptiveUnitIndex]);
       const newUnitIndex = Number(adaptiveEntry.split(',')[0]);
       const targetUnitIndex = newUnitIndex - 1;
@@ -139,7 +140,7 @@ export class AdaptiveUnitCoordinator {
           throw new Error(`Adaptive template index ${templateIndex} not found for adaptive target ${adaptiveEntry}.`);
         }
         tutor.unit.splice(targetUnitIndex, 0, this.buildUnit(
-          template,
+          structuredClone(template),
           adaptiveQuestionTimes,
           adaptiveQuestions,
           adaptiveCheckpoints,

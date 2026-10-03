@@ -19,6 +19,7 @@ export default [
       'mofacts/packages/ddp-server/**',
       'mofacts/public/build-assets/**',
       'mofacts/public/build-chunks/**',
+      'mofacts/public/webgazer/**',
       'mofacts/private/build-assets/**',
       'mofacts/private/build-chunks/**',
       'deploy/local-data/**',

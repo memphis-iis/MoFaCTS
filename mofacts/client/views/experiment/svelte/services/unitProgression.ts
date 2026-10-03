@@ -20,6 +20,8 @@ import {
 } from './sessionSurfaceMode';
 import '../../../../../common/Collections';
 import type { ExperimentState } from '../../../../../common/types/experiment';
+import { captureAdaptiveUnitSequence } from '../../../../../common/adaptiveUnitSequence';
+import { restartContentSurface } from './contentSurfaceInstance';
 import type { UnitCompletionEngine } from '../../../../../common/types/svelteServices';
 import { COMPLETED_LESSON_REDIRECT } from '../../../../lib/cardEntryIntent';
 import { getCourseAssignmentLaunchContext } from '../../../../lib/courseAssignmentLaunchContext';
@@ -203,7 +205,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
     }
 
-    leaveTarget = resolveSessionSurfaceUnitEntryRoute(resolveSessionContentSurface(resolveSessionSurfaceState({
+    leaveTarget = curTdfUnit?.gazecalibrationsession ? '/content' : resolveSessionSurfaceUnitEntryRoute(resolveSessionContentSurface(resolveSessionSurfaceState({
       currentTdfUnit: curTdfUnit,
     })));
   } else {
@@ -239,6 +241,9 @@ export async function unitIsFinished(_reason: string): Promise<void> {
     mappingSignature: Session.get('mappingSignature'),
     conditionTdfId: curExperimentState.conditionTdfId,
     schedule: null, // Reset schedule for next unit
+    ...(adaptive ? {
+      adaptiveUnitSequence: captureAdaptiveUnitSequence(Session.get('currentTdfId'), curTdf.tdfs.tutor.unit),
+    } : {}),
   };
 
   if (resetStudentPerformance) {
@@ -258,6 +263,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
   await createExperimentState(newExperimentState);
   const { leavePage } = await import('./navigationCleanup');
   await leavePage(leaveTarget);
+  if (leaveTarget === '/content') restartContentSurface();
 }
 
 export async function checkUnitCompletion(engine: UnitCompletionEngine | null | undefined): Promise<boolean> {

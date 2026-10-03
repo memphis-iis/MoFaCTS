@@ -550,11 +550,6 @@ function loadUploadQuotaStatus(instance: ContentUploadInstance): void {
     });
 }
 
-// Global helper for equality comparison in Blaze templates
-Template.registerHelper('equals', function(a: any, b: any) {
-  return a === b;
-});
-
 Template.contentUpload.helpers({
   TdfFiles: function(this: any) {
     return TdfsCollection.find();

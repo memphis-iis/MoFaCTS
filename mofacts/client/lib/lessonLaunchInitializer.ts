@@ -1,4 +1,5 @@
 import { Session } from 'meteor/session';
+import { restoreAdaptiveUnitSequence } from '../../common/adaptiveUnitSequence';
 import { getExperimentState } from '../views/experiment/svelte/services/experimentState';
 import { ensureCurrentStimuliSetId } from '../views/experiment/svelte/services/mediaResolver';
 import { setIgnoreOutOfGrammarResponses } from '../views/experiment/svelte/services/audioRuntimeState';
@@ -88,12 +89,20 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   setIgnoreOutOfGrammarResponses(ignoreOutOfGrammarResponses);
   Session.set('speechOutOfGrammarFeedback', speechOutOfGrammarFeedback);
 
-  const unitCount = Array.isArray(content?.tdfs?.tutor?.unit) ? content.tdfs.tutor.unit.length : 0;
   setLaunchLoadingMessage?.(translatePlatformString(getActiveUiLocale(), 'dashboard.restoringProgress'));
   markLaunchLoadingTiming?.('getExperimentState:start', { source });
   const persistedExperimentState = await getExperimentState();
+  restoreAdaptiveUnitSequence(content, persistedExperimentState, currentTdfId);
+  Session.set('currentTdfFile', content);
+  Session.set('currentTdfDoc', tdfDoc);
+  const unitCount = Array.isArray(content?.tdfs?.tutor?.unit) ? content.tdfs.tutor.unit.length : 0;
   markLaunchLoadingTiming?.('getExperimentState:complete', { source });
   const launchProgress = resolveCardLaunchProgress(persistedExperimentState, unitCount);
+  const resumedUnitNumber = launchProgress.persistedUnitNumber;
+  if (!launchProgress.moduleCompleted && resumedUnitNumber !== null && content?.tdfs?.tutor?.unit?.[resumedUnitNumber]?.gazecalibrationsession) {
+    Session.set('currentUnitNumber', resumedUnitNumber);
+    Session.set('currentTdfUnit', content.tdfs.tutor.unit[resumedUnitNumber]);
+  }
   // Initialization belongs to preparation, not navigation: cold routes need the
   // same instruction identity as dashboard entry even when navigation is deferred.
   const entryRoute = launchProgress.moduleCompleted ? null : initializeLessonLaunchEntry({

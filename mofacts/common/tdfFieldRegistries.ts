@@ -358,6 +358,14 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
 
 
 export const UNIT_FIELD_REGISTRY: SectionFieldRegistry = {
+  gazeTracking: simpleField({ type: 'boolean', default: false }, {
+    brief: 'Show webcam gaze estimates during this unit.',
+    verbose: 'Requires session calibration. Visual prototype only; no gaze data is saved.',
+  }),
+  gazecalibrationsession: simpleField({ type: 'object', properties: {}, additionalProperties: false }, {
+    brief: 'Gaze calibration unit.',
+    verbose: 'Calibrate the webcam tracker before units with gazeTracking enabled. Cannot coexist with another session selector.',
+  }),
   unitname: simpleField(stringField('', 6), {
     brief: 'Unit name for tracking.',
     verbose: 'Tracking/display name for this unit.'
