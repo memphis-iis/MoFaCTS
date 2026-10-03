@@ -321,19 +321,15 @@ function parseLearnerEvidence(
     }
     let dialogueHistoryIndex: number | null;
     let sourceText: string;
+    let referencesLearner = true;
     if (source === 'dialogueHistory') {
       if (!Number.isInteger(citation.dialogueHistoryIndex) || Number(citation.dialogueHistoryIndex) < 0) {
         throw citationError(`${citationLabel} dialogueHistoryIndex must be a nonnegative integer for dialogueHistory evidence`);
       }
       dialogueHistoryIndex = Number(citation.dialogueHistoryIndex);
       const dialogueEntry = dialogueHistory[dialogueHistoryIndex];
-      if (!dialogueEntry) {
-        throw citationError(`${citationLabel} dialogueHistoryIndex ${dialogueHistoryIndex} is out of range`);
-      }
-      if (dialogueEntry.role !== 'student') {
-        throw citationError(`${citationLabel} must reference a student dialogueHistory entry`);
-      }
-      sourceText = nonBlankString(dialogueEntry.text);
+      referencesLearner = dialogueEntry?.role === 'student';
+      sourceText = nonBlankString(dialogueEntry?.text);
     } else {
       if (citation.dialogueHistoryIndex !== null) {
         throw citationError(`${citationLabel} dialogueHistoryIndex must be null for learnerText evidence`);
@@ -341,12 +337,9 @@ function parseLearnerEvidence(
       dialogueHistoryIndex = null;
       sourceText = learnerText;
     }
-    if (!sourceText.trim()) {
-      throw citationError(`${citationLabel} learner-authored source must not be empty`);
-    }
-    if (!sourceText.includes(quote)) {
-      // A quotation is diagnostic evidence. Its spelling does not change the
-      // provider's score, and must not prevent an otherwise valid learner turn.
+    if (!referencesLearner || !sourceText.includes(quote)) {
+      // Citation alignment is diagnostic, not a gate on an otherwise valid score.
+      // Preserve the provider's reference: do not repair it or mark it verified.
       onMismatch(describeSparcCitation(citation, dialogueHistory, learnerText));
     }
     const identity = `${source}:${dialogueHistoryIndex ?? 'latest'}:${quote}`;
@@ -636,7 +629,7 @@ export function createSparcDialogueOpenRouterProvider(
     const evidenceEnvelope = parseEvidenceEnvelope(result.parsedContent, dialogueHistory, learnerText, (diagnostic) => {
       mismatchCount += 1;
       if (mismatchCount <= 3) {
-        clientConsole(1, '[SPARC][Dialogue] citation quotation mismatch', JSON.stringify(diagnostic));
+        clientConsole(1, '[SPARC][Dialogue] citation mismatch', JSON.stringify(diagnostic));
       }
     });
     options.onLearnerResponseScoringTrace?.({

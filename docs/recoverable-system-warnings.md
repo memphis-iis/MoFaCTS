@@ -2,7 +2,7 @@
 
 Admin Tests (`/admin/tests`) includes an administrator-only **Recoverable system warnings** log. It loads the newest 50 events, with Refresh and Older warnings controls. The server checks the administrator role on every read; there is no reactive publication or learner-facing warning display.
 
-The first event is `autotutor.citationMismatch`: a nonempty AI quotation does not exactly match the learner-authored source it references. AutoTutor uses the otherwise valid score unchanged and continues the normal tutor-response flow. The original provider quotation is not corrected or treated as verified. Prompt instructions still request exact evidence. Invalid sources (including tutor-authored sources), invalid scores, and malformed responses retain their existing validation.
+The event `autotutor.citationMismatch` covers a nonempty AI quotation whose reference points to a tutor or missing history entry, or whose text does not match the referenced learner statement. AutoTutor uses the otherwise valid score unchanged and continues the normal tutor-response flow. The original provider quotation and reference are not corrected or treated as verified. Prompt instructions still request exact learner-authored evidence. Citation structure (recognized source type, nonnegative integer history index or null latest-answer index, nonempty quote), evaluation direction, and score validation remain enforced.
 
 ## Ownership and data
 

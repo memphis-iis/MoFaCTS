@@ -641,11 +641,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
     }]);
   });
 
-  it('requires directional citations to identify a valid learner-authored source', async function() {
+  it('requires citations to agree with the evaluation direction', async function() {
     const invalidCitations = [{
-      learnerEvidence: dialogueLearnerEvidence(1, 'Tutor claim.'),
-      message: 'must reference a student dialogueHistory entry',
-    }, {
       learnerEvidence: [],
       message: 'must cite at least one learner-authored phrase',
     }, {
@@ -695,15 +692,49 @@ describe('SPARC dialogue OpenRouter provider', function() {
       }
       expect(error).to.be.instanceOf(Error);
       expect((error as Error).message).to.contain(invalid.message);
-      if (invalid.message === 'must reference a student dialogueHistory entry') {
-        const diagnostic = JSON.parse((error as Error).message.split('; citation=')[1]!);
-        expect(diagnostic.index).to.equal(1);
-        expect(diagnostic.referencedRole).to.equal('tutor');
-        expect(diagnostic.matchingTutorIndices).to.deep.equal([1]);
-        expect(diagnostic.matchingStudentCount).to.equal(0);
-        expect((error as Error).message).not.to.contain('Tutor claim.');
-        expect((error as Error).message).not.to.contain('Learner evidence.');
-      }
+    }
+  });
+
+  it('keeps scoring with unchanged citations when a reference points to a tutor or missing entry', async function() {
+    for (const citation of [
+      ...dialogueLearnerEvidence(7, 'Latest learner answer.'),
+      ...dialogueLearnerEvidence(7, 'Tutor claim.'),
+      ...dialogueLearnerEvidence(8, 'Latest learner answer.'),
+    ]) {
+      const warnings: unknown[] = [];
+      const traces: SparcDialogueLearnerResponseScoringTraceEvent[] = [];
+      const provider = createSparcDialogueOpenRouterProvider({
+        tdfId: 'tdf-demo',
+        reportWarning: (warning) => { warnings.push(warning); },
+        onLearnerResponseScoringTrace: (trace) => { traces.push(trace); },
+        async callResolvedOpenRouterJson() {
+          return { parsedContent: {
+            learningTargetEvaluations: [{
+              clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
+              learnerEvidence: [citation],
+            }],
+            diagnosticMisconceptionEvaluations: [{
+              id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
+            }],
+            learnerContribution: { type: 'answer' },
+          } };
+        },
+      });
+      const result = await provider.scoreLearnerResponse({
+        display: dialogueDisplay(), learnerText: 'Latest learner answer.',
+        ...scorerContext(undefined, Array.from({ length: 8 }, (_, index) => ({
+          speaker: index % 2 === 0 ? 'learner' as const : 'tutor' as const,
+          text: index % 2 === 0 ? 'Earlier learner answer.' : 'Tutor claim.',
+        }))),
+      } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+      expect(result.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
+      expect(warnings).to.deep.equal([{
+        code: 'autotutor.citationMismatch', tdfId: 'tdf-demo', mismatchCount: 1,
+      }]);
+      const parsed = traces.find((trace) => trace.stage === 'evidence-parsed');
+      expect(parsed?.stage === 'evidence-parsed'
+        && parsed.evidenceEnvelope.learningTargetEvaluations[0]?.learnerEvidence).to.deep.equal([citation]);
+      expect(traces.at(-1)?.stage).to.equal('evaluation-completed');
     }
   });
 
