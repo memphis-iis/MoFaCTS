@@ -14,7 +14,7 @@ import type {
 
 export const SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES = 2 * 1024;
 export const SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS = 2 * 1024;
-export const SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS = 512;
+export const SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS = 2096;
 
 export type SparcDialogueTurnNodeOptions = {
   readonly boxId?: string;

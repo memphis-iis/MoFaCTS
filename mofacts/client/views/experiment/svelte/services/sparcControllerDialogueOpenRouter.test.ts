@@ -904,7 +904,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.messages[0]?.content).to.contain('Follow the selected runtime move policy.');
         expect(params.messages[0]?.content).to.contain('Active-target isolation:');
         expect(params.messages[0]?.content).to.contain(
-          'do not preview or address a requirement outside the selected target',
+          'Do not preview or address a requirement outside the selected target',
         );
         expect(params.messages[0]?.content).to.contain('Acknowledgement boundary for every move');
         expect(params.messages[0]?.content).to.contain('Usually begin with one brief, natural response');
@@ -927,7 +927,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
           'Generate only tutorMessage. The application owns the selected target and dialogue move metadata.',
         );
         expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
-        expect(userMessage.content).to.contain('Problem statement (task context only; its other requirements are outside the active target):');
+        expect(userMessage.content).to.contain('Opening scenario (context only; choose the next question to elicit the selected expectation or address the selected misconception):');
         expect(userMessage.content).to.contain(problemStatement);
         expect(userMessage.content).to.contain('Latest student answer (the primary source for any acknowledgement):');
         expect(userMessage.content.indexOf('Latest student answer')).to.be.greaterThan(
@@ -1185,7 +1185,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
 
       if (move === 'pump') {
         expect(systemPrompt).to.contain('Explicitly identify the active concept before the open invitation');
-        expect(userPrompt).to.contain('Problem statement (task context only; its other requirements are outside the active target):');
+        expect(userPrompt).to.contain('Opening scenario (context only; choose the next question to elicit the selected expectation or address the selected misconception):');
         expect(userPrompt).to.contain(problemStatement);
         expect(userPrompt).to.contain('App-selected pedagogical state:');
         expect(userPrompt).to.not.contain('Current scored planner state:');
