@@ -83,9 +83,9 @@ Template.signUp.events({
     routeToSignin();
   },
 
-  'click #signUpButton': async function(event: Event) {
-    Meteor.logout();
+  'submit .auth-form': async function(event: Event) {
     event.preventDefault();
+    Meteor.logout();
 
     const formUsername = normalizeEmailForAuth($('#signUpUsername').val());
     const formPassword1 = legacyTrim(String($('#password1').val() || ''));
