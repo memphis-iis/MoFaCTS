@@ -19,7 +19,7 @@ import { ExperimentStateStore } from './lib/state/experimentStateStore';
 import {instructContinue} from './views/experiment/instructions';
 import { shouldSuppressAuthenticatedChrome } from './lib/authenticatedChromePolicy';
 import {routeToSignin} from './lib/router';
-import { resolveNormalLoginDestination } from './lib/normalLoginDestination';
+import { clearExperimentSignInContext } from './lib/signInRouting';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { Tracker } from 'meteor/tracker';
 import {
@@ -48,7 +48,6 @@ import {
   startSessionCheckInterval,
   stopSessionCheckInterval,
 } from './lib/userSessionHelpers';
-import {Cookie} from './lib/cookies';
 import {currentUserHasRole, hasRoleFromAuthFlags} from './lib/roleUtils';
 import { managementRoutePresentation } from './lib/adminUi/routePresentationState';
 import './views/shared/adminUi/adminUi';
@@ -57,7 +56,7 @@ import { hideBootstrapModal } from './lib/bootstrapModal';
 import './index.html';
 import { getPracticeLaunchMode } from './lib/practiceLaunchMode';
 import { isLessonRoutePath } from './lib/lessonRoute';
-import { clearStoredPublicDemoSession, readStoredPublicDemoSession } from './lib/publicDemoSession';
+import { readStoredPublicDemoSession } from './lib/publicDemoSession';
 
 // =============================================================================
 // Blaze Template Registration
@@ -514,11 +513,7 @@ function handleUnexpectedLogout(currentPath: string) {
 
   if (readStoredPublicDemoSession()) {
     clientConsole(1, '[AUTH] Public demo session ended, returning to overview from', currentPath);
-    Session.set('loginMode', 'normal');
-    Cookie.set('isExperiment', '0', 1);
-    Cookie.set('experimentTarget', '', 1);
-    Cookie.set('experimentXCond', '', 1);
-    clearStoredPublicDemoSession();
+    clearExperimentSignInContext();
     Session.set('curModule', 'signinoauth');
     Session.set('appLoading', false);
     sessionCleanUp();
@@ -530,24 +525,16 @@ function handleUnexpectedLogout(currentPath: string) {
     return;
   }
 
-  const expCookie = parseInt(Cookie.get('isExperiment') || '0', 10);
-  const isExperiment = Session.get('loginMode') === 'experiment' || expCookie === 1;
-  if (!isExperiment) {
-    Session.set('loginMode', 'normal');
-    Cookie.set('isExperiment', '0', 1);
-    Cookie.set('experimentTarget', '', 1);
-    Cookie.set('experimentXCond', '', 1);
-  }
-
   clientConsole(1, '[AUTH] Session ended, redirecting to sign-in from', currentPath);
   Session.set('curModule', 'signinoauth');
   Session.set('currentTemplate', 'signIn');
   Session.set('appLoading', false);
   sessionCleanUp();
-  routeToSignin(isExperiment ? undefined : resolveNormalLoginDestination(currentPath));
+  routeToSignin(undefined, lastKnownUserLoginMode ?? Session.get('loginMode'));
 }
 
 let lastKnownUserId: string | null = null;
+let lastKnownUserLoginMode: string | null = null;
 let pendingUnexpectedLogoutTimer: ReturnType<typeof setTimeout> | null = null;
 let authObserverStartedAt = Date.now();
 
@@ -626,6 +613,14 @@ Meteor.startup(function() {
   Tracker.autorun(() => {
     const currentUserId = Meteor.userId();
     const currentPath = FlowRouter.current()?.path || window.location.pathname || '';
+    const currentUser = Meteor.user() as (Meteor.User & { loginParams?: { loginMode?: string } }) | null;
+    // Keep the authenticated mode through user-document removal so shared
+    // lesson routes do not mistake an ordinary session loss for an experiment.
+    if (currentUserId && currentUser) {
+      lastKnownUserLoginMode = currentUser.loginParams?.loginMode || null;
+    } else if (currentUserId && currentUserId !== lastKnownUserId) {
+      lastKnownUserLoginMode = null;
+    }
     const connected = Meteor.status?.().connected ?? true;
     const authReady = Session.get('authReady') === true;
     const observerGraceElapsed = Date.now() - authObserverStartedAt > 5000;

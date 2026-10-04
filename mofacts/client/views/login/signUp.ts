@@ -80,7 +80,7 @@ Template.signUp.events({
   'click #backkTosignInButton': function(event: Event) {
     Meteor.logout();
     event.preventDefault();
-    routeToSignin();
+    routeToSignin('/home');
   },
 
   'submit .auth-form': async function(event: Event) {

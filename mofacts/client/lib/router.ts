@@ -16,7 +16,6 @@ import {
   setActiveTdfContext,
   setExperimentParticipantContext,
 } from './idContext';
-import { legacyInt, legacyTrim } from '../../common/underscoreCompat';
 import { getErrorMessage } from './errorUtils';
 import { CARD_ENTRY_INTENT, setCardEntryIntent } from './cardEntryIntent';
 import { isLaunchLoadingActive } from './launchLoading';
@@ -33,9 +32,9 @@ import { getActiveUiLocale } from './interfaceLocaleState';
 import { hasPublicCreatorDisplayName } from './contentCreatorIdentity';
 import {
   LEARNING_ANALYTICS_DESTINATION,
-  resolveNormalLoginDestination,
   type NormalLoginReturnDestination,
 } from './normalLoginDestination';
+import { clearExperimentSignInContext, getSignInDestination } from './signInRouting';
 import {
   getCourseAssignmentLaunchContext,
   setCourseAssignmentLaunchContext,
@@ -44,7 +43,7 @@ import { getPracticeLaunchMode, setPracticeLaunchMode } from './practiceLaunchMo
 import { resolveLessonRouteRequest, type LessonRouteRequest } from './lessonRoute';
 import { publicExperienceText } from '../views/publicExperience/publicExperienceI18n';
 import { isPublicDemoKind } from '../../common/publicDemoContract';
-import { clearStoredPublicDemoSession, isPublicDemoAccount, publicDemoOverviewPath } from './publicDemoSession';
+import { isPublicDemoAccount, publicDemoOverviewPath } from './publicDemoSession';
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra');
 const Tdfs: any = (globalThis as any).Tdfs;
 const COURSE_ASSIGNMENT_DIRECT_LAUNCH_DENIED_REASON = 'Launch this TDF through its active course assignment';
@@ -103,8 +102,8 @@ a cookie scheme to insure experimental participants stay in experiment mode:
 
     * When a user first hits the URL /experiment/{target}/{x} we write cookies
       (with expiration set so that they outlast the current browser session)
-    * Whenever routeToSignin is called, we check the cookies. If they are set
-      then we reconstruct the experiment session variables as above.
+    * Experiment entry and shared lesson continuation may restore these cookies.
+      An ordinary destination instead clears experiment sign-in context.
     * If a user visits the root ("/") route, we reset all cookies back in order
       to allow "normal" login again.
 */
@@ -200,7 +199,7 @@ function routeDeniedUserToEntryPoint(): void {
     return;
   }
 
-  routeToSignin();
+  routeToSignin(currentRoutePath());
 }
 
 function normalizeRouteParam(value: unknown): string {
@@ -406,11 +405,8 @@ function renderHomeForUser(controller: any, user: any) {
 
   if (loginMode === 'experiment') {
     clientConsole(2, '[ROUTER] Experiment mode detected, redirecting to signIn');
-    Cookie.set('isExperiment', '0', 1); // 1 day
-    Cookie.set('experimentTarget', '', 1);
-    Cookie.set('experimentXCond', '', 1);
     Session.set('curModule', 'signinoauth');
-    FlowRouter.go('/auth/login');
+    routeToSignin('/home');
     return;
   }
 
@@ -447,42 +443,31 @@ function handleIndexRoute(controller: any, user: any) {
 
   // If no user is logged in and they are navigating to "/" then we clear the
   // (possible) cookie keeping them in experiment mode.
-  Cookie.set('isExperiment', '0', 1); // 1 day
-  Cookie.set('experimentTarget', '', 1);
-  Cookie.set('experimentXCond', '', 1);
+  clearExperimentSignInContext();
   Session.set('curModule', 'signinoauth');
   renderLayout(controller, 'publicLanding');
 }
 
-function routeToSignin(returnTo?: NormalLoginReturnDestination) {
-  // If the isExperiment cookie is set we always for experiment mode. This
-  // handles an experimental participant refreshing the browser
-  const expCookie = legacyInt(legacyTrim(Cookie.get('isExperiment')));
-  if (expCookie) {
+function routeToSignin(returnTo?: NormalLoginReturnDestination, loginMode?: unknown) {
+  const destination = getSignInDestination(returnTo, loginMode);
+  if (destination.kind === 'experiment') {
     Session.set('loginMode', 'experiment');
-    Session.set('experimentTarget', Cookie.get('experimentTarget'));
-    Session.set('experimentXCond', Cookie.get('experimentXCond'));
-  }
-
-  const loginMode = Session.get('loginMode');
-
-  if (loginMode === 'experiment') {
+    setExperimentParticipantContext({ experimentTarget: destination.target }, 'router.signInContinuation');
+    Session.set('experimentXCond', destination.xcond);
     const routeParts = ['/experiment'];
-
-    const target = Session.get('experimentTarget');
+    const target = destination.target;
     if (target) {
       routeParts.push(target);
-      const xcond = Session.get('experimentXCond');
+      const xcond = destination.xcond;
       if (xcond) {
         routeParts.push(xcond);
       }
     }
 
     FlowRouter.go(routeParts.join('/'));
-  } else if (returnTo) {
-    FlowRouter.go('/auth/login', {}, { returnTo });
-  } else { // Normal login mode
-    FlowRouter.go('/auth/login');
+  } else {
+    clearExperimentSignInContext();
+    FlowRouter.go('/auth/login', {}, { returnTo: destination.returnTo });
   }
 }
 
@@ -675,8 +660,7 @@ function waitForAuthenticatedRoute(
       if (shouldWaitForAuthHydration()) return;
       pendingAuthRouteHandles[routeName]?.stop();
       delete pendingAuthRouteHandles[routeName];
-      const currentPath = (FlowRouter.current() as { path?: string } | undefined)?.path;
-      routeToSignin(signInReturnDestination ?? resolveNormalLoginDestination(currentPath));
+      routeToSignin(signInReturnDestination);
     }
   });
 }
@@ -747,6 +731,7 @@ async function renderSignInRoute(controller: any) {
     FlowRouter.go('/auth/logout');
     return;
   }
+  clearExperimentSignInContext();
   if (user && getUserLoginMode(user) !== 'experiment') {
     FlowRouter.go('/home');
     return;
@@ -813,11 +798,7 @@ FlowRouter.route('/auth/logout', {
       clientConsole(1, '[AUTH] Failed to record logout revocation event:', getErrorMessage(error));
     }
     await new Promise<void>((resolve) => Meteor.logout(() => resolve()));
-    Session.set('loginMode', 'normal');
-    Cookie.set('isExperiment', '0', 1);
-    Cookie.set('experimentTarget', '', 1);
-    Cookie.set('experimentXCond', '', 1);
-    clearStoredPublicDemoSession();
+    clearExperimentSignInContext();
     FlowRouter.go('/');
   }
 });
@@ -953,7 +934,7 @@ FlowRouter.route('/classes/:teacherId/:sectionId', {
 
     writePendingClassInvite({ teacherId, sectionId });
     if (!Meteor.userId() || !Meteor.user()) {
-      routeToSignin();
+      routeToSignin(currentRoutePath());
       return;
     }
 
