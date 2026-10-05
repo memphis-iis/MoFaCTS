@@ -767,3 +767,41 @@ test('reset expiration probes select only links older than the configured lifeti
   assert.equal(selectExpiredResetLink(links.slice(0, 1), now, 60 * 60 * 1000), null);
   assert.throws(() => selectExpiredResetLink(null, now, 60 * 60 * 1000));
 });
+
+test('public Caddy CSP restricts execution without blocking supported browser dependencies', () => {
+  const config = fs.readFileSync(new URL('../../../deploy/Caddyfile.self-hosted.example', import.meta.url), 'utf8');
+  const policy = config.match(/^\s*header \?Content-Security-Policy "([^"]+)"$/m)?.[1];
+  assert.ok(policy, 'Caddy must supply a deferred default CSP, preserving application-owned policies');
+  assert.doesNotMatch(config, /Content-Security-Policy-Report-Only/);
+  const directives = new Map(policy.split(';').map((part) => {
+    const [name, ...sources] = part.trim().split(/\s+/);
+    return [name, sources];
+  }));
+  for (const name of ['default-src', 'base-uri', 'form-action']) {
+    assert.deepEqual(directives.get(name), ["'self'"]);
+  }
+  for (const name of ['object-src', 'frame-ancestors']) {
+    assert.deepEqual(directives.get(name), ["'none'"]);
+  }
+  for (const sources of directives.values()) {
+    assert.ok(!sources.includes("'unsafe-eval'"));
+    assert.ok(!sources.some((source) => source.includes('*') || source.startsWith('http:') || source.startsWith('ws:')));
+  }
+  assert.ok(!directives.get('script-src').includes("'unsafe-inline'"));
+  assert.ok(!directives.get('style-src').includes("'unsafe-inline'"));
+  assert.deepEqual(directives.get('style-src-attr'), ["'unsafe-inline'"]);
+  assert.ok(directives.get('script-src').includes("'wasm-unsafe-eval'"), 'Anki import requires WebAssembly compilation');
+  for (const source of ['https://www.youtube.com/iframe_api', 'https://www.youtube.com/s/player/']) {
+    assert.ok(directives.get('script-src').includes(source));
+  }
+  for (const source of ['wss://mofacts.example.org', 'https://openrouter.ai/api/v1/', 'https://en.wikipedia.org/w/api.php', 'https://commons.wikimedia.org/w/api.php', 'https://upload.wikimedia.org', 'https://noembed.com/embed', 'https://cdn.plyr.io/3.8.4/plyr.svg']) {
+    assert.ok(directives.get('connect-src').includes(source), `Missing reviewed browser connection: ${source}`);
+  }
+  assert.ok(directives.get('img-src').includes('https://upload.wikimedia.org'));
+  assert.ok(directives.get('frame-src').includes('https://www.youtube-nocookie.com'));
+  assert.ok(!directives.get('frame-src').includes('https://www.youtube.com'));
+  for (const source of ['https://cloud.google.com', 'https://docs.cloud.google.com']) {
+    assert.ok(directives.get('media-src').includes(source));
+    assert.ok(!directives.get('script-src').includes(source));
+  }
+});
