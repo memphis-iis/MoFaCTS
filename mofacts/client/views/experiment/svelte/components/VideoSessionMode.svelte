@@ -14,6 +14,7 @@
   import { parseYouTubeVideoUrl } from '../../../../lib/youtubeUrl';
   import { insertCompressedHistory } from '../../../../lib/historyWire';
   import { ensureStylesheet } from '../../../../lib/cssAssetLoader';
+  import { createVideoParticipantControls } from '../services/videoParticipantControls';
 
   const dispatch = createEventDispatcher();
 
@@ -52,6 +53,8 @@
 
   /** @type {boolean} Whether to prevent seeking beyond the current checkpoint */
   export let preventScrubbing = false;
+  export let preventPause = false;
+  export let preventRewind = false;
 
   /** @type {boolean} Whether the parent state machine can accept a checkpoint now */
   export let canAcceptCheckpoint = false;
@@ -72,8 +75,8 @@
   let nextCheckpointIndex = 0;
   let atCheckpoint = false;
   let wasFullscreen = false;
-  let maxAllowedTime = 0;
-  let allowSeeking = false;
+  let participantControls;
+  let youtubePositionObserver = null;
   let loggingSeek = false;
   let seekStart;
   let lastVolume;
@@ -96,16 +99,31 @@
   }
   $: if (player && startBlocked) {
     player.muted = true;
-    if (!player.paused) {
-      player.pause();
-    }
+    participantControls?.pauseSystem();
+  }
+  $: if (player) {
+    startBlocked;
+    atCheckpoint;
+    updateParticipantPlayControls();
   }
 
   function destroyPlayer() {
+    if (youtubePositionObserver !== null) clearInterval(youtubePositionObserver);
+    youtubePositionObserver = null;
+    participantControls?.dispose();
     if (player && typeof player.destroy === 'function') {
       player.destroy();
     }
     player = null;
+    participantControls = null;
+    initializedVideoUrl = '';
+    nextCheckpointIndex = 0;
+    atCheckpoint = false;
+    wasFullscreen = false;
+    loggingSeek = false;
+    appliedResumeAnchorKey = '';
+    lastRejectedCheckpointKey = '';
+    machineResumeInProgress = false;
   }
 
   function initializePlayer() {
@@ -141,7 +159,10 @@
 
     // Build Plyr configuration
     const plyrConfig = {
-      controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+      controls: preventPause
+        ? ['play-large', 'progress', 'current-time', 'mute', 'volume', 'fullscreen']
+        : ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+      clickToPlay: !preventPause,
       autopause: false,
       hideControls: false,
     };
@@ -187,6 +208,17 @@
     }
 
     initializedVideoUrl = normalizedVideoUrl;
+    const controlledPlayer = player;
+    participantControls = createVideoParticipantControls({
+      getPlayer: () => controlledPlayer,
+      getPolicy: () => ({ preventPause, preventRewind, preventScrubbing }),
+      isPlayBlocked: () => startBlocked || (atCheckpoint && !machineResumeInProgress),
+      onSeekBlocked: () => logVideoAction('seek_blocked'),
+      onPlayRejected: (error) => {
+        clientConsole(1, '[VideoSessionMode] Restricted playback resume failed:', error?.message || error);
+        updateParticipantPlayControls();
+      },
+    });
 
     if (!isYouTube) {
       const inferredType = inferVideoMimeType(normalizedVideoUrl) || 'video/mp4';
@@ -205,20 +237,15 @@
       });
     }
 
-    // Event listeners
-    player.on('play', () => {
-      const activeCheckpointIndex = Math.max(0, nextCheckpointIndex - 1);
-      const activeCheckpointTime = Number(questionTimes?.[activeCheckpointIndex]);
-      const isAtTriggeredCheckpointTime = Number.isFinite(activeCheckpointTime) &&
-        player.currentTime >= activeCheckpointTime - 0.5;
+    // Ignore late provider events from a player destroyed during a unit change.
+    const onPlayer = (event, listener) => controlledPlayer.on(event, (...args) => {
+      if (player === controlledPlayer) listener(...args);
+    });
 
-      if (atCheckpoint && !machineResumeInProgress && isAtTriggeredCheckpointTime) {
-        clientConsole(1, '[VideoSessionMode] Blocking manual playback while checkpoint question is active', {
-          currentTime: player.currentTime,
-          nextCheckpointIndex,
-          activeCheckpointTime,
-        });
-        player.pause();
+    // Event listeners
+    onPlayer('play', () => {
+      if (!participantControls.handlePlay()) {
+        updateParticipantPlayControls();
         return;
       }
       isPlaying = true;
@@ -231,22 +258,25 @@
       }
       logVideoAction('play');
       dispatch('play', { time: player.currentTime });
+      updateParticipantPlayControls();
     });
 
-    player.on('pause', () => {
+    onPlayer('pause', () => {
       isPlaying = false;
       logVideoAction('pause');
       dispatch('pause', { time: player.currentTime });
+      participantControls.handlePause();
+      updateParticipantPlayControls();
     });
 
-    player.on('timeupdate', handleTimeUpdate);
+    onPlayer('timeupdate', () => handleTimeUpdate());
 
-    player.on('loadedmetadata', () => {
+    onPlayer('loadedmetadata', () => {
       duration = player.duration;
       dispatch('loadedmetadata', { duration: player.duration });
     });
 
-    player.on('ready', () => {
+    onPlayer('ready', () => {
       clientConsole(1, '[VideoSessionMode] Player ready', {
         mode: isYouTube ? 'youtube' : 'html5',
         src: initializedVideoUrl || normalizedVideoUrl,
@@ -265,42 +295,55 @@
         normalizedResumeIndex >= 0
       ) {
         nextCheckpointIndex = Math.floor(normalizedResumeIndex);
-        maxAllowedTime = normalizedResumeTime;
         setCurrentTime(normalizedResumeTime);
         appliedResumeAnchorKey = resumeAnchorKey;
       }
       if (preventScrubbing) {
         disableSeekUi();
       }
+      if (startBlocked) participantControls.pauseSystem();
+      updateParticipantPlayControls();
+      if (isYouTube && youtubePositionObserver === null) {
+        // YouTube's API can move while paused without emitting seeked/timeupdate.
+        // Observe its reported position explicitly, including authorized seeks.
+        youtubePositionObserver = setInterval(() => {
+          if (player === controlledPlayer && (controlledPlayer.seeking || participantControls.hasPendingSeek())) {
+            handleTimeUpdate('provider-observation');
+          }
+        }, 100);
+      }
       dispatch('ready', { duration: player.duration });
     });
 
-    player.on('ended', () => {
+    onPlayer('ended', () => {
+      participantControls.handleEnded();
       logVideoAction('end');
       dispatch('ended');
     });
 
-    player.on('seeking', () => {
+    onPlayer('seeking', () => {
       markSeekStart();
-      clampSeekIfNeeded();
+      participantControls.checkPosition('seeking');
       dispatch('seeking', { time: player.currentTime });
     });
 
-    player.on('seeked', () => {
-      clampSeekIfNeeded();
-      logSeekAction();
+    onPlayer('seeked', () => {
+      const systemSeek = participantControls.hasPendingSeek();
+      participantControls.checkPosition('seeked');
+      if (!systemSeek) logSeekAction();
+      else loggingSeek = false;
       dispatch('seeked', { time: player.currentTime });
     });
 
-    player.on('volumechange', () => {
+    onPlayer('volumechange', () => {
       logVideoAction('volumechange');
     });
 
-    player.on('ratechange', () => {
+    onPlayer('ratechange', () => {
       logVideoAction('ratechange');
     });
 
-    player.on('error', (error) => {
+    onPlayer('error', (error) => {
       const mediaErrorCode = videoElement?.error?.code ?? null;
       clientConsole(1, '[VideoSessionMode] Player error event', {
         error: error?.message || error || null,
@@ -324,12 +367,14 @@
   onMount(() => {
     mounted = true;
     ensureStylesheet('/vendor/plyr/3.8.4/plyr.css');
+    containerElement.addEventListener('keydown', preventPauseShortcut, true);
     // Use tick() to ensure DOM is fully rendered before first init
     tick().then(() => initializePlayer());
   });
 
   onDestroy(() => {
     mounted = false;
+    containerElement?.removeEventListener('keydown', preventPauseShortcut, true);
     destroyPlayer();
   });
 
@@ -341,7 +386,7 @@
   /**
    * Handle timeupdate - check for question checkpoints
    */
-  function handleTimeUpdate() {
+  function handleTimeUpdate(positionEvent = 'timeupdate') {
     if (!player) return;
 
     currentTime = player.currentTime;
@@ -350,11 +395,7 @@
       // Metadata is not ready yet (common during initial player bootstrapping).
       return;
     }
-    if (clampSeekIfNeeded()) return;
-
-    if (!preventScrubbing || currentTime <= maxAllowedTime + 1) {
-      maxAllowedTime = Math.max(maxAllowedTime, currentTime);
-    }
+    if (participantControls.checkPosition(positionEvent)) return;
 
     // Check if we've reached the next checkpoint
     if (questionTimes && questionTimes.length > 0 && nextCheckpointIndex < questionTimes.length && !atCheckpoint) {
@@ -403,8 +444,8 @@
         // Mark that we're at a checkpoint (prevents re-triggering)
         atCheckpoint = true;
 
-        // Pause video
-        player.pause();
+        // This is a system pause, never a participant pause.
+        participantControls.pauseSystem();
 
         // Exit fullscreen if active (so user can see the question)
         if (player.fullscreen && player.fullscreen.active) {
@@ -427,10 +468,12 @@
   }
 
   // Expose player control methods
-  export function play() {
+  export async function play() {
+    // Instruction Continue clears the parent gate in this same event turn.
+    await tick();
     if (!player) return undefined;
     player.muted = false;
-    const playPromise = player.play();
+    const playPromise = participantControls.playSystem();
     if (playPromise?.catch) {
       playPromise.catch((error) => {
         if (error?.name === 'AbortError') {
@@ -444,7 +487,8 @@
   }
 
   export function pause() {
-    if (player) player.pause();
+    participantControls?.pauseSystem();
+    updateParticipantPlayControls();
   }
 
   export function seek(time) {
@@ -494,7 +538,7 @@
 
       // Resume playback
       machineResumeInProgress = true;
-      const playPromise = player.play();
+      const playPromise = participantControls.playSystem();
       if (playPromise?.catch) {
         playPromise
           .catch((error) => {
@@ -512,7 +556,7 @@
   export function recoverRejectedCheckpoint() {
     atCheckpoint = false;
     if (player && player.paused) {
-      const playPromise = player.play();
+      const playPromise = participantControls.playSystem();
       if (playPromise?.catch) {
         playPromise.catch((error) => {
           clientConsole(1, '[VideoSessionMode] Failed to recover rejected checkpoint:', error?.message || error);
@@ -554,7 +598,7 @@
 
   function attemptAutoplay() {
     if (!player) return;
-    const playPromise = player.play();
+    const playPromise = participantControls.playSystem();
     if (playPromise?.catch) {
       playPromise.catch((error) => {
         clientConsole(1, '[VideoSessionMode] Autoplay failed:', error?.message || error);
@@ -563,32 +607,50 @@
   }
 
   function setCurrentTime(time) {
-    if (!player || !Number.isFinite(time)) return;
-    allowSeeking = true;
-    player.currentTime = time;
-    allowSeeking = false;
+    participantControls?.seekSystem(time);
   }
 
-  function clampSeekIfNeeded() {
-    if (!player || !preventScrubbing || allowSeeking) return false;
-    const current = player.currentTime;
-    if (current > maxAllowedTime + 1) {
-      clientConsole(2, '[VideoSessionMode] Blocking seek beyond maxAllowedTime', current, maxAllowedTime);
-      logVideoAction('seek_blocked');
-      setCurrentTime(maxAllowedTime);
-      return true;
+  function updateParticipantPlayControls() {
+    if (!player || !containerElement || !participantControls) return;
+    const blocked = !participantControls.canParticipantPlay();
+    containerElement.querySelectorAll('[data-plyr="play"]').forEach(button => {
+      button.disabled = blocked;
+      button.hidden = blocked || (preventPause && !player.paused);
+    });
+    if (isYouTube && (preventPause || preventRewind || preventScrubbing)) {
+      // Keep interaction on the accessible Plyr controls; provider overlays must
+      // not expose a second set of pause/seek controls inside the cross-origin iframe.
+      containerElement.querySelectorAll('iframe').forEach(frame => {
+        frame.inert = true;
+        frame.tabIndex = -1;
+        frame.style.pointerEvents = 'none';
+      });
     }
-    return false;
+  }
+
+  function preventPauseShortcut(event) {
+    if (!preventPause || !player || ![' ', 'k', 'K'].includes(event.key)) return;
+    const target = event.target;
+    if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    // Space on another control (volume/fullscreen) keeps its normal semantics.
+    if (event.key === ' ' && target?.closest?.('button:not([data-plyr="play"]), [role="button"]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (player.paused && participantControls?.canParticipantPlay()) {
+      void participantControls.playSystem().catch(error => {
+        clientConsole(1, '[VideoSessionMode] Keyboard play failed:', error?.message || error);
+      });
+    }
   }
 
   function markSeekStart() {
-    if (!player || allowSeeking || loggingSeek) return;
+    if (!player || participantControls?.hasPendingSeek() || loggingSeek) return;
     loggingSeek = true;
-    seekStart = player.currentTime;
+    seekStart = participantControls.getAcceptedTime();
   }
 
   function logSeekAction() {
-    if (!player || allowSeeking || !loggingSeek) return;
+    if (!player || participantControls?.hasPendingSeek() || !loggingSeek) return;
     logVideoAction('seek');
     loggingSeek = false;
   }
@@ -830,4 +892,3 @@
     background: var(--app-text-color);
   }
 </style>
-

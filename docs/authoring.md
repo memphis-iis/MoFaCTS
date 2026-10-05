@@ -83,6 +83,28 @@ Editor review returns `status: 'confirmation-required'`, lesson identification, 
 
 Learner execution does not compare content signatures. Existing signature fields remain stored and unused. Saved positions and mappings remain intact; a valid permutation is reused regardless of current shuffle/swap settings. Frozen generated adaptive sequences continue to restore their saved units and questions. Missing units, missing or invalid mappings, missing questions and missing/invalid/wrong-lesson adaptive sequences fail with the concrete reason, without resetting progress, regenerating progressed mappings or selecting another unit.
 
+## Video participant controls
+
+Video units accept optional `videosession.preventPause` and `videosession.preventRewind`
+flags, both defaulting to `false`. They use the same Boolean authoring conventions as
+`preventScrubbing` and appear in the generated lesson editor.
+
+- `preventPause` removes participant pause controls and pause shortcuts. Initial Play
+  remains available. Instructions and questions still pause playback automatically.
+- `preventRewind` rejects backward participant seeks (with a 0.1-second rounding
+  tolerance). Configured `rewindOnIncorrect` and saved-position restoration remain allowed.
+- `preventScrubbing` retains its existing disabled seek bar/shortcuts and restriction
+  on forward jumps into unwatched material. Enable all three flags to restrict
+  participant pausing and seeking in both directions. Volume and fullscreen remain available.
+
+Unexpected pauses during expected playback receive one automatic resume attempt;
+browser rejection leaves Play available when no instruction or question is blocking it.
+These are player interaction controls, not guarantees against browser closure or OS
+interruptions. They do not change section timers or playback-speed settings.
+
+Run the player-policy regressions from `mofacts/` with
+`node --experimental-strip-types --test scripts/videoParticipantControls.test.cjs`.
+
 ## Where Detailed Examples Belong
 
 Detailed course examples, content packages, sync workflows, and internal authoring notes belong in the configuration/content repository or the GitHub wiki, not in the public application README.

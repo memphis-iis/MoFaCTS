@@ -17,6 +17,8 @@
   export let overlayVisible = false;
   export let performanceStatsProps = {};
   export let preventScrubbing = false;
+  export let preventPause = false;
+  export let preventRewind = false;
   export let questionIndices = [];
   export let questionTimes = [];
   export let resumeCheckpointIndex = undefined;
@@ -51,6 +53,8 @@
   resumeStartTime={resumeStartTime}
   resumeCheckpointIndex={resumeCheckpointIndex}
   preventScrubbing={preventScrubbing}
+  {preventPause}
+  {preventRewind}
   canAcceptCheckpoint={videoCanAcceptCheckpoint}
   checkpointGateState={checkpointGateState}
   startBlocked={startBlocked}

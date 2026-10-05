@@ -1217,6 +1217,8 @@
       overlayVisible={trialContentVisible}
       performanceStatsProps={performanceStatsProps}
       preventScrubbing={preventScrubbingEnabled}
+      preventPause={videoRuntimeSnapshot.preventPauseEnabled}
+      preventRewind={videoRuntimeSnapshot.preventRewindEnabled}
       questionIndices={videoRuntimeSnapshot.questionIndices}
       questionTimes={videoRuntimeSnapshot.questionTimes}
       resumeCheckpointIndex={videoRuntimeSnapshot.resumeCheckpointIndex}

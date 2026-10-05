@@ -3186,6 +3186,46 @@
                           "grid_columns": 4
                         }
                       },
+                      "preventPause": {
+                        "title": "Prevent participant pausing.",
+                        "description": "Prevent participant pauses while retaining initial Play and automatic pauses for instructions and questions.",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true",
+                              "false"
+                            ]
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ],
+                        "default": "false",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
+                      "preventRewind": {
+                        "title": "Prevent participant rewinding.",
+                        "description": "Prevent backward participant seeks. System-controlled rewinds after incorrect answers and saved-position restoration remain allowed.",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "true",
+                              "false"
+                            ]
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ],
+                        "default": "false",
+                        "options": {
+                          "grid_columns": 4
+                        }
+                      },
                       "rewindOnIncorrect": {
                         "title": "Rewind after incorrect answers.",
                         "description": "Rewind the video after an incorrect checkpoint answer.",
@@ -5658,6 +5698,46 @@
                   "preventScrubbing": {
                     "title": "Prevent scrubbing ahead in the video.",
                     "description": "Disallow learner seeking/scrubbing beyond the allowed point.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "preventPause": {
+                    "title": "Prevent participant pausing.",
+                    "description": "Prevent participant pauses while retaining initial Play and automatic pauses for instructions and questions.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "default": "false",
+                    "options": {
+                      "grid_columns": 4
+                    }
+                  },
+                  "preventRewind": {
+                    "title": "Prevent participant rewinding.",
+                    "description": "Prevent backward participant seeks. System-controlled rewinds after incorrect answers and saved-position restoration remain allowed.",
                     "anyOf": [
                       {
                         "type": "string",

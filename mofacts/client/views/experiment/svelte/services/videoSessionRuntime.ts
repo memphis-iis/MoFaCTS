@@ -76,10 +76,14 @@ export function createVideoSessionRuntimeController(
     }
 
     deps.setVideoInstructionStartBlocked(false);
+    // The explicit Continue action releases the instruction gate before asking
+    // the player to start. Persist completion only after playback succeeds.
+    deps.setVideoInstructionDismissed(true);
     let playResult: void | Promise<unknown>;
     try {
       playResult = videoPlayer.play();
     } catch (error) {
+      deps.setVideoInstructionDismissed(false);
       deps.setVideoInstructionStartBlocked(true);
       deps.log(1, '[ContentSurface] Video start from instructions threw:', errorMessage(error));
       return false;
@@ -91,6 +95,7 @@ export function createVideoSessionRuntimeController(
           markInstructionsContinued();
         })
         .catch((error) => {
+          deps.setVideoInstructionDismissed(false);
           deps.setVideoInstructionStartBlocked(true);
           deps.log(1, '[ContentSurface] Video start from instructions was blocked:', errorMessage(error));
         });

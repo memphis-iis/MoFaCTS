@@ -17,6 +17,8 @@ describe('video runtime snapshot service', function() {
       currentTdfUnit: {
         videosession: {
           preventScrubbing: 'true',
+          preventPause: 'true',
+          preventRewind: true,
           repeatQuestionsSinceCheckpoint: 1,
           rewindOnIncorrect: true,
         },
@@ -36,6 +38,8 @@ describe('video runtime snapshot service', function() {
       canAcceptCheckpoint: true,
       checkpointGateState: '{"videoWaiting":true}',
       preventScrubbingEnabled: true,
+      preventPauseEnabled: true,
+      preventRewindEnabled: true,
       repeatQuestionsSinceCheckpointEnabled: true,
       resumeCheckpointIndex: 2,
       resumeStartTime: 12,
@@ -58,6 +62,8 @@ describe('video runtime snapshot service', function() {
       canAcceptCheckpoint: false,
       checkpointGateState: '"idle"',
       preventScrubbingEnabled: false,
+      preventPauseEnabled: false,
+      preventRewindEnabled: false,
       repeatQuestionsSinceCheckpointEnabled: false,
       resumeCheckpointIndex: undefined,
       resumeStartTime: undefined,

@@ -12,6 +12,8 @@ export interface VideoRuntimeSnapshot {
   readonly canAcceptCheckpoint: boolean;
   readonly checkpointGateState: string;
   readonly preventScrubbingEnabled: boolean;
+  readonly preventPauseEnabled: boolean;
+  readonly preventRewindEnabled: boolean;
   readonly questionIndices: unknown[];
   readonly questionTimes: unknown[];
   readonly repeatQuestionsSinceCheckpointEnabled: boolean;
@@ -41,6 +43,8 @@ export function buildVideoRuntimeSnapshot(params: {
     canAcceptCheckpoint: Boolean(params.state?.matches?.('videoWaiting')),
     checkpointGateState: JSON.stringify(params.currentState),
     preventScrubbingEnabled: videoPlaybackPolicy.preventScrubbing,
+    preventPauseEnabled: videoPlaybackPolicy.preventPause,
+    preventRewindEnabled: videoPlaybackPolicy.preventRewind,
     questionIndices: Array.isArray(params.videoCheckpoints?.questions)
       ? params.videoCheckpoints.questions
       : [],

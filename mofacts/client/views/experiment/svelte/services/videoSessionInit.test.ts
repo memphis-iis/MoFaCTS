@@ -9,6 +9,8 @@ describe('video session init', function() {
       rewindOnIncorrect: true,
     })).to.deep.equal({
       preventScrubbing: true,
+      preventPause: false,
+      preventRewind: false,
       repeatQuestionsSinceCheckpoint: true,
       rewindOnIncorrect: true,
     });
@@ -19,14 +21,24 @@ describe('video session init', function() {
       rewindOnIncorrect: undefined,
     })).to.deep.equal({
       preventScrubbing: false,
+      preventPause: false,
+      preventRewind: false,
       repeatQuestionsSinceCheckpoint: false,
       rewindOnIncorrect: false,
     });
 
     expect(resolveVideoPlaybackPolicy(null)).to.deep.equal({
       preventScrubbing: false,
+      preventPause: false,
+      preventRewind: false,
       repeatQuestionsSinceCheckpoint: false,
       rewindOnIncorrect: false,
+    });
+  });
+
+  it('normalizes the independent participant restrictions', function() {
+    expect(resolveVideoPlaybackPolicy({preventPause: 'true', preventRewind: 1})).to.include({
+      preventPause: true, preventRewind: true, preventScrubbing: false,
     });
   });
 
@@ -39,12 +51,16 @@ describe('video session init', function() {
       },
     })).to.deep.equal({
       preventScrubbing: true,
+      preventPause: false,
+      preventRewind: false,
       repeatQuestionsSinceCheckpoint: true,
       rewindOnIncorrect: false,
     });
 
     expect(resolveVideoPlaybackPolicyForUnit({})).to.deep.equal({
       preventScrubbing: false,
+      preventPause: false,
+      preventRewind: false,
       repeatQuestionsSinceCheckpoint: false,
       rewindOnIncorrect: false,
     });

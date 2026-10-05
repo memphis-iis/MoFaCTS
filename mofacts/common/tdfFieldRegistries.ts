@@ -657,6 +657,14 @@ export const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Prevent scrubbing ahead in the video.',
     verbose: 'Disallow learner seeking/scrubbing beyond the allowed point.'
   }),
+  preventPause: simpleField(legacyBooleanField('false'), {
+    brief: 'Prevent participant pausing.',
+    verbose: 'Prevent participant pauses while retaining initial Play and automatic pauses for instructions and questions.'
+  }),
+  preventRewind: simpleField(legacyBooleanField('false'), {
+    brief: 'Prevent participant rewinding.',
+    verbose: 'Prevent backward participant seeks. System-controlled rewinds after incorrect answers and saved-position restoration remain allowed.'
+  }),
   rewindOnIncorrect: simpleField(legacyBooleanField('false'), {
     brief: 'Rewind after incorrect answers.',
     verbose: 'Rewind the video after an incorrect checkpoint answer.'
@@ -790,6 +798,8 @@ export const VIDEO_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'checkpoints',
   'displayText',
   'preventScrubbing',
+  'preventPause',
+  'preventRewind',
   'questiontimes',
   'questions',
   'repeatQuestionsSinceCheckpoint',
