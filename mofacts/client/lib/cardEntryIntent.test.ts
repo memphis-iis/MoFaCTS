@@ -120,13 +120,13 @@ describe('cardEntryIntent', function() {
     });
   });
 
-  it('classifies refresh rebuild with either completion sentinel as completed', function() {
+  it('requires the final completed-unit marker when classifying refresh completion', function() {
     expect(classifyCardRefreshRebuild({
       currentUnitNumber: 4,
     }, 4)).to.deep.equal({
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
       reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
-      moduleCompleted: true,
+      moduleCompleted: false,
       persistedUnitNumber: 4,
       lastUnitCompleted: null,
     });
@@ -138,6 +138,17 @@ describe('cardEntryIntent', function() {
       reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
       moduleCompleted: true,
       persistedUnitNumber: null,
+      lastUnitCompleted: 3,
+    });
+
+    expect(classifyCardRefreshRebuild({
+      currentUnitNumber: 4,
+      lastUnitCompleted: 3,
+    }, 4)).to.deep.equal({
+      intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
+      reason: CARD_REFRESH_REBUILD_REASON.SAVED_PROGRESS_STATE,
+      moduleCompleted: true,
+      persistedUnitNumber: 4,
       lastUnitCompleted: 3,
     });
   });

@@ -92,11 +92,12 @@ function primeMinimalSession(): void {
 describe('resume runtime integration seams', function() {
   beforeEach(function() {
     primeMinimalSession();
-    ExperimentStateStore.set({});
+    ExperimentStateStore.set({ clusterMapping: [0] });
     setQuestionIndex(1);
   });
 
   afterEach(function() {
+    ExperimentStateStore.clear();
     Session.set('currentLearningAttemptId', undefined);
     resetQuestionIndex();
     resetActiveTrialDisplayRuntimeState();
