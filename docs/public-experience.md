@@ -49,3 +49,7 @@ Every lesson in Practice exposes **Settings**, including video, assessment, and 
 Confirmation applies to the lesson family selected through that lesson's Settings button. Settings and confirmation remain attached to the selected lesson when resetting progress, sorting, or filtering changes the list. Opening another lesson's settings starts a separate confirmation.
 
 Course Settings does not offer progress reset. The server also rejects a Practice reset when the lesson family is assigned through a current class in which the learner is enrolled. Reset does not change authored content, other learners' data, or personal lesson settings.
+
+## Multiple-choice interaction
+
+Each new question starts with fresh answer buttons, so the previous answer's interaction highlight does not carry into the next question, even when the answer text repeats. Hover highlighting applies only to hover-capable, fine pointers; touchscreen taps do not apply hover styling. Keyboard navigation and visible keyboard focus remain available.

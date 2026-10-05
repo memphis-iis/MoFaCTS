@@ -251,25 +251,28 @@
 
 {#if showButtons && buttonList.length > 0}
   <div class="multiple-choice" class:disabled={!enabled} bind:this={multipleChoiceElement}>
-    <div class="button-grid" style="--columns: {columns}" bind:this={gridElement}>
-      {#each buttonList as button, index}
-        <button
-          class="choice-button"
-          class:disabled={!enabled}
-          class:is-image={button.isImage}
-          disabled={!enabled}
-          on:click={() => handleChoice(button, index)}
-          on:keydown={(event) => handleKeydown(event, index, button)}
-          data-button-value={button.buttonValue}
-        >
-          {#if button.isImage}
-            <img src={button.buttonName} alt="Choice {index + 1}" on:load={scheduleUniformWidth} />
-          {:else}
-            {@html sanitizeButtonName(button.buttonName)}
-          {/if}
-        </button>
-      {/each}
-    </div>
+    <!-- Each trial builds a fresh list, even when answer text repeats. -->
+    {#key buttonList}
+      <div class="button-grid" style="--columns: {columns}" bind:this={gridElement}>
+        {#each buttonList as button, index}
+          <button
+            class="choice-button"
+            class:disabled={!enabled}
+            class:is-image={button.isImage}
+            disabled={!enabled}
+            on:click={() => handleChoice(button, index)}
+            on:keydown={(event) => handleKeydown(event, index, button)}
+            data-button-value={button.buttonValue}
+          >
+            {#if button.isImage}
+              <img src={button.buttonName} alt="Choice {index + 1}" on:load={scheduleUniformWidth} />
+            {:else}
+              {@html sanitizeButtonName(button.buttonName)}
+            {/if}
+          </button>
+        {/each}
+      </div>
+    {/key}
   </div>
 {/if}
 
@@ -326,15 +329,17 @@
     opacity: 1;
   }
 
-  .choice-button:hover:not(.disabled) {
-    background-color: color-mix(
-      in srgb,
-      var(--app-primary-action-surface-color) calc(100% - (var(--app-button-hover-darkness) * 1%)),
-      black calc(var(--app-button-hover-darkness) * 1%)
-    );
-    color: var(--app-primary-action-text-color);
-    opacity: 1;
-    box-shadow: 0 2px 6px color-mix(in srgb, var(--app-primary-action-surface-color) 20%, transparent);
+  @media (hover: hover) and (pointer: fine) {
+    .choice-button:hover:not(.disabled) {
+      background-color: color-mix(
+        in srgb,
+        var(--app-primary-action-surface-color) calc(100% - (var(--app-button-hover-darkness) * 1%)),
+        black calc(var(--app-button-hover-darkness) * 1%)
+      );
+      color: var(--app-primary-action-text-color);
+      opacity: 1;
+      box-shadow: 0 2px 6px color-mix(in srgb, var(--app-primary-action-surface-color) 20%, transparent);
+    }
   }
 
   .choice-button.disabled {
