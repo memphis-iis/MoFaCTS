@@ -45,7 +45,6 @@ function mergeExperimentState(
   // Ensure only allowed fields are kept in the final state to be persisted
   const allowedFields = [
     'clusterMapping',
-    'mappingSignature',
     'conditionTdfId',
     'experimentXCond',
     'subTdfIndex',

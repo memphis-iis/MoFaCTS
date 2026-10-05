@@ -1,3 +1,5 @@
+import '../shared/adminUi/adminUi';
+import { createContentUpdateConfirmation, saveEditedContent } from '../../lib/contentUpdateWarningsClient';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Tracker } from 'meteor/tracker';
@@ -38,6 +40,11 @@ Template.sparcEdit.onCreated(function(this: any) {
   this.tdfId = FlowRouter.getParam('tdfId');
   this.subscribe('tdfForEdit', this.tdfId);
   this.subscribe('files.assets.all');
+  this.contentUpdateConfirmation = new ReactiveVar(null);
+  this.contentUpdateReview = createContentUpdateConfirmation(
+    (view) => this.contentUpdateConfirmation.set(view),
+    () => document.querySelector<HTMLElement>('#sparc-editor-root .btn-primary'),
+  );
   this.mounted = new ReactiveVar(false);
   this.svelteMount = null;
 });
@@ -66,7 +73,9 @@ Template.sparcEdit.onRendered(function(this: any) {
       queryParams: FlowRouter.current()?.queryParams || {},
       onCancel: () => FlowRouter.go('/contentUpload'),
       onSave: async (updatedRawStimuliFile: any) => {
-        await meteorCallAsync('saveTdfStimuli', instance.tdfId, updatedRawStimuliFile, null);
+        const saved = await saveEditedContent({ callAsync: meteorCallAsync, method: 'saveTdfStimuli',
+          args: [instance.tdfId, updatedRawStimuliFile, null], confirm: instance.contentUpdateReview.request });
+        if (!saved) return false;
         FlowRouter.go('/contentUpload');
       },
     });
@@ -83,6 +92,7 @@ Template.sparcEdit.onRendered(function(this: any) {
 });
 
 Template.sparcEdit.onDestroyed(function(this: any) {
+  this.contentUpdateReview.destroy();
   if (this.svelteMount) {
     this.svelteMount.cleanup();
     this.svelteMount = null;
@@ -90,6 +100,7 @@ Template.sparcEdit.onDestroyed(function(this: any) {
 });
 
 Template.sparcEdit.helpers({
+    contentUpdateConfirmation() { return (Template.instance() as any).contentUpdateConfirmation.get(); },
   sparcText(key: any) {
     return translatePlatformString(getActiveUiLocale(), key);
   },
@@ -108,4 +119,10 @@ Template.sparcEdit.helpers({
     }
     return !hasSparcPages(tdf);
   },
+});
+
+Template.sparcEdit.events({
+  'click .admin-confirmation-confirm'(event: Event, instance: any) { event.preventDefault(); instance.contentUpdateReview.confirm(); },
+  'click .admin-confirmation-cancel'(event: Event, instance: any) { event.preventDefault(); instance.contentUpdateReview.cancel(); },
+  'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: any) { instance.contentUpdateReview.handleKeydown(event); },
 });

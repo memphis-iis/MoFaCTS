@@ -1,6 +1,7 @@
 import { initializeLearnerSettingsHost, destroyLearnerSettingsHost, learnerSettingsEvents, flushLearnerSettings, type LearnerConfigState } from '../shared/learnerTdfSettings';
 import { getLearnerTdfConfig, learnerConfigHasSetSpecAudioOverride } from '../../lib/learnerSettings';
 import type { LearnerTdfConfig } from '../../../common/lib/learnerTdfConfig';
+import { SavedAdaptiveUnitSequenceError } from '../../../common/adaptiveUnitSequence';
 import {ReactiveVar} from 'meteor/reactive-var';
 import './learningDashboard.html';
 import './learningDashboard.css';
@@ -1069,6 +1070,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   } catch (error) {
     clientConsole(1, '[LearningDashboard] Failed to load launch-ready TDF:', currentTdfId, error);
     finishLaunchLoading('tdf-subscription-missing-content');
+    if (error instanceof SavedAdaptiveUnitSequenceError) throw error;
     throw new Error(dashboardText('dashboard.unableToLoadSelectedLesson'));
   }
 

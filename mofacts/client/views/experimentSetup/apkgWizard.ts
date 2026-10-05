@@ -1,3 +1,4 @@
+import { formatPackageUpdateWarnings } from '../../lib/contentUpdateWarningsClient';
 /**
  * Anki .apkg Import Wizard
  * Multi-step wizard for configuring and generating MoFaCTS TDFs from Anki decks
@@ -791,9 +792,7 @@ Template.apkgWizard.events({
         confirmUpdates: async (plan) => requestApkgConfirmation(template, {
           id: `overwrite-package-${plan.uploadPlanId}`,
           title: apkgText('apkg.overwriteTdfTitle'),
-          message: plan.updates.map((entry: any) => apkgText('content.previousTdfOverwriteMessage', {
-            filename: entry.lessonName || entry.fileName || entry.tdfId,
-          })).join(' '),
+          message: formatPackageUpdateWarnings(plan.updates),
           confirmLabel: apkgText('apkg.overwriteContent'),
         }),
       });

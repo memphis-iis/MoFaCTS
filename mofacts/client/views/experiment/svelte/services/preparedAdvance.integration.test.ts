@@ -15,7 +15,6 @@ import {
 
 function primeMinimalSession(): void {
   Session.set('clusterMapping', [0]);
-  Session.set('mappingSignature', null);
   Session.set('clusterIndex', 0);
   Session.set('engineIndices', { clusterIndex: 0, stimIndex: 0 });
   Session.set('currentUnitNumber', 0);

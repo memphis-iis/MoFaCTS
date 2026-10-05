@@ -28,8 +28,7 @@ import { initializeEngine } from '../services/unitEngineService';
 import { initVideoSessionData } from '../services/videoSessionInit';
 import { getExperimentState, createExperimentState } from '../services/experimentState';
 import { resumeFromExperimentState } from '../services/resumeService';
-import { createMappingSignature } from '../../../../lib/mappingSignature';
-import { hasMeaningfulMappingProgress, isStrictMappingMismatchEnforcementEnabled } from './mappingProgressPolicy';
+import { hasMeaningfulMappingProgress } from './mappingProgressPolicy';
 import {
   applyMappingRecordToSession,
   createMappingRecord,
@@ -555,24 +554,26 @@ async function initializeStandardCardEntry(
     }
 
     const mappingMissing = !mappingRecord || !Array.isArray(mappingRecord.mappingTable) || mappingRecord.mappingTable.length === 0;
-    const mappingIncompatible = !mappingMissing && !validateMappingRecord(mappingRecord, stimCount, setSpec);
-    const mappingNeedsIntervention = mappingMissing || mappingIncompatible;
+    const mappingInvalid = !mappingMissing && !validateMappingRecord(mappingRecord, stimCount);
+    const mappingNeedsIntervention = mappingMissing || mappingInvalid;
 
     if (mappingNeedsIntervention) {
       if (hasMeaningfulMappingProgress(experimentState)) {
-        clientConsole(1, '[Content Surface Init] Cluster mapping missing/incompatible with current setSpec; blocking initialization (resume compatibility policy)', {
+        clientConsole(1, '[Content Surface Init] Saved cluster mapping is missing or structurally invalid; blocking initialization', {
           eventType: 'mapping-hard-stop',
           reason: mappingMissing ? 'missing-mapping-with-progress' : 'invalid-mapping-with-progress',
           hardStop: true,
           mappingMissing,
-          mappingIncompatible,
+          mappingInvalid,
           stimCount,
           mappingLength: mappingRecord?.mappingTable?.length ?? null,
           currentRootTdfId: Session.get('currentRootTdfId'),
           currentTdfId: Session.get('currentTdfId'),
         });
         Session.set('uiMessage', {
-          text: 'Saved progress cannot be resumed because this lesson content changed. Restart the lesson to continue.',
+          text: mappingMissing
+            ? 'The saved question mapping is missing. Please contact the content owner.'
+            : 'The saved question mapping contains invalid or missing question references. Please contact the content owner.',
           variant: 'warning',
         });
         await leavePage('/home');
@@ -596,82 +597,6 @@ async function initializeStandardCardEntry(
       };
     }
 
-    const { signature: currentMappingSignature } = createMappingSignature({
-      tdfFile,
-      rootTdfId: Session.get('currentRootTdfId'),
-      conditionTdfId: experimentState?.conditionTdfId || null,
-      stimuliSetId: Session.get('currentStimuliSetId') || tdfFile.stimuliSetId || null,
-      stimuliSet: Session.get('currentStimuliSet'),
-      stimCount,
-    });
-    const persistedMappingSignature = typeof experimentState?.mappingSignature === 'string'
-      ? experimentState.mappingSignature
-      : null;
-    const signatureMismatch = !!persistedMappingSignature && persistedMappingSignature !== currentMappingSignature;
-    const enforceableSignatureMismatch = signatureMismatch;
-    const strictMismatchEnforcement = isStrictMappingMismatchEnforcementEnabled();
-    let signatureMismatchHasMeaningfulProgress = false;
-
-    if (enforceableSignatureMismatch) {
-      const progressed = hasMeaningfulMappingProgress(experimentState);
-      signatureMismatchHasMeaningfulProgress = progressed;
-      const hardStop = strictMismatchEnforcement && progressed;
-      const mismatchPayload = {
-        eventType: 'mapping-hard-stop',
-        reason: 'signature-mismatch',
-        hardStop,
-        strictMismatchEnforcement,
-        progressed,
-        userMessage: 'Saved progress cannot be resumed because this lesson content changed. Restart the lesson to continue.',
-        persistedMappingSignature,
-        currentMappingSignature,
-        rootTdfId: Session.get('currentRootTdfId'),
-        currentTdfId: Session.get('currentTdfId'),
-        conditionTdfId: experimentState?.conditionTdfId || null,
-        stimuliSetId: Session.get('currentStimuliSetId') || tdfFile.stimuliSetId || null,
-      };
-      clientConsole(1, '[Content Surface Init] Mapping signature mismatch detected', mismatchPayload);
-      if (hardStop) {
-        Session.set('uiMessage', {
-          text: mismatchPayload.userMessage,
-          variant: 'warning',
-        });
-        await leavePage('/home');
-        return {
-          redirected: true,
-          redirectTo: '/home',
-          error: 'cluster-mapping-signature-mismatch',
-        };
-      }
-    }
-    const shouldUseCurrentMappingSignature =
-      !persistedMappingSignature ||
-      persistedMappingSignature === currentMappingSignature ||
-      (enforceableSignatureMismatch && !signatureMismatchHasMeaningfulProgress);
-    const shouldPersistCurrentMappingSignature =
-      !persistedMappingSignature ||
-      (enforceableSignatureMismatch && !signatureMismatchHasMeaningfulProgress);
-
-    mappingRecord = {
-      ...(mappingRecord || { mappingTable: (Session.get('clusterMapping') || []) as number[], createdAt: Date.now(), mappingSignature: null }),
-      mappingTable: (mappingRecord?.mappingTable || (Session.get('clusterMapping') || [])) as number[],
-      mappingSignature:
-        shouldUseCurrentMappingSignature
-          ? currentMappingSignature
-          : persistedMappingSignature,
-    };
-    applyMappingRecordToSession(mappingRecord);
-
-    if (shouldPersistCurrentMappingSignature) {
-      const stateUpdate: Record<string, unknown> = {
-        ...(pendingMappingStateUpdate || {}),
-        mappingSignature: currentMappingSignature,
-      };
-      if (Array.isArray(mappingRecord.mappingTable) && mappingRecord.mappingTable.length === stimCount) {
-        stateUpdate.clusterMapping = mappingRecord.mappingTable;
-      }
-      pendingMappingStateUpdate = stateUpdate;
-    }
   } else {
     clientConsole(1, '[Content Surface Init] Cannot create cluster mapping - stimCount is 0');
   }

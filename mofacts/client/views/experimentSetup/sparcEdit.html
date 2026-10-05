@@ -8,7 +8,11 @@
         <i class="fa fa-arrow-left"></i> {{sparcText 'sparc.backToContentManager'}}
       </a>
     {{else}}
-      <div id="sparc-editor-root" class="editor-initial-surface"></div>
+
+    {{#if contentUpdateConfirmation}}
+    <div class="admin-form-row-sm">{{> adminInlineConfirmation confirmation=contentUpdateConfirmation}}</div>
+    {{/if}}
+    <div id="sparc-editor-root" class="editor-initial-surface"></div>
     {{/if}}
   </div>
 </template>

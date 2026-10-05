@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { applyPreparedInteractionStepState } from './interactionStepAssembly';
+import { applyPreparedInteractionStepState, buildPreparedInteractionStepState } from './interactionStepAssembly';
 
 describe('applyPreparedInteractionStepState', function() {
   it('writes the prepared current answer through the named runtime capability', function() {
@@ -35,4 +35,10 @@ describe('applyPreparedInteractionStepState', function() {
       currentAnswer: 'alpha',
     });
   });
+  it('reports the specific missing saved question group or question', async function() {
+    const deps = { stimClusters: [{ stims: [{}] }], getCurrentTestType: () => 'd', getDeliverySettings: () => ({}), getStimAnswer: () => '', log: () => {} };
+    await assert.rejects(() => buildPreparedInteractionStepState(1, 0, null, {}, deps), /saved question group 1 does not exist/);
+    await assert.rejects(() => buildPreparedInteractionStepState(0, 1, null, {}, deps), /saved question 1 does not exist/);
+  });
+
 });

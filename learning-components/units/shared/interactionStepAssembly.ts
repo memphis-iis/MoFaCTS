@@ -61,6 +61,12 @@ export async function buildPreparedInteractionStepState(
 ): Promise<PreparedInteractionStepState> {
   const newExperimentState: Record<string, unknown> = {};
   const cluster = dependencies.stimClusters[cardIndex];
+  if (!Number.isInteger(cardIndex) || cardIndex < 0 || !cluster) {
+    throw new Error(`The saved question group ${cardIndex} does not exist in this lesson.`);
+  }
+  if (!Number.isInteger(whichStim) || whichStim < 0 || !cluster.stims?.[whichStim]) {
+    throw new Error(`The saved question ${whichStim} does not exist in question group ${cardIndex}.`);
+  }
   dependencies.log(
     'setUpCardQuestionAndAnswerGlobals',
     cardIndex,

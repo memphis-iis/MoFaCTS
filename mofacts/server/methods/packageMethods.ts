@@ -1,3 +1,4 @@
+import { getContentUpdateWarnings, type ContentUpdateWarning, type ContentUpdateConfirmation, type ContentUpdateReview } from '../../common/lib/contentUpdateWarnings';
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
 import { parsePackageZip, type UploadedPackageFile } from '../lib/packageParser';
@@ -347,6 +348,9 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
           identityMode: job.identityMode === 'copy' ? 'copy' : 'preserve',
         }
       );
+      if (result && 'status' in result && result.status === 'confirmation-required') {
+        throw new Meteor.Error('tdf-revision-conflict', 'The content changed after upload review. Upload the package again to review the current content.');
+      }
       await deps.TdfMutationJobs.updateAsync(
         { _id: uploadPlanId, actorUserId: actingUserId, status: 'committing' },
         { $set: { status: 'complete', terminalResult: result, updatedAt: new Date() } },
@@ -1007,9 +1011,32 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     return results;
   }
 
-  async function saveTdfStimuli(this: MethodContext, tdfId: string, updatedRawStimuliFile: UnknownRecord, filteredStimuli: unknown[] | null | undefined) {
+  function reviewEditorUpdate(tdf: any, structuralWarnings: ContentUpdateWarning[], confirmation?: ContentUpdateConfirmation): ContentUpdateReview | null {
+    check(confirmation, Match.Maybe({ expectedRevision: Match.Integer, confirmed: Match.Where((value: unknown) => value === true) }));
+    const expectedRevision = Number.isInteger(tdf.tdfRevision) ? tdf.tdfRevision : 0;
+    if (confirmation && confirmation.expectedRevision !== expectedRevision) {
+      throw new Meteor.Error('tdf-revision-conflict', 'This lesson changed after review. Reload it and review your update again.');
+    }
+    return structuralWarnings.length && !confirmation ? {
+      status: 'confirmation-required', tdfId: tdf._id,
+      lessonName: tdf.content?.tdfs?.tutor?.setspec?.lessonname || '',
+      expectedRevision, structuralWarnings,
+    } : null;
+  }
+
+  function editorRevisionSelector(tdf: any): UnknownRecord {
+    const revision = Number.isInteger(tdf.tdfRevision) ? tdf.tdfRevision : 0;
+    return revision === 0
+      ? { _id: tdf._id, $or: [{ tdfRevision: 0 }, { tdfRevision: { $exists: false } }] }
+      : { _id: tdf._id, tdfRevision: revision };
+  }
+
+  async function saveTdfStimuli(this: MethodContext, tdfId: string, updatedRawStimuliFile: UnknownRecord, filteredStimuli: unknown[] | null | undefined, updateConfirmation?: ContentUpdateConfirmation) {
     check(tdfId, String);
     check(updatedRawStimuliFile, Object);
+    check(updatedRawStimuliFile, Match.ObjectIncluding({ setspec: Match.ObjectIncluding({
+      clusters: [Match.ObjectIncluding({ stims: [Object] })],
+    }) }));
     check(filteredStimuli, Match.OneOf(Array, null, undefined));
     assertNoH5PContent(updatedRawStimuliFile);
     assertNoH5PContent(filteredStimuli);
@@ -1030,6 +1057,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!autoTutorValidation.valid) {
       throw new Meteor.Error('invalid-autotutor-content', autoTutorValidation.errors.join('; '));
     }
+
+    const review = reviewEditorUpdate(tdf, getContentUpdateWarnings(
+      { stimuli: tdf.rawStimuliFile }, { stimuli: updatedRawStimuliFile as any }), updateConfirmation);
+    if (review) return review;
 
     const stimuliSetId = tdf.stimuliSetId;
     await deps.canonicalizeStimDisplayMediaRefs(updatedRawStimuliFile, stimuliSetId, {
@@ -1058,13 +1089,14 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       });
     }
 
-    await deps.Tdfs.updateAsync({_id: tdfId}, {
+    const updated = await deps.Tdfs.updateAsync(editorRevisionSelector(tdf), {
       $set: {
         rawStimuliFile: updatedRawStimuliFile,
         stimuli: stimuliToSave
       },
       $inc: { tdfRevision: 1 },
     });
+    if (updated !== 1) throw new Meteor.Error('tdf-revision-conflict', 'This lesson changed during saving. Reload it and review your update again.');
 
     await deps.updateStimDisplayTypeMap([stimuliSetId]);
     deps.serverConsole('saveTdfStimuli: Updated TDF', tdfId, 'with', stimuliToSave.length, 'stimuli');
@@ -1077,7 +1109,8 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     tdfId: string,
     tdfContent: { tdfs?: { tutor?: { setspec?: { lessonname?: string; speechAPIKey?: string; textToSpeechAPIKey?: string; openRouterApiKey?: string; condition?: string[]; conditionTdfIds?: Array<string | null>; [key: string]: unknown } } } } & UnknownRecord,
     apiKeyUpdates: { speechAPIKey?: boolean; textToSpeechAPIKey?: boolean; openRouterApiKey?: boolean } = {},
-    removedTutorPaths: string[] = []
+    removedTutorPaths: string[] = [],
+    updateConfirmation?: ContentUpdateConfirmation
   ) {
     assertNoH5PContent(tdfContent);
     check(tdfId, String);
@@ -1165,6 +1198,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!autoTutorValidation.valid) {
       throw new Meteor.Error('invalid-autotutor-content', autoTutorValidation.errors.join('; '));
     }
+    const review = reviewEditorUpdate(tdf, getContentUpdateWarnings(
+      { tutor: tdf.content?.tdfs?.tutor }, { tutor: tdfContentToSave.tdfs?.tutor }), updateConfirmation);
+    if (review) return review;
+
     const tutor = tdfContentToSave.tdfs?.tutor as { unit?: Array<{ unitinstructions?: string }> } | undefined;
     if (tutor?.unit && Array.isArray(tutor.unit)) {
       await deps.processAudioFilesForTDF({ tutor: { unit: tutor.unit } }, tdf.stimuliSetId, {
@@ -1173,12 +1210,13 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       });
     }
 
-    await deps.Tdfs.updateAsync({_id: tdfId}, {
+    const updated = await deps.Tdfs.updateAsync(editorRevisionSelector(tdf), {
       $set: {
         content: tdfContentToSave
       },
       $inc: { tdfRevision: 1 },
     });
+    if (updated !== 1) throw new Meteor.Error('tdf-revision-conflict', 'This lesson changed during saving. Reload it and review your update again.');
 
     deps.serverConsole('saveTdfContent: Updated TDF', tdfId, 'lesson:', tdfContentToSave.tdfs?.tutor?.setspec?.lessonname || '');
 

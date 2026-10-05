@@ -1,6 +1,8 @@
 import type { TargetUiLocale } from '../../common/lib/interfaceLocales';
 
 export const PLATFORM_STRING_KEYS = [
+  'content.questionsRemovedWarning',
+  'content.unitSequenceChangedWarning',
   'common.submit',
   'common.next',
   'common.continue',
@@ -1907,6 +1909,8 @@ export type LocaleResource = Partial<Record<PlatformStringKey, string>>;
 
 export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> = {
   en: {
+    'content.questionsRemovedWarning': 'This update removes questions or question groups and may disrupt existing attempts.',
+    'content.unitSequenceChangedWarning': 'This update changes the authored unit sequence and may disrupt existing attempts.',
     'common.submit': 'Submit',
     'common.next': 'Next',
     'common.continue': 'Continue',
@@ -3723,6 +3727,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'online help guide',
   },
   'zh-Hans': {
+    'content.questionsRemovedWarning': '此更新会移除题目或题目组，可能影响已有的学习记录。',
+    'content.unitSequenceChangedWarning': '此更新会更改编写的单元顺序，可能影响已有的学习记录。',
     'common.submit': '提交',
     'common.next': '下一步',
     'common.continue': '继续',
@@ -5539,6 +5545,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': '在线帮助指南',
   },
   hi: {
+    'content.questionsRemovedWarning': 'यह अपडेट प्रश्न या प्रश्न समूह हटाता है और मौजूदा प्रयासों को बाधित कर सकता है।',
+    'content.unitSequenceChangedWarning': 'यह अपडेट लिखे गए इकाइयों के क्रम को बदलता है और मौजूदा प्रयासों को बाधित कर सकता है।',
     'common.submit': 'जमा करें',
     'common.next': 'अगला',
     'common.continue': 'जारी रखें',
@@ -7355,6 +7363,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'ऑनलाइन सहायता मार्गदर्शिका',
   },
   es: {
+    'content.questionsRemovedWarning': 'Esta actualización elimina preguntas o grupos de preguntas y puede afectar los intentos existentes.',
+    'content.unitSequenceChangedWarning': 'Esta actualización cambia la secuencia de unidades del contenido y puede afectar los intentos existentes.',
     'common.submit': 'Enviar',
     'common.next': 'Siguiente',
     'common.continue': 'Continuar',
@@ -9171,6 +9181,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'guía de ayuda en línea',
   },
   ar: {
+    'content.questionsRemovedWarning': 'يزيل هذا التحديث أسئلة أو مجموعات أسئلة، وقد يؤثر في المحاولات الحالية.',
+    'content.unitSequenceChangedWarning': 'يغير هذا التحديث تسلسل الوحدات المؤلفة، وقد يؤثر في المحاولات الحالية.',
     'common.submit': 'إرسال',
     'common.next': 'التالي',
     'common.continue': 'متابعة',
@@ -10987,6 +10999,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'دليل المساعدة عبر الإنترنت',
   },
   fr: {
+    'content.questionsRemovedWarning': 'Cette mise à jour supprime des questions ou des groupes de questions et peut perturber les tentatives existantes.',
+    'content.unitSequenceChangedWarning': 'Cette mise à jour modifie la séquence des unités du contenu et peut perturber les tentatives existantes.',
     'common.submit': 'Envoyer',
     'common.next': 'Suivant',
     'common.continue': 'Continuer',
@@ -12803,6 +12817,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'guide d’aide en ligne',
   },
   bn: {
+    'content.questionsRemovedWarning': 'এই আপডেট প্রশ্ন বা প্রশ্নের গুচ্ছ সরিয়ে দেয় এবং বিদ্যমান প্রচেষ্টায় বিঘ্ন ঘটাতে পারে।',
+    'content.unitSequenceChangedWarning': 'এই আপডেট রচিত ইউনিটগুলোর ক্রম পরিবর্তন করে এবং বিদ্যমান প্রচেষ্টায় বিঘ্ন ঘটাতে পারে।',
     'common.submit': 'জমা দিন',
     'common.next': 'পরবর্তী',
     'common.continue': 'চালিয়ে যান',
@@ -14619,6 +14635,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'অনলাইন সহায়তা নির্দেশিকা',
   },
   pt: {
+    'content.questionsRemovedWarning': 'Esta atualização remove perguntas ou grupos de perguntas e pode afetar as tentativas existentes.',
+    'content.unitSequenceChangedWarning': 'Esta atualização altera a sequência das unidades do conteúdo e pode afetar as tentativas existentes.',
     'common.submit': 'Enviar',
     'common.next': 'Próximo',
     'common.continue': 'Continuar',
@@ -16435,6 +16453,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'guia de ajuda online',
   },
   id: {
+    'content.questionsRemovedWarning': 'Pembaruan ini menghapus pertanyaan atau kelompok pertanyaan dan dapat mengganggu percobaan yang sudah ada.',
+    'content.unitSequenceChangedWarning': 'Pembaruan ini mengubah urutan unit yang ditulis dan dapat mengganggu percobaan yang sudah ada.',
     'common.submit': 'Kirim',
     'common.next': 'Berikutnya',
     'common.continue': 'Lanjutkan',
@@ -18251,6 +18271,8 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'panduan bantuan online',
   },
   ur: {
+    'content.questionsRemovedWarning': 'یہ اپ ڈیٹ سوالات یا سوالات کے گروپس کو ہٹاتا ہے اور موجودہ کوششوں میں خلل ڈال سکتا ہے۔',
+    'content.unitSequenceChangedWarning': 'یہ اپ ڈیٹ تیار کردہ یونٹس کی ترتیب کو بدلتا ہے اور موجودہ کوششوں میں خلل ڈال سکتا ہے۔',
     'common.submit': 'جمع کریں',
     'common.next': 'اگلا',
     'common.continue': 'جاری رکھیں',

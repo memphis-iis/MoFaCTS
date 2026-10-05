@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { captureAdaptiveUnitSequence, restoreAdaptiveUnitSequence } from './adaptiveUnitSequence';
+import { captureAdaptiveUnitSequence, restoreAdaptiveUnitSequence, SavedAdaptiveUnitSequenceError } from './adaptiveUnitSequence';
 import { AdaptiveUnitCoordinator } from '../../learning-components/units/shared/AdaptiveUnitCoordinator';
 
 describe('adaptive unit sequence continuity', function() {
@@ -32,17 +32,26 @@ describe('adaptive unit sequence continuity', function() {
       // This stimulus maps to C0S0 (clusterKC modulo KC_MULTIPLE).
       expect(content.tdfs.tutor.unit[1].videosession.questions).to.deep.equal(outcome === 'correct' ? [] : [8]);
       expect(content.tdfs.tutor.unit[2].videosession.questions).to.deep.equal(outcome === 'correct' ? [] : [14]);
-      const state = { currentUnitNumber: 2, adaptiveUnitSequence: captureAdaptiveUnitSequence('lesson', content.tdfs.tutor.unit) };
+      const state = { mappingSignature: 'old-authored-signature', currentUnitNumber: 2, adaptiveUnitSequence: captureAdaptiveUnitSequence('lesson', content.tdfs.tutor.unit) };
       const resumed = makeContent();
       restoreAdaptiveUnitSequence(resumed, state, 'lesson');
       expect(resumed.tdfs.tutor.unit).to.deep.equal(content.tdfs.tutor.unit);
       expect(resumed.tdfs.tutor.unit).not.to.equal(state.adaptiveUnitSequence.units);
+      expect(state.mappingSignature).to.equal('old-authored-signature');
+      const refreshed = makeContent();
+      restoreAdaptiveUnitSequence(refreshed, { ...state, currentUnitNumber: 3 }, 'lesson');
+      expect(refreshed.tdfs.tutor.unit[3].unitname).to.equal('Final');
+      expect(refreshed.tdfs.tutor.unit).to.deep.equal(resumed.tdfs.tutor.unit);
       expect(() => restoreAdaptiveUnitSequence(makeContent(), state, 'another-lesson')).to.throw('another lesson');
     });
   }
 
+  it('rejects malformed saved adaptive units', function() {
+    expect(() => restoreAdaptiveUnitSequence(makeContent(), { adaptiveUnitSequence: { version: 1, tdfId: 'lesson', units: [null] } }, 'lesson')).to.throw(SavedAdaptiveUnitSequenceError, 'invalid');
+  });
+
   it('rejects missing generated state after an adaptive unit instead of resuming at Final', function() {
-    expect(() => restoreAdaptiveUnitSequence(makeContent(), { currentUnitNumber: 1 }, 'lesson')).to.throw('no saved adaptive unit sequence');
+    expect(() => restoreAdaptiveUnitSequence(makeContent(), { currentUnitNumber: 1 }, 'lesson')).to.throw(SavedAdaptiveUnitSequenceError, 'no saved adaptive unit sequence');
     expect(() => restoreAdaptiveUnitSequence(makeContent(), { currentUnitNumber: 0 }, 'lesson')).not.to.throw();
   });
 });

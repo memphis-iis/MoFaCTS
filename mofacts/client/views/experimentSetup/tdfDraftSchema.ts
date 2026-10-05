@@ -2,15 +2,15 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
-function declareTutorPropertiesInBranch(
+function declarePropertiesInBranch(
   branch: Record<string, any> | undefined,
-  tutorProperties: Record<string, any>
+  canonicalProperties: Record<string, any>
 ) {
   if (!branch) return;
 
   const branchProperties = branch.properties || {};
   branch.properties = Object.fromEntries(
-    Object.entries(tutorProperties).map(([key, propertySchema]) => [
+    Object.entries(canonicalProperties).map(([key, propertySchema]) => [
       key,
       {
         ...propertySchema,
@@ -28,15 +28,17 @@ function declareTutorPropertiesInBranch(
  */
 export function prepareTutorSchemaForJsonEditor(tutorSchema: Record<string, any>) {
   const preparedSchema = clone(tutorSchema || {});
-  const tutorProperties = preparedSchema.properties || {};
-
-  for (const conditional of preparedSchema.allOf || []) {
-    declareTutorPropertiesInBranch(conditional, tutorProperties);
-    declareTutorPropertiesInBranch(conditional.if, tutorProperties);
-    declareTutorPropertiesInBranch(conditional.then, tutorProperties);
-    declareTutorPropertiesInBranch(conditional.then?.not, tutorProperties);
-    declareTutorPropertiesInBranch(conditional.else, tutorProperties);
+  function prepareObject(schema: Record<string, any>) {
+    // Unit objects have their own conditional session exclusions. Prepare
+    // nested definitions before sharing canonical properties into branches.
+    for (const property of Object.values(schema.properties || {}) as Record<string, any>[]) prepareObject(property);
+    if (schema.items && !Array.isArray(schema.items)) prepareObject(schema.items);
+    const properties = schema.properties || {};
+    for (const conditional of schema.allOf || []) {
+      for (const branch of [conditional, conditional.if, conditional.then, conditional.then?.not, conditional.else,
+        ...(conditional.then?.not?.anyOf || [])]) declarePropertiesInBranch(branch, properties);
+    }
   }
-
+  prepareObject(preparedSchema);
   return preparedSchema;
 }

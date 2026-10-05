@@ -230,13 +230,11 @@ export function resolveCardLaunchProgress(
     lastUnitCompleted !== null ||
     Boolean(experimentState.schedule && normalizeUnitNumber(experimentState.scheduleUnitNumber) !== null);
 
-  const moduleCompleted = safeUnitCount > 0 && (
-    (persistedUnitNumber !== null && persistedUnitNumber >= safeUnitCount) ||
-    (
-      lastUnitCompleted !== null &&
-      lastUnitCompleted >= (safeUnitCount - 1)
-    )
-  );
+  // A missing saved unit is not evidence of completion. The normal completion
+  // writer records the final completed unit and an optional one-past-end cursor.
+  const moduleCompleted = safeUnitCount > 0
+    && lastUnitCompleted === safeUnitCount - 1
+    && (persistedUnitNumber === null || (persistedUnitNumber >= 0 && persistedUnitNumber <= safeUnitCount));
 
   return {
     intent: hasMeaningfulHistory

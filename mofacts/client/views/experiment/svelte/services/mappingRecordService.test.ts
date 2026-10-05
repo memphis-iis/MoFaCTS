@@ -5,6 +5,7 @@ import {
   applyMappingRecordToSession,
   loadMappingRecord,
   resolveOriginalClusterIndex,
+  validateMappingRecord,
 } from './mappingRecordService';
 
 describe('mappingRecordService', function() {
@@ -29,20 +30,27 @@ describe('mappingRecordService', function() {
 
     expect(record).to.not.equal(null);
     expect(record!.mappingTable).to.deep.equal([0, 1, 2]);
-    expect(record!.mappingSignature).to.equal('persisted-sig');
+    expect(record).not.to.have.property('mappingSignature');
   });
 
-  it('clears stale signature when applying null signature record', function() {
-    Session.set('mappingSignature', 'stale-signature');
+  it('reuses a structurally valid mapping with an old stored signature', function() {
+    const state = { clusterMapping: [1, 0], mappingSignature: 'old-signature' };
+    const record = loadMappingRecord(state);
+    expect(validateMappingRecord(record, 2)).to.equal(true);
+    applyMappingRecordToSession(record!);
+    expect(Session.get('clusterMapping')).to.deep.equal([1, 0]);
+    expect(state.mappingSignature).to.equal('old-signature');
+  });
 
-    applyMappingRecordToSession({
-      mappingTable: [0, 1, 2],
-      mappingSignature: null,
-      createdAt: Date.now(),
-    });
+  it('does not hide a missing persisted mapping with stale session state', function() {
+    Session.set('clusterMapping', [0, 1]);
+    expect(loadMappingRecord({ overallStudyHistory: [{}] })).to.equal(null);
+  });
 
-    expect(Session.get('clusterMapping')).to.deep.equal([0, 1, 2]);
-    expect(Session.get('mappingSignature')).to.equal(null);
+  it('rejects duplicate, missing, fractional and out-of-range question references', function() {
+    for (const mapping of [[0, 0], [0], [0, 1.5], [0, 2]]) {
+      expect(validateMappingRecord({ mappingTable: mapping, createdAt: 0 }, 2)).to.equal(false);
+    }
   });
 
   it('creates an invertible permutation mapping for configured shuffle/swap ranges', function() {
@@ -64,7 +72,6 @@ describe('mappingRecordService', function() {
   it('resolveOriginalClusterIndex returns null for invalid index and mapped value for valid index', function() {
     const record = {
       mappingTable: [3, 0, 2, 1],
-      mappingSignature: 'msig_v2_test',
       createdAt: Date.now(),
     };
 

@@ -1,3 +1,4 @@
+import { createContentUpdateConfirmation, saveEditedContent } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import './contentEdit.html';
@@ -96,6 +97,14 @@ Template.contentEdit.onCreated(function(this: any) {
     instance.saving = new ReactiveVar(false);
     instance.saveFeedback = new ReactiveVar('');
     instance.editorMessages = new ReactiveVar({});
+    instance.contentUpdateConfirmation = new ReactiveVar(null);
+    instance.contentUpdateReview = createContentUpdateConfirmation(
+        (view) => {
+            instance.contentUpdateConfirmation.set(view);
+            if (view) instance.removeIncorrectConfirmationController?.cancel();
+        },
+        () => instance.find('.save-btn'),
+    );
     instance.removeIncorrectConfirmation = new ReactiveVar(null);
     instance.removeIncorrectConfirmationController = createInlineConfirmationController(
         (view) => instance.removeIncorrectConfirmation.set(view.status === 'open' ? view : null),
@@ -121,6 +130,7 @@ Template.contentEdit.onCreated(function(this: any) {
 
 Template.contentEdit.onDestroyed(function(this: any) {
     this.lifetime.destroy();
+    this.contentUpdateReview.destroy();
     (document.querySelector('.media-full-size-preview') as HTMLElement | null)?.click();
     // Clean up editor
     if (this.editor) {
@@ -171,6 +181,7 @@ Template.contentEdit.onDestroyed(function(this: any) {
 });
 
 Template.contentEdit.helpers({
+    contentUpdateConfirmation() { return (Template.instance() as any).contentUpdateConfirmation.get(); },
     editorLoadError() {
         const state = (Template.instance() as any).loadState.get();
         return state.status === 'error' ? state.message : '';
@@ -454,15 +465,17 @@ Template.contentEdit.events({
 
     'click .admin-confirmation-cancel'(event: any, instance: any) {
         event.preventDefault();
+        if (instance.contentUpdateReview.cancel()) return;
         instance.removeIncorrectConfirmationController.cancel();
     },
 
     'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: any) {
-        instance.removeIncorrectConfirmationController.handleKeydown(event);
+        if (!instance.contentUpdateReview.handleKeydown(event)) instance.removeIncorrectConfirmationController.handleKeydown(event);
     },
 
     'click .admin-confirmation-confirm'(event: any, instance: any) {
         event.preventDefault();
+        if (instance.contentUpdateReview.confirm()) return;
         if (!instance.editor) return;
 
         const result = removeAllIncorrectResponses(instance);
@@ -519,7 +532,9 @@ Template.contentEdit.events({
 
             // We'll let the server regenerate the stimuli array from the raw file
             // This is cleaner than trying to rebuild it client-side
-            await meteorCallAsync('saveTdfStimuli', instance.tdfId, updatedRawStimuli, null);
+            const saved = await saveEditedContent({ callAsync: meteorCallAsync, method: 'saveTdfStimuli',
+                args: [instance.tdfId, updatedRawStimuli, null], confirm: instance.contentUpdateReview.request });
+            if (!saved) return;
 
             showSaveFeedbackAndRedirect(instance, contentEditorText('tdfEditor.savedReturning'));
             instance.hasChanges.set(false);

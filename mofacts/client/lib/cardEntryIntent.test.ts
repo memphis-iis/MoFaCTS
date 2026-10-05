@@ -167,7 +167,7 @@ describe('cardEntryIntent', function() {
     });
   });
 
-  it('treats out-of-bounds currentUnitNumber as completed launch sentinel', function() {
+  it('preserves the recorded completed launch sentinel', function() {
     expect(resolveCardLaunchProgress({
       currentUnitNumber: 4,
       lastUnitCompleted: 3,
@@ -204,4 +204,9 @@ describe('cardEntryIntent', function() {
       lastUnitCompleted: null,
     });
   });
+  it('does not classify a removed saved unit as completion', function() {
+    expect(resolveCardLaunchProgress({ currentUnitNumber: 4, lastUnitCompleted: 3 }, 2).moduleCompleted).to.equal(false);
+    expect(resolveCardLaunchProgress({ currentUnitNumber: 4 }, 2).moduleCompleted).to.equal(false);
+  });
+
 });

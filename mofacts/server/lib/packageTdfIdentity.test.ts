@@ -229,4 +229,20 @@ describe('packageTdfIdentity', function() {
       }]),
     }), (error: any) => error?.error === 'ambiguous-experiment-target');
   });
+  it('reports structural warnings per updated lesson in a multi-lesson package', async function() {
+    const one = tdfFile('one.json', { tdfId: 'one-id' });
+    const two = tdfFile('two.json', { tdfId: 'two-id' });
+    (one.contents as any).tutor.unit = [{ unitname: 'changed' }];
+    (two.contents as any).tutor.unit = [{ unitname: 'same' }];
+    const existing = [
+      { _id: 'one-id', tdfRevision: 1, content: { tdfs: { tutor: { unit: [{ unitname: 'original' }] } } }, rawStimuliFile: { setspec: { clusters: [{ stims: [{}] }] } } },
+      { _id: 'two-id', tdfRevision: 2, content: { tdfs: { tutor: { unit: [{ unitname: 'same' }] } } }, rawStimuliFile: { setspec: { clusters: [] } } },
+    ];
+    const plan = await preflightPackageTdfIdentities({ unzippedFiles: packageFiles(one, two), packageAssetId: 'multi', ownerId: 'owner', deps: deps(existing) });
+    assert.deepEqual(plan.updates.map(update => [update.tdfId, update.structuralWarnings]), [
+      ['one-id', ['questions-removed', 'unit-sequence-changed']], ['two-id', []],
+    ]);
+    assert.equal(existing[0]!.tdfRevision, 1);
+  });
+
 });

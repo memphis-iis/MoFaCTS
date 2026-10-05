@@ -145,39 +145,7 @@ function performClusterSwap(swapclusters: unknown, mapping: number[]) {
   return swapped.slice();
 }
 
-function collectRangeIndexes(rangeSpec: unknown, stimCount: number) {
-  const indexes = new Set<number>();
-  if (!rangeSpec) {
-    return indexes;
-  }
-
-  const raw = Array.isArray(rangeSpec) ? rangeSpec.join(' ') : String(rangeSpec);
-  const tokens = raw
-    .split(/[\s,]+/)
-    .map((token) => legacyTrim(token))
-    .filter(Boolean);
-
-  for (const token of tokens) {
-    const rangeValues = rangeVal(token);
-    if (rangeValues.length > 0) {
-      for (const idx of rangeValues) {
-        if (idx >= 0 && idx < stimCount) {
-          indexes.add(idx);
-        }
-      }
-      continue;
-    }
-
-    const parsed = parseInt(token, 10);
-    if (Number.isFinite(parsed) && parsed >= 0 && parsed < stimCount) {
-      indexes.add(parsed);
-    }
-  }
-
-  return indexes;
-}
-
-function isValidClusterPermutation(clusterMapping: unknown, stimCount: number) {
+export function isValidClusterPermutation(clusterMapping: unknown, stimCount: number) {
   if (!Array.isArray(clusterMapping) || clusterMapping.length !== stimCount) {
     return false;
   }
@@ -212,43 +180,4 @@ export function createStimClusterMapping(
   mapping = performClusterSwap(swapclusters, mapping);
 
   return mapping;
-}
-
-export function isClusterMappingCompatibleWithSetSpec(
-  clusterMapping: unknown,
-  stimCount: number,
-  setSpec: { shuffleclusters?: unknown; swapclusters?: unknown } = {}
-) {
-  if (!isValidClusterPermutation(clusterMapping, stimCount)) {
-    return false;
-  }
-  const mapping = clusterMapping as number[];
-
-  const touched = new Set<number>();
-  const shuffledIndexes = collectRangeIndexes(setSpec.shuffleclusters, stimCount);
-  const swappedIndexes = collectRangeIndexes(setSpec.swapclusters, stimCount);
-
-  for (const idx of shuffledIndexes) {
-    touched.add(idx);
-  }
-  for (const idx of swappedIndexes) {
-    touched.add(idx);
-  }
-
-  if (touched.size === 0) {
-    for (let i = 0; i < stimCount; i++) {
-      if (mapping[i] !== i) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  for (let i = 0; i < stimCount; i++) {
-    if (!touched.has(i) && mapping[i] !== i) {
-      return false;
-    }
-  }
-
-  return true;
 }

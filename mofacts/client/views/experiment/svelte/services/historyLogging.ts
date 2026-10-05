@@ -398,15 +398,14 @@ function ensureClusterStateForLogging() {
   }
   applyMappingRecordToSession(mappingRecord);
 
-  const setSpec = Session.get('currentTdfFile')?.tdfs?.tutor?.setspec || {};
   const stimCount = getStimCount();
   if (!Number.isInteger(stimCount) || stimCount <= 0) {
     clientConsole(1, '[History Logging] Stim count unavailable when validating cluster mapping - aborting log');
     throw new Error('Stim count unavailable');
   }
-  const mappingValid = validateMappingRecord(mappingRecord, stimCount, setSpec);
+  const mappingValid = validateMappingRecord(mappingRecord, stimCount);
   if (!mappingValid) {
-    clientConsole(1, '[History Logging] Cluster mapping invalid/incompatible for current setSpec - aborting log until mapping restored');
+    clientConsole(1, '[History Logging] Saved cluster mapping is structurally invalid - aborting history log');
     throw new Error('Cluster mapping invalid');
   }
 

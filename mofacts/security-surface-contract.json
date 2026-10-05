@@ -119,7 +119,8 @@
     },
     {
       "name": "confirmPackageUpload",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Only the bound uploader may confirm an unexpired plan. Archive integrity and identity revisions are rechecked; changed plans fail before writes."
     },
     {
       "name": "copyTdf",
@@ -619,7 +620,8 @@
     },
     {
       "name": "processPackageUpload",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing content-management authorization and package identity preflight remain required. Update summaries include structuralWarnings before content writes."
     },
     {
       "name": "provisionExperimentUser",
@@ -751,11 +753,13 @@
     },
     {
       "name": "saveTdfContent",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Content-management authorization is rechecked on every save. Risky authored-unit updates return confirmation-required with expectedRevision; confirmed writes compare tdfRevision atomically."
     },
     {
       "name": "saveTdfStimuli",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Content-management authorization is rechecked on every save. Question reductions return confirmation-required with expectedRevision; confirmed writes compare tdfRevision atomically."
     },
     {
       "name": "saveUserAWSData",

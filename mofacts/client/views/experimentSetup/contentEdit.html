@@ -21,6 +21,11 @@
             </p>
         </div>
 
+
+    {{#if contentUpdateConfirmation}}
+    <div class="admin-form-row-sm">{{> adminInlineConfirmation confirmation=contentUpdateConfirmation}}</div>
+    {{/if}}
+
         {{#if editorLoadError}}
         <div class="admin-status admin-status-error" role="alert">
             <i class="fa fa-exclamation-circle" aria-hidden="true"></i>

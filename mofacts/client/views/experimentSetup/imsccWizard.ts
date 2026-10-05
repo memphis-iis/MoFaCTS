@@ -1,3 +1,4 @@
+import { formatPackageUpdateWarnings } from '../../lib/contentUpdateWarningsClient';
 /**
  * Canvas IMSCC Import Wizard
  * Client-side extraction and conversion for Canvas course export packages.
@@ -48,9 +49,7 @@ function requestImsccConfirmation(template: any, plan: any): Promise<boolean> {
     template.inlineConfirmationController.open({
       confirmationId: `imscc-package-${plan.uploadPlanId}`,
       title: imsccText('content.overwriteExistingContent'),
-      message: plan.updates.map((entry: any) => imsccText('content.previousTdfOverwriteMessage', {
-        filename: entry.lessonName || entry.fileName || entry.tdfId,
-      })).join(' '),
+      message: formatPackageUpdateWarnings(plan.updates),
       confirmLabel: imsccText('content.overwriteContent'),
       cancelLabel: imsccText('content.cancel'),
       severity: 'warning',

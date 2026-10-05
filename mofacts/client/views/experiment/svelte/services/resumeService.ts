@@ -12,9 +12,8 @@ import '../../../../../common/Collections';
 import { createExperimentState, getExperimentState } from './experimentState';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
-import { createMappingSignature } from '../../../../lib/mappingSignature';
 import { loadLaunchReadyTdf } from '../../../../lib/launchReadyTdf';
-import { hasMeaningfulMappingProgress, isStrictMappingMismatchEnforcementEnabled } from './mappingProgressPolicy';
+import { hasMeaningfulMappingProgress } from './mappingProgressPolicy';
 import {
   assertAssessmentScheduleArtifactForUnit,
   assertAssessmentScheduleBounds,
@@ -143,7 +142,6 @@ interface TdfDocumentLike extends Record<string, unknown> {
 interface ResumeExperimentState extends ExperimentState {
   conditionTdfId?: string | null;
   clusterMapping?: number[];
-  mappingSignature?: string | null;
   schedule?: unknown;
   experimentXCond?: number;
   subTdfIndex?: number;
@@ -155,7 +153,6 @@ const RESUME_STATE_PERSIST_FIELDS = [
   'conditionTdfId',
   'experimentXCond',
   'clusterMapping',
-  'mappingSignature',
   'currentUnitNumber',
   'subTdfIndex',
 ] as const satisfies readonly (keyof ResumeExperimentState)[];
@@ -178,16 +175,6 @@ function buildResumeStatePatch(
     }
   }
   return patch;
-}
-
-function getResolvedConditionTdfId(
-  currentState: ResumeExperimentState,
-  stagedState: ResumeExperimentState
-): string | null {
-  if (Object.prototype.hasOwnProperty.call(stagedState, 'conditionTdfId')) {
-    return stagedState.conditionTdfId ?? null;
-  }
-  return currentState.conditionTdfId ?? null;
 }
 
 interface ResumeEngineLike extends UnitEngineLike {
@@ -768,24 +755,26 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     const swaps = setSpec.swapclusters ? setSpec.swapclusters.trim().split(" ") : [''];
     let mappingRecord = loadMappingRecord(curExperimentState);
     const mappingMissing = !mappingRecord || !Array.isArray(mappingRecord.mappingTable) || mappingRecord.mappingTable.length === 0;
-    const mappingIncompatible = !mappingMissing && !validateMappingRecord(mappingRecord, stimCount, setSpec);
-    const mappingNeedsIntervention = mappingMissing || mappingIncompatible;
+    const mappingInvalid = !mappingMissing && !validateMappingRecord(mappingRecord, stimCount);
+    const mappingNeedsIntervention = mappingMissing || mappingInvalid;
 
     if (mappingNeedsIntervention) {
       if (hasMeaningfulMappingProgress(curExperimentState)) {
-        clientConsole(1, '[Resume Service] Cluster mapping missing/incompatible with current setSpec; blocking resume (resume compatibility policy)', {
+        clientConsole(1, '[Resume Service] Saved cluster mapping is missing or structurally invalid; blocking resume', {
           eventType: 'mapping-hard-stop',
           reason: mappingMissing ? 'missing-mapping-with-progress' : 'invalid-mapping-with-progress',
           hardStop: true,
           mappingMissing,
-          mappingIncompatible,
+          mappingInvalid,
           stimCount,
           mappingLength: mappingRecord?.mappingTable?.length ?? null,
           currentRootTdfId: Session.get('currentRootTdfId'),
           currentTdfId: Session.get('currentTdfId'),
         });
         return handleResumeFailure(
-          'Saved progress cannot be resumed because this lesson content changed. Restart the lesson to continue.',
+          mappingMissing
+            ? 'The saved question mapping is missing. Please contact the content owner.'
+            : 'The saved question mapping contains invalid or missing question references. Please contact the content owner.',
           { redirectTo: '/home', variant: 'warning' }
         );
       }
@@ -810,67 +799,7 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       throw new Error('The cluster mapping is invalid - can not continue');
     }
 
-    const { signature: currentMappingSignature } = createMappingSignature({
-      tdfFile: curTdf.content,
-      rootTdfId: Session.get('currentRootTdfId'),
-      conditionTdfId: getResolvedConditionTdfId(curExperimentState, newExperimentState),
-      stimuliSetId: Session.get('currentStimuliSetId'),
-      stimuliSet: Session.get('currentStimuliSet'),
-      stimCount,
-    });
-    const persistedMappingSignature = typeof curExperimentState.mappingSignature === 'string'
-      ? curExperimentState.mappingSignature
-      : null;
-    const signatureMismatch = !!persistedMappingSignature && persistedMappingSignature !== currentMappingSignature;
-    const enforceableSignatureMismatch = signatureMismatch;
-    const strictMismatchEnforcement = isStrictMappingMismatchEnforcementEnabled();
-    let signatureMismatchHasMeaningfulProgress = false;
-    if (enforceableSignatureMismatch) {
-      const progressed = hasMeaningfulMappingProgress(curExperimentState);
-      signatureMismatchHasMeaningfulProgress = progressed;
-      const hardStop = strictMismatchEnforcement && progressed;
-      const mismatchPayload = {
-        eventType: 'mapping-hard-stop',
-        reason: 'signature-mismatch',
-        hardStop,
-        strictMismatchEnforcement,
-        progressed,
-        userMessage: 'Saved progress cannot be resumed because this lesson content changed. Restart the lesson to continue.',
-        persistedMappingSignature,
-        currentMappingSignature,
-        rootTdfId: Session.get('currentRootTdfId'),
-        currentTdfId: Session.get('currentTdfId'),
-        conditionTdfId: getResolvedConditionTdfId(curExperimentState, newExperimentState),
-        stimuliSetId: Session.get('currentStimuliSetId'),
-      };
-      clientConsole(1, '[Resume Service] Mapping signature mismatch detected', mismatchPayload);
-      if (hardStop) {
-        return handleResumeFailure(mismatchPayload.userMessage, {
-          redirectTo: '/home',
-          variant: 'warning',
-        });
-      }
-    }
-
-    if (
-      !persistedMappingSignature ||
-      persistedMappingSignature === currentMappingSignature ||
-      (enforceableSignatureMismatch && !signatureMismatchHasMeaningfulProgress)
-    ) {
-      newExperimentState.mappingSignature = currentMappingSignature;
-    }
-
-    mappingRecord = {
-      ...(mappingRecord || { mappingTable: clusterMapping, createdAt: Date.now(), mappingSignature: null }),
-      mappingTable: clusterMapping,
-      mappingSignature:
-        !persistedMappingSignature ||
-        persistedMappingSignature === currentMappingSignature ||
-        (enforceableSignatureMismatch && !signatureMismatchHasMeaningfulProgress)
-          ? currentMappingSignature
-          : persistedMappingSignature,
-    };
-    applyMappingRecordToSession(mappingRecord);
+    applyMappingRecordToSession(mappingRecord!);
 
     if (curExperimentState.currentUnitNumber !== undefined && curExperimentState.currentUnitNumber !== null) {
       Session.set('currentUnitNumber', curExperimentState.currentUnitNumber);
@@ -913,9 +842,9 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
     ensureCurrentStimuliSetId(curTdf?.stimuliSetId);
     const unitList = resolvedUnitList as TdfUnitLike[];
-    const currentUnitNumber = Number(Session.get('currentUnitNumber') || 0);
+    const currentUnitNumber = Number(Session.get('currentUnitNumber') ?? 0);
 
-    if (currentUnitNumber > unitList.length - 1) {
+    if (resolveCardLaunchProgress(curExperimentState, unitList.length).moduleCompleted) {
       return handleResumeFailure('You have completed all the units in this lesson.', {
         redirectTo: COMPLETED_LESSON_REDIRECT,
         variant: 'info'
@@ -923,13 +852,13 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     }
 
     const curTdfUnit = unitList[currentUnitNumber];
-    if (!curTdfUnit) {
+    if (!Number.isInteger(currentUnitNumber) || currentUnitNumber < 0 || !curTdfUnit) {
       clientConsole(1, '[Resume Service] Current unit missing from unit list', {
         currentUnitNumber,
         totalUnits: unitList.length,
         currentTdfId: Session.get('currentTdfId'),
       });
-      return handleResumeFailure('Unable to load the current unit for this lesson. Please contact your administrator.');
+      return handleResumeFailure('The saved unit does not exist in this lesson. Please contact the content owner.');
     }
     if (isVideoResumeSession(curTdfUnit)) {
       setVideoSessionActive(true);

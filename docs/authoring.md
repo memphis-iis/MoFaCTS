@@ -66,6 +66,25 @@ MoFaCTS supports multiple stimulus and response formats, including:
 - The Canvas/Common Cartridge wizard reads `.imscc` locally and uploads only the converted MoFaCTS `.zip` package.
 - Lesson media uploads are separate from package imports and must target a specific TDF and stimulus set.
 
+## Reviewing Structural Updates
+
+Package updates (ZIP, Anki, IMSCC and manual creation) retain the inline **Update Content** review. Lesson, question and SPARC editor saves also require inline review when either criterion is met:
+
+- **Questions removed:** fewer clusters, fewer total questions (`stims`), or fewer questions at an existing cluster position.
+- **Unit sequence changed:** the exact ordered authored `unitname` list changes, including additions, removals, reordering or renaming. Generated adaptive units are excluded.
+
+The warning explains that existing attempts may be disrupted. The content owner can cancel without saving or proceed. Other package updates retain their ordinary overwrite confirmation. Wording, answers, video URLs and adaptive-rule edits alone do not trigger these structural warnings. Startup imports assume prior review and are unchanged.
+
+The lesson editor preserves canonical unit properties in conditional schema validation, including unit names and session exclusions.
+
+The warning is a count/name comparison, not a compatibility guarantee: replacing a question at the same count is not detected, and movement between identical or unnamed unit names cannot be distinguished. Owners are responsible for deciding whether to apply an update.
+
+Editor review returns `status: 'confirmation-required'`, lesson identification, `expectedRevision` and `structuralWarnings`. The client resubmits the same proposal with `updateConfirmation: { expectedRevision, confirmed: true }`. Authorization is rechecked and the write compares `tdfRevision` atomically; a stale review returns `tdf-revision-conflict` and must be reviewed again. Package confirmations retain their archive hash, plan binding, expiry, cancellation and rollback contract.
+
+Learner execution does not compare content signatures. Existing signature fields remain stored and unused. Saved positions and mappings remain intact; a valid permutation is reused regardless of current shuffle/swap settings. Frozen generated adaptive sequences continue to restore their saved units and questions. Missing units, missing or invalid mappings, missing questions and missing/invalid/wrong-lesson adaptive sequences fail with the concrete reason, without resetting progress, regenerating progressed mappings or selecting another unit.
+
 ## Where Detailed Examples Belong
 
 Detailed course examples, content packages, sync workflows, and internal authoring notes belong in the configuration/content repository or the GitHub wiki, not in the public application README.
+
+The pure warning, adaptive-artifact and question-reference regressions run from `mofacts/` with `node --test scripts/contentUpdateWarnings.test.cjs`. Editor/server-method and package integration regressions use the supported Meteor CI test environment. Full application `npm run typecheck` and `npm run lint` remain required.

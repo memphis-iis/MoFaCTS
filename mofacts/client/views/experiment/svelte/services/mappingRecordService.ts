@@ -1,96 +1,42 @@
 import { Session } from 'meteor/session';
-import { createStimClusterMapping, isClusterMappingCompatibleWithSetSpec } from '../../../../../../learning-components/content/tdf/clusterMapping';
+import { createStimClusterMapping, isValidClusterPermutation } from '../../../../../../learning-components/content/tdf/clusterMapping';
 
-type MappingRecord = {
-  mappingTable: number[];
-  mappingSignature: string | null;
-  createdAt: number;
-};
-
-type SetSpecLike = { shuffleclusters?: unknown; swapclusters?: unknown };
-type ExperimentStateLike = {
-  clusterMapping?: unknown;
-  mappingSignature?: unknown;
-} | null | undefined;
+type MappingRecord = { mappingTable: number[]; createdAt: number };
+type ExperimentStateLike = { clusterMapping?: unknown; [key: string]: unknown } | null | undefined;
 
 function asMappingTable(value: unknown): number[] | null {
-  return Array.isArray(value) ? (value as number[]) : null;
+  return Array.isArray(value) ? value as number[] : null;
 }
 
 export function loadMappingRecord(experimentState: ExperimentStateLike): MappingRecord | null {
-  const sessionMapping = asMappingTable(Session.get('clusterMapping'));
-  const persistedMapping = asMappingTable(experimentState?.clusterMapping);
-  // Persisted record is authoritative; session is only a cache fallback.
-  const mappingTable = persistedMapping && persistedMapping.length ? persistedMapping : sessionMapping;
-  if (!mappingTable || !mappingTable.length) {
-    return null;
-  }
-  const signature = typeof experimentState?.mappingSignature === 'string'
-    ? experimentState.mappingSignature
-    : (typeof Session.get('mappingSignature') === 'string' ? String(Session.get('mappingSignature')) : null);
-  return {
-    mappingTable,
-    mappingSignature: signature,
-    createdAt: Date.now(),
-  };
+  // An existing attempt owns its mapping; a missing persisted mapping cannot be supplied by another session.
+  const mappingTable = asMappingTable(experimentState == null
+    ? Session.get('clusterMapping') : experimentState.clusterMapping);
+  return mappingTable?.length ? { mappingTable, createdAt: Date.now() } : null;
 }
 
 export function loadSessionMappingRecord(): MappingRecord | null {
-  const mappingTable = asMappingTable(Session.get('clusterMapping'));
-  if (!mappingTable || !mappingTable.length) {
-    return null;
-  }
-  const signature = typeof Session.get('mappingSignature') === 'string'
-    ? String(Session.get('mappingSignature'))
-    : null;
-  return {
-    mappingTable,
-    mappingSignature: signature,
-    createdAt: Date.now(),
-  };
+  return loadMappingRecord(null);
 }
 
-export function createMappingRecord(params: {
-  stimCount: number;
-  shuffles: unknown;
-  swaps: unknown;
-  mappingSignature?: string | null;
-}): MappingRecord {
-  const mappingTable = createStimClusterMapping(params.stimCount, params.shuffles, params.swaps, []);
-  return {
-    mappingTable,
-    mappingSignature: params.mappingSignature || null,
-    createdAt: Date.now(),
-  };
+export function createMappingRecord(params: { stimCount: number; shuffles: unknown; swaps: unknown }): MappingRecord {
+  return { mappingTable: createStimClusterMapping(params.stimCount, params.shuffles, params.swaps, []), createdAt: Date.now() };
 }
 
-export function validateMappingRecord(record: MappingRecord | null, stimCount: number, setSpec: SetSpecLike): boolean {
-  if (!record || !Array.isArray(record.mappingTable) || !record.mappingTable.length) {
-    return false;
-  }
-  return isClusterMappingCompatibleWithSetSpec(record.mappingTable, stimCount, setSpec);
+export function validateMappingRecord(record: MappingRecord | null, stimCount: number): boolean {
+  return !!record && record.mappingTable.length > 0 && isValidClusterPermutation(record.mappingTable, stimCount);
 }
 
 export function resolveOriginalClusterIndex(shuffledClusterIndex: number, record: MappingRecord | null): number | null {
-  if (!record || !Array.isArray(record.mappingTable)) {
-    return null;
-  }
+  if (!record) return null;
   const mapped = record.mappingTable[shuffledClusterIndex];
-  if (typeof mapped !== 'number' || !Number.isInteger(mapped)) {
-    return null;
-  }
-  if (mapped < 0 || mapped >= record.mappingTable.length) {
-    return null;
-  }
-  return mapped;
+  return typeof mapped === 'number' && Number.isInteger(mapped) && mapped >= 0 && mapped < record.mappingTable.length ? mapped : null;
 }
 
 export function applyMappingRecordToSession(record: MappingRecord): void {
   Session.set('clusterMapping', record.mappingTable);
-  Session.set('mappingSignature', record.mappingSignature || null);
 }
 
 export function clearMappingRecordFromSession(): void {
   Session.set('clusterMapping', '');
-  Session.set('mappingSignature', null);
 }

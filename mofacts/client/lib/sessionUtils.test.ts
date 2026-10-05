@@ -22,13 +22,11 @@ describe('sessionUtils mapping cleanup', function() {
 
   beforeEach(function() {
     Session.set('clusterMapping', [2, 1, 0]);
-    Session.set('mappingSignature', 'msig_v2_abc123');
   });
 
   afterEach(function() {
     setTestPath(originalPath);
     Session.set('clusterMapping', '');
-    Session.set('mappingSignature', null);
     Session.set('fromInstructions', false);
     Session.set('contentBootstrapInProgress', false);
     Session.set('currentTdfName', undefined);
@@ -46,7 +44,6 @@ describe('sessionUtils mapping cleanup', function() {
     clearMappingSessionStateForCleanup();
 
     expect(Session.get('clusterMapping')).to.equal('');
-    expect(Session.get('mappingSignature')).to.equal(null);
   });
 
   it('clears mapping and signature in the normal (full) cleanup branch', function() {
@@ -55,7 +52,6 @@ describe('sessionUtils mapping cleanup', function() {
     sessionCleanUp();
 
     expect(Session.get('clusterMapping')).to.equal('');
-    expect(Session.get('mappingSignature')).to.equal(null);
   });
 
   it('clears mapping and signature in the fromInstructions guard branch', function() {
@@ -66,7 +62,6 @@ describe('sessionUtils mapping cleanup', function() {
     sessionCleanUp();
 
     expect(Session.get('clusterMapping')).to.equal('');
-    expect(Session.get('mappingSignature')).to.equal(null);
   });
 
   it('clears mapping and signature in the card bootstrap guard branch', function() {
@@ -77,7 +72,6 @@ describe('sessionUtils mapping cleanup', function() {
     sessionCleanUp();
 
     expect(Session.get('clusterMapping')).to.equal('');
-    expect(Session.get('mappingSignature')).to.equal(null);
   });
 
   it('preserves documented unit launch keys when moving from instructions to /content', function() {

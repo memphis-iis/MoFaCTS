@@ -1,3 +1,5 @@
+import '../shared/adminUi/adminUi';
+import { createContentUpdateConfirmation, saveEditedContent } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import './tdfEdit.html';
@@ -104,6 +106,13 @@ Template.tdfEdit.onCreated(function(this: any) {
     instance.saving = new ReactiveVar(false);
     instance.saveFeedback = new ReactiveVar('');
     instance.editorMessages = new ReactiveVar({});
+    instance.contentUpdateConfirmation = new ReactiveVar(null);
+    instance.contentUpdateReview = createContentUpdateConfirmation(
+        (view) => {
+            instance.contentUpdateConfirmation.set(view);
+        },
+        () => instance.find('.save-btn'),
+    );
     instance.tooltipMode = new ReactiveVar(getTooltipMode());
     instance.editor = null;
     instance.originalTdf = null;
@@ -118,6 +127,7 @@ Template.tdfEdit.onCreated(function(this: any) {
 
 Template.tdfEdit.onDestroyed(function(this: any) {
     this.lifetime.destroy();
+    this.contentUpdateReview.destroy();
     // Clean up editor
     if (this.editor) {
         this.editor.destroy();
@@ -164,6 +174,7 @@ Template.tdfEdit.onDestroyed(function(this: any) {
 });
 
 Template.tdfEdit.helpers({
+    contentUpdateConfirmation() { return (Template.instance() as any).contentUpdateConfirmation.get(); },
     editorReady() {
         return (Template.instance() as any).loadState.get().status === 'ready';
     },
@@ -348,7 +359,9 @@ Template.tdfEdit.events({
             const removedTutorPaths = collectRemovedEditorPaths(instance._baselineValue, editedTutor);
 
             // Call server to save (server validates ownership, encrypts new API keys, and saves)
-            await meteorCallAsync('saveTdfContent', instance.tdfId, tdfContent, apiKeyUpdates, removedTutorPaths);
+            const saved = await saveEditedContent({ callAsync: meteorCallAsync, method: 'saveTdfContent',
+                args: [instance.tdfId, tdfContent, apiKeyUpdates, removedTutorPaths], confirm: instance.contentUpdateReview.request });
+            if (!saved) return;
 
             showSaveFeedbackAndRedirect(instance, tdfEditorText('tdfEditor.savedReturning'));
             instance.hasChanges.set(false);
@@ -1378,3 +1391,9 @@ function toggleUnitMC(instance: any, unitIndex: any) {
 
 
 
+
+Template.tdfEdit.events({
+  'click .admin-confirmation-confirm'(event: Event, instance: any) { event.preventDefault(); instance.contentUpdateReview.confirm(); },
+  'click .admin-confirmation-cancel'(event: Event, instance: any) { event.preventDefault(); instance.contentUpdateReview.cancel(); },
+  'keydown .admin-inline-confirmation'(event: KeyboardEvent, instance: any) { instance.contentUpdateReview.handleKeydown(event); },
+});

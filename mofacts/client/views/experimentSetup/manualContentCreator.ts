@@ -1,3 +1,4 @@
+import { formatPackageUpdateWarnings } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { Template } from 'meteor/templating';
@@ -978,9 +979,7 @@ Template.manualContentCreator.events({
           onProcessing: () => instance.uploadStatus.set({ message: manualText('content.processingPackage'), progress: 65 }),
           confirmUpdates: async (plan) => requestManualConfirmation(instance, uploadTrigger, {
             title: manualText('content.overwriteExistingContent'),
-            message: plan.updates.map((entry: any) => manualText('content.previousTdfOverwriteMessage', {
-              filename: entry.lessonName || entry.fileName || entry.tdfId,
-            })).join(' '),
+            message: formatPackageUpdateWarnings(plan.updates),
             confirmLabel: manualText('content.overwriteContent'),
             placement: 'upload',
           }),

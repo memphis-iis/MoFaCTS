@@ -1,4 +1,4 @@
-// Resume-compatibility policy helper.
+// Saved mapping integrity: progressed attempts must never regenerate mappings.
 // Conservative by design: ambiguous progress is treated as meaningful progress.
 
 type MappingProgressState = {
@@ -13,26 +13,14 @@ type MappingProgressState = {
   overallStudyHistory?: unknown;
 };
 
-type MeteorSettingsPublicLike = {
-  features?: {
-    strictMappingMismatchEnforcement?: boolean | string;
-  };
-  strictMappingMismatchEnforcement?: boolean | string;
-};
-
-function getMeteorPublicSettings(): MeteorSettingsPublicLike | undefined {
-  return (globalThis as typeof globalThis & {
-    Meteor?: {
-      settings?: {
-        public?: MeteorSettingsPublicLike;
-      };
-    };
-  }).Meteor?.settings?.public;
-}
-
 export function hasMeaningfulMappingProgress(state: MappingProgressState | null | undefined): boolean {
   if (!state || typeof state !== 'object') {
     return false;
+  }
+
+  if (Number(state.currentUnitNumber) > 0
+    || (state.lastUnitCompleted != null && Number(state.lastUnitCompleted) >= 0)) {
+    return true;
   }
 
   if (Object.prototype.hasOwnProperty.call(state, 'questionIndex')) {
@@ -64,22 +52,4 @@ export function hasMeaningfulMappingProgress(state: MappingProgressState | null 
   }
 
   return false;
-}
-
-export function isStrictMappingMismatchEnforcementEnabled(): boolean {
-  const meteorSettings = getMeteorPublicSettings();
-  const raw =
-    meteorSettings?.features?.strictMappingMismatchEnforcement ??
-    meteorSettings?.strictMappingMismatchEnforcement;
-
-  if (typeof raw === 'boolean') {
-    return raw;
-  }
-
-  if (typeof raw === 'string') {
-    return raw.trim().toLowerCase() === 'true';
-  }
-
-  // Default enabled per rollout policy.
-  return true;
 }

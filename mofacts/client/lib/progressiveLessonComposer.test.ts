@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { composeProgressiveLesson } from './progressiveLessonComposer';
 import {
   createStimClusterMapping,
-  isClusterMappingCompatibleWithSetSpec,
+  isValidClusterPermutation,
 } from '../../../learning-components/content/tdf/clusterMapping';
 
 function member(id: string, setId: string, clusterKC: string, stimulusKC: string, responseKC: string) {
@@ -107,10 +107,9 @@ describe('progressive lesson composition', function() {
     expect([first, next]).to.deep.equal(original);
     expect(composeProgressiveLesson(payload)).to.deep.equal(result);
     expect(createStimClusterMapping(4, [], [], null)).to.deep.equal([0, 1, 2, 3]);
-    expect(isClusterMappingCompatibleWithSetSpec([0, 1, 2, 3], 4, setSpec)).to.equal(true);
-    // A previous shuffled resume must be rejected, not reinterpreted against
-    // different cards. The existing resume guard leaves recorded history intact.
-    expect(isClusterMappingCompatibleWithSetSpec([1, 0, 2, 3], 4, setSpec)).to.equal(false);
+    expect(isValidClusterPermutation([0, 1, 2, 3], 4)).to.equal(true);
+    // A saved permutation remains usable after shuffle/swap settings change.
+    expect(isValidClusterPermutation([1, 0, 2, 3], 4)).to.equal(true);
   });
 
   it('merges shared clusters while retaining distinct source-scoped stimuli and endpoint settings', function() {

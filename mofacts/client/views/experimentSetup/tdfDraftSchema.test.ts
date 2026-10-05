@@ -2,6 +2,17 @@ import { expect } from 'chai';
 import { prepareTutorSchemaForJsonEditor } from './tdfDraftSchema';
 
 describe('prepareTutorSchemaForJsonEditor', function() {
+  it('preserves unit names and session exclusions in nested unit conditionals', function() {
+    const schema = { properties: { unit: { type: 'array', items: {
+      properties: { unitname: { type: 'string' }, gazecalibrationsession: { type: 'object' }, assessmentsession: { type: 'object' } },
+      allOf: [{ if: { required: ['gazecalibrationsession'] }, then: { not: { anyOf: [{ required: ['assessmentsession'] }] } } }],
+    } } } };
+    const unit = prepareTutorSchemaForJsonEditor(schema).properties.unit.items;
+    expect(unit.allOf[0].properties).to.have.keys('unitname', 'gazecalibrationsession', 'assessmentsession');
+    expect(unit.allOf[0].then.not.anyOf[0].properties).to.have.keys('unitname', 'gazecalibrationsession', 'assessmentsession');
+    expect(unit.allOf[0].then.not.anyOf[0].required).to.deep.equal(['assessmentsession']);
+    expect(schema.properties.unit.items.allOf[0]).not.to.have.property('properties');
+  });
   it('declares canonical tutor properties in conditional branches without weakening branch rules', function() {
     const schema = {
       type: 'object',

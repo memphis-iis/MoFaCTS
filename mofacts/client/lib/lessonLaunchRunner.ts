@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { SavedAdaptiveUnitSequenceError } from '../../common/adaptiveUnitSequence';
 import { Session } from 'meteor/session';
 import { getExperimentState } from '../views/experiment/svelte/services/experimentState';
 import {
@@ -108,6 +109,7 @@ export async function selectTdf(
   } catch (error) {
     clientConsole(1, '[LessonLaunch] Failed to load launch-ready TDF:', currentTdfId, error);
     setCourseAssignmentLaunchContext(null);
+    if (error instanceof SavedAdaptiveUnitSequenceError) throw error;
     throw new Error(translatePlatformString(getActiveUiLocale(), 'dashboard.unableToLoadSelectedLesson'), { cause: error });
   }
 

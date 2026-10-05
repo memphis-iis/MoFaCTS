@@ -646,8 +646,8 @@
     saveMessage = '';
     try {
       validateBeforeSave();
-      await onSave(clone(rawStimuliFile));
-      saveMessage = sparcText('sparc.saved');
+      const saved = await onSave(clone(rawStimuliFile));
+      if (saved !== false) saveMessage = sparcText('sparc.saved');
     } catch (error) {
       saveErrorText = error.reason || error.message || String(error);
     } finally {

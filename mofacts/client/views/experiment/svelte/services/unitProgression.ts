@@ -238,7 +238,6 @@ export async function unitIsFinished(_reason: string): Promise<void> {
     currentUnitNumber: newUnitNum,
     lastUnitCompleted: curUnitNum,
     clusterMapping: Session.get('clusterMapping'),
-    mappingSignature: Session.get('mappingSignature'),
     conditionTdfId: curExperimentState.conditionTdfId,
     schedule: null, // Reset schedule for next unit
     ...(adaptive ? {

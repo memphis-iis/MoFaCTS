@@ -1,3 +1,4 @@
+import { getContentUpdateWarnings, type ContentUpdateWarning } from '../../common/lib/contentUpdateWarnings';
 import { Meteor } from 'meteor/meteor';
 
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
@@ -26,7 +27,7 @@ export type PackageTdfIdentityMode = 'preserve' | 'copy';
 export type PackageTdfIdentityPlan = {
   fingerprint: string;
   entries: PackageTdfIdentityEntry[];
-  updates: Array<{ tdfId: string; fileName: string; lessonName: string }>;
+  updates: Array<{ tdfId: string; fileName: string; lessonName: string; structuralWarnings: ContentUpdateWarning[] }>;
   creates: Array<{ tdfId: string; fileName: string; lessonName: string }>;
 };
 
@@ -409,7 +410,19 @@ export async function preflightPackageTdfIdentities(args: {
     entries,
     updates: entries
       .filter((entry) => entry.action === 'update')
-      .map(({ tdfId, fileName, lessonName }) => ({ tdfId, fileName, lessonName })),
+      .map((entry) => {
+        const file = filesByName.get(packageEntryKey(entry.fileName))!;
+        const incoming = file.contents as any;
+        const stimulus = unzippedFiles.find((candidate) => candidate.type === 'stim'
+          && packageEntryKey(candidate.name) === packageEntryKey(incoming.tutor.setspec.stimulusfile));
+        const before = entry.beforeImage!;
+        return {
+          tdfId: entry.tdfId, fileName: entry.fileName, lessonName: entry.lessonName,
+          structuralWarnings: getContentUpdateWarnings(
+            { tutor: (before.content as any)?.tdfs?.tutor, stimuli: before.rawStimuliFile as any },
+            { tutor: incoming.tutor, stimuli: stimulus!.contents as any }),
+        };
+      }),
     creates: entries
       .filter((entry) => entry.action === 'create')
       .map(({ tdfId, fileName, lessonName }) => ({ tdfId, fileName, lessonName })),

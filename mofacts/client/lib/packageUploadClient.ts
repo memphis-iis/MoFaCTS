@@ -1,3 +1,4 @@
+import type { ContentUpdateWarning } from '../../common/lib/contentUpdateWarnings';
 export type PackageUploadIntegrity = { expectedSize: number; sha256?: string };
 
 type PackageUploadCollection = {
@@ -27,7 +28,7 @@ type PackageProcessingOptions = {
     uploadPlanId: string;
     expiresAt: Date | string;
     creates: Array<Record<string, unknown>>;
-    updates: Array<Record<string, unknown>>;
+    updates: Array<{ tdfId: string; fileName: string; lessonName: string; structuralWarnings: ContentUpdateWarning[] }>;
   }) => Promise<boolean>;
 };
 

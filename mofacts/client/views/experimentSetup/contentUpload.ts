@@ -1,3 +1,4 @@
+import { formatPackageUpdateWarnings } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Session } from 'meteor/session';
@@ -2227,9 +2228,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                 confirmUpdates: async (plan) => requestContentConfirmation(template, {
                   placement: 'upload-package',
                   title: contentText('content.overwriteExistingContent'),
-                  message: plan.updates.map((entry: any) => contentText('content.previousTdfOverwriteMessage', {
-                    filename: entry?.lessonName || entry?.fileName || entry?.tdfId || '',
-                  })).join(' '),
+                  message: formatPackageUpdateWarnings(plan.updates),
                   confirmLabel: contentText('content.overwriteContent'),
                   cancelLabel: contentText('content.cancel'),
                   level: 'warning',

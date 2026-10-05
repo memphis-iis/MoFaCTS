@@ -1,4 +1,5 @@
 import {meteorCallAsync} from '..';
+import { SavedAdaptiveUnitSequenceError } from '../../common/adaptiveUnitSequence';
 import { haveMeteorUser } from './userIdentity';
 import {instructContinue, unitHasLockout} from '../views/experiment/instructions';
 import {Cookie} from './cookies';
@@ -1271,6 +1272,11 @@ async function bootstrapLessonRoute(
       FlowRouter.go(location.path, {}, location.queryParams);
       return false;
     }
+  } catch (error) {
+    if (!(error instanceof SavedAdaptiveUnitSequenceError)) throw error;
+    Session.set('uiMessage', { text: error.message, variant: 'danger' });
+    FlowRouter.go('/home');
+    return false;
   } finally {
     Session.set('contentBootstrapInProgress', false);
   }

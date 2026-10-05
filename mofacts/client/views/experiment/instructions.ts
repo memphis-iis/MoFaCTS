@@ -1,4 +1,5 @@
 import {currentUserHasRole} from '../../lib/roleUtils';
+import { SavedAdaptiveUnitSequenceError } from '../../../common/adaptiveUnitSequence';
 import {secsIntervalString} from '../../../common/globalHelpers';
 import { haveMeteorUser } from '../../lib/userIdentity';
 import './instructions.html';
@@ -989,7 +990,8 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
     clientConsole(1, '[Instructions] Continue action failed', error);
     Session.set('uiMessage', {
       variant: 'danger',
-      text: translatePlatformString(getActiveUiLocale(), 'dashboard.unableToLoadSelectedLesson'),
+      text: error instanceof SavedAdaptiveUnitSequenceError ? error.message
+        : translatePlatformString(getActiveUiLocale(), 'dashboard.unableToLoadSelectedLesson'),
     });
   }
 }
