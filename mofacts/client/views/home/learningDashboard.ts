@@ -214,6 +214,9 @@ function formatSnapshotLesson(lesson: any, creators: PracticeDashboardCreator[])
     : null;
   return {
     ...lesson,
+    // Blaze uses _id to retain row identity as reset/sort/filter moves lessons.
+    // This is a view-only alias of the existing lesson ID, never persisted.
+    _id: lesson.TDFId,
     creatorDisplayName,
     creatorAvatarImageData,
     creatorAvatarIsImage: Boolean(creatorAvatarImageData),
@@ -758,15 +761,15 @@ Template.learningDashboard.events({
   'click .continue-lesson': async function(event: any) {
     event.preventDefault();
     unlockAppleMobileAudioForUserGesture();
-    const target = $(event.currentTarget);
+    const target = event.currentTarget as HTMLElement;
     await safeSelectTdf(
-      target.data('tdfid'),
-      target.data('lessonname'),
-      target.data('currentstimulisetid'),
+      target.getAttribute('data-tdfid'),
+      target.getAttribute('data-lessonname'),
+      target.getAttribute('data-currentstimulisetid'),
       null,
       null,
       'Continue from practice menu',
-      target.data('ismultitdf'),
+      parseBooleanLike(target.getAttribute('data-ismultitdf')),
       null,
     );
   },
@@ -774,15 +777,15 @@ Template.learningDashboard.events({
   'click .start-lesson': async function(event: any) {
     event.preventDefault();
     unlockAppleMobileAudioForUserGesture();
-    const target = $(event.currentTarget);
+    const target = event.currentTarget as HTMLElement;
     await safeSelectTdf(
-      target.data('tdfid'),
-      target.data('lessonname'),
-      target.data('currentstimulisetid'),
+      target.getAttribute('data-tdfid'),
+      target.getAttribute('data-lessonname'),
+      target.getAttribute('data-currentstimulisetid'),
       null,
       null,
       'Start from practice menu',
-      target.data('ismultitdf'),
+      parseBooleanLike(target.getAttribute('data-ismultitdf')),
       null,
     );
   },
@@ -790,15 +793,15 @@ Template.learningDashboard.events({
   'click .start-blocks': async function(event: any) {
     event.preventDefault();
     unlockAppleMobileAudioForUserGesture();
-    const target = $(event.currentTarget);
+    const target = event.currentTarget as HTMLElement;
     await safeSelectTdf(
-      target.data('tdfid'),
-      target.data('lessonname'),
-      target.data('currentstimulisetid'),
+      target.getAttribute('data-tdfid'),
+      target.getAttribute('data-lessonname'),
+      target.getAttribute('data-currentstimulisetid'),
       null,
       null,
       'Blocks from practice menu',
-      target.data('ismultitdf'),
+      parseBooleanLike(target.getAttribute('data-ismultitdf')),
       null,
       false,
       false,
@@ -812,7 +815,7 @@ Template.learningDashboard.events({
     const row = $(event.currentTarget).closest('tr, .learning-dashboard-card');
     const selector = row.find('.condition-tdf-selector');
     const selectedId = selector.val() as string;
-    const rootId = selector.data('roottdfid') as string;
+    const rootId = selector.attr('data-roottdfid') as string;
     if (!selectedId) return;
 
     const isExplicitCondition = selectedId !== rootId;

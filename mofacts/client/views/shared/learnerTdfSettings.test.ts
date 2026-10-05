@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
+declare const $: JQueryStatic;
 import {
   destroyLearnerSettingsHost,
   flushLearnerSettings,
@@ -35,6 +36,149 @@ if (Meteor.isClient) describe('standalone lesson settings and progress reset', f
     destroyLearnerSettingsHost(host);
     sinon.restore();
     Session.set('learnerTdfConfigOverrides', {});
+  });
+
+  it('reads the current lesson ID after a button has cached another lesson', async function() {
+    $(event.currentTarget).data('tdfid');
+    event.currentTarget.dataset.tdfid = 'adaptive';
+    await learnerSettingsEvents['click .configure-lesson'].call({}, event, host);
+    expect(call.calledWithExactly('getTdfById', 'adaptive', { courseAssignment: null })).to.equal(true);
+    expect(host.learnerConfigState.get().tdfId).to.equal('adaptive');
+  });
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: Error) => void;
+    const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  }
+
+  async function open(tdfId: string, row = {}) {
+    event.currentTarget.dataset.tdfid = tdfId;
+    await learnerSettingsEvents['click .configure-lesson'].call(row, event, host);
+  }
+
+  it('ignores an old load even when the same lesson is reopened', async function() {
+    const first = deferred<any>();
+    call.withArgs('getTdfById', 'synthetic').onFirstCall().returns(first.promise);
+    const opening = learnerSettingsEvents['click .configure-lesson'].call({}, event, host);
+    await Promise.resolve();
+    await open('adaptive');
+    await open('synthetic');
+    const latest = host.learnerConfigState.get();
+    first.resolve({ content: { tdfs: { tutor: { unit: [], setspec: { lessonname: 'Old' } } } } });
+    await opening;
+    expect(host.learnerConfigState.get()).to.equal(latest);
+  });
+
+  for (const succeeds of [true, false]) {
+    it(`keeps the new panel when an earlier reset ${succeeds ? 'succeeds' : 'fails'}`, async function() {
+      const reset = deferred<any>();
+      call.withArgs('resetOwnLessonProgress').returns(reset.promise);
+      await open('synthetic');
+      await learnerSettingsEvents['click .learner-config-reset-progress'](event, host);
+      const resetting = learnerSettingsEvents['click .learner-config-reset-progress'](event, host);
+      await open('adaptive');
+      const latest = host.learnerConfigState.get();
+      if (succeeds) reset.resolve({ cacheTdfIds: ['synthetic', 'family-member'] });
+      else reset.reject(new Error('Old reset failed'));
+      await resetting;
+      expect(host.learnerConfigState.get()).to.equal(latest);
+      expect(refresh.calledOnceWithExactly(['synthetic', 'family-member'])).to.equal(succeeds);
+    });
+  }
+
+  it('reopens the same lesson during closing without retaining confirmation', async function() {
+    const clock = sinon.useFakeTimers();
+    await open('synthetic');
+    await learnerSettingsEvents['click .learner-config-reset-progress'](event, host);
+    await open('synthetic');
+    expect(host.learnerConfigState.get().closing).to.equal(true);
+    await open('synthetic');
+    clock.tick(5000);
+    expect(host.learnerConfigState.get()).to.include({ tdfId: 'synthetic', closing: false, resetConfirming: false });
+  });
+
+  it('invalidates pending loads when the host is destroyed', async function() {
+    const load = deferred<any>();
+    call.withArgs('getTdfById').returns(load.promise);
+    const opening = learnerSettingsEvents['click .configure-lesson'].call({}, event, host);
+    await Promise.resolve();
+    destroyLearnerSettingsHost(host);
+    load.resolve({ content });
+    await opening;
+    expect(host.learnerConfigState.get().tdfId).to.equal(null);
+  });
+
+  it('does not attach an old load error to a newer panel', async function() {
+    const load = deferred<any>();
+    call.withArgs('getTdfById', 'synthetic').returns(load.promise);
+    const opening = learnerSettingsEvents['click .configure-lesson'].call({}, event, host);
+    await Promise.resolve();
+    await open('adaptive');
+    const latest = host.learnerConfigState.get();
+    load.reject(new Error('Old load failed'));
+    await opening;
+    expect(host.learnerConfigState.get()).to.equal(latest);
+  });
+
+  it('refreshes the full reset scope without reopening a destroyed panel', async function() {
+    const reset = deferred<any>();
+    call.withArgs('resetOwnLessonProgress').returns(reset.promise);
+    await open('synthetic');
+    await learnerSettingsEvents['click .learner-config-reset-progress'](event, host);
+    const resetting = learnerSettingsEvents['click .learner-config-reset-progress'](event, host);
+    destroyLearnerSettingsHost(host);
+    reset.resolve({ cacheTdfIds: ['synthetic', 'adaptive', 'family-root'] });
+    await resetting;
+    expect(refresh.calledOnceWithExactly(['synthetic', 'adaptive', 'family-root'])).to.equal(true);
+    expect(host.learnerConfigState.get().tdfId).to.equal(null);
+  });
+
+  it('reads the active state after waiting for pending saves', async function() {
+    const saving = deferred<void>();
+    host.learnerConfigSavePromise = saving.promise;
+    const opening = learnerSettingsEvents['click .configure-lesson'].call({}, event, host);
+    host.learnerConfigState.set({ ...host.learnerConfigState.get(), tdfId: 'synthetic' });
+    saving.resolve();
+    await opening;
+    expect(host.learnerConfigState.get().closing).to.equal(true);
+    expect(call.calledWith('getTdfById')).to.equal(false);
+  });
+
+  for (const succeeds of [true, false]) {
+    it(`settles reset ${succeeds ? 'success' : 'failure'} after an autosave state update within the same panel`, async function() {
+      const reset = deferred<any>();
+      call.withArgs('resetOwnLessonProgress').returns(reset.promise);
+      await open('synthetic');
+      await learnerSettingsEvents['click .learner-config-reset-progress'](event, host);
+      const resetting = learnerSettingsEvents['click .learner-config-reset-progress'](event, host);
+      host.learnerConfigState.set({ ...host.learnerConfigState.get(), saving: false, dirty: false });
+      if (succeeds) reset.resolve({ cacheTdfIds: ['synthetic'] });
+      else reset.reject(new Error('Reset failed'));
+      await resetting;
+      if (succeeds) expect(host.learnerConfigState.get().closing).to.equal(true);
+      else expect(host.learnerConfigState.get()).to.include({ resettingProgress: false, error: 'Reset failed' });
+    });
+  }
+
+  it('does not open a panel after destruction while waiting for a save', async function() {
+    const saving = deferred<void>();
+    host.learnerConfigSavePromise = saving.promise;
+    const opening = learnerSettingsEvents['click .configure-lesson'].call({}, event, host);
+    destroyLearnerSettingsHost(host);
+    saving.resolve();
+    await opening;
+    expect(host.learnerConfigState.get().tdfId).to.equal(null);
+    expect(call.calledWith('getTdfById')).to.equal(false);
+  });
+
+  it('retains the current assignment when the same lesson is opened in another course row', async function() {
+    host.settingsCourseContext = (row: any) => row;
+    await open('synthetic', { assignmentId: 'first', courseId: 'course', TDFId: 'synthetic' });
+    await open('synthetic', { assignmentId: 'second', courseId: 'course', TDFId: 'synthetic' });
+    expect(host.learnerConfigState.get().courseAssignment.assignmentId).to.equal('second');
+    expect(host.learnerConfigState.get().canResetProgress).to.equal(false);
   });
 
   for (const unit of [

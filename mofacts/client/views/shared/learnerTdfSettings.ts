@@ -58,6 +58,11 @@ const EMPTY_CONFIG_STATE: LearnerConfigState = {
   resultMessage: null,
 };
 
+// Ownership is a reference to an operation's existing state object, not a
+// second settings representation. Autosave can update state within a panel
+// without giving an old operation ownership of a subsequently opened panel.
+const learnerConfigPanelOwners = new WeakMap<object, LearnerConfigState>();
+
 const LEARNER_CONFIG_CLOSE_FALLBACK_MS = 200;
 const LEARNER_CONFIG_AUTOSAVE_DELAY_MS = 500;
 const LEARNER_CONFIG_SLIDER_DISPLAY_SESSION_KEY = 'learnerConfigSliderDisplayValues';
@@ -148,10 +153,14 @@ function closeLearnerConfigPanel(instance: any) {
   }
 
   clearLearnerConfigCloseTimer(instance);
-  instance.learnerConfigState.set({ ...current, closing: true });
+  const closingState = { ...current, closing: true };
+  learnerConfigPanelOwners.set(instance, closingState);
+  instance.learnerConfigState.set(closingState);
   instance.learnerConfigCloseTimer = setTimeout(() => {
-    clearLearnerConfigSliderDisplayValues(current.tdfId);
-    instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+    if (learnerConfigPanelOwners.get(instance) === closingState) {
+      clearLearnerConfigSliderDisplayValues(current.tdfId);
+      instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+    }
     instance.learnerConfigCloseTimer = null;
   }, getLearnerConfigCloseDurationMs());
 }
@@ -496,6 +505,7 @@ export function initializeLearnerSettingsHost(instance: any, options: {
   instance.learnerConfigAutosaveTimer = null;
   instance.learnerConfigSaveRevision = 0;
   instance.learnerConfigState = new ReactiveVar(EMPTY_CONFIG_STATE);
+  learnerConfigPanelOwners.set(instance, EMPTY_CONFIG_STATE);
   instance.settingsCourseContext = options.courseContext || (() => null);
   instance.settingsProgressReset = options.onProgressReset;
 }
@@ -503,6 +513,9 @@ export function initializeLearnerSettingsHost(instance: any, options: {
 export function destroyLearnerSettingsHost(instance: any) {
   clearLearnerConfigCloseTimer(instance);
   clearLearnerConfigAutosaveTimer(instance);
+  clearLearnerConfigSliderDisplayValues(instance.learnerConfigState.get().tdfId);
+  instance.learnerConfigState.set(EMPTY_CONFIG_STATE);
+  learnerConfigPanelOwners.delete(instance);
 }
 
 export async function flushLearnerSettings(instance: any): Promise<void> {
@@ -516,32 +529,36 @@ export async function flushLearnerSettings(instance: any): Promise<void> {
 export const learnerSettingsEvents = {
   'click .configure-lesson': async function(event: any, instance: any) {
     event.preventDefault();
-    const target = $(event.currentTarget);
-    const tdfId = String(target.data('tdfid') || '');
+    const tdfId = (event.currentTarget as HTMLElement).getAttribute('data-tdfid') || '';
+    if (!tdfId) return;
     const courseAssignment = instance.settingsCourseContext(this);
-    const existingState = instance.learnerConfigState.get() as LearnerConfigState;
     try { await flushLearnerSettings(instance); } catch { return; }
+    if (!learnerConfigPanelOwners.has(instance)) return;
+    const existingState = instance.learnerConfigState.get() as LearnerConfigState;
     if (existingState.tdfId === tdfId
-      && existingState.courseAssignment?.assignmentId === courseAssignment?.assignmentId) {
+      && existingState.courseAssignment?.assignmentId === courseAssignment?.assignmentId
+      && !existingState.closing) {
       closeLearnerConfigPanel(instance);
       return;
     }
 
     clearLearnerConfigSliderDisplayValues(existingState.tdfId);
     clearLearnerConfigCloseTimer(instance);
-    instance.learnerConfigState.set({
+    const openingState: LearnerConfigState = {
       ...EMPTY_CONFIG_STATE,
       tdfId,
       courseAssignment,
       loading: true
-    });
+    };
+    learnerConfigPanelOwners.set(instance, openingState);
+    instance.learnerConfigState.set(openingState);
 
     try {
       const [tdfDoc] = await Promise.all([
         meteorCallAsync('getTdfById', tdfId, { courseAssignment }) as Promise<any>,
         loadLearnerTdfConfig(tdfId),
       ]);
-      if (instance.learnerConfigState.get().tdfId !== tdfId) return;
+      if (learnerConfigPanelOwners.get(instance) !== openingState) return;
       const content = tdfDoc?.content;
       const canResetProgress = Boolean(instance.settingsProgressReset) && !courseAssignment;
       const conditions = content?.tdfs?.tutor?.setspec?.condition;
@@ -566,7 +583,7 @@ export const learnerSettingsEvents = {
         family: 'deliverySettings'
       });
     } catch (error) {
-      if (instance.learnerConfigState.get().tdfId !== tdfId) return;
+      if (learnerConfigPanelOwners.get(instance) !== openingState) return;
       clientConsole(1, '[Learner Settings] Failed to load full TDF:', error);
       instance.learnerConfigState.set({
         ...EMPTY_CONFIG_STATE,
@@ -634,7 +651,9 @@ export const learnerSettingsEvents = {
       return;
     }
 
-    instance.learnerConfigState.set({ ...current, resettingProgress: true, error: null });
+    const resettingState = { ...current, resettingProgress: true, error: null };
+    learnerConfigPanelOwners.set(instance, resettingState);
+    instance.learnerConfigState.set(resettingState);
     try {
       const result = await meteorCallAsync('resetOwnLessonProgress', current.tdfId) as {
         cacheTdfIds?: string[];
@@ -643,10 +662,11 @@ export const learnerSettingsEvents = {
         throw new Error('Reset completed without a practice refresh scope');
       }
       await instance.settingsProgressReset(result.cacheTdfIds);
-      closeLearnerConfigPanel(instance);
+      if (learnerConfigPanelOwners.get(instance) === resettingState) closeLearnerConfigPanel(instance);
     } catch (error: any) {
       clientConsole(1, '[Learner Settings] Failed to reset own lesson progress:', error);
       const latest = instance.learnerConfigState.get() as LearnerConfigState;
+      if (learnerConfigPanelOwners.get(instance) !== resettingState) return;
       instance.learnerConfigState.set({
         ...latest,
         resetConfirming: false,

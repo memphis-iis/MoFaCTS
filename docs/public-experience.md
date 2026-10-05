@@ -46,4 +46,6 @@ Demo packages are authored in the canonical `mofacts_config` repository and must
 
 Every lesson in Practice exposes **Settings**, including video, assessment, and instruction lessons. The panel shows only applicable personal settings. **Reset test progress → Confirm reset** removes the caller's saved history and attempt state for the whole lesson family, including prequiz answers and generated adaptive sequences; the next launch starts anew. Cancel leaves progress intact. This reset cannot be undone.
 
+Confirmation applies to the lesson family selected through that lesson's Settings button. Settings and confirmation remain attached to the selected lesson when resetting progress, sorting, or filtering changes the list. Opening another lesson's settings starts a separate confirmation.
+
 Course Settings does not offer progress reset. The server also rejects a Practice reset when the lesson family is assigned through a current class in which the learner is enrolled. Reset does not change authored content, other learners' data, or personal lesson settings.
