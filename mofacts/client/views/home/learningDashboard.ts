@@ -368,7 +368,9 @@ function configForLessonTable(tdf: any) {
 }
 
 function shouldShowSettingsButton(tdf: any): boolean {
-  return Boolean(tdf.hasConfigurableSettings);
+  // Progress reset belongs to every standalone lesson, independently of which
+  // unit types expose learner-configurable fields.
+  return Boolean(tdf.TDFId);
 }
 
 function parseBooleanLike(value: unknown): boolean {

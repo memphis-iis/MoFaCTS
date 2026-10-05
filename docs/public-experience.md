@@ -41,3 +41,9 @@ Each role action on the overview starts its demonstration directly; there is no 
 The overview and ordinary authentication surfaces use the same semantic application roles as the authenticated interface. A theme selected on the current device therefore remains active before sign-in, after logout, and when the overview first loads; there is no separate public palette. Only colors, typography, density, and other visual styling come from the selected theme; identity comes from the deployment Brand Profile.
 
 Demo packages are authored in the canonical `mofacts_config` repository and must be uploaded through the normal package workflow before the corresponding route is available. No config content is published automatically by the application source change.
+
+## Standalone practice settings and reset
+
+Every lesson in Practice exposes **Settings**, including video, assessment, and instruction lessons. The panel shows only applicable personal settings. **Reset test progress → Confirm reset** removes the caller's saved history and attempt state for the whole lesson family, including prequiz answers and generated adaptive sequences; the next launch starts anew. Cancel leaves progress intact. This reset cannot be undone.
+
+Course Settings does not offer progress reset. The server also rejects a Practice reset when the lesson family is assigned through a current class in which the learner is enrolled. Reset does not change authored content, other learners' data, or personal lesson settings.

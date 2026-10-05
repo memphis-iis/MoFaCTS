@@ -15,7 +15,6 @@ import {
   LEARNER_TDF_FIELD_DEFINITIONS,
   applyLearnerTdfConfig,
   learnerTdfFieldAppliesToUnit,
-  unitHasConfigurableRuntime,
   type LearnerTdfConfig
 } from '../../../common/lib/learnerTdfConfig';
 
@@ -221,20 +220,10 @@ function unitHasLearnerConfigurableFields(unit: any) {
   });
 }
 
-function getConfigurableRuntimeUnitIndexes(content: any) {
-  return getTutorUnits(content)
-    .map((unit: any, index: number) => unitHasConfigurableRuntime(unit) ? index : -1)
-    .filter((index: number) => index >= 0);
-}
-
 function getLearnerConfigurableUnitIndexes(content: any) {
   return getTutorUnits(content)
     .map((unit: any, index: number) => unitHasLearnerConfigurableFields(unit) ? index : -1)
     .filter((index: number) => index >= 0);
-}
-
-function tdfHasConfigurableRuntime(content: any) {
-  return getConfigurableRuntimeUnitIndexes(content).length > 0;
 }
 
 function tdfHasLearnerConfigurableFields(content: any) {
@@ -554,7 +543,10 @@ export const learnerSettingsEvents = {
       ]);
       if (instance.learnerConfigState.get().tdfId !== tdfId) return;
       const content = tdfDoc?.content;
-      if (!Array.isArray(content?.tdfs?.tutor?.unit)) {
+      const canResetProgress = Boolean(instance.settingsProgressReset) && !courseAssignment;
+      const conditions = content?.tdfs?.tutor?.setspec?.condition;
+      const isConditionRoot = Array.isArray(conditions) && conditions.length > 0;
+      if (!Array.isArray(content?.tdfs?.tutor?.unit) && !(canResetProgress && isConditionRoot)) {
         instance.learnerConfigState.set({
           ...EMPTY_CONFIG_STATE,
           tdfId,
@@ -563,21 +555,12 @@ export const learnerSettingsEvents = {
         });
         return;
       }
-      if (!tdfHasConfigurableRuntime(content)) {
-        instance.learnerConfigState.set({
-          ...EMPTY_CONFIG_STATE,
-          tdfId,
-          courseAssignment,
-          error: dashboardText('dashboard.settingsNeedConfigurableUnits')
-        });
-        return;
-      }
       instance.learnerConfigState.set({
         ...EMPTY_CONFIG_STATE,
         tdfId,
         content,
         courseAssignment,
-        canResetProgress: Boolean(instance.settingsProgressReset),
+        canResetProgress,
         step: 'settings',
         scope: 'setspec',
         family: 'deliverySettings'
@@ -641,7 +624,8 @@ export const learnerSettingsEvents = {
   'click .learner-config-reset-progress': async function(event: any, instance: any) {
     event.preventDefault();
     const current = instance.learnerConfigState.get() as LearnerConfigState;
-    if (!current.tdfId || current.resettingProgress) {
+    if (!current.tdfId || !current.canResetProgress || current.courseAssignment
+      || typeof instance.settingsProgressReset !== 'function' || current.resettingProgress) {
       return;
     }
 
@@ -661,7 +645,7 @@ export const learnerSettingsEvents = {
       await instance.settingsProgressReset(result.cacheTdfIds);
       closeLearnerConfigPanel(instance);
     } catch (error: any) {
-      clientConsole(1, '[Dashboard Config] Failed to reset admin lesson progress:', error);
+      clientConsole(1, '[Learner Settings] Failed to reset own lesson progress:', error);
       const latest = instance.learnerConfigState.get() as LearnerConfigState;
       instance.learnerConfigState.set({
         ...latest,
