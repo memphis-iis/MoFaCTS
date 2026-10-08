@@ -38,6 +38,10 @@ MoFaCTS supports multiple stimulus and response formats, including:
 
 ## Authoring Guidance
 
+Trial type and duration control answer feedback. Drill trials (`d`), including video checkpoint questions, use `deliverySettings.correctprompt` after a correct answer and `deliverySettings.reviewstudy` after an incorrect answer or timeout. Durations are in milliseconds; zero skips that outcome's feedback phase. Test trials (`t` and button tests `h`) show no answer feedback even when those durations are positive. Study trials (`s`) display the answer using `purestudy`. There are no separate correct/incorrect feedback visibility switches. History records omit feedback text and type when the trial does not have an answer-feedback phase.
+
+Assessment schedule entries retain their authored input method on initial display, prepared transitions, and resume. A `b` entry uses buttons even for a single-answer introduction; an `f` entry retains typed input.
+
 - Keep item wording clear and concise.
 - Prefer explicit metadata over implicit naming conventions.
 - Verify media paths and file names before upload.
@@ -83,6 +87,8 @@ Editor review returns `status: 'confirmation-required'`, lesson identification, 
 
 Learner execution does not compare content signatures. Existing signature fields remain stored and unused. Saved positions and mappings remain intact; a valid permutation is reused regardless of current shuffle/swap settings. Frozen generated adaptive sequences continue to restore their saved units and questions. Missing units, missing or invalid mappings, missing questions and missing/invalid/wrong-lesson adaptive sequences fail with the concrete reason, without resetting progress, regenerating progressed mappings or selecting another unit.
 
+Fresh lessons that enter instructions directly save their initial question mapping before opening those instructions. The mapping uses the loaded lesson's canonical clusters and configured shuffle/swap ranges. A failed save prevents entry; valid saved mappings are reused on reload. This prevents introductory instruction completion from creating saved progress without a mapping. Existing affected attempts remain subject to the same strict resume checks and require separate review; this initialization repair does not reset them.
+
 ## Video participant controls
 
 Video units accept optional `videosession.preventPause` and `videosession.preventRewind`
@@ -102,8 +108,47 @@ browser rejection leaves Play available when no instruction or question is block
 These are player interaction controls, not guarantees against browser closure or OS
 interruptions. They do not change section timers or playback-speed settings.
 
+`rewindOnIncorrect` resets the checkpoint pointer when replaying an interval; scheduled
+questions in that interval can recur. There is no separate selective-repeat setting.
+On refresh, committed correct and incorrect checkpoint answers both count toward
+video resume progress. Playback resumes just after the last completed checkpoint;
+an unanswered checkpoint is presented again.
+The content list hides generated TDF record IDs; authored SPARC page, node, and rule
+identifiers remain available because authors use them to connect their content.
+
+Video activity is recorded with `eventType = "video"`, `levelUnitType = "video"`, and
+the playing media source as `displayedStimulus`. It does not depend on a checkpoint
+question being active. The ordinary TSV export includes these events and their video
+position, seek, speed, volume, and playback fields. Pure wire/export regression coverage
+runs with `node --test scripts/videoHistory.test.cjs`; saved-history integration uses CI.
+
 Run the player-policy regressions from `mofacts/` with
 `node --experimental-strip-types --test scripts/videoParticipantControls.test.cjs`.
+
+## Condition assignment
+
+Root TDFs may set `setspec.loadbalancing` to `"not-max"` in addition to the existing
+`"max"` and `"min"` modes. `not-max` excludes conditions tied at the highest count,
+or includes all conditions when every count ties. The server shuffles one block
+containing each eligible condition once and consumes it in order. It replenishes
+an exhausted block and rebuilds when the maximum count or eligible condition IDs change.
+
+The block and participant assignment commit in one MongoDB transaction. Retries and
+returning participants reuse the saved assignment. `countcompletion` still determines
+when counts increase; `"beginning"` counts commit with assignment, while later milestones
+retain their existing timing. Thus later completion counts need not equal assignment
+counts. Explicit owner previews do not consume the block or increment beginning counts.
+
+No existing study package is converted. The generated editor exposes the new enum
+value; omitted mode, `max`, and `min` retain their existing behavior. The server-owned
+block is runtime state, not authored TDF content. Resetting/replacing counts clears it.
+The supported Mongo replica-set runtime and the existing `unique_user_tdf` state index
+are required; no separate allocation collection, dependency or data migration is added.
+
+Run pure allocation regressions from `mofacts/` with
+`node --test scripts/conditionAllocation.test.cjs`. Real transaction/concurrency and
+authorization coverage is in `serverComposition.test.ts` and requires the supported
+Meteor test environment and fresh authorization for each `npm run test:ci` invocation.
 
 ## Retired Mechanical Turk fields
 
@@ -116,3 +161,16 @@ Experiment login defaults to the localized Participant ID label; an authored `ex
 Detailed course examples, content packages, sync workflows, and internal authoring notes belong in the configuration/content repository or the GitHub wiki, not in the public application README.
 
 The pure warning, adaptive-artifact and question-reference regressions run from `mofacts/` with `node --test scripts/contentUpdateWarnings.test.cjs`. Editor/server-method and package integration regressions use the supported Meteor CI test environment. Full application `npm run typecheck` and `npm run lint` remain required.
+
+### Assessment answer history
+
+Assessment and adaptive-practice answers are each saved once with their existing origin fields. Original assessment answers are available to later model loading; fixed assessment delivery is unchanged. Historical assessment copies are excluded from operational counts and ordinary exports. Existing deployments require the read-only preflight in [the history contract](history.md) before rollout.
+
+### Timed TutorScript worksheets
+
+TutorScript pages can opt into fixed-question work and read-only review with
+`display.worksheet`. Each answer is saved normally and is model-eligible for later
+loading; the worksheet does not update the live adaptive model. Video checkpoints
+select these same pages with `checkpointBehavior: "worksheet"` and aligned `pageIds`.
+See [worksheet authoring and history](worksheets.md) for fields, timing, resume,
+feedback exposure, bounds and verification.
