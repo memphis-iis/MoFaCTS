@@ -72,6 +72,10 @@ completed on reload. Scope includes learner, lesson, unit, page, checkpoint and 
 assignment when present; merely reloading does not create a new attempt. Conflicting
 starts/sequences and orphaned histories fail explicitly instead of silently merging.
 
+Worksheet controls and status messages use the learner’s interface language.
+Authored prompts, choices, answers and feedback retain their authored text; choosing
+an interface language does not translate lesson content.
+
 ## Persistence, security and verification
 
 `insertHistory` retains self/course/lesson authorization and adds deterministic worksheet
@@ -81,7 +85,9 @@ fields and reject more than 10,000 records rather than truncate reconstruction. 
 `worksheet_scoped_history` index supports the query prefix. No old histories are rewritten.
 
 Run `node --test scripts/worksheet.test.cjs` from `mofacts/` for pure lifecycle and
-write-identity coverage. Method authorization, bounded reads and duplicate-insert
+write-identity coverage. `node --test scripts/interfaceI18n.test.cjs` checks interface
+translation completeness and answer interpolation; `node --test scripts/analyticsMethods.test.cjs`
+checks isolated method contracts with synthetic dependencies. Method authorization, bounded reads and duplicate-insert
 coverage live in `server/methods/analyticsMethods.test.ts`; each Meteor integration
 invocation requires fresh authorization. Run schema generation, full-app typecheck and
 lint when changing this contract. Browser delivery requires the supported hotfix workflow

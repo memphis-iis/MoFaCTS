@@ -296,6 +296,29 @@ describe('analyticsMethods', function() {
     });
   }
 
+  for (const userId of [undefined, null, '', '   ']) {
+    for (const allocateCondition of [false, true]) {
+      it(`rejects missing caller identity ${JSON.stringify(userId)} before state access (allocation=${allocateCondition})`, async function() {
+        let accessedState = false;
+        const failOnStateAccess = () => { accessedState = true; throw new Error('Unexpected state access'); };
+        const { deps } = createAnalyticsDeps({
+          writeConditionState: failOnStateAccess,
+          Tdfs: { findOneAsync: failOnStateAccess },
+          GlobalExperimentStates: { findOneAsync: failOnStateAccess, insertAsync: failOnStateAccess },
+        });
+        const methods = createAnalyticsMethods(deps as any);
+        let failure: any;
+        try {
+          await methods.createExperimentState.call(
+            userId === undefined ? {} : { userId }, { currentRootTdfId: 'root-tdf' }, { allocateCondition },
+          );
+        } catch (error) { failure = error; }
+        expect(failure?.error).to.equal(401);
+        expect(accessedState).to.equal(false);
+      });
+    }
+  }
+
   it('replaces stale condition-scoped control state for an explicit fresh condition launch', async function() {
     let updateModifier: Record<string, any> | null = null;
     const { deps } = createAssignedRootDeps({

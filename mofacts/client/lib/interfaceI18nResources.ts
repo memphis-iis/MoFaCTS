@@ -3559,6 +3559,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'online help guide',
   },
   'zh-Hans': {
+    "worksheet.label": "练习表",
+    "worksheet.submitContinue": "提交并继续",
+    "worksheet.yourAnswer": "你的答案：{answer}",
+    "worksheet.correct": "正确",
+    "worksheet.incorrect": "错误",
+    "worksheet.saveFailed": "无法保存或加载练习表的记录。请刷新页面后再继续。",
+
     'content.questionsRemovedWarning': '此更新会移除题目或题目组，可能影响已有的学习记录。',
     'content.unitSequenceChangedWarning': '此更新会更改编写的单元顺序，可能影响已有的学习记录。',
     'common.submit': '提交',
@@ -5286,6 +5293,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': '在线帮助指南',
   },
   hi: {
+    "worksheet.label": "अभ्यास पत्रक",
+    "worksheet.submitContinue": "जमा करें और जारी रखें",
+    "worksheet.yourAnswer": "आपका उत्तर: {answer}",
+    "worksheet.correct": "सही",
+    "worksheet.incorrect": "गलत",
+    "worksheet.saveFailed": "अभ्यास पत्रक का इतिहास सहेजा या लोड नहीं किया जा सका। आगे बढ़ने से पहले पृष्ठ फिर से लोड करें।",
+
     'content.questionsRemovedWarning': 'यह अपडेट प्रश्न या प्रश्न समूह हटाता है और मौजूदा प्रयासों को बाधित कर सकता है।',
     'content.unitSequenceChangedWarning': 'यह अपडेट लिखे गए इकाइयों के क्रम को बदलता है और मौजूदा प्रयासों को बाधित कर सकता है।',
     'common.submit': 'जमा करें',
@@ -7013,6 +7027,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'ऑनलाइन सहायता मार्गदर्शिका',
   },
   es: {
+    "worksheet.label": "Hoja de ejercicios",
+    "worksheet.submitContinue": "Enviar y continuar",
+    "worksheet.yourAnswer": "Tu respuesta: {answer}",
+    "worksheet.correct": "Correcto",
+    "worksheet.incorrect": "Incorrecto",
+    "worksheet.saveFailed": "No se pudo guardar o cargar el historial de la hoja de ejercicios. Recarga la página antes de continuar.",
+
     'content.questionsRemovedWarning': 'Esta actualización elimina preguntas o grupos de preguntas y puede afectar los intentos existentes.',
     'content.unitSequenceChangedWarning': 'Esta actualización cambia la secuencia de unidades del contenido y puede afectar los intentos existentes.',
     'common.submit': 'Enviar',
@@ -8740,6 +8761,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'guía de ayuda en línea',
   },
   ar: {
+    "worksheet.label": "ورقة التمارين",
+    "worksheet.submitContinue": "إرسال ومتابعة",
+    "worksheet.yourAnswer": "إجابتك: {answer}",
+    "worksheet.correct": "صحيح",
+    "worksheet.incorrect": "غير صحيح",
+    "worksheet.saveFailed": "تعذر حفظ سجل ورقة التمارين أو تحميله. أعد تحميل الصفحة قبل المتابعة.",
+
     'content.questionsRemovedWarning': 'يزيل هذا التحديث أسئلة أو مجموعات أسئلة، وقد يؤثر في المحاولات الحالية.',
     'content.unitSequenceChangedWarning': 'يغير هذا التحديث تسلسل الوحدات المؤلفة، وقد يؤثر في المحاولات الحالية.',
     'common.submit': 'إرسال',
@@ -10467,6 +10495,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'دليل المساعدة عبر الإنترنت',
   },
   fr: {
+    "worksheet.label": "Feuille d’exercices",
+    "worksheet.submitContinue": "Envoyer et continuer",
+    "worksheet.yourAnswer": "Votre réponse : {answer}",
+    "worksheet.correct": "Correct",
+    "worksheet.incorrect": "Incorrect",
+    "worksheet.saveFailed": "Impossible d’enregistrer ou de charger l’historique de la feuille d’exercices. Rechargez la page avant de continuer.",
+
     'content.questionsRemovedWarning': 'Cette mise à jour supprime des questions ou des groupes de questions et peut perturber les tentatives existantes.',
     'content.unitSequenceChangedWarning': 'Cette mise à jour modifie la séquence des unités du contenu et peut perturber les tentatives existantes.',
     'common.submit': 'Envoyer',
@@ -12194,6 +12229,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'guide d’aide en ligne',
   },
   bn: {
+    "worksheet.label": "অনুশীলনপত্র",
+    "worksheet.submitContinue": "জমা দিন এবং চালিয়ে যান",
+    "worksheet.yourAnswer": "আপনার উত্তর: {answer}",
+    "worksheet.correct": "সঠিক",
+    "worksheet.incorrect": "ভুল",
+    "worksheet.saveFailed": "অনুশীলনপত্রের ইতিহাস সংরক্ষণ বা লোড করা যায়নি। চালিয়ে যাওয়ার আগে পৃষ্ঠাটি আবার লোড করুন।",
+
     'content.questionsRemovedWarning': 'এই আপডেট প্রশ্ন বা প্রশ্নের গুচ্ছ সরিয়ে দেয় এবং বিদ্যমান প্রচেষ্টায় বিঘ্ন ঘটাতে পারে।',
     'content.unitSequenceChangedWarning': 'এই আপডেট রচিত ইউনিটগুলোর ক্রম পরিবর্তন করে এবং বিদ্যমান প্রচেষ্টায় বিঘ্ন ঘটাতে পারে।',
     'common.submit': 'জমা দিন',
@@ -13921,6 +13963,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'অনলাইন সহায়তা নির্দেশিকা',
   },
   pt: {
+    "worksheet.label": "Folha de exercícios",
+    "worksheet.submitContinue": "Enviar e continuar",
+    "worksheet.yourAnswer": "Sua resposta: {answer}",
+    "worksheet.correct": "Correto",
+    "worksheet.incorrect": "Incorreto",
+    "worksheet.saveFailed": "Não foi possível salvar ou carregar o histórico da folha de exercícios. Recarregue a página antes de continuar.",
+
     'content.questionsRemovedWarning': 'Esta atualização remove perguntas ou grupos de perguntas e pode afetar as tentativas existentes.',
     'content.unitSequenceChangedWarning': 'Esta atualização altera a sequência das unidades do conteúdo e pode afetar as tentativas existentes.',
     'common.submit': 'Enviar',
@@ -15648,6 +15697,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'guia de ajuda online',
   },
   id: {
+    "worksheet.label": "Lembar latihan",
+    "worksheet.submitContinue": "Kirim dan lanjutkan",
+    "worksheet.yourAnswer": "Jawaban Anda: {answer}",
+    "worksheet.correct": "Benar",
+    "worksheet.incorrect": "Salah",
+    "worksheet.saveFailed": "Riwayat lembar latihan tidak dapat disimpan atau dimuat. Muat ulang halaman sebelum melanjutkan.",
+
     'content.questionsRemovedWarning': 'Pembaruan ini menghapus pertanyaan atau kelompok pertanyaan dan dapat mengganggu percobaan yang sudah ada.',
     'content.unitSequenceChangedWarning': 'Pembaruan ini mengubah urutan unit yang ditulis dan dapat mengganggu percobaan yang sudah ada.',
     'common.submit': 'Kirim',
@@ -17375,6 +17431,13 @@ export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> =
     'help.onlineHelpGuide': 'panduan bantuan online',
   },
   ur: {
+    "worksheet.label": "مشق کی شیٹ",
+    "worksheet.submitContinue": "جمع کریں اور جاری رکھیں",
+    "worksheet.yourAnswer": "آپ کا جواب: {answer}",
+    "worksheet.correct": "درست",
+    "worksheet.incorrect": "غلط",
+    "worksheet.saveFailed": "مشق کی شیٹ کی سابقہ معلومات محفوظ یا لوڈ نہیں ہو سکیں۔ جاری رکھنے سے پہلے صفحہ دوبارہ لوڈ کریں۔",
+
     'content.questionsRemovedWarning': 'یہ اپ ڈیٹ سوالات یا سوالات کے گروپس کو ہٹاتا ہے اور موجودہ کوششوں میں خلل ڈال سکتا ہے۔',
     'content.unitSequenceChangedWarning': 'یہ اپ ڈیٹ تیار کردہ یونٹس کی ترتیب کو بدلتا ہے اور موجودہ کوششوں میں خلل ڈال سکتا ہے۔',
     'common.submit': 'جمع کریں',

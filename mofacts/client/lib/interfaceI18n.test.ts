@@ -475,6 +475,22 @@ describe('interfaceI18n', function() {
   const apkgKeys = Object.keys(PLATFORM_LOCALE_RESOURCES.en)
     .filter((key) => key.startsWith('apkg.')) as Array<keyof LocaleResource>;
 
+  it('localizes worksheet controls and preserves the learner answer in every interface language', function() {
+    for (const [locale, resource] of Object.entries(PLATFORM_LOCALE_RESOURCES)) {
+      for (const key of ['worksheet.label', 'worksheet.submitContinue', 'worksheet.yourAnswer',
+        'worksheet.correct', 'worksheet.incorrect', 'worksheet.saveFailed'] as const) {
+        const text = requireResourceString(resource, key, `${locale} ${key}`);
+        if (locale !== 'en' && key !== 'worksheet.correct' && key !== 'worksheet.incorrect') {
+          expect(text, `${locale} ${key}`).not.to.equal(PLATFORM_LOCALE_RESOURCES.en[key]);
+        }
+      }
+      expect(translatePlatformString(locale, 'worksheet.yourAnswer', { answer: 'alpha.' }))
+        .to.contain('alpha.');
+      expect(() => translatePlatformString(locale, 'worksheet.yourAnswer'))
+        .to.throw('Missing interpolation value "answer"');
+    }
+  });
+
   it('keeps all starter platform translations complete for every target locale', function() {
     expect(() => assertCompletePlatformLocaleResources()).not.to.throw();
   });

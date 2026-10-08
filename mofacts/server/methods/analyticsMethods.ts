@@ -551,12 +551,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   }
 
   async function createExperimentState(
-    this: MethodContext | undefined,
     curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
-    actorUserId: string | null = null,
+    actorUserId: string | null,
     options: { replaceExistingState?: boolean; allocateCondition?: boolean } = {},
   ) {
-    const resolvedUserId = actorUserId || this?.userId || Meteor.userId();
+    const resolvedUserId = requireAuthenticatedUser(actorUserId, 'Must be logged in', 401);
     const rootTdfId = deps.normalizeCanonicalId((curExperimentState as any)?.currentRootTdfId)
       || deps.normalizeCanonicalId(curExperimentState.currentTdfId);
     if (!rootTdfId) {
@@ -1669,7 +1668,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       ) {
         throw new Meteor.Error(400, 'Invalid experiment state write options');
       }
-      return await createExperimentState.call(this, curExperimentState, this.userId || null, options);
+      return await createExperimentState(curExperimentState, this.userId || null, options);
     },
     getClassPerformanceByTDF,
     getStudentPerformanceByIdAndTDFIdFromHistory: async function(
@@ -1919,7 +1918,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
           'methods.updateExperimentState'
         );
       }
-      return await createExperimentState.call(this, curExperimentState, this.userId || null);
+      return await createExperimentState(curExperimentState, this.userId || null);
     },
 
     getOutcomesForAdaptiveLearning: async function(this: MethodContext, userId: string, TDFId: string) {

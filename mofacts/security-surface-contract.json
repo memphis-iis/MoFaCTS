@@ -145,7 +145,7 @@
     {
       "name": "createExperimentState",
       "access": "authenticated-self",
-      "notes": "Actor comes from method context; existing root-access and condition-family checks retained. not-max allocation and state writes use one Mongo transaction. Participants cannot supply or change their assigned condition; only the root owner retains explicit preview selection."
+      "notes": "Actor comes exclusively from the explicit method context and unauthenticated creation fails with 401 before any reads or writes; existing root-access and condition-family checks retained. not-max allocation and state writes use one Mongo transaction. Participants cannot supply or change their assigned condition; only the root owner retains explicit preview selection."
     },
     {
       "name": "createThemeFromBase",

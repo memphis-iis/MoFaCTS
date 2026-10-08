@@ -328,7 +328,8 @@ describe('resume runtime integration seams', function() {
       userAnswer: 'alpha',
       isCorrect: true,
       testType: 'd',
-      deliverySettings: { feedbackType: 'full' },
+      deliverySettings: { feedbackType: 'full', correctprompt: 2000 },
+      feedbackText: 'Correct. The answer is alpha.',
       engine: {
         unitType: 'schedule',
         findCurrentCardInfo: () => ({
@@ -352,6 +353,8 @@ describe('resume runtime integration seams', function() {
     expect(record.CFCorrectAnswer).to.equal('alpha');
     expect(record.CFStimFileIndex).to.equal(0);
     expect(record.outcome).to.equal('correct');
+    expect(record.feedbackText).to.equal('Correct. The answer is alpha.');
+    expect(record.feedbackType).to.equal('correct');
     expect(record.time).to.equal(1250);
     expect(record.problemStartTime).to.equal(1000);
     expect(record.modelEvidenceSource).to.equal('assessment');
@@ -370,7 +373,8 @@ describe('resume runtime integration seams', function() {
       userAnswer: 'alpha',
       isCorrect: true,
       testType: 'd',
-      deliverySettings: { feedbackType: 'full' },
+      deliverySettings: { feedbackType: 'full', correctprompt: 2000 },
+      feedbackText: 'Correct. The answer is alpha.',
       engine: {
         unitType: 'schedule',
         findCurrentCardInfo: () => ({
@@ -418,7 +422,8 @@ describe('resume runtime integration seams', function() {
       userAnswer: 'alpha',
       isCorrect: true,
       testType: 'd',
-      deliverySettings: { feedbackType: 'full' },
+      deliverySettings: { feedbackType: 'full', correctprompt: 2000 },
+      feedbackText: 'Correct. The answer is alpha.',
       engine: {
         unitType: 'model',
         findCurrentCardInfo: () => ({
@@ -485,7 +490,8 @@ describe('resume runtime integration seams', function() {
       userAnswer: 'alpha',
       isCorrect: true,
       testType: 'd',
-      deliverySettings: { feedbackType: 'full' },
+      deliverySettings: { feedbackType: 'full', correctprompt: 2000 },
+      feedbackText: 'Correct. The answer is alpha.',
       engine: {
         unitType: 'model',
         findCurrentCardInfo: () => ({
@@ -521,7 +527,8 @@ describe('resume runtime integration seams', function() {
       userAnswer: 'alpha',
       isCorrect: true,
       testType: 'd',
-      deliverySettings: { feedbackType: 'full' },
+      deliverySettings: { feedbackType: 'full', correctprompt: 2000 },
+      feedbackText: 'Correct. The answer is alpha.',
       engine: {
         unitType: 'schedule',
         findCurrentCardInfo: () => ({
