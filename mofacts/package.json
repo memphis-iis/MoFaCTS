@@ -9,7 +9,7 @@
   },
   "overrides": {
     "@xmldom/xmldom": "^0.8.15",
-    "brace-expansion": "^2.0.3",
+    "brace-expansion": "^2.1.7",
     "follow-redirects": "^1.16.0",
     "node-forge": "^1.4.0",
     "yaml": "^2.8.3",
@@ -19,7 +19,7 @@
     "ip-address": "^10.4.0",
     "qs": "$qs",
     "socket.io-parser": "^4.2.7",
-    "undici": "^7.29.0",
+    "undici": "^7.29.1",
     "ws@^7.0.0": "7.5.11",
     "ws@^8.0.0": "8.21.0",
     "ajv": "^8.18.0",
@@ -30,7 +30,7 @@
       "ajv": "^6.14.0"
     },
     "minimatch": "^9.0.9",
-    "shell-quote": "^1.8.4",
+    "shell-quote": "^1.11.0",
     "serialize-javascript": "^7.0.4",
     "terser-webpack-plugin": "^5.4.0",
     "@types/node": "^22.19.11",
@@ -110,7 +110,7 @@
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@meteorjs/rspack": "^2.0.1",
-    "@rsdoctor/rspack-plugin": "^1.5.11",
+    "@rsdoctor/rspack-plugin": "^1.6.4",
     "@rspack/cli": "1.7.12",
     "@rspack/core": "1.7.12",
     "@types/chai": "^5.2.3",
