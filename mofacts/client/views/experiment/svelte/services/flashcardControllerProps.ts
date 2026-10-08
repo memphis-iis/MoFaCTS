@@ -17,8 +17,6 @@ export interface FlashcardControllerDeliverySettings {
   readonly correctColor?: unknown;
   readonly correctLabelText?: unknown;
   readonly displayCorrectAnswerInIncorrectFeedback?: unknown;
-  readonly displayCorrectFeedback?: unknown;
-  readonly displayIncorrectFeedback?: unknown;
   readonly displayQuestionNumber?: unknown;
   readonly displayUserAnswerInFeedback?: unknown;
   readonly feedbackLayout?: unknown;
@@ -31,9 +29,7 @@ export interface FlashcardControllerDeliverySettings {
 
 export interface FlashcardControllerSlotState {
   readonly correctColor?: unknown;
-  readonly displayCorrectFeedback?: unknown;
   readonly displayVisible?: unknown;
-  readonly displayIncorrectFeedback?: unknown;
   readonly feedbackMessage?: unknown;
   readonly feedbackUserAnswer?: unknown;
   readonly feedbackVisible?: unknown;
@@ -85,8 +81,6 @@ export interface FlashcardControllerPropsFromSubsetInput {
   readonly correctColor: unknown;
   readonly defaultInputMode: string;
   readonly deliverySettings: FlashcardControllerDeliverySettings;
-  readonly displayCorrectFeedback: unknown;
-  readonly displayIncorrectFeedback: unknown;
   readonly feedbackMessage: unknown;
   readonly feedbackUserAnswer: unknown;
   readonly inputEnabled: unknown;
@@ -159,8 +153,6 @@ export function buildFlashcardControllerProps(
     correctColor: slotState.correctColor || input.deliverySettings.correctColor,
     defaultInputMode: String(slotState.inputMode || input.defaultInputMode),
     deliverySettings: input.deliverySettings,
-    displayCorrectFeedback: slotState.displayCorrectFeedback,
-    displayIncorrectFeedback: slotState.displayIncorrectFeedback,
     feedbackMessage: slotState.feedbackMessage || '',
     feedbackUserAnswer: slotState.feedbackUserAnswer || '',
     inputEnabled: slotState.inputEnabled,
@@ -222,8 +214,6 @@ export function buildFlashcardControllerPropsFromSubset(
       forceCorrectPrompt: input.deliverySettings.forceCorrectPrompt || 'Please type the correct answer to continue',
       correctColor: input.correctColor || input.deliverySettings.correctColor,
       incorrectColor: input.deliverySettings.incorrectColor,
-      displayCorrectFeedback: Boolean(input.displayCorrectFeedback),
-      displayIncorrectFeedback: Boolean(input.displayIncorrectFeedback),
       displayUserAnswerInFeedback: input.deliverySettings.displayUserAnswerInFeedback,
       feedbackLayout: input.deliverySettings.feedbackLayout,
       displayCorrectAnswerInIncorrectFeedback: input.deliverySettings.displayCorrectAnswerInIncorrectFeedback,

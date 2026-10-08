@@ -70,12 +70,6 @@ export function buildIncomingTrialSlotDisplaySnapshot(
           correctColor: kind === 'study'
             ? 'var(--app-text-color)'
             : input.deliverySettings.correctColor,
-          displayCorrectFeedback: kind === 'study'
-            ? true
-            : input.deliverySettings.displayCorrectFeedback,
-          displayIncorrectFeedback: kind === 'study'
-            ? false
-            : input.deliverySettings.displayIncorrectFeedback,
         },
         trialLike: input.preparedTrial,
       })

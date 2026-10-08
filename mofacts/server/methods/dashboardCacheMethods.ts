@@ -3,7 +3,7 @@ import type {
   DashboardHistoryRecord,
   DashboardTdfStats,
 } from './dashboardCacheMethods.contracts';
-import { createStimulusKey, isBlankIdentityValue } from '../../common/historyEnvelope';
+import { createStimulusKey, isBlankIdentityValue, isAssessmentHistoryCopy, isModelPracticeHistoryRecord, operationalHistorySelector } from '../../common/historyEnvelope';
 import { curSemester } from '../../common/Definitions';
 import {
   DASHBOARD_CACHE_VERSION,
@@ -82,17 +82,11 @@ function isAutoTutorRecord(record: DashboardHistoryRecord): boolean {
 }
 
 function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): boolean {
-  if (record.levelUnitType === 'model' && record.modelEvidenceSource === 'assessment') {
-    return false;
-  }
-  return true;
+  return !isAssessmentHistoryCopy(record);
 }
 
 function resolveDashboardModelStimulusKey(record: DashboardHistoryRecord): string | null {
-  if (
-    record.levelUnitType !== 'model' ||
-    record.modelEvidenceSource === 'assessment'
-  ) {
+  if (!isModelPracticeHistoryRecord(record)) {
     return null;
   }
   if (isBlankIdentityValue(record.stimuliSetId) || isBlankIdentityValue(record.stimulusKC)) {
@@ -115,9 +109,7 @@ function dashboardHistorySelector(extraSelector: Record<string, unknown> = {}): 
   return {
     ...extraSelector,
     levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES },
-    $nor: [
-      { levelUnitType: 'model', modelEvidenceSource: 'assessment' },
-    ],
+    ...operationalHistorySelector(),
   };
 }
 

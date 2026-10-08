@@ -6,20 +6,20 @@ describe('lessonLaunchEntryRoute', function() {
   it('initializes instruction identity without needing navigation (cold reload)', function() {
     const unit = { unitname: 'Instructions', unitinstructions: 'Read first' };
     const state: Record<string, unknown> = {};
-    const entry = initializeLessonLaunchEntry({
+    const entry = initializeLessonLaunchEntry(resolveLessonLaunchEntryRoute({
       content: { tdfs: { tutor: { unit: [unit] } } },
       intent: CARD_ENTRY_INTENT.INITIAL_TDF_ENTRY,
-    }, (key, value) => { state[key] = value; });
+    }), (key, value) => { state[key] = value; });
     expect(entry.route).to.equal('/instructions');
     expect(state).to.deep.equal({ currentUnitNumber: 0, currentTdfUnit: unit, curUnitInstructionsSeen: false });
   });
 
   it('leaves persisted unit restoration to the content lifecycle, never resets to zero', function() {
     const writes: string[] = [];
-    const entry = initializeLessonLaunchEntry({
+    const entry = initializeLessonLaunchEntry(resolveLessonLaunchEntryRoute({
       content: { tdfs: { tutor: { unit: [{ unitinstructions: 'Read first' }] } } },
       intent: CARD_ENTRY_INTENT.PERSISTED_PROGRESS_RESUME,
-    }, (key) => { writes.push(key); });
+    }), (key) => { writes.push(key); });
     expect(entry.route).to.equal('/content');
     expect(writes).to.deep.equal([]);
   });

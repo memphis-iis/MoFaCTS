@@ -28,11 +28,9 @@ import {
   getStimuliSetById,
   getHistoryByTDFID,
   serverConsole} from './serverComposition';
-import {outputFields} from '../common/Definitions';
-import {getHistory} from '../server/orm';
 import _ from 'underscore';
 
-import { legacyTrim } from '../common/underscoreCompat';
+import { writeHistoryExport } from './lib/historyExport';
 
 export {
   createExperimentExport,
@@ -41,7 +39,6 @@ export {
   writeExperimentExportFromHistoryIterable,
 };
 
-let FIELDSDS = JSON.parse(JSON.stringify(outputFields));
 
 function toSortableNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -102,35 +99,6 @@ function sortHistoriesByStudentThenTime(histories: any[]): any[] {
   });
 }
 
-// Helper to transform our output record into a delimited record
-// Need to adhere to these data limittions: https://datashop.memphis.edu/help?page=importFormatTd
-async function delimitedRecord(rec: any, listOfDynamicStimTags: any[], isHeader = false) {
-  let vals: any = new Array(FIELDSDS.length);
-  for (let i = 0; i < FIELDSDS.length; ++i) {
-    let charLimit = 255;
-    if(FIELDSDS[i] == 'Feedback Text' || FIELDSDS[i].slice(0,2) == "KC"){
-      charLimit = 65535;
-    }
-    else if(FIELDSDS[i].slice(0,2) == "CF"){
-      charLimit = 65000;
-    }
-    vals[i] = legacyTrim(rec[FIELDSDS[i]])
-        .replace(/\s+/gm, ' ') // Norm ws and remove non-space ws
-        .slice(0, charLimit) // Respect len limits for data shop
-        .replace(/\s+$/gm, ''); // Might have revealed embedded space at end
-  }
-  for(let i = 0; i < listOfDynamicStimTags.length; i++){
-    let record = isHeader ? `CF (${listOfDynamicStimTags[i]})` : rec[`CF (${listOfDynamicStimTags[i]})`];
-    vals.push(legacyTrim(record)
-      .replace(/\s+/gm, ' ') // Norm ws and remove non-space ws
-      .slice(0, 65000) // CF fields are limited too 65000 characters
-      .replace(/\s+$/gm, '')); // Might have revealed embedded space at end
-  }
-  vals = vals.join('\t') + "\n"
-  return vals;
-}
-
-
 // Exported main function: call recordAcceptor with each record generated
 // for expName in datashop format. We do NOT terminate our records.
 // We return the number of records written
@@ -187,32 +155,7 @@ async function writeExperimentExportFromHistoryIterable(
   histories: Iterable<any> | AsyncIterable<any>,
   writeRecord: (chunk: string) => void | Promise<void>
 ) {
-  const header: Record<string, string> = {};
-  const listOfDynamicStimTags: any[] = [];
-
-  FIELDSDS.forEach(function(f: string) {
-    const prefix = f.substr(0, 14);
-
-    let t;
-    if (prefix === 'Condition Name') {
-      t = 'Condition Name';
-    } else if (prefix === 'Condition Type') {
-      t = 'Condition Type';
-    } else {
-      t = f;
-    }
-
-    header[f] = t;
+  await writeHistoryExport(histories, writeRecord, (error) => {
+    serverConsole('There was an error populating the record - it will be skipped', error);
   });
-
-  await writeRecord(await delimitedRecord(header, listOfDynamicStimTags, true));
-
-  for await (let history of histories) {
-      try {
-        history = getHistory(history);
-        await writeRecord(await delimitedRecord(history, listOfDynamicStimTags, false));
-      } catch (e: any) {
-        serverConsole('There was an error populating the record - it will be skipped', e, e.stack);
-      }
-  }
 }

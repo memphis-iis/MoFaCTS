@@ -28,10 +28,9 @@ export type LessonLaunchEntryRoute =
 type UnitEntrySurface = 'instructions' | 'content';
 
 export function initializeLessonLaunchEntry(
-  params: Parameters<typeof resolveLessonLaunchEntryRoute>[0],
+  entry: LessonLaunchEntryRoute,
   setSession: (key: string, value: unknown) => void,
 ): LessonLaunchEntryRoute {
-  const entry = resolveLessonLaunchEntryRoute(params);
   if (entry.route === '/instructions' || entry.currentUnitNumber !== undefined) {
     setSession('currentUnitNumber', entry.currentUnitNumber);
     setSession('currentTdfUnit', entry.currentTdfUnit);

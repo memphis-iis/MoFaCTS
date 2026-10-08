@@ -6,7 +6,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { TRIAL_TYPES, SUPPORTED_TRIAL_TYPES, THRESHOLDS, ERROR_SEVERITY_MAP, ERROR_SEVERITY } from './constants';
-import { getFeedbackTimeoutMs } from '../utils/timeoutUtils';
+import { hasAnswerFeedback } from '../utils/timeoutUtils';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { getAudioPromptMode } from '../../../../lib/state/audioState';
 import {
@@ -21,7 +21,7 @@ import {
   isResumeRequested,
 } from '../services/cardRuntimeState';
 
-type FeedbackTimeoutContext = Parameters<typeof getFeedbackTimeoutMs>[0];
+type FeedbackTimeoutContext = Parameters<typeof hasAnswerFeedback>[0];
 type PreparedAdvanceMode = 'none' | 'seamless' | 'direct';
 
 type ContentRuntimeMachineActorArgs = {
@@ -57,7 +57,6 @@ type ContentRuntimeMachineActorArgs = {
     };
     feedbackText?: string | undefined;
     feedbackRevealStarted?: boolean | undefined;
-    feedbackSuppressed?: boolean | undefined;
     blocksNeedsTray?: boolean | undefined;
   };
   event: {
@@ -73,14 +72,14 @@ type ContentRuntimeMachineActorArgs = {
   };
 };
 
-function resolveFeedbackTimeoutMs({ context, event }: ContentRuntimeMachineActorArgs): number {
+function resolveAnswerFeedback({ context, event }: ContentRuntimeMachineActorArgs): boolean {
   const validationResult = event?.output;
   const validationIsCorrect =
     validationResult && typeof validationResult === 'object' && 'isCorrect' in validationResult
       ? Boolean(validationResult.isCorrect)
       : context.isCorrect;
 
-  return getFeedbackTimeoutMs({
+  return hasAnswerFeedback({
     deliverySettings: context.deliverySettings,
     testType: context.testType,
     isCorrect: validationIsCorrect,
@@ -299,15 +298,11 @@ export function ttsDisabled(_args: ContentRuntimeMachineActorArgs): boolean {
 }
 
 function feedbackContentReady({ context }: ContentRuntimeMachineActorArgs): boolean {
-  if (context.feedbackSuppressed === true) {
-    return true;
-  }
   return typeof context.feedbackText === 'string' && context.feedbackText.trim() !== '';
 }
 
 export function feedbackReadyForTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
-    args.context.feedbackSuppressed !== true &&
     feedbackContentReady(args) &&
     audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'feedback');
 }
@@ -315,7 +310,7 @@ export function feedbackReadyForTts(args: ContentRuntimeMachineActorArgs): boole
 export function feedbackReadyWithoutTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
     feedbackContentReady(args) &&
-    (args.context.feedbackSuppressed === true || !audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'feedback'));
+    !audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'feedback');
 }
 
 // =============================================================================
@@ -330,11 +325,7 @@ export function feedbackReadyWithoutTts(args: ContentRuntimeMachineActorArgs): b
  * @returns {boolean}
  */
 export function needsFeedback(args: ContentRuntimeMachineActorArgs): boolean {
-  const feedbackTimeoutMs = resolveFeedbackTimeoutMs(args);
-  return (
-    isDrillTrial(args) &&
-    feedbackTimeoutMs > 0
-  );
+  return resolveAnswerFeedback(args);
 }
 
 /**

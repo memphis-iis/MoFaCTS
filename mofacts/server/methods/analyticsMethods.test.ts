@@ -1,3 +1,4 @@
+import { modelPracticeHistorySelector } from '../../common/historyEnvelope';
 import { expect } from 'chai';
 import { progressiveRevisionId } from '../lib/progressiveAssignmentRevision';
 import { createAnalyticsMethods } from './analyticsMethods';
@@ -146,6 +147,103 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('analyticsMethods', function() {
+  it('deduplicates worksheet transport retries and rejects conflicting writes', async function() {
+    const stored = new Map<string, Record<string, unknown>>(); let updates = 0;
+    const base = createAnalyticsDeps();
+    const { deps } = createAnalyticsDeps({
+      Histories: { ...base.deps.Histories,
+        insertAsync: async (record: Record<string, unknown>) => {
+          const key = String(record._id);
+          if (stored.has(key)) throw Object.assign(new Error('duplicate'), { code: 11000 });
+          stored.set(key, record); return key;
+        },
+        findOneAsync: async (selector: Record<string, unknown>) => stored.get(String(selector._id)),
+      },
+      onHistoryInserted: async () => { updates++; },
+    });
+    const methods = createAnalyticsMethods(deps as any);
+    const record = createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparc', outcome: 'unknown',
+      input: '', responseValue: '', sparc: { pageKey: 'worksheet', sourceAddress: {pageKey:'worksheet',nodeId:'root'},
+        worksheet: { attemptId:'attempt', checkpointIndex:0, sequence:1, writeId:'write', kind:'start', order:['q'], deadline:2000 } } });
+    await Promise.all([methods.insertHistory.call({userId:'learner-1'},record), methods.insertHistory.call({userId:'learner-1'},record)]);
+    expect(stored.size).to.equal(1); expect(updates).to.equal(1);
+    let conflict: any;
+    try { await methods.insertHistory.call({userId:'learner-1'},{...record,time:1710000001000}); } catch(error) { conflict = error; }
+    expect(conflict?.error).to.equal('worksheet-history-conflict'); expect(stored.size).to.equal(1);
+  });
+
+  it('bounds worksheet history and retains learner, lesson, unit and checkpoint scope', async function() {
+    let query: any; let readOptions: any; let rowCount = 0;
+    const { deps } = createAnalyticsDeps({Histories: {
+      find: (selector: unknown, options: unknown) => { query=selector; readOptions=options; return {fetchAsync: async()=>Array(rowCount).fill({})}; },
+    }});
+    const methods=createAnalyticsMethods(deps as any);
+    await methods.getSparcHistoryForUnit.call({userId:'learner-1'},'learner-1','tdf-1',2,{worksheetPageKey:'page',worksheetCheckpointIndex:3});
+    expect(query).to.include({userId:'learner-1',TDFId:'tdf-1',levelUnit:2,'sparc.pageKey':'page','sparc.worksheet.checkpointIndex':3});
+    expect(query.courseAssignment).to.deep.equal({$exists:false}); expect(readOptions.limit).to.equal(10001);
+    expect(readOptions.fields.sparc).to.equal(1); rowCount=10001;
+    let limit: any;
+    try { await methods.getSparcHistoryForUnit.call({userId:'learner-1'},'learner-1','tdf-1',2,{worksheetPageKey:'page',worksheetCheckpointIndex:3}); } catch(error) { limit=error; }
+    expect(limit?.error).to.equal('worksheet-history-limit');
+    let denied: any;
+    try { await methods.getSparcHistoryForUnit.call({userId:'learner-2'},'learner-1','tdf-1',2,{worksheetPageKey:'page',worksheetCheckpointIndex:3}); } catch(error) { denied=error; }
+    expect(denied?.error).to.equal(403);
+  });
+
+  it('saves an original assessment once and rejects obsolete client copies before persistence or aggregate updates', async function() {
+    let crowdUpdates = 0;
+    const { deps, insertedHistory } = createAnalyticsDeps({ StimulusCrowdStats: {
+      upsertAsync: async () => { crowdUpdates++; }, find: () => ({ fetchAsync: async () => [] }),
+    } });
+    const methods = createAnalyticsMethods(deps as any);
+    await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord({
+      levelUnitType: 'schedule', modelEvidenceSource: 'assessment',
+    }));
+    let rejected: any;
+    try {
+      await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord({ modelEvidenceSource: 'assessment' }));
+    } catch (error) { rejected = error; }
+    expect(rejected?.error).to.equal('obsolete-assessment-history-write');
+    expect(insertedHistory).to.have.length(1);
+    expect(insertedHistory[0]?.levelUnitType).to.equal('schedule');
+    expect(crowdUpdates).to.equal(1);
+  });
+
+  it('counts both answered video outcomes and excludes unrelated histories on resume', async function() {
+    const selectors: Record<string, unknown>[] = [];
+    const { deps } = createAnalyticsDeps({ Histories: {
+      find: (selector: Record<string, unknown>) => {
+        selectors.push(selector);
+        return { countAsync: async () => 2 };
+      },
+    } });
+    const methods = createAnalyticsMethods(deps as any);
+    expect(await methods.getVideoCompletedCheckpointQuestionCountFromHistory.call(
+      { userId: 'learner-1' }, 'learner-1', 'tdf-1', 2,
+    )).to.equal(2);
+    expect(selectors).to.deep.equal([{
+      userId: 'learner-1', TDFId: 'tdf-1', levelUnitType: 'video', levelUnit: 2,
+      studentResponseType: 'ATTEMPT', outcome: { $in: ['correct', 'incorrect'] },
+    }]);
+  });
+
+  it('rejects an unauthorized video resume query before reading any history', async function() {
+    let reads = 0;
+    const { deps } = createAnalyticsDeps({ Histories: {
+      find: () => { reads++; return { countAsync: async () => 0 }; },
+    } });
+    const methods = createAnalyticsMethods(deps as any);
+    for (const caller of [null, 'other-learner']) {
+      let caught: unknown;
+      try {
+        await methods.getVideoCompletedCheckpointQuestionCountFromHistory.call(
+          { userId: caller }, 'learner-1', 'tdf-1', 2,
+        );
+      } catch (error) { caught = error; }
+      expect(caught).to.be.instanceOf(Error);
+    }
+    expect(reads).to.equal(0);
+  });
   function createAssignedRootDeps(overrides: Record<string, unknown> = {}) {
     return createAnalyticsDeps({
       resolveAssignedRootTdfIdsForUser: async () => ['root-tdf'],
@@ -410,7 +508,7 @@ describe('analyticsMethods', function() {
     expect(capturedSelector).to.deep.equal({
       userId: 'learner-1',
       TDFId: 'root-tdf',
-      levelUnitType: 'model',
+      ...modelPracticeHistorySelector(),
       levelUnit: { $lte: 1 },
     });
   });
@@ -478,7 +576,7 @@ describe('analyticsMethods', function() {
     expect(rows).to.deep.equal(courseRows);
     expect(capturedSelector).to.deep.equal({
       userId: 'learner-1',
-      levelUnitType: 'model',
+      ...modelPracticeHistorySelector(),
       $or: [{ TDFId: { $in: ['root-tdf'] } }],
     });
     expect(capturedFindOptions).to.deep.include({
@@ -591,7 +689,7 @@ describe('analyticsMethods', function() {
 
     expect(capturedSelector).to.deep.equal({
       userId: 'learner-1',
-      levelUnitType: 'model',
+      ...modelPracticeHistorySelector(),
       $or: [
         { TDFId: { $in: ['lesson-1', 'lesson-2'] } },
       ],

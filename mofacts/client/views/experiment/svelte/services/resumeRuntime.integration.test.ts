@@ -1,11 +1,15 @@
 import { expect } from 'chai';
+import sinon from 'sinon';
+import { Meteor } from 'meteor/meteor';
+import { decompressHistoryRecord } from '../../../../../common/historyCompression';
 import { Session } from 'meteor/session';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
 import {
   resolveSelectedCardExportQuestionIndex,
   selectCardService,
 } from './unitEngineService';
-import { createAssessmentModelEvidenceRecord, createHistoryRecord, historyLoggingService } from './historyLogging';
+import { createHistoryRecord, historyLoggingService } from './historyLogging';
+import { isModelPracticeHistoryRecord } from '../../../../../common/historyEnvelope';
 import {
   getQuestionIndex,
   resetQuestionIndex,
@@ -90,6 +94,27 @@ function primeMinimalSession(): void {
 }
 
 describe('resume runtime integration seams', function() {
+  it('writes exactly one original assessment answer through the real client logging service', async function() {
+    const sandbox = sinon.createSandbox();
+    const previousCourseContext = Session.get('courseAssignmentLaunchContext');
+    try {
+      Session.set('courseAssignmentLaunchContext', null);
+      sandbox.stub(Meteor, 'userId').returns('synthetic-learner');
+      sandbox.stub(Meteor, 'user').returns({ _id: 'synthetic-learner', username: 'synthetic' });
+      const call = sandbox.stub(Meteor, 'callAsync').resolves();
+      const engine = { unitType: 'schedule', findCurrentCardInfo: () => ({ clusterIndex: 0, whichStim: 0, probabilityEstimate: 0.7 }) };
+      await historyLoggingService({
+        testType: 't', isCorrect: true, userAnswer: 'alpha', source: 'keyboard', deliverySettings: {},
+        currentAnswer: 'alpha', originalAnswer: 'alpha', currentDisplay: { text: 'Prompt 1' }, engine,
+        timestamps: { trialStart: 1000, trialEnd: 1500, firstKeypress: 1100, feedbackStart: 0, feedbackEnd: 1500 },
+      }, { skipOutcomeHistoryUpdate: true });
+      expect(call.callCount).to.equal(1);
+      expect(call.firstCall.args[0]).to.equal('insertHistory');
+      const record = decompressHistoryRecord(call.firstCall.args[1] as Record<string, unknown>);
+      expect(record).to.include({ levelUnitType: 'schedule', modelEvidenceSource: 'assessment', outcome: 'correct' });
+    } finally { sandbox.restore(); Session.set('courseAssignmentLaunchContext', previousCourseContext); }
+  });
+
   beforeEach(function() {
     primeMinimalSession();
     ExperimentStateStore.set({ clusterMapping: [0] });
@@ -336,7 +361,7 @@ describe('resume runtime integration seams', function() {
     expect(record.KCId).to.equal('KC-1');
   });
 
-  it('creates a model-scoped companion row for assessment shared-model evidence', function() {
+  it('uses the original assessment row directly as shared-model evidence', function() {
     const record = createHistoryRecord({
       trialEndTimeStamp: 2000,
       trialStartTimeStamp: 1000,
@@ -365,11 +390,10 @@ describe('resume runtime integration seams', function() {
       },
     });
 
-    const companion = createAssessmentModelEvidenceRecord(record);
-
     expect(record.levelUnitType).to.equal('schedule');
-    expect(companion).to.include({
-      levelUnitType: 'model',
+    expect(isModelPracticeHistoryRecord(record)).to.equal(true);
+    expect(record).to.include({
+      levelUnitType: 'schedule',
       modelEvidenceSource: 'assessment',
       clusterKC: '1000',
       KCCluster: '1000',

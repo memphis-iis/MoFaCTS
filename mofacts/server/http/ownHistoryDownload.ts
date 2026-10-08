@@ -1,3 +1,4 @@
+import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
 import type { IncomingMessage, ServerResponse } from 'http';
@@ -55,7 +56,7 @@ WebApp.connectHandlers.use('/data-download/own-history', async (req: IncomingMes
     }
 
     const history = await Histories.findOneAsync(
-      { userId: record.userId },
+      { userId: record.userId, ...operationalHistorySelector() },
       { fields: { _id: 1 } }
     );
     if (!history) {
@@ -73,7 +74,7 @@ WebApp.connectHandlers.use('/data-download/own-history', async (req: IncomingMes
 
     const cursor = (Histories.rawCollection() as any)
       .find(
-        { userId: record.userId },
+        { userId: record.userId, ...operationalHistorySelector() },
         { sort: { recordedServerTime: 1, time: 1, eventId: 1 } }
       )
       .batchSize(HISTORY_EXPORT_BATCH_SIZE);

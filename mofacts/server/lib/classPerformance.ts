@@ -1,4 +1,5 @@
 import type { DueDateException } from '../../common/courseAssignments.contracts';
+import { operationalHistorySelector } from '../../common/historyEnvelope';
 
 type ClassPerformanceEntry = {
   userId: string;
@@ -98,7 +99,7 @@ async function aggregateHistoryStatsByUser(
   extraMatch?: Record<string, unknown>
 ) {
   const pipeline: Record<string, unknown>[] = [
-    { $match: baseMatch }
+    { $match: { ...baseMatch, ...operationalHistorySelector() } }
   ];
 
   if (extraMatch) {

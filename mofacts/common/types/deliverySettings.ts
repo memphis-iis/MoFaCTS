@@ -10,8 +10,6 @@ export interface DeliverySettings {
   stimuliPosition?: StimuliPosition;
   isVideoSession?: boolean;
   videoUrl?: string;
-  displayCorrectFeedback?: boolean;
-  displayIncorrectFeedback?: boolean;
   correctLabelText?: string;
   incorrectLabelText?: string;
   correctColor?: string;

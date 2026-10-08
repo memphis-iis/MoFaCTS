@@ -34,8 +34,6 @@
   export let feedbackMessage = '';
   export let correctColor = 'var(--feedback-correct-color)';
   export let incorrectColor = 'var(--feedback-error-color)';
-  export let displayCorrectFeedback = true;
-  export let displayIncorrectFeedback = true;
   export let displayUserAnswerInFeedback = 'onIncorrect';
   export let feedbackLayout = 'stacked';
   export let displayCorrectAnswerInIncorrectFeedback = true;
@@ -59,8 +57,6 @@
       {feedbackMessage}
       {correctColor}
       {incorrectColor}
-      {displayCorrectFeedback}
-      {displayIncorrectFeedback}
       {displayUserAnswerInFeedback}
       {feedbackLayout}
       {displayCorrectAnswerInIncorrectFeedback}

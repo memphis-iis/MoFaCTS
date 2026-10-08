@@ -615,6 +615,8 @@
       class:sparc-correctness-correct={getNodeCorrectness(node) === 'correct'}
       class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
       data-node-id={node.id}
+      aria-pressed={node.selected === undefined ? undefined : node.selected}
+      class:worksheet-selected={node.selected === true}
       disabled={node.readOnly === true}
       on:click={() => authoringSelectOnly ? onNodeFocus(node.id) : onButtonActivate(node)}
     >
@@ -626,6 +628,7 @@
 {/if}
 
 <style>
+  .worksheet-selected { outline: 3px solid currentColor; outline-offset: 2px; }
   .sparc-group {
     width: 100%;
     display: flex;

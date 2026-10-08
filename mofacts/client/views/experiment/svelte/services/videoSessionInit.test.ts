@@ -5,25 +5,21 @@ describe('video session init', function() {
   it('normalizes video playback policy flags from authored session values', function() {
     expect(resolveVideoPlaybackPolicy({
       preventScrubbing: 'true',
-      repeatQuestionsSinceCheckpoint: 1,
       rewindOnIncorrect: true,
     })).to.deep.equal({
       preventScrubbing: true,
       preventPause: false,
       preventRewind: false,
-      repeatQuestionsSinceCheckpoint: true,
       rewindOnIncorrect: true,
     });
 
     expect(resolveVideoPlaybackPolicy({
       preventScrubbing: 'false',
-      repeatQuestionsSinceCheckpoint: 0,
       rewindOnIncorrect: undefined,
     })).to.deep.equal({
       preventScrubbing: false,
       preventPause: false,
       preventRewind: false,
-      repeatQuestionsSinceCheckpoint: false,
       rewindOnIncorrect: false,
     });
 
@@ -31,7 +27,6 @@ describe('video session init', function() {
       preventScrubbing: false,
       preventPause: false,
       preventRewind: false,
-      repeatQuestionsSinceCheckpoint: false,
       rewindOnIncorrect: false,
     });
   });
@@ -46,14 +41,12 @@ describe('video session init', function() {
     expect(resolveVideoPlaybackPolicyForUnit({
       videosession: {
         preventScrubbing: true,
-        repeatQuestionsSinceCheckpoint: '1',
         rewindOnIncorrect: 0,
       },
     })).to.deep.equal({
       preventScrubbing: true,
       preventPause: false,
       preventRewind: false,
-      repeatQuestionsSinceCheckpoint: true,
       rewindOnIncorrect: false,
     });
 
@@ -61,7 +54,6 @@ describe('video session init', function() {
       preventScrubbing: false,
       preventPause: false,
       preventRewind: false,
-      repeatQuestionsSinceCheckpoint: false,
       rewindOnIncorrect: false,
     });
   });

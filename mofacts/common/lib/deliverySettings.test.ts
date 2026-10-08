@@ -6,6 +6,13 @@ import {
 } from './deliverySettingsMigration';
 
 describe('deliverySettings migration', function() {
+  it('drops retired visibility switches without rewriting feedback durations', function() {
+    const result = migrateTdfDeliverySettings({ tdfs: { tutor: {
+      deliverySettings: { displayCorrectFeedback: false, displayIncorrectFeedback: false, correctprompt: 2000, reviewstudy: 2000 },
+    } } });
+    expect(result.tdf.tdfs.tutor.deliverySettings).to.deep.equal({ correctprompt: 2000, reviewstudy: 2000 });
+    expect(result.warnings).to.have.length(2);
+  });
   it('migrates root deliveryparams and setspec uiSettings into tutor.deliverySettings', function() {
     const result = migrateTdfDeliverySettings({
       tdfs: {
@@ -18,7 +25,7 @@ describe('deliverySettings migration', function() {
           },
           setspec: {
             uiSettings: {
-              displayCorrectFeedback: 'false',
+              displayQuestionNumber: 'false',
             },
           },
         },
@@ -28,7 +35,7 @@ describe('deliverySettings migration', function() {
     const tutor = (result.tdf as any).tdfs.tutor;
     expect(tutor.deliverySettings).to.deep.equal({
       optimalThreshold: 0.95,
-      displayCorrectFeedback: false,
+      displayQuestionNumber: false,
       drill: 30000,
     });
     expect(tutor.deliveryparams).to.be.undefined;
@@ -41,14 +48,14 @@ describe('deliverySettings migration', function() {
         tutor: {
           deliverySettings: {
             drill: 1000,
-            displayCorrectFeedback: true,
+            displayQuestionNumber: true,
           },
           deliveryparams: {
             drill: '2000',
           },
           setspec: {
             uiSettings: {
-              displayCorrectFeedback: 'false',
+              displayQuestionNumber: 'false',
             },
           },
         },
@@ -57,7 +64,7 @@ describe('deliverySettings migration', function() {
 
     const tutor = (result.tdf as any).tdfs.tutor;
     expect(tutor.deliverySettings.drill).to.equal(1000);
-    expect(tutor.deliverySettings.displayCorrectFeedback).to.equal(true);
+    expect(tutor.deliverySettings.displayQuestionNumber).to.equal(true);
     expect(result.warnings.filter((warning) => warning.message.includes('already defines a different value'))).to.have.length(2);
   });
 
@@ -316,7 +323,7 @@ describe('deliverySettings migration', function() {
           },
           setspec: {
             uiSettings: {
-              displayCorrectFeedback: 'false',
+              displayQuestionNumber: 'false',
             },
           },
         },
@@ -325,9 +332,9 @@ describe('deliverySettings migration', function() {
 
     const tutor = (result.tdf as any).tdfs.tutor;
     expect(tutor.deliverySettings.drill).to.equal(30000);
-    expect(tutor.deliverySettings.displayCorrectFeedback).to.equal(false);
+    expect(tutor.deliverySettings.displayQuestionNumber).to.equal(false);
     expect(tutor.deliveryparams.drill).to.equal('30000');
-    expect(tutor.setspec.uiSettings.displayCorrectFeedback).to.equal('false');
+    expect(tutor.setspec.uiSettings.displayQuestionNumber).to.equal('false');
   });
 
   it('migrates cached learner config root and every unit override to deliverySettings', function() {
@@ -337,7 +344,7 @@ describe('deliverySettings migration', function() {
         setspec: {
           audioPromptMode: 'feedback',
           uiSettings: {
-            displayCorrectFeedback: 'false',
+            displayQuestionNumber: 'false',
           },
         },
         deliveryparams: {
@@ -366,7 +373,7 @@ describe('deliverySettings migration', function() {
     expect(overrides.setspec.uiSettings).to.be.undefined;
     expect(overrides.deliveryparams).to.be.undefined;
     expect(overrides.deliverySettings.drill).to.equal(30000);
-    expect(overrides.deliverySettings.displayCorrectFeedback).to.equal(false);
+    expect(overrides.deliverySettings.displayQuestionNumber).to.equal(false);
     expect(overrides.unit['0'].deliverySettings.feedbackLayout).to.equal('inline');
     expect(overrides.unit['1'].deliveryparams).to.be.undefined;
     expect(overrides.unit['1'].uiSettings).to.be.undefined;

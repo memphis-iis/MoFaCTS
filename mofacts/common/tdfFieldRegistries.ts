@@ -667,10 +667,6 @@ export const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Rewind after incorrect answers.',
     verbose: 'Rewind the video after an incorrect checkpoint answer.'
   }),
-  repeatQuestionsSinceCheckpoint: simpleField(legacyBooleanField('false'), {
-    brief: 'Repeat questions since the last checkpoint.',
-    verbose: 'Repeat checkpoint questions after rewinding to the previous anchor.'
-  }),
   unitMode: simpleField(stringField('', 4), {
     brief: 'Video-session selection algorithm.',
     verbose: 'Learning engine unit mode used by mixed video/question sessions.'
@@ -797,7 +793,6 @@ export const VIDEO_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   'preventRewind',
   'questiontimes',
   'questions',
-  'repeatQuestionsSinceCheckpoint',
   'rewindOnIncorrect',
   'unitMode',
   'videosource',

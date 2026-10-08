@@ -1,6 +1,7 @@
 import { Session } from 'meteor/session';
 import { restoreAdaptiveUnitSequence } from '../../common/adaptiveUnitSequence';
-import { getExperimentState } from '../views/experiment/svelte/services/experimentState';
+import { getExperimentState, createExperimentState } from '../views/experiment/svelte/services/experimentState';
+import { applyMappingRecordToSession } from '../views/experiment/svelte/services/mappingRecordService';
 import { ensureCurrentStimuliSetId } from '../views/experiment/svelte/services/mediaResolver';
 import { setIgnoreOutOfGrammarResponses } from '../views/experiment/svelte/services/audioRuntimeState';
 import { clearConditionResolutionContext, setActiveTdfContext } from './idContext';
@@ -11,7 +12,8 @@ import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionCon
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
 import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
-import { initializeLessonLaunchEntry, type LessonLaunchEntryRoute } from './lessonLaunchEntryRoute';
+import { initializeLessonLaunchEntry, resolveLessonLaunchEntryRoute, type LessonLaunchEntryRoute } from './lessonLaunchEntryRoute';
+import { prepareInstructionLaunchMapping } from './instructionLaunchMapping';
 
 type LessonLaunchTimingLogger = (eventName: string, payload?: Record<string, unknown>) => void;
 type LessonLaunchMessageSetter = (message: string) => void;
@@ -105,10 +107,18 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   }
   // Initialization belongs to preparation, not navigation: cold routes need the
   // same instruction identity as dashboard entry even when navigation is deferred.
-  const entryRoute = launchProgress.moduleCompleted ? null : initializeLessonLaunchEntry({
+  const entryRoute = launchProgress.moduleCompleted ? null : resolveLessonLaunchEntryRoute({
     content,
     intent: launchProgress.intent,
-  }, (key, value) => Session.set(key, value));
+  });
+  if (entryRoute?.route === '/instructions') {
+    const mapping = await prepareInstructionLaunchMapping({
+      content, tdfDoc, currentTdfId, experimentState: persistedExperimentState,
+      persist: createExperimentState,
+    });
+    if (mapping) applyMappingRecordToSession({ mappingTable: mapping, createdAt: Date.now() });
+  }
+  if (entryRoute) initializeLessonLaunchEntry(entryRoute, (key, value) => Session.set(key, value));
 
   return {
     tdfDoc,

@@ -6,6 +6,11 @@ type TimeoutContext = {
   isCorrect?: boolean;
 };
 
+/** Answer feedback belongs to drill trials with a positive outcome duration. */
+export function hasAnswerFeedback(context: TimeoutContext): boolean {
+  return context.testType === 'd' && getFeedbackTimeoutMs(context) > 0;
+}
+
 function parseTimeoutMs(value: unknown, options: { allowZero?: boolean } = {}): number | null {
   const { allowZero = false } = options;
   const parsed = parseInt(String(value), 10);

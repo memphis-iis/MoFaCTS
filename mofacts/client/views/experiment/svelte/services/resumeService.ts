@@ -530,6 +530,14 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
       } else if (prevCondition) {
         clientConsole(2, 'Found previous experimental condition: using that');
         conditionTdfId = prevCondition;
+      } else if (setspec.loadbalancing === 'not-max') {
+        await createExperimentState({
+          currentRootTdfId: rootTdfId,
+          currentTdfId: rootTdfId,
+        }, { allocateCondition: true });
+        curExperimentState = ExperimentStateStore.get() as ResumeExperimentState;
+        newExperimentState = JSON.parse(JSON.stringify(curExperimentState)) as ResumeExperimentState;
+        conditionTdfId = curExperimentState.conditionTdfId || null;
       } else {
         // No previous condition - need to select one
         if(!setspec.loadbalancing){

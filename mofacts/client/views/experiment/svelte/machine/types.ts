@@ -83,8 +83,6 @@
  * @property {string} [videoUrl] - Video URL for video session
  *
  * Feedback Settings
- * @property {boolean} displayCorrectFeedback - Show "Correct!" message
- * @property {boolean} displayIncorrectFeedback - Show "Incorrect" message
  * @property {string} correctLabelText - Custom correct feedback label text
  * @property {string} incorrectLabelText - Custom incorrect feedback label text
  * @property {string} correctColor - Correct feedback color (CSS hex)
@@ -332,7 +330,7 @@
 
 /**
  * @typedef {Object} VideoCheckpointEvent
- * @property {'VIDEO_CHECKPOINT'} type
+ * @property {'VIDEO_CHECKPOINT' | 'VIDEO_WORKSHEET_CHECKPOINT'} type
  * @property {number} [checkpointIndex]
  * @property {number} [questionIndex]
  */
@@ -344,7 +342,7 @@
 
 /**
  * @typedef {Object} VideoContinueEvent
- * @property {'VIDEO_CONTINUE'} type
+ * @property {'VIDEO_CONTINUE' | 'VIDEO_WORKSHEET_COMPLETE'} type
  */
 
 /**

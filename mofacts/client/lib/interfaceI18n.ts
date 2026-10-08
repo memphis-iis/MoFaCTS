@@ -60,7 +60,13 @@ export function translatePlatformString(
     throw new Error(`Missing platform translation "${key}" for locale "${locale}"`);
   }
 
-  const interpolated = interpolateTemplate(template, values);
+  // Preserve answer punctuation; suppress only the period supplied by these labels.
+  const answerHasPeriod = String(values?.answer ?? '').trimEnd().endsWith('.');
+  const answerLabel = key === 'feedback.userAnswerWas' || key === 'feedback.correctAnswerIs';
+  const interpolationTemplate = answerLabel && answerHasPeriod
+    ? template.replace(/\{answer\}\.(?=\s*$)/u, '{answer}')
+    : template;
+  const interpolated = interpolateTemplate(interpolationTemplate, values);
   const brandName = platformBrandNameResolver?.().trim();
   return brandName ? interpolated.replace(/mofacts/gi, () => brandName) : interpolated;
 }

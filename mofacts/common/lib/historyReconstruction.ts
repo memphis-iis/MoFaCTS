@@ -1,5 +1,5 @@
 import { computePracticeTimeMs } from '../../lib/practiceTime';
-import { isBlankIdentityValue } from '../historyEnvelope';
+import { isBlankIdentityValue, isAssessmentHistoryCopy } from '../historyEnvelope';
 import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
 import { createStimulusKey } from '../../../learning-components/runtime/historyStimulusIdentity';
 
@@ -8,6 +8,7 @@ export type LearningOutcome = 'study' | 'correct' | 'incorrect';
 export type LearningHistoryRecord = {
   eventType?: string | null;
   levelUnitType?: string | null;
+  modelEvidenceSource?: string | null;
   time?: number | string | null;
   problemStartTime?: number | string | null;
   outcome?: LearningOutcome | string | null;
@@ -320,6 +321,7 @@ export function reconstructLearningStateFromHistory(
   options: LearningReconstructionOptions = {},
 ): LearningReconstructionResult {
   const orderedRows: OrderedLearningHistoryRecord[] = (historyRows || [])
+    .filter((row) => !isAssessmentHistoryCopy(row))
     .map((row, index) => ({
       ...row,
       time: toFiniteTime(row?.time, 'time'),

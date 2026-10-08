@@ -11,7 +11,6 @@ describe('card reactive trackers', function() {
     const performanceValues: unknown[] = [];
     const users: unknown[] = [];
     const videoCheckpoints: unknown[] = [];
-    let resetCount = 0;
     let performance = { correct: 1 };
     let user = { _id: 'u1' };
     let checkpoints = { times: [1] };
@@ -31,9 +30,6 @@ describe('card reactive trackers', function() {
       setPerformanceData: (value) => performanceValues.push(value),
       setUser: (value) => users.push(value),
       setVideoCheckpoints: (value) => videoCheckpoints.push(value),
-      resetCompletedVideoQuestions: () => {
-        resetCount += 1;
-      },
     });
 
     trackers.start();
@@ -42,7 +38,6 @@ describe('card reactive trackers', function() {
     expect(performanceValues).to.deep.equal([{ correct: 1 }]);
     expect(users).to.deep.equal([{ _id: 'u1' }]);
     expect(videoCheckpoints).to.deep.equal([{ times: [1] }]);
-    expect(resetCount).to.equal(1);
 
     performance = { correct: 2 };
     user = { _id: 'u2' };
@@ -54,7 +49,6 @@ describe('card reactive trackers', function() {
     expect(performanceValues).to.deep.equal([{ correct: 1 }, { correct: 2 }]);
     expect(users).to.deep.equal([{ _id: 'u1' }, { _id: 'u2' }]);
     expect(videoCheckpoints).to.deep.equal([{ times: [1] }, { times: [2] }]);
-    expect(resetCount).to.equal(2);
 
     trackers.stop();
     expect(stopped).to.deep.equal([0, 1, 2]);
@@ -78,7 +72,6 @@ describe('card reactive trackers', function() {
       setPerformanceData: () => undefined,
       setUser: () => undefined,
       setVideoCheckpoints: () => undefined,
-      resetCompletedVideoQuestions: () => undefined,
     });
 
     trackers.start();

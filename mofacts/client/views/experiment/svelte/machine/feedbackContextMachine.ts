@@ -7,7 +7,6 @@ const assign: any = xAssign;
 export const resetFeedbackRevealState = assign({
   feedbackText: () => '',
   feedbackRevealStarted: () => false,
-  feedbackSuppressed: () => false,
 });
 
 export const markFeedbackRevealStarted = assign({
@@ -16,5 +15,4 @@ export const markFeedbackRevealStarted = assign({
 
 export const storeFeedbackContent = assign({
   feedbackText: ({ event }: MachineArgs) => String(event.feedbackText || '').trim(),
-  feedbackSuppressed: ({ event }: MachineArgs) => event.feedbackSuppressed === true,
 });

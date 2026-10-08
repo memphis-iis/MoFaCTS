@@ -1,3 +1,4 @@
+import { modelPracticeHistorySelector } from '../common/historyEnvelope';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
 import {
@@ -223,7 +224,7 @@ Meteor.publish('userHistory', function(tdfId: any) {
     // Query parameters - only user's own history
     const query: any = {
         userId: this.userId,
-        levelUnitType: 'model'
+        ...modelPracticeHistorySelector()
     };
 
     // If tdfId provided, filter by specific TDF
@@ -237,6 +238,8 @@ Meteor.publish('userHistory', function(tdfId: any) {
         userId: 1,
         TDFId: 1,
         outcome: 1,
+        levelUnitType: 1,
+        modelEvidenceSource: 1,
         CFEndLatency: 1,
         CFFeedbackLatency: 1,
         stimuliSetId: 1,
@@ -244,8 +247,7 @@ Meteor.publish('userHistory', function(tdfId: any) {
         clusterKC: 1,
         CFStimFileIndex: 1,
         problemName: 1,
-        recordedServerTime: 1,
-        levelUnitType: 1
+        recordedServerTime: 1
     };
 
     return Histories.find(query, { fields });

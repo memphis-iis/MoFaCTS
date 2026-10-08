@@ -8,13 +8,13 @@
   import { Meteor } from 'meteor/meteor';
   import { Session } from 'meteor/session';
   import Plyr from 'plyr';
-  import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
   import { clientConsole } from '../../../../lib/userSessionHelpers';
   import { legacyTrim } from '../../../../../common/underscoreCompat';
   import { parseYouTubeVideoUrl } from '../../../../lib/youtubeUrl';
   import { insertCompressedHistory } from '../../../../lib/historyWire';
   import { ensureStylesheet } from '../../../../lib/cssAssetLoader';
   import { createVideoParticipantControls } from '../services/videoParticipantControls';
+  import { buildVideoHistoryIdentity } from '../services/videoHistoryIdentity';
 
   const dispatch = createEventDispatcher();
 
@@ -318,7 +318,10 @@
     onPlayer('ended', () => {
       participantControls.handleEnded();
       logVideoAction('end');
-      dispatch('ended');
+      // A final checkpoint still owns its question/review even when the provider
+      // reports ended before its final timeupdate.
+      handleTimeUpdate();
+      if (!atCheckpoint) dispatch('ended');
     });
 
     onPlayer('seeking', () => {
@@ -525,6 +528,16 @@
       });
       atCheckpoint = false;
 
+      const duration = Number(player.duration);
+      if (Number.isFinite(duration) && duration > 0 && player.currentTime >= duration) {
+        handleTimeUpdate();
+        if (!atCheckpoint) {
+          participantControls.handleEnded();
+          dispatch('ended');
+        }
+        return;
+      }
+
       clientConsole(
         2,
         `[VideoSessionMode] Resuming after question, next checkpoint index: ${nextCheckpointIndex}`
@@ -661,10 +674,20 @@
     const actionTimestamp = Date.now();
     const sessionID = `${new Date(trialStartTimestamp).toUTCString().substr(0, 16)} ${Session.get('currentTdfName')}`;
     const curTdf = Session.get('currentTdfFile');
-    const unitName = legacyTrim(curTdf?.tdfs?.tutor?.unit?.[Session.get('currentUnitNumber')]?.unitname || '');
-    const problemName = ExperimentStateStore.get()?.originalDisplay || '';
+    const unitNumber = Session.get('currentUnitNumber');
+    let videoIdentity;
+    try {
+      videoIdentity = buildVideoHistoryIdentity({
+        videoUrl,
+        unitNumber,
+        unit: curTdf?.tdfs?.tutor?.unit?.[unitNumber],
+      });
+    } catch (error) {
+      clientConsole(1, '[VideoSessionMode] Error writing video history:', error?.message || error);
+      return;
+    }
     const currentTimeStamp = player.currentTime;
-    const seekEnd = seekStart ? currentTimeStamp : null;
+    const seekEnd = Number.isFinite(seekStart) ? currentTimeStamp : null;
 
     const answerLogRecord = {
       itemId: 'N/A',
@@ -675,7 +698,7 @@
       probabilityEstimate: 'N/A',
       typeOfResponse: 'N/A',
       responseValue: 'N/A',
-      displayedStimulus: Session.get('currentDisplay'),
+      ...videoIdentity,
       sectionId: Session.get('curSectionId'),
       teacherId: Session.get('curTeacher')?._id,
       anonStudentId: Meteor.user()?.username,
@@ -694,11 +717,6 @@
         ? Meteor.user()?.loginParams?.entryPoint
         : null,
       responseDuration: null,
-      levelUnit: Session.get('currentUnitNumber'),
-      levelUnitName: unitName,
-      levelUnitType: Session.get('unitType'),
-      problemName,
-      stepName: problemName,
       time: actionTimestamp,
       problemStartTime: trialStartTimestamp,
       selection: 'video',

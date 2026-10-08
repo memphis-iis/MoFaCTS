@@ -1271,6 +1271,7 @@ async function handleMediaUpload(file: any, mediaType: any, input: any, preview:
         }
 
         const upload = (globalThis as any).DynamicAssets.insert({
+            transport: 'ddp',
             file: file,
             chunkSize: 'dynamic',
             meta: {

@@ -24,6 +24,9 @@
   let gridElement;
   let resizeHandler;
   let schedulePending = false;
+  let fittedButtonList;
+  let fittedColumns;
+  let fittedVisibility;
 
   function handleChoice(button, index) {
     if (!enabled) return;
@@ -212,6 +215,14 @@
   });
 
   afterUpdate(() => {
+    // Answer selection only changes enabled state; preserve the fitted layout.
+    // Content/column/visibility changes and window resizing still request a fit.
+    if (buttonList === fittedButtonList && columns === fittedColumns && showButtons === fittedVisibility) {
+      return;
+    }
+    fittedButtonList = buttonList;
+    fittedColumns = columns;
+    fittedVisibility = showButtons;
     scheduleUniformWidth();
   });
 

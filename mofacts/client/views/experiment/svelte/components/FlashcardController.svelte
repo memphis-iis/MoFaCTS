@@ -121,12 +121,6 @@
   /** @type {string} Incorrect color */
   export let incorrectColor = 'var(--feedback-error-color)';
 
-  /** @type {boolean} Display correct feedback */
-  export let displayCorrectFeedback = true;
-
-  /** @type {boolean} Display incorrect feedback */
-  export let displayIncorrectFeedback = true;
-
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Display user answer rules */
   export let displayUserAnswerInFeedback = 'onIncorrect';
 
@@ -375,8 +369,6 @@
           {feedbackMessage}
           {correctColor}
           {incorrectColor}
-          {displayCorrectFeedback}
-          {displayIncorrectFeedback}
           {displayUserAnswerInFeedback}
           {feedbackLayout}
           {displayCorrectAnswerInIncorrectFeedback}

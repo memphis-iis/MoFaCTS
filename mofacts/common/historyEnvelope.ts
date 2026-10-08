@@ -13,6 +13,9 @@ export {
   createStimulusKey,
   isBlankIdentityValue,
   isModelPracticeHistoryRecord,
+  isAssessmentHistoryCopy,
+  operationalHistorySelector,
+  modelPracticeHistorySelector,
 } from '../../learning-components/runtime/historyStimulusIdentity';
 
 export type {

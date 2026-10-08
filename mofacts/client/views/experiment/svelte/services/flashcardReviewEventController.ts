@@ -5,7 +5,6 @@ type SendEvent =
       type: 'FEEDBACK_CONTENT';
       feedbackText: string;
       feedbackHtml: string;
-      feedbackSuppressed: boolean;
     }
   | {
       type: typeof EVENTS.TRIAL_REVEAL_STARTED;
@@ -35,13 +34,11 @@ export function createFlashcardReviewEventController({
   function handleFeedbackContent(detail: {
     feedbackText?: unknown;
     feedbackHtml?: unknown;
-    suppressed?: unknown;
   } | null | undefined): void {
     send({
       type: 'FEEDBACK_CONTENT',
       feedbackText: String(detail?.feedbackText || '').trim(),
       feedbackHtml: String(detail?.feedbackHtml || ''),
-      feedbackSuppressed: detail?.suppressed === true,
     });
   }
 

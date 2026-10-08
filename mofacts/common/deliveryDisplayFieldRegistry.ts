@@ -50,26 +50,6 @@ export const DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
       validation: { kind: 'string' },
     },
   }),
-  displayCorrectFeedback: simpleField(booleanField(true, 4), {
-    brief: 'Show correct feedback',
-    verbose: 'When enabled, learners see feedback after correct answers. When disabled, correct answers still count as correct, but no correct-answer feedback is displayed or spoken.'
-  }, {
-    runtime: {
-      default: true,
-      coerce: 'boolean',
-      validation: { kind: 'boolean' },
-    },
-  }),
-  displayIncorrectFeedback: simpleField(booleanField(true, 4), {
-    brief: 'Show incorrect feedback',
-    verbose: 'When enabled, learners see feedback after incorrect answers and timeouts. When disabled, incorrect outcomes still count as incorrect, but no incorrect-answer feedback is displayed or spoken.'
-  }, {
-    runtime: {
-      default: true,
-      coerce: 'boolean',
-      validation: { kind: 'boolean' },
-    },
-  }),
   correctLabelText: simpleField(stringField('Correct.', 6), {
     brief: 'Correct feedback label',
     verbose: 'Text used for the leading outcome label on correct-answer feedback. This label does not replace evaluator explanations such as close-enough or phonetic-match messages.'

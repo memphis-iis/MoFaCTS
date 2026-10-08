@@ -47,12 +47,6 @@
   /** @type {string} Incorrect color (theme var) */
   export let incorrectColor = 'var(--feedback-error-color)';
 
-  /** @type {boolean} Whether to display correct feedback */
-  export let displayCorrectFeedback = true;
-
-  /** @type {boolean} Whether to display incorrect feedback */
-  export let displayIncorrectFeedback = true;
-
   /** @type {'onCorrect' | 'onIncorrect' | boolean} Display user answer rules */
   export let displayUserAnswerInFeedback = 'onIncorrect';
 
@@ -62,10 +56,8 @@
   /** @type {boolean} Show the correct answer on incorrect feedback */
   export let displayCorrectAnswerInIncorrectFeedback = true;
 
-  $: shouldDisplay = visible && (
-    (isCorrect && displayCorrectFeedback) ||
-    (!isCorrect && displayIncorrectFeedback)
-  );
+  // Trial type and duration determine visibility in the trial state machine.
+  $: shouldDisplay = visible;
 
   $: feedbackColor = isCorrect ? correctColor : incorrectColor;
   $: feedbackMessageText = feedbackMessage || '';
@@ -136,12 +128,6 @@
   $: {
     if (shouldDisplay && feedbackText) {
       dispatch('feedbackcontent', feedbackContent);
-    } else if (visible && !shouldDisplay) {
-      dispatch('feedbackcontent', {
-        feedbackText: '',
-        feedbackHtml: '',
-        suppressed: true,
-      });
     }
   }
 

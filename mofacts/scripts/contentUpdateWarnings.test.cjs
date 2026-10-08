@@ -18,6 +18,7 @@ for (const filename of [
   '../common/adaptiveUnitSequence.test.ts',
   '../client/views/experimentSetup/tdfDraftSchema.test.ts',
   '../client/views/experiment/svelte/services/mappingProgressPolicy.test.ts',
+  '../client/lib/instructionLaunchMapping.test.ts',
   '../../learning-components/content/tdf/clusterMapping.test.ts',
   '../../learning-components/units/shared/interactionStepAssembly.test.ts',
 ]) require(path.resolve(__dirname, filename));

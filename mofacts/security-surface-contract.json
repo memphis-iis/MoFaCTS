@@ -181,15 +181,18 @@
     },
     {
       "name": "downloadDataById",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing owner authorization and condition-family validation retained; ordinary TSV exports exclude historical assessment copies."
     },
     {
       "name": "downloadDataByTeacher",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing teacher ownership checks retained; ordinary TSV exports exclude historical assessment copies."
     },
     {
       "name": "downloadOwnHistoryAcrossTdfs",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing authenticated-self token issuance retained; ordinary exports exclude historical assessment copies."
     },
     {
       "name": "duplicateTheme",
@@ -233,7 +236,8 @@
     },
     {
       "name": "getAdaptiveOutcomeRows",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing subject and lesson authorization retained; excludes historical assessment copies before projection."
     },
     {
       "name": "getAdminApiKeyAlternativeMetadata",
@@ -293,7 +297,8 @@
     },
     {
       "name": "getClassPerformanceByTDF",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing instructor/class authorization retained; aggregates exclude historical assessment copies."
     },
     {
       "name": "getContentUploadListIds",
@@ -333,7 +338,8 @@
     },
     {
       "name": "getHistoryByTDFID",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Internal export helper preserves its caller authorization boundary and excludes historical assessment copies."
     },
     {
       "name": "getLastTDFAccessed",
@@ -353,7 +359,8 @@
     },
     {
       "name": "getLearningHistoryForUnit",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing self and course/lesson/unit scope retained. Selects original assessment and adaptive-practice rows and excludes historical assessment copies; provenance remains in the sparse projection."
     },
     {
       "name": "getManualContentDraft",
@@ -377,7 +384,8 @@
     },
     {
       "name": "getOutcomesForAdaptiveLearning",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing subject and lesson authorization retained; excludes historical assessment copies before projection."
     },
     {
       "name": "getOwnOpenRouterSettings",
@@ -421,7 +429,8 @@
     },
     {
       "name": "getSparcHistoryForUnit",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Self and course authorization retained. Worksheet reads require page/checkpoint scope, use the worksheet_scoped_history index prefix, and reject more than 10000 records."
     },
     {
       "name": "getStimDisplayTypeMap",
@@ -449,7 +458,8 @@
     },
     {
       "name": "getStudentPerformanceByIdAndTDFIdFromHistory",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing subject/lesson authorization retained; original assessment and adaptive-practice histories share the copy exclusion rule."
     },
     {
       "name": "getStudentPerformanceForClassAndTdfId",
@@ -559,7 +569,8 @@
     },
     {
       "name": "insertHistory",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet payloads are validated and server-derived record IDs deduplicate retries; conflicting sequence writes fail."
     },
     {
       "name": "insertNewUsers",
@@ -640,7 +651,8 @@
     },
     {
       "name": "getLearnerLessonAnalyticsHistoryPage",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing learner lesson reauthorization and cursor limits retained; historical assessment copies are excluded."
     },
     {
       "name": "getLearnerLessonAnalyticsSource",
@@ -1004,7 +1016,8 @@
     },
     {
       "name": "userHistory",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing authenticated-self publication retained with sparse fields; includes original assessment answers and excludes historical copies."
     }
   ],
   "httpRoutes": [
@@ -1022,7 +1035,8 @@
     },
     {
       "name": "/data-download/own-history",
-      "access": "single-use-download"
+      "access": "single-use-download",
+      "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies."
     },
     {
       "name": "/dynamic-assets",

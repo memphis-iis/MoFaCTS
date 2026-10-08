@@ -27,8 +27,6 @@ describe('incomingTrialSlotDisplay', () => {
       defaultInputMode: 'text',
       deliverySettings: {
         correctColor: 'green',
-        displayCorrectFeedback: true,
-        displayIncorrectFeedback: true,
         displayQuestionNumber: true,
       },
       formatAnswerText: (answer) => `answer:${answer}`,
@@ -58,8 +56,6 @@ describe('incomingTrialSlotDisplay', () => {
       defaultInputMode: 'text',
       deliverySettings: {
         correctColor: 'green',
-        displayCorrectFeedback: false,
-        displayIncorrectFeedback: true,
         displayQuestionNumber: true,
         skipstudy: true,
       },
@@ -80,8 +76,6 @@ describe('incomingTrialSlotDisplay', () => {
     expect(snapshot.slot?.subset.showSkipStudyButton).to.equal(true);
     expect(snapshot.slot?.props).to.include({
       correctColor: 'var(--app-text-color)',
-      displayCorrectFeedback: true,
-      displayIncorrectFeedback: false,
       isCorrect: true,
       questionNumber: 2,
     });

@@ -1,3 +1,4 @@
+import { operationalHistorySelector } from '../../common/historyEnvelope';
 import type {
   GetLearnerLessonAnalyticsHistoryPageRequest,
   GetLearnerLessonAnalyticsSourceRequest,
@@ -139,7 +140,7 @@ async function historySnapshotBounds(
   tdfIds: string[],
 ): Promise<{ upperId: string | null; rowCount: number }> {
   const latest = (await deps.Histories.find(
-    { userId, TDFId: { $in: tdfIds } },
+    { userId, TDFId: { $in: tdfIds }, ...operationalHistorySelector() },
     { fields: { _id: 1 }, sort: { _id: -1 }, limit: 1 },
   ).fetchAsync())[0];
   const upperId = latest ? requireStringId(latest._id, 'upper history') : null;
@@ -147,6 +148,7 @@ async function historySnapshotBounds(
     userId,
     TDFId: { $in: tdfIds },
     _id: { $lte: upperId },
+    ...operationalHistorySelector(),
   }).countAsync();
   return { upperId, rowCount };
 }
@@ -159,6 +161,7 @@ async function readHistoryPage(params: {
   const rows = await params.deps.Histories.find({
     userId: params.userId,
     TDFId: { $in: params.tdfIds },
+    ...operationalHistorySelector(),
     _id: { $lte: params.upperId, ...(params.afterId ? { $gt: params.afterId } : {}) },
   }, { fields: HISTORY_FIELDS, sort: { _id: 1 }, limit: ANALYTICS_HISTORY_PAGE_SIZE + 1 }).fetchAsync();
   const hasMore = rows.length > ANALYTICS_HISTORY_PAGE_SIZE;
@@ -186,7 +189,7 @@ async function resolveModelInput(params: {
 }): Promise<LearnerAnalyticsModelInput> {
   const conditionIds = params.authorized.tdfIds.slice(1);
   const latestCondition = conditionIds.length === 0 || !params.upperId ? null : (await params.deps.Histories.find(
-    { userId: params.userId, TDFId: { $in: conditionIds }, _id: { $lte: params.upperId } },
+    { userId: params.userId, TDFId: { $in: conditionIds }, _id: { $lte: params.upperId }, ...operationalHistorySelector() },
     { fields: { TDFId: 1 }, sort: { recordedServerTime: -1, _id: -1 }, limit: 1 },
   ).fetchAsync())[0];
   const modelTdfId = latestCondition ? String(latestCondition.TDFId) : String(params.authorized.rootTdfDoc._id);

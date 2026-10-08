@@ -752,6 +752,15 @@ describe('interfaceI18n', function() {
     expect(translatePlatformString('ur', 'common.submit')).to.equal('جمع کریں');
   });
 
+  it('adds one terminal period to feedback answers that do not already have one', function() {
+    for (const key of ['feedback.userAnswerWas', 'feedback.correctAnswerIs'] as const) {
+      expect(translatePlatformString('en', key, { answer: 'An answer' })).to.match(/An answer\.$/);
+      expect(translatePlatformString('en', key, { answer: 'An answer.' })).to.match(/An answer\.$/);
+      expect(translatePlatformString('es', key, { answer: 'Una respuesta.' })).to.match(/Una respuesta\.$/);
+      expect(translatePlatformString('en', key, { answer: '1.25' })).to.match(/1\.25\.$/);
+    }
+  });
+
   it('fails clearly for unsupported locales instead of falling back', function() {
     expect(() => translatePlatformString('de-DE', 'common.submit')).to.throw(/Unsupported UI locale/);
   });

@@ -108,6 +108,7 @@ function mergeExperimentState(
 
 type ExperimentStateWriteOptions = {
   replaceExistingState?: boolean;
+  allocateCondition?: boolean;
 };
 
 /**
@@ -144,6 +145,7 @@ export async function createExperimentState(
   options: ExperimentStateWriteOptions = {},
 ): Promise<string | undefined> {
   if (isProgressiveCourseLaunch()) {
+    if (options.allocateCondition) throw new Error('Condition allocation requires a durable experiment launch');
     const transientState = mergeExperimentState(ExperimentStateStore.get(), partialState);
     ExperimentStateStore.set(transientState);
     return transientState.currentTdfId as string | undefined;

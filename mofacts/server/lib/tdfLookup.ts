@@ -277,7 +277,7 @@ export function createTdfLookupHelpers(deps: TdfLookupDeps) {
       throw new Meteor.Error('tdf-identity-repair-required', 'This lesson requires an identity repair before it can be used.');
     }
 
-    const loadFullTdf = async () => await deps.Tdfs.findOneAsync({ _id: TDFId });
+    const loadFullTdf = async () => await deps.Tdfs.findOneAsync({ _id: TDFId }, { fields: { conditionAllocation: 0 } });
     const assignedRootIds = new Set(await deps.resolveAssignedRootTdfIdsForUser(this.userId));
     const normalizedRequestedTdfId = deps.normalizeCanonicalId(TDFId);
     if (normalizedRequestedTdfId && options.courseAssignment) {

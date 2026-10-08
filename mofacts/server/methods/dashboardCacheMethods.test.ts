@@ -558,8 +558,8 @@ describe('dashboardCacheMethods', function() {
 
     expect(stats.totalTrials).to.equal(1);
     expect(stats.correctTrials).to.equal(1);
-    expect(stats.itemsPracticedCount).to.equal(0);
-    expect(stats.itemsPracticedApplies).to.equal(false);
+    expect(stats.itemsPracticedCount).to.equal(1);
+    expect(stats.itemsPracticedApplies).to.equal(true);
   });
 
   it('computeCacheStats does not compute an accuracy percentage for AutoTutor rows', function() {

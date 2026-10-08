@@ -13,25 +13,16 @@ export interface VideoPlayerBridge {
 }
 
 export interface VideoMachineBridgeDependencies {
-  readonly addCompletedVideoQuestion: (questionIndex: number) => void;
-  readonly getCompletedVideoQuestions: () => ReadonlySet<number>;
   readonly getCurrentState: () => unknown;
-  readonly getRepeatQuestionsSinceCheckpointEnabled: () => boolean;
   readonly getRewindOnIncorrectEnabled: () => boolean;
   readonly getVideoCheckpoints: () => VideoCheckpoints | null | undefined;
   readonly getVideoPlayer: () => VideoPlayerBridge | null | undefined;
   readonly log: (level: number, message: string, details?: unknown) => void;
   readonly scheduleRetry: (callback: () => void, delayMs: number) => void;
-  readonly setQuestionsToRepeat: (questions: RepeatedVideoQuestion[]) => void;
   readonly stateMatches: (path: string) => boolean;
   readonly waitForDomUpdate: () => Promise<void>;
 }
 
-export interface RepeatedVideoQuestion {
-  readonly index: number;
-  readonly time: number;
-  readonly question: number;
-}
 
 export interface VideoMachineBridge {
   readonly flushPendingResume: (reason: string) => Promise<void>;
@@ -73,39 +64,6 @@ export function getCheckpointResetIndex(questionTimes: unknown[] | null | undefi
   });
   const nextCheckpointIndex = normalizedTimes.findIndex((time) => time >= (rewindTime - 0.001));
   return nextCheckpointIndex >= 0 ? nextCheckpointIndex : normalizedTimes.length;
-}
-
-export function buildQuestionsToRepeat(params: {
-  readonly checkpoints: VideoCheckpoints | null | undefined;
-  readonly completedVideoQuestions: ReadonlySet<number>;
-  readonly checkpointTime: number;
-  readonly currentTime: number;
-}): RepeatedVideoQuestion[] {
-  if (!Array.isArray(params.checkpoints?.times)) {
-    return [];
-  }
-
-  const questionsToRepeat: RepeatedVideoQuestion[] = [];
-  const times = params.checkpoints.times;
-  const questions = params.checkpoints.questions || [];
-
-  for (let i = 0; i < times.length; i++) {
-    const time = Number(times[i]);
-    if (!Number.isFinite(time)) continue;
-    if (time >= params.checkpointTime && time <= params.currentTime) {
-      const questionIndex = Number(questions[i]);
-      if (!Number.isFinite(questionIndex)) continue;
-      if (!params.completedVideoQuestions.has(questionIndex)) {
-        questionsToRepeat.push({
-          index: i,
-          time,
-          question: questionIndex,
-        });
-      }
-    }
-  }
-
-  return questionsToRepeat;
 }
 
 export function createVideoMachineBridge(deps: VideoMachineBridgeDependencies): VideoMachineBridge {
@@ -166,12 +124,7 @@ export function createVideoMachineBridge(deps: VideoMachineBridgeDependencies): 
       videoCheckpointsRewind: videoCheckpoints?.rewindCheckpoints,
     });
 
-    const questionIndex = Number.isFinite(checkpointIndex)
-      ? videoCheckpoints?.questions?.[checkpointIndex as number]
-      : undefined;
-    if (isCorrect && Number.isFinite(questionIndex)) {
-      deps.addCompletedVideoQuestion(questionIndex as number);
-      deps.log(2, '[VIDEO-REWIND-DEBUG] Correct answer, marking completed:', questionIndex);
+    if (isCorrect) {
       return;
     }
 
@@ -218,15 +171,6 @@ export function createVideoMachineBridge(deps: VideoMachineBridgeDependencies): 
       rewindIndex,
       checkpointTimes,
     });
-
-    if (deps.getRepeatQuestionsSinceCheckpointEnabled()) {
-      deps.setQuestionsToRepeat(buildQuestionsToRepeat({
-        checkpoints: videoCheckpoints,
-        completedVideoQuestions: deps.getCompletedVideoQuestions(),
-        checkpointTime: rewindTime,
-        currentTime,
-      }));
-    }
 
     if (typeof videoPlayer.resetCheckpointTo === 'function') {
       deps.log(2, '[VIDEO-REWIND-DEBUG] Calling resetCheckpointTo:', rewindIndex);

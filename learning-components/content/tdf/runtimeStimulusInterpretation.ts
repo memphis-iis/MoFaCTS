@@ -32,7 +32,7 @@ function documentClusters(document: any): RawStimulusCluster[] | null {
   return Array.isArray(clusters) ? clusters : null;
 }
 
-function resolveRawClusters(source: RuntimeStimulusSource): RawStimulusCluster[] {
+export function resolveRawClusters(source: RuntimeStimulusSource): RawStimulusCluster[] {
   const direct = documentClusters(source.tdfFile);
   if (direct) return direct;
   const tdfId = typeof source.currentTdfId === 'string' ? source.currentTdfId.trim() : '';

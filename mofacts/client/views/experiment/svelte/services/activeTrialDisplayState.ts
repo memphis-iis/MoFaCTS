@@ -6,8 +6,6 @@ import {
 
 export interface ActiveTrialDisplayValues {
   readonly display: TrialDisplayContent;
-  readonly displayCorrectFeedback: boolean;
-  readonly displayIncorrectFeedback: boolean;
   readonly displayVisible: boolean;
   readonly feedbackCorrectAnswer: string;
   readonly feedbackCorrectColor: unknown;
@@ -29,8 +27,6 @@ export interface ActiveTrialCurrentDisplayInput {
   readonly correctColor: unknown;
   readonly currentAnswer: unknown;
   readonly currentDisplay: TrialDisplayContent;
-  readonly displayCorrectFeedback: unknown;
-  readonly displayIncorrectFeedback: unknown;
   readonly feedbackMessage: unknown;
   readonly formatAnswerText: (answer: string) => string;
   readonly isCorrect: unknown;
@@ -50,8 +46,6 @@ function stringOrEmpty(value: unknown): string {
 export function createInitialActiveTrialDisplayValues(): ActiveTrialDisplayValues {
   return {
     display: cloneDisplay({}),
-    displayCorrectFeedback: true,
-    displayIncorrectFeedback: true,
     displayVisible: false,
     feedbackCorrectAnswer: '',
     feedbackCorrectColor: 'var(--feedback-correct-color)',
@@ -79,8 +73,6 @@ export function buildActiveTrialCurrentDisplayValues(
 
   return {
     display: input.currentDisplay,
-    displayCorrectFeedback: input.isStudyState ? true : Boolean(input.displayCorrectFeedback),
-    displayIncorrectFeedback: input.isStudyState ? false : Boolean(input.displayIncorrectFeedback),
     displayVisible,
     feedbackCorrectAnswer,
     feedbackCorrectColor: input.isStudyState ? 'var(--app-text-color)' : input.correctColor,

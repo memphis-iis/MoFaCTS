@@ -1,3 +1,5 @@
+import { loadWorksheetHistory } from './worksheetRuntime';
+import { worksheetEvent } from '../../../../../../learning-components/units/sparcsession/sparcWorksheet';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { meteorCallAsync } from '../../../../index';
@@ -33,7 +35,6 @@ export interface VideoSessionLike extends UnknownRecord {
   preventScrubbing?: unknown;
   preventPause?: unknown;
   preventRewind?: unknown;
-  repeatQuestionsSinceCheckpoint?: unknown;
   rewindOnIncorrect?: unknown;
 }
 
@@ -46,7 +47,7 @@ type RuntimeDeliverySettings = DeliverySettings & {
   videoUrl?: string;
 };
 
-const VIDEO_CHECKPOINT_BEHAVIORS = new Set(['none', 'pause', 'all', 'some', 'adaptive']);
+const VIDEO_CHECKPOINT_BEHAVIORS = new Set(['none', 'pause', 'all', 'some', 'adaptive', 'worksheet']);
 
 export function normalizeVideoBoolean(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
@@ -57,7 +58,6 @@ export function resolveVideoPlaybackPolicy(videoSession: VideoSessionLike | null
     preventScrubbing: normalizeVideoBoolean(videoSession?.preventScrubbing),
     preventPause: normalizeVideoBoolean(videoSession?.preventPause),
     preventRewind: normalizeVideoBoolean(videoSession?.preventRewind),
-    repeatQuestionsSinceCheckpoint: normalizeVideoBoolean(videoSession?.repeatQuestionsSinceCheckpoint),
     rewindOnIncorrect: normalizeVideoBoolean(videoSession?.rewindOnIncorrect),
   };
 }
@@ -238,8 +238,16 @@ export async function initVideoSessionData(curTdfUnit: VideoTdfUnitLike | null |
     throw new Error('[Svelte Init] Video session missing videosource');
   }
 
-  const parsedQuestions = resolveVideoQuestions(videoSession);
+  const worksheetMode = videoSession.checkpointBehavior === 'worksheet';
+  const pageIds = (videoSession.worksheet as { pageIds?: string[] } | undefined)?.pageIds;
+  if (worksheetMode && (!Array.isArray(pageIds) || !pageIds.length || pageIds.some((id) => typeof id !== 'string' || !id.trim()))) {
+    throw new Error('Video worksheet requires pageIds');
+  }
+  const parsedQuestions = worksheetMode ? pageIds!.map((_id, index) => index) : resolveVideoQuestions(videoSession);
   const times = resolveVideoQuestionTimes(videoSession);
+  if (worksheetMode && times.some((time, index) => time < 0 || (index > 0 && time <= times[index - 1]!))) {
+    throw new Error('Video worksheet checkpoint times must be nonnegative and strictly increasing');
+  }
   if (parsedQuestions.length !== times.length) {
     throw new Error('[Svelte Init] Video session questions do not match question times length');
   }
@@ -262,14 +270,28 @@ export async function initVideoSessionData(curTdfUnit: VideoTdfUnitLike | null |
   const currentTdfId = Session.get('currentTdfId');
   const currentUnitNumber = Number(Session.get('currentUnitNumber') || 0);
   if (userId && typeof currentTdfId === 'string' && currentTdfId.trim() !== '' && Number.isFinite(currentUnitNumber)) {
-    completedCheckpointQuestionCount = await meteorCallAsync(
+    completedCheckpointQuestionCount = worksheetMode ? 0 : await meteorCallAsync(
       'getVideoCompletedCheckpointQuestionCountFromHistory',
       userId,
       currentTdfId,
       currentUnitNumber,
     );
   }
-  const videoResumeAnchor = resolveVideoResumeAnchor(times, completedCheckpointQuestionCount);
+  let worksheetResumeAnchor = null;
+  if (worksheetMode && userId && typeof currentTdfId === 'string') {
+    for (let index = 0; index < pageIds!.length; index++) {
+      const history = await loadWorksheetHistory(userId, currentTdfId, currentUnitNumber, pageIds![index]!, index);
+      if (history.some((record) => worksheetEvent(record)?.kind === 'complete')) {
+        completedCheckpointQuestionCount = index + 1;
+      } else {
+        if (history.some((record) => worksheetEvent(record)?.kind === 'start')) {
+          worksheetResumeAnchor = { resumeStartTime: times[index], resumeCheckpointIndex: index };
+        }
+        break;
+      }
+    }
+  }
+  const videoResumeAnchor = worksheetResumeAnchor ?? resolveVideoResumeAnchor(times, completedCheckpointQuestionCount);
   setVideoResumeAnchor(videoResumeAnchor);
 
   const resolvedVideoUrl = resolveDynamicAssetPath(videoSession.videosource, { logPrefix: '[Svelte Init]' });

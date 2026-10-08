@@ -45,8 +45,6 @@ describe('field registry section composition', function() {
     expect(stimSchema.properties).to.have.property('setspec');
     expect(DELIVERY_DISPLAY_SETTINGS_RUNTIME_DEFAULTS).to.include({
       stimuliPosition: 'top',
-      displayCorrectFeedback: true,
-      displayIncorrectFeedback: true,
     });
     const unitProperties = (tdfSchema as any).properties.tutor.properties.unit.items.properties;
     expect(unitProperties.audioInputEnabled).to.exist;

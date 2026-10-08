@@ -89,6 +89,10 @@ export async function createPerformanceIndexes() {
       { name: 'perf_userId_TDFId_type_time', background: true }
     );
     serverConsole('  Created: Histories.userId_TDFId_type_time');
+    await Histories.rawCollection().createIndex(
+      { userId: 1, TDFId: 1, levelUnit: 1, 'sparc.pageKey': 1, 'sparc.worksheet.checkpointIndex': 1, 'courseAssignment.courseId': 1, time: 1 },
+      { name: 'worksheet_scoped_history', background: true }
+    );
 
     await Histories.rawCollection().createIndex(
       { userId: 1, levelUnitType: 1, TDFId: 1, recordedServerTime: 1 },

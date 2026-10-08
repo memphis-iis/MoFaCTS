@@ -1288,6 +1288,15 @@ describe('learner analytics method authorization', function() {
   });
 
   it('returns prior-unit model history for later units unless unit-scoped history is requested', async function() {
+    const assessment = {
+      userId: 'current-user', TDFId: 'tdf-shared-model', levelUnit: 0, levelUnitType: 'schedule',
+      modelEvidenceSource: 'assessment', time: 500, outcome: 'correct', eventType: '',
+      stimuliSetId: 'set-a', stimulusKC: 'stim-a', clusterKC: 'cluster-a', KCCluster: 'cluster-a',
+      KCId: 'stim-a', responseKey: 'Alpha', responseDuration: 60,
+    };
+    await HistoriesAny.insertAsync({ ...assessment, _id: 'assessment-original' });
+    await HistoriesAny.insertAsync({ ...assessment, _id: 'assessment-copy', levelUnitType: 'model' });
+    await HistoriesAny.insertAsync({ ...assessment, _id: 'other-learner-assessment', userId: 'other-user' });
     await HistoriesAny.insertAsync({
       _id: 'sparc-model-unit-1',
       userId: 'current-user',
@@ -1330,8 +1339,10 @@ describe('learner analytics method authorization', function() {
       2,
       false
     );
-    expect(cumulativeRows.map((row: any) => row.time)).to.deep.equal([1000, 2000]);
-    expect(cumulativeRows.map((row: any) => row.eventType)).to.deep.equal(['sparc', '']);
+    expect(cumulativeRows.map((row: any) => row.time)).to.deep.equal([500, 1000, 2000]);
+    expect(cumulativeRows.map((row: any) => row.eventType)).to.deep.equal(['', 'sparc', '']);
+    expect(cumulativeRows[0].levelUnitType).to.equal('schedule');
+    expect(cumulativeRows[0].modelEvidenceSource).to.equal('assessment');
 
     const unitScopedRows = await (asyncMethods.getLearningHistoryForUnit as any).call(
       { userId: 'current-user' },

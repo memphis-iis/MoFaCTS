@@ -1,3 +1,4 @@
+import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import {
@@ -80,7 +81,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
     downloadOwnHistoryAcrossTdfs: async function(this: MethodContext) {
       const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
 
-      const history = await deps.Histories.findOneAsync({ userId: actingUserId }, { fields: { _id: 1 } });
+      const history = await deps.Histories.findOneAsync({ userId: actingUserId, ...operationalHistorySelector() }, { fields: { _id: 1 } });
       if (!history) {
         throw new Meteor.Error(404, 'No history found for current user');
       }

@@ -2,6 +2,7 @@ import {
   assertModelPracticeHistoryIdentity,
   createStimulusKey,
   isBlankIdentityValue,
+  isModelPracticeHistoryRecord,
 } from '../../common/historyEnvelope';
 
 type UnknownRecord = Record<string, unknown>;
@@ -39,7 +40,7 @@ function isTimeoutResponse(record: UnknownRecord): boolean {
 }
 
 export function shouldRecordStimulusCrowdOutcome(record: UnknownRecord): boolean {
-  if (record.levelUnitType !== 'model') {
+  if (!isModelPracticeHistoryRecord(record)) {
     return false;
   }
   if (!isCountablePracticeEvent(record)) {

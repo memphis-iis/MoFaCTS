@@ -11,7 +11,7 @@ class MeteorError extends Error {
 }
 
 function createMethodFixture(rowCount = 0) {
-  const rows = Array.from({ length: rowCount }, (_, index) => ({
+  const rows: Array<Record<string, any>> = Array.from({ length: rowCount }, (_, index) => ({
     _id: String(index + 1).padStart(6, '0'),
     userId: 'learner',
     TDFId: 'lesson',
@@ -43,6 +43,7 @@ function createMethodFixture(rowCount = 0) {
         && selector.TDFId.$in.includes(row.TDFId)
         && (!selector._id?.$lte || row._id <= selector._id.$lte)
         && (!selector._id?.$gt || row._id > selector._id.$gt)
+        && !(selector.$nor || []).some((clause: Record<string, unknown>) => Object.entries(clause).every(([key, value]) => row[key] === value))
       ));
       selected.sort((left, right) => options.sort?._id === -1
         ? right._id.localeCompare(left._id)
@@ -82,6 +83,20 @@ function createMethodFixture(rowCount = 0) {
 }
 
 describe('learnerAnalyticsMethods', function() {
+  it('excludes historical copies from snapshot bounds, counts and pages while retaining originals', async function() {
+    const fixture = createMethodFixture(2);
+    fixture.rows[0]!.levelUnitType = 'schedule';
+    fixture.rows[0]!.modelEvidenceSource = 'assessment';
+    fixture.rows.push({ ...fixture.rows[0], _id: '000003', levelUnitType: 'model' });
+    const source = await fixture.methods.getLearnerLessonAnalyticsSource.call({ userId: 'learner' }, { rootTdfId: 'lesson' });
+    expect(source.historyRowCount).to.equal(2);
+    expect(source.historyPage.rows.map((row: any) => row._id)).to.deep.equal(['000001', '000002']);
+    expect(source.historyPage.rows[0]).to.include({ levelUnitType: 'schedule', modelEvidenceSource: 'assessment' });
+    for (const query of fixture.historyQueries) {
+      expect(query.selector.$nor).to.deep.equal([{ levelUnitType: 'model', modelEvidenceSource: 'assessment' }]);
+    }
+  });
+
   it('offers only practiced study sets and defaults to the most recent one', function() {
     const overview = buildLearnerAnalyticsOverview({
       lessons: [

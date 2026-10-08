@@ -36,14 +36,12 @@ describe('card review event controller', function() {
     harness.controller.handleFeedbackContent({
       feedbackText: '  Good work  ',
       feedbackHtml: '<b>Good work</b>',
-      suppressed: true,
     });
 
     expect(harness.sent).to.deep.equal([{
       type: 'FEEDBACK_CONTENT',
       feedbackText: 'Good work',
       feedbackHtml: '<b>Good work</b>',
-      feedbackSuppressed: true,
     }]);
   });
 

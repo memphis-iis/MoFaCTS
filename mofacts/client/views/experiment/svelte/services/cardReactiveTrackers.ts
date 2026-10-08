@@ -22,7 +22,6 @@ export function createCardReactiveTrackers(deps: {
   readonly setPerformanceData: (performance: unknown) => void;
   readonly setUser: (user: unknown) => void;
   readonly setVideoCheckpoints: (videoCheckpoints: unknown) => void;
-  readonly resetCompletedVideoQuestions: () => void;
 }): CardReactiveTrackers {
   let computations: ReactiveComputation[] = [];
 
@@ -44,7 +43,6 @@ export function createCardReactiveTrackers(deps: {
       }),
       deps.autorun(() => {
         deps.setVideoCheckpoints(deps.getVideoCheckpoints());
-        deps.resetCompletedVideoQuestions();
       }),
     ];
   }
@@ -59,7 +57,6 @@ export function createMeteorCardReactiveTrackers(deps: {
   readonly setPerformanceData: (performance: unknown) => void;
   readonly setUser: (user: unknown) => void;
   readonly setVideoCheckpoints: (videoCheckpoints: unknown) => void;
-  readonly resetCompletedVideoQuestions: () => void;
 }): CardReactiveTrackers {
   return createCardReactiveTrackers({
     autorun: (callback) => Tracker.autorun(callback),

@@ -59,6 +59,8 @@ const REMOVED_FIELDS = new Set<string>([
   'simplefeedbackOnCorrect',
   'simplefeedbackOnIncorrect',
   'suppressFeedbackDisplay',
+  'displayCorrectFeedback',
+  'displayIncorrectFeedback',
   'feedbackDisplayPosition',
   'finalInstructions',
   'showhistory',

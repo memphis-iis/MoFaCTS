@@ -66,7 +66,6 @@ export interface ContentRuntimeMachineContext {
   feedbackMessage: string;
   feedbackText: string;
   feedbackRevealStarted: boolean;
-  feedbackSuppressed: boolean;
   sparcResult: SparcControllerResult | null;
   sparcNodeValues: Record<string, unknown>;
   isCorrect: boolean;
@@ -120,7 +119,6 @@ export interface ContentRuntimeMachineEvent extends Record<string, unknown> {
   unitFinished?: boolean;
   feedbackText?: string;
   feedbackHtml?: string;
-  feedbackSuppressed?: boolean;
   practiceLaunchMode?: string;
   sparcResult?: SparcControllerResult | null;
   sparcNodeValues?: Record<string, unknown>;
@@ -176,7 +174,6 @@ export const initialContext: ContentRuntimeMachineContext = {
   feedbackMessage: '',
   feedbackText: '',
   feedbackRevealStarted: false,
-  feedbackSuppressed: false,
   sparcResult: null,
   sparcNodeValues: {},
   isCorrect: false,

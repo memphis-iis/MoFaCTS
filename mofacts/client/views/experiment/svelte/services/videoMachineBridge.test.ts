@@ -1,25 +1,20 @@
 import { expect } from 'chai';
 import {
-  buildQuestionsToRepeat,
   createVideoMachineBridge,
   getCheckpointResetIndex,
   getRewindCheckpointTimes,
-  type RepeatedVideoQuestion,
   type VideoCheckpoints,
   type VideoPlayerBridge,
 } from './videoMachineBridge';
 
 function createBridgeHarness(options: {
   checkpoints?: VideoCheckpoints | null;
-  repeat?: boolean;
   rewind?: boolean;
   stateMatches?: boolean;
   videoPlayer?: VideoPlayerBridge | null;
 } = {}) {
-  const completed = new Set<number>();
   const logs: Array<{ level: number; message: string; details?: unknown }> = [];
   const retries: Array<() => void> = [];
-  const repeatedQuestions: RepeatedVideoQuestion[][] = [];
   const resumeCalls: string[] = [];
   const resetCalls: number[] = [];
   const rewindCalls: number[] = [];
@@ -36,10 +31,7 @@ function createBridgeHarness(options: {
     : options.videoPlayer;
 
   const bridge = createVideoMachineBridge({
-    addCompletedVideoQuestion: (questionIndex) => completed.add(questionIndex),
-    getCompletedVideoQuestions: () => completed,
     getCurrentState: () => 'test-state',
-    getRepeatQuestionsSinceCheckpointEnabled: () => options.repeat === true,
     getRewindOnIncorrectEnabled: () => options.rewind !== false,
     getVideoCheckpoints: () => options.checkpoints === undefined
       ? {
@@ -59,9 +51,6 @@ function createBridgeHarness(options: {
     scheduleRetry: (callback) => {
       retries.push(callback);
     },
-    setQuestionsToRepeat: (questions) => {
-      repeatedQuestions.push(questions);
-    },
     stateMatches: () => options.stateMatches !== false,
     waitForDomUpdate: async () => undefined,
   });
@@ -69,9 +58,7 @@ function createBridgeHarness(options: {
   return {
     actionCalls,
     bridge,
-    completed,
     logs,
-    repeatedQuestions,
     resetCalls,
     resumeCalls,
     retries,
@@ -86,18 +73,6 @@ describe('video machine bridge', function() {
     expect(getCheckpointResetIndex([10, 20, 30], 20.1)).to.equal(2);
     expect(() => getRewindCheckpointTimes({ rewindCheckpoints: ['bad'] })).to.throw(/invalid/);
     expect(() => getCheckpointResetIndex([10, 'bad'], 0)).to.throw(/invalid/);
-  });
-
-  it('builds repeat questions excluding completed questions', function() {
-    expect(buildQuestionsToRepeat({
-      checkpoints: { times: [10, 20, 30], questions: [1, 2, 3] },
-      completedVideoQuestions: new Set([2]),
-      checkpointTime: 10,
-      currentTime: 30,
-    })).to.deep.equal([
-      { index: 0, time: 10, question: 1 },
-      { index: 2, time: 30, question: 3 },
-    ]);
   });
 
   it('resumes video only when machine and player are ready', async function() {
@@ -121,24 +96,24 @@ describe('video machine bridge', function() {
     expect(harness.retries).to.have.length(1);
   });
 
-  it('marks correct video questions as completed without rewinding', function() {
+  it('leaves the video position unchanged for correct answers', function() {
     const harness = createBridgeHarness();
 
     harness.bridge.handleVideoAnswer({ isCorrect: true, checkpointIndex: 1 });
 
-    expect([...harness.completed]).to.deep.equal([2]);
     expect(harness.rewindCalls).to.deep.equal([]);
+    expect(harness.resetCalls).to.deep.equal([]);
+    expect(harness.actionCalls).to.deep.equal([]);
   });
 
   it('rewinds to the previous checkpoint for incorrect answers', function() {
-    const harness = createBridgeHarness({ repeat: true });
+    const harness = createBridgeHarness();
 
     harness.bridge.handleVideoAnswer({ isCorrect: false, checkpointIndex: 2 });
 
     expect(harness.resetCalls).to.deep.equal([2]);
     expect(harness.rewindCalls).to.deep.equal([20.1]);
     expect(harness.actionCalls).to.deep.equal(['rewind_to_checkpoint']);
-    expect(harness.repeatedQuestions).to.deep.equal([[]]);
   });
 
   it('fails clearly when rewind invariants are missing', function() {

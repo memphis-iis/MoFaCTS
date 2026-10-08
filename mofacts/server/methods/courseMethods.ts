@@ -1,3 +1,4 @@
+import { operationalHistorySelector } from '../../common/historyEnvelope';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionId, progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
 import type { DueDateException } from '../../common/courseAssignments.contracts';
@@ -1533,6 +1534,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     const tdf = await deps.Histories.findOneAsync({
       TDFId: tdfId,
       userId,
+      ...operationalHistorySelector(),
       $and: [
         { levelUnitType: { $ne: 'schedule' } },
         { levelUnitType: { $ne: 'Instruction' } },

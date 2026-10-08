@@ -1,3 +1,4 @@
+import { worksheetHistoryWriteId, sameWorksheetWrite } from '../lib/worksheetHistoryWrite';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
 import {
@@ -6,7 +7,7 @@ import {
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import { decompressHistoryRecord } from '../../common/historyCompression';
-import { assertCanonicalHistoryEnvelope, validateHistoryWirePayload } from '../../common/historyEnvelope';
+import { assertCanonicalHistoryEnvelope, validateHistoryWirePayload, isAssessmentHistoryCopy, modelPracticeHistorySelector, operationalHistorySelector } from '../../common/historyEnvelope';
 import {
   recordStimulusCrowdOutcome,
   type StimulusCrowdStatsCollection,
@@ -18,6 +19,7 @@ import { curSemester } from '../../common/Definitions';
 import { collectLessonFamilyRefs, createLessonFamilyResolver } from '../lib/tdfLessonFamilyResolver';
 import { createStimulusKey } from '../../../learning-components/runtime/historyStimulusIdentity';
 import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
+import type { ConditionStateWrite } from '../lib/conditionAllocation';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: unknown[]) => void;
@@ -128,7 +130,7 @@ function buildLearningHistoryScopeMatch(
   return {
     userId,
     TDFId,
-    levelUnitType: 'model',
+    ...modelPracticeHistorySelector(),
     levelUnit: unitScopedOnly ? normalizedUnit : { $lte: normalizedUnit },
   };
 }
@@ -308,7 +310,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (validated.launchMode === 'individual') {
       const clusterKcs = await clusterKcsForTdfIds(sourceTdfIds);
       if (clusterKcs.length === 0) {
-        return { userId, levelUnitType: 'model', $or: scopeTerms };
+        return { userId, ...modelPracticeHistorySelector(), $or: scopeTerms };
       }
       scopeTerms.push({
         'courseAssignment.courseId': validated.courseId,
@@ -317,7 +319,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
     return {
       userId,
-      levelUnitType: 'model',
+      ...modelPracticeHistorySelector(),
       $or: scopeTerms,
     };
   }
@@ -622,7 +624,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
   async function getUserLastFeedbackTypeFromHistory(tdfID: string) {
     const userHistory = await deps.Histories.findOneAsync(
-      { TDFId: tdfID, userId: (Meteor as any).userId },
+      { TDFId: tdfID, userId: (Meteor as any).userId, ...operationalHistorySelector() },
       { sort: { time: -1 } }
     );
     let feedbackType = 'undefined';
@@ -646,6 +648,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
     const decompressStartTime = Date.now();
     const decompressedRecord = decompressHistoryRecord(historyRecord);
+    if (isAssessmentHistoryCopy(decompressedRecord)) {
+      throw new Meteor.Error('obsolete-assessment-history-write', 'Reload MoFaCTS before continuing. Assessment answers must be saved once.');
+    }
     const decompressMs = elapsedMsSince(decompressStartTime);
 
     const sanitizeStartTime = Date.now();
@@ -686,7 +691,22 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
 
     const insertStartTime = Date.now();
-    await deps.Histories.insertAsync(sanitizedHistoryRecord);
+    const worksheetId = worksheetHistoryWriteId(sanitizedHistoryRecord);
+    if (worksheetId) {
+      Object.assign(sanitizedHistoryRecord, { _id: worksheetId });
+      try {
+        await deps.Histories.insertAsync(sanitizedHistoryRecord);
+      } catch (error) {
+        if ((error as { code?: number }).code !== 11000) throw error;
+        const existing = await deps.Histories.findOneAsync({ _id: worksheetId, userId: actingUserId });
+        if (!existing || !sameWorksheetWrite(existing, sanitizedHistoryRecord)) {
+          throw new Meteor.Error('worksheet-history-conflict', 'Worksheet history changed in another session. Reload before continuing.');
+        }
+        return;
+      }
+    } else {
+      await deps.Histories.insertAsync(sanitizedHistoryRecord);
+    }
     const insertMs = elapsedMsSince(insertStartTime);
     const crowdStatsStartTime = Date.now();
     await recordStimulusCrowdOutcome(deps.StimulusCrowdStats, sanitizedHistoryRecord);
@@ -730,7 +750,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   }
 
   async function getHistoryByTDFID(TDFId: string) {
-    return await deps.Histories.find({ TDFId }).fetchAsync();
+    return await deps.Histories.find({ TDFId, ...operationalHistorySelector() }).fetchAsync();
   }
 
   async function getStimulusCrowdStatsForDeck(
@@ -985,7 +1005,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   }
 
   async function getUserRecentTDFs(userId: string) {
-    const history = await deps.Histories.find({ userId }, { sort: { time: -1 }, limit: 5 }).fetchAsync();
+    const history = await deps.Histories.find({ userId, ...operationalHistorySelector() }, { sort: { time: -1 }, limit: 5 }).fetchAsync();
     const recentTdfIds = history
       .map((historyRecord: any) => deps.normalizeCanonicalId(historyRecord?.TDFId))
       .filter((tdfId: string | null): tdfId is string => typeof tdfId === 'string');
@@ -1058,7 +1078,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   async function getStudentPerformanceByIdAndTDFIdFromHistory(userId: string, TDFId: string, returnRows: number | null = null) {
     const query: unknown[] = [
       {
-        $match: { userId, TDFId, levelUnitType: 'model' },
+        $match: { userId, TDFId, ...modelPracticeHistorySelector() },
       },
       {
         $addFields: {
@@ -1242,7 +1262,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnitType: 'video',
       levelUnit: Number(levelUnit),
       studentResponseType: 'ATTEMPT',
-      outcome: 'correct',
+      outcome: { $in: ['correct', 'incorrect'] },
     }).countAsync();
   }
 
@@ -1270,6 +1290,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         outcome: 1,
         eventType: 1,
         levelUnitType: 1,
+        modelEvidenceSource: 1,
         stimuliSetId: 1,
         stimulusKC: 1,
         clusterKC: 1,
@@ -1292,7 +1313,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     userId: string,
     TDFId: string,
     levelUnit: number,
-    options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {}
+    options: Pick<LearningHistoryReadOptions, 'courseAssignment'> & { worksheetPageKey?: string; worksheetCheckpointIndex?: number } = {}
   ) {
     await rejectMissingCourseAssignmentContextForAssignedTdf(
       userId,
@@ -1306,6 +1327,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: Number(levelUnit),
       eventType: 'sparc',
       levelUnitType: { $in: ['model', 'sparc'] },
+      ...operationalHistorySelector(),
     };
     if (options.courseAssignment) {
       await validateCourseAssignmentHistoryContext({ courseAssignment: options.courseAssignment }, TDFId, userId);
@@ -1318,7 +1340,17 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         'courseAssignment.courseId': courseId,
       };
     }
-    return await deps.Histories.find(selector, {
+    if (options.worksheetPageKey !== undefined) {
+      if (typeof options.worksheetPageKey !== 'string' || !options.worksheetPageKey.trim()
+        || options.worksheetPageKey.length > 300 || !Number.isInteger(options.worksheetCheckpointIndex)
+        || Number(options.worksheetCheckpointIndex) < -1) throw new Meteor.Error(400, 'Invalid worksheet history scope');
+      if (options.courseAssignment) selector['courseAssignment.assignmentId'] = options.courseAssignment.assignmentId;
+      else selector.courseAssignment = { $exists: false };
+      selector['sparc.pageKey'] = options.worksheetPageKey;
+      selector['sparc.worksheet.checkpointIndex'] = options.worksheetCheckpointIndex;
+    }
+    const records = await deps.Histories.find(selector, {
+      ...(options.worksheetPageKey !== undefined ? { limit: 10001 } : {}),
       fields: {
         historySchemaVersion: 1,
         TDFId: 1,
@@ -1328,6 +1360,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         levelUnit: 1,
         levelUnitName: 1,
         levelUnitType: 1,
+        modelEvidenceSource: 1,
         time: 1,
         problemStartTime: 1,
         selection: 1,
@@ -1354,6 +1387,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       },
       sort: { time: 1, recordedServerTime: 1, eventId: 1 },
     }).fetchAsync();
+    if (options.worksheetPageKey !== undefined && records.length > 10000) {
+      throw new Meteor.Error('worksheet-history-limit', 'Worksheet history exceeds its supported bound');
+    }
+    return records;
   }
 
   async function getAutoTutorHistoryForUnit(
@@ -1389,7 +1426,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const rows = await deps.Histories.find({
       userId,
       TDFId,
-      levelUnitType: 'model',
+      ...modelPracticeHistorySelector(),
       CFItemRemoved: true,
     }, {
       fields: {
@@ -1419,7 +1456,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
   async function getNumDroppedItemsByUserIDAndTDFId(userId: string, TDFId: string) {
     deps.serverConsole('getNumDroppedItemsByUserIDAndTDFId', userId, TDFId);
-    return await deps.Histories.find({ userId, TDFId, CFItemRemoved: true, levelUnitType: 'model' }).countAsync();
+    return await deps.Histories.find({ userId, TDFId, CFItemRemoved: true, ...modelPracticeHistorySelector() }).countAsync();
   }
 
   async function getStudentPerformanceForClassAndTdfId(instructorId: string, date: number | null = null) {
@@ -1457,7 +1494,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     }
 
     const histMatch: Record<string, unknown> = {
-      levelUnitType: 'model',
+      ...modelPracticeHistorySelector(),
       userId: { $in: enrolledUserIds },
     };
     if (date) {
@@ -1688,7 +1725,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       userId: string,
       TDFId: string,
       levelUnit: number,
-      options: Pick<LearningHistoryReadOptions, 'courseAssignment'> = {}
+      options: Pick<LearningHistoryReadOptions, 'courseAssignment'> & { worksheetPageKey?: string; worksheetCheckpointIndex?: number } = {}
     ) {
       const scopedUserId = requireSelfScopedUserId(this, userId);
       return await getSparcHistoryForUnit(scopedUserId, requireNormalizedTdfId(TDFId), levelUnit, options);
@@ -1731,7 +1768,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         );
       }
       return await deps.Histories.find(
-        { userId: requestedUserId, TDFId: normalizedTdfId },
+        { userId: requestedUserId, TDFId: normalizedTdfId, ...operationalHistorySelector() },
         {
           fields: { _id: 0, stimulusKC: 1, outcome: 1, recordedServerTime: 1, time: 1 },
           sort: { recordedServerTime: 1, time: 1 },
@@ -1910,7 +1947,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         );
       }
       const history = await deps.Histories.find(
-        { userId: requestedUserId, TDFId: normalizedTdfId },
+        { userId: requestedUserId, TDFId: normalizedTdfId, ...operationalHistorySelector() },
         {
           fields: { _id: 0, stimulusKC: 1, outcome: 1, recordedServerTime: 1, time: 1 },
           sort: { recordedServerTime: 1, time: 1 },

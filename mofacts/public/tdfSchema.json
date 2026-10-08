@@ -1662,38 +1662,6 @@
                               "sparc"
                             ]
                           },
-                          "displayCorrectFeedback": {
-                            "title": "Show correct feedback",
-                            "description": "When enabled, learners see feedback after correct answers. When disabled, correct answers still count as correct, but no correct-answer feedback is displayed or spoken.",
-                            "type": "boolean",
-                            "default": true,
-                            "options": {
-                              "grid_columns": 4
-                            },
-                            "x-appliesToUnitTypes": [
-                              "learning",
-                              "assessment",
-                              "video",
-                              "autotutor",
-                              "sparc"
-                            ]
-                          },
-                          "displayIncorrectFeedback": {
-                            "title": "Show incorrect feedback",
-                            "description": "When enabled, learners see feedback after incorrect answers and timeouts. When disabled, incorrect outcomes still count as incorrect, but no incorrect-answer feedback is displayed or spoken.",
-                            "type": "boolean",
-                            "default": true,
-                            "options": {
-                              "grid_columns": 4
-                            },
-                            "x-appliesToUnitTypes": [
-                              "learning",
-                              "assessment",
-                              "video",
-                              "autotutor",
-                              "sparc"
-                            ]
-                          },
                           "correctLabelText": {
                             "title": "Correct feedback label",
                             "description": "Text used for the leading outcome label on correct-answer feedback. This label does not replace evaluator explanations such as close-enough or phonetic-match messages.",
@@ -2483,38 +2451,6 @@
                                 "sparc"
                               ]
                             },
-                            "displayCorrectFeedback": {
-                              "title": "Show correct feedback",
-                              "description": "When enabled, learners see feedback after correct answers. When disabled, correct answers still count as correct, but no correct-answer feedback is displayed or spoken.",
-                              "type": "boolean",
-                              "default": true,
-                              "options": {
-                                "grid_columns": 4
-                              },
-                              "x-appliesToUnitTypes": [
-                                "learning",
-                                "assessment",
-                                "video",
-                                "autotutor",
-                                "sparc"
-                              ]
-                            },
-                            "displayIncorrectFeedback": {
-                              "title": "Show incorrect feedback",
-                              "description": "When enabled, learners see feedback after incorrect answers and timeouts. When disabled, incorrect outcomes still count as incorrect, but no incorrect-answer feedback is displayed or spoken.",
-                              "type": "boolean",
-                              "default": true,
-                              "options": {
-                                "grid_columns": 4
-                              },
-                              "x-appliesToUnitTypes": [
-                                "learning",
-                                "assessment",
-                                "video",
-                                "autotutor",
-                                "sparc"
-                              ]
-                            },
                             "correctLabelText": {
                               "title": "Correct feedback label",
                               "description": "Text used for the leading outcome label on correct-answer feedback. This label does not replace evaluator explanations such as close-enough or phonetic-match messages.",
@@ -3220,26 +3156,6 @@
                       "rewindOnIncorrect": {
                         "title": "Rewind after incorrect answers.",
                         "description": "Rewind the video after an incorrect checkpoint answer.",
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "enum": [
-                              "true",
-                              "false"
-                            ]
-                          },
-                          {
-                            "type": "boolean"
-                          }
-                        ],
-                        "default": "false",
-                        "options": {
-                          "grid_columns": 4
-                        }
-                      },
-                      "repeatQuestionsSinceCheckpoint": {
-                        "title": "Repeat questions since the last checkpoint.",
-                        "description": "Repeat checkpoint questions after rewinding to the previous anchor.",
                         "anyOf": [
                           {
                             "type": "string",
@@ -4181,38 +4097,6 @@
                           "sparc"
                         ]
                       },
-                      "displayCorrectFeedback": {
-                        "title": "Show correct feedback",
-                        "description": "When enabled, learners see feedback after correct answers. When disabled, correct answers still count as correct, but no correct-answer feedback is displayed or spoken.",
-                        "type": "boolean",
-                        "default": true,
-                        "options": {
-                          "grid_columns": 4
-                        },
-                        "x-appliesToUnitTypes": [
-                          "learning",
-                          "assessment",
-                          "video",
-                          "autotutor",
-                          "sparc"
-                        ]
-                      },
-                      "displayIncorrectFeedback": {
-                        "title": "Show incorrect feedback",
-                        "description": "When enabled, learners see feedback after incorrect answers and timeouts. When disabled, incorrect outcomes still count as incorrect, but no incorrect-answer feedback is displayed or spoken.",
-                        "type": "boolean",
-                        "default": true,
-                        "options": {
-                          "grid_columns": 4
-                        },
-                        "x-appliesToUnitTypes": [
-                          "learning",
-                          "assessment",
-                          "video",
-                          "autotutor",
-                          "sparc"
-                        ]
-                      },
                       "correctLabelText": {
                         "title": "Correct feedback label",
                         "description": "Text used for the leading outcome label on correct-answer feedback. This label does not replace evaluator explanations such as close-enough or phonetic-match messages.",
@@ -5002,38 +4886,6 @@
                             "sparc"
                           ]
                         },
-                        "displayCorrectFeedback": {
-                          "title": "Show correct feedback",
-                          "description": "When enabled, learners see feedback after correct answers. When disabled, correct answers still count as correct, but no correct-answer feedback is displayed or spoken.",
-                          "type": "boolean",
-                          "default": true,
-                          "options": {
-                            "grid_columns": 4
-                          },
-                          "x-appliesToUnitTypes": [
-                            "learning",
-                            "assessment",
-                            "video",
-                            "autotutor",
-                            "sparc"
-                          ]
-                        },
-                        "displayIncorrectFeedback": {
-                          "title": "Show incorrect feedback",
-                          "description": "When enabled, learners see feedback after incorrect answers and timeouts. When disabled, incorrect outcomes still count as incorrect, but no incorrect-answer feedback is displayed or spoken.",
-                          "type": "boolean",
-                          "default": true,
-                          "options": {
-                            "grid_columns": 4
-                          },
-                          "x-appliesToUnitTypes": [
-                            "learning",
-                            "assessment",
-                            "video",
-                            "autotutor",
-                            "sparc"
-                          ]
-                        },
                         "correctLabelText": {
                           "title": "Correct feedback label",
                           "description": "Text used for the leading outcome label on correct-answer feedback. This label does not replace evaluator explanations such as close-enough or phonetic-match messages.",
@@ -5756,26 +5608,6 @@
                       "grid_columns": 4
                     }
                   },
-                  "repeatQuestionsSinceCheckpoint": {
-                    "title": "Repeat questions since the last checkpoint.",
-                    "description": "Repeat checkpoint questions after rewinding to the previous anchor.",
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "true",
-                          "false"
-                        ]
-                      },
-                      {
-                        "type": "boolean"
-                      }
-                    ],
-                    "default": "false",
-                    "options": {
-                      "grid_columns": 4
-                    }
-                  },
                   "unitMode": {
                     "title": "Video-session selection algorithm.",
                     "description": "Learning engine unit mode used by mixed video/question sessions.",
@@ -6418,38 +6250,6 @@
                 "left"
               ],
               "default": "top",
-              "options": {
-                "grid_columns": 4
-              },
-              "x-appliesToUnitTypes": [
-                "learning",
-                "assessment",
-                "video",
-                "autotutor",
-                "sparc"
-              ]
-            },
-            "displayCorrectFeedback": {
-              "title": "Show correct feedback",
-              "description": "When enabled, learners see feedback after correct answers. When disabled, correct answers still count as correct, but no correct-answer feedback is displayed or spoken.",
-              "type": "boolean",
-              "default": true,
-              "options": {
-                "grid_columns": 4
-              },
-              "x-appliesToUnitTypes": [
-                "learning",
-                "assessment",
-                "video",
-                "autotutor",
-                "sparc"
-              ]
-            },
-            "displayIncorrectFeedback": {
-              "title": "Show incorrect feedback",
-              "description": "When enabled, learners see feedback after incorrect answers and timeouts. When disabled, incorrect outcomes still count as incorrect, but no incorrect-answer feedback is displayed or spoken.",
-              "type": "boolean",
-              "default": true,
               "options": {
                 "grid_columns": 4
               },

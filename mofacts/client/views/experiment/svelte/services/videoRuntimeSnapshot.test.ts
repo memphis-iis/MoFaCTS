@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import {
   buildVideoRuntimeSnapshot,
-  createCompletedVideoQuestionsStore,
 } from './videoRuntimeSnapshot';
 
 function stateMatching(paths: string[]) {
@@ -19,7 +18,6 @@ describe('video runtime snapshot service', function() {
           preventScrubbing: 'true',
           preventPause: 'true',
           preventRewind: true,
-          repeatQuestionsSinceCheckpoint: 1,
           rewindOnIncorrect: true,
         },
       },
@@ -40,7 +38,6 @@ describe('video runtime snapshot service', function() {
       preventScrubbingEnabled: true,
       preventPauseEnabled: true,
       preventRewindEnabled: true,
-      repeatQuestionsSinceCheckpointEnabled: true,
       resumeCheckpointIndex: 2,
       resumeStartTime: 12,
       rewindOnIncorrectEnabled: true,
@@ -64,7 +61,6 @@ describe('video runtime snapshot service', function() {
       preventScrubbingEnabled: false,
       preventPauseEnabled: false,
       preventRewindEnabled: false,
-      repeatQuestionsSinceCheckpointEnabled: false,
       resumeCheckpointIndex: undefined,
       resumeStartTime: undefined,
       rewindOnIncorrectEnabled: false,
@@ -74,14 +70,4 @@ describe('video runtime snapshot service', function() {
     expect(snapshot.questionIndices).to.deep.equal([]);
   });
 
-  it('tracks completed video questions behind an explicit store', function() {
-    const store = createCompletedVideoQuestionsStore();
-
-    store.add(2);
-    store.add(3);
-    expect([...store.get()]).to.deep.equal([2, 3]);
-
-    store.reset();
-    expect([...store.get()]).to.deep.equal([]);
-  });
 });

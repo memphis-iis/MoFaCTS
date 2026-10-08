@@ -87,6 +87,7 @@
     on:blockingassetstate={(event) => forward('blockingassetstate', event.detail)}
     on:reviewrevealstarted={(event) => forward('reviewrevealstarted', event.detail)}
   />
+  {/if}
 </VideoSessionMode>
 
 <VideoSessionOverlays

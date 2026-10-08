@@ -1,4 +1,5 @@
 import { MongoClient } from 'mongodb';
+import { modelPracticeHistorySelector } from '../../learning-components/runtime/historyStimulusIdentity';
 
 type TdfSummary = {
   id: string;
@@ -95,7 +96,7 @@ async function auditHistoryForTdfs(db: any, tdfIds: string[]) {
     {
       $match: {
         TDFId: { $in: tdfIds },
-        levelUnitType: 'model',
+        ...modelPracticeHistorySelector(),
       },
     },
     {
@@ -122,7 +123,7 @@ async function auditCourseSharedClusters(db: any, tdfIds: string[]) {
     {
       $match: {
         TDFId: { $in: tdfIds },
-        levelUnitType: 'model',
+        ...modelPracticeHistorySelector(),
         'courseAssignment.courseId': { $exists: true },
       },
     },

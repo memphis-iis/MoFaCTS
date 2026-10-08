@@ -7,7 +7,7 @@ export type SparcControllerResult = SparcTrialResult;
 
 export type UnitType = 'schedule' | 'video' | 'model' | 'sparc' | 'autotutor' | 'instruction-only' | 'gaze-calibration';
 
-export type VideoCheckpointBehavior = 'none' | 'pause' | 'all' | 'some' | 'adaptive';
+export type VideoCheckpointBehavior = 'none' | 'pause' | 'all' | 'some' | 'adaptive' | 'worksheet';
 
 export interface RewindCheckpointData {
   checkpointBehavior: VideoCheckpointBehavior;
@@ -266,7 +266,6 @@ export interface HistoryLoggingContext {
   alternateDisplayIndex?: number | null;
   reviewEntry?: string;
   feedbackText?: string;
-  feedbackSuppressed?: boolean;
   sparcResult?: SparcControllerResult | null;
 }
 

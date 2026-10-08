@@ -180,7 +180,6 @@ describe('machine guard contracts', function() {
     const args = makeArgs({
       context: {
         feedbackRevealStarted: true,
-        feedbackSuppressed: false,
         feedbackText: 'Correct.',
       },
     });

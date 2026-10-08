@@ -1,3 +1,4 @@
+import { isModelPracticeHistoryRecord } from '../../../../common/historyEnvelope';
 import { applyLearnerTdfConfig } from '../../../../common/lib/learnerTdfConfig';
 import { reconstructLearningStateFromHistory } from '../../../../common/lib/historyReconstruction';
 import type {
@@ -50,7 +51,7 @@ function challengeTarget(settings: Record<string, unknown>): number {
 
 function hiddenStimulusKeys(rows: LearnerAnalyticsHistoryRow[]): Set<string> {
   return new Set(rows
-    .filter((row) => row.levelUnitType === 'model' && row.CFItemRemoved === true)
+    .filter((row) => isModelPracticeHistoryRecord(row) && row.CFItemRemoved === true)
     .map((row) => String(row.stimulusKC ?? ''))
     .filter(Boolean));
 }
@@ -118,8 +119,7 @@ export function buildLearnerUnitModelSnapshots(params: LearnerAnalyticsModelInpu
     };
     const unitRows = params.historyRows.filter((row) => (
       Number(row.levelUnit) === unitIndex
-      && row.levelUnitType === 'model'
-      && row.modelEvidenceSource !== 'assessment'
+      && isModelPracticeHistoryRecord(row)
     ));
     const reconstructed = reconstructLearningStateFromHistory(unitRows, {
       allowResponseLessSparcModelPractice: false,

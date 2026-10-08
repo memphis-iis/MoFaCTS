@@ -16,7 +16,6 @@ export interface VideoRuntimeSnapshot {
   readonly preventRewindEnabled: boolean;
   readonly questionIndices: unknown[];
   readonly questionTimes: unknown[];
-  readonly repeatQuestionsSinceCheckpointEnabled: boolean;
   readonly resumeCheckpointIndex: unknown;
   readonly resumeStartTime: unknown;
   readonly rewindOnIncorrectEnabled: boolean;
@@ -51,26 +50,9 @@ export function buildVideoRuntimeSnapshot(params: {
     questionTimes: Array.isArray(params.videoCheckpoints?.times)
       ? params.videoCheckpoints.times
       : [],
-    repeatQuestionsSinceCheckpointEnabled: videoPlaybackPolicy.repeatQuestionsSinceCheckpoint,
     resumeCheckpointIndex: videoResumeAnchor?.resumeCheckpointIndex,
     resumeStartTime: videoResumeAnchor?.resumeStartTime,
     rewindOnIncorrectEnabled: videoPlaybackPolicy.rewindOnIncorrect,
     videoResumeAnchor,
-  };
-}
-
-export function createCompletedVideoQuestionsStore() {
-  let completedVideoQuestions = new Set<number>();
-
-  return {
-    add(questionIndex: number): void {
-      completedVideoQuestions.add(questionIndex);
-    },
-    get(): ReadonlySet<number> {
-      return completedVideoQuestions;
-    },
-    reset(): void {
-      completedVideoQuestions = new Set();
-    },
   };
 }

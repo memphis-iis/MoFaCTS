@@ -112,15 +112,15 @@ describe('DeliverySettings Validator (Phase 4)', function() {
 
     it('should coerce string booleans to actual booleans', function() {
       const input = {
-        displayCorrectFeedback: 'true',
+        displayQuestionNumber: 'true',
         displayTimeoutBar: 'false',
       };
 
       const result = sanitizeDeliverySettingsAny(input, { silent: true });
 
-      expect(result.displayCorrectFeedback).to.equal(true);
+      expect(result.displayQuestionNumber).to.equal(true);
+      expect(typeof result.displayQuestionNumber).to.equal('boolean');
       expect(result.displayTimeoutBar).to.equal(false);
-      expect(typeof result.displayCorrectFeedback).to.equal('boolean');
       expect(typeof result.displayTimeoutBar).to.equal('boolean');
     });
 
@@ -160,8 +160,6 @@ describe('DeliverySettings Validator (Phase 4)', function() {
         stimuliPosition: 'left',
         isVideoSession: true,
         videoUrl: 'https://example.com/video.mp4',
-        displayCorrectFeedback: true,
-        displayIncorrectFeedback: true,
         correctLabelText: 'Excellent!',
         incorrectLabelText: 'Try again',
         correctColor: '#00ff00',
@@ -186,8 +184,6 @@ describe('DeliverySettings Validator (Phase 4)', function() {
       expect(result.stimuliPosition).to.equal('left');
       expect(result.isVideoSession).to.equal(true);
       expect(result.videoUrl).to.equal('https://example.com/video.mp4');
-      expect(result.displayCorrectFeedback).to.equal(true);
-      expect(result.displayIncorrectFeedback).to.equal(true);
       expect(result.correctLabelText).to.equal('Excellent!');
       expect(result.incorrectLabelText).to.equal('Try again');
       expect(result.correctColor).to.equal('#00ff00');
@@ -212,7 +208,6 @@ describe('DeliverySettings Validator (Phase 4)', function() {
     it('should return empty array for clean settings', function() {
       const input = {
         stimuliPosition: 'left',
-        displayCorrectFeedback: true,
       };
 
       const result = getDeprecatedFields(input);
@@ -244,7 +239,6 @@ describe('DeliverySettings Validator (Phase 4)', function() {
     it('should return empty array for clean settings', function() {
       const input = {
         stimuliPosition: 'left',
-        displayCorrectFeedback: true,
       };
 
       const result = getUnknownFields(input);
@@ -307,7 +301,6 @@ describe('DeliverySettings Validator (Phase 4)', function() {
     it('should indicate no migration needed for clean settings', function() {
       const input = {
         stimuliPosition: 'left',
-        displayCorrectFeedback: true,
       };
 
       const report = getDeprecationReport(input, 'tdf456', 'Clean TDF');

@@ -56,6 +56,7 @@ import type {
   SparcTrialDisplayProductionRuleRuntimeParams,
 } from '../../../../../../learning-components/units/sparcsession/SparcSessionUnitEngine';
 
+import { buildTrialFeedbackHistory } from './trialFeedbackHistory';
 import { legacyTrim } from '../../../../../common/underscoreCompat';
 type HistoryLoggingServiceContext = {
   testType: string;
@@ -84,7 +85,6 @@ type HistoryLoggingServiceContext = {
   originalAnswer?: unknown;
   currentAnswer?: unknown;
   feedbackText?: string;
-  feedbackSuppressed?: boolean;
   sparcResult?: SparcControllerResult | null;
 };
 type HistoryAnswerContext = {
@@ -130,29 +130,6 @@ function getTrialOutcome(testType: string, isCorrect: boolean): string {
   return isCorrect ? 'correct' : 'incorrect';
 }
 
-function getDisplayedFeedbackText(testType: string, feedbackText?: string, feedbackSuppressed = false): string {
-  if (testType === 't' || testType === 'h' || testType === 's') {
-    return '';
-  }
-
-  if (feedbackSuppressed) {
-    return '';
-  }
-
-  if (typeof feedbackText !== 'string' || legacyTrim(feedbackText) === '') {
-    throw new Error('[History Logging] feedbackText missing before history write');
-  }
-
-  return feedbackText;
-}
-
-function getLoggedFeedbackType(testType: string, isCorrect: boolean, feedbackSuppressed = false): string {
-  if (testType === 't' || testType === 'h' || testType === 's' || feedbackSuppressed) {
-    return '';
-  }
-  return isCorrect ? 'correct' : 'incorrect';
-}
-
 function getModelEvidenceSource(unitType: unknown): 'learning' | 'assessment' | undefined {
   if (unitType === 'model') {
     return 'learning';
@@ -161,20 +138,6 @@ function getModelEvidenceSource(unitType: unknown): 'learning' | 'assessment' | 
     return 'assessment';
   }
   return undefined;
-}
-
-export function createAssessmentModelEvidenceRecord(record: HistoryRecord): HistoryRecord | null {
-  if (record.levelUnitType !== 'schedule' || record.modelEvidenceSource !== 'assessment') {
-    return null;
-  }
-  if (!record.clusterKC) {
-    throw new Error('[History Logging] Assessment model evidence requires clusterKC');
-  }
-  return {
-    ...record,
-    levelUnitType: 'model',
-    modelEvidenceSource: 'assessment',
-  };
 }
 
 function truncateToFiveDecimals(value: number): number {
@@ -585,7 +548,7 @@ export function createHistoryRecord({
   userAnswer,
   isCorrect,
   testType,
-  deliverySettings: _deliverySettings,
+  deliverySettings,
   wasReportedForRemoval = false,
   engine,
   currentDisplay,
@@ -594,7 +557,6 @@ export function createHistoryRecord({
   questionIndex = 1,
   alternateDisplayIndex = null,
   feedbackText = '',
-  feedbackSuppressed = false,
   reviewEntry = '',
   answerContext = {}
 }: {
@@ -614,10 +576,11 @@ export function createHistoryRecord({
   questionIndex?: number;
   alternateDisplayIndex?: number | null;
   feedbackText?: string;
-  feedbackSuppressed?: boolean;
   reviewEntry?: string;
   answerContext?: HistoryAnswerContext;
 }): HistoryRecord {
+  const feedback = buildTrialFeedbackHistory({ testType, isCorrect, deliverySettings, feedbackText });
+
   // Validate critical state before proceeding
   ensureClusterStateForLogging();
 
@@ -799,8 +762,8 @@ export function createHistoryRecord({
     'CFNote': '',
 
     // Feedback
-    'feedbackText': legacyTrim(feedbackText || ''),
-    'feedbackType': getLoggedFeedbackType(testType, isCorrect, feedbackSuppressed),
+    'feedbackText': feedback.feedbackText,
+    'feedbackType': feedback.feedbackType,
 
     // Entry point
     'entryPoint': meteorUser?.loginParams?.entryPoint || '',
@@ -868,9 +831,6 @@ export async function historyLoggingService(
       ? context.timestamps.trialStart
       : context.timestamps.firstKeypress ?? context.timestamps.trialEnd;
 
-    const feedbackSuppressed = context.feedbackSuppressed === true;
-    const feedbackText = getDisplayedFeedbackText(context.testType, context.feedbackText, feedbackSuppressed);
-
     // Create record
     const engine = (event.engine || context.engine) as HistoryEngineLike;
 
@@ -890,8 +850,7 @@ export async function historyLoggingService(
       wasButtonTrial: context.buttonTrial === true,
       questionIndex: context.questionIndex ?? 1,
       alternateDisplayIndex: context.alternateDisplayIndex ?? null,
-      feedbackText,
-      feedbackSuppressed,
+      feedbackText: context.feedbackText ?? '',
       reviewEntry: context.reviewEntry || '',
       answerContext: {
         originalDisplay: context.currentDisplay?.text || context.currentDisplay?.clozeText || '',
@@ -907,10 +866,6 @@ export async function historyLoggingService(
     record.CFFeedbackLatency = timings.feedbackLatency;
     // Insert record
     await insertHistoryRecord(record);
-    const assessmentModelRecord = createAssessmentModelEvidenceRecord(record);
-    if (assessmentModelRecord) {
-      await insertHistoryRecord(assessmentModelRecord);
-    }
     await commitSparcProductionRulesForHistory({
       engine,
       currentDisplay: context.currentDisplay,

@@ -67,7 +67,6 @@
   import { createVideoEventRuntime } from '../services/videoEventRuntime';
   import {
     buildVideoRuntimeSnapshot,
-    createCompletedVideoQuestionsStore,
   } from '../services/videoRuntimeSnapshot';
   import { waitForBrowserPaint } from '../utils/paintTiming';
   import { getMainTimeoutMs, getFeedbackTimeoutMs } from '../utils/timeoutUtils';
@@ -448,8 +447,6 @@
     correctColor: deliverySettings.correctColor,
     currentAnswer: context.currentAnswer,
     currentDisplay: context.currentDisplay,
-    displayCorrectFeedback: deliverySettings.displayCorrectFeedback,
-    displayIncorrectFeedback: deliverySettings.displayIncorrectFeedback,
     feedbackMessage: context.feedbackMessage,
     formatAnswerText: getDisplayAnswerText,
     isCorrect: context.isCorrect,
@@ -476,8 +473,6 @@
   $: feedbackCorrectColor = activeTrialDisplaySnapshot.active.feedbackCorrectColor;
   $: feedbackText = activeTrialDisplaySnapshot.active.feedbackText;
   $: feedbackCorrectAnswer = activeTrialDisplaySnapshot.active.feedbackCorrectAnswer;
-  $: displayCorrectFeedback = activeTrialDisplaySnapshot.active.displayCorrectFeedback;
-  $: displayIncorrectFeedback = activeTrialDisplaySnapshot.active.displayIncorrectFeedback;
   $: trialSubset = buildTrialSubset({
     kind: trialSubsetKind,
     display: activeTrialDisplaySnapshot.active.display,
@@ -497,8 +492,6 @@
     correctColor: feedbackCorrectColor,
     defaultInputMode: inputMode,
     deliverySettings,
-    displayCorrectFeedback,
-    displayIncorrectFeedback,
     feedbackMessage: feedbackText,
     feedbackUserAnswer: context.userAnswer,
     inputEnabled,
@@ -902,7 +895,6 @@
     await flashcardEventController.handleReplay(event);
   }
 
-  const completedVideoQuestionsStore = createCompletedVideoQuestionsStore();
   const cardWakeLockController = createCardWakeLockController({
     navigatorRef: () => typeof navigator === 'undefined' ? null : navigator,
     documentRef: () => typeof document === 'undefined' ? null : document,
@@ -913,21 +905,13 @@
     log: clientConsole,
   });
   const videoMachineBridge = createVideoMachineBridge({
-    addCompletedVideoQuestion: (questionIndex) => {
-      completedVideoQuestionsStore.add(questionIndex);
-    },
-    getCompletedVideoQuestions: completedVideoQuestionsStore.get,
     getCurrentState: () => currentState,
-    getRepeatQuestionsSinceCheckpointEnabled: () => repeatQuestionsSinceCheckpointEnabled,
     getRewindOnIncorrectEnabled: () => rewindOnIncorrectEnabled,
     getVideoCheckpoints: () => videoCheckpoints,
     getVideoPlayer: () => videoPlayer,
     log: clientConsole,
     scheduleRetry: (callback, delayMs) => {
       setTimeout(callback, delayMs);
-    },
-    setQuestionsToRepeat: (questionsToRepeat) => {
-      Session.set('questionsToRepeat', questionsToRepeat);
     },
     stateMatches: (path) => state.matches(path),
     waitForDomUpdate: tick,
@@ -1054,9 +1038,6 @@
       setVideoCheckpoints: (nextVideoCheckpoints) => {
         videoCheckpoints = nextVideoCheckpoints;
       },
-      resetCompletedVideoQuestions: () => {
-        completedVideoQuestionsStore.reset();
-      },
     }),
   });
 
@@ -1165,7 +1146,6 @@
   });
   $: preventScrubbingEnabled = videoRuntimeSnapshot.preventScrubbingEnabled;
   $: rewindOnIncorrectEnabled = videoRuntimeSnapshot.rewindOnIncorrectEnabled;
-  $: repeatQuestionsSinceCheckpointEnabled = videoRuntimeSnapshot.repeatQuestionsSinceCheckpointEnabled;
   $: videoEventRuntime.syncPendingResume();
   const showCardDebugState = cardDebugStateEnabled();
 
@@ -1233,7 +1213,7 @@
       videoEndOverlayMounted={videoEndOverlayMounted}
       videoEndOverlayVisible={videoEndOverlayVisible}
       videoPlayerReady={videoPlayerReady}
-      on:checkpoint={(event) => videoEventRuntime.handleCheckpoint(event)}
+      on:checkpoint={handleVideoCheckpoint}
       on:ready={() => videoEventRuntime.handleReady(showVideoInstructionOverlay)}
       on:ended={() => videoEventRuntime.handleEnded()}
       on:transitionrun={logTrialFadeEvent}
@@ -1275,8 +1255,6 @@
       feedbackMessage={flashcardControllerProps.feedbackMessage}
       correctColor={flashcardControllerProps.correctColor}
       incorrectColor={flashcardControllerProps.incorrectColor}
-      displayCorrectFeedback={flashcardControllerProps.displayCorrectFeedback}
-      displayIncorrectFeedback={flashcardControllerProps.displayIncorrectFeedback}
       displayUserAnswerInFeedback={flashcardControllerProps.displayUserAnswerInFeedback}
       feedbackLayout={flashcardControllerProps.feedbackLayout}
       displayCorrectAnswerInIncorrectFeedback={flashcardControllerProps.displayCorrectAnswerInIncorrectFeedback}
@@ -1289,6 +1267,7 @@
       on:runtimewatchedstatechanged={handleRuntimeRefresh}
       on:forceadvance={handleForceAdvance}
     />
+    {/if}
   {:else if showBlocksSessionSurface}
     <BlocksSessionSurface
       flashcardProps={blocksFlashcardProps}
@@ -1429,4 +1408,3 @@
     word-wrap: break-word;
   }
 </style>
-

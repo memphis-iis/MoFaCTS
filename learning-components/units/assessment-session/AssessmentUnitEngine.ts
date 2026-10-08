@@ -152,6 +152,7 @@ export function createAssessmentUnitEngine(deps: CreateAssessmentUnitEngineDeps)
         stimIndex: curStimIndex,
         whichStim: curStimIndex,
         testType: questInfo.testType,
+        forceButtonTrial: questInfo.forceButtonTrial,
         preparedState,
       };
     },

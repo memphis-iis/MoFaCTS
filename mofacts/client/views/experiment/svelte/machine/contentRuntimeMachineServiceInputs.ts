@@ -69,9 +69,6 @@ export function toStudyAnswerTtsInput({ context, event }: MachineArgs) {
 
 export function toFeedbackTtsInput({ context, event }: MachineArgs) {
   const feedbackText = context.feedbackText;
-  if (context.feedbackSuppressed === true) {
-    throw new Error('[contentRuntimeMachine] suppressed feedback should not enter feedback.speaking');
-  }
   if (typeof feedbackText !== 'string' || feedbackText.trim() === '') {
     throw new Error('[contentRuntimeMachine] feedbackText missing at feedback.speaking handoff');
   }

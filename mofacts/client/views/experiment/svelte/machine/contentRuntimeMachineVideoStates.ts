@@ -2,6 +2,7 @@ import { EVENTS, STATES } from './constants';
 import {
   acceptVideoCheckpoint,
   markVideoEnded,
+  resumeVideoSessionAfterQuestion,
 } from './videoSessionMachine';
 import { setInvalidVideoCheckpointError } from './machineErrorContext';
 

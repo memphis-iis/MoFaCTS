@@ -73,7 +73,7 @@ describe('delivery settings production migration', function() {
           {
             setspec: {
               [displayKey]: {
-                displayCorrectFeedback: 'false',
+                displayQuestionNumber: 'false',
               },
               unitTemplate: [
                 withOldFields({}, { reviewstudy: '6000' }),
@@ -97,7 +97,7 @@ describe('delivery settings production migration', function() {
         {
           setspec: {
             [displayKey]: {
-              displayIncorrectFeedback: 'false',
+              displayTimeoutCountdown: 'false',
             },
           },
           unit: {
@@ -134,7 +134,7 @@ describe('delivery settings production migration', function() {
     expect(tdfUpdate).to.exist;
     const migratedTdf = tdfUpdate!.modifier.$set.content;
     expect(migratedTdf.tdfs.tutor.deliverySettings).to.deep.equal({
-      displayCorrectFeedback: false,
+      displayQuestionNumber: false,
       drill: 30000,
     });
     expect(migratedTdf.tdfs.tutor.unit[0].deliverySettings).to.deep.equal([
@@ -147,7 +147,7 @@ describe('delivery settings production migration', function() {
     expect(cacheUpdate).to.exist;
     const migratedCache = cacheUpdate!.modifier.$set.learnerTdfConfigs['tdf-a'];
     expect(migratedCache.overrides.deliverySettings).to.deep.equal({
-      displayIncorrectFeedback: false,
+      displayTimeoutCountdown: false,
       drill: 45000,
     });
     expect(migratedCache.overrides.unit['0'].deliverySettings.reviewstudy).to.equal(6000);
@@ -253,7 +253,7 @@ describe('delivery settings config directory conversion', function() {
           {
             setspec: {
               [displayKey]: {
-                displayCorrectFeedback: 'false',
+                displayQuestionNumber: 'false',
               },
             },
           },
@@ -273,7 +273,7 @@ describe('delivery settings config directory conversion', function() {
 
       const migrated = JSON.parse(await fs.readFile(file, 'utf8'));
       expect(migrated.tutor.deliverySettings).to.deep.equal({
-        displayCorrectFeedback: false,
+        displayQuestionNumber: false,
         drill: 30000,
       });
       expect(findOldFieldPaths(migrated)).to.deep.equal([]);
