@@ -66,7 +66,6 @@ export { instructContinue, unitHasLockout, checkForFileImage, recordCurrentInstr
 let lockoutInterval: any = null;
 let lockoutFreeTime: any = null;
 let lockoutHandled = false;
-let serverNotify: any = null;
 // Will get set on first periodic check and cleared when we leave the page
 let displayTimeStart: any = null;
 let timeRendered = 0
@@ -143,7 +142,6 @@ function clearLockoutInterval() {
   lockoutInterval = null;
   lockoutFreeTime = null;
   lockoutHandled = false;
-  serverNotify = null;
 }
 
 function getCurrentLockoutScopeKey() {
@@ -393,36 +391,6 @@ function lockoutPeriodicCheck() {
     $('#lockoutTimeRemaining').text(timeLeftDisplay);
     $('#continueButton').prop('disabled', true);
 
-    // Make sure that the server knows a lockout has been detected - but
-    // we only need to call it once
-    if (serverNotify === null) {
-      serverNotify = async function() {
-        if (Meteor.user()?.loginParams?.loginMode !== 'experiment') {
-          return; // Nothing to do
-        }
-
-        // We're in experiment mode and locked out - if they should get a Turk email,
-        // now is the time to let the server know we've shown a lockout msg
-        const currUnit = Session.get('currentTdfUnit');
-        const turkemail = trimText(currUnit?.turkemail);
-        const subject = trimText(currUnit?.turkemailsubject);
-
-        if (!turkemail) {
-          return; // No message to show
-        }
-
-        const experimentId = Session.get('currentRootTdfId');
-
-        const scheduleAt = Math.floor(lockoutFreeTime) + 1;
-        try {
-          await meteorCallAsync('turkScheduleLockoutMessage', experimentId, scheduleAt, subject, turkemail);
-          clientConsole(2, 'Server accepted lockout msg schedule', scheduleAt, turkemail);
-        } catch (error) {
-          clientConsole(1, 'Server schedule failed. Error:', error);
-        }
-      };
-      void serverNotify();
-    }
     // IMPORTANT: we're leaving
     return;
   }

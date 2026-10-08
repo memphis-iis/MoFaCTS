@@ -1,3 +1,4 @@
+import { removeEmptyEditorProperties } from '../../../common/lib/editorSaveShape';
 import '../shared/adminUi/adminUi';
 import { createContentUpdateConfirmation, saveEditedContent } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
@@ -618,37 +619,6 @@ const API_KEY_FIELDS = ['speechAPIKey', 'textToSpeechAPIKey', 'openRouterApiKey'
 /**
  * Check if a value is considered "empty" for display purposes
  */
-function isEmpty(value: any) {
-    if (value === null || value === undefined || value === '') return true;
-    if (Array.isArray(value) && value.length === 0) return true;
-    if (typeof value === 'object' && Object.keys(value).length === 0) return true;
-    return false;
-}
-
-/**
- * Recursively remove empty properties from an object
- * This makes json-editor only render fields that actually have data
- */
-function removeEmptyProperties(obj: any): any {
-    if (Array.isArray(obj)) {
-        const cleaned: any[] = obj
-            .map((item: any) => removeEmptyProperties(item))
-            .filter((item: any) => !isEmpty(item));
-        return cleaned.length > 0 ? cleaned : [];
-    }
-    if (obj !== null && typeof obj === 'object') {
-        const cleaned: Record<string, any> = {};
-        for (const [key, value] of Object.entries(obj)) {
-            const cleanedValue = removeEmptyProperties(value);
-            if (!isEmpty(cleanedValue)) {
-                cleaned[key] = cleanedValue;
-            }
-        }
-        return Object.keys(cleaned).length > 0 ? cleaned : {};
-    }
-    return obj;
-}
-
 function normalizeEditorValue(value: any) {
     return value && typeof value === 'object' ? value : {};
 }
@@ -988,10 +958,8 @@ async function initEditor(instance: any, tdf: any) {
     });
     // Remove empty properties so json-editor only shows populated fields
     // Users can add new fields via the Properties button
-    tutorData = removeEmptyProperties(tutorData);
-
-    // Extract the tutor schema (the main part we want to edit)
     const tutorSchema = prepareTutorSchemaForJsonEditor(cachedSchema.properties?.tutor || cachedSchema);
+    tutorData = removeEmptyEditorProperties(tutorData, tutorSchema);
 
     // Inject tooltip descriptions based on current mode (brief or verbose)
     const schemaWithDescriptions = injectDescriptions(tutorSchema, TDF_TOOLTIPS, tooltipMode);

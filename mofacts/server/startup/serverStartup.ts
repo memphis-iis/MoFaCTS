@@ -26,7 +26,6 @@ import { migrateDynamicAssetLocalPaths } from '../migrations/migrate_dynamic_ass
 import { repairContentMediaIdentity } from '../migrations/repair_content_media_identity';
 import { purgeLearnerUnitAnalyticsCache } from '../migrations/purge_learner_unit_analytics_cache';
 import { getLocalStoragePaths, getStorageBackend } from '../lib/storageBoundary';
-import { sendScheduledTurkMessages } from '../turk_methods';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
 import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery';
@@ -92,9 +91,6 @@ type RunServerStartupDeps = {
       updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
       rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
     };
-  };
-  ScheduledTurkMessages: {
-    rawCollection: () => { createIndex: (keys: UnknownRecord, options?: UnknownRecord) => Promise<unknown> };
   };
   AuthThrottleState: {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
@@ -836,7 +832,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
 
   deps.serverConsole('Password hash runtime info:', deps.getPasswordHashRuntimeInfo());
 
-  await deps.ScheduledTurkMessages.rawCollection().createIndex({ sent: 1, scheduled: 1 });
   await deps.AuditLog.rawCollection().createIndex(
     { action: 1, createdAt: -1, _id: -1 },
     { name: 'audit_action_created_id' },
@@ -857,7 +852,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
     Meteor,
     isProd: deps.isProd,
     serverConsole: deps.serverConsole,
-    sendScheduledTurkMessages,
     sendErrorReportSummaries: deps.sendErrorReportSummaries,
     checkDriveSpace: async () => checkDriveSpace(deps),
   });

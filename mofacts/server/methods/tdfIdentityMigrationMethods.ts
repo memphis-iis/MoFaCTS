@@ -14,10 +14,6 @@ type MigrationDeps = {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<number>;
   };
-  ScheduledTurkMessages: {
-    find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
-    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<number>;
-  };
   AuditLog: { insertAsync: (document: UnknownRecord) => Promise<unknown> };
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
   serverConsole: (...args: unknown[]) => void;
@@ -28,7 +24,6 @@ export type FilenameReferenceMigrationOptions = {
   confirmWrite?: string;
   expectedFingerprint?: string;
   afterUserTimesLogId?: string;
-  afterTurkMessageId?: string;
   batchSize?: number;
 };
 
@@ -45,7 +40,7 @@ function logRecordArrays(document: UnknownRecord) {
 }
 
 export async function migrateFilenameTdfReferences(
-  deps: Pick<MigrationDeps, 'Tdfs' | 'UserTimesLog' | 'ScheduledTurkMessages' | 'AuditLog' | 'serverConsole'>,
+  deps: Pick<MigrationDeps, 'Tdfs' | 'UserTimesLog' | 'AuditLog' | 'serverConsole'>,
   options: FilenameReferenceMigrationOptions = {},
 ) {
   const dryRun = options.dryRun !== false;
@@ -55,13 +50,8 @@ export async function migrateFilenameTdfReferences(
   }
 
   const logSelector = options.afterUserTimesLogId ? { _id: { $gt: options.afterUserTimesLogId } } : {};
-  const messageSelector = options.afterTurkMessageId ? { _id: { $gt: options.afterTurkMessageId } } : {};
-  const [logs, turkMessages] = await Promise.all([
-    deps.UserTimesLog.find(logSelector, { sort: { _id: 1 }, limit: batchSize }).fetchAsync(),
-    deps.ScheduledTurkMessages.find(messageSelector, { sort: { _id: 1 }, limit: batchSize }).fetchAsync(),
-  ]);
+  const logs = await deps.UserTimesLog.find(logSelector, { sort: { _id: 1 }, limit: batchSize }).fetchAsync();
   const fileNames = new Set<string>();
-  const messageExperimentKeys = new Set<string>();
   for (const log of logs) {
     for (const [, records] of logRecordArrays(log)) {
       for (const record of records as UnknownRecord[]) {
@@ -72,12 +62,7 @@ export async function migrateFilenameTdfReferences(
       }
     }
   }
-  for (const message of turkMessages) {
-    const experiment = normalizedString(message?.experiment);
-    if (experiment) messageExperimentKeys.add(experiment);
-  }
-
-  const lookupKeys = new Set([...fileNames, ...messageExperimentKeys]);
+  const lookupKeys = fileNames;
   const tdfs = lookupKeys.size > 0
     ? await deps.Tdfs.find({
         $or: [
@@ -88,10 +73,8 @@ export async function migrateFilenameTdfReferences(
       }, { fields: { _id: 1, tdfFileName: 1, 'content.fileName': 1 } }).fetchAsync()
     : [];
   const idsByFileName = new Map<string, string[]>();
-  const existingTdfIds = new Set<string>();
   for (const tdf of tdfs) {
     const tdfId = normalizedString(tdf?._id);
-    if (tdfId) existingTdfIds.add(tdfId);
     for (const candidate of [tdf?.content?.fileName, tdf?.tdfFileName]) {
       const fileName = normalizedString(candidate);
       if (!fileName) continue;
@@ -104,7 +87,6 @@ export async function migrateFilenameTdfReferences(
   const ambiguousFileNames = new Set<string>();
   const missingFileNames = new Set<string>();
   const updates: Array<{ logId: string; guard: UnknownRecord; set: UnknownRecord; changedRecords: number }> = [];
-  const messageUpdates: Array<{ messageId: string; previousExperiment: string; tdfId: string }> = [];
   let alreadyCanonical = 0;
   let scannedRecords = 0;
   for (const log of logs) {
@@ -140,39 +122,15 @@ export async function migrateFilenameTdfReferences(
       updates.push({ logId: String(log._id), guard, set, changedRecords });
     }
   }
-  let canonicalTurkMessages = 0;
-  for (const message of turkMessages) {
-    const experiment = normalizedString(message?.experiment);
-    if (!experiment) continue;
-    if (existingTdfIds.has(experiment)) {
-      canonicalTurkMessages += 1;
-      continue;
-    }
-    const ids = idsByFileName.get(experiment) || [];
-    if (ids.length === 0) {
-      missingFileNames.add(experiment);
-      continue;
-    }
-    if (ids.length > 1) {
-      ambiguousFileNames.add(experiment);
-      continue;
-    }
-    messageUpdates.push({ messageId: String(message._id), previousExperiment: experiment, tdfId: ids[0]! });
-  }
-
   const fingerprintPayload = {
     scannedDocuments: logs.length,
     scannedRecords,
     changedDocuments: updates.length,
     changedRecords: updates.reduce((sum, update) => sum + update.changedRecords, 0),
     alreadyCanonical,
-    scannedTurkMessages: turkMessages.length,
-    changedTurkMessages: messageUpdates.length,
-    canonicalTurkMessages,
     ambiguousFileNames: [...ambiguousFileNames].sort(),
     missingFileNames: [...missingFileNames].sort(),
     nextAfterUserTimesLogId: logs.length === batchSize ? String(logs[logs.length - 1]?._id || '') : null,
-    nextAfterTurkMessageId: turkMessages.length === batchSize ? String(turkMessages[turkMessages.length - 1]?._id || '') : null,
   };
   const fingerprint = hashValue(fingerprintPayload);
   const reportBase = { dryRun, ...fingerprintPayload };
@@ -190,13 +148,6 @@ export async function migrateFilenameTdfReferences(
       );
       if (written !== 1) throw new Meteor.Error('migration-write-conflict', 'A user time log changed during migration.');
     }
-    for (const update of messageUpdates) {
-      const written = await deps.ScheduledTurkMessages.updateAsync(
-        { _id: update.messageId, experiment: update.previousExperiment },
-        { $set: { experiment: update.tdfId } },
-      );
-      if (written !== 1) throw new Meteor.Error('migration-write-conflict', 'A scheduled Turk message changed during migration.');
-    }
     await deps.AuditLog.insertAsync({
       eventType: 'tdf-filename-reference-migration',
       occurredAt: new Date(),
@@ -205,8 +156,6 @@ export async function migrateFilenameTdfReferences(
         scannedRecords: reportBase.scannedRecords,
         changedDocuments: reportBase.changedDocuments,
         changedRecords: reportBase.changedRecords,
-        scannedTurkMessages: reportBase.scannedTurkMessages,
-        changedTurkMessages: reportBase.changedTurkMessages,
       },
     });
   }
@@ -225,7 +174,6 @@ export function createTdfIdentityMigrationMethods(deps: MigrationDeps) {
         confirmWrite: Match.Maybe(String),
         expectedFingerprint: Match.Maybe(String),
         afterUserTimesLogId: Match.Maybe(String),
-        afterTurkMessageId: Match.Maybe(String),
         batchSize: Match.Maybe(Number),
       });
       return await migrateFilenameTdfReferences(deps, options);

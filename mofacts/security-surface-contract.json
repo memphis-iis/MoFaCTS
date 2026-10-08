@@ -499,10 +499,6 @@
       "access": "authenticated-self"
     },
     {
-      "name": "getTurkWorkflowExperiments",
-      "access": "role-checked"
-    },
-    {
       "name": "getUploadQuotaStatus",
       "access": "role-checked"
     },
@@ -524,10 +520,6 @@
     },
     {
       "name": "getUserSpeechAPIKey",
-      "access": "role-checked"
-    },
-    {
-      "name": "getUsersByExperimentId",
       "access": "role-checked"
     },
     {
@@ -672,10 +664,6 @@
       "access": "role-checked"
     },
     {
-      "name": "removeTurkById",
-      "access": "role-checked"
-    },
-    {
       "name": "removeUserDueDateException",
       "access": "role-checked"
     },
@@ -762,10 +750,6 @@
       "notes": "Content-management authorization is rechecked on every save. Question reductions return confirmation-required with expectedRevision; confirmed writes compare tdfRevision atomically."
     },
     {
-      "name": "saveUserAWSData",
-      "access": "role-checked"
-    },
-    {
       "name": "saveUserSpeechAPIKey",
       "access": "role-checked"
     },
@@ -848,34 +832,6 @@
     {
       "name": "transferDataOwnership",
       "access": "admin-only"
-    },
-    {
-      "name": "turkBonus",
-      "access": "role-checked"
-    },
-    {
-      "name": "turkGetAssignment",
-      "access": "role-checked"
-    },
-    {
-      "name": "turkPay",
-      "access": "role-checked"
-    },
-    {
-      "name": "turkScheduleLockoutMessage",
-      "access": "role-checked"
-    },
-    {
-      "name": "turkSendMessage",
-      "access": "role-checked"
-    },
-    {
-      "name": "turkTest",
-      "access": "role-checked"
-    },
-    {
-      "name": "turkUserLogStatus",
-      "access": "role-checked"
     },
     {
       "name": "updateExperimentState",
@@ -1203,10 +1159,6 @@
     },
     {
       "name": "client.theme|/theme",
-      "access": "admin-only"
-    },
-    {
-      "name": "client.turkWorkflow|/turkWorkflow",
       "access": "admin-only"
     },
     {

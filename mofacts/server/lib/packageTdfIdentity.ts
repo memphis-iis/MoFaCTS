@@ -8,6 +8,7 @@ import {
 } from '../../common/lib/tdfIdentityContract';
 import type { UploadedPackageFile } from './packageParser';
 import { assertNoH5PContent } from '../../common/lib/unsupportedContent';
+import { TDF_CONTENT_SCHEMA } from '../../common/lib/tdfContentSchema';
 
 const crypto = require('crypto');
 
@@ -140,7 +141,7 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
 
   for (const tdf of tdfFiles) {
     const contents = tdf.contents as any;
-    assertNoH5PContent(contents);
+    assertNoH5PContent(contents, TDF_CONTENT_SCHEMA);
     const setspec = contents?.tutor?.setspec;
     if (!setspec || typeof setspec !== 'object') {
       throw new Meteor.Error('invalid-package-tdf', `TDF "${tdf.name}" is missing tutor.setspec.`);

@@ -8,6 +8,7 @@ import type { PackageUploadIntegrity, ProcessPackageUploadDeps } from '../lib/pa
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import { validateAutoTutorContent } from '../../common/lib/autoTutorContract';
 import { mergeEditorContentPreservingSourceShape } from '../../common/lib/editorSaveShape';
+import { TDF_CONTENT_SCHEMA } from '../../common/lib/tdfContentSchema';
 import { createPackageGeneratedContentMethods, prepareAiGeneratedPackage } from './packageGeneratedContentMethods';
 import type { ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { validateAndEncryptUploadedApiKey } from '../lib/uploadedApiKeyValidation';
@@ -17,7 +18,7 @@ import {
   reconcileConditionCountsByChildId,
   validateConditionFamilyTutor,
 } from '../../common/lib/tdfIdentityContract';
-import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
+import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -1112,7 +1113,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     removedTutorPaths: string[] = [],
     updateConfirmation?: ContentUpdateConfirmation
   ) {
-    assertNoH5PContent(tdfContent);
+    assertNoH5PContent(tdfContent, TDF_CONTENT_SCHEMA);
     check(tdfId, String);
     check(tdfContent, Object);
     check(apiKeyUpdates, Object);
@@ -1132,7 +1133,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
       throw new Meteor.Error('invalid-tdf', 'TDF must have a lesson name');
     }
 
-    const tdfContentToSave = mergeEditorContentPreservingSourceShape(tdf.content, tdfContent);
+    const tdfContentToSave = mergeEditorContentPreservingSourceShape(tdf.content, tdfContent, TDF_CONTENT_SCHEMA);
     try {
       assertValidTdfExpressions(tdfContentToSave, 'tdfs.tutor');
     } catch (error: unknown) {

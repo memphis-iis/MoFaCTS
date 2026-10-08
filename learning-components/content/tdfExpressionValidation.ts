@@ -54,7 +54,11 @@ function collectAdaptiveRules(value: unknown, fieldPath: string): Array<{ source
   return rules;
 }
 
-export function validateTdfExpressions(tdfValue: unknown, rootPath = 'tdfs.tutor'): TdfExpressionValidationResult {
+export function validateTdfExpressions(
+  tdfValue: unknown,
+  rootPath = 'tdfs.tutor',
+  ignoredUnitFields: ReadonlySet<string> = new Set(),
+): TdfExpressionValidationResult {
   const wrapper = asRecord(tdfValue);
   const tutor = asRecord(asRecord(wrapper?.tdfs)?.tutor) ?? asRecord(wrapper?.tutor) ?? wrapper;
   const issues: TdfExpressionValidationIssue[] = [];
@@ -79,6 +83,7 @@ export function validateTdfExpressions(tdfValue: unknown, rootPath = 'tdfs.tutor
     if (seen.has(record)) return;
     seen.add(record);
     for (const [key, fieldValue] of Object.entries(record)) {
+      if (depth === 0 && ignoredUnitFields.has(key)) continue;
       const childPath = `${fieldPath}.${key}`;
       if (key === 'calculateProbability') {
         if (fieldValue === undefined || fieldValue === null || fieldValue === '') continue;
@@ -121,7 +126,7 @@ export function validateTdfExpressions(tdfValue: unknown, rootPath = 'tdfs.tutor
   };
 }
 
-export function assertValidTdfExpressions(tdfValue: unknown, rootPath = 'tdfs.tutor'): void {
-  const result = validateTdfExpressions(tdfValue, rootPath);
+export function assertValidTdfExpressions(tdfValue: unknown, rootPath = 'tdfs.tutor', ignoredUnitFields?: ReadonlySet<string>): void {
+  const result = validateTdfExpressions(tdfValue, rootPath, ignoredUnitFields);
   if (!result.valid) throw new Error(result.issues.map((issue) => issue.message).join('; '));
 }

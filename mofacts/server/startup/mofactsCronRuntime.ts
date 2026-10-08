@@ -4,7 +4,7 @@ import { Random } from 'meteor/random';
 
 type UnknownRecord = Record<string, unknown>;
 type Logger = (...args: any[]) => void;
-type ScheduleKind = 'everyMinute' | 'dailyAtLocalTime';
+type ScheduleKind = 'dailyAtLocalTime';
 type ScheduledJob = {
   name: string;
   schedule: ScheduleKind;
@@ -32,7 +32,6 @@ type StartConfiguredMofactsCronJobsDeps = {
   Meteor: typeof Meteor;
   isProd: boolean;
   serverConsole: Logger;
-  sendScheduledTurkMessages: () => Promise<unknown>;
   sendErrorReportSummaries: () => Promise<unknown>;
   checkDriveSpace: () => unknown | Promise<unknown>;
 };
@@ -41,19 +40,6 @@ const CRON_PROCESS_ID = Random.id();
 const RUNNING_JOB_TIMEOUT_MS = 60 * 60 * 1000;
 const MAX_TIMER_DELAY_MS = 2147483647;
 const cronHistory = new Mongo.Collection<CronHistoryDocument>('cronHistory') as CronHistoryCollection;
-
-function truncateToSecond(date: Date) {
-  const next = new Date(date.getTime());
-  next.setMilliseconds(0);
-  return next;
-}
-
-function getNextMinuteDate(from: Date) {
-  const next = truncateToSecond(from);
-  next.setSeconds(0);
-  next.setMinutes(next.getMinutes() + 1);
-  return next;
-}
 
 function getNextLocalTimeDate(from: Date, hour: number, minute: number) {
   const next = new Date(from.getTime());
@@ -65,9 +51,6 @@ function getNextLocalTimeDate(from: Date, hour: number, minute: number) {
 }
 
 function getNextRunDate(job: ScheduledJob, from = new Date()) {
-  if (job.schedule === 'everyMinute') {
-    return getNextMinuteDate(from);
-  }
   if (job.hour === undefined || job.minute === undefined) {
     throw new Error(`Scheduled job "${job.name}" is missing daily local time fields`);
   }
@@ -198,18 +181,6 @@ function scheduleCronJob(job: ScheduledJob, serverConsole: Logger) {
 
 function getConfiguredJobs(deps: StartConfiguredMofactsCronJobsDeps): ScheduledJob[] {
   return [
-    {
-      name: 'Period Email Sent Check',
-      schedule: 'everyMinute',
-      run: async () => {
-        try {
-          return await deps.sendScheduledTurkMessages();
-        } catch (error: unknown) {
-          deps.serverConsole('MoFaCTS cron job failed: Period Email Sent Check', error);
-          return { sendCount: 0, error: String(error) };
-        }
-      },
-    },
     {
       name: 'Send Error Report Summaries',
       schedule: 'dailyAtLocalTime',

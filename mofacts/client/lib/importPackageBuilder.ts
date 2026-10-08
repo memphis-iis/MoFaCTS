@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import type { BuiltImportPackage, ImportDraftLesson } from './normalizedImportTypes';
 import { getImportFileNames } from './importCompositionBuilder';
-import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
+import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 
 type BuildImportPackageOptions = {
   preserveLessonTitle?: boolean;

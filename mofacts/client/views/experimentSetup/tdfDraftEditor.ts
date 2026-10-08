@@ -1,3 +1,4 @@
+import { removeEmptyEditorProperties } from '../../../common/lib/editorSaveShape';
 import { clientConsole } from '../../lib/clientLogger';
 import { installSchemaApplicabilityControls } from '../../lib/schemaApplicabilityEditor';
 import { ensureJsonEditor } from '../../lib/jsonEditorLoader';
@@ -10,31 +11,6 @@ function formatSchemaKey(key: string) {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (str: string) => str.toUpperCase())
     .trim();
-}
-
-function isEmpty(value: any) {
-  if (value === null || value === undefined || value === '') return true;
-  if (Array.isArray(value) && value.length === 0) return true;
-  if (typeof value === 'object' && Object.keys(value).length === 0) return true;
-  return false;
-}
-
-function removeEmptyProperties(obj: any): any {
-  if (Array.isArray(obj)) {
-    const cleaned = obj.map((item: any) => removeEmptyProperties(item)).filter((item: any) => !isEmpty(item));
-    return cleaned.length > 0 ? cleaned : [];
-  }
-  if (obj !== null && typeof obj === 'object') {
-    const cleaned: Record<string, any> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      const cleanedValue = removeEmptyProperties(value);
-      if (!isEmpty(cleanedValue)) {
-        cleaned[key] = cleanedValue;
-      }
-    }
-    return Object.keys(cleaned).length > 0 ? cleaned : {};
-  }
-  return obj;
 }
 
 function addTitlesToSchema(schema: any): any {
@@ -149,7 +125,7 @@ export async function createTdfDraftEditor(
   const JSONEditorAny = await ensureJsonEditor();
 
   const schema = await loadTdfSchema();
-  const editorValue = removeEmptyProperties(initialValue);
+  const editorValue = removeEmptyEditorProperties(initialValue, schema.properties?.tutor);
   const wrappedSchema = {
     type: 'object',
     properties: {
@@ -224,7 +200,7 @@ export async function createTdfDraftEditor(
     },
     setValue(value: Record<string, unknown>) {
       isApplyingValue = true;
-      editor.setValue({ tutor: removeEmptyProperties(value) });
+      editor.setValue({ tutor: removeEmptyEditorProperties(value, schema.properties?.tutor) });
       isApplyingValue = false;
     },
     validate() {

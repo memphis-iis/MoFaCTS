@@ -64,7 +64,6 @@ export default [
         ErrorReports: 'readonly',
         UserUploadQuota: 'readonly',
         UserDashboardCache: 'readonly',
-        ScheduledTurkMessages: 'readonly',
         AuditLog: 'readonly',
         PasswordResetTokens: 'readonly',
         ClozeEditHistory: 'readonly',

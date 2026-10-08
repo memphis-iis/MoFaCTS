@@ -1112,37 +1112,27 @@
                     }
                   },
                   "turkemailsubject": {
-                    "title": "MTurk reminder email subject.",
-                    "description": "Subject line used for Turk reminder messages.",
-                    "type": "string",
-                    "default": "",
+                    "format": "ignored",
+                    "additionalProperties": true,
+                    "x-editor": false,
                     "options": {
-                      "grid_columns": 12
+                      "hidden": true
                     }
                   },
                   "turkemail": {
-                    "title": "MTurk reminder email body.",
-                    "description": "Body text for Turk reminder messages.",
-                    "type": "string",
-                    "default": "",
-                    "format": "textarea",
+                    "format": "ignored",
+                    "additionalProperties": true,
+                    "x-editor": false,
                     "options": {
-                      "grid_columns": 12
+                      "hidden": true
                     }
                   },
                   "turkbonus": {
-                    "title": "MTurk bonus amount.",
-                    "description": "Bonus amount associated with reaching this unit.",
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "number"
-                      }
-                    ],
+                    "format": "ignored",
+                    "additionalProperties": true,
+                    "x-editor": false,
                     "options": {
-                      "grid_columns": 4
+                      "hidden": true
                     }
                   },
                   "adaptive": {
@@ -3641,37 +3631,27 @@
                 }
               },
               "turkemailsubject": {
-                "title": "MTurk reminder email subject.",
-                "description": "Subject line used for Turk reminder messages.",
-                "type": "string",
-                "default": "",
+                "format": "ignored",
+                "additionalProperties": true,
+                "x-editor": false,
                 "options": {
-                  "grid_columns": 12
+                  "hidden": true
                 }
               },
               "turkemail": {
-                "title": "MTurk reminder email body.",
-                "description": "Body text for Turk reminder messages.",
-                "type": "string",
-                "default": "",
-                "format": "textarea",
+                "format": "ignored",
+                "additionalProperties": true,
+                "x-editor": false,
                 "options": {
-                  "grid_columns": 12
+                  "hidden": true
                 }
               },
               "turkbonus": {
-                "title": "MTurk bonus amount.",
-                "description": "Bonus amount associated with reaching this unit.",
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ],
+                "format": "ignored",
+                "additionalProperties": true,
+                "x-editor": false,
                 "options": {
-                  "grid_columns": 4
+                  "hidden": true
                 }
               },
               "adaptive": {

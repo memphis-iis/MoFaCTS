@@ -83,7 +83,7 @@ import './views/termsOfService';
 // -- Experiment --
 import './views/experiment/multiTdfSelect';
 // Lazily loaded route modules are loaded from client/lib/router.js:
-// - admin/help/theme/turk/user/test pages
+// - admin/help/theme/user/test pages
 // - experiment setup editor/upload pages
 // - experiment reporting pages
 

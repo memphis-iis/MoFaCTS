@@ -421,16 +421,6 @@ export function createAuthSupport(deps: AuthSupportDeps) {
     }
   }
 
-  function defaultAwsProfile() {
-    return {
-      have_aws_id: false,
-      have_aws_secret: false,
-      aws_id: '',
-      aws_secret_key: '',
-      use_sandbox: Meteor.settings.mturkSandbox ?? true,
-    };
-  }
-
   async function waitForUserToPersist(createdId: string) {
     let user = null;
     let attempts = 0;
@@ -473,14 +463,12 @@ export function createAuthSupport(deps: AuthSupportDeps) {
           username: string;
           password: string;
           profile: UnknownRecord;
-          aws: ReturnType<typeof defaultAwsProfile>;
           email_original?: string;
           email_canonical?: string;
         } = {
           username,
           password,
           profile,
-          aws: defaultAwsProfile()
         };
         if (includeEmail && isValidEmailAddress(normalizedUsername)) {
           createUserPayload.email = normalizedUsername;
@@ -728,7 +716,6 @@ export function createAuthSupport(deps: AuthSupportDeps) {
     sendVerificationEmailForUser,
     escapeRegexLiteral,
     assertStrongPassword,
-    defaultAwsProfile,
     isValidEmailAddress,
     createUserWithRetry,
     withSignUpLock,

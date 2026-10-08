@@ -105,6 +105,12 @@ interruptions. They do not change section timers or playback-speed settings.
 Run the player-policy regressions from `mofacts/` with
 `node --experimental-strip-types --test scripts/videoParticipantControls.test.cjs`.
 
+## Retired Mechanical Turk fields
+
+Mechanical Turk operations, credentials, bonuses, and reminders have been removed. Old `turkemail`, `turkemailsubject`, and `turkbonus` fields are ignored in units and unit templates: any JSON value is accepted silently, has no effect, and is preserved during editor saves. The editor exposes no controls or tooltips for them and supplies no defaults. Other unsupported fields still fail validation. Existing content files do not need changes.
+
+Experiment login defaults to the localized Participant ID label; an authored `experimentLoginText` still overrides it. Existing Prolific participant/study entry and completion navigation are unchanged. Run the field/editor and entry/Continue regressions from `mofacts/` with `node --test scripts/ignoredTdfFields.test.cjs`.
+
 ## Where Detailed Examples Belong
 
 Detailed course examples, content packages, sync workflows, and internal authoring notes belong in the configuration/content repository or the GitHub wiki, not in the public application README.

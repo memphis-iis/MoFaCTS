@@ -26,7 +26,6 @@ describe('management route presentation policies', function() {
       { routeName: 'client.adminBackups', requiresAuth: true, allowedRoles: 'admin' },
       { routeName: 'client.adminSecurityAudits', requiresAuth: true, allowedRoles: 'admin' },
       { routeName: 'client.userAdmin', requiresAuth: true, allowedRoles: 'admin' },
-      { routeName: 'client.turkWorkflow', requiresAuth: true, allowedRoles: 'admin' },
       { routeName: 'client.theme', requiresAuth: true, allowedRoles: 'admin' },
       { routeName: 'client.adminTests', requiresAuth: true, allowedRoles: 'admin' },
       { routeName: 'client.classEdit', requiresAuth: true, allowedRoles: 'admin,teacher' },

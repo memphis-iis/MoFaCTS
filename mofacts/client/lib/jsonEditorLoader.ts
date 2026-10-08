@@ -1,6 +1,7 @@
 const JSON_EDITOR_SCRIPT_URL = '/vendor/json-editor/2.15.2/dist/jsoneditor.min.js';
 
 import './jsonEditorStaticRules.css';
+import { configureIgnoredJsonEditorFields } from './ignoredJsonEditorFields';
 
 let jsonEditorLoadPromise: Promise<any> | null = null;
 
@@ -17,6 +18,7 @@ function configureJsonEditor(jsonEditor: any) {
   // production CSP intentionally blocks inline style elements, so the exact
   // bundled rules live in jsonEditorStaticRules.css instead.
   jsonEditor.defaults.options.disable_theme_rules = true;
+  configureIgnoredJsonEditorFields(jsonEditor);
   return jsonEditor;
 }
 

@@ -28,7 +28,6 @@ declare var SectionUserMap: any;
 declare var UserTimesLog: any;
 declare var UserMetrics: any;
 declare var DynamicSettings: any;
-declare var ScheduledTurkMessages: any;
 declare var ClozeEditHistory: any;
 declare var ErrorReports: any;
 declare var DynamicConfig: any;

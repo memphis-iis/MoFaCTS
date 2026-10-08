@@ -433,17 +433,15 @@ export const UNIT_FIELD_REGISTRY: SectionFieldRegistry = {
   }, {
     surfaces: { learnerConfig: false },
   }),
-  turkemailsubject: simpleField(stringField('', 12), {
-    brief: 'MTurk reminder email subject.',
-    verbose: 'Subject line used for Turk reminder messages.'
+  // Retired provider metadata is accepted unchanged but never exposed or executed.
+  turkemailsubject: simpleField({}, { brief: '', verbose: '' }, {
+    lifecycle: { status: 'ignored' }, surfaces: { editor: false, learnerConfig: false, runtime: false },
   }),
-  turkemail: simpleField(textareaField(''), {
-    brief: 'MTurk reminder email body.',
-    verbose: 'Body text for Turk reminder messages.'
+  turkemail: simpleField({}, { brief: '', verbose: '' }, {
+    lifecycle: { status: 'ignored' }, surfaces: { editor: false, learnerConfig: false, runtime: false },
   }),
-  turkbonus: simpleField(withGrid({ anyOf: [{ type: 'string' }, { type: 'number' }] }, 4), {
-    brief: 'MTurk bonus amount.',
-    verbose: 'Bonus amount associated with reaching this unit.'
+  turkbonus: simpleField({}, { brief: '', verbose: '' }, {
+    lifecycle: { status: 'ignored' }, surfaces: { editor: false, learnerConfig: false, runtime: false },
   }),
   adaptive: simpleField(stringArrayField('Adaptive Targets', 'Adaptive Target'), {
     brief: 'Adaptive scheduling targets.',
@@ -758,9 +756,6 @@ export const UNIT_DIRECT_RUNTIME_KEYS = Object.freeze([
   'instructionminseconds',
   'picture',
   'recordInstructions',
-  'turkbonus',
-  'turkemail',
-  'turkemailsubject',
   'unitinstructions',
   'unitname',
 ]);

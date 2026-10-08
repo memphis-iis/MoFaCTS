@@ -421,10 +421,13 @@ export function createClosedObjectSchema(
   const properties = Object.fromEntries(
     Object.entries(registry)
       .filter(([, definition]) =>
-        definition.lifecycle.status === 'supported' &&
+        (definition.lifecycle.status === 'supported' || definition.lifecycle.status === 'ignored') &&
         definition.surfaces?.schema !== false
       )
       .map(([key, definition]) => {
+        if (definition.lifecycle.status === 'ignored') {
+          return [key, { format: 'ignored', additionalProperties: true, 'x-editor': false, options: { hidden: true } }];
+        }
         const schema: Record<string, unknown> = {
           title: definition.tooltip.brief,
           description: definition.tooltip.verbose,
@@ -448,7 +451,9 @@ export function createClosedObjectSchema(
     additionalProperties: false,
   };
 
-  const supportedRequired = required.filter((key) => Object.prototype.hasOwnProperty.call(properties, key));
+  const supportedRequired = required.filter((key) =>
+    registry[key]?.lifecycle.status === 'supported' && Object.prototype.hasOwnProperty.call(properties, key)
+  );
   if (supportedRequired.length > 0) {
     schema.required = supportedRequired;
   }

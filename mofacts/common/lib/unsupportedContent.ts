@@ -1,9 +1,12 @@
-export function containsH5PContent(value: unknown): boolean {
+type ContentSchema = { format?: unknown; properties?: Record<string, ContentSchema>; items?: ContentSchema };
+
+export function containsH5PContent(value: unknown, schema: ContentSchema = {}): boolean {
+  if (schema.format === 'ignored') return false;
   if (!value || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return value.some(containsH5PContent);
+  if (Array.isArray(value)) return value.some(entry => containsH5PContent(entry, schema.items));
   const record = value as Record<string, unknown>;
   if (Object.prototype.hasOwnProperty.call(record, 'h5p')) return true;
-  return Object.values(record).some(containsH5PContent);
+  return Object.entries(record).some(([key, entry]) => containsH5PContent(entry, schema.properties?.[key]));
 }
 
 export class UnsupportedH5PContentError extends Error {
@@ -15,8 +18,8 @@ export class UnsupportedH5PContentError extends Error {
   }
 }
 
-export function assertNoH5PContent(value: unknown): void {
-  if (containsH5PContent(value)) {
+export function assertNoH5PContent(value: unknown, schema?: ContentSchema): void {
+  if (containsH5PContent(value, schema)) {
     throw new UnsupportedH5PContentError();
   }
 }

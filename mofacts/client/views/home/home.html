@@ -83,10 +83,6 @@
               <span class="fa fa-user" aria-hidden="true"></span>
               <span>{{t 'home.userAdmin'}}</span>
             </button>
-            <button type="button" class="nav-item {{sidebarActiveClass 'turkWorkflow'}}" data-label="{{t 'home.mechanicalTurk'}}" id="mechTurkButton">
-              <span class="fa fa-wrench" aria-hidden="true"></span>
-              <span>{{t 'home.mechanicalTurk'}}</span>
-            </button>
             <button type="button" class="nav-item {{sidebarActiveClass 'theme'}}" data-label="{{t 'home.theme'}}" id="themeButton">
               <span class="fa fa-paint-brush" aria-hidden="true"></span>
               <span>{{t 'home.theme'}}</span>
@@ -222,7 +218,6 @@
       {{#if isInRole 'admin'}}
         <button type="button" data-practice-menu-action="adminControls"><span class="fa fa-cogs" aria-hidden="true"></span> {{t 'home.adminControlPanel'}}</button>
         <button type="button" data-practice-menu-action="userAdmin"><span class="fa fa-user" aria-hidden="true"></span> {{t 'home.userAdmin'}}</button>
-        <button type="button" data-practice-menu-action="turkWorkflow"><span class="fa fa-wrench" aria-hidden="true"></span> {{t 'home.mechanicalTurk'}}</button>
         <button type="button" data-practice-menu-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> {{t 'home.theme'}}</button>
         <button type="button" data-practice-menu-action="adminTests"><span class="fa fa-flask" aria-hidden="true"></span> {{t 'home.adminTests'}}</button>
         <button type="button" data-practice-menu-action="adminBackups"><span class="fa fa-archive" aria-hidden="true"></span> {{t 'home.backups'}}</button>

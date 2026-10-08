@@ -111,6 +111,9 @@ describe('server auth and session methods', function() {
     const password = `LongPassword-${Random.id()}123`;
 
     const result = await methods.signUpUser.call({}, email, password);
+    const createdUser = await MeteorUsersAny.findOneAsync({ _id: result.userId });
+    expect(createdUser).to.not.have.property('aws');
+    expect(createdUser.profile).to.not.have.property('aws');
     const auditEntry = await AuditLogAny.findOneAsync({
       action: 'auth.signupCompleted',
       targetUserId: result.userId
@@ -2366,47 +2369,5 @@ describe('content helper authorization', function() {
   it('does not expose retired raw content save or fingerprint confirmation methods', function() {
     expect(asyncMethods).not.to.have.property('saveContentFile');
     expect(asyncMethods).not.to.have.property('tdfUpdateConfirmed');
-  });
-});
-
-describe('MTurk workflow authorization', function() {
-  beforeEach(async function() {
-    await clearServerCompositionCollections();
-  });
-
-  it('requires teacher or admin role for MTurk experiment listing and AWS profile updates', async function() {
-    try {
-      await (asyncMethods.getTurkWorkflowExperiments as any).call({ userId: 'student-user' });
-      expect.fail('Expected MTurk experiment listing to require teacher/admin');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-
-    try {
-      await (asyncMethods.saveUserAWSData as any).call({ userId: 'student-user' }, {});
-      expect.fail('Expected MTurk AWS profile update to require teacher/admin');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
-  });
-
-  it('denies MTurk worker listing for experiments owned by another teacher', async function() {
-    await Roles.addUsersToRolesAsync('teacher-a', 'teacher');
-    await Roles.addUsersToRolesAsync('teacher-b', 'teacher');
-    await TdfsAny.insertAsync({
-      _id: 'turk-experiment-a',
-      ownerId: 'teacher-a',
-      content: {
-        fileName: 'turk-experiment-a.json',
-        tdfs: { tutor: { setspec: { lessonname: 'Turk A', experimentTarget: 'turk-a' } } },
-      },
-    });
-
-    try {
-      await (asyncMethods.getUsersByExperimentId as any).call({ userId: 'teacher-b' }, 'turk-experiment-a');
-      expect.fail('Expected cross-owner MTurk worker listing to be denied');
-    } catch (error: any) {
-      expect(error.error).to.equal(403);
-    }
   });
 });

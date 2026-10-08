@@ -92,12 +92,6 @@ export const COLLECTION_OWNERSHIP = {
     purpose: 'Admin-controlled runtime settings such as theme and client verbosity.',
     notes: 'The Mongo collection name is misspelled historically. Do not rename without a migration.',
   },
-  ScheduledTurkMessages: {
-    mongoName: 'scheduledTurkMessages',
-    globalName: 'ScheduledTurkMessages',
-    owner: 'mturk',
-    purpose: 'Scheduled MTurk communication records.',
-  },
   ClozeEditHistory: {
     mongoName: 'clozeEditHistory',
     globalName: 'ClozeEditHistory',

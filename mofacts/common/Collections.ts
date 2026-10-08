@@ -28,7 +28,6 @@ const SectionUserMap = new Mongo.Collection(collectionMongoName('SectionUserMap'
 const UserTimesLog = new Mongo.Collection(collectionMongoName('UserTimesLog'));
 const UserMetrics = new Mongo.Collection(collectionMongoName('UserMetrics'));
 const DynamicSettings = new Mongo.Collection(collectionMongoName('DynamicSettings'));
-const ScheduledTurkMessages = new Mongo.Collection(collectionMongoName('ScheduledTurkMessages'));
 const ClozeEditHistory = new Mongo.Collection(collectionMongoName('ClozeEditHistory'));
 const ErrorReports = new Mongo.Collection(collectionMongoName('ErrorReports'));
 const DynamicConfig = new Mongo.Collection(collectionMongoName('DynamicConfig'));
@@ -56,6 +55,7 @@ function configuredDynamicAssetsStoragePath(): string {
 const DynamicAssets = new FilesCollection({
   collectionName: collectionMongoName('DynamicAssets'),
   ...(Meteor.isServer ? { storagePath: configuredDynamicAssetsStoragePath() } : {}),
+  disableSetTokenCookie: true,
   allowClientCode: false, // Security: Disallow file operations from client (use server methods)
   onBeforeUpload(this: { userId?: string }, file: { name?: string; extension?: string; type?: string; meta?: DynamicAssetUploadMeta }) {
     if (!this.userId) {
@@ -135,7 +135,6 @@ Object.assign(globalThis, {
   UserTimesLog,
   UserMetrics,
   DynamicSettings,
-  ScheduledTurkMessages,
   ClozeEditHistory,
   ErrorReports,
   DynamicConfig,

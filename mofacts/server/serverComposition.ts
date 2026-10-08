@@ -65,7 +65,6 @@ import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
 import { createRecoverableWarningMethods } from './methods/recoverableWarningMethods';
-import { createTurkWorkflowMethods } from './methods/turkWorkflowMethods';
 import { createTdfIdentityMigrationMethods } from './methods/tdfIdentityMigrationMethods';
 import {
   createThemeMethods,
@@ -579,16 +578,6 @@ const {
   ...publicExperimentMethods
 } = experimentMethods;
 
-const turkWorkflowMethods = createTurkWorkflowMethods({
-  serverConsole,
-  Tdfs,
-  ScheduledTurkMessages,
-  usersCollection: MeteorAny.users,
-  getCurrentUser: () => MeteorAny.userAsync(),
-  getMethodAuthorizationDeps,
-  encryptData,
-});
-
 // Published to all clients (even without subscription calls)
 Meteor.publish(null, function() {
   // Only valid way to get the user ID for publications
@@ -645,7 +634,6 @@ export const methods: any = {
   ...createRecoverableWarningMethods({ auditLog: AuditLog, requireAdminUser }),
   ...createSystemMethods({
     serverConsole,
-    ScheduledTurkMessages,
     usersCollection: MeteorAny.users,
     ErrorReports,
     DynamicSettings,
@@ -1064,13 +1052,11 @@ export const asyncMethods: Record<string, unknown> = {
   ...createTdfIdentityMigrationMethods({
     Tdfs,
     UserTimesLog,
-    ScheduledTurkMessages,
     AuditLog,
     userIsInRoleAsync: (userId, roles) => Roles.userIsInRoleAsync(userId, roles),
     serverConsole,
   }),
   getTdfByExperimentTarget: getTdfByExperimentTargetPublic,
-  ...turkWorkflowMethods,
 
   ...publicAnalyticsMethods,
   ...publicCourseMethods,
@@ -1198,7 +1184,6 @@ Meteor.startup(async function() {
     ManualContentDrafts,
     TdfMutationJobs,
     DynamicAssets,
-    ScheduledTurkMessages,
     AuthThrottleState: AuthThrottleStateAny,
     Tdfs,
     Histories,

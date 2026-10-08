@@ -43,12 +43,6 @@ const surfaces = [
     ],
   },
   {
-    name: 'mechanical turk',
-    files: [
-      'client/views/turkWorkflow.html',
-    ],
-  },
-  {
     name: 'theme',
     files: [
       'client/views/theme.html',
@@ -84,7 +78,7 @@ const surfaces = [
       'public/styles/classic.css',
       'client/views/home/home.css',
     ],
-    selectorFilter: /(?:^|[\s,{])(?:\.admin-|\.theme-|\.user-admin|\.data-download|\.instructor-|\.manual-|\.content-|\.audio-|\.turk|\.help|\.class-selection|\.table|\.card|\.page-header-title|thead|tbody|tfoot|\.btn|\.dropdown|\.modal|\.alert|\.container)\b/,
+    selectorFilter: /(?:^|[\s,{])(?:\.admin-|\.theme-|\.user-admin|\.data-download|\.instructor-|\.manual-|\.content-|\.audio-|\.help|\.class-selection|\.table|\.card|\.page-header-title|thead|tbody|tfoot|\.btn|\.dropdown|\.modal|\.alert|\.container)\b/,
   },
 ];
 

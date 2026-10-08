@@ -60,7 +60,7 @@ in Chrome with certain versions of Iron Router (they routing engine we use).
 IMPORTANT: If you are routing someone to the signin screen (i.e. they need to
 log in) then you should call the routeToSignin function of calling Router.go
 directly. This is important to make sure that both "normal" logins *and*
-experimental participant (Mechanical Turk) logins function correctly.
+experimental participant logins function correctly.
 
 The routes are self-explanatory, but "loginMode" requires a little explanation.
 When a user enters the application via a URL of the form /experiment/{target}/{x}
@@ -73,7 +73,7 @@ they are placed in "experiment" mode. The following changes are made:
       in the URL. This defaults to 0. The default value is used if the value
       given cannot be interpreted as an int.
     * The user is NOT shown the OAuth "Sign In With Google" screen. Instead a
-      screen for user ID entry (which should be their Turk ID) is shown instead
+      screen for participant ID entry is shown instead
     * The user isn't allowed to select a TDF - the TDF matching {target} is
       always chosen. (This is specified in the <experimentTarget> tag in the
       top TDF setspec section).
@@ -545,7 +545,7 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
         tdf.content.tdfs.tutor.setspec.experimentPasswordRequired === 'true' ||
         tdf.content.tdfs.tutor.setspec.experimentPasswordRequired === true;
       Session.set('experimentPasswordRequired', experimentPasswordRequired);
-      Session.set('loginPrompt',tdf.content.tdfs.tutor.deliverySettings?.experimentLoginText || "Amazon Turk ID");
+      Session.set('loginPrompt',tdf.content.tdfs.tutor.deliverySettings?.experimentLoginText || translatePlatformString(getActiveUiLocale(), 'auth.participationId'));
       clientConsole(2, 'experimentPasswordRequired:', experimentPasswordRequired);
 
       clientConsole(2, 'EXPERIMENT target:', target, 'xcond', xcond);
@@ -869,11 +869,6 @@ FlowRouter.route('/resetPassword', {
     FlowRouter.go('/auth/forgot-password');
   }
 });
-
-FlowRouter.route('/turkWorkflow', {
-  name: 'client.turkWorkflow',
-  action: getRestrictedRouteAction('turkWorkflow'),
-})
 
 FlowRouter.route('/dataDownload', {
   name: 'client.dataDownload',

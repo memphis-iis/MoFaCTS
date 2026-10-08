@@ -32,7 +32,7 @@ const surfaceRules = [
   ['chrome/sidebar/header/footer', /client[\\/](?:index|views[\\/]footer)|classic\.css$/],
   ['home/practice cards', /client[\\/]views[\\/]home/],
   ['auth/help/error/access-denied', /client[\\/]views[\\/](?:login|help|experimentError|accessDenied)/],
-  ['admin/theme/tools', /client[\\/]views[\\/](?:adminControls|theme|userAdmin|testRunner|turkWorkflow)|client[\\/]views[\\/]audioSettings/],
+  ['admin/theme/tools', /client[\\/]views[\\/](?:adminControls|theme|userAdmin|testRunner)|client[\\/]views[\\/]audioSettings/],
   ['upload/edit/TDF editors', /client[\\/]views[\\/]experimentSetup[\\/](?:contentUpload|contentEdit|tdfEdit|tdfAssignmentEdit|classEdit)/],
   ['APKG/IMSCC/manual/draft editor', /client[\\/]views[\\/]experimentSetup[\\/](?:apkgWizard|imsccWizard|manualContentCreator|draftEditorWorkspace|contentDraftEditor|tdfDraftEditor)/],
   ['experiment/card/instructions', /client[\\/]views[\\/]experiment[\\/](?:card|instructions|multiTdfSelect)/],

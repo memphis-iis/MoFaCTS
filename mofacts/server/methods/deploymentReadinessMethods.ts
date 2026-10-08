@@ -4,7 +4,7 @@ import { validateStorageBoundary } from '../lib/storageBoundary';
 import { validateBackupConfig } from '../lib/backup/backupConfig';
 import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
 import { getStrictMongoReactivityMetrics } from '../lib/strictMongoReactivity';
-import { validateTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
+import { validateTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 
 type UnknownRecord = Record<string, unknown>;
 

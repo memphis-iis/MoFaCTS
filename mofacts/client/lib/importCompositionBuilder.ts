@@ -1,6 +1,6 @@
 import { CALCULATE_PROBABILITY_FORMULA, cloneImportParameterDefaults } from './importParameterDefaults';
 import type { ImportDraftLesson, NormalizedImportItem, SourceKind } from './normalizedImportTypes';
-import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
+import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 
 type BuildImportLessonDraftOptions = {
   id: string;

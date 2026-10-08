@@ -15,7 +15,7 @@ import { processParsedPackageTdfs } from './packageUploadPersistence';
 import { postProcessUploadedTdfs } from './packageUploadPostProcess';
 import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
 import { preflightPackageTdfIdentities, type PackageTdfIdentityMode } from './packageTdfIdentity';
-import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
+import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 
 const INCOMPLETE_UPLOAD_MESSAGE = 'The uploaded ZIP appears incomplete or truncated. Please upload the file again.';
 

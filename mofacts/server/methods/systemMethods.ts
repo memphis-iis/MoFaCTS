@@ -7,7 +7,6 @@ import {
 } from '../../common/loggingSettings';
 import {
   requireAuthenticatedUser,
-  requireUserMatchesOrHasRole,
   requireUserWithRoles,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
@@ -21,9 +20,6 @@ type MethodContext = {
 
 type SystemMethodsDeps = {
   serverConsole: (...args: unknown[]) => void;
-  ScheduledTurkMessages: {
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
-  };
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
@@ -90,25 +86,6 @@ function sanitizeLogRows(logs: unknown) {
 
 export function createSystemMethods(deps: SystemMethodsDeps) {
   return {
-    removeTurkById: async function(this: MethodContext, turkId: string, experimentId: string) {
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId: this.userId,
-        subjectUserId: turkId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only modify your own lockouts',
-        forbiddenCode: 403,
-      });
-
-      deps.serverConsole('removeTurkById', turkId, experimentId);
-      await deps.ScheduledTurkMessages.removeAsync({ workerUserId: turkId, experiment: experimentId });
-      const currentUser = await deps.getCurrentUser();
-      const lockout = currentUser.lockouts;
-      lockout[experimentId].lockoutMinutes = Number.MAX_SAFE_INTEGER;
-      await deps.usersCollection.updateAsync({ _id: Meteor.userId() }, { $set: { lockouts: lockout } });
-    },
-
     saveAudioSettings: async function(this: MethodContext, audioSettings: UnknownRecord) {
       if (!this.userId) {
         throw new Meteor.Error(401, 'Must be logged in to save audio settings');

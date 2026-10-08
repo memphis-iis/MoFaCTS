@@ -1,7 +1,7 @@
 import { buildImportLessonDraft } from './importCompositionBuilder';
 import { CALCULATE_PROBABILITY_FORMULA, cloneImportParameterDefaults } from './importParameterDefaults';
 import type { ImportDraftLesson, NormalizedImportItem, PromptAttribution } from './normalizedImportTypes';
-import { assertValidTdfExpressions } from '../../../learning-components/content/tdfExpressionValidation';
+import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
 
 export type LessonStructure =
   | 'learning-only'

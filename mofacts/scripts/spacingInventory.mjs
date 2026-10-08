@@ -16,7 +16,7 @@ function surfaceForFile(file) {
   if (normalized.includes('/views/home/')) return 'home/practice menu';
   if (normalized.includes('/views/experiment/svelte/') || normalized.includes('/views/experiment/')) return 'experiment/card/instructions';
   if (normalized.includes('/views/experimentSetup/')) return 'content upload/edit/TDF editor';
-  if (normalized.includes('/views/theme') || normalized.includes('/views/admin') || normalized.includes('/views/userAdmin') || normalized.includes('/views/turkWorkflow') || normalized.includes('/views/audioSettings')) return 'theme/admin/tools';
+  if (normalized.includes('/views/theme') || normalized.includes('/views/admin') || normalized.includes('/views/userAdmin') || normalized.includes('/views/audioSettings')) return 'theme/admin/tools';
   if (normalized.endsWith('/client/index.html') || normalized.endsWith('/client/index.ts') || normalized.startsWith('public/styles/')) return 'app chrome/global';
   return 'other UI';
 }

@@ -16,7 +16,7 @@ This inventory classifies the self-hosted configuration surface used by applicat
 | `MAIL_URL` | production-only, private-server, secret | when `enableEmail` or `prod` enables mail | Meteor mail transport |
 | `emailFrom` | production-only, private-server, deployment-specific | when `enableEmail` or `prod` enables mail | startup validation, account verification, password reset, system mail |
 | `emailReplyTo` | optional, private-server, deployment-specific | when operators want replies to go to an admin mailbox | system mail reply-to |
-| `mturkSandbox` | optional integration, private-server | MTurk workflows | auth/support and MTurk workflow methods |
+| `mturkSandbox` | retired, unused | Accepted in old settings files; has no effect | No runtime consumer |
 | `auth.allowPublicSignup` | required, private-server/public behavior | self-hosted production | signup method guard |
 | `auth.requireEmailVerification` | required, private-server/public behavior | self-hosted production | auth state and verification flow |
 | `auth.argon2Enabled` | required, private-server | self-hosted production | password hash runtime |

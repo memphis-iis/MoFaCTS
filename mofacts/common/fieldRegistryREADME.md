@@ -25,9 +25,11 @@ The field registry is the source of truth for public TDF, stimulus, delivery-set
 
 - `supported`: current authored field. Supported fields appear on their enabled surfaces unless a `surfaces` flag disables that surface.
 - `deprecated`: historical field with migration guidance. Deprecated fields should include `migration.replacement` or `migration.note` so tooling can explain what to do.
-- `ignored`: known field that should remain documented as intentionally ignored by registry-driven tooling. Do not use `ignored` to hide an invariant break.
+- `ignored`: retired metadata accepted with any JSON value and preserved unchanged during editor round trips. Generated schemas impose no type or value constraints (`additionalProperties: true` also exempts opaque objects from the editor's global strict-property option). Ignored fields have no authoring controls, tooltips, runtime defaults, learner settings, or runtime-key entries. The bundled editor uses `ignoredJsonEditorFields.ts` to retain opaque values, including empty values. Do not use `ignored` to hide an invariant break.
 
 Do not remove or rename public TDF fields without a compatibility and content-repository plan.
+
+Recursive content validation must honor ignored fields too. The app's `common/lib/tdfExpressionValidation.ts` supplies registry lifecycle policy to the learning component through its explicit ignored-unit-fields interface. `TDF_CONTENT_SCHEMA` supplies the same metadata to unsupported-content validation and the editor save merge, for uploaded and stored TDF envelopes. These validators never inspect opaque values or alter the saved data.
 
 ## Aliases And Migrations
 
@@ -51,5 +53,7 @@ npm run lint
 npm run generate:schemas
 npm run audit:fields
 ```
+
+The opaque-field and bundled-editor regressions run with `node --test scripts/ignoredTdfFields.test.cjs`; they also cover strict unknown-field validation, management route policy, existing Prolific entry, and instruction Continue policy.
 
 Do not run every command for documentation-only edits. For registry edits, run `npm run generate:schemas` and inspect generated schema diffs before claiming the registry and generated artifacts are aligned.

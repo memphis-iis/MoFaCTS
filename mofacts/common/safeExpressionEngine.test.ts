@@ -9,7 +9,7 @@ import {
 } from '../../learning-components/models/adaptive-logistic/probabilityFunctions';
 import { PROBABILITY_FUNCTION_HELPER_NAMES } from '../../learning-components/content/probabilityExpressionContract';
 import { createTdfProbabilityFunction } from '../../learning-components/models/adaptive-logistic/tdfProbabilityFunction';
-import { validateTdfExpressions } from '../../learning-components/content/tdfExpressionValidation';
+import { validateTdfExpressions } from './lib/tdfExpressionValidation';
 
 function modelInput() {
   return {

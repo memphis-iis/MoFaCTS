@@ -152,7 +152,6 @@ Acceptance criteria after implementation:
   - `#errorReportingModal`
   - `#helpModal`
   - `#generateIncorrectModal`
-  - `#turkModal`
   - `#profileWorkModal`
   - `#detailsModal`
 - Remove jQuery modal assumptions before relying on same-origin Bootstrap 5 assets.
