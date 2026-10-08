@@ -235,9 +235,9 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
       severity: 'warning',
     },
   }),
-  loadbalancing: simpleField(enumStringField(['max', 'min'], undefined, 4), {
+  loadbalancing: simpleField(enumStringField(['max', 'min', 'not-max'], undefined, 4), {
     brief: 'Condition assignment mode.',
-    verbose: 'Controls root-TDF experiment condition load balancing.'
+    verbose: 'max selects randomly below the highest count; min selects randomly at the lowest count. not-max uses a durable server-owned shuffled block of conditions below the highest count (all conditions when tied). Returning participants retain their assignment.'
   }),
   countcompletion: simpleField(
     withGrid(

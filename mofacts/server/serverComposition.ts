@@ -42,6 +42,7 @@ import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { createAccessMethods } from './methods/accessMethods';
 import { createAdminMethods } from './methods/adminMethods';
 import { createAnalyticsMethods } from './methods/analyticsMethods';
+import { writeConditionState } from './lib/conditionAllocationMongo';
 import { createAuthMethods } from './methods/authMethods';
 import { createContentMethods } from './methods/contentMethods';
 import { createCourseMethods } from './methods/courseMethods';
@@ -498,6 +499,7 @@ const learnerAnalyticsMethods = createLearnerAnalyticsMethods({
 });
 
 const analyticsMethods = createAnalyticsMethods({
+  writeConditionState,
   serverConsole,
   Histories,
   StimulusCrowdStats,

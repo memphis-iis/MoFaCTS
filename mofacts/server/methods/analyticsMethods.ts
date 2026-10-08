@@ -28,6 +28,7 @@ type MethodContext = {
 };
 
 type AnalyticsMethodsDeps = {
+  writeConditionState: (write: ConditionStateWrite) => Promise<UnknownRecord | null>;
   serverConsole: Logger;
   Histories: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync: () => Promise<number> };
@@ -527,6 +528,8 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     where: string
   ) {
     await validateExperimentStateMutation(userId, TDFId, newExperimentState, where || 'setExperimentState');
+    const conditionState = await deps.writeConditionState({ userId, rootTdfId: TDFId, state: newExperimentState });
+    if (conditionState) return conditionState;
     deps.serverConsole('setExperimentState:', where, {
       userId,
       currentTdfId: TDFId,
@@ -549,7 +552,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     this: MethodContext | undefined,
     curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
     actorUserId: string | null = null,
-    options: { replaceExistingState?: boolean } = {},
+    options: { replaceExistingState?: boolean; allocateCondition?: boolean } = {},
   ) {
     const resolvedUserId = actorUserId || this?.userId || Meteor.userId();
     const rootTdfId = deps.normalizeCanonicalId((curExperimentState as any)?.currentRootTdfId)
@@ -558,6 +561,10 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       throw new Meteor.Error(400, 'createExperimentState requires currentRootTdfId/currentTdfId');
     }
     await validateExperimentStateMutation(resolvedUserId, rootTdfId, curExperimentState, 'createExperimentState');
+    const conditionState = await deps.writeConditionState({
+      userId: resolvedUserId as string, rootTdfId, state: curExperimentState, ...options,
+    });
+    if (conditionState) return conditionState;
     deps.serverConsole('createExperimentState', {
       userId: resolvedUserId,
       currentTdfId: rootTdfId,
@@ -1613,14 +1620,15 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     createExperimentState: async function(
       this: MethodContext,
       curExperimentState: UnknownRecord & { currentRootTdfId?: string; currentTdfId?: string },
-      options: { replaceExistingState?: boolean } = {},
+      options: { replaceExistingState?: boolean; allocateCondition?: boolean } = {},
     ) {
       if (
         options === null
         || typeof options !== 'object'
         || Array.isArray(options)
-        || Object.keys(options).some((key) => key !== 'replaceExistingState')
+        || Object.keys(options).some((key) => !['replaceExistingState', 'allocateCondition'].includes(key))
         || (options.replaceExistingState !== undefined && typeof options.replaceExistingState !== 'boolean')
+        || (options.allocateCondition !== undefined && typeof options.allocateCondition !== 'boolean')
       ) {
         throw new Meteor.Error(400, 'Invalid experiment state write options');
       }

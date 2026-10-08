@@ -128,7 +128,8 @@
     },
     {
       "name": "createExperimentState",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Actor comes from method context; existing root-access and condition-family checks retained. not-max allocation and state writes use one Mongo transaction. Participants cannot supply or change their assigned condition; only the root owner retains explicit preview selection."
     },
     {
       "name": "createThemeFromBase",
@@ -468,7 +469,8 @@
     },
     {
       "name": "getTdfById",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing lesson/course access checks retained; authenticated runtime reads exclude the server-owned conditionAllocation block."
     },
     {
       "name": "getTdfNamesAssignedByInstructor",
@@ -544,7 +546,8 @@
     },
     {
       "name": "incrementTdfConditionCount",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing root access required. not-max milestone increments must match the caller's saved condition; beginning increments belong exclusively to the allocation transaction."
     },
     {
       "name": "initializeCustomTheme",
@@ -835,7 +838,8 @@
     },
     {
       "name": "updateExperimentState",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing record ownership and root authorization retained. not-max state writes preserve the server-assigned condition atomically, including stale writes and replacement initialization."
     },
     {
       "name": "updateOwnOpenRouterSettings",
@@ -855,7 +859,8 @@
     },
     {
       "name": "updateTdfConditionCounts",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "not-max count replacement additionally requires root ownership or admin role and clears the server-owned block. Other modes retain existing authorization."
     },
     {
       "name": "upsertStimFile",
@@ -917,7 +922,8 @@
     },
     {
       "name": "currentTdf",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing exact-ID runtime authorization retained; excludes the server-owned conditionAllocation block alongside runtime secrets."
     },
     {
       "name": "dashboardCache",
@@ -961,7 +967,8 @@
     },
     {
       "name": "tdfByIds",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing bounded runtime authorization retained; excludes the server-owned conditionAllocation block alongside runtime secrets."
     },
     {
       "name": "tdfForContentUploadDetails",

@@ -85,6 +85,7 @@ export const DYNAMIC_ASSET_PUBLICATION_FIELDS = {
 };
 
 export const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
+    conditionAllocation: 0,
     'content.tdfs.tutor.setspec.speechAPIKey': 0,
     'content.tdfs.tutor.setspec.textToSpeechAPIKey': 0,
     'content.tdfs.tutor.setspec.openRouterApiKey': 0

@@ -46,6 +46,7 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
   const insertedHistory: Record<string, unknown>[] = [];
   const logEntries: unknown[][] = [];
   const deps = {
+    writeConditionState: async () => null,
     serverConsole: (...args: unknown[]) => {
       logEntries.push(args);
     },

@@ -16,6 +16,9 @@ type AnalyticsConditionCountDeps = {
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
+  GlobalExperimentStates: {
+    findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
+  };
   normalizeCanonicalId: (value: unknown) => string | null;
 };
 
@@ -44,7 +47,7 @@ export function createAnalyticsConditionCountMethods(
       }
       const tdf = await deps.Tdfs.findOneAsync(
         { _id: normalizedTdfId },
-        { fields: { 'content.tdfs.tutor.setspec.condition': 1 } }
+        { fields: { ownerId: 1, 'content.tdfs.tutor.setspec.condition': 1, 'content.tdfs.tutor.setspec.loadbalancing': 1 } }
       );
       const conditions = Array.isArray(tdf?.content?.tdfs?.tutor?.setspec?.condition)
         ? tdf.content.tdfs.tutor.setspec.condition
@@ -52,13 +55,20 @@ export function createAnalyticsConditionCountMethods(
       if (conditions.length !== conditionCounts.length) {
         throw new Meteor.Error(400, 'Condition counts length does not match root TDF conditions');
       }
+      if (tdf?.content?.tdfs?.tutor?.setspec?.loadbalancing === 'not-max') {
+        await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
+          actingUserId: this.userId, subjectUserId: tdf.ownerId, roles: ['admin'],
+          forbiddenMessage: 'Only owner or admin can replace block-allocation counts',
+        });
+        if (conditionCounts.some(count => !Number.isSafeInteger(count))) throw new Meteor.Error(400, 'Invalid condition counts');
+      }
       await callbacks.validateExperimentStateMutation(
         this.userId,
         normalizedTdfId,
         { currentTdfId: normalizedTdfId },
         'methods.updateTdfConditionCounts'
       );
-      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $inc: { tdfRevision: 1 } });
+      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $unset: { conditionAllocation: '' }, $inc: { tdfRevision: 1 } });
     },
 
     incrementTdfConditionCount: async function(this: MethodContext, TDFId: string, conditionIndex: number) {
@@ -72,7 +82,7 @@ export function createAnalyticsConditionCountMethods(
       }
       const tdf = await deps.Tdfs.findOneAsync(
         { _id: normalizedTdfId },
-        { fields: { conditionCounts: 1, 'content.tdfs.tutor.setspec.condition': 1 } }
+        { fields: { conditionCounts: 1, 'content.tdfs.tutor.setspec': 1 } }
       );
       const conditions = Array.isArray(tdf?.content?.tdfs?.tutor?.setspec?.condition)
         ? tdf.content.tdfs.tutor.setspec.condition
@@ -93,6 +103,19 @@ export function createAnalyticsConditionCountMethods(
         { currentTdfId: normalizedTdfId },
         'methods.incrementTdfConditionCount'
       );
+      const spec = tdf?.content?.tdfs?.tutor?.setspec;
+      if (spec?.loadbalancing === 'not-max') {
+        if (spec.countcompletion === 'beginning') {
+          throw new Meteor.Error(400, 'Beginning counts are committed atomically with condition assignment');
+        }
+        const assignment = await deps.GlobalExperimentStates.findOneAsync(
+          { userId: this.userId, TDFId: normalizedTdfId }, { fields: { 'experimentState.conditionTdfId': 1 } },
+        );
+        if (!assignment?.experimentState?.conditionTdfId
+          || assignment.experimentState.conditionTdfId !== spec.conditionTdfIds?.[conditionIndex]) {
+          throw new Meteor.Error(403, 'Can only count the participant’s assigned condition');
+        }
+      }
       await deps.Tdfs.updateAsync(
         { _id: normalizedTdfId },
         { $inc: { [`conditionCounts.${conditionIndex}`]: 1, tdfRevision: 1 } }
@@ -121,7 +144,7 @@ export function createAnalyticsConditionCountMethods(
       const setspec = tdf?.content?.tdfs?.tutor?.setspec;
       const conditions = Array.isArray(setspec?.condition) ? setspec.condition : [];
       const conditionCounts = new Array(conditions.length).fill(0);
-      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $inc: { tdfRevision: 1 } });
+      await deps.Tdfs.updateAsync({ _id: normalizedTdfId }, { $set: { conditionCounts }, $unset: { conditionAllocation: '' }, $inc: { tdfRevision: 1 } });
     },
   };
 }

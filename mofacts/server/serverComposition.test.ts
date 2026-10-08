@@ -1817,6 +1817,88 @@ describe('system method authorization', function() {
   });
 });
 
+describe('not-max condition allocation transactions', function() {
+  async function seed(countcompletion = 'end') {
+    await TdfsAny.insertAsync({ _id: 'block-root', ownerId: 'block-owner', conditionCounts: [0, 0, 0],
+      content: { fileName: 'block-root.json', tdfs: { tutor: { setspec: { lessonname: 'Blocks',
+        userselect: 'true', loadbalancing: 'not-max', countcompletion,
+        condition: ['block-a.json', 'block-b.json', 'block-c.json'],
+        conditionTdfIds: ['block-a', 'block-b', 'block-c'],
+      } } } } });
+    for (const id of ['block-a', 'block-b', 'block-c']) {
+      await TdfsAny.insertAsync({ _id: id, ownerId: 'block-owner',
+        content: { fileName: `${id}.json`, tdfs: { tutor: { setspec: { lessonname: id }, unit: [{}] } } } });
+    }
+  }
+  const allocate = (userId: string) => (asyncMethods.createExperimentState as any).call(
+    { userId }, { currentRootTdfId: 'block-root', currentTdfId: 'block-root' }, { allocateCondition: true },
+  );
+  beforeEach(async function() { await clearServerCompositionCollections(); });
+
+  it('commits concurrent distinct participants in balanced blocks using real Mongo transactions', async function() {
+    await seed();
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) => allocate(`block-user-${i}`)));
+    for (const id of ['block-a', 'block-b', 'block-c']) {
+      expect(results.filter(result => result.conditionTdfId === id)).to.have.length(4);
+    }
+    expect(await GlobalExperimentStatesAny.find({ TDFId: 'block-root' }).countAsync()).to.equal(12);
+    const root = await TdfsAny.findOneAsync('block-root');
+    expect(root.conditionAllocation.cursor).to.equal(3);
+    expect(root.conditionCounts).to.deep.equal([0, 0, 0]);
+  });
+
+  it('allocates a simultaneous same-user launch once, including beginning counts', async function() {
+    await seed('beginning');
+    const results = await Promise.all(Array.from({ length: 8 }, () => allocate('block-same-user')));
+    expect(new Set(results.map(result => result.id)).size).to.equal(1);
+    expect(new Set(results.map(result => result.conditionTdfId)).size).to.equal(1);
+    const root = await TdfsAny.findOneAsync('block-root');
+    expect(root.conditionCounts.reduce((sum: number, n: number) => sum + n, 0)).to.equal(1);
+    expect(root.conditionAllocation.cursor).to.equal(1);
+    const index = root.content.tdfs.tutor.setspec.conditionTdfIds.indexOf(results[0].conditionTdfId);
+    let error: any;
+    try { await (asyncMethods.incrementTdfConditionCount as any).call({ userId: 'block-same-user' }, 'block-root', index); }
+    catch (caught) { error = caught; }
+    expect(error?.error).to.equal(400);
+  });
+
+  it('preserves assignments on stale replacement writes and rejects client-selected reassignment', async function() {
+    await seed();
+    const assigned = await allocate('block-stable-user');
+    const replaced = await (asyncMethods.createExperimentState as any).call(
+      { userId: 'block-stable-user' }, { currentRootTdfId: 'block-root', currentTdfId: 'block-root' },
+      { replaceExistingState: true },
+    );
+    expect(replaced.conditionTdfId).to.equal(assigned.conditionTdfId);
+    const other = ['block-a', 'block-b', 'block-c'].find(id => id !== assigned.conditionTdfId);
+    let rejected = false;
+    try { await (asyncMethods.updateExperimentState as any).call({ userId: 'block-stable-user' },
+      { currentRootTdfId: 'block-root', conditionTdfId: other }, assigned.id); }
+    catch { rejected = true; }
+    expect(rejected).to.equal(true);
+    expect((await allocate('block-stable-user')).conditionTdfId).to.equal(assigned.conditionTdfId);
+  });
+
+  it('denies unauthenticated allocation and participant count replacement; permits the assigned later milestone', async function() {
+    await seed();
+    let error: any;
+    try { await allocate(''); } catch (caught) { error = caught; }
+    expect(error?.error).to.equal(401);
+    const result = await allocate('block-milestone-user');
+    const index = ['block-a', 'block-b', 'block-c'].indexOf(result.conditionTdfId);
+    await (asyncMethods.incrementTdfConditionCount as any).call({ userId: 'block-milestone-user' }, 'block-root', index);
+    error = null;
+    try { await (asyncMethods.updateTdfConditionCounts as any).call({ userId: 'block-milestone-user' }, 'block-root', [0, 0, 0]); }
+    catch (caught) { error = caught; }
+    expect(error).to.exist;
+    await (asyncMethods.resetTdfConditionCounts as any).call({ userId: 'block-owner' }, 'block-root');
+    const root = await TdfsAny.findOneAsync('block-root');
+    expect(root.conditionAllocation).to.equal(undefined);
+    expect(root.conditionCounts).to.deep.equal([0, 0, 0]);
+    expect((await allocate('block-milestone-user')).conditionTdfId).to.equal(result.conditionTdfId);
+  });
+});
+
 describe('condition count method authorization', function() {
   beforeEach(async function() {
     await clearServerCompositionCollections();
