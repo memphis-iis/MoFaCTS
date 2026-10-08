@@ -1,6 +1,147 @@
 # Security Audit Durable Redesign Status
 
-Updated: 2026-10-04.
+Updated: 2026-10-07.
+
+## Third authorized Meteor invocation — 2026-10-07
+
+The third freshly authorized `npm run test:ci` finished with **exit 1**.
+Harness: **16 passed, 0 failed**. Server: **721 passed, 15 pending, 4 failed**.
+Browser: **1,086 passed, 7 pending, 5 failed**. All three rendered theme
+confirmation tests now pass, including Cancel/Escape, selected-row deletion,
+duplicate submission protection and focus retention. The upload ownership,
+transport/cookie, download boundary and voice-preview tests also pass.
+
+The remaining failures concern concurrent work outside this repair batch:
+three analytics-method history selectors, one dashboard assessment-history count,
+and five learner-history construction tests whose fixtures now lack required
+feedback text. Full application typecheck also failed on a removed
+`createAssessmentModelEvidenceRecord` export used by the resume integration test
+and a duplicate `levelUnitType` property in `server/publications.ts`; lint failed
+on that duplicate property. These are results from the checkout at check time,
+which includes concurrently edited source. No unrelated code was changed to
+obtain passing checks. Source-security tests passed **34/34**, and standalone
+voice-preview tests passed **2/2**.
+
+The runner removed test-driver resolutions, and the manifest artifact guard
+passed. The orphan MongoDB process was matched to this invocation's temporary
+database directory, test port and exited parent before stopping it; no database
+files were removed. Neither test port remains listening. The canonical local
+watcher was already running when restoration was requested; status verified app
+health, executable browser bundle, HMR, active supervisor and 37 Change Streams.
+
+Required verification failures still block commit, push and staging2 release.
+No commit, push, image build or deployment occurred. This invocation consumed
+its single-use authorization. Staging Chrome playback, visible theme deletion
+and the remaining remote security/browser acceptance checks remain outstanding.
+This result does not close Phase 0 or establish committed-image release confidence.
+
+## Authorized Meteor rerun — 2026-10-07
+
+The second freshly authorized invocation finished with **exit 1**: harness
+**16 passed, 0 failed**; server **722 passed, 15 pending, 0 failed**; browser
+**1,073 passed, 7 pending, 3 failed**. The corrected admin fixture reached the
+real rendered confirmation. Two cancellation assertions incorrectly expected the
+shared component's section to be removed: its intentional contract retains a
+hidden section. Those tests now inspect only `aria-hidden="false"` confirmations.
+
+The Confirm test exposed an actual focus issue: restoring focus to Delete was
+followed by disabling the row during the command, leaving focus on the document
+body. The existing Export Active Theme button now carries the controller's
+already-defined return-focus marker. Confirm places focus there before starting
+delete; Cancel/Escape retain their row-trigger focus behavior. No control was
+added, no authorization changed, and the inline controller is preserved. The
+regression now also removes only the selected synthetic row on command completion
+and checks that focus remains on that stable control while the other row remains.
+
+These source/test corrections have not had another Meteor run. Commit/push and
+staging2 release remain blocked by the required failed integration check; the
+single-use authorization was consumed by this invocation. Full application typecheck and lint passed after these corrections (55 upstream
+lint warnings, no errors). The canonical watcher was restored and verified: app
+health, executable browser bundle, HMR on 8082 and supervisor are ready, with four
+active Change Streams. No listener remains on the test ports.
+
+The test runner removed driver resolutions; the artifact guard passed and the
+version manifest has no semantic diff. The owned orphan test MongoDB was matched
+to this rerun's temporary directory, test port and exited parent before stopping
+it. No database files were removed. Upstream package npm cache remains ignored.
+Production, original staging, provider credentials and unrelated changes remain
+untouched. Phase 0 and this candidate's browser/security acceptance remain open.
+
+## Authorized Meteor integration result — 2026-10-07
+
+One freshly authorized `npm run test:ci` invocation finished with **exit 1**.
+Harness: **16 passed, 0 failed**. Server: **722 passed, 15 pending, 0 failed**.
+Browser reporter: **3 failures**, all in the new theme-confirmation tests. The
+browser passing/pending totals were not retained in the bounded output; no
+combined passing count is claimed. The package-method, upload ownership and
+server download-boundary tests completed without server failures. The full run
+used the working checkout, including unrelated concurrent changes, and does not
+qualify a future committed-source image.
+
+All three failures occurred before opening a confirmation: the selected theme's
+Delete button was absent. Source inspection identified a test-fixture error:
+Blaze checks `__helpers.has(name)` before `__helpers.get(name)`, but the synthetic
+admin fixture stubbed only `get`. The fixture now declares helper presence as well
+as its value. Application authorization and the confirmation repair are unchanged.
+This correction still requires another authorized Meteor run; the failed run does
+not establish confirmation rendering, focus or deletion acceptance.
+
+The watcher was already stopped before this invocation, with an earlier MongoDB
+connection-pool failure recorded. It was explicitly kept stopped during testing.
+The runner removed transient test-driver resolutions; the manifest artifact guard
+passed. The remaining test MongoDB process was verified against this invocation's
+temporary database directory, test port and exited parent, then stopped without
+removing database files or affecting another process. The canonical watcher was restored: app health, executable browser client bundle,
+Rspack HMR on port 8082 and supervisor are ready, with two active Change Streams.
+Full application typecheck and lint passed after the fixture correction; lint
+retains 55 upstream warnings and no errors. The corrected fixture is not yet
+Meteor-verified.
+
+No commit, push, image build or staging2 deployment occurred. Required integration
+failure blocks release. The new package retains upstream `.gitignore` so generated
+Meteor npm cache/shrinkwrap output stays untracked. Production, older staging,
+provider credentials, learner histories and unrelated source edits are preserved.
+Phase 0 and all candidate browser/remote acceptance checks remain open.
+
+## Upload/browser repair implementation checkpoint — 2026-10-06
+
+The approved repair batch is implemented in the working checkout, not yet
+committed or deployed. Production and the older staging installation are unchanged.
+Phase 0 remains open. See [the upload guide](../docs/uploads.md) and the maintained
+package's [provenance and upgrade instructions](../mofacts/packages/ostrio-files/MAINTENANCE.md).
+
+- Maintained upstream `ostrio:files` 3.0.1 source is pinned to
+  `442a08912595c552c49fabebf8684bf896ee0fb5`, preserving its license and dependencies.
+  DDP start establishes the caller as pending owner; write/finish/abort authorize
+  from persisted ownership before stream/file access. No administrator bypass is
+  present. Duplicate identifiers and client filename substitution are rejected;
+  abort cannot remove completed assets. Missing owners require a new upload.
+- HTTP upload code and file-cookie authentication are removed. Explicit HTTP
+  transport fails, the app-owned retired endpoint returns 410 before lookup,
+  and the client expires the former host-only `x_mtok` cookie without renewing it.
+  Existing download visibility and URLs are preserved.
+- Voice preview uses only the ten offered direct documentation URLs, owns one
+  audio instance and reports failure in localized inline TTS status. Theme
+  confirmation now reads its reactive view before checking nonreactive scope.
+- Real Meteor tests were added for generated package handlers with Mongo and file
+  streams, missing-owner rejection and persisted continuation, DDP-only/cookie
+  behavior, download boundaries and Blaze confirmation rendering. They are
+  automatically discovered by the existing test entries; they have not yet run.
+- Full application typecheck: **passed**. Voice-preview lifecycle tests: **2 passed**.
+  Source-security tests: **34 passed**. Full lint: **passed**, with 55 retained
+  upstream-style warnings and no errors; the security contract covers **305**
+  syntactic surfaces including the package's four generated methods and raw asset
+  route. The disabled generated Remove method is classified explicitly. This is
+  a narrow package binding, not completion of the runtime-registry redesign.
+
+Fresh single-use authorization is still required for the Meteor suite. Commit,
+push, committed-source Compose build, rollback retention and staging2 deployment
+remain pending the required checks. Chrome playback and visible theme deletion,
+wire-level owner/other-user probes, actual process-restart continuation and the
+existing CSP/learner/Anki/fonts/YouTube regressions remain **NOT RUN** for this
+candidate. Prior baseline checks below do not establish acceptance for this code.
+No security item is marked closed by the local source checks. Unrelated concurrent
+content, video and launch work is preserved and excluded from this batch.
 
 ## Current checkpoint — 2026-10-04
 

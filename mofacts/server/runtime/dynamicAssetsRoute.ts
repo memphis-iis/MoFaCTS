@@ -92,11 +92,16 @@ function isValidAssetId(assetId: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(assetId);
 }
 
-async function serveDynamicAssetById(
+export async function serveDynamicAssetById(
   deps: DynamicAssetsRouteDeps,
   res: ServerResponse<IncomingMessage>,
   assetId: string
 ) {
+  if (assetId === '__upload') {
+    res.writeHead(410, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('HTTP uploads are retired. Use DDP.');
+    return;
+  }
   if (!assetId || !isValidAssetId(assetId)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('File not found');

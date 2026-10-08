@@ -872,6 +872,22 @@
     {
       "name": "userAdminRoleChange",
       "access": "admin-only"
+    },
+    {
+      "name": "_FilesCollectionAbort_Assets",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "_FilesCollectionRemove_Assets",
+      "access": "disabled"
+    },
+    {
+      "name": "_FilesCollectionStart_Assets",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "_FilesCollectionWrite_Assets",
+      "access": "authenticated-self"
     }
   ],
   "publications": [
@@ -1008,6 +1024,10 @@
     {
       "name": "/health",
       "access": "public-rate-limited"
+    },
+    {
+      "name": "/cdn/storage/Assets",
+      "access": "public"
     }
   ],
   "exports": [

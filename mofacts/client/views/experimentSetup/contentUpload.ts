@@ -715,7 +715,6 @@ Template.contentUpload.helpers({
             thisTdf.stimFileInfo = [];
             thisTdf.stimFilesCount = null;
             thisTdf.fileName = summary?.fileName || 'unknown.xml';
-            thisTdf.shortTdfId = tdfId.length > 18 ? `${tdfId.slice(0, 10)}…${tdfId.slice(-6)}` : tdfId;
             thisTdf.experimentTarget = summary?.experimentTarget || '';
             thisTdf.languageMetadataRows = buildLanguageMetadataRows(summary);
 
@@ -2013,6 +2012,7 @@ async function uploadMediaFiles(files: any, tdfId: any, template: any) {
       // Upload using DynamicAssetsCollection
       await new Promise((resolve: any, reject: any) => {
         const upload = DynamicAssetsCollection.insert({
+          transport: 'ddp',
           file: file,
           meta: {
             uploadPurpose: 'content-media',
@@ -2103,6 +2103,7 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
     };
 
     const upload = DynamicAssetsCollection.insert({
+      transport: 'ddp',
       file: file,
       chunkSize: 'dynamic',
       meta: {

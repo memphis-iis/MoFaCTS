@@ -25,6 +25,7 @@ import {
   setAudioPromptVoiceView,
   setAudioPromptFeedbackVoiceView,
 } from '../lib/state/audioState';
+import { createVoicePreview } from '../lib/voicePreview';
 import { getErrorMessage } from '../lib/errorUtils';
 import { evaluateSrAvailability } from '../lib/audioAvailability';
 import { resolveExplicitTtsLanguageCode } from '../lib/audioLanguage';
@@ -76,6 +77,7 @@ type AudioSettingsInstance = Blaze.TemplateInstance & {
   keyPresentation: ReactiveVar<LoadableState<boolean>>;
   settingsCommandStates: ReactiveVar<Partial<Record<AudioSettingsCommandScope, AsyncCommandState<void>>>>;
   keyCommandState: ReactiveVar<AsyncCommandState<void>>;
+  voicePreview: ReturnType<typeof createVoicePreview>;
   audioSettingsMessages: ReactiveVar<Partial<Record<AudioSettingsScope, AudioSettingsMessage>>>;
   volumeDraft: ReactiveVar<number>;
   sensitivityDraft: ReactiveVar<number>;
@@ -281,6 +283,10 @@ Template.audioSettings.onCreated(function(this: AudioSettingsInstance) {
   this.settingsCommandStates = new ReactiveVar({});
   this.keyCommandState = new ReactiveVar<AsyncCommandState<void>>({ status: 'idle' });
   this.audioSettingsMessages = new ReactiveVar({});
+  this.voicePreview = createVoicePreview(() => {
+    clientConsole(1, '[audioSettings] Voice preview playback failed');
+    setAudioSettingsMessage(this, 'tts', { level: 'error', text: audioText('audio.voicePreviewFailed') });
+  });
   this.volumeDraft = new ReactiveVar(0);
   this.sensitivityDraft = new ReactiveVar(60);
   this.speechApiDraft = new ReactiveVar('');
@@ -301,6 +307,7 @@ Template.audioSettings.onCreated(function(this: AudioSettingsInstance) {
 });
 
 Template.audioSettings.onDestroyed(function(this: AudioSettingsInstance) {
+  this.voicePreview.destroy();
   this.settingsLifetime.destroy();
   this.keyLifetime.destroy();
   this.settingsCommandRegistry.destroy();
@@ -490,8 +497,8 @@ Template.audioSettings.events({
     event.preventDefault();
     const current = readySettings(instance);
     if (!current) return;
-    const audio = new Audio(`https://cloud.google.com/text-to-speech/docs/audio/${sharedVoice(current)}.wav`);
-    void audio.play();
+    setAudioSettingsMessage(instance, 'tts', null);
+    instance.voicePreview.play(sharedVoice(current));
   },
 });
 

@@ -2,7 +2,7 @@ import type { ContentUpdateWarning } from '../../common/lib/contentUpdateWarning
 export type PackageUploadIntegrity = { expectedSize: number; sha256?: string };
 
 type PackageUploadCollection = {
-  insert: (options: { file: File; chunkSize: 'dynamic'; meta: Record<string, unknown> }, autoStart: false) => {
+  insert: (options: { file: File; transport: 'ddp'; chunkSize: 'dynamic'; meta: Record<string, unknown> }, autoStart: false) => {
     on: (event: 'start' | 'progress' | 'end', handler: (...args: any[]) => void) => void;
     start: () => void;
   };
@@ -55,6 +55,7 @@ export async function uploadPackageAsset(options: PackageAssetUploadOptions): Pr
   };
   const asset = await new Promise<Record<string, unknown> & { _id: string }>((resolve, reject) => {
     const upload = options.dynamicAssets.insert({
+      transport: 'ddp',
       file: options.file,
       chunkSize: 'dynamic',
       meta: {

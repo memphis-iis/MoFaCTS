@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
+import { uploadMethodNames } from '../../packages/ostrio-files/upload-policy.js';
 
 const toolAppRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '..', '..');
 const sourceRepoRoot = path.resolve(toolAppRoot, '..');
@@ -77,7 +78,7 @@ export async function discoverSecuritySurfaces() {
     methods.push(...discoverMethods(source));
     publications.push(...regexMatches(text, /Meteor\.publish\(\s*(?:'([^']+)'|null)/g,
       (match) => match[1] || '<default>'));
-    httpRoutes.push(...regexMatches(text, /connectHandlers\.use\(\s*'([^']+)'/g, (match) => match[1]));
+    httpRoutes.push(...regexMatches(text, /(?:connectHandlers|rawConnectHandlers)\.use\(\s*'([^']+)'/g, (match) => match[1]));
   }
   const routePolicyText = await fs.readFile(
     path.join(appRoot, 'client', 'lib', 'adminUi', 'managementRoutePresentationPolicies.ts'), 'utf8',
@@ -87,6 +88,16 @@ export async function discoverSecuritySurfaces() {
     /routeName:\s*'([^']+)'\s*,\s*path:\s*'([^']+)'/g,
     (match) => `${match[1]}|${match[2]}`,
   );
+  // One explicit application binding for the maintained package, not a runtime
+  // registry redesign. Fail clearly if that binding or its policy changes.
+  const collections = await fs.readFile(path.join(appRoot, 'common', 'Collections.ts'), 'utf8');
+  const ownership = await fs.readFile(path.join(appRoot, 'common', 'collectionOwnership.ts'), 'utf8');
+  const assetName = ownership.match(/DynamicAssets:\s*\{\s*mongoName:\s*'([^']+)'/)?.[1];
+  if (!assetName || !collections.includes("collectionName: collectionMongoName('DynamicAssets')")
+      || !collections.includes('allowClientCode: false') || !collections.includes('disableSetTokenCookie: true')) {
+    throw new Error('Review the DynamicAssets package security binding before classifying its methods.');
+  }
+  methods.push(...Object.values(uploadMethodNames(assetName)));
   const uniqueMethods = [...new Set(methods)].sort();
   const uniqueHttpRoutes = [...new Set(httpRoutes)].sort();
   const exports = [
@@ -127,7 +138,7 @@ if (process.argv.includes('--discover')) {
   const invalidPolicies = Object.entries(manifest)
     .filter(([, entries]) => Array.isArray(entries))
     .flatMap(([kind, entries]) => entries.filter((entry) =>
-      !['public', 'public-rate-limited', 'authenticated-self', 'role-checked', 'admin-only', 'signed-ingestion', 'single-use-download'].includes(entry.access))
+      !['disabled', 'public', 'public-rate-limited', 'authenticated-self', 'role-checked', 'admin-only', 'signed-ingestion', 'single-use-download'].includes(entry.access))
       .map((entry) => ({ kind, name: entry.name, access: entry.access })));
   const failures = comparisons.filter((comparison) => comparison.missing.length || comparison.removed.length);
   if (failures.length || invalidPolicies.length) {

@@ -647,8 +647,9 @@ Template.theme.helpers({
     },
     'themeConfirmationFor': function(scope: string) {
         const instance = Template.instance() as any;
+        const view = instance.themeConfirmationView.get();
         return instance.themeConfirmationController.getContext()?.scope === scope
-            ? instance.themeConfirmationView.get()
+            ? view
             : null;
     },
     'themeScope': function(themeId: string) {
@@ -1265,6 +1266,9 @@ Template.theme.events({
         if (!confirmed) {
             return;
         }
+        // The row trigger becomes disabled and is removed after deletion. Keep
+        // focus on the existing stable library control throughout that command.
+        template.find('[data-theme-confirmation-return-fallback]')?.focus();
         const scope = `theme:${themeId}`;
         clearThemeMessage(template, scope);
         await template.themeCommandRegistry.run(scope, async () => {
