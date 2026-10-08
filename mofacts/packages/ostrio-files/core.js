@@ -104,7 +104,7 @@ export default class FilesCollectionCore extends EventEmitter {
    */
   _debug(...args) {
     if (this.debug) {
-       
+
       (console.info || console.log || function () {}).apply(undefined, args);
     }
   }
@@ -210,10 +210,10 @@ export default class FilesCollectionCore extends EventEmitter {
    */
   async findOneAsync(selector = {}, options) {
     this._debug(`[FilesCollection] [findOneAsync(${JSON.stringify(selector)}, ${JSON.stringify(options)})]`);
-     
+
     check(selector, Match.Optional(Match.OneOf(Object, String, Boolean, Number, null)));
     check(options, Match.Optional(Object));
-     
+
 
     const doc = await this.collection.findOneAsync(selector, options);
     if (doc) {
@@ -236,10 +236,10 @@ export default class FilesCollectionCore extends EventEmitter {
     if (Meteor.isServer) {
       throw new Meteor.Error(404, 'FilesCollection#findOne() not available in server! Use .findOneAsync instead');
     }
-     
+
     check(selector, Match.Optional(Match.OneOf(Object, String, Boolean, Number, null)));
     check(options, Match.Optional(Object));
-     
+
 
     const doc = this.collection.findOne(selector, options);
     if (doc) {
@@ -258,10 +258,10 @@ export default class FilesCollectionCore extends EventEmitter {
    */
   find(selector = {}, options) {
     this._debug(`[FilesCollection] [find(${JSON.stringify(selector)}, ${JSON.stringify(options)})]`);
-     
+
     check(selector, Match.Optional(Match.OneOf(Object, String, Boolean, Number, null)));
     check(options, Match.Optional(Object));
-     
+
 
     return new FilesCursor(selector, options, this);
   }
@@ -299,10 +299,10 @@ export default class FilesCollectionCore extends EventEmitter {
    */
   async countDocuments(_selector = {}, options) {
     this._debug(`[FilesCollection] [countDocuments(${JSON.stringify(_selector)}, ${JSON.stringify(options)})]`);
-     
+
     check(_selector, Match.Optional(Match.OneOf(Object, String)));
     check(options, Match.Optional(Object));
-     
+
     const selector = typeof _selector === 'string' && _selector.length ? { _id: _selector } : _selector;
     return await this.collection.countDocuments(selector, options);
   }
@@ -315,7 +315,7 @@ export default class FilesCollectionCore extends EventEmitter {
    * @returns {Promise<number>}
    */
   async estimatedDocumentCount(options) {
-     
+
     check(options, Match.Optional(Object));
     this._collection._debug('[FilesCollection] [estimatedDocumentCount()]');
     return await this.collection.estimatedDocumentCount(options);

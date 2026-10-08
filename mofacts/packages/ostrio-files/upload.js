@@ -105,7 +105,7 @@ export class FileUpload extends EventEmitter {
     }
     this.emit('abort', this.file);
     if (this.config.debug) {
-       
+
       console.timeEnd(`insert ${this.config.fileData.name}`);
     }
 
@@ -159,7 +159,7 @@ export class UploadInstance extends EventEmitter {
       this.config.allowWebWorkers = true;
     }
 
-     
+
     check(this.config, {
       ddp: Match.Any,
       file: Match.Any,
@@ -179,7 +179,7 @@ export class UploadInstance extends EventEmitter {
       onBeforeUpload: Match.Optional(Function),
       allowWebWorkers: Boolean
     });
-     
+
 
     this.config.isEnded = false;
 
@@ -237,9 +237,9 @@ export class UploadInstance extends EventEmitter {
     }
 
     if (this.collection.debug) {
-       
+
       console.time(`insert ${this.fileData.name}`);
-       
+
       console.time(`loadFile ${this.fileData.name}`);
     }
 
@@ -343,7 +343,7 @@ export class UploadInstance extends EventEmitter {
       }
       this.config.isEnded = true;
       this.result.remainingTime.set('00:00:00');
-       
+
       if (this.result.estimateTimer) {
         Meteor.clearInterval(this.result.estimateTimer);
       }
@@ -384,7 +384,7 @@ export class UploadInstance extends EventEmitter {
   _end(error, data) {
     this.collection._debug('[FilesCollection] [UploadInstance] [end]', this.fileId, { error, data });
     if (this.collection.debug) {
-       
+
       console.timeEnd(`insert ${this.fileData.name}`);
     }
 
@@ -447,7 +447,7 @@ export class UploadInstance extends EventEmitter {
 
     if (this.fileLength === evt.data.chunkId) {
       if (this.collection.debug) {
-         
+
         console.timeEnd(`loadFile ${this.fileData.name}`);
       }
       this.result.emit('readEnd');

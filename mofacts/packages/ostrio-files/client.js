@@ -118,7 +118,7 @@ class FilesCollection extends FilesCollectionCore {
     // Expire the former host-only file-session cookie. Never renew it.
     cookie.remove('x_mtok', '/');
 
-     
+
     check(this.onbeforeunloadMessage, Match.OneOf(String, Function));
 
     try {
@@ -147,10 +147,10 @@ class FilesCollection extends FilesCollectionCore {
     check(this.chunkSize, Number);
     check(this.downloadRoute, String);
     check(this.disableUpload, Boolean);
-     
+
     check(this.namingFunction, Match.OneOf(false, Function));
     check(this.onBeforeUpload, Match.OneOf(false, Function));
-     
+
     check(this.allowClientCode, Boolean);
     check(this.ddp, Match.Any);
 
@@ -288,10 +288,10 @@ class FilesCollection extends FilesCollectionCore {
    */
   remove(selector = {}, callback) {
     this._debug(`[FilesCollection] [remove(${JSON.stringify(selector)})]`);
-     
+
     check(selector, Match.OneOf(Object, String));
     check(callback, Match.Optional(Function));
-     
+
 
     if (this.allowClientCode) {
       this.ddp.call(this._methodNames._Remove, selector, (callback || NOOP));
@@ -314,7 +314,7 @@ class FilesCollection extends FilesCollectionCore {
    */
   async removeAsync(selector = {}) {
     this._debug(`[FilesCollection] [removeAsync(${JSON.stringify(selector)})]`);
-     
+
     check(selector, Match.OneOf(Object, String));
 
     if (this.allowClientCode) {

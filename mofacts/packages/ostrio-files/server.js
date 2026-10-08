@@ -364,7 +364,7 @@ class FilesCollection extends FilesCollectionCore {
     check(this.disableDownload, Boolean);
     check(this.continueUploadTTL, Number);
     check(this.allowQueryStringCookies, Boolean);
-     
+
     check(this.onAfterRemove, Match.OneOf(false, Function));
     check(this.onAfterUpload, Match.OneOf(false, Function));
     check(this.onBeforeRemove, Match.OneOf(false, Function));
@@ -373,7 +373,7 @@ class FilesCollection extends FilesCollectionCore {
     check(this.interceptDownload, Match.OneOf(false, Function));
     check(this.responseHeaders, Match.OneOf(Object, Function));
     check(this.allowedOrigins, Match.OneOf(Boolean, RegExp));
-     
+
 
     this._runUploadOperation = createUploadQueue();
 
@@ -457,13 +457,13 @@ class FilesCollection extends FilesCollectionCore {
     check(this.chunkSize, Number);
     check(this.downloadRoute, String);
     check(this.allowClientCode, Boolean);
-     
+
     check(this.getUser, Match.OneOf(false, Function));
     check(this.protected, Match.OneOf(Boolean, Function));
     check(this.namingFunction, Match.OneOf(false, Function));
     check(this.onBeforeUpload, Match.OneOf(false, Function));
     check(this.onInitiateUpload, Match.OneOf(false, Function));
-     
+
 
     if (this.public && this.protected) {
       throw new Meteor.Error(500, `[FilesCollection.${this.collectionName}]: Files can not be public and protected at the same time!`);
@@ -636,7 +636,7 @@ class FilesCollection extends FilesCollectionCore {
     // Method used to remove file
     // from Client side
     _methods[this._methodNames._Remove] = async function (selector) {
-       
+
       check(selector, Match.OneOf(String, Object));
       self._debug(`[FilesCollection] [Unlink Method] [.removeAsync(${selector})]`);
 
@@ -676,7 +676,7 @@ class FilesCollection extends FilesCollectionCore {
     // So user can pause/disconnect and
     // continue upload later, during `continueUploadTTL`
     _methods[this._methodNames._Start] = async function (opts, returnMeta) {
-       
+
       check(opts, {
         file: Object,
         fileId: String,
@@ -685,7 +685,7 @@ class FilesCollection extends FilesCollectionCore {
         fileLength: Number
       });
       check(returnMeta, Match.Optional(Boolean));
-       
+
       self._debug(`[FilesCollection] [File Start Method] ${opts.file.name} - ${opts.fileId}`);
 
       if (!this.userId) throw new Meteor.Error(403, 'Authentication required.');
@@ -733,14 +733,14 @@ class FilesCollection extends FilesCollectionCore {
     _methods[this._methodNames._Write] = async function (_opts) {
       let opts = _opts;
       let result;
-       
+
       check(opts, {
         eof: Match.Optional(Boolean),
         fileId: String,
         binData: Match.Optional(String),
         chunkId: Match.Optional(Number)
       });
-       
+
 
       self._debug('[FilesCollection] [Write Method] Chunk received', opts.fileId);
 
@@ -1014,10 +1014,10 @@ class FilesCollection extends FilesCollectionCore {
       proceedAfterUpload = opts;
       opts = {};
     }
-     
+
     check(opts, Match.Optional(Object));
     check(proceedAfterUpload, Match.Optional(Boolean));
-     
+
 
     opts.fileId = opts.fileId && this.sanitize(opts.fileId, 20, 'a');
     const fileId = opts.fileId || Random.id();
@@ -1124,10 +1124,10 @@ class FilesCollection extends FilesCollectionCore {
     }
 
     check(url, String);
-     
+
     check(opts, Match.Optional(Object));
     check(proceedAfterUpload, Match.Optional(Boolean));
-     
+
 
     if (!helpers.isObject(opts)) {
       opts = {
@@ -1271,10 +1271,10 @@ class FilesCollection extends FilesCollectionCore {
     }
 
     check(path, String);
-     
+
     check(opts, Match.Optional(Object));
     check(proceedAfterUpload, Match.Optional(Boolean));
-     
+
 
     let stats;
     try {
