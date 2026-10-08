@@ -1,4 +1,5 @@
 import './tests/uploadBoundary.test.mjs';
+import './tests/checkCiDependencies.test.mjs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -602,7 +603,8 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$MOFACTS_SOURCE_REVISION/);
   assert.match(runtimeNpmHardening, /bcrypt@6\.0\.0 argon2@0\.41\.1 node-gyp-build@4\.8\.4/);
   assert.match(runtimeNpmHardening, /openpgp@5\.11\.3/);
-  assert.match(runtimeNpmHardening, /tmp@0\.2\.7 lodash@4\.18\.1 postcss@8\.5\.18 nanoid@3\.3\.18 svgo@2\.8\.3 nodemailer@9\.0\.1/);
+  assert.match(runtimeNpmHardening, /tmp@0\.2\.7 postcss@8\.5\.18 nanoid@3\.3\.18 svgo@2\.8\.3 nodemailer@9\.0\.1/);
+  assert.doesNotMatch(runtimeNpmHardening, /ostrio_files|lodash/);
   assert.match(runtimeNpmHardening, /browserslist@4\.28\.8 baseline-browser-mapping@2\.11\.20 caniuse-lite@1\.0\.30001810/);
   assert.match(runtimeNpmHardening, /electron-to-chromium@1\.5\.420 node-releases@2\.0\.54 update-browserslist-db@1\.3\.2/);
   assert.match(runtimeNpmHardening, /Patched browserslist failed its runtime load check/);

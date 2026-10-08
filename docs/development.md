@@ -145,6 +145,11 @@ resolutions as application dependencies.
 Never overwrite a private `settings.json` or describe a narrower local check as
 equivalent coverage.
 
+The independent Security workflow gates high/critical production dependencies
+and reviewed build exposures while reporting development advisories as
+maintenance information. See [Dependency Security Notes](dependency-security.md)
+for audit ownership, execution-error handling, and remaining findings.
+
 ## Modify Or Add A Unit Type
 
 Production unit behavior lives in `learning-components/`, not in the scaffold package under `packages/unit-engine-api`.

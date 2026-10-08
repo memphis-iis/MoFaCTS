@@ -29,7 +29,7 @@ jobs:
             git --redact --config /repo/.gitleaks.toml /repo
 
   source-contracts:
-    name: Security surface and dependency contracts
+    name: Security surface and scanner contracts
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -54,10 +54,36 @@ jobs:
         working-directory: mofacts
         run: node --test scripts/security-audit/source-security.test.mjs
 
-      - name: Audit application dependencies
-        working-directory: mofacts
-        run: npm audit --package-lock-only --audit-level=high
+  dependency-audits:
+    name: Dependency audit (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: application
+            lockfile: application
+            directory: mofacts
+          - name: Mongo sidecar
+            lockfile: sidecar-mongo
+            directory: mofacts-mcp-sidecar/services/mongo-mcp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Audit Sidecar Mongo dependencies
-        working-directory: mofacts-mcp-sidecar/services/mongo-mcp
-        run: npm audit --package-lock-only --audit-level=high
+      - name: Use pinned Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.15.0'
+
+      - name: Audit locked dependencies
+        working-directory: ${{ matrix.directory }}
+        run: |
+          # npm exits 1 for advisories. Other exit codes and malformed/error JSON
+          # still fail; the checker owns runtime and reviewed build-exposure gates.
+          npm audit --json --package-lock-only > "$RUNNER_TEMP/dependencies-all.json" || { status=$?; test "$status" -eq 1; }
+          npm audit --json --package-lock-only --omit=dev > "$RUNNER_TEMP/dependencies-runtime.json" || { status=$?; test "$status" -eq 1; }
+          node "$GITHUB_WORKSPACE/mofacts/scripts/security-audit/check-ci-dependencies.mjs" \
+            '${{ matrix.lockfile }}' \
+            "$RUNNER_TEMP/dependencies-all.json" \
+            "$RUNNER_TEMP/dependencies-runtime.json"
