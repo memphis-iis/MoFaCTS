@@ -142,6 +142,16 @@ during a test run. The repository runner removes only those test-driver entries
 when it exits, while lint and the pre-commit hook reject any such entries left
 in the application dependency manifest. Do not commit these `meteortesting:*`
 resolutions as application dependencies.
+
+CI waits for the explicitly named test MongoDB container to accept a ping and
+then become writable primary in `mofacts-ci-rs`. The readiness helper fails
+immediately when the container stops, limits probe attempts, and records
+bounded startup logs plus exit/OOM status and image identity. Failure steps
+also record diagnostics before cleanup in the integration and Docker smoke
+jobs. These diagnostics inspect only `mofacts-ci-*` containers and never dump
+container environments or mounted files. The helper's synthetic tests run
+before CI starts the test database; they do not start Docker or Meteor.
+
 Never overwrite a private `settings.json` or describe a narrower local check as
 equivalent coverage.
 

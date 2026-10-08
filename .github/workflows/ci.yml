@@ -54,6 +54,9 @@ jobs:
       - name: Install CI browser
         run: ./node_modules/.bin/playwright install --with-deps chromium
 
+      - name: Verify test MongoDB readiness helpers
+        run: node --test scripts/ciMongoReadiness.test.cjs
+
       - name: Start Change Streams test MongoDB
         working-directory: .
         run: |
@@ -63,22 +66,10 @@ jobs:
             mongo:8.0 \
             --replSet mofacts-ci-rs \
             --bind_ip_all
-          for attempt in $(seq 1 60); do
-            if docker exec mofacts-ci-mongodb mongosh --quiet --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'; then
-              break
-            fi
-            test "$attempt" -lt 60
-            sleep 1
-          done
+          node mofacts/scripts/ciMongoReadiness.cjs wait mofacts-ci-mongodb ping
           docker exec mofacts-ci-mongodb mongosh --quiet --eval \
             'rs.initiate({_id:"mofacts-ci-rs",members:[{_id:0,host:"127.0.0.1:27017"}]})'
-          for attempt in $(seq 1 60); do
-            if docker exec mofacts-ci-mongodb mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
-              exit 0
-            fi
-            sleep 1
-          done
-          exit 1
+          node mofacts/scripts/ciMongoReadiness.cjs wait mofacts-ci-mongodb primary mofacts-ci-rs
 
       - name: Test
         run: npm run test:ci
@@ -95,6 +86,11 @@ jobs:
           MOFACTS_SELF_HOSTED: 'false'
           MOFACTS_REQUIRE_REDIS: 'false'
 
+      - name: Record failed test MongoDB diagnostics
+        if: failure()
+        working-directory: .
+        run: node mofacts/scripts/ciMongoReadiness.cjs diagnostics mofacts-ci-mongodb
+
       - name: Clean up Change Streams test MongoDB
         if: always()
         working-directory: .
@@ -106,6 +102,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Setup Node.js for CI helpers
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.15.0'
 
       - name: Build amd64 application image
         run: |
@@ -126,6 +127,7 @@ jobs:
           app=mofacts-ci-app-standalone
           docker network create "$network"
           docker run -d --name "$mongo" --network "$network" mongo:8.0
+          node mofacts/scripts/ciMongoReadiness.cjs wait "$mongo" ping
           docker run -d \
             --name "$app" \
             --network "$network" \
@@ -157,22 +159,10 @@ jobs:
           app=mofacts-ci-app-amd64
           docker network create "$network"
           docker run -d --name "$mongo" --network "$network" mongo:8.0 --replSet mofacts-ci-rs --bind_ip_all
-          for attempt in $(seq 1 60); do
-            if docker exec "$mongo" mongosh --quiet --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'; then
-              break
-            fi
-            test "$attempt" -lt 60
-            sleep 1
-          done
+          node mofacts/scripts/ciMongoReadiness.cjs wait "$mongo" ping
           docker exec "$mongo" mongosh --quiet --eval \
             'rs.initiate({_id:"mofacts-ci-rs",members:[{_id:0,host:"mofacts-ci-mongo-amd64:27017"}]})'
-          for attempt in $(seq 1 60); do
-            if docker exec "$mongo" mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
-              break
-            fi
-            test "$attempt" -lt 60
-            sleep 1
-          done
+          node mofacts/scripts/ciMongoReadiness.cjs wait "$mongo" primary mofacts-ci-rs
           docker run -d \
             --name "$app" \
             --network "$network" \
@@ -197,6 +187,13 @@ jobs:
           done
           docker logs "$app"
           exit 1
+
+      - name: Record failed smoke container diagnostics
+        if: failure()
+        run: |
+          node mofacts/scripts/ciMongoReadiness.cjs diagnostics \
+            mofacts-ci-mongo-amd64 mofacts-ci-app-amd64 \
+            mofacts-ci-mongo-standalone mofacts-ci-app-standalone
 
       - name: Clean up smoke containers
         if: always()
