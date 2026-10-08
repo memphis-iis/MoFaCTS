@@ -3024,6 +3024,25 @@
                     "type": "object",
                     "title": "Video Session",
                     "properties": {
+                      "worksheet": {
+                        "title": "TutorScript worksheet checkpoints.",
+                        "description": "Page IDs aligned with questiontimes. Each referenced TutorScript page owns worksheet timing and question order.",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "pageIds": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        },
+                        "required": [
+                          "pageIds"
+                        ]
+                      },
                       "videosource": {
                         "title": "Video URL or source.",
                         "description": "Source URL or file for the video session.",
@@ -3067,7 +3086,8 @@
                         "enum": [
                           "pause",
                           "adaptive",
-                          "none"
+                          "none",
+                          "worksheet"
                         ],
                         "options": {
                           "grid_columns": 4
@@ -5459,6 +5479,25 @@
                 "type": "object",
                 "title": "Video Session",
                 "properties": {
+                  "worksheet": {
+                    "title": "TutorScript worksheet checkpoints.",
+                    "description": "Page IDs aligned with questiontimes. Each referenced TutorScript page owns worksheet timing and question order.",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "pageIds": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "required": [
+                      "pageIds"
+                    ]
+                  },
                   "videosource": {
                     "title": "Video URL or source.",
                     "description": "Source URL or file for the video session.",
@@ -5502,7 +5541,8 @@
                     "enum": [
                       "pause",
                       "adaptive",
-                      "none"
+                      "none",
+                      "worksheet"
                     ],
                     "options": {
                       "grid_columns": 4

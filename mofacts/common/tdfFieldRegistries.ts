@@ -605,6 +605,14 @@ export const ASSESSMENT_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
 
 
 export const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
+  worksheet: simpleField({
+    type: 'object', additionalProperties: false,
+    properties: { pageIds: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } } },
+    required: ['pageIds'],
+  }, {
+    brief: 'TutorScript worksheet checkpoints.',
+    verbose: 'Page IDs aligned with questiontimes. Each referenced TutorScript page owns worksheet timing and question order.',
+  }),
   videosource: simpleField(stringField('', 12), {
     brief: 'Video URL or source.',
     verbose: 'Source URL or file for the video session.'
@@ -627,7 +635,7 @@ export const VIDEO_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Question checkpoint times.',
     verbose: 'Timestamps where video questions should appear.'
   }),
-  checkpointBehavior: simpleField(enumStringField(['pause', 'adaptive', 'none'], undefined, 4), {
+  checkpointBehavior: simpleField(enumStringField(['pause', 'adaptive', 'none', 'worksheet'], undefined, 4), {
     brief: 'Checkpoint mode.',
     verbose: 'Controls how video checkpoints are interpreted.'
   }),
@@ -783,6 +791,7 @@ export const ASSESSMENT_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
 
 
 export const VIDEO_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
+  'worksheet',
   'adaptiveLogic',
   'calculateProbability',
   'checkpointBehavior',

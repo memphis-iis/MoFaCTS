@@ -1,6 +1,13 @@
 import type { TargetUiLocale } from '../../common/lib/interfaceLocales';
 
 export const PLATFORM_STRING_KEYS = [
+  'worksheet.label',
+  'worksheet.submitContinue',
+  'worksheet.yourAnswer',
+  'worksheet.correct',
+  'worksheet.incorrect',
+  'worksheet.saveFailed',
+
   'content.questionsRemovedWarning',
   'content.unitSequenceChangedWarning',
   'common.submit',
@@ -1818,6 +1825,13 @@ export type LocaleResource = Partial<Record<PlatformStringKey, string>>;
 
 export const PLATFORM_LOCALE_RESOURCES: Record<TargetUiLocale, LocaleResource> = {
   en: {
+    'worksheet.label': 'Worksheet',
+    'worksheet.submitContinue': 'Submit and Continue',
+    'worksheet.yourAnswer': 'Your answer: {answer}',
+    'worksheet.correct': 'Correct',
+    'worksheet.incorrect': 'Incorrect',
+    'worksheet.saveFailed': 'The worksheet could not save or load its history. Reload before continuing.',
+
     'content.questionsRemovedWarning': 'This update removes questions or question groups and may disrupt existing attempts.',
     'content.unitSequenceChangedWarning': 'This update changes the authored unit sequence and may disrupt existing attempts.',
     'common.submit': 'Submit',

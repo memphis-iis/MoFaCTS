@@ -798,7 +798,36 @@
                 "minLength": 1
               },
               "display": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "worksheet": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "description": "Fixed-question work and read-only feedback. Answers are saved normally without live model updates.",
+                    "required": [
+                      "workDurationSeconds",
+                      "reviewDurationSeconds",
+                      "randomizeQuestions"
+                    ],
+                    "properties": {
+                      "workDurationSeconds": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Maximum work time in seconds; early Submit and Continue is available."
+                      },
+                      "reviewDurationSeconds": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Maximum feedback time in seconds; early Continue is available."
+                      },
+                      "randomizeQuestions": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Shuffle whole questions once per worksheet attempt."
+                      }
+                    }
+                  }
+                }
               }
             }
           }

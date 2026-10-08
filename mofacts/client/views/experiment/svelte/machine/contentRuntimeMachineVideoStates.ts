@@ -13,6 +13,9 @@ export const contentRuntimeMachineVideoStates = {
   videoWaiting: {
     entry: ['logStateTransition'],
     on: {
+      VIDEO_WORKSHEET_CHECKPOINT: {
+        target: 'videoWorksheet', guard: 'canAcceptVideoCheckpoint', actions: [acceptVideoCheckpoint],
+      },
       [EVENTS.VIDEO_CHECKPOINT]: [
         {
           target: `#contentRuntimeMachine.${STATES.PRESENTING}`,
@@ -42,9 +45,14 @@ export const contentRuntimeMachineVideoStates = {
     },
   },
 
-  /**
-   * Video has finished; wait for UI to advance the unit.
-   */
+  /** Worksheet owns work and review; no adaptive trial runs at this checkpoint. */
+  videoWorksheet: {
+    on: {
+      VIDEO_WORKSHEET_COMPLETE: {
+        target: 'videoWaiting', actions: [resumeVideoSessionAfterQuestion, 'resumeVideoPlayback'],
+      },
+    },
+  },
   videoEnded: {
     entry: ['logStateTransition'],
     on: {

@@ -59,6 +59,10 @@ export { SPARC_SESSION_UNIT_TYPE };
 
 export type CreateSparcSessionUnitEngineDeps = CreateAdaptiveLogisticUnitEngineDeps;
 
+type SparcPageDeps = Pick<CreateSparcSessionUnitEngineDeps, 'findTdfById' | 'getSessionValue'> & {
+  getStimCluster: (index: number) => { clusterKC?: unknown; stims?: readonly Record<string, unknown>[] };
+};
+
 type SparcPageRecord = {
   readonly pageId?: unknown;
   readonly display?: unknown;
@@ -77,7 +81,7 @@ function responseKeyForStim(stim: Record<string, unknown>): string {
 }
 
 function createClusterTargetFromFirstStim(params: {
-  readonly deps: CreateSparcSessionUnitEngineDeps;
+  readonly deps: SparcPageDeps;
   readonly clusterIndex: number;
 }): Record<string, unknown> {
   const cluster = params.deps.getStimCluster(params.clusterIndex);
@@ -117,7 +121,7 @@ function createClusterTargetFromFirstStim(params: {
 }
 
 function createAutoTutorExpectationFromCluster(params: {
-  readonly deps: CreateSparcSessionUnitEngineDeps;
+  readonly deps: SparcPageDeps;
   readonly clusterIndex: number;
   readonly pageDisplay?: SparcTrialDisplay;
 }): SparcAutoTutorExpectation {
@@ -148,7 +152,7 @@ function createAutoTutorExpectationFromCluster(params: {
 }
 
 function createCleanAutoTutorClusterTarget(params: {
-  readonly deps: CreateSparcSessionUnitEngineDeps;
+  readonly deps: SparcPageDeps;
   readonly clusterIndex: number;
 }): Record<string, unknown> {
   const cluster = params.deps.getStimCluster(params.clusterIndex);
@@ -287,7 +291,7 @@ function collectSparcPageClusterIndices(display: SparcTrialDisplay): number[] {
 }
 
 function resolveSparcPage(
-  deps: CreateSparcSessionUnitEngineDeps,
+  deps: SparcPageDeps,
   unit: unknown,
 ): { pageId: string; pageKey: string; pageDisplay: SparcTrialDisplay } {
   const tdf = deps.findTdfById(deps.getSessionValue('currentTdfId'));
@@ -344,15 +348,15 @@ function resolveSparcPage(
 }
 
 function resolveSparcPageClusterListSource(
-  deps: CreateSparcSessionUnitEngineDeps,
+  deps: SparcPageDeps,
   unit: unknown,
 ): string {
   const { pageId, pageKey, pageDisplay } = resolveSparcPage(deps, unit);
   return collectSparcPageClusterIndices({ ...pageDisplay, pageId, pageKey }).join(' ');
 }
 
-function resolveSparcPageDisplay(
-  deps: CreateSparcSessionUnitEngineDeps,
+export function resolveSparcPageDisplay(
+  deps: SparcPageDeps,
   unit: unknown,
 ): SparcTrialDisplay {
   const { pageId, pageKey, pageDisplay } = resolveSparcPage(deps, unit);

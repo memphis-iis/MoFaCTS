@@ -133,6 +133,8 @@
   import DisplayTimeoutFooter from './DisplayTimeoutFooter.svelte';
   import FlashcardSessionSurface from './FlashcardSessionSurface.svelte';
   import BlocksSessionSurface from './BlocksSessionSurface.svelte';
+  import SparcWorksheetSurface from './SparcWorksheetSurface.svelte';
+  import { resolveVideoWorksheetDisplay } from '../services/worksheetRuntime';
   import SparcSessionSurface from './SparcSessionSurface.svelte';
   import VideoSessionSurface from './VideoSessionSurface.svelte';
 
@@ -692,7 +694,7 @@
   $: hasDisplayTimeout = displayTimeoutSnapshot.hasDisplayTimeout;
   $: displayTimeoutCanContinue = displayTimeoutSnapshot.canContinue;
   $: footerMessage = displayTimeoutSnapshot.footerMessage;
-  $: if (displayTimeoutSnapshot.shouldAutoAdvance) {
+  $: if (displayTimeoutSnapshot.shouldAutoAdvance && !state.matches('videoWorksheet') && !(showSparcSessionSurface && flashcardControllerProps.display?.worksheet)) {
     displayTimeoutController.markAutoAdvanced();
     void forceAdvanceToNextUnit('Display Max Seconds Reached');
   }
@@ -1166,6 +1168,25 @@
     });
   }
 
+  function handleVideoCheckpoint(event) {
+    if (currentTdfUnit?.videosession?.checkpointBehavior !== 'worksheet') {
+      videoEventRuntime.handleCheckpoint(event); return;
+    }
+    const index = Number(event.detail.index);
+    const ids = currentTdfUnit.videosession.worksheet.pageIds;
+    if (!state.matches('videoWaiting') || !Number.isInteger(index) || !ids[index]) {
+      throw new Error('Invalid worksheet video checkpoint');
+    }
+    send({ type: 'VIDEO_WORKSHEET_CHECKPOINT', checkpointIndex: index, questionIndex: index });
+  }
+  $: videoWorksheetProps = state.matches('videoWorksheet') ? {
+    display: resolveVideoWorksheetDisplay(currentTdfUnit.videosession.worksheet.pageIds[context.videoSession.currentCheckpointIndex]),
+    userId: context.userId, tdfId: context.tdfId, levelUnit: context.unitId, attemptId: context.attemptId,
+    checkpointIndex: context.videoSession.currentCheckpointIndex,
+    inputLanguage: contentLanguageAttributes.lang || '',
+    inputTextDirection: contentLanguageAttributes.dir || '',
+  } : null;
+
   async function handleFooterContinue(event) {
     event?.preventDefault?.();
     await forceAdvanceToNextUnit('Continue Button Pressed');
@@ -1185,6 +1206,8 @@
     <AutoTutorSession on:complete={() => forceAdvanceToNextUnit('AutoTutor Complete')} />
   {:else if sessionContentSurface.showVideoSession}
     <VideoSessionSurface
+      worksheetProps={videoWorksheetProps}
+      on:worksheetcomplete={() => send({ type: 'VIDEO_WORKSHEET_COMPLETE' })}
       bind:videoPlayer={videoPlayer}
       bind:trialContentFadeElement={trialContentFadeElement}
       checkpointGateState={videoRuntimeSnapshot.checkpointGateState}
@@ -1231,6 +1254,15 @@
       on:videocontinue={() => videoEventRuntime.handleContinue()}
     />
   {:else if showSparcSessionSurface}
+    {#if flashcardControllerProps.display?.worksheet}
+      {#key `${context.tdfId}:${context.unitId}:${flashcardControllerProps.display.pageKey}`}
+        <SparcWorksheetSurface display={flashcardControllerProps.display} userId={context.userId}
+          tdfId={context.tdfId} levelUnit={context.unitId} attemptId={context.attemptId}
+          inputLanguage={flashcardControllerProps.inputLanguage}
+          inputTextDirection={flashcardControllerProps.inputTextDirection}
+          on:complete={() => forceAdvanceToNextUnit('Worksheet Complete')} />
+      {/key}
+    {:else}
     <SparcSessionSurface
       display={flashcardControllerProps.display}
       adminDiagnosticMode={adminDiagnosticModeEnabled()}
@@ -1327,7 +1359,7 @@
     />
   {/if}
 
-  {#if hasDisplayTimeout && !showBlocksSessionSurface}
+  {#if hasDisplayTimeout && !showBlocksSessionSurface && !videoWorksheetProps && !(showSparcSessionSurface && flashcardControllerProps.display?.worksheet)}
     <DisplayTimeoutFooter
       canContinue={displayTimeoutCanContinue}
       continueButtonText={deliverySettings.continueButtonText || ''}

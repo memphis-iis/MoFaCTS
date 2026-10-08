@@ -2,6 +2,22 @@
   "schema": "MoFaCTSSecuritySurfaceContractV1",
   "methods": [
     {
+      "name": "_FilesCollectionAbort_Assets",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "_FilesCollectionRemove_Assets",
+      "access": "disabled"
+    },
+    {
+      "name": "_FilesCollectionStart_Assets",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "_FilesCollectionWrite_Assets",
+      "access": "authenticated-self"
+    },
+    {
       "name": "addCourse",
       "access": "role-checked"
     },
@@ -463,7 +479,8 @@
     },
     {
       "name": "getStudentPerformanceForClassAndTdfId",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing instructor authorization and enrollment scope retained; aggregates count original histories once."
     },
     {
       "name": "getStudentPerformanceForUnitFromHistory",
@@ -536,7 +553,8 @@
     },
     {
       "name": "getVideoCompletedCheckpointQuestionCountFromHistory",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Retains existing authenticated-self scope and exact lesson/unit query. Completed checkpoints include correct and incorrect ATTEMPT outcomes; no learner records are changed."
     },
     {
       "name": "hasUserPersonalKeys",
@@ -656,7 +674,8 @@
     },
     {
       "name": "getLearnerLessonAnalyticsSource",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing learner lesson authorization retained; copy exclusion applies to snapshot bounds, counts and pages."
     },
     {
       "name": "refreshUserAdminUsageCaches",
@@ -716,7 +735,8 @@
     },
     {
       "name": "resetTdfConditionCounts",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing owner/admin check retained. Reset clears the allocation block together with counts; saved participant assignments remain intact."
     },
     {
       "name": "resolveAssignedRootTdfIdsForUser",
@@ -889,22 +909,6 @@
     {
       "name": "userAdminRoleChange",
       "access": "admin-only"
-    },
-    {
-      "name": "_FilesCollectionAbort_Assets",
-      "access": "authenticated-self"
-    },
-    {
-      "name": "_FilesCollectionRemove_Assets",
-      "access": "disabled"
-    },
-    {
-      "name": "_FilesCollectionStart_Assets",
-      "access": "authenticated-self"
-    },
-    {
-      "name": "_FilesCollectionWrite_Assets",
-      "access": "authenticated-self"
     }
   ],
   "publications": [

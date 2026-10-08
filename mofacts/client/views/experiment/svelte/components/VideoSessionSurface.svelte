@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import SparcWorksheetSurface from './SparcWorksheetSurface.svelte';
   import ActiveFlashcardControllerSlot from './ActiveFlashcardControllerSlot.svelte';
   import PerformanceArea from './PerformanceArea.svelte';
   import VideoSessionMode from './VideoSessionMode.svelte';
@@ -7,6 +8,7 @@
 
   const dispatch = createEventDispatcher();
 
+  export let worksheetProps = null;
   export let checkpointGateState = '';
   export let continueButtonText = '';
   export let deliverySettings = {};
@@ -58,8 +60,8 @@
   canAcceptCheckpoint={videoCanAcceptCheckpoint}
   checkpointGateState={checkpointGateState}
   startBlocked={startBlocked}
-  overlayMounted={overlayMounted}
-  overlayVisible={overlayVisible}
+  overlayMounted={overlayMounted || Boolean(worksheetProps)}
+  overlayVisible={overlayVisible || Boolean(worksheetProps)}
   on:checkpoint={(event) => forward('checkpoint', event.detail)}
   on:ready={(event) => forward('ready', event.detail)}
   on:play={(event) => forward('play', event.detail)}
@@ -67,6 +69,11 @@
   on:timeupdate={(event) => forward('timeupdate', event.detail)}
   on:ended={(event) => forward('ended', event.detail)}
 >
+  {#if worksheetProps}
+    {#key `${worksheetProps.tdfId}:${worksheetProps.levelUnit}:${worksheetProps.checkpointIndex}`}
+      <SparcWorksheetSurface {...worksheetProps} on:complete={() => forward('worksheetcomplete')} />
+    {/key}
+  {:else}
   <ActiveFlashcardControllerSlot
     bind:fadeElement={trialContentFadeElement}
     contentProps={flashcardControllerProps}
