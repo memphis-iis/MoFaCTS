@@ -1,0 +1,78 @@
+<template name="prolific">
+  <div class="container py-3">
+    <p>{{t 'prolific.help'}} <a href="https://researcher.prolific.com" target="_blank" rel="noopener noreferrer">Prolific ↗</a></p>
+    {{#if error}}<p class="alert alert-danger" role="alert">{{t 'prolific.error'}}</p>{{/if}}
+    {{#if busy}}<p role="status">{{t 'common.loading'}}</p>{{/if}}
+    <fieldset disabled="{{busy}}">
+      <form id="prolific-connect" class="card card-body mb-3">
+        <label for="prolific-token">{{t 'prolific.token'}}</label>
+        <input id="prolific-token" type="password" autocomplete="off" maxlength="512" class="form-control" required>
+        <button class="btn btn-primary mt-2" type="submit">{{t 'prolific.connection'}}</button>
+        <button class="btn btn-secondary mt-2" type="button" data-action="workspaces">{{t 'prolific.refresh'}}</button>
+      </form>
+      <div class="card card-body mb-3">
+        <label for="prolific-workspace">{{t 'prolific.workspace'}}</label>
+        <select id="prolific-workspace" class="form-control"><option value="">—</option>{{#each workspaces}}<option value="{{id}}">{{name}}</option>{{/each}}</select>
+        <label for="prolific-project">{{t 'prolific.project'}}</label>
+        <select id="prolific-project" class="form-control"><option value="">—</option>{{#each projects}}<option value="{{id}}">{{name}}</option>{{/each}}</select>
+        <label for="prolific-study">{{t 'prolific.study'}}</label>
+        <select id="prolific-study" class="form-control"><option value="">—</option>{{#each studies}}<option value="{{id}}">{{name}} · {{status}}</option>{{/each}}</select>
+        {{#if moreStudies}}<button type="button" class="btn btn-secondary" data-action="studies-next">{{t 'common.next'}}</button>{{/if}}
+        <label for="prolific-lesson">{{t 'prolific.lesson'}}</label>
+        <select id="prolific-lesson" class="form-control"><option value="">—</option>{{#each lessons}}<option value="{{id}}">{{name}} · {{target}}</option>{{/each}}</select>
+        {{#if moreLessons}}<button type="button" class="btn btn-secondary" data-action="lessons-next">{{t 'common.next'}}</button>{{/if}}
+        <label for="prolific-reminder">{{t 'prolific.reminder'}}</label>
+        <textarea id="prolific-reminder" class="form-control" maxlength="4500" rows="3"></textarea>
+        <button type="button" class="btn btn-primary mt-2" data-action="bind">{{t 'prolific.link'}}</button>
+        <button type="button" class="btn btn-secondary mt-2" data-action="dashboard">{{t 'prolific.refresh'}}</button>
+      </div>
+      {{#if dashboard}}
+      <h2>{{dashboard.name}} · {{dashboard.currency}}</h2>
+      <div class="table-responsive"><table class="table"><thead><tr>
+        <th>{{t 'prolific.participant'}}</th><th>{{t 'prolific.submission'}}</th><th>{{t 'prolific.sessions'}}</th><th>{{t 'prolific.status'}}</th><th>{{t 'prolific.amount'}} ({{dashboard.currency}})</th><th>{{t 'prolific.message'}}</th>
+      </tr></thead><tbody>{{#each dashboard.results}}<tr>
+        <td><label><input type="checkbox" class="prolific-select" value="{{submissionId}}"> {{participantId}}</label></td>
+        <td>{{submissionId}}</td><td>{{sessions}}{{#if firstSessionCompletedAt}}<br>{{t 'prolific.firstSessionCompleted'}}: {{firstSessionCompletedAt}}{{/if}}{{#if completedAt}}<br>{{t 'prolific.experimentCompleted'}}: {{completedAt}}{{/if}}</td><td>{{status}} · {{payment}}<br>{{#each bonuses}}<span class="d-block">{{displayAmount this}} {{currency}}</span>{{/each}}</td>
+        <td><input type="text" inputmode="decimal" class="form-control prolific-amount" data-submission="{{submissionId}}" aria-label="{{t 'prolific.amount'}} {{participantId}}"></td>
+        <td><button type="button" class="btn btn-secondary" data-action="messages" data-submission="{{submissionId}}">{{t 'prolific.read'}}</button></td>
+      </tr>{{/each}}</tbody></table></div>
+      {{#if dashboard.hasMore}}<button type="button" class="btn btn-secondary" data-action="participants-next">{{t 'common.next'}}</button>{{/if}}
+      <button type="button" class="btn btn-secondary" data-action="approve">{{t 'prolific.approve'}}</button>
+      <button type="button" class="btn btn-secondary" data-action="bonus">{{t 'prolific.bonus'}}</button>
+      <label for="prolific-message" class="d-block mt-3">{{t 'prolific.message'}}</label>
+      <textarea id="prolific-message" rows="3" maxlength="5000" class="form-control"></textarea>
+      <button type="button" class="btn btn-secondary" data-action="message">{{t 'prolific.preview'}}</button>
+      {{#each messages}}<div class="card card-body"><p>{{#if fromResearcher}}{{t 'prolific.researcher'}}{{else}}{{participantId}}{{/if}} · <time>{{sentAt}}</time></p>{{#if unassignedStudy}}<p>{{t 'prolific.noStudy'}}</p>{{/if}}<p class="text-break" style="white-space: pre-wrap">{{body}}</p></div>{{/each}}
+      {{/if}}
+      {{#if preview}}
+      <section class="card card-body my-3" aria-live="polite">
+        <h2>{{t 'prolific.preview'}} · {{operationKind preview.kind}}</h2>
+        <p>{{preview.currency}}</p>
+        {{#each preview.rows}}<p>{{participantId}} · {{submissionId}} · {{displayAmount cents}}</p>{{/each}}
+        <p style="white-space: pre-wrap">{{previewBody}}</p>
+        {{#if preview.quote}}
+        <p>{{t 'prolific.subtotal'}}: {{displayAmount preview.quote.amount}} {{preview.currency}}</p>
+        <p>{{t 'prolific.fees'}}: {{displayAmount preview.quote.fees}} {{preview.currency}}</p>
+        <p>{{t 'prolific.tax'}}: {{displayAmount preview.quote.vat}} {{preview.currency}}</p>
+        <p>{{t 'prolific.quote'}}: {{displayAmount preview.quote.total}} {{preview.currency}}</p>
+        {{/if}}
+        <p>{{operationStatus preview.status}}</p>
+        {{#if prepared}}<button type="button" class="btn btn-primary" data-action="confirm">{{t 'prolific.confirm'}}</button>{{/if}}
+      </section>
+      {{/if}}
+      {{#if dashboard}}
+      <h2>{{t 'prolific.operations'}}</h2>
+      <label for="prolific-review">{{t 'prolific.reviewNote'}}</label>
+      <textarea id="prolific-review" class="form-control" maxlength="1000"></textarea>
+      {{#each dashboard.operations}}<p>{{createdAt}} · {{operationKind kind}} · {{operationStatus status}} · {{id}}
+        {{#each outcomes}}<span class="d-block">{{submissionId}} · {{operationStatus status}}</span>{{/each}}
+        {{#if canReview status}}<button type="button" class="btn btn-secondary" data-action="review" data-operation="{{id}}">{{t 'prolific.review'}}</button>{{/if}}
+      </p>{{/each}}
+      <h2>{{t 'prolific.reminders'}}</h2>
+      {{#each dashboard.reminders}}<p>{{dueAt}} · {{operationStatus status}} · {{participationId}}
+        {{#if canRetry status}}<button type="button" class="btn btn-secondary" data-action="retry-reminder" data-reminder="{{_id}}">{{t 'prolific.retryReminder'}}</button>{{/if}}
+      </p>{{/each}}
+      {{/if}}
+    </fieldset>
+  </div>
+</template>

@@ -1,3 +1,5 @@
+import { finalizeProlificSession, showParticipationSaveError } from '../../../../lib/prolificParticipation';
+import { prolificCompletionUrl } from '../../../../../common/prolific';
 /**
  * Navigation Cleanup Service
  * Performs comprehensive cleanup before navigating away from card screen
@@ -31,7 +33,12 @@ function stopCardAudioNow(): void {
 /**
  * Perform comprehensive cleanup and navigate to destination.
  */
-export async function leavePage(dest: NavigationDestination): Promise<void> {
+export async function leavePage(dest: NavigationDestination, externalProlific = false): Promise<void> {
+  if (externalProlific) prolificCompletionUrl(dest);
+  if (dest === '/home' && !externalProlific) {
+    try { if (await finalizeProlificSession()) return; }
+    catch { showParticipationSaveError(async () => { if (!await finalizeProlificSession()) await leavePage(dest); }); return; }
+  }
   // Prevent duplicate navigation
   if (isNavigatingAway) {
     return;
@@ -50,7 +57,7 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
     if (
       dest !== '/content'
       && dest !== '/instructions'
-      && !isLessonRoutePath(document.location.pathname, '/instructions')
+      && (externalProlific || !isLessonRoutePath(document.location.pathname, '/instructions'))
     ) {
       // Clear experiment state
       ExperimentStateStore.clear();
@@ -69,7 +76,8 @@ export async function leavePage(dest: NavigationDestination): Promise<void> {
     clientConsole(1, '[Navigation] Cleanup error (continuing navigation):', error);
   } finally {
     // Navigate regardless of cleanup success
-    FlowRouter.go(
+    if (externalProlific) window.location.assign(dest);
+    else FlowRouter.go(
       lessonDestination?.path || dest,
       {},
       lessonDestination?.queryParams || {},

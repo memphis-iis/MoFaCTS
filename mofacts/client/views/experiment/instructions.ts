@@ -1,3 +1,4 @@
+import { checkpointProlificLockout, finalizeProlificSession, showParticipationSaveError, isProlificAccount, participationSaveFailed } from '../../lib/prolificParticipation';
 import {currentUserHasRole} from '../../lib/roleUtils';
 import { SavedAdaptiveUnitSequenceError } from '../../../common/adaptiveUnitSequence';
 import {secsIntervalString} from '../../../common/globalHelpers';
@@ -148,7 +149,12 @@ function getCurrentLockoutScopeKey() {
   return `${String(Session.get('currentTdfId') || '')}:${String(Session.get('currentUnitNumber') || '')}`;
 }
 
-function leavePage(dest: any) {
+async function leavePage(dest: any) {
+  if (dest === '/home' && isProlificAccount()) {
+    const navigation = await import('./svelte/services/navigationCleanup');
+    await navigation.leavePage(dest);
+    return;
+  }
   clearLockoutInterval();
   displayTimeStart = null;
   if (typeof dest === 'function') {
@@ -289,7 +295,7 @@ async function lockoutKick() {
     !lockoutInterval
   ) {
     $('#continueButton').prop('disabled', true);
-    try {
+    const persistLockout = async () => {
       const requestedLockoutTimeStamp = Date.now();
       const persistedLockout = await meteorCallAsync(
         'setLockoutTimeStamp',
@@ -301,18 +307,21 @@ async function lockoutKick() {
       const persistedLockoutTimeStamp = Number(persistedLockout?.lockoutTimeStamp);
       const persistedLockoutMinutes = Number(persistedLockout?.lockoutMinutes);
       if (!Number.isFinite(persistedLockoutTimeStamp) || !Number.isFinite(persistedLockoutMinutes)) {
-        clientConsole(1, 'Invalid persisted lockout payload from server', persistedLockout);
-        return;
+        throw new Error('Invalid persisted lockout payload from server');
       }
       const initialLockoutEndTime = persistedLockoutTimeStamp + persistedLockoutMinutes * 60 * 1000;
+      if (await finalizeProlificSession()) return;
       startLockoutInterval(initialLockoutEndTime);
-    } catch (error) {
-      clientConsole(1, 'Failed to persist lockout timestamp on server', error);
+    };
+    try { await persistLockout(); } catch (error) {
+      if (isProlificAccount()) showParticipationSaveError(persistLockout);
+      else clientConsole(1, 'Failed to persist lockout timestamp on server', error);
     }
     return
   }
   logLockout(lockoutminutes);
   const hasExistingLockout = checkForExistingLockout();
+  if (hasExistingLockout && await checkpointProlificLockout()) return;
   const doDisplay = (display.minSecs > 0 || display.maxSecs > 0);
   const doLockout = (!lockoutInterval && currLockOut() > 0);
   // No lockout and no display timeout: enable Continue immediately.
@@ -474,6 +483,7 @@ function getUnitsRemaining() {
 // must only reference visible from anywhere on the client AND we take great
 // pains to not modify anything reactive until this function has returned
 async function instructContinue() {
+  if (participationSaveFailed()) return;
   if (!isLaunchLoadingActive()) {
     startLaunchLoading(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'), 'instructions');
   }
@@ -508,27 +518,35 @@ async function instructContinue() {
     });
     const navigationTarget = continuePolicy.navigationTarget;
 
-    if (continuePolicy.sessionPatch) {
-      Session.set('currentUnitNumber', continuePolicy.sessionPatch.currentUnitNumber);
-      Session.set('currentTdfUnit', unitList[continuePolicy.sessionPatch.currentTdfUnitIndex]);
-      Session.set('curUnitInstructionsSeen', continuePolicy.sessionPatch.curUnitInstructionsSeen);
-    }
-    if (continuePolicy.experimentStatePatch) {
-      await createExperimentState(continuePolicy.experimentStatePatch as any);
-    }
+    const persistAndNavigate = async () => {
+      if (continuePolicy.experimentStatePatch) {
+        await createExperimentState(continuePolicy.experimentStatePatch as any);
+      }
+      if (continuePolicy.sessionPatch) {
+        Session.set('currentUnitNumber', continuePolicy.sessionPatch.currentUnitNumber);
+        Session.set('currentTdfUnit', unitList[continuePolicy.sessionPatch.currentTdfUnitIndex]);
+        Session.set('curUnitInstructionsSeen', continuePolicy.sessionPatch.curUnitInstructionsSeen);
+      }
 
-    if (navigationTarget === '/content') {
-      setCardEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE, {
-        source: 'instructions.instructContinue',
-      });
-    } else {
-      finishLaunchLoading('instructions-complete-dashboard');
+
+      if (navigationTarget === '/content') {
+        setCardEntryIntent(CARD_ENTRY_INTENT.INSTRUCTION_CONTINUE, {
+          source: 'instructions.instructContinue',
+        });
+      } else {
+        finishLaunchLoading('instructions-complete-dashboard');
+      }
+      Session.set('fromInstructions', true);
+      setEnterKeyLock(false);
+      clientConsole(2, 'releasing enterKeyLock in instructContinue');
+      markLaunchLoadingTiming('instructionContinue:route', { navigationTarget });
+      await leavePage(navigationTarget);
+    };
+    try { await persistAndNavigate(); } catch (error) {
+      if (!isProlificAccount()) throw error;
+      finishLaunchLoading('prolific-instruction-save-failed');
+      showParticipationSaveError(persistAndNavigate);
     }
-    Session.set('fromInstructions', true);
-    setEnterKeyLock(false);
-    clientConsole(2, 'releasing enterKeyLock in instructContinue');
-    markLaunchLoadingTiming('instructionContinue:route', { navigationTarget });
-    leavePage(navigationTarget);
   } catch (error) {
     finishLaunchLoading('instruction-continue-failed');
     throw error;
@@ -921,6 +939,7 @@ async function recordCurrentInstructionContinue(trialStartTimeStamp: any = timeR
 }
 
 async function handleInstructionContinueAction(forceBypassLockout = false) {
+  if (participationSaveFailed()) return;
   if (forceBypassLockout) {
     // Prevent stale lockout config from bleeding into the next unit after manual bypass.
     Session.set('currentDeliverySettings', null);
@@ -950,11 +969,15 @@ async function handleInstructionContinueAction(forceBypassLockout = false) {
 
   startLaunchLoading(translatePlatformString(getActiveUiLocale(), 'common.loadingContent'), 'instructions');
   markLaunchLoadingTiming('instructionContinue:pressed', { forceBypassLockout });
-  try {
+  const recordAndContinue = async () => {
     await recordCurrentInstructionContinue(timeRendered);
     await instructContinue();
+  };
+  try {
+    await recordAndContinue();
   } catch (error) {
     finishLaunchLoading('instruction-continue-action-failed');
+    if (isProlificAccount()) { showParticipationSaveError(recordAndContinue); return; }
     clientConsole(1, '[Instructions] Continue action failed', error);
     Session.set('uiMessage', {
       variant: 'danger',

@@ -61,7 +61,7 @@ describe('ignored TDF metadata', () => {
     const units = [...values, { h5p: {}, adaptiveLogic: 17 }].map((value, index) => ({
       unitinstructions: `unit ${index}`, ...Object.fromEntries(fields.map(key => [key, value])),
     }));
-    const original = { setspec: { lessonname: 'Synthetic', stimulusfile: 'synthetic.json', unitTemplate: units }, unit: units };
+    const original = { setspec: { lessonname: 'Synthetic', stimulusfile: 'synthetic.json', prolificCompletionUrl: 'https://app.prolific.com/submissions/complete?cc=ABC123', unitTemplate: units }, unit: units };
     const initial = removeEmptyEditorProperties(original, tutorSchema);
     assert.deepEqual(initial, original);
     const container = dom.window.document.getElementById('editor');
@@ -73,6 +73,9 @@ describe('ignored TDF metadata', () => {
       await new Promise(resolve => editor.on('ready', resolve));
       assert.deepEqual(JSON.parse(JSON.stringify(editor.getValue())), original);
       assert.equal(editor.validate().length, 0);
+      const completionControl = editor.getEditor('root.setspec.prolificCompletionUrl');
+      assert.ok(completionControl.container.querySelector('input'));
+      assert.equal(completionControl.getValue(), original.setspec.prolificCompletionUrl);
       for (const scope of ['root.unit', 'root.setspec.unitTemplate']) {
         for (let index = 0; index < values.length; index++) {
           for (const key of fields) {

@@ -505,9 +505,26 @@ async function logoutCurrentUserForExperimentRoute() {
   });
 }
 
+FlowRouter.route('/prolific/resume', {
+  name: 'client.prolificResume',
+  action: async function() {
+    const token = window.location.hash.slice(1);
+    window.history.replaceState(null, '', '/prolific/resume');
+    try {
+      const result = await meteorCallAsync('resumeProlificParticipation', token) as any;
+      Session.set('prolificResumeEntry', result);
+      FlowRouter.go(`/experiment/${result.experimentTarget}/${result.experimentXCond || ''}`);
+    } catch {
+      Session.set('prolificEntryError', true);
+      renderLayout(this, 'signIn');
+    }
+  },
+});
+
 FlowRouter.route('/experiment/:target?/:xcond?', {
   name: 'client.experiment',
   action: async function(params: any) {
+    Session.set('prolificEntryError', false);
     const target = params.target || '';
     const xcond = params.xcond || '';
 
@@ -530,9 +547,27 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
     Cookie.set('experimentTarget', target, 21);
     Cookie.set('experimentXCond', xcond, 21);
 
-    let tdf = Tdfs.findOne({"content.tdfs.tutor.setspec.experimentTarget": target});
-
-    if(!tdf) tdf = await meteorCallAsync('getTdfByExperimentTarget', target);
+    // Listing publications omit entry settings. Always resolve the server-owned
+    // public entry document instead of treating a cached listing as configuration.
+    const query = new URLSearchParams(window.location.search);
+    const prolificEntry = ['PROLIFIC_PID', 'STUDY_ID', 'SESSION_ID'].some(key => query.has(key))
+      || Boolean(Session.get('prolificResumeEntry'));
+    let tdf: any;
+    try { tdf = await meteorCallAsync('getTdfByExperimentTarget', target); }
+    catch (error) {
+      if (!prolificEntry) throw error;
+    }
+    if (!tdf && prolificEntry) {
+      Session.set('prolificEntryError', true);
+      Session.set('prolificResumeEntry', null);
+      Session.set('prolificCompletionUrl', undefined);
+      Session.set('experimentPasswordRequired', false);
+      Session.set('loginPrompt', translatePlatformString(getActiveUiLocale(), 'auth.participationId'));
+      clearAppLoadingUnlessLaunch();
+      await logoutCurrentUserForExperimentRoute();
+      renderLayout(this, 'signIn');
+      return;
+    }
 
     if (tdf) {
 
@@ -544,6 +579,7 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
       const experimentPasswordRequired =
         tdf.content.tdfs.tutor.setspec.experimentPasswordRequired === 'true' ||
         tdf.content.tdfs.tutor.setspec.experimentPasswordRequired === true;
+      Session.set('prolificCompletionUrl', tdf.content.tdfs.tutor.setspec.prolificCompletionUrl);
       Session.set('experimentPasswordRequired', experimentPasswordRequired);
       Session.set('loginPrompt',tdf.content.tdfs.tutor.deliverySettings?.experimentLoginText || translatePlatformString(getActiveUiLocale(), 'auth.participationId'));
       clientConsole(2, 'experimentPasswordRequired:', experimentPasswordRequired);

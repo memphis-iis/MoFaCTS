@@ -72,6 +72,9 @@
           </div>
         {{/if}}
 
+        {{#if isInRole 'admin,teacher'}}
+          <button type="button" class="nav-item {{sidebarActiveClass 'prolific'}}" id="prolificButton"><span>{{t 'home.prolific'}}</span></button>
+        {{/if}}
         {{#if isInRole 'admin'}}
           <div class="section">
             <div class="section-title">{{t 'home.admin'}}</div>
@@ -210,6 +213,9 @@
       <button type="button" data-practice-menu-action="courses"><span class="fa fa-list-alt" aria-hidden="true"></span> {{t 'home.courses'}}</button>
       <button type="button" data-practice-menu-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> {{t 'home.content'}}</button>
       <button type="button" data-practice-menu-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> {{t 'home.detailedData'}}</button>
+      {{#if isInRole 'admin,teacher'}}
+        <button type="button" data-practice-menu-action="prolific">{{t 'home.prolific'}}</button>
+      {{/if}}
       {{#if isInRole 'teacher'}}
         <button type="button" data-practice-menu-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> {{t 'home.courses'}}</button>
         <button type="button" data-practice-menu-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> {{t 'home.grades'}}</button>

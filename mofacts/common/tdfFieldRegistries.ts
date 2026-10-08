@@ -1,3 +1,4 @@
+import { PROLIFIC_COMPLETION_URL } from './prolific.ts';
 import {
   enumStringField,
   GOOGLE_STT_LANGUAGE_CODES,
@@ -64,6 +65,10 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Short internal lesson name.',
     verbose: 'Short internal identifier used for tracking or exports.'
   }),
+  prolificCompletionUrl: simpleField({ ...stringField(undefined, 12), pattern: PROLIFIC_COMPLETION_URL.source }, {
+    brief: 'Prolific completion URL.',
+    verbose: 'Official https://app.prolific.com/submissions/complete?cc=CODE URL. Prolific participants return here after their first saved session; ordinary participants keep normal navigation.'
+  }, { surfaces: { learnerConfig: false } }),
   experimentTarget: simpleField(stringField('', 6), {
     brief: 'Direct experiment URL target.',
     verbose: 'Path segment used for no-login experiment links.'

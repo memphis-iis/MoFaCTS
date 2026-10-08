@@ -30,6 +30,7 @@ interface ExperimentStateServiceEvent {
 type MeteorUserProfileLike = {
   profile?: {
     experimentTarget?: string;
+    createdBy?: string;
   };
 };
 
@@ -96,6 +97,18 @@ function mergeExperimentState(
     if (normalizedTarget) {
       filteredState.experimentTarget = normalizedTarget;
     }
+  }
+
+  // Preserve an explicit URL condition in the existing experiment-state field for return links.
+  // Randomized delivery retains its current assignment owner.
+  const profile = (Meteor.user() as MeteorUserProfileLike | null)?.profile;
+  const urlCondition = Session.get('experimentXCond');
+  const randomizedDelivery = Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.randomizedDelivery;
+  if (profile?.createdBy === 'startProlificParticipation' && filteredState.experimentXCond == null
+    && urlCondition !== '' && urlCondition != null && !randomizedDelivery?.length) {
+    const condition = Number(urlCondition);
+    if (!Number.isSafeInteger(condition) || condition < 0) throw new Error('Invalid experiment delivery condition');
+    filteredState.experimentXCond = condition;
   }
 
   filteredState.courseAssignmentLaunchContext = courseAssignmentContextForStateWrite({

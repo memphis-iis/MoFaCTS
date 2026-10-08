@@ -1,3 +1,4 @@
+import './views/shared/prolificSaveError';
 import {ENTER_KEY} from '../common/Definitions';
 import '../common/Collections';
 import '../common/globalHelpers';

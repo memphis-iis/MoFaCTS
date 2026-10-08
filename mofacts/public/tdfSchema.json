@@ -90,6 +90,15 @@
                 "grid_columns": 6
               }
             },
+            "prolificCompletionUrl": {
+              "title": "Prolific completion URL.",
+              "description": "Official https://app.prolific.com/submissions/complete?cc=CODE URL. Prolific participants return here after their first saved session; ordinary participants keep normal navigation.",
+              "type": "string",
+              "options": {
+                "grid_columns": 12
+              },
+              "pattern": "^https:\\/\\/app\\.prolific\\.com\\/submissions\\/complete\\?cc=[A-Za-z0-9]+(?![\\s\\S])"
+            },
             "experimentTarget": {
               "title": "Direct experiment URL target.",
               "description": "Path segment used for no-login experiment links.",

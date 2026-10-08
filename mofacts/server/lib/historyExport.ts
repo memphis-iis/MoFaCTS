@@ -3,7 +3,8 @@ import { getHistory } from '../orm';
 import { legacyTrim } from '../../common/underscoreCompat';
 import { isAssessmentHistoryCopy } from '../../common/historyEnvelope';
 
-const FIELDSDS: string[] = [...outputFields];
+const PROLIFIC_COLUMNS = ['Prolific Participant ID', 'Prolific Study ID', 'Prolific Submission ID'];
+const FIELDSDS: string[] = [...outputFields, ...PROLIFIC_COLUMNS];
 
 // Helper to transform our output record into a delimited record
 // Need to adhere to these data limittions: https://datashop.memphis.edu/help?page=importFormatTd
@@ -39,6 +40,7 @@ export async function writeHistoryExport(
   histories: Iterable<any> | AsyncIterable<any>,
   writeRecord: (chunk: string) => void | Promise<void>,
   onRecordError: (error: unknown) => void,
+  loadParticipationIdentities?: (userIds: string[]) => Promise<Array<{ userId: string; participantId: string; studyId: string; submissionId: string }>>,
 ) {
   const header: Record<string, string> = {};
   const listOfDynamicStimTags: any[] = [];
@@ -60,13 +62,27 @@ export async function writeHistoryExport(
 
   await writeRecord(await delimitedRecord(header, listOfDynamicStimTags, true));
 
-  for await (let history of histories) {
-      if (isAssessmentHistoryCopy(history)) continue;
+  let batch: any[] = [];
+  async function flush() {
+    const userIds = [...new Set(batch.map(h => h.userId).filter(id => typeof id === 'string'))] as string[];
+    const identities = new Map((loadParticipationIdentities ? await loadParticipationIdentities(userIds) : []).map(p => [p.userId, p]));
+    for (const raw of batch) {
+      if (isAssessmentHistoryCopy(raw)) continue;
       try {
-        history = getHistory(history);
-        await writeRecord(await delimitedRecord(history, listOfDynamicStimTags, false));
-      } catch (e: any) {
-        onRecordError(e);
-      }
+        const history = getHistory(raw);
+        const p = identities.get(raw.userId);
+        await writeRecord(await delimitedRecord({ ...history,
+          [PROLIFIC_COLUMNS[0]!]: p?.participantId || '',
+          [PROLIFIC_COLUMNS[1]!]: p?.studyId || '',
+          [PROLIFIC_COLUMNS[2]!]: p?.submissionId || '',
+        }, listOfDynamicStimTags, false));
+      } catch (error) { onRecordError(error); }
+    }
+    batch = [];
   }
+  for await (const history of histories) {
+    batch.push(history);
+    if (batch.length === 100) await flush();
+  }
+  if (batch.length) await flush();
 }

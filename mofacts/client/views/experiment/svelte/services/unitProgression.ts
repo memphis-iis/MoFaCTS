@@ -1,3 +1,4 @@
+import { showParticipationSaveError, isProlificAccount, participationSaveFailed } from '../../../../lib/prolificParticipation';
 /**
  * Unit Progression Service
  *
@@ -122,6 +123,7 @@ function getConditionIndexOrThrow(conditions: string[], conditionFileName: unkno
 }
 
 export async function unitIsFinished(_reason: string): Promise<void> {
+  if (participationSaveFailed()) return;
   assertIdInvariants('unitProgression.unitIsFinished.start', { requireCurrentTdfId: true, requireStimuliSetId: false });
   const curTdf = Session.get('currentTdfFile') as TdfFileState | null;
   if (!curTdf) {
@@ -259,10 +261,16 @@ export async function unitIsFinished(_reason: string): Promise<void> {
     }
   }
 
-  await createExperimentState(newExperimentState);
-  const { leavePage } = await import('./navigationCleanup');
-  await leavePage(leaveTarget);
-  if (leaveTarget === '/content') restartContentSurface();
+  const saveAndLeave = async () => {
+    await createExperimentState(newExperimentState);
+    const { leavePage } = await import('./navigationCleanup');
+    await leavePage(leaveTarget);
+    if (leaveTarget === '/content') restartContentSurface();
+  };
+  try { await saveAndLeave(); } catch (error) {
+    if (!isProlificAccount()) throw error;
+    showParticipationSaveError(saveAndLeave);
+  }
 }
 
 export async function checkUnitCompletion(engine: UnitCompletionEngine | null | undefined): Promise<boolean> {

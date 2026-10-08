@@ -1,3 +1,4 @@
+import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './lib/prolificCollections';
 import "../common/Collections";
 import { Meteor } from 'meteor/meteor';
 import { Roles } from 'meteor/alanning:roles';
@@ -45,6 +46,11 @@ function requireRemovableCollection(collection: unknown, name: string): Removabl
 
 async function clearServerCompositionCollections() {
   const collections: Array<[string, unknown]> = [
+    ['ProlificConnections', ProlificConnections],
+    ['ProlificStudies', ProlificStudies],
+    ['ProlificParticipations', ProlificParticipations],
+    ['ProlificOperations', ProlificOperations],
+    ['ProlificReminders', ProlificReminders],
     ['AuditLog', AuditLogAny],
     ['Assignments', AssignmentsAny],
     ['AuthThrottleState', AuthThrottleStateAny],
@@ -998,6 +1004,7 @@ describe('public TDF and stimulus method authorization', function() {
               lessonname: 'Experiment Root',
               experimentTarget: 'study-a',
               experimentPasswordRequired: false,
+              prolificCompletionUrl: 'https://app.prolific.com/submissions/complete?cc=ABC123',
               srfilterclose: 'false',
               speechAPIKey: 'encrypted-speech-key',
               textToSpeechAPIKey: 'encrypted-tts-key',
@@ -1033,6 +1040,7 @@ describe('public TDF and stimulus method authorization', function() {
     expect(entry.content.tdfs.tutor.setspec.speechAPIKey).to.equal(undefined);
     expect(entry.content.tdfs.tutor.setspec.textToSpeechAPIKey).to.equal(undefined);
     expect(entry.content.tdfs.tutor.setspec.srfilterclose).to.equal('false');
+    expect(entry.content.tdfs.tutor.setspec.prolificCompletionUrl).to.equal('https://app.prolific.com/submissions/complete?cc=ABC123');
     expect(entry.content.tdfs.tutor.deliverySettings).to.deep.equal({
       experimentLoginText: 'Participant ID',
     });
@@ -2462,5 +2470,59 @@ describe('content helper authorization', function() {
   it('does not expose retired raw content save or fingerprint confirmation methods', function() {
     expect(asyncMethods).not.to.have.property('saveContentFile');
     expect(asyncMethods).not.to.have.property('tdfUpdateConfirmed');
+  });
+});
+
+
+describe('Prolific composed account and completion methods', function() {
+  beforeEach(async function() { await clearServerCompositionCollections(); });
+  it('issues resume tokens for one immutable participation and denies ordinary provisioning of its account', async function() {
+    const studyId = 'b'.repeat(24), participantId = 'a'.repeat(24), submissionId = 'c'.repeat(24);
+    const url = 'https://app.prolific.com/submissions/complete?cc=ABC123';
+    await TdfsAny.insertAsync({ _id: 'prolific-root', ownerId: 'researcher', tdfAvailability: 'available', content: { tdfs: { tutor: { setspec: { experimentTarget: studyId, prolificCompletionUrl: url }, unit: [{ deliverySettings: { lockoutminutes: 5 } }] } } } });
+    await ProlificStudies.insertAsync({ studyId, rootTdfId: 'prolific-root', ownerId: 'researcher', reminderText: 'Synthetic' });
+    const launch = { participantId, studyId, submissionId, experimentTarget: studyId };
+    const first = await methods.startProlificParticipation.call({}, launch);
+    const p = await ProlificParticipations.findOneAsync({ submissionId });
+    const account = await MeteorUsersAny.findOneAsync({ _id: p.userId });
+    expect(first.loginToken).to.be.a('string');
+    expect(account.services.resume.loginTokens.length).to.equal(1);
+    expect(account.profile).not.to.have.property('participantId');
+    expect(account).not.to.have.property('aws');
+    const second = await methods.startProlificParticipation.call({}, launch);
+    expect(second.loginToken).not.to.equal(first.loginToken);
+    expect(await ProlificParticipations.find({ submissionId }).countAsync()).to.equal(1);
+    try {
+      await methods.provisionExperimentUser.call({}, studyId, account.username);
+      expect.fail('Ordinary entry must not mint a Prolific token');
+    } catch (error: any) { expect(error.error).to.equal(403); }
+    await ProlificParticipations.updateAsync({ _id: p._id }, { $set: { userId: `pending:${p._id}` } });
+    try {
+      await methods.provisionExperimentUser.call({}, studyId, account.username);
+      expect.fail('An account awaiting participation binding must also reject ordinary entry');
+    } catch (error: any) { expect(error.error).to.equal(403); }
+    await ProlificParticipations.updateAsync({ _id: p._id }, { $set: { userId: p.userId } });
+    await GlobalExperimentStatesAny.insertAsync({ userId: p.userId, TDFId: 'prolific-root', experimentState: { currentUnitNumber: 0, lastUnitCompleted: -1 } });
+    const lockouts = await Promise.all(Array.from({ length: 4 }, () => methods.setLockoutTimeStamp.call({ userId: p.userId }, 0, 999, 0, 'prolific-root')));
+    expect(new Set(lockouts.map((lockout: any) => lockout.lockoutTimeStamp)).size).to.equal(1);
+    expect(lockouts[0].lockoutMinutes).to.equal(5);
+    expect(lockouts[0].lockoutTimeStamp).to.be.greaterThan(0);
+    expect((await methods.completeProlificParticipation.call({ userId: p.userId })).completionUrl).to.equal(undefined);
+    await GlobalExperimentStatesAny.updateAsync({ userId: p.userId, TDFId: 'prolific-root' }, { $set: { experimentState: { currentUnitNumber: 1, lastUnitCompleted: 0 } } });
+    const completed = await methods.completeProlificParticipation.call({ userId: p.userId });
+    expect(completed.completionUrl).to.equal(url);
+    expect(completed.completed).to.equal(true);
+    expect((await methods.completeProlificParticipation.call({ userId: p.userId }, true)).completionUrl).to.equal(url);
+  });
+  it('keeps ordinary manual and password-required experiments separate from completion configuration', async function() {
+    await TdfsAny.insertAsync({ _id: 'ordinary-root', ownerId: 'researcher', tdfAvailability: 'available', content: { tdfs: { tutor: { setspec: { experimentTarget: 'ordinary', prolificCompletionUrl: 'https://app.prolific.com/submissions/complete?cc=ABC123' }, unit: [{}] } } } });
+    const ordinary = await methods.provisionExperimentUser.call({}, 'ordinary', 'PR-ORDINARY');
+    expect(ordinary.loginToken).to.be.a('string');
+    expect(await methods.completeProlificParticipation.call({ userId: ordinary.userId })).to.deep.equal({ prolific: false });
+    await TdfsAny.updateAsync({ _id: 'ordinary-root' }, { $set: { 'content.tdfs.tutor.setspec.experimentPasswordRequired': true } });
+    try {
+      await methods.provisionExperimentUser.call({}, 'ordinary', 'ANOTHER-PARTICIPANT');
+      expect.fail('Password-required experiments must retain credentialed login');
+    } catch (error: any) { expect(error.error).to.equal('experiment-password-required'); }
   });
 });

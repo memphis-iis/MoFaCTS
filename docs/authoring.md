@@ -154,7 +154,7 @@ Meteor test environment and fresh authorization for each `npm run test:ci` invoc
 
 Mechanical Turk operations, credentials, bonuses, and reminders have been removed. Old `turkemail`, `turkemailsubject`, and `turkbonus` fields are ignored in units and unit templates: any JSON value is accepted silently, has no effect, and is preserved during editor saves. The editor exposes no controls or tooltips for them and supplies no defaults. Other unsupported fields still fail validation. Existing content files do not need changes.
 
-Experiment login defaults to the localized Participant ID label; an authored `experimentLoginText` still overrides it. Existing Prolific participant/study entry and completion navigation are unchanged. Run the field/editor and entry/Continue regressions from `mofacts/` with `node --test scripts/ignoredTdfFields.test.cjs`.
+Experiment login defaults to the localized Participant ID label; an authored `experimentLoginText` still overrides it. Ordinary experiment entry and completion navigation remain supported. Prolific participation and researcher controls are described below. Run the field/editor and entry/Continue regressions from `mofacts/` with `node --test scripts/ignoredTdfFields.test.cjs`.
 
 ## Where Detailed Examples Belong
 
@@ -174,3 +174,31 @@ loading; the worksheet does not update the live adaptive model. Video checkpoint
 select these same pages with `checkpointBehavior: "worksheet"` and aligned `pageIds`.
 See [worksheet authoring and history](worksheets.md) for fields, timing, resume,
 feedback exposure, bounds and verification.
+
+## Prolific participation and researcher controls
+
+Create the initial study on Prolific, then use its study ID as `setspec.experimentTarget`. Set the optional root `setspec.prolificCompletionUrl` to the exact official URL, for example `https://app.prolific.com/submissions/complete?cc=ABC123`. Only HTTPS on `app.prolific.com`, the `/submissions/complete` path, and one nonempty alphanumeric `cc` value are accepted. Credentials, ports, fragments, and other query parameters are rejected. There is no default.
+
+Use all three Prolific placeholders in the study's external URL:
+
+```text
+https://your-mofacts-host/experiment/<STUDY_ID>?PROLIFIC_PID={{%PROLIFIC_PID%}}&STUDY_ID={{%STUDY_ID%}}&SESSION_ID={{%SESSION_ID%}}
+```
+
+Replace `<STUDY_ID>` with the study ID; leave the three placeholders for Prolific to populate. Participant, study, and submission identity are recorded together in a private participation collection. Reopening the same triple resumes its account and condition/progress; conflicting bindings fail. A participant can join separate studies with independent progress. Entry validates local configuration and link syntax, not eligibility or Prolific submission ownership through the API. Treat these as bearer identity links, not independently verified identities.
+
+A teacher or administrator opens **Prolific** in the sidebar, connects their own API token, selects a workspace and project, selects the existing study and their own experiment, and enters the return-session reminder text before linking them. The token uses the existing server encryption mechanism and is never published. Reconnecting can rotate that account's token; linked studies cannot silently move to another researcher account. The existing encryption key must remain available. No study creation, publishing, rejection, local participant deletion, or longitudinal wave setup is provided here.
+
+The panel shows local session counts, first-session and whole-experiment completion times alongside fresh Prolific submission/payment status. It supports explicit individual or selected-group approvals, researcher-entered bonuses, and individual or selected-group messages. Bonus previews show the workspace currency, bonus subtotal, fees, tax, and total from Prolific's quote. An incomplete or inconsistent quote cannot be confirmed. Confirmation sends the prepared operation once; acceptance is not proof that payment settled. Unknown outcomes are marked `review-required` and prevent another conflicting operation. Check Prolific, then record an external review before deciding whether a new operation is appropriate. Repeated confirmation never repeats the original request. Review records are researcher assertions, not provider verification. Recent operations and reminders show at most 50 records; participant and study views are paged in groups of 20. Message reading shows the latest 100 returned messages for the selected study, including participant messages with no study specified (labeled explicitly). Prolific remains the complete external record.
+
+The initial paid submission returns to Prolific after the **first saved MoFaCTS session**: completed work followed by a positive lockout before the next unit, or the end of the entire assigned lesson. An initial lockout before any completed work does not count. Selected conditions and saved adaptive sequences are respected. Required history/progress writes and participation finalization precede cleanup/navigation. Failed writes/finalization retain the learner context and provide an inline retry.
+
+Later sessions remain in MoFaCTS and are compensated through researcher-entered bonuses. At each saved lockout boundary MoFaCTS queues one Prolific message, due when the lockout expires, with a private return link. The server processes bounded batches every minute. Return links resume the same account, preserve the countdown, and stop working once the whole experiment finishes. Completed or superseded sessions cancel queued reminders. Definitively failed reminders can be retried explicitly; uncertain sends are not automatically repeated. Prolific controls whether its messages also produce email notifications. There is no separate email sender or arbitrary reminder schedule.
+
+A launch without any Prolific identity parameter uses ordinary experiment mode, even with the completion URL configured. Manual participant IDs, password-protected experiments, and authored prompts remain available. A launch containing any Prolific identity parameter must contain all three exactly once and match a linked, passwordless study; invalid launches display an error without switching to manual login. Configuring the completion URL alone never redirects ordinary participants.
+
+Authorized history exports append `Prolific Participant ID`, `Prolific Study ID`, and `Prolific Submission ID` through joins of at most 100 history rows. Ordinary participants have blank values. Existing history rows and accounts are not migrated. Ignored Turk fields remain inert.
+
+MoFaCTS records local completion and requests the completion redirect. It does not itself verify eligibility, approval, or payment. Configure completion-code actions and initial remuneration on Prolific. See the official [study URL/completion-code contract](https://docs.prolific.com/api-reference/studies/the-study-object), [bonus setup](https://docs.prolific.com/api-reference/bonuses/create-bonus-payments), and [non-idempotent bonus payment endpoint](https://docs.prolific.com/api-reference/bonuses/pay-bonus-payments).
+
+Run `node --test scripts/prolific.test.cjs scripts/ignoredTdfFields.test.cjs` from `mofacts/` for synthetic transport/persistence contracts, entry, schema/editor, export, and completion-retry coverage. CI includes these checks. Real Mongo unique-index/claim coverage is in `server/lib/prolificPersistence.test.ts`; learner integration and Meteor account/method coverage require the supported Meteor test environment. Every `npm run test:ci` invocation needs fresh explicit authorization. No live payment, approval, or message is part of automated tests.

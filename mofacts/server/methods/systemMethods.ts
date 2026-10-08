@@ -19,6 +19,7 @@ type MethodContext = {
 };
 
 type SystemMethodsDeps = {
+  validateProlificLockout?: (userId: string, tdfId: string, unit: number) => Promise<number | null>;
   serverConsole: (...args: unknown[]) => void;
   usersCollection: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -120,7 +121,19 @@ export function createSystemMethods(deps: SystemMethodsDeps) {
       currentUnitNumber: number,
       TDFId: string
     ) {
-      deps.serverConsole('setLockoutTimeStamp', lockoutTimeStamp, lockoutMinutes, currentUnitNumber, TDFId);
+      const actingUserId = requireAuthenticatedUser(this.userId);
+      const prolificMinutes = await deps.validateProlificLockout?.(actingUserId, TDFId, currentUnitNumber);
+      if (prolificMinutes !== null && prolificMinutes !== undefined) {
+        const path = `lockouts.${TDFId}`;
+        // One persisted start per unit, including concurrent tabs/server replicas.
+        await deps.usersCollection.updateAsync({ _id: actingUserId, [`${path}.currentLockoutUnit`]: { $ne: currentUnitNumber } }, {
+          $set: { [path]: { lockoutMinutes: prolificMinutes, lockoutTimeStamp: Date.now(), currentLockoutUnit: currentUnitNumber } },
+        });
+        const user = await deps.usersCollection.findOneAsync({ _id: actingUserId }, { fields: { [path]: 1 } });
+        const saved = user?.lockouts?.[TDFId];
+        if (saved?.currentLockoutUnit !== currentUnitNumber || !Number.isFinite(saved.lockoutTimeStamp) || !Number.isFinite(saved.lockoutMinutes)) throw new Meteor.Error('prolific.failed', 'prolific.failed');
+        return saved;
+      }
       const currentUser = await deps.getCurrentUser();
       let lockouts = currentUser?.lockouts;
       if (!lockouts) lockouts = {};

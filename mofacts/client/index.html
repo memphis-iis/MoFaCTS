@@ -60,6 +60,7 @@
 </template>
 
 <template name="DefaultLayout">
+  {{> prolificSaveError}}
   <div class="theme-bootstrap {{themeBootstrapClass}}">
   <!-- Global Loading Spinner - Persists across route transitions for elegant UX -->
   {{#if appLoading}}

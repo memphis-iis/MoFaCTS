@@ -51,6 +51,9 @@ jobs:
       - name: Typecheck vendor declarations (blocking)
         run: npm run typecheck:vendor
 
+      - name: Prolific and ignored-field contracts
+        run: node --test scripts/prolific.test.cjs scripts/ignoredTdfFields.test.cjs
+
       - name: Install CI browser
         run: ./node_modules/.bin/playwright install --with-deps chromium
 

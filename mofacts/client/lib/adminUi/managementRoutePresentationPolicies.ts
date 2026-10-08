@@ -17,6 +17,7 @@ export type ManagementRoutePresentationPolicy = RouteAccessPolicy & Readonly<{
 }>;
 
 const MANAGEMENT_ROUTE_PRESENTATION_POLICIES = [
+  { routeName: 'client.prolific', path: '/prolific', template: 'prolific', titleKey: 'home.prolific', chromeMode: 'app', requiresAuth: true, allowedRoles: 'admin,teacher', load: () => import('../../views/prolific') },
   { routeName: 'client.contentUpload', path: '/contentUpload', template: 'contentUpload', titleKey: 'home.content', chromeMode: 'app', requiresAuth: true, load: () => import('../../views/experimentSetup/contentUpload') },
   { routeName: 'client.aiContentCreator', path: '/aiContentCreate', template: 'aiContentCreator', titleKey: 'home.content', chromeMode: 'app', requiresAuth: true, load: () => import('../../views/experimentSetup/aiContentCreator') },
   { routeName: 'client.manualContentCreator', path: '/contentCreate', template: 'manualContentCreator', titleKey: 'home.content', chromeMode: 'app', requiresAuth: true, load: () => import('../../views/experimentSetup/manualContentCreator') },

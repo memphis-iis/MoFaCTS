@@ -1,3 +1,4 @@
+import { savedLessonCompleted, normalizeSavedUnitNumber as normalizeUnitNumber } from '../../common/experimentCompletion';
 import { Session } from 'meteor/session';
 
 // Entry intent is about how the learner reached /content, not about which trial appears next.
@@ -69,18 +70,6 @@ function normalizeNonEmptyString(value: unknown): string | null {
   return trimmed ? trimmed : null;
 }
 
-function normalizeUnitNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value)) {
-    return value;
-  }
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && Number.isInteger(parsed)) {
-      return parsed;
-    }
-  }
-  return null;
-}
 
 function normalizeTimestamp(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
@@ -232,9 +221,7 @@ export function resolveCardLaunchProgress(
 
   // A missing saved unit is not evidence of completion. The normal completion
   // writer records the final completed unit and an optional one-past-end cursor.
-  const moduleCompleted = safeUnitCount > 0
-    && lastUnitCompleted === safeUnitCount - 1
-    && (persistedUnitNumber === null || (persistedUnitNumber >= 0 && persistedUnitNumber <= safeUnitCount));
+  const moduleCompleted = savedLessonCompleted(experimentState, safeUnitCount);
 
   return {
     intent: hasMeaningfulHistory

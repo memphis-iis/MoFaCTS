@@ -22,6 +22,7 @@ type MethodContext = {
 };
 
 type ExperimentMethodsDeps = {
+  isProlificAccount: (userId: string) => Promise<boolean>;
   serverConsole: (...args: unknown[]) => void;
   Tdfs: {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
@@ -52,23 +53,24 @@ type ExperimentMethodsDeps = {
   ) => Promise<void>;
 };
 
-export function createExperimentMethods(deps: ExperimentMethodsDeps) {
-  async function issueLoginToken(userId: string) {
-    const accountsAny = Accounts as any;
-    if (
-      typeof accountsAny._generateStampedLoginToken !== 'function' ||
-      typeof accountsAny._insertLoginToken !== 'function'
-    ) {
-      throw new Meteor.Error('experiment-login-token-unavailable', 'Experiment login token support is unavailable');
-    }
-
-    const stampedToken = accountsAny._generateStampedLoginToken();
-    if (!stampedToken?.token) {
-      throw new Meteor.Error('experiment-login-token-missing', 'Experiment login token could not be created');
-    }
-    await accountsAny._insertLoginToken(userId, stampedToken);
-    return stampedToken.token;
+export async function issueExperimentLoginToken(userId: string) {
+  const accountsAny = Accounts as any;
+  if (
+    typeof accountsAny._generateStampedLoginToken !== 'function' ||
+    typeof accountsAny._insertLoginToken !== 'function'
+  ) {
+    throw new Meteor.Error('experiment-login-token-unavailable', 'Experiment login token support is unavailable');
   }
+
+  const stampedToken = accountsAny._generateStampedLoginToken();
+  if (!stampedToken?.token) {
+    throw new Meteor.Error('experiment-login-token-missing', 'Experiment login token could not be created');
+  }
+  await accountsAny._insertLoginToken(userId, stampedToken);
+  return stampedToken.token;
+}
+
+export function createExperimentMethods(deps: ExperimentMethodsDeps) {
 
   async function getTdfByExperimentTarget(experimentTarget: string) {
     try {
@@ -154,6 +156,8 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
         const existingUser = await deps.usersCollection.findOneAsync({ username: usernameExactCI });
 
         if (existingUser) {
+          // The account marker also covers the brief reservation-to-account binding step.
+          if (existingUser.profile?.createdBy === 'startProlificParticipation' || await deps.isProlificAccount(existingUser._id)) throw new Meteor.Error(403, 'Use the Prolific study link');
           const hasAnyExperimentHistory = !!(await deps.GlobalExperimentStates.findOneAsync({
             userId: existingUser._id
           }));
@@ -240,7 +244,7 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
             userExists: true
           });
 
-          const loginToken = await issueLoginToken(existingUser._id);
+          const loginToken = await issueExperimentLoginToken(existingUser._id);
           return { userExists: true, userId: existingUser._id, loginToken, status: 'resumed' };
         }
 
@@ -267,7 +271,7 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
           userExists: false
         });
 
-        const loginToken = await issueLoginToken(createdId);
+        const loginToken = await issueExperimentLoginToken(createdId);
         return { userExists: false, userId: createdId, loginToken, status: 'created' };
       });
     } catch (error: unknown) {
@@ -328,7 +332,7 @@ export function createExperimentMethods(deps: ExperimentMethodsDeps) {
       expiresAt,
     });
     return {
-      loginToken: await issueLoginToken(createdId),
+      loginToken: await issueExperimentLoginToken(createdId),
       launchPath: definition.launchPath,
       expiresAt,
     };

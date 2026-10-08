@@ -86,6 +86,7 @@ const SIDEBAR_ACTION_ROUTES: Record<string, string> = {
   userAdminButton: '/userAdmin',
   themeButton: '/theme',
   adminTestsButton: '/admin/tests',
+  prolificButton: '/prolific',
   adminBackupsButton: '/admin/backups',
   adminSecurityAuditsButton: '/admin/security-audits',
 };
@@ -103,6 +104,7 @@ const PRACTICE_MENU_ACTION_ROUTES: Record<string, string> = {
   userAdmin: '/userAdmin',
   theme: '/theme',
   adminTests: '/admin/tests',
+  prolific: '/prolific',
   adminBackups: '/admin/backups',
   adminSecurityAudits: '/admin/security-audits',
 };
@@ -120,6 +122,7 @@ const SIDEBAR_ACTIVE_MATCHERS: Record<string, string[]> = {
   userAdmin: ['/userAdmin'],
   theme: ['/theme'],
   adminTests: ['/admin/tests'],
+  prolific: ['/prolific'],
   adminBackups: ['/admin/backups'],
   adminSecurityAudits: ['/admin/security-audits'],
 };

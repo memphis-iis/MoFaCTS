@@ -1,15 +1,13 @@
+import { pickTimingRuntimeSettings, selectDeliverySettingsSource } from '../../common/deliveryTimingSettings';
 import { Session } from 'meteor/session';
 import { MODEL_UNIT } from '../../common/Definitions';
 import {
   DELIVERY_DISPLAY_SETTINGS_RUNTIME_KEYS,
   DELIVERY_SETTINGS_DEFAULTS,
-  normalizeDeliverySettingsSource,
-  normalizeDeliverySettingValue,
 } from '../../common/fieldRegistry.ts';
 import { sanitizeDeliverySettings } from './deliverySettingsValidator';
 
 type DeliverySettingsRecord = Record<string, unknown>;
-type DeliverySettingValue = string | number | boolean | undefined;
 
 type TdfUnitWithDeliverySettings = {
   deliverySettings?: unknown;
@@ -35,42 +33,6 @@ type DeliverySettingsResolution = {
   hasTutorSettings: boolean;
   hasUnitSettings: boolean;
 };
-
-function isDeliverySettingValue(value: unknown): value is DeliverySettingValue {
-  return value === undefined ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean';
-}
-
-function selectDeliverySettingsSource(source: unknown, experimentXCond: unknown): unknown {
-  if (!Array.isArray(source)) {
-    return source;
-  }
-  if (!source.length) {
-    return undefined;
-  }
-  let xcondIndex = Number.parseInt(String(experimentXCond ?? ''), 10);
-  if (!Number.isFinite(xcondIndex) || xcondIndex < 0 || xcondIndex >= source.length) {
-    xcondIndex = 0;
-  }
-  return source[xcondIndex];
-}
-
-function pickTimingRuntimeSettings(source: unknown, experimentXCond: unknown): DeliverySettingsRecord {
-  const selectedSource = selectDeliverySettingsSource(source, experimentXCond);
-  const normalizedSource = normalizeDeliverySettingsSource(
-    selectedSource as Record<string, unknown> | null | undefined
-  );
-  const result: DeliverySettingsRecord = {};
-  for (const key of Object.keys(DELIVERY_SETTINGS_DEFAULTS)) {
-    const value = normalizedSource[key];
-    if (isDeliverySettingValue(value)) {
-      result[key] = normalizeDeliverySettingValue(key, value);
-    }
-  }
-  return result;
-}
 
 function pickDisplayRuntimeSettings(source: unknown, experimentXCond: unknown): DeliverySettingsRecord {
   const selectedSource = selectDeliverySettingsSource(source, experimentXCond);

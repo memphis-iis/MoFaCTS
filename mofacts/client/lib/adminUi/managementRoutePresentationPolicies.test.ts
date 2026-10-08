@@ -12,6 +12,7 @@ describe('management route presentation policies', function() {
       requiresAuth: policy.requiresAuth,
       allowedRoles: policy.allowedRoles ?? null,
     }))).to.deep.equal([
+      { routeName: 'client.prolific', requiresAuth: true, allowedRoles: 'admin,teacher' },
       { routeName: 'client.contentUpload', requiresAuth: true, allowedRoles: null },
       { routeName: 'client.aiContentCreator', requiresAuth: true, allowedRoles: null },
       { routeName: 'client.manualContentCreator', requiresAuth: true, allowedRoles: null },

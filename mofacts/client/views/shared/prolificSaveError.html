@@ -1,0 +1,8 @@
+<template name="prolificSaveError">
+  {{#if failed}}
+  <div class="container alert alert-danger" role="alert" aria-live="assertive">
+    <p>{{t 'prolific.saveError'}}</p>
+    <button type="button" class="btn btn-primary" disabled="{{busy}}">{{t 'common.tryAgain'}}</button>
+  </div>
+  {{/if}}
+</template>

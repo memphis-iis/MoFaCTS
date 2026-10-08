@@ -1,3 +1,4 @@
+import { finalizeProlificSession, showParticipationSaveError } from '../../lib/prolificParticipation';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
@@ -366,24 +367,38 @@ Template.signIn.onRendered(async function(this: any) {
     });
   });
 
-  if (isExperimentFlow && !Session.get('experimentPasswordRequired') && !template._prolificAutoSignInAttempted) {
+  const resumeEntry = Session.get('prolificResumeEntry');
+  if ((isExperimentFlow || window.location.pathname === '/prolific/resume') && Session.get('prolificEntryError')) {
+    template._prolificEntryBlocked = true;
+    $('#experimentSignin').prop('disabled', true);
+    showInlineSignInError(authText('prolific.entryError'), {}, template);
+  } else if ((isExperimentFlow || resumeEntry) && !template._prolificAutoSignInAttempted) {
     template._prolificAutoSignInAttempted = true;
-    const entry = resolveProlificExperimentEntry(
-      Session.get('experimentTarget'),
-      FlowRouterAny?.current?.()?.queryParams
-    );
-    if (entry.mode === 'automatic') {
-      const usernameInput = document.getElementById('signInUsername') as HTMLInputElement | null;
-      if (usernameInput) {
-        usernameInput.value = entry.participantId;
-        $('#experimentSignin').prop('disabled', true);
-        await userPasswordCheck(template);
+    const entry = resolveProlificExperimentEntry(Session.get('experimentTarget'), new URLSearchParams(window.location.search), {
+      prolificCompletionUrl: Session.get('prolificCompletionUrl'), experimentPasswordRequired: Session.get('experimentPasswordRequired'),
+    });
+    if (entry.mode !== 'manual' || resumeEntry) {
+      template._prolificEntryBlocked = true;
+      $('#experimentSignin').prop('disabled', true);
+      if (entry.mode === 'error') showInlineSignInError(authText('prolific.entryError'), {}, template);
+      else {
+        try {
+          const result = resumeEntry || await meteorCallAsync('startProlificParticipation', {
+            ...(entry.mode === 'automatic' ? entry.identity : {}), experimentTarget: Session.get('experimentTarget'),
+          }) as any;
+          Session.set('prolificResumeEntry', null);
+          sessionCleanUp();
+          await new Promise<void>((resolve, reject) => Meteor.loginWithToken(result.loginToken, (error?: any) => error ? reject(error) : resolve()));
+          if (resumeEntry) sessionStorage.removeItem('prolificInitialReturn');
+          else sessionStorage.setItem('prolificInitialReturn', Meteor.userId()!);
+          setExperimentParticipantContext({ experimentTarget: result.experimentTarget, userId: Meteor.userId() }, 'signIn.prolific');
+          const finishEntry = async () => { if (!await finalizeProlificSession()) await completeExperimentSignIn(template); };
+          try { await finishEntry(); } catch { showParticipationSaveError(finishEntry); }
+        } catch {
+          restoreVisibleSignInScreen(template);
+          showInlineSignInError(authText('prolific.entryError'), {}, template);
+        }
       }
-    } else if (entry.reason !== 'missing') {
-      clientConsole(1, '[PROLIFIC-ENTRY] Automatic experiment sign-in skipped', {
-        reason: entry.reason,
-        experimentTarget: Session.get('experimentTarget')
-      });
     }
   }
 });
@@ -998,6 +1013,8 @@ async function persistLoginDataAfterLogin(
 }
 
 async function userPasswordCheck(template?: any) {
+  if (template?._prolificEntryBlocked) return;
+  if (window.location.pathname === '/prolific/resume' || Session.get('prolificResumeEntry') || new URLSearchParams(window.location.search).has('PROLIFIC_PID') || new URLSearchParams(window.location.search).has('STUDY_ID') || new URLSearchParams(window.location.search).has('SESSION_ID')) return;
   clearSignInState(template);
 
   const experiment = Session.get('loginMode') === 'experiment';

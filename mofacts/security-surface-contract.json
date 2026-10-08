@@ -909,6 +909,54 @@
     {
       "name": "userAdminRoleChange",
       "access": "admin-only"
+    },
+    {
+      "name": "completeProlificParticipation",
+      "access": "authenticated-self"
+    },
+    {
+      "name": "prolificBindStudy",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificConfirmOperation",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificConnect",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificDashboard",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificList",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificMessages",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificPrepareOperation",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificRetryReminder",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificReviewOperation",
+      "access": "role-checked"
+    },
+    {
+      "name": "resumeProlificParticipation",
+      "access": "public-rate-limited"
+    },
+    {
+      "name": "startProlificParticipation",
+      "access": "public-rate-limited"
     }
   ],
   "publications": [
@@ -1209,6 +1257,10 @@
     {
       "name": "client.userAdmin|/userAdmin",
       "access": "admin-only"
+    },
+    {
+      "name": "client.prolific|/prolific",
+      "access": "role-checked"
     }
   ]
 }

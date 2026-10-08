@@ -1,3 +1,7 @@
+import { createProlificMethods } from './methods/prolificMethods';
+import { createProlificParticipationService } from './lib/prolificParticipation';
+import { createProlificManagementService } from './lib/prolificManagement';
+import { ensureProlificIndexes, ProlificParticipations } from './lib/prolificCollections';
 import {Roles} from 'meteor/alanning:roles';
 // import * as ElaboratedFeedback from './lib/CachedElaboratedFeedback';
 // import * as DefinitionalFeedback from '../server/lib/DefinitionalFeedback.js';
@@ -54,7 +58,7 @@ import { createBackupMethods, createBackupRegistry } from './methods/backupMetho
 import { createSecurityAuditMethods } from './methods/securityAuditMethods';
 import { reconcileInterruptedBackupJobs } from './lib/backup/backupService';
 import { ensureSecurityAuditIndexes, SecurityAuditReports } from './securityAudit/securityAuditStorage';
-import { createExperimentMethods } from './methods/experimentMethods';
+import { createExperimentMethods, issueExperimentLoginToken } from './methods/experimentMethods';
 import { createExperimentTargetFamilyResolver } from './lib/experimentTargetFamilyResolver';
 import { createPackageMethods } from './methods/packageMethods';
 import {
@@ -136,6 +140,7 @@ export { getTdfById, getHistoryByTDFID, getStimuliSetById, serverConsole, decryp
 // for creating some MongoDB queries
 let serverVerbosityLevel: LoggingVerbosityLevel = SERVER_VERBOSITY_SETTING.defaultValue;
 let serverVerbosityObserverHandle: { stop(): void } | undefined;
+let prolificReminderInterval: ReturnType<typeof setInterval> | undefined;
 let publicDemoCleanupInterval: ReturnType<typeof setInterval> | undefined;
 
 function setServerVerbosityLevel(value: unknown): void {
@@ -562,7 +567,14 @@ const openRouterModelCatalogService = createOpenRouterModelCatalogService({
 
 export const resolveExperimentTargetFamily = createExperimentTargetFamilyResolver({ Tdfs });
 
+const prolificParticipation = createProlificParticipationService({
+  resolveExperimentTargetFamily, Tdfs, states: GlobalExperimentStates, users: MeteorAny.users, createUser: createUserWithRetry,
+  issueToken: issueExperimentLoginToken, withLock: withSignUpLock, encrypt: encryptData, decrypt: decryptData, baseUrl: () => Meteor.absoluteUrl(),
+});
+const prolificManagement = createProlificManagementService({ resolveExperimentTargetFamily, progress: prolificParticipation.progress, Tdfs, encrypt: encryptData, decrypt: decryptData, audit: writeAuditLog });
+
 const experimentMethods = createExperimentMethods({
+  isProlificAccount: async userId => Boolean(await ProlificParticipations.findOneAsync({ userId }, { fields: { _id: 1 } })),
   serverConsole,
   Tdfs,
   GlobalExperimentStates,
@@ -633,8 +645,10 @@ function normalizeCanonicalId(value: unknown): string | null {
 }
 
 export const methods: any = {
+  ...createProlificMethods({ participation: prolificParticipation, management: prolificManagement, authorization: getMethodAuthorizationDeps, rateLimit: applyMethodRateLimit }),
   ...createRecoverableWarningMethods({ auditLog: AuditLog, requireAdminUser }),
   ...createSystemMethods({
+    validateProlificLockout: prolificParticipation.validateLockout,
     serverConsole,
     usersCollection: MeteorAny.users,
     ErrorReports,
@@ -914,6 +928,7 @@ function buildPublicExperimentEntry(tdf: any) {
     'condition',
     'experimentTarget',
     'experimentPasswordRequired',
+    'prolificCompletionUrl',
     'speechIgnoreOutOfGrammarResponses',
     'srfilterclose',
     'speechOutOfGrammarFeedback',
@@ -1146,6 +1161,15 @@ registerServerRuntime({
 });
 
 Meteor.startup(async function() {
+  await ensureProlificIndexes();
+  let prolificReminderRunning = false;
+  prolificReminderInterval = setInterval(async () => {
+    if (prolificReminderRunning) return;
+    prolificReminderRunning = true;
+    try { await prolificManagement.processReminders(); }
+    catch { serverConsole(1, 'Prolific reminder processing failed; queued work retained'); }
+    finally { prolificReminderRunning = false; }
+  }, 60000);
   await ensureSecurityAuditIndexes();
   const publicDemoCleanupDeps = {
     usersCollection: MeteorAny.users,
@@ -1241,6 +1265,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     serverVerbosityObserverHandle?.stop();
     serverVerbosityObserverHandle = undefined;
+    if (prolificReminderInterval) { clearInterval(prolificReminderInterval); prolificReminderInterval = undefined; }
     if (publicDemoCleanupInterval) {
       clearInterval(publicDemoCleanupInterval);
       publicDemoCleanupInterval = undefined;
