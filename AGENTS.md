@@ -21,6 +21,7 @@ When instructions compete, use this order:
 
 - For runtime behavior, UI rendering, themes, transitions, Svelte components, state machines, or application logic, work in this repository and prefer `mofacts/`.
 - For TDF/config content or sync scripts, use `C:\dev\mofacts_config`; inspect this repository only for compatibility checks.
+- `mofacts_config` is passive storage, not an active application component. Do not require manifests or run content validators/audits there for storage, conversion, commits, or pushes unless the user explicitly requests those checks. MoFaCTS owns upload-time content validation.
 - For product and developer documentation too long for public repo docs, use `C:\dev\MoFaCTS.wiki`.
 - `MOFACTS_CONFIG_REPO`, when present, must resolve to `C:\dev\mofacts_config`. If it points elsewhere, stop and report the mismatch. If it is missing, verify `C:\dev\mofacts_config` exists, use that path, and do not report missingness as a problem.
 - `MOFACTS_WIKI_REPO`, when present, must resolve to `C:\dev\MoFaCTS.wiki`. If it points elsewhere, stop and report the mismatch. If it is missing, verify `C:\dev\MoFaCTS.wiki` exists, use that path, and do not report missingness as a problem.
