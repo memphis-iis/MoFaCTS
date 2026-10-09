@@ -36,7 +36,7 @@ supervisor and four active Change Streams. No further native Meteor invocation
 is planned unless new changes or failures justify one and authorization is fresh.
 Phase 0 remains open. Later step outcomes will be recorded here as they occur.
 
-### Staging2 candidate and partial acceptance checkpoint
+### Staging2 candidate and acceptance checkpoint
 
 Steps 1–3 are complete. Commit `a3155584ca26bbd03b83a123f9852aeddaa29a50`
 was pushed to main. Its [CI run](https://github.com/memphis-iis/MoFaCTS/actions/runs/37917879685)
@@ -57,7 +57,7 @@ omitted the existing Compose project name and hit a container-name conflict;
 only its newly created, unattached empty resources were removed. Deployment then
 used the recorded `staging2` project and completed with a healthy application.
 
-Step 4 is partial, not accepted or closed:
+Step 4 completed for the representative repair acceptance scope:
 
 - Synthetic DDP probes passed **28/28**, including anonymous/cross-user/admin
   denials, forged owner rejection, duplicate identifier rejection, completed
@@ -73,16 +73,43 @@ Step 4 is partial, not accepted or closed:
   theme. Confirm returned focus to Export Active Theme. The original Default
   theme was restored and all three system themes remain. Deletion acceptance used
   the UI, not a backend cleanup call.
-- Browser file-chooser control timed out before any synthetic package was
-  selected. Normal package/media upload and Anki analysis remain unverified.
-  The documented Chrome extension file-access prerequisite is the next blocking
-  decision. Learner reload/resume, hosted fonts, YouTube and the remaining CSP/
-  cookie/reconnect checks have not yet been repeated on this candidate.
+- The first file-chooser attempt timed out when targeting the package input.
+  The user confirmed extension file access was already enabled. Retrying through
+  the visible drop-zone control succeeded: package upload as a separate synthetic
+  copy, media upload and Anki analysis all passed. The wizard identified one note,
+  one card, one media file and its fields. The disposable package copy was removed
+  through the visible guarded confirmation. No extension change was required.
+- The existing synthetic learner resumed its lesson after reload, submitted a
+  correct response and returned to a dashboard with the saved progress. YouTube
+  playback advanced to the ten-second question checkpoint. Player/Plyr resources
+  returned 200. This is representative coverage, not every lesson or provider.
+- A temporary theme loaded the Google stylesheet and font files with 200 responses
+  and applied Roboto. The browser's intentional personal Default override initially
+  kept the server theme from appearing; selecting the temporary theme exercised the
+  font. Both server/browser Default were restored and the disposable theme deleted.
+- The served CSP and nosniff header remain intact; ordinary JavaScript evaluation
+  and inline script execution were denied. The retired cookie was absent after
+  login, reload and an explicit supported Meteor disconnect/reconnect; reconnection
+  restored an authenticated connection. Temporary diagnostic state was removed.
 
-The healthy candidate remains on staging2 with rollback retained. No application
-acceptance failure has been established by the browser-control interruption.
-Steps 5–6 remain pending; this checkpoint does not close the repair batch or
-Phase 0. Production and original staging were not changed.
+The healthy candidate remains on staging2 with the verified image identity and
+rollback retained. Step 5 closes the identified upload/voice/theme repair batch;
+it does not qualify every security surface or close Phase 0. Production and
+original staging were not changed. No new Meteor invocation was needed.
+
+GitHub separately reports high development-dependency alert 155, `node-forge`
+(`GHSA-86w9-cpqp-85rv`), in `mofacts/package-lock.json`, with no patched version
+listed at this checkpoint. This is not the runtime bundle audit's zero-findings
+claim. Reachability/remediation remains a separate dependency-triage task; the
+alert has not been dismissed or treated as fixed.
+
+Step 6 resumes at the existing approved source-test design: acquire supplemental
+test inputs, run the complete supported Linux source-test lane against a writable
+derivative, seal the candidate and bind final in-image source proof. This remains
+unfinished implementation, not release evidence supplied by this staging session.
+Release-record readers, protected host receipt ownership/retention and V1 history
+approval remain separate unresolved decisions. New concurrent SPARC source and
+wiki documentation changes were preserved; they are not in candidate `a3155584`.
 
 ## Third authorized Meteor invocation — 2026-10-07
 
