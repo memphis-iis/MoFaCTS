@@ -102,6 +102,20 @@ Generate the source-only proof bundle after successful source verification and b
 
 ### 2.4 Bounds, efficiency and implementation acceptance
 
+October 9 implementation continuation: the existing CI job now calls combined
+`prepare-tests` acquisition before dependency installation and uses the returned
+writable derivative for its source checks and single Meteor invocation.
+`verify-tests` compares the reviewed supplemental digest and freshly
+Docker-filtered build digest after dependency synchronization and after testing,
+including recipe/ignore integrity and original candidate rechecks. A final
+metadata-only artifact is associated with the GitHub run/attempt for 14 days;
+it is temporary acquisition evidence, not protected authoritative release
+storage or a qualified source-test bundle. Cleanup owns installed test cache
+links and never follows them to external targets. The output is explicitly
+unqualified. Real Linux execution of this revised path, stronger sealing,
+complete outcome/discovery evidence and final canonical image binding remain
+pending; ordinary builds and source-proof schemas are unchanged.
+
 Proposed initial safety ceilings are 100,000 filesystem entries, 2 GiB total input bytes, 256 MiB per regular file, depth 64 and 1,024 UTF-8 bytes per relative path. These are conservative design limits, **not measured production capacity**; validate them against an authorized minimized context inventory before release and revise the single owning contract deliberately if necessary. Count directories and bytes during acquisition, not after unbounded extraction. Apply the bounds independently to build and supplemental test inputs.
 
 Stream file hashing with fixed concurrency (initially four); sort only bounded metadata, not file contents. Reject traversal, duplicate or case-colliding paths, unsupported file types and ambiguous Unicode/path encoding. Initially require regular files/directories only; symlinks, junctions and hard-link preservation need an explicit supported contract and fixtures before qualification accepts them. Never silently dereference or omit them. Cleanup may only target the helper's validated temporary root. Retain digests/bounded outcomes in audit evidence, not raw inventories, source contents or native-command logs.

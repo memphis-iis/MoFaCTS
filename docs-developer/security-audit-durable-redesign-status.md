@@ -180,6 +180,48 @@ revision. No new Meteor run, Docker command, workflow dispatch, server connectio
 or deployment ran. GitHub execution of the revised workflow remains pending
 fresh authorization; the development alert remains deferred and open.
 
+## Phase 0 source observation implementation — 2026-10-09
+
+The separately authorized push of `a6135d0b` completed successfully.
+[CI run 37974478896](https://github.com/memphis-iis/MoFaCTS/actions/runs/37974478896)
+and [Security run 37974478765](https://github.com/memphis-iis/MoFaCTS/actions/runs/37974478765)
+both passed for that exact revision. Linux Phase 0 tests passed 72/72 and capture
+tests 67/67 with no skips; harness 16 passed, server 775 passed/15 pending,
+browser 1,092 passed/7 pending, zero failures. Docker smoke and cleanup passed.
+Those results establish the previous CI revision, not execution of the following
+new capture integration or qualification of the staging2 image.
+
+The next implementation slice integrates the existing capture helper with that
+same CI job. `prepare-tests` atomically owns capture/collection cleanup; every
+ordinary source/test command uses its writable test derivative. `verify-tests`
+checks supplemental source/recipe/ignore bytes and uses Docker's real filter to
+re-export tested build inputs. Their native digest must match the original build
+identity after dependency synchronization and again after testing. Cache/output
+exclusions remain Docker-owned; no second ignore interpreter or arbitrary
+manifest normalization is introduced. CI retains only bounded digest metadata,
+associated with the run/attempt, for 14 days. No raw source or private files are
+uploaded; this does not choose protected release/host retention ownership.
+
+Owned test cleanup removes installed dependency/cache links without following
+their targets, while captured build-source cleanup retains its strict link
+rejection. Synthetic regression coverage verifies mismatched supplemental
+inputs, altered Docker-observed build bytes, changed ignore rules, failed
+combined acquisition and preservation of external cleanup-link targets.
+
+Local verification passes: full app typecheck; full lint with the existing
+28 vendor warnings, zero errors and 310 syntactic surfaces; Phase 0 72/72;
+source-security 41/41; capture **72 passed, zero failures, 1 Linux-mode skip**
+(73 total). Workflow YAML, captured command working directories, single Meteor
+invocation and shell syntax validate. PowerShell syntax and diff hygiene pass.
+No new Meteor integration, actual Docker acquisition/build, push or deployment
+has run for this implementation. No app behavior, dependencies or data changed.
+
+The retained state is `test-inputs-verified-unqualified`, not a passing source
+qualification or production proof bundle. Remaining gates include an authorized
+Linux trial, stronger candidate sealing, complete discovery/outcome evidence,
+matching final canonical Compose image source, and protected release/host and
+historical compatibility work. Staging2 and production remain unchanged.
+
 ## Third authorized Meteor invocation — 2026-10-07
 
 The third freshly authorized `npm run test:ci` finished with **exit 1**.

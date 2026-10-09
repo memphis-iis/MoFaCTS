@@ -172,6 +172,12 @@ explicitly authorized check. Source-to-image proof binding is still unfinished;
 passing workflows alone do not close Phase 0. See the
 [source-test lane contract](../docs-developer/security-audit-phase0-contracts.md#23-supported-source-test-lane-and-evidence-binding).
 
+CI's source-acquisition implementation now runs its checks in an owned captured
+test derivative and verifies build/supplemental source digests afterward. The
+new path awaits its authorized Linux trial. Its retained metadata is explicitly
+unqualified until stronger sealing, complete outcome evidence and final image
+binding pass; see the [capture guide](security-audit/source-capture.md).
+
 ## SPARC OpenRouter Prefix Caching
 
 “Improve prompt caching” is an on/off checkbox in User Admin alongside the global OpenRouter API key, model, and reasoning controls. It defaults to off for existing and new settings. Enabling it sends OpenRouter's top-level `session_id` for SPARC requests so related calls stay on one provider route; disabling it omits that field. Provider prompt caching may still occur automatically when this option is off, and enabling it does not guarantee lower total cost because output tokens and completed turns also affect cost. Changes apply to subsequent requests without rebuilding or restarting the server. The ID is generated randomly in the dialogue runtime, is stable only for one TDF/attempt/page scope (or one live-evaluation run), and contains no learner, attempt, TDF, or content-derived identity. It is never written to AI-flow logs.

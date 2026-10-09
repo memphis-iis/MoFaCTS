@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { localDockerInvoker } from './localDockerBuilder.mjs';
-import { collectTestInputs } from './testInputs.mjs';
+import { collectTestInputs, supplementalDigest, TEST_INPUTS } from './testInputs.mjs';
 import { parseBuildIdentity } from '../../../common/securityAudit/buildIdentity.ts';
 import { extractSnapshot, inspectSnapshotTree, sha256, snapshotPath, invalidSnapshot } from './sourceSnapshot.mjs';
 
@@ -157,7 +157,20 @@ async function removeOwnedTree(root) {
 }
 
 async function removeWorkspace(workspace) {
-  await removeOwnedTree(await requireWorkspace(workspace));
+  const root = await requireWorkspace(workspace);
+  // The writable test derivative owns installed dependency/cache links. Remove
+  // those links themselves, never their targets; strict build-source cleanup
+  // remains unchanged. This exact child is allocated only by this helper.
+  const derivative = path.join(root, 'test-context');
+  const stat = await fs.lstat(derivative).catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+    return null;
+  });
+  if (stat) {
+    if (!stat.isDirectory() || stat.isSymbolicLink()) invalidSnapshot();
+    await fs.rm(derivative, { recursive: true, force: true });
+  }
+  await removeOwnedTree(root);
 }
 
 // Explicit dependencies permit synthetic orchestration tests without executing
@@ -260,6 +273,49 @@ export async function collectCapturedTestInputs(workspace, builder, dependencies
   }
 }
 
+export async function verifyCapturedTestInputs(workspace, builder, dependencies = {}) {
+  const checked = await verifyCapture(workspace, builder, dependencies);
+  const receipt = JSON.parse(await readControl(path.join(checked.root, 'test-inputs.json')));
+  if (receipt.schema !== 'MoFaCTSTestInputsV1' || receipt.state !== 'test-inputs-captured-unqualified'
+    || !isDeepStrictEqual(parseBuildIdentity(receipt.identity), checked.identity)
+    || receipt.buildLocalTreeDigestSha256 !== checked.receipt.localTreeDigestSha256
+    || receipt.testInputContractDigestSha256 !== sha256(JSON.stringify(TEST_INPUTS))) invalidSnapshot();
+  const derivative = path.join(checked.root, 'test-context');
+  const recipe = await readControl(path.join(checked.candidate, 'Dockerfile'));
+  if (!(await readControl(path.join(derivative, 'Dockerfile'))).equals(recipe)
+    || !(await readControl(path.join(derivative, '.dockerignore')))
+      .equals(await readControl(path.join(checked.candidate, '.dockerignore')))
+    || await supplementalDigest(derivative) !== receipt.supplementalDigestSha256) invalidSnapshot();
+  // Docker owns cache/output exclusions. Never invent a second ignore parser
+  // or hash installed node_modules as if it were captured source.
+  const roundTrip = await fs.mkdtemp(path.join(checked.root, 'test-round-trip-'));
+  try {
+    const observed = await exportSource(derivative, recipe, builder, roundTrip, dependencies.docker ?? docker);
+    assertCapturedEntries(observed.entries, captureRoots(recipe.toString('utf8')));
+    if (observed.sourceSnapshotDigestSha256 !== checked.identity.sourceSnapshotDigestSha256
+      || await supplementalDigest(derivative) !== receipt.supplementalDigestSha256
+      || !(await readControl(path.join(derivative, 'Dockerfile'))).equals(recipe)
+      || !(await readControl(path.join(derivative, '.dockerignore')))
+        .equals(await readControl(path.join(checked.candidate, '.dockerignore')))
+      || (await inspectSnapshotTree(checked.candidate)).digestSha256 !== checked.receipt.localTreeDigestSha256) invalidSnapshot();
+  } finally {
+    await requireWorkspace(checked.root);
+    await removeOwnedTree(roundTrip);
+  }
+  return { state: 'test-inputs-verified-unqualified', identity: checked.identity,
+    testInputContractDigestSha256: receipt.testInputContractDigestSha256,
+    supplementalDigestSha256: receipt.supplementalDigestSha256 };
+}
+
+export async function prepareCapturedTestInputs(builder, baseCommit, dirty, dependencies = {}) {
+  const captured = await prepareCapture(builder, baseCommit, dirty, dependencies);
+  try { return await collectCapturedTestInputs(captured.workspace, builder, dependencies); }
+  catch (error) {
+    await removeWorkspace(captured.workspace);
+    throw error;
+  }
+}
+
 export async function buildCapturedSource(workspace, builder, envFile, dependencies = {}) {
   const invoke = dependencies.docker ?? docker;
   const checked = await verifyCapture(workspace, builder, dependencies);
@@ -286,16 +342,19 @@ export async function main(argv) {
     if (!/^--[a-z-]+$/.test(rest[i]) || !rest[i + 1] || args.has(rest[i])) invalidSnapshot();
     args.set(rest[i], rest[i + 1]);
   }
-  const allowed = { prepare: ['--builder', '--base-commit', '--dirty'], verify: ['--builder', '--workspace'],
+  const allowed = { prepare: ['--builder', '--base-commit', '--dirty'],
+    'prepare-tests': ['--builder', '--base-commit', '--dirty'], verify: ['--builder', '--workspace'],
     'collect-tests': ['--builder', '--workspace'],
+    'verify-tests': ['--builder', '--workspace'],
     build: ['--builder', '--workspace', '--env-file'], cleanup: ['--workspace'] }[action];
   if (!allowed || allowed.length !== args.size || allowed.some((key) => !args.has(key))) invalidSnapshot();
   const builder = args.get('--builder');
   if (builder !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(builder)) invalidSnapshot();
   const dependencies = { docker: localDockerInvoker(builder, docker) };
-  if (action === 'prepare') {
+  if (action === 'prepare' || action === 'prepare-tests') {
     if (!['true', 'false'].includes(args.get('--dirty'))) invalidSnapshot();
-    return prepareCapture(builder, args.get('--base-commit'), args.get('--dirty') === 'true', dependencies);
+    const prepare = action === 'prepare' ? prepareCapture : prepareCapturedTestInputs;
+    return prepare(builder, args.get('--base-commit'), args.get('--dirty') === 'true', dependencies);
   }
   if (action === 'verify') {
     const { identity } = await verifyCapture(args.get('--workspace'), builder, dependencies);
@@ -303,6 +362,7 @@ export async function main(argv) {
   }
   if (action === 'build') return buildCapturedSource(args.get('--workspace'), builder, args.get('--env-file'), dependencies);
   if (action === 'collect-tests') return collectCapturedTestInputs(args.get('--workspace'), builder, dependencies);
+  if (action === 'verify-tests') return verifyCapturedTestInputs(args.get('--workspace'), builder, dependencies);
   await removeWorkspace(args.get('--workspace'));
   return { state: 'temporary-capture-removed' };
 }

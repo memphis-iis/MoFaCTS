@@ -64,6 +64,12 @@ async function inventory(root, selections, limits) {
   return { entries, bytes };
 }
 
+export async function supplementalDigest(repository, limits = SNAPSHOT_LIMITS) {
+  const stat = await fs.lstat(repository);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) invalidSnapshot();
+  return sha256(JSON.stringify(await inventory(repository, TEST_INPUTS, limits)));
+}
+
 async function exists(target) {
   try { return await fs.lstat(target); }
   catch (error) { if (error.code === 'ENOENT') return null; throw error; }
@@ -170,5 +176,6 @@ export async function collectTestInputs(candidate, repository, destination, limi
   return { state: 'test-inputs-captured-unqualified', localTreeDigestSha256: merged.digestSha256,
     buildLocalTreeDigestSha256: buildBefore.digestSha256,
     testInputContractDigestSha256: sha256(JSON.stringify(TEST_INPUTS)),
+    supplementalDigestSha256: sha256(JSON.stringify(supplemental)),
     entryCount: merged.entries, bytes: merged.bytes };
 }

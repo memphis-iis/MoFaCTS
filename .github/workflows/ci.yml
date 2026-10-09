@@ -23,10 +23,30 @@ jobs:
           cache: npm
           cache-dependency-path: mofacts/package-lock.json
 
+      - name: Capture build and supplemental test inputs
+        id: capture
+        working-directory: .
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          MOFACTS_CAPTURE_RESULT="$(node mofacts/scripts/security-audit/qualification/captureBuildSource.mjs \
+            prepare-tests --builder default --base-commit "$(git rev-parse HEAD)" --dirty false)"
+          export MOFACTS_CAPTURE_RESULT
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import path from "node:path";
+            const result = JSON.parse(process.env.MOFACTS_CAPTURE_RESULT);
+            if (result.state !== "test-inputs-captured-unqualified") throw Error("Incomplete capture");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT,
+              `workspace=${result.workspace}\ntest_app=${path.join(result.workspace, "test-context", "mofacts")}\n`);
+          '
+
       - name: Install Meteor 3.5
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: curl https://install.meteor.com/?release=3.5 | sh
 
       - name: Assert framework toolchain
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: |
           test "$(meteor --version)" = "Meteor 3.5"
           test "$(meteor node --version)" = "v24.15.0"
@@ -35,34 +55,44 @@ jobs:
           test "$(npm --version)" = "11.12.1"
 
       - name: Sync Meteor npm dependencies
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: |
           meteor update --npm
-          git diff --exit-code -- .meteor/release .meteor/packages .meteor/versions package.json package-lock.json
+          node "$GITHUB_WORKSPACE/mofacts/scripts/security-audit/qualification/captureBuildSource.mjs" \
+            verify-tests --builder default --workspace '${{ steps.capture.outputs.workspace }}'
 
       - name: Install dependencies
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: npm ci
 
       - name: Lint
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: npm run lint
 
       - name: Typecheck (blocking)
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: npm run typecheck
 
       - name: Typecheck vendor declarations (blocking)
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: npm run typecheck:vendor
 
       - name: Phase 0 source identity and capture contracts
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: |
           npm run security:test:phase0
           npm run security:test:capture
 
       - name: Prolific and ignored-field contracts
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: node --test scripts/prolific.test.cjs scripts/ignoredTdfFields.test.cjs
 
       - name: Install CI browser
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Verify test MongoDB readiness helpers
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: node --test scripts/ciMongoReadiness.test.cjs
 
       - name: Start Change Streams test MongoDB
@@ -74,12 +104,13 @@ jobs:
             mongo:8.0 \
             --replSet mofacts-ci-rs \
             --bind_ip_all
-          node mofacts/scripts/ciMongoReadiness.cjs wait mofacts-ci-mongodb ping
+          node '${{ steps.capture.outputs.test_app }}/scripts/ciMongoReadiness.cjs' wait mofacts-ci-mongodb ping
           docker exec mofacts-ci-mongodb mongosh --quiet --eval \
             'rs.initiate({_id:"mofacts-ci-rs",members:[{_id:0,host:"127.0.0.1:27017"}]})'
-          node mofacts/scripts/ciMongoReadiness.cjs wait mofacts-ci-mongodb primary mofacts-ci-rs
+          node '${{ steps.capture.outputs.test_app }}/scripts/ciMongoReadiness.cjs' wait mofacts-ci-mongodb primary mofacts-ci-rs
 
       - name: Test
+        working-directory: ${{ steps.capture.outputs.test_app }}
         run: npm run test:ci
         env:
           TEST_BROWSER_DRIVER: playwright
@@ -95,14 +126,36 @@ jobs:
           MOFACTS_REQUIRE_REDIS: 'false'
 
       - name: Record failed test MongoDB diagnostics
-        if: failure()
+        if: failure() && steps.capture.outputs.test_app != ''
         working-directory: .
-        run: node mofacts/scripts/ciMongoReadiness.cjs diagnostics mofacts-ci-mongodb
+        run: node '${{ steps.capture.outputs.test_app }}/scripts/ciMongoReadiness.cjs' diagnostics mofacts-ci-mongodb
 
       - name: Clean up Change Streams test MongoDB
         if: always()
         working-directory: .
         run: docker rm -f mofacts-ci-mongodb 2>/dev/null || true
+
+      - name: Verify tested source and record digest observation
+        working-directory: .
+        run: |
+          node mofacts/scripts/security-audit/qualification/captureBuildSource.mjs \
+            verify-tests --builder default --workspace '${{ steps.capture.outputs.workspace }}' \
+            > "$RUNNER_TEMP/mofacts-source-observation.json"
+
+      - name: Retain source observation metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: source-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mofacts-source-observation.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Clean up captured test workspace
+        if: always() && steps.capture.outputs.workspace != ''
+        working-directory: .
+        run: |
+          node mofacts/scripts/security-audit/qualification/captureBuildSource.mjs \
+            cleanup --workspace '${{ steps.capture.outputs.workspace }}'
 
   docker-amd64-smoke:
     needs: lint-and-test

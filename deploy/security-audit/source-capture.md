@@ -14,6 +14,13 @@ CI or require its own repeated integration suite. CI source-digest/evidence and
 final Compose image binding still need implementation. See the
 [revised lane contract](../../docs-developer/security-audit-phase0-contracts.md#23-supported-source-test-lane-and-evidence-binding).
 
+The next implementation slice adds `prepare-tests` and `verify-tests`. CI now
+acquires Docker-filtered build source before dependency installation, runs its
+existing checks in the owned writable test derivative, and compares filtered
+source and reviewed supplemental digests after synchronization and after testing.
+This new CI path has not yet run on Linux. All outcomes remain unqualified;
+strong sealing, complete test evidence and final image binding remain open.
+
 Status: implemented source prototype; 50 synthetic capture/builder tests pass. **The authorized 2026-09-07 real source capture, Windows-to-Linux round trip, endpoint-bound no-cache Compose build and structural image smoke passed. Do not replace the operator's production build command: full application smoke, source-proof binding and remaining qualification gates are still open.** See the [executed checkpoint](../../docs-developer/security-audit-durable-redesign-status.md), including the repaired Compose/Buildx context conflict and default-path comparison. This tool does not issue a security qualification.
 
 The 2026-09-07 ordinary comparison build failed fetching Meteor's pinned `uWebSockets.js` dependency (`ssh: not found`). The separately authorized 2026-09-08 build-stage HTTPS transport repair preserves that repository/ref; the ordinary no-cache build and structural image smoke subsequently passed. The historical failed comparison is not relabeled successful, and these different-source image runs are not bit-for-bit equivalence or full release qualification. See the status checkpoint and [build transport note](../README.md#build-context).
@@ -60,6 +67,11 @@ $captureResult = & C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
 & C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
     -Action collect-tests -Builder $ApprovedLocalBuilder -Workspace $captureResult.workspace
 
+# After a separately authorized test run in test-context, verify source inputs.
+# Docker applies its existing ignore policy to dependency/cache outputs.
+& C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
+    -Action verify-tests -Builder $ApprovedLocalBuilder -Workspace $captureResult.workspace
+
 # Only after separate build authorization and the prototype acceptance checks:
 & C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
     -Action build -Builder $ApprovedLocalBuilder -Workspace $captureResult.workspace `
@@ -103,6 +115,34 @@ MongoDB, browser or application server are started, and no tests, image build,
 push or deployment are invoked by this action. An isolated Linux runner,
 stronger sealing, complete test-evidence validation and final in-image source
 proof remain required before source qualification.
+
+`prepare-tests` accepts the same arguments as `prepare`, combines preparation
+and collection, and removes its whole newly allocated workspace if collection
+fails. Existing captures lacking the supplemental digest require fresh
+collection; missing metadata is not inferred. `verify-tests` accepts the same
+arguments as `verify`, verifies the original capture, checks the test derivative's
+recipe/ignore bytes and supplemental digest, then freshly exports that derivative
+through Docker. Its observed build digest must match the original build identity.
+It rechecks controls and supplemental bytes after export and removes its exact
+round-trip directory on failure or success. The success state is
+`test-inputs-verified-unqualified`, not evidence that any tests ran or passed.
+
+In CI the actual checkout must start clean. All ordinary source/test commands
+then use `test-context/mofacts`; test MongoDB helpers also come from that captured
+copy. Git diff is replaced by input verification after `meteor update --npm`,
+because the derivative deliberately has no Git directory. Docker's ignore policy
+owns installed dependency and cache exclusions; unexplained source/manifest edits
+still fail. Only the final bounded JSON observation is retained as a GitHub
+artifact, associated with the run/attempt, for 14 days. No source tree, raw source
+inventory, private configuration or test logs are uploaded by this step. This
+temporary CI metadata is not authoritative protected release/host storage.
+
+Cleanup validates the workspace owner and the exact non-linked test derivative
+root before removing it. Installed dependency/cache links inside that disposable
+derivative are unlinked without following their targets; strict cleanup and link
+rejection remain in force for captured build-source trees. CI always schedules
+owned workspace cleanup once acquisition returns its workspace. Hosted runner
+disposal remains responsible for interrupted job lifetime, not the local watcher.
 
 - The temporary root is created under the OS temporary directory with a unique helper-owned name and marker. Linux permissions are restricted; Windows inherits the user's temporary-directory ACL. Windows ACL isolation remains part of runtime qualification, not a claim that Node `chmod` implements an ACL.
 - The candidate is immutable by helper ownership: test code never writes to it and the helper rechecks it. This is **not** an OS-enforced immutable snapshot or defense against a malicious process with the same user permissions. Do not edit candidate files. Full in-image source observation and stronger sealing remain acceptance work.
