@@ -177,6 +177,20 @@ feedback exposure, bounds and verification.
 
 ## Prolific participation and researcher controls
 
+### Test studies
+
+Connect a researcher token, select its workspace/project and an existing Prolific draft, and select a separately uploaded, unused MoFaCTS experiment. The experiment does not need an `experimentTarget` yet. **Add test participant** accepts an email not already registered with Prolific. The tester then uses Prolific's **Forgot password** flow; MoFaCTS stores no tester password. Account creation creates a provisioning receipt, not learner participation or answer history. Testing must be enabled for the workspace; generic authorization failures do not establish that it is disabled.
+
+**Prepare test-study setup** shows the draft, experiment, workspace, launch URL and completion code. Choose a code when the draft has several; its Prolific actions remain unchanged. **Create test study from draft** updates the draft's external URL, creates the test study and configures the MoFaCTS root using the returned study ID. The launch URL uses the study placeholder in both its path and query; actual provider expansion must be verified before collaborative testing.
+
+Setup rejects existing bindings, experiment targets, learner history, progress, assignments and nonzero condition counts across the family. It preserves authored conditions and uses the normal revision-checked content writer. Package export signatures include the changed content, so subsequent downloads rebuild as needed; existing ZIPs on disk are not rewritten.
+
+**Test setup history** retains the latest 50 operations. Ready setups expose **Open Prolific test study**. A confirmed created study with incomplete local configuration can be continued without another creation request. Unknown outcomes require external investigation and are never automatically resent. Definitive failures can be retried explicitly. A fresh preparation can supersede an unsent or definitively failed setup; uncertain operations retain their reservation and have no automatic reset. The existing stale-operation sweep makes known created studies resumable and uncertain creations review-required.
+
+This workflow does not publish live recruitment, approve submissions, issue bonuses, send researcher messages, or add later learner sessions. Run `node --test scripts/prolific.test.cjs` from `mofacts/` for synthetic provisioning and participation checks. Before use, verify the real test launch, all three identity substitutions, condition retention, saved answers and completion return. Every Meteor integration invocation requires fresh authorization.
+
+### Live-study connection
+
 Create the initial study on Prolific, then use its study ID as `setspec.experimentTarget`. Set the optional root `setspec.prolificCompletionUrl` to the exact official URL, for example `https://app.prolific.com/submissions/complete?cc=ABC123`. Only HTTPS on `app.prolific.com`, the `/submissions/complete` path, and one nonempty alphanumeric `cc` value are accepted. Credentials, ports, fragments, and other query parameters are rejected. There is no default.
 
 Use all three Prolific placeholders in the study's external URL:

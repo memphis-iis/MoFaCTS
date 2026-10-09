@@ -31,6 +31,10 @@ export function createProlificMethods(deps: Deps) {
       });
     },
     prolificConnect: function(this: Context, input: unknown) { return run(this, 'researcher', 'connect', id => deps.management.connect(id, input)); },
+    prolificCreateTestParticipant: function(this: Context, input: unknown) { return run(this, 'researcher', 'test-participant', id => deps.management.createTestParticipant(id, input)); },
+    prolificPrepareTestStudy: function(this: Context, input: unknown) { return run(this, 'researcher', 'test-prepare', id => deps.management.prepareTestStudy(id, input)); },
+    prolificExecuteTestStudy: function(this: Context, input: unknown) { return run(this, 'researcher', 'test-execute', id => deps.management.executeTestStudy(id, input)); },
+    prolificTestSetupStatus: function(this: Context) { return run(this, 'researcher', 'test-status', id => deps.management.testSetupStatus(id)); },
     prolificList: function(this: Context, input: unknown) { return run(this, 'researcher', 'list', id => deps.management.list(id, input)); },
     prolificBindStudy: function(this: Context, input: unknown) { return run(this, 'researcher', 'bind', id => deps.management.bind(id, input)); },
     prolificDashboard: function(this: Context, input: unknown) { return run(this, 'researcher', 'dashboard', id => deps.management.dashboard(id, input)); },

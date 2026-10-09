@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'crypto';
 import { prolificId, prolificAmount, prolificCompletionUrl } from '../../common/prolific';
 import { prolificRequest, prolificPage, ProlificApiError } from './prolificApi';
 import { ProlificConnections, ProlificStudies, ProlificParticipations, ProlificOperations, ProlificReminders } from './prolificCollections';
+import { createProlificTestSetup } from './prolificTestSetup';
 
 type Deps = {
   resolveExperimentTargetFamily: (target: string) => Promise<{ root: any } | null>;
@@ -9,6 +10,7 @@ type Deps = {
   progress: (participation: any) => Promise<{ state: any; tdfId: string }>;
   audit: (action: string, actor: string | null, target: string | null, details?: any) => Promise<void>;
   request?: typeof prolificRequest;
+  testExperiment?: Pick<Parameters<typeof createProlificTestSetup>[0], 'inspect' | 'configure' | 'baseUrl'>;
 };
 const stores = { connections: ProlificConnections, studies: ProlificStudies, participants: ProlificParticipations, operations: ProlificOperations, reminders: ProlificReminders };
 function text(value: unknown, max = 5000): string {
@@ -28,6 +30,11 @@ export function createProlificManagementService(deps: Deps, db = stores) {
     const c = await db.connections.findOneAsync({ ownerId });
     if (!c) throw new Error('prolific.connectionRequired');
     return { ...c, token: deps.decrypt(c.tokenEncrypted) };
+  }
+  function testing() {
+    if (!deps.testExperiment) throw new Error('Prolific test setup dependencies are required');
+    return createProlificTestSetup({ ...deps.testExperiment, operations: db.operations, connection,
+      request, encrypt: deps.encrypt, decrypt: deps.decrypt, audit: deps.audit });
   }
   async function study(ownerId: string, rawId: unknown) {
     const studyId = prolificId(rawId);
@@ -70,7 +77,7 @@ export function createProlificManagementService(deps: Deps, db = stores) {
     }
     if (input?.kind === 'lessons') {
       const after = typeof input.after === 'string' ? input.after : '';
-      const rows = await deps.Tdfs.find({ ownerId, ...(after ? { _id: { $gt: after } } : {}), 'content.tdfs.tutor.setspec.experimentTarget': { $exists: true } }, { fields: { 'content.tdfs.tutor.setspec': 1 }, sort: { _id: 1 }, limit: 21 }).fetchAsync();
+      const rows = await deps.Tdfs.find({ ownerId, ...(after ? { _id: { $gt: after } } : {}) }, { fields: { 'content.tdfs.tutor.setspec.lessonname': 1, 'content.tdfs.tutor.setspec.experimentTarget': 1 }, sort: { _id: 1 }, limit: 21 }).fetchAsync();
       return { results: rows.slice(0, 20).map((r: any) => ({ id: r._id, name: r.content.tdfs.tutor.setspec.lessonname, target: r.content.tdfs.tutor.setspec.experimentTarget })), hasMore: rows.length > 20 };
     }
     throw new Error('prolific.invalidInput');
@@ -230,8 +237,11 @@ export function createProlificManagementService(deps: Deps, db = stores) {
   async function processReminders() {
     // A crashed claimed send remains visible for review; it is never automatically resent.
     for (const [collection, age] of [[db.reminders, 120000], [db.operations, 3600000]] as const) {
-      const stale = await collection.find({ status: 'sending', sentAt: { $lt: new Date(Date.now() - age) } }, { fields: { _id: 1 }, limit: 50 }).fetchAsync();
-      if (stale.length) await collection.updateAsync({ _id: { $in: stale.map((r: any) => r._id) }, status: 'sending' }, { $set: { status: 'review-required' } }, { multi: true });
+      const stale = await collection.find({ status: 'sending', sentAt: { $lt: new Date(Date.now() - age) } }, { fields: { _id: 1, kind: 1, studyId: 1 }, limit: 50 }).fetchAsync();
+      const resumable = stale.filter((r: any) => r.kind === 'test-study' && r.studyId).map((r: any) => r._id);
+      const uncertain = stale.filter((r: any) => !resumable.includes(r._id)).map((r: any) => r._id);
+      if (resumable.length) await collection.updateAsync({ _id: { $in: resumable }, status: 'sending' }, { $set: { status: 'setup-incomplete' } }, { multi: true });
+      if (uncertain.length) await collection.updateAsync({ _id: { $in: uncertain }, status: 'sending' }, { $set: { status: 'review-required' } }, { multi: true });
     }
     const due = await db.reminders.find({ status: 'pending', dueAt: { $lte: new Date() } }, { sort: { dueAt: 1 }, limit: 20 }).fetchAsync();
     for (const item of due) {
@@ -258,5 +268,10 @@ export function createProlificManagementService(deps: Deps, db = stores) {
       }
     }
   }
-  return { connect, list, bind, dashboard, messages, prepare, confirm, review, retryReminder, processReminders };
+  return { connect, list, bind, dashboard, messages, prepare, confirm, review, retryReminder, processReminders,
+    createTestParticipant: (ownerId: string, input: unknown) => testing().participant(ownerId, input),
+    prepareTestStudy: (ownerId: string, input: unknown) => testing().prepare(ownerId, input),
+    executeTestStudy: (ownerId: string, input: unknown) => testing().execute(ownerId, input),
+    testSetupStatus: (ownerId: string) => testing().status(ownerId),
+  };
 }

@@ -1,7 +1,7 @@
 <template name="prolific">
   <div class="container py-3">
     <p>{{t 'prolific.help'}} <a href="https://researcher.prolific.com" target="_blank" rel="noopener noreferrer">Prolific ↗</a></p>
-    {{#if error}}<p class="alert alert-danger" role="alert">{{t 'prolific.error'}}</p>{{/if}}
+    {{#if error}}<p class="alert alert-danger" role="alert">{{errorText}}</p>{{/if}}
     {{#if busy}}<p role="status">{{t 'common.loading'}}</p>{{/if}}
     <fieldset disabled="{{busy}}">
       <form id="prolific-connect" class="card card-body mb-3">
@@ -9,6 +9,13 @@
         <input id="prolific-token" type="password" autocomplete="off" maxlength="512" class="form-control" required>
         <button class="btn btn-primary mt-2" type="submit">{{t 'prolific.connection'}}</button>
         <button class="btn btn-secondary mt-2" type="button" data-action="workspaces">{{t 'prolific.refresh'}}</button>
+      </form>
+      <form id="prolific-test-participant" class="card card-body mb-3">
+        <h2>{{t 'prolific.testParticipants'}}</h2>
+        <label for="prolific-test-email">{{t 'prolific.testEmail'}}</label>
+        <input id="prolific-test-email" type="email" maxlength="254" class="form-control" required>
+        <p>{{t 'prolific.testPasswordHelp'}}</p>
+        <button class="btn btn-secondary" type="submit">{{t 'prolific.addTestParticipant'}}</button>
       </form>
       <div class="card card-body mb-3">
         <label for="prolific-workspace">{{t 'prolific.workspace'}}</label>
@@ -25,7 +32,40 @@
         <textarea id="prolific-reminder" class="form-control" maxlength="4500" rows="3"></textarea>
         <button type="button" class="btn btn-primary mt-2" data-action="bind">{{t 'prolific.link'}}</button>
         <button type="button" class="btn btn-secondary mt-2" data-action="dashboard">{{t 'prolific.refresh'}}</button>
+        <p class="mt-3">{{t 'prolific.testSetupHelp'}}</p>
+        {{#if completionCodes}}
+        <label for="prolific-test-code">{{t 'prolific.completionCode'}}</label>
+        <select id="prolific-test-code" class="form-control"><option value="">—</option>{{#each completionCodes}}<option value="{{this}}">{{this}}</option>{{/each}}</select>
+        {{/if}}
+        <button type="button" class="btn btn-secondary mt-2" data-action="test-prepare">{{t 'prolific.prepareTestStudy'}}</button>
       </div>
+      {{#if testPreview}}
+      <section class="card card-body mb-3" aria-live="polite">
+        <h2>{{t 'prolific.testSummary'}}</h2>
+        <p>{{testPreview.draftName}} · {{testPreview.lessonName}}</p>
+        <p>{{t 'prolific.workspace'}}: {{testPreview.workspaceId}}</p>
+        <p>{{t 'prolific.completionCode'}}: {{testPreview.completionCode}}</p>
+        <p class="text-break">{{testPreview.launchUrl}}</p>
+        <button type="button" class="btn btn-primary" data-action="test-execute" data-operation="{{testPreview.id}}">{{t 'prolific.createTestStudy'}}</button>
+      </section>
+      {{/if}}
+      <section class="card card-body mb-3" aria-live="polite">
+        <h2>{{t 'prolific.testSetups'}}</h2>
+        <button type="button" class="btn btn-secondary" data-action="test-refresh">{{t 'prolific.refresh'}}</button>
+        {{#each testOperations}}
+        <div class="border-top mt-2 pt-2">
+          <p>{{operationKind kind}} · {{operationStatus status}} · {{draftName}} · {{lessonName}} {{participantId}}</p>
+          {{#if errorKey}}<p role="alert">{{testError errorKey}}</p>{{/if}}
+          {{#if canRetryTestParticipant status kind}}<button type="button" class="btn btn-secondary" data-action="test-participant-retry" data-operation="{{id}}">{{t 'prolific.continueTestSetup'}}</button>{{/if}}
+          {{#if canExecuteTest status kind}}
+          <p>{{t 'prolific.workspace'}}: {{workspaceId}} · {{t 'prolific.completionCode'}}: {{completionCode}}</p>
+          <p class="text-break">{{launchUrl}}</p>
+          <button type="button" class="btn btn-primary" data-action="test-execute" data-operation="{{id}}">{{t 'prolific.continueTestSetup'}}</button>
+          {{/if}}
+          {{#if testReady status}}<a href="{{testUrl}}" target="_blank" rel="noopener noreferrer">{{t 'prolific.openTestStudy'}}</a>{{/if}}
+        </div>
+        {{/each}}
+      </section>
       {{#if dashboard}}
       <h2>{{dashboard.name}} · {{dashboard.currency}}</h2>
       <div class="table-responsive"><table class="table"><thead><tr>

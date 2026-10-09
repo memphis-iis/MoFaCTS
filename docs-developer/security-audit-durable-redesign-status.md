@@ -1,6 +1,40 @@
 # Security Audit Durable Redesign Status
 
-Updated: 2026-10-07.
+Updated: 2026-10-09.
+
+## Consolidated repair release sequence — 2026-10-09
+
+The approved six-step sequence is: commit the current changes; verify exact-commit
+CI and Security; build one canonical Compose image and deploy it to staging2 with
+rollback retained; run consolidated staging browser/security acceptance; record
+outcomes and close only the accepted repair batch; then resume remaining Phase 0
+work, stopping at unresolved decisions. Production and original staging remain
+outside this sequence.
+
+Step 1 review: the upload/browser repairs are already committed in `309f89c2`.
+The remaining checkout changes implement Prolific test-study setup and include
+public authoring guidance; the wiki already describes this workflow. Reviewed
+methods require admin/teacher roles, rate limits and owner-bound operations.
+Focused synthetic Prolific tests passed **48/48**. Real provider test-study launch
+is not established by those tests and is outside the upload/browser acceptance
+session; no provider credentials or external creation calls are needed here.
+
+The first October 9 native Meteor invocation ended abnormally before final suite
+totals. The separately authorized retry completed with **exit 0**: harness
+**16 passed, 0 failed**; server **775 passed, 15 pending, 0 failed**; browser
+**1,092 passed, 7 pending, 0 failed**. This result covers the working checkout,
+including the Prolific setup changes; exact-commit CI remains the next gate.
+Full app typecheck and lint passed (28 upstream vendor warnings, no errors),
+with **310** syntactic security surfaces. Source-security passed **41/41**,
+Phase 0 contracts **72/72**, source-capture contracts **50/50**. The production
+dependency audit reported **seven moderate**, no high/critical findings.
+
+Both invocations' orphan test Mongo processes were ownership-verified before
+stopping; database files were retained. Test ports are clear, the manifest guard
+passes, and the canonical watcher is ready with health, browser bundle, HMR,
+supervisor and four active Change Streams. No further native Meteor invocation
+is planned unless new changes or failures justify one and authorization is fresh.
+Phase 0 remains open. Later step outcomes will be recorded here as they occur.
 
 ## Third authorized Meteor invocation — 2026-10-07
 

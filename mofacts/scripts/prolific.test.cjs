@@ -21,7 +21,7 @@ Module._load = originalLoad;
 require('../client/lib/prolificExperimentEntry.test.ts');
 
 function values(doc, path) {
-  if (!path.length) return [doc];
+  if (!path.length) return Array.isArray(doc) ? doc : [doc];
   if (Array.isArray(doc)) return doc.flatMap(d => values(d, path));
   return values(doc?.[path[0]], path.slice(1));
 }
@@ -308,6 +308,10 @@ describe('researcher operations and reminders', () => {
     const f = fixture(), rateCalls = [];
     const methods = createProlificMethods({ participation: f.participation, management: f.management, authorization: () => ({ userIsInRoleAsync: async id => id === 'owner' }), rateLimit: async (...args) => rateCalls.push(args) });
     await assert.rejects(methods.prolificDashboard.call({ userId: 'student' }, { studyId }));
+    for (const name of ['prolificCreateTestParticipant', 'prolificPrepareTestStudy', 'prolificExecuteTestStudy', 'prolificTestSetupStatus']) {
+      await assert.rejects(methods[name].call({ userId: 'student' }, {}));
+      await assert.rejects(methods[name].call({}, {}));
+    }
     await assert.rejects(methods.completeProlificParticipation.call({}));
     await methods.startProlificParticipation.call({ connection: { clientAddress: 'synthetic' } }, launch);
     assert.equal(rateCalls[0][0], 'prolific-start');
@@ -377,4 +381,147 @@ describe('learner completion navigation', () => {
     await runtime.retryParticipationSave();
     assert.equal(completions, 1); assert.equal(runtime.participationSaveFailed(), false);
   });
+});
+
+const { createProlificTestSetup } = require('../server/lib/prolificTestSetup.ts');
+function testSetupFixture() {
+ const f=fixture();
+ f.db.operations=new Store([], [['ownerId','requestId'],['testRootKey'],['testDraftKey'],['testParticipantKey']]);
+ let configured=0, inspectFailure=false, saveFailure=false, mutationFailure=null;
+ const newStudy='9'.repeat(24);
+ const draft={id:studyId,project:projectId,name:'Test draft',status:'UNPUBLISHED',completion_codes:[{code:'TEST123',actions:[{action:'MANUALLY_REVIEW'}]}]};
+ const requests=[];
+ const service=createProlificTestSetup({operations:f.db.operations,connection:async()=>({token:'synthetic',accountId}),
+ encrypt:v=>v,decrypt:v=>v,audit:async()=>{},baseUrl:()=> 'https://example.org/',
+ inspect:async()=>{if(inspectFailure) throw new Error('prolific.experimentUsed');return {name:'Mock lesson',revisions:{root:1}};},
+ configure:async()=>{if(saveFailure)throw new Error('save failed');configured++;},
+ request:async(_token,path,body,_transport,method)=>{
+  requests.push({path,body,method});
+  if(body && mutationFailure)throw mutationFailure;
+  if(path==='projects/'+projectId+'/')return {id:projectId,workspace:workspaceId};
+  if(path.endsWith('/balance/'))return {currency_code:'USD'};
+  if(path==='researchers/participants/')return {participant_id:participantId};
+  if(path.endsWith('/test-study'))return {study_id:newStudy,study_url:'https://app.prolific.com/studies/'+newStudy+'/test'};
+  if(path==='studies/'+studyId+'/'){if(method==='PATCH')draft.external_study_url=body.external_study_url;return structuredClone(draft);}
+  if(path==='studies/'+newStudy+'/')return {...draft,id:newStudy,status:'ACTIVE'};
+  throw new Error('Unexpected request');
+ }});
+ const input={requestId:'prepare',workspaceId,projectId,sourceStudyId:studyId,rootTdfId:'root',reminderText:'Return for testing'};
+ return {service,input,requests,draft,db:f.db,newStudy,configured:()=>configured,used:()=>{inspectFailure=true;},failSave:v=>{saveFailure=v;},failMutation:v=>{mutationFailure=v;}};
+}
+describe('Prolific test provisioning',()=>{
+ it('prepares without mutations and configures the returned test identity',async()=>{
+  const f=testSetupFixture(), p=await f.service.prepare('owner',f.input);
+  assert.equal(f.requests.some(r=>r.body),false);assert.equal(p.status,'prepared');assert.match(p.launchUrl,/experiment\/\{\{%STUDY_ID%\}\}/);
+  const done=await f.service.execute('owner',{operationId:p.id});assert.equal(done.status,'ready');assert.equal(done.studyId,f.newStudy);assert.equal(f.configured(),1);
+  assert.equal(f.requests.filter(r=>r.path.endsWith('/test-study')).length,1);
+  await f.service.execute('owner',{operationId:p.id});assert.equal(f.configured(),1);
+ });
+ it('requires an explicit choice among multiple completion codes',async()=>{
+  const f=testSetupFixture();f.draft.completion_codes.push({code:'SECOND'});
+  const p=await f.service.prepare('owner',f.input);assert.equal(p.status,'choose-code');assert.equal(f.db.operations.rows.length,0);
+  assert.equal((await f.service.prepare('owner',{...f.input,completionCode:'SECOND'})).completionCode,'SECOND');
+ });
+ it('rejects non-drafts and used experiments before creation',async()=>{
+  const f=testSetupFixture();f.draft.status='ACTIVE';await assert.rejects(f.service.prepare('owner',f.input),/draftRequired/);
+  f.draft.status='UNPUBLISHED';f.used();await assert.rejects(f.service.prepare('owner',f.input),/experimentUsed/);
+  assert.equal(f.requests.some(r=>r.body),false);
+ });
+ it('rejects changed drafts and newly used experiments before mutations',async()=>{
+  const f=testSetupFixture();const p=await f.service.prepare('owner',f.input);f.draft.name='Changed';
+  assert.equal((await f.service.execute('owner',{operationId:p.id})).errorKey,'prolific.setupChanged');assert.equal(f.requests.some(r=>r.body),false);
+  const g=testSetupFixture();const q=await g.service.prepare('owner',g.input);g.used();assert.equal((await g.service.execute('owner',{operationId:q.id})).errorKey,'prolific.experimentUsed');
+ });
+ it('resumes local configuration without repeating remote creation',async()=>{
+  const f=testSetupFixture(),p=await f.service.prepare('owner',f.input);f.failSave(true);
+  assert.equal((await f.service.execute('owner',{operationId:p.id})).status,'setup-incomplete');
+  f.failSave(false);assert.equal((await f.service.execute('owner',{operationId:p.id})).status,'ready');
+  assert.equal(f.requests.filter(r=>r.path.endsWith('/test-study')).length,1);
+ });
+ it('claims concurrent creation once and retains status across clients',async()=>{
+  const f=testSetupFixture(),p=await f.service.prepare('owner',f.input);
+  await Promise.all([1,2,3].map(()=>f.service.execute('owner',{operationId:p.id})));
+  assert.equal(f.requests.filter(r=>r.path.endsWith('/test-study')).length,1);
+  assert.equal((await f.service.status('owner'))[0].status,'ready');assert.deepEqual(await f.service.status('another'),[]);
+  await assert.rejects(f.service.execute('another',{operationId:p.id}),/accessDenied/);
+ });
+ it('retains unknown outcomes without retrying external writes',async()=>{
+  const f=testSetupFixture(),p=await f.service.prepare('owner',f.input);f.failMutation(new ProlificApiError(0,true));
+  assert.equal((await f.service.execute('owner',{operationId:p.id})).status,'review-required');
+  const count=f.requests.length;await f.service.execute('owner',{operationId:p.id});assert.equal(f.requests.length,count);
+ });
+ it('creates participant receipts without participation or learner records',async()=>{
+  const f=testSetupFixture(),input={email:'tester@example.org',requestId:'participant'};
+  const result=await f.service.participant('owner',input);assert.equal(result.participantId,participantId);
+  await f.service.participant('owner',input);assert.equal(f.requests.length,1);assert.equal(f.db.participants.rows.length,0);
+  assert.equal(JSON.stringify(await f.service.status('owner')).includes('tester@example.org'),false);
+  await assert.rejects(f.service.participant('owner',{...input,requestId:'another'}),/setupConflict/);
+ });
+});
+
+const { createProlificTestExperiment } = require('../server/lib/prolificTestExperiment.ts');
+function unusedExperimentFixture() {
+ const root={_id:'root',ownerId:'owner',tdfAvailability:'available',tdfRevision:3,content:{tdfs:{tutor:{setspec:{lessonname:'Synthetic',loadbalancing:'not-max'},unit:[{unitname:'Preserved'}]}}}};
+ const deps={Tdfs:new Store([root]),Histories:new Store(),states:new Store(),assignments:new Store(),studies:new Store([], [['rootTdfId'],['studyId']]),participants:new Store(),
+ saveContent:async(_owner,previous,content)=>{const current=deps.Tdfs.rows[0];assert.equal(current.tdfRevision,previous.tdfRevision);current.content=content;current.tdfRevision++;}};
+ const service=createProlificTestExperiment(deps);
+ const operation={_id:'operation',rootTdfId:'root',studyId,accountId,workspaceId,projectId,currency:'USD',reminderText:'Return',revisions:{root:3},completionCode:'TEST123'};
+ return {deps,service,operation};
+}
+describe('unused test experiment contract',()=>{
+ it('uses the normal content writer and retries without another revision',async()=>{
+  const f=unusedExperimentFixture();assert.deepEqual((await f.service.inspect('owner','root')).revisions,{root:3});
+  await f.service.configure('owner',f.operation);await f.service.configure('owner',f.operation);
+  assert.equal(f.deps.Tdfs.rows[0].tdfRevision,4);assert.equal(f.deps.Tdfs.rows[0].content.tdfs.tutor.setspec.loadbalancing,'not-max');
+  assert.equal(f.deps.Tdfs.rows[0].content.tdfs.tutor.unit[0].unitname,'Preserved');assert.equal(f.deps.studies.rows.length,1);
+ });
+ for(const store of ['Histories','states','assignments','participants'])it('rejects existing '+store,async()=>{
+  const f=unusedExperimentFixture();await f.deps[store].insertAsync(store==='participants'?{rootTdfId:'root'}:{TDFId:'root'});
+  await assert.rejects(f.service.inspect('owner','root'),/experimentUsed/);
+ });
+ it('rejects another owner and revision changes without saving',async()=>{
+  const f=unusedExperimentFixture();await assert.rejects(f.service.inspect('another','root'),/accessDenied/);
+  f.deps.Tdfs.rows[0].tdfRevision++;await assert.rejects(f.service.configure('owner',f.operation),/setupChanged/);
+  assert.equal(f.deps.studies.rows.length,0);
+ });
+ it('rejects a bound lesson and does not rewrite it',async()=>{
+  const f=unusedExperimentFixture();await f.deps.studies.insertAsync({rootTdfId:'root',studyId:'9'.repeat(24)});
+  await assert.rejects(f.service.configure('owner',f.operation),/experimentUsed/);assert.equal(f.deps.Tdfs.rows[0].tdfRevision,3);
+ });
+ it('checks the child condition history, not only the root',async()=>{
+  const f=unusedExperimentFixture(),root=f.deps.Tdfs.rows[0];delete root.content.tdfs.tutor.unit;
+  Object.assign(root.content.tdfs.tutor.setspec,{condition:['child.json'],conditionTdfIds:['child']});
+  await f.deps.Tdfs.insertAsync({_id:'child',ownerId:'owner',tdfAvailability:'available',tdfRevision:1,content:{fileName:'child.json',tdfs:{tutor:{setspec:{lessonname:'Child'},unit:[{}]}}}});
+  await f.deps.Histories.insertAsync({TDFId:'child'});await assert.rejects(f.service.inspect('owner','root'),/experimentUsed/);
+ });
+});
+it('sanitizes explicit provider testing errors without labeling all 403 responses unavailable',async()=>{
+ for(const [path,body,key] of [
+  ['researchers/participants/',{detail:'Testing feature is not enabled'},'prolific.testingUnavailable'],
+  ['researchers/participants/',{email:['Already registered']},'prolific.testEmailUsed'],
+  ['studies/'+studyId+'/test-study',{detail:'At least one test participant is required'},'prolific.testParticipantRequired'],
+  ['researchers/participants/',{detail:'Access denied'},'prolific.connectionFailed']]) {
+  await assert.rejects(prolificRequest('secret',path,{},async()=>new Response(JSON.stringify(body),{status:403})),e=>e.message===key);
+ }
+});
+
+it('allows explicit retries of known failures but never ambiguous participant creation',async()=>{
+ const f=testSetupFixture();f.failMutation(new ProlificApiError(403,false,'prolific.testingUnavailable'));
+ const op=await f.service.participant('owner',{email:'retry@example.org',requestId:'retry'});assert.equal(op.status,'failed');
+ f.failMutation(null);assert.equal((await f.service.participant('owner',{operationId:op.id})).status,'accepted');
+ const g=testSetupFixture();g.failMutation(new ProlificApiError(0,true));
+ const uncertain=await g.service.participant('owner',{email:'uncertain@example.org',requestId:'unknown'});
+ g.failMutation(null);await g.service.participant('owner',{operationId:uncertain.id});assert.equal(g.requests.length,1);
+});
+it('requires a fresh explicit review to replace a changed prepared setup',async()=>{
+ const f=testSetupFixture(),p=await f.service.prepare('owner',f.input);f.draft.name='Reviewed change';
+ const revised=await f.service.prepare('owner',{...f.input,requestId:'revision'});
+ assert.notEqual(revised.id,p.id);assert.equal((await f.service.execute('owner',{operationId:p.id})).status,'reviewed');
+ assert.equal((await f.service.execute('owner',{operationId:revised.id})).status,'ready');
+});
+it('rejects progressive course assignments and directly selected children',async()=>{
+ const f=unusedExperimentFixture();await f.deps.assignments.insertAsync({memberTdfIds:['root']});
+ await assert.rejects(f.service.inspect('owner','root'),/experimentUsed/);
+ const g=unusedExperimentFixture();await g.deps.Tdfs.insertAsync({_id:'parent',content:{tdfs:{tutor:{setspec:{conditionTdfIds:['root']}}}}});
+ await assert.rejects(g.service.inspect('owner','root'),/invalidConfiguration/);
 });

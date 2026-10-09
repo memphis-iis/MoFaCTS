@@ -1,7 +1,8 @@
 import { createProlificMethods } from './methods/prolificMethods';
+import { createProlificTestExperiment } from './lib/prolificTestExperiment';
 import { createProlificParticipationService } from './lib/prolificParticipation';
 import { createProlificManagementService } from './lib/prolificManagement';
-import { ensureProlificIndexes, ProlificParticipations } from './lib/prolificCollections';
+import { ensureProlificIndexes, ProlificParticipations, ProlificStudies } from './lib/prolificCollections';
 import {Roles} from 'meteor/alanning:roles';
 // import * as ElaboratedFeedback from './lib/CachedElaboratedFeedback';
 // import * as DefinitionalFeedback from '../server/lib/DefinitionalFeedback.js';
@@ -571,7 +572,14 @@ const prolificParticipation = createProlificParticipationService({
   resolveExperimentTargetFamily, Tdfs, states: GlobalExperimentStates, users: MeteorAny.users, createUser: createUserWithRetry,
   issueToken: issueExperimentLoginToken, withLock: withSignUpLock, encrypt: encryptData, decrypt: decryptData, baseUrl: () => Meteor.absoluteUrl(),
 });
-const prolificManagement = createProlificManagementService({ resolveExperimentTargetFamily, progress: prolificParticipation.progress, Tdfs, encrypt: encryptData, decrypt: decryptData, audit: writeAuditLog });
+const prolificTestExperiment = createProlificTestExperiment({ Tdfs, Histories, states: GlobalExperimentStates,
+  assignments: Assignments, studies: ProlificStudies, participants: ProlificParticipations,
+  saveContent: (ownerId, root, content) => saveTdfContent.call({ userId: ownerId }, root._id, content, {}, [],
+    { expectedRevision: root.tdfRevision ?? 0, confirmed: true }),
+});
+const prolificManagement = createProlificManagementService({ resolveExperimentTargetFamily, progress: prolificParticipation.progress, Tdfs, encrypt: encryptData, decrypt: decryptData, audit: writeAuditLog,
+  testExperiment: { ...prolificTestExperiment, baseUrl: () => Meteor.absoluteUrl() },
+});
 
 const experimentMethods = createExperimentMethods({
   isProlificAccount: async userId => Boolean(await ProlificParticipations.findOneAsync({ userId }, { fields: { _id: 1 } })),
@@ -1162,6 +1170,10 @@ registerServerRuntime({
 
 Meteor.startup(async function() {
   await ensureProlificIndexes();
+  // Test provisioning checks exact lesson families without course/user scope.
+  await GlobalExperimentStates.rawCollection().createIndex({ TDFId: 1 });
+  await Assignments.rawCollection().createIndex({ TDFId: 1 });
+  await Assignments.rawCollection().createIndex({ memberTdfIds: 1 });
   let prolificReminderRunning = false;
   prolificReminderInterval = setInterval(async () => {
     if (prolificReminderRunning) return;

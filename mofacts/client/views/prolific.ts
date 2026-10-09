@@ -1,6 +1,6 @@
 import { translatePlatformString } from '../lib/interfaceI18n';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
-import type { PlatformStringKey } from '../lib/interfaceI18nResources';
+import { PLATFORM_STRING_KEYS, type PlatformStringKey } from '../lib/interfaceI18nResources';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { meteorCallAsync } from '../lib/meteorAsync';
@@ -10,6 +10,7 @@ Template.prolific.onCreated(function(this: any) {
   this.viewState = new ReactiveVar({ busy: false, error: false, workspaces: [], projects: [], studies: [], lessons: [] });
   this.active = true;
   this.studyPage = 1;
+  void run(this, async () => { update(this, { testOperations: await meteorCallAsync('prolificTestSetupStatus') }); });
 });
 Template.prolific.onDestroyed(function(this: any) { this.active = false; });
 const current = () => (Template.instance() as any).viewState.get();
@@ -17,6 +18,14 @@ Template.prolific.helpers({
   operationStatus: (status: string) => translatePlatformString(getActiveUiLocale(), `prolific.status.${status}` as PlatformStringKey),
   operationKind: (kind: string) => translatePlatformString(getActiveUiLocale(), `prolific.${kind}` as PlatformStringKey),
   busy: () => current().busy, error: () => current().error,
+  errorText: () => errorText(current().errorKey),
+  testError: (key: string) => errorText(key),
+  testPreview: () => current().testPreview,
+  completionCodes: () => current().completionCodes,
+  testOperations: () => current().testOperations,
+  canExecuteTest: (status: string, kind: string) => kind === 'test-study' && ['prepared', 'failed', 'setup-incomplete'].includes(status),
+  canRetryTestParticipant: (status: string, kind: string) => kind === 'test-participant' && status === 'failed',
+  testReady: (status: string) => status === 'ready',
   workspaces: () => current().workspaces, projects: () => current().projects, studies: () => current().studies,
   lessons: () => current().lessons, moreStudies: () => current().moreStudies, moreLessons: () => current().moreLessons,
   dashboard: () => current().dashboard, messages: () => current().messages,
@@ -28,11 +37,15 @@ Template.prolific.helpers({
   displayAmount: (cents: unknown) => typeof cents === 'number' ? (cents / 100).toFixed(2) : '',
 });
 function value(t: any, id: string): string { return t.find(`#prolific-${id}`)?.value || ''; }
+function errorText(key: string) {
+  const safeKey: PlatformStringKey = (PLATFORM_STRING_KEYS as readonly string[]).includes(key) ? key as PlatformStringKey : 'prolific.error';
+  return translatePlatformString(getActiveUiLocale(), safeKey);
+}
 function update(t: any, patch: any) { if (t.active) t.viewState.set({ ...t.viewState.get(), ...patch }); }
 async function run(t: any, action: () => Promise<void>) {
   if (t.viewState.get().busy) return;
   update(t, { busy: true, error: false });
-  try { await action(); } catch { update(t, { error: true }); }
+  try { await action(); } catch (error: any) { update(t, { error: true, errorKey: /^prolific\.[A-Za-z]+$/.test(error?.error) ? error.error : 'prolific.error' }); }
   finally { update(t, { busy: false }); }
 }
 async function list(t: any, kind: string, extra = {}) {
@@ -42,6 +55,15 @@ async function refresh(t: any, after = '') {
   update(t, { dashboard: await meteorCallAsync('prolificDashboard', { studyId: value(t, 'study'), after }) });
 }
 Template.prolific.events({
+  'submit #prolific-test-participant': function(event: Event, t: any) {
+    event.preventDefault();
+    void run(t, async () => {
+      const email = value(t, 'test-email');
+      if (t.testEmail !== email) { t.testEmail = email; t.testParticipantRequest = crypto.randomUUID(); }
+      await meteorCallAsync('prolificCreateTestParticipant', { email, requestId: t.testParticipantRequest });
+      update(t, { testOperations: await meteorCallAsync('prolificTestSetupStatus') });
+    });
+  },
   'submit #prolific-connect': function(event: Event, t: any) {
     event.preventDefault();
     void run(t, async () => {
@@ -70,7 +92,21 @@ Template.prolific.events({
     const action = button.dataset.action;
     void run(t, async () => {
       const studyId = value(t, 'study');
-      if (action === 'workspaces') update(t, { workspaces: await list(t, 'workspaces') });
+      if (action === 'test-prepare') {
+        const input = { sourceStudyId: studyId, workspaceId: value(t, 'workspace'), projectId: value(t, 'project'),
+          rootTdfId: value(t, 'lesson'), reminderText: value(t, 'reminder'), completionCode: value(t, 'test-code') };
+        const result: any = await meteorCallAsync('prolificPrepareTestStudy', { ...input, requestId: crypto.randomUUID() });
+        update(t, { completionCodes: result.status === 'choose-code' ? result.completionCodes : [],
+          testPreview: result.status === 'prepared' ? result : null,
+          testOperations: await meteorCallAsync('prolificTestSetupStatus') });
+      } else if (action === 'test-participant-retry') {
+        await meteorCallAsync('prolificCreateTestParticipant', { operationId: button.dataset.operation });
+        update(t, { testOperations: await meteorCallAsync('prolificTestSetupStatus') });
+      } else if (action === 'test-execute') {
+        await meteorCallAsync('prolificExecuteTestStudy', { operationId: button.dataset.operation });
+        update(t, { testPreview: null, testOperations: await meteorCallAsync('prolificTestSetupStatus') });
+      } else if (action === 'test-refresh') update(t, { testOperations: await meteorCallAsync('prolificTestSetupStatus') });
+      else if (action === 'workspaces') update(t, { workspaces: await list(t, 'workspaces') });
       else if (action === 'bind') {
         await meteorCallAsync('prolificBindStudy', { workspaceId: value(t, 'workspace'), projectId: value(t, 'project'), studyId, rootTdfId: value(t, 'lesson'), reminderText: value(t, 'reminder') });
         await refresh(t);

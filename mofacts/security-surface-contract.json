@@ -923,6 +923,22 @@
       "access": "role-checked"
     },
     {
+      "name": "prolificCreateTestParticipant",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificPrepareTestStudy",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificExecuteTestStudy",
+      "access": "role-checked"
+    },
+    {
+      "name": "prolificTestSetupStatus",
+      "access": "role-checked"
+    },
+    {
       "name": "prolificConnect",
       "access": "role-checked"
     },
