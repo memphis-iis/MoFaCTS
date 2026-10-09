@@ -36,6 +36,54 @@ supervisor and four active Change Streams. No further native Meteor invocation
 is planned unless new changes or failures justify one and authorization is fresh.
 Phase 0 remains open. Later step outcomes will be recorded here as they occur.
 
+### Staging2 candidate and partial acceptance checkpoint
+
+Steps 1–3 are complete. Commit `a3155584ca26bbd03b83a123f9852aeddaa29a50`
+was pushed to main. Its [CI run](https://github.com/memphis-iis/MoFaCTS/actions/runs/37917879685)
+and [Security run](https://github.com/memphis-iis/MoFaCTS/actions/runs/37917879795)
+both passed. One clean Git archive was built with the supported Compose workflow,
+without cache. The resulting staging2 image has source revision `a3155584` and
+Docker image identity `sha256:5eadcf85e2ec98e9a2e7bf594f440896c45451315da223f5bd8dbb6b5d865c20`;
+the remote identity matches. The runtime bundle dependency audit reported zero
+vulnerabilities; this is distinct from the application/build dependency audit.
+The previous image and protected deployment configuration were retained.
+Only the staging2 application was replaced; existing database volumes remain.
+
+Before deployment, world-writable root-owned deployment inputs were corrected
+after inventory: directories 755, non-secret regular files 644, shell scripts
+755. The private environment file remains 600. Compose validation passed and the
+ordinary operator can no longer write the Compose definition. An initial command
+omitted the existing Compose project name and hit a container-name conflict;
+only its newly created, unattached empty resources were removed. Deployment then
+used the recorded `staging2` project and completed with a healthy application.
+
+Step 4 is partial, not accepted or closed:
+
+- Synthetic DDP probes passed **28/28**, including anonymous/cross-user/admin
+  denials, forged owner rejection, duplicate identifier rejection, completed
+  asset abort denial, public byte integrity, private download denial, retired
+  HTTP endpoint 410 and persisted owner continuation after reconnect and an
+  application-only restart. Completed synthetic assets were removed through the
+  separately guarded management operation.
+- Chrome voice preview played unmuted with advancing playback time and no player
+  error. Blocking the sample request produced the localized inline failure;
+  temporary diagnostics and the original audio preference were restored.
+- Visible theme confirmation passed initial Cancel focus, Cancel/Escape
+  preservation and return focus, and Confirm deletion of only the named disposable
+  theme. Confirm returned focus to Export Active Theme. The original Default
+  theme was restored and all three system themes remain. Deletion acceptance used
+  the UI, not a backend cleanup call.
+- Browser file-chooser control timed out before any synthetic package was
+  selected. Normal package/media upload and Anki analysis remain unverified.
+  The documented Chrome extension file-access prerequisite is the next blocking
+  decision. Learner reload/resume, hosted fonts, YouTube and the remaining CSP/
+  cookie/reconnect checks have not yet been repeated on this candidate.
+
+The healthy candidate remains on staging2 with rollback retained. No application
+acceptance failure has been established by the browser-control interruption.
+Steps 5–6 remain pending; this checkpoint does not close the repair batch or
+Phase 0. Production and original staging were not changed.
+
 ## Third authorized Meteor invocation — 2026-10-07
 
 The third freshly authorized `npm run test:ci` finished with **exit 1**.
