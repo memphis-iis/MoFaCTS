@@ -16,7 +16,7 @@ import type {
 } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type {
   SparcUtteranceGenerator,
-} from '../../../../../../learning-components/units/sparcsession/sparcControllerDialogueTurn';
+} from '../../../../../../learning-components/units/sparcsession/sparcAutoTutorRuleRuntime';
 import {
   requireBoundedSparcDialogueMessage,
   SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,

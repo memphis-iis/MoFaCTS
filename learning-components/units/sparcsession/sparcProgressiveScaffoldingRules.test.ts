@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { runSparcProductionRules } from './sparcProductionRuleEvaluator';
+import { runSparcProductionRulesWithActions } from './sparcProductionRuleEvaluator';
 import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 
@@ -64,14 +64,15 @@ function progress(targetKind: 'expectation' | 'misconception', targetId: string,
 }
 
 function execute(facts: readonly SparcWorkingMemoryFact[]) {
-  return runSparcProductionRules({
-    facts,
+  return runSparcProductionRulesWithActions({
+    facts: [fact('interface-event', { eventType: 'response-submitted', eventId: 'snapshot-1', pageKey: 'test-page' }), ...facts],
+    actions: { 'autotutor.generate-move': () => ({ assertions: [], writes: [] }) },
     rules: createSparcProgressiveScaffoldingRules(),
   });
 }
 
-function selectedAction(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact {
-  const execution = execute(facts);
+async function selectedAction(facts: readonly SparcWorkingMemoryFact[]): Promise<SparcWorkingMemoryFact> {
+  const execution = await execute(facts);
   const selected = execution.facts.filter((entry) => entry.factType === 'controller.selectedAction');
   assert.equal(selected.length, 1);
   const decisions = execution.facts.filter((entry) => entry.factType === 'instructional.decision');
@@ -80,8 +81,8 @@ function selectedAction(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingM
 }
 
 describe('SPARC production-owned instructional control', function() {
-  it('starts the maximum expectation at pump when no misconception is eligible', function() {
-    const selected = selectedAction([
+  it('starts the maximum expectation at pump when no misconception is eligible', async function() {
+    const selected = await selectedAction([
       ...commonFacts(),
       fact('instructional.cycleStatus', { snapshotId: 'snapshot-1', continuable: false }),
       candidate({ targetKind: 'expectation', targetId: 'kc-a', currentValue: 0.2 }),
@@ -90,8 +91,8 @@ describe('SPARC production-owned instructional control', function() {
     assert.equal(selected.slots?.action, 'pump');
   });
 
-  it('starts the maximum threshold-eligible misconception at a targeted prompt', function() {
-    const selected = selectedAction([
+  it('starts the maximum threshold-eligible misconception at a targeted prompt', async function() {
+    const selected = await selectedAction([
       ...commonFacts(),
       fact('instructional.cycleStatus', { snapshotId: 'snapshot-1', continuable: false }),
       candidate({ targetKind: 'expectation', targetId: 'kc-a', currentValue: 0.2 }),
@@ -102,8 +103,8 @@ describe('SPARC production-owned instructional control', function() {
     assert.equal(selected.slots?.action, 'prompt');
   });
 
-  it('interrupts an active expectation whenever a misconception is eligible', function() {
-    const execution = execute([
+  it('interrupts an active expectation whenever a misconception is eligible', async function() {
+    const execution = await execute([
       ...commonFacts(),
       fact('instructional.cycleStatus', { snapshotId: 'snapshot-1', continuable: true }),
       activeCycle({ targetKind: 'expectation', targetId: 'kc-a', stage: 'PUMP' }),
@@ -115,8 +116,8 @@ describe('SPARC production-owned instructional control', function() {
     assert.equal(execution.facts.find((entry) => entry.factType === 'controller.selectedAction')?.slots?.action, 'prompt');
   });
 
-  it('keeps a productive expectation pump at pump', function() {
-    const selected = selectedAction([
+  it('keeps a productive expectation pump at pump', async function() {
+    const selected = await selectedAction([
       ...commonFacts(),
       fact('instructional.cycleStatus', { snapshotId: 'snapshot-1', continuable: true }),
       activeCycle({ targetKind: 'expectation', targetId: 'kc-a', stage: 'PUMP' }),
@@ -126,8 +127,8 @@ describe('SPARC production-owned instructional control', function() {
     assert.equal(selected.slots?.action, 'pump');
   });
 
-  it('advances an unproductive expectation pump to prompt', function() {
-    const selected = selectedAction([
+  it('advances an unproductive expectation pump to prompt', async function() {
+    const selected = await selectedAction([
       ...commonFacts(),
       fact('instructional.cycleStatus', { snapshotId: 'snapshot-1', continuable: true }),
       activeCycle({ targetKind: 'expectation', targetId: 'kc-a', stage: 'PUMP' }),
@@ -137,8 +138,8 @@ describe('SPARC production-owned instructional control', function() {
     assert.equal(selected.slots?.action, 'prompt');
   });
 
-  it('continues an active misconception rather than switching to an expectation', function() {
-    const selected = selectedAction([
+  it('continues an active misconception rather than switching to an expectation', async function() {
+    const selected = await selectedAction([
       ...commonFacts(),
       fact('instructional.cycleStatus', { snapshotId: 'snapshot-1', continuable: true }),
       activeCycle({ targetKind: 'misconception', targetId: 'm1', stage: 'PROMPT' }),
@@ -150,8 +151,8 @@ describe('SPARC production-owned instructional control', function() {
     assert.equal(selected.slots?.action, 'pump');
   });
 
-  it('selects completion independently of an active cycle', function() {
-    const selected = selectedAction([
+  it('selects completion independently of an active cycle', async function() {
+    const selected = await selectedAction([
       fact('instructional.assessmentSnapshot', { snapshotId: 'snapshot-1' }),
       fact('controller.completionState', { completed: true }),
       activeCycle({ targetKind: 'expectation', targetId: 'kc-a', stage: 'PUMP' }),

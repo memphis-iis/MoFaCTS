@@ -273,6 +273,12 @@ export type SparcProductionRuleTest = {
 
 export type SparcProductionRuleEffect =
   | {
+      /** Runtime-registered capability; never evaluated while matching rules. */
+      readonly type: 'invoke-action';
+      readonly actionId: string;
+      readonly args?: Readonly<Record<string, SparcRuleExpression>>;
+    }
+  | {
       readonly type: 'assert-fact';
       readonly fact: SparcWorkingMemoryFactTemplate;
       readonly persist?: boolean;
@@ -397,7 +403,28 @@ export type SparcProductionRuleFiring = {
   readonly credits: readonly string[];
   readonly terminatesProductionPhase: boolean;
   readonly terminalReason?: string;
+  readonly executedActions?: readonly string[];
 };
+
+export type SparcProductionActionResult = {
+  readonly assertions: readonly {
+    readonly fact: SparcWorkingMemoryFact;
+    readonly persist?: boolean;
+    readonly identitySlots?: Readonly<Record<string, unknown>>;
+  }[];
+  readonly writes: readonly SparcStateWrite[];
+};
+
+export type SparcProductionActionRequest = {
+  readonly actionId: string;
+  readonly ruleId: string;
+  readonly args: Readonly<Record<string, unknown>>;
+  readonly facts: readonly SparcWorkingMemoryFact[];
+};
+
+export type SparcProductionActionHandler = (
+  request: SparcProductionActionRequest,
+) => SparcProductionActionResult | Promise<SparcProductionActionResult>;
 
 export type SparcProductionRuleExecution = {
   readonly initialFacts: readonly SparcWorkingMemoryFact[];

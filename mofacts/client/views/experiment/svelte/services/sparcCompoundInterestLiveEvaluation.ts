@@ -2,7 +2,7 @@ import type {
   SparcTrialDisplay,
   SparcTrialResult,
 } from '../../../../../../learning-components/trial-displays/sparc/SparcTrialDisplayAdapter';
-import { evaluateSparcControllerDialogueTurn } from '../../../../../../learning-components/units/sparcsession/sparcControllerDialogueTurn';
+import { executeSparcAutoTutorRules } from '../../../../../../learning-components/units/sparcsession/sparcAutoTutorRuleRuntime';
 import { createSparcProgressiveScaffoldingRules } from '../../../../../../learning-components/units/sparcsession/sparcProgressiveScaffoldingRules';
 import type {
   SparcLearnerResponseEvidenceEnvelope,
@@ -760,28 +760,58 @@ async function runOnce(
       currentProviderParsedContent = undefined;
       currentEvidenceEnvelope = undefined;
       currentResponseEvaluation = undefined;
-      let learnerResponseScore: SparcLearnerResponseScoringResult;
+      let learnerResponseScore: SparcLearnerResponseScoringResult | undefined;
+      const scoreLearnerResponse = async () => {
+        try {
+          learnerResponseScore = await provider.scoreLearnerResponse({
+            document,
+            display,
+            result,
+            event,
+            problemStatement,
+            learnerText,
+            replayState,
+          });
+          if (!currentResponseEvaluation) {
+            throw new Error('SPARC live evaluation provider did not record the completed learner-response evaluation');
+          }
+          return learnerResponseScore;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          evaluationDiagnostic = {
+            stage: currentEvidenceEnvelope
+              ? 'scoring-evidence-validation'
+              : currentProviderResponseRecorded
+                ? 'scoring-response-parse'
+                : 'scoring-provider',
+            message,
+            attemptedTurn: {
+              turn,
+              phase,
+              learnerText,
+              ...(currentProviderResponseRecorded
+                ? { providerParsedContent: currentProviderParsedContent }
+                : {}),
+              ...(currentEvidenceEnvelope ? { evidenceEnvelope: currentEvidenceEnvelope } : {}),
+            },
+          };
+          throw error;
+        }
+      };
+      let dialogueTurn: Awaited<ReturnType<typeof executeSparcAutoTutorRules>>;
       try {
-        learnerResponseScore = await provider.scoreLearnerResponse({
+        dialogueTurn = await executeSparcAutoTutorRules({
           document,
-          display,
-          result,
+          replayState,
           event,
           problemStatement,
-          learnerText,
-          replayState,
+          scoreLearnerResponse,
+          generateTutorUtterance: provider.generateTutorUtterance,
         });
-        if (!currentResponseEvaluation) {
-          throw new Error('SPARC live evaluation provider did not record the completed learner-response evaluation');
-        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        evaluationDiagnostic = {
-          stage: currentEvidenceEnvelope
-            ? 'scoring-evidence-validation'
-            : currentProviderResponseRecorded
-              ? 'scoring-response-parse'
-              : 'scoring-provider',
+        evaluationDiagnostic ??= {
+          stage: 'dialogue-turn',
           message,
           attemptedTurn: {
             turn,
@@ -795,35 +825,9 @@ async function runOnce(
         };
         throw error;
       }
+      if (!currentResponseEvaluation || !learnerResponseScore) throw new Error('SPARC evaluation production did not complete');
       const { evidenceEnvelope } = currentResponseEvaluation;
-      let dialogueTurn: Awaited<ReturnType<typeof evaluateSparcControllerDialogueTurn>>;
-      try {
-        dialogueTurn = await evaluateSparcControllerDialogueTurn({
-          document,
-          replayState,
-          event,
-          problemStatement,
-          learnerResponseScore,
-          generateTutorUtterance: provider.generateTutorUtterance,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        evaluationDiagnostic = {
-          stage: 'dialogue-turn',
-          message,
-          attemptedTurn: {
-            turn,
-            phase,
-            learnerText,
-            ...(currentProviderResponseRecorded
-              ? { providerParsedContent: currentProviderParsedContent }
-              : {}),
-            evidenceEnvelope,
-          },
-        };
-        throw error;
-      }
-      const completed = completionFromFacts(dialogueTurn.planning.derivedFacts);
+      const completed = completionFromFacts(dialogueTurn.assessment.derivedFacts);
       turns.push({
         turn,
         phase,

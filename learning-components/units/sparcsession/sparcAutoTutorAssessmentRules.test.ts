@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import { evaluateSparcControllerTurnPlanning } from './sparcControllerTurnPlanning';
+import { executeSparcAutoTutorRules } from './sparcAutoTutorRuleRuntime';
 import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
 import type { SparcAuthoredDocument, SparcInterfaceEvent, SparcWorkingMemoryFact } from './sparcSessionContracts';
 
@@ -39,21 +38,26 @@ const event: SparcInterfaceEvent = {
   payload: { input: 'learner response' },
 };
 
-function selectedAction(result: ReturnType<typeof evaluateSparcControllerTurnPlanning>): SparcWorkingMemoryFact {
-  return result.productionRuleEvaluation.execution.facts
+function selectedAction(result: Awaited<ReturnType<typeof executeSparcAutoTutorRules>>): SparcWorkingMemoryFact {
+  return result.execution.facts
     .filter((entry) => entry.factType === 'controller.selectedAction')[0]!;
 }
 
-describe('evaluateSparcControllerTurnPlanning', function() {
-  it('lets a production start the maximum expectation at pump', function() {
-    const result = evaluateSparcControllerTurnPlanning({ document: document(), event });
-    assert.equal(result.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-a');
+describe('SPARC assessment and instructional productions', function() {
+  it('lets a production start the maximum expectation at pump', async function() {
+    const result = await executeSparcAutoTutorRules({
+      problemStatement: 'Explain A.', scoreLearnerResponse: () => ({}),
+      generateTutorUtterance: () => 'Tutor response.', document: document(), event,
+    });
+    assert.equal(result.assessment.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-a');
     assert.equal(selectedAction(result).slots?.targetType, 'expectation');
     assert.equal(selectedAction(result).slots?.action, 'pump');
   });
 
-  it('gives every threshold-eligible misconception priority and starts the maximum at prompt', function() {
-    const result = evaluateSparcControllerTurnPlanning({
+  it('gives every threshold-eligible misconception priority and starts the maximum at prompt', async function() {
+    const result = await executeSparcAutoTutorRules({
+      problemStatement: 'Explain A.', scoreLearnerResponse: () => ({}),
+      generateTutorUtterance: () => 'Tutor response.',
       document: document([
         fact('autotutor.misconception', { id: 'm-low', text: 'Low.' }),
         fact('autotutor.misconception', { id: 'm-high', text: 'High.' }),
@@ -62,13 +66,15 @@ describe('evaluateSparcControllerTurnPlanning', function() {
       ]),
       event,
     });
-    assert.equal(result.instructionalProjection.candidates.maximumMisconception?.targetId, 'm-high');
+    assert.equal(result.assessment.instructionalProjection.candidates.maximumMisconception?.targetId, 'm-high');
     assert.equal(selectedAction(result).slots?.targetId, 'm-high');
     assert.equal(selectedAction(result).slots?.action, 'prompt');
   });
 
-  it('interrupts an unfinished expectation when a misconception crosses threshold', function() {
-    const result = evaluateSparcControllerTurnPlanning({
+  it('interrupts an unfinished expectation when a misconception crosses threshold', async function() {
+    const result = await executeSparcAutoTutorRules({
+      problemStatement: 'Explain A.', scoreLearnerResponse: () => ({}),
+      generateTutorUtterance: () => 'Tutor response.',
       document: document([
         fact('autotutor.misconception', { id: 'm1', text: 'Incorrect belief.' }),
         fact('diagnostic.misconceptionScore', { id: 'm1', supportStrength: 0.4 }),
@@ -83,8 +89,10 @@ describe('evaluateSparcControllerTurnPlanning', function() {
     assert.equal(selectedAction(result).slots?.action, 'prompt');
   });
 
-  it('selects the terminal summary at completion', function() {
-    const result = evaluateSparcControllerTurnPlanning({
+  it('selects the terminal summary at completion', async function() {
+    const result = await executeSparcAutoTutorRules({
+      problemStatement: 'Explain A.', scoreLearnerResponse: () => ({}),
+      generateTutorUtterance: () => 'Tutor response.',
       document: document([
         fact('dialogue.graduation', { requiredTargetCount: 1 }),
         fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.9 }),

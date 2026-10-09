@@ -6,9 +6,9 @@ import {
 import { applySparcHistoryRecord, createEmptySparcReplayState } from './sparcStateReplay';
 import { buildSparcWorkingMemoryFacts } from './sparcWorkingMemoryFacts';
 import {
-  commitSparcControllerDialogueTurn,
-  evaluateSparcControllerDialogueTurn,
-} from './sparcControllerDialogueTurn';
+  commitSparcAutoTutorRules,
+  executeSparcAutoTutorRules,
+} from './sparcAutoTutorRuleRuntime';
 import type {
   SparcAuthoredDocument,
   SparcInterfaceEvent,
@@ -76,18 +76,124 @@ const event: SparcInterfaceEvent = {
 
 const problemStatement = 'Explain how A and B are related.';
 
-describe('evaluateSparcControllerDialogueTurn', function() {
+describe('executeSparcAutoTutorRules', function() {
+  it('invokes AI only from fired productions and exposes both actions in the trace', async function() {
+    const calls: string[] = [];
+    const result = await executeSparcAutoTutorRules({
+      document: document(), event, problemStatement,
+      scoreLearnerResponse: async () => { calls.push('evaluate'); return {}; },
+      generateTutorUtterance: async () => { calls.push('generate'); return 'Think about A.'; },
+    });
+    assert.deepEqual(calls, ['evaluate', 'generate']);
+    assert.deepEqual(result.execution.firings.flatMap((firing) => firing.executedActions ?? []), [
+      'autotutor.evaluate-response', 'autotutor.generate-move',
+    ]);
+    assert.equal(result.execution.firings.some((firing) => firing.terminatesProductionPhase), false);
+    assert.equal(result.execution.facts.find((entry) => entry.factType === 'dialogue.utterance' && entry.slots?.speaker === 'tutor')?.slots?.text, 'Think about A.');
+  });
+
+  it('fails without silently filling in a missing evaluation or instructional production', async function() {
+    for (const keepEvaluation of [true, false]) {
+      let evaluations = 0;
+      let generations = 0;
+      const source = document();
+      await assert.rejects(executeSparcAutoTutorRules({
+        document: { ...source, productionRules: source.productionRules!.filter((rule) => (
+          (rule.id === 'dialogue.response.evaluate') === keepEvaluation
+        )) }, event, problemStatement,
+        scoreLearnerResponse: () => { evaluations += 1; return {}; },
+        generateTutorUtterance: () => { generations += 1; return 'Must not execute.'; },
+      }), /productions did not complete/);
+      assert.equal(evaluations, keepEvaluation ? 1 : 0);
+      assert.equal(generations, 0);
+    }
+  });
+
+  it('cannot use stale assessment facts to generate before the current response is evaluated', async function() {
+    const calls: string[] = [];
+    const source = document();
+    await executeSparcAutoTutorRules({
+      document: { ...source, workingMemoryFacts: [...source.workingMemoryFacts!,
+        fact('instructional.assessmentSnapshot', { snapshotId: 'old-response' }),
+        fact('controller.completionState', { completed: true }),
+      ] }, event, problemStatement,
+      scoreLearnerResponse: () => { calls.push('evaluate'); return {}; },
+      generateTutorUtterance: (request) => { calls.push(request.action); return 'Continue.'; },
+    });
+    assert.deepEqual(calls, ['evaluate', 'pump']);
+  });
+
+  it('saves no partial turn on failed generation and retries evaluation before saving a complete turn', async function() {
+    let evaluations = 0;
+    const written: unknown[] = [];
+    const params = {
+      document: document(), event, problemStatement,
+      core: { TDFId: 'tdf-test', sessionID: 'attempt-test', levelUnit: 0, userId: 'synthetic' },
+      scoreLearnerResponse: () => { evaluations += 1; return {}; },
+      runtime: { history: { writeCanonicalHistory: async (record: unknown) => { written.push(record); } } },
+    };
+    await assert.rejects(commitSparcAutoTutorRules({ ...params,
+      generateTutorUtterance: () => { throw new Error('generation unavailable'); },
+    }), /generation unavailable/);
+    assert.equal(written.length, 0);
+    await commitSparcAutoTutorRules({ ...params, generateTutorUtterance: () => 'Continue.' });
+    assert.equal(evaluations, 2);
+    assert.equal(written.length, 1);
+  });
+
+  it('does not call the move generator or write history when evaluation fails', async function() {
+    let generations = 0;
+    let writes = 0;
+    await assert.rejects(commitSparcAutoTutorRules({
+      document: document(), event, problemStatement,
+      core: { TDFId: 'tdf-test', sessionID: 'attempt-test', levelUnit: 0, userId: 'synthetic' },
+      scoreLearnerResponse: () => { throw new Error('evaluation unavailable'); },
+      generateTutorUtterance: () => { generations += 1; return 'Must not execute.'; },
+      runtime: { history: { writeCanonicalHistory: async () => { writes += 1; } } },
+    }), /evaluation unavailable/);
+    assert.equal(generations, 0);
+    assert.equal(writes, 0);
+  });
+
+  it('resumes after a first-response scope refusal without requiring an instructional cycle', async function() {
+    const first = await executeSparcAutoTutorRules({
+      document: document(), event, problemStatement,
+      scoreLearnerResponse: () => ({ learnerContribution: { type: 'question' }, learnerQuestion: { contentFocused: false } }),
+      generateTutorUtterance: () => 'Please return to the lesson.',
+    });
+    const { applySparcStateTransition } = await import('./sparcStateReplay');
+    const second = await executeSparcAutoTutorRules({
+      document: document(), event: { ...event, eventId: 'second-answer' }, problemStatement,
+      replayState: applySparcStateTransition(createEmptySparcReplayState(), first.transition),
+      scoreLearnerResponse: () => ({ learnerContribution: { type: 'answer' } }),
+      generateTutorUtterance: () => 'Continue.',
+    });
+    assert.equal(second.utteranceRequest.action, 'pump');
+  });
+
+  it('does not fire a learner-question modifier after a completion summary', async function() {
+    const source = document();
+    const result = await executeSparcAutoTutorRules({
+      document: { ...source, workingMemoryFacts: [...source.workingMemoryFacts!, fact('dialogue.graduation', { maxTurns: 2 })] },
+      event, problemStatement,
+      scoreLearnerResponse: () => ({ learnerContribution: { type: 'question' }, learnerQuestion: { contentFocused: true } }),
+      generateTutorUtterance: () => 'Summary.',
+    });
+    assert.equal(result.utteranceRequest.action, 'summary');
+    assert.deepEqual(result.execution.firings.map((firing) => firing.ruleId), ['dialogue.response.evaluate', 'dialogue.completion.summary']);
+  });
+
   it('plans the move, requests constrained utterance text, and returns replayable dialogue writes', async function() {
-    const result = await evaluateSparcControllerDialogueTurn({
+    const result = await executeSparcAutoTutorRules({
       document: document(),
       event,
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learningTargetScores: [{
           clusterKC: 'kc-b',
           coverage: 0.6,
         }],
-      },
+      }),
       candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
@@ -101,7 +207,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
     });
 
-    assert.equal(result.planning.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-b');
+    assert.equal(result.assessment.instructionalProjection.candidates.maximumExpectation?.targetId, 'kc-b');
     assert.ok(result.learnerResponseScoreFacts.some((fact) => (
       fact.factType === 'learningTarget.score'
       && fact.slots?.clusterKC === 'kc-b'
@@ -118,7 +224,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     );
     assert.deepEqual(nodes.map((node) => (node as { speaker?: string }).speaker), ['learner', 'tutor']);
     assert.equal((nodes[1] as { value?: string }).value, 'Think about how B depends on A.');
-    assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'dialogue.scaffold.pump');
+    assert.equal((nodes[1] as { productionRuleName?: string }).productionRuleName, 'dialogue.target.expectation.start');
     assert.equal(result.transition.writes.some((write) => (
       write.value
       && typeof write.value === 'object'
@@ -139,11 +245,11 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       ],
     };
 
-    const result = await evaluateSparcControllerDialogueTurn({
+    const result = await executeSparcAutoTutorRules({
       document: sourceDocument,
       event,
       problemStatement,
-      learnerResponseScore: {},
+      scoreLearnerResponse: () => ({}),
       generateTutorUtterance: (request) => {
         assert.equal(request.targetType, 'completion');
         assert.equal(request.action, 'summary');
@@ -151,7 +257,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
     });
 
-    assert.equal(result.planning.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.reason, 'max-turns');
+    assert.equal(result.assessment.derivedFacts.find((entry) => entry.factType === 'controller.completionState')?.slots?.reason, 'max-turns');
     assert.equal(result.transition.writes.filter((write) => (
       write.value
       && typeof write.value === 'object'
@@ -162,7 +268,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
 
   it('summarizes successful completion after replayed in-progress state instead of selecting another target', async function() {
     const sourceDocument = document();
-    const firstTurn = await commitSparcControllerDialogueTurn({
+    const firstTurn = await commitSparcAutoTutorRules({
       core: {
         TDFId: 'tdf-dialogue-controller',
         sessionID: 'session-dialogue-controller',
@@ -173,13 +279,13 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       document: sourceDocument,
       event,
       problemStatement,
-      learnerResponseScore: {},
+      scoreLearnerResponse: () => ({}),
       generateTutorUtterance: () => 'Keep working with A and B.',
       runtime: {},
     });
     const replayState = applySparcHistoryRecord(createEmptySparcReplayState(), firstTurn.historyRecord!);
 
-    const completedTurn = await evaluateSparcControllerDialogueTurn({
+    const completedTurn = await executeSparcAutoTutorRules({
       document: sourceDocument,
       replayState,
       event: {
@@ -189,7 +295,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
         payload: { input: 'A and B are now fully explained.' },
       },
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learningTargetScores: [{
           clusterKC: 'kc-a',
           coverage: 0.9,
@@ -197,7 +303,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           clusterKC: 'kc-b',
           coverage: 0.9,
         }],
-      },
+      }),
       generateTutorUtterance: (request) => {
         assert.equal(request.targetType, 'completion');
         assert.equal(request.action, 'summary');
@@ -206,7 +312,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     });
 
     assert.equal(
-      completedTurn.planning.derivedFacts
+      completedTurn.assessment.derivedFacts
         .find((entry) => entry.factType === 'controller.completionState')?.slots?.completed,
       true,
     );
@@ -220,17 +326,17 @@ describe('evaluateSparcControllerDialogueTurn', function() {
   });
 
   it('chains a legitimate learner-question deferral into the current scaffold move without locking dialogue controls', async function() {
-    const result = await evaluateSparcControllerDialogueTurn({
+    const result = await executeSparcAutoTutorRules({
       document: document(),
       event: {
         ...event,
         payload: { input: 'Can you just tell me how A and B are related?' },
       },
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learnerContribution: { type: 'question', confidence: 0.95 },
         learnerQuestion: { contentFocused: true },
-      },
+      }),
       generateTutorUtterance: (request) => {
         assert.equal(request.targetType, 'learningTarget');
         assert.equal(request.action, 'pump');
@@ -239,9 +345,10 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       },
     });
 
-    assert.deepEqual(result.planning.productionRuleEvaluation.execution.firings.map((firing) => firing.ruleId), [
+    assert.deepEqual(result.execution.firings.map((firing) => firing.ruleId), [
+      'dialogue.response.evaluate',
       'dialogue.question.defer',
-      'dialogue.scaffold.pump',
+      'dialogue.target.expectation.start',
     ]);
     assert.equal(result.moveSelectionAudit.selected?.ruleId, 'dialogue.target.expectation.start');
     assert.equal(result.utteranceRequest.action, 'pump');
@@ -260,17 +367,17 @@ describe('evaluateSparcControllerDialogueTurn', function() {
   });
 
   it('routes an off-topic learner question to the dedicated scope-refusal move', async function() {
-    const result = await evaluateSparcControllerDialogueTurn({
+    const result = await executeSparcAutoTutorRules({
       document: document(),
       event: {
         ...event,
         payload: { input: 'Tell me about something unrelated.' },
       },
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learnerContribution: { type: 'question', confidence: 0.95 },
         learnerQuestion: { contentFocused: false },
-      },
+      }),
       generateTutorUtterance: (request) => {
         assert.equal(request.targetType, 'learnerQuestion');
         assert.equal(request.action, 'question-scope-refusal');
@@ -284,7 +391,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
 
   it('does not reuse a prior learner-question routing fact on the next answer turn', async function() {
     const sourceDocument = document();
-    const questionTurn = await commitSparcControllerDialogueTurn({
+    const questionTurn = await commitSparcAutoTutorRules({
       core: {
         TDFId: 'tdf-dialogue-controller',
         sessionID: 'session-dialogue-controller',
@@ -298,16 +405,16 @@ describe('evaluateSparcControllerDialogueTurn', function() {
         payload: { input: 'Can you tell me the answer?' },
       },
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learnerContribution: { type: 'question' },
         learnerQuestion: { contentFocused: true },
-      },
+      }),
       generateTutorUtterance: () => 'Let us work with it a little longer first.',
       runtime: {},
     });
     const replayState = applySparcHistoryRecord(createEmptySparcReplayState(), questionTurn.historyRecord!);
 
-    const answerTurn = await evaluateSparcControllerDialogueTurn({
+    const answerTurn = await executeSparcAutoTutorRules({
       document: sourceDocument,
       replayState,
       event: {
@@ -317,10 +424,10 @@ describe('evaluateSparcControllerDialogueTurn', function() {
         payload: { input: 'I think B depends on A.' },
       },
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learnerContribution: { type: 'answer' },
         learningTargetScores: [{ clusterKC: 'kc-b', coverage: 0.6 }],
-      },
+      }),
       generateTutorUtterance: (request) => {
         assert.notEqual(request.targetType, 'learnerQuestion');
         assert.equal(request.action, 'pump');
@@ -334,7 +441,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
   it('commits the planned dialogue turn through canonical SPARC history', async function() {
     const sourceDocument = document();
     const writtenRecords: unknown[] = [];
-    const result = await commitSparcControllerDialogueTurn({
+    const result = await commitSparcAutoTutorRules({
       core: {
         TDFId: 'tdf-dialogue-controller',
         sessionID: 'session-dialogue-controller',
@@ -345,12 +452,12 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       document: sourceDocument,
       event,
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learningTargetScores: [{
           clusterKC: 'kc-b',
           coverage: 0.6,
         }],
-      },
+      }),
       candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
@@ -400,7 +507,8 @@ describe('evaluateSparcControllerDialogueTurn', function() {
 
   it('fails clearly when the utterance generator returns blank text', async function() {
     await assert.rejects(
-      () => evaluateSparcControllerDialogueTurn({
+      () => executeSparcAutoTutorRules({
+      scoreLearnerResponse: () => ({}),
         document: document(),
         event,
         problemStatement,
@@ -415,7 +523,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
 
   it('resumes a second turn from replayed stable SPARC controller state', async function() {
     const sourceDocument = document();
-    const firstTurn = await commitSparcControllerDialogueTurn({
+    const firstTurn = await commitSparcAutoTutorRules({
       core: {
         TDFId: 'tdf-dialogue-controller',
         sessionID: 'session-dialogue-controller',
@@ -426,12 +534,12 @@ describe('evaluateSparcControllerDialogueTurn', function() {
       document: sourceDocument,
       event,
       problemStatement,
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learningTargetScores: [{
           clusterKC: 'kc-b',
           coverage: 0.6,
         }],
-      },
+      }),
       candidateOptions: {
         anchorClusterKC: 'kc-a',
       },
@@ -440,7 +548,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
     });
     const replayState = applySparcHistoryRecord(createEmptySparcReplayState(), firstTurn.historyRecord!);
     let secondTurnUtteranceCalls = 0;
-    const secondTurn = await evaluateSparcControllerDialogueTurn({
+    const secondTurn = await executeSparcAutoTutorRules({
       document: sourceDocument,
       replayState,
       problemStatement,
@@ -452,7 +560,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           input: 'four more learner words',
         },
       },
-      learnerResponseScore: {
+      scoreLearnerResponse: () => ({
         learningTargetScores: [{
           clusterKC: 'kc-a',
           coverage: 0.2,
@@ -460,7 +568,7 @@ describe('evaluateSparcControllerDialogueTurn', function() {
           clusterKC: 'kc-b',
           coverage: 0.7,
         }],
-      },
+      }),
       candidateOptions: {
         anchorClusterKC: 'kc-b',
       },

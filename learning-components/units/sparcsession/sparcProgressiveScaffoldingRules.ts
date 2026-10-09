@@ -11,10 +11,20 @@ const literalPattern = (value: unknown) => ({ type: 'literal' as const, value })
 const bind = (name: string) => ({ type: 'bind' as const, variable: name });
 const bound = (name: string) => ({ type: 'bound' as const, variable: name });
 
+export const SPARC_AUTOTUTOR_EVALUATE_ACTION = 'autotutor.evaluate-response';
+export const SPARC_AUTOTUTOR_GENERATE_ACTION = 'autotutor.generate-move';
+
+function responsePattern(): SparcFactPattern {
+  return {
+    factType: 'interface-event',
+    slots: { eventType: literalPattern('response-submitted'), eventId: bind('snapshotId'), pageKey: bind('pageKey') },
+  };
+}
+
 function assessmentPattern(): SparcFactPattern {
   return {
     factType: 'instructional.assessmentSnapshot',
-    slots: { snapshotId: bind('snapshotId') },
+    slots: { snapshotId: bound('snapshotId') },
   };
 }
 
@@ -258,8 +268,8 @@ function decisionEffects(params: {
       ? startedCycle(params.targetKind, params.stage)
       : continuedCycle(params.targetKind, params.stage),
   }, {
-    type: 'terminate-production-phase',
-    reason: 'instructional-decision-selected',
+    type: 'invoke-action',
+    actionId: SPARC_AUTOTUTOR_GENERATE_ACTION,
   }];
 }
 
@@ -279,6 +289,7 @@ function continuationRule(params: {
     module: 'dialogue.instructional-control',
     salience: 60,
     when: [
+      responsePattern(),
       assessmentPattern(),
       completionPattern(false),
       activeCyclePattern({ targetKind: params.targetKind, stage: params.currentStage }),
@@ -312,6 +323,7 @@ function startRule(params: {
     module: 'dialogue.instructional-control',
     salience: params.targetKind === 'misconception' ? 70 : 50,
     when: [
+      responsePattern(),
       assessmentPattern(),
       completionPattern(false),
       cycleStatusPattern(false),
@@ -353,10 +365,18 @@ function learnerQuestionDecision(params: {
 
 export function createSparcProgressiveScaffoldingRules(): readonly SparcProductionRule[] {
   return [{
+    id: 'dialogue.response.evaluate',
+    module: 'dialogue.assessment',
+    when: [responsePattern(), {
+      type: 'not',
+      pattern: { factType: 'instructional.assessmentSnapshot', slots: { snapshotId: bound('snapshotId') } },
+    }],
+    then: [{ type: 'invoke-action', actionId: SPARC_AUTOTUTOR_EVALUATE_ACTION }],
+  }, {
     id: 'dialogue.completion.summary',
     module: 'dialogue.instructional-control',
     salience: 100,
-    when: [assessmentPattern(), completionPattern(true), noDecisionPattern()],
+    when: [responsePattern(), assessmentPattern(), completionPattern(true), noDecisionPattern()],
     then: [{
       type: 'assert-fact',
       persist: true,
@@ -407,14 +427,23 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
         },
       },
     }, {
-      type: 'terminate-production-phase',
-      reason: 'instructional-decision-selected',
-    }],
+      type: 'invoke-action',
+      actionId: SPARC_AUTOTUTOR_GENERATE_ACTION,
+    }, ...(['learner-response-input', 'learner-response-submit'] as const).map((id) => ({
+      type: 'insert-node' as const,
+      node: {
+        id, nodeType: 'atomic',
+        atomType: id === 'learner-response-input' ? 'text-input' : 'button',
+        label: id === 'learner-response-input' ? 'Response' : 'Submit',
+        ...(id === 'learner-response-submit' ? { value: 'submit' } : {}),
+        readOnly: true,
+      },
+    }))],
   }, {
     id: 'dialogue.question.defer',
     module: 'dialogue.instructional-control',
     salience: 90,
-    when: [assessmentPattern(), {
+    when: [responsePattern(), assessmentPattern(), noDecisionPattern(), {
       factType: 'dialogue.learnerQuestion',
       slots: { contentFocused: literalPattern(true) },
     }],
@@ -433,7 +462,7 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
     id: 'dialogue.question.scope-refusal',
     module: 'dialogue.instructional-control',
     salience: 90,
-    when: [assessmentPattern(), {
+    when: [responsePattern(), assessmentPattern(), {
       factType: 'dialogue.learnerQuestion',
       slots: { contentFocused: literalPattern(false) },
     }, noDecisionPattern()],
@@ -460,14 +489,15 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
         },
       },
     }, {
-      type: 'terminate-production-phase',
-      reason: 'instructional-decision-selected',
+      type: 'invoke-action',
+      actionId: SPARC_AUTOTUTOR_GENERATE_ACTION,
     }],
   }, {
     id: 'dialogue.target.misconception.interrupt',
     module: 'dialogue.instructional-control',
     salience: 80,
     when: [
+      responsePattern(),
       assessmentPattern(),
       completionPattern(false),
       interruptedExpectationPattern(),

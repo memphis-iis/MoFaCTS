@@ -12,10 +12,10 @@ import {
   type SparcCommittedProductionRuleEvaluation,
 } from './sparcProductionRuleCommit';
 import {
-  commitSparcControllerDialogueTurn,
-  type SparcControllerDialogueTurnResult,
+  commitSparcAutoTutorRules,
+  type SparcAutoTutorRuleTurnResult,
   type SparcUtteranceGenerator,
-} from './sparcControllerDialogueTurn';
+} from './sparcAutoTutorRuleRuntime';
 import { requireBoundedSparcDialogueMessage } from './sparcDialogueTurnNodes';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
@@ -93,11 +93,11 @@ export type SparcTrialDisplayDialogueTurnScorer = (params: {
   readonly replayState: SparcReplayState;
 }) => Promise<SparcLearnerResponseScoringResult> | SparcLearnerResponseScoringResult;
 
-export type SparcTrialDisplayControllerDialogueTurnCommitResult = {
+export type SparcTrialDisplayAutoTutorRuleCommitResult = {
   readonly document: SparcAuthoredDocument;
   readonly event: SparcInterfaceEvent;
   readonly learnerText: string;
-  readonly dialogueTurn: SparcControllerDialogueTurnResult;
+  readonly dialogueTurn: SparcAutoTutorRuleTurnResult;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -740,7 +740,7 @@ function createSparcDialogueEventFromTrialResult(params: {
   };
 }
 
-export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
+export async function commitSparcTrialDisplayAutoTutorRules(params: {
   readonly core: SparcPracticeHistoryCore;
   readonly pageKey: string;
   readonly display: SparcTrialDisplay;
@@ -753,7 +753,7 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
-}): Promise<SparcTrialDisplayControllerDialogueTurnCommitResult> {
+}): Promise<SparcTrialDisplayAutoTutorRuleCommitResult> {
   const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
     pageKey: params.pageKey,
     display: params.display,
@@ -769,22 +769,21 @@ export async function commitSparcTrialDisplayControllerDialogueTurn(params: {
     'SPARC learner dialogue text',
   );
   const problemStatement = requireSparcDialogueProblemStatement(params.display);
-  const learnerResponseScore = await params.scoreLearnerResponse({
-    document,
-    display: params.display,
-    result: params.result,
-    event,
-    problemStatement,
-    learnerText,
-    replayState,
-  });
-  const dialogueTurn = await commitSparcControllerDialogueTurn({
+  const dialogueTurn = await commitSparcAutoTutorRules({
     core: params.core,
     document,
     replayState,
     event,
     problemStatement,
-    learnerResponseScore,
+    scoreLearnerResponse: () => params.scoreLearnerResponse({
+      document,
+      display: params.display,
+      result: params.result,
+      event,
+      problemStatement,
+      learnerText,
+      replayState,
+    }),
     ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
     ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
     generateTutorUtterance: params.generateTutorUtterance,

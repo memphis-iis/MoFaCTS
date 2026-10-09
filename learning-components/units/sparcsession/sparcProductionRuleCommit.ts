@@ -373,7 +373,7 @@ function createCorrectFeedbackClearWrites(params: {
   }];
 }
 
-function createProductionRuleTransition(params: {
+export function createProductionRuleTransition(params: {
   readonly document: SparcAuthoredDocument;
   readonly event: SparcInterfaceEvent;
   readonly execution: SparcProductionRuleExecution;

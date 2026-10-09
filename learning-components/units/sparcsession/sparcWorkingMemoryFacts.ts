@@ -145,7 +145,7 @@ function replayStateFacts(replayState: SparcReplayState): readonly SparcWorkingM
   });
 }
 
-function progressiveDialogueFacts(replayState: SparcReplayState): readonly SparcWorkingMemoryFact[] {
+export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'transitions'>): readonly SparcWorkingMemoryFact[] {
   return replayState.transitions.flatMap((transition) => transition.writes.flatMap((write) => {
     if (write.key !== SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY || !isRecord(write.value)) {
       return [];

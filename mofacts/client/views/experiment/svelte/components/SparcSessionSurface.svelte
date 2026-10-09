@@ -5,9 +5,9 @@
     resolveSparcControllerResult,
   } from '../services/sparcController';
   import {
-    commitSparcControllerDialogueSubmit,
-    isSparcControllerDialogueDisplay,
-  } from '../services/sparcControllerDialogueCommit';
+    commitSparcAutoTutorSubmit,
+    isSparcAutoTutorDisplay,
+  } from '../services/sparcAutoTutorRuleCommit';
   import {
     createSparcDialogueOpenRouterProvider,
   } from '../services/sparcControllerDialogueOpenRouter';
@@ -425,7 +425,7 @@
   }
 
   function buildOptimisticDialogueLearnerOperations(candidateDisplay, sparcResult) {
-    if (!isSparcControllerDialogueDisplay(candidateDisplay)) {
+    if (!isSparcAutoTutorDisplay(candidateDisplay)) {
       return [];
     }
     const learnerText = String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
@@ -485,7 +485,7 @@
       return;
     }
     const currentDisplay = currentSparcControllerDisplay('[SparcSessionSurface] SPARC action');
-    if (isSparcControllerDialogueDisplay(currentDisplay)) {
+    if (isSparcAutoTutorDisplay(currentDisplay)) {
       return;
     }
     const pageKey = typeof currentDisplay.pageKey === 'string' ? currentDisplay.pageKey.trim() : '';
@@ -515,7 +515,7 @@
       return { canSubmit: true };
     }
     const currentDisplay = currentSparcControllerDisplay('[SparcSessionSurface] SPARC submit');
-    if (isSparcControllerDialogueDisplay(currentDisplay)) {
+    if (isSparcAutoTutorDisplay(currentDisplay)) {
       const sparcResult = resolveSparcControllerResult(currentDisplay, detail || {}, '[SparcSessionSurface]');
       if (!sparcResult) {
         throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
@@ -541,7 +541,7 @@
       }
       let result;
       try {
-        result = await commitSparcControllerDialogueSubmit({
+        result = await commitSparcAutoTutorSubmit({
           engine,
           currentDisplay,
           sparcResult,

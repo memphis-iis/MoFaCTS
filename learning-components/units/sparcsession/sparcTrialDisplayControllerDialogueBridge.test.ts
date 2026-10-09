@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { collectSparcProgressiveNodeOperations } from '../../trial-displays/sparc/sparcProgressiveNodes';
-import { commitSparcTrialDisplayControllerDialogueTurn } from './sparcTrialDisplayRuntimeBridge';
+import { commitSparcTrialDisplayAutoTutorRules } from './sparcTrialDisplayRuntimeBridge';
 import type { SparcTrialDisplay } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
@@ -82,7 +82,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
     let generatorTargetId = '';
     let generatorProblemStatement = '';
 
-    const result = await commitSparcTrialDisplayControllerDialogueTurn({
+    const result = await commitSparcTrialDisplayAutoTutorRules({
       core: {
         TDFId: 'tdf-1',
         sessionID: 'session-1',
@@ -152,7 +152,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
     const historyRecords: CanonicalHistoryRecord[] = [];
     const display = dialogueDisplay();
 
-    await commitSparcTrialDisplayControllerDialogueTurn({
+    await commitSparcTrialDisplayAutoTutorRules({
       core: {
         TDFId: 'tdf-1',
         sessionID: 'session-1',
@@ -192,7 +192,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
 
     let secondScorerCalls = 0;
     let secondGeneratorCalls = 0;
-    const _secondTurn = await commitSparcTrialDisplayControllerDialogueTurn({
+    const _secondTurn = await commitSparcTrialDisplayAutoTutorRules({
       core: {
         TDFId: 'tdf-1',
         sessionID: 'session-1',
@@ -244,7 +244,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
 
   it('rejects ambiguous dialogue submits instead of guessing a learner response', async function() {
     await assert.rejects(
-      () => commitSparcTrialDisplayControllerDialogueTurn({
+      () => commitSparcTrialDisplayAutoTutorRules({
         core: {
           TDFId: 'tdf-1',
           sessionID: 'session-1',
@@ -278,7 +278,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
     let scorerCalls = 0;
 
     await assert.rejects(
-      () => commitSparcTrialDisplayControllerDialogueTurn({
+      () => commitSparcTrialDisplayAutoTutorRules({
         core: {
           TDFId: 'tdf-1',
           sessionID: 'session-1',

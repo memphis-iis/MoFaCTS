@@ -8,6 +8,7 @@ import type {
   SparcProductionRuleFiring,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { SPARC_AUTOTUTOR_GENERATE_ACTION } from './sparcProgressiveScaffoldingRules';
 
 export type SparcMoveSelectionAuditCandidate = {
   readonly ruleId: string;
@@ -122,7 +123,9 @@ export function auditSparcMoveSelection(params: {
       right.salience - left.salience
       || left.ruleId.localeCompare(right.ruleId)
     ));
-  const selected = candidates.find((candidate) => candidate.terminal && candidate.valid);
+  const selected = candidates.find((candidate) => candidate.valid && firings.some((firing) => (
+    firing.ruleId === candidate.ruleId && firing.executedActions?.includes(SPARC_AUTOTUTOR_GENERATE_ACTION)
+  )));
   const selectedAction = selected
     ? firings.find((firing) => firing.ruleId === selected.ruleId)
     : undefined;

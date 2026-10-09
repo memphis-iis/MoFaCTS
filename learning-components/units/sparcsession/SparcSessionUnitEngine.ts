@@ -14,12 +14,12 @@ import {
   evaluateSparcAuthoredProductionRules,
 } from './sparcProductionRuleCommit';
 import {
-  commitSparcControllerDialogueTurn,
+  commitSparcAutoTutorRules,
   type SparcUtteranceGenerator,
-} from './sparcControllerDialogueTurn';
+} from './sparcAutoTutorRuleRuntime';
 import type { SparcLearnerResponseScoringResult } from './sparcLearnerResponseScoring';
 import {
-  commitSparcTrialDisplayControllerDialogueTurn,
+  commitSparcTrialDisplayAutoTutorRules,
   commitSparcTrialDisplayProductionRuleEvents,
   evaluateSparcTrialDisplayProductionRuleEvents,
   type SparcTrialDisplayDialogueTurnScorer,
@@ -403,14 +403,14 @@ export type SparcAuthoredProductionRuleRuntimeParams = {
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
-export type SparcControllerDialogueTurnRuntimeParams = {
+export type SparcAutoTutorRuleTurnRuntimeParams = {
   readonly core: SparcPracticeHistoryCore;
   readonly document: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
   readonly event: SparcInterfaceEvent;
   readonly problemStatement: string;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
-  readonly learnerResponseScore?: SparcLearnerResponseScoringResult;
+  readonly scoreLearnerResponse: () => SparcLearnerResponseScoringResult | Promise<SparcLearnerResponseScoringResult>;
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
@@ -428,7 +428,7 @@ export type SparcTrialDisplayProductionRuleRuntimeParams = {
   readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
 };
 
-export type SparcTrialDisplayControllerDialogueTurnRuntimeParams = {
+export type SparcTrialDisplayAutoTutorRuleRuntimeParams = {
   readonly core: SparcPracticeHistoryCore;
   readonly pageKey: string;
   readonly display: SparcTrialDisplay;
@@ -522,17 +522,17 @@ export async function createSparcSessionUnitEngine(
       });
     },
 
-    async commitSparcControllerDialogueTurn(
-      params: SparcControllerDialogueTurnRuntimeParams,
+    async commitSparcAutoTutorRules(
+      params: SparcAutoTutorRuleTurnRuntimeParams,
     ) {
-      return await commitSparcControllerDialogueTurn({
+      return await commitSparcAutoTutorRules({
         core: params.core,
         document: params.document,
         ...(params.replayState ? { replayState: params.replayState } : {}),
         event: params.event,
         problemStatement: params.problemStatement,
         ...(params.extraFacts ? { extraFacts: params.extraFacts } : {}),
-        ...(params.learnerResponseScore ? { learnerResponseScore: params.learnerResponseScore } : {}),
+        scoreLearnerResponse: params.scoreLearnerResponse,
         ...(params.candidateOptions ? { candidateOptions: params.candidateOptions } : {}),
         ...(params.maxProductionRuleCycles !== undefined ? { maxProductionRuleCycles: params.maxProductionRuleCycles } : {}),
         generateTutorUtterance: params.generateTutorUtterance,
@@ -561,10 +561,10 @@ export async function createSparcSessionUnitEngine(
       });
     },
 
-    async commitSparcTrialDisplayControllerDialogueTurn(
-      params: SparcTrialDisplayControllerDialogueTurnRuntimeParams,
+    async commitSparcTrialDisplayAutoTutorRules(
+      params: SparcTrialDisplayAutoTutorRuleRuntimeParams,
     ) {
-      return await commitSparcTrialDisplayControllerDialogueTurn({
+      return await commitSparcTrialDisplayAutoTutorRules({
         core: params.core,
         pageKey: params.pageKey,
         display: params.display,

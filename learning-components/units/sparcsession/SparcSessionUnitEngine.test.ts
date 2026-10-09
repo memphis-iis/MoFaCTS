@@ -999,7 +999,8 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     const engine = await createSparcSessionUnitEngine(createMinimalDeps());
     const writtenRecords: CanonicalHistoryRecord[] = [];
 
-    const result = await engine.commitSparcControllerDialogueTurn({
+    const result = await engine.commitSparcAutoTutorRules({
+      scoreLearnerResponse: () => ({}),
       core: {
         TDFId: 'tdf-1',
         sessionID: 'session-1',

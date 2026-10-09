@@ -12,14 +12,14 @@ import {
   collectSparcProgressiveNodeOperations,
 } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import type {
-  SparcTrialDisplayControllerDialogueTurnRuntimeParams,
+  SparcTrialDisplayAutoTutorRuleRuntimeParams,
 } from '../../../../../../learning-components/units/sparcsession/SparcSessionUnitEngine';
 import type {
   SparcTrialDisplayDialogueTurnScorer,
 } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type {
   SparcUtteranceGenerator,
-} from '../../../../../../learning-components/units/sparcsession/sparcControllerDialogueTurn';
+} from '../../../../../../learning-components/units/sparcsession/sparcAutoTutorRuleRuntime';
 import type { UnitEngineLike } from '../../../../../common/types';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import {
@@ -41,8 +41,8 @@ type SparcControllerDialogueDisplay = SparcControllerDisplay & {
 };
 
 type SparcControllerDialogueEngine = UnitEngineLike & {
-  readonly commitSparcTrialDisplayControllerDialogueTurn?: (
-    params: SparcTrialDisplayControllerDialogueTurnRuntimeParams
+  readonly commitSparcTrialDisplayAutoTutorRules?: (
+    params: SparcTrialDisplayAutoTutorRuleRuntimeParams
   ) => Promise<{
     readonly document?: unknown;
     readonly dialogueTurn?: {
@@ -72,7 +72,7 @@ function defaultUserId(): string | null {
   return typeof meteor?.userId === 'function' ? meteor.userId() : null;
 }
 
-export function isSparcControllerDialogueDisplay(display: unknown): display is SparcControllerDialogueDisplay {
+export function isSparcAutoTutorDisplay(display: unknown): display is SparcControllerDialogueDisplay {
   const sparcDisplay = resolveSparcControllerDisplay(
     isRecord(display) ? display : undefined,
     '[SPARC][Dialogue]',
@@ -134,7 +134,7 @@ function extractDialogueNodeValues(params: {
   return values;
 }
 
-export async function commitSparcControllerDialogueSubmit(params: {
+export async function commitSparcAutoTutorSubmit(params: {
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
   readonly sparcResult: SparcControllerResult;
@@ -170,7 +170,7 @@ export async function commitSparcControllerDialogueSubmit(params: {
   }
 
   const engine = params.engine as SparcControllerDialogueEngine | null | undefined;
-  if (typeof engine?.commitSparcTrialDisplayControllerDialogueTurn !== 'function') {
+  if (typeof engine?.commitSparcTrialDisplayAutoTutorRules !== 'function') {
     throw new Error('[SPARC][Dialogue] Submit requires SPARC session controller-dialogue commit support');
   }
   const sparcRuntime = readSparcResumeSnapshot({
@@ -184,7 +184,7 @@ export async function commitSparcControllerDialogueSubmit(params: {
   const startedAt = Date.now();
   let writtenHistoryCount = 0;
 
-  const result = await engine.commitSparcTrialDisplayControllerDialogueTurn({
+  const result = await engine.commitSparcTrialDisplayAutoTutorRules({
     core: {
       TDFId: tdfId,
       sessionID: attemptId,

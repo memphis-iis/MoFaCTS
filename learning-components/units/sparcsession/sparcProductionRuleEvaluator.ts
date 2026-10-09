@@ -12,6 +12,9 @@ import type {
   SparcRuleExpression,
   SparcStateWrite,
   SparcWorkingMemoryFact,
+  SparcProductionActionHandler,
+  SparcProductionActionRequest,
+  SparcProductionActionResult,
 } from './sparcSessionContracts';
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 
@@ -492,6 +495,11 @@ function collectReferencedVariablesFromEffect(
   variables: Set<string>,
 ): void {
   switch (effect.type) {
+    case 'invoke-action':
+      for (const expression of Object.values(effect.args ?? {})) {
+        collectReferencedVariablesFromExpression(expression, variables);
+      }
+      break;
     case 'assert-fact':
       addVariablesFromTemplate(effect.fact.factId, variables);
       for (const expression of Object.values(effect.fact.slots ?? {})) {
@@ -823,6 +831,10 @@ function instantiateFiring(
 
   for (const effect of rule.then) {
     switch (effect.type) {
+      case 'invoke-action':
+        // Matching only describes potential firings. The execution driver owns calls.
+        requireNonBlank(effect.actionId, 'SPARC production action id');
+        break;
       case 'assert-fact':
         {
         const fact = instantiateFact(effect, bindings);
@@ -993,19 +1005,66 @@ export function getCompiledSparcProductionRulePlan(
   return compiled;
 }
 
-export function runSparcProductionRules(params: {
+type SparcProductionExecutionParams = {
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly rules: readonly SparcProductionRule[];
   readonly maxCycles?: number;
   readonly compiledPlan?: SparcProductionRulePlan;
-}): SparcProductionRuleExecution {
+};
+
+function mergeFirings(left: SparcProductionRuleFiring, right: SparcProductionRuleFiring): SparcProductionRuleFiring {
+  return {
+    ruleId: left.ruleId,
+    bindings: left.bindings,
+    assertedFacts: [...left.assertedFacts, ...right.assertedFacts],
+    persistentAssertedFacts: [...left.persistentAssertedFacts, ...right.persistentAssertedFacts],
+    persistentAssertedFactIdentitySlots: [...left.persistentAssertedFactIdentitySlots, ...right.persistentAssertedFactIdentitySlots],
+    writes: [...left.writes, ...right.writes],
+    messages: [...left.messages, ...right.messages],
+    modelPracticeObservations: [...left.modelPracticeObservations, ...right.modelPracticeObservations],
+    classifications: [...left.classifications, ...right.classifications],
+    credits: [...left.credits, ...right.credits],
+    executedActions: [...(left.executedActions ?? []), ...(right.executedActions ?? [])],
+    terminatesProductionPhase: left.terminatesProductionPhase || right.terminatesProductionPhase,
+    ...((right.terminalReason ?? left.terminalReason) !== undefined
+      ? { terminalReason: right.terminalReason ?? left.terminalReason! } : {}),
+  };
+}
+
+function applyAssertion(
+  facts: SparcWorkingMemoryFact[],
+  fact: SparcWorkingMemoryFact,
+  identitySlots?: Readonly<Record<string, unknown>>,
+): void {
+  requireNonBlank(fact.factType, 'SPARC action fact type');
+  if (identitySlots) {
+    for (const [key, value] of Object.entries(identitySlots)) {
+      if (stableStringify(fact.slots?.[key]) !== stableStringify(value)) {
+        throw new Error(`SPARC fact identity slot "${key}" does not match asserted fact`);
+      }
+    }
+    for (let index = facts.length - 1; index >= 0; index -= 1) {
+      const existing = facts[index]!;
+      if (existing.factType === fact.factType && existing.factId === fact.factId
+        && Object.entries(identitySlots).every(([key, value]) => (
+          stableStringify(existing.slots?.[key]) === stableStringify(value)
+        ))) facts.splice(index, 1);
+    }
+  }
+  const key = createFactKey(fact);
+  if (!facts.some((existing) => createFactKey(existing) === key)) facts.push(fact);
+}
+
+/** One execution machine for synchronous derivations and awaited capability actions. */
+function* executeProductionRules(params: SparcProductionExecutionParams): Generator<
+  SparcProductionActionRequest, SparcProductionRuleExecution, SparcProductionActionResult
+> {
   const maxCycles = params.maxCycles ?? 25;
   if (!Number.isInteger(maxCycles) || maxCycles < 1) {
     throw new Error('SPARC production rule maxCycles must be a positive integer');
   }
 
   const facts: SparcWorkingMemoryFact[] = [...params.facts];
-  const factKeys = new Set(facts.map((fact) => createFactKey(fact)));
   const firedActivationKeys = new Set<string>();
   const firings: SparcProductionRuleFiring[] = [];
   const compiledPlan = params.compiledPlan ?? getCompiledSparcProductionRulePlan(params.rules);
@@ -1033,16 +1092,47 @@ export function runSparcProductionRules(params: {
       };
     }
 
-    firings.push(nextFiring);
-    for (const fact of nextFiring.assertedFacts) {
-      const factKey = createFactKey(fact);
-      if (factKeys.has(factKey)) {
-        continue;
+    const rule = compiledPlan.sortedRules.find((candidate) => candidate.id === nextFiring.ruleId)!;
+    let executed = instantiateFiring({ ...rule, then: [] }, { ...nextFiring.bindings });
+    for (const effect of rule.then) {
+      if (effect.type === 'invoke-action') {
+        const result = yield {
+          actionId: effect.actionId,
+          ruleId: rule.id,
+          args: Object.fromEntries(Object.entries(effect.args ?? {}).map(([key, expression]) => (
+            [key, evaluateSparcRuleExpression(expression, nextFiring.bindings)]
+          ))),
+          facts: [...facts],
+        };
+        if (!result || !Array.isArray(result.assertions) || !Array.isArray(result.writes)) {
+          throw new Error(`SPARC action "${effect.actionId}" must return assertions and writes`);
+        }
+        for (const write of result.writes) {
+          requireNonBlank(write.target?.pageKey, 'SPARC action write pageKey');
+          requireNonBlank(write.target?.nodeId, 'SPARC action write nodeId');
+          requireNonBlank(write.key, 'SPARC action write key');
+        }
+        for (const assertion of result.assertions) applyAssertion(facts, assertion.fact, assertion.identitySlots);
+        const persistent = result.assertions.filter((assertion) => assertion.persist !== false);
+        executed = mergeFirings(executed, {
+          ...instantiateFiring({ ...rule, then: [] }, { ...nextFiring.bindings }),
+          assertedFacts: result.assertions.map((assertion) => assertion.fact),
+          persistentAssertedFacts: persistent.map((assertion) => assertion.fact),
+          persistentAssertedFactIdentitySlots: persistent.map((assertion) => assertion.identitySlots),
+          writes: result.writes,
+          executedActions: [effect.actionId],
+        });
+      } else {
+        const part = instantiateFiring({ ...rule, then: [effect] }, { ...nextFiring.bindings });
+        for (const fact of part.assertedFacts) {
+          const identity = effect.type === 'assert-fact' ? instantiateFactIdentitySlots(effect, fact) : undefined;
+          applyAssertion(facts, fact, identity);
+        }
+        executed = mergeFirings(executed, part);
       }
-      factKeys.add(factKey);
-      facts.push(fact);
     }
-    if (nextFiring.terminatesProductionPhase) {
+    firings.push(executed);
+    if (executed.terminatesProductionPhase) {
       return {
         initialFacts: params.facts,
         facts,
@@ -1053,4 +1143,27 @@ export function runSparcProductionRules(params: {
   }
 
   throw new Error(`SPARC production rules did not quiesce within ${maxCycles} cycles`);
+}
+
+export function runSparcProductionRules(params: SparcProductionExecutionParams): SparcProductionRuleExecution {
+  const execution = executeProductionRules(params);
+  const step = execution.next();
+  if (!step.done) {
+    throw new Error(`SPARC action "${step.value.actionId}" requires the asynchronous production executor`);
+  }
+  return step.value;
+}
+
+export async function runSparcProductionRulesWithActions(params: SparcProductionExecutionParams & {
+  readonly actions: Readonly<Record<string, SparcProductionActionHandler>>;
+}): Promise<SparcProductionRuleExecution> {
+  const execution = executeProductionRules(params);
+  let step = execution.next();
+  while (!step.done) {
+    const request = step.value;
+    const handler = Object.hasOwn(params.actions, request.actionId) ? params.actions[request.actionId] : undefined;
+    if (!handler) throw new Error(`SPARC production action "${request.actionId}" is not registered`);
+    step = execution.next(await handler(request));
+  }
+  return step.value;
 }

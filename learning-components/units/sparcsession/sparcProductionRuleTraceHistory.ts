@@ -77,6 +77,7 @@ function traceDetails(params: {
     sourceEventId: params.event.eventId,
     sourceEventType: params.event.type,
     firingIndex: params.index,
+    ...(params.firing.executedActions?.length ? { executedActions: params.firing.executedActions } : {}),
     ...ruleMetadata(params.document, params.firing.ruleId),
     bindings: params.firing.bindings,
     ...(params.firing.messages.length > 0 ? { messages: params.firing.messages } : {}),

@@ -132,6 +132,38 @@ under production-rule conditions: meaningful Pump gain stays at Pump, while no
 meaningful Pump gain advances to Prompt. The active cycle and decision are
 stable replayed facts; assessment candidates and progress are projected for the
 current learner-response snapshot.
+
+Every AutoTutor submission enters the production engine as a `response-submitted`
+event. `dialogue.response.evaluate` invokes `autotutor.evaluate-response` and
+supplies validated student-state facts plus an `instructional.assessmentSnapshot`
+whose identity is the response event ID. Instructional productions require that
+current snapshot. Each move-producing rule invokes `autotutor.generate-move`
+directly in its `then`, after asserting its decision and cycle updates. The
+selected move definition supplies its prompt; generated dialogue returns as
+transient working-memory facts and replayable node writes. Summary rules also
+lock the response controls. No separate procedure calls evaluation before rules
+or generation after rules.
+
+`sparcAutoTutorRuleRuntime.ts` supplies registered capabilities, validates the
+completed execution, and commits one completed dialogue turn. Failed evaluation
+or generation commits no partial turn; a retry may repeat evaluation. Existing
+completed-turn histories retain their identities and resume without replaying
+AI calls. The lesson TDFs, stimulus files, and policy selection remain unchanged.
+
+`invoke-action` is a runtime production effect with an `actionId` and optional
+expression-valued `args`. `runSparcProductionRulesWithActions` executes it only
+after a production is selected, awaits its validated assertions and writes, and
+continues matching with the same activation history. Stable assertions replace
+facts by their declared identity. The synchronous runner shares this execution
+machine and rejects action invocations. Handlers are explicit runtime
+dependencies; the authoring palette does not expose these runtime capabilities.
+
+Run the pure AutoTutor/action tests from the repository root with
+`node mofacts/scripts/sparcAutoTutorRules.test.cjs`. Add
+`--include-general-rules` for the broader evaluator and trial-display regression
+suites. These checks use the existing TypeScript test loader without emitting
+files, starting Meteor, or calling an AI provider. Full app typecheck and lint
+remain required; these pure checks do not replace Meteor integration coverage.
 Stoichiometry content uses the same mechanism with authored `chemistry-field`
 facts: rules derive accepted conversion values, units, cancellation, and result
 values from problem facts and prior completed-field facts, while BRD-derived
