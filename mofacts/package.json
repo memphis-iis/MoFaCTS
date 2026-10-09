@@ -183,7 +183,7 @@
     "security:surfaces": "node scripts/security-audit/check-security-surfaces.mjs",
     "security:test:source": "node --test scripts/security-audit/source-security.test.mjs",
     "security:test:phase0": "node --test scripts/security-audit/tests/phase0CurrentScanner.test.mjs scripts/security-audit/tests/phase0ReleaseIdentity.test.mjs scripts/security-audit/tests/phase0RuntimeSemantics.test.mjs",
-    "security:test:capture": "node --test scripts/security-audit/tests/sourceSnapshot.test.mjs scripts/security-audit/tests/localDockerBuilder.test.mjs",
+    "security:test:capture": "node --test scripts/security-audit/tests/sourceSnapshot.test.mjs scripts/security-audit/tests/localDockerBuilder.test.mjs scripts/security-audit/tests/testInputs.test.mjs",
     "check:server-algorithm-boundary": "node scripts/checkServerAlgorithmBoundary.cjs",
     "check:meteor-test-artifacts": "node scripts/checkMeteorTestVersionArtifacts.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",

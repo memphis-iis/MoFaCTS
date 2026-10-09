@@ -111,6 +111,40 @@ Release-record readers, protected host receipt ownership/retention and V1 histor
 approval remain separate unresolved decisions. New concurrent SPARC source and
 wiki documentation changes were preserved; they are not in candidate `a3155584`.
 
+## Phase 0 continuation — supplemental test inputs, 2026-10-09
+
+The user chose to defer development alert 155. Prior dependency/source/runtime
+triage located `node-forge` under Rspack's development HTTPS-certificate helper;
+the deployed application bundle did not contain that package. The alert remains
+open, with no dependency override, dismissal or claim of repair in this batch.
+
+The first source-test implementation slice adds the opt-in `collect-tests`
+capture action. It verifies the existing capture, copies it into a separate
+owned derivative and adds the reviewed root/test/deployment fixtures needed by
+the existing checks. Supplemental files cannot replace captured build files
+with different bytes or native modes. Missing inputs, links, private/cache paths
+and resource-bound violations fail explicitly. Failed acquisition removes its
+incomplete derivative; an existing derivative is never silently replaced.
+The receipt binds the build identity, reviewed selection contract and resulting
+local tree digest. Every success remains `test-inputs-captured-unqualified`.
+
+Verification: full application typecheck and vendor typecheck pass; lint passes
+with the existing 28 upstream vendor warnings and 310 syntactic surfaces;
+Phase 0 tests pass **72/72** and source-security tests **41/41**. The expanded
+capture suite passes **66**, fails **0**, and skips **1** Linux-native file-mode
+test on Windows (67 total). Synthetic integration covers fresh capture
+verification, receipt identity, reuse rejection and failed-derivative cleanup.
+No real Docker capture, Meteor integration, build or deployment ran for this
+slice. No dependency, application behavior, data contract or security surface
+changed; the maintainer capture guide documents the new action.
+
+Remaining implementation: exercise collection on the supported Linux lane,
+complete test discovery/evidence checks and runner cleanup, enforce stronger
+sealing, and bind final source proof inside the canonical image build. This
+checkpoint does not establish full test-input closure or close Phase 0.
+External release/host evidence ownership and V1 historical-reader decisions
+remain open. The normal build and production command sheet are unchanged.
+
 ## Third authorized Meteor invocation — 2026-10-07
 
 The third freshly authorized `npm run test:ci` finished with **exit 1**.

@@ -1,5 +1,11 @@
 # Opt-in build-source capture
 
+October 9 continuation: `collect-tests` now creates a separate test-input derivative
+after verifying the captured build source. The expanded capture suite passes 66
+tests on Windows, with one Linux-native permission test skipped. The earlier
+50-test checkpoint below remains historical evidence. Collection has not yet
+been exercised against a real Docker capture; it does not run or qualify tests.
+
 Status: implemented source prototype; 50 synthetic capture/builder tests pass. **The authorized 2026-09-07 real source capture, Windows-to-Linux round trip, endpoint-bound no-cache Compose build and structural image smoke passed. Do not replace the operator's production build command: full application smoke, source-proof binding and remaining qualification gates are still open.** See the [executed checkpoint](../../docs-developer/security-audit-durable-redesign-status.md), including the repaired Compose/Buildx context conflict and default-path comparison. This tool does not issue a security qualification.
 
 The 2026-09-07 ordinary comparison build failed fetching Meteor's pinned `uWebSockets.js` dependency (`ssh: not found`). The separately authorized 2026-09-08 build-stage HTTPS transport repair preserves that repository/ref; the ordinary no-cache build and structural image smoke subsequently passed. The historical failed comparison is not relabeled successful, and these different-source image runs are not bit-for-bit equivalence or full release qualification. See the status checkpoint and [build transport note](../README.md#build-context).
@@ -15,6 +21,7 @@ The ordinary `deploy and build.txt` procedure remains unchanged. The root Docker
 | `mofacts/scripts/security-audit/qualification/captureBuildSource.mjs` | Acquisition, workspace lifecycle, recipe/input ownership checks, source round-trip comparison and build-only Compose integration |
 | `mofacts/scripts/security-audit/qualification/sourceSnapshot.mjs` | Bounded streaming tar extraction, path/type checks, canonical source digest and local tamper observations |
 | `mofacts/scripts/security-audit/qualification/localDockerBuilder.mjs` | Explicit local context/engine binding shared by capture and Compose; rejects unavailable, remote or non-context-backed builders |
+| `mofacts/scripts/security-audit/qualification/testInputs.mjs` | Reviewed supplemental test readers, bounded collection and rejection of conflicting build-file bytes or modes |
 | `mofacts/common/securityAudit/buildIdentity.ts` | Existing shared source identity contract; not a second release record |
 
 `capture.json` is private temporary acquisition state, not a production release receipt. Its Docker-observed source digest uses exact file bytes, native archive modes and directory entries. Its separate local-tree digest detects local changes; Windows filesystem modes are not substituted for Linux/Docker modes. Verification requires a fresh Docker re-export to match the original source digest.
@@ -40,6 +47,11 @@ $captureResult = & C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
 & C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
     -Action verify -Builder $ApprovedLocalBuilder -Workspace $captureResult.workspace
 
+# Separately authorized collection also performs the fresh Docker verification.
+# This does not install dependencies, run Meteor or issue qualification.
+& C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
+    -Action collect-tests -Builder $ApprovedLocalBuilder -Workspace $captureResult.workspace
+
 # Only after separate build authorization and the prototype acceptance checks:
 & C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
     -Action build -Builder $ApprovedLocalBuilder -Workspace $captureResult.workspace `
@@ -57,6 +69,32 @@ Actions require exactly their documented arguments. A missing builder/identity/w
 Output states are intentionally `captured-unqualified`, `capture-verified-unqualified`, and `built-unqualified`. Exit zero for these actions means that action completed, **not that source tests, image smoke, published identity, host identity or a security audit passed**. There is no `PASS` release proof, embedded source bundle or automatic deployment-record write. Existing push/runtime overlay/remote commands are not invoked or rewritten.
 
 ## Safety and supported bounds
+
+`collect-tests` creates `test-context/` and a private `test-inputs.json` receipt
+inside the existing owned workspace. It copies captured build source first,
+then the exact reviewed selections in `TEST_INPUTS`: root ESLint configuration,
+examples, excluded application tests, the two CI/security workflows, the canonical
+Compose definition and named deployment/security fixtures read by source tests.
+It never exports the config repository or the entire deployment directory.
+The production ignore policy is unchanged. Additional fixture readers must be
+reviewed and added to this owner before claiming runner closure.
+
+Missing selections, links (including selected ancestors), ambiguous paths,
+private/cache paths, or conflicting build bytes/native modes cause failure.
+Files are hashed with a fixed-size buffer. Acquisition applies the existing
+entry/byte/file/path/depth bounds; the combined preflight conservatively counts
+shared entries twice. Build-source and supplemental inventories are rechecked
+after copying, and the resulting derivative gets its own local digest. These
+checks observe changes; they do not provide an OS-enforced seal against a process
+with the same privileges. Windows modes cannot establish Linux mode equivalence.
+The owner removes an incomplete derivative on failure and rejects a second
+collection into the same workspace instead of replacing existing evidence.
+
+Its sole success state is `test-inputs-captured-unqualified`. No dependencies,
+MongoDB, browser or application server are started, and no tests, image build,
+push or deployment are invoked by this action. An isolated Linux runner,
+stronger sealing, complete test-evidence validation and final in-image source
+proof remain required before source qualification.
 
 - The temporary root is created under the OS temporary directory with a unique helper-owned name and marker. Linux permissions are restricted; Windows inherits the user's temporary-directory ACL. Windows ACL isolation remains part of runtime qualification, not a claim that Node `chmod` implements an ACL.
 - The candidate is immutable by helper ownership: test code never writes to it and the helper rechecks it. This is **not** an OS-enforced immutable snapshot or defense against a malicious process with the same user permissions. Do not edit candidate files. Full in-image source observation and stronger sealing remain acceptance work.

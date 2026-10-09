@@ -6,7 +6,8 @@ import { Readable } from 'node:stream';
 import test from 'node:test';
 import { SNAPSHOT_LIMITS, extractSnapshot, inspectSnapshotTree, snapshotPath, snapshotDigest, sha256 } from '../qualification/sourceSnapshot.mjs';
 import { captureRoots, contextOverride, assertContextOnlyChange, assertCapturedEntries, main,
-  prepareCapture, verifyCapture, buildCapturedSource } from '../qualification/captureBuildSource.mjs';
+  prepareCapture, verifyCapture, buildCapturedSource, collectCapturedTestInputs } from '../qualification/captureBuildSource.mjs';
+import { TEST_INPUTS } from '../qualification/testInputs.mjs';
 
 function header(name, size = 0, type = '0', mode = 0o644) {
   const result = Buffer.alloc(512);
@@ -246,6 +247,35 @@ test('synthetic capture rejects local tampering before attempting Docker verific
   await fs.writeFile(path.join(captured.workspace, 'context/mofacts/source.ts'), 'tampered');
   await assert.rejects(verifyCapture(captured.workspace, 'synthetic-builder', dependencies), /validation failed/);
   assert.equal(calls.length, 1);
+});
+
+test('synthetic test collection verifies capture, preserves build identity and rejects reuse', async (t) => {
+  const { captured, calls, dependencies, repositoryRoot } = await syntheticCapture(t);
+  for (const [name, type] of TEST_INPUTS) {
+    const target = path.join(repositoryRoot, name);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    if (type === 'directory') await fs.mkdir(target);
+    else if (name !== 'deploy/docker-compose.yml') await fs.writeFile(target, 'synthetic test input');
+  }
+  const result = await collectCapturedTestInputs(captured.workspace, 'synthetic-builder', dependencies);
+  assert.equal(result.state, 'test-inputs-captured-unqualified');
+  assert.deepEqual(result.identity, captured.identity);
+  assert.equal(calls.length, 2);
+  const receipt = JSON.parse(await fs.readFile(path.join(captured.workspace, 'test-inputs.json')));
+  assert.equal(receipt.schema, 'MoFaCTSTestInputsV1');
+  assert.equal(receipt.localTreeDigestSha256,
+    (await inspectSnapshotTree(path.join(captured.workspace, 'test-context'))).digestSha256);
+  await assert.rejects(collectCapturedTestInputs(captured.workspace, 'synthetic-builder', dependencies), { code: 'EEXIST' });
+  assert.equal(calls.some((args) => args[0] === 'compose'), false);
+});
+
+test('failed synthetic test collection removes only its incomplete derivative', async (t) => {
+  const { captured, dependencies } = await syntheticCapture(t);
+  const before = await inspectSnapshotTree(path.join(captured.workspace, 'context'));
+  await assert.rejects(collectCapturedTestInputs(captured.workspace, 'synthetic-builder', dependencies), { code: 'ENOENT' });
+  await assert.rejects(fs.stat(path.join(captured.workspace, 'test-context')), { code: 'ENOENT' });
+  await assert.rejects(fs.stat(path.join(captured.workspace, 'test-inputs.json')), { code: 'ENOENT' });
+  assert.deepEqual(await inspectSnapshotTree(path.join(captured.workspace, 'context')), before);
 });
 
 test('synthetic capture rejects changed Docker round-trip metadata and removes the failed export', async (t) => {

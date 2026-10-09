@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('prepare', 'verify', 'build', 'cleanup')]
+    [ValidateSet('prepare', 'verify', 'collect-tests', 'build', 'cleanup')]
     [string]$Action,
     [string]$Builder,
     [string]$BaseCommit,

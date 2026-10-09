@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { localDockerInvoker } from './localDockerBuilder.mjs';
+import { collectTestInputs } from './testInputs.mjs';
 import { parseBuildIdentity } from '../../../common/securityAudit/buildIdentity.ts';
 import { extractSnapshot, inspectSnapshotTree, sha256, snapshotPath, invalidSnapshot } from './sourceSnapshot.mjs';
 
@@ -238,6 +239,27 @@ export async function verifyCapture(workspace, builder, dependencies = {}) {
   return { root, candidate, receipt, identity };
 }
 
+export async function collectCapturedTestInputs(workspace, builder, dependencies = {}) {
+  const checked = await verifyCapture(workspace, builder, dependencies);
+  const destination = path.join(checked.root, 'test-context');
+  const receiptPath = path.join(checked.root, 'test-inputs.json');
+  // A prior derivative is never silently replaced or reused.
+  await fs.mkdir(destination, { mode: 0o700 });
+  try {
+    const receipt = await collectTestInputs(checked.candidate, dependencies.repositoryRoot ?? repoRoot, destination);
+    if (receipt.buildLocalTreeDigestSha256 !== checked.receipt.localTreeDigestSha256
+      || sha256(await readControl(path.join(destination, 'deploy/docker-compose.yml')))
+        !== checked.receipt.composeDigestSha256) invalidSnapshot();
+    await fs.writeFile(receiptPath, JSON.stringify({ schema: 'MoFaCTSTestInputsV1',
+      identity: checked.identity, ...receipt }), { flag: 'wx', mode: 0o600 });
+    return { ...receipt, workspace: checked.root, identity: checked.identity };
+  } catch (error) {
+    await requireWorkspace(checked.root);
+    await removeOwnedTree(destination);
+    throw error;
+  }
+}
+
 export async function buildCapturedSource(workspace, builder, envFile, dependencies = {}) {
   const invoke = dependencies.docker ?? docker;
   const checked = await verifyCapture(workspace, builder, dependencies);
@@ -265,6 +287,7 @@ export async function main(argv) {
     args.set(rest[i], rest[i + 1]);
   }
   const allowed = { prepare: ['--builder', '--base-commit', '--dirty'], verify: ['--builder', '--workspace'],
+    'collect-tests': ['--builder', '--workspace'],
     build: ['--builder', '--workspace', '--env-file'], cleanup: ['--workspace'] }[action];
   if (!allowed || allowed.length !== args.size || allowed.some((key) => !args.has(key))) invalidSnapshot();
   const builder = args.get('--builder');
@@ -279,6 +302,7 @@ export async function main(argv) {
     return { state: 'capture-verified-unqualified', identity };
   }
   if (action === 'build') return buildCapturedSource(args.get('--workspace'), builder, args.get('--env-file'), dependencies);
+  if (action === 'collect-tests') return collectCapturedTestInputs(args.get('--workspace'), builder, dependencies);
   await removeWorkspace(args.get('--workspace'));
   return { state: 'temporary-capture-removed' };
 }
