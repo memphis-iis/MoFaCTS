@@ -6,6 +6,14 @@ tests on Windows, with one Linux-native permission test skipped. The earlier
 50-test checkpoint below remains historical evidence. Collection has not yet
 been exercised against a real Docker capture; it does not run or qualify tests.
 
+The subsequent approved efficiency revision selects existing GitHub Linux CI as
+the primary full automated suite for committed releases. No second routine full
+runner is planned on the workstation or staging2. The capture helper remains
+optional acquisition tooling for source-proof integration; it does not replace
+CI or require its own repeated integration suite. CI source-digest/evidence and
+final Compose image binding still need implementation. See the
+[revised lane contract](../../docs-developer/security-audit-phase0-contracts.md#23-supported-source-test-lane-and-evidence-binding).
+
 Status: implemented source prototype; 50 synthetic capture/builder tests pass. **The authorized 2026-09-07 real source capture, Windows-to-Linux round trip, endpoint-bound no-cache Compose build and structural image smoke passed. Do not replace the operator's production build command: full application smoke, source-proof binding and remaining qualification gates are still open.** See the [executed checkpoint](../../docs-developer/security-audit-durable-redesign-status.md), including the repaired Compose/Buildx context conflict and default-path comparison. This tool does not issue a security qualification.
 
 The 2026-09-07 ordinary comparison build failed fetching Meteor's pinned `uWebSockets.js` dependency (`ssh: not found`). The separately authorized 2026-09-08 build-stage HTTPS transport repair preserves that repository/ref; the ordinary no-cache build and structural image smoke subsequently passed. The historical failed comparison is not relabeled successful, and these different-source image runs are not bit-for-bit equivalence or full release qualification. See the status checkpoint and [build transport note](../README.md#build-context).

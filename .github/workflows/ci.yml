@@ -51,6 +51,11 @@ jobs:
       - name: Typecheck vendor declarations (blocking)
         run: npm run typecheck:vendor
 
+      - name: Phase 0 source identity and capture contracts
+        run: |
+          npm run security:test:phase0
+          npm run security:test:capture
+
       - name: Prolific and ignored-field contracts
         run: node --test scripts/prolific.test.cjs scripts/ignoredTdfFields.test.cjs
 

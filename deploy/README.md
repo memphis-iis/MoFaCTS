@@ -161,6 +161,17 @@ protected database.
 
 Build, push, and deploy commands should be run only by maintainers or release owners with the appropriate environment access.
 
+For committed security-audit candidates, use the existing Linux CI as the single
+routine full Meteor integration suite. It also runs the Phase 0 and source-capture
+contracts; the separate Security workflow owns source-security, secret and
+dependency checks. Match both workflows to the actual tested checkout revision.
+Staging2 acceptance verifies the deployed image/configuration and affected browser,
+HTTPS and security behavior; it does not routinely repeat the full Meteor suite.
+The manual Change Streams fault/recovery workflow above remains a distinct,
+explicitly authorized check. Source-to-image proof binding is still unfinished;
+passing workflows alone do not close Phase 0. See the
+[source-test lane contract](../docs-developer/security-audit-phase0-contracts.md#23-supported-source-test-lane-and-evidence-binding).
+
 ## SPARC OpenRouter Prefix Caching
 
 “Improve prompt caching” is an on/off checkbox in User Admin alongside the global OpenRouter API key, model, and reasoning controls. It defaults to off for existing and new settings. Enabling it sends OpenRouter's top-level `session_id` for SPARC requests so related calls stay on one provider route; disabling it omits that field. Provider prompt caching may still occur automatically when this option is off, and enabling it does not guarantee lower total cost because output tokens and completed turns also affect cost. Changes apply to subsequent requests without rebuilding or restarting the server. The ID is generated randomly in the dialogue runtime, is stable only for one TDF/attempt/page scope (or one live-evaluation run), and contains no learner, attempt, TDF, or content-derived identity. It is never written to AI-flow logs.

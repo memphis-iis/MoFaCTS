@@ -145,6 +145,41 @@ checkpoint does not establish full test-input closure or close Phase 0.
 External release/host evidence ownership and V1 historical-reader decisions
 remain open. The normal build and production command sheet are unchanged.
 
+## Phase 0 efficiency revision — reuse existing Linux CI, 2026-10-09
+
+The user approved reusing an existing automated lane and limiting staging2 to
+deployment-specific acceptance. Source review confirms ordinary CI already runs
+the full Meteor server/browser suite on Ubuntu with the pinned toolchain,
+Chromium and a disposable MongoDB replica set. The independent Security workflow
+already runs the source-security suite, surface classification and secret and
+dependency scans. The manual Change Streams qualification injects database
+faults/restarts and therefore retains a distinct, explicitly authorized purpose.
+
+The CI definition now adds the Phase 0 and capture contract suites to its existing
+test job, without adding a second Meteor invocation or duplicating Security's
+source-security suite. The [lane contract](security-audit-phase0-contracts.md#23-supported-source-test-lane-and-evidence-binding)
+and public deployment/capture guides now select existing Linux CI as the primary
+full suite for committed releases. This supersedes the preceding proposal to
+implement another routine full runner locally or on staging2. Dirty-source
+qualification remains a separate opt-in future capability, not a requirement
+for ordinary committed releases or a reason to borrow clean-commit evidence.
+
+Remaining source qualification still requires capture/protection of actual
+build/test inputs, complete test outcome/discovery evidence, and matching source
+digests inside the final canonical Compose image. A passing commit SHA or CI's
+separately built smoke image does not establish those missing bindings. Staging2
+continues to own deployed image/configuration identity, readiness and affected
+HTTPS/browser/security acceptance. Unchanged candidate/configuration acceptance
+can be reused; full regression repetition is not a routine staging gate.
+
+Local verification passes: workflow YAML and exactly one ordinary Meteor
+invocation validated; Phase 0 **72/72**, capture **66 passed, 1 Linux-mode skip**,
+and source-security **41/41**. Diff hygiene passes. No app source or dependency
+changed, so full app typecheck/lint were not repeated for this workflow/document
+revision. No new Meteor run, Docker command, workflow dispatch, server connection
+or deployment ran. GitHub execution of the revised workflow remains pending
+fresh authorization; the development alert remains deferred and open.
+
 ## Third authorized Meteor invocation — 2026-10-07
 
 The third freshly authorized `npm run test:ci` finished with **exit 1**.
@@ -574,7 +609,7 @@ V1 full membership is frozen as 52 test-fixture IDs; exposure retains 20 schedul
 
 1. **Record reconciliation completed on October 4:** retain historical results and identify the isolated deployed candidate, latest native integration result, and checks still missing. The manifest correction and bounded local capture/build/application smoke checkpoints remain established within their recorded scope.
 2. **Next: qualify the staging baseline when explicitly authorized.** Verify administrator signup/login, email verification/delivery, authenticated deployment readiness, a synthetic learner flow, HTTPS/proxy/header/cookie behavior and effective host exposure. These checks establish the environment prerequisite; they do not replace the planned report-contract, restricted-host or authorization/runtime qualification lanes.
-3. Implement and verify supplemental test-input acquisition, the supported source-bound Linux test runner, sealing and final in-image source-proof binding. The opt-in capture helper emits unqualified outcomes only. Use the recorded real capture/round-trip/build results as bounded prior evidence; do not repeat the obsolete blanket claim that Docker has never run. Preserve ordinary build/startup behavior when qualification metadata is unavailable.
+3. Integrate and verify source capture/test evidence with the existing Linux CI for committed releases, including sealing and final in-image source-proof binding. Supplemental collection is implemented but not yet qualified on Linux. Do not implement a second routine full Meteor runner locally or on staging2; retain a future dirty-source lane only for explicitly requested dirty qualification. The opt-in capture helper emits unqualified outcomes only. Use the recorded real capture/round-trip/build results as bounded prior evidence; preserve ordinary build/startup behavior when qualification metadata is unavailable.
 4. Confirm external release-record readers, protected host projection destination/owner and retained rollback history. The optional record-extension parser and bounded command/image observations are implemented, but not integrated into the production command sheet, host script or storage. The private staging deployment checkpoint is not a substitute for that authoritative release-record extension.
 5. Resolve V1 historical-read approval and qualify previous-image storage/list/latest/download behavior before V2 cutover. Confirm the recoverable protected fixture owner and restore procedure using non-production values. Available private staging credentials do not settle the automated fixture-storage contract; the original staging remains frozen.
 6. Complete the remaining invocation/HTTP/provider/composition compatibility cases and the separately authorized remote qualification work. Inventory enabled providers before selecting test bindings; use synthetic accounts/resources and no production learner data. Each Meteor rerun, workflow dispatch, restricted host-tool install and broader qualification action needs the authorization specified by the plan; completed build/deploy permission is not blanket security-probe permission.
