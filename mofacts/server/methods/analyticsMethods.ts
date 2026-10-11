@@ -1,4 +1,7 @@
+import { isSparcAdminPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { worksheetHistoryWriteId, sameWorksheetWrite } from '../lib/worksheetHistoryWrite';
+import { sparcHistoryWriteId } from '../lib/sparcHistoryWrite';
+import { sameHistoryWrite } from '../lib/historyWriteIdentity';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
 import {
@@ -666,6 +669,12 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     } catch (error: unknown) {
       throw new Meteor.Error(400, error instanceof Error ? error.message : String(error));
     }
+    const sparcTransition = (decompressedRecord.sparc as { stateTransition?: { event?: { payload?: { policyId?: string } }; writes?: { value?: { factType?: string } }[] } } | undefined)?.stateTransition;
+    const requiresAdmin = isSparcAdminPolicy(sparcTransition?.event?.payload?.policyId)
+      || sparcTransition?.writes?.some((write) => ['instructional.modelObservation', 'instructional.oet'].includes(write.value?.factType ?? ''));
+    if (requiresAdmin && !(await deps.getMethodAuthorizationDeps().userIsInRoleAsync(actingUserId, ['admin']))) {
+      throw new Meteor.Error(403, 'Competitive and student-selected AutoTutor are restricted to admin accounts');
+    }
     await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
     const sanitizeMs = elapsedMsSince(sanitizeStartTime);
 
@@ -691,15 +700,17 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
 
     const insertStartTime = Date.now();
     const worksheetId = worksheetHistoryWriteId(sanitizedHistoryRecord);
-    if (worksheetId) {
-      Object.assign(sanitizedHistoryRecord, { _id: worksheetId });
+    const sparcId = sparcHistoryWriteId(sanitizedHistoryRecord);
+    const durableId = worksheetId ?? sparcId;
+    if (durableId) {
+      Object.assign(sanitizedHistoryRecord, { _id: durableId });
       try {
         await deps.Histories.insertAsync(sanitizedHistoryRecord);
       } catch (error) {
         if ((error as { code?: number }).code !== 11000) throw error;
-        const existing = await deps.Histories.findOneAsync({ _id: worksheetId, userId: actingUserId });
-        if (!existing || !sameWorksheetWrite(existing, sanitizedHistoryRecord)) {
-          throw new Meteor.Error('worksheet-history-conflict', 'Worksheet history changed in another session. Reload before continuing.');
+        const existing = await deps.Histories.findOneAsync({ _id: durableId, userId: actingUserId });
+        if (!existing || !(worksheetId ? sameWorksheetWrite : sameHistoryWrite)(existing, sanitizedHistoryRecord)) {
+          throw new Meteor.Error(worksheetId ? 'worksheet-history-conflict' : 'sparc-history-conflict', 'History changed in another session. Reload before continuing.');
         }
         return;
       }
@@ -924,7 +935,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       if (!assignedCourseRootTdfId) {
         throw new Meteor.Error(400, 'Course assignment history context is incomplete');
       }
-      await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
+      // The common write boundary has already validated this assignment and policy.
       return;
     }
 

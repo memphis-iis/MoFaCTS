@@ -38,6 +38,7 @@ export function createSparcStateTransitionHistoryRecord(params: {
   readonly action?: string;
   readonly outcome?: string;
   readonly responseValue?: unknown;
+  readonly expectationLogitChanges?: SparcCanonicalHistoryExtension['expectationLogitChanges'];
 }): SparcCanonicalHistoryRecord {
   const TDFId = requireNonBlank(params.core.TDFId, 'TDFId');
   const sessionID = requireNonBlank(params.core.sessionID, 'sessionID');
@@ -51,6 +52,7 @@ export function createSparcStateTransitionHistoryRecord(params: {
     pageKey: sourceAddress.pageKey,
     sourceAddress,
     stateTransition: params.transition,
+    ...(params.expectationLogitChanges !== undefined ? { expectationLogitChanges: params.expectationLogitChanges } : {}),
   };
   const record = withCanonicalHistorySchemaVersion({
     TDFId,

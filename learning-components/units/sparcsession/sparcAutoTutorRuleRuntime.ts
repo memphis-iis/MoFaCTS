@@ -1,7 +1,9 @@
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
+import type { SparcGeneratedInstruction } from './sparcInstructionalPrimitives';
+import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import type { SparcPracticeHistoryCore } from './sparcPracticeHistoryBridge';
-import { createSparcLearnerResponseScoreFacts, type SparcLearnerResponseScoringResult } from './sparcLearnerResponseScoring';
+import { createSparcLearnerResponseScoreFacts, expectationLogitChangesFromScoreFacts, type SparcLearnerResponseScoringResult } from './sparcLearnerResponseScoring';
 import { auditSparcMoveSelection, type SparcMoveSelectionAudit } from './sparcMoveSelectionAudit';
 import { createSparcDialogueTurnTransition, requireBoundedSparcDialogueMessage, type SparcDialogueTurnNodeOptions } from './sparcDialogueTurnNodes';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
@@ -20,7 +22,7 @@ import type {
   SparcProductionActionResult,
 } from './sparcSessionContracts';
 
-export type SparcGeneratedUtterance = string | { readonly text: string };
+export type SparcGeneratedUtterance = SparcGeneratedInstruction;
 export type SparcUtteranceGenerator = (request: SparcUtteranceRequest) => Promise<SparcGeneratedUtterance> | SparcGeneratedUtterance;
 
 export type SparcAutoTutorRuleTurnParams = {
@@ -42,6 +44,7 @@ type Assessment = {
 };
 
 export type SparcAutoTutorRuleTurnResult = {
+  readonly expectationLogitChanges: readonly ExpectationLogitChange[];
   readonly execution: SparcProductionRuleExecution;
   readonly assessment: Assessment;
   readonly learnerResponseScoreFacts: readonly SparcWorkingMemoryFact[];
@@ -82,7 +85,7 @@ function tutorTextFromGeneratedUtterance(value: SparcGeneratedUtterance): string
   if (typeof value === 'string') {
     return requireBoundedSparcDialogueMessage(value, 'SPARC generated tutor utterance text');
   }
-  if (isRecord(value)) {
+  if (isRecord(value) && 'text' in value) {
     return requireBoundedSparcDialogueMessage(value.text, 'SPARC generated tutor utterance text');
   }
   throw new Error('SPARC utterance generator must return text or { text }');
@@ -122,7 +125,7 @@ function hasTutorUtterance(transition: SparcStateTransition): boolean {
   });
 }
 
-function assertCompletedDialogueReplayState(replayState: SparcReplayState | undefined): void {
+export function assertCompletedDialogueReplayState(replayState: SparcReplayState | undefined): void {
   if (!replayState) {
     return;
   }
@@ -151,18 +154,14 @@ function assertCompletedDialogueReplayState(replayState: SparcReplayState | unde
       return isRecord(slots) && slots.targetType === 'learnerQuestion' && slots.action === 'question-scope-refusal';
     });
     const hasCanonicalControl = (factTypes.has('instructional.activeCycle') || scopeRefusal) && factTypes.has('instructional.decision');
-    const hasPreCanonicalControl = factTypes.has('instructionalTarget.active')
-      && factTypes.has('instructionalFocus.episode')
-      && factTypes.has('scaffold.state')
-      && (factTypes.has('learningTarget.selected') || factTypes.has('diagnostic.misconceptionSelected'));
-    if (!hasCanonicalControl && !hasPreCanonicalControl) {
-      throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing canonical or migratable instructional control state`);
+    if (!hasCanonicalControl) {
+      throw new Error(`SPARC dialogue replay state for transition "${transition.transitionId}" is missing canonical instructional control state; pre-canonical histories are unsupported`);
     }
   }
 }
 
 // These are response-local projections, never inputs from an earlier response.
-const RESPONSE_LOCAL_FACT_TYPES = new Set([
+export const RESPONSE_LOCAL_FACT_TYPES = new Set([
   'learningTarget.selected', 'learningTarget.candidate', 'diagnostic.misconceptionSelected',
   'dialogue.completionSelected', 'controller.completionState', 'controller.selectedAction',
   'controller.moveSelectionAudit', 'learningObservation.targetProgress',
@@ -191,6 +190,7 @@ export async function executeSparcAutoTutorRules(params: SparcAutoTutorRuleTurnP
   const adapter = requireSparcInstructionalAdapter(params.document.instructionalController);
   const facts = buildSparcWorkingMemoryFacts(params).filter((fact) => !RESPONSE_LOCAL_FACT_TYPES.has(fact.factType));
   const outcome: {
+    expectationLogitChanges?: readonly ExpectationLogitChange[];
     assessment?: Assessment;
     scoreFacts?: readonly SparcWorkingMemoryFact[];
     utteranceRequest?: SparcUtteranceRequest;
@@ -216,6 +216,7 @@ export async function executeSparcAutoTutorRules(params: SparcAutoTutorRuleTurnP
         });
         outcome.assessment = { derivedFacts, instructionalProjection };
         outcome.scoreFacts = scoreFacts;
+        outcome.expectationLogitChanges = expectationLogitChangesFromScoreFacts(currentFacts, scoreFacts);
         return {
           assertions: [
             ...scoreFacts.map((fact) => assertion(fact, fact.factType !== 'dialogue.learnerQuestion')),
@@ -261,6 +262,7 @@ export async function executeSparcAutoTutorRules(params: SparcAutoTutorRuleTurnP
   if (!ruleTransition) throw new Error('SPARC AutoTutor productions produced no state transition');
   return {
     execution,
+    expectationLogitChanges: outcome.expectationLogitChanges ?? [],
     assessment: outcome.assessment,
     learnerResponseScoreFacts: outcome.scoreFacts,
     moveSelectionAudit: auditSparcMoveSelection({ rules: params.document.productionRules ?? [], execution }),
@@ -288,6 +290,7 @@ export async function commitSparcAutoTutorRules(params: SparcAutoTutorRuleTurnPa
   const historyRecord = createSparcStateTransitionHistoryRecord({
     core: params.core, transition: evaluated.transition, action: 'sparc-dialogue-turn',
     outcome: 'unknown', responseValue: learnerTextFromEvent(params.event),
+    expectationLogitChanges: evaluated.expectationLogitChanges,
   });
   if (params.runtime.history) await params.runtime.history.writeCanonicalHistory(historyRecord);
   return { ...evaluated, historyRecord };

@@ -1,3 +1,4 @@
+import { isSparcAdminPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
 import {
@@ -638,6 +639,9 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
     callResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter', 401);
       await deps.assertPublicDemoAiQuota(userId, String(this.connection?.clientAddress || 'unknown'));
+      if (isRecord(params) && isSparcAdminPolicy(params.policyId)) {
+        await requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId, roles: ['admin'], forbiddenMessage: 'Competitive and student-selected AutoTutor are restricted to admin accounts' });
+      }
       return executeResolvedOpenRouterJson(deps, userId, params, 'json');
     },
 

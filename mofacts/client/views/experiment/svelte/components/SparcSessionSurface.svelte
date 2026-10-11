@@ -12,6 +12,8 @@
     createSparcDialogueOpenRouterProvider,
   } from '../services/sparcControllerDialogueOpenRouter';
   import { createSparcOpenRouterSession } from '../services/sparcOpenRouterSession';
+  import { readSparcResumeSnapshot } from '../services/sparcRuntimeState';
+  import { SPARC_STUDENT_SELECTED_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
   import {
@@ -212,7 +214,7 @@
   function dialogueNodes(nodes = [], options = {}) {
     const includeOpening = options.includeOpening === true;
     return flattenNodes(nodes).filter((node) => (
-      node?.atomType === 'dialogue-utterance'
+      (node?.atomType === 'dialogue-utterance' || (node?.atomType === 'html-block' && node?.turnEventId) || node?.id === 'instructional-choice-menu')
       && (includeOpening || node.id !== 'opening-tutor-message')
     ));
   }
@@ -318,6 +320,10 @@
     const buttonSubmission = node?.id
       ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) }
       : {};
+    if (node?.menuId && node?.optionId) {
+      void submitAutoTutorDialogue({ submittedNodes: buttonSubmission, triggeredBy: node.id, timestamp: Date.now() });
+      return;
+    }
     if (!isSubmitButton(node)) {
       void handleSparcAction({
         submittedNodes: buttonSubmission,
@@ -463,12 +469,6 @@
     });
   }
 
-  function sendSparcProgressiveNodeOperations(operations, timestamp) {
-    dispatchSparcNodeValues({
-      [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: operations,
-    }, timestamp);
-  }
-
   function currentSparcControllerDisplay(source) {
     if (!display) {
       throw new Error(describeSparcBoundaryContext(display, `${source} SPARC session is missing controller display`));
@@ -521,6 +521,7 @@
         throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
       }
       const provider = createSparcDialogueOpenRouterProvider({
+        ...(currentDisplay.instructionalController?.policyId ? { policyId: currentDisplay.instructionalController.policyId } : {}),
         tdfId: typeof tdfId === 'string' ? tdfId : null,
         sessionId: openRouterSession.sessionIdForScope({
           tdfId,
@@ -553,9 +554,9 @@
           generateTutorUtterance: provider.generateTutorUtterance,
         });
       } catch (error) {
-        if (optimisticOperations.length > 0) {
-          sendSparcProgressiveNodeOperations(priorProgressiveOperations, sparcResult.timestamp);
-        }
+        // Accepted assessment/selection remains visible even if the subsequent provider call fails.
+        dispatchSparcNodeValues(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit,
+          pageKey: currentDisplay.pageKey, display: currentDisplay }).nodeValues, sparcResult.timestamp);
         throw error;
       }
       dispatch('runtimewatchedstatechanged');
@@ -643,6 +644,10 @@
     } finally {
       dialogueSubmitPending = false;
       pendingAutoTutorProgressSnapshot = null;
+      await tick();
+      const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
+        || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
+      nextControl?.focus();
     }
   }
 
@@ -749,9 +754,10 @@
     pendingSnapshot: pendingAutoTutorProgressSnapshot,
     submissionPending: dialogueSubmitPending,
   });
-  $: autoTutorDialogueCompleted = autoTutorDialogueMode && currentAutoTutorProgressSnapshot.completed;
+  $: autoTutorDialogueCompleted = autoTutorDialogueMode && sparcDisplay?.instructionalController?.policyId !== SPARC_STUDENT_SELECTED_POLICY_ID && currentAutoTutorProgressSnapshot.completed;
   $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
-  $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes) : [];
+  $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => node.id === 'instructional-choice-menu' && dialogueSubmitPending
+    ? { ...node, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
   $: if (
     autoTutorDialogueMode

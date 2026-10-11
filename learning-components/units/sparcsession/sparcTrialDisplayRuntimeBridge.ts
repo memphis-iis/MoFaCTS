@@ -1,3 +1,5 @@
+import { SPARC_COMPETITIVE_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
+import { createSparcCompetitiveRules } from './sparcCompetitiveSelection';
 import type {
   SparcTrialDisplay,
   SparcTrialResult,
@@ -41,6 +43,9 @@ import type {
 import type { SparcInstructionalCandidateOptions } from './sparcInstructionalCandidates';
 import { assertSparcInstructionalControllerConfig } from './sparcInstructionalControl';
 import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
+import { isSparcInstructionalCycle, SPARC_STUDENT_SELECTED_POLICY_ID } from './sparcInstructionalControl';
+import { createSparcInstructionalCycleRules } from './sparcInstructionalCycleRules';
+import { commitSparcInstructionalCycle, currentSparcMenu, type SparcCycleResult } from './sparcInstructionalCycle';
 
 type DisplayNodeRecord = {
   readonly id?: unknown;
@@ -97,7 +102,7 @@ export type SparcTrialDisplayAutoTutorRuleCommitResult = {
   readonly document: SparcAuthoredDocument;
   readonly event: SparcInterfaceEvent;
   readonly learnerText: string;
-  readonly dialogueTurn: SparcAutoTutorRuleTurnResult;
+  readonly dialogueTurn: SparcAutoTutorRuleTurnResult | SparcCycleResult;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -109,11 +114,10 @@ function stringOrUndefined(value: unknown): string | undefined {
 }
 
 function requireOptionalClusterIndex(value: unknown, label: string): number {
-  const numberValue = Number(value);
-  if (!Number.isInteger(numberValue) || numberValue < 0) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative integer`);
   }
-  return numberValue;
+  return value;
 }
 
 function requireNonBlank(value: unknown, label: string): string {
@@ -205,6 +209,8 @@ function nodeKind(node: DisplayNodeRecord): SparcAuthoredNode['kind'] {
   }
   switch (node.atomType) {
     case 'text-input':
+    case 'fraction-input':
+    case 'dropdown':
     case 'select':
     case 'checkbox':
     case 'button':
@@ -226,6 +232,9 @@ function authoredNodeFromDisplayNode(node: DisplayNodeRecord): SparcAuthoredNode
     ? node.children.filter(isRecord).map((child) => authoredNodeFromDisplayNode(child))
     : [];
   const nodeId = requireNonBlank(node.id, 'SPARC display node id');
+  if (node.clusterIndices !== undefined && !Array.isArray(node.clusterIndices)) {
+    throw new Error(`SPARC display node "${nodeId}" clusterIndices must be an array`);
+  }
   const clusterIndices = Array.isArray(node.clusterIndices)
     ? node.clusterIndices.map((value, index) => requireOptionalClusterIndex(
         value,
@@ -337,7 +346,9 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
   const productionRules = display.unitType === 'sparc-autotutor-dialogue'
-    ? createSparcProgressiveScaffoldingRules()
+    ? instructionalController?.policyId === SPARC_COMPETITIVE_POLICY_ID ? createSparcCompetitiveRules() : isSparcInstructionalCycle(instructionalController)
+      ? createSparcInstructionalCycleRules(instructionalController?.policyId === SPARC_STUDENT_SELECTED_POLICY_ID ? 'student' : 'agent')
+      : createSparcProgressiveScaffoldingRules()
     : directProductionRules;
   const initialState = Array.isArray(display.initialState)
     ? display.initialState as readonly SparcStateWrite[]
@@ -759,6 +770,39 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     display: params.display,
   });
   const replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
+  if (isSparcInstructionalCycle(document.instructionalController)) {
+    // Resume the existing attempt, including when the app has assigned a new launch ID.
+    const origin = params.priorHistoryRecords.find((record) => record.eventType === 'sparc'
+      && (record.sparc as { pageKey?: string })?.pageKey === params.pageKey
+      && record.userId === params.core.userId && record.TDFId === params.core.TDFId
+      && record.levelUnit === params.core.levelUnit);
+    const core = origin ? { ...params.core, sessionID: requireNonBlank(origin.sessionID, 'SPARC resumed attempt identity') } : params.core;
+    const eventTime = replayState.transitions.reduce((time, transition) => Math.max(time, transition.event.time + 1), params.result.timestamp);
+    const menu = currentSparcMenu(replayState);
+    const menuId = String(menu?.slots?.menuId ?? '');
+    const triggeredBy = String(params.result.triggeredBy ?? '');
+    const priorChoice = replayState.transitions.find((transition) => transition.event.type === 'choice-selected' && transition.event.source.nodeId === triggeredBy)?.event;
+    const option = (menu?.slots?.options as Record<string, unknown>[] | undefined)?.find((entry) => triggeredBy === `${menuId}:${String(entry.id)}`);
+    let event: SparcInterfaceEvent;
+    let learnerText: string;
+    if (priorChoice || option) {
+      event = priorChoice ?? { eventId: `${menuId}:choice`, type: 'choice-selected', source: { pageKey: params.pageKey, nodeId: triggeredBy }, time: eventTime,
+        payload: { menuId, optionId: option!.id, targetId: option!.targetId, targetKind: option!.targetKind } };
+      learnerText = '';
+    } else {
+      if (menu?.slots?.status === 'pending' || menu?.slots?.status === 'selected') throw new Error('Select an offered instructional option before submitting another answer');
+      const response = createSparcDialogueEventFromTrialResult(params);
+      const lastInstruction = replayState.transitions.filter((transition) => transition.transitionId.endsWith(':cycle')).at(-1);
+      event = { ...response.event, time: eventTime, eventId: `${params.pageKey}:response:${lastInstruction?.event.time ?? 'opening'}` };
+      learnerText = response.learnerText;
+    }
+    const problemStatement = requireSparcDialogueProblemStatement(params.display);
+    const dialogueTurn = await commitSparcInstructionalCycle({ ...params, core, document, replayState, event, problemStatement,
+      scoreLearnerResponse: () => params.scoreLearnerResponse({ document, replayState, event, problemStatement, learnerText, display: params.display, result: params.result }),
+      runtime: { history: params.history },
+    });
+    return { document, event, learnerText, dialogueTurn };
+  }
   const { event, learnerText: submittedLearnerText } = createSparcDialogueEventFromTrialResult({
     pageKey: params.pageKey,
     display: params.display,

@@ -1,12 +1,7 @@
-import { createHash } from 'node:crypto';
+import { historyWriteDigest as digest } from './historyWriteIdentity';
+export { sameHistoryWrite as sameWorksheetWrite } from './historyWriteIdentity';
 
 type RecordValue = Record<string, unknown>;
-function stable(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stable);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, stable(item)]));
-  return value;
-}
-function digest(value: unknown): string { return createHash('sha256').update(JSON.stringify(stable(value))).digest('hex'); }
 export function worksheetHistoryWriteId(record: RecordValue): string | undefined {
   const sparc = record.sparc as RecordValue | undefined;
   const event = sparc?.worksheet as RecordValue | undefined;
@@ -37,9 +32,4 @@ export function worksheetHistoryWriteId(record: RecordValue): string | undefined
   // One start per resumable page/checkpoint scope; competing starts fail rather than merge answers.
   return `worksheet:${digest([record.userId, record.TDFId, record.levelUnit, course?.courseId ?? null, course?.assignmentId ?? null,
     sparc.pageKey, event.checkpointIndex, event.kind === 'start' ? 'start' : [event.attemptId, event.sequence]])}`;
-}
-export function sameWorksheetWrite(saved: RecordValue, incoming: RecordValue): boolean {
-  const payload = (record: RecordValue) => Object.fromEntries(Object.entries(record).filter(([key]) =>
-    !['_id', 'eventId', 'recordedServerTime', 'dynamicTagFields'].includes(key)));
-  return digest(payload(saved)) === digest(payload(incoming));
 }

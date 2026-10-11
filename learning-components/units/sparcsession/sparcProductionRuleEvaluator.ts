@@ -203,6 +203,14 @@ function compareRuleTest(
       return left === right;
     case 'neq':
       return left !== right;
+    case 'in':
+    case 'not-in': {
+      if (!Array.isArray(right)) {
+        throw new Error(`SPARC rule test ${test.op} requires an array on the right`);
+      }
+      const matched = right.some((value) => value === left);
+      return test.op === 'in' ? matched : !matched;
+    }
     case 'truthy':
       return Boolean(left);
     case 'falsy':
@@ -217,6 +225,8 @@ function compareRuleTest(
       return requireFiniteNumber(left, 'SPARC rule test left') <= requireFiniteNumber(right, 'SPARC rule test right');
     case 'regex':
       return new RegExp(String(right ?? '')).test(String(left ?? ''));
+    case 'not-regex':
+      return !new RegExp(String(right ?? '')).test(String(left ?? ''));
   }
 }
 
@@ -949,15 +959,23 @@ export function evaluateSparcProductionRules(params: {
   readonly facts: readonly SparcWorkingMemoryFact[];
   readonly rules: readonly SparcProductionRule[];
   readonly compiledPlan?: SparcProductionRulePlan;
+  /** Match first; selection may supply bindings consumed by the chosen THEN. */
+  readonly deferEffects?: boolean;
 }): readonly SparcProductionRuleFiring[] {
   const firings: SparcProductionRuleFiring[] = [];
+  const activationKeys = new Set<string>();
   const factIndex = createFactIndex(params.facts);
   const sortedRules = params.compiledPlan?.sortedRules ?? getCompiledSparcProductionRulePlan(params.rules).sortedRules;
   for (const rule of sortedRules) {
     const matches = findPatternMatches(factIndex, rule.when);
     for (const bindings of matches) {
       if ((rule.tests ?? []).every((test) => compareRuleTest(test, bindings))) {
-        firings.push(instantiateFiring(rule, bindings));
+        const firing = instantiateFiring(params.deferEffects ? { ...rule, then: [] } : rule, bindings);
+        const activationKey = createActivationKey(firing);
+        if (!activationKeys.has(activationKey)) {
+          activationKeys.add(activationKey);
+          firings.push(firing);
+        }
       }
     }
   }
@@ -1010,6 +1028,7 @@ type SparcProductionExecutionParams = {
   readonly rules: readonly SparcProductionRule[];
   readonly maxCycles?: number;
   readonly compiledPlan?: SparcProductionRulePlan;
+  readonly selectActivation?: (activations: readonly SparcProductionRuleFiring[]) => SparcProductionRuleFiring | undefined;
 };
 
 function mergeFirings(left: SparcProductionRuleFiring, right: SparcProductionRuleFiring): SparcProductionRuleFiring {
@@ -1070,18 +1089,19 @@ function* executeProductionRules(params: SparcProductionExecutionParams): Genera
   const compiledPlan = params.compiledPlan ?? getCompiledSparcProductionRulePlan(params.rules);
 
   for (let cycle = 1; cycle <= maxCycles; cycle += 1) {
-    const nextFiring = evaluateSparcProductionRules({
+    const eligible = evaluateSparcProductionRules({
       facts,
       rules: params.rules,
       compiledPlan,
-    }).find((firing) => {
-      const activationKey = createActivationKey(firing);
-      if (firedActivationKeys.has(activationKey)) {
-        return false;
-      }
-      firedActivationKeys.add(activationKey);
-      return true;
-    });
+      deferEffects: true,
+    }).filter((firing) => !firedActivationKeys.has(createActivationKey(firing)));
+    const nextFiring = params.selectActivation ? params.selectActivation(eligible) : eligible[0];
+    if (nextFiring) {
+      const original = eligible.find((activation) => activation.ruleId === nextFiring.ruleId
+        && Object.entries(activation.bindings).every(([key, value]) => stableStringify(value) === stableStringify(nextFiring.bindings[key])));
+      if (!original) throw new Error('Production selector must select an eligible activation');
+      firedActivationKeys.add(createActivationKey(original));
+    }
 
     if (!nextFiring) {
       return {

@@ -1,3 +1,4 @@
+import { sparcPolicyForAccount } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
@@ -7,10 +8,6 @@ import type {
 import {
   resolveSparcControllerDisplay,
 } from './sparcController';
-import {
-  SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
-  collectSparcProgressiveNodeOperations,
-} from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import type {
   SparcTrialDisplayAutoTutorRuleRuntimeParams,
 } from '../../../../../../learning-components/units/sparcsession/SparcSessionUnitEngine';
@@ -28,12 +25,7 @@ import {
 } from './sparcRuntimeState';
 import {
   applySparcStateTransition,
-  replaySparcHistory,
 } from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
-import {
-  buildSparcDialogueProgressFacts,
-  SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY,
-} from './sparcDialogueRuntimeValues';
 
 type SparcControllerDialogueDisplay = SparcControllerDisplay & {
   readonly pageKey: string;
@@ -53,6 +45,7 @@ type SparcControllerDialogueEngine = UnitEngineLike & {
 };
 
 type SparcControllerDialogueCommitDeps = {
+  readonly getIsAdmin?: () => boolean;
   readonly getUserId?: () => string | null;
   readonly writeHistory?: (historyRecord: CanonicalHistoryRecord) => Promise<void>;
 };
@@ -103,37 +96,6 @@ function requireSparcControllerDialogueDisplay(display: unknown): SparcControlle
   return sparcDisplay as unknown as SparcControllerDialogueDisplay;
 }
 
-function extractDialogueNodeValues(params: {
-  readonly historyRecords: readonly CanonicalHistoryRecord[];
-  readonly transition?: Parameters<typeof applySparcStateTransition>[1];
-  readonly document?: unknown;
-}): Record<string, unknown> {
-  const progressiveOperations = collectSparcProgressiveNodeOperations([
-    ...params.historyRecords.map((record) => (
-      isRecord(record.sparc) && isRecord(record.sparc.stateTransition)
-        ? record.sparc.stateTransition
-        : {}
-    )),
-    params.transition ?? {},
-  ]);
-  const values: Record<string, unknown> = {};
-  if (progressiveOperations.length > 0) {
-    values[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveOperations;
-    values['learner-response-input'] = '';
-  }
-  if (isRecord(params.document)) {
-    const replayedState = replaySparcHistory(params.historyRecords);
-    const currentState = params.transition
-      ? applySparcStateTransition(replayedState, params.transition)
-      : replayedState;
-    values[SPARC_DIALOGUE_PROGRESS_FACTS_VALUE_KEY] = buildSparcDialogueProgressFacts({
-      document: params.document as Parameters<typeof buildSparcDialogueProgressFacts>[0]['document'],
-      replayState: currentState,
-    });
-  }
-  return values;
-}
-
 export async function commitSparcAutoTutorSubmit(params: {
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
@@ -164,6 +126,10 @@ export async function commitSparcAutoTutorSubmit(params: {
   if (authenticatedUserId !== userId) {
     throw new Error('[SPARC][Dialogue] History requires an authenticated user');
   }
+  const isAdmin = params.deps?.getIsAdmin ? params.deps.getIsAdmin() : (await import('../../../../lib/roleUtils')).currentUserHasRole('admin');
+  if (sparcDisplay.instructionalController?.policyId !== sparcPolicyForAccount(isAdmin, sparcDisplay.instructionalController?.policyId)) {
+    throw new Error('AutoTutor account policy changed; reopen this lesson before submitting');
+  }
   const levelUnit = Number(params.levelUnit);
   if (!Number.isFinite(levelUnit)) {
     throw new Error('[SPARC][Dialogue] History requires finite levelUnit');
@@ -184,10 +150,10 @@ export async function commitSparcAutoTutorSubmit(params: {
   const startedAt = Date.now();
   let writtenHistoryCount = 0;
 
-  const result = await engine.commitSparcTrialDisplayAutoTutorRules({
+  await engine.commitSparcTrialDisplayAutoTutorRules({
     core: {
       TDFId: tdfId,
-      sessionID: attemptId,
+      sessionID: String(priorHistoryRecords.at(-1)?.sessionID ?? `${attemptId}:${sparcDisplay.instructionalController!.policyId}:${startedAt}`),
       levelUnit,
       userId,
     },
@@ -224,10 +190,7 @@ export async function commitSparcAutoTutorSubmit(params: {
 
   return {
     committed: true,
-    sparcNodeValues: extractDialogueNodeValues({
-      historyRecords: priorHistoryRecords,
-      ...(result.dialogueTurn?.transition ? { transition: result.dialogueTurn.transition } : {}),
-      document: result.document,
-    }),
+    sparcNodeValues: { ...readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues,
+      'learner-response-input': '' },
   };
 }

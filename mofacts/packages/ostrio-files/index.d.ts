@@ -307,7 +307,7 @@ declare module 'meteor/ostrio:files' {
     parentDirPermissions?: number;
     integrityCheck?: boolean;
     strict?: boolean;
-    downloadCallback?: (this: ContextHTTP & ContextUser, fileObj: FileObj) => boolean;
+    downloadCallback?: (http: ContextHTTP & ContextUser, fileObj: FileObj) => boolean | Promise<boolean>;
     protected?: boolean | ((this: ContextHTTP & ContextUser, fileObj: FileObj) => boolean | number);
     public?: boolean;
     onBeforeUpload?: (this: ContextUpload & ContextUser, fileData: FileData) => boolean | string;

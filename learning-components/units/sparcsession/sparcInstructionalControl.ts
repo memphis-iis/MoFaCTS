@@ -8,10 +8,15 @@ import type {
   SparcInstructionalControllerConfig,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
+import { SPARC_COMPETITIVE_POLICY_ID, SPARC_INSTRUCTIONAL_POLICY_IDS, SPARC_STUDENT_SELECTED_POLICY_ID, SPARC_AGENT_SELECTED_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
+export { SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID, SPARC_STUDENT_SELECTED_POLICY_ID, SPARC_AGENT_SELECTED_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
 
 export const SPARC_AUTOTUTOR_ADAPTER_ID = 'sparc-autotutor-v1';
-export const SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID = 'progressive-scaffolding-v1';
 export const SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_VERSION = 1;
+
+export function isSparcInstructionalCycle(config: SparcInstructionalControllerConfig | undefined): boolean {
+  return config?.policyId === SPARC_COMPETITIVE_POLICY_ID || config?.policyId === SPARC_STUDENT_SELECTED_POLICY_ID || config?.policyId === SPARC_AGENT_SELECTED_POLICY_ID;
+}
 
 export type SparcAutoTutorInstructionalProjection = {
   readonly candidates: SparcInstructionalCandidateProjection;
@@ -57,52 +62,20 @@ export function assertSparcInstructionalControllerConfig(
   const adapterId = requireNonBlank(config.adapterId, 'SPARC instructionalController.adapterId');
   const policyId = requireNonBlank(config.policyId, 'SPARC instructionalController.policyId');
   if (adapterId !== SPARC_AUTOTUTOR_ADAPTER_ID) throw new Error(`SPARC instructional adapter "${adapterId}" is not registered`);
-  if (policyId !== SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID) throw new Error(`SPARC authored instructional policy "${policyId}" is not registered`);
+  if (!(SPARC_INSTRUCTIONAL_POLICY_IDS as readonly string[]).includes(policyId)) throw new Error(`SPARC authored instructional policy "${policyId}" is not registered`);
   if (config.policyVersion !== SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_VERSION) {
     throw new Error(`SPARC authored instructional policy version "${String(config.policyVersion)}" is not supported`);
   }
   minimumProgress(config);
 }
 
-function preCanonicalActiveCycle(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact | undefined {
-  const target = facts
-    .filter((fact) => fact.factType === 'instructionalTarget.active' && fact.slots?.status === 'active')
-    .at(-1);
-  if (!target) return undefined;
-  const targetKind = stringSlot(target, 'targetKind');
-  const targetId = stringSlot(target, 'targetId');
-  const targetKey = stringSlot(target, 'targetKey');
-  if (!targetId || !targetKey || (targetKind !== 'expectation' && targetKind !== 'misconception')) return undefined;
-  const focus = facts
-    .filter((fact) => fact.factType === 'instructionalFocus.episode' && fact.slots?.status === 'active')
-    .at(-1);
-  const focusEpisodeId = stringSlot(focus, 'focusEpisodeId') ?? `precanonical:${targetKey}`;
-  const scaffold = facts
-    .filter((fact) => fact.factType === 'scaffold.state' && fact.slots?.focusEpisodeId === focusEpisodeId)
-    .at(-1);
-  const progressValue = optionalFinite(target.slots?.currentProgress) ?? 0;
-  const priorValue = targetKind === 'expectation' ? progressValue : 1 - progressValue;
-  return {
-    factType: 'instructional.activeCycle',
-    slots: {
-      cycleId: focusEpisodeId,
-      targetKind,
-      targetId,
-      targetKey,
-      stage: stringSlot(scaffold, 'stage') ?? 'PUMP',
-      priorValue,
-      startedAtTurn: optionalFinite(focus?.slots?.startedAtTurn) ?? 0,
-      cycleTurnCount: 0,
-      status: 'active',
-      migratedFrom: 'pre-canonical-instructional-focus',
-    },
-  };
-}
-
 function latestActiveCycle(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact | undefined {
+  if (facts.some((fact) => ['instructionalTarget.active', 'instructionalFocus.episode', 'scaffold.state'].includes(fact.factType))) {
+    throw new Error('Pre-canonical SPARC instructional state is unsupported');
+  }
   return facts
     .filter((fact) => fact.factType === 'instructional.activeCycle' && fact.slots?.status === 'active')
-    .at(-1) ?? preCanonicalActiveCycle(facts);
+    .at(-1);
 }
 
 function currentCandidate(
@@ -160,6 +133,7 @@ export function projectSparcAutoTutorInstructionalFacts(params: {
   const candidates = projectSparcInstructionalCandidates({
     snapshotId: params.snapshotId,
     facts: params.facts,
+    policyId: params.config.policyId,
     ...(params.candidateOptions ? { options: params.candidateOptions } : {}),
   });
   const cycle = latestActiveCycle(params.facts);

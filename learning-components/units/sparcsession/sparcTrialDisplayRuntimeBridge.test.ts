@@ -506,6 +506,26 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
     );
   });
 
+  it('requires numeric cluster attachments and preserves valid zero-based indices', function() {
+    for (const value of [null, false, '', '0', [], {}, -1, 0.5, NaN, Infinity]) {
+      for (const attachment of [{ clusterIndex: value }, { clusterIndices: [0, value] }]) {
+        assert.throws(() => createSparcAuthoredDocumentFromTrialDisplay({
+          pageKey: 'doc-1',
+          display: { schema: 'tutorscript-sparc/2.0', nodes: [{ id: 'input', nodeType: 'atomic', atomType: 'dropdown', ...attachment }] },
+        }), /must be a non-negative integer/);
+      }
+    }
+    assert.throws(() => createSparcAuthoredDocumentFromTrialDisplay({
+      pageKey: 'doc-1', display: { schema: 'tutorscript-sparc/2.0', nodes: [{ id: 'input', clusterIndices: '0' }] },
+    }), /clusterIndices must be an array/);
+    const document = createSparcAuthoredDocumentFromTrialDisplay({
+      pageKey: 'doc-1',
+      display: { schema: 'tutorscript-sparc/2.0', nodes: [{ id: 'input', nodeType: 'atomic', atomType: 'dropdown', clusterIndices: [0, 2] }] },
+    });
+    assert.deepEqual(document.root.children?.[0]?.clusterIndices, [0, 2]);
+    assert.equal(document.root.children?.[0]?.kind, 'input');
+  });
+
   it('turns active-node focus changes into instantaneous production-rule events', function() {
     const [event] = createSparcProductionRuleEventsFromTrialResult({
       pageKey: 'doc-1',
@@ -565,11 +585,17 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         value: 'Unit accepted.',
       }, {
         nodeId: 'node-term-1-num-units',
+        key: 'value',
+        value: 'g',
+      }, {
+        nodeId: 'node-term-1-num-units',
         key: 'correctness',
         value: 'correct',
       }],
     );
-    assert.equal(writtenRecords.length, 2);
+    assert.deepEqual(writtenRecords.map((record) => (record as { action: string }).action), [
+      'sparc-production-rule-trace', 'sparc-production-rule-trace', 'sparc-production-rule',
+    ]);
   });
 
   it('commits unhandled answerable submissions as CTAT-style incorrect feedback', async function() {
@@ -602,6 +628,10 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         value: write.value,
       })),
       [{
+        nodeId: 'node-term-1-num-units',
+        key: 'value',
+        value: 'kg',
+      }, {
         nodeId: 'node-term-1-num-units',
         key: 'correctness',
         value: 'incorrect',
@@ -639,7 +669,11 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
 
     assert.equal(result.commits.length, 1);
     assert.equal(result.evaluations[0]?.transition, undefined);
-    assert.equal(writtenRecords.length, 0);
+    assert.equal(result.evaluations[0]?.execution.firings.length, 0);
+    assert.equal(result.commits[0]?.historyRecord, undefined);
+    assert.equal(writtenRecords.length, 1);
+    assert.equal((writtenRecords[0] as { action: string }).action, 'sparc-production-rule-trace');
+    assert.equal(result.evaluations[0]?.derivedRuleExecution?.firings[0]?.ruleId, 'derived-fact:target-unit-label');
   });
 
   it('loads clean SPARC AutoTutor targets with clusterKC-only authored clusterTargets', function() {
@@ -895,8 +929,8 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
       },
       time: 5000,
       problemStartTime: 5000,
-      selection: 'node-known-1-equivalent-bottom',
-      action: 'sparc-response',
+      selection: 'sparc-fractions-addition:node-known-1-equivalent-bottom',
+      action: 'sparc-response-outcome',
       typeOfResponse: 'sparc',
       eventType: 'sparc',
       sourceAddress: {
@@ -904,7 +938,9 @@ describe('sparcTrialDisplayRuntimeBridge', function() {
         nodeId: 'node-known-1-equivalent-bottom',
       },
     });
-    assert.equal(writtenRecords.length, 1);
+    assert.deepEqual(writtenRecords.map((record) => (record as { action: string }).action), [
+      'sparc-response-outcome', 'sparc-production-rule-trace', 'sparc-production-rule',
+    ]);
     assert.equal((writtenRecords[0] as { stimulusKC?: unknown }).stimulusKC, 'fractions.lcd');
   });
 

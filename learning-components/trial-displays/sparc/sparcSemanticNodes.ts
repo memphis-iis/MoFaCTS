@@ -25,7 +25,7 @@ type SemanticCompileResult = {
 };
 
 type SemanticRuleTest = {
-  readonly op: 'eq' | 'neq' | 'regex';
+  readonly op: 'eq' | 'neq' | 'in' | 'not-in' | 'regex' | 'not-regex';
   readonly left: JsonRecord;
   readonly right: JsonRecord;
 };
@@ -166,6 +166,12 @@ function collectExistingIds(nodes: readonly unknown[], context: SemanticCompileC
 }
 
 function responseTests(response: JsonRecord, defaultExpected: unknown): SemanticRuleTest[] {
+  // An authored regex is the matcher, not an additional restriction on the
+  // display's expected-answer text (which can be an example or placeholder).
+  const regex = nonBlankString(response.regex);
+  if (regex) {
+    return [{ op: 'regex', left: variable('input'), right: literal(regex) }];
+  }
   const exactValues = 'value' in response
     ? [response.value]
     : 'expected' in response
@@ -174,20 +180,11 @@ function responseTests(response: JsonRecord, defaultExpected: unknown): Semantic
   const acceptedValues = Array.isArray(response.acceptedValues) && response.acceptedValues.length > 0
     ? response.acceptedValues
     : exactValues;
-  const tests: SemanticRuleTest[] = acceptedValues.map((value) => ({
-    op: 'eq',
+  return [{
+    op: acceptedValues.length === 1 ? 'eq' : 'in',
     left: variable('input'),
-    right: literal(value),
-  }));
-  const regex = nonBlankString(response.regex);
-  if (regex) {
-    tests.push({
-      op: 'regex',
-      left: variable('input'),
-      right: literal(regex),
-    });
-  }
-  return tests;
+    right: literal(acceptedValues.length === 1 ? acceptedValues[0] : acceptedValues),
+  }];
 }
 
 function semanticResponses(node: JsonRecord, part: JsonRecord, defaultExpected: unknown): {
@@ -209,7 +206,10 @@ function semanticResponses(node: JsonRecord, part: JsonRecord, defaultExpected: 
       value: defaultExpected,
       outcome: 'correct',
       message: stableText(scoring.correctFeedback, stableText(scoring.feedback, 'Correct.')),
-      tests: responseTests({ value: defaultExpected }, defaultExpected),
+      tests: responseTests({
+        value: defaultExpected,
+        ...(Array.isArray(part.acceptedValues) ? { acceptedValues: part.acceptedValues } : {}),
+      }, defaultExpected),
     });
   }
   const defaultScoring = isRecord(scoring.default) ? scoring.default : null;
@@ -220,9 +220,8 @@ function semanticResponses(node: JsonRecord, part: JsonRecord, defaultExpected: 
         outcome: stableText(defaultScoring.outcome, 'incorrect'),
         message: stableText(defaultScoring.feedback, stableText(defaultScoring.message, 'Incorrect.')),
         tests: responses.flatMap((response) => response.tests
-          .filter((test) => test.op === 'eq')
           .map((test) => ({
-            op: 'neq',
+            op: test.op === 'regex' ? 'not-regex' : test.op === 'in' ? 'not-in' : 'neq',
             left: variable('input'),
             right: test.right,
           }))),

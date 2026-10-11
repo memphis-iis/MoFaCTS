@@ -137,6 +137,24 @@ function maximumCandidatePattern(params: {
   };
 }
 
+/** Target progression is shared by deterministic scaffolding and competitive moves. */
+export function instructionalTargetConditions(
+  targetKind: 'expectation' | 'misconception',
+  transition: 'start' | 'continue' | 'interrupt',
+  stage?: string,
+): SparcProductionRuleCondition[] {
+  if (transition === 'interrupt') {
+    if (targetKind !== 'misconception') throw new Error('Only a misconception can interrupt an expectation');
+    return [interruptedExpectationPattern(), cycleStatusPattern(true), maximumCandidatePattern({ targetKind })];
+  }
+  return [
+    ...(transition === 'continue'
+      ? [activeCyclePattern({ targetKind, ...(stage === undefined ? {} : { stage }) }), activeCandidatePattern({ targetKind })]
+      : [cycleStatusPattern(false), maximumCandidatePattern({ targetKind })]),
+    ...(targetKind === 'expectation' ? [noEligibleMisconceptionPattern()] : []),
+  ];
+}
+
 function progressPattern(meaningfulGain: boolean): SparcFactPattern {
   return {
     factType: 'instructional.progress',
@@ -197,7 +215,7 @@ function instructionalDecision(params: {
   };
 }
 
-function startedCycle(
+export function startedCycle(
   targetKind: 'expectation' | 'misconception',
   stage: string,
 ): SparcWorkingMemoryFactTemplate {
@@ -241,7 +259,7 @@ function continuedCycle(
   };
 }
 
-function decisionEffects(params: {
+export function decisionEffects(params: {
   readonly targetKind: 'expectation' | 'misconception';
   readonly action: string;
   readonly stage: string;
@@ -281,9 +299,6 @@ function continuationRule(params: {
   readonly action: string;
   readonly nextStage: string;
 }): SparcProductionRule {
-  const targetSpecificConditions: SparcProductionRuleCondition[] = params.targetKind === 'expectation'
-    ? [noEligibleMisconceptionPattern()]
-    : [];
   return {
     id: params.id,
     module: 'dialogue.instructional-control',
@@ -292,10 +307,8 @@ function continuationRule(params: {
       responsePattern(),
       assessmentPattern(),
       completionPattern(false),
-      activeCyclePattern({ targetKind: params.targetKind, stage: params.currentStage }),
-      activeCandidatePattern({ targetKind: params.targetKind }),
+      ...instructionalTargetConditions(params.targetKind, 'continue', params.currentStage),
       ...(params.meaningfulGain === undefined ? [] : [progressPattern(params.meaningfulGain)]),
-      ...targetSpecificConditions,
       noDecisionPattern(),
     ],
     then: decisionEffects({
@@ -326,9 +339,7 @@ function startRule(params: {
       responsePattern(),
       assessmentPattern(),
       completionPattern(false),
-      cycleStatusPattern(false),
-      maximumCandidatePattern({ targetKind: params.targetKind }),
-      ...(params.targetKind === 'expectation' ? [noEligibleMisconceptionPattern()] : []),
+      ...instructionalTargetConditions(params.targetKind, 'start'),
       turnPattern(),
       noDecisionPattern(),
     ],
@@ -500,9 +511,7 @@ export function createSparcProgressiveScaffoldingRules(): readonly SparcProducti
       responsePattern(),
       assessmentPattern(),
       completionPattern(false),
-      interruptedExpectationPattern(),
-      cycleStatusPattern(true),
-      maximumCandidatePattern({ targetKind: 'misconception' }),
+      ...instructionalTargetConditions('misconception', 'interrupt'),
       turnPattern(),
       noDecisionPattern(),
     ],

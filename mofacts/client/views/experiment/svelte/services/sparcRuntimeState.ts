@@ -1,4 +1,9 @@
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
+import { SPARC_COMPETITIVE_POLICY_ID, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+import { logistic, targetExpectancy } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
+import { calculateExpectationProbabilities } from '../../../../../../learning-components/models/adaptive-logistic/probabilityCalculation';
+import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
+import { projectSparcMenuOperations } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
 import {
   SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
   collectSparcProgressiveNodeOperations,
@@ -38,6 +43,7 @@ type SparcDurableScope = {
 };
 
 export type SparcResumeSnapshot = SparcDurableScope & {
+  readonly expectationProbabilities: Readonly<Record<string, number>>;
   readonly document: SparcAuthoredDocument;
   readonly replayState: SparcReplayState;
   readonly retainedHistoryRecords: readonly CanonicalHistoryRecord[];
@@ -143,9 +149,9 @@ export function projectSparcReplayStateToNodeValues(
       nodeValues[`${nodeId}::${key}`] = cell.value;
     }
   }
-  const progressiveNodeOperations = collectSparcProgressiveNodeOperations(
+  const progressiveNodeOperations = [...collectSparcProgressiveNodeOperations(
     replayState.transitions,
-  ) as readonly Record<string, unknown>[];
+  ) as readonly Record<string, unknown>[], ...projectSparcMenuOperations(replayState)];
   if (progressiveNodeOperations.length > 0) {
     nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveNodeOperations;
   }
@@ -153,7 +159,31 @@ export function projectSparcReplayStateToNodeValues(
     document,
     replayState,
   });
+  const pending = replayState.transitions.filter((transition) => transition.transitionId.endsWith(':decision')
+    && transition.event.type === 'response-submitted'
+    && !replayState.transitions.some((entry) => entry.transitionId === `${transition.event.eventId}:cycle`)).at(-1);
+  if (pending) nodeValues['learner-response-input'] = pending.event.payload?.input ?? '';
   return nodeValues;
+}
+
+function expectationTargets(document: SparcAuthoredDocument): string[] {
+  return [...new Set(buildSparcWorkingMemoryFacts({ document }).filter((fact) => fact.factType === 'autotutor.expectation')
+    .map((fact) => String(fact.slots?.clusterKC)))];
+}
+
+/** Only the latest attempt may resume, and only under its recorded policy. */
+export function sparcHistoryForPolicy(records: readonly CanonicalHistoryRecord[], policyId: string): CanonicalHistoryRecord[] {
+  const policy = (record: CanonicalHistoryRecord) => (record.sparc as { stateTransition?: { event?: { payload?: { policyId?: string } } } })?.stateTransition?.event?.payload?.policyId ?? SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID;
+  const last = records.at(-1);
+  if (!last || policy(last) !== policyId) return [];
+  return records.filter((record) => record.sessionID === last.sessionID && policy(record) === policyId);
+}
+
+function snapshotProbabilities(document: SparcAuthoredDocument, replayState: SparcReplayState, records: readonly CanonicalHistoryRecord[], scope: SparcDurableScope) {
+  const targets = expectationTargets(document);
+  if (document.instructionalController?.policyId !== SPARC_COMPETITIVE_POLICY_ID) return calculateExpectationProbabilities(records, scope, targets);
+  const facts = buildSparcWorkingMemoryFacts({ document, replayState });
+  return Object.fromEntries(targets.map((target) => [target, logistic(targetExpectancy(facts, `expectation:${target}`))]));
 }
 
 function buildSnapshot(
@@ -165,19 +195,21 @@ function buildSnapshot(
     pageKey: entry.pageKey,
     display,
   });
-  const replayState = replaySparcDocumentHistory(document, entry.retainedHistoryRecords);
+  const records = document.instructionalController ? sparcHistoryForPolicy(entry.retainedHistoryRecords, document.instructionalController.policyId) : entry.retainedHistoryRecords;
+  const replayState = replaySparcDocumentHistory(document, records);
   const nodeValues = projectSparcReplayStateToNodeValues({ document, replayState });
   const progressiveNodeOperations = (
     nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] as readonly Record<string, unknown>[] | undefined
   ) ?? [];
   const snapshot: SparcResumeSnapshot = {
+    expectationProbabilities: snapshotProbabilities(document, replayState, records, entry),
     userId: entry.userId,
     TDFId: entry.TDFId,
     levelUnit: entry.levelUnit,
     pageKey: entry.pageKey,
     document,
     replayState,
-    retainedHistoryRecords: [...entry.retainedHistoryRecords],
+    retainedHistoryRecords: [...records],
     nodeValues,
     progressiveNodeOperations,
   };
@@ -277,8 +309,9 @@ export function rememberSparcRuntimeHistoryRecord(record: CanonicalHistoryRecord
     });
     entry.snapshot = {
       ...entry.snapshot,
+      expectationProbabilities: snapshotProbabilities(entry.snapshot.document, replayState, [...entry.snapshot.retainedHistoryRecords, record], entry),
       replayState,
-      retainedHistoryRecords: [...entry.retainedHistoryRecords],
+      retainedHistoryRecords: [...entry.snapshot.retainedHistoryRecords, record],
       nodeValues,
       progressiveNodeOperations: (
         nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] as readonly Record<string, unknown>[] | undefined

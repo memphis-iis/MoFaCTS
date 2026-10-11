@@ -147,6 +147,52 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('analyticsMethods', function() {
+  it('requires admin authority for competitive policy and OET writes even with a forged policy label', async function() {
+    for (const admin of [false, true]) {
+      const { deps, insertedHistory } = createAnalyticsDeps({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => admin }) });
+      const methods = createAnalyticsMethods(deps as any);
+      for (const policyId of ['oet-boltzmann-v2', 'progressive-scaffolding-v1', 'student-selected-v2']) {
+        const record = createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparcsession', sparc: { pageKey: 'p', stateTransition: {
+          transitionId: `e:${policyId}`, event: {eventId: 'e', type: 'response-submitted', source: {pageKey: 'p', nodeId: 'root'}, time: 1, payload: {policyId}},
+          writes: policyId === 'student-selected-v2' ? [] : [{target: {pageKey: 'p', nodeId: 'root'}, key: 'workingMemoryFact', value: {factType: 'instructional.oet', slots: {logit: 0}}}],
+        } } });
+        let error: any;
+        try { await methods.insertHistory.call({userId: 'learner-1'}, record); } catch (caught) { error = caught; }
+        if (admin) expect(error).to.equal(undefined); else expect(error?.error).to.equal(403);
+      }
+      expect(insertedHistory.length).to.equal(admin ? 3 : 0);
+    }
+  });
+
+  it('accepts one SPARC decision under concurrent retries and rejects a competing option', async function() {
+    const stored = new Map<string, Record<string, unknown>>(); let updates = 0;
+    const base = createAnalyticsDeps();
+    const { deps } = createAnalyticsDeps({
+      Histories: { ...base.deps.Histories,
+        insertAsync: async (record: Record<string, unknown>) => {
+          const key = String(record._id);
+          if (stored.has(key)) throw Object.assign(new Error('duplicate'), { code: 11000 });
+          stored.set(key, record); return key;
+        },
+        findOneAsync: async (selector: Record<string, unknown>) => stored.get(String(selector._id)),
+      },
+      onHistoryInserted: async () => { updates++; },
+    });
+    const methods = createAnalyticsMethods(deps as any);
+    const choice = (optionId: string) => createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparc', outcome: 'unknown',
+      input: '', responseValue: '', sparc: { pageKey: 'page', sourceAddress: { pageKey: 'page', nodeId: `menu:${optionId}` },
+        stateTransition: { transitionId: 'menu:choice:decision', event: { eventId: 'menu:choice', type: 'choice-selected', time: 1710000000000,
+          source: { pageKey: 'page', nodeId: `menu:${optionId}` }, payload: { optionId } }, writes: [] } } });
+    await Promise.all([methods.insertHistory.call({ userId: 'learner-1' }, choice('question')),
+      methods.insertHistory.call({ userId: 'learner-1' }, choice('question'))]);
+    expect(stored.size).to.equal(1); expect(updates).to.equal(1);
+    let conflict: any;
+    try { await methods.insertHistory.call({ userId: 'learner-1' }, choice('next-target')); } catch (error) { conflict = error; }
+    expect(conflict?.error).to.equal('sparc-history-conflict'); expect(updates).to.equal(1);
+    let denied: any;
+    try { await methods.insertHistory.call({ userId: 'learner-2' }, choice('question')); } catch (error) { denied = error; }
+    expect(denied?.error).to.equal(403);
+  });
   it('deduplicates worksheet transport retries and rejects conflicting writes', async function() {
     const stored = new Map<string, Record<string, unknown>>(); let updates = 0;
     const base = createAnalyticsDeps();

@@ -1,3 +1,4 @@
+import { currentUserHasRole } from '../../../../lib/roleUtils';
 /**
  * Unit Engine Service
  *
@@ -18,7 +19,7 @@ import { getExperimentState } from './experimentState';
 import { assertIdInvariants, logIdInvariantBreachOnce } from '../../../../lib/idContext';
 import { getPreparedCardDataFromSelection as buildPreparedCardDataFromSelection } from './cardPayloadBuilder';
 import { resolveSessionSurfaceState } from './sessionSurfaceMode';
-import { resolveSparcControllerDisplay } from './sparcController';
+import { resolveSparcControllerDisplay, resolveSparcAccountPolicy } from './sparcController';
 import { ensureSparcRuntimeHistoryHydrated, readSparcResumeSnapshot } from './sparcRuntimeState';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import {
@@ -582,10 +583,10 @@ export async function selectCardService(
 
     // Now get card data (engine has prepared internal state)
     const cardData = getCardDataFromEngine(engine, clusterIndex, exportedQuestionIndex);
-    const sparcDisplay = resolveSparcControllerDisplay(
+    const sparcDisplay = resolveSparcAccountPolicy(resolveSparcControllerDisplay(
       cardData.currentDisplay,
       '[Unit Engine] Selected SPARC display',
-    );
+    ), currentUserHasRole('admin'));
     if (sparcDisplay?.pageKey) {
       const hydratedScopes = await ensureSparcRuntimeHistoryHydrated({
         userId: context.userId,
@@ -635,6 +636,7 @@ export async function selectCardService(
     // Return complete card data (available as event.output in onDone)
     return {
       ...cardData,
+      ...(sparcDisplay ? { currentDisplay: sparcDisplay } : {}),
       ...(sparcNodeValues ? { sparcNodeValues } : {}),
       unitFinished: false,
       engine // Pass engine back to update context

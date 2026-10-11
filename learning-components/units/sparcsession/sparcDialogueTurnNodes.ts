@@ -67,6 +67,7 @@ function utteranceNode(params: {
   readonly targetId?: string;
   readonly productionRuleId?: string;
   readonly productionRuleName?: string;
+  readonly competition?: Readonly<Record<string, number>>;
   readonly selectionTargetKind?: 'expectation' | 'misconception';
   readonly selectionCurrentValue?: number;
   readonly selectionGoalValue?: number;
@@ -85,6 +86,7 @@ function utteranceNode(params: {
     speaker: params.speaker,
     value: params.text,
     turnEventId: params.turnEventId,
+    ...(params.competition ? { competition: params.competition } : {}),
     ...(params.action ? { action: params.action } : {}),
     ...(params.targetType ? { targetType: params.targetType } : {}),
     ...(params.targetId ? { targetId: params.targetId } : {}),
@@ -199,6 +201,7 @@ export function createSparcDialogueTurnTransition(params: {
           targetId: params.utteranceRequest.targetId,
           ...productionRuleMetadata,
           ...selectionDiagnosticMetadata,
+          ...(params.utteranceRequest.competition ? { competition: params.utteranceRequest.competition } : {}),
           ...moveDefinitionMetadata,
         }),
       }),

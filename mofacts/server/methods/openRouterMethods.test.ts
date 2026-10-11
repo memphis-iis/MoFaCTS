@@ -40,6 +40,17 @@ function adminDeps(isAdmin = true, openRouterPrefixCachingEnabled?: boolean) {
 }
 
 describe('openRouterMethods Admin Tests configuration', function() {
+  it('rejects competitive AutoTutor provider requests before resolving a non-admin key', async function() {
+    const methods = createOpenRouterMethods(adminDeps(false) as any);
+    for (const policyId of ['oet-boltzmann-v2', 'student-selected-v2']) {
+      let error: any;
+      try { await methods.callResolvedOpenRouterJson.call({userId: 'learner'}, {policyId}); }
+      catch (caught) { error = caught; }
+      expect(error?.error).to.equal(403);
+      expect(error?.message).to.contain('admin');
+    }
+  });
+
   afterEach(function() {
     sinon.restore();
   });

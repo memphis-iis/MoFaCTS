@@ -530,7 +530,7 @@ describe('sparcProductionRuleEvaluator', function() {
         facts: [{ factType: 'learningTarget.score', slots: { coverage: 0.5 } }],
         rules: [missingBoundsRule],
       }),
-      /range pattern requires min or max/,
+      /range requires min or max/,
     );
     assert.throws(
       () => evaluateSparcProductionRules({
@@ -608,6 +608,39 @@ describe('sparcProductionRuleEvaluator', function() {
       () => compileSparcProductionRulePlan(rules),
       /any condition branch-local bindings are referenced outside the any condition: targetClusterKC/,
     );
+  });
+
+  it('compares accepted alternatives without coercion and rejects malformed membership operands', function() {
+    const rule: SparcProductionRule = {
+      id: 'membership', when: [{ factType: 'answer', slots: { input: { type: 'bind', variable: 'input' } } }],
+      tests: [{ op: 'in', left: variable('input'), right: literal([1, 'one']) }], then: [],
+    };
+    for (const [input, count] of [[1, 1], ['one', 1], ['1', 0], ['two', 0]] as const) {
+      assert.equal(evaluateSparcProductionRules({ facts: [{ factType: 'answer', slots: { input } }], rules: [rule] }).length, count);
+    }
+    for (const op of ['in', 'not-in'] as const) {
+      assert.throws(() => evaluateSparcProductionRules({
+        facts: [{ factType: 'answer', slots: { input: 'one' } }],
+        rules: [{ ...rule, tests: [{ op, left: variable('input'), right: literal('one') }] }],
+      }), /requires an array on the right/);
+    }
+  });
+
+  it('returns each rule/binding activation once while retaining distinct OR bindings', function() {
+    const rules: SparcProductionRule[] = [{
+      id: 'select-target',
+      when: [{ type: 'any', conditions: ['eligible', 'preferred'].map((factType) => ({
+        factType, slots: { target: { type: 'bind' as const, variable: 'target' } },
+      })) }],
+      then: [{ type: 'assert-fact', fact: { factType: 'selected', slots: { target: variable('target') } } }],
+    }];
+    const facts = [
+      { factType: 'eligible', slots: { target: 'a' } },
+      { factType: 'preferred', slots: { target: 'a' } },
+      { factType: 'eligible', slots: { target: 'b' } },
+    ];
+    assert.deepEqual(evaluateSparcProductionRules({ facts, rules }).map((firing) => firing.bindings.target), ['a', 'b']);
+    assert.deepEqual(runSparcProductionRules({ facts, rules }).firings.map((firing) => firing.bindings.target), ['a', 'b']);
   });
 
   it('validates nested any and not condition bindings before execution', function() {

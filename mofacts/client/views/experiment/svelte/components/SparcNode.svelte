@@ -1,5 +1,6 @@
 <script>
   import DOMPurify from 'dompurify';
+  import SparcPromptFigure from './SparcPromptFigure.svelte';
   import LearningProgressChart from './LearningProgressChart.svelte';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
@@ -203,7 +204,11 @@
     }
     const action = String(candidate?.action || '').trim();
     const targetId = String(candidate?.targetId || '').trim();
-    const targetKind = String(candidate?.selectionTargetKind || '').trim();
+    const targetKind = String(candidate?.selectionTargetKind || candidate?.targetType || '').trim();
+    if (candidate?.competition) {
+      const values = Object.entries(candidate.competition).map(([key, value]) => `${key}=${compactDiagnosticNumber(value)}`).join(' · ');
+      return `${action} → ${targetKind} ${targetId} · ${values}`;
+    }
     if (!action || !targetId || !targetKind) {
       return '';
     }
@@ -515,6 +520,9 @@
       <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}</div>
       <div class="sparc-dialogue-bubble">
         <div>{getNodeValue(node)}</div>
+        {#if node.figure !== undefined}
+          <SparcPromptFigure figure={node.figure} figureId={node.id} />
+        {/if}
         {#if dialogueProductionRuleLabel(node)}
           <div class="sparc-dialogue-diagnostic">production: {dialogueProductionRuleLabel(node)}</div>
           {#if dialogueSelectionLabel(node)}
@@ -555,6 +563,7 @@
       class:sparc-correctness-incorrect={getNodeCorrectness(node) === 'incorrect' || getNodeCorrectness(node) === 'buggy'}
       data-node-id={node.id}
       type="text"
+      aria-label={node.label || undefined}
       value={getNodeValue(node)}
       maxlength={node.maxlength}
       placeholder={node.hint || ''}

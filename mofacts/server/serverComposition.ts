@@ -67,6 +67,7 @@ import {
   createOpenRouterModelCatalogService,
 } from './methods/openRouterCatalogMethods';
 import { createOpenRouterMethods } from './methods/openRouterMethods';
+import { createSparcPromptImageMethods } from './methods/sparcPromptImageMethods';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
@@ -1105,6 +1106,8 @@ export const asyncMethods: Record<string, unknown> = {
   getTdfById: getTdfByIdPublic,
 
   ...speechMethods,
+
+  ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary }),
 
   ...createOpenRouterMethods({
     serverConsole,

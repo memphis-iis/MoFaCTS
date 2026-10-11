@@ -1129,7 +1129,7 @@ export const SPARC_RULE_CATALOG: readonly SparcAuthoringCatalogEntry[] = [{
     type: 'object',
     required: ['op', 'left'],
     properties: {
-      op: { enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy', 'regex'] },
+      op: { enum: ['eq', 'neq', 'in', 'not-in', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy', 'regex', 'not-regex'] },
       left: ruleExpressionSchema,
       right: ruleExpressionSchema,
     },

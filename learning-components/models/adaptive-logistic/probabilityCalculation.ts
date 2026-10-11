@@ -1,4 +1,32 @@
 import { createProbabilityFunctionHelpers } from './probabilityFunctions';
+import { readExpectationLogitHistory, type ExpectationHistoryScope } from '../../runtime/expectationLogitHistory';
+import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
+
+export function probabilityLogit(value: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error('Expectation coverage must be a finite probability');
+  }
+  const bounded = Math.min(0.9999, Math.max(0.0001, value));
+  return Math.log(bounded / (1 - bounded));
+}
+
+export function expectationLogitChange(previous: number, current: number): number {
+  return probabilityLogit(current) - probabilityLogit(previous);
+}
+
+export function expectationProbability(deltas: readonly number[]): number {
+  if (deltas.some((delta) => !Number.isFinite(delta))) throw new Error('Expectation deltas must be finite');
+  const sum = deltas.reduce((total, delta) => total + delta, 0);
+  return 1 / (1 + Math.exp(-sum));
+}
+
+/** Derived diagnostic result only; never writes the active scheduling estimates. */
+export function calculateExpectationProbabilities(
+  records: Iterable<CanonicalHistoryRecord>, scope: ExpectationHistoryScope, targets: readonly string[],
+): Readonly<Record<string, number>> {
+  const history = readExpectationLogitHistory(records, scope);
+  return Object.fromEntries(targets.map((target) => [target, expectationProbability(history.get(target) ?? [])]));
+}
 
 export interface CalculateSingleProbabilityParams {
   readonly cardProbabilities: any;

@@ -1,3 +1,4 @@
+import { SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import type {
   AutoTutorExpectationScore,
   AutoTutorLearnerContributionScore,
@@ -484,10 +485,10 @@ function validateSparcAutoTutorContent(context: AutoTutorValidationContext, erro
     if (
       !instructionalController
       || instructionalController.adapterId !== 'sparc-autotutor-v1'
-      || instructionalController.policyId !== 'progressive-scaffolding-v1'
+      || !(SPARC_INSTRUCTIONAL_POLICY_IDS as readonly string[]).includes(String(instructionalController.policyId))
       || instructionalController.policyVersion !== 1
     ) {
-      errors.push(`${pagePrefix}.display.instructionalController must select sparc-autotutor-v1 and progressive-scaffolding-v1 version 1`);
+      errors.push(`${pagePrefix}.display.instructionalController must select sparc-autotutor-v1 and a registered policy (${SPARC_INSTRUCTIONAL_POLICY_IDS.join(', ')}) at version 1`);
     }
     validateSparcAutoTutorTargets(display, clusters, `${pagePrefix}.display`, errors);
   });

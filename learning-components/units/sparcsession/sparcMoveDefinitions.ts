@@ -1,3 +1,5 @@
+import { SPARC_SUPPORTED_PROMPT_SCHEMA_ID } from './sparcSupportedPrompt';
+
 export type SparcMoveFamily =
   | 'autotutor-dialogue'
   | 'sparc-component'
@@ -7,6 +9,8 @@ export type SparcMoveFamily =
 export type SparcMoveStatus = 'active';
 
 export type SparcMoveDefinition = {
+  readonly components?: readonly ('explanation' | 'richContent' | 'question')[];
+  readonly assistance?: number;
   readonly moveId: string;
   readonly version: string;
   readonly family: SparcMoveFamily;
@@ -36,8 +40,10 @@ function promptPolicy(...requirements: readonly string[]): string {
 
 function autotutorDialogueMove(params: {
   readonly moveId: string;
+  readonly assistance?: number;
   readonly paperRuleIds?: readonly string[];
   readonly paperMoveName: string;
+  readonly outputSchemaId?: string;
   readonly promptVersion?: string;
   readonly promptPolicy: string;
   readonly requiredFacts?: readonly string[];
@@ -46,6 +52,7 @@ function autotutorDialogueMove(params: {
     moveId: params.moveId,
     version: 'v1',
     family: 'autotutor-dialogue',
+    ...(params.assistance !== undefined ? { assistance: params.assistance } : {}),
     status: 'active',
     source: {
       paperRuleIds: params.paperRuleIds ?? [],
@@ -54,13 +61,26 @@ function autotutorDialogueMove(params: {
     requiredFacts: params.requiredFacts ?? ['controller.selectedAction'],
     promptId: `autotutor.${params.moveId}`,
     promptVersion: params.promptVersion ?? 'v1',
-    outputSchemaId: AUTOTUTOR_DIALOGUE_OUTPUT_SCHEMA_ID,
+    outputSchemaId: params.outputSchemaId ?? AUTOTUTOR_DIALOGUE_OUTPUT_SCHEMA_ID,
     outputSchemaVersion: AUTOTUTOR_DIALOGUE_OUTPUT_SCHEMA_VERSION,
     renderer: AUTOTUTOR_DIALOGUE_RENDERER,
     historyAction: AUTOTUTOR_DIALOGUE_HISTORY_ACTION,
     promptPolicy: params.promptPolicy,
   };
 }
+
+const AUTOTUTOR_PROMPT_POLICY = promptPolicy(
+      '1. Acknowledgement: Usually begin with a brief natural acknowledgement of the learner\'s latest answer or the progress it shows. If there was no progress, acknowledge the answer neutrally before continuing. The acknowledgement must not agree with an incorrect answer or adopt the learner\'s claim as the tutor\'s own position. Avoid fixed templates and vary wording across turns.',
+      '2. Learner-language and terminology boundary: Represent the learner\'s meaning faithfully, but do not mechanically reproduce their wording. In the tutor\'s own voice, use canonical authored terminology and silently normalize obvious misspellings, transcription errors, malformed grammar, and incorrect nonconceptual word choices. Do not attribute rubric language, unstated beliefs, or missing content to the learner. Do not interrupt the lesson to correct the learner\'s language unless the terminology distinction is itself instructionally relevant.',
+      '3. Transition: Then continue with the selected pedagogical move.',
+      '4. Scaffolding principle: Scaffold locally: use dialogue history diagnostically to infer the learner\'s current ZPD, make the relevant task structure visible, and keep the main reasoning step with the learner.',
+      '5. Selected target expectation: If targetType is learningTarget, ask one focused question that elicits a specific, substantive part of the selected target expectation that the learner has not yet supplied correctly: a conceptually important entity, property, process step, or technical concept. Seek a short answer. Make clear what information is requested without supplying it or explaining the relationship the learner needs to establish. Ground the question in the expectation\'s conceptual content; use details from the opening example only when needed to make the question understandable.',
+      '6. Selected target misconception: If targetType is misconception, ask one focused question that elicits a conceptually important entity, property, process step, or technical concept needed to recognize or correct the misconception the learner actually expressed. Use the relevant correct expectation to identify that missing content, without stating the correction or supplying an explanatory clue. Do not present rubric wording as the learner\'s position or describe repetition or endorsement of an active misconception as progress, closeness, or a good start.',
+      '7. Repetition handling: Use dialogue history to see whether this same substantive part has already been prompted. If it has, do not repeat the same question; narrow or reframe the prompt by focusing on a different substantive part of the same selected target.',
+      '8. Content boundary: Ground the wording in the selected target expectation and authored domain facts, but do not embed the answer in the question.',
+      '9. Question form: Use a natural question or a brief completion request, whichever fits the dialogue. A fill-in-the-blank form is optional.',
+      '10. Technical-condition clarity: Use correct domain terminology, but do not rely on an unexplained technical term when its interpretation changes the answer. Briefly restate the decisive condition in learner-accessible language without supplying the target conclusion. Preserve the authored meaning and do not silently replace it with a different assumption.',
+    );
 
 export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
   autotutorDialogueMove({
@@ -88,7 +108,7 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
     ),
   }),
   autotutorDialogueMove({
-    moveId: 'pump',
+    moveId: 'pump', assistance: 0,
     paperRuleIds: ['paper-rule-01-pump', 'paper-rule-02-pump'],
     paperMoveName: 'Pumping for more information',
     promptVersion: 'v7',
@@ -106,23 +126,21 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
     ),
   }),
   autotutorDialogueMove({
-    moveId: 'prompt',
+    moveId: 'prompt', assistance: 0.66,
     paperRuleIds: ['paper-rule-05-prompt'],
     paperMoveName: 'Prompting for specific information',
-    promptVersion: 'v3',
-    promptPolicy: promptPolicy(
-      '1. Acknowledgement: Usually begin with a brief natural acknowledgement of the learner\'s latest answer or the progress it shows. If there was no progress, acknowledge the answer neutrally before continuing. The acknowledgement must not agree with an incorrect answer or adopt the learner\'s claim as the tutor\'s own position. Avoid fixed templates and vary wording across turns.',
-      '2. Learner-language and terminology boundary: Represent the learner\'s meaning faithfully, but do not mechanically reproduce their wording. In the tutor\'s own voice, use canonical authored terminology and silently normalize obvious misspellings, transcription errors, malformed grammar, and incorrect nonconceptual word choices. Do not attribute rubric language, unstated beliefs, or missing content to the learner. Do not interrupt the lesson to correct the learner\'s language unless the terminology distinction is itself instructionally relevant.',
-      '3. Transition: Then continue with the selected pedagogical move.',
-      '4. Scaffolding principle: Scaffold locally: use dialogue history diagnostically to infer the learner\'s current ZPD, make the relevant task structure visible, and keep the main reasoning step with the learner.',
-      '5. Move execution: If targetType is learningTarget, ask one constrained question that directs attention to a specific missing slot, relation, mechanism, contrast, variable, cause, evidence, or consequence. If targetType is misconception, ask one constrained question that helps the learner examine a consequence, contradiction, or relevant contrast in the claim they actually expressed without presenting rubric wording as their position or embedding the correction. Do not describe repetition or endorsement of an active misconception as progress, closeness, or a good start.',
-      '6. Repetition handling: Use dialogue history to see whether this same slot has already been prompted. If it has, do not repeat the same question; narrow or reframe the prompt by focusing on a different feature of the same target structure.',
-      '7. Content boundary: Ground the wording in the current expectation and authored domain facts, but do not embed the answer in the question.',
-      '8. Technical-condition clarity: Use correct domain terminology, but do not rely on an unexplained technical term when its interpretation changes the answer. Briefly restate the decisive condition in learner-accessible language without supplying the target conclusion. Preserve the authored meaning and do not silently replace it with a different assumption.',
-    ),
+    promptVersion: 'v4',
+    promptPolicy: AUTOTUTOR_PROMPT_POLICY,
   }),
   autotutorDialogueMove({
-    moveId: 'hint',
+    moveId: 'prompt-supported', assistance: 1.33,
+    paperMoveName: 'Prompting with an incomplete aligned figure',
+    outputSchemaId: SPARC_SUPPORTED_PROMPT_SCHEMA_ID,
+    promptPolicy: AUTOTUTOR_PROMPT_POLICY + '\n' +
+      '11. Figure support: Return tutorMessage, imagePrompt, and figureDescription together. Write a precise image-generation brief for a polished, incomplete educational figure aligned with the selected target and the single tutor question. Choose the visual form appropriate to the subject: an illustration, process, spatial arrangement, comparison, table, plot, or other figure. Leave a conceptually important feature, relationship, step, or label for the learner to infer; incompleteness need not be a missing word or a cloze item. Specify exactly what is visible, what is intentionally omitted, the exact short labels to show, and how the question refers to the figure. Use only the authored problem, selected expectation, and established dialogue; do not invent numeric variables or domain-specific assumptions. Do not put the missing answer in visible labels, the tutor message, or figureDescription. The description is accessible text describing the visible figure and its omission, not an answer key. If addressing a misconception, use the correct expectation to challenge only the misconception actually expressed; do not present it as correct. Do not return markup, image URLs, or executable drawing code.',
+  }),
+  autotutorDialogueMove({
+    moveId: 'hint', assistance: 2,
     paperRuleIds: ['paper-rule-06-hint', 'paper-rule-07-hint'],
     paperMoveName: 'Hinting',
     promptVersion: 'v3',
@@ -140,7 +158,7 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
     ),
   }),
   autotutorDialogueMove({
-    moveId: 'assertion',
+    moveId: 'assertion', assistance: 2.4,
     paperMoveName: 'Assertion/direct content supply',
     promptVersion: 'v3',
     promptPolicy: promptPolicy(
@@ -170,8 +188,22 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
   }),
 ] as const satisfies readonly SparcMoveDefinition[]);
 
+export const SPARC_COMPOSITE_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = [
+  { moveId: 'instruction.question', components: ['question'], assistance: 0 },
+  { moveId: 'instruction.explanation-question', components: ['explanation', 'question'], assistance: 1 },
+  { moveId: 'instruction.rich-question', components: ['richContent', 'question'], assistance: 1.4 },
+  { moveId: 'instruction.explanation-rich-question', components: ['explanation', 'richContent', 'question'], assistance: 1.8 },
+].map((definition) => ({
+  ...definition,
+  components: definition.components as NonNullable<SparcMoveDefinition['components']>,
+  version: 'v1', family: 'sparc-component', status: 'active', requiredFacts: ['controller.selectedAction'],
+  promptId: definition.moveId, promptVersion: 'v1', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v1',
+  renderer: 'sparc.nodes', historyAction: 'sparc-instruction',
+  promptPolicy: 'Teach only the selected target. Return the requested components, ending with one question. Rich content is a worked example, table, image, or figure in semantic HTML. Use only supplied asset URLs for images; include meaningful alt text and figure captions. Do not invent image URLs. Use a worked example or table when no particular rich form is requested and no image asset is supplied. Never substitute a different form when a particular form is requested. No scripts, interactive HTML controls, iframes, or embedded styles. Explanations and questions are plain text. Do not disclose internal scoring, identifiers, or rule metadata.',
+}));
+
 export function getSparcMoveDefinition(moveId: string): SparcMoveDefinition | undefined {
-  return SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS.find((definition) => definition.moveId === moveId);
+  return [...SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS, ...SPARC_COMPOSITE_MOVE_DEFINITIONS].find((definition) => definition.moveId === moveId);
 }
 
 export function requireActiveSparcMoveDefinition(moveId: string): SparcMoveDefinition {

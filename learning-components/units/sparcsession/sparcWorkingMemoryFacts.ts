@@ -1,3 +1,4 @@
+import { parseSparcPromptFigure } from './sparcSupportedPrompt';
 import type {
   SparcAuthoredDocument,
   SparcAuthoredNode,
@@ -161,7 +162,7 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
     const id = typeof node.id === 'string' ? node.id.trim() : '';
     const speaker = node.speaker === 'learner' || node.speaker === 'tutor' ? node.speaker : '';
     const text = typeof node.value === 'string' ? node.value.trim() : '';
-    if (node.atomType !== 'dialogue-utterance' || !id || !speaker || !text) {
+    if ((node.atomType !== 'dialogue-utterance' && !(node.atomType === 'html-block' && node.turnEventId)) || !id || !speaker || !text) {
       return [];
     }
     const optionalStringSlots = [
@@ -192,6 +193,7 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
       eventId: transition.event.eventId,
       time: transition.event.time,
     };
+    if (node.figure !== undefined) slots.figure = parseSparcPromptFigure(node.figure);
     for (const slot of optionalStringSlots) {
       if (typeof node[slot] === 'string' && node[slot].trim()) {
         slots[slot] = node[slot];

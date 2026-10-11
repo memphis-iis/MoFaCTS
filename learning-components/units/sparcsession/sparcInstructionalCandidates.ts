@@ -1,4 +1,5 @@
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
+import { SPARC_COMPETITIVE_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
 
 export type SparcInstructionalTargetKind = 'expectation' | 'misconception';
 
@@ -40,6 +41,7 @@ export type SparcInstructionalCandidateWeights = {
 };
 
 export type SparcInstructionalCandidateOptions = {
+  readonly includeCompletedExpectations?: boolean;
   readonly coverageThreshold?: number;
   readonly misconceptionThreshold?: number;
   readonly anchorClusterKC?: string;
@@ -252,6 +254,7 @@ function candidateFact(
 export function projectSparcInstructionalCandidates(params: {
   readonly snapshotId: string;
   readonly facts: readonly SparcWorkingMemoryFact[];
+  readonly policyId?: string;
   readonly options?: SparcInstructionalCandidateOptions;
 }): SparcInstructionalCandidateProjection {
   const snapshotId = params.snapshotId.trim();
@@ -312,12 +315,14 @@ export function projectSparcInstructionalCandidates(params: {
       // Prefer the most structurally ready expectation the learner is already
       // closest to meeting; remaining need is a penalty, not a reward.
       priorityScore: structuralPriorityScore - instructionalNeed,
-      eligible: targetId !== excludeClusterKC && currentCoverage < coverageThreshold,
+      eligible: targetId !== excludeClusterKC && (options.includeCompletedExpectations === true || currentCoverage < coverageThreshold),
     };
   }));
 
   const misconceptions = rankedMisconceptions(misconceptionIds.map((targetId) => {
     const supportStrength = support.get(targetId) ?? 0;
+    const triggered = supportStrength >= misconceptionThreshold || params.facts.some((fact) =>
+      fact.factType === 'instructional.modelObservation' && fact.slots?.targetKey === `misconception:${targetId}`);
     const instructionalNeed = misconceptionThreshold < 1
       ? rounded(Math.max(0, supportStrength - misconceptionThreshold) / (1 - misconceptionThreshold))
       : 0;
@@ -329,7 +334,11 @@ export function projectSparcInstructionalCandidates(params: {
       goalValue: misconceptionThreshold,
       instructionalNeed,
       priorityScore: supportStrength,
-      eligible: supportStrength >= misconceptionThreshold,
+      // Determine eligibility before ranking and active-cycle projection, so all
+      // progression rules agree about whether a detected misconception is done.
+      eligible: params.policyId === SPARC_COMPETITIVE_POLICY_ID
+        ? triggered && 1 - supportStrength < coverageThreshold
+        : supportStrength >= misconceptionThreshold,
     };
   }));
   const maximumExpectation = expectations.find((candidate) => candidate.isMaximumWithinKind);
@@ -341,8 +350,16 @@ export function projectSparcInstructionalCandidates(params: {
     factType: 'instructional.thresholds',
     slots: { snapshotId, coverageThreshold, misconceptionThreshold },
   },
-  ...expectations.map((candidate) => candidateFact(snapshotId, candidate)),
-  ...misconceptions.map((candidate) => candidateFact(snapshotId, candidate))];
+  ...expectations.map((candidate, index) => {
+    const fact = candidateFact(snapshotId, candidate);
+    return options.includeCompletedExpectations ? { ...fact, slots: { ...fact.slots,
+      nextTargetId: expectations[(index + 1) % expectations.length]!.targetId } } : fact;
+  }),
+  ...misconceptions.map((candidate) => {
+    const fact = candidateFact(snapshotId, candidate);
+    return options.includeCompletedExpectations && expectations.length ? { ...fact, slots: { ...fact.slots,
+      nextTargetId: expectations[0]!.targetId } } : fact;
+  })];
   return {
     snapshotId,
     coverageThreshold,

@@ -177,6 +177,15 @@ describe('AutoTutor content contract', function() {
     expect(result).to.deep.equal({ valid: true, errors: [] });
   });
 
+  it('accepts the two separate instructional versions and rejects unknown policies', function() {
+    for (const policyId of ['student-selected-v2', 'agent-selected-v1', 'oet-boltzmann-v2', 'unknown-policy']) {
+      const stimuli = buildValidSparcAutoTutorStimuli();
+      stimuli.setspec.sparcPages[0]!.display.instructionalController.policyId = policyId;
+      const result = validateAutoTutorContent({ tdf: buildValidSparcAutoTutorTdf(), stimuli });
+      expect(result.valid).to.equal(policyId !== 'unknown-policy');
+    }
+  });
+
   it('rejects authored production rules in runtime-owned SPARC AutoTutor content', function() {
     const stimuli = buildValidSparcAutoTutorStimuli();
     const display = stimuli.setspec.sparcPages[0]!.display as Record<string, unknown>;

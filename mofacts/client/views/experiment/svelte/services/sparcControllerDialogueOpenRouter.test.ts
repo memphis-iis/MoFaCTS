@@ -149,7 +149,7 @@ const utteranceRequest: SparcUtteranceRequest = {
 };
 
 function utteranceRequestFor(
-  action: 'pump' | 'prompt' | 'hint' | 'assertion' | 'question-deferral' | 'question-scope-refusal' | 'summary',
+  action: 'pump' | 'prompt' | 'prompt-supported' | 'hint' | 'assertion' | 'question-deferral' | 'question-scope-refusal' | 'summary',
   targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion',
 ): SparcUtteranceRequest {
   const targetId = targetType === 'learningTarget'
@@ -199,6 +199,33 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
+  it('generates all four composite schemas through the existing provider', async function() {
+    for (const action of ['instruction.question', 'instruction.explanation-question', 'instruction.rich-question', 'instruction.explanation-rich-question']) {
+      const definition = requireActiveSparcMoveDefinition(action);
+      const output = { explanation: definition.components!.includes('explanation') ? 'An explanation.' : null,
+        richContent: definition.components!.includes('richContent') ? '<table><tr><th>A</th></tr><tr><td>1</td></tr></table>' : null,
+        question: 'What follows?' };
+      const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+        expect(params.intent.schema).to.have.property('additionalProperties', false);
+        expect(params.messages[0]!.content).to.include(definition.promptPolicy);
+        return { parsedContent: output };
+      } });
+      expect(await provider.generateTutorUtterance({ ...utteranceRequest, action, moveDefinition: definition })).to.deep.equal(output);
+    }
+  });
+
+  it('rejects rich output that cannot be rendered or invents an image asset', async function() {
+    for (const richContent of ['<svg><circle /></svg>', '<img src="https://example.org/invented.png" alt="A diagram">']) {
+      const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson() {
+        return { parsedContent: { explanation: null, richContent, question: 'What follows?' } };
+      } });
+      let error: unknown;
+      try { await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.rich-question',
+        moveDefinition: requireActiveSparcMoveDefinition('instruction.rich-question') }); } catch (caught) { error = caught; }
+      expect(error).to.be.instanceOf(Error);
+      expect((error as Error).message).to.include('Invalid rich instruction');
+    }
+  });
   it('scores learner responses through server-resolved OpenRouter without choosing a move', async function() {
     const calls: unknown[] = [];
     const observedTrace: SparcDialogueLearnerResponseScoringTraceEvent[] = [];
@@ -303,7 +330,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.contain('primary conversational action genuinely requests information or confirmation');
     expect(systemMessage?.content).to.contain('may be either a question or an answer');
     expect(systemMessage?.content).to.contain('score its instructional meaning the same either way');
-    expect(systemMessage?.content).to.contain('A response that addresses the problem or answers the tutor cannot be off-task');
+    expect(systemMessage?.content).to.contain('Treat a contribution as on-topic if it relates to the original problem or to the ongoing instructional dialogue, including ideas introduced by the tutor');
+    expect(systemMessage?.content).to.contain('Expressions of confusion and requests for clarification about that material are on-topic');
+    expect(systemMessage?.content).to.contain('contentFocused true for an on-topic question, using the definition in step 1');
     expect(systemMessage?.content).to.contain('exactly one learningTargetEvaluations entry for every supplied learning target');
     expect(systemMessage?.content).to.contain('exactly one diagnosticMisconceptionEvaluations entry for every supplied misconception');
     expect(systemMessage?.content).to.contain('Every supports or contradicts evaluation must include at least one learnerEvidence citation');
@@ -372,11 +401,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
       role: 'tutor',
       text: 'What happens after the first year?',
     }]);
-    expect(userMessage.content.indexOf('"learnerText"')).to.be.greaterThan(
-      userMessage.content.indexOf('"dialogueHistory"'),
+    expect((userMessage.content as string).indexOf('"learnerText"')).to.be.greaterThan(
+      (userMessage.content as string).indexOf('"dialogueHistory"'),
     );
-    expect(userMessage.content.indexOf('"evaluationDirective"')).to.be.greaterThan(
-      userMessage.content.indexOf('"learnerText"'),
+    expect((userMessage.content as string).indexOf('"evaluationDirective"')).to.be.greaterThan(
+      (userMessage.content as string).indexOf('"learnerText"'),
     );
     expect(scoringUserPayload.evaluationDirective).to.contain(
       'Evaluate learnerText as the latest and primary evidence for this state update.',
@@ -826,6 +855,44 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.learnerContribution?.type).to.equal('answer');
   });
 
+  it('generates an aligned brief then a private image and supplies that image on later turns', async function() {
+    const utteranceRequest = utteranceRequestFor('prompt-supported', 'learningTarget');
+    const figure = { assetId: 'image123', description: 'Two stages separated by an unfinished middle step.' };
+    let jsonCalls = 0;
+    let imageCalls = 0;
+    const provider = createSparcDialogueOpenRouterProvider({
+      tdfId: 'lesson', sessionId: 'session',
+      async callResolvedOpenRouterJson(params) {
+        jsonCalls++;
+        if (jsonCalls === 1) {
+          expect(params.intent.schema.required).to.deep.equal(['tutorMessage', 'imagePrompt', 'figureDescription']);
+          return { parsedContent: { tutorMessage: 'What happens between these stages?', imagePrompt: 'A polished illustration with its middle step omitted.', figureDescription: figure.description } };
+        }
+        const content = params.messages[1]!.content;
+        expect(Array.isArray(content)).to.equal(true);
+        expect(content).to.deep.include({ type: 'image_url', image_url: { url: 'data:image/png;base64,aW1hZ2U=' } });
+        return { parsedContent: { tutorMessage: 'What is the next step?' } };
+      },
+      async callSparcPromptImage(params) {
+        imageCalls++;
+        expect(params.generationId).to.equal('event');
+        expect(params.imagePrompt).to.contain(utteranceRequest.problemStatement);
+        expect(params.imagePrompt).to.contain('middle step omitted');
+        return { tutorMessage: params.tutorMessage, figure };
+      },
+      async readSparcPromptImage(assetId) {
+        expect(assetId).to.equal(figure.assetId);
+        return { dataUrl: 'data:image/png;base64,aW1hZ2U=' };
+      },
+    });
+    expect(await provider.generateTutorUtterance({ ...utteranceRequest, selectedAction: { snapshotId: 'event' } }))
+      .to.deep.equal({ tutorMessage: 'What happens between these stages?', figure });
+    await provider.generateTutorUtterance({ ...utteranceRequestFor('hint', 'learningTarget'),
+      dialogueHistory: [{ role: 'tutor', text: 'What happens between these stages?', figure }] });
+    expect(imageCalls).to.equal(1);
+    expect(jsonCalls).to.equal(2);
+  });
+
   it('requires nonblank tutor text without delegating control metadata to the model', async function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson() {
@@ -930,8 +997,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(userMessage.content).to.contain('Opening scenario (context only; choose the next question to elicit the selected expectation or address the selected misconception):');
         expect(userMessage.content).to.contain(problemStatement);
         expect(userMessage.content).to.contain('Latest student answer (the primary source for any acknowledgement):');
-        expect(userMessage.content.indexOf('Latest student answer')).to.be.greaterThan(
-          userMessage.content.indexOf('Full dialogue history'),
+        expect((userMessage.content as string).indexOf('Latest student answer')).to.be.greaterThan(
+          (userMessage.content as string).indexOf('Full dialogue history'),
         );
         expect(userMessage.content).to.contain('Target kind: learningTarget.');
         expect(userMessage.content).to.contain('Registered move definition:');
@@ -968,7 +1035,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
   it('orders a question-deferral modifier before the terminal scaffold move', async function() {
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
-        const systemPrompt = params.messages[0]?.content ?? '';
+        const systemPrompt = params.messages[0]?.content as string ?? '';
         const modifierIndex = systemPrompt.indexOf('Response modifier: question-deferral.');
         const selectedMoveIndex = systemPrompt.indexOf('Selected move: prompt.');
         expect(modifierIndex).to.be.greaterThan(-1);
@@ -1048,7 +1115,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
             items?: { properties?: Record<string, Record<string, unknown>>; required?: string[] };
           }>;
         };
-        const userMessage = JSON.parse(params.messages[1]?.content ?? '{}') as Record<string, unknown>;
+        const userMessage = JSON.parse(params.messages[1]?.content as string ?? '{}') as Record<string, unknown>;
         expect(userMessage).to.deep.include({
           problemStatement: 'Suppose $1,000 earns 5% interest and interest remains in the account. How does the balance grow?',
           learnerText: latestLearnerText,
@@ -1145,7 +1212,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const capturedMessages: Array<readonly { role: string; content: string }[]> = [];
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
-        capturedMessages.push(params.messages);
+        capturedMessages.push(params.messages as readonly { role: string; content: string }[]);
         return {
           parsedContent: {
             tutorMessage: 'Constructed response.',

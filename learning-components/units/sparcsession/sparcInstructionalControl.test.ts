@@ -87,8 +87,8 @@ describe('SPARC AutoTutor instructional projection', function() {
     assert.equal(result.facts.find((entry) => entry.factType === 'instructional.cycleStatus')?.slots?.continuable, false);
   });
 
-  it('projects pre-cutover focus state into one canonical cycle', function() {
-    const result = projectSparcAutoTutorInstructionalFacts({
+  it('rejects unsupported pre-canonical state without reinterpreting it', function() {
+    assert.throws(() => projectSparcAutoTutorInstructionalFacts({
       snapshotId: 'snapshot-5',
       config,
       facts: authoredFacts([
@@ -101,9 +101,6 @@ describe('SPARC AutoTutor instructional projection', function() {
         fact('scaffold.state', { focusEpisodeId: 'legacy-cycle', stage: 'PUMP' }),
         fact('learningTarget.score', { clusterKC: 'kc-a', coverage: 0.4 }),
       ]),
-    });
-    const cycle = result.facts.find((entry) => entry.factType === 'instructional.activeCycle');
-    assert.equal(cycle?.slots?.cycleId, 'legacy-cycle');
-    assert.equal(cycle?.slots?.migratedFrom, 'pre-canonical-instructional-focus');
+    }), /Pre-canonical SPARC instructional state is unsupported/);
   });
 });

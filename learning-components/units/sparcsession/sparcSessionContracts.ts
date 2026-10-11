@@ -170,6 +170,7 @@ export type SparcStateQuery = {
 };
 
 export type SparcInterfaceEventType =
+  | 'choice-selected'
   | 'document-loaded'
   | 'node-mounted'
   | 'focus-changed'
@@ -266,7 +267,7 @@ export type SparcProductionRuleCondition =
     };
 
 export type SparcProductionRuleTest = {
-  readonly op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'truthy' | 'falsy' | 'regex';
+  readonly op: 'eq' | 'neq' | 'in' | 'not-in' | 'gt' | 'gte' | 'lt' | 'lte' | 'truthy' | 'falsy' | 'regex' | 'not-regex';
   readonly left: SparcRuleExpression;
   readonly right?: SparcRuleExpression;
 };
@@ -444,6 +445,7 @@ export type SparcTraceStep = {
 };
 
 export type SparcCanonicalHistoryExtension = {
+  readonly expectationLogitChanges?: readonly import('../../runtime/expectationLogitHistory').ExpectationLogitChange[];
   readonly pageKey: string;
   readonly sourceAddress: SparcDocumentAddress;
   readonly practiceObservation?: SparcPracticeObservation;

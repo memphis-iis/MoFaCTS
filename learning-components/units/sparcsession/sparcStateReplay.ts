@@ -190,6 +190,11 @@ export function applySparcHistoryRecord(
 
   if (extension.stateTransition) {
     assertStateTransition(extension.stateTransition, 'sparc.stateTransition', extension.pageKey);
+    const accepted = state.transitions.find((entry) => entry.transitionId === extension.stateTransition!.transitionId);
+    if (accepted) {
+      if (JSON.stringify(accepted) !== JSON.stringify(extension.stateTransition)) throw new Error('Conflicting SPARC transition replay');
+      return state;
+    }
     assertSameAddress(
       extension.stateTransition.event.source,
       extension.sourceAddress,
@@ -252,6 +257,11 @@ export function applySparcStateTransition(
 ): SparcReplayState {
   const pageKey = transition.event.source.pageKey;
   assertStateTransition(transition, 'sparc.stateTransition', pageKey);
+  const accepted = state.transitions.find((entry) => entry.transitionId === transition.transitionId);
+  if (accepted) {
+    if (JSON.stringify(accepted) !== JSON.stringify(transition)) throw new Error('Conflicting SPARC transition replay');
+    return state;
+  }
   const nextCells: Record<string, SparcReplayCell> = { ...state.cells };
   for (const write of transition.writes) {
     const cellKey = createSparcStateCellKey(write.target, write.key);

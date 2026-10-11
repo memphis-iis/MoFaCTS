@@ -20,12 +20,13 @@ describe('SPARC move definitions', function() {
     assert.ok(hint.promptPolicy.includes('clue'));
   });
 
-  it('preserves the seven active move identities and metadata', function() {
+  it('preserves the active move identities and metadata', function() {
     const expectedMoveIds = [
       'question-deferral',
       'question-scope-refusal',
       'pump',
       'prompt',
+      'prompt-supported',
       'hint',
       'assertion',
       'summary',
@@ -40,13 +41,14 @@ describe('SPARC move definitions', function() {
       assert.equal(definition.family, 'autotutor-dialogue');
       assert.equal(definition.status, 'active');
       assert.equal(definition.promptId, `autotutor.${definition.moveId}`);
-      const expectedPromptVersion = definition.moveId === 'question-scope-refusal' ? 'v1'
+      const expectedPromptVersion = ['question-scope-refusal', 'prompt-supported'].includes(definition.moveId) ? 'v1'
         : definition.moveId === 'pump' ? 'v7'
-          : definition.moveId === 'question-deferral' || definition.moveId === 'prompt' || definition.moveId === 'hint'
+          : definition.moveId === 'prompt' ? 'v4'
+          : ['question-deferral', 'hint', 'assertion'].includes(definition.moveId)
             ? 'v3'
             : 'v2';
       assert.equal(definition.promptVersion, expectedPromptVersion);
-      assert.equal(definition.outputSchemaId, 'autotutor.chat_utterance');
+      assert.equal(definition.outputSchemaId, definition.moveId === 'prompt-supported' ? 'autotutor.supported_prompt' : 'autotutor.chat_utterance');
       assert.equal(definition.outputSchemaVersion, 'v1');
       assert.equal(definition.renderer, 'sparc.dialogue_utterance');
       assert.equal(definition.historyAction, 'sparc-dialogue-turn');
@@ -66,13 +68,11 @@ describe('SPARC move definitions', function() {
   });
 
   it('defines target-specific execution in every scaffold move', function() {
-    for (const moveId of ['prompt', 'hint', 'assertion']) {
+    for (const moveId of ['prompt', 'prompt-supported', 'hint', 'assertion']) {
       const policy = requireActiveSparcMoveDefinition(moveId).promptPolicy;
       assert.ok(policy.includes('If targetType is learningTarget'));
       assert.ok(policy.includes('If targetType is misconception'));
-      assert.ok(policy.includes(
-        'Do not describe repetition or endorsement of an active misconception as progress, closeness, or a good start.',
-      ));
+      assert.match(policy, /(?:Do not|do not|or) describe repetition or endorsement of an active misconception as progress, closeness, or a good start\./);
     }
   });
 
@@ -82,7 +82,7 @@ describe('SPARC move definitions', function() {
 
     assert.ok(pump.includes('genuinely open invitation'));
     assert.ok(pump.includes('Content-grounded acknowledgement'));
-    assert.ok(pump.includes('anchored to one concept, relationship, calculation, or conclusion actually present'));
+    assert.ok(pump.includes('anchored only to one concept, relationship, calculation, or conclusion actually present'));
     assert.ok(pump.includes('Explicitly identify the active concept before the open invitation'));
     assert.ok(pump.includes('compact learner-facing concept label'));
     assert.ok(pump.includes('one to three content words'));

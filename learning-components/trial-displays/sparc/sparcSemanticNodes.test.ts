@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { sparcTrialDisplayAdapter } from './SparcTrialDisplayAdapter';
+import { runSparcProductionRules } from '../../units/sparcsession/sparcProductionRuleEvaluator';
+import type { SparcProductionRule } from '../../units/sparcsession/sparcSessionContracts';
 
 function generatedRules(display: { productionRules?: unknown[] }): Record<string, unknown>[] {
   return (display.productionRules ?? []) as Record<string, unknown>[];
@@ -230,6 +232,60 @@ describe('sparc semantic nodes', function() {
     assert.equal((shortAnswerDisplay.nodes[0] as Record<string, unknown>).groupType, 'short-answer');
     assert.equal(shortAnswerDisplay.response?.intentByNode?.[0]?.node, 'short-1-input');
     assert.equal(((shortRules[0]!.tests as Record<string, unknown>[])[0]!).op, 'regex');
+  });
+
+  it('executes regex responses and their default without conflicting feedback or model practice', function() {
+    const display = sparcTrialDisplayAdapter.normalizeDisplay({
+      nodes: [{
+        id: 'short-1', nodeType: 'semantic', semanticType: 'short-answer',
+        clusterIndex: 7, expected: 'Example answer, not a required literal.',
+        scoring: {
+          responses: [{ id: 'mean', regex: '^mean\\b', outcome: 'correct', feedback: 'Accepted.' }],
+          default: { outcome: 'incorrect', feedback: 'Try again.' },
+        },
+      }],
+    });
+    for (const [input, outcome, feedback] of [
+      ['mean is the average', 'correct', 'Accepted.'],
+      ['median', 'incorrect', 'Try again.'],
+      ['a mean value', 'incorrect', 'Try again.'],
+    ]) {
+      const execution = runSparcProductionRules({
+        rules: display.productionRules as SparcProductionRule[],
+        facts: [{ factType: 'interface-event', slots: {
+          pageKey: 'doc-1', selection: 'short-1-submit', action: 'ButtonPressed', input,
+        } }],
+      });
+      assert.equal(execution.firings.length, 1);
+      assert.deepEqual(execution.firings[0]?.classifications, [outcome]);
+      assert.deepEqual(execution.firings[0]?.messages.map((message) => message.text), [feedback]);
+      assert.deepEqual(execution.firings[0]?.modelPracticeObservations.map((observation) => observation.outcome), [outcome]);
+    }
+  });
+
+  it('accepts alternatives from input metadata or authored scoring and excludes them from default feedback', function() {
+    for (const authoredScoring of [false, true]) {
+      const display = sparcTrialDisplayAdapter.normalizeDisplay({
+        nodes: [{
+          id: 'text-1', nodeType: 'semantic', semanticType: 'text-input',
+          inputs: [{ id: 'answer', clusterIndex: 5, expected: 'mean', acceptedValues: ['mean', 'average'] }],
+          scoring: {
+            ...(authoredScoring ? { responses: [{ acceptedValues: ['mean', 'average'], outcome: 'correct' }] } : {}),
+            default: { outcome: 'incorrect' },
+          },
+        }],
+      });
+      for (const input of ['mean', 'average', 'median']) {
+        const execution = runSparcProductionRules({
+          rules: display.productionRules as SparcProductionRule[],
+          facts: [{ factType: 'interface-event', slots: {
+            pageKey: 'doc-1', selection: 'text-1-input-answer', action: 'UpdateTextField', input,
+          } }],
+        });
+        assert.equal(execution.firings.length, 1);
+        assert.deepEqual(execution.firings[0]?.classifications, [input === 'median' ? 'incorrect' : 'correct']);
+      }
+    }
   });
 
   it('fails clearly for modeled semantic questions without a model target', function() {

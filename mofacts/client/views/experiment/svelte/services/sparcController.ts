@@ -1,3 +1,4 @@
+import { sparcPolicyForAccount } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { registerDefaultTrialDisplayComponents } from '../../../../../common/defaultTrialDisplayComponents';
 import { getTrialDisplayAdapter } from '../../../../../../learning-components/runtime/TrialDisplayAdapterRegistry';
 import {
@@ -69,4 +70,11 @@ export function evaluateSparcControllerResponse({
     display,
     result,
   });
+}
+
+/** Account rollout belongs at app delivery; authored lesson content is unchanged. */
+export function resolveSparcAccountPolicy(display: SparcControllerDisplay | null, isAdmin: boolean): SparcControllerDisplay | null {
+  if (!display || display.unitType !== 'sparc-autotutor-dialogue') return display;
+  if (!display.instructionalController) throw new Error('AutoTutor requires an instructional controller');
+  return { ...display, instructionalController: { ...display.instructionalController, policyId: sparcPolicyForAccount(isAdmin, display.instructionalController.policyId) } };
 }

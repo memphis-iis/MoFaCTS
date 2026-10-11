@@ -1,4 +1,6 @@
 import { createSparcStableWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
+import { expectationLogitChange } from '../../models/adaptive-logistic/probabilityCalculation';
+import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
 import type {
   SparcAuthoredDocument,
   SparcInterfaceEvent,
@@ -11,6 +13,17 @@ export type SparcLearningTargetScoreInput = {
   readonly clusterKC: string;
   readonly coverage: number;
 };
+
+export function expectationLogitChangesFromScoreFacts(
+  previous: readonly SparcWorkingMemoryFact[], scored: readonly SparcWorkingMemoryFact[],
+): ExpectationLogitChange[] {
+  const before = new Map(previous.filter((fact) => fact.factType === 'learningTarget.score')
+    .map((fact) => [String(fact.slots?.clusterKC), Number(fact.slots?.coverage)]));
+  return scored.filter((fact) => fact.factType === 'learningTarget.score').map((fact) => {
+    const clusterKC = String(fact.slots?.clusterKC);
+    return { clusterKC, delta: expectationLogitChange(before.get(clusterKC) ?? 0, Number(fact.slots?.coverage)) };
+  });
+}
 
 export type SparcDiagnosticMisconceptionScoreInput = {
   readonly id: string;

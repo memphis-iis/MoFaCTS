@@ -134,7 +134,7 @@ describe('SPARC trial display controller dialogue bridge', function() {
     assert.equal(result.learnerText, 'Here is my partial answer.');
     assert.equal(result.event.source.nodeId, 'learner-response-input');
     assert.equal(generatorTargetId, 'kc-b');
-    assert.equal(result.dialogueTurn.utteranceRequest.action, 'pump');
+    assert.equal(result.dialogueTurn.utteranceRequest?.action, 'pump');
     assert.equal(historyRecords.length, 1);
     assert.equal(historyRecords[0]?.action, 'sparc-dialogue-turn');
 

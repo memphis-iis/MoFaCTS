@@ -1,4 +1,5 @@
 import { assertModelPracticeHistoryIdentity } from './historyStimulusIdentity';
+import { assertExpectationLogitChanges } from './expectationLogitHistory';
 
 export type CanonicalHistoryRecord = Record<string, unknown>;
 
@@ -157,6 +158,15 @@ export function assertCanonicalHistoryEnvelope(
   assertNoUnsupportedComponentFields(record);
   assertStableEventType(record);
   assertModelPracticeHistoryIdentity(record);
+  const sparc = record.sparc as Record<string, unknown> | undefined;
+  if (record.eventType === 'sparc' && sparc?.expectationLogitChanges !== undefined) {
+    assertExpectationLogitChanges(sparc.expectationLogitChanges);
+    const transition = sparc.stateTransition as { event?: { eventId?: unknown; type?: unknown } } | undefined;
+    if (typeof transition?.event?.eventId !== 'string' || !transition.event.eventId
+      || transition.event.type !== 'response-submitted') {
+      throw new Error('Expectation logit changes require an accepted response transition');
+    }
+  }
   assertBoundedComponentExtensionFields(record, options);
 }
 

@@ -1,3 +1,4 @@
+import { parseSparcPromptFigure } from './sparcSupportedPrompt';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 import {
   requireActiveSparcMoveDefinition,
@@ -23,6 +24,7 @@ export type SparcUtteranceRequest = {
   readonly pedagogicalState?: Readonly<Record<string, unknown>>;
   readonly targetContent?: unknown;
   readonly plannerState?: unknown;
+  readonly competition?: Readonly<Record<string, number>>;
   readonly selectionDiagnostic?: {
     readonly targetKind: 'expectation' | 'misconception';
     readonly currentValue: number;
@@ -120,6 +122,7 @@ export function buildSparcDialogueHistory(
     .map((fact) => ({
       role: fact.slots?.speaker === 'learner' ? 'student' : 'tutor',
       text: stringSlot(fact, 'text') ?? '',
+      ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
     }))
     .filter((entry) => entry.text);
 }
@@ -196,6 +199,7 @@ function targetContent(params: {
       return {
         clusterKC,
         text: stringSlot(fact, 'text') ?? '',
+      ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
         coverage,
         status: coverage >= coverageThreshold ? 'covered' : 'uncovered',
       };
@@ -206,6 +210,7 @@ function targetContent(params: {
       return {
         id,
         text: stringSlot(fact, 'text') ?? '',
+      ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
         supportStrength,
         status: supportStrength >= misconceptionThreshold ? 'active' : 'inactive',
       };
@@ -341,6 +346,7 @@ export function createSparcUtteranceRequestFromFacts(
     pedagogicalState: pedagogicalState(selectedAction),
     targetContent: targetContent({ facts, targetType, targetId, contentTexts }),
     plannerState: plannerState(facts),
+    ...(latestFact(facts, 'instructional.decision')?.slots?.utility !== undefined ? { competition: Object.fromEntries(['expectancyLogit', 'assistance', 'oetLogit', 'utility', 'temperature', 'selectionProbability'].map((key) => [key, Number(latestFact(facts, 'instructional.decision')!.slots![key])])) } : {}),
     ...(selectedDiagnostic ? { selectionDiagnostic: selectedDiagnostic } : {}),
     dialogueHistory: buildSparcDialogueHistory(facts),
     ...(sourceRuleId ? { sourceRuleId } : {}),

@@ -107,7 +107,8 @@
     },
     {
       "name": "callResolvedOpenRouterJson",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Competitive and student-selected AutoTutor policy requests additionally require the admin role."
     },
     {
       "name": "cancelPackageUpload",
@@ -237,6 +238,10 @@
     {
       "name": "generateFaviconsFromLogo",
       "access": "role-checked"
+    },
+    {
+      "name": "generateSparcPromptImage",
+      "access": "admin-only"
     },
     {
       "name": "getAccessableTDFSForUser",
@@ -449,6 +454,10 @@
       "notes": "Self and course authorization retained. Worksheet reads require page/checkpoint scope, use the worksheet_scoped_history index prefix, and reject more than 10000 records."
     },
     {
+      "name": "getSparcPromptImage",
+      "access": "admin-only"
+    },
+    {
       "name": "getStimDisplayTypeMap",
       "access": "role-checked"
     },
@@ -588,7 +597,7 @@
     {
       "name": "insertHistory",
       "access": "role-checked",
-      "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet payloads are validated and server-derived record IDs deduplicate retries; conflicting sequence writes fail."
+      "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet and SPARC transition identities are validated; server-derived record IDs deduplicate retries using Mongo uniqueness. Conflicting sequence or transition writes fail. Competitive and student-selected AutoTutor policies and model/OET facts require an admin account at the common history-write boundary."
     },
     {
       "name": "insertNewUsers",
