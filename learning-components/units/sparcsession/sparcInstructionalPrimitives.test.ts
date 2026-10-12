@@ -23,7 +23,7 @@ describe('SPARC instructional primitives', () => {
     }
   });
   it('persists the supported text and incomplete figure in replay and scoring context', () => {
-    const generated = { tutorMessage: 'What belongs at ? A?', figure: { assetId: 'image123', description: 'A process with its last step omitted.' } };
+    const generated = { tutorMessage: 'What belongs at ? A?', figure: { assetId: 'image123', description: 'A process with its last step omitted.', displayWidth: 360 } };
     const transition = createSparcInstructionTransition({ document, event, learnerText: 'A', request: request('prompt-supported'), generated, includeLearner: false });
     assert.equal(transition.writes.length, 1);
     const node = (transition.writes[0]!.value as { node: Record<string, unknown> }).node;
@@ -46,7 +46,16 @@ describe('SPARC instructional primitives', () => {
     ]) assert.throws(() => parseSparcSupportedPrompt({ tutorMessage: 'Q?', figure }));
     assert.throws(() => parseSparcSupportedPromptBrief({ tutorMessage: 'Q?', imagePrompt: 'Figure' }));
     assert.throws(() => parseSparcSupportedPromptBrief({ tutorMessage: 'Q?', imagePrompt: '', figureDescription: 'Figure' }));
-    assert.equal(parseSparcSupportedPromptBrief({ tutorMessage: 'What process is missing?', imagePrompt: 'Draw the process with its middle stage omitted.', figureDescription: 'Two visible stages separated by an empty area.' }).tutorMessage, 'What process is missing?');
+    assert.equal(parseSparcSupportedPromptBrief({ tutorMessage: 'What process is missing?', imagePrompt: 'Draw the process with its middle stage omitted.', figureDescription: 'Two visible stages separated by an empty area.', displayWidth: 360 }).tutorMessage, 'What process is missing?');
+  });
+  it('rejects invalid new width estimates and preserves historical figure references', () => {
+    const brief = { tutorMessage: 'Q?', imagePrompt: 'Draw stages.', figureDescription: 'Stages.' };
+    for (const displayWidth of [undefined, 239, 641, 360.5, '360', NaN, Infinity]) {
+      assert.throws(() => parseSparcSupportedPromptBrief({ ...brief, displayWidth }));
+    }
+    const historical = { tutorMessage: 'Q?', figure: { assetId: 'image123', description: 'Stages.' } };
+    assert.deepEqual(parseSparcSupportedPrompt(historical), historical);
+    assert.throws(() => parseSparcSupportedPrompt({ ...historical, figure: { ...historical.figure, displayWidth: 641 } }));
   });
   it('retains the AutoTutor utterance and rejects incomplete or unsafe composite output', () => {
     const transition = createSparcInstructionTransition({ document, event, learnerText: 'A', request: request('pump'), generated: 'Tell me more about A.', includeLearner: false });

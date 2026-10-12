@@ -35,12 +35,13 @@ export type ContentInitializeFailureDiagnostic = {
 export type ContentLaunchFailureStage = 'initializeContentSurface' | 'contentReadinessTimeout';
 
 export type ContentLaunchRunResult =
+  | { status: 'cancelled' }
   | { status: 'redirected' }
   | { status: 'failed'; stage: ContentLaunchFailureStage }
   | { status: 'ready' };
 
 export type ContentLaunchOrchestrationDeps = {
-  initializeContent: () => Promise<ContentInitResult>;
+  initializeContent: (isCurrent: () => boolean) => Promise<ContentInitResult>;
   waitForContentReadiness: (deps: ContentReadinessDependencies) => Promise<boolean>;
   getReadinessDependencies: () => ContentReadinessDependencies;
   buildReadinessDiagnostic: () => ContentReadinessDiagnostic;
@@ -84,17 +85,21 @@ export function buildContentInitializeFailureDiagnostic(
 }
 
 export async function runContentLaunchOrchestration(
-  deps: ContentLaunchOrchestrationDeps
+  deps: ContentLaunchOrchestrationDeps,
+  isCurrent: () => boolean,
 ): Promise<ContentLaunchRunResult> {
+  if (!isCurrent()) return { status: 'cancelled' };
   let initResult: ContentInitResult;
   try {
     deps.setLaunchLoadingMessage(deps.loadingContentMessage);
     deps.markLaunchLoadingTiming('initializeContentSurface:start');
-    initResult = await deps.initializeContent();
+    initResult = await deps.initializeContent(isCurrent);
+    if (!isCurrent()) return { status: 'cancelled' };
     deps.markLaunchLoadingTiming('initializeContentSurface:complete', {
       redirected: !!initResult?.redirected,
     });
   } catch (error) {
+    if (!isCurrent()) return { status: 'cancelled' };
     const diagnostic = deps.buildInitializeFailureDiagnostic(error);
     deps.setFailureDiagnostic('initializeContentSurface', {
       ...diagnostic,
@@ -112,6 +117,7 @@ export async function runContentLaunchOrchestration(
 
   deps.markLaunchLoadingTiming('contentReadinessWait:start');
   const ready = await deps.waitForContentReadiness(deps.getReadinessDependencies());
+  if (!isCurrent()) return { status: 'cancelled' };
   deps.markLaunchLoadingTiming('contentReadinessWait:complete', { ready });
   if (!ready) {
     const diagnostic = deps.buildReadinessDiagnostic();
@@ -122,5 +128,6 @@ export async function runContentLaunchOrchestration(
   }
 
   await deps.prepareRender();
+  if (!isCurrent()) return { status: 'cancelled' };
   return { status: 'ready' };
 }

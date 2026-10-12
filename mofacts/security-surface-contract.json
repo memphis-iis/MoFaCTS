@@ -241,7 +241,8 @@
     },
     {
       "name": "generateSparcPromptImage",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Requires a bounded integer display-width estimate before provider access. Generated assets retain that estimate with their private account-owned text/image pairing."
     },
     {
       "name": "getAccessableTDFSForUser",

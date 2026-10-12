@@ -41,15 +41,15 @@ describe('SPARC move definitions', function() {
       assert.equal(definition.family, 'autotutor-dialogue');
       assert.equal(definition.status, 'active');
       assert.equal(definition.promptId, `autotutor.${definition.moveId}`);
-      const expectedPromptVersion = ['question-scope-refusal', 'prompt-supported'].includes(definition.moveId) ? 'v1'
+      const expectedPromptVersion = definition.moveId === 'question-scope-refusal' ? 'v1'
         : definition.moveId === 'pump' ? 'v7'
           : definition.moveId === 'prompt' ? 'v4'
-          : ['question-deferral', 'hint', 'assertion'].includes(definition.moveId)
+          : ['question-deferral', 'hint', 'assertion', 'prompt-supported'].includes(definition.moveId)
             ? 'v3'
             : 'v2';
       assert.equal(definition.promptVersion, expectedPromptVersion);
       assert.equal(definition.outputSchemaId, definition.moveId === 'prompt-supported' ? 'autotutor.supported_prompt' : 'autotutor.chat_utterance');
-      assert.equal(definition.outputSchemaVersion, 'v1');
+      assert.equal(definition.outputSchemaVersion, definition.moveId === 'prompt-supported' ? 'v2' : 'v1');
       assert.equal(definition.renderer, 'sparc.dialogue_utterance');
       assert.equal(definition.historyAction, 'sparc-dialogue-turn');
     }

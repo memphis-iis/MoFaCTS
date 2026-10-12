@@ -6,6 +6,7 @@
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
   import { shouldSubmitTextInputOnKeydown } from '../services/textInputComposition';
+  import { SPARC_INSTRUCTIONAL_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycleRules';
 
   const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 
@@ -203,11 +204,12 @@
       return '';
     }
     const action = String(candidate?.action || '').trim();
+    const actionLabel = SPARC_INSTRUCTIONAL_MENU_OPTIONS.find(option => option.action === action)?.label ?? action;
     const targetId = String(candidate?.targetId || '').trim();
     const targetKind = String(candidate?.selectionTargetKind || candidate?.targetType || '').trim();
     if (candidate?.competition) {
       const values = Object.entries(candidate.competition).map(([key, value]) => `${key}=${compactDiagnosticNumber(value)}`).join(' · ');
-      return `${action} → ${targetKind} ${targetId} · ${values}`;
+      return `${actionLabel} → ${targetKind} ${targetId} · ${values}`;
     }
     if (!action || !targetId || !targetKind) {
       return '';
@@ -218,7 +220,7 @@
     const metric = targetKind === 'expectation' ? 'coverage' : 'support';
     const score = currentValue && goalValue ? ` · ${metric} ${currentValue}/${goalValue}` : '';
     const ranking = Number.isInteger(rank) && rank > 0 ? ` · rank #${rank}` : '';
-    return `${action} → ${targetKind} ${targetId}${score}${ranking}`;
+    return `${actionLabel} → ${targetKind} ${targetId}${score}${ranking}`;
   }
 
   function skillBarFill(candidate) {

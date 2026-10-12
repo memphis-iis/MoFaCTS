@@ -103,7 +103,7 @@ describe('content launch orchestration', function() {
       },
     });
 
-    const result = await runContentLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps, () => true);
 
     expect(result).to.deep.equal({ status: 'redirected' });
     expect(readinessWaited).to.equal(false);
@@ -122,7 +122,7 @@ describe('content launch orchestration', function() {
       },
     });
 
-    const result = await runContentLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps, () => true);
 
     expect(result).to.deep.equal({ status: 'failed', stage: 'initializeContentSurface' });
     expect(harness.failures).to.have.length(1);
@@ -136,7 +136,7 @@ describe('content launch orchestration', function() {
       waitForContentReadiness: async () => false,
     });
 
-    const result = await runContentLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps, () => true);
 
     expect(result).to.deep.equal({ status: 'failed', stage: 'contentReadinessTimeout' });
     expect(harness.failures).to.deep.equal([{
@@ -161,7 +161,7 @@ describe('content launch orchestration', function() {
   it('returns ready after successful content, readiness, and render-preparation gates', async function() {
     const harness = createDeps();
 
-    const result = await runContentLaunchOrchestration(harness.deps);
+    const result = await runContentLaunchOrchestration(harness.deps, () => true);
 
     expect(result).to.deep.equal({ status: 'ready' });
     expect(harness.events).to.include('prepare-render');

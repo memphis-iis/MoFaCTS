@@ -4,7 +4,7 @@ import type { OpenRouterUsageSummary } from '../../../../lib/openRouterClient';
 
 export type CallSparcPromptImage = (params: {
   tdfId: string; sessionId: string; generationId: string;
-  tutorMessage: string; imagePrompt: string; figureDescription: string;
+  tutorMessage: string; imagePrompt: string; figureDescription: string; displayWidth: number;
 }) => Promise<SparcSupportedPrompt & { usage?: OpenRouterUsageSummary }>;
 export type ReadSparcPromptImage = (assetId: string) => Promise<{ dataUrl: string }>;
 

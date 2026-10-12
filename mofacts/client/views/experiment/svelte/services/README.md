@@ -9,6 +9,7 @@ This directory contains side-effectful runtime services and pure helpers used by
 - `contentReadiness.ts`: card display readiness predicates and diagnostics.
 - `contentLaunchCoordinator.ts`: canonical content entry and first-visible-render lifecycle.
 - `contentLaunchOrchestration.ts`: content initialization and readiness sequencing.
+- `contentSurfaceLifecycleRuntime.ts`: owns the mounted screen's pending launch. Unmount revokes its generation before cleanup; the launch orchestrator discards late initialization or readiness results instead of reporting failure, routing, committing render readiness, or starting the runtime. Active launch failures still use `contentLaunchFailure.ts`.
 - `contentLaunchEnvironment.ts`: Meteor/session dependencies for content launch diagnostics.
 - `contentLaunchFailure.ts`: launch failure reporting, loading cleanup, and failure routing.
 - `unitEngineService.ts`: unit-engine construction and integration with standard card, assessment, video, and AutoTutor unit behavior.

@@ -10,7 +10,7 @@ export interface ContentSurfaceLifecycleRuntimeOptions {
   readonly clearTimeoutCountdown: () => void;
   readonly completeCleanup: () => void;
   readonly failLaunch: (failure: unknown) => void;
-  readonly launch: (deps: ContentLaunchOrchestrationDeps) => Promise<{ status: string }>;
+  readonly launch: (deps: ContentLaunchOrchestrationDeps, isCurrent: () => boolean) => Promise<{ status: string }>;
   readonly launchDeps: ContentLaunchOrchestrationDeps;
   readonly lifecycle: CardRuntimeLifecycleController;
   readonly normalizeTestSnapshot: (snapshot: unknown) => ContentRuntimeMachineSnapshot;
@@ -27,8 +27,11 @@ export interface ContentSurfaceLifecycleRuntimeOptions {
 }
 
 export function createContentSurfaceLifecycleRuntime(options: ContentSurfaceLifecycleRuntimeOptions) {
-  async function prepareRender(): Promise<void> {
+  let generation = 0;
+  async function prepareRender(isCurrent: () => boolean): Promise<void> {
+    if (!isCurrent()) return;
     await options.launchDeps.prepareRender();
+    if (!isCurrent()) return;
     options.setSessionUnitModeVersion((current) => current + 1);
     options.setInitializedForRender(true);
     await options.waitForDomUpdate();
@@ -36,6 +39,8 @@ export function createContentSurfaceLifecycleRuntime(options: ContentSurfaceLife
 
   return {
     mount(): void {
+      const currentGeneration = ++generation;
+      const isCurrent = () => currentGeneration === generation;
       options.startDisplayTimeoutClock();
 
       if (options.testMode()) {
@@ -49,8 +54,9 @@ export function createContentSurfaceLifecycleRuntime(options: ContentSurfaceLife
       void (async () => {
         const launchResult = await options.launch({
           ...options.launchDeps,
-          prepareRender,
-        });
+          prepareRender: () => prepareRender(isCurrent),
+        }, isCurrent);
+        if (!isCurrent()) return;
         if (launchResult.status === 'failed') {
           options.failLaunch(launchResult);
           return;
@@ -65,6 +71,8 @@ export function createContentSurfaceLifecycleRuntime(options: ContentSurfaceLife
       })();
     },
     unmount(): void {
+      // Revoke this screen's pending launch before any cleanup changes shared state.
+      generation++;
       options.lifecycle.stop();
       options.clearTimeoutCountdown();
       options.clearDisplayTimeoutClock();

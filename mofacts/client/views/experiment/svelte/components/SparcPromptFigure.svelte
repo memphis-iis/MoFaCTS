@@ -1,6 +1,7 @@
 <script>
   import { parseSparcPromptFigure } from '../../../../../../learning-components/units/sparcsession/sparcSupportedPrompt';
   import { readSparcPromptImage } from '../services/sparcPromptImage';
+  import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../../../../common/lib/sparcPromptImage';
 
   export let figure;
   export let figureId;
@@ -8,7 +9,7 @@
   $: image = readSparcPromptImage(validated.assetId);
 </script>
 
-<figure id={figureId} class="sparc-prompt-figure">
+<figure id={figureId} class="sparc-prompt-figure" style:width={`min(100%, ${validated.displayWidth ?? SPARC_PROMPT_IMAGE_SETTINGS.maxDisplayWidth}px)`}>
   {#await image}
     <p role="status">Loading figure…</p>
   {:then loaded}
@@ -19,7 +20,7 @@
 </figure>
 
 <style>
-  .sparc-prompt-figure { margin: 0.75rem 0 0; width: min(100%, 640px); }
+  .sparc-prompt-figure { margin: 0.75rem 0 0; }
   img { display: block; width: 100%; height: auto; border-radius: 0.4rem; }
 </style>
 

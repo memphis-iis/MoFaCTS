@@ -10,7 +10,7 @@ const bind = (variable: string) => ({ type: 'bind' as const, variable });
 const bound = (variable: string) => ({ type: 'bound' as const, variable });
 
 // Authored THEN options, not a second move registry. Their actions use the existing registry.
-const initialOptions = [
+export const SPARC_INSTRUCTIONAL_MENU_OPTIONS = [
   { id: 'pump', label: 'Pump', action: 'pump' },
   { id: 'prompt', label: 'Prompt (unsupported)', action: 'prompt' },
   { id: 'prompt-supported', label: 'Prompt (supported)', action: 'prompt-supported' },
@@ -49,7 +49,7 @@ export function createSparcInstructionalCycleRules(version: 'student' | 'agent')
   }
 
   // Each student IF retains the offered target and directly selects the named move.
-  const selections = initialOptions.flatMap((option) =>
+  const selections = SPARC_INSTRUCTIONAL_MENU_OPTIONS.flatMap((option) =>
     (['expectation', 'misconception'] as const).map((kind): SparcProductionRule => {
       const id = `instruction.student.choose.${option.id}.${kind}`;
       return { id, when: [eventPattern('choice-selected'), assessment, noDecision,
@@ -73,7 +73,7 @@ export function createSparcInstructionalCycleRules(version: 'student' | 'agent')
       { factType: 'instructional.candidate', slots: { snapshotId: bound('snapshotId'), targetKind: bound('targetKind'), targetId: bound('targetId'), nextTargetId: bind('nextTargetId') } },
       { type: 'not', pattern: { factType: 'instructional.menu', slots: { snapshotId: bound('snapshotId') } } },
     ], then: [{ type: 'invoke-action', actionId: SPARC_MENU_ACTION, args: {
-      options: literal(initialOptions), targetKind: variable('targetKind'), targetId: variable('targetId'), nextTargetId: variable('nextTargetId'),
+      options: literal(SPARC_INSTRUCTIONAL_MENU_OPTIONS), targetKind: variable('targetKind'), targetId: variable('targetId'), nextTargetId: variable('nextTargetId'),
     } }],
   }, ...selections];
 }

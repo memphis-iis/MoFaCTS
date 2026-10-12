@@ -1060,10 +1060,11 @@
     },
     launch: runContentLaunchOrchestration,
     launchDeps: {
-      initializeContent: async () => {
+      initializeContent: async (isCurrent) => {
         contentLaunchCoordinator.begin();
         try {
           const result = await initializeContentSurface();
+          if (!isCurrent()) return result;
           if (!result?.redirected) {
             const activeTdfId = String(Session.get('currentTdfId') || '').trim();
             const rootTdfId = String(Session.get('currentRootTdfId') || '').trim();
@@ -1086,7 +1087,7 @@
           }
           return result;
         } catch (error) {
-          contentLaunchCoordinator.fail(error);
+          if (isCurrent()) contentLaunchCoordinator.fail(error);
           throw error;
         }
       },

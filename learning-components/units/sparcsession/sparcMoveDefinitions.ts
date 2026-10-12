@@ -1,4 +1,4 @@
-import { SPARC_SUPPORTED_PROMPT_SCHEMA_ID } from './sparcSupportedPrompt';
+import { SPARC_SUPPORTED_PROMPT_SCHEMA_ID, SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY, SPARC_SUPPORTED_PROMPT_SIZING_POLICY } from './sparcSupportedPrompt';
 
 export type SparcMoveFamily =
   | 'autotutor-dialogue'
@@ -44,6 +44,7 @@ function autotutorDialogueMove(params: {
   readonly paperRuleIds?: readonly string[];
   readonly paperMoveName: string;
   readonly outputSchemaId?: string;
+  readonly outputSchemaVersion?: string;
   readonly promptVersion?: string;
   readonly promptPolicy: string;
   readonly requiredFacts?: readonly string[];
@@ -62,7 +63,7 @@ function autotutorDialogueMove(params: {
     promptId: `autotutor.${params.moveId}`,
     promptVersion: params.promptVersion ?? 'v1',
     outputSchemaId: params.outputSchemaId ?? AUTOTUTOR_DIALOGUE_OUTPUT_SCHEMA_ID,
-    outputSchemaVersion: AUTOTUTOR_DIALOGUE_OUTPUT_SCHEMA_VERSION,
+    outputSchemaVersion: params.outputSchemaVersion ?? AUTOTUTOR_DIALOGUE_OUTPUT_SCHEMA_VERSION,
     renderer: AUTOTUTOR_DIALOGUE_RENDERER,
     historyAction: AUTOTUTOR_DIALOGUE_HISTORY_ACTION,
     promptPolicy: params.promptPolicy,
@@ -134,10 +135,12 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
   }),
   autotutorDialogueMove({
     moveId: 'prompt-supported', assistance: 1.33,
+    promptVersion: 'v3',
     paperMoveName: 'Prompting with an incomplete aligned figure',
     outputSchemaId: SPARC_SUPPORTED_PROMPT_SCHEMA_ID,
+    outputSchemaVersion: 'v2',
     promptPolicy: AUTOTUTOR_PROMPT_POLICY + '\n' +
-      '11. Figure support: Return tutorMessage, imagePrompt, and figureDescription together. Write a precise image-generation brief for a polished, incomplete educational figure aligned with the selected target and the single tutor question. Choose the visual form appropriate to the subject: an illustration, process, spatial arrangement, comparison, table, plot, or other figure. Leave a conceptually important feature, relationship, step, or label for the learner to infer; incompleteness need not be a missing word or a cloze item. Specify exactly what is visible, what is intentionally omitted, the exact short labels to show, and how the question refers to the figure. Use only the authored problem, selected expectation, and established dialogue; do not invent numeric variables or domain-specific assumptions. Do not put the missing answer in visible labels, the tutor message, or figureDescription. The description is accessible text describing the visible figure and its omission, not an answer key. If addressing a misconception, use the correct expectation to challenge only the misconception actually expressed; do not present it as correct. Do not return markup, image URLs, or executable drawing code.',
+      '11. Figure support: Return tutorMessage, imagePrompt, figureDescription, and displayWidth together. Write a precise image-generation brief for a polished, incomplete educational figure aligned with the selected target and the single tutor question. Choose the visual form appropriate to the subject: an illustration, process, spatial arrangement, comparison, table, plot, or other figure. Leave a conceptually important feature, relationship, step, or label for the learner to infer; incompleteness need not be a missing word or a cloze item. Specify exactly what is visible, what is intentionally omitted, the exact short labels to show, and how the question refers to the figure. Use only the authored problem, selected expectation, and established dialogue; do not invent numeric variables or domain-specific assumptions. Do not put the missing answer in visible labels, the tutor message, or figureDescription. The description is accessible text describing the visible figure and its omission, not an answer key. If addressing a misconception, use the correct expectation to challenge only the misconception actually expressed; do not present it as correct. Do not return markup, image URLs, or executable drawing code.' + ' ' + SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY + ' ' + SPARC_SUPPORTED_PROMPT_SIZING_POLICY,
   }),
   autotutorDialogueMove({
     moveId: 'hint', assistance: 2,

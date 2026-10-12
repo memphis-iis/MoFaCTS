@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { createHash } from 'crypto';
 import fs from 'fs/promises';
-import { SPARC_PROMPT_IMAGE_SETTINGS, SPARC_PROMPT_IMAGE_PURPOSE as PURPOSE, parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
+import { SPARC_PROMPT_IMAGE_SETTINGS, SPARC_PROMPT_IMAGE_PURPOSE as PURPOSE, parseSparcPromptFigure, parseSparcPromptDisplayWidth } from '../../common/lib/sparcPromptImage';
 import { generateSparcPromptImage, type GeneratedSparcPromptImage } from '../lib/sparcPromptImageGeneration';
 import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/methodAuthorization';
@@ -50,11 +50,12 @@ export function createSparcPromptImageMethods(deps: Deps) {
   };
   const envelope = (asset: Asset, reused: boolean) => ({
     tutorMessage: bounded(asset.meta.tutorMessage, 'Saved tutor message', 2048),
-    figure: parseSparcPromptFigure({ assetId: asset._id, description: asset.meta.description }),
+    figure: parseSparcPromptFigure({ assetId: asset._id, description: asset.meta.description,
+      ...(Object.prototype.hasOwnProperty.call(asset.meta, 'displayWidth') ? { displayWidth: asset.meta.displayWidth } : {}) }),
     ...(!reused ? { usage: asset.meta.usage } : {}),
   });
   return {
-    async generateSparcPromptImage(this: Context, params: { tdfId: string; sessionId: string; generationId: string; tutorMessage: string; imagePrompt: string; figureDescription: string }) {
+    async generateSparcPromptImage(this: Context, params: { tdfId: string; sessionId: string; generationId: string; tutorMessage: string; imagePrompt: string; figureDescription: string; displayWidth: number }) {
       const userId = await authorize(this);
       this.unblock?.();
       const tdfId = bounded(params?.tdfId, 'TDF identity', 200);
@@ -62,6 +63,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
       const generationId = bounded(params?.generationId, 'Generation identity', 500);
       const tutorMessage = bounded(params?.tutorMessage, 'Tutor message', 2048);
       const description = bounded(params?.figureDescription, 'Figure description', 2048);
+      const displayWidth = parseSparcPromptDisplayWidth(params?.displayWidth);
       parseSparcPromptFigure({ assetId: 'validation', description });
       const prompt = bounded(params?.imagePrompt, 'Image brief', SPARC_PROMPT_IMAGE_SETTINGS.maxPromptCharacters);
       const identity = digest(JSON.stringify([userId, tdfId, sessionId, generationId]));
@@ -86,7 +88,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
         const fileName = `supported-prompt.${image.extension}`;
         const file = await deps.DynamicAssets.writeAsync(image.bytes, { fileId: assetId, fileName, userId, type: image.mediaType,
           meta: { public: false, uploadPurpose: PURPOSE, generationIdentity: identity, tdfId, sessionId,
-            tutorMessage, description, fileName, model: SPARC_PROMPT_IMAGE_SETTINGS.model,
+            tutorMessage, description, displayWidth, fileName, model: SPARC_PROMPT_IMAGE_SETTINGS.model,
             resolution: SPARC_PROMPT_IMAGE_SETTINGS.resolution, usage: image.usage, ready: deps.storageBoundary.backend === 'local' } });
         if (file._id !== assetId) throw new Meteor.Error(500, 'SPARC image storage changed the generation identity');
         asset = await findOwned(assetId, userId);

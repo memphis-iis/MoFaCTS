@@ -857,7 +857,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
 
   it('generates an aligned brief then a private image and supplies that image on later turns', async function() {
     const utteranceRequest = utteranceRequestFor('prompt-supported', 'learningTarget');
-    const figure = { assetId: 'image123', description: 'Two stages separated by an unfinished middle step.' };
+    const figure = { assetId: 'image123', description: 'Two stages separated by an unfinished middle step.', displayWidth: 360 };
     let jsonCalls = 0;
     let imageCalls = 0;
     const provider = createSparcDialogueOpenRouterProvider({
@@ -865,8 +865,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
       async callResolvedOpenRouterJson(params) {
         jsonCalls++;
         if (jsonCalls === 1) {
-          expect(params.intent.schema.required).to.deep.equal(['tutorMessage', 'imagePrompt', 'figureDescription']);
-          return { parsedContent: { tutorMessage: 'What happens between these stages?', imagePrompt: 'A polished illustration with its middle step omitted.', figureDescription: figure.description } };
+          expect(params.intent.schema.required).to.deep.equal(['tutorMessage', 'imagePrompt', 'figureDescription', 'displayWidth']);
+          return { parsedContent: { tutorMessage: 'What happens between these stages?', imagePrompt: 'A polished illustration with its middle step omitted.', figureDescription: figure.description, displayWidth: figure.displayWidth } };
         }
         const content = params.messages[1]!.content;
         expect(Array.isArray(content)).to.equal(true);
@@ -876,8 +876,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
       async callSparcPromptImage(params) {
         imageCalls++;
         expect(params.generationId).to.equal('event');
+        expect(params.displayWidth).to.equal(360);
+        expect(params.imagePrompt).to.contain('Intended display width: 360 CSS pixels');
         expect(params.imagePrompt).to.contain(utteranceRequest.problemStatement);
         expect(params.imagePrompt).to.contain('middle step omitted');
+        expect(params.imagePrompt).to.contain('compact canvas shape');
         return { tutorMessage: params.tutorMessage, figure };
       },
       async readSparcPromptImage(assetId) {

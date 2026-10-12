@@ -40,7 +40,7 @@ describe('SPARC private supported Prompt image contracts', () => {
     const methods = createSparcPromptImageMethods(deps as unknown as Parameters<typeof createSparcPromptImageMethods>[0]);
     return { methods, assets, providerCalls: () => providerCalls };
   }
-  const request = { tdfId: 'lesson', sessionId: 'session', generationId: 'turn', tutorMessage: 'What happens in the empty middle stage?', imagePrompt: 'Show two stages, leaving the intervening process unillustrated.', figureDescription: 'Two visible stages with an empty area between them.' };
+  const request = { tdfId: 'lesson', sessionId: 'session', generationId: 'turn', tutorMessage: 'What happens in the empty middle stage?', imagePrompt: 'Show two stages, leaving the intervening process unillustrated.', figureDescription: 'Two visible stages with an empty area between them.', displayWidth: 360 };
 
   it('blocks unauthorized generation before calling the provider', async () => {
     const f = fixture();
@@ -57,29 +57,55 @@ describe('SPARC private supported Prompt image contracts', () => {
       f.methods.generateSparcPromptImage.call({ userId: 'admin' }, request),
     ]) as Array<{ tutorMessage: string; figure: { assetId: string }; usage?: unknown }>;
     assert.deepEqual(first, concurrent);
-    const retry = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, { ...request, tutorMessage: 'A different generated question', imagePrompt: 'A different brief' }) as NonNullable<typeof first>;
+    const retry = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, { ...request, tutorMessage: 'A different generated question', imagePrompt: 'A different brief', displayWidth: 480 }) as NonNullable<typeof first>;
     assert.equal(retry.tutorMessage, request.tutorMessage);
     assert.deepEqual(retry.figure, first!.figure);
     assert.equal(retry.usage, undefined);
     assert.equal(f.providerCalls(), 1);
+    assert.equal(f.assets.get(first!.figure.assetId)!.meta.displayWidth, 360);
     assert.equal(f.assets.get(first!.figure.assetId)!.meta.public, false);
     await assert.rejects(f.methods.getSparcPromptImage.call({ userId: 'otherAdmin' }, first!.figure.assetId), /not found/);
     const read = await f.methods.getSparcPromptImage.call({ userId: 'admin' }, first!.figure.assetId);
     assert.ok(read.dataUrl.startsWith('data:image/png;base64,'));
   });
+  it('rejects invalid sizing before provider access or asset writes', async () => {
+    const f = fixture();
+    for (const displayWidth of [undefined, 239, 641, 360.5, '360']) {
+      await assert.rejects(f.methods.generateSparcPromptImage.call({ userId: 'admin' }, { ...request, displayWidth } as unknown as typeof request));
+    }
+    assert.equal(f.providerCalls(), 0);
+    assert.equal(f.assets.size, 0);
+  });
+  it('reuses historical canonical assets without rewriting their size or regenerating', async () => {
+    const f = fixture();
+    const generated = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, request) as { figure: { assetId: string } };
+    const asset = f.assets.get(generated.figure.assetId)!;
+    delete asset.meta.displayWidth; // Synthetic pre-sizing canonical asset.
+    const retry = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, { ...request, displayWidth: 480 }) as { figure: Record<string, unknown> };
+    assert.deepEqual(retry.figure, { assetId: generated.figure.assetId, description: request.figureDescription });
+    assert.equal(Object.prototype.hasOwnProperty.call(asset.meta, 'displayWidth'), false);
+    assert.equal(f.providerCalls(), 1);
+  });
   it('uses one pinned 1K image request and rejects active markup or a mislabeled raster response', async () => {
     const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
     const fakeFetch = (result: unknown) => (async (_url: unknown, options: RequestInit) => {
       const body = JSON.parse(String(options.body));
-      assert.equal(body.model, 'google/gemini-nano-banana-2.1');
+      assert.equal(body.model, 'bytedance-seed/seedream-5-0-flash');
       assert.equal(body.resolution, '1K');
+      assert.equal(body.aspect_ratio, 'auto');
       assert.equal(body.n, 1);
-      assert.deepEqual(body.provider, { only: ['google-ai-studio'], allow_fallbacks: false });
+      assert.deepEqual(body.provider, { only: ['seed'], allow_fallbacks: false });
       return { ok: true, json: async () => result };
     }) as unknown as typeof fetch;
     const image = await generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type: 'image/png', b64_json: png.toString('base64') }], usage: { cost: .0336 } }));
     assert.deepEqual(image.bytes, png);
     assert.equal(image.usage.costUsd, .0336);
+    const jpeg = Buffer.from([255, 216, 255, 224, 0]);
+    const seedreamImage = await generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type: 'image/jpeg', b64_json: jpeg.toString('base64') }], usage: { cost: .018 } }));
+    assert.deepEqual(seedreamImage.bytes, jpeg);
+    assert.equal(seedreamImage.mediaType, 'image/jpeg');
+    assert.equal(seedreamImage.extension, 'jpg');
+    assert.equal(seedreamImage.usage.costUsd, .018);
     for (const media_type of ['image/svg+xml', 'image/jpeg']) {
       await assert.rejects(generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type, b64_json: png.toString('base64') }] })));
     }

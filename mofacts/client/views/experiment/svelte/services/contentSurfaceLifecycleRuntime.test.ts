@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { createContentSurfaceLifecycleRuntime } from './contentSurfaceLifecycleRuntime';
 import type { ContentLaunchOrchestrationDeps } from './contentLaunchOrchestration';
+import { runContentLaunchOrchestration } from './contentLaunchOrchestration';
 import type { ContentRuntimeMachineSnapshot } from './contentRuntimeMachineRuntime';
 
 function machineSnapshot(value: unknown): ContentRuntimeMachineSnapshot {
@@ -78,7 +79,7 @@ function createHarness(overrides: Partial<{
     clearTimeoutCountdown: () => events.push('timeout:stop'),
     completeCleanup: () => events.push('complete-cleanup'),
     failLaunch: (failure: unknown) => events.push(`launch:failed:${JSON.stringify(failure)}`),
-    launch: async (deps: ContentLaunchOrchestrationDeps) => {
+    launch: async (deps: ContentLaunchOrchestrationDeps, _isCurrent: () => boolean) => {
       events.push('launch');
       await deps.prepareRender();
       return { status: overrides.launchStatus || 'ready' };
@@ -109,10 +110,44 @@ function createHarness(overrides: Partial<{
   return {
     controller: createContentSurfaceLifecycleRuntime(options),
     events,
+    options,
   };
 }
 
 describe('content surface lifecycle runtime', function() {
+  it('does not report or route a pending initialization failure after unmount', async function() {
+    const harness = createHarness();
+    let rejectInitialization!: (error: Error) => void;
+    harness.options.launch = runContentLaunchOrchestration;
+    harness.options.launchDeps.initializeContent = () => new Promise((_resolve, reject) => {
+      rejectInitialization = reject;
+    });
+    harness.options.launchDeps.routeInitializationFailure = () => harness.events.push('route-failure');
+    harness.controller.mount();
+    harness.controller.unmount();
+    rejectInitialization(new Error('Initialization finished after navigation'));
+    await flushLaunchLifecycle();
+    expect(harness.events).not.to.include('route-failure');
+    expect(harness.events.some(event => event.startsWith('launch:failed:'))).to.equal(false);
+  });
+
+  it('does not render or start runtime when readiness completes after unmount', async function() {
+    const harness = createHarness();
+    let resolveReadiness!: (ready: boolean) => void;
+    harness.options.launch = runContentLaunchOrchestration;
+    harness.options.launchDeps.waitForContentReadiness = () => new Promise(resolve => {
+      resolveReadiness = resolve;
+    });
+    harness.controller.mount();
+    await flushLaunchLifecycle();
+    harness.controller.unmount();
+    resolveReadiness(true);
+    await flushLaunchLifecycle();
+    expect(harness.events).not.to.include('old-prepare-render');
+    expect(harness.events).not.to.include('initialized:true');
+    expect(harness.events).not.to.include('runtime:start');
+  });
+
   it('seeds static tester state without launching the runtime', function() {
     const { controller, events } = createHarness({
       testMode: true,
