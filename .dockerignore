@@ -1,6 +1,7 @@
 # Dependency directories - will be installed fresh in Docker
-mofacts/node_modules/
-node_modules/
+# Includes Meteor package-owned .npm/package and .npm/devPackage installations.
+# Keep their tracked shrinkwrap files as source; exclude installed dependencies.
+**/node_modules/
 
 # Meteor local build cache (NEVER include this!)
 mofacts/.meteor/local/

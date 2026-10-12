@@ -29,6 +29,13 @@ The ordinary `deploy and build.txt` procedure remains unchanged. The root Docker
 
 ## Ownership
 
+The root `.dockerignore` excludes installed `node_modules` directories at every
+depth, including Meteor local-package installations under `.npm/package` and
+`.npm/devPackage`. Tracked shrinkwrap files and package declarations remain
+captured source. Dependency synchronization may create those excluded installation
+trees, but changes to the captured declarations or lockfiles still fail source
+verification. Docker owns this filtering for both builds and CI round trips.
+
 | Owner | Responsibility |
 | --- | --- |
 | Root `Dockerfile` | Single source-copy stage; capture target; unchanged application compilation/runtime instructions |
