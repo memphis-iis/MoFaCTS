@@ -58,6 +58,22 @@ jobs:
         working-directory: ${{ steps.capture.outputs.test_app }}
         run: |
           meteor update --npm
+          node --input-type=module - '${{ steps.capture.outputs.workspace }}' <<'NODE'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          const workspace = process.argv[2];
+          const files = [
+            'mofacts/package.json', 'mofacts/package-lock.json',
+            'mofacts/.meteor/release', 'mofacts/.meteor/packages', 'mofacts/.meteor/versions',
+            'mofacts/packages/ddp-server/.npm/package/npm-shrinkwrap.json',
+            'mofacts/packages/rspack/.npm/devPackage/npm-shrinkwrap.json',
+          ];
+          for (const file of files) {
+            const before = await fs.readFile(path.join(workspace, 'context', file));
+            const after = await fs.readFile(path.join(workspace, 'test-context', file));
+            if (!before.equals(after)) console.error('Dependency synchronization modified captured source: ' + file);
+          }
+          NODE
           node "$GITHUB_WORKSPACE/mofacts/scripts/security-audit/qualification/captureBuildSource.mjs" \
             verify-tests --builder default --workspace '${{ steps.capture.outputs.workspace }}'
 
