@@ -1,6 +1,47 @@
 # Security Audit Durable Redesign Status
 
-Updated: 2026-10-09.
+Updated: 2026-10-13.
+
+## Image-side source comparison implementation — 2026-10-13
+
+The preceding authorized fresh CI execution on `e9bdfb9e` completed successfully
+([run 38427845958, attempt 2](https://github.com/memphis-iis/MoFaCTS/actions/runs/38427845958/attempts/2)):
+server 811 passed/15 pending, browser 1,104 passed/7 pending, harness 16 passed,
+zero failures; Phase 0 72/72 and capture 75/75 on Linux. Toolchain, locked package
+install, lint/typechecks, post-test source verification, metadata retention,
+Docker smoke and cleanup passed. This evidence applies to that previous source.
+
+The next slice adds optional image-side comparison before compilation. Shared
+Docker inputs now own the recipe/ignore metadata; a pinned Node observation
+stage hashes that exact tree, and compiler copies consume the observed inputs.
+Runtime receives a bounded JSON observation outside the input hash. Requested
+comparison requires the existing digest, base revision and explicit dirty
+provenance; mismatch aborts construction. Ordinary builds record comparison
+unavailable without requiring a proof or changing startup/permissions.
+
+The capture Compose override changes only context and two provenance arguments;
+all other resolved build/image/runtime values remain checked. CI's successful
+source job exposes its existing identity through job outputs, the single smoke
+build receives those values, and a runtime metadata assertion compares them.
+No extra Meteor invocation, image compilation, dependency or production record
+is introduced. No acquisition or image result is relabeled security PASS.
+
+Local checks pass: full app typecheck and lint (28 existing vendor warnings,
+zero errors, 318 syntactic surfaces), Phase 0 72/72, source-security 41/41, and
+capture **78 passed, 0 failed, 2 Linux-only skips** (80 total). Tests cover normal
+unavailable observations, exact bytes/empty directories, malformed provenance,
+output self-reference/replacement rejection, Compose mutation boundaries and
+existing synthetic capture/build wiring. Workflow/YAML/shell validation and
+diff hygiene pass. An initial old COPY-path assertion failed after the deliberate
+stage change, was updated to assert observed-source consumption, and passed on
+rerun. This revised Docker/CI path has not executed yet; no build or deployment
+ran in this slice.
+
+Image-side comparison remains `source-matched-unqualified`. Required next work:
+fresh authorized CI/Docker execution, final canonical Compose candidate proof,
+stronger pre-test sealing and complete test-evidence validation, then protected
+release/host and historical compatibility gates. Staging2 and production remain
+unchanged. No user-facing UI/content/schema or database migration changed.
 
 ## Consolidated repair release sequence — 2026-10-09
 

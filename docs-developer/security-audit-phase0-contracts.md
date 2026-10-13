@@ -23,6 +23,23 @@ The evaluator returns `PASS` only for this narrow identity-consistency property.
 
 ## 2. Source snapshot binding
 
+October 13 continuation: image-side comparison is implemented but awaits Docker
+execution. The single shared input stage owns recipe/ignore bytes; the source-only
+export inherits it, while an observation stage copies and hashes those inputs
+before compilation when an expected digest is requested. Compiler copies come
+from that observed tree, and generated runtime metadata remains outside the
+source hash. The already used pinned Node image provides the observer; no new
+application/system dependency was added. Ordinary builds record missing comparison
+without requiring a source proof. Optional Compose arguments and the capture
+override carry the existing identity's digest and explicit dirty flag; all other
+resolved inputs must remain unchanged. CI supplies its successful post-test
+observation to the existing single image build, then reads back the embedded
+identity. This is a byte-binding observation, not authenticated qualified evidence.
+Stronger pre-test sealing, full evidence/catalog validation and final protected
+Compose release/host checks remain pending. Earlier context-only override notes
+describe the prior prototype; its narrowly scoped override now also sets these
+two provenance arguments. Fresh capture is required after the recipe change.
+
 `baseCommit` keeps its current meaning: HEAD at build time, including when local changes are included. The existing dirty flag is preserved, not inferred from the tag. `sourceSnapshotDigestSha256` identifies the actual reviewed source inputs; a successful clean-base CI run is not evidence for a different dirty snapshot.
 
 The future capture contract is:

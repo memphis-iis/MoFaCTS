@@ -1,5 +1,37 @@
 # Opt-in build-source capture
 
+October 13 image-comparison implementation: the shared `source_inputs` stage now
+owns recipe/ignore metadata as well as the four source roots. `source_capture`
+remains a source-only export target. A new `source_observation` stage uses the
+already pinned Node image and copies that one shared tree; before any compilation
+it recomputes the same bounded native source digest. The compiler consumes those
+observed inputs, and runtime receives `/opt/mofacts-source-observation.json`.
+This implementation has local synthetic coverage but has not yet run in Docker.
+
+An ordinary build supplies no expected digest and records `unavailable` with
+reason `not-requested`; it does not hash or require qualification metadata.
+When explicitly comparing source, the build requires a digest, base revision
+and explicit dirty provenance. A malformed value or byte/mode/directory mismatch
+fails construction; it never substitutes a newly observed digest. A match is
+`source-matched-unqualified`, not evidence of tests, publication or deployment.
+The generated observation is outside the input tree and cannot hash itself.
+
+Compose exposes optional `MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256` and
+`MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES` build arguments. The opt-in
+capture override binds those values from the existing `BuildIdentityV1`, changes
+the build context, and preserves all other resolved Compose/image/runtime inputs.
+Existing temporary overrides require a fresh capture after this recipe change.
+Ordinary operator commands are unchanged. The helper still returns
+`built-unqualified`; it does not retrieve or authenticate CI evidence by itself.
+
+CI now forwards the post-test source digest/revision/dirty outputs directly to
+its single smoke-image build and asserts the embedded observation matches them.
+It adds no second compilation or Meteor invocation. CI's smoke image remains
+separate from the final Compose release candidate. Strong pre-test sealing,
+complete qualified test evidence and protected release/host identity are still
+required. A workstation's different line endings cannot borrow a matching Git
+commit's Linux digest; exact captured bytes must match.
+
 October 9 continuation: `collect-tests` now creates a separate test-input derivative
 after verifying the captured build source. The expanded capture suite passes 66
 tests on Windows, with one Linux-native permission test skipped. The earlier
@@ -25,7 +57,7 @@ Status: implemented source prototype; 50 synthetic capture/builder tests pass. *
 
 The 2026-09-07 ordinary comparison build failed fetching Meteor's pinned `uWebSockets.js` dependency (`ssh: not found`). The separately authorized 2026-09-08 build-stage HTTPS transport repair preserves that repository/ref; the ordinary no-cache build and structural image smoke subsequently passed. The historical failed comparison is not relabeled successful, and these different-source image runs are not bit-for-bit equivalence or full release qualification. See the status checkpoint and [build transport note](../README.md#build-context).
 
-The ordinary `deploy and build.txt` procedure remains unchanged. The root Dockerfile now shares its four copied source roots through `source_inputs`. The separate `source_capture` target adds only the recipe and root ignore file; normal compilation still ends at the existing `runtime` stage. No tests, archive export, capture bounds or new proof requirements run on the default build path.
+The ordinary `deploy and build.txt` procedure remains unchanged. The root Dockerfile shares its four copied source roots and recipe/ignore metadata through `source_inputs`. The separate `source_capture` target inherits those inputs without executing tools. Normal compilation consumes the observation-stage copy and still ends at `runtime`. With no expected digest, no tests, archive export, capture bounds or proof requirement run on the default build path; the observer writes only the explicit unavailable metadata.
 
 ## Ownership
 
@@ -91,7 +123,7 @@ $captureResult = & C:\dev\MoFaCTS\deploy\capture-build-source.ps1 `
 
 Actions require exactly their documented arguments. A missing builder/identity/workspace/env-file argument is an error; no inferred alternate source, builder or ordinary-build retry is used. The base-revision argument in the resolved Compose build must match the captured identity. The helper uses argument arrays without a shell, keeps resolved private Compose configuration in memory, drains native stderr without retaining it, and emits bounded JSON outcomes rather than raw logs or source inventories.
 
-`prepare` creates a new task-owned temporary directory outside the checkout, exports Docker-filtered inputs, checks recipe/ignore bytes and declared roots, and writes acquisition state plus a JSON Compose override. A failed preparation removes its own incomplete directory. `verify` checks local integrity and performs a new bounded re-export from the candidate, then deletes its own round-trip derivative. `build` first verifies, compares resolved base/override Compose configurations, permits only the absolute build-context adjustment, and invokes base Compose with that override, the supplied builder, `--no-cache` and service `mofacts`. Post-build local integrity is checked. An unsuccessful build never yields a successful result or retries against the live checkout.
+`prepare` creates a new task-owned temporary directory outside the checkout, exports Docker-filtered inputs, checks recipe/ignore bytes and declared roots, and writes acquisition state plus a JSON Compose override. A failed preparation removes its own incomplete directory. `verify` checks local integrity and performs a new bounded re-export from the candidate, then deletes its own round-trip derivative. `build` first verifies, compares resolved base/override Compose configurations, permits only the absolute build-context adjustment and the two captured provenance arguments, and invokes base Compose with that override, the supplied builder, `--no-cache` and service `mofacts`. Post-build local integrity is checked. An unsuccessful build never yields a successful result or retries against the live checkout.
 
 Output states are intentionally `captured-unqualified`, `capture-verified-unqualified`, and `built-unqualified`. Exit zero for these actions means that action completed, **not that source tests, image smoke, published identity, host identity or a security audit passed**. There is no `PASS` release proof, embedded source bundle or automatic deployment-record write. Existing push/runtime overlay/remote commands are not invoked or rewritten.
 

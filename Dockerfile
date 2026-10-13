@@ -4,10 +4,20 @@ COPY ./deploy/docker/ /deploy/docker/
 COPY ./mofacts/ /mofacts/
 COPY ./learning-components/ /learning-components/
 COPY ./packages/ /packages/
+COPY ./Dockerfile ./.dockerignore /
 
 # Explicitly selected acquisition target; not an ordinary-build dependency.
 FROM source_inputs AS source_capture
-COPY ./Dockerfile ./.dockerignore /
+
+# Observe exact inputs before any npm/Meteor transformation. The existing pinned
+# Node image is also used by dependency/runtime stages. No tests run here.
+FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS source_observation
+ARG MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256=
+ARG MOFACTS_SOURCE_REVISION=unknown
+ARG MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES=
+COPY --from=source_inputs / /captured-source/
+RUN node /captured-source/mofacts/scripts/security-audit/qualification/imageSourceObservation.mjs \
+    /captured-source /source-observation.json "$MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256" "$MOFACTS_SOURCE_REVISION" "$MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES"
 
 # The tag here should match the Meteor version of your app, per .meteor/release
 FROM geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083 AS meteor_builder
@@ -21,18 +31,18 @@ RUN git config --global --add url.https://github.com/unetworking/uWebSockets.js.
     git config --global --add url.https://github.com/unetworking/uWebSockets.js.insteadOf git@github.com:unetworking/uWebSockets.js
 
 # Use the repo-owned deploy scripts so deploy/ is the only source of truth.
-COPY --from=source_inputs /deploy/docker/ $SCRIPTS_FOLDER/
+COPY --from=source_observation /captured-source/deploy/docker/ $SCRIPTS_FOLDER/
 RUN sed -i 's/\r$//' $SCRIPTS_FOLDER/*.sh && \
     chmod +x $SCRIPTS_FOLDER/*.sh
 
 # Function: copy application source into container build context.
-COPY --from=source_inputs /mofacts/ $APP_SOURCE_FOLDER/
+COPY --from=source_observation /captured-source/mofacts/ $APP_SOURCE_FOLDER/
 
 # Function: copy root-level source roots used by the application.
 # Relative imports from /opt/learning-components/... resolve the app as
 # /opt/mofacts, matching the repository layout during local development.
-COPY --from=source_inputs /learning-components/ /opt/learning-components/
-COPY --from=source_inputs /packages/ /opt/packages/
+COPY --from=source_observation /captured-source/learning-components/ /opt/learning-components/
+COPY --from=source_observation /captured-source/packages/ /opt/packages/
 
 # Function: clear Meteor cache so the image build compiles from a clean state.
 RUN echo "[Function] Clean Meteor local cache" && \
@@ -135,6 +145,7 @@ FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a6
 
 ARG MOFACTS_SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$MOFACTS_SOURCE_REVISION
+COPY --from=source_observation /source-observation.json /opt/mofacts-source-observation.json
 
 ENV APP_BUNDLE_FOLDER /opt/bundle
 ENV SCRIPTS_FOLDER /docker

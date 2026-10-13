@@ -38,11 +38,12 @@ export async function readControl(file) {
 
 // Intentionally bounded to the canonical recipe's supported registration shape.
 // This reads COPY ownership, not Docker ignore patterns. Unsupported acquisition
-// families fail qualification; the ordinary Docker build remains untouched.
+// families fail acquisition; this parser never executes an application build.
 export function captureRoots(recipe) {
   const lines = recipe.replace(/\\\r?\n/g, ' ').split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
   const roots = [];
   const stages = new Set();
+  const observationInstructions = [];
   let stage;
   let captureMetadata = false;
   for (const line of lines) {
@@ -57,26 +58,59 @@ export function captureRoots(recipe) {
     }
     if (/^ADD\b/i.test(line) || /--mount[= ]/i.test(line)) invalidSnapshot();
     if (stage === 'source_inputs') {
+      if (line === 'COPY ./Dockerfile ./.dockerignore /') {
+        if (captureMetadata) invalidSnapshot();
+        captureMetadata = true;
+        continue;
+      }
       const copy = /^COPY \.\/([^\s]+) \/([^\s]+)$/.exec(line);
       if (!copy || copy[1] !== copy[2] || !copy[1].endsWith('/')) invalidSnapshot();
       const root = snapshotPath(copy[1].slice(0, -1));
       if (roots.some((existing) => root === existing || root.startsWith(`${existing}/`) || existing.startsWith(`${root}/`))) invalidSnapshot();
       roots.push(root);
     } else if (stage === 'source_capture') {
-      if (line !== 'COPY ./Dockerfile ./.dockerignore /' || captureMetadata) invalidSnapshot();
-      captureMetadata = true;
+      invalidSnapshot();
+    } else if (stage === 'source_observation') {
+      observationInstructions.push(line.replace(/\s+/g, ' '));
     } else if (/^COPY\b/i.test(line)) {
       const copy = /^COPY --from=([a-z_]+)\s+/.exec(line);
       if (!copy || !stages.has(copy[1]) || copy[1] === stage || copy[1] === 'source_capture') invalidSnapshot();
     }
   }
-  if (!roots.length || !captureMetadata || stage !== 'runtime') invalidSnapshot();
+  if (!roots.length || !captureMetadata || !stages.has('source_capture') || stage !== 'runtime') invalidSnapshot();
+  if (!isDeepStrictEqual(observationInstructions, [
+    'ARG MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256=',
+    'ARG MOFACTS_SOURCE_REVISION=unknown',
+    'ARG MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES=',
+    'COPY --from=source_inputs / /captured-source/',
+    'RUN node /captured-source/mofacts/scripts/security-audit/qualification/imageSourceObservation.mjs /captured-source /source-observation.json "$MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256" "$MOFACTS_SOURCE_REVISION" "$MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES"',
+  ])) invalidSnapshot();
   return roots;
 }
 
-export function contextOverride(candidate) {
+export function contextOverride(candidate, identity) {
   if (!path.isAbsolute(candidate)) invalidSnapshot();
-  return { services: { mofacts: { build: { context: candidate } } } };
+  const build = { context: candidate };
+  if (identity !== undefined) {
+    const parsed = parseBuildIdentity(identity);
+    build.args = {
+      MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256: parsed.sourceSnapshotDigestSha256,
+      MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES: String(parsed.includedUncommittedLocalChanges),
+    };
+  }
+  return { services: { mofacts: { build } } };
+}
+
+export function assertSourceBoundBuildChange(before, after, candidate, identity) {
+  const comparison = structuredClone(after);
+  const args = contextOverride(candidate, identity).services.mofacts.build.args;
+  for (const [name, value] of Object.entries(args)) {
+    if (comparison.services?.mofacts?.build?.args?.[name] !== value) invalidSnapshot();
+    if (Object.hasOwn(before.services.mofacts.build.args ?? {}, name)) {
+      comparison.services.mofacts.build.args[name] = before.services.mofacts.build.args[name];
+    } else delete comparison.services.mofacts.build.args[name];
+  }
+  assertContextOnlyChange(before, comparison, candidate);
 }
 
 export function assertContextOnlyChange(before, after, candidate) {
@@ -227,7 +261,7 @@ export async function prepareCapture(builder, baseCommit, dirty, dependencies = 
       entryCount: result.entries.length,
     };
     await fs.writeFile(path.join(workspace, 'capture.json'), JSON.stringify(receipt), { flag: 'wx', mode: 0o600 });
-    await fs.writeFile(path.join(workspace, 'compose.capture.json'), JSON.stringify(contextOverride(candidate)), { flag: 'wx', mode: 0o600 });
+    await fs.writeFile(path.join(workspace, 'compose.capture.json'), JSON.stringify(contextOverride(candidate, receipt.identity)), { flag: 'wx', mode: 0o600 });
     return { state: 'captured-unqualified', workspace, identity: receipt.identity, entryCount: receipt.entryCount };
   } catch (error) {
     await removeWorkspace(workspace);
@@ -263,7 +297,7 @@ export async function verifyCapture(workspace, builder, dependencies = {}) {
       || (await fs.lstat(roundTrip)).isSymbolicLink()) invalidSnapshot();
     await removeOwnedTree(roundTrip);
   }
-  const override = contextOverride(candidate);
+  const override = contextOverride(candidate, identity);
   if (!isDeepStrictEqual(JSON.parse(await readControl(path.join(root, 'compose.capture.json'))), override)) invalidSnapshot();
   return { root, candidate, receipt, identity, sourceEntries };
 }
@@ -346,7 +380,7 @@ export async function buildCapturedSource(workspace, builder, envFile, dependenc
   const qualified = [...compose, '-f', path.join(checked.root, 'compose.capture.json')];
   const baseline = JSON.parse(await invoke([...compose, 'config', '--format', 'json']));
   const effective = JSON.parse(await invoke([...qualified, 'config', '--format', 'json']));
-  assertContextOnlyChange(baseline, effective, checked.candidate);
+  assertSourceBoundBuildChange(baseline, effective, checked.candidate, checked.identity);
   if (baseline.services.mofacts.build.args?.MOFACTS_SOURCE_REVISION !== checked.identity.baseCommit) invalidSnapshot();
   // Source compilation remains Compose-owned. No push, test:ci, SSH or deployment.
   await invoke([...qualified, 'build', '--builder', builder, '--no-cache', 'mofacts'], {

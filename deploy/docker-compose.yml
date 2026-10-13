@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
       args:
         MOFACTS_SOURCE_REVISION: ${MOFACTS_SOURCE_REVISION:-unknown}
+        MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256: ${MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256:-}
+        MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES: ${MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES:-}
     volumes:
       # Runtime override directory for deploy-time assets that should not be baked
       # into the image, including Memphis SAML PEM files.

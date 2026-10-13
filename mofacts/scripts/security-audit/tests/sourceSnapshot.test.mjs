@@ -195,7 +195,8 @@ const recipe = await fs.readFile(new URL('../../../../Dockerfile', import.meta.u
 test('canonical Dockerfile shares four copy roots and leaves runtime as the default stage', () => {
   assert.deepEqual(captureRoots(recipe), ['deploy/docker', 'mofacts', 'learning-components', 'packages']);
   assert.ok(recipe.includes("RUN sed -i 's/\\r$//' $SCRIPTS_FOLDER/*.sh"));
-  assert.ok(recipe.includes('COPY --from=source_inputs /mofacts/ $APP_SOURCE_FOLDER/'));
+  assert.ok(recipe.includes('COPY --from=source_observation /captured-source/mofacts/ $APP_SOURCE_FOLDER/'));
+  assert.ok(recipe.includes('COPY --from=source_inputs / /captured-source/'));
   assert.ok(recipe.includes('ENTRYPOINT ["/docker/entrypoint.sh"]'));
 });
 test('capture rejects undeclared input families and executable capture instructions', () => {
@@ -257,7 +258,11 @@ async function syntheticCapture(t, change = () => {}) {
         context: repositoryRoot, dockerfile: 'Dockerfile', args: { MOFACTS_SOURCE_REVISION: 'a'.repeat(40) },
       } } } };
       const override = args.find((arg) => arg.endsWith('compose.capture.json'));
-      if (override) config.services.mofacts.build.context = JSON.parse(await fs.readFile(override)).services.mofacts.build.context;
+      if (override) {
+        const capturedBuild = JSON.parse(await fs.readFile(override)).services.mofacts.build;
+        config.services.mofacts.build.context = capturedBuild.context;
+        Object.assign(config.services.mofacts.build.args, capturedBuild.args);
+      }
       return JSON.stringify(config);
     }
     return options.consume(Readable.from([]));

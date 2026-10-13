@@ -9,6 +9,10 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    outputs:
+      source_digest: ${{ steps.source_observation.outputs.source_digest }}
+      source_commit: ${{ steps.source_observation.outputs.source_commit }}
+      source_dirty: ${{ steps.source_observation.outputs.source_dirty }}
     defaults:
       run:
         working-directory: mofacts
@@ -170,11 +174,21 @@ jobs:
         run: docker rm -f mofacts-ci-mongodb 2>/dev/null || true
 
       - name: Verify tested source and record digest observation
+        id: source_observation
         working-directory: .
         run: |
           node mofacts/scripts/security-audit/qualification/captureBuildSource.mjs \
             verify-tests --builder default --workspace '${{ steps.capture.outputs.workspace }}' \
             > "$RUNNER_TEMP/mofacts-source-observation.json"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseBuildIdentity } from './mofacts/common/securityAudit/buildIdentity.ts';
+          const observation = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/mofacts-source-observation.json'));
+          if (observation.state !== 'test-inputs-verified-unqualified') throw Error('Missing tested source observation');
+          const identity = parseBuildIdentity(observation.identity);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,
+            `source_digest=${identity.sourceSnapshotDigestSha256}\nsource_commit=${identity.baseCommit}\nsource_dirty=${identity.includedUncommittedLocalChanges}\n`);
+          NODE
 
       - name: Retain source observation metadata
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -206,7 +220,24 @@ jobs:
       - name: Build amd64 application image
         run: |
           test "$(uname -m)" = "x86_64"
-          docker build --platform linux/amd64 --tag mofacts-ci:meteor-3.5-amd64 .
+          docker build --platform linux/amd64 --tag mofacts-ci:meteor-3.5-amd64 \
+            --build-arg MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256='${{ needs.lint-and-test.outputs.source_digest }}' \
+            --build-arg MOFACTS_SOURCE_REVISION='${{ needs.lint-and-test.outputs.source_commit }}' \
+            --build-arg MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES='${{ needs.lint-and-test.outputs.source_dirty }}' .
+
+      - name: Assert image source matches tested input identity
+        run: |
+          docker run --rm --entrypoint node mofacts-ci:meteor-3.5-amd64 -e '
+            const observation = require("/opt/mofacts-source-observation.json");
+            const identity = observation.identity;
+            if (observation.schema !== "MoFaCTSImageSourceObservationV1"
+              || observation.state !== "source-matched-unqualified"
+              || identity?.sourceSnapshotDigestSha256 !== process.argv[1]
+              || identity?.baseCommit !== process.argv[2]
+              || String(identity?.includedUncommittedLocalChanges) !== process.argv[3]) process.exit(1);
+          ' '${{ needs.lint-and-test.outputs.source_digest }}' \
+            '${{ needs.lint-and-test.outputs.source_commit }}' \
+            '${{ needs.lint-and-test.outputs.source_dirty }}'
 
       - name: Assert bundle ABI and runtime identity
         run: |
