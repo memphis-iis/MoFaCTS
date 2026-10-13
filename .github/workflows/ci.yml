@@ -54,7 +54,14 @@ jobs:
           test "$(node --version)" = "v24.15.0"
           test "$(npm --version)" = "11.12.1"
 
-      - name: Sync Meteor npm dependencies
+      - name: Install application and locked Meteor package dependencies
+        working-directory: ${{ steps.capture.outputs.test_app }}
+        run: |
+          npm ci
+          node --test scripts/installRspackPackageDependencies.test.cjs
+          node scripts/installRspackPackageDependencies.cjs
+
+      - name: Compile Meteor plugins and verify captured inputs
         working-directory: ${{ steps.capture.outputs.test_app }}
         run: |
           meteor update --npm
@@ -91,10 +98,6 @@ jobs:
           path: ${{ steps.capture.outputs.test_app }}/packages/rspack/.npm/devPackage/npm-shrinkwrap.json
           include-hidden-files: true
           retention-days: 3
-
-      - name: Install dependencies
-        working-directory: ${{ steps.capture.outputs.test_app }}
-        run: npm ci
 
       - name: Lint
         working-directory: ${{ steps.capture.outputs.test_app }}

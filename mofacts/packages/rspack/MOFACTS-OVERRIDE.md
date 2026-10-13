@@ -1,8 +1,9 @@
 # Pinned Meteor Rspack override
 
-This directory is a source copy, with whitespace-only normalization, of Meteor pull request
+This directory starts from a source copy, with whitespace-only normalization, of Meteor pull request
 [#14562](https://github.com/meteor/meteor/pull/14562) at commit
 `fa20c29abb4ae30fe78facab2819ce4f5c99e588`.
+The repository-owned dependency diagnostic change is documented below.
 
 It temporarily replaces the stable Atmosphere `rspack@1.1.0` package. That
 package drops the compiled Blaze client bundle during `meteor test` and can
@@ -53,6 +54,21 @@ Production still requires the independent Phase 5 database acceptance and
 rollout gates.
 
 ## Verification and removal
+
+The repository also owns a locked cold-install boundary for this override.
+Meteor 3.5's internal flat v4 shrinkwrap can be re-resolved by npm 11 while
+reconstructing a missing package installation. `scripts/installRspackPackageDependencies.cjs`
+converts the committed flat pins into npm's native v3 install inputs in a fresh
+temporary directory, runs the pinned `meteor npm ci`, validates every installed
+version, source and integrity value, and creates Meteor's normal installed-tree
+markers. It preserves the source shrinkwrap byte for byte. CI and Docker run
+this after installing application dependencies and before compiling plugins;
+the full captured-source and checksum checks still run afterward. Unsupported
+lock shapes, registry failures and mismatched installed packages fail clearly.
+
+The local diagnostic in `lib/processes.js` now points to that locked setup and
+does not recommend suppressing a failed dependency synchronization command.
+The upstream bundler bridge and package version remain unchanged.
 
 `npm run test:ci:harness` verifies that both Meteor package graphs select this
 local package version and that the pinned fix is present. `npm run test:ci`

@@ -125,6 +125,32 @@ The full TypeScript check is the required TypeScript verification path for app c
 
 ## Tests
 
+### Locked Meteor package installation
+
+After `npm ci`, run `node scripts/installRspackPackageDependencies.cjs` from
+`mofacts/` before compiling local Meteor plugins in a clean checkout. CI and the
+Docker builder use the same installer. The application lockfile owns application
+dependencies; `packages/rspack/.npm/devPackage/npm-shrinkwrap.json` owns the local
+Rspack package's exact transitive pins.
+
+Meteor 3.5 stores a flat internal v4 shrinkwrap. A cold npm 11 reconstruction
+can select newer transitive versions even when that file is present. The installer
+uses npm's native lock format in a temporary directory, runs the pinned
+`meteor npm ci`, validates installed versions, sources and integrity values, and
+creates the normal Meteor installed-tree markers. It removes temporary inputs
+and leaves the committed shrinkwrap unchanged. It does not update dependencies
+or patch the Meteor tool/cache. Unsupported lock formats fail explicitly.
+
+CI installs application and locked package dependencies before `meteor update --npm`
+compiles plugins, then checks the entire captured input tree. Docker additionally
+checks both tracked Meteor package shrinkwrap files before and after compilation
+and after the final bundle build. These guards remain blocking. Dependency updates
+must be intentional source changes; do not suppress synchronization errors or
+exclude tracked shrinkwraps from source identity.
+
+The focused contract suite is
+`node --test scripts/installRspackPackageDependencies.test.cjs`.
+
 The repository defines test scripts in `mofacts/package.json`. Some local Meteor workflows may require additional environment setup. For release preparation, record any test limitations explicitly rather than treating a narrowed check as full release confidence.
 
 CI owns `npm run test:ci`. The workflow supplies an explicit checked-in test

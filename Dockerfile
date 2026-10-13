@@ -44,10 +44,13 @@ RUN cd $APP_SOURCE_FOLDER && \
     test "$(meteor --version)" = "Meteor 3.5" && \
     test "$(meteor node --version)" = "v24.15.0" && \
     test "$(meteor npm --version)" = "11.12.1" && \
-    sha256sum .meteor/release .meteor/packages .meteor/versions package.json package-lock.json > /tmp/mofacts-toolchain.sha256 && \
+    sha256sum .meteor/release .meteor/packages .meteor/versions package.json package-lock.json \
+      packages/ddp-server/.npm/package/npm-shrinkwrap.json \
+      packages/rspack/.npm/devPackage/npm-shrinkwrap.json > /tmp/mofacts-toolchain.sha256 && \
+    METEOR_ALLOW_SUPERUSER=1 meteor npm ci && \
+    METEOR_ALLOW_SUPERUSER=1 meteor node scripts/installRspackPackageDependencies.cjs && \
     METEOR_ALLOW_SUPERUSER=1 meteor update --npm && \
-    sha256sum --check /tmp/mofacts-toolchain.sha256 && \
-    METEOR_ALLOW_SUPERUSER=1 meteor npm ci
+    sha256sum --check /tmp/mofacts-toolchain.sha256
 
 # Function: expose Meteor bundled node binary on PATH for Rspack child processes.
 RUN NODE_BIN="$(find /root/.meteor/packages/meteor-tool -type f -path '*/dev_bundle/bin/node' | head -n 1)" && \
@@ -65,6 +68,7 @@ RUN cd $APP_SOURCE_FOLDER && \
         TOOL_NODE_FLAGS=--max-old-space-size=8000 \
         meteor build --allow-superuser --directory $APP_BUNDLE_FOLDER --server-only \
         >"$BUILD_LOG" 2>&1; then \
+        sha256sum --check /tmp/mofacts-toolchain.sha256 || exit 1; \
         echo "Meteor build succeeded on attempt $i"; \
         awk 'tolower($0) ~ /warning/ { lines = 12 } lines > 0 { print; lines-- }' "$BUILD_LOG"; \
         exit 0; \

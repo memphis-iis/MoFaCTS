@@ -33,6 +33,7 @@ When instructions compete, use this order:
 - Do not add compatibility fallback paths unless explicitly requested.
 - Do not run Docker build, push, deploy, or production-affecting commands unless explicitly requested.
 - Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
+- In clean CI/Docker installs, run `mofacts/scripts/installRspackPackageDependencies.cjs` after application `npm ci` and before Meteor plugin compilation. Keep source-owned package shrinkwraps in capture/checksum verification.
 
 ## User Intent And Permissions
 

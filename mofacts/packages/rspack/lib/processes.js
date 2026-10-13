@@ -178,7 +178,7 @@ export function getConfigFilePath() {
 
   // If no config file is found, throw an error with suggestion to run npm install
   const isYarnProj = process.env.YARN_ENABLED === 'true';
-  const installCommand = isYarnProj ? 'yarn install' : 'npm install';
+  const installCommand = isYarnProj ? 'yarn install --frozen-lockfile' : 'meteor npm ci';
   const isCI = !!(
     process.env.CI ||                      // Most CI providers (GitHub Actions, GitLab CI, Travis, CircleCI, Buildkite, Drone, Semaphore, etc.)
     process.env.GITHUB_ACTIONS ||          // GitHub Actions
@@ -191,12 +191,12 @@ export function getConfigFilePath() {
   );
   let message =
     `Could not find rspack.config.js, rspack.config.ts, rspack.config.mjs, or rspack.config.cjs.\n\n` +
-    `Try running \`meteor update --npm\` followed by \`${installCommand}\` in your project directory and then re-run the build.\n` +
-    `This will ensure @meteorjs/rspack is installed correctly.`;
+    `Run \`${installCommand}\` and \`meteor node scripts/installRspackPackageDependencies.cjs\` in your project directory, then re-run the build.\n` +
+    `This installs the application and local Rspack package from their committed dependency locks.`;
   if (isCI) {
     message += `\n\nIt looks like you are running in a CI/Docker environment.\n` +
-      `Make sure your Dockerfile or CI pipeline runs \`(meteor update --npm 2>/dev/null || true) && ${installCommand}\` before building.\n` +
-      `See: https://docs.meteor.com/about/modern-build-stack/rspack-bundler-integration.html#docker`;
+      `Install the locked dependencies before compiling Meteor plugins and retain the captured-source checks.\n` +
+      `See the repository's docs/development.md dependency-installation contract.`;
   }
   throw new Error(message);
 }
