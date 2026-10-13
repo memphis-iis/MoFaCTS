@@ -11,6 +11,12 @@
 
   const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 
+  function isWorkedExample(component) {
+    return component.id === `${component.turnEventId}:richContent`
+      && component.figure === undefined
+      && SPARC_DYNAMIC_MENU_OPTIONS.some((option) => option.action === component.action);
+  }
+
   export let node;
   export let adminDiagnosticMode = false;
   export let nodeValues = {};
@@ -524,11 +530,20 @@
       <div class="sparc-dialogue-bubble">
         {#if node.children?.length}
           {#each node.children as component (component.id)}
-            <div class="sparc-instruction-component">
+            {@const workedExample = isWorkedExample(component)}
+            <div
+              class="sparc-instruction-component"
+              class:sparc-worked-example={workedExample}
+              role={workedExample ? 'group' : undefined}
+              aria-label={workedExample ? sparcText('sparc.workedExample') : undefined}
+            >
+              {#if workedExample}
+                <div class="sparc-worked-example-title" aria-hidden="true">{sparcText('sparc.workedExample')}</div>
+              {/if}
               {#if component.atomType === 'html-block'}
-                <div>{@html sanitizeSparcHtml(getNodeValue(component))}</div>
+                <div class="sparc-instruction-content">{@html sanitizeSparcHtml(getNodeValue(component))}</div>
               {:else}
-                <div>{getNodeValue(component)}</div>
+                <div class="sparc-instruction-content">{getNodeValue(component)}</div>
               {/if}
               {#if component.figure !== undefined}
                 <SparcPromptFigure figure={component.figure} figureId={component.id} />
@@ -1236,8 +1251,30 @@
     font-weight: var(--app-font-weight-semibold, 600);
   }
 
+  .sparc-instruction-component {
+    white-space: normal;
+  }
+
+  .sparc-instruction-content {
+    white-space: pre-wrap;
+  }
+
   .sparc-instruction-component + .sparc-instruction-component {
     margin-top: 0.85rem;
+  }
+
+  .sparc-worked-example {
+    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-sm);
+    padding: var(--sparc-space-2) var(--sparc-space-3);
+  }
+
+  .sparc-worked-example-title {
+    margin-bottom: var(--sparc-space-1);
+    font-size: var(--sparc-font-size-small);
+    font-weight: var(--app-font-weight-semibold, 600);
+    line-height: 1.25;
+    text-align: center;
   }
 
   .sparc-dialogue-bubble {
