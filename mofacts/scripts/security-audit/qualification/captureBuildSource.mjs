@@ -14,6 +14,20 @@ const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 const workspacePrefix = 'mofacts-qualified-build-';
 const maxControlBytes = 1024 * 1024;
 
+/** Bounded relative-path metadata only; never source contents or absolute paths. */
+export function capturedSourceDifferences(before, after) {
+  const index = entries => new Map(entries.map(entry => [snapshotPath(entry[0]), entry]));
+  const baseline = index(before);
+  const observed = index(after);
+  const differences = [];
+  for (const name of [...new Set([...baseline.keys(), ...observed.keys()])].sort()) {
+    if (isDeepStrictEqual(baseline.get(name), observed.get(name))) continue;
+    differences.push({ change: !baseline.has(name) ? 'added' : !observed.has(name) ? 'removed' : 'modified', path: name });
+    if (differences.length === 20) break;
+  }
+  return differences;
+}
+
 export async function readControl(file) {
   const stat = await fs.lstat(file);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maxControlBytes) invalidSnapshot();
@@ -235,11 +249,13 @@ export async function verifyCapture(workspace, builder, dependencies = {}) {
   const roots = captureRoots(recipe.toString('utf8'));
   // Every verification owns a new export; a prior successful export is not reused.
   const roundTrip = await fs.mkdtemp(path.join(root, 'round-trip-'));
+  let sourceEntries;
   try {
     const observed = await exportSource(candidate, recipe, builder, roundTrip, dependencies.docker ?? docker);
     assertCapturedEntries(observed.entries, roots);
     if (observed.sourceSnapshotDigestSha256 !== identity.sourceSnapshotDigestSha256
       || (await inspectSnapshotTree(candidate)).digestSha256 !== receipt.localTreeDigestSha256) invalidSnapshot();
+    sourceEntries = observed.entries;
   } finally {
     // This exact child was allocated above, never taken from receipt metadata.
     await requireWorkspace(root);
@@ -249,7 +265,7 @@ export async function verifyCapture(workspace, builder, dependencies = {}) {
   }
   const override = contextOverride(candidate);
   if (!isDeepStrictEqual(JSON.parse(await readControl(path.join(root, 'compose.capture.json'))), override)) invalidSnapshot();
-  return { root, candidate, receipt, identity };
+  return { root, candidate, receipt, identity, sourceEntries };
 }
 
 export async function collectCapturedTestInputs(workspace, builder, dependencies = {}) {
@@ -292,6 +308,12 @@ export async function verifyCapturedTestInputs(workspace, builder, dependencies 
   try {
     const observed = await exportSource(derivative, recipe, builder, roundTrip, dependencies.docker ?? docker);
     assertCapturedEntries(observed.entries, captureRoots(recipe.toString('utf8')));
+    if (observed.sourceSnapshotDigestSha256 !== checked.identity.sourceSnapshotDigestSha256) {
+      for (const difference of capturedSourceDifferences(checked.sourceEntries, observed.entries)) {
+        console.error(`Captured source difference: ${JSON.stringify(difference)}`);
+      }
+      invalidSnapshot();
+    }
     if (observed.sourceSnapshotDigestSha256 !== checked.identity.sourceSnapshotDigestSha256
       || await supplementalDigest(derivative) !== receipt.supplementalDigestSha256
       || !(await readControl(path.join(derivative, 'Dockerfile'))).equals(recipe)

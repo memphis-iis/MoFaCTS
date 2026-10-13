@@ -7,8 +7,18 @@ import test from 'node:test';
 import { SNAPSHOT_LIMITS, extractSnapshot, inspectSnapshotTree, snapshotPath, snapshotDigest, sha256 } from '../qualification/sourceSnapshot.mjs';
 import { captureRoots, contextOverride, assertContextOnlyChange, assertCapturedEntries, main,
   prepareCapture, verifyCapture, buildCapturedSource, collectCapturedTestInputs,
-  verifyCapturedTestInputs, prepareCapturedTestInputs } from '../qualification/captureBuildSource.mjs';
+  verifyCapturedTestInputs, prepareCapturedTestInputs, capturedSourceDifferences } from '../qualification/captureBuildSource.mjs';
 import { TEST_INPUTS } from '../qualification/testInputs.mjs';
+
+test('bounds changed-source diagnostics to validated relative paths without contents or digests', () => {
+  const entry = (name, digest = 'private-content-digest') => [name, 'file', 0o644, digest];
+  assert.deepEqual(capturedSourceDifferences([entry('before'), entry('changed')], [entry('after'), entry('changed', 'new')]), [
+    { change: 'added', path: 'after' }, { change: 'removed', path: 'before' }, { change: 'modified', path: 'changed' },
+  ]);
+  assert.equal(capturedSourceDifferences([], Array.from({ length: 25 }, (_, i) => entry(`file-${i}`))).length, 20);
+  assert.throws(() => capturedSourceDifferences([], [entry('../secret')]), /validation failed/);
+  assert.throws(() => capturedSourceDifferences([], [entry('/absolute')]), /validation failed/);
+});
 
 function header(name, size = 0, type = '0', mode = 0o644) {
   const result = Buffer.alloc(512);
