@@ -68,6 +68,8 @@ import {
 } from './methods/openRouterCatalogMethods';
 import { createOpenRouterMethods } from './methods/openRouterMethods';
 import { createSparcPromptImageMethods } from './methods/sparcPromptImageMethods';
+import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
+  removeSparcFigureAssetMetadata, removeSparcFigureUserDecisions } from './lib/sparcFigureLibraryStorage';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
@@ -686,6 +688,8 @@ export const methods: any = {
   }),
 
   ...createAdminMethods({
+    removeSparcFigureAssetMetadata,
+    removeSparcFigureUserDecisions,
     serverConsole,
     csvParser: PapaAny,
     usersCollection: MeteorAny.users,
@@ -1107,7 +1111,9 @@ export const asyncMethods: Record<string, unknown> = {
 
   ...speechMethods,
 
-  ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary }),
+  ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary,
+    figureLibrary: createSparcFigureLibraryStore(),
+    minimumFigureSimilarity: (Meteor.settings as { sparcFigures?: { minimumSimilarity?: number } }).sparcFigures?.minimumSimilarity }),
 
   ...createOpenRouterMethods({
     serverConsole,
@@ -1172,6 +1178,7 @@ registerServerRuntime({
 });
 
 Meteor.startup(async function() {
+  await ensureSparcFigureLibraryIndexes();
   await ensureProlificIndexes();
   // Test provisioning checks exact lesson families without course/user scope.
   await GlobalExperimentStates.rawCollection().createIndex({ TDFId: 1 });

@@ -1,11 +1,14 @@
 import type { SparcSupportedPrompt } from '../../../../../../learning-components/units/sparcsession/sparcSupportedPrompt';
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../../../../common/lib/sparcPromptImage';
 import type { OpenRouterUsageSummary } from '../../../../lib/openRouterClient';
+import type { SparcFigureSituation } from '../../../../../common/lib/sparcFigureLibrary';
 
 export type CallSparcPromptImage = (params: {
   tdfId: string; sessionId: string; generationId: string;
   tutorMessage: string; imagePrompt: string; figureDescription: string; displayWidth: number;
-}) => Promise<SparcSupportedPrompt & { usage?: OpenRouterUsageSummary }>;
+  situation?: SparcFigureSituation;
+}) => Promise<SparcSupportedPrompt & { usage?: OpenRouterUsageSummary; embeddingUsage?: OpenRouterUsageSummary;
+  libraryMatch?: { source: 'generated' | 'semantic' | 'resume'; similarity: number | null } }>;
 export type ReadSparcPromptImage = (assetId: string) => Promise<{ dataUrl: string }>;
 
 function call(name: string, value: unknown): Promise<unknown> {

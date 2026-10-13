@@ -74,6 +74,7 @@ When instructions compete, use this order:
 - New unit types should go through the unit-engine registry and expose explicit lifecycle methods.
 - Do not duplicate legacy behavior in `mofacts/client/views/experiment/unitEngine.ts`; keep that path as an app dependency facade.
 - Learning components should depend on explicit runtime context/dependency interfaces.
+- SPARC teaching-figure retrieval and persistence are owned by the server image/library services; see `docs/sparc-instructional-cycle.md`. Preserve saved learner figure decisions when curating the shared library.
 - Avoid reaching from `learning-components/` into deep Meteor client/server paths unless a temporary facade is already documented and behavior-preserving.
 - If an alternate runtime path is intentional, name it by the domain behavior it provides. Do not call a deliberate path a fallback.
 - Do not add recovery behavior that masks a broken invariant.

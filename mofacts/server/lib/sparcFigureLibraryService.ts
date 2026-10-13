@@ -1,0 +1,98 @@
+import { normalizeSparcFigureEmbedding, sparcFigureCosineSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
+import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../common/lib/sparcPromptImage';
+import type { OpenRouterUsageSummary } from '../../common/lib/openRouterClient';
+
+export type SparcFigureLibraryEntry = {
+  _id: string; version: string; imageModel: string; embeddingModel: string; dimensions: number;
+  situation: string; embedding: number[]; ready: boolean; reusable: boolean; createdAt: Date;
+  generation?: { imagePrompt: string; tutorMessage: string; description: string; displayWidth: number };
+};
+export type SparcFigureDecision = {
+  _id: string; kind: 'decision'; userId: string; tdfId: string; sessionId: string;
+  assetId: string; source: 'generated' | 'semantic'; similarity: number | null; createdAt: Date;
+};
+export type SparcFigureLibraryStore = {
+  findDecision: (identity: string, userId: string) => Promise<SparcFigureDecision | undefined>;
+  saveDecision: (decision: SparcFigureDecision) => Promise<void>;
+  findEntry: (assetId: string) => Promise<SparcFigureLibraryEntry | undefined>;
+  saveEntry: (entry: SparcFigureLibraryEntry) => Promise<void>;
+  candidates: (query: { version: string; imageModel: string; embeddingModel: string; dimensions: number; afterId: string }) => Promise<SparcFigureLibraryEntry[]>;
+  withLock: <T>(work: () => Promise<T>) => Promise<T>;
+};
+type SparcFigureLibraryResult = { assetId: string; source: 'resume' | 'semantic' | 'generated'; similarity: number | null;
+  usage?: OpenRouterUsageSummary | undefined; embeddingUsage?: OpenRouterUsageSummary | undefined };
+
+/** One exact cosine search, paged on the server; no similarity reranker or critic call. */
+export async function selectSparcLibraryFigure(store: SparcFigureLibraryStore, embedding: number[], minimumSimilarity: number) {
+  const query = { version: SPARC_FIGURE_LIBRARY_SETTINGS.version, imageModel: SPARC_PROMPT_IMAGE_SETTINGS.model,
+    embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel, dimensions: embedding.length, afterId: '' };
+  let best: { entry: SparcFigureLibraryEntry; similarity: number } | undefined;
+  for (;;) {
+    const page = await store.candidates(query);
+    for (const entry of page) {
+      if (entry._id <= query.afterId || !entry.ready || !entry.reusable || entry.dimensions !== embedding.length
+        || entry.version !== query.version || entry.imageModel !== query.imageModel || entry.embeddingModel !== query.embeddingModel) {
+        throw new Error('SPARC figure library returned an invalid candidate page');
+      }
+      const similarity = sparcFigureCosineSimilarity(embedding, entry.embedding);
+      if (similarity >= minimumSimilarity && (!best || similarity > best.similarity)) best = { entry, similarity };
+    }
+    if (page.length < SPARC_FIGURE_LIBRARY_SETTINGS.batchSize) return best;
+    query.afterId = page[page.length - 1]!._id;
+  }
+}
+
+export async function getOrGenerateSparcLibraryFigure(params: {
+  store: SparcFigureLibraryStore; identity: string; assetId: string; userId: string; tdfId: string; sessionId: string;
+  situation: string; imagePrompt: string; tutorMessage: string; description: string; displayWidth: number;
+  minimumSimilarity: number;
+  embed: (input: string) => Promise<{ vector: number[]; usage?: OpenRouterUsageSummary }>;
+  generate: (entry: SparcFigureLibraryEntry) => Promise<{ usage?: OpenRouterUsageSummary }>;
+}): Promise<SparcFigureLibraryResult> {
+  const { store } = params;
+  const prior = await store.findDecision(params.identity, params.userId);
+  if (prior) return { assetId: prior.assetId, source: 'resume' as const, similarity: prior.similarity };
+  let embedding: number[] | undefined;
+  let embeddingUsage: OpenRouterUsageSummary | undefined;
+  const acceptMatch = async (match: { entry: SparcFigureLibraryEntry; similarity: number }): Promise<SparcFigureLibraryResult> => {
+    await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId,
+      tdfId: params.tdfId, sessionId: params.sessionId, assetId: match.entry._id,
+      source: 'semantic', similarity: match.similarity, createdAt: new Date() });
+    const accepted = await store.findDecision(params.identity, params.userId);
+    if (!accepted) throw new Error('SPARC figure library did not persist the selected figure');
+    return { assetId: accepted.assetId, source: 'semantic', similarity: accepted.similarity, embeddingUsage };
+  };
+  if (!await store.findEntry(params.assetId)) {
+    const embedded = await params.embed(params.situation);
+    embedding = normalizeSparcFigureEmbedding(embedded.vector);
+    embeddingUsage = embedded.usage;
+    const match = await selectSparcLibraryFigure(store, embedding, params.minimumSimilarity);
+    if (match) return await acceptMatch(match);
+  }
+  // Warm retrievals run concurrently. Only a miss or interrupted generation acquires the lease.
+  return store.withLock(async () => {
+    const resumed = await store.findDecision(params.identity, params.userId);
+    if (resumed) return { assetId: resumed.assetId, source: 'resume' as const, similarity: resumed.similarity, embeddingUsage };
+    // A durable pending entry keeps the original situation and brief after provider/storage failure.
+    let entry = await store.findEntry(params.assetId);
+    if (!entry) {
+      if (!embedding) throw new Error('SPARC figure library lost the new situation embedding');
+      // Another first encounter may have populated this region while this request waited.
+      const match = await selectSparcLibraryFigure(store, embedding, params.minimumSimilarity);
+      if (match) return await acceptMatch(match);
+      entry = { _id: params.assetId, version: SPARC_FIGURE_LIBRARY_SETTINGS.version, imageModel: SPARC_PROMPT_IMAGE_SETTINGS.model,
+        embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel, dimensions: embedding.length,
+        situation: params.situation, embedding, generation: { imagePrompt: params.imagePrompt, tutorMessage: params.tutorMessage,
+          description: params.description, displayWidth: params.displayWidth }, ready: false, reusable: true, createdAt: new Date() };
+      await store.saveEntry(entry);
+    }
+    const generated = await params.generate(entry);
+    entry.ready = true;
+    delete entry.generation;
+    await store.saveEntry(entry);
+    await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId,
+      tdfId: params.tdfId, sessionId: params.sessionId, assetId: entry._id,
+      source: 'generated', similarity: null, createdAt: new Date() });
+    return { assetId: entry._id, source: 'generated' as const, similarity: null, usage: generated.usage, embeddingUsage };
+  });
+}

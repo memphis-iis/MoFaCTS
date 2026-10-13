@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import type { SparcControllerDisplay } from './sparcController';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
+import type { SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
 import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import {
   createSparcDialogueOpenRouterProvider,
@@ -199,16 +200,17 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
-  it('generates all four composite schemas through the existing provider', async function() {
+  it('realizes the retained component compositions through dependent primitives', async function() {
     for (const action of ['instruction.question', 'instruction.explanation-question', 'instruction.rich-question', 'instruction.explanation-rich-question']) {
       const definition = requireActiveSparcMoveDefinition(action);
       const output = { explanation: definition.components!.includes('explanation') ? 'An explanation.' : null,
-        richContent: definition.components!.includes('richContent') ? '<table><tr><th>A</th></tr><tr><td>1</td></tr></table>' : null,
+        richContent: definition.components!.includes('richContent') ? 'In this worked case, A is 1 because of the rule.' : null,
         question: 'What follows?' };
       const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
         expect(params.intent.schema).to.have.property('additionalProperties', false);
         expect(params.messages[0]!.content).to.include(definition.promptPolicy);
-        return { parsedContent: output };
+        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'worked-example', workedExample: output.richContent, imagePrompt: null, figureDescription: null, displayWidth: null } };
+        return { parsedContent: { tutorMessage: params.intent.schemaName.includes('explanation_primitive') ? output.explanation : output.question } };
       } });
       expect(await provider.generateTutorUtterance({ ...utteranceRequest, action, moveDefinition: definition })).to.deep.equal(output);
     }
@@ -217,14 +219,86 @@ describe('SPARC dialogue OpenRouter provider', function() {
   it('rejects rich output that cannot be rendered or invents an image asset', async function() {
     for (const richContent of ['<svg><circle /></svg>', '<img src="https://example.org/invented.png" alt="A diagram">']) {
       const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson() {
-        return { parsedContent: { explanation: null, richContent, question: 'What follows?' } };
+        return { parsedContent: { kind: 'worked-example', workedExample: richContent, imagePrompt: null, figureDescription: null, displayWidth: null } };
       } });
       let error: unknown;
       try { await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.rich-question',
         moveDefinition: requireActiveSparcMoveDefinition('instruction.rich-question') }); } catch (caught) { error = caught; }
       expect(error).to.be.instanceOf(Error);
-      expect((error as Error).message).to.include('Invalid rich instruction');
+      expect((error as Error).message).to.include('plain text');
     }
+  });
+  it('uses the actual generated figure and explanation for the isomorphic question and resumes saved support', async function() {
+    const realized: Partial<{ -readonly [K in keyof SparcInstructionComponents]: SparcInstructionComponents[K] }> = {};
+    let images = 0;
+    let explanations = 0;
+    let questions = 0;
+    const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
+      async readSparcPromptImage(assetId) { expect(assetId).to.equal('image123'); return { dataUrl: 'data:image/png;base64,AAAA' }; },
+      async callSparcPromptImage(params) {
+        images++; expect(params.imagePrompt).to.include('complete teaching figure');
+        return { tutorMessage: params.tutorMessage, figure: { assetId: 'image123', description: params.figureDescription, displayWidth: params.displayWidth } };
+      },
+      async callResolvedOpenRouterJson(params) {
+        if (params.intent.schemaName.includes('explanation_primitive')) {
+          explanations++; expect(images).to.equal(1);
+          expect(JSON.stringify(params.messages[1]!.content)).to.include('data:image/png;base64,AAAA');
+          return { parsedContent: { tutorMessage: 'The parameter stays fixed across repeated samples.' } };
+        }
+        if (params.intent.schemaName.includes('rich_primitive')) {
+          expect(String(params.messages[0]!.content)).to.include('Only the question primitive may ask a learner question');
+          expect(String(params.messages[0]!.content)).to.include('Neither figureDescription nor imagePrompt may contain a learner question');
+          return { parsedContent: { kind: 'figure', workedExample: null,
+            imagePrompt: 'Show varying sample intervals against a fixed mean.', figureDescription: 'Three different intervals and one fixed mean.', displayWidth: 300 } };
+        }
+        questions++;
+        expect(String(params.messages[0]!.content)).to.include('Selected target for this question:');
+        expect(String(params.messages[0]!.content)).to.include(JSON.stringify(request.contentTexts));
+        const content = params.messages[1]!.content;
+        expect(JSON.stringify(content)).to.include('parameter stays fixed');
+        expect(JSON.stringify(content)).to.include('Three different intervals');
+        expect(JSON.stringify(content)).to.include('data:image/png;base64,AAAA');
+        if (questions === 1) throw new Error('question provider failed');
+        return { parsedContent: { tutorMessage: 'In a new repeated-sampling experiment, which quantity stays fixed?' } };
+      },
+    });
+    const request: SparcUtteranceRequest = { ...utteranceRequest, action: 'instruction.dynamic.explanation-rich-question',
+      moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question'), selectedAction: { snapshotId: 'response-1' },
+      realizedInstruction: realized, onInstructionComponent: async (component, text, figure) => { realized[component] = text; if (figure) realized.figure = figure; } };
+    let error: unknown;
+    try { await provider.generateTutorUtterance(request); } catch (caught) { error = caught; }
+    expect((error as Error).message).to.equal('question provider failed');
+    const result = await provider.generateTutorUtterance(request) as SparcInstructionComponents;
+    expect(result.figure!.assetId).to.equal('image123');
+    expect(result.question).to.include('new repeated-sampling');
+    expect(images).to.equal(1); expect(explanations).to.equal(1); expect(questions).to.equal(2);
+  });
+  it('propagates requested figure failure before asking a question without substituting a worked example', async function() {
+    let questions = 0;
+    const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
+      async callSparcPromptImage() { throw new Error('figure unavailable'); },
+      async callResolvedOpenRouterJson(params) {
+        if (params.intent.schemaName.includes('explanation_primitive')) return { parsedContent: { tutorMessage: 'An explanation.' } };
+        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'figure', workedExample: null, imagePrompt: 'Draw the model.', figureDescription: 'The model.', displayWidth: 300 } };
+        questions++; return { parsedContent: { tutorMessage: 'A question?' } };
+      },
+    });
+    let error: unknown;
+    try { await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.dynamic.explanation-rich-question',
+      moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question'), selectedAction: { snapshotId: 'response-2' } }); } catch (caught) { error = caught; }
+    expect((error as Error).message).to.equal('figure unavailable'); expect(questions).to.equal(0);
+  });
+  it('gives standalone feedback the existing assessment without next-move instructions', async function() {
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+      expect(params.messages[0]!.content).to.include('Do not choose a new instructional target or ask another question');
+      expect(params.messages[0]!.content).not.to.include('Active-target isolation');
+      expect(params.messages[1]!.content).to.include('Existing assessment');
+      expect(params.messages[1]!.content).to.include('0.4');
+      return { parsedContent: { tutorMessage: 'The parameter is fixed; the intervals vary.' } };
+    } });
+    const result = await provider.generateTutorUtterance({ ...utteranceRequest, targetType: 'feedback', action: 'instruction.feedback',
+      moveDefinition: requireActiveSparcMoveDefinition('instruction.feedback'), plannerState: { assessment: [{ clusterKC: 'kc-a', coverage: .4 }] } });
+    expect(result).to.equal('The parameter is fixed; the intervals vary.');
   });
   it('scores learner responses through server-resolved OpenRouter without choosing a move', async function() {
     const calls: unknown[] = [];

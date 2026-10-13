@@ -1,5 +1,5 @@
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
-import { SPARC_COMPETITIVE_POLICY_ID, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+import { isSparcCompetitivePolicy, isSparcDynamicPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { logistic, targetExpectancy } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
 import { calculateExpectationProbabilities } from '../../../../../../learning-components/models/adaptive-logistic/probabilityCalculation';
 import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
@@ -181,7 +181,14 @@ export function sparcHistoryForPolicy(records: readonly CanonicalHistoryRecord[]
 
 function snapshotProbabilities(document: SparcAuthoredDocument, replayState: SparcReplayState, records: readonly CanonicalHistoryRecord[], scope: SparcDurableScope) {
   const targets = expectationTargets(document);
-  if (document.instructionalController?.policyId !== SPARC_COMPETITIVE_POLICY_ID) return calculateExpectationProbabilities(records, scope, targets);
+  if (!isSparcCompetitivePolicy(document.instructionalController?.policyId)) {
+    if (isSparcDynamicPolicy(document.instructionalController?.policyId)) {
+      const facts = buildSparcWorkingMemoryFacts({ document, replayState });
+      return Object.fromEntries(targets.map(target => [target, Math.max(0.2, Number(facts.find(fact => fact.factType === 'learningTarget.score' && fact.slots?.clusterKC === target)?.slots?.coverage ?? 0.2))]));
+    }
+    const probabilities = calculateExpectationProbabilities(records, scope, targets);
+    return probabilities;
+  }
   const facts = buildSparcWorkingMemoryFacts({ document, replayState });
   return Object.fromEntries(targets.map((target) => [target, logistic(targetExpectancy(facts, `expectation:${target}`))]));
 }

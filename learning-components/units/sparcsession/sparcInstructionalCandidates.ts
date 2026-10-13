@@ -1,5 +1,5 @@
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
-import { SPARC_COMPETITIVE_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
+import { isSparcCompetitivePolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
 
 export type SparcInstructionalTargetKind = 'expectation' | 'misconception';
 
@@ -336,7 +336,7 @@ export function projectSparcInstructionalCandidates(params: {
       priorityScore: supportStrength,
       // Determine eligibility before ranking and active-cycle projection, so all
       // progression rules agree about whether a detected misconception is done.
-      eligible: params.policyId === SPARC_COMPETITIVE_POLICY_ID
+      eligible: isSparcCompetitivePolicy(params.policyId)
         ? triggered && 1 - supportStrength < coverageThreshold
         : supportStrength >= misconceptionThreshold,
     };
@@ -352,12 +352,12 @@ export function projectSparcInstructionalCandidates(params: {
   },
   ...expectations.map((candidate, index) => {
     const fact = candidateFact(snapshotId, candidate);
-    return options.includeCompletedExpectations ? { ...fact, slots: { ...fact.slots,
+    return isSparcStudentPolicy(params.policyId) || options.includeCompletedExpectations ? { ...fact, slots: { ...fact.slots,
       nextTargetId: expectations[(index + 1) % expectations.length]!.targetId } } : fact;
   }),
   ...misconceptions.map((candidate) => {
     const fact = candidateFact(snapshotId, candidate);
-    return options.includeCompletedExpectations && expectations.length ? { ...fact, slots: { ...fact.slots,
+    return (isSparcStudentPolicy(params.policyId) || options.includeCompletedExpectations) && expectations.length ? { ...fact, slots: { ...fact.slots,
       nextTargetId: expectations[0]!.targetId } } : fact;
   })];
   return {

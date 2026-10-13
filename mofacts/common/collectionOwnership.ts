@@ -7,6 +7,14 @@ type CollectionOwnership = {
 };
 
 export const COLLECTION_OWNERSHIP = {
+  SparcFigureLibrary: {
+    mongoName: 'sparc_figure_library', globalName: 'SparcFigureLibrary', owner: 'sparc-figure-library',
+    purpose: 'Shared teaching figures indexed by their originating instructional-situation embeddings; server-only.',
+  },
+  SparcFigureRequests: {
+    mongoName: 'sparc_figure_requests', globalName: 'SparcFigureRequests', owner: 'sparc-figure-library',
+    purpose: 'Durable per-user figure decisions and bounded library-generation leases; server-only.',
+  },
   Tdfs: {
     mongoName: 'tdfs',
     globalName: 'Tdfs',

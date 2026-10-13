@@ -89,6 +89,8 @@ function createAdminDeps(
     getUserDisplayIdentifier: (user: any) => String(user?.username || user?._id || ''),
     syncUsernameCaches: () => undefined,
     deleteTdfRuntimeData: async () => undefined,
+    removeSparcFigureAssetMetadata: async () => undefined,
+    removeSparcFigureUserDecisions: async () => undefined,
     clearStimDisplayTypeMap: () => undefined,
     encryptData: (value: string) => `encrypted:${value}`,
     openRouterModelCatalogService: {

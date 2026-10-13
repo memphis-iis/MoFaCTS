@@ -1,9 +1,9 @@
 /** System-owned image settings; the dialogue model remains account-configured. */
 export const SPARC_PROMPT_IMAGE_SETTINGS = Object.freeze({
-  model: 'bytedance-seed/seedream-5-0-flash',
-  resolution: '1K',
+  model: 'openai/gpt-image-2.5-sunburst',
+  quality: 'medium',
   aspectRatio: 'auto',
-  provider: 'seed',
+  provider: 'openai',
   maxBytes: 8 * 1024 * 1024,
   maxPromptCharacters: 12000,
   minDisplayWidth: 240,

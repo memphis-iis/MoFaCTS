@@ -242,7 +242,7 @@
     {
       "name": "generateSparcPromptImage",
       "access": "admin-only",
-      "notes": "Requires a bounded integer display-width estimate before provider access. Generated assets retain that estimate with their private account-owned text/image pairing."
+      "notes": "Requires bounded display width and optional identity-free instructional situation. Complete teaching figures use a shared embedding library and durable per-user decision ledger; other session figures retain private ownership. No critic or prior human approval gate."
     },
     {
       "name": "getAccessableTDFSForUser",
@@ -456,7 +456,8 @@
     },
     {
       "name": "getSparcPromptImage",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Reads owned historical assets or canonical shared teaching-library assets. Generic downloads remain blocked; no library embeddings or learner decision records are returned."
     },
     {
       "name": "getStimDisplayTypeMap",

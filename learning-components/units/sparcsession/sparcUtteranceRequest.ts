@@ -1,4 +1,5 @@
-import { parseSparcPromptFigure } from './sparcSupportedPrompt';
+import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
+import type { SparcInstructionComponents } from './sparcInstructionalPrimitives';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 import {
   requireActiveSparcMoveDefinition,
@@ -6,8 +7,10 @@ import {
 } from './sparcMoveDefinitions';
 
 export type SparcUtteranceRequest = {
+  readonly realizedInstruction?: Readonly<Partial<SparcInstructionComponents>>;
+  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure) => Promise<void>;
   readonly problemStatement: string;
-  readonly targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion';
+  readonly targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion' | 'feedback';
   readonly action: string;
   readonly targetId: string;
   readonly contentTexts: readonly string[];

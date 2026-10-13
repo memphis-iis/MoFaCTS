@@ -7,6 +7,7 @@
   import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
   import { shouldSubmitTextInputOnKeydown } from '../services/textInputComposition';
   import { SPARC_INSTRUCTIONAL_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycleRules';
+  import { SPARC_DYNAMIC_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcDynamicInstructionRules';
 
   const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 
@@ -204,7 +205,7 @@
       return '';
     }
     const action = String(candidate?.action || '').trim();
-    const actionLabel = SPARC_INSTRUCTIONAL_MENU_OPTIONS.find(option => option.action === action)?.label ?? action;
+    const actionLabel = [...SPARC_INSTRUCTIONAL_MENU_OPTIONS, ...SPARC_DYNAMIC_MENU_OPTIONS].find(option => option.action === action)?.label ?? action;
     const targetId = String(candidate?.targetId || '').trim();
     const targetKind = String(candidate?.selectionTargetKind || candidate?.targetType || '').trim();
     if (candidate?.competition) {
@@ -521,9 +522,24 @@
     >
       <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}</div>
       <div class="sparc-dialogue-bubble">
-        <div>{getNodeValue(node)}</div>
-        {#if node.figure !== undefined}
-          <SparcPromptFigure figure={node.figure} figureId={node.id} />
+        {#if node.children?.length}
+          {#each node.children as component (component.id)}
+            <div class="sparc-instruction-component">
+              {#if component.atomType === 'html-block'}
+                <div>{@html sanitizeSparcHtml(getNodeValue(component))}</div>
+              {:else}
+                <div>{getNodeValue(component)}</div>
+              {/if}
+              {#if component.figure !== undefined}
+                <SparcPromptFigure figure={component.figure} figureId={component.id} />
+              {/if}
+            </div>
+          {/each}
+        {:else}
+          <div>{getNodeValue(node)}</div>
+          {#if node.figure !== undefined}
+            <SparcPromptFigure figure={node.figure} figureId={node.id} />
+          {/if}
         {/if}
         {#if dialogueProductionRuleLabel(node)}
           <div class="sparc-dialogue-diagnostic">production: {dialogueProductionRuleLabel(node)}</div>
@@ -1218,6 +1234,10 @@
     color: var(--sparc-secondary-text-color);
     font-size: var(--sparc-font-size-small);
     font-weight: var(--app-font-weight-semibold, 600);
+  }
+
+  .sparc-instruction-component + .sparc-instruction-component {
+    margin-top: 0.85rem;
   }
 
   .sparc-dialogue-bubble {

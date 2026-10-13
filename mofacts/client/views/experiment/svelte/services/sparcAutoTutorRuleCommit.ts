@@ -1,4 +1,4 @@
-import { sparcPolicyForAccount } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+import { sparcPolicyForAccount, isSparcDynamicPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
@@ -106,6 +106,7 @@ export async function commitSparcAutoTutorSubmit(params: {
   readonly levelUnit: unknown;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
+  readonly onNodeValues?: (values: Record<string, unknown>) => void | Promise<void>;
   readonly deps?: SparcControllerDialogueCommitDeps;
 }): Promise<{
   readonly committed: boolean;
@@ -174,6 +175,11 @@ export async function commitSparcAutoTutorSubmit(params: {
         }
         rememberSparcRuntimeHistoryRecord(historyRecord);
         writtenHistoryCount += 1;
+        const transitionId = (historyRecord.sparc as { stateTransition?: { transitionId?: string } })?.stateTransition?.transitionId ?? '';
+        if (isSparcDynamicPolicy(sparcDisplay.instructionalController?.policyId)
+          && (transitionId.endsWith(':feedback') || transitionId.includes(':primitive:'))) {
+          await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
+        }
       },
     },
   });

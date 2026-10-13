@@ -103,6 +103,8 @@ type AdminMethodsDeps = {
   getUserDisplayIdentifier: (user: any) => string;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
   deleteTdfRuntimeData: (tdfId: string) => Promise<void>;
+  removeSparcFigureAssetMetadata: (assetId: string) => Promise<void>;
+  removeSparcFigureUserDecisions: (userId: string) => Promise<void>;
   clearStimDisplayTypeMap: () => void;
   encryptData?: (value: string) => string;
   decryptData?: (value: string) => string;
@@ -718,6 +720,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
       }
 
       await removeUserOwnedData(deps, normalizedTargetUserId);
+      await deps.removeSparcFigureUserDecisions(normalizedTargetUserId);
       await Roles.setUserRolesAsync(normalizedTargetUserId, []);
       await deps.usersCollection.removeAsync({ _id: normalizedTargetUserId });
       deps.syncUsernameCaches(normalizedTargetUserId, '', String(targetUser?.username || ''));
@@ -769,6 +772,7 @@ export function createAdminMethods(deps: AdminMethodsDeps) {
           try {
             deps.serverConsole('removing file ' + fileId);
             await deps.DynamicAssets.removeAsync({ _id: fileId });
+            await deps.removeSparcFigureAssetMetadata(fileId);
             filesRemoved++;
           } catch (fileError: unknown) {
             deps.serverConsole('Error removing file ' + fileId + ':', fileError);

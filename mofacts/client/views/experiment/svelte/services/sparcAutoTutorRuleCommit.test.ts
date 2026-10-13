@@ -1,5 +1,5 @@
 import { resolveSparcAccountPolicy } from './sparcController';
-import { SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcDynamicPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { currentSparcMenu } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
 import { strict as assert } from 'node:assert';
 import { commitSparcAutoTutorSubmit } from './sparcAutoTutorRuleCommit';
@@ -10,13 +10,40 @@ import { requireActiveSparcMoveDefinition } from '../../../../../../learning-com
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 
 describe('SPARC app instructional commit', () => {
+  it('publishes saved dynamic feedback to the surface before generating the next instruction', async () => {
+    clearSparcRuntimeState();
+    const display = resolveSparcAccountPolicy({ pageKey: 'dynamic-surface', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
+      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v1', policyVersion: 1 },
+      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A' }], misconceptions: [] },
+      clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }],
+      workingMemoryFacts: [{ factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: .5 } }],
+      nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain the topic.' },
+        { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' },
+        { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }],
+    }, true)!;
+    let publishedFeedback = false;
+    await commitSparcAutoTutorSubmit({ engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'],
+      currentDisplay: display, tdfId: 'dynamic-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
+      sparcResult: { submittedNodes: { 'learner-response-input': 'An answer.' }, triggeredBy: 'learner-response-submit', timestamp: 101 },
+      scoreLearnerResponse: () => ({ learningTargetScores: [{ clusterKC: 'a', coverage: .2 }] }),
+      onNodeValues: values => { publishedFeedback = JSON.stringify(values).includes('Here is the correction.'); },
+      generateTutorUtterance: request => {
+        if (request.action === 'instruction.feedback') return 'Here is the correction.';
+        assert.equal(publishedFeedback, true);
+        return { explanation: 'An explanation.', richContent: 'A complete worked example.', question: 'How does the new case work?' };
+      },
+      deps: { getIsAdmin: () => true, getUserId: () => 'u', writeHistory: async () => {} },
+    });
+    clearSparcRuntimeState();
+  });
   it('uses the package choice for admins and preserves the deterministic non-admin route', () => {
     for (const policyId of SPARC_INSTRUCTIONAL_POLICY_IDS) {
       const display = { nodes: [], unitType: 'sparc-autotutor-dialogue', instructionalController: { adapterId: 'sparc-autotutor-v1', policyVersion: 1, policyId } };
       const admin = resolveSparcAccountPolicy(display, true)!;
-      assert.equal(admin.instructionalController?.policyId, policyId === 'student-selected-v2' ? policyId : 'oet-boltzmann-v2');
+      assert.equal(admin.instructionalController?.policyId, policyId === 'student-selected-v2' || isSparcDynamicPolicy(policyId) ? policyId : 'oet-boltzmann-v2');
       assert.equal(resolveSparcAccountPolicy(admin, true)?.instructionalController?.policyId, admin.instructionalController?.policyId);
-      assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, 'progressive-scaffolding-v1');
+      if (isSparcDynamicPolicy(policyId)) assert.throws(() => resolveSparcAccountPolicy(display, false), /admin account/);
+      else assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, 'progressive-scaffolding-v1');
       assert.equal(display.instructionalController.policyId, policyId);
     }
   });

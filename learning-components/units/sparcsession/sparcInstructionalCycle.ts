@@ -1,14 +1,14 @@
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
-import { SPARC_COMPETITIVE_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
+import { isSparcCompetitivePolicy, isSparcDynamicPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { SPARC_DYNAMIC_TARGET_LOGIT, SPARC_FEEDBACK_ACTION } from './sparcDynamicInstructionRules';
 import { advanceOet, competitiveAssessmentFacts, competitiveCandidateFacts, competitiveMoveFacts, selectCompetitiveActivation, SPARC_ADVANCE_OET_ACTION, targetOet } from './sparcCompetitiveSelection';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
-import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
+import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY, type SparcProgressiveNodeOperation } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import { assertCompletedDialogueReplayState, RESPONSE_LOCAL_FACT_TYPES, type SparcAutoTutorRuleTurnParams } from './sparcAutoTutorRuleRuntime';
 import { createSparcLearnerResponseScoreFacts, expectationLogitChangesFromScoreFacts } from './sparcLearnerResponseScoring';
 import { requireSparcInstructionalAdapter } from './sparcInstructionalAdapterRegistry';
-import { SPARC_STUDENT_SELECTED_POLICY_ID } from './sparcInstructionalControl';
-import { SPARC_COMPOSITE_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
-import { createSparcInstructionTransition } from './sparcInstructionalPrimitives';
+import { SPARC_COMPOSITE_MOVE_DEFINITIONS, SPARC_DYNAMIC_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
+import { createSparcInstructionTransition, createSparcFeedbackRequest, createSparcInstructionComponentWrite, type SparcInstructionComponents } from './sparcInstructionalPrimitives';
 import { createSparcUtteranceRequestFromFacts, type SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts, progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
 import { createSparcStableWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
@@ -41,12 +41,33 @@ export function currentSparcMenu(replay: SparcReplayState): SparcWorkingMemoryFa
   return Object.values(replay.cells).map((cell) => cell.value as SparcWorkingMemoryFact)
     .find((fact) => fact?.factType === 'instructional.menu');
 }
-export function projectSparcMenuOperations(replay: SparcReplayState): Record<string, unknown>[] {
+export function projectSparcMenuOperations(replay: SparcReplayState): SparcProgressiveNodeOperation[] {
+  const selected: SparcProgressiveNodeOperation[] = [];
+  let anchor = '';
+  for (const transition of replay.transitions) {
+    for (const write of transition.writes) {
+      const operation = write.value as { node?: { id?: string; turnEventId?: string; atomType?: string } };
+      if (write.key === SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY && operation?.node?.turnEventId
+        && ['dialogue-utterance', 'html-block'].includes(operation.node.atomType!)) anchor = operation.node.id!;
+      const fact = write.value as SparcWorkingMemoryFact;
+      if (fact?.factType !== 'instructional.menu' || fact.slots?.status !== 'selected') continue;
+      const option = (fact.slots.options as MenuOption[]).find(entry => entry.id === fact.slots!.selectedOptionId);
+      if (!option) throw new Error('Saved instructional choice is missing its offered option');
+      const id = `${String(fact.slots.menuId)}:selected`;
+      selected.push({ type: 'insert-node', boxId: 'dialogue-flow', ...(anchor ? { afterNodeId: anchor } : {}), node: {
+        id, nodeType: 'group', groupType: 'button-group', children: [{
+          id: `${id}:${option.id}`, nodeType: 'atomic', atomType: 'button', label: option.label,
+          value: option.id, selected: true, readOnly: true,
+        }],
+      } });
+      anchor = id;
+    }
+  }
   const menu = currentSparcMenu(replay);
-  if (!menu) return [];
+  if (!menu) return selected;
   const pending = menu.slots?.status === 'pending' || menu.slots?.status === 'selected';
   const options = pending ? menu.slots?.options as MenuOption[] : [];
-  return [{ type: 'insert-node', boxId: 'dialogue-flow', node: {
+  return [...selected, { type: 'insert-node', boxId: 'dialogue-flow', node: {
     id: 'instructional-choice-menu', nodeType: 'group', groupType: 'button-group',
     label: pending ? 'Choose what to do next' : '',
     children: options.map((option) => ({ id: `${String(menu.slots?.menuId)}:${option.id}`, nodeType: 'atomic', atomType: 'button', label: option.label,
@@ -70,8 +91,9 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   readonly core: SparcPracticeHistoryCore;
   readonly runtime: { readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'> };
 }): Promise<SparcCycleResult> {
-  const student = params.document.instructionalController?.policyId === SPARC_STUDENT_SELECTED_POLICY_ID;
-  const competitive = params.document.instructionalController?.policyId === SPARC_COMPETITIVE_POLICY_ID;
+  const student = isSparcStudentPolicy(params.document.instructionalController?.policyId);
+  const competitive = isSparcCompetitivePolicy(params.document.instructionalController?.policyId);
+  const dynamic = isSparcDynamicPolicy(params.document.instructionalController?.policyId);
   assertCompletedDialogueReplayState(params.replayState);
   const adapter = requireSparcInstructionalAdapter(params.document.instructionalController);
   const previous = params.replayState?.transitions ?? [];
@@ -88,10 +110,11 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   if (completed) return { transition: completed };
   const acceptedDecision = previous.find((transition) => transition.transitionId === `${event.eventId}:decision`);
   const acceptedAssessment = previous.find((transition) => transition.transitionId === `${event.eventId}:assessment`);
+  const acceptedFeedback = previous.find((transition) => transition.transitionId === `${event.eventId}:feedback`);
   let facts = [...buildSparcWorkingMemoryFacts({ ...params, event })].filter((fact) => !RESPONSE_LOCAL_FACT_TYPES.has(fact.factType)
-    || (event.type === 'choice-selected' && ['learnerResponse.contribution', 'dialogue.learnerQuestion'].includes(fact.factType)));
+    || (event.type === 'choice-selected' && ['learnerResponse.contribution', 'dialogue.learnerQuestion', ...(dynamic ? ['controller.completionState'] : [])].includes(fact.factType)));
   facts.push({ factType: 'dialogue.problemStatement', slots: { text: params.problemStatement } });
-  if (competitive) facts.push(...competitiveMoveFacts());
+  if (competitive) facts.push(...(dynamic ? SPARC_DYNAMIC_MOVE_DEFINITIONS.map((move) => ({ factType: 'instructional.move', slots: { action: move.moveId, assistance: move.assistance } })) : competitiveMoveFacts()));
   let finalRecord: SparcCanonicalHistoryRecord | undefined;
   let generatedRequest: SparcUtteranceRequest | undefined;
   let generated = false;
@@ -117,9 +140,9 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   const projection = (current: readonly SparcWorkingMemoryFact[]) => {
     const projected = adapter.projectInstructionalFacts({
     snapshotId: event.eventId, facts: current, config: params.document.instructionalController!,
-    candidateOptions: { ...params.candidateOptions, ...(student ? { includeCompletedExpectations: true } : {}) },
+    candidateOptions: { ...params.candidateOptions, ...(student ? { includeCompletedExpectations: !dynamic } : {}) },
     });
-    return competitive ? { ...projected, facts: competitiveCandidateFacts([...current, ...projected.facts]).slice(current.length) } : projected;
+    return competitive ? { ...projected, facts: competitiveCandidateFacts([...current, ...projected.facts], dynamic ? SPARC_DYNAMIC_TARGET_LOGIT : undefined).slice(current.length) } : projected;
   };
   const assertions = (values: readonly SparcWorkingMemoryFact[], persist = false) => values.map((fact) => ({ fact, persist,
     identitySlots: fact.factType === 'learningTarget.score' ? { clusterKC: fact.slots?.clusterKC }
@@ -148,13 +171,43 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     const menu = current.find((fact) => fact.factType === 'instructional.menu');
     const menuConsumed = { factType: 'instructional.menu', slots: { ...menu?.slots, snapshotId: event.eventId, status: 'consumed' } };
     await saveDecision(current);
-    const output = await params.generateTutorUtterance(request);
+    const realized: Partial<{ -readonly [K in keyof SparcInstructionComponents]: SparcInstructionComponents[K] }> = {};
+    const savedComponents = new Set<string>();
+    for (const prior of previous.filter(entry => entry.transitionId.startsWith(`${event.eventId}:primitive:`))) {
+      const component = prior.transitionId.split(':').at(-1) as 'explanation' | 'richContent' | 'question';
+      const node = (prior.writes[0]?.value as { node?: Record<string, unknown> })?.node;
+      if (!node || typeof node.value !== 'string') throw new Error('Saved instructional primitive is invalid');
+      realized[component] = node.value;
+      if (node.figure) realized.figure = node.figure as NonNullable<SparcInstructionComponents['figure']>;
+      savedComponents.add(component);
+    }
+    const output = await params.generateTutorUtterance({ ...request, realizedInstruction: realized,
+      onInstructionComponent: async (component, text, figure) => {
+        const write = createSparcInstructionComponentWrite({ document: params.document, event, request, component, text, ...(figure ? { figure } : {}) });
+        await save({ transitionId: `${event.eventId}:primitive:${component}`, event, writes: [write] });
+        savedComponents.add(component);
+      },
+    });
     const transition = createSparcInstructionTransition({ document: params.document, event, learnerText: request.learnerText, request, generated: output, includeLearner: false });
     generatedRequest = request;
     generated = true;
-    return { assertions: [...assertions(student ? [menuConsumed] : [], true)], writes: [...transition.writes, ...inputControls(event, true)] };
+    return { assertions: [...assertions(student ? [menuConsumed] : [], true)], writes: [...transition.writes.filter(write => {
+      const id = (write.value as { node?: { id?: string } })?.node?.id;
+      return !id || !savedComponents.has(id.substring(`${event.eventId}:`.length));
+    }), ...inputControls(event, true)] };
   };
   const actions: Record<string, SparcProductionActionHandler> = {
+    [SPARC_FEEDBACK_ACTION]: async ({ facts: current, ruleId }) => {
+      let transition = acceptedFeedback;
+      if (!transition) {
+        const request = createSparcFeedbackRequest(current, event, ruleId);
+        const output = await params.generateTutorUtterance(request);
+        const realized = createSparcInstructionTransition({ document: params.document, event, learnerText: request.learnerText!, request, generated: output, includeLearner: false });
+        transition = { ...realized, transitionId: `${event.eventId}:feedback` };
+        await save(transition);
+      }
+      return { assertions: assertions(progressiveDialogueFacts({ transitions: [transition] })), writes: [] };
+    },
     [SPARC_AUTOTUTOR_EVALUATE_ACTION]: async ({ facts: current }) => {
       let acceptedFacts: SparcWorkingMemoryFact[];
       let learnerWrites: SparcStateWrite[] = [];
@@ -172,12 +225,31 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
           misconceptionThreshold: projected.candidates.misconceptionThreshold,
         }) : [];
         if (competitive) completed = !projection([...scored, ...derived, ...modelFacts]).facts.some((fact) => fact.factType === 'instructional.candidate' && fact.slots?.eligible === true);
-        acceptedFacts = [...scoreFacts, ...modelFacts, ...derived.map((fact) => fact.factType === 'controller.completionState'
+        acceptedFacts = [...scoreFacts, ...derived.map((fact) => fact.factType === 'controller.completionState'
           ? { ...fact, slots: { ...fact.slots, completed, reason: completed ? 'required-coverage' : 'in-progress' } } : fact)];
         const changes = competitive ? undefined : expectationLogitChangesFromScoreFacts(current, scoreFacts);
         learnerWrites = [{ target: { pageKey: params.document.id, nodeId: 'root' }, key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
           value: { type: 'append-node', boxId: 'dialogue-flow', node: { id: `${event.eventId}:learner`, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'learner', value: event.payload?.input, turnEventId: event.eventId } } }];
         await save({ transitionId: `${event.eventId}:assessment`, event, writes: [...factWrites(acceptedFacts, event), ...learnerWrites] }, changes);
+      }
+      if (competitive && !acceptedFacts.some(fact => fact.factType === 'instructional.modelObservation')) {
+        // The assessment is the durable evidence checkpoint. Each target's derived
+        // observations form one atomic model update, keeping seven-KC records bounded.
+        // Replay reuses the assessment and each accepted update without another AI call.
+        const thresholds = projection([...current, ...acceptedFacts]).candidates;
+        const modelFacts = competitiveAssessmentFacts({ facts: current, scoreFacts: acceptedFacts, snapshotId: event.eventId,
+          coverageThreshold: thresholds.coverageThreshold, misconceptionThreshold: thresholds.misconceptionThreshold });
+        const updates = new Map<string, SparcWorkingMemoryFact[]>();
+        for (const fact of modelFacts) {
+          const key = String(fact.slots!.targetKey);
+          updates.set(key, [...(updates.get(key) ?? []), fact]);
+        }
+        for (const [key, update] of updates) {
+          const id = `${event.eventId}:assessment:model:${key}`;
+          const accepted = previous.find(entry => entry.transitionId === id);
+          if (!accepted) await save({ transitionId: id, event, writes: factWrites(update, event) });
+          acceptedFacts.push(...(accepted ? writtenFacts(accepted) : update));
+        }
       }
       const types = new Set(acceptedFacts.map((fact) => fact.factType));
       const scored = [...current.filter((fact) => !types.has(fact.factType)
@@ -194,7 +266,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       return { assertions: assertions([{ factType: 'instructional.oet', factId: targetKey,
         slots: { targetKey, logit: advanceOet(targetOet(current, targetKey), Number(args.increment)) } }], true), writes: [] };
     },
-    ...Object.fromEntries(SPARC_COMPOSITE_MOVE_DEFINITIONS.map((definition) => [definition.moveId, generate])),
+    ...Object.fromEntries([...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS].map((definition) => [definition.moveId, generate])),
     [SPARC_MENU_ACTION]: async ({ args }) => {
       menuOffered = true;
       return { assertions: assertions([menuFrom(args)], true), writes: inputControls(event, false) };

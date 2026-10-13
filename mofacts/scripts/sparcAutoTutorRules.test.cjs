@@ -12,6 +12,7 @@ const suites = [
   'sparcInstructionalPrimitives',
   'sparcInstructionalCycle',
   'sparcCompetitiveSelection',
+  'sparcDynamicInstructionRules',
   'sparcInstructionalControl',
   'sparcProductionActions',
   'sparcProgressiveScaffoldingRules',
@@ -48,6 +49,7 @@ if (process.argv.includes('--include-client-contracts')) {
     require('../client/views/experiment/svelte/services/sparcAutoTutorRuleCommit.test.ts');
     require('../common/lib/autoTutorContract.test.ts');
     require('../server/methods/sparcPromptImageMethods.test.ts');
+    require('../server/lib/sparcFigureLibraryService.test.ts');
   } finally { Module._load = originalLoad; }
   tests.after(() => { dom.window.close(); delete global.document; });
 }

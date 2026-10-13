@@ -200,13 +200,34 @@ export const SPARC_COMPOSITE_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = 
   ...definition,
   components: definition.components as NonNullable<SparcMoveDefinition['components']>,
   version: 'v1', family: 'sparc-component', status: 'active', requiredFacts: ['controller.selectedAction'],
-  promptId: definition.moveId, promptVersion: 'v1', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v1',
+  promptId: definition.moveId, promptVersion: 'v2', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v2',
   renderer: 'sparc.nodes', historyAction: 'sparc-instruction',
-  promptPolicy: 'Teach only the selected target. Return the requested components, ending with one question. Rich content is a worked example, table, image, or figure in semantic HTML. Use only supplied asset URLs for images; include meaningful alt text and figure captions. Do not invent image URLs. Use a worked example or table when no particular rich form is requested and no image asset is supplied. Never substitute a different form when a particular form is requested. No scripts, interactive HTML controls, iframes, or embedded styles. Explanations and questions are plain text. Do not disclose internal scoring, identifiers, or rule metadata.',
+  promptPolicy: 'Teach only the selected target. Realize the requested components through shared primitives, ending with one question. Use a complete worked example or an actually generated teaching figure for rich content. Keep the case, notation, and relationships coherent across components, and make the following question isomorphic to the rich case. Never invent image URLs or substitute a different form when a particular form is requested. All generated text is plain text. Do not disclose internal scoring, identifiers, or rule metadata.',
 }));
 
+export const SPARC_DYNAMIC_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = [
+  { moveId: 'instruction.dynamic.question', components: ['question'], assistance: 0 },
+  { moveId: 'instruction.dynamic.explanation-question', components: ['explanation', 'question'], assistance: 1.8 },
+  { moveId: 'instruction.dynamic.explanation-rich-question', components: ['explanation', 'richContent', 'question'], assistance: 2.77 },
+].map((definition) => ({
+  ...definition, components: definition.components as NonNullable<SparcMoveDefinition['components']>,
+  version: 'v1', family: 'sparc-component', status: 'active', requiredFacts: ['controller.selectedAction'],
+  promptId: definition.moveId, promptVersion: 'v1', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v2',
+  renderer: 'sparc.nodes', historyAction: 'sparc-instruction',
+  promptPolicy: 'Teach only the selected expectation or the correct distinction for the selected misconception. Generate a new case appropriate to that target; the opening is context, not a limit on subsequent cases. The requested components share the actual case, notation, and relationships. A worked example may include a formula and complete reasoning. Prefer figures for illustrating models and worked examples for applying principles; choose pedagogically within the selected rich move. End with one focused question with its own necessary givens. For rich instruction, that question must be isomorphic to the worked case or figure, with a new case or inputs rather than copying the demonstrated answer. Do not repeat feedback already given. Do not expose internal scores or rule metadata.'
+    + (definition.moveId === 'instruction.dynamic.question' ? '\n' + AUTOTUTOR_PROMPT_POLICY.split('\n').slice(4).join('\n') : ''),
+}));
+
+export const SPARC_FEEDBACK_MOVE_DEFINITION: SparcMoveDefinition = autotutorDialogueMove({
+  moveId: 'instruction.feedback', paperMoveName: 'Post-answer feedback', promptVersion: 'v1',
+  promptPolicy: promptPolicy(
+    SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS.find((definition) => definition.moveId === 'assertion')!.promptPolicy.split('\n').slice(0, 2).join('\n'),
+    'Give brief substantive feedback on the latest learner answer to the actual preceding problem. Use the supplied assessment and dialogue as context. Identify what is correct and correct the specific error or omission, explaining enough to understand the correction. State the correct answer or distinction when needed. Do not attribute an unexpressed misconception to the learner or endorse an incorrect claim. Do not automatically provide a full worked example. Do not ask a new question, choose a next target or move, or evaluate knowledge again. Answer an on-topic clarification when appropriate; neutrally redirect off-topic content. Use learner-facing language, never internal scores or identifiers.',
+  ),
+});
+
 export function getSparcMoveDefinition(moveId: string): SparcMoveDefinition | undefined {
-  return [...SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS, ...SPARC_COMPOSITE_MOVE_DEFINITIONS].find((definition) => definition.moveId === moveId);
+  return [...SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS, ...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS, SPARC_FEEDBACK_MOVE_DEFINITION].find((definition) => definition.moveId === moveId);
 }
 
 export function requireActiveSparcMoveDefinition(moveId: string): SparcMoveDefinition {

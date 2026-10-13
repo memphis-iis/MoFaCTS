@@ -13,7 +13,8 @@
   } from '../services/sparcControllerDialogueOpenRouter';
   import { createSparcOpenRouterSession } from '../services/sparcOpenRouterSession';
   import { readSparcResumeSnapshot } from '../services/sparcRuntimeState';
-  import { SPARC_STUDENT_SELECTED_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+  import { SPARC_STUDENT_SELECTED_POLICY_ID, isSparcDynamicPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+  import { projectSparcInstructionMessages } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
   import {
@@ -213,10 +214,10 @@
 
   function dialogueNodes(nodes = [], options = {}) {
     const includeOpening = options.includeOpening === true;
-    return flattenNodes(nodes).filter((node) => (
-      (node?.atomType === 'dialogue-utterance' || (node?.atomType === 'html-block' && node?.turnEventId) || node?.id === 'instructional-choice-menu')
+    return projectSparcInstructionMessages(flattenNodes(nodes).filter((node) => (
+      (node?.atomType === 'dialogue-utterance' || (node?.atomType === 'html-block' && node?.turnEventId) || node?.id === 'instructional-choice-menu' || (node?.groupType === 'button-group' && node.id?.endsWith(':selected')))
       && (includeOpening || node.id !== 'opening-tutor-message')
-    ));
+    )));
   }
 
   function firstNodeById(nodes = [], id) {
@@ -552,6 +553,10 @@
           levelUnit,
           scoreLearnerResponse: provider.scoreLearnerResponse,
           generateTutorUtterance: provider.generateTutorUtterance,
+          onNodeValues: async values => {
+            dispatchSparcNodeValues(values, sparcResult.timestamp);
+            await tick();
+          },
         });
       } catch (error) {
         // Accepted assessment/selection remains visible even if the subsequent provider call fails.
@@ -693,6 +698,7 @@
       message?.id || '',
       message?.speaker || '',
       message?.value || '',
+      (message?.children || []).map(child => `${child.id}:${child.value ?? child.label ?? ''}`).join('|'),
     ].join(':')).join('|');
   }
 
@@ -754,7 +760,8 @@
     pendingSnapshot: pendingAutoTutorProgressSnapshot,
     submissionPending: dialogueSubmitPending,
   });
-  $: autoTutorDialogueCompleted = autoTutorDialogueMode && sparcDisplay?.instructionalController?.policyId !== SPARC_STUDENT_SELECTED_POLICY_ID && currentAutoTutorProgressSnapshot.completed;
+  $: autoTutorDialogueCompleted = autoTutorDialogueMode && sparcDisplay?.instructionalController?.policyId !== SPARC_STUDENT_SELECTED_POLICY_ID && currentAutoTutorProgressSnapshot.completed
+    && (!isSparcDynamicPolicy(sparcDisplay?.instructionalController?.policyId) || !dialogueSubmitPending);
   $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
   $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => node.id === 'instructional-choice-menu' && dialogueSubmitPending
     ? { ...node, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];

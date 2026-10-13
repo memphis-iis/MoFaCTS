@@ -10,7 +10,8 @@ export const SPARC_COMPETITIVE_DEFAULTS = Object.freeze({
 });
 export const SPARC_ADVANCE_OET_ACTION = 'instruction.advance-oet';
 export const SPARC_COMPETITIVE_STOP_ACTION = 'instruction.stop';
-const MODULE = 'dialogue.instructional-competition';
+export const SPARC_INSTRUCTIONAL_COMPETITION_MODULE = 'dialogue.instructional-competition';
+const MODULE = SPARC_INSTRUCTIONAL_COMPETITION_MODULE;
 const MODEL = 'instructional.modelObservation';
 const OET = 'instructional.oet';
 const COMPETITIVE_MOVES = ['pump', 'prompt', 'prompt-supported', 'hint', 'assertion'] as const;
@@ -76,13 +77,13 @@ export function competitiveAssessmentFacts(params: {
   return output;
 }
 
-export function competitiveCandidateFacts(facts: readonly SparcWorkingMemoryFact[]): SparcWorkingMemoryFact[] {
+export function competitiveCandidateFacts(facts: readonly SparcWorkingMemoryFact[], fixedTargetLogit?: number): SparcWorkingMemoryFact[] {
   return facts.map((fact) => {
     if (fact.factType !== 'instructional.candidate') return fact;
     const key = String(fact.slots?.targetKey);
     const theta = targetExpectancy(facts, key);
     // Eligibility, ranking and cycle status belong to the common target projection.
-    return { ...fact, slots: { ...fact.slots, expectancyLogit: theta, oetLogit: targetOet(facts, key) } };
+    return { ...fact, slots: { ...fact.slots, expectancyLogit: theta, oetLogit: fixedTargetLogit ?? targetOet(facts, key) } };
   });
 }
 

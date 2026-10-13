@@ -1,4 +1,5 @@
-import { SPARC_COMPETITIVE_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
+import { SPARC_COMPETITIVE_POLICY_ID, isSparcDynamicPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { createSparcDynamicInstructionRules } from './sparcDynamicInstructionRules';
 import { createSparcCompetitiveRules } from './sparcCompetitiveSelection';
 import type {
   SparcTrialDisplay,
@@ -346,7 +347,8 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
   const productionRules = display.unitType === 'sparc-autotutor-dialogue'
-    ? instructionalController?.policyId === SPARC_COMPETITIVE_POLICY_ID ? createSparcCompetitiveRules() : isSparcInstructionalCycle(instructionalController)
+    ? isSparcDynamicPolicy(instructionalController?.policyId) ? createSparcDynamicInstructionRules(isSparcStudentPolicy(instructionalController?.policyId) ? 'student' : 'agent')
+      : instructionalController?.policyId === SPARC_COMPETITIVE_POLICY_ID ? createSparcCompetitiveRules() : isSparcInstructionalCycle(instructionalController)
       ? createSparcInstructionalCycleRules(instructionalController?.policyId === SPARC_STUDENT_SELECTED_POLICY_ID ? 'student' : 'agent')
       : createSparcProgressiveScaffoldingRules()
     : directProductionRules;

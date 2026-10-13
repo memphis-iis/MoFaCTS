@@ -2,9 +2,11 @@ import { strict as assert } from 'node:assert';
 import { createSparcPromptImageMethods } from './sparcPromptImageMethods';
 import { generateSparcPromptImage } from '../lib/sparcPromptImageGeneration';
 import { allowsGenericSparcImageDownload, SPARC_PROMPT_IMAGE_PURPOSE } from '../../common/lib/sparcPromptImage';
+import { sparcLibraryFixture } from '../lib/sparcFigureLibraryService.test';
+import type { SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
 
 describe('SPARC private supported Prompt image contracts', () => {
-  function fixture() {
+  function fixture(figureLibrary?: SparcFigureLibraryStore) {
     let providerCalls = 0;
     const assets = new Map<string, Record<string, any>>();
     const deps = {
@@ -17,11 +19,15 @@ describe('SPARC private supported Prompt image contracts', () => {
         decryptData: () => 'synthetic-api-key',
       }),
       storageBoundary: { backend: 'local' },
+      figureLibrary,
+      async embedSituation() { return { vector: [1, 0], usage: { costUsd: .0001 } }; },
       DynamicAssets: {
         collection: {
           async findOneAsync(selector: Record<string, unknown>) {
             const asset = assets.get(String(selector._id));
-            return asset && asset.userId === selector.userId && asset.meta.public === false && asset.meta.uploadPurpose === selector['meta.uploadPurpose'] ? asset : undefined;
+            return asset && (selector.userId === undefined || asset.userId === selector.userId)
+              && asset.meta.public === false && asset.meta.uploadPurpose === selector['meta.uploadPurpose']
+              && (selector['meta.figureLibraryVersion'] === undefined || asset.meta.figureLibraryVersion === selector['meta.figureLibraryVersion']) ? asset : undefined;
           },
           async updateAsync() { throw new Error('Unexpected local metadata update'); },
         },
@@ -41,6 +47,22 @@ describe('SPARC private supported Prompt image contracts', () => {
     return { methods, assets, providerCalls: () => providerCalls };
   }
   const request = { tdfId: 'lesson', sessionId: 'session', generationId: 'turn', tutorMessage: 'What happens in the empty middle stage?', imagePrompt: 'Show two stages, leaving the intervening process unillustrated.', figureDescription: 'Two visible stages with an empty area between them.', displayWidth: 360 };
+
+  it('shares only canonical teaching-library figures across authorized users and retains each decision', async () => {
+    const library = sparcLibraryFixture(); const f = fixture(library.store);
+    const teaching = { ...request, tutorMessage: 'The complete teaching figure.', imagePrompt: 'Draw the full model.',
+      figureDescription: 'A fixed mean and repeated intervals.', situation: { targetType: 'learningTarget' as const,
+        targetTexts: ['Long-run interval coverage.'], currentValue: .2, assistance: 2.77, illustrationBrief: 'Draw the full model.' } };
+    const first = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as { figure: { assetId: string; description: string }; usage?: unknown };
+    const second = await f.methods.generateSparcPromptImage.call({ userId: 'otherAdmin' }, { ...teaching,
+      sessionId: 'another-session', figureDescription: 'A different proposed description.' }) as typeof first;
+    assert.deepEqual(first.figure, second.figure); assert.equal(second.usage, undefined); assert.equal(f.providerCalls(), 1);
+    assert.equal(library.decisions.size, 2);
+    const shared = await f.methods.getSparcPromptImage.call({ userId: 'otherAdmin' }, first.figure.assetId);
+    assert.ok(shared.dataUrl.startsWith('data:image/png;base64,'));
+    await assert.rejects(f.methods.getSparcPromptImage.call({ userId: 'student' }, first.figure.assetId), /Permission denied/);
+    await assert.rejects(f.methods.generateSparcPromptImage.call({ userId: 'student' }, teaching), /Permission denied/);
+  });
 
   it('blocks unauthorized generation before calling the provider', async () => {
     const f = fixture();
@@ -86,15 +108,16 @@ describe('SPARC private supported Prompt image contracts', () => {
     assert.equal(Object.prototype.hasOwnProperty.call(asset.meta, 'displayWidth'), false);
     assert.equal(f.providerCalls(), 1);
   });
-  it('uses one pinned 1K image request and rejects active markup or a mislabeled raster response', async () => {
+  it('uses the pinned Sunburst quality request and rejects active markup or a mislabeled raster response', async () => {
     const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
     const fakeFetch = (result: unknown) => (async (_url: unknown, options: RequestInit) => {
       const body = JSON.parse(String(options.body));
-      assert.equal(body.model, 'bytedance-seed/seedream-5-0-flash');
-      assert.equal(body.resolution, '1K');
+      assert.equal(body.model, 'openai/gpt-image-2.5-sunburst');
+      assert.equal(body.quality, 'medium');
+      assert.equal(body.resolution, undefined);
       assert.equal(body.aspect_ratio, 'auto');
       assert.equal(body.n, 1);
-      assert.deepEqual(body.provider, { only: ['seed'], allow_fallbacks: false });
+      assert.deepEqual(body.provider, { only: ['openai'], allow_fallbacks: false });
       return { ok: true, json: async () => result };
     }) as unknown as typeof fetch;
     const image = await generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type: 'image/png', b64_json: png.toString('base64') }], usage: { cost: .0336 } }));
