@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { SNAPSHOT_LIMITS, extractSnapshot, inspectSnapshotTree, snapshotPath, snapshotDigest, sha256 } from '../qualification/sourceSnapshot.mjs';
 import { captureRoots, contextOverride, assertContextOnlyChange, assertCapturedEntries, main,
@@ -28,6 +29,10 @@ test('Linux CI Docker acquisition excludes regenerated outputs but still rejects
   const captured = await prepareCapturedTestInputs('default', process.env.GITHUB_SHA, false, dependencies);
   t.after(() => main(['cleanup', '--workspace', captured.workspace]));
   const derivative = path.join(captured.workspace, 'test-context');
+  const harness = spawnSync(process.execPath, ['--test', 'scripts/meteorCiHarness.test.cjs'], {
+    cwd: path.join(derivative, 'mofacts'), encoding: 'utf8', maxBuffer: 64 * 1024,
+  });
+  assert.equal(harness.status, 0, 'The captured Meteor harness must include all public files it reads');
   for (const name of ['mofacts/packages/ostrio-files/.npm/package/README', 'mofacts/public/webgazer/mediapipe/generated.js']) {
     const target = path.join(derivative, name);
     await fs.mkdir(path.dirname(target), { recursive: true });

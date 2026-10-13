@@ -4,14 +4,21 @@ import { createHash } from 'node:crypto';
 import { inspectSnapshotTree, invalidSnapshot, sha256, SNAPSHOT_LIMITS, snapshotPath } from './sourceSnapshot.mjs';
 
 // Reviewed supplemental readers: root ESLint/typecheck examples, excluded Meteor
-// tests, source-security deployment assertions and the actual CI runner recipe.
+// tests, source-security deployment assertions, Meteor harness fixtures and CI recipes.
 // Build-owned deploy/docker and app/script fixtures already belong to context.
 export const TEST_INPUTS = Object.freeze([
   ['eslint.config.mjs', 'file'], ['.gitleaksignore', 'file'],
   ['.github/workflows/ci.yml', 'file'],
   ['.github/workflows/production-security-audit.yml', 'file'],
+  ['.github/workflows/meteor-35-change-streams-qualification.yml', 'file'],
+  ['AGENTS.md', 'file'],
   ['examples', 'directory'], ['mofacts/tests', 'directory'],
   ['deploy/docker-compose.yml', 'file'],
+  ['deploy/docker-compose.local.yml', 'file'],
+  ['deploy/docker-compose.change-streams-qualification.yml', 'file'],
+  ['deploy/hotfix-local.ps1', 'file'],
+  ['deploy/mongodb/assert-change-streams.js', 'file'],
+  ['deploy/mongodb/assert-change-streams.sh', 'file'],
   ['deploy/Caddyfile.self-hosted.example', 'file'],
   ['deploy/security-audit/host-exposure-audit.sh', 'file'],
   ['deploy/security-audit/security-audit.conf.example', 'file'],

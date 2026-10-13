@@ -157,6 +157,13 @@ shrinkwraps remain source inputs. A Linux GitHub CI regression uses the actual
 Docker acquisition target to verify this distinction and reject a changed
 source-owned Rspack lock.
 
+The supplemental test-input contract includes the public qualification workflow,
+agent guide, local/qualification Compose recipes, hotfix manager and Change Streams
+assertion scripts read by the Meteor CI harness. These supplement the captured
+build tree and are hashed separately. The Linux Docker regression also runs the
+harness inside its captured test workspace, so missing fixture inputs fail early.
+Private runtime settings, environment files and local service state stay excluded.
+
 The focused contract suite is
 `node --test scripts/installRspackPackageDependencies.test.cjs`.
 
