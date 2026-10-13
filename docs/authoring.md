@@ -116,6 +116,10 @@ an unanswered checkpoint is presented again.
 The content list hides generated TDF record IDs; authored SPARC page, node, and rule
 identifiers remain available because authors use them to connect their content.
 
+Checkpoint responses identify their unit as `video` on initial entry and after refresh
+or resume. The video engine establishes that runtime identity before history is written;
+canonical history validation remains required before playback continues.
+
 Video activity is recorded with `eventType = "video"`, `levelUnitType = "video"`, and
 the playing media source as `displayedStimulus`. It does not depend on a checkpoint
 question being active. The ordinary TSV export includes these events and their video

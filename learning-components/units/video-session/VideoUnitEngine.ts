@@ -13,6 +13,7 @@ export function createVideoSessionUnitEngine(deps: CreateVideoSessionUnitEngineD
     unitType: "video",
 
     initImpl: function() {
+      deps.setSessionValue('unitType', this.unitType);
       // Video sessions don't need model/probability initialization.
       deps.log(1, "Video unit engine initialized (no model setup needed)");
     },

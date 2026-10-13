@@ -3071,6 +3071,14 @@ body:has(.content-container) {
     background-color: var(--app-background-color);
 }
 
+/* DefaultLayout's theme gate must pass viewport space to the lesson or app shell. */
+body:has(.content-container) > .theme-bootstrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
 /* Container for Svelte ContentSurface - fills remaining viewport after app chrome */
 .content-container {
     display: flex;
