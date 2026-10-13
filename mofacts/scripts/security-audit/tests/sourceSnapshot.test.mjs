@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { SNAPSHOT_LIMITS, extractSnapshot, inspectSnapshotTree, snapshotPath, snapshotDigest, sha256 } from '../qualification/sourceSnapshot.mjs';
 import { captureRoots, contextOverride, assertContextOnlyChange, assertCapturedEntries, main,
@@ -18,6 +19,23 @@ test('bounds changed-source diagnostics to validated relative paths without cont
   assert.equal(capturedSourceDifferences([], Array.from({ length: 25 }, (_, i) => entry(`file-${i}`))).length, 20);
   assert.throws(() => capturedSourceDifferences([], [entry('../secret')]), /validation failed/);
   assert.throws(() => capturedSourceDifferences([], [entry('/absolute')]), /validation failed/);
+});
+
+test('Linux CI Docker acquisition excludes regenerated outputs but still rejects changed source-owned locks', {
+  skip: process.platform !== 'linux' || process.env.GITHUB_ACTIONS !== 'true',
+}, async t => {
+  const dependencies = { repositoryRoot: fileURLToPath(new URL('../../../../', import.meta.url)) };
+  const captured = await prepareCapturedTestInputs('default', process.env.GITHUB_SHA, false, dependencies);
+  t.after(() => main(['cleanup', '--workspace', captured.workspace]));
+  const derivative = path.join(captured.workspace, 'test-context');
+  for (const name of ['mofacts/packages/ostrio-files/.npm/package/README', 'mofacts/public/webgazer/mediapipe/generated.js']) {
+    const target = path.join(derivative, name);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, 'synthetic generated dependency output');
+  }
+  assert.equal((await verifyCapturedTestInputs(captured.workspace, 'default', dependencies)).state, 'test-inputs-verified-unqualified');
+  await fs.appendFile(path.join(derivative, 'mofacts/packages/rspack/.npm/devPackage/npm-shrinkwrap.json'), '\n');
+  await assert.rejects(verifyCapturedTestInputs(captured.workspace, 'default', dependencies), /validation failed/);
 });
 
 function header(name, size = 0, type = '0', mode = 0o644) {

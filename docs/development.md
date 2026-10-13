@@ -148,6 +148,15 @@ and after the final bundle build. These guards remain blocking. Dependency updat
 must be intentional source changes; do not suppress synchronization errors or
 exclude tracked shrinkwraps from source identity.
 
+Docker's acquisition boundary excludes the regenerated
+`packages/ostrio-files/.npm/` and `public/webgazer/` output trees. Ostrio's source
+package declaration pins its npm dependency; `prepareWebGazerAssets.cjs` copies
+MediaPipe assets from the locked WebGazer installation and source license files.
+Both outputs are regenerated before bundling. The tracked DDP and Rspack
+shrinkwraps remain source inputs. A Linux GitHub CI regression uses the actual
+Docker acquisition target to verify this distinction and reject a changed
+source-owned Rspack lock.
+
 The focused contract suite is
 `node --test scripts/installRspackPackageDependencies.test.cjs`.
 
