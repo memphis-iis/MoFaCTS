@@ -157,6 +157,12 @@ shrinkwraps remain source inputs. A Linux GitHub CI regression uses the actual
 Docker acquisition target to verify this distinction and reject a changed
 source-owned Rspack lock.
 
+Rspack's `_build`, public/private `build-assets` and `build-chunks`, and `.rsdoctor`
+trees are compiler outputs too. Docker acquisition excludes them, including the
+standard `METEOR_LOCAL_DIR` suffix variants. The source compiler, configuration,
+package declarations and locks remain captured; the builder regenerates the
+outputs before bundling. The same regression covers these output families.
+
 The supplemental test-input contract includes the public qualification workflow,
 agent guide, local/qualification Compose recipes, hotfix manager and Change Streams
 assertion scripts read by the Meteor CI harness. These supplement the captured

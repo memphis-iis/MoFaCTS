@@ -9,6 +9,21 @@ mofacts/packages/ostrio-files/.npm/
 # prepareWebGazerAssets.cjs regenerates these from locked WebGazer + source licenses.
 mofacts/public/webgazer/
 
+# Rspack compiler outputs; their scripts, configuration and lockfiles stay captured.
+mofacts/_build/
+mofacts/_build-*/
+mofacts/public/build-assets/
+mofacts/public/build-assets-*/
+mofacts/public/build-chunks/
+mofacts/public/build-chunks-*/
+mofacts/private/build-assets/
+mofacts/private/build-assets-*/
+mofacts/private/build-chunks/
+mofacts/private/build-chunks-*/
+mofacts/.rsdoctor/
+mofacts/public/.rsdoctor/
+mofacts/private/.rsdoctor/
+
 # Meteor local build cache (NEVER include this!)
 mofacts/.meteor/local/
 .meteor/local/

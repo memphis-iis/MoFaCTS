@@ -33,7 +33,15 @@ test('Linux CI Docker acquisition excludes regenerated outputs but still rejects
     cwd: path.join(derivative, 'mofacts'), encoding: 'utf8', maxBuffer: 64 * 1024,
   });
   assert.equal(harness.status, 0, 'The captured Meteor harness must include all public files it reads');
-  for (const name of ['mofacts/packages/ostrio-files/.npm/package/README', 'mofacts/public/webgazer/mediapipe/generated.js']) {
+  for (const name of [
+    'mofacts/packages/ostrio-files/.npm/package/README', 'mofacts/public/webgazer/mediapipe/generated.js',
+    'mofacts/_build/test/client-entry.js', 'mofacts/_build-qualification/test/client-entry.js',
+    'mofacts/public/build-assets/generated.wasm', 'mofacts/public/build-assets-qualification/generated.wasm',
+    'mofacts/public/build-chunks/main.css', 'mofacts/public/build-chunks-qualification/main.css',
+    'mofacts/private/build-assets/generated.bin', 'mofacts/private/build-assets-qualification/generated.bin',
+    'mofacts/private/build-chunks/server.js', 'mofacts/private/build-chunks-qualification/server.js',
+    'mofacts/.rsdoctor/report.json', 'mofacts/public/.rsdoctor/report.json', 'mofacts/private/.rsdoctor/report.json',
+  ]) {
     const target = path.join(derivative, name);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, 'synthetic generated dependency output');
