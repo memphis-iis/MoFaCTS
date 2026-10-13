@@ -54,4 +54,4 @@ Course Settings does not offer progress reset. The server also rejects a Practic
 
 ## Multiple-choice interaction
 
-Each new question starts with fresh answer buttons, so the previous answer's interaction highlight does not carry into the next question, even when the answer text repeats. Hover highlighting applies only to hover-capable, fine pointers; touchscreen taps do not apply hover styling. Keyboard navigation and visible keyboard focus remain available.
+Each new question starts with fresh answer buttons, so the previous answer's interaction highlight does not carry into the next question, even when the answer text repeats. Submitting an answer disables the current buttons without rebuilding or resizing them while the next question is prepared. The state machine's committed answer list owns this boundary; intermediate snapshots retain the active list. Hover highlighting applies only to hover-capable, fine pointers; touchscreen taps do not apply hover styling. Keyboard navigation and visible keyboard focus remain available.

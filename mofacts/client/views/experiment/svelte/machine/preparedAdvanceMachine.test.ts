@@ -1,12 +1,44 @@
 import { expect } from 'chai';
+import { createActor, createMachine } from 'xstate';
 import {
   resolvePreparedQuestionIndex,
   resolvePreparedQuestionIndexRoute,
   resolveSelectedQuestionIndex,
+  storePreparedIncomingTrial,
 } from './preparedAdvanceMachine';
+import { commitPreparedTrialToActiveContext } from './trialContextMachine';
+import { initialContext } from './contentRuntimeMachineTypes';
 import type { ContentRuntimeMachineContext, CardSelectionDoneArgs } from './contentRuntimeMachineTypes';
 
 describe('prepared advance machine helpers', function() {
+  it('keeps the active answer-list identity until the prepared trial is committed', function() {
+    const activeButtons = [{ buttonName: 'A', buttonValue: 'A', verbalChoice: 'a', isImage: false }];
+    const incomingButtons = activeButtons.map(button => ({ ...button }));
+    const actor = createActor(createMachine({
+      context: { ...initialContext, buttonList: activeButtons },
+      on: {
+        PREPARED: { actions: storePreparedIncomingTrial },
+        COMMIT: { actions: commitPreparedTrialToActiveContext },
+      },
+    }));
+    actor.start();
+    try {
+      actor.send({ type: 'PREPARED', output: {
+        currentDisplay: { text: 'Next question' },
+        buttonList: incomingButtons,
+        preparedAdvanceMode: 'direct',
+        testType: 't',
+      } });
+      expect(actor.getSnapshot().context.buttonList).to.equal(activeButtons);
+      expect(actor.getSnapshot().context.preparedTrial?.buttonList).to.equal(incomingButtons);
+      actor.send({ type: 'COMMIT' });
+      expect(actor.getSnapshot().context.buttonList).to.equal(incomingButtons);
+      expect(actor.getSnapshot().context.preparedTrial).to.equal(null);
+    } finally {
+      actor.stop();
+    }
+  });
+
   it('names question-index routing by transition behavior', function() {
     expect(resolvePreparedQuestionIndexRoute({ unitType: 'schedule' })).to.equal('schedule-live-index');
     expect(resolvePreparedQuestionIndexRoute({ unitType: 'model' })).to.equal('context-counter');

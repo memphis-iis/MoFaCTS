@@ -28,6 +28,17 @@
   let fittedColumns;
   let fittedVisibility;
 
+  // The machine retains this list until it commits another trial. Legacy-mode
+  // Svelte treats an object-valued {#key} as changed on parent updates, even
+  // when the reference is identical. Use a primitive revision so submission
+  // and incoming-trial preparation preserve the active buttons and their fit.
+  let renderedButtonList = buttonList;
+  let buttonListRevision = 0;
+  $: if (buttonList !== renderedButtonList) {
+    renderedButtonList = buttonList;
+    buttonListRevision += 1;
+  }
+
   function handleChoice(button, index) {
     if (!enabled) return;
 
@@ -263,7 +274,7 @@
 {#if showButtons && buttonList.length > 0}
   <div class="multiple-choice" class:disabled={!enabled} bind:this={multipleChoiceElement}>
     <!-- Each trial builds a fresh list, even when answer text repeats. -->
-    {#key buttonList}
+    {#key buttonListRevision}
       <div class="button-grid" style="--columns: {columns}" bind:this={gridElement}>
         {#each buttonList as button, index}
           <button

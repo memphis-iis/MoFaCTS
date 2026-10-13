@@ -8,6 +8,7 @@ if (Meteor.isClient) describe('multiple-choice interaction across questions', fu
   let component: ReturnType<typeof createClassComponent>;
   let container: HTMLDivElement;
   let answers: Array<{ index: number; buttonName: string }>;
+  let activeChoices: ReturnType<typeof choices>;
 
   const choices = (question: number) => ['A', 'B', 'C', 'D'].map(answer => ({
     buttonName: `Question ${question} ${answer}`, buttonValue: answer,
@@ -16,12 +17,13 @@ if (Meteor.isClient) describe('multiple-choice interaction across questions', fu
 
   beforeEach(async function() {
     answers = [];
+    activeChoices = choices(1);
     container = document.createElement('div');
     container.className = 'response-area';
     document.body.append(container);
     component = createClassComponent({
       component: MultipleChoice, target: container,
-      props: { buttonList: choices(1), enabled: true, columns: 2 },
+      props: { buttonList: activeChoices, enabled: true, columns: 2 },
     });
     component.$on('choice', (event: CustomEvent) => answers.push(event.detail));
     await tick();
@@ -65,10 +67,46 @@ if (Meteor.isClient) describe('multiple-choice interaction across questions', fu
   it('preserves buttons and keyboard focus during updates within the same question', async function() {
     const button = container.querySelector<HTMLButtonElement>('.choice-button')!;
     button.focus();
-    component.$set({ columns: 1 });
+    component.$set({ buttonList: activeChoices, columns: 1 });
     await tick();
     expect(container.querySelector('.choice-button')).to.equal(button);
     expect(document.activeElement).to.equal(button);
+  });
+
+  it('preserves the fitted active grid through submission and parent snapshot updates', async function() {
+    // Let the component's scheduled sizing run before submitting an answer.
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const grid = container.querySelector<HTMLElement>('.button-grid')!;
+    const before = Array.from(grid.querySelectorAll<HTMLButtonElement>('.choice-button'));
+    const fittedStyle = grid.getAttribute('style');
+    expect(grid.style.getPropertyValue('--choice-font-size')).not.to.equal('');
+    before[0]!.click();
+    expect(answers).to.have.length(1);
+
+    // ContentSurface rebuilds props for each machine snapshot, including the
+    // unchanged list while input is disabled and another trial is prepared.
+    for (let snapshot = 0; snapshot < 3; snapshot++) {
+      component.$set({ buttonList: activeChoices, enabled: false, columns: 2 });
+      await tick();
+      expect(container.querySelector('.button-grid')).to.equal(grid);
+      expect(Array.from(grid.querySelectorAll('.choice-button'))).to.deep.equal(before);
+      expect(grid.getAttribute('style')).to.equal(fittedStyle);
+      expect(before.every(button => button.disabled)).to.equal(true);
+      before[0]!.click();
+      expect(answers).to.have.length(1);
+    }
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    expect(grid.getAttribute('style')).to.equal(fittedStyle);
+
+    // A committed trial has a fresh list even if every answer label repeats.
+    component.$set({ buttonList: choices(1), enabled: true, columns: 2 });
+    await tick();
+    expect(container.querySelector('.button-grid')).not.to.equal(grid);
+    expect(before.every(button => !button.isConnected)).to.equal(true);
+    const next = container.querySelector<HTMLButtonElement>('.choice-button')!;
+    expect(next.disabled).to.equal(false);
+    next.click();
+    expect(answers).to.have.length(2);
   });
 
   it('retains arrow navigation and Enter/Space submission after moving to the next question', async function() {
