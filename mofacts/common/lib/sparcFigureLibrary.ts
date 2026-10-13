@@ -6,7 +6,15 @@ export const SPARC_FIGURE_LIBRARY_SETTINGS = Object.freeze({
   embeddingModel: AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
   minimumSimilarity: 0.9,
   batchSize: 100,
+  inspectionPageSize: 24,
 });
+
+export type SparcLibraryImage = Readonly<{
+  libraryId: string; assetId: string; description: string; createdAt: string; model: string; reusable: boolean; revision: number;
+}>;
+export type SparcLibraryImageVersion = Readonly<{ assetId: string; description: string; createdAt: string; model: string; revision: number }>;
+export type SparcLibraryImageHistory = Readonly<{ versions: SparcLibraryImageVersion[]; nextCursor: number | null }>;
+export type SparcLibraryImagePage = Readonly<{ images: SparcLibraryImage[]; nextCursor: string | null }>;
 
 export type SparcFigureSituation = Readonly<{
   targetType: 'learningTarget' | 'misconception';

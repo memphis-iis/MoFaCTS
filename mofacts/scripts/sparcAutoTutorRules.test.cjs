@@ -20,6 +20,8 @@ const suites = [
   'sparcAutoTutorRuleRuntime',
   'sparcTrialDisplayControllerDialogueBridge',
 ];
+require('../common/lib/sparcFigureClustering.test.ts');
+require('../server/lib/sparcFigureBrowseService.test.ts');
 if (process.argv.includes('--include-general-rules')) {
   suites.push('sparcProductionRuleEvaluator', 'sparcTrialDisplayRuntimeBridge');
 }

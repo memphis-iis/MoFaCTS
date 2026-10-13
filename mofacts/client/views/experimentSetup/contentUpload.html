@@ -2,6 +2,11 @@
 
 <template name="contentUpload">
     <div class="content-upload-root">
+        {{#if canInspectImageLibrary}}
+        <div class="admin-form-row">
+            <a href="/sparcImageLibrary" class="btn btn-outline-primary">Inspect image library</a>
+        </div>
+        {{/if}}
         <!-- Upload Quota Status (for regular users) -->
         {{#if quotaStatusError}}
         {{> adminStatus variant="error" text=quotaStatusError urgent=true}}

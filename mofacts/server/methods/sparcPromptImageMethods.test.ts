@@ -4,11 +4,14 @@ import { generateSparcPromptImage } from '../lib/sparcPromptImageGeneration';
 import { allowsGenericSparcImageDownload, SPARC_PROMPT_IMAGE_PURPOSE } from '../../common/lib/sparcPromptImage';
 import { sparcLibraryFixture } from '../lib/sparcFigureLibraryService.test';
 import type { SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
+import { figureBrowseFixture, figureBrowseRows } from '../lib/sparcFigureBrowseService.test';
+import type { SparcFigureVersion, SparcFigureVersionStore } from '../lib/sparcFigureVersions';
 
 describe('SPARC private supported Prompt image contracts', () => {
-  function fixture(figureLibrary?: SparcFigureLibraryStore) {
+  function fixture(figureLibrary?: SparcFigureLibraryStore, figureBrowse?: Parameters<typeof createSparcPromptImageMethods>[0]['figureBrowse'], figureVersions?: SparcFigureVersionStore) {
     let providerCalls = 0;
     const assets = new Map<string, Record<string, any>>();
+    const fileBytes = new Map<string, Buffer>();
     const deps = {
       getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async (id: string) => id === 'admin' || id === 'otherAdmin' }),
       getApiKeyResolutionDeps: () => ({
@@ -20,33 +23,266 @@ describe('SPARC private supported Prompt image contracts', () => {
       }),
       storageBoundary: { backend: 'local' },
       figureLibrary,
+      figureBrowse,
+      figureVersions,
       async embedSituation() { return { vector: [1, 0], usage: { costUsd: .0001 } }; },
       DynamicAssets: {
         collection: {
+          find(selector: Record<string, any>, options: Record<string, any>) {
+            assert.ok(selector._id.$in.length <= 24);
+            assert.ok(Object.keys(options.fields).every(key => ['_id', 'meta.description', 'meta.figureLibraryVersion', 'meta.model', 'meta.humanReplacement', 'meta.replacedAt'].includes(key)));
+            return { fetchAsync: async () => [...assets.values()].filter(asset => selector._id.$in.includes(asset._id)
+              && asset.meta.public === false && asset.meta.uploadPurpose === selector['meta.uploadPurpose'] && asset.meta.ready === true) };
+          },
           async findOneAsync(selector: Record<string, unknown>) {
             const asset = assets.get(String(selector._id));
             return asset && (selector.userId === undefined || asset.userId === selector.userId)
-              && asset.meta.public === false && asset.meta.uploadPurpose === selector['meta.uploadPurpose']
+              && asset.meta.public === false && (selector['meta.uploadPurpose'] === undefined || asset.meta.uploadPurpose === selector['meta.uploadPurpose'])
               && (selector['meta.figureLibraryVersion'] === undefined || asset.meta.figureLibraryVersion === selector['meta.figureLibraryVersion']) ? asset : undefined;
           },
           async updateAsync() { throw new Error('Unexpected local metadata update'); },
         },
         async writeAsync(_bytes: Buffer, options: Record<string, any>) {
-          const asset = { _id: options.fileId, userId: options.userId, type: options.type, path: 'synthetic-image', meta: options.meta };
+          assert.ok(!assets.has(options.fileId), 'Saved image bytes must never be overwritten');
+          const asset = { _id: options.fileId, userId: options.userId, type: options.type, path: options.fileId, meta: options.meta };
           assets.set(asset._id, asset);
+          fileBytes.set(asset._id, Buffer.from(_bytes));
           return asset;
         },
       },
-      async readFile() { return Buffer.from('synthetic-raster'); },
+      async readFile(path: string) { return fileBytes.get(path) ?? Buffer.from('synthetic-raster'); },
       async generateImage() {
         providerCalls++;
         return { bytes: Buffer.from('synthetic-raster'), mediaType: 'image/png', extension: 'png', usage: { costUsd: .0336 } };
       },
     };
     const methods = createSparcPromptImageMethods(deps as unknown as Parameters<typeof createSparcPromptImageMethods>[0]);
-    return { methods, assets, providerCalls: () => providerCalls };
+    return { methods, assets, deps, providerCalls: () => providerCalls };
   }
   const request = { tdfId: 'lesson', sessionId: 'session', generationId: 'turn', tutorMessage: 'What happens in the empty middle stage?', imagePrompt: 'Show two stages, leaving the intervening process unillustrated.', figureDescription: 'Two visible stages with an empty area between them.', displayWidth: 360 };
+
+  function versionFixture(library: ReturnType<typeof sparcLibraryFixture>) {
+    const versions = new Map<string, SparcFigureVersion>();
+    const store: SparcFigureVersionStore = {
+      async find(id) { return versions.get(id); },
+      async history(id, before) { return [...versions.values()].filter(row => row.libraryId === id && row.revision < before)
+        .sort((a, b) => b.revision - a.revision).slice(0, 25); },
+      async publish(p) {
+        const entry = library.entries.get(p.libraryId)!;
+        if (versions.has(p.assetId)) return structuredClone(entry);
+        if ((entry.currentAssetId ?? entry._id) !== p.expectedAssetId) throw new Error('This image has changed');
+        const revision = (entry.revision ?? 0) + 1;
+        if (revision === 1) versions.set(entry._id, { _id: entry._id, libraryId: entry._id, revision: 0, createdAt: entry.createdAt });
+        versions.set(p.assetId, { _id: p.assetId, libraryId: entry._id, revision, previousAssetId: p.expectedAssetId,
+          createdAt: new Date(), createdBy: p.userId, replacementIdentity: p.identity });
+        entry.currentAssetId = p.assetId; entry.revision = revision;
+        return structuredClone(entry);
+      },
+    };
+    return { store, versions };
+  }
+  const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]).toString('base64');
+  it('admits only human uploads, uses the current version for new selections, and preserves original decisions, bytes and captions', async () => {
+    const library = sparcLibraryFixture(); const history = versionFixture(library); const f = fixture(library.store, undefined, history.store);
+    const teaching = { ...request, situation: { targetType: 'learningTarget' as const, targetTexts: ['Long-run coverage.'],
+      currentValue: .2, assistance: 2.77, illustrationBrief: 'Repeated intervals and a fixed mean.' } };
+    const original = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as { figure: { assetId: string; description: string } };
+    const libraryId = original.figure.assetId;
+    const prior = structuredClone(library.entries.get(libraryId)!);
+    const upload = { libraryId, expectedAssetId: libraryId, description: 'A human-corrected teaching figure.', mediaType: 'image/png', base64: png };
+    const replacement = await f.methods.replaceSparcLibraryImage.call({ userId: 'otherAdmin' }, upload);
+    assert.notEqual(replacement.assetId, libraryId); assert.equal(replacement.libraryId, libraryId);
+    assert.equal(replacement.revision, 1); assert.equal(replacement.model, 'Human replacement');
+    assert.deepEqual(library.entries.get(libraryId), { ...prior, currentAssetId: replacement.assetId, revision: 1 });
+    assert.deepEqual(await f.methods.replaceSparcLibraryImage.call({ userId: 'otherAdmin' }, upload), replacement);
+    assert.equal(f.assets.size, 2); assert.equal(history.versions.size, 2);
+    const fresh = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, { ...teaching, generationId: 'new-move' }) as typeof original;
+    assert.equal(fresh.figure.assetId, replacement.assetId); assert.equal(fresh.figure.description, upload.description);
+    const resumed = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as typeof original;
+    assert.deepEqual(resumed.figure, original.figure);
+    assert.equal((await f.methods.getSparcPromptImage.call({ userId: 'otherAdmin' }, libraryId)).dataUrl, 'data:image/png;base64,' + Buffer.from('synthetic-raster').toString('base64'));
+    assert.equal((await f.methods.getSparcPromptImage.call({ userId: 'admin' }, replacement.assetId)).dataUrl, 'data:image/png;base64,' + png);
+    const second = await f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, expectedAssetId: replacement.assetId, description: 'Second human correction.' });
+    const old = await f.methods.listSparcLibraryImageVersions.call({ userId: 'otherAdmin' }, { libraryId });
+    assert.deepEqual(old.versions.map(row => [row.assetId, row.revision]), [[replacement.assetId, 1], [libraryId, 0]]);
+    assert.equal(old.versions[1]!.description, original.figure.description); assert.equal(old.nextCursor, null);
+    // Retrying an earlier completed upload never reinstates it as the current version.
+    assert.equal((await f.methods.replaceSparcLibraryImage.call({ userId: 'otherAdmin' }, upload)).assetId, second.assetId);
+    const gallery = await f.methods.listSparcLibraryImages.call({ userId: 'admin' });
+    assert.equal(gallery.images.length, 1); assert.equal(gallery.images[0]!.assetId, second.assetId);
+    await f.methods.setSparcLibraryImageReusable.call({ userId: 'admin' }, { assetId: libraryId, reusable: false });
+    const third = await f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, expectedAssetId: second.assetId, description: 'Third correction.' });
+    assert.equal(third.reusable, false); assert.equal(f.providerCalls(), 1);
+  });
+  it('rejects non-admin, malformed, private and stale replacements without publishing history, and bounds old-version pages', async () => {
+    const library = sparcLibraryFixture(); const history = versionFixture(library); const f = fixture(library.store, undefined, history.store);
+    const teaching = { ...request, situation: { targetType: 'learningTarget' as const, targetTexts: ['Coverage.'], currentValue: .2, assistance: 2.77, illustrationBrief: 'Intervals.' } };
+    const original = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as { figure: { assetId: string } };
+    const upload = { libraryId: original.figure.assetId, expectedAssetId: original.figure.assetId, description: 'Corrected figure.', mediaType: 'image/png', base64: png };
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'student' }, upload), /Permission denied/);
+    await assert.rejects(f.methods.listSparcLibraryImageVersions.call({ userId: 'student' }, { libraryId: upload.libraryId }), /Permission denied/);
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, mediaType: 'image/svg+xml' }), /raster/);
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, base64: Buffer.from('not a PNG').toString('base64') }), /raster format/);
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, base64: 'A'.repeat(12 * 1024 * 1024) }), /8 MB/);
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, description: '<script>' }), /markup|description/);
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, libraryId: 'private' }), /not found/);
+    assert.equal(f.assets.size, 1); assert.equal(history.versions.size, 0);
+    const results = await Promise.allSettled([
+      f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, upload),
+      f.methods.replaceSparcLibraryImage.call({ userId: 'otherAdmin' }, { ...upload, description: 'Competing correction.' }),
+    ]);
+    assert.equal(results.filter(row => row.status === 'fulfilled').length, 1);
+    assert.equal(f.assets.size, 2); assert.equal(history.versions.size, 2);
+    let current = library.entries.get(upload.libraryId)!.currentAssetId!;
+    for (let i = 2; i <= 26; i++) {
+      current = (await f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, expectedAssetId: current, description: `Correction ${i}.` })).assetId;
+    }
+    const first = await f.methods.listSparcLibraryImageVersions.call({ userId: 'admin' }, { libraryId: upload.libraryId });
+    assert.equal(first.versions.length, 24); assert.equal(first.nextCursor, 2);
+    const last = await f.methods.listSparcLibraryImageVersions.call({ userId: 'admin' }, { libraryId: upload.libraryId, beforeRevision: first.nextCursor! });
+    assert.deepEqual(last.versions.map(row => row.revision), [1, 0]); assert.equal(last.nextCursor, null);
+    await assert.rejects(f.methods.listSparcLibraryImageVersions.call({ userId: 'admin' }, { libraryId: upload.libraryId, beforeRevision: -1 }), /cursor/);
+  });
+  it('does not admit a replacement until durable storage succeeds and retries the same pending asset without rewriting it', async () => {
+    const library = sparcLibraryFixture(); const history = versionFixture(library); const f = fixture(library.store, undefined, history.store);
+    const teaching = { ...request, situation: { targetType: 'learningTarget' as const, targetTexts: ['Coverage.'], currentValue: .2, assistance: 2.77, illustrationBrief: 'Intervals.' } };
+    const original = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as { figure: { assetId: string } };
+    const originalEntry = structuredClone(library.entries.get(original.figure.assetId));
+    let fail = true; let uploads = 0;
+    Object.assign(f.deps.storageBoundary, { backend: 's3', async putObject() { uploads++; if (fail) throw new Error('Synthetic storage failure'); } });
+    Object.assign(f.deps.DynamicAssets.collection, { async updateAsync(selector: Record<string, any>, modifier: Record<string, any>) {
+      const asset = f.assets.get(selector._id)!;
+      for (const [key, value] of Object.entries(modifier.$set)) asset.meta[key.slice(5)] = value;
+    } });
+    const upload = { libraryId: original.figure.assetId, expectedAssetId: original.figure.assetId, description: 'Corrected figure.', mediaType: 'image/png', base64: png };
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, upload), /storage failure/);
+    assert.deepEqual(library.entries.get(upload.libraryId), originalEntry); assert.equal(history.versions.size, 0); assert.equal(f.assets.size, 2);
+    fail = false;
+    const replacement = await f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, upload);
+    assert.equal(f.assets.size, 2); assert.equal(history.versions.size, 2); assert.equal(uploads, 2);
+    assert.equal(f.assets.get(replacement.assetId)!.meta.storageBackend, 's3');
+  });
+
+  it('serves cluster summaries and bounded center-ordered pages without exposing embeddings, and rejects stale and unauthorized reads', async () => {
+    const rows = figureBrowseRows(60); const browsing = figureBrowseFixture(rows); const library = sparcLibraryFixture();
+    const history = versionFixture(library); const f = fixture(library.store, browsing.deps, history.store);
+    for (const row of rows) {
+      library.entries.set(row._id, { ...row, imageModel: 'synthetic-model', ready: true, reusable: row._id !== rows[0]!._id, createdAt: new Date() });
+      f.assets.set(row._id, { _id: row._id, userId: 'other-admin', path: 'synthetic-image', type: 'image/png',
+        meta: { uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE, public: false, ready: true, figureLibraryVersion: row.version, description: 'Representative teaching figure.' } });
+    }
+    const overview = await f.methods.getSparcLibraryClusters.call({ userId: 'admin' });
+    assert.deepEqual(Object.keys(overview).sort(), ['clusters', 'snapshotId', 'total']);
+    assert.equal(overview.total, 60); assert.equal(overview.clusters.length, 2);
+    assert.deepEqual(Object.keys(overview.clusters[0]!).sort(), ['count', 'id', 'label', 'representativeAssetId']);
+    const params = { snapshotId: overview.snapshotId, clusterId: overview.clusters[0]!.id };
+    const first = await f.methods.listSparcLibraryImages.call({ userId: 'admin' }, params);
+    assert.equal(first.images.length, 24); assert.ok(first.nextCursor);
+    const next = await f.methods.listSparcLibraryImages.call({ userId: 'admin' }, { ...params, cursor: first.nextCursor! });
+    assert.equal(next.images.length, 6); assert.equal(next.nextCursor, null);
+    assert.ok(next.images.every(image => !first.images.some(prior => prior.assetId === image.assetId)));
+    const representative = overview.clusters[0]!.representativeAssetId;
+    const replacementId = 'humanreplacement01';
+    const originalAsset = f.assets.get(representative)!;
+    f.assets.set(replacementId, { ...originalAsset, _id: replacementId, meta: { ...originalAsset.meta,
+      humanReplacement: true, replacedAt: new Date(), description: 'Human-corrected group representative.' } });
+    await history.store.publish({ libraryId: representative, expectedAssetId: representative,
+      assetId: replacementId, identity: 'synthetic-group-replacement', userId: 'admin' });
+    const updatedOverview = await f.methods.getSparcLibraryClusters.call({ userId: 'admin' });
+    assert.equal(updatedOverview.snapshotId, overview.snapshotId);
+    assert.equal(updatedOverview.clusters[0]!.representativeAssetId, replacementId);
+    const updatedPage = await f.methods.listSparcLibraryImages.call({ userId: 'admin' }, params);
+    const updatedImage = updatedPage.images.find(image => image.libraryId === representative)!;
+    assert.equal(updatedImage.assetId, replacementId); assert.equal(updatedImage.revision, 1);
+    assert.equal(updatedImage.description, 'Human-corrected group representative.');
+    await f.methods.getSparcPromptImage.call({ userId: 'otherAdmin' }, replacementId);
+    await assert.rejects(f.methods.getSparcLibraryClusters.call({ userId: 'student' }), /Permission denied/);
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'student' }, params), /Permission denied/);
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }, { ...params, cursor: '$invalid' }), /cursor/);
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }, { ...params, clusterId: 'f'.repeat(24) }), /not found/);
+    browsing.invalidate();
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }, params), /library changed/);
+    assert.equal(f.providerCalls(), 0);
+  });
+
+  it('inspects all completed shared figures across systems and versions, including excluded figures, in bounded pages without private state', async () => {
+    const library = sparcLibraryFixture(); const f = fixture(library.store);
+    for (let i = 0; i < 25; i++) {
+      const id = String(i).padStart(20, '0');
+      const version = i === 0 ? 'earlier-library-version' : 'sparc-teaching-figure-library-v1';
+      library.entries.set(id, { _id: id, version, imageModel: 'synthetic-model', embeddingModel: 'synthetic-embedding',
+        dimensions: 2, situation: 'Private situation', embedding: [1, 0], ready: true, reusable: i !== 0, createdAt: new Date('2026-10-12T00:00:00Z') });
+      f.assets.set(id, { _id: id, userId: 'another-admin', type: 'image/png', path: 'synthetic-image',
+        meta: { public: false, uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE, figureLibraryVersion: version, ready: true,
+          tdfId: i % 2 ? 'system-a' : 'system-b', sessionId: 'private-session', description: `Teaching figure ${i}` } });
+    }
+    f.assets.set('private-prompt', { _id: 'private-prompt', meta: { public: false, ready: true, uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE } });
+    library.entries.set('unfinished', { ...library.entries.get('00000000000000000001')!, _id: 'unfinished', ready: false });
+    const first = await f.methods.listSparcLibraryImages.call({ userId: 'admin' });
+    assert.equal(first.images.length, 24);
+    assert.equal(first.images[0]!.reusable, false);
+    assert.equal(first.nextCursor, '00000000000000000023');
+    assert.deepEqual(Object.keys(first.images[0]!).sort(), ['assetId', 'createdAt', 'description', 'libraryId', 'model', 'reusable', 'revision']);
+    const last = await f.methods.listSparcLibraryImages.call({ userId: 'otherAdmin' }, { afterId: first.nextCursor! });
+    assert.equal(last.images.length, 1); assert.equal(last.nextCursor, null);
+    const raster = await f.methods.getSparcPromptImage.call({ userId: 'admin' }, first.images[0]!.assetId);
+    assert.ok(raster.dataUrl.startsWith('data:image/png;base64,'));
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'student' }), /Permission denied/);
+    await assert.rejects(f.methods.listSparcLibraryImages.call({}), /logged in/);
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }, { afterId: '$invalid' }), /Invalid image cursor/);
+    assert.equal(f.providerCalls(), 0);
+  });
+
+  it('reports a broken canonical asset rather than silently hiding library records', async () => {
+    const library = sparcLibraryFixture(); const f = fixture(library.store);
+    library.entries.set('missing', { _id: 'missing', version: 'v1', imageModel: 'synthetic-model', embeddingModel: 'synthetic-embedding',
+      dimensions: 2, situation: 'Private situation', embedding: [1, 0], ready: true, reusable: true, createdAt: new Date() });
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }), /missing its completed canonical asset/);
+  });
+
+  it('deprecates and restores shared figures, excludes new matches and preserves the saved decision and image', async () => {
+    const library = sparcLibraryFixture(); const f = fixture(library.store);
+    const teaching = { ...request, situation: { targetType: 'learningTarget' as const, targetTexts: ['Long-run coverage.'],
+      currentValue: .2, assistance: 2.77, illustrationBrief: 'Repeated intervals and a fixed mean.' } };
+    const first = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as { figure: { assetId: string } };
+    const before = structuredClone(library.entries.get(first.figure.assetId)!);
+    const decisions = structuredClone([...library.decisions.values()]);
+    const excluded = await f.methods.setSparcLibraryImageReusable.call({ userId: 'otherAdmin' }, { assetId: first.figure.assetId, reusable: false });
+    assert.deepEqual(excluded, { assetId: first.figure.assetId, reusable: false });
+    assert.deepEqual(library.entries.get(first.figure.assetId), { ...before, reusable: false });
+    assert.deepEqual([...library.decisions.values()], decisions);
+    assert.equal((await f.methods.listSparcLibraryImages.call({ userId: 'admin' })).images[0]!.reusable, false);
+    await f.methods.getSparcPromptImage.call({ userId: 'otherAdmin' }, first.figure.assetId);
+    const resumed = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as typeof first;
+    assert.equal(resumed.figure.assetId, first.figure.assetId); assert.equal(f.providerCalls(), 1);
+    const fresh = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, { ...teaching, generationId: 'next-turn' }) as typeof first;
+    assert.notEqual(fresh.figure.assetId, first.figure.assetId); assert.equal(f.providerCalls(), 2);
+    await f.methods.setSparcLibraryImageReusable.call({ userId: 'admin' }, { assetId: first.figure.assetId, reusable: true });
+    assert.deepEqual(library.entries.get(first.figure.assetId), before);
+    const restore = await f.methods.setSparcLibraryImageReusable.call({ userId: 'admin' }, { assetId: first.figure.assetId, reusable: true });
+    assert.equal(restore.reusable, true);
+  });
+
+  it('rejects unauthorized curation, private or unfinished images, and non-boolean reuse states without writes', async () => {
+    const library = sparcLibraryFixture(); const f = fixture(library.store);
+    const params = { assetId: 'unknown', reusable: false };
+    await assert.rejects(f.methods.setSparcLibraryImageReusable.call({ userId: 'student' }, params), /Permission denied/);
+    await assert.rejects(f.methods.setSparcLibraryImageReusable.call({}, params), /logged in/);
+    for (const reusable of [undefined, null, 0, 1, 'false', {}]) {
+      await assert.rejects(f.methods.setSparcLibraryImageReusable.call({ userId: 'admin' }, { ...params, reusable } as any), /boolean reuse status/);
+    }
+    await assert.rejects(f.methods.setSparcLibraryImageReusable.call({ userId: 'admin' }, params), /not found/);
+    const privateImage = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, request) as { figure: { assetId: string } };
+    await assert.rejects(f.methods.setSparcLibraryImageReusable.call({ userId: 'admin' }, { ...params, assetId: privateImage.figure.assetId }), /not found/);
+    assert.equal(library.entries.size, 0);
+    assert.equal(library.decisions.size, 0);
+    const pending = { _id: 'unfinished', version: 'sparc-teaching-figure-library-v1', imageModel: 'synthetic-model',
+      embeddingModel: 'synthetic-embedding', dimensions: 2, situation: 'Private situation', embedding: [1, 0],
+      ready: false, reusable: true, createdAt: new Date() };
+    library.entries.set(pending._id, structuredClone(pending));
+    await assert.rejects(f.methods.setSparcLibraryImageReusable.call({ userId: 'admin' }, { ...params, assetId: pending._id }), /not found/);
+    assert.deepEqual(library.entries.get(pending._id), pending);
+  });
 
   it('shares only canonical teaching-library figures across authorized users and retains each decision', async () => {
     const library = sparcLibraryFixture(); const f = fixture(library.store);

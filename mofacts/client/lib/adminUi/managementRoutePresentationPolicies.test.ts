@@ -17,6 +17,7 @@ describe('management route presentation policies', function() {
       { routeName: 'client.aiContentCreator', requiresAuth: true, allowedRoles: null },
       { routeName: 'client.manualContentCreator', requiresAuth: true, allowedRoles: null },
       { routeName: 'client.contentEdit', requiresAuth: true, allowedRoles: null },
+      { routeName: 'client.sparcImageLibrary', requiresAuth: true, allowedRoles: 'admin' },
       { routeName: 'client.tdfEdit', requiresAuth: true, allowedRoles: null },
       { routeName: 'client.dataDownload', requiresAuth: true, allowedRoles: null },
       { routeName: 'client.profile', requiresAuth: true, allowedRoles: null },

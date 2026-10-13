@@ -1127,6 +1127,15 @@ FlowRouter.route('/sparcEdit/:tdfId', {
   }
 })
 
+FlowRouter.route('/sparcImageLibrary', {
+  name: 'client.sparcImageLibrary',
+  action: async function() {
+    waitForAuthenticatedRoute(this, 'client.sparcImageLibrary', async () => {
+      await renderRouteTemplate(this, 'sparcImageLibrary');
+    }, getRouteAccessPolicy('client.sparcImageLibrary'));
+  }
+})
+
 FlowRouter.route('/tdfEdit/:tdfId', {
   name: 'client.tdfEdit',
   action: async function(params: any) {

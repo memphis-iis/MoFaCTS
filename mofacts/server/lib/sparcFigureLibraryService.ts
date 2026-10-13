@@ -6,12 +6,18 @@ export type SparcFigureLibraryEntry = {
   _id: string; version: string; imageModel: string; embeddingModel: string; dimensions: number;
   situation: string; embedding: number[]; ready: boolean; reusable: boolean; createdAt: Date;
   generation?: { imagePrompt: string; tutorMessage: string; description: string; displayWidth: number };
+  // The entry identity remains the original asset; subsequent assets are immutable versions.
+  currentAssetId?: string;
+  revision?: number;
 };
 export type SparcFigureDecision = {
   _id: string; kind: 'decision'; userId: string; tdfId: string; sessionId: string;
   assetId: string; source: 'generated' | 'semantic'; similarity: number | null; createdAt: Date;
 };
 export type SparcFigureLibraryStore = {
+  inspectEntries: (assetIds: string[]) => Promise<SparcFigureInspection[]>;
+  setReusable: (assetId: string, reusable: boolean) => Promise<boolean>;
+  inspectPage: (afterId: string) => Promise<SparcFigureInspection[]>;
   findDecision: (identity: string, userId: string) => Promise<SparcFigureDecision | undefined>;
   saveDecision: (decision: SparcFigureDecision) => Promise<void>;
   findEntry: (assetId: string) => Promise<SparcFigureLibraryEntry | undefined>;
@@ -19,6 +25,8 @@ export type SparcFigureLibraryStore = {
   candidates: (query: { version: string; imageModel: string; embeddingModel: string; dimensions: number; afterId: string }) => Promise<SparcFigureLibraryEntry[]>;
   withLock: <T>(work: () => Promise<T>) => Promise<T>;
 };
+export type SparcFigureInspection = Pick<SparcFigureLibraryEntry, '_id' | 'version' | 'imageModel' | 'createdAt' | 'reusable' | 'currentAssetId' | 'revision'>;
+export const currentSparcFigureAssetId = (entry: SparcFigureInspection) => entry.currentAssetId ?? entry._id;
 type SparcFigureLibraryResult = { assetId: string; source: 'resume' | 'semantic' | 'generated'; similarity: number | null;
   usage?: OpenRouterUsageSummary | undefined; embeddingUsage?: OpenRouterUsageSummary | undefined };
 
@@ -56,7 +64,7 @@ export async function getOrGenerateSparcLibraryFigure(params: {
   let embeddingUsage: OpenRouterUsageSummary | undefined;
   const acceptMatch = async (match: { entry: SparcFigureLibraryEntry; similarity: number }): Promise<SparcFigureLibraryResult> => {
     await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId,
-      tdfId: params.tdfId, sessionId: params.sessionId, assetId: match.entry._id,
+      tdfId: params.tdfId, sessionId: params.sessionId, assetId: currentSparcFigureAssetId(match.entry),
       source: 'semantic', similarity: match.similarity, createdAt: new Date() });
     const accepted = await store.findDecision(params.identity, params.userId);
     if (!accepted) throw new Error('SPARC figure library did not persist the selected figure');

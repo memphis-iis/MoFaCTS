@@ -69,7 +69,10 @@ import {
 import { createOpenRouterMethods } from './methods/openRouterMethods';
 import { createSparcPromptImageMethods } from './methods/sparcPromptImageMethods';
 import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
-  removeSparcFigureAssetMetadata, removeSparcFigureUserDecisions } from './lib/sparcFigureLibraryStorage';
+  removeSparcFigureAssetMetadata, removeSparcFigureUserDecisions, SparcFigureLibrary, withSparcFigureLibraryLock } from './lib/sparcFigureLibraryStorage';
+import { createSparcFigureBrowseStore, ensureSparcFigureBrowseIndexes } from './lib/sparcFigureBrowseStorage';
+import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
+import { createSparcFigureVersionStore, ensureSparcFigureVersionIndexes, removeSparcFigureVersionMetadata } from './lib/sparcFigureVersionStorage';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
@@ -688,7 +691,10 @@ export const methods: any = {
   }),
 
   ...createAdminMethods({
-    removeSparcFigureAssetMetadata,
+    removeSparcFigureAssetMetadata: async assetId => {
+      await removeSparcFigureAssetMetadata(assetId);
+      await removeSparcFigureVersionMetadata(assetId);
+    },
     removeSparcFigureUserDecisions,
     serverConsole,
     csvParser: PapaAny,
@@ -1113,6 +1119,12 @@ export const asyncMethods: Record<string, unknown> = {
 
   ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary,
     figureLibrary: createSparcFigureLibraryStore(),
+    figureVersions: createSparcFigureVersionStore(),
+    figureBrowse: {
+      store: createSparcFigureBrowseStore(SparcFigureLibrary, work => withSparcFigureLibraryLock(work, 'browse')),
+      labels: createSparcFigureClusterLabeler(getApiKeyResolutionDeps, openRouterModelCatalogService),
+      progress: (stage, count) => serverConsole('[SPARC image grouping]', stage, count),
+    },
     minimumFigureSimilarity: (Meteor.settings as { sparcFigures?: { minimumSimilarity?: number } }).sparcFigures?.minimumSimilarity }),
 
   ...createOpenRouterMethods({
@@ -1179,6 +1191,8 @@ registerServerRuntime({
 
 Meteor.startup(async function() {
   await ensureSparcFigureLibraryIndexes();
+  await ensureSparcFigureVersionIndexes();
+  await ensureSparcFigureBrowseIndexes();
   await ensureProlificIndexes();
   // Test provisioning checks exact lesson families without course/user scope.
   await GlobalExperimentStates.rawCollection().createIndex({ TDFId: 1 });

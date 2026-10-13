@@ -37,4 +37,23 @@ describe('SPARC figure library Mongo contracts', function() {
     assert.equal((await store.findDecision(decision._id, decision.userId))!.assetId, entry._id);
     assert.equal(await store.findDecision(decision._id, 'other-user'), undefined);
   });
+  it('inspects completed entries across versions without vectors or situation records', async function() {
+    const store = createSparcFigureLibraryStore();
+    const entry = { _id: 'test-library-inspect-a', version: 'earlier-version', imageModel: 'synthetic-model',
+      embeddingModel: 'synthetic-embedding', dimensions: 2, situation: 'Private situation', embedding: [1, 0],
+      ready: true, reusable: false, createdAt: new Date() };
+    await store.saveEntry(entry);
+    await store.saveEntry({ ...entry, _id: 'test-library-inspect-b', version: SPARC_FIGURE_LIBRARY_SETTINGS.version, reusable: true });
+    await store.saveEntry({ ...entry, _id: 'test-library-inspect-c', ready: false });
+    const page = await store.inspectPage('test-library-inspect-');
+    assert.deepEqual(page.map(record => record._id), ['test-library-inspect-a', 'test-library-inspect-b']);
+    assert.deepEqual(Object.keys(page[0]!).sort(), ['_id', 'createdAt', 'imageModel', 'reusable', 'version']);
+    assert.equal(page[0]!.reusable, false);
+    assert.equal(await store.setReusable(entry._id, true), true);
+    assert.deepEqual(await store.findEntry(entry._id), { ...entry, reusable: true });
+    assert.equal(await store.setReusable(entry._id, true), true);
+    assert.equal(await store.setReusable('test-library-inspect-c', true), false);
+    assert.equal(await store.setReusable('test-library-missing', false), false);
+    assert.deepEqual((await store.inspectPage(entry._id)).map(record => record._id), ['test-library-inspect-b']);
+  });
 });

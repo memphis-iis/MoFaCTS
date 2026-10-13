@@ -1,3 +1,4 @@
+import { parseSparcRaster } from './sparcRaster';
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../common/lib/sparcPromptImage';
 import { redactOpenRouterSecretText, type OpenRouterUsageSummary } from '../../common/lib/openRouterClient';
 
@@ -37,21 +38,11 @@ export async function generateSparcPromptImage(apiKey: string, prompt: string, f
   const body = await response.json();
   if (!Array.isArray(body?.data) || body.data.length !== 1) throw new Error('SPARC image provider must return exactly one image');
   const image = body.data[0];
-  const extensions: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
-  if (!extensions[image?.media_type] || typeof image?.b64_json !== 'string'
-    || !/^[a-zA-Z0-9+/]+={0,2}$/.test(image.b64_json)
-    || image.b64_json.length > Math.ceil(SPARC_PROMPT_IMAGE_SETTINGS.maxBytes / 3) * 4) {
-    throw new Error('SPARC image provider returned an invalid or oversized raster image');
-  }
-  const bytes = Buffer.from(image.b64_json, 'base64');
-  const validHeader = image.media_type === 'image/png' ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-    : image.media_type === 'image/jpeg' ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
-      : bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
-  if (!validHeader || bytes.length > SPARC_PROMPT_IMAGE_SETTINGS.maxBytes) throw new Error('SPARC image bytes do not match their raster format');
+  const { bytes, mediaType, extension } = parseSparcRaster(image?.media_type, image?.b64_json);
   const usage: { -readonly [K in keyof OpenRouterUsageSummary]: OpenRouterUsageSummary[K] } = {};
   for (const [source, target] of [['prompt_tokens', 'promptTokens'], ['completion_tokens', 'completionTokens'], ['total_tokens', 'totalTokens'], ['cost', 'costUsd']] as const) {
     const value = body.usage?.[source];
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0) usage[target] = value;
   }
-  return { bytes, mediaType: image.media_type, extension: extensions[image.media_type]!, usage };
+  return { bytes, mediaType, extension, usage };
 }

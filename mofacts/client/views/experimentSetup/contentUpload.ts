@@ -552,6 +552,7 @@ function loadUploadQuotaStatus(instance: ContentUploadInstance): void {
 }
 
 Template.contentUpload.helpers({
+  canInspectImageLibrary() { return currentUserHasRole('admin'); },
   TdfFiles: function(this: any) {
     return TdfsCollection.find();
   },

@@ -457,7 +457,32 @@
     {
       "name": "getSparcPromptImage",
       "access": "admin-only",
-      "notes": "Reads owned historical assets or canonical shared teaching-library assets. Generic downloads remain blocked; no library embeddings or learner decision records are returned."
+      "notes": "Reads owned historical assets or completed canonical shared teaching-library assets, including older versions for repository inspection and saved history. Generic downloads remain blocked; no library embeddings or learner decision records are returned."
+    },
+    {
+      "name": "listSparcLibraryImages",
+      "access": "admin-only",
+      "notes": "Indexed cursor listing of all completed shared teaching figures or one selected current semantic cluster. Returns at most 24 descriptions, models, dates and reuse states; no embeddings, learner identifiers or private supported-Prompt assets. Group pages reject stale snapshots and invalid cursors."
+    },
+    {
+      "name": "getSparcLibraryClusters",
+      "access": "admin-only",
+      "notes": "Builds or reads a server-only derived browsing snapshot with automatically selected clusters. Shared administrator model labels bounded representative descriptions and authored target texts; no identities, responses or embeddings are sent to the labeler or returned to the browser. Cluster membership and cache leases are separate from instructional retrieval."
+    },
+    {
+      "name": "replaceSparcLibraryImage",
+      "access": "admin-only",
+      "notes": "Explicit administrator raster upload only; bounded PNG/JPEG/WebP validation, expected-current conflict check and idempotent immutable assets. A Mongo transaction publishes version history and the library current pointer together after durable file storage; no provider call or AI replacement primitive. Saved decisions are unchanged."
+    },
+    {
+      "name": "listSparcLibraryImageVersions",
+      "access": "admin-only",
+      "notes": "Indexed, revision-cursor listing of at most 24 prior admitted versions for one completed shared entry. Original and replacement assets remain readable; only descriptions, immutable IDs, dates, models and revisions are returned. No administrator identities, learner records or embeddings."
+    },
+    {
+      "name": "setSparcLibraryImageReusable",
+      "access": "admin-only",
+      "notes": "Sets only the existing reusable boolean on a completed canonical shared-library entry. Deprecated means reusable=false. Private assets, pending entries and invalid boolean inputs are rejected; image bytes and saved learner decisions are preserved."
     },
     {
       "name": "getStimDisplayTypeMap",
@@ -1240,6 +1265,10 @@
     {
       "name": "client.contentEdit|/contentEdit/:tdfId",
       "access": "role-checked"
+    },
+    {
+      "name": "client.sparcImageLibrary|/sparcImageLibrary",
+      "access": "admin-only"
     },
     {
       "name": "client.contentUpload|/contentUpload",

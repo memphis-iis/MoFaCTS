@@ -10,6 +10,21 @@ export function sparcLibraryFixture() {
   const decisions = new Map<string, SparcFigureDecision>();
   let lock = Promise.resolve();
   const store: SparcFigureLibraryStore = {
+    async inspectEntries(ids) {
+      return [...entries.values()].filter(entry => ids.includes(entry._id) && entry.ready)
+        .map(({ _id, version, imageModel, createdAt, reusable, currentAssetId, revision }) => ({ _id, version, imageModel, createdAt, reusable, ...(currentAssetId === undefined ? {} : { currentAssetId }), ...(revision === undefined ? {} : { revision }) }));
+    },
+    async setReusable(id, reusable) {
+      const entry = entries.get(id);
+      if (!entry?.ready) return false;
+      entry.reusable = reusable;
+      return true;
+    },
+    async inspectPage(afterId) {
+      return [...entries.values()].filter(entry => entry.ready && entry._id > afterId)
+        .sort((a, b) => a._id.localeCompare(b._id)).slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize + 1)
+        .map(({ _id, version, imageModel, createdAt, reusable, currentAssetId, revision }) => ({ _id, version, imageModel, createdAt, reusable, ...(currentAssetId === undefined ? {} : { currentAssetId }), ...(revision === undefined ? {} : { revision }) }));
+    },
     async findDecision(id, userId) { const value = decisions.get(id); return value?.userId === userId ? structuredClone(value) : undefined; },
     async saveDecision(decision) { if (!decisions.has(decision._id)) decisions.set(decision._id, structuredClone(decision)); },
     async findEntry(id) { const value = entries.get(id); return value ? structuredClone(value) : undefined; },
