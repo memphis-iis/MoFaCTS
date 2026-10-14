@@ -1,11 +1,12 @@
 <script>
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher, onMount, tick } from 'svelte';
   import {
     resolveSparcControllerDisplay,
     resolveSparcControllerResult,
   } from '../services/sparcController';
   import {
     commitSparcAutoTutorSubmit,
+    commitSparcAutoTutorDocumentLoad,
     isSparcAutoTutorDisplay,
   } from '../services/sparcAutoTutorRuleCommit';
   import {
@@ -13,7 +14,7 @@
   } from '../services/sparcControllerDialogueOpenRouter';
   import { createSparcOpenRouterSession } from '../services/sparcOpenRouterSession';
   import { readSparcResumeSnapshot } from '../services/sparcRuntimeState';
-  import { SPARC_STUDENT_SELECTED_POLICY_ID, isSparcDynamicPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+  import { SPARC_STUDENT_SELECTED_POLICY_ID, isSparcDynamicPolicy, isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
   import { projectSparcInstructionMessages } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
@@ -82,6 +83,52 @@
   let lastFeedbackRevealSignature = '';
   let observedProgressiveNodeOperationCount = 0;
   let observedAutoTutorDialogueSignature = '';
+  let mounted = false;
+  let startedDialogueScope = '';
+  let dialogueInitialized = false;
+  onMount(() => {
+    mounted = true;
+    return () => { mounted = false; };
+  });
+
+  async function startCategorizedDialogue(currentDisplay, scope) {
+    startedDialogueScope = scope;
+    dialogueInitialized = false;
+    dialogueSubmitPending = true;
+    dialogueSubmitError = '';
+    dialogueSubmitErrorDetail = '';
+    const timestamp = Date.now();
+    try {
+      const provider = createSparcDialogueOpenRouterProvider({ policyId: currentDisplay.instructionalController.policyId,
+        tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
+      const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
+        scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
+        onNodeValues: async values => {
+          if (!mounted || dialogueScope !== scope) return;
+          dispatchSparcNodeValues(values, timestamp); await tick();
+        },
+      });
+      if (!mounted || dialogueScope !== scope) return;
+      dispatch('runtimewatchedstatechanged');
+      dispatchSparcNodeValues(result.sparcNodeValues, timestamp);
+      dialogueInitialized = true;
+    } catch (error) {
+      if (!mounted || dialogueScope !== scope) return;
+      dispatchSparcNodeValues(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit,
+        pageKey: currentDisplay.pageKey, display: currentDisplay }).nodeValues, timestamp);
+      dialogueSubmitError = platformText('autoTutor.serviceError');
+      dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
+      clientConsole(1, '[SPARC][Dialogue] initialization failed', { detail: dialogueSubmitErrorDetail });
+    } finally {
+      dialogueSubmitPending = false;
+      if (mounted && dialogueScope === scope) {
+        await tick();
+        const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
+          || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
+        nextControl?.focus();
+      }
+    }
+  }
 
   function handleFeedbackContent(event) {
     dispatch('feedbackcontent', event.detail);
@@ -762,7 +809,13 @@
   });
   $: autoTutorDialogueCompleted = autoTutorDialogueMode && sparcDisplay?.instructionalController?.policyId !== SPARC_STUDENT_SELECTED_POLICY_ID && currentAutoTutorProgressSnapshot.completed
     && (!isSparcDynamicPolicy(sparcDisplay?.instructionalController?.policyId) || !dialogueSubmitPending);
-  $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
+  $: categorizedDialogue = autoTutorDialogueMode && isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId);
+  $: dialogueScope = JSON.stringify([userId, tdfId, attemptId, levelUnit, sparcDisplay?.pageKey]);
+  $: if (mounted && categorizedDialogue && engine && userId && tdfId && attemptId && subsetKind === 'question'
+    && startedDialogueScope !== dialogueScope && !dialogueSubmitPending) {
+    startCategorizedDialogue(sparcDisplay, dialogueScope);
+  }
+  $: autoTutorDialoguePrompt = autoTutorDialogueMode && !categorizedDialogue ? dialoguePrompt(topLevelNodes) : '';
   $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending
     ? { ...node, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
@@ -775,10 +828,10 @@
   }
   $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
   $: autoTutorDialogueSubmitNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-submit') : null;
-  $: autoTutorDialogueInputRenderNode = autoTutorDialogueInputNode && dialogueSubmitPending
+  $: autoTutorDialogueInputRenderNode = autoTutorDialogueInputNode && (dialogueSubmitPending || (categorizedDialogue && !dialogueInitialized))
     ? { ...autoTutorDialogueInputNode, readOnly: true }
     : autoTutorDialogueInputNode;
-  $: autoTutorDialogueSubmitRenderNode = autoTutorDialogueSubmitNode && dialogueSubmitPending
+  $: autoTutorDialogueSubmitRenderNode = autoTutorDialogueSubmitNode && (dialogueSubmitPending || (categorizedDialogue && !dialogueInitialized))
     ? { ...autoTutorDialogueSubmitNode, readOnly: true }
     : autoTutorDialogueSubmitNode;
   $: progressiveNodeOperationCount = progressiveNodeOperations.length;
@@ -794,12 +847,12 @@
   {/if}
 
   {#if autoTutorDialogueMode}
-    <header class="sparc-auto-tutor-header">
+    {#if autoTutorDialoguePrompt}<header class="sparc-auto-tutor-header">
       <div class="sparc-auto-tutor-question">
         <h1>{autoTutorDialoguePrompt}</h1>
       </div>
-      <SparcAutoTutorProgress snapshot={autoTutorProgressSnapshot} />
-    </header>
+    </header>{/if}
+    <SparcAutoTutorProgress snapshot={autoTutorProgressSnapshot} />
 
     <section
       bind:this={autoTutorChatElement}
@@ -1145,16 +1198,13 @@
   }
 
   .sparc-auto-tutor-dialogue-surface {
+    position: relative;
     gap: var(--sparc-space-3);
     padding: clamp(var(--app-space-3), 2vw, var(--app-space-5));
     overflow: hidden;
   }
 
   .sparc-auto-tutor-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
-    gap: var(--sparc-space-3);
-    align-items: start;
     flex: 0 0 auto;
   }
 
@@ -1316,11 +1366,6 @@
   @media (max-width: 768px) {
     .sparc-auto-tutor-dialogue-surface {
       padding: calc(0.625rem * var(--app-density-scale));
-      gap: var(--sparc-space-2);
-    }
-
-    .sparc-auto-tutor-header {
-      grid-template-columns: minmax(0, 1fr);
       gap: var(--sparc-space-2);
     }
 

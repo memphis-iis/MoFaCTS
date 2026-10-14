@@ -137,6 +137,7 @@ function buildValidSparcAutoTutorStimuli() {
                 clusterKC: 'autotutor.demo.kc.e1',
               },
             ],
+            workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'Confidence intervals' } }],
             autoTutorTargets: {
               expectations: [
                 {
@@ -169,6 +170,9 @@ describe('AutoTutor content contract', function() {
     Object.assign(display.autoTutorTargets.expectations[0]!, { category: 'model-rule' });
     Object.assign(display.autoTutorTargets.misconceptions[0]!, { category: 'fact-model' });
     expect(validate()).to.deep.equal({ valid: true, errors: [] });
+    display.workingMemoryFacts[0]!.slots.topic = '';
+    expect(validate().errors.join(' ')).to.contain('dialogue.source');
+    display.workingMemoryFacts[0]!.slots.topic = 'Confidence intervals';
     Object.assign(display.autoTutorTargets.expectations[0]!, { category: 'principle' });
     expect(validate().valid).to.equal(false);
     display.instructionalController.policyId = 'dynamic-instruction-student-v1';

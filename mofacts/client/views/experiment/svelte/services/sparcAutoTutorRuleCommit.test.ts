@@ -32,7 +32,7 @@ describe('SPARC app instructional commit', () => {
         assert.equal(publishedFeedback, true);
         return { explanation: 'An explanation.', richContent: 'A complete worked example.', question: 'How does the new case work?' };
       },
-      deps: { getIsAdmin: () => true, getUserId: () => 'u', writeHistory: async () => {} },
+      deps: { getIsAdmin: () => true, getUserId: () => 'u', writeHistory: async () => {}, writeHistoryBatch: async () => {} },
     });
     clearSparcRuntimeState();
   });
@@ -66,7 +66,7 @@ describe('SPARC app instructional commit', () => {
       tdfId: 'student-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: ['a', 'b'].map((clusterKC) => ({ clusterKC, coverage: 0.2 })) }; },
       generateTutorUtterance: (request: SparcUtteranceRequest) => { requests.push(request); return 'Here is a hint.'; },
-      deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); } },
+      deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'student-tdf', levelUnit: 0, pageKey: 'student-cycle', display };
     const menu = () => currentSparcMenu(readSparcResumeSnapshot(scope).replayState)!;
@@ -83,7 +83,12 @@ describe('SPARC app instructional commit', () => {
     await choose('next-target', 20);
     assert.notEqual(target(), firstTarget);
     const selectedTarget = target();
+    const savedSnapshot = readSparcResumeSnapshot(scope);
     clearSparcRuntimeState(); hydrateSparcRuntimeHistory(JSON.parse(JSON.stringify(rows)));
+    const loadedSnapshot = readSparcResumeSnapshot(scope);
+    assert.deepEqual(loadedSnapshot.replayState, savedSnapshot.replayState);
+    assert.deepEqual(loadedSnapshot.expectationProbabilities, savedSnapshot.expectationProbabilities);
+    assert.deepEqual(loadedSnapshot.nodeValues, savedSnapshot.nodeValues);
     await choose('hint', 30);
     assert.equal(evaluations, 1);
     assert.equal(requests[0]!.action, 'hint');
@@ -111,7 +116,7 @@ describe('SPARC app instructional commit', () => {
       tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: [{ clusterKC: 'a', coverage: 0.2 }] }; },
       generateTutorUtterance: (request: SparcUtteranceRequest) => { if (fail) throw new Error('provider failed'); const parts = requireActiveSparcMoveDefinition(request.action).components; return parts ? { explanation: parts.includes('explanation') ? 'Explanation' : null, richContent: parts.includes('richContent') ? '<p>Example</p>' : null, question: 'What is A?' } : 'Tell me more.'; },
-      deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); } },
+      deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'tdf', levelUnit: 0, pageKey: display.pageKey, display };
     const choice = { submittedNodes: { 'learner-response-input': 'An answer.' }, timestamp: 10 };

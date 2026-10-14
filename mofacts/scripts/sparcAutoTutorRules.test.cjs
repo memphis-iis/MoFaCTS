@@ -23,6 +23,7 @@ const suites = [
 ];
 require('../common/lib/sparcFigureClustering.test.ts');
 require('../server/lib/sparcFigureBrowseService.test.ts');
+require('../server/lib/sparcHistoryBatchStorage.test.ts');
 if (process.argv.includes('--include-general-rules')) {
   suites.push('sparcProductionRuleEvaluator', 'sparcTrialDisplayRuntimeBridge');
 }
@@ -31,7 +32,7 @@ if (process.argv.includes('--include-general-rules')) {
   require('../../learning-components/trial-displays/sparc/sparcSemanticNodes.test.ts');
   require('../../learning-components/trial-displays/sparc/sparcProgressiveNodes.test.ts');
 }
-if (process.argv.includes('--include-client-contracts')) {
+if (process.argv.includes('--include-client-contracts') || process.argv.includes('--include-history-contracts')) {
   // Isolated client contracts use the same injected providers/writers as Meteor tests.
   // This is not a live Meteor or Mongo integration run.
   const Module = require('node:module');
@@ -41,18 +42,21 @@ if (process.argv.includes('--include-client-contracts')) {
   global.document = dom.window.document;
   Module._load = function(request, parent, isMain) {
     if (request === 'meteor/meteor') return { Meteor: { Error: class MeteorError extends Error {
-      constructor(code, reason) { super(reason); this.error = code; }
+      constructor(code, reason) { super(reason); this.error = code; this.reason = reason; }
     }, callAsync: () => { throw new Error('Unexpected live Meteor call in isolated contracts'); } } };
     if (request === 'meteor/tracker') return { Tracker: {} };
     if (request === 'meteor/session') return { Session: { get: () => undefined } };
+    if (request === 'meteor/check') return { check: () => {} };
+    if (request === 'meteor/random') return { Random: { secret: () => require('node:crypto').randomBytes(32).toString('hex') } };
     return originalLoad.call(this, request, parent, isMain);
   };
   try {
-    require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
+    if (process.argv.includes('--include-client-contracts')) require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
     require('../client/views/experiment/svelte/services/sparcAutoTutorRuleCommit.test.ts');
     require('../common/lib/autoTutorContract.test.ts');
     require('../server/methods/sparcPromptImageMethods.test.ts');
     require('../server/lib/sparcFigureLibraryService.test.ts');
+    if (process.argv.includes('--include-history-contracts')) require('../server/methods/analyticsMethods.test.ts');
   } finally { Module._load = originalLoad; }
   tests.after(() => { dom.window.close(); delete global.document; });
 }

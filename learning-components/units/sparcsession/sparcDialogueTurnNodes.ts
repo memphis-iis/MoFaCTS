@@ -129,7 +129,8 @@ function appendDialogueNodeWrite(params: {
 export function createSparcDialogueTurnTransition(params: {
   readonly document: SparcAuthoredDocument;
   readonly event: SparcInterfaceEvent;
-  readonly learnerText: string;
+  readonly learnerText?: string;
+  readonly includeLearner?: boolean;
   readonly utteranceRequest: SparcUtteranceRequest;
   readonly tutorText: string;
   readonly options?: SparcDialogueTurnNodeOptions;
@@ -141,7 +142,8 @@ export function createSparcDialogueTurnTransition(params: {
     );
   }
   const eventId = requireNonBlank(params.event.eventId, 'SPARC dialogue eventId');
-  const learnerText = requireBoundedSparcDialogueMessage(params.learnerText, 'SPARC learner dialogue text');
+  const learnerText = params.includeLearner === false ? undefined
+    : requireBoundedSparcDialogueMessage(params.learnerText, 'SPARC learner dialogue text');
   const tutorText = requireBoundedSparcDialogueMessage(params.tutorText, 'SPARC tutor dialogue text');
   const boxId = requireNonBlank(params.options?.boxId ?? 'dialogue-flow', 'SPARC dialogue boxId');
   const productionRuleId = params.utteranceRequest.sourceRuleId;
@@ -176,7 +178,7 @@ export function createSparcDialogueTurnTransition(params: {
     transitionId: `${eventId}:dialogue-turn`,
     event: params.event,
     writes: [
-      appendDialogueNodeWrite({
+      ...(learnerText === undefined ? [] : [appendDialogueNodeWrite({
         pageKey,
         boxId,
         ...(params.options?.afterNodeId ? { afterNodeId: params.options.afterNodeId } : {}),
@@ -186,11 +188,12 @@ export function createSparcDialogueTurnTransition(params: {
           text: learnerText,
           turnEventId: eventId,
         }),
-      }),
+      })]),
       appendDialogueNodeWrite({
         pageKey,
         boxId,
-        afterNodeId: learnerNodeId,
+        ...(learnerText !== undefined ? { afterNodeId: learnerNodeId }
+          : params.options?.afterNodeId ? { afterNodeId: params.options.afterNodeId } : {}),
         node: utteranceNode({
           id: tutorNodeId,
           speaker: 'tutor',

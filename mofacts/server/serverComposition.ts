@@ -47,6 +47,8 @@ import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { createAccessMethods } from './methods/accessMethods';
 import { createAdminMethods } from './methods/adminMethods';
 import { createAnalyticsMethods } from './methods/analyticsMethods';
+import { insertSparcHistoryBatch } from './lib/sparcHistoryBatchStorage';
+import { MongoInternals } from 'meteor/mongo';
 import { writeConditionState } from './lib/conditionAllocationMongo';
 import { createAuthMethods } from './methods/authMethods';
 import { createContentMethods } from './methods/contentMethods';
@@ -514,6 +516,7 @@ const analyticsMethods = createAnalyticsMethods({
   writeConditionState,
   serverConsole,
   Histories,
+  insertSparcHistoryBatch: records => insertSparcHistoryBatch(Histories.rawCollection(), records, () => MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession()),
   StimulusCrowdStats,
   GlobalExperimentStates,
   Tdfs,

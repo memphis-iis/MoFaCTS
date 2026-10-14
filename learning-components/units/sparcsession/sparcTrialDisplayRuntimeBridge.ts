@@ -328,6 +328,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
   }
   const autoTutorTargets = normalizeCleanAutoTutorTargets(display);
   const instructionalController = normalizeInstructionalController(display);
+  if (isSparcCategorizedPolicy(instructionalController?.policyId)) requireSparcDialogueProblemStatement(display);
   if (display.unitType === 'sparc-autotutor-dialogue' || autoTutorTargets) {
     assertNoForbiddenAutoTutorTargetSchema({
       workingMemoryFacts: display.workingMemoryFacts,
@@ -473,6 +474,12 @@ function collectDisplayNodesById(nodes: readonly unknown[] | undefined, nodesByI
 }
 
 function requireSparcDialogueProblemStatement(display: SparcTrialDisplay): string {
+  if (isSparcCategorizedPolicy(display.instructionalController?.policyId)) {
+    const sources = (display.workingMemoryFacts as readonly SparcWorkingMemoryFact[] | undefined)
+      ?.filter(fact => fact.factType === 'dialogue.source') ?? [];
+    if (sources.length !== 1) throw new Error('Categorized AutoTutor requires exactly one dialogue.source lesson context');
+    return requireNonBlank(sources[0]!.slots?.topic, 'Categorized AutoTutor dialogue.source.topic');
+  }
   const opening = collectDisplayNodesById(display.nodes).get('opening-tutor-message');
   return requireNonBlank(
     opening?.value,
@@ -763,7 +770,7 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
   readonly core: SparcPracticeHistoryCore;
   readonly pageKey: string;
   readonly display: SparcTrialDisplay;
-  readonly result: SparcTrialResult;
+  readonly result?: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
   readonly document?: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
@@ -771,13 +778,34 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
   readonly generateTutorUtterance: SparcUtteranceGenerator;
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
-  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
 }): Promise<SparcTrialDisplayAutoTutorRuleCommitResult> {
   const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({
     pageKey: params.pageKey,
     display: params.display,
   });
   const replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
+  if (!params.result) {
+    if (!isSparcCategorizedPolicy(document.instructionalController?.policyId)) throw new Error('Automatic document startup requires a categorized policy');
+    const previous = replayState.transitions;
+    const last = previous.at(-1);
+    // Established attempts restore. Interrupted startup resumes its accepted
+    // production and saved components using the same event identity.
+    if (last && previous.some(entry => entry.transitionId.endsWith(':cycle') || entry.event.type === 'response-submitted')) {
+      return { document, event: last.event, learnerText: '', dialogueTurn: { transition: last } };
+    }
+    const event: SparcInterfaceEvent = previous.find(entry => entry.event.type === 'document-loaded')?.event ?? {
+      eventId: `${params.pageKey}:document-loaded`, type: 'document-loaded',
+      source: { pageKey: params.pageKey, nodeId: 'root' }, time: Date.now(),
+    };
+    const problemStatement = requireSparcDialogueProblemStatement(params.display);
+    const dialogueTurn = await commitSparcInstructionalCycle({ ...params, document, replayState, event, problemStatement,
+      scoreLearnerResponse: () => { throw new Error('Document startup cannot evaluate a learner response'); },
+      runtime: { history: params.history },
+    });
+    return { document, event, learnerText: '', dialogueTurn };
+  }
+  const result = params.result;
   if (isSparcInstructionalCycle(document.instructionalController)) {
     // Resume the existing attempt, including when the app has assigned a new launch ID.
     const origin = params.priorHistoryRecords.find((record) => record.eventType === 'sparc'
@@ -817,14 +845,14 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
         if (event.payload?.choiceId !== selected.id) throw new Error('Conflicting multiple-choice answer');
       } else {
         if (questions.length && questions.at(-1)?.turnEventId === lastInstruction?.event.eventId) throw new Error('Select an option for the current multiple-choice question');
-        const response = createSparcDialogueEventFromTrialResult(params);
+        const response = createSparcDialogueEventFromTrialResult({ ...params, result });
         event = { ...response.event, time: eventTime, eventId: `${params.pageKey}:response:${lastInstruction?.event.time ?? 'opening'}` };
         learnerText = response.learnerText;
       }
     }
     const problemStatement = requireSparcDialogueProblemStatement(params.display);
     const dialogueTurn = await commitSparcInstructionalCycle({ ...params, core, document, replayState, event, problemStatement,
-      scoreLearnerResponse: () => params.scoreLearnerResponse({ document, replayState, event, problemStatement, learnerText, display: params.display, result: params.result }),
+      scoreLearnerResponse: () => params.scoreLearnerResponse({ document, replayState, event, problemStatement, learnerText, display: params.display, result }),
       runtime: { history: params.history },
     });
     return { document, event, learnerText, dialogueTurn };
@@ -848,7 +876,7 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     scoreLearnerResponse: () => params.scoreLearnerResponse({
       document,
       display: params.display,
-      result: params.result,
+      result,
       event,
       problemStatement,
       learnerText,
@@ -877,7 +905,7 @@ export async function commitSparcTrialDisplayProductionRuleEvents(params: {
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
   readonly document?: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
-  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
   readonly adaptiveModel?: ModelPracticeRuntime;
 }): Promise<SparcTrialDisplayProductionRuleCommitResult> {
   const document = params.document ?? createSparcAuthoredDocumentFromTrialDisplay({

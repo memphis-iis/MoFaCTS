@@ -406,6 +406,13 @@ function validateSparcAutoTutorTargets(
 
   const autoTutorTargets = isRecord(display.autoTutorTargets) ? display.autoTutorTargets : {};
   const categorized = isSparcCategorizedPolicy(isRecord(display.instructionalController) ? display.instructionalController.policyId : undefined);
+  if (categorized) {
+    const sources = Array.isArray(display.workingMemoryFacts)
+      ? display.workingMemoryFacts.filter(fact => isRecord(fact) && fact.factType === 'dialogue.source') : [];
+    if (sources.length !== 1 || !isRecord(sources[0]) || !isRecord(sources[0].slots) || !nonEmptyString(sources[0].slots.topic)) {
+      errors.push(`${prefix}.workingMemoryFacts requires exactly one dialogue.source with a non-empty topic for categorized instruction`);
+    }
+  }
   const expectations = Array.isArray(autoTutorTargets.expectations) ? autoTutorTargets.expectations : [];
   if (expectations.length === 0) {
     errors.push(`${prefix}.autoTutorTargets.expectations must contain at least one expectation`);

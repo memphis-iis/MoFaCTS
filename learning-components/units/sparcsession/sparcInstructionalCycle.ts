@@ -44,11 +44,15 @@ export function currentSparcMenu(replay: SparcReplayState): SparcWorkingMemoryFa
 export function projectSparcMenuOperations(replay: SparcReplayState): SparcProgressiveNodeOperation[] {
   const selected: SparcProgressiveNodeOperation[] = [];
   let anchor = '';
+  let firstDialogueNodeId = '';
   for (const transition of replay.transitions) {
     for (const write of transition.writes) {
       const operation = write.value as { node?: { id?: string; turnEventId?: string; atomType?: string } };
       if (write.key === SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY && operation?.node?.turnEventId
-        && ['dialogue-utterance', 'html-block'].includes(operation.node.atomType!)) anchor = operation.node.id!;
+        && ['dialogue-utterance', 'html-block'].includes(operation.node.atomType!)) {
+        anchor = operation.node.id!;
+        firstDialogueNodeId ||= anchor;
+      }
       const fact = write.value as SparcWorkingMemoryFact;
       if (fact?.factType !== 'instructional.menu' || fact.slots?.status !== 'selected') continue;
       const option = (fact.slots.options as MenuOption[]).find(entry => entry.id === fact.slots!.selectedOptionId);
@@ -63,11 +67,13 @@ export function projectSparcMenuOperations(replay: SparcReplayState): SparcProgr
       anchor = id;
     }
   }
+  const orderedSelections = selected.map(operation => operation.type === 'insert-node' && !operation.afterNodeId && firstDialogueNodeId
+    ? { ...operation, beforeNodeId: firstDialogueNodeId } : operation);
   const menu = currentSparcMenu(replay);
-  if (!menu) return selected;
+  if (!menu) return orderedSelections;
   const pending = menu.slots?.status === 'pending' || menu.slots?.status === 'selected';
   const options = pending ? menu.slots?.options as MenuOption[] : [];
-  return [...selected, { type: 'insert-node', boxId: 'dialogue-flow', node: {
+  return [...orderedSelections, { type: 'insert-node', boxId: 'dialogue-flow', node: {
     id: 'instructional-choice-menu', nodeType: 'group', groupType: 'button-group',
     label: pending ? 'Choose what to do next' : '',
     children: options.map((option) => ({ id: `${String(menu.slots?.menuId)}:${option.id}`, nodeType: 'atomic', atomType: 'button', label: option.label,
@@ -89,7 +95,7 @@ function inputControls(event: SparcInterfaceEvent, enabled: boolean): SparcState
 /** Resume and persistence around the existing production engine, for multi-event instructional cycles. */
 export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTurnParams & {
   readonly core: SparcPracticeHistoryCore;
-  readonly runtime: { readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'> };
+  readonly runtime: { readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'> };
 }): Promise<SparcCycleResult> {
   const student = isSparcStudentPolicy(params.document.instructionalController?.policyId);
   const competitive = isSparcCompetitivePolicy(params.document.instructionalController?.policyId);
@@ -121,11 +127,14 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   let generated = false;
   let menuOffered = false;
   let stopped = false;
-  const save = async (transition: SparcStateTransition, changes?: readonly ExpectationLogitChange[]) => {
-    const record = createSparcStateTransitionHistoryRecord({ core: params.core, transition, action: `sparc-${transition.transitionId.split(':').at(-1)}`,
+  let documentLoadFacts: readonly SparcWorkingMemoryFact[] = [];
+  const historyRecord = (transition: SparcStateTransition, changes?: readonly ExpectationLogitChange[]) =>
+    createSparcStateTransitionHistoryRecord({ core: params.core, transition, action: `sparc-${transition.transitionId.split(':').at(-1)}`,
       responseValue: event.type === 'response-submitted' ? event.payload?.input ?? '' : '',
       ...(changes ? { expectationLogitChanges: changes } : {}),
     });
+  const save = async (transition: SparcStateTransition, changes?: readonly ExpectationLogitChange[]) => {
+    const record = historyRecord(transition, changes);
     await params.runtime.history.writeCanonicalHistory(record);
     return record;
   };
@@ -141,7 +150,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   const projection = (current: readonly SparcWorkingMemoryFact[]) => {
     const projected = adapter.projectInstructionalFacts({
     snapshotId: event.eventId, facts: current, config: params.document.instructionalController!,
-    candidateOptions: { ...params.candidateOptions, ...(student ? { includeCompletedExpectations: !dynamic } : {}) },
+    candidateOptions: { ...params.candidateOptions, ...(student ? { includeCompletedExpectations: !dynamic } : {}),
+      ...(event.type === 'document-loaded' ? { weights: { frontierWeight: 0, coherenceWeight: 0, centralityWeight: 1 } } : {}) },
     });
     return competitive ? { ...projected, facts: competitiveCandidateFacts([...current, ...projected.facts], dynamic ? SPARC_DYNAMIC_TARGET_LOGIT : undefined).slice(current.length) } : projected;
   };
@@ -162,7 +172,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   const generate: SparcProductionActionHandler = async ({ facts: current, ruleId, actionId }) => {
     const request = { ...createSparcUtteranceRequestFromFacts(current), learnerText: String(event.payload?.input ||
       current.filter((fact) => fact.factType === 'dialogue.utterance' && fact.slots?.speaker === 'learner').at(-1)?.slots?.text || '') };
-    if (!request.learnerText || request.sourceRuleId !== ruleId || request.selectedAction.snapshotId !== event.eventId
+    if ((!request.learnerText && !isSparcCategorizedPolicy(params.document.instructionalController?.policyId))
+      || request.sourceRuleId !== ruleId || request.selectedAction.snapshotId !== event.eventId
       || (actionId !== SPARC_AUTOTUTOR_GENERATE_ACTION && actionId !== request.action)) throw new Error('Instruction requires the firing production decision and response context');
     const decisions = current.filter((fact) => fact.factType === 'instructional.decision' && fact.slots?.snapshotId === event.eventId);
     if (decisions.length !== 1 || decisions[0]!.slots?.action !== request.action || decisions[0]!.slots?.targetId !== request.targetId) throw new Error('Conflicting instructional decision');
@@ -214,7 +225,12 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     [SPARC_AUTOTUTOR_EVALUATE_ACTION]: async ({ facts: current }) => {
       let acceptedFacts: SparcWorkingMemoryFact[];
       let learnerWrites: SparcStateWrite[] = [];
-      if (acceptedAssessment) acceptedFacts = writtenFacts(acceptedAssessment);
+      if (acceptedAssessment) {
+        // Score changes live in their own rows. Rehydrate carried values before
+        // continuing an accepted assessment, including existing bundled histories.
+        const restored = [...createSparcLearnerResponseScoreFacts({ facts: current, score: {} }), ...writtenFacts(acceptedAssessment)];
+        acceptedFacts = [...new Map(factWrites(restored, event).map((write, i) => [write.key, restored[i]!])).values()];
+      }
       else {
         const scoreFacts = createSparcLearnerResponseScoreFacts({ facts: current, score: await params.scoreLearnerResponse() });
         const scoreTypes = new Set(scoreFacts.map((fact) => fact.factType));
@@ -233,7 +249,24 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
         const changes = competitive ? undefined : expectationLogitChangesFromScoreFacts(current, scoreFacts);
         learnerWrites = [{ target: { pageKey: params.document.id, nodeId: 'root' }, key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
           value: { type: 'append-node', boxId: 'dialogue-flow', node: { id: `${event.eventId}:learner`, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'learner', value: event.payload?.input, turnEventId: event.eventId } } }];
-        await save({ transitionId: `${event.eventId}:assessment`, event, writes: [...factWrites(acceptedFacts, event), ...learnerWrites] }, changes);
+        const scoreChangeFacts = scoreFacts.filter((fact) => {
+          const expectation = fact.factType === 'learningTarget.score';
+          if (!expectation && fact.factType !== 'diagnostic.misconceptionScore') return false;
+          const identity = expectation ? 'clusterKC' : 'id';
+          const value = expectation ? 'coverage' : 'supportStrength';
+          const prior = current.find(entry => entry.factType === fact.factType && entry.slots?.[identity] === fact.slots?.[identity]);
+          return fact.slots?.[value] !== (prior?.slots?.[value] ?? 0);
+        });
+        const records = scoreChangeFacts.map(fact => {
+          const expectation = fact.factType === 'learningTarget.score';
+          const id = String(expectation ? fact.slots?.clusterKC : fact.slots?.id);
+          return historyRecord({ transitionId: `${event.eventId}:assessment:score:${expectation ? 'expectation' : 'misconception'}:${id}`,
+            event, writes: factWrites([fact], event) }, changes?.filter(change => change.clusterKC === id));
+        });
+        records.push(historyRecord({ transitionId: `${event.eventId}:assessment`, event,
+          writes: [...factWrites(acceptedFacts.filter(fact => !['learningTarget.score', 'diagnostic.misconceptionScore'].includes(fact.factType)), event), ...learnerWrites] }));
+        if (!params.runtime.history.writeCanonicalHistoryBatch) throw new Error('SPARC assessments require an atomic history batch writer');
+        await params.runtime.history.writeCanonicalHistoryBatch(records);
       }
       if (competitive && !acceptedFacts.some(fact => fact.factType === 'instructional.modelObservation')) {
         // The assessment is the durable evidence checkpoint. Each target's derived
@@ -284,6 +317,12 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     },
     [SPARC_STOP_ACTION]: async () => { stopped = true; return { assertions: [], writes: inputControls(event, false) }; },
   };
+  if (event.type === 'document-loaded') {
+    if (!isSparcCategorizedPolicy(params.document.instructionalController?.policyId)) throw new Error('Document startup requires a categorized instructional policy');
+    const derived = adapter.deriveControllerFacts(facts);
+    documentLoadFacts = derived;
+    facts.push(...derived, ...projection([...facts, ...derived]).facts);
+  }
   if (event.type === 'choice-selected') {
     const pending = params.replayState && currentSparcMenu(params.replayState);
     if (!acceptedDecision) {
@@ -317,6 +356,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     // here duplicates those records and makes each turn grow with the lesson.
     transition = { ...result, event, transitionId: `${event.eventId}:cycle` };
   }
+  if (documentLoadFacts.length) transition = { ...transition, writes: [...transition.writes, ...factWrites(documentLoadFacts, event)] };
   finalRecord = await save(transition);
   return { transition, historyRecord: finalRecord, execution, ...(generatedRequest ? { utteranceRequest: generatedRequest } : {}) };
 }

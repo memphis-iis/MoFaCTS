@@ -36,14 +36,14 @@ export function readExpectationLogitHistory(
     if (!transition?.event?.eventId || typeof record.sessionID !== 'string' || !record.sessionID) {
       throw new Error('Expectation history requires its source response and session identity');
     }
-    const identity = JSON.stringify([record.sessionID, transition.event.eventId]);
-    const payload = JSON.stringify([...extension.expectationLogitChanges].sort((a, b) => a.clusterKC.localeCompare(b.clusterKC)));
-    if (seen.has(identity)) {
-      if (seen.get(identity) !== payload) throw new Error('Conflicting expectation history for the same response');
-      continue;
-    }
-    seen.set(identity, payload);
     for (const { clusterKC, delta } of extension.expectationLogitChanges) {
+      const identity = JSON.stringify([record.sessionID, transition.event.eventId, clusterKC]);
+      const payload = JSON.stringify(delta);
+      if (seen.has(identity)) {
+        if (seen.get(identity) !== payload) throw new Error('Conflicting expectation history for the same response');
+        continue;
+      }
+      seen.set(identity, payload);
       const history = result.get(clusterKC) ?? [];
       history.push(delta);
       result.set(clusterKC, history);

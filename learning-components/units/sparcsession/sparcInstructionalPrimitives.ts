@@ -81,9 +81,9 @@ export function createSparcInstructionTransition(params: {
     'SPARC tutor utterance');
   const transition = createSparcDialogueTurnTransition({
     document: params.document, event: params.event, learnerText: params.learnerText,
-    utteranceRequest: params.request, tutorText,
+    utteranceRequest: params.request, tutorText, includeLearner: params.includeLearner !== false,
   });
-  const tutorWrite = transition.writes[1]!;
+  const tutorWrite = transition.writes.at(-1)!;
   const operation = tutorWrite.value as { node: Record<string, unknown>; [key: string]: unknown };
   const nodes: Record<string, unknown>[] = [];
   if (composite) {
@@ -131,8 +131,8 @@ export function createSparcInstructionComponentWrite(params: {
   details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'>;
 }): SparcStateWrite {
   const transition = createSparcDialogueTurnTransition({ document: params.document, event: params.event,
-    learnerText: params.request.learnerText!, utteranceRequest: params.request, tutorText: params.text });
-  const write = transition.writes[1]!;
+    includeLearner: false, utteranceRequest: params.request, tutorText: params.text });
+  const write = transition.writes[0]!;
   const operation = write.value as { node: Record<string, unknown> };
   return { ...write, value: { type: 'append-node', boxId: 'dialogue-flow', node: {
     ...operation.node, id: `${params.event.eventId}:${params.component}`,

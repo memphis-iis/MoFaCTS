@@ -284,7 +284,7 @@ export async function executeSparcAutoTutorRules(params: SparcAutoTutorRuleTurnP
 
 export async function commitSparcAutoTutorRules(params: SparcAutoTutorRuleTurnParams & {
   readonly core: SparcPracticeHistoryCore;
-  readonly runtime: { readonly history?: Pick<HistoryRuntime, 'writeCanonicalHistory'> };
+  readonly runtime: { readonly history?: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'> };
 }): Promise<SparcAutoTutorRuleTurnResult> {
   const evaluated = await executeSparcAutoTutorRules(params);
   const historyRecord = createSparcStateTransitionHistoryRecord({

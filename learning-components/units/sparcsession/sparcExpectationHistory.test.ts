@@ -41,4 +41,14 @@ describe('SPARC expectation history', () => {
     assert.ok(sameHistoryWrite(row, { ...row, eventId: 27, recordedServerTime: 10 }));
     assert.equal(sameHistoryWrite(row, record('r1', 2)), false);
   });
+  it('loads separate per-KC change rows from one response and deduplicates each target independently', () => {
+    const a = record('r1', 1), b = record('r1', 2);
+    a.sparc.expectationLogitChanges = [{ clusterKC: 'a', delta: 1 }];
+    b.sparc.expectationLogitChanges = [{ clusterKC: 'b', delta: 2 }];
+    b.sparc.stateTransition.transitionId = 'r1:assessment:score:expectation:b';
+    const rows = [a, b, JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b))];
+    assert.deepEqual([...readExpectationLogitHistory(rows, scope)], [['a', [1]], ['b', [2]]]);
+    const conflict = JSON.parse(JSON.stringify(a)); conflict.sparc.expectationLogitChanges[0].delta = 3;
+    assert.throws(() => readExpectationLogitHistory([...rows, conflict], scope), /Conflicting/);
+  });
 });

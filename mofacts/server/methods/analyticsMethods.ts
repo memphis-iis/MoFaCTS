@@ -93,6 +93,7 @@ type AnalyticsMethodsDeps = {
   getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
   onHistoryInserted?: (context: MethodContext, historyRecord: UnknownRecord) => Promise<void>;
+  insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string })[]) => Promise<readonly UnknownRecord[]>;
 };
 
 const INSERT_HISTORY_TIMING_ENABLED = process.env.MOFACTS_INSERT_HISTORY_TIMING === '1';
@@ -636,9 +637,14 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     return feedbackType;
   }
 
-  async function insertHistory(this: MethodContext, historyRecord: UnknownRecord) {
-    const methodStartTime = Date.now();
-    const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
+  function assessmentScope(record: UnknownRecord): string {
+    const sparc = record.sparc as { pageKey?: unknown; stateTransition?: { event?: { eventId?: unknown; payload?: { policyId?: unknown } } } } | undefined;
+    return JSON.stringify([record.userId, record.TDFId, record.sessionID, record.levelUnit,
+      record.courseAssignment ?? null, sparc?.pageKey, sparc?.stateTransition?.event?.eventId, sparc?.stateTransition?.event?.payload?.policyId]);
+  }
+
+  async function prepareHistoryRecord(context: MethodContext, historyRecord: UnknownRecord, authorizedScope?: UnknownRecord) {
+    const actingUserId = requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
     if (!historyRecord || typeof historyRecord !== 'object' || Array.isArray(historyRecord)) {
       throw new Meteor.Error(400, 'Invalid history record');
     }
@@ -672,14 +678,17 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const sparcTransition = (decompressedRecord.sparc as { stateTransition?: { event?: { payload?: { policyId?: string } }; writes?: { value?: { factType?: string } }[] } } | undefined)?.stateTransition;
     const requiresAdmin = isSparcAdminPolicy(sparcTransition?.event?.payload?.policyId)
       || sparcTransition?.writes?.some((write) => ['instructional.modelObservation', 'instructional.oet'].includes(write.value?.factType ?? ''));
-    if (requiresAdmin && !(await deps.getMethodAuthorizationDeps().userIsInRoleAsync(actingUserId, ['admin']))) {
+    if (authorizedScope && assessmentScope({ ...decompressedRecord, userId: actingUserId, TDFId: tdfId }) !== assessmentScope(authorizedScope)) {
+      throw new Meteor.Error(400, 'SPARC assessment batch must have one authenticated lesson, attempt, response, and policy');
+    }
+    if (!authorizedScope && requiresAdmin && !(await deps.getMethodAuthorizationDeps().userIsInRoleAsync(actingUserId, ['admin']))) {
       throw new Meteor.Error(403, 'Competitive and student-selected AutoTutor are restricted to admin accounts');
     }
-    await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
+    if (!authorizedScope) await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
     const sanitizeMs = elapsedMsSince(sanitizeStartTime);
 
     const authorizationStartTime = Date.now();
-    await validateHistoryWriteAccess(actingUserId, tdfId, decompressedRecord);
+    if (!authorizedScope) await validateHistoryWriteAccess(actingUserId, tdfId, decompressedRecord);
     const authorizationMs = elapsedMsSince(authorizationStartTime);
 
     const recordBuildStartTime = Date.now();
@@ -691,6 +700,47 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       recordedServerTime: (new Date()).getTime(),
     });
     const recordBuildMs = elapsedMsSince(recordBuildStartTime);
+    return { sanitizedHistoryRecord, actingUserId, decompressMs, sanitizeMs, authorizationMs, recordBuildMs };
+  }
+
+  async function insertAssessmentBatch(context: MethodContext, records: UnknownRecord[]) {
+    requireAuthenticatedUser(context.userId, 'Must be logged in', 401);
+    if (!records.length || records.length > 256 || Buffer.byteLength(JSON.stringify(records), 'utf8') > 1024 * 1024) {
+      throw new Meteor.Error(400, 'SPARC assessment batches require 1–256 bounded history records within 1 MiB');
+    }
+    const prepared: (UnknownRecord & { _id: string })[] = [];
+    for (const [index, record] of records.entries()) {
+      const { sanitizedHistoryRecord: row } = await prepareHistoryRecord(context, record, prepared[0]);
+      const transition = (row.sparc as { stateTransition?: { transitionId?: string; event?: { eventId?: string; payload?: { policyId?: string } }; writes?: { value?: { factType?: string } }[] } } | undefined)?.stateTransition;
+      const eventId = transition?.event?.eventId;
+      if (row.eventType !== 'sparc' || !eventId || !isSparcAdminPolicy(transition?.event?.payload?.policyId)
+        || (index === records.length - 1 ? transition?.transitionId !== `${eventId}:assessment`
+          : !transition?.transitionId?.startsWith(`${eventId}:assessment:score:`) || transition.writes?.length !== 1
+            || !['learningTarget.score', 'diagnostic.misconceptionScore'].includes(transition.writes[0]?.value?.factType ?? ''))) {
+        throw new Meteor.Error(400, 'SPARC batches require target score-change rows followed by the assessment completion row');
+      }
+      const id = sparcHistoryWriteId(row);
+      if (!id || prepared.some(previous => previous._id === id)) throw new Meteor.Error(400, 'SPARC assessment transition IDs must be unique');
+      prepared.push({ ...row, _id: id });
+    }
+    if (Buffer.byteLength(JSON.stringify(prepared), 'utf8') > 1024 * 1024) throw new Meteor.Error(400, 'SPARC assessment batch exceeds 1 MiB');
+    if (!deps.insertSparcHistoryBatch) throw new Error('Atomic SPARC assessment history storage is not configured');
+    const inserted = await deps.insertSparcHistoryBatch(prepared);
+    for (const row of inserted) await recordStimulusCrowdOutcome(deps.StimulusCrowdStats, row);
+    if (inserted.length && deps.onHistoryInserted) {
+      try { await deps.onHistoryInserted(context, inserted[inserted.length - 1]!); }
+      catch (error) {
+        deps.serverConsole('[insertHistory] Dashboard cache update failed after assessment batch', {
+          ...historyDiagnosticMetadata(inserted[inserted.length - 1]!), errorType: error instanceof Error ? error.name : typeof error,
+        });
+      }
+    }
+  }
+
+  async function insertHistory(this: MethodContext, historyRecord: UnknownRecord | UnknownRecord[]) {
+    if (Array.isArray(historyRecord)) return await insertAssessmentBatch(this, historyRecord);
+    const methodStartTime = Date.now();
+    const { sanitizedHistoryRecord, actingUserId, decompressMs, sanitizeMs, authorizationMs, recordBuildMs } = await prepareHistoryRecord(this, historyRecord);
     let rawPayloadBytes: number | undefined;
     let finalRecordBytes: number | undefined;
     if (INSERT_HISTORY_TIMING_ENABLED) {

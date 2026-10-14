@@ -36,6 +36,11 @@ export function createSparcDynamicInstructionRules(version: 'student' | 'agent',
   const moves = categorized ? SPARC_CATEGORIZED_MOVE_DEFINITIONS : SPARC_DYNAMIC_MOVE_DEFINITIONS;
   const options = categorized ? SPARC_CATEGORIZED_MENU_OPTIONS : SPARC_DYNAMIC_MENU_OPTIONS;
   const categories = categorized ? SPARC_TARGET_CATEGORIES : [undefined];
+  const selectionContext = (kind: string, transition: string): SparcProductionRuleCondition[] => {
+    const afterResponse: SparcProductionRuleCondition = { type: 'all', conditions: [event('response-submitted'), assessed, feedback] };
+    return [categorized && kind === 'expectation' && transition === 'start'
+      ? { type: 'any', conditions: [event('document-loaded'), afterResponse] } : afterResponse];
+  };
   const categoryCondition = (kind: string, category: string | undefined): SparcProductionRuleCondition[] => category === undefined ? [] : [{
     factType: kind === 'expectation' ? 'autotutor.expectation' : 'autotutor.misconception',
     slots: { [kind === 'expectation' ? 'clusterKC' : 'id']: bound('targetId'), category: literal(category) },
@@ -54,7 +59,7 @@ export function createSparcDynamicInstructionRules(version: 'student' | 'agent',
         const id = `instruction.dynamic.agent.${kind}.${transition}.${move.moveId}${category ? `.${category}` : ''}`;
         const effects = decisionEffects({ targetKind: kind, action: move.moveId, stage: 'DYNAMIC', transition, sourceRuleId: id, reason: 'oet-distance', startsCycle: transition !== 'continue' });
         return { id, module: SPARC_INSTRUCTIONAL_COMPETITION_MODULE,
-          when: [event('response-submitted'), assessed, feedback, completion(false), undecided,
+          when: [...selectionContext(kind, transition), completion(false), undecided,
             ...instructionalTargetConditions(kind, transition),
             ...categoryCondition(kind, category),
             { factType: 'instructional.candidate', slots: { snapshotId: bound('snapshotId'), targetKind: literal(kind), targetId: bound('targetId'), eligible: literal(true), expectancyLogit: bind('expectancyLogit'), oetLogit: bind('oetLogit') } },
@@ -69,7 +74,7 @@ export function createSparcDynamicInstructionRules(version: 'student' | 'agent',
   const menus = (['expectation', 'misconception'] as const).flatMap((kind) =>
     (kind === 'expectation' ? ['start', 'continue'] as const : ['start', 'continue', 'interrupt'] as const).map((transition): SparcProductionRule => ({
       id: `instruction.dynamic.student.menu.${kind}.${transition}`,
-      when: [event('response-submitted'), assessed, feedback, completion(false),
+      when: [...selectionContext(kind, transition), completion(false),
         ...instructionalTargetConditions(kind, transition),
         { factType: 'instructional.candidate', slots: { snapshotId: bound('snapshotId'), targetKind: literal(kind), targetId: bound('targetId'), nextTargetId: bind('nextTargetId') } }, turn,
         { type: 'not', pattern: { factType: 'instructional.menu', slots: { snapshotId: bound('snapshotId') } } }],

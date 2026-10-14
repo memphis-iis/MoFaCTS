@@ -624,7 +624,7 @@
     {
       "name": "insertHistory",
       "access": "role-checked",
-      "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet and SPARC transition identities are validated; server-derived record IDs deduplicate retries using Mongo uniqueness. Conflicting sequence or transition writes fail. Competitive and student-selected AutoTutor policies and model/OET facts require an admin account at the common history-write boundary."
+      "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet and SPARC transition identities are validated; server-derived record IDs deduplicate retries using Mongo uniqueness. Conflicting sequence or transition writes fail. Competitive and student-selected AutoTutor policies and model/OET facts require an admin account at the common history-write boundary. SPARC assessment arrays are admin-only, limited to 256 records and 1 MiB, share one authorized lesson/attempt/response/course/policy scope, contain score-change rows followed by completion, and persist atomically in a Mongo transaction."
     },
     {
       "name": "insertNewUsers",

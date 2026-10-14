@@ -47,7 +47,7 @@ function fixture(covered = false) {
       const parts = request.moveDefinition.components;
       return parts ? { explanation: parts.includes('explanation') ? 'An explanation.' : null, richContent: parts.includes('richContent') ? '<table><tr><th>A</th></tr><tr><td>1</td></tr></table>' : null, question: 'What is A?' } : 'Tell me more about A.';
     },
-    history: { writeCanonicalHistory: async (record) => {
+    history: { writeCanonicalHistoryBatch: async records => { rows.push(...records); }, writeCanonicalHistory: async (record) => {
       const prior = rows.find((row) => sparcHistoryWriteId(row) === sparcHistoryWriteId(record));
       if (prior && !sameHistoryWrite(prior, record)) throw new Error('Conflicting accepted history');
       if (!prior) rows.push(record);
@@ -69,7 +69,7 @@ describe('Competitive instructional cycles', () => {
     f.setScores({ a: 0, b: 0 });
     await f.answer();
     assert.ok(Math.abs(logistic(targetExpectancy(facts(), 'expectation:a')) - .2) < 1e-9);
-    assert.equal(facts().find(fact => fact.factType === 'learningTarget.score' && fact.slots?.clusterKC === 'a')!.slots!.coverage, 0);
+    assert.equal(facts().find(fact => fact.factType === 'learningTarget.score' && fact.slots?.clusterKC === 'a'), undefined, 'unchanged initial zero is reconstructed without a score row');
     f.setScores({ a: .6, b: 0 });
     await f.answer();
     f.setScores({ a: .1, b: 0 });

@@ -203,6 +203,23 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
+  it('orients a starting explanation to the selected KC without inventing an opening answer or feedback', async function() {
+    const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-question.text');
+    const prompts: string[] = [];
+    const provider = createSparcDialogueOpenRouterProvider({ callResolvedOpenRouterJson: async params => {
+      prompts.push(String(params.messages[0]?.content));
+      expect(String(params.messages[1]?.content)).to.contain('"lessonTopic":"Confidence intervals"');
+      expect(String(params.messages[1]?.content)).not.to.contain('openingContext');
+      return { parsedContent: { tutorMessage: params.intent.schemaName.includes('explanation_primitive')
+        ? 'When first thinking about interval construction, begin with an estimate.' : 'How is the interval constructed?' } };
+    } });
+    await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
+      problemStatement: 'Confidence intervals', learnerText: '', dialogueHistory: [], plannerState: { decision: { transition: 'start' } } });
+    expect(prompts[0]).to.contain('Starting an expectation: give this selected concept a brief basis or purpose');
+    expect(prompts[0]).to.contain('No learner answer or feedback exists yet');
+    expect(prompts[0]).not.to.contain('Feedback has already been delivered');
+    expect(prompts[1]).not.to.contain('Starting an expectation:');
+  });
   it('realizes all 42 category/composition/format specifications with the selected instructions and actual support', async function() {
     for (const category of SPARC_TARGET_CATEGORIES) for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
       const observed: string[] = [];
@@ -473,7 +490,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.contain('primary conversational action genuinely requests information or confirmation');
     expect(systemMessage?.content).to.contain('may be either a question or an answer');
     expect(systemMessage?.content).to.contain('score its instructional meaning the same either way');
-    expect(systemMessage?.content).to.contain('Treat a contribution as on-topic if it relates to the original problem or to the ongoing instructional dialogue, including ideas introduced by the tutor');
+    expect(systemMessage?.content).to.contain('Treat a contribution as on-topic if it relates to the lesson context or to the ongoing instructional dialogue, including ideas introduced by the tutor');
     expect(systemMessage?.content).to.contain('Expressions of confusion and requests for clarification about that material are on-topic');
     expect(systemMessage?.content).to.contain('contentFocused true for an on-topic question, using the definition in step 1');
     expect(systemMessage?.content).to.contain('exactly one learningTargetEvaluations entry for every supplied learning target');
@@ -486,7 +503,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.contain('Do not average turns, sum per-turn scores');
     expect(systemMessage?.content).to.contain('as an answer to the immediately preceding tutor question');
     expect(systemMessage?.content).to.contain('A short phrase, choice, number, or confirmation can fully establish');
-    expect(systemMessage?.content).to.contain('do not require the learner to restate the original problem');
+    expect(systemMessage?.content).to.contain('do not require the learner to restate the lesson context');
     expect(systemMessage?.content).to.contain('Tutor turns provide context');
     expect(systemMessage?.content).to.contain('never learner evidence');
     expect(systemMessage?.content).to.contain('return the cumulative semantic coverage the learner has demonstrated');
@@ -1140,7 +1157,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
           'Generate only tutorMessage. The application owns the selected target and dialogue move metadata.',
         );
         expect(params.messages[0]?.content).to.contain('The JSON object must exactly follow this envelope shape:');
-        expect(userMessage.content).to.contain('Opening scenario (context only; choose the next question to elicit the selected expectation or address the selected misconception):');
+        expect(userMessage.content).to.contain('Lesson context (background for the selected target and actual preceding tutor question):');
         expect(userMessage.content).to.contain(problemStatement);
         expect(userMessage.content).to.contain('Latest student answer (the primary source for any acknowledgement):');
         expect((userMessage.content as string).indexOf('Latest student answer')).to.be.greaterThan(
@@ -1398,7 +1415,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
 
       if (move === 'pump') {
         expect(systemPrompt).to.contain('Explicitly identify the active concept before the open invitation');
-        expect(userPrompt).to.contain('Opening scenario (context only; choose the next question to elicit the selected expectation or address the selected misconception):');
+        expect(userPrompt).to.contain('Lesson context (background for the selected target and actual preceding tutor question):');
         expect(userPrompt).to.contain(problemStatement);
         expect(userPrompt).to.contain('App-selected pedagogical state:');
         expect(userPrompt).to.not.contain('Current scored planner state:');

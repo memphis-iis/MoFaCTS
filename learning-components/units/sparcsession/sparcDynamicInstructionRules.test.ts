@@ -19,18 +19,20 @@ import type { SparcWorkingMemoryFact, SparcStateTransition } from './sparcSessio
 
 const transition = (row: CanonicalHistoryRecord) => (row.sparc as { stateTransition: SparcStateTransition }).stateTransition;
 
-function fixture(version: 'student' | 'agent', longIdentities = false, category?: SparcTargetCategory) {
+function fixture(version: 'student' | 'agent', longIdentities = false, category?: SparcTargetCategory, targetCount = 7, misconceptionCount = 3) {
   const rows: CanonicalHistoryRecord[] = [];
   const requests: SparcUtteranceRequest[] = [];
-  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(id => longIdentities ? `dynamic.stats-confidence-interval-001.kc.${id}` : id);
+  const ids = Array.from({ length: targetCount }, (_, i) => String.fromCharCode(97 + i)).map(id => longIdentities ? `dynamic.biology-species-speciation-hlw4e-ch21-001.kc.${id}` : id);
+  const misconceptionIds = Array.from({ length: misconceptionCount }, (_, i) => `m${i + 1}`);
   const pageKey = longIdentities ? 'sparc-dynamic-confidence-interval-agent-with-seven-long-target-identities' : 'dynamic-cycle';
   const source: SparcTrialDisplay = {
     pageKey, schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
     instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: version === 'student' ? category ? SPARC_CATEGORIZED_STUDENT_POLICY_ID : SPARC_DYNAMIC_STUDENT_POLICY_ID : category ? SPARC_CATEGORIZED_AGENT_POLICY_ID : SPARC_DYNAMIC_AGENT_POLICY_ID, policyVersion: 1 },
     autoTutorTargets: { expectations: ids.map(clusterKC => ({ clusterKC, text: `Explain ${clusterKC}`, ...(category ? { category } : {}) })),
-      misconceptions: ['m1', 'm2', 'm3'].map(id => ({ id, text: `Misconception ${id}`, ...(category ? { category } : {}) })) },
+      misconceptions: misconceptionIds.map(id => ({ id, text: `Misconception ${id}`, ...(category ? { category } : {}) })) },
     clusterTargets: ids.map((clusterKC, clusterIndex) => ({ clusterKC, clusterIndex })),
-    workingMemoryFacts: ids.map(clusterKC => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: .5 } })),
+    workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'The lesson topic' } },
+      ...ids.map(clusterKC => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: .5 } }))],
     nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain the topic.' },
       { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' },
       { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit', value: 'submit' }],
@@ -42,11 +44,12 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
   let support = 0;
   let failQuestion = false;
   let failModelAfter: number | undefined;
-  const submit = (result: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
+  let failBatch = false;
+  const submit = (result?: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
     core: { userId: 'u', TDFId: 'dynamic', sessionID: 'session', levelUnit: 0 }, pageKey, display: source,
-    result, priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
+    ...(result ? { result } : {}), priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
     scoreLearnerResponse: () => { calls++; return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === ids[0] ? firstCoverage ?? coverage : coverage })),
-      diagnosticMisconceptionScores: ['m1', 'm2', 'm3'].map(id => ({ id, supportStrength: id === 'm1' ? support : 0 })) }; },
+      diagnosticMisconceptionScores: misconceptionIds.map(id => ({ id, supportStrength: id === 'm1' ? support : 0 })) }; },
     generateTutorUtterance: async request => {
       requests.push(request);
       if (request.action === 'instruction.feedback') {
@@ -55,8 +58,10 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
         assert.ok(rows.some(row => transition(row).transitionId.endsWith(':assessment')));
         return 'Your answer identifies the relevant idea; here is the correction.';
       }
-      assert.ok(rows.some(row => transition(row).transitionId.endsWith(':feedback')));
-      assert.ok(request.dialogueHistory?.some(entry => String(entry.text).includes('here is the correction')));
+      if (request.learnerText) {
+        assert.ok(rows.some(row => transition(row).transitionId.endsWith(':feedback')));
+        assert.ok(request.dialogueHistory?.some(entry => String(entry.text).includes('here is the correction')));
+      }
       const explanation = request.moveDefinition.components!.includes('explanation') ? request.realizedInstruction?.explanation ?? 'An explanation of the target.' : null;
       const richContent = request.moveDefinition.components!.includes('richContent') ? request.realizedInstruction?.richContent ?? 'In the worked case, apply the rule to get 4.' : null;
       if (explanation && !request.realizedInstruction?.explanation) await request.onInstructionComponent?.('explanation', explanation);
@@ -71,7 +76,10 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
       if (!request.realizedInstruction?.question) await request.onInstructionComponent?.('question', question, undefined, choices ? { choices } : undefined);
       return { explanation, richContent, question, ...(choices ? { choices } : {}) };
     },
-    history: { writeCanonicalHistory: async record => {
+    history: { writeCanonicalHistoryBatch: async records => {
+      if (failBatch) throw new Error('assessment write interrupted');
+      rows.push(...records);
+    }, writeCanonicalHistory: async record => {
       if (transition(record).transitionId.includes(':assessment:model:') && failModelAfter !== undefined
         && rows.filter(row => transition(row).transitionId.includes(':assessment:model:')).length >= failModelAfter) throw new Error('model write interrupted');
       rows.push(record);
@@ -91,10 +99,97 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
   };
   return { source, rows, requests, submit, answer, choice, mcAnswer, menu, facts, calls: () => calls,
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
-    fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; } };
+    fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; },
+    failBatch: (value: boolean) => { failBatch = value; } };
 }
 
 describe('Dynamic instruction production cycles', () => {
+  it('journals only changed scores, including misconception activation and repair, with bounded chapter-sized rows', async () => {
+    const f = fixture('agent', true, 'model-rule', 24, 20);
+    f.scores(0); f.firstTarget(.3);
+    await f.answer();
+    const changes = () => f.rows.filter(row => transition(row).transitionId.includes(':assessment:score:'));
+    const respond = () => f.requests.at(-1)!.moveDefinition.responseFormat === 'multiple-choice' ? f.mcAnswer('a') : f.answer();
+    assert.equal(changes().length, 1);
+    assert.equal((transition(changes()[0]!).writes[0]!.value as SparcWorkingMemoryFact).factType, 'learningTarget.score');
+    const firstCount = f.rows.length;
+    await respond();
+    assert.equal(changes().length, 1, 'unchanged carried scores must not create score rows');
+    assert.ok(f.rows.slice(firstCount).some(row => transition(row).transitionId.endsWith(':assessment')));
+    f.scores(0, .7); await respond();
+    assert.equal(changes().length, 2);
+    f.scores(0, 0); await respond();
+    assert.equal(changes().length, 3);
+    const repair = transition(changes().at(-1)!).writes[0]!.value as SparcWorkingMemoryFact;
+    assert.equal(repair.factType, 'diagnostic.misconceptionScore');
+    assert.equal(repair.slots!.supportStrength, 0);
+    f.scores(.9); f.firstTarget(.9); await respond();
+    assert.equal(changes().length, 27, 'each of the 24 newly changed KCs gets one row');
+    assert.ok(f.rows.every(row => Buffer.byteLength(JSON.stringify(row.sparc)) < 16384));
+    assert.equal(f.facts().filter(fact => fact.factType === 'learningTarget.score').length, 24);
+  });
+  it('accepts no partial score state when an assessment batch fails, then resumes accepted assessment without rescoring', async () => {
+    const f = fixture('agent', true, 'fact-model', 24, 20);
+    f.failBatch(true);
+    await assert.rejects(f.answer(100), /assessment write interrupted/);
+    assert.equal(f.rows.length, 0);
+    f.failBatch(false); f.failModel(2);
+    await assert.rejects(f.answer(100), /model write interrupted/);
+    assert.equal(f.calls(), 2);
+    const acceptedScoreRows = f.rows.filter(row => transition(row).transitionId.includes(':assessment:score:')).length;
+    f.failModel(); await f.answer(100);
+    assert.equal(f.calls(), 2, 'the accepted assessment must not invoke the provider again');
+    assert.equal(f.rows.filter(row => transition(row).transitionId.includes(':assessment:score:')).length, acceptedScoreRows);
+    assert.equal(new Set(f.rows.map(row => transition(row).transitionId)).size, f.rows.length);
+  });
+  it('starts the most central KC without a focal question, assessment, learner turn, or duplicate startup on reload', async () => {
+    const f = fixture('agent', false, 'model-rule');
+    f.source.nodes = f.source.nodes!.filter(node => (node as { id: string }).id !== 'opening-tutor-message');
+    f.source.workingMemoryFacts = (f.source.workingMemoryFacts as SparcWorkingMemoryFact[]).map(fact => fact.slots?.clusterKC === 'b'
+      ? { ...fact, slots: { ...fact.slots, centrality: .9 } } : fact);
+    f.fail(true);
+    await assert.rejects(f.submit(), /question failed/);
+    const first = f.requests[0]!;
+    assert.equal(first.targetId, 'b');
+    assert.ok(first.sourceRuleId?.includes('.expectation.start.'));
+    assert.equal(first.problemStatement, 'The lesson topic');
+    assert.equal(first.learnerText, '');
+    f.fail(false);
+    await f.submit();
+    assert.equal(f.requests.at(-1)!.sourceRuleId, first.sourceRuleId);
+    assert.equal(f.calls(), 0);
+    assert.ok(!f.rows.some(row => transition(row).transitionId.includes(':assessment') || transition(row).transitionId.endsWith(':feedback')));
+    assert.equal(f.facts().find(fact => fact.factType === 'session.turnState')?.slots?.turnCount, 0);
+    assert.ok(!buildSparcDialogueHistory(progressiveDialogueFacts(replaySparcHistory(f.rows))).some(entry => entry.role === 'student'));
+    const count = f.rows.length, requests = f.requests.length;
+    await f.submit();
+    assert.equal(f.rows.length, count);
+    assert.equal(f.requests.length, requests);
+    if (first.moveDefinition.responseFormat === 'multiple-choice') await f.mcAnswer('a'); else await f.answer();
+    assert.equal(f.calls(), 1);
+    const afterAnswer = f.rows.length;
+    await f.submit();
+    assert.equal(f.rows.length, afterAnswer);
+  });
+  it('offers the initial student menu on the central KC and generates only the chosen move without an assessment', async () => {
+    const f = fixture('student', false, 'fact');
+    f.source.nodes = f.source.nodes!.filter(node => (node as { id: string }).id !== 'opening-tutor-message');
+    await f.submit();
+    assert.equal(f.calls(), 0);
+    assert.equal(f.requests.length, 0);
+    assert.equal((f.menu()!.slots!.options as { targetId: string }[])[0]!.targetId, 'a');
+    await f.choice('explanation-question.text');
+    assert.equal(f.calls(), 0);
+    assert.equal(f.requests.at(-1)!.learnerText, '');
+    assert.equal(f.requests.at(-1)!.targetId, 'a');
+    const replay = replaySparcHistory(f.rows);
+    const displayed = applySparcProgressiveNodeOperations(f.source.nodes, [
+      ...collectSparcProgressiveNodeOperations(replay.transitions), ...projectSparcMenuOperations(replay),
+    ]) as { id: string }[];
+    assert.ok(displayed.findIndex(node => node.id.endsWith(':selected')) < displayed.findIndex(node => node.id.endsWith(':explanation')));
+    await f.answer();
+    assert.equal(f.calls(), 1);
+  });
   it('builds all 210 automatic variants with exact category conditions and the six approved assistance values', () => {
     const rules = createSparcDynamicInstructionRules('agent', true).filter(rule => rule.module === 'dialogue.instructional-competition');
     assert.equal(rules.length, 210);
@@ -192,7 +287,7 @@ describe('Dynamic instruction production cycles', () => {
     const f = fixture('student'); await f.answer();
     assert.equal(f.calls(), 1); assert.equal(f.requests.length, 1);
     assert.deepEqual((f.menu()!.slots!.options as { id: string }[]).map(option => option.id), ['question', 'explanation-question', 'explanation-rich-question', 'next-target']);
-    assert.ok(transition(f.rows[1]!).transitionId.endsWith(':feedback'));
+    assert.ok(f.rows.findIndex(row => transition(row).transitionId.endsWith(':feedback')) > f.rows.findIndex(row => transition(row).transitionId.endsWith(':assessment')));
     await f.choice('explanation-rich-question');
     assert.equal(f.calls(), 1); assert.equal(f.menu()!.slots!.status, 'consumed');
     assert.equal(f.requests.at(-1)!.moveDefinition.assistance, 2.77);
@@ -311,7 +406,7 @@ describe('Dynamic instruction production cycles', () => {
     assert.ok(f.rows.every(row => Buffer.byteLength(JSON.stringify(row.sparc)) < 16384));
     const updates = f.rows.filter(row => transition(row).transitionId.includes(':assessment:model:'));
     assert.equal(updates.length, 7);
-    const combined = { ...transition(f.rows[0]!), writes: [...transition(f.rows[0]!).writes, ...updates.flatMap(row => transition(row).writes)] };
+    const combined = { ...transition(f.rows[0]!), writes: f.rows.filter(row => /:assessment(?::score:|:model:|$)/.test(transition(row).transitionId)).flatMap(row => transition(row).writes) };
     assert.ok(Buffer.byteLength(JSON.stringify({ ...(f.rows[0]!.sparc as object), stateTransition: combined })) > 16384);
   });
 });

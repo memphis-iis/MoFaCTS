@@ -39,7 +39,7 @@ function fixture(version: 'student' | 'agent', covered = false) {
       const parts = request.moveDefinition.components;
       return parts ? { explanation: parts.includes('explanation') ? 'An explanation.' : null, richContent: parts.includes('richContent') ? '<table><tr><th>A</th></tr><tr><td>1</td></tr></table>' : null, question: 'What is A?' } : 'Tell me more about A.';
     },
-    history: { writeCanonicalHistory: async (record) => {
+    history: { writeCanonicalHistoryBatch: async records => { rows.push(...records); }, writeCanonicalHistory: async (record) => {
       const prior = rows.find((row) => sparcHistoryWriteId(row) === sparcHistoryWriteId(record));
       if (prior && !sameHistoryWrite(prior, record)) throw new Error('Conflicting accepted history');
       if (!prior) rows.push(record);

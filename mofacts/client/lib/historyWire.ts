@@ -19,4 +19,16 @@ async function insertCompressedHistory(historyRecord: HistoryWireRecord): Promis
   await meteorCallAsync('insertHistory', compressedRecord);
 }
 
-export { compressHistoryRecord, insertCompressedHistory, normalizeHistoryValueForWire };
+/** One server transaction accepts all assessment changes and their completion row. */
+async function insertCompressedHistoryBatch(records: readonly HistoryWireRecord[]): Promise<void> {
+  const compressed = records.map(record => {
+    const versioned = withCanonicalHistorySchemaVersion(applyCourseAssignmentLaunchContext(record));
+    assertCanonicalHistoryEnvelope(versioned);
+    const wire = compressHistoryRecord(versioned);
+    validateHistoryWirePayload(wire);
+    return wire;
+  });
+  await meteorCallAsync('insertHistory', compressed);
+}
+
+export { compressHistoryRecord, insertCompressedHistory, insertCompressedHistoryBatch, normalizeHistoryValueForWire };

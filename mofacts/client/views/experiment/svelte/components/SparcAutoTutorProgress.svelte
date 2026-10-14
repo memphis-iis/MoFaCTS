@@ -3,6 +3,15 @@
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
 
   export let snapshot;
+  let expanded = false;
+
+  function handleToggleKey(event) {
+    if (event.key === 'Escape' && expanded) {
+      expanded = false;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
 
   function platformText(key, values) {
     return translatePlatformString(getActiveUiLocale(), key, values);
@@ -33,8 +42,14 @@
   }
 </script>
 
-<section class="sparc-auto-tutor-progress" aria-label={platformText('autoTutor.progress')}>
-  <div class="sparc-auto-tutor-progress-title">{platformText('learningProgress.progress')}</div>
+<details class="sparc-auto-tutor-progress-popout" bind:open={expanded}>
+  <summary aria-label={platformText('autoTutor.progress')} on:keydown={handleToggleKey}>
+    <svg viewBox="0 0 24 24" aria-hidden="true" class:expanded>
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+    <span>{platformText('learningProgress.progress')}</span>
+  </summary>
+  <section class="sparc-auto-tutor-progress" aria-label={platformText('autoTutor.progress')}>
 
   <div class="sparc-auto-tutor-meter-row">
     <div class="sparc-auto-tutor-meter-copy">
@@ -90,21 +105,81 @@
     {formatTurnCount(snapshot.turnCount)}
   </div>
 </section>
+</details>
 
 <style>
+  .sparc-auto-tutor-progress-popout {
+    position: absolute;
+    top: var(--app-space-2);
+    right: var(--app-space-2);
+    z-index: 3;
+    width: max-content;
+    max-width: calc(100% - var(--app-space-2) - var(--app-space-2));
+    border: 1px solid var(--sparc-border-color);
+    border-radius: var(--sparc-border-radius-sm);
+    color: var(--app-text-color);
+    background: var(--learning-card-surface-color);
+    box-shadow: 0 3px 12px rgb(0 0 0 / 12%);
+  }
+
+  .sparc-auto-tutor-progress-popout[open] {
+    width: min(24rem, calc(100% - var(--app-space-2) - var(--app-space-2)));
+  }
+
+  summary {
+    display: flex;
+    align-items: center;
+    gap: var(--app-space-2);
+    padding: calc(0.45rem * var(--app-density-scale)) calc(0.7rem * var(--app-density-scale));
+    font-size: calc(var(--app-font-size-base) * 0.85);
+    font-weight: 600;
+    line-height: 1.25;
+    list-style: none;
+    cursor: pointer;
+    border-radius: inherit;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary:focus-visible {
+    outline: 2px solid var(--app-text-color);
+    outline-offset: 2px;
+  }
+
+  summary svg {
+    flex: 0 0 1rem;
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    transition: transform 160ms ease;
+  }
+
+  summary svg.expanded {
+    transform: rotate(180deg);
+  }
+
   .sparc-auto-tutor-progress {
     display: flex;
     flex-direction: column;
     gap: calc(0.35rem * var(--app-density-scale));
-    min-width: 15rem;
+    min-width: 0;
     max-width: 24rem;
+    padding: var(--app-space-3);
+    border-top: 1px solid var(--sparc-border-color);
     color: var(--app-text-color);
   }
 
-  .sparc-auto-tutor-progress-title {
-    font-size: calc(var(--app-font-size-base) * 0.9);
-    font-weight: 700;
-    line-height: 1.1;
+  .sparc-auto-tutor-progress-popout[open] .sparc-auto-tutor-progress {
+    animation: reveal-progress 160ms ease-out;
+  }
+
+  @keyframes reveal-progress {
+    from { opacity: 0; transform: translateX(0.5rem); }
+    to { opacity: 1; transform: translateX(0); }
   }
 
   .sparc-auto-tutor-meter-row {
@@ -175,11 +250,13 @@
     font-size: calc(var(--app-font-size-base) * 0.74);
   }
 
-  @media (max-width: 768px) {
-    .sparc-auto-tutor-progress {
-      min-width: 0;
-      max-width: none;
-      width: 100%;
+  @media (prefers-reduced-motion: reduce) {
+    summary svg {
+      transition: none;
+    }
+
+    .sparc-auto-tutor-progress-popout[open] .sparc-auto-tutor-progress {
+      animation: none;
     }
   }
 </style>

@@ -42,6 +42,57 @@ function createHistoryRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function scoreChangeBatch() {
+  const pageKey = 'species-and-speciation';
+  const event = { eventId: 'response-1', type: 'response-submitted', source: { pageKey, nodeId: 'learner-response-submit' },
+    time: 1710000000000, payload: { input: 'A synthetic answer.', policyId: 'dynamic-instruction-agent-v2' } };
+  return [
+    { suffix: 'assessment:score:expectation:s15', factType: 'learningTarget.score', slots: { clusterKC: 's15', coverage: .3 } },
+    { suffix: 'assessment:score:misconception:M02', factType: 'diagnostic.misconceptionScore', slots: { id: 'M02', supportStrength: 0 } },
+    { suffix: 'assessment', factType: 'session.turnState', slots: { turnCount: 1 } },
+  ].map(({ suffix, factType, slots }) => createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparc',
+    sparc: { pageKey, sourceAddress: event.source, stateTransition: { transitionId: `response-1:${suffix}`, event,
+      writes: [{ target: { pageKey, nodeId: 'root' }, key: `workingMemoryFactStable:${factType}`, value: { factType, slots } }] } } }));
+}
+
+describe('SPARC assessment batch authorization and loading', () => {
+  it('authorizes one response scope, sends separate score rows to atomic storage, and loads the complete history in order', async () => {
+    let saved: Record<string, unknown>[] = [];
+    const { deps } = createAnalyticsDeps({
+      getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true }),
+      insertSparcHistoryBatch: async (records: Record<string, unknown>[]) => { saved = records; return records; },
+      Histories: { find: (_selector: unknown, options: unknown) => {
+        expect(options).to.have.property('sort'); return { fetchAsync: async () => saved };
+      } },
+    });
+    const methods = createAnalyticsMethods(deps as unknown as Parameters<typeof createAnalyticsMethods>[0]);
+    await methods.insertHistory.call({ userId: 'learner-1' }, scoreChangeBatch());
+    expect(saved).to.have.length(3);
+    expect(new Set(saved.map(row => row._id)).size).to.equal(3);
+    const loaded = await methods.getSparcHistoryForUnit.call({ userId: 'learner-1' }, 'learner-1', 'tdf-1', 0);
+    expect(loaded).to.deep.equal(saved);
+  });
+  it('rejects cross-user, mixed-response, invalid terminal, non-admin, and oversized batches before storage', async () => {
+    let writes = 0;
+    const { deps } = createAnalyticsDeps({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true }),
+      insertSparcHistoryBatch: async () => { writes++; return []; } });
+    const methods = createAnalyticsMethods(deps as unknown as Parameters<typeof createAnalyticsMethods>[0]);
+    const denied = async (rows: Record<string, unknown>[], userId = 'learner-1') => {
+      let caught; try { await methods.insertHistory.call({ userId }, rows); } catch (error) { caught = error; }
+      expect(caught).to.be.instanceOf(Error);
+    };
+    await denied(scoreChangeBatch(), 'another-user');
+    const mixed = scoreChangeBatch(); mixed[1]!.TDFId = 'other-lesson'; await denied(mixed);
+    await denied(scoreChangeBatch().slice(0, 2));
+    await denied([]);
+    await denied(Array.from({ length: 257 }, () => scoreChangeBatch()[0]!));
+    const nonAdmin = createAnalyticsMethods({ ...deps, getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => false }) });
+    let caught; try { await nonAdmin.insertHistory.call({ userId: 'learner-1' }, scoreChangeBatch()); } catch (error) { caught = error; }
+    expect(caught).to.be.instanceOf(Error);
+    expect(writes).to.equal(0);
+  });
+});
+
 function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
   let nextEventId = 100;
   const insertedHistory: Record<string, unknown>[] = [];

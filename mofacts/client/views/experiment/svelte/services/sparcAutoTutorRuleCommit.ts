@@ -18,7 +18,7 @@ import type {
   SparcUtteranceGenerator,
 } from '../../../../../../learning-components/units/sparcsession/sparcAutoTutorRuleRuntime';
 import type { UnitEngineLike } from '../../../../../common/types';
-import { insertCompressedHistory } from '../../../../lib/historyWire';
+import { insertCompressedHistory, insertCompressedHistoryBatch } from '../../../../lib/historyWire';
 import {
   readSparcResumeSnapshot,
   rememberSparcRuntimeHistoryRecord,
@@ -48,6 +48,7 @@ type SparcControllerDialogueCommitDeps = {
   readonly getIsAdmin?: () => boolean;
   readonly getUserId?: () => string | null;
   readonly writeHistory?: (historyRecord: CanonicalHistoryRecord) => Promise<void>;
+  readonly writeHistoryBatch?: (records: readonly CanonicalHistoryRecord[]) => Promise<void>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -96,10 +97,10 @@ function requireSparcControllerDialogueDisplay(display: unknown): SparcControlle
   return sparcDisplay as unknown as SparcControllerDialogueDisplay;
 }
 
-export async function commitSparcAutoTutorSubmit(params: {
+type SparcAutoTutorCommitParams = {
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
-  readonly sparcResult: SparcControllerResult;
+  readonly sparcResult?: SparcControllerResult;
   readonly tdfId: unknown;
   readonly userId: unknown;
   readonly attemptId: unknown;
@@ -108,7 +109,17 @@ export async function commitSparcAutoTutorSubmit(params: {
   readonly generateTutorUtterance: SparcUtteranceGenerator;
   readonly onNodeValues?: (values: Record<string, unknown>) => void | Promise<void>;
   readonly deps?: SparcControllerDialogueCommitDeps;
-}): Promise<{
+};
+
+export function commitSparcAutoTutorSubmit(params: SparcAutoTutorCommitParams & { readonly sparcResult: SparcControllerResult }) {
+  return commitSparcAutoTutorEvent(params);
+}
+
+export function commitSparcAutoTutorDocumentLoad(params: Omit<SparcAutoTutorCommitParams, 'sparcResult'>) {
+  return commitSparcAutoTutorEvent(params);
+}
+
+async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Promise<{
   readonly committed: boolean;
   readonly sparcNodeValues: Record<string, unknown>;
 }> {
@@ -160,13 +171,23 @@ export async function commitSparcAutoTutorSubmit(params: {
     },
     pageKey: sparcDisplay.pageKey,
     display: sparcDisplay,
-    result: params.sparcResult,
+    ...(params.sparcResult ? { result: params.sparcResult } : {}),
     document: sparcRuntime.document,
     replayState: sparcRuntime.replayState,
     priorHistoryRecords,
     scoreLearnerResponse: params.scoreLearnerResponse,
     generateTutorUtterance: params.generateTutorUtterance,
     history: {
+      async writeCanonicalHistoryBatch(records) {
+        if (params.deps?.writeHistoryBatch) await params.deps.writeHistoryBatch(records);
+        else {
+          if (params.deps?.writeHistory) throw new Error('Injected SPARC history requires an atomic batch writer');
+          await insertCompressedHistoryBatch(records);
+        }
+        // Publish replay state only after every row has been durably accepted.
+        for (const record of records) rememberSparcRuntimeHistoryRecord(record);
+        writtenHistoryCount += records.length;
+      },
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         if (params.deps?.writeHistory) {
           await params.deps.writeHistory(historyRecord);
@@ -187,8 +208,8 @@ export async function commitSparcAutoTutorSubmit(params: {
     pageKey: sparcDisplay.pageKey,
     tdfId,
     levelUnit,
-    triggeredBy: nonBlankString(params.sparcResult.triggeredBy) || undefined,
-    submittedNodeCount: Object.keys(params.sparcResult.submittedNodes ?? {}).length,
+    triggeredBy: nonBlankString(params.sparcResult?.triggeredBy) || undefined,
+    submittedNodeCount: Object.keys(params.sparcResult?.submittedNodes ?? {}).length,
     retainedHistoryCount: priorHistoryRecords.length,
     writtenHistoryCount,
     elapsedMs: Date.now() - startedAt,

@@ -16,11 +16,58 @@ SPARC AutoTutor displays select one runtime-owned production set through
 These remain separate component policies. During the admin rollout described below,
 the app retains an authored student-selected policy for admins and resolves other
 AutoTutor policies to competitive selection for admins. Non-admins use the deterministic
-reference. Explicit dynamic-instruction policies are retained for admins and rejected for non-admins. The new versions retain the opening question and existing navigation.
+reference. Explicit dynamic-instruction policies are retained for admins and rejected for non-admins. The categorized versions start from the most central KC without a fixed opening question; existing navigation remains.
 Authored AutoTutor displays omit `productionRules`; the runtime supplies the selected
 set. Upload validation and the runtime share the allowed policy identifiers.
 
 ## Dynamic instruction
+
+### Assessment change records and full resume
+
+Instructional-cycle assessments persist one history row for each KC coverage or
+misconception-support value that changes from its previous value. An absent score
+has the existing zero baseline; unchanged zero or carried scores create no score
+row. A misconception returning to zero is a real change and is saved. A separate
+`:assessment` row retains the learner utterance and derived turn/controller facts.
+
+The client sends these bounded rows together through `insertHistory`. The server
+accepts only admin SPARC assessment batches sharing one user, lesson, attempt,
+response, course context, and policy. Batches are capped at 256 records and 1 MiB;
+each record still satisfies the existing 16 KiB extension and 32 KiB wire limits.
+One snapshot/majority Mongo transaction accepts the changes and completion row,
+so a failed transaction exposes no partial assessment. Stable transition IDs
+deduplicate retries; conflicting content fails explicitly. This requires the
+existing Mongo replica-set setup, with no sequential-write substitute.
+
+History loading retains the existing scope and chronological ordering. Replay
+reconstructs current target values from the change rows and combines them with
+the completion row's metadata. Existing saved bundled assessments remain readable;
+they are not rewritten. Interrupted later model updates, feedback, or instruction
+reuse the accepted assessment without another evaluation or duplicate score rows.
+Ordinary non-SPARC history continues to use its existing single-record writer.
+
+### KC-led startup
+
+For categorized v2 policies, `document-loaded` lets the existing expectation-start
+productions select the most central KC. Centrality is the sole initial target-ranking
+criterion; equal centralities retain the existing stable target-ID tie break. Only
+moves for that target compete. Agent selection realizes its chosen move; student
+selection first offers the existing move menu. No learner answer, assessment, feedback,
+or model update is fabricated at startup; the learner turn count remains zero.
+
+Exactly one authored `dialogue.source` fact with a nonempty `topic` supplies lesson
+context. Categorized packages omit the fixed opening node and focal-question heading.
+The progress widget starts collapsed at the upper right of the instructional surface.
+Opening it overlays the conversation without reserving a header row or resizing the
+conversation. It stays open until toggled closed while the lesson view remains mounted;
+responses and move selections do not dismiss it. The native disclosure supports keyboard
+activation, Escape from its toggle, visible focus, and reduced motion. Each question supplies its
+own givens. An expectation-start explanation briefly establishes the concept's basis
+or purpose in the topic; continuation explanations address the current need.
+Startup decisions and completed primitives use canonical history, so an interrupted
+startup resumes its saved decision/components and a completed or established attempt
+reloads without another generation. Existing v1/reference units retain their authored
+opening behavior.
 
 ### Category-aware text and multiple choice
 

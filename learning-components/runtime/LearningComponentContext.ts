@@ -33,6 +33,8 @@ export interface HistoryRuntime<TResult = unknown> {
   normalizeResult(result: unknown, context: unknown): TResult;
   writeResult(result: TResult): Promise<void>;
   writeCanonicalHistory(record: CanonicalHistoryRecord): Promise<void>;
+  /** Required by multi-record SPARC assessments; acceptance is atomic across the batch. */
+  writeCanonicalHistoryBatch?(records: readonly CanonicalHistoryRecord[]): Promise<void>;
 }
 
 export type ServerMethodRuntime = Record<string, (...args: any[]) => Promise<unknown>>;

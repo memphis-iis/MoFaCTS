@@ -227,7 +227,7 @@ export const SPARC_CATEGORIZED_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] 
     version: 'v2', promptId: `${definition.promptId}.${responseFormat}`, promptVersion: 'v2',
     outputSchemaVersion: 'v3',
     // Category-aware wording is composed from authored target demands at request construction.
-    promptPolicy: 'Generate only the selected composition and response format. Respect the authored KC demands and shared category instructions. All text is plain text; feedback has already been delivered.',
+    promptPolicy: 'Generate only the selected composition and response format. Respect the authored KC demands and shared category instructions. All text is plain text. Generate the selected instruction without repeating prior feedback.',
   })));
 
 export const SPARC_FEEDBACK_MOVE_DEFINITION: SparcMoveDefinition = autotutorDialogueMove({

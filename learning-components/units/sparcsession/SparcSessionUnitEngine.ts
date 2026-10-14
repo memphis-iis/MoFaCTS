@@ -393,7 +393,7 @@ export type SparcAuthoredResponseOutcomeRuntimeParams = {
   readonly document: SparcAuthoredDocument;
   readonly input: SparcResponseOutcomeInput;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
-  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
 };
 
 export type SparcAuthoredProductionRuleRuntimeParams = {
@@ -403,7 +403,7 @@ export type SparcAuthoredProductionRuleRuntimeParams = {
   readonly event: SparcInterfaceEvent;
   readonly extraFacts?: readonly SparcWorkingMemoryFact[];
   readonly maxCycles?: number;
-  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
 };
 
 export type SparcAutoTutorRuleTurnRuntimeParams = {
@@ -417,7 +417,7 @@ export type SparcAutoTutorRuleTurnRuntimeParams = {
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
-  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
 };
 
 export type SparcTrialDisplayProductionRuleRuntimeParams = {
@@ -428,14 +428,14 @@ export type SparcTrialDisplayProductionRuleRuntimeParams = {
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
   readonly document?: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
-  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
 };
 
 export type SparcTrialDisplayAutoTutorRuleRuntimeParams = {
   readonly core: SparcPracticeHistoryCore;
   readonly pageKey: string;
   readonly display: SparcTrialDisplay;
-  readonly result: SparcTrialResult;
+  readonly result?: SparcTrialResult;
   readonly priorHistoryRecords: readonly CanonicalHistoryRecord[];
   readonly document?: SparcAuthoredDocument;
   readonly replayState?: SparcReplayState;
@@ -443,7 +443,7 @@ export type SparcTrialDisplayAutoTutorRuleRuntimeParams = {
   readonly generateTutorUtterance: SparcUtteranceGenerator;
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
   readonly maxProductionRuleCycles?: number;
-  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory'>;
+  readonly history: Pick<HistoryRuntime, 'writeCanonicalHistory' | 'writeCanonicalHistoryBatch'>;
 };
 
 export type SparcTrialDisplayProductionRuleEvaluationRuntimeParams = {
@@ -571,7 +571,7 @@ export async function createSparcSessionUnitEngine(
         core: params.core,
         pageKey: params.pageKey,
         display: params.display,
-        result: params.result,
+        ...(params.result ? { result: params.result } : {}),
         priorHistoryRecords: params.priorHistoryRecords,
         ...(params.document ? { document: params.document } : {}),
         ...(params.replayState ? { replayState: params.replayState } : {}),
