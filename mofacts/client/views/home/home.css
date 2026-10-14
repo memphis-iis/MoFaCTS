@@ -269,6 +269,11 @@
     opacity: 0.9;
 }
 
+.fa-prolific {
+    background-color: currentColor;
+    mask: url('/images/prolific-icon.ico') center / contain no-repeat;
+}
+
 .sidebar-collapsed {
     width: var(--home-sidebar-collapsed-width) !important;
 }
@@ -513,6 +518,12 @@
     width: calc(1.15rem * var(--app-density-scale));
     color: var(--app-accent-color);
     text-align: center;
+}
+
+.app-practice-menu-panel button .fa-prolific {
+    display: inline-block;
+    height: calc(1.15rem * var(--app-density-scale));
+    vertical-align: middle;
 }
 
 .app-practice-menu-panel button:hover,

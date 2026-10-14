@@ -607,6 +607,7 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
 
 const restrictedRoutes = [
   'multiTdfSelect',
+  'prolific',
   'userAdmin',
   'tdfAssignmentEdit',
   'instructorReporting',

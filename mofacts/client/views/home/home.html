@@ -72,12 +72,13 @@
           </div>
         {{/if}}
 
-        {{#if isInRole 'admin,teacher'}}
-          <button type="button" class="nav-item {{sidebarActiveClass 'prolific'}}" id="prolificButton"><span>{{t 'home.prolific'}}</span></button>
-        {{/if}}
         {{#if isInRole 'admin'}}
           <div class="section">
             <div class="section-title">{{t 'home.admin'}}</div>
+            <button type="button" class="nav-item {{sidebarActiveClass 'prolific'}}" data-label="{{t 'home.prolific'}}" aria-label="{{t 'home.prolific'}}" id="prolificButton">
+              <span class="fa fa-prolific" aria-hidden="true"></span>
+              <span>{{t 'home.prolific'}}</span>
+            </button>
             <button type="button" class="nav-item {{sidebarActiveClass 'adminControls'}}" data-label="{{t 'home.adminControlPanel'}}" id="adminControlsBtn">
               <span class="fa fa-cogs" aria-hidden="true"></span>
               <span>{{t 'home.adminControlPanel'}}</span>
@@ -213,15 +214,13 @@
       <button type="button" data-practice-menu-action="courses"><span class="fa fa-list-alt" aria-hidden="true"></span> {{t 'home.courses'}}</button>
       <button type="button" data-practice-menu-action="contentUpload"><span class="fa fa-folder-open" aria-hidden="true"></span> {{t 'home.content'}}</button>
       <button type="button" data-practice-menu-action="dataDownload"><span class="fa fa-download" aria-hidden="true"></span> {{t 'home.detailedData'}}</button>
-      {{#if isInRole 'admin,teacher'}}
-        <button type="button" data-practice-menu-action="prolific">{{t 'home.prolific'}}</button>
-      {{/if}}
       {{#if isInRole 'teacher'}}
         <button type="button" data-practice-menu-action="classEdit"><span class="fa fa-users" aria-hidden="true"></span> {{t 'home.courses'}}</button>
         <button type="button" data-practice-menu-action="instructorReporting"><span class="fa fa-bar-chart" aria-hidden="true"></span> {{t 'home.grades'}}</button>
         <button type="button" data-practice-menu-action="tdfAssignmentEdit"><span class="fa fa-tasks" aria-hidden="true"></span> {{t 'home.assignments'}}</button>
       {{/if}}
       {{#if isInRole 'admin'}}
+        <button type="button" data-practice-menu-action="prolific"><span class="fa fa-prolific" aria-hidden="true"></span> {{t 'home.prolific'}}</button>
         <button type="button" data-practice-menu-action="adminControls"><span class="fa fa-cogs" aria-hidden="true"></span> {{t 'home.adminControlPanel'}}</button>
         <button type="button" data-practice-menu-action="userAdmin"><span class="fa fa-user" aria-hidden="true"></span> {{t 'home.userAdmin'}}</button>
         <button type="button" data-practice-menu-action="theme"><span class="fa fa-paint-brush" aria-hidden="true"></span> {{t 'home.theme'}}</button>
