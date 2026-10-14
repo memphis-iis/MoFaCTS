@@ -45,7 +45,7 @@ export const contentRuntimeMachineTransitionState = {
       ],
     },
     logging: {
-      entry: ['markFeedbackEnd', 'markTrialEnd', 'logStateTransition'],
+      entry: ['markFeedbackEnd', 'markTrialEnd', 'emitTrialEnd', 'logStateTransition'],
       invoke: {
         id: 'historyLoggingService',
         src: 'historyLoggingService',
@@ -188,6 +188,13 @@ export const contentRuntimeMachineTransitionState = {
     },
     fadingOut: {
       entry: ['logStateTransition'],
+      always: [
+        {
+          guard: 'skipsCardFadeOut',
+          target: 'clearing',
+          actions: ['logStateTransition'],
+        },
+      ],
       on: {
         [EVENTS.TRANSITION_COMPLETE]: [
           {
@@ -251,6 +258,7 @@ export const contentRuntimeMachineTransitionState = {
           guard: 'unitFinished',
           actions: [
             'handleUnitCompletion',
+            'emitSessionEnd',
             'logStateTransition',
           ],
         },

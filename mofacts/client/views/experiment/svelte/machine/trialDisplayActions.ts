@@ -4,6 +4,7 @@ import { translatePlatformString } from '../../../../lib/interfaceI18n';
 import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { setDisplayReadyState, setInputReadyState } from '../services/cardRuntimeState';
 import { assign, type ActionArgs } from './contentRuntimeMachineActionTypes';
+import { emitStimulusOnset } from './signalCaptureLifecycleActions';
 
 const DEFAULT_CORRECT_LABELS = new Set(['Correct', 'Correct.']);
 const DEFAULT_INCORRECT_LABELS = new Set(['Incorrect', 'Incorrect.']);
@@ -118,12 +119,14 @@ export function displayFeedback({ context }: ActionArgs) {
   }
 }
 
-export function setDisplayReady({ context: _context }: ActionArgs) {
+export function setDisplayReady(args: ActionArgs) {
   setDisplayReadyState(true);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('contentRuntimeMachine:displayReady'));
   }
+
+  emitStimulusOnset(args);
 }
 
 export function setDisplayNotReady() {

@@ -1,5 +1,6 @@
 import * as guards from './guards';
 import * as contentRuntimeMachineActions from './contentRuntimeMachineActions';
+import * as signalCaptureLifecycleActions from './signalCaptureLifecycleActions';
 import { createServices } from './services';
 import type { MachineArgs } from './contentRuntimeMachineTypes';
 import * as contentRuntimeMachineTransitionGuards from './contentRuntimeMachineTransitionGuards';
@@ -99,6 +100,8 @@ export const contentRuntimeMachineOptions = {
     isNotVideoSession: guards.isNotVideoSession,
     canAcceptVideoCheckpoint: guards.canAcceptVideoCheckpoint,
 
+    skipsCardFadeOut: guards.skipsCardFadeOut,
+
     hasUserAnswer: guards.hasUserAnswer,
     noUserAnswer: guards.noUserAnswer,
     hasPrestimulus: guards.hasPrestimulus,
@@ -154,6 +157,13 @@ export const contentRuntimeMachineOptions = {
     clearFeedback: contentRuntimeMachineActions.clearFeedback,
     announceToScreenReader: contentRuntimeMachineActions.announceToScreenReader,
     handleUnitCompletion: contentRuntimeMachineActions.handleUnitCompletion,
+    emitSessionStart: signalCaptureLifecycleActions.emitSessionStart,
+    emitSessionEnd: signalCaptureLifecycleActions.emitSessionEnd,
+    emitTrialStart: signalCaptureLifecycleActions.emitTrialStart,
+    emitStimulusOnset: signalCaptureLifecycleActions.emitStimulusOnset,
+    emitResponse: signalCaptureLifecycleActions.emitResponse,
+    emitFeedback: signalCaptureLifecycleActions.emitFeedback,
+    emitTrialEnd: signalCaptureLifecycleActions.emitTrialEnd,
     displayAnswer: contentRuntimeMachineActions.displayAnswer,
     displayFeedback: contentRuntimeMachineActions.displayFeedback,
     setDisplayReady: contentRuntimeMachineActions.setDisplayReady,

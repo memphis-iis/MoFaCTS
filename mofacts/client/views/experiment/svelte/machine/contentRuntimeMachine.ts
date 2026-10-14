@@ -64,12 +64,13 @@ export const contentRuntimeMachine = createMachine(
                   actions: [
                     'initializeSession',
                     activateVideoSessionAtStart,
+                    'emitSessionStart',
                     'logStateTransition',
                   ],
                 },
                 {
                   target: `#contentRuntimeMachine.${STATES.PRESENTING}`,
-                  actions: ['initializeSession', 'logStateTransition'],
+                  actions: ['initializeSession', 'emitSessionStart', 'logStateTransition'],
                 },
               ],
             },

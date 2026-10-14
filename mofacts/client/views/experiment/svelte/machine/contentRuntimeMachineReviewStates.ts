@@ -127,7 +127,7 @@ export const contentRuntimeMachineReviewStates = {
     },
     states: {
       preparing: {
-        entry: [resetFeedbackRevealState, 'displayFeedback', 'announceToScreenReader', 'logStateTransition'],
+        entry: [resetFeedbackRevealState, 'displayFeedback', 'emitFeedback', 'announceToScreenReader', 'logStateTransition'],
         always: [
           {
             target: 'speaking',

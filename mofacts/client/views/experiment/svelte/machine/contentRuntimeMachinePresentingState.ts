@@ -51,6 +51,7 @@ export const contentRuntimeMachinePresentingState = {
               'resetSrState',
               'resetSrAttempts',
               'clearErrorMessage',
+              'emitTrialStart',
               'logStateTransition',
             ],
           },
@@ -242,11 +243,11 @@ export const contentRuntimeMachinePresentingState = {
                 },
                 [EVENTS.SUBMIT]: {
                   target: '#contentRuntimeMachine.presenting.validating',
-                  actions: ['captureAnswer', 'logStateTransition'],
+                  actions: ['captureAnswer', 'emitResponse', 'logStateTransition'],
                 },
                 [EVENTS.TIMEOUT]: {
                   target: '#contentRuntimeMachine.presenting.validating',
-                  actions: ['markTimeout', 'logStateTransition'],
+                  actions: ['markTimeout', 'emitResponse', 'logStateTransition'],
                 },
               },
             },
