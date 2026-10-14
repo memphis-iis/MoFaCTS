@@ -20,6 +20,8 @@ The first startup after this feature is installed creates the initial published 
 
 The published profile drives document metadata, social previews, the web-app manifest, icons, ordinary sign-in and signup, shared headers and footers, system email subjects, downloadable archive names, help and legal links, and the public experience. `/legal` is a brand-neutral legal hub that always exposes the configured software license/source destination.
 
+The generated 1200 × 630 social-preview image uses the published landing-page headline and eyebrow, social description, and brand logo alongside the landing page's practice and progress graphics. Colors and type come from the active application theme. A configured custom social image still takes precedence. Changes to the generated artwork use a new image-version URL so social platforms can fetch the revised image; existing platform previews may also need a fresh scrape.
+
 ## Public routes
 
 The overview uses one audience selector for students, teachers, and researchers. Header links and accessible tabs select a single role-specific explanation, product preview, and public-demo action; the selected role is reflected by the `#students`, `#teachers`, or `#researchers` fragment.

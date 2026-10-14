@@ -30,7 +30,7 @@ type ThemeLike = {
 };
 
 const SOCIAL_CRAWLER_PATTERN = /\b(facebookexternalhit|facebot|linkedinbot|twitterbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|skypeuripreview|microsoftpreview)\b/i;
-const SOCIAL_PREVIEW_IMAGE_VERSION = '2026-05-05-3';
+const SOCIAL_PREVIEW_IMAGE_VERSION = '2026-10-13-1';
 const execFileAsync = promisify(execFile);
 let cachedPreviewPng: { key: string; png: Buffer; expiresAt: number } | null = null;
 
@@ -180,6 +180,8 @@ async function getSocialPreviewSettings() {
 
   return {
     title,
+    heroTitle: localized.heroTitle,
+    eyebrow: localized.eyebrow,
     description,
     twitterDescription: description,
     type: firstNonEmptyString(configured.type) || 'website',
@@ -375,38 +377,58 @@ async function renderSocialPreviewPng() {
     ? writeDataImage(logoSource, path.join(tempDir, 'logo-source'))
     : logoSource;
   const titleLine = previewImageTitle(preview);
-  const subtitleLines = wrapText(preview.description, 58, 3);
+  const heroLines = wrapText(preview.heroTitle, 17, 3);
+  const subtitleLines = wrapText(preview.description, 43, 3);
   const fontRegular = resolveThemeFont(preview.theme.fontFamily, 'regular');
   const fontBold = resolveThemeFont(preview.theme.fontFamily, 'bold');
   try {
     await execImageMagick([
       '-size', '1200x630',
       `xc:${preview.theme.backgroundColor}`,
-      '-fill', preview.theme.accentColor,
-      '-draw', 'rectangle 0,0 1200,20',
-      '-fill', preview.theme.secondaryColor,
-      '-draw', 'rectangle 0,610 1200,630',
+      // Match the public landing hero: readable copy beside practice/progress cards.
+      '-fill', 'none',
+      '-stroke', preview.theme.accentColor,
+      '-strokewidth', '2',
+      '-draw', 'ellipse 884,340 258,164 0,360',
+      '-draw', 'ellipse 884,340 180,225 0,360',
+      '-stroke', 'none',
       '-fill', preview.theme.cardColor,
-      '-draw', 'roundrectangle 96,58 1104,572 24,24',
-      '-fill', preview.theme.backgroundColor,
-      '-draw', 'circle 600,164 600,88',
-      '-gravity', 'North',
+      '-draw', 'roundrectangle 690,170 1030,345 22,22',
+      '-draw', 'roundrectangle 814,326 1144,512 22,22',
+      '-fill', preview.theme.accentColor,
+      '-draw', 'roundrectangle 50,40 104,94 12,12',
+      // Two curved arrows, matching the landing page's practice icon.
+      '-draw', "path 'M 800,254 C 807,208 859,190 895,219 L 912,200 L 912,250 L 864,250 L 880,234 C 857,216 826,227 821,254 Z'",
+      '-draw', "path 'M 912,266 C 905,312 853,330 817,301 L 800,320 L 800,270 L 848,270 L 832,286 C 855,304 886,293 891,266 Z'",
+      // The second card uses the landing page's simple progress chart.
+      '-draw', 'rectangle 878,371 886,463',
+      '-draw', 'rectangle 878,455 1080,463',
+      '-draw', 'rectangle 908,418 934,443',
+      '-draw', 'rectangle 950,391 976,443',
+      '-draw', 'rectangle 992,404 1018,443',
+      '-draw', 'rectangle 1034,367 1060,443',
+      '-gravity', 'NorthWest',
       '-font', fontBold,
-      '-pointsize', '74',
+      '-pointsize', '34',
       '-fill', preview.theme.textColor,
-      '-annotate', '+0+262', titleLine,
+      '-annotate', '+118+48', titleLine,
+      '-pointsize', '22',
+      '-annotate', '+56+133', preview.eyebrow,
+      '-pointsize', '64',
+      '-annotate', '+56+181', heroLines[0] || '',
+      '-annotate', '+56+257', heroLines[1] || '',
+      '-annotate', '+56+333', heroLines[2] || '',
       '-font', fontRegular,
-      '-pointsize', '30',
-      '-fill', preview.theme.textColor,
-      '-annotate', '+0+358', subtitleLines[0] || '',
-      '-annotate', '+0+398', subtitleLines[1] || '',
-      '-annotate', '+0+438', subtitleLines[2] || '',
       '-pointsize', '26',
-      '-annotate', '+0+526', preview.rootUrl.replace(/^https?:\/\//, ''),
+      '-annotate', '+56+432', subtitleLines[0] || '',
+      '-annotate', '+56+468', subtitleLines[1] || '',
+      '-annotate', '+56+504', subtitleLines[2] || '',
+      '-pointsize', '22',
+      '-annotate', '+56+573', preview.rootUrl.replace(/^https?:\/\//, ''),
       basePath,
     ]);
-    await execImageMagick([logoPath, '-resize', '92x92', logoResizedPath]);
-    await execImageMagick([basePath, logoResizedPath, '-geometry', '+554+118', '-composite', pngPath]);
+    await execImageMagick([logoPath, '-resize', '42x42', logoResizedPath]);
+    await execImageMagick([basePath, logoResizedPath, '-geometry', '+56+46', '-composite', pngPath]);
   } finally {
     // Cleanup happens after the generated PNG is read below.
   }
