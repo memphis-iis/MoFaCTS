@@ -1134,8 +1134,13 @@
       "access": "single-use-download"
     },
     {
-      "name": "/internal/security-audits/v1",
-      "access": "signed-ingestion"
+      "name": "/api/psynaptix/history",
+      "access": "signed-ingestion",
+      "notes": "Service-token bearer auth; disabled when PSYNAPTIX_SERVICE_TOKEN is unset."
+    },
+    {
+      "name": "/cdn/storage/Assets",
+      "access": "public"
     },
     {
       "name": "/data-download/own-history",
@@ -1151,8 +1156,13 @@
       "access": "public-rate-limited"
     },
     {
-      "name": "/cdn/storage/Assets",
-      "access": "public"
+      "name": "/internal/security-audits/v1",
+      "access": "signed-ingestion"
+    },
+    {
+      "name": "/psynaptix-config",
+      "access": "public",
+      "notes": "Serves capture session-config YAML refs for external-url / signal-capture delivery settings."
     }
   ],
   "exports": [

@@ -12,6 +12,8 @@ export const HISTORY_EVENT_TYPES = [
   'video',
   'autotutor-turn',
   'sparc',
+  'session-summary',
+  'psynaptix-postprocess',
 ] as const;
 
 export type HistoryEventType = typeof HISTORY_EVENT_TYPES[number];
