@@ -1,4 +1,6 @@
 import { parseSparcPromptFigure } from './sparcSupportedPrompt';
+import { isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { requireSparcTargetCategory } from '../../runtime/sparcTargetCategories';
 import type {
   SparcAuthoredDocument,
   SparcAuthoredNode,
@@ -194,6 +196,9 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
       time: transition.event.time,
     };
     if (node.figure !== undefined) slots.figure = parseSparcPromptFigure(node.figure);
+    if (speaker === 'learner' && transition.event.type === 'response-submitted' && transition.event.payload?.questionId) {
+      slots.responseFormat = 'multiple-choice';
+    }
     for (const slot of optionalStringSlots) {
       if (typeof node[slot] === 'string' && node[slot].trim()) {
         slots[slot] = node[slot];
@@ -266,12 +271,18 @@ function autoTutorTargetFacts(document: SparcAuthoredDocument): readonly SparcWo
   if (!targets) {
     return [];
   }
+  if (isSparcCategorizedPolicy(document.instructionalController?.policyId)) {
+    for (const target of [...targets.expectations, ...targets.misconceptions]) {
+      requireSparcTargetCategory(target.category, `Authored target ${'clusterKC' in target ? target.clusterKC : target.id}`);
+    }
+  }
   return [
     ...targets.expectations.map((expectation) => ({
       factType: 'autotutor.expectation',
       slots: {
         clusterKC: expectation.clusterKC,
         text: expectation.text,
+        ...(expectation.category ? { category: expectation.category } : {}),
       },
     })),
     ...targets.misconceptions.map((misconception) => ({
@@ -279,6 +290,7 @@ function autoTutorTargetFacts(document: SparcAuthoredDocument): readonly SparcWo
       slots: {
         id: misconception.id,
         text: misconception.text,
+        ...(misconception.category ? { category: misconception.category } : {}),
       },
     })),
   ];

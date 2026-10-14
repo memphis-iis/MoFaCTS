@@ -7,14 +7,16 @@
   import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
   import { shouldSubmitTextInputOnKeydown } from '../services/textInputComposition';
   import { SPARC_INSTRUCTIONAL_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycleRules';
-  import { SPARC_DYNAMIC_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcDynamicInstructionRules';
+  import { SPARC_DYNAMIC_MENU_OPTIONS, SPARC_CATEGORIZED_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcDynamicInstructionRules';
+  import { sparcQuestionAnswerNodes } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
+  import { getSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 
   const sparcText = (key) => translatePlatformString(getActiveUiLocale(), key);
 
   function isWorkedExample(component) {
     return component.id === `${component.turnEventId}:richContent`
       && component.figure === undefined
-      && SPARC_DYNAMIC_MENU_OPTIONS.some((option) => option.action === component.action);
+      && [...SPARC_DYNAMIC_MENU_OPTIONS, ...SPARC_CATEGORIZED_MENU_OPTIONS].some((option) => option.action === component.action);
   }
 
   export let node;
@@ -211,7 +213,7 @@
       return '';
     }
     const action = String(candidate?.action || '').trim();
-    const actionLabel = [...SPARC_INSTRUCTIONAL_MENU_OPTIONS, ...SPARC_DYNAMIC_MENU_OPTIONS].find(option => option.action === action)?.label ?? action;
+    const actionLabel = [...SPARC_INSTRUCTIONAL_MENU_OPTIONS, ...SPARC_DYNAMIC_MENU_OPTIONS, ...SPARC_CATEGORIZED_MENU_OPTIONS].find(option => option.action === action)?.label ?? action;
     const targetId = String(candidate?.targetId || '').trim();
     const targetKind = String(candidate?.selectionTargetKind || candidate?.targetType || '').trim();
     if (candidate?.competition) {
@@ -531,22 +533,30 @@
         {#if node.children?.length}
           {#each node.children as component (component.id)}
             {@const workedExample = isWorkedExample(component)}
+            {@const categorizedSupport = component.id === `${component.turnEventId}:richContent` && !!getSparcMoveDefinition(component.action)?.responseFormat}
+            {@const heading = categorizedSupport ? component.supportHeading : workedExample ? sparcText('sparc.workedExample') : undefined}
             <div
               class="sparc-instruction-component"
-              class:sparc-worked-example={workedExample}
-              role={workedExample ? 'group' : undefined}
-              aria-label={workedExample ? sparcText('sparc.workedExample') : undefined}
+              class:sparc-worked-example={workedExample || categorizedSupport}
+              role={workedExample || categorizedSupport ? 'group' : undefined}
+              aria-label={heading}
             >
-              {#if workedExample}
-                <div class="sparc-worked-example-title" aria-hidden="true">{sparcText('sparc.workedExample')}</div>
+              {#if heading}
+                <div class="sparc-worked-example-title" aria-hidden="true">{heading}</div>
               {/if}
-              {#if component.atomType === 'html-block'}
+              {#if categorizedSupport && component.figure !== undefined}
+                <SparcPromptFigure figure={component.figure} figureId={component.id} compact={true} />
+              {:else if component.atomType === 'html-block'}
                 <div class="sparc-instruction-content">{@html sanitizeSparcHtml(getNodeValue(component))}</div>
               {:else}
                 <div class="sparc-instruction-content">{getNodeValue(component)}</div>
               {/if}
-              {#if component.figure !== undefined}
+              {#if component.figure !== undefined && !categorizedSupport}
                 <SparcPromptFigure figure={component.figure} figureId={component.id} />
+              {/if}
+              {#if component.choices}
+                <svelte:self node={sparcQuestionAnswerNodes(component, !!component.readOnly)} {nodeValues}
+                  {onButtonActivate} {onNodeFocus} {authoringSelectOnly} {adminDiagnosticMode} />
               {/if}
             </div>
           {/each}

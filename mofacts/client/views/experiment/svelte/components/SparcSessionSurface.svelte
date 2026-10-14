@@ -321,7 +321,7 @@
     const buttonSubmission = node?.id
       ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) }
       : {};
-    if (node?.menuId && node?.optionId) {
+    if ((node?.menuId && node?.optionId) || node?.questionId) {
       void submitAutoTutorDialogue({ submittedNodes: buttonSubmission, triggeredBy: node.id, timestamp: Date.now() });
       return;
     }
@@ -763,7 +763,7 @@
   $: autoTutorDialogueCompleted = autoTutorDialogueMode && sparcDisplay?.instructionalController?.policyId !== SPARC_STUDENT_SELECTED_POLICY_ID && currentAutoTutorProgressSnapshot.completed
     && (!isSparcDynamicPolicy(sparcDisplay?.instructionalController?.policyId) || !dialogueSubmitPending);
   $: autoTutorDialoguePrompt = autoTutorDialogueMode ? dialoguePrompt(topLevelNodes) : '';
-  $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => node.id === 'instructional-choice-menu' && dialogueSubmitPending
+  $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending
     ? { ...node, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
   $: if (

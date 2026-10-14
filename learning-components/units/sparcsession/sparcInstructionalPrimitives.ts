@@ -4,8 +4,9 @@ import { buildSparcDialogueHistory, type SparcUtteranceRequest } from './sparcUt
 import { SPARC_FEEDBACK_MOVE_DEFINITION, getSparcMoveDefinition } from './sparcMoveDefinitions';
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
 import { createSparcDialogueTurnTransition, requireBoundedSparcDialogueMessage } from './sparcDialogueTurnNodes';
+import { parseSparcQuestionChoices, type SparcQuestionChoice } from './sparcMultipleChoiceQuestion';
 
-export type SparcInstructionComponents = { readonly explanation: string | null; readonly richContent: string | null; readonly question: string; readonly figure?: SparcPromptFigure };
+export type SparcInstructionComponents = { readonly explanation: string | null; readonly richContent: string | null; readonly question: string; readonly figure?: SparcPromptFigure; readonly choices?: readonly SparcQuestionChoice[]; readonly supportHeading?: string };
 export type SparcGeneratedInstruction = string | { readonly text: string } | SparcInstructionComponents | SparcSupportedPrompt;
 
 /** Primitives retain their durable identities but form one learner-facing move. */
@@ -40,8 +41,14 @@ export function parseInstructionComponents(value: unknown, request: SparcUtteran
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Composite instruction requires an object');
   const record = value as Record<string, unknown>;
   const components = request.moveDefinition.components;
-  if (!components || Object.keys(record).some((key) => !['explanation', 'richContent', 'question', 'figure'].includes(key))) {
+  if (!components || Object.keys(record).some((key) => !['explanation', 'richContent', 'question', 'figure', 'choices', 'supportHeading'].includes(key))) {
     throw new Error('Invalid composite instruction fields');
+  }
+  if (request.moveDefinition.responseFormat === 'multiple-choice') parseSparcQuestionChoices(record.choices);
+  else if (record.choices !== undefined) throw new Error('Text-response instruction cannot contain multiple-choice options');
+  if (record.supportHeading !== undefined) {
+    const heading = requireBoundedSparcDialogueMessage(record.supportHeading, 'Support heading');
+    if (!components.includes('richContent') || record.figure || heading.length > 60 || /[<>\r\n]/.test(heading)) throw new Error('Invalid instructional support heading');
   }
   if (record.figure !== undefined) {
     if (!components.includes('richContent')) throw new Error('Figure requires a selected rich component');
@@ -85,6 +92,8 @@ export function createSparcInstructionTransition(params: {
         atomType: component === 'richContent' && !composite.figure ? 'html-block' : 'dialogue-utterance',
         value: composite[component], assistance: params.request.moveDefinition.assistance,
         ...(component === 'richContent' && composite.figure ? { figure: composite.figure } : {}),
+        ...(component === 'richContent' && composite.supportHeading ? { supportHeading: composite.supportHeading } : {}),
+        ...(component === 'question' && composite.choices ? { choices: composite.choices } : {}),
       });
     }
   } else nodes.push({ ...operation.node, ...(supported ? { figure: supported.figure } : {}), assistance: params.request.moveDefinition.assistance });
@@ -119,6 +128,7 @@ export function createSparcFeedbackRequest(facts: readonly SparcWorkingMemoryFac
 export function createSparcInstructionComponentWrite(params: {
   document: SparcAuthoredDocument; event: SparcInterfaceEvent; request: SparcUtteranceRequest;
   component: 'explanation' | 'richContent' | 'question'; text: string; figure?: SparcPromptFigure;
+  details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'>;
 }): SparcStateWrite {
   const transition = createSparcDialogueTurnTransition({ document: params.document, event: params.event,
     learnerText: params.request.learnerText!, utteranceRequest: params.request, tutorText: params.text });
@@ -128,5 +138,6 @@ export function createSparcInstructionComponentWrite(params: {
     ...operation.node, id: `${params.event.eventId}:${params.component}`,
     atomType: params.component === 'richContent' && !params.figure ? 'html-block' : 'dialogue-utterance',
     assistance: params.request.moveDefinition.assistance, ...(params.figure ? { figure: params.figure } : {}),
+    ...(params.details ?? {}),
   } } };
 }

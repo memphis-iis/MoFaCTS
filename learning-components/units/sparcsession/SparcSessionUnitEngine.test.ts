@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   createSparcSessionUnitEngine,
+  resolveSparcPageDisplay,
 } from './SparcSessionUnitEngine';
 import {
   createSparcStateCellKey,
@@ -728,6 +729,23 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
       () => engine.buildPreparedCardQuestionAndAnswerGlobals(0, 0, [0, 0.8]),
       /SPARC pageId "duplicate-page" is duplicated/,
     );
+  });
+
+  it('preserves authored expectation and misconception categories through package preparation', function() {
+    const display = {
+      unitType: 'sparc-autotutor-dialogue',
+      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
+      clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }],
+      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Recognize the rule.', category: 'model-rule' }],
+        misconceptions: [{ id: 'm', text: 'A wrong rule.', category: 'rule' }] },
+      nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', clusterIndex: 0 }],
+    };
+    const deps = createPageRuntimeDeps({ getStimCluster: () => ({ clusterKC: 'a', stims: [{ text: 'Flattened text' }] }),
+      findTdfById: () => ({ rawStimuliFile: { setspec: { sparcPages: [{ pageId: 'categorized', display }] } } }) });
+    const prepared = resolveSparcPageDisplay(deps, { sparcsession: { pageId: 'categorized' } });
+    assert.deepEqual(prepared.autoTutorTargets, display.autoTutorTargets);
+    delete (display.autoTutorTargets.expectations[0]! as { category?: string }).category;
+    assert.throws(() => resolveSparcPageDisplay(deps, { sparcsession: { pageId: 'categorized' } }), /requires category/);
   });
 
   it('renders SPARC AutoTutor target rows flattened from package upload', async function() {

@@ -1,5 +1,11 @@
 import { strict as assert } from 'node:assert';
-import { SPARC_DYNAMIC_AGENT_POLICY_ID, SPARC_DYNAMIC_STUDENT_POLICY_ID, sparcPolicyForAccount } from '../../runtime/sparcInstructionalPolicies';
+import { SPARC_DYNAMIC_AGENT_POLICY_ID, SPARC_DYNAMIC_STUDENT_POLICY_ID, SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID, sparcPolicyForAccount } from '../../runtime/sparcInstructionalPolicies';
+import { SPARC_TARGET_CATEGORIES, type SparcTargetCategory } from '../../runtime/sparcTargetCategories';
+import { createSparcDynamicInstructionRules, SPARC_CATEGORIZED_MENU_OPTIONS } from './sparcDynamicInstructionRules';
+import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
+import { savedSparcChoiceQuestions, sparcQuestionAnswerNodes, projectSparcAnsweredQuestionOperations } from './sparcMultipleChoiceQuestion';
+import { buildSparcDialogueHistory } from './sparcUtteranceRequest';
+import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
 import { commitSparcTrialDisplayAutoTutorRules } from './sparcTrialDisplayRuntimeBridge';
 import { currentSparcMenu, projectSparcMenuOperations } from './sparcInstructionalCycle';
 import { projectSparcInstructionMessages } from './sparcInstructionalPrimitives';
@@ -13,16 +19,16 @@ import type { SparcWorkingMemoryFact, SparcStateTransition } from './sparcSessio
 
 const transition = (row: CanonicalHistoryRecord) => (row.sparc as { stateTransition: SparcStateTransition }).stateTransition;
 
-function fixture(version: 'student' | 'agent', longIdentities = false) {
+function fixture(version: 'student' | 'agent', longIdentities = false, category?: SparcTargetCategory) {
   const rows: CanonicalHistoryRecord[] = [];
   const requests: SparcUtteranceRequest[] = [];
   const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(id => longIdentities ? `dynamic.stats-confidence-interval-001.kc.${id}` : id);
   const pageKey = longIdentities ? 'sparc-dynamic-confidence-interval-agent-with-seven-long-target-identities' : 'dynamic-cycle';
   const source: SparcTrialDisplay = {
     pageKey, schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
-    instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: version === 'student' ? SPARC_DYNAMIC_STUDENT_POLICY_ID : SPARC_DYNAMIC_AGENT_POLICY_ID, policyVersion: 1 },
-    autoTutorTargets: { expectations: ids.map(clusterKC => ({ clusterKC, text: `Explain ${clusterKC}` })),
-      misconceptions: ['m1', 'm2', 'm3'].map(id => ({ id, text: `Misconception ${id}` })) },
+    instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: version === 'student' ? category ? SPARC_CATEGORIZED_STUDENT_POLICY_ID : SPARC_DYNAMIC_STUDENT_POLICY_ID : category ? SPARC_CATEGORIZED_AGENT_POLICY_ID : SPARC_DYNAMIC_AGENT_POLICY_ID, policyVersion: 1 },
+    autoTutorTargets: { expectations: ids.map(clusterKC => ({ clusterKC, text: `Explain ${clusterKC}`, ...(category ? { category } : {}) })),
+      misconceptions: ['m1', 'm2', 'm3'].map(id => ({ id, text: `Misconception ${id}`, ...(category ? { category } : {}) })) },
     clusterTargets: ids.map((clusterKC, clusterIndex) => ({ clusterKC, clusterIndex })),
     workingMemoryFacts: ids.map(clusterKC => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: .5 } })),
     nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain the topic.' },
@@ -57,8 +63,13 @@ function fixture(version: 'student' | 'agent', longIdentities = false) {
       if (richContent && !request.realizedInstruction?.richContent) await request.onInstructionComponent?.('richContent', richContent);
       if (failQuestion) throw new Error('question failed');
       const question = request.realizedInstruction?.question ?? 'How does the rule apply to the new case?';
-      if (!request.realizedInstruction?.question) await request.onInstructionComponent?.('question', question);
-      return { explanation, richContent, question };
+      const choices = request.moveDefinition.responseFormat === 'multiple-choice' ? request.realizedInstruction?.choices ?? [
+        { id: 'a', label: 'The rule holds under its specified conditions.', correct: true },
+        { id: 'b', label: 'The rule holds under every condition.', correct: false },
+        { id: 'c', label: 'The rule never holds.', correct: false },
+      ] : undefined;
+      if (!request.realizedInstruction?.question) await request.onInstructionComponent?.('question', question, undefined, choices ? { choices } : undefined);
+      return { explanation, richContent, question, ...(choices ? { choices } : {}) };
     },
     history: { writeCanonicalHistory: async record => {
       if (transition(record).transitionId.includes(':assessment:model:') && failModelAfter !== undefined
@@ -73,12 +84,104 @@ function fixture(version: 'student' | 'agent', longIdentities = false) {
     return submit({ submittedNodes: { [node]: id }, triggeredBy: node, timestamp: time });
   };
   const facts = () => Object.values(replaySparcHistory(rows).cells).map(cell => cell.value as SparcWorkingMemoryFact);
-  return { source, rows, requests, answer, choice, menu, facts, calls: () => calls,
+  const mcAnswer = (id: string, time = timestamp++) => {
+    const question = savedSparcChoiceQuestions(replaySparcHistory(rows)).at(-1)!;
+    const node = `${String(question.id)}:answer:${id}`;
+    return submit({ submittedNodes: { [node]: id }, triggeredBy: node, timestamp: time });
+  };
+  return { source, rows, requests, submit, answer, choice, mcAnswer, menu, facts, calls: () => calls,
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
     fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; } };
 }
 
 describe('Dynamic instruction production cycles', () => {
+  it('builds all 210 automatic variants with exact category conditions and the six approved assistance values', () => {
+    const rules = createSparcDynamicInstructionRules('agent', true).filter(rule => rule.module === 'dialogue.instructional-competition');
+    assert.equal(rules.length, 210);
+    assert.equal(new Set(rules.map(rule => rule.id)).size, 210);
+    for (const category of SPARC_TARGET_CATEGORIES) {
+      const variants = rules.filter(rule => rule.id.endsWith(`.${category}`));
+      assert.equal(variants.length, 30);
+      assert.ok(variants.every(rule => rule.when.some(condition => 'factType' in condition
+        && ['autotutor.expectation', 'autotutor.misconception'].includes(condition.factType)
+        && JSON.stringify(condition.slots?.category) === JSON.stringify({ type: 'literal', value: category }))));
+    }
+    assert.deepEqual(SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => move.assistance), [-.25, .25, 1.55, 2.05, 2.52, 3.02]);
+  });
+  it('routes every student category/composition/format combination to the same composed primitive and retains target transitions', async () => {
+    for (const category of SPARC_TARGET_CATEGORIES) for (const option of SPARC_CATEGORIZED_MENU_OPTIONS.filter(option => option.id !== 'next-target')) {
+      const f = fixture('student', false, category); await f.answer();
+      await assert.rejects(f.answer(), /Select an offered instructional option/);
+      assert.equal(f.calls(), 1);
+      await f.choice(option.id);
+      const request = f.requests.at(-1)!;
+      assert.equal(request.action, option.action);
+      assert.equal(request.targetId, 'a');
+      assert.ok(request.sourceRuleId!.endsWith(`.${category}`));
+      for (const aspect of category.split('-')) assert.ok(request.moveDefinition.promptPolicy.includes(`${aspect.toUpperCase()}:`));
+      assert.ok(request.moveDefinition.promptPolicy.includes('Strategically integrate as many'));
+      assert.equal(f.calls(), 1);
+      if (request.moveDefinition.responseFormat === 'multiple-choice') await f.mcAnswer('a'); else await f.answer();
+      assert.equal(f.calls(), 2);
+      await f.choice('next-target'); assert.equal(f.calls(), 2);
+    }
+  });
+  it('binds MC answers to saved option identities and meanings, rejects stale/modified answers and restores the selected option', async () => {
+    for (const id of ['a', 'b']) {
+      const f = fixture('student', false, 'model-rule'); await f.answer(); await f.choice('question.multiple-choice');
+      assert.equal((f.menu()!.slots!.options as unknown[]).length, 7);
+      await assert.rejects(f.answer(), /Select an option/);
+      const before = JSON.stringify(savedSparcChoiceQuestions(replaySparcHistory(f.rows)));
+      await f.mcAnswer(id);
+      assert.equal(f.calls(), 2);
+      assert.equal(JSON.stringify(savedSparcChoiceQuestions(replaySparcHistory(f.rows))), before);
+      const replay = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
+      const restored = projectSparcAnsweredQuestionOperations(replay).find(operation => 'node' in operation && operation.node.choices)!;
+      assert.ok('node' in restored);
+      if ('node' in restored) {
+        const answers = sparcQuestionAnswerNodes(restored.node, true).children as Record<string, unknown>[];
+        assert.equal(answers.find(choice => choice.selected)?.value, id);
+        assert.ok(answers.every(choice => choice.readOnly));
+        assert.equal(answers.find(choice => choice.selected)?.label, id === 'a' ? 'The rule holds under its specified conditions.' : 'The rule holds under every condition.');
+      }
+      const response = replay.transitions.find(entry => entry.event.payload?.choiceId === id)!.event;
+      const original = collectSparcProgressiveNodeOperations(replay.transitions);
+      const projected = projectSparcAnsweredQuestionOperations(replay);
+      assert.deepEqual(projected.map(operation => 'node' in operation ? operation.node.id : operation), original.map(operation => 'node' in operation ? operation.node.id : operation));
+      assert.equal(response.type, 'response-submitted');
+      assert.equal(response.payload!.correct, id === 'a');
+      assert.equal(response.payload!.input, id === 'a' ? 'The rule holds under its specified conditions.' : 'The rule holds under every condition.');
+      const dialogue = buildSparcDialogueHistory(progressiveDialogueFacts(replay));
+      assert.equal(dialogue.find(entry => entry.text === response.payload!.input)?.responseFormat, 'multiple-choice');
+      const retainedRows = f.rows.length;
+      await f.submit({ submittedNodes: { [response.source.nodeId]: id }, triggeredBy: response.source.nodeId, timestamp: 500 });
+      assert.equal(f.calls(), 2); assert.equal(f.rows.length, retainedRows);
+      await assert.rejects(f.submit({ submittedNodes: { [response.source.nodeId]: 'modified' }, triggeredBy: response.source.nodeId, timestamp: 501 }), /binding/);
+    }
+  });
+  it('keeps the selected target, misconception interruption, and feedback-first completion in the categorized agent', async () => {
+    for (const category of SPARC_TARGET_CATEGORIES) {
+      const f = fixture('agent', false, category); await f.answer();
+      assert.equal(f.requests.at(-1)!.targetId, 'a');
+      assert.ok(f.requests.at(-1)!.sourceRuleId!.endsWith(`.${category}`));
+      const respond = () => f.requests.at(-1)!.moveDefinition.responseFormat === 'multiple-choice' ? f.mcAnswer('b') : f.answer();
+      await respond(); assert.equal(f.requests.at(-1)!.targetId, 'a');
+      f.scores(.3,.8); await respond(); assert.equal(f.requests.at(-1)!.targetId, 'm1');
+      f.scores(.9,0); await respond();
+      assert.equal(f.requests.at(-1)!.action, 'instruction.feedback');
+      assert.equal(f.facts().find(fact => fact.factType === 'controller.completionState')!.slots!.completed, true);
+    }
+  });
+  it('rejects a missing category at runtime and preserves admin restrictions for the new family', async () => {
+    const f = fixture('agent', false, 'fact');
+    const targets = f.source.autoTutorTargets as { expectations: { category?: string }[] };
+    delete targets.expectations[0]!.category;
+    await assert.rejects(f.answer(), /requires category/);
+    for (const id of [SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID]) {
+      assert.equal(sparcPolicyForAccount(true, id), id);
+      assert.throws(() => sparcPolicyForAccount(false, id), /admin account/);
+    }
+  });
   it('preserves explicit new policies for admins and rejects non-admin entry', () => {
     for (const id of [SPARC_DYNAMIC_AGENT_POLICY_ID, SPARC_DYNAMIC_STUDENT_POLICY_ID]) {
       assert.equal(sparcPolicyForAccount(true, id), id);

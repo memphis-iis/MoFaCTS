@@ -1,4 +1,5 @@
-import { SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../learning-components/runtime/sparcInstructionalPolicies';
+import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcCategorizedPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
+import { sparcTargetCategoryFields } from '../../../learning-components/runtime/sparcTargetCategories';
 import type {
   AutoTutorExpectationScore,
   AutoTutorLearnerContributionScore,
@@ -404,6 +405,7 @@ function validateSparcAutoTutorTargets(
   });
 
   const autoTutorTargets = isRecord(display.autoTutorTargets) ? display.autoTutorTargets : {};
+  const categorized = isSparcCategorizedPolicy(isRecord(display.instructionalController) ? display.instructionalController.policyId : undefined);
   const expectations = Array.isArray(autoTutorTargets.expectations) ? autoTutorTargets.expectations : [];
   if (expectations.length === 0) {
     errors.push(`${prefix}.autoTutorTargets.expectations must contain at least one expectation`);
@@ -422,6 +424,8 @@ function validateSparcAutoTutorTargets(
     if (!nonEmptyString(expectation.text)) {
       errors.push(`${expectationPrefix}.text must be a non-empty string`);
     }
+    try { sparcTargetCategoryFields(expectation.category, `${expectationPrefix} (${String(expectation.clusterKC)})`, categorized); }
+    catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
   });
 
   const misconceptions = Array.isArray(autoTutorTargets.misconceptions) ? autoTutorTargets.misconceptions : [];
@@ -437,6 +441,8 @@ function validateSparcAutoTutorTargets(
     if (!nonEmptyString(misconception.text)) {
       errors.push(`${misconceptionPrefix}.text must be a non-empty string`);
     }
+    try { sparcTargetCategoryFields(misconception.category, `${misconceptionPrefix} (${String(misconception.id)})`, categorized); }
+    catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
   });
 }
 

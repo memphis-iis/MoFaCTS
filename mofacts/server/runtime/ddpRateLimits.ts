@@ -148,7 +148,7 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     type: 'method',
     name: isRateLimitedOpenRouterMethod,
     userId(userId: string | null | undefined) { return !!userId; }
-  }, 120, 3600000);
+  }, 600, 3600000);
 
   DDPRateLimiterWithErrorMessage.setErrorMessage(function(rateLimitResult: RateLimitResult) {
     const { timeToReset, numInvocationsLeft } = rateLimitResult;

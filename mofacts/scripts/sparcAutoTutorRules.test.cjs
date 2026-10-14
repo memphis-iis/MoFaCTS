@@ -13,6 +13,7 @@ const suites = [
   'sparcInstructionalCycle',
   'sparcCompetitiveSelection',
   'sparcDynamicInstructionRules',
+  'SparcSessionUnitEngine',
   'sparcInstructionalControl',
   'sparcProductionActions',
   'sparcProgressiveScaffoldingRules',

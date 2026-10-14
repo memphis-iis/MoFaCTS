@@ -1,6 +1,8 @@
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
 import type { SparcInstructionComponents } from './sparcInstructionalPrimitives';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
+import { requireSparcTargetCategory } from '../../runtime/sparcTargetCategories';
+import { composeSparcCategoryInstructions } from './sparcCategoryInstructions';
 import {
   requireActiveSparcMoveDefinition,
   type SparcMoveDefinition,
@@ -8,7 +10,7 @@ import {
 
 export type SparcUtteranceRequest = {
   readonly realizedInstruction?: Readonly<Partial<SparcInstructionComponents>>;
-  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure) => Promise<void>;
+  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure, details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'>) => Promise<void>;
   readonly problemStatement: string;
   readonly targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion' | 'feedback';
   readonly action: string;
@@ -125,6 +127,7 @@ export function buildSparcDialogueHistory(
     .map((fact) => ({
       role: fact.slots?.speaker === 'learner' ? 'student' : 'tutor',
       text: stringSlot(fact, 'text') ?? '',
+      ...(fact.slots?.responseFormat === 'multiple-choice' ? { responseFormat: 'multiple-choice' } : {}),
       ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
     }))
     .filter((entry) => entry.text);
@@ -321,8 +324,15 @@ export function createSparcUtteranceRequestFromFacts(
   if (targetType !== 'learningTarget' && targetType !== 'misconception' && targetType !== 'learnerQuestion' && targetType !== 'completion') {
     throw new Error(`SPARC selected action targetType "${targetType}" is not supported for utterance generation`);
   }
-  const moveDefinition = requireActiveSparcMoveDefinition(action);
+  let moveDefinition = requireActiveSparcMoveDefinition(action);
   const targetId = selectedTargetId(selectedAction, targetType);
+  if (moveDefinition.responseFormat) {
+    const target = facts.find(fact => targetType === 'learningTarget'
+      ? fact.factType === 'autotutor.expectation' && fact.slots?.clusterKC === targetId
+      : fact.factType === 'autotutor.misconception' && fact.slots?.id === targetId);
+    const category = requireSparcTargetCategory(target?.slots?.category, `Selected target ${targetId}`);
+    moveDefinition = { ...moveDefinition, promptPolicy: composeSparcCategoryInstructions(category, moveDefinition.components!, moveDefinition.responseFormat) };
+  }
   if (targetType !== 'completion' && targetType !== 'learnerQuestion') {
     assertSelectedActionMatchesActiveTarget({ facts, targetType, targetId });
   }

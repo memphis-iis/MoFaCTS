@@ -1,3 +1,5 @@
+import { sparcTargetCategoryFields } from '../../runtime/sparcTargetCategories';
+import { isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
 import {
   createAdaptiveLogisticUnitEngine,
   type CreateAdaptiveLogisticUnitEngineDeps,
@@ -148,6 +150,7 @@ function createAutoTutorExpectationFromCluster(params: {
   return {
     clusterKC: normalizedClusterKC,
     text,
+    ...sparcTargetCategoryFields(authoredExpectation?.category, `expectation ${normalizedClusterKC}`, isSparcCategorizedPolicy(params.pageDisplay?.instructionalController?.policyId)),
   };
 }
 
@@ -185,7 +188,7 @@ function cleanMisconceptionsFromDisplay(display: SparcTrialDisplay): readonly Sp
     if (!id || !text) {
       throw new Error(`SPARC AutoTutor autoTutorTargets.misconceptions[${index}] requires id and text`);
     }
-    return { id, text };
+    return { id, text, ...sparcTargetCategoryFields(entry.category, `misconception ${id}`, isSparcCategorizedPolicy(display.instructionalController?.policyId)) };
   });
 }
 
@@ -203,7 +206,7 @@ function cleanExpectationsFromDisplay(display?: SparcTrialDisplay): readonly Spa
     if (!clusterKC || !text) {
       throw new Error(`SPARC AutoTutor autoTutorTargets.expectations[${index}] requires clusterKC and text`);
     }
-    return { clusterKC, text };
+    return { clusterKC, text, ...sparcTargetCategoryFields(entry.category, `expectation ${clusterKC}`, isSparcCategorizedPolicy(display?.instructionalController?.policyId)) };
   });
 }
 

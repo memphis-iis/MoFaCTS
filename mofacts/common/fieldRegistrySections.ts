@@ -1,4 +1,5 @@
 import { createDeliverySettingSchema } from './fieldRegistry.ts';
+import { SPARC_TARGET_CATEGORIES } from '../../learning-components/runtime/sparcTargetCategories.ts';
 import {
   INTERACTIVE_TDF_UNIT_TYPES,
   type TdfUnitType,
@@ -311,6 +312,14 @@ export function createStimSchemaFromRegistry(): Record<string, unknown> {
               properties: {
                 pageId: { type: 'string', minLength: 1 },
                 display: { type: 'object', properties: {
+                  autoTutorTargets: { type: 'object', properties: {
+                    expectations: { type: 'array', items: { type: 'object', properties: {
+                      category: { type: 'string', enum: [...SPARC_TARGET_CATEGORIES], description: 'Complete authored fact/model/rule combination. Required for category-aware dynamic policies by upload validation.' },
+                    } } },
+                    misconceptions: { type: 'array', items: { type: 'object', properties: {
+                      category: { type: 'string', enum: [...SPARC_TARGET_CATEGORIES], description: 'Category of the intended corrective understanding.' },
+                    } } },
+                  } },
                   worksheet: { type: 'object', additionalProperties: false,
                     description: 'Fixed-question work and read-only feedback. Answers are saved normally without live model updates.',
                     required: ['workDurationSeconds', 'reviewDurationSeconds', 'randomizeQuestions'],

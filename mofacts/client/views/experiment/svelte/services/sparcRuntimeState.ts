@@ -1,4 +1,5 @@
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
+import { projectSparcAnsweredQuestionOperations } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
 import { isSparcCompetitivePolicy, isSparcDynamicPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { logistic, targetExpectancy } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
 import { calculateExpectationProbabilities } from '../../../../../../learning-components/models/adaptive-logistic/probabilityCalculation';
@@ -6,7 +7,6 @@ import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-compone
 import { projectSparcMenuOperations } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
 import {
   SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
-  collectSparcProgressiveNodeOperations,
 } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
 import {
   createSparcAuthoredDocumentFromTrialDisplay,
@@ -149,9 +149,7 @@ export function projectSparcReplayStateToNodeValues(
       nodeValues[`${nodeId}::${key}`] = cell.value;
     }
   }
-  const progressiveNodeOperations = [...collectSparcProgressiveNodeOperations(
-    replayState.transitions,
-  ) as readonly Record<string, unknown>[], ...projectSparcMenuOperations(replayState)];
+  const progressiveNodeOperations = [...projectSparcAnsweredQuestionOperations(replayState), ...projectSparcMenuOperations(replayState)];
   if (progressiveNodeOperations.length > 0) {
     nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveNodeOperations;
   }

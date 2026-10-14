@@ -3,6 +3,9 @@ import type { SparcControllerDisplay } from './sparcController';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import type { SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
 import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
+import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
+import { SPARC_TARGET_CATEGORIES } from '../../../../../../learning-components/runtime/sparcTargetCategories';
+import { composeSparcCategoryInstructions } from '../../../../../../learning-components/units/sparcsession/sparcCategoryInstructions';
 import {
   createSparcDialogueOpenRouterProvider,
   type SparcDialogueLearnerResponseScoringTraceEvent,
@@ -200,6 +203,46 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
+  it('realizes all 42 category/composition/format specifications with the selected instructions and actual support', async function() {
+    for (const category of SPARC_TARGET_CATEGORIES) for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
+      const observed: string[] = [];
+      const provider = createSparcDialogueOpenRouterProvider({ callResolvedOpenRouterJson: async params => {
+        const system = String(params.messages[0]!.content);
+        expect(system).to.contain('Strategically integrate as many');
+        for (const aspect of category.split('-')) expect(system).to.contain(`${aspect.toUpperCase()}:`);
+        observed.push(params.intent.schemaName);
+        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: {
+          kind: 'comparison', workedExample: 'Case A meets the decisive condition. Case B does not.', heading: 'Comparison',
+          imagePrompt: null, figureDescription: null, displayWidth: null,
+        } };
+        if (params.intent.schemaName.includes('explanation_primitive')) {
+          if (definition.components!.includes('richContent')) expect(String(params.messages[1]!.content)).to.contain('Case A');
+          return { parsedContent: { tutorMessage: 'The condition determines whether the rule applies.' } };
+        }
+        expect(system).to.contain('RESPONSE FORMAT:');
+        return { parsedContent: { tutorMessage: 'Which case meets the specified condition?', ...(definition.responseFormat === 'multiple-choice' ? {
+          choices: [{ id: 'a', label: 'Case A', correct: true }, { id: 'b', label: 'Case B', correct: false }, { id: 'c', label: 'Neither case', correct: false }],
+        } : {}) } };
+      } });
+      const output = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId,
+        moveDefinition: { ...definition, promptPolicy: composeSparcCategoryInstructions(category, definition.components!, definition.responseFormat!) } }) as SparcInstructionComponents;
+      expect(output.question).to.contain('Which case');
+      expect(observed).to.have.length(definition.components!.length);
+      if (definition.responseFormat === 'multiple-choice') expect(output.choices!.filter(choice => choice.correct)).to.have.length(1);
+      else expect(output.choices).to.equal(undefined);
+      if (definition.components!.includes('richContent')) expect(output.supportHeading).to.equal('Comparison');
+    }
+  });
+  it('rejects generated MC options without one defensible answer instead of substituting text or another move', async function() {
+    const definition = requireActiveSparcMoveDefinition('instruction.dynamic.question.multiple-choice');
+    const provider = createSparcDialogueOpenRouterProvider({ callResolvedOpenRouterJson: async () => ({ parsedContent: {
+      tutorMessage: 'Select a case.', choices: [{ id: 'a', label: 'A', correct: false }, { id: 'b', label: 'B', correct: false }, { id: 'c', label: 'C', correct: false }],
+    } }) });
+    let error: unknown;
+    try { await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition }); }
+    catch (caught) { error = caught; }
+    expect(String(error)).to.contain('exactly one correct');
+  });
   it('realizes the retained component compositions through dependent primitives', async function() {
     for (const action of ['instruction.question', 'instruction.explanation-question', 'instruction.rich-question', 'instruction.explanation-rich-question']) {
       const definition = requireActiveSparcMoveDefinition(action);
@@ -300,6 +343,32 @@ describe('SPARC dialogue OpenRouter provider', function() {
       moveDefinition: requireActiveSparcMoveDefinition('instruction.feedback'), plannerState: { assessment: [{ clusterKC: 'kc-a', coverage: .4 }] } });
     expect(result).to.equal('The parameter is fixed; the intervals vary.');
   });
+  it('evaluates a selected MC meaning as evidence rather than converting its answer key into coverage', async function() {
+    const context = scorerContext();
+    const learnerText = 'Interest is calculated on the total balance.';
+    const provider = createSparcDialogueOpenRouterProvider({
+      async callResolvedOpenRouterJson(params) {
+        const input = JSON.parse(params.messages[1]!.content as string);
+        expect(input).to.include({ learnerText, responseFormat: 'multiple-choice', selectedChoiceId: 'option-b' });
+        expect(input).not.to.have.property('correct');
+        expect(params.messages[0]!.content).to.include('unselected distractors are not learner beliefs');
+        expect(params.messages[0]!.content).to.include('Do not treat selection of supplied wording as independent free recall');
+        return { parsedContent: {
+          learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
+            learnerEvidence: latestLearnerEvidence('total balance') }],
+          diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
+          learnerContribution: { type: 'answer', confidence: 0.9 },
+        } };
+      },
+    });
+    const score = await provider.scoreLearnerResponse({
+      display: dialogueDisplay(), learnerText, ...context,
+      event: { ...context.event, payload: { questionId: 'accepted-turn:question', choiceId: 'option-b', correct: true } },
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(score.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
+    expect(score.diagnosticMisconceptionScores).to.equal(undefined);
+  });
+
   it('scores learner responses through server-resolved OpenRouter without choosing a move', async function() {
     const calls: unknown[] = [];
     const observedTrace: SparcDialogueLearnerResponseScoringTraceEvent[] = [];

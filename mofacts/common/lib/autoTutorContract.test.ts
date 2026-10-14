@@ -159,6 +159,22 @@ function buildValidSparcAutoTutorStimuli() {
 }
 
 describe('AutoTutor content contract', function() {
+  it('requires exactly one valid authored category for every target in the new dynamic family', function() {
+    const stimuli = buildValidSparcAutoTutorStimuli();
+    const display = stimuli.setspec.sparcPages[0]!.display;
+    display.instructionalController.policyId = 'dynamic-instruction-agent-v2';
+    const validate = () => validateAutoTutorContent({ tdf: buildValidSparcAutoTutorTdf(), stimuli });
+    expect(validate().valid).to.equal(false);
+    expect(validate().errors.join(' ')).to.contain('requires category');
+    Object.assign(display.autoTutorTargets.expectations[0]!, { category: 'model-rule' });
+    Object.assign(display.autoTutorTargets.misconceptions[0]!, { category: 'fact-model' });
+    expect(validate()).to.deep.equal({ valid: true, errors: [] });
+    Object.assign(display.autoTutorTargets.expectations[0]!, { category: 'principle' });
+    expect(validate().valid).to.equal(false);
+    display.instructionalController.policyId = 'dynamic-instruction-student-v1';
+    delete (display.autoTutorTargets.expectations[0]! as { category?: string }).category;
+    expect(validate().valid).to.equal(true);
+  });
   it('accepts a valid AutoTutor TDF and stimulus pair', function() {
     const result = validateAutoTutorContent({
       tdf: buildValidTdf(),

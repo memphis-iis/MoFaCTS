@@ -1,5 +1,5 @@
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
-import { isSparcCompetitivePolicy, isSparcDynamicPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { isSparcCompetitivePolicy, isSparcDynamicPolicy, isSparcStudentPolicy, isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
 import { SPARC_DYNAMIC_TARGET_LOGIT, SPARC_FEEDBACK_ACTION } from './sparcDynamicInstructionRules';
 import { advanceOet, competitiveAssessmentFacts, competitiveCandidateFacts, competitiveMoveFacts, selectCompetitiveActivation, SPARC_ADVANCE_OET_ACTION, targetOet } from './sparcCompetitiveSelection';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
@@ -7,7 +7,7 @@ import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY, type SparcProgressiveNodeOp
 import { assertCompletedDialogueReplayState, RESPONSE_LOCAL_FACT_TYPES, type SparcAutoTutorRuleTurnParams } from './sparcAutoTutorRuleRuntime';
 import { createSparcLearnerResponseScoreFacts, expectationLogitChangesFromScoreFacts } from './sparcLearnerResponseScoring';
 import { requireSparcInstructionalAdapter } from './sparcInstructionalAdapterRegistry';
-import { SPARC_COMPOSITE_MOVE_DEFINITIONS, SPARC_DYNAMIC_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
+import { SPARC_COMPOSITE_MOVE_DEFINITIONS, SPARC_DYNAMIC_MOVE_DEFINITIONS, SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
 import { createSparcInstructionTransition, createSparcFeedbackRequest, createSparcInstructionComponentWrite, type SparcInstructionComponents } from './sparcInstructionalPrimitives';
 import { createSparcUtteranceRequestFromFacts, type SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts, progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
@@ -94,6 +94,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   const student = isSparcStudentPolicy(params.document.instructionalController?.policyId);
   const competitive = isSparcCompetitivePolicy(params.document.instructionalController?.policyId);
   const dynamic = isSparcDynamicPolicy(params.document.instructionalController?.policyId);
+  const dynamicMoves = isSparcCategorizedPolicy(params.document.instructionalController?.policyId) ? SPARC_CATEGORIZED_MOVE_DEFINITIONS : SPARC_DYNAMIC_MOVE_DEFINITIONS;
   assertCompletedDialogueReplayState(params.replayState);
   const adapter = requireSparcInstructionalAdapter(params.document.instructionalController);
   const previous = params.replayState?.transitions ?? [];
@@ -114,7 +115,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   let facts = [...buildSparcWorkingMemoryFacts({ ...params, event })].filter((fact) => !RESPONSE_LOCAL_FACT_TYPES.has(fact.factType)
     || (event.type === 'choice-selected' && ['learnerResponse.contribution', 'dialogue.learnerQuestion', ...(dynamic ? ['controller.completionState'] : [])].includes(fact.factType)));
   facts.push({ factType: 'dialogue.problemStatement', slots: { text: params.problemStatement } });
-  if (competitive) facts.push(...(dynamic ? SPARC_DYNAMIC_MOVE_DEFINITIONS.map((move) => ({ factType: 'instructional.move', slots: { action: move.moveId, assistance: move.assistance } })) : competitiveMoveFacts()));
+  if (competitive) facts.push(...(dynamic ? dynamicMoves.map((move) => ({ factType: 'instructional.move', slots: { action: move.moveId, assistance: move.assistance } })) : competitiveMoveFacts()));
   let finalRecord: SparcCanonicalHistoryRecord | undefined;
   let generatedRequest: SparcUtteranceRequest | undefined;
   let generated = false;
@@ -179,11 +180,13 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       if (!node || typeof node.value !== 'string') throw new Error('Saved instructional primitive is invalid');
       realized[component] = node.value;
       if (node.figure) realized.figure = node.figure as NonNullable<SparcInstructionComponents['figure']>;
+      if (node.choices) realized.choices = node.choices as NonNullable<SparcInstructionComponents['choices']>;
+      if (node.supportHeading) realized.supportHeading = String(node.supportHeading);
       savedComponents.add(component);
     }
     const output = await params.generateTutorUtterance({ ...request, realizedInstruction: realized,
-      onInstructionComponent: async (component, text, figure) => {
-        const write = createSparcInstructionComponentWrite({ document: params.document, event, request, component, text, ...(figure ? { figure } : {}) });
+      onInstructionComponent: async (component, text, figure, details) => {
+        const write = createSparcInstructionComponentWrite({ document: params.document, event, request, component, text, ...(figure ? { figure } : {}), ...(details ? { details } : {}) });
         await save({ transitionId: `${event.eventId}:primitive:${component}`, event, writes: [write] });
         savedComponents.add(component);
       },
@@ -194,7 +197,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     return { assertions: [...assertions(student ? [menuConsumed] : [], true)], writes: [...transition.writes.filter(write => {
       const id = (write.value as { node?: { id?: string } })?.node?.id;
       return !id || !savedComponents.has(id.substring(`${event.eventId}:`.length));
-    }), ...inputControls(event, true)] };
+    }), ...inputControls(event, request.moveDefinition.responseFormat !== 'multiple-choice')] };
   };
   const actions: Record<string, SparcProductionActionHandler> = {
     [SPARC_FEEDBACK_ACTION]: async ({ facts: current, ruleId }) => {
@@ -266,7 +269,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       return { assertions: assertions([{ factType: 'instructional.oet', factId: targetKey,
         slots: { targetKey, logit: advanceOet(targetOet(current, targetKey), Number(args.increment)) } }], true), writes: [] };
     },
-    ...Object.fromEntries([...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS].map((definition) => [definition.moveId, generate])),
+    ...Object.fromEntries([...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS, ...SPARC_CATEGORIZED_MOVE_DEFINITIONS].map((definition) => [definition.moveId, generate])),
     [SPARC_MENU_ACTION]: async ({ args }) => {
       menuOffered = true;
       return { assertions: assertions([menuFrom(args)], true), writes: inputControls(event, false) };

@@ -1,4 +1,6 @@
-import { SPARC_COMPETITIVE_POLICY_ID, isSparcDynamicPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { SPARC_COMPETITIVE_POLICY_ID, isSparcDynamicPolicy, isSparcStudentPolicy, isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { sparcTargetCategoryFields } from '../../runtime/sparcTargetCategories';
+import { savedSparcChoiceQuestions, parseSparcQuestionChoices } from './sparcMultipleChoiceQuestion';
 import { createSparcDynamicInstructionRules } from './sparcDynamicInstructionRules';
 import { createSparcCompetitiveRules } from './sparcCompetitiveSelection';
 import type {
@@ -131,6 +133,8 @@ function requireNonBlank(value: unknown, label: string): string {
 
 function normalizeCleanAutoTutorTargets(display: SparcTrialDisplay): SparcAuthoredDocument['autoTutorTargets'] | undefined {
   const cleanTargets = (display as Record<string, unknown>).autoTutorTargets;
+  const controller = (display as Record<string, unknown>).instructionalController;
+  const categorized = isSparcCategorizedPolicy(isRecord(controller) ? controller.policyId : undefined);
   const expectationEntries = isRecord(cleanTargets) && Array.isArray(cleanTargets.expectations)
     ? cleanTargets.expectations
     : [];
@@ -152,6 +156,7 @@ function normalizeCleanAutoTutorTargets(display: SparcTrialDisplay): SparcAuthor
     return {
       clusterKC: requireNonBlank(entry.clusterKC, `SPARC AutoTutor autoTutorTargets.expectations[${index}].clusterKC`),
       text: requireNonBlank(entry.text, `SPARC AutoTutor autoTutorTargets.expectations[${index}].text`),
+      ...sparcTargetCategoryFields(entry.category, `expectation ${entry.clusterKC}`, categorized),
     };
   });
   const misconceptions: SparcAutoTutorMisconception[] = misconceptionEntries.map((entry, index) => {
@@ -161,6 +166,7 @@ function normalizeCleanAutoTutorTargets(display: SparcTrialDisplay): SparcAuthor
     return {
       id: requireNonBlank(entry.id, `SPARC AutoTutor autoTutorTargets.misconceptions[${index}].id`),
       text: requireNonBlank(entry.text, `SPARC AutoTutor autoTutorTargets.misconceptions[${index}].text`),
+      ...sparcTargetCategoryFields(entry.category, `misconception ${entry.id}`, categorized),
     };
   });
   return { expectations, misconceptions };
@@ -347,7 +353,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
   const productionRules = display.unitType === 'sparc-autotutor-dialogue'
-    ? isSparcDynamicPolicy(instructionalController?.policyId) ? createSparcDynamicInstructionRules(isSparcStudentPolicy(instructionalController?.policyId) ? 'student' : 'agent')
+    ? isSparcDynamicPolicy(instructionalController?.policyId) ? createSparcDynamicInstructionRules(isSparcStudentPolicy(instructionalController?.policyId) ? 'student' : 'agent', isSparcCategorizedPolicy(instructionalController?.policyId))
       : instructionalController?.policyId === SPARC_COMPETITIVE_POLICY_ID ? createSparcCompetitiveRules() : isSparcInstructionalCycle(instructionalController)
       ? createSparcInstructionalCycleRules(instructionalController?.policyId === SPARC_STUDENT_SELECTED_POLICY_ID ? 'student' : 'agent')
       : createSparcProgressiveScaffoldingRules()
@@ -792,11 +798,29 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
         payload: { menuId, optionId: option!.id, targetId: option!.targetId, targetKind: option!.targetKind } };
       learnerText = '';
     } else {
-      if (menu?.slots?.status === 'pending' || menu?.slots?.status === 'selected') throw new Error('Select an offered instructional option before submitting another answer');
-      const response = createSparcDialogueEventFromTrialResult(params);
       const lastInstruction = replayState.transitions.filter((transition) => transition.transitionId.endsWith(':cycle')).at(-1);
-      event = { ...response.event, time: eventTime, eventId: `${params.pageKey}:response:${lastInstruction?.event.time ?? 'opening'}` };
-      learnerText = response.learnerText;
+      const questions = savedSparcChoiceQuestions(replayState);
+      const question = questions.find(node => triggeredBy.startsWith(`${String(node.id)}:answer:`));
+      const priorResponse = question ? replayState.transitions.find(transition => transition.event.type === 'response-submitted'
+        && transition.event.source.nodeId === triggeredBy && transition.event.payload?.questionId === question.id)?.event : undefined;
+      if (!priorResponse && (menu?.slots?.status === 'pending' || menu?.slots?.status === 'selected')) throw new Error('Select an offered instructional option before submitting another answer');
+      if (question) {
+        const choices = parseSparcQuestionChoices(question.choices);
+        const selected = choices.find(choice => triggeredBy === `${String(question.id)}:answer:${choice.id}`);
+        if (!selected || params.result.submittedNodes[triggeredBy] !== selected.id) throw new Error('Invalid multiple-choice answer binding');
+        if (!priorResponse && (question !== questions.at(-1) || question.turnEventId !== lastInstruction?.event.eventId
+          || replayState.transitions.some(transition => transition.event.payload?.questionId === question.id))) throw new Error('Stale multiple-choice question');
+        learnerText = selected.label;
+        event = priorResponse ?? { eventId: `${params.pageKey}:response:${lastInstruction!.event.time}`, type: 'response-submitted',
+          source: { pageKey: params.pageKey, nodeId: triggeredBy }, time: eventTime,
+          payload: { action: 'SubmitDialogueResponse', input: learnerText, triggeredBy, questionId: question.id, choiceId: selected.id, correct: selected.correct } };
+        if (event.payload?.choiceId !== selected.id) throw new Error('Conflicting multiple-choice answer');
+      } else {
+        if (questions.length && questions.at(-1)?.turnEventId === lastInstruction?.event.eventId) throw new Error('Select an option for the current multiple-choice question');
+        const response = createSparcDialogueEventFromTrialResult(params);
+        event = { ...response.event, time: eventTime, eventId: `${params.pageKey}:response:${lastInstruction?.event.time ?? 'opening'}` };
+        learnerText = response.learnerText;
+      }
     }
     const problemStatement = requireSparcDialogueProblemStatement(params.display);
     const dialogueTurn = await commitSparcInstructionalCycle({ ...params, core, document, replayState, event, problemStatement,

@@ -10,6 +10,8 @@ SPARC AutoTutor displays select one runtime-owned production set through
 | `oet-boltzmann-v2` | Existing target progression selects and retains the KC; Pump, both Prompt variants, Hint, and Assertion compete only for that target using expectancy, assistance, OET, and temperature. No unfinished eligible target is a natural stop. |
 | `dynamic-instruction-agent-v1` | Existing target progression and Boltzmann calculation; three component moves with assistance 0, 1.8, and 2.77, fixed target probability 0.8, feedback before selection. |
 | `dynamic-instruction-student-v1` | Same three component moves plus separate next-KC navigation, with feedback before the menu. Stops when all expectation goals are met and no misconception remains eligible. |
+| `dynamic-instruction-agent-v2` | Category-aware dynamic instruction: six composition/response-format variants, exact authored category IFs, 210 instructional productions, fixed OET. |
+| `dynamic-instruction-student-v2` | Same shared category-aware primitives; six labeled text/MC choices plus next-KC navigation, with dynamic feedback and completion. |
 
 These remain separate component policies. During the admin rollout described below,
 the app retains an authored student-selected policy for admins and resolves other
@@ -19,6 +21,61 @@ Authored AutoTutor displays omit `productionRules`; the runtime supplies the sel
 set. Upload validation and the runtime share the allowed policy identifiers.
 
 ## Dynamic instruction
+
+### Category-aware text and multiple choice
+
+The v2 dynamic policies require `category` on every entry in
+`display.autoTutorTargets.expectations` and `.misconceptions`. Allowed complete combinations
+are `fact`, `model`, `rule`, `fact-model`, `fact-rule`, `model-rule`, and `fact-model-rule`.
+`model-rule` represents a principle. Misconception categories describe the corrective
+understanding. App upload validation and runtime target construction reject missing or
+invalid categories for these policies; they do not infer a category. Other policies do
+not acquire a new required field. The generated stimulus schema describes this field.
+
+`sparcDynamicInstructionRules.ts` builds 210 automatic instructional productions
+(five target transitions × three compositions × two response formats × seven categories),
+plus evaluation, feedback, and stop. Student instruction selections explicitly match
+the same category. `sparcCategoryInstructions.ts` maintains the fact/model/rule, move,
+response-format, and synthesis blocks once. Generation composes them for the authored
+KC demands: recall, recognition, application, and/or explanation, integrating as many
+specified demands as feasible. No extra synthesis provider call or generation engine
+is introduced. The review workbook in `docs/sparc-primitive-instructions-proposal.xlsx`
+contains the corresponding 42 specifications and ten initial target assignments.
+
+Complete-move assistance logits are question text −0.25 / MC 0.25;
+explanation text 1.55 / MC 2.05; rich text 2.52 / MC 3.02. These do not alter the
+0.2 expectation floor, fixed 0.8 OET, temperature 0.1, or current-target boundary.
+The registered move IDs append `.text` or `.multiple-choice` to the dynamic base action.
+
+Generated MC questions have three or four distinct options with stable IDs and exactly
+one correct answer. `sparcMultipleChoiceQuestion.ts` reuses TutorScript's semantic MC
+expansion and standard buttons. Menu clicks remain `choice-selected`; MC answers become
+`response-submitted`, bound to a saved `questionId` and `choiceId`. The selected option's
+actual label is the learner contribution to the existing semantic evaluator; the saved
+answer key records correctness without directly inventing KC coverage. Choosing a supplied
+explanation does not establish that the learner independently produced it. Free-text
+submission is disabled while an MC question is active. Stale/tampered options reject,
+accepted responses score once, and reload retains option order and the selected answer.
+
+Rich support realizes before dependent explanation/question generation. Images are framed
+without a displayed caption or heading and retain their accessible description and saved
+provider context. Nonimage support is framed with a compact form heading: Worked Example,
+Comparison, or a short table/form label. Ordinary explanation remains unframed. Figure-library
+retrieval, authorization, immutable asset versions, and saved decisions retain their owners.
+
+Ordinary authenticated OpenRouter requests are limited by the existing DDP rule to
+600 requests per hour. A rich instructional turn can use separate calls for scoring,
+feedback, support, explanation, and question; this limit accommodates those calls
+and author testing. Method authorization and public-demo AI quotas still apply.
+
+Initial packages live in `C:\dev\mofacts_config\SPARC Categorized Confidence Interval`.
+They have fresh TDF/page identities, preserve the seven expectation and three misconception
+texts and graph, and select the two v2 policies. Source packages and learner history are
+not rewritten. Upload them only after the category-aware application runtime is available.
+
+The older dynamic behavior described below applies to v1. Its historical acceptance
+evidence does not verify the v2 extension. Current verification results are recorded
+in the wiki specification.
 
 `sparcDynamicInstructionRules.ts` provides the new student and agent rule family.
 The existing response-evaluation production runs once; a separate feedback production
@@ -212,9 +269,10 @@ Detailed specification, acceptance results, and outstanding verification are in 
 
 ## Admin competition rollout
 
-AutoTutor delivery honors an authored `student-selected-v2` for authenticated admins;
-all other supported AutoTutor policies resolve to `oet-boltzmann-v2` for admins.
-Every non-admin account retains `progressive-scaffolding-v1`. This preserves the
+AutoTutor delivery honors authored student-selected and explicit dynamic-instruction
+policies for authenticated admins; remaining supported AutoTutor policies resolve to
+`oet-boltzmann-v2` for admins. Non-admins use `progressive-scaffolding-v1` for ordinary
+AutoTutor packages and are rejected from explicit dynamic-instruction packages. This preserves the
 existing admin behavior for ordinary AutoTutor packages while enabling the separate
 student-choice package. Other SPARC unit types are unaffected. Delivery and submission
 share the same account/policy resolution. No adaptive switching between authorities is added.

@@ -94,11 +94,13 @@ export type SparcClusterModelTarget = ModelPracticeHistoryIdentity & {
 };
 
 export type SparcAutoTutorExpectation = {
+  readonly category?: import('../../runtime/sparcTargetCategories').SparcTargetCategory;
   readonly clusterKC: string;
   readonly text: string;
 };
 
 export type SparcAutoTutorMisconception = {
+  readonly category?: import('../../runtime/sparcTargetCategories').SparcTargetCategory;
   readonly id: string;
   readonly text: string;
 };

@@ -9,6 +9,7 @@ export type SparcMoveFamily =
 export type SparcMoveStatus = 'active';
 
 export type SparcMoveDefinition = {
+  readonly responseFormat?: import('../../runtime/sparcTargetCategories').SparcQuestionResponseFormat;
   readonly components?: readonly ('explanation' | 'richContent' | 'question')[];
   readonly assistance?: number;
   readonly moveId: string;
@@ -218,6 +219,17 @@ export const SPARC_DYNAMIC_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = [
     + (definition.moveId === 'instruction.dynamic.question' ? '\n' + AUTOTUTOR_PROMPT_POLICY.split('\n').slice(4).join('\n') : ''),
 }));
 
+/** Six complete moves share the existing component generator and node renderer. */
+export const SPARC_CATEGORIZED_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = SPARC_DYNAMIC_MOVE_DEFINITIONS.flatMap(definition =>
+  (['text', 'multiple-choice'] as const).map(responseFormat => ({
+    ...definition, moveId: `${definition.moveId}.${responseFormat}`, responseFormat,
+    assistance: Math.round((definition.assistance! + (responseFormat === 'text' ? -0.25 : 0.25)) * 100) / 100,
+    version: 'v2', promptId: `${definition.promptId}.${responseFormat}`, promptVersion: 'v2',
+    outputSchemaVersion: 'v3',
+    // Category-aware wording is composed from authored target demands at request construction.
+    promptPolicy: 'Generate only the selected composition and response format. Respect the authored KC demands and shared category instructions. All text is plain text; feedback has already been delivered.',
+  })));
+
 export const SPARC_FEEDBACK_MOVE_DEFINITION: SparcMoveDefinition = autotutorDialogueMove({
   moveId: 'instruction.feedback', paperMoveName: 'Post-answer feedback', promptVersion: 'v1',
   promptPolicy: promptPolicy(
@@ -227,7 +239,7 @@ export const SPARC_FEEDBACK_MOVE_DEFINITION: SparcMoveDefinition = autotutorDial
 });
 
 export function getSparcMoveDefinition(moveId: string): SparcMoveDefinition | undefined {
-  return [...SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS, ...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS, SPARC_FEEDBACK_MOVE_DEFINITION].find((definition) => definition.moveId === moveId);
+  return [...SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS, ...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS, ...SPARC_CATEGORIZED_MOVE_DEFINITIONS, SPARC_FEEDBACK_MOVE_DEFINITION].find((definition) => definition.moveId === moveId);
 }
 
 export function requireActiveSparcMoveDefinition(moveId: string): SparcMoveDefinition {

@@ -1,6 +1,7 @@
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief, parseSparcPromptFigure, SPARC_SUPPORTED_PROMPT_JSON_SCHEMA, SPARC_SUPPORTED_PROMPT_SCHEMA_ID, SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY } from '../../../../../../learning-components/units/sparcsession/sparcSupportedPrompt';
 import { callSparcPromptImage, readSparcPromptImage, type CallSparcPromptImage, type ReadSparcPromptImage } from './sparcPromptImage';
 import { parseInstructionComponents, type SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
+import { parseSparcQuestionChoices } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
 import { SPARC_SUPPORTED_PROMPT_SIZING_POLICY } from '../../../../../../learning-components/units/sparcsession/sparcSupportedPrompt';
 import type {
   OpenRouterJsonSchema,
@@ -565,8 +566,12 @@ export function createSparcDialogueOpenRouterProvider(
     let explanation: string | null = request.realizedInstruction?.explanation ?? null;
     let richContent: string | null = request.realizedInstruction?.richContent ?? null;
     let figure: SparcInstructionComponents['figure'] = request.realizedInstruction?.figure;
+    let choices: SparcInstructionComponents['choices'] = request.realizedInstruction?.choices;
+    let supportHeading = request.realizedInstruction?.supportHeading;
+    const categorized = request.moveDefinition.responseFormat !== undefined;
     const context = () => JSON.stringify({ targetKind: request.targetType, targetContent: request.targetContent ?? request.contentTexts,
       openingContext: request.problemStatement, learnerText: request.learnerText, dialogueHistory: request.dialogueHistory,
+      selectedMove: request.action, responseFormat: request.moveDefinition.responseFormat, requestedComponents: components,
       explanation, richContent, ...(figure ? { figure } : {}) });
     const realize = async (component: string, task: string, schema: OpenRouterJsonSchema) => {
       const history = [...(request.dialogueHistory ?? []), ...(figure ? [{ role: 'tutor', text: richContent, figure }] : [])];
@@ -597,25 +602,34 @@ export function createSparcDialogueOpenRouterProvider(
     if (components.includes('richContent') && richContent === null) {
       const stringOrNull = { type: ['string', 'null'], maxLength: 2048 };
       const output = await realize('rich', [
-        'Choose worked-example or figure based on pedagogical appropriateness. Prefer figures for models and worked examples for principles; either can teach conceptual reasoning.',
+        categorized ? 'Choose worked-example, comparison, table, or figure to serve the authored category and KC demands. For nonimage support, supply plain-text content in workedExample and a short heading naming its instructional form. Worked examples use exactly Worked Example; comparisons use Comparison. Other headings name the form, not the topic. Figures use null for heading and have no displayed title or caption.' : 'Choose worked-example or figure based on pedagogical appropriateness. Prefer figures for models and worked examples for principles; either can teach conceptual reasoning.',
+        ...(categorized ? ['The support demonstrates only the selected KC task. Its result can be the required recognition, identification, explanation, or application; do not complete a larger domain procedure or calculate extra outcomes belonging to other KCs to make the example seem complete. The heading is rendered separately: do not repeat it inside workedExample content.'] : []),
         'For worked-example, supply a complete worked case in workedExample and use null for all figure fields. Include givens, reasoning, result, and a formula when useful.',
         'For figure, use null for workedExample and supply imagePrompt, figureDescription, and displayWidth. Illustrate the teaching case completely, with accurate relationships. figureDescription describes and explains only this teaching figure. Neither figureDescription nor imagePrompt may contain a learner question, a new practice case, or a response task. The separate question primitive will create the isomorphic question after the figure exists. Do not automatically omit a model feature as the old supported prompt did.',
         'The image brief describes reusable instructional content. Do not include a learner name, account identifier, raw learner response, or personal history in the brief or figure.',
         SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY, SPARC_SUPPORTED_PROMPT_SIZING_POLICY,
       ].join('\n'), {
-        type: 'object', additionalProperties: false, required: ['kind', 'workedExample', 'imagePrompt', 'figureDescription', 'displayWidth'],
-        properties: { kind: { type: 'string', enum: ['worked-example', 'figure'] }, workedExample: stringOrNull,
+        type: 'object', additionalProperties: false, required: ['kind', 'workedExample', 'imagePrompt', 'figureDescription', 'displayWidth', ...(categorized ? ['heading'] : [])],
+        properties: { kind: { type: 'string', enum: categorized ? ['worked-example', 'comparison', 'table', 'figure'] : ['worked-example', 'figure'] }, workedExample: stringOrNull,
           imagePrompt: { type: ['string', 'null'], maxLength: 8000 }, figureDescription: stringOrNull,
-          displayWidth: { type: ['integer', 'null'] } },
+          displayWidth: { type: ['integer', 'null'] }, ...(categorized ? { heading: { type: ['string', 'null'], maxLength: 60 } } : {}) },
       });
       if (!output || typeof output !== 'object' || Array.isArray(output)) throw new Error('Rich primitive requires an object');
       const rich = output as Record<string, unknown>;
-      if (Object.keys(rich).length !== 5) throw new Error('Invalid rich primitive fields');
-      if (rich.kind === 'worked-example') {
+      if (Object.keys(rich).length !== (categorized ? 6 : 5)) throw new Error('Invalid rich primitive fields');
+      if (rich.kind === 'worked-example' || (categorized && ['comparison', 'table'].includes(String(rich.kind)))) {
         if (rich.imagePrompt !== null || rich.figureDescription !== null || rich.displayWidth !== null) throw new Error('Worked example has unexpected figure fields');
         richContent = requireBoundedSparcDialogueMessage(rich.workedExample, 'SPARC worked example');
         if (/<\/?[a-z][^>]*>/i.test(richContent)) throw new Error('Worked-example primitive requires plain text, not HTML or image markup');
+        if (categorized) {
+          supportHeading = requireBoundedSparcDialogueMessage(rich.heading, 'Support heading');
+          if (supportHeading.length > 60 || /[<>\r\n]/.test(supportHeading)
+            || (rich.kind === 'worked-example' && supportHeading !== 'Worked Example')
+            || (rich.kind === 'comparison' && supportHeading !== 'Comparison')) throw new Error('Invalid instructional support heading');
+          if (richContent.split(/\r?\n/)[0]!.trim() === supportHeading) throw new Error('Support content must omit its separately rendered heading');
+        }
       } else if (rich.kind === 'figure') {
+        if (categorized && rich.heading !== null) throw new Error('Figure must not have a displayed heading');
         if (rich.workedExample !== null) throw new Error('Figure has unexpected worked-example content');
         const brief = parseSparcSupportedPromptBrief({ tutorMessage: rich.figureDescription, imagePrompt: rich.imagePrompt, figureDescription: rich.figureDescription, displayWidth: rich.displayWidth });
         const generationId = request.selectedAction.snapshotId;
@@ -633,19 +647,35 @@ export function createSparcDialogueOpenRouterProvider(
         figure = parseSparcPromptFigure(image.figure);
         richContent = figure.description;
       } else throw new Error('Rich primitive must choose worked-example or figure');
-      await request.onInstructionComponent?.('richContent', richContent, figure);
+      await request.onInstructionComponent?.('richContent', richContent, figure, supportHeading ? { supportHeading } : undefined);
     }
     // Select the actual support first. Display order remains explanation, support, question.
     if (components.includes('explanation') && explanation === null) {
       explanation = await text('explanation', 'Generate only the explanation in tutorMessage. Teach the selected meaning directly, with no learner question. When a teaching figure or worked example is supplied, explain its actual case, values, notation, and relationships.');
       await request.onInstructionComponent?.('explanation', explanation);
     }
-    const question = request.realizedInstruction?.question ?? await text('question', [
+    const questionTask = [
       'Generate exactly one focused question in tutorMessage, with its own necessary givens. Do not supply its answer.',
-      richContent ? 'Use the actual worked example or actual generated figure supplied in context to construct an isomorphic question. Preserve the underlying relationship/task structure while using a new case, context, or inputs. Conceptual reasoning is valid. Do not ask the learner to copy a demonstrated result.' : 'The question must flow from the supplied explanation when present and elicit the selected target.',
-    ].join('\n'));
-    if (!request.realizedInstruction?.question) await request.onInstructionComponent?.('question', question);
-    return parseInstructionComponents({ explanation, richContent, question, ...(figure ? { figure } : {}) }, request);
+      ...(categorized ? ['Return only the question stem and necessary givens, without repeating the explanation, definitions, model conclusions, or worked reasoning already supplied. Do not state a definition or relationship that this question asks the learner to supply or recognize. A formula or other fact needed as an input to an application may be included when it is not itself the requested answer.'] : []),
+      richContent ? (categorized ? 'Use the actual support to elicit the specified KC demands. Use a structurally analogous new case when application/transfer is required; do not force new-case application for a recall or recognition target. Do not ask the learner merely to copy a displayed answer.' : 'Use the actual worked example or actual generated figure supplied in context to construct an isomorphic question. Preserve the underlying relationship/task structure while using a new case, context, or inputs. Conceptual reasoning is valid. Do not ask the learner to copy a demonstrated result.') : 'The question must flow from the supplied explanation when present and elicit the selected target.',
+    ].join('\n');
+    let question = request.realizedInstruction?.question;
+    if (question === undefined) {
+      if (request.moveDefinition.responseFormat === 'multiple-choice') {
+        const parsed = await realize('question', questionTask + '\nReturn tutorMessage and choices. Options use stable short ids, plain-text labels, and a correct boolean; exactly one is correct. The correct boolean is an answer key, never visible question text.', {
+          type: 'object', additionalProperties: false, required: ['tutorMessage', 'choices'], properties: {
+            tutorMessage: { type: 'string', minLength: 1, maxLength: 2048 },
+            choices: { type: 'array', minItems: 3, maxItems: 4, items: { type: 'object', additionalProperties: false,
+              required: ['id', 'label', 'correct'], properties: { id: { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,24}$' }, label: { type: 'string', minLength: 1, maxLength: 240 }, correct: { type: 'boolean' } } } },
+          },
+        });
+        if (!isRecord(parsed) || Object.keys(parsed).length !== 2) throw new Error('Invalid multiple-choice question output');
+        question = requireBoundedSparcDialogueMessage(parsed.tutorMessage, 'Multiple-choice question');
+        choices = parseSparcQuestionChoices(parsed.choices);
+      } else question = await text('question', questionTask);
+      await request.onInstructionComponent?.('question', question, undefined, choices ? { choices } : undefined);
+    }
+    return parseInstructionComponents({ explanation, richContent, question, ...(figure ? { figure } : {}), ...(choices ? { choices } : {}), ...(supportHeading ? { supportHeading } : {}) }, request);
   };
   const scoreLearnerResponseWithEvidence = async ({
     display,
@@ -653,6 +683,7 @@ export function createSparcDialogueOpenRouterProvider(
     problemStatement,
     document,
     replayState,
+    event,
   }: Parameters<SparcTrialDisplayDialogueTurnScorer>[0]): Promise<SparcDialogueLearnerResponseEvaluation> => {
     const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
     const learningTargets = targetSummaries(display);
@@ -668,6 +699,9 @@ export function createSparcDialogueOpenRouterProvider(
           content: [
             'You evaluate the learner’s accumulated instructional knowledge across the full dialogue through the latest response.',
             'Return only JSON matching the schema. Compare meanings, not keyword overlap.',
+            ...(event?.payload?.questionId || dialogueHistory.some(entry => entry.responseFormat === 'multiple-choice') ? [
+              'Response-format evidence: A multiple-choice response is the learner selecting and endorsing one supplied option. Evaluate the selected meaning in the actual question context and the KC demands it demonstrates. Do not treat selection of supplied wording as independent free recall or a self-produced explanation. It can demonstrate recognition, discrimination, or selecting an application/explanation. Preserve misconception detection from the learner’s selected meaning; unselected distractors are not learner beliefs. Do not convert an answer-key boolean directly into KC coverage.',
+            ] : []),
             '',
             'Apply these steps in order:',
             '1. Classify the latest contribution. Treat a contribution as on-topic if it relates to the original problem or to the ongoing instructional dialogue, including ideas introduced by the tutor. Expressions of confusion and requests for clarification about that material are on-topic. Use "answer" for an ordinary answer or explanation. Use "off-task" only when the response is unrelated to both the original problem and the ongoing instructional dialogue. Use "other" only when no other type fits.',
@@ -711,6 +745,7 @@ export function createSparcDialogueOpenRouterProvider(
             misconceptions,
             dialogueHistory,
             learnerText,
+            ...(event?.payload?.questionId ? { responseFormat: 'multiple-choice', selectedChoiceId: event.payload.choiceId } : {}),
             evaluationDirective: SPARC_SCORING_TERMINAL_DIRECTIVE,
           }),
         }],
