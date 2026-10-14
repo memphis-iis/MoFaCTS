@@ -3,7 +3,6 @@ import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { withCanonicalHistorySchemaVersion } from '../../../../../common/historyEnvelope';
 import type { HistoryWireRecord } from '../../../../../common/historyCompression';
 import { clientConsole } from '../../../../lib/clientLogger';
-import { getResearchAnonStudentId } from '../../../../lib/researchAnonId';
 import {
   sanitizePsynaptixSessionSummary,
   serializePsynaptixSessionSummary,
@@ -37,7 +36,7 @@ export function buildExternalSessionHistoryRecord(input: ExternalSessionHistoryI
   const resultJson = serializePsynaptixSessionSummary(input.result);
   const record: Record<string, unknown> = withCanonicalHistorySchemaVersion({
     userId: Meteor.userId() || undefined,
-    anonStudentId: getResearchAnonStudentId(),
+    anonStudentId: Meteor.user()?.username || '',
     TDFId: input.tdfId || undefined,
     sessionID: input.sessionId || '',
     levelUnit: Number.isFinite(input.unitId) ? Number(input.unitId) : 0,

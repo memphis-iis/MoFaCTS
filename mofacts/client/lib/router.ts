@@ -31,6 +31,7 @@ import { resolveSpeechIgnoreOutOfGrammarResponses } from './speechRecognitionCon
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
 import { hasPublicCreatorDisplayName } from './contentCreatorIdentity';
+import { capturePortalHandoffFromLocation } from '../views/experiment/svelte/services/externalUrlSession';
 import {
   LEARNING_ANALYTICS_DESTINATION,
   type NormalLoginReturnDestination,
@@ -542,6 +543,10 @@ FlowRouter.route('/experiment/:target?/:xcond?', {
     Session.set('tdfLaunchMode', 'root-random');
     Session.set('tdfFamilyRootTdfId', null);
     setExperimentParticipantContext({ experimentTarget: target }, 'router.experimentRoute');
+
+    if (typeof window !== 'undefined') {
+      capturePortalHandoffFromLocation(window.location.search);
+    }
 
     Cookie.set('isExperiment', '1', 21); // 21 days
     Cookie.set('experimentTarget', target, 21);

@@ -5,15 +5,15 @@ describe('externalUrlSession history (issue #240)', function() {
   afterEach(function() {
     // Clear the Meteor user stubs the record builder reads.
     (Meteor as unknown as Record<string, unknown>)._userId = undefined;
-    delete (Meteor as unknown as Record<string, unknown>)._userStub;
+    delete (Meteor as unknown as Record<string, unknown>).user;
   });
 
   it('builds a canonical session-summary record with a sanitized result payload', function() {
     (Meteor as unknown as Record<string, unknown>)._userId = 'learner-7';
-    (Meteor as unknown as Record<string, unknown>)._userStub = {
+    (Meteor as unknown as Record<string, unknown>).user = () => ({
       _id: 'learner-7',
-      profile: { researchAnonId: 'a_0123456789abcdef0123456789abcdef' },
-    };
+      username: 'learner-7',
+    });
     const record = buildExternalSessionHistoryRecord({
       sessionId: 'psx-s1',
       tdfId: 'tdf-1',

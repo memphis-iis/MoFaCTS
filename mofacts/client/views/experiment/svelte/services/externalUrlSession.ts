@@ -170,7 +170,7 @@ export function isExternalSessionReadyMessage(data: unknown, completionType: str
 
 /**
  * Issue #307: resilient completion channels shared with psynaptix `/session`
- * by convention only (no imports — AGPL boundary). BroadcastChannel +
+ * by convention only (no shared code imports). BroadcastChannel +
  * localStorage only help when MoFaCTS and psynaptix share an origin (e.g.
  * reverse-proxied under one host). Cross-origin handoff still relies on
  * `window.opener` postMessage; `/session` re-posts on "Return to MoFaCTS".

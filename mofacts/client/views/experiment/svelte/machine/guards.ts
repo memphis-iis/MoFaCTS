@@ -637,6 +637,16 @@ export function hasQuestionAudio({ context }: ContentRuntimeMachineActorArgs): b
   return !!context.currentDisplay?.audioSrc;
 }
 
+type ExternalUrlFadeEngineLike = {
+  unitType?: unknown;
+};
+
+/** external-url units have no card fade surface; skip fadingOut wait. */
+export function skipsCardFadeOut({ context }: ContentRuntimeMachineActorArgs): boolean {
+  const engine = context.engine as ExternalUrlFadeEngineLike | null | undefined;
+  return engine?.unitType === 'external-url';
+}
+
 
 
 

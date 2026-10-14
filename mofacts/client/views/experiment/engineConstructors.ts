@@ -1,4 +1,4 @@
-import { AUTO_TUTOR_UNIT, MODEL_UNIT, SPARC_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../../common/Definitions';
+import { AUTO_TUTOR_UNIT, EXTERNAL_URL_UNIT, MODEL_UNIT, SPARC_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../../common/Definitions';
 import type { UnitEngineLike, UnitType } from '../../../common/types';
 import { createUnitEngineByType, getCreatableUnitEngineTypes } from './unitEngine';
 
@@ -12,6 +12,7 @@ interface EngineUnitLike {
   sparcsession?: unknown;
   videosession?: unknown;
   autotutorsession?: unknown;
+  externalurl?: unknown;
   unitinstructions?: unknown;
   picture?: unknown;
 }
@@ -34,6 +35,7 @@ function getAvailableUnitShapes(unit: EngineUnitLike | null | undefined): string
   if (unit.sparcsession) shapes.push('sparcsession');
   if (unit.videosession) shapes.push('videosession');
   if (unit.autotutorsession) shapes.push('autotutorsession');
+  if (unit.externalurl) shapes.push('externalurl');
   if (unit.unitinstructions) shapes.push('unitinstructions');
   if (unit.picture) shapes.push('picture');
   return shapes;
@@ -55,6 +57,7 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
     || shape === 'sparcsession'
     || shape === 'videosession'
     || shape === 'autotutorsession'
+    || shape === 'externalurl'
   ));
   if (runnableSessionShapes.length > 1) {
     const unitName = typeof unit.unitname === 'string' ? unit.unitname : '<unnamed>';
@@ -70,13 +73,14 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
   if (unit.sparcsession) return SPARC_UNIT;
   if (unit.learningsession) return MODEL_UNIT;
   if (unit.autotutorsession) return AUTO_TUTOR_UNIT;
+  if (unit.externalurl) return EXTERNAL_URL_UNIT;
   if (hasInstructionContent(unit)) return 'instruction-only';
 
   const unitName = typeof unit.unitname === 'string' ? unit.unitname : '<unnamed>';
   const shapes = getAvailableUnitShapes(unit);
   throw new Error(
     `${source}: Cannot determine unit type for unit "${unitName}". ` +
-    `Expected assessmentsession, learningsession, sparcsession, videosession, autotutorsession, or instruction-only content. ` +
+    `Expected assessmentsession, learningsession, sparcsession, videosession, autotutorsession, externalurl, or instruction-only content. ` +
     `Unit has: ${shapes.length ? shapes.join(', ') : 'no runnable unit shape'}`
   );
 }

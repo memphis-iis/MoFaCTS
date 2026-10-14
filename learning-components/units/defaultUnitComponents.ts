@@ -24,6 +24,10 @@ import {
   videoSessionUnitComponentManifest,
   VIDEO_SESSION_UNIT_TYPE,
 } from './video-session/manifest';
+import {
+  externalUrlSessionUnitComponentManifest,
+  EXTERNAL_URL_SESSION_UNIT_TYPE,
+} from './external-url-session/manifest';
 
 import { gazeCalibrationUnitComponentManifest } from './gaze-calibration/manifest';
 
@@ -34,6 +38,7 @@ export const defaultUnitComponentManifests: readonly LearningComponentManifest<C
   sparcSessionUnitComponentManifest,
   assessmentSessionUnitComponentManifest,
   videoSessionUnitComponentManifest,
+  externalUrlSessionUnitComponentManifest,
   autoTutorUnitComponentManifest,
 ];
 
@@ -44,4 +49,5 @@ export {
   LEARNING_SESSION_UNIT_TYPE,
   SPARC_SESSION_UNIT_TYPE,
   VIDEO_SESSION_UNIT_TYPE,
+  EXTERNAL_URL_SESSION_UNIT_TYPE,
 };

@@ -29,6 +29,8 @@
   } from '../../../../lib/launchLoading';
   import { getDisplayAnswerText } from '../../learnerResponseAssessment';
   import { contentRuntimeMachine } from '../machine/contentRuntimeMachine';
+  import ExternalUrlSession from './ExternalUrlSession.svelte';
+  import { writeExternalSessionHistory } from '../services/externalUrlHistory';
   import { DEFAULT_DELIVERY_SETTINGS, EVENTS, STATES } from '../machine/constants';
   import { initializeContentSurface } from '../services/contentSurfaceInit';
   import { createExperimentState } from '../services/experimentState';
@@ -181,6 +183,14 @@
   function parsePositiveNumber(value) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  function externalResultEventId(result) {
+    if (result === null || result === undefined || typeof result !== 'object') {
+      return undefined;
+    }
+    const candidate = result.eventId;
+    return typeof candidate === 'string' ? candidate : undefined;
   }
 
   function toBoolean(value) {
@@ -531,6 +541,7 @@
   };
   $: showSparcSessionSurface = sessionContentSurface.showSparcSession &&
     flashcardControllerProps.subsetKind !== 'none';
+  $: showExternalUrlSession = context.engine?.unitType === 'external-url';
   // The prop is launch input only. Runtime surface selection must use the same
   // initialized machine context that owns Blocks transitions.
   $: showBlocksSessionSurface = shouldShowBlocksSessionSurface({
@@ -1203,7 +1214,29 @@
   bind:this={contentSurfaceElement}
   style={cardFontSizeStyle}
 >
-  {#if sessionContentSurface.showAutoTutorSession}
+  {#if showExternalUrlSession}
+    <ExternalUrlSession
+      engine={context.engine}
+      sessionId={tdfId || attemptId || userId}
+      tdfId={tdfId}
+      attemptId={attemptId}
+      userId={userId}
+      onResult={(result) => {
+        Session.set('externalUrlSessionResult', result);
+        void writeExternalSessionHistory({
+          sessionId: tdfId || attemptId || userId,
+          tdfId,
+          unitId: typeof context.unitId === 'number' ? context.unitId : undefined,
+          result,
+          eventId: externalResultEventId(result),
+        });
+      }}
+      onComplete={() => {
+        void forceAdvanceToNextUnit('External Session Complete');
+        send({ type: EVENTS.UNIT_FINISHED });
+      }}
+    />
+  {:else if sessionContentSurface.showAutoTutorSession}
     <AutoTutorSession on:complete={() => forceAdvanceToNextUnit('AutoTutor Complete')} />
   {:else if sessionContentSurface.showVideoSession}
     <VideoSessionSurface

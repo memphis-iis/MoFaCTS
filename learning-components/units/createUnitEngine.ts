@@ -23,6 +23,7 @@ import type {
 import {
   ASSESSMENT_SESSION_UNIT_TYPE,
   AUTO_TUTOR_SESSION_UNIT_TYPE,
+  EXTERNAL_URL_SESSION_UNIT_TYPE,
   INSTRUCTION_UNIT_TYPE,
   LEARNING_SESSION_UNIT_TYPE,
   VIDEO_SESSION_UNIT_TYPE,
@@ -271,6 +272,10 @@ export async function createScheduleUnit(deps: CreateUnitEngineDeps, curExperime
 
 export async function createVideoUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
   return await createUnitEngineByType(deps, curExperimentData, VIDEO_SESSION_UNIT_TYPE);
+}
+
+export async function createExternalUrlUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
+  return await createUnitEngineByType(deps, curExperimentData, EXTERNAL_URL_SESSION_UNIT_TYPE);
 }
 
 export async function createAutoTutorUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {

@@ -212,3 +212,43 @@ export function resolveSessionSurfaceUnitEntryRoute(
     ? '/content'
     : '/instructions';
 }
+
+type UnitInstructionSurfaceLike = {
+  unitinstructions?: unknown;
+  picture?: unknown;
+  assessmentsession?: unknown;
+  learningsession?: unknown;
+  sparcsession?: unknown;
+  videosession?: unknown;
+  autotutorsession?: unknown;
+  gazecalibrationsession?: unknown;
+  externalurl?: unknown;
+};
+
+/** Mid-lesson unit entry: skip empty flashcard instruction pages. */
+export function resolveNextUnitEntryRoute(params: {
+  currentTdfUnit: UnitInstructionSurfaceLike | null | undefined;
+  lockoutMinutes?: number;
+}): SessionSurfaceUnitEntryRoute {
+  const currentTdfUnit = params.currentTdfUnit || {};
+  if (currentTdfUnit.gazecalibrationsession) {
+    return '/content';
+  }
+  const contentSurface = resolveSessionContentSurface(resolveSessionSurfaceState({
+    currentTdfUnit,
+  }));
+  const modeRoute = resolveSessionSurfaceUnitEntryRoute(contentSurface);
+  if (modeRoute === '/content') {
+    return '/content';
+  }
+
+  const hasUnitText = typeof currentTdfUnit.unitinstructions === 'string'
+    && currentTdfUnit.unitinstructions.trim().length > 0;
+  const hasUnitImage = typeof currentTdfUnit.picture === 'string'
+    && currentTdfUnit.picture.trim().length > 0;
+  const lockoutMinutes = Number(params.lockoutMinutes || 0);
+  if (hasUnitText || hasUnitImage || lockoutMinutes > 0) {
+    return '/instructions';
+  }
+  return '/content';
+}

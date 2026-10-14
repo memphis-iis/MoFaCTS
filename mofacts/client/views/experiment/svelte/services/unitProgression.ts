@@ -14,11 +14,7 @@ import { refreshCurrentDeliverySettingsStore } from '../../../../lib/currentDeli
 import { deliverySettingsStore } from '../../../../lib/state/deliverySettingsStore';
 import { getExperimentState, createExperimentState } from './experimentState';
 import { setFeedbackTypeFromHistory, setFeedbackUnset } from './feedbackRuntimeState';
-import {
-  resolveSessionContentSurface,
-  resolveSessionSurfaceState,
-  resolveSessionSurfaceUnitEntryRoute,
-} from './sessionSurfaceMode';
+import { resolveNextUnitEntryRoute } from './sessionSurfaceMode';
 import '../../../../../common/Collections';
 import type { ExperimentState } from '../../../../../common/types/experiment';
 import { captureAdaptiveUnitSequence } from '../../../../../common/adaptiveUnitSequence';
@@ -207,9 +203,9 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
     }
 
-    leaveTarget = curTdfUnit?.gazecalibrationsession ? '/content' : resolveSessionSurfaceUnitEntryRoute(resolveSessionContentSurface(resolveSessionSurfaceState({
+    leaveTarget = resolveNextUnitEntryRoute({
       currentTdfUnit: curTdfUnit,
-    })));
+    });
   } else {
     clientConsole(2, 'UNIT FINISHED: No More Units');
 
