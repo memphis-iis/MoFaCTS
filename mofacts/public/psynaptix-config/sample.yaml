@@ -1,0 +1,21 @@
+# Sample Psynaptix session configuration (issue #89).
+# Reference from a TDF: deliverySettings.psynaptixConfigRef: "sample.yaml"
+# Inline overrides: deliverySettings.psynaptixConfig: { ... } (inline wins).
+# Applied per session by the Psynaptix service (psynaptix #109).
+
+# Deliberately non-default: mouse-only calibration with a tighter quality
+# bar and faster blink capture, to demonstrate the knobs.
+enableEeg: false
+enableMouse: true
+mouseCalibrationMode: target
+mouseCalibrationTargets: 5
+mouseCalibrationTargetRadiusPx: 40
+mouseRecenterPerTrial: true
+eegQualityThreshold: 0.8
+eegQualityDurationMs: 3000
+eegQualityDeviceConnectTimeoutMs: 15000
+eegQualityMaxArtifactRatio: 0.03
+eegBlinkCount: 2
+eegBlinkThresholdUv: 120
+eegBlinkRefractoryMs: 400
+baselineDurationSec: 20

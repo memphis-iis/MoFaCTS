@@ -34,6 +34,24 @@ type DeliverySettingsResolution = {
   hasUnitSettings: boolean;
 };
 
+const CAPTURE_DELIVERY_KEYS = [
+  'enableSignalCapture',
+  'enablePsynaptix',
+  'captureApiEndpoint',
+  'psynaptixEndpoint',
+  'captureApiToken',
+] as const;
+
+export function pickCaptureSettings(source: unknown): Record<string, unknown> {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
+  const record = source as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of CAPTURE_DELIVERY_KEYS) {
+    if (key in record) out[key] = record[key];
+  }
+  return out;
+}
+
 function pickDisplayRuntimeSettings(source: unknown, experimentXCond: unknown): DeliverySettingsRecord {
   const selectedSource = selectDeliverySettingsSource(source, experimentXCond);
   if (!selectedSource || typeof selectedSource !== 'object' || Array.isArray(selectedSource)) {
@@ -100,6 +118,10 @@ export function resolveCurrentDeliverySettings(params: {
     ...tutorTimingSettings,
     ...unitTimingSettings,
   };
+  const captureSettings = {
+    ...pickCaptureSettings(tutor?.deliverySettings),
+    ...pickCaptureSettings(unit?.deliverySettings),
+  };
   const rawDisplaySettings = {
     ...tutorDisplaySettings,
     ...unitDisplaySettings,
@@ -115,6 +137,7 @@ export function resolveCurrentDeliverySettings(params: {
     settings: {
       ...timingSettings,
       ...displaySettings,
+      ...captureSettings,
       scoringEnabled: resolveLearningSessionFlag(unitType, params.isLearningSession),
     },
     hasTutorSettings: Object.keys(tutorTimingSettings).length > 0 || Object.keys(tutorDisplaySettings).length > 0,

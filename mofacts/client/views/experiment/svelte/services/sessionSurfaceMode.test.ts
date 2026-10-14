@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import {
+  resolveNextUnitEntryRoute,
   resolveSessionContentSurface,
   resolveSessionSurfaceDiagnostic,
   resolveSessionSurfaceLearningProgressPanel,
@@ -227,6 +228,37 @@ describe('session surface mode', function() {
     expect(resolveSessionSurfaceUnitEntryRoute(
       resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { autotutorsession: {} } })),
     )).to.equal('/content');
+  });
+
+  it('skips empty flashcard instruction pages on next-unit entry', function() {
+    expect(resolveNextUnitEntryRoute({
+      currentTdfUnit: { assessmentsession: { clusterlist: '1' } },
+    })).to.equal('/content');
+    expect(resolveNextUnitEntryRoute({
+      currentTdfUnit: {
+        assessmentsession: { clusterlist: '1' },
+        unitinstructions: '   ',
+      },
+    })).to.equal('/content');
+    expect(resolveNextUnitEntryRoute({
+      currentTdfUnit: {
+        assessmentsession: { clusterlist: '1' },
+        unitinstructions: 'Read this',
+      },
+    })).to.equal('/instructions');
+    expect(resolveNextUnitEntryRoute({
+      currentTdfUnit: {
+        assessmentsession: { clusterlist: '1' },
+        picture: 'a.png',
+      },
+    })).to.equal('/instructions');
+    expect(resolveNextUnitEntryRoute({
+      currentTdfUnit: { assessmentsession: { clusterlist: '1' } },
+      lockoutMinutes: 5,
+    })).to.equal('/instructions');
+    expect(resolveNextUnitEntryRoute({
+      currentTdfUnit: { videosession: {} },
+    })).to.equal('/content');
   });
 
   it('requires video readiness only for the active video content surface', function() {

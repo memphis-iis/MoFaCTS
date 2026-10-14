@@ -28,4 +28,19 @@ export interface DeliverySettings {
   accentSensitive?: boolean;
   displayQuestionNumber?: boolean;
   allowRevisitUnit?: boolean;
+  /** @deprecated Use enableSignalCapture */
+  enablePsynaptix?: boolean;
+  /** Master gate for learner-signal capture. */
+  enableSignalCapture?: boolean;
+  /** @deprecated Use captureApiEndpoint */
+  psynaptixEndpoint?: string;
+  /** Base URL of the signal capture service. Events POSTed to {endpoint}/events. */
+  captureApiEndpoint?: string;
+  captureApiToken?: string;
+  /** @deprecated Use captureConfigRef */
+  psynaptixConfigRef?: string;
+  captureConfigRef?: string;
+  /** @deprecated Use captureConfig */
+  psynaptixConfig?: Record<string, unknown>;
+  captureConfig?: Record<string, unknown>;
 }

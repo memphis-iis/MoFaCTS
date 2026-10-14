@@ -243,4 +243,36 @@ export const DELIVERY_DISPLAY_SETTINGS_FIELD_REGISTRY: SectionFieldRegistry = {
     },
     appliesToUnitTypes: ['instructions'],
   }),
+  enableSignalCapture: simpleField(booleanField(false, 4), {
+    brief: 'Enable learner-signal capture.',
+    verbose: 'When enabled, the client may emit session lifecycle events to the configured capture API endpoint.'
+  }, {
+    appliesToUnitTypes: ['learning', 'assessment', 'instructions', 'video'],
+    surfaces: {
+      schema: false,
+      learnerConfig: false,
+      editor: false,
+    },
+    runtime: {
+      default: false,
+      coerce: 'boolean',
+      validation: { kind: 'boolean' },
+    },
+  }),
+  captureApiEndpoint: simpleField(stringField('', 12), {
+    brief: 'Capture API service endpoint URL.',
+    verbose: 'Base URL of the learner-signal capture service. Events are POSTed to {endpoint}/events.'
+  }, {
+    appliesToUnitTypes: ['learning', 'assessment', 'instructions', 'video'],
+    surfaces: {
+      schema: false,
+      learnerConfig: false,
+      editor: false,
+    },
+    runtime: {
+      default: '',
+      coerce: 'none',
+      validation: { kind: 'string' },
+    },
+  }),
 };

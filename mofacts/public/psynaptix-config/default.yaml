@@ -1,0 +1,29 @@
+# Default Psynaptix session configuration (TDF-driven, issue #86).
+# Reference from a TDF: deliverySettings.psynaptixConfigRef: "default.yaml"
+# Inline overrides: deliverySettings.psynaptixConfig: { key: value } (inline wins).
+# Applied per session by the Psynaptix service (psynaptix #109); see
+# docs/psynaptix-configuration.md for the full key reference.
+#
+# Service env (PSYNAPTIX_*) / calibration presets are the baseline; these
+# values win per session where set.
+
+enableEeg: true
+enableMouse: true
+eegSampleRateHz: 512
+eegMaxEventsPerTrial: 5000
+mouseSampleIntervalMs: 50
+mouseMaxEventsPerTrial: 5000
+calibrationDefaultMode: quality+baseline   # quality+baseline | baseline-only | none
+baselineDurationSec: 30
+mouseCalibrationMode: click-to-begin       # target | click-to-begin | none
+mouseCalibrationTargets: 5
+mouseCalibrationTargetRadiusPx: 40
+mouseRecenterPerTrial: true
+eegQualityThreshold: 0.7
+eegQualityDurationMs: 2000
+eegQualityDeviceConnectTimeoutMs: 10000
+eegQualityStepTimeoutMs: 120000
+eegQualityMaxArtifactRatio: 0.05
+eegBlinkCount: 3
+eegBlinkThresholdUv: 100
+eegBlinkRefractoryMs: 500

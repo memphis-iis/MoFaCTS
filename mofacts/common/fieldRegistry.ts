@@ -433,6 +433,72 @@ export const DELIVERY_SETTINGS_FIELD_REGISTRY: DeliverySettingRegistry = {
     },
     validation: { kind: 'none' }
   },
+  captureApiEndpoint: {
+    surfaces: { learnerConfig: false },
+    authoring: { type: 'string', default: '', editor: { gridColumns: 12 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Signal capture service endpoint',
+      verbose: 'Base URL of the optional signal-capture service used for external-session launch and lifecycle event emission.'
+    },
+    validation: { kind: 'none' }
+  },
+  psynaptixEndpoint: {
+    surfaces: { learnerConfig: false },
+    authoring: { type: 'string', default: '', editor: { gridColumns: 12 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Signal capture service endpoint (legacy name)',
+      verbose: 'Legacy alias for captureApiEndpoint.'
+    },
+    validation: { kind: 'none' }
+  },
+  enableSignalCapture: {
+    surfaces: { learnerConfig: false },
+    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
+    runtime: { default: false, normalize: 'boolean' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Enable learner-signal capture',
+      verbose: 'When true, the lesson may emit lifecycle events to captureApiEndpoint and launch external-url capture sessions when authored.'
+    },
+    validation: { kind: 'none' }
+  },
+  enablePsynaptix: {
+    surfaces: { learnerConfig: false },
+    authoring: { type: 'booleanString', default: 'false', editor: { gridColumns: 4 } },
+    runtime: { default: false, normalize: 'boolean' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Enable learner-signal capture (legacy name)',
+      verbose: 'Legacy alias for enableSignalCapture.'
+    },
+    validation: { kind: 'none' }
+  },
+  captureConfigRef: {
+    surfaces: { learnerConfig: false },
+    authoring: { type: 'string', default: '', editor: { gridColumns: 12 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'supported' },
+    tooltip: {
+      brief: 'Capture config reference',
+      verbose: 'Identifier of the server-side capture configuration YAML for this lesson.'
+    },
+    validation: { kind: 'none' }
+  },
+  captureConfig: {
+    surfaces: { learnerConfig: false },
+    authoring: { type: 'string', default: '', editor: { gridColumns: 12 } },
+    runtime: { default: '', normalize: 'string' },
+    lifecycle: { status: 'deprecated' },
+    tooltip: {
+      brief: 'Capture config (deprecated inline)',
+      verbose: 'Inline capture configuration carried for backward compatibility; prefer captureConfigRef.'
+    },
+    validation: { kind: 'none' }
+  },
   readyPromptStringDisplayTime: {
     authoring: { type: 'integer', default: 0, editor: { gridColumns: 4 } },
     runtime: { default: 0, normalize: 'integer' },
