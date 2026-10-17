@@ -1,3 +1,4 @@
+import type { SparcPrimitiveReference } from './sparcMoveLibrary';
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
 import type { SparcInstructionComponents } from './sparcInstructionalPrimitives';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
@@ -9,8 +10,11 @@ import {
 } from './sparcMoveDefinitions';
 
 export type SparcUtteranceRequest = {
+  /** Canonical lesson-session identity; distinct from provider prefix-cache correlation. */
+  readonly historySessionId?: string;
+  readonly onFeedback?: (text: string, reference: SparcPrimitiveReference) => Promise<void>;
   readonly realizedInstruction?: Readonly<Partial<SparcInstructionComponents>>;
-  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure, details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'>) => Promise<void>;
+  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure, details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'> & { primitiveReference?: SparcPrimitiveReference }) => Promise<void>;
   readonly problemStatement: string;
   readonly targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion' | 'feedback';
   readonly action: string;
@@ -126,6 +130,9 @@ export function buildSparcDialogueHistory(
   return factsByType(facts, 'dialogue.utterance')
     .map((fact) => ({
       role: fact.slots?.speaker === 'learner' ? 'student' : 'tutor',
+      responseId: fact.factId,
+      ...(fact.slots?.component ? { component: fact.slots.component } : {}),
+      ...(fact.slots?.primitiveReference ? { primitiveReference: fact.slots.primitiveReference } : {}),
       text: stringSlot(fact, 'text') ?? '',
       ...(fact.slots?.responseFormat === 'multiple-choice' ? { responseFormat: 'multiple-choice' } : {}),
       ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
@@ -144,9 +151,6 @@ function misconceptionContent(facts: readonly SparcWorkingMemoryFact[], id: stri
     .find((fact) => stringSlot(fact, 'id') === id);
   return {
     selectedMisconception: source?.slots ?? { id, text: '' },
-    correctExpectations: factsByType(facts, 'autotutor.expectation')
-      .map((fact) => fact.slots ?? {})
-      .filter((slots) => stringSlot({ factType: 'autotutor.expectation', slots }, 'text')),
   };
 }
 
@@ -269,6 +273,7 @@ function plannerState(facts: readonly SparcWorkingMemoryFact[]): unknown {
     return [...latest.values()];
   };
   return {
+    evidence: factsByType(facts, 'instructional.evidence').map(fact => fact.slots),
     expectations: latestByIdentity('learningTarget.score', 'clusterKC'),
     misconceptions: latestByIdentity('diagnostic.misconceptionScore', 'id'),
     activeCycle: latestFact(facts, 'instructional.activeCycle')?.slots ?? null,

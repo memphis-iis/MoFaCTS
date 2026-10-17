@@ -203,6 +203,39 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
+  it('retrieves every instructional primitive before any generation and journals using the canonical history session', async function() {
+    const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question');
+    const order: string[] = [];
+    const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'opaque-provider-correlation',
+      async callResolvedOpenRouterJson() { throw new Error('No generation should run on a library hit'); },
+      async callSparcPromptImage() { throw new Error('No image generation should run on a library hit'); },
+      async readSparcPromptImage() { throw new Error('No image read is needed when all components are retrieved'); },
+      moveLibrary: {
+        async lookup(query) {
+          expect(query.sessionId).to.equal('canonical-history-session');
+          expect(query.context.specification).to.contain(definition.promptVersion);
+          order.push(`lookup:${query.context.kind}`);
+          return { status: 'hit', content: { text: `Saved ${query.context.kind}`,
+            ...(query.context.kind === 'richContent' ? { figure: { assetId: 'image123', description: 'Saved figure', displayWidth: 300 } } : {}) },
+          reference: { entryId: `saved-${query.context.kind}`, version: 'sparc-moves-v1', source: 'retrieved', similarity: .99 } };
+        },
+        async publish() { throw new Error('Retrieved content must not be republished'); },
+        async present(query, _reference, nodeId) {
+          expect(query.sessionId).to.equal('canonical-history-session');
+          expect(nodeId).to.equal(`event:${query.context.kind}`);
+          expect(order.at(-1)).to.equal(`persist:${query.context.kind}`);
+          order.push(`present:${query.context.kind}`);
+        },
+      },
+    });
+    const result = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
+      selectedAction: { snapshotId: 'event' }, historySessionId: 'canonical-history-session',
+      onInstructionComponent: async kind => { order.push(`persist:${kind}`); } }) as SparcInstructionComponents;
+    expect(result.question).to.equal('Saved question');
+    expect(result.figure?.assetId).to.equal('image123');
+    expect(order).to.deep.equal(['richContent', 'explanation', 'question'].flatMap(kind => [`lookup:${kind}`, `persist:${kind}`, `present:${kind}`]));
+  });
+
   it('orients a starting explanation to the selected KC without inventing an opening answer or feedback', async function() {
     const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-question.text');
     const prompts: string[] = [];
@@ -276,6 +309,37 @@ describe('SPARC dialogue OpenRouter provider', function() {
     }
   });
 
+  it('keeps generation on the selected evidence and current components while retaining earlier questions only for novelty', async function() {
+    const evidence = { kind: 'expectation', id: 'kc-a', demonstrated: ['Known A'], incorrect: [], unresolved: ['Remaining A'] };
+    const calls: string[] = [];
+    const provider = createSparcDialogueOpenRouterProvider({
+      async readSparcPromptImage() { throw new Error('An unrelated historical figure must not be loaded'); },
+      async callResolvedOpenRouterJson(params) {
+        const system = String(params.messages[0]!.content);
+        const context = JSON.parse(String(params.messages[1]!.content));
+        expect(context.assessment).to.deep.equal({ evidence: [evidence] });
+        expect(context).not.to.have.property('dialogueHistory');
+        expect(context).not.to.have.property('learnerText');
+        expect(JSON.stringify(params.messages)).not.to.include('UNRELATED');
+        const question = params.intent.schemaName.includes('question_primitive');
+        expect(system.includes('Earlier question?')).to.equal(question);
+        if (question) expect(context.explanation).to.equal('Current explanation.');
+        calls.push(params.intent.schemaName);
+        return { parsedContent: { tutorMessage: question ? 'New question?' : 'Current explanation.' } };
+      },
+    });
+    await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.explanation-question',
+      moveDefinition: requireActiveSparcMoveDefinition('instruction.explanation-question'),
+      learnerText: 'UNRELATED previous answer',
+      plannerState: { evidence: [evidence, { ...evidence, id: 'kc-b', demonstrated: ['UNRELATED target'] },
+        { ...evidence, kind: 'misconception', demonstrated: ['UNRELATED colliding id'] }],
+        expectations: [{ clusterKC: 'kc-b', text: 'UNRELATED score' }], candidates: ['UNRELATED candidate'] },
+      dialogueHistory: [{ role: 'tutor', text: 'UNRELATED explanation', figure: { assetId: 'old', description: 'UNRELATED figure' } },
+        { role: 'tutor', text: 'Earlier question?', responseId: 'old:question' }, { role: 'student', text: 'UNRELATED answer' }],
+    });
+    expect(calls).to.have.length(2);
+  });
+
   it('rejects rich output that cannot be rendered or invents an image asset', async function() {
     for (const richContent of ['<svg><circle /></svg>', '<img src="https://example.org/invented.png" alt="A diagram">']) {
       const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson() {
@@ -285,7 +349,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       try { await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.rich-question',
         moveDefinition: requireActiveSparcMoveDefinition('instruction.rich-question') }); } catch (caught) { error = caught; }
       expect(error).to.be.instanceOf(Error);
-      expect((error as Error).message).to.include('plain text');
+      expect((error as Error).message).to.include('Markdown text');
     }
   });
   it('uses the actual generated figure and explanation for the isomorphic question and resumes saved support', async function() {
@@ -554,6 +618,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       'learningTargets',
       'misconceptions',
       'dialogueHistory',
+      'priorEvidence',
       'learnerText',
       'evaluationDirective',
     ]);
@@ -957,6 +1022,31 @@ describe('SPARC dialogue OpenRouter provider', function() {
     }]);
   });
 
+  it('retains summaries but saves only verified learner citations when the provider mixes valid and invalid references', async function() {
+    const warnings: unknown[] = [];
+    const summary = { demonstrated: ['A matters'], incorrect: [], unresolved: [] };
+    const provider = createSparcDialogueOpenRouterProvider({
+      reportWarning: warning => { warnings.push(warning); },
+      async callResolvedOpenRouterJson() {
+        return { parsedContent: {
+          learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6, summary,
+            learnerEvidence: [...latestLearnerEvidence('A matters'), ...latestLearnerEvidence('A paraphrase'),
+              ...dialogueLearnerEvidence(0, 'Tutor claim.'), ...dialogueLearnerEvidence(99, 'Missing response')] }],
+          diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
+          learnerContribution: { type: 'answer' },
+        } };
+      },
+    });
+    const result = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText: 'A matters.',
+      ...scorerContext(undefined, [{ speaker: 'tutor', text: 'Tutor claim.' }]),
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(result.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
+    expect(result.evidence).to.deep.equal([{ kind: 'expectation', id: 'kc-a', ...summary,
+      citations: [{ responseId: 'score-event:learner', start: 0, end: 9 }] }]);
+    expect(warnings).to.have.length(1);
+    expect(warnings[0]).to.have.property('mismatchCount', 3);
+  });
+
   it('continues scoring when warning delivery throws or rejects', async function() {
     for (const reportWarning of [
       () => { throw new Error('diagnostic unavailable'); },
@@ -1298,10 +1388,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
         });
         expect((userMessage.misconceptions as Array<Record<string, unknown>>)[0]).to.not.have.property('priorSupportStrength');
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties).to.have.all.keys(
-          'clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence',
+          'clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         );
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.required).to.deep.equal([
-          'clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence',
+          'clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
         expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 2, maxItems: 2 });
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.clusterKC?.enum)
@@ -1309,10 +1399,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.evidenceStrength)
           .to.include({ minimum: 0, maximum: 1 });
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties).to.have.all.keys(
-          'id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence',
+          'id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         );
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.required).to.deep.equal([
-          'id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence',
+          'id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 1, maxItems: 1 });
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties?.id?.enum)

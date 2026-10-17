@@ -34,6 +34,18 @@ describe('packageExport identity', function() {
       conditionTdfIds: ['child-id'],
     });
     const child = tdfDoc('child-id', 'Child Lesson');
+    const suppliedFacts = [
+      { factType: 'dialogue.graduation', slots: { requiredTargetCount: 1 } },
+      { factType: 'kcGraph.node', slots: { clusterKC: 'kc-1', centrality: 0.6 } },
+      { factType: 'kcGraph.relationship', slots: { strength: 0.6 } },
+      { factType: 'kcGraph.chain', slots: { startingKC: 'kc-1', order: ['kc-1'] } },
+    ];
+    (root.rawStimuliFile.setspec as any).sparcPages = [{ display: { workingMemoryFacts: suppliedFacts } }];
+    (child.rawStimuliFile.setspec as any).sparcPages = [{ display: { workingMemoryFacts: suppliedFacts } }];
+    const clusters = [{ stims: [{ autoTutor: { id: 'script-1', expectationRelationships: { a: { b: 0.6 } },
+      expectationRelationshipProvenance: { model: 'embedding-model' } } }] }];
+    (root.rawStimuliFile.setspec as any).clusters = clusters;
+    (child.rawStimuliFile.setspec as any).clusters = clusters;
     const docs = [root, child];
     let zipBuffer: Buffer | null = null;
 
@@ -94,5 +106,10 @@ describe('packageExport identity', function() {
     assert.deepEqual(rootExport.tutor.setspec.conditionTdfIds, ['child-id']);
     assert.deepEqual(rootExport.tutor.setspec.condition, ['Child Lesson.json']);
     assert.ok(zip.file('shared-stims.json'));
+    const stimuliExport = JSON.parse(await zip.file('shared-stims.json').async('string'));
+    assert.deepEqual(stimuliExport.setspec.sparcPages[0].display.workingMemoryFacts, [suppliedFacts[0]]);
+    assert.equal((root.rawStimuliFile.setspec as any).sparcPages[0].display.workingMemoryFacts.length, suppliedFacts.length);
+    assert.deepEqual(stimuliExport.setspec.clusters[0].stims[0].autoTutor, { id: 'script-1' });
+    assert.ok(clusters[0]!.stims[0]!.autoTutor.expectationRelationships);
   });
 });

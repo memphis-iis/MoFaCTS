@@ -221,6 +221,75 @@ function graphFacts(display: Record<string, any>): Record<string, any>[] {
 }
 
 describe('packageUploadPostProcess SPARC AutoTutor graph generation', function() {
+  it('generates paths for each distinct unit start and removes stale generated paths', async function() {
+    const display: Record<string, any> = {
+      unitType: 'sparc-autotutor-dialogue',
+      autoTutorTargets: { expectations: ['kc-e1', 'kc-e2', 'kc-e3'].map(clusterKC => ({ clusterKC, text: clusterKC })) },
+      workingMemoryFacts: [{ factType: 'kcGraph.chain', slots: { startingKC: 'old', order: ['old'] } }],
+    };
+    const tdf = tdfWithDisplay(display);
+    tdf.content.tdfs.tutor.unit = ['kc-e1', 'kc-e2'].map(startingKC => ({ sparcsession: { pageId: 'page-a', startingKC } }));
+    await postProcessUploadedTdfs({ unzippedFiles: [uploadedTdfFile()], deps: packageDeps({ tdf }), state: packageState() });
+    const chains = display.workingMemoryFacts.filter((f: any) => f.factType === 'kcGraph.chain');
+    assert.equal(chains.length, 2);
+    for (const chain of chains) {
+      assert.equal(chain.slots.order[0], chain.slots.startingKC);
+      assert.equal(new Set(chain.slots.order).size, 3);
+    }
+  });
+
+  it('rejects an invalid startingKC before requesting embeddings', async function() {
+    const display = { unitType: 'sparc-autotutor-dialogue', autoTutorTargets: { expectations: [{ clusterKC: 'kc-e1', text: 'A' }] } };
+    const tdf = tdfWithDisplay(display);
+    tdf.content.tdfs.tutor.unit = [{ sparcsession: { pageId: 'page-a', startingKC: 'missing' } }];
+    const embeddingInputs: string[][] = [];
+    await assert.rejects(postProcessUploadedTdfs({ unzippedFiles: [uploadedTdfFile()], deps: packageDeps({ tdf, embeddingInputs }), state: packageState() }), /not an expectation/);
+    assert.equal(embeddingInputs.length, 0);
+  });
+
+  it('computes cosine relationships even when the stored display has a complete graph', async function() {
+    const display = {
+      unitType: 'sparc-autotutor-dialogue',
+      autoTutorTargets: {
+        expectations: [
+          { clusterKC: 'kc-e1', text: 'Expectation one text.' },
+          { clusterKC: 'kc-e2', text: 'Expectation two text.' },
+        ],
+        misconceptions: [],
+      },
+      workingMemoryFacts: [
+        { factType: 'kcGraph.node', slots: { clusterKC: 'kc-e1', centrality: 0.9 } },
+        { factType: 'kcGraph.node', slots: { clusterKC: 'kc-e2', centrality: 0.9 } },
+        { factType: 'kcGraph.relationship', slots: { sourceClusterKC: 'kc-e1', targetClusterKC: 'kc-e2', strength: 0.9 } },
+        { factType: 'kcGraph.relationship', slots: { sourceClusterKC: 'kc-e2', targetClusterKC: 'kc-e1', strength: 0.9 } },
+      ],
+    };
+    const embeddingInputs: string[][] = [];
+    await postProcessUploadedTdfs({
+      unzippedFiles: [uploadedTdfFile()],
+      deps: packageDeps({ tdf: tdfWithDisplay(display), embeddingInputs, embeddings: [[1, 0], [0.6, 0.8]] }),
+      state: packageState(),
+    });
+    assert.equal(embeddingInputs.length, 1);
+    assert.deepEqual(graphFacts(display).filter(fact => fact.factType === 'kcGraph.relationship')
+      .map(fact => fact.slots.strength), [0.6, 0.6]);
+    assert.deepEqual(graphFacts(display).filter(fact => fact.factType === 'kcGraph.node')
+      .map(fact => fact.slots.centrality), [0.6, 0.6]);
+  });
+
+  it('fails graph generation when its embedding model fails instead of switching models', async function() {
+    const display = { unitType: 'sparc-autotutor-dialogue', autoTutorTargets: {
+      expectations: [{ clusterKC: 'kc-e1', text: 'One.' }, { clusterKC: 'kc-e2', text: 'Two.' }],
+      misconceptions: [],
+    } };
+    const deps = packageDeps({ tdf: tdfWithDisplay(display) });
+    const models: string[] = [];
+    deps.callOpenRouterEmbeddings = async options => { models.push(options.model); throw new Error('Embedding unavailable'); };
+    await assert.rejects(() => postProcessUploadedTdfs({ unzippedFiles: [uploadedTdfFile()], deps,
+      state: packageState() }), /Embedding unavailable/);
+    assert.deepEqual(models, ['google/gemini-embedding-001']);
+  });
+
   it('generates an expectation-scoped KC graph when workingMemoryFacts is missing', async function() {
     const display = {
       unitType: 'sparc-autotutor-dialogue',

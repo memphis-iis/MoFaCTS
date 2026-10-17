@@ -1,10 +1,12 @@
 <script>
+  import { relevantSupport } from '../services/sparcRelevantSupport';
   import DOMPurify from 'dompurify';
   import SparcPromptFigure from './SparcPromptFigure.svelte';
   import LearningProgressChart from './LearningProgressChart.svelte';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
+  import { renderSparcInstructionMarkdown } from '../services/sparcInstructionMarkdown';
   import { shouldSubmitTextInputOnKeydown } from '../services/textInputComposition';
   import { SPARC_INSTRUCTIONAL_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycleRules';
   import { SPARC_DYNAMIC_MENU_OPTIONS, SPARC_CATEGORIZED_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcDynamicInstructionRules';
@@ -23,6 +25,7 @@
   export let adminDiagnosticMode = false;
   export let nodeValues = {};
   export let learningProgressSnapshot = null;
+  let diagnosticPanelOpen = false;
   export let authoringSelectedNodeId = '';
   export let authoringSelectOnly = false;
   export let inputLanguage = '';
@@ -527,6 +530,7 @@
       class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
       data-node-id={node.id}
       data-sparc-speaker={dialogueSpeaker(node)}
+      use:relevantSupport
     >
       <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}</div>
       <div class="sparc-dialogue-bubble">
@@ -537,22 +541,27 @@
             {@const heading = categorizedSupport ? component.supportHeading : workedExample ? sparcText('sparc.workedExample') : undefined}
             <div
               class="sparc-instruction-component"
+              id={`sparc-primitive-${encodeURIComponent(component.id)}`}
+              tabindex="-1"
               class:sparc-worked-example={workedExample || categorizedSupport}
               role={workedExample || categorizedSupport ? 'group' : undefined}
               aria-label={heading}
             >
+              {#if component.primitiveReference?.priorNodeId}
+                <a class="sparc-support-reference" data-sparc-reference={`sparc-primitive-${encodeURIComponent(component.primitiveReference.priorNodeId)}`}
+                  href={`#sparc-primitive-${encodeURIComponent(component.primitiveReference.priorNodeId)}`}>Relevant earlier {component.component === 'explanation' ? 'explanation' : 'support'}</a>
+              {:else}
               {#if heading}
                 <div class="sparc-worked-example-title" aria-hidden="true">{heading}</div>
               {/if}
               {#if categorizedSupport && component.figure !== undefined}
                 <SparcPromptFigure figure={component.figure} figureId={component.id} compact={true} />
-              {:else if component.atomType === 'html-block'}
-                <div class="sparc-instruction-content">{@html sanitizeSparcHtml(getNodeValue(component))}</div>
               {:else}
-                <div class="sparc-instruction-content">{getNodeValue(component)}</div>
+                <div class="sparc-instruction-content sparc-html-block">{@html renderSparcInstructionMarkdown(getNodeValue(component), DOMPurify.sanitize.bind(DOMPurify))}</div>
               {/if}
               {#if component.figure !== undefined && !categorizedSupport}
                 <SparcPromptFigure figure={component.figure} figureId={component.id} />
+              {/if}
               {/if}
               {#if component.choices}
                 <svelte:self node={sparcQuestionAnswerNodes(component, !!component.readOnly)} {nodeValues}
@@ -561,16 +570,31 @@
             </div>
           {/each}
         {:else}
-          <div>{getNodeValue(node)}</div>
+          {#if dialogueSpeaker(node) === 'tutor'}
+            <div class="sparc-instruction-content sparc-html-block">{@html renderSparcInstructionMarkdown(getNodeValue(node), DOMPurify.sanitize.bind(DOMPurify))}</div>
+          {:else}
+            <div>{getNodeValue(node)}</div>
+          {/if}
           {#if node.figure !== undefined}
             <SparcPromptFigure figure={node.figure} figureId={node.id} />
           {/if}
         {/if}
         {#if dialogueProductionRuleLabel(node)}
-          <div class="sparc-dialogue-diagnostic">production: {dialogueProductionRuleLabel(node)}</div>
-          {#if dialogueSelectionLabel(node)}
-            <div class="sparc-dialogue-diagnostic sparc-dialogue-diagnostic-selection">selected: {dialogueSelectionLabel(node)}</div>
-          {/if}
+          <details class="sparc-production-details" bind:open={diagnosticPanelOpen}>
+            <summary on:keydown={(event) => {
+              if (event.key === 'Escape') {
+                diagnosticPanelOpen = false;
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}>{sparcText('dashboard.details')}</summary>
+            <div class="sparc-production-panel">
+              <div class="sparc-dialogue-diagnostic">production: {dialogueProductionRuleLabel(node)}</div>
+              {#if dialogueSelectionLabel(node)}
+                <div class="sparc-dialogue-diagnostic sparc-dialogue-diagnostic-selection">selected: {dialogueSelectionLabel(node)}</div>
+              {/if}
+            </div>
+          </details>
         {/if}
       </div>
     </div>
@@ -680,7 +704,15 @@
 {/if}
 
 <style>
-  .worksheet-selected { outline: 3px solid currentColor; outline-offset: 2px; }
+  :global(.sparc-relevant-support) {
+    background: color-mix(in srgb, var(--sparc-accent-color) 12%, transparent);
+    outline: 2px solid var(--sparc-accent-color);
+    outline-offset: 4px;
+  }
+  .sparc-support-reference { color: var(--primary-color); text-decoration: underline; }
+  .sparc-instruction-component:focus-visible { outline: 2px solid var(--primary-color); }
+
+  .worksheet-selected { outline: 3px solid var(--sparc-accent-color); outline-offset: 2px; }
   .sparc-group {
     width: 100%;
     display: flex;
@@ -1205,7 +1237,7 @@
   }
 
   .sparc-text-block,
-  .sparc-html-block,
+  .sparc-html-block:not(.sparc-instruction-content),
   .sparc-text,
   .sparc-header-cell,
   .sparc-message-box,
@@ -1253,6 +1285,9 @@
   .sparc-dialogue-utterance-tutor {
     align-self: flex-start;
     align-items: flex-start;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .sparc-dialogue-speaker {
@@ -1266,17 +1301,48 @@
   }
 
   .sparc-instruction-content {
-    white-space: pre-wrap;
+    white-space: normal;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-wrap: anywhere;
+  }
+
+  :global(.sparc-instruction-content > p),
+  :global(.sparc-instruction-content > ul),
+  :global(.sparc-instruction-content > ol) {
+    max-width: 70ch;
+  }
+
+  :global(.sparc-instruction-content table) {
+    min-width: 36rem;
+    line-height: 1.5;
+  }
+
+  :global(.sparc-dialogue-bubble .sparc-group-answer-list) {
+    width: 100%;
+    max-width: 70ch;
+  }
+
+  :global(.sparc-group-answer-list > .sparc-group-body > .sparc-button),
+  :global(.sparc-group[data-sparc-glue="answer-list"] > .sparc-group-body > .sparc-button) {
+    width: 100%;
+    text-align: start;
+    font-weight: 400;
+    line-height: 1.5;
+    padding: var(--sparc-space-3);
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .sparc-instruction-component + .sparc-instruction-component {
-    margin-top: 0.85rem;
+    margin-top: var(--sparc-space-4);
   }
 
   .sparc-worked-example {
-    border: var(--sparc-border-width) solid var(--sparc-border-color);
     border-radius: var(--sparc-border-radius-sm);
     padding: var(--sparc-space-2) var(--sparc-space-3);
+    background: color-mix(in srgb, var(--sparc-accent-color) 5%, var(--sparc-control-surface-color));
   }
 
   .sparc-worked-example-title {
@@ -1284,18 +1350,18 @@
     font-size: var(--sparc-font-size-small);
     font-weight: var(--app-font-weight-semibold, 600);
     line-height: 1.25;
-    text-align: center;
+    text-align: start;
   }
 
   .sparc-dialogue-bubble {
     width: 100%;
     box-sizing: border-box;
-    border: var(--sparc-border-width) solid var(--sparc-border-color);
+    border: 0;
     border-radius: var(--sparc-border-radius-lg);
     padding: var(--sparc-space-2) var(--sparc-space-3);
     background: var(--sparc-control-surface-color);
     color: var(--sparc-text-color);
-    line-height: 1.45;
+    line-height: 1.5;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -1306,9 +1372,6 @@
   }
 
   .sparc-dialogue-diagnostic {
-    margin-top: var(--sparc-space-2);
-    padding-top: var(--sparc-space-1);
-    border-top: var(--sparc-border-width) solid var(--sparc-border-color);
     color: var(--sparc-muted-text-color);
     font-family: var(--sparc-monospace-font-family);
     font-size: calc(var(--sparc-font-size-small) * 0.86);
@@ -1320,6 +1383,46 @@
     margin-top: var(--sparc-space-1);
     padding-top: 0;
     border-top: 0;
+  }
+
+  .sparc-production-details {
+    margin-top: var(--sparc-space-3);
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .sparc-production-details summary {
+    width: fit-content;
+    padding: var(--sparc-space-1) var(--sparc-space-2);
+    color: var(--sparc-secondary-text-color);
+    font-size: var(--sparc-font-size-small);
+    cursor: pointer;
+    border-radius: var(--sparc-border-radius-sm);
+  }
+
+  .sparc-production-details summary:focus-visible {
+    outline: 2px solid var(--sparc-accent-color);
+    outline-offset: 2px;
+  }
+
+  .sparc-production-panel {
+    padding: var(--sparc-space-3);
+    background: var(--sparc-muted-surface-color);
+    border-inline-start: 2px solid var(--sparc-accent-color);
+    border-radius: var(--sparc-border-radius-sm);
+  }
+
+  .sparc-production-details[open] .sparc-production-panel {
+    animation: production-panel-reveal 160ms ease-out;
+  }
+
+  @keyframes production-panel-reveal {
+    from { opacity: 0; transform: translateY(-0.5rem); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sparc-production-details[open] .sparc-production-panel { animation: none; }
   }
 
   :global(.sparc-html-block .oli-definition),
@@ -1573,8 +1676,7 @@
   .sparc-input:focus,
   .sparc-select:focus,
   .sparc-button:focus {
-    outline: none;
-    box-shadow: none;
+    box-shadow: 0 0 0 3px var(--sparc-accent-color);
   }
 
   .sparc-input.sparc-correctness-correct,
@@ -1675,11 +1777,28 @@
   .sparc-button {
     cursor: pointer;
     font-weight: var(--app-font-weight-semibold, 600);
-    min-height: var(--app-text-input-height);
+    min-height: var(--app-button-height);
+    line-height: var(--app-button-line-height);
+    padding: var(--app-space-2) var(--app-space-3);
+    border-color: color-mix(in srgb, var(--sparc-primary-action-surface-color) calc(100% - (var(--app-button-border-darkness) * 1%)), black calc(var(--app-button-border-darkness) * 1%));
   }
 
-  .sparc-button:hover {
-    background: var(--app-state-hover-surface-color, color-mix(in srgb, var(--sparc-accent-color) 12%, var(--sparc-control-surface-color)));
+  .sparc-button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--sparc-primary-action-surface-color) calc(100% - (var(--app-button-hover-darkness) * 1%)), black calc(var(--app-button-hover-darkness) * 1%));
+    color: var(--sparc-primary-action-text-color);
+  }
+
+  .sparc-button:disabled {
+    background: var(--sparc-muted-surface-color);
+    color: var(--sparc-secondary-text-color);
+    cursor: not-allowed;
+  }
+
+  .sparc-input:disabled,
+  .sparc-select:disabled {
+    background: var(--sparc-muted-surface-color);
+    color: var(--sparc-secondary-text-color);
+    cursor: not-allowed;
   }
 
   .sparc-button-green,

@@ -7,6 +7,13 @@ type CollectionOwnership = {
 };
 
 export const COLLECTION_OWNERSHIP = {
+  SparcInstructionalLibrary: { mongoName: 'sparc_instructional_library', globalName: 'SparcInstructionalLibrary', owner: 'sparc-instructional-library', purpose: 'Single shared repository of instructional components, including images, and their retrieval embeddings.' },
+  SparcMoveRequests: { mongoName: 'sparc_move_requests', globalName: 'SparcMoveRequests', owner: 'sparc-move-library', purpose: 'Private resumable primitive selection and generation requests.' },
+  SparcMoveExposures: { mongoName: 'sparc_move_exposures', globalName: 'SparcMoveExposures', owner: 'sparc-move-library', purpose: 'Private learner primitive and question presentation records.' },
+  SparcMoveManifests: { mongoName: 'sparc_move_manifests', globalName: 'SparcMoveManifests', owner: 'sparc-move-library', purpose: 'Shared complete move manifests referencing immutable primitives.' },
+  SparcMoveLeases: { mongoName: 'sparc_move_leases', globalName: 'SparcMoveLeases', owner: 'sparc-move-library', purpose: 'Request-scoped generation leases.' },
+  SparcMoveMigrations: { mongoName: 'sparc_move_migrations', globalName: 'SparcMoveMigrations', owner: 'sparc-move-library', purpose: 'Restartable per-learner historical exposure projection checkpoints.' },
+
   SparcFigureVersions: {
     mongoName: 'sparc_figure_versions', globalName: 'SparcFigureVersions', owner: 'sparc-figure-library',
     purpose: 'Server-only immutable human replacement history; references original and replacement assets.',
@@ -14,10 +21,6 @@ export const COLLECTION_OWNERSHIP = {
   SparcFigureBrowse: {
     mongoName: 'sparc_figure_browse', globalName: 'SparcFigureBrowse', owner: 'sparc-figure-library',
     purpose: 'Server-only derived semantic browsing snapshots, revision state and paged cluster membership; no learner data.',
-  },
-  SparcFigureLibrary: {
-    mongoName: 'sparc_figure_library', globalName: 'SparcFigureLibrary', owner: 'sparc-figure-library',
-    purpose: 'Shared teaching figures indexed by their originating instructional-situation embeddings; server-only.',
   },
   SparcFigureRequests: {
     mongoName: 'sparc_figure_requests', globalName: 'SparcFigureRequests', owner: 'sparc-figure-library',

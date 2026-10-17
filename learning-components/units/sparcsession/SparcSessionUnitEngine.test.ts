@@ -748,6 +748,33 @@ describe('SparcSessionUnitEngine document runtime boundary', function() {
     assert.throws(() => resolveSparcPageDisplay(deps, { sparcsession: { pageId: 'categorized' } }), /requires category/);
   });
 
+  it('carries the TDF startingKC into document policy and requires its generated path', function() {
+    const display = {
+      unitType: 'sparc-autotutor-dialogue',
+      clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }],
+      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Recognize A.' }], misconceptions: [] },
+      workingMemoryFacts: [
+        { factType: 'controller.targetSelectionPolicy', slots: { policy: 'kc-graph-priority' } },
+        { factType: 'kcGraph.chain', slots: { startingKC: 'a', order: ['a'] } },
+      ],
+      nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', clusterIndex: 0 }],
+    };
+    const deps = createPageRuntimeDeps({ getStimCluster: () => ({ clusterKC: 'a', stims: [{ text: 'A' }] }),
+      findTdfById: () => ({ rawStimuliFile: { setspec: { sparcPages: [{ pageId: 'chain', display }] } } }) });
+    const unit = { sparcsession: { pageId: 'chain', startingKC: 'a' } };
+    const prepared = resolveSparcPageDisplay(deps, unit);
+    const facts = prepared.workingMemoryFacts as { factType: string; slots: Record<string, unknown> }[];
+    assert.equal(facts.find(f => f.factType === 'controller.targetSelectionPolicy')?.slots.startingKC, 'a');
+    assert.equal('startingKC' in display.workingMemoryFacts[0]!.slots, false);
+    const policy = display.workingMemoryFacts.shift()!;
+    const withoutAuthoredPolicy = resolveSparcPageDisplay(deps, unit);
+    assert.ok((withoutAuthoredPolicy.workingMemoryFacts as { factType: string; slots: Record<string, unknown> }[])
+      .some(f => f.factType === 'controller.targetSelectionPolicy' && f.slots.startingKC === 'a'));
+    display.workingMemoryFacts.unshift(policy);
+    display.workingMemoryFacts.pop();
+    assert.throws(() => resolveSparcPageDisplay(deps, unit), /one generated KC chain/);
+  });
+
   it('renders SPARC AutoTutor target rows flattened from package upload', async function() {
     const engine = await createSparcSessionUnitEngine(createPageRuntimeDeps({
       getStimCount: () => 1,

@@ -3,6 +3,7 @@ import {
   resolveSparcSessionPageId,
   resolveSparcSessionProbabilitySource,
   resolveSparcSessionRuntimeConfig,
+  resolveSparcSessionStartingKC,
   resolveSparcSessionUnitMode,
   validateSparcSessionModelConfiguration,
 } from './sparcSessionRuntimeConfig';
@@ -18,6 +19,14 @@ describe('sparc session runtime config', function() {
     assert.equal(resolveSparcSessionPageId({ sparcsession: { pageId: ' page-1 ' } }), 'page-1');
     assert.equal(resolveSparcSessionPageId({ sparcsession: { pageId: '  ' } }), undefined);
     assert.equal(resolveSparcSessionPageId({}), undefined);
+  });
+
+  it('reads the unit starting KC and rejects invalid configured identities', function() {
+    assert.equal(resolveSparcSessionStartingKC({ sparcsession: { startingKC: ' biology.kc.s06 ' } }), 'biology.kc.s06');
+    assert.equal(resolveSparcSessionStartingKC({}), undefined);
+    for (const startingKC of ['', '  ', 6, null]) {
+      assert.throws(() => resolveSparcSessionStartingKC({ sparcsession: { startingKC } }), /nonempty clusterKC identity/);
+    }
   });
 
   it('resolves sparcsession unit mode without learning-session aliases', function() {

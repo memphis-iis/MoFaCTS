@@ -21,7 +21,10 @@ export function isRateLimitedOpenRouterMethod(name: string): boolean {
   return [
     'callAiContentOpenRouterRequest',
     'callResolvedOpenRouterJson',
-    'callResolvedOpenRouterEmbeddings'
+    'callResolvedOpenRouterEmbeddings',
+    'lookupSparcPrimitive',
+    'publishSparcPrimitive',
+    'reviseSparcPrimitive'
   ].includes(name);
 }
 

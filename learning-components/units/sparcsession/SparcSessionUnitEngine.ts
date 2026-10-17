@@ -1,4 +1,5 @@
 import { sparcTargetCategoryFields } from '../../runtime/sparcTargetCategories';
+import { resolveClusterKcChain } from '../../runtime/clusterKcChain';
 import { isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
 import {
   createAdaptiveLogisticUnitEngine,
@@ -52,6 +53,7 @@ import type {
 } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import {
   resolveSparcSessionPageId,
+  resolveSparcSessionStartingKC,
   resolveSparcSessionProbabilitySource,
   resolveSparcSessionRuntimeConfig,
   resolveSparcSessionUnitMode,
@@ -365,6 +367,21 @@ export function resolveSparcPageDisplay(
   const { pageId, pageKey, pageDisplay } = resolveSparcPage(deps, unit);
   const clusterListIndices = collectSparcPageClusterIndices({ ...pageDisplay, pageId, pageKey });
   const isAutoTutor = pageDisplay.unitType === 'sparc-autotutor-dialogue';
+  const startingKC = resolveSparcSessionStartingKC(unit as { sparcsession?: Record<string, unknown> | null });
+  if (startingKC) {
+    if (!isAutoTutor) throw new Error('sparcsession.startingKC requires an AutoTutor page');
+    const ids = clusterListIndices.map(index => normalizeClusterKC(createCleanAutoTutorClusterTarget({ deps, clusterIndex: index }).clusterKC));
+    const facts = (pageDisplay.workingMemoryFacts ?? []) as readonly SparcWorkingMemoryFact[];
+    resolveClusterKcChain(facts, ids, startingKC);
+    const policies = facts.filter(fact => fact.factType === 'controller.targetSelectionPolicy');
+    if (policies.length > 1) throw new Error('Chain progression permits at most one controller.targetSelectionPolicy');
+    // TDF owns the instructor's starting KC. The display carries its resolved
+    // policy into the existing document/replay boundary, never a second setting.
+    pageDisplay.workingMemoryFacts = policies.length
+      ? facts.map(fact => fact.factType === 'controller.targetSelectionPolicy'
+        ? { ...fact, slots: { ...fact.slots, startingKC } } : fact)
+      : [...facts, { factType: 'controller.targetSelectionPolicy', slots: { startingKC } }];
+  }
   return {
     ...pageDisplay,
     schema: 'tutorscript-sparc/2.0',

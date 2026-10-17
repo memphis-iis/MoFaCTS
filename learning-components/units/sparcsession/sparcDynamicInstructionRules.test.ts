@@ -1,3 +1,4 @@
+import type { SparcRetainedEvidence } from './sparcEvidenceHistory';
 import { strict as assert } from 'node:assert';
 import { SPARC_DYNAMIC_AGENT_POLICY_ID, SPARC_DYNAMIC_STUDENT_POLICY_ID, SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID, sparcPolicyForAccount } from '../../runtime/sparcInstructionalPolicies';
 import { SPARC_TARGET_CATEGORIES, type SparcTargetCategory } from '../../runtime/sparcTargetCategories';
@@ -11,6 +12,7 @@ import { currentSparcMenu, projectSparcMenuOperations } from './sparcInstruction
 import { projectSparcInstructionMessages } from './sparcInstructionalPrimitives';
 import { applySparcProgressiveNodeOperations, collectSparcProgressiveNodeOperations } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import { replaySparcHistory } from './sparcStateReplay';
+import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import { logistic, targetExpectancy } from './sparcCompetitiveSelection';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { SparcTrialDisplay, SparcTrialResult } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
@@ -32,7 +34,10 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
       misconceptions: misconceptionIds.map(id => ({ id, text: `Misconception ${id}`, ...(category ? { category } : {}) })) },
     clusterTargets: ids.map((clusterKC, clusterIndex) => ({ clusterKC, clusterIndex })),
     workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'The lesson topic' } },
-      ...ids.map(clusterKC => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: .5 } }))],
+      { factType: 'dialogue.utterance', factId: 'opening:question', slots: { speaker: 'tutor', component: 'question',
+        eventId: 'opening', targetType: 'learningTarget', targetId: ids[0], text: 'Explain the topic.' } },
+      ...ids.map(clusterKC => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: .5 } })),
+      ...ids.flatMap(source => ids.filter(target => source !== target).map(target => ({ factType: 'kcGraph.relationship', slots: { sourceClusterKC: source, targetClusterKC: target, strength: .5 } })))],
     nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain the topic.' },
       { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' },
       { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit', value: 'submit' }],
@@ -45,11 +50,12 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
   let failQuestion = false;
   let failModelAfter: number | undefined;
   let failBatch = false;
+  let evidence: SparcRetainedEvidence[] = [];
   const submit = (result?: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
     core: { userId: 'u', TDFId: 'dynamic', sessionID: 'session', levelUnit: 0 }, pageKey, display: source,
     ...(result ? { result } : {}), priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
     scoreLearnerResponse: () => { calls++; return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === ids[0] ? firstCoverage ?? coverage : coverage })),
-      diagnosticMisconceptionScores: misconceptionIds.map(id => ({ id, supportStrength: id === 'm1' ? support : 0 })) }; },
+      evidence, diagnosticMisconceptionScores: misconceptionIds.map(id => ({ id, supportStrength: id === 'm1' ? support : 0 })) }; },
     generateTutorUtterance: async request => {
       requests.push(request);
       if (request.action === 'instruction.feedback') {
@@ -97,13 +103,82 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
     const node = `${String(question.id)}:answer:${id}`;
     return submit({ submittedNodes: { [node]: id }, triggeredBy: node, timestamp: time });
   };
-  return { source, rows, requests, submit, answer, choice, mcAnswer, menu, facts, calls: () => calls,
+  return { source, rows, requests, submit, answer, choice, mcAnswer, menu, facts, evidence: (value: SparcRetainedEvidence[]) => { evidence = value; }, calls: () => calls,
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
     fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; },
     failBatch: (value: boolean) => { failBatch = value; } };
 }
 
 describe('Dynamic instruction production cycles', () => {
+  it('starts at the configured chain endpoint for both categorized policies and skips incidentally covered KCs', async () => {
+    for (const version of ['agent', 'student'] as const) {
+      const f = fixture(version, false, 'fact');
+      const order = ['g', 'c', 'e', 'a', 'b', 'd', 'f'];
+      f.source.workingMemoryFacts = [...f.source.workingMemoryFacts!,
+        { factType: 'controller.targetSelectionPolicy', slots: { startingKC: 'g' } },
+        { factType: 'kcGraph.chain', slots: { startingKC: 'g', order } }];
+      await f.submit();
+      const target = () => version === 'agent' ? f.requests.at(-1)?.targetId
+        : (f.menu()?.slots?.options as { targetId: string }[])[0]?.targetId;
+      assert.equal(target(), 'g');
+      assert.equal(f.calls(), 0, 'startup must not create an assessment');
+      if (version === 'student') await f.choice('question.text');
+      f.scores(.9); f.firstTarget(.2); // g/c/e are incidentally covered; a is not.
+      if (f.requests.at(-1)?.moveDefinition.responseFormat === 'multiple-choice') await f.mcAnswer('a');
+      else await f.answer();
+      assert.equal(target(), 'a');
+      assert.equal(f.calls(), 1);
+    }
+  });
+
+  it('binds an unanswered corrected question to its latest saved meaning while preserving the original journal', async () => {
+    const f = fixture('student', false, 'model-rule'); await f.answer(); await f.choice('question.multiple-choice');
+    const before = JSON.stringify(f.rows);
+    const replay = replaySparcHistory(f.rows);
+    const question = savedSparcChoiceQuestions(replay).at(-1)!;
+    const original = replay.transitions.find(t => t.writes.some(w => (w.value as { node?: { id?: string } })?.node?.id === question.id))!;
+    const write = original.writes.find(w => (w.value as { node?: { id?: string } })?.node?.id === question.id)!;
+    const corrected = { ...question, value: 'Which complete claim applies?', choices: [
+      { id: 'a', label: 'A complete incorrect claim.', correct: false },
+      { id: 'b', label: 'A complete corrected claim.', correct: true },
+      { id: 'c', label: 'Another complete incorrect claim.', correct: false },
+    ] };
+    f.rows.push(createSparcStateTransitionHistoryRecord({ core: { TDFId: 'tdf', sessionID: 'session', userId: 'u', levelUnit: 0 },
+      transition: { transitionId: 'question-correction', event: { eventId: 'question-correction', type: 'value-changed',
+        source: { ...original.event.source, nodeId: String(question.id) }, time: original.event.time + .5 },
+        writes: [{ ...write, value: { type: 'append-node', boxId: 'dialogue-flow', node: corrected } }] } }));
+    assert.equal(JSON.stringify(f.rows.slice(0, -1)), before);
+    const restored = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
+    const questions = savedSparcChoiceQuestions(restored);
+    assert.equal(questions.filter(q => q.id === question.id).length, 1);
+    assert.deepEqual(questions.at(-1)?.choices, corrected.choices);
+    const facts = progressiveDialogueFacts(restored).filter(fact => fact.factId === question.id);
+    assert.equal(facts.length, 1); assert.equal(facts[0]!.slots!.text, corrected.value);
+    const shown = applySparcProgressiveNodeOperations([], projectSparcAnsweredQuestionOperations(restored)) as Record<string, unknown>[];
+    assert.equal(shown.filter(n => n.id === question.id).length, 1);
+    assert.equal(shown.at(-1)?.value, corrected.value);
+    await f.mcAnswer('b');
+    const response = replaySparcHistory(f.rows).transitions.find(t => t.event.payload?.questionId === question.id)!.event;
+    assert.equal(response.payload!.input, 'A complete corrected claim.');
+    assert.equal(response.payload!.correct, true);
+    assert.equal(response.payload!.choiceId, 'b');
+  });
+  it('retains change-only descriptive evidence across failed generation and full resume', async () => {
+    const f = fixture('agent', false, 'model-rule');
+    const evidence: SparcRetainedEvidence = { kind: 'expectation', id: 'a', demonstrated: ['A demonstrated requirement'], incorrect: [], unresolved: ['A remaining requirement'], citations: [] };
+    f.evidence([evidence]); f.fail(true);
+    await assert.rejects(f.answer(100), /question failed/);
+    const changes = () => f.rows.filter(row => transition(row).transitionId.includes(':assessment:evidence:'));
+    assert.equal(changes().length, 1); assert.equal(f.calls(), 1);
+    f.fail(false); await f.answer(100);
+    assert.equal(f.calls(), 1); assert.equal(changes().length, 1);
+    assert.equal(f.requests.at(-1)!.historySessionId, 'session');
+    const respond = () => f.requests.at(-1)!.moveDefinition.responseFormat === 'multiple-choice' ? f.mcAnswer('a') : f.answer();
+    await respond(); assert.equal(changes().length, 1);
+    f.evidence([{ ...evidence, unresolved: [] }]); await respond();
+    assert.equal(changes().length, 2);
+    assert.deepEqual(f.facts().find(fact => fact.factType === 'instructional.evidence')?.slots?.unresolved, []);
+  });
   it('journals only changed scores, including misconception activation and repair, with bounded chapter-sized rows', async () => {
     const f = fixture('agent', true, 'model-rule', 24, 20);
     f.scores(0); f.firstTarget(.3);
@@ -381,6 +456,22 @@ describe('Dynamic instruction production cycles', () => {
     assert.ok(f.requests.at(-1)!.realizedInstruction?.explanation);
     assert.ok(f.requests.at(-1)!.realizedInstruction?.richContent);
     assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':primitive:richContent')).length, 1);
+  });
+  it('continues interrupted established instruction on document reload without rescoring or repeating saved feedback and support', async () => {
+    for (const version of ['agent', 'student'] as const) {
+      const f = fixture(version, false, 'model-rule');
+      if (version === 'student') { await f.answer(); f.fail(true); await assert.rejects(f.choice('explanation-rich-question.text', 100), /question failed/); }
+      else { f.fail(true); await assert.rejects(f.answer(100), /question failed/); }
+      const accepted = f.requests.at(-1)!;
+      const counts = () => ({ scores: f.calls(), feedback: f.rows.filter(row => transition(row).transitionId.endsWith(':feedback')).length,
+        support: f.rows.filter(row => transition(row).transitionId.endsWith(':primitive:richContent')).length });
+      const before = counts(); f.fail(false); await f.submit();
+      assert.deepEqual(counts(), before);
+      assert.equal(f.requests.at(-1)!.selectedAction.snapshotId, accepted.selectedAction.snapshotId);
+      assert.equal(f.requests.at(-1)!.action, accepted.action);
+      assert.ok(f.requests.at(-1)!.realizedInstruction?.richContent);
+      const rows = f.rows.length; await f.submit(); assert.equal(f.rows.length, rows);
+    }
   });
   it('retains the selected history button and permits retry only of the accepted student choice after failure', async () => {
     const f = fixture('student'); await f.answer(); f.fail(true);

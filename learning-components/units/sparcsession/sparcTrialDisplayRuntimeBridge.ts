@@ -785,34 +785,35 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     display: params.display,
   });
   const replayState = params.replayState ?? replaySparcDocumentHistory(document, params.priorHistoryRecords);
+  const origin = params.priorHistoryRecords.find((record) => record.eventType === 'sparc'
+    && (record.sparc as { pageKey?: string })?.pageKey === params.pageKey
+    && record.userId === params.core.userId && record.TDFId === params.core.TDFId
+    && record.levelUnit === params.core.levelUnit);
+  const core = origin ? { ...params.core, sessionID: requireNonBlank(origin.sessionID, 'SPARC resumed attempt identity') } : params.core;
   if (!params.result) {
     if (!isSparcCategorizedPolicy(document.instructionalController?.policyId)) throw new Error('Automatic document startup requires a categorized policy');
     const previous = replayState.transitions;
     const last = previous.at(-1);
-    // Established attempts restore. Interrupted startup resumes its accepted
-    // production and saved components using the same event identity.
-    if (last && previous.some(entry => entry.transitionId.endsWith(':cycle') || entry.event.type === 'response-submitted')) {
+    // Continue the latest interrupted instructional event, including a response
+    // whose assessment/feedback committed before generation failed.
+    const latest = [...previous].reverse().find(entry => ['document-loaded', 'response-submitted', 'choice-selected'].includes(entry.event.type));
+    const pending = latest && !previous.some(entry => entry.transitionId === `${latest.event.eventId}:cycle`) ? latest.event : undefined;
+    if (last && !pending && previous.some(entry => entry.transitionId.endsWith(':cycle') || entry.event.type === 'response-submitted')) {
       return { document, event: last.event, learnerText: '', dialogueTurn: { transition: last } };
     }
-    const event: SparcInterfaceEvent = previous.find(entry => entry.event.type === 'document-loaded')?.event ?? {
+    const event: SparcInterfaceEvent = pending ?? previous.find(entry => entry.event.type === 'document-loaded')?.event ?? {
       eventId: `${params.pageKey}:document-loaded`, type: 'document-loaded',
       source: { pageKey: params.pageKey, nodeId: 'root' }, time: Date.now(),
     };
     const problemStatement = requireSparcDialogueProblemStatement(params.display);
-    const dialogueTurn = await commitSparcInstructionalCycle({ ...params, document, replayState, event, problemStatement,
-      scoreLearnerResponse: () => { throw new Error('Document startup cannot evaluate a learner response'); },
+    const dialogueTurn = await commitSparcInstructionalCycle({ ...params, core, document, replayState, event, problemStatement,
+      scoreLearnerResponse: () => { throw new Error('Resumed instruction requires its accepted assessment; document startup cannot evaluate a learner response'); },
       runtime: { history: params.history },
     });
-    return { document, event, learnerText: '', dialogueTurn };
+    return { document, event, learnerText: String(event.payload?.input ?? ''), dialogueTurn };
   }
   const result = params.result;
   if (isSparcInstructionalCycle(document.instructionalController)) {
-    // Resume the existing attempt, including when the app has assigned a new launch ID.
-    const origin = params.priorHistoryRecords.find((record) => record.eventType === 'sparc'
-      && (record.sparc as { pageKey?: string })?.pageKey === params.pageKey
-      && record.userId === params.core.userId && record.TDFId === params.core.TDFId
-      && record.levelUnit === params.core.levelUnit);
-    const core = origin ? { ...params.core, sessionID: requireNonBlank(origin.sessionID, 'SPARC resumed attempt identity') } : params.core;
     const eventTime = replayState.transitions.reduce((time, transition) => Math.max(time, transition.event.time + 1), params.result.timestamp);
     const menu = currentSparcMenu(replayState);
     const menuId = String(menu?.slots?.menuId ?? '');

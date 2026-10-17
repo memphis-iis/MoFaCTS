@@ -1,10 +1,12 @@
 import { normalizeSparcFigureEmbedding, sparcFigureCosineSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../common/lib/sparcPromptImage';
 import type { OpenRouterUsageSummary } from '../../common/lib/openRouterClient';
+import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 
 export type SparcFigureLibraryEntry = {
-  _id: string; version: string; imageModel: string; embeddingModel: string; dimensions: number;
+  _id: string; kind?: 'image'; version: string; imageModel: string; embeddingModel: string; dimensions: number;
   situation: string; embedding: number[]; ready: boolean; reusable: boolean; createdAt: Date;
+  embeddingVersion?: string;
   generation?: { imagePrompt: string; tutorMessage: string; description: string; displayWidth: number };
   // The entry identity remains the original asset; subsequent assets are immutable versions.
   currentAssetId?: string;
@@ -23,7 +25,7 @@ export type SparcFigureLibraryStore = {
   findEntry: (assetId: string) => Promise<SparcFigureLibraryEntry | undefined>;
   saveEntry: (entry: SparcFigureLibraryEntry) => Promise<void>;
   candidates: (query: { version: string; imageModel: string; embeddingModel: string; dimensions: number; afterId: string }) => Promise<SparcFigureLibraryEntry[]>;
-  withLock: <T>(work: () => Promise<T>) => Promise<T>;
+  withLock: <T>(work: () => Promise<T>, scope?: string) => Promise<T>;
 };
 export type SparcFigureInspection = Pick<SparcFigureLibraryEntry, '_id' | 'version' | 'imageModel' | 'createdAt' | 'reusable' | 'currentAssetId' | 'revision'>;
 export const currentSparcFigureAssetId = (entry: SparcFigureInspection) => entry.currentAssetId ?? entry._id;
@@ -42,6 +44,7 @@ export async function selectSparcLibraryFigure(store: SparcFigureLibraryStore, e
         || entry.version !== query.version || entry.imageModel !== query.imageModel || entry.embeddingModel !== query.embeddingModel) {
         throw new Error('SPARC figure library returned an invalid candidate page');
       }
+      if (entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
       const similarity = sparcFigureCosineSimilarity(embedding, entry.embedding);
       if (similarity >= minimumSimilarity && (!best || similarity > best.similarity)) best = { entry, similarity };
     }
@@ -90,10 +93,12 @@ export async function getOrGenerateSparcLibraryFigure(params: {
       if (match) return await acceptMatch(match);
       entry = { _id: params.assetId, version: SPARC_FIGURE_LIBRARY_SETTINGS.version, imageModel: SPARC_PROMPT_IMAGE_SETTINGS.model,
         embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel, dimensions: embedding.length,
+        embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
         situation: params.situation, embedding, generation: { imagePrompt: params.imagePrompt, tutorMessage: params.tutorMessage,
           description: params.description, displayWidth: params.displayWidth }, ready: false, reusable: true, createdAt: new Date() };
       await store.saveEntry(entry);
     }
+    if (entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Pending image embedding requires reindexing');
     const generated = await params.generate(entry);
     entry.ready = true;
     delete entry.generation;
@@ -102,5 +107,5 @@ export async function getOrGenerateSparcLibraryFigure(params: {
       tdfId: params.tdfId, sessionId: params.sessionId, assetId: entry._id,
       source: 'generated', similarity: null, createdAt: new Date() });
     return { assetId: entry._id, source: 'generated' as const, similarity: null, usage: generated.usage, embeddingUsage };
-  });
+  }, 'generation');
 }

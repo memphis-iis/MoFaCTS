@@ -124,11 +124,8 @@ describe('createSparcUtteranceRequestFromFacts', function() {
         id: 'm1',
         text: 'The same dollar amount is added every year.',
       },
-      correctExpectations: [{
-        clusterKC: 'kc-a',
-        text: 'Interest is calculated from the updated balance.',
-      }],
     });
+    assert.equal(JSON.stringify(request.targetContent).includes('updated balance'), false);
     assert.deepEqual((request.plannerState as { misconceptions: unknown[] }).misconceptions, [{
       id: 'm1',
       confidence: 0.95,

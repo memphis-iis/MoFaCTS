@@ -1009,6 +1009,34 @@
     {
       "name": "startProlificParticipation",
       "access": "public-rate-limited"
+    },
+    {
+      "name": "listSparcMoveLibrary",
+      "access": "admin-only"
+    },
+    {
+      "name": "listSparcInstructionalComponents",
+      "access": "admin-only"
+    },
+    {
+      "name": "lookupSparcPrimitive",
+      "access": "admin-only"
+    },
+    {
+      "name": "presentSparcPrimitive",
+      "access": "admin-only"
+    },
+    {
+      "name": "publishSparcPrimitive",
+      "access": "admin-only"
+    },
+    {
+      "name": "reviseSparcPrimitive",
+      "access": "admin-only"
+    },
+    {
+      "name": "setSparcMoveReusable",
+      "access": "admin-only"
     }
   ],
   "publications": [

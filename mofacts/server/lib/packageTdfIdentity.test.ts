@@ -77,6 +77,37 @@ function deps(existing: any[] = [], manageable = true) {
 }
 
 describe('packageTdfIdentity', function() {
+  for (const factType of ['kcGraph.node', 'kcGraph.relationship', 'kcGraph.chain']) {
+    it(`rejects package-supplied ${factType} before persistence`, async function() {
+      const files = packageFiles(tdfFile('manual-graph.json'));
+      (files.at(-1)!.contents as any).setspec.sparcPages = [{ display: {
+        workingMemoryFacts: [{ factType, slots: {
+          clusterKC: 'kc-a', sourceClusterKC: 'kc-a', targetClusterKC: 'kc-b', strength: 0.9, centrality: 0.9,
+        } }],
+      } }];
+      await assert.rejects(() => preflightPackageTdfIdentities({ unzippedFiles: files,
+        packageAssetId: 'manual-graph', ownerId: 'owner-1', deps: deps() }), /KC graphs are generated from expectation embeddings/);
+    });
+  }
+
+  for (const field of ['expectationRelationships', 'expectationRelationshipProvenance']) {
+    it(`rejects package-supplied ${field}`, async function() {
+      const files = packageFiles(tdfFile('manual-matrix.json'));
+      (files.at(-1)!.contents as any).setspec.clusters = [{ stims: [{ autoTutor: { [field]: {} } }] }];
+      await assert.rejects(() => preflightPackageTdfIdentities({ unzippedFiles: files,
+        packageAssetId: 'manual-matrix', ownerId: 'owner-1', deps: deps() }), /KC graphs are generated from expectation embeddings/);
+    });
+  }
+
+  it('rejects graph facts hidden in TDF initial state as well as stimulus pages', async function() {
+    const files = packageFiles(tdfFile('manual-state.json'));
+    (files[0]!.contents as any).tutor.unit[0].initialState = {
+      facts: [{ factType: 'kcGraph.relationship', slots: { strength: 0.9 } }],
+    };
+    await assert.rejects(() => preflightPackageTdfIdentities({ unzippedFiles: files,
+      packageAssetId: 'manual-state', ownerId: 'owner-1', deps: deps() }), /KC graphs are generated from expectation embeddings/);
+  });
+
   it('creates an id-less TDF without consulting a colliding filename', async function() {
     const plan = await preflightPackageTdfIdentities({
       unzippedFiles: packageFiles(tdfFile('AllConditionsRoot.json')),

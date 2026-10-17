@@ -17,16 +17,6 @@ export type ClusterKcRelationshipNode = {
   readonly description: string;
 };
 
-export type ClusterKcRelationshipMatrix = Record<string, Record<string, number>>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function nonBlankString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
 export function normalizeClusterKcEmbeddingVector(vector: readonly number[]): number[] {
   return normalizeEmbeddingVector(vector, 'clusterKC relationship embedding vector');
 }
@@ -73,74 +63,6 @@ export function computeClusterKcRelationshipsFromEmbeddings(params: {
     }
   }
   return relationships;
-}
-
-export function normalizeClusterKcRelationshipMatrix(
-  matrix: unknown,
-  resolveClusterKC: (matrixKey: string) => string | undefined,
-): ClusterKcRelationship[] {
-  if (!isRecord(matrix)) {
-    return [];
-  }
-  const relationships: ClusterKcRelationship[] = [];
-  for (const [fromKey, rawTargets] of Object.entries(matrix)) {
-    const sourceClusterKC = resolveClusterKC(fromKey);
-    if (!sourceClusterKC || !isRecord(rawTargets)) {
-      continue;
-    }
-    for (const [targetId, rawScore] of Object.entries(rawTargets)) {
-      const targetClusterKC = resolveClusterKC(targetId);
-      if (!targetClusterKC) {
-        continue;
-      }
-      relationships.push({
-        sourceClusterKC,
-        targetClusterKC,
-        strength: Number(rawScore),
-        relation: 'related',
-      });
-    }
-  }
-  return relationships;
-}
-
-export function normalizeClusterKcRelationshipList(
-  value: unknown,
-): ClusterKcRelationship[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.map((entry) => ({
-    sourceClusterKC: nonBlankString((entry as Record<string, unknown> | null)?.sourceClusterKC),
-    targetClusterKC: nonBlankString((entry as Record<string, unknown> | null)?.targetClusterKC),
-    strength: Number((entry as Record<string, unknown> | null)?.strength),
-    relation: nonBlankString((entry as Record<string, unknown> | null)?.relation) || 'related',
-  }));
-}
-
-export function validateClusterKcRelationships(params: {
-  readonly relationships: readonly ClusterKcRelationship[];
-  readonly clusterKCs: ReadonlySet<string>;
-  readonly label?: string;
-}): void {
-  const label = params.label || 'clusterKcRelationships';
-  for (const [index, relationship] of params.relationships.entries()) {
-    if (!relationship.sourceClusterKC) {
-      throw new Error(`${label}[${index}].sourceClusterKC is required`);
-    }
-    if (!relationship.targetClusterKC) {
-      throw new Error(`${label}[${index}].targetClusterKC is required`);
-    }
-    if (!params.clusterKCs.has(relationship.sourceClusterKC)) {
-      throw new Error(`${label}[${index}].sourceClusterKC does not resolve to exactly one generated clusterKC`);
-    }
-    if (!params.clusterKCs.has(relationship.targetClusterKC)) {
-      throw new Error(`${label}[${index}].targetClusterKC does not resolve to exactly one generated clusterKC`);
-    }
-    if (!Number.isFinite(relationship.strength) || relationship.strength < 0 || relationship.strength > 1) {
-      throw new Error(`${label}[${index}].strength must be a number from 0 to 1`);
-    }
-  }
 }
 
 export function computeClusterKcCentrality(params: {

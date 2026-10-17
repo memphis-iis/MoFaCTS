@@ -22,8 +22,13 @@ const suites = [
   'sparcTrialDisplayControllerDialogueBridge',
 ];
 require('../common/lib/sparcFigureClustering.test.ts');
+require('../server/lib/clusterKcChainSolver.test.ts');
+require('../../learning-components/runtime/sparcInstructionalNeed.test.ts');
+require('../server/lib/sparcInstructionalEmbeddingMigration.test.ts');
 require('../server/lib/sparcFigureBrowseService.test.ts');
 require('../server/lib/sparcHistoryBatchStorage.test.ts');
+require('../server/lib/sparcMoveLibraryService.test.ts');
+require('../../learning-components/units/sparcsession/sparcEvidenceHistory.test.ts');
 if (process.argv.includes('--include-general-rules')) {
   suites.push('sparcProductionRuleEvaluator', 'sparcTrialDisplayRuntimeBridge');
 }
@@ -40,6 +45,9 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   const originalLoad = Module._load;
   const dom = new JSDOM('');
   global.document = dom.window.document;
+  global.window = dom.window;
+  global.HTMLElement = dom.window.HTMLElement;
+  global.MutationObserver = dom.window.MutationObserver;
   Module._load = function(request, parent, isMain) {
     if (request === 'meteor/meteor') return { Meteor: { Error: class MeteorError extends Error {
       constructor(code, reason) { super(reason); this.error = code; this.reason = reason; }
@@ -53,10 +61,20 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   try {
     if (process.argv.includes('--include-client-contracts')) require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
     require('../client/views/experiment/svelte/services/sparcAutoTutorRuleCommit.test.ts');
+    require('../client/views/experiment/svelte/services/sparcInstructionMarkdown.test.ts');
+    require('../client/views/experiment/svelte/services/sparcPrimitiveRealization.test.ts');
+    require('../client/views/experiment/svelte/services/sparcRelevantSupport.test.ts');
     require('../common/lib/autoTutorContract.test.ts');
+    global.__meteor_bootstrap__ = { serverDir: require('node:path').resolve(__dirname, '..') };
+    require('../server/lib/packageUploadPostProcess.test.ts');
+    require('../server/lib/packageTdfIdentity.test.ts');
+    require('../server/lib/packageExport.test.ts');
     require('../server/methods/sparcPromptImageMethods.test.ts');
+    require('../server/methods/sparcMoveLibraryMethods.test.ts');
+    require('../server/methods/sparcInstructionalBrowseMethods.test.ts');
+    require('../server/lib/sparcInstructionalLibraryMigration.test.ts');
     require('../server/lib/sparcFigureLibraryService.test.ts');
     if (process.argv.includes('--include-history-contracts')) require('../server/methods/analyticsMethods.test.ts');
   } finally { Module._load = originalLoad; }
-  tests.after(() => { dom.window.close(); delete global.document; });
+  tests.after(() => { dom.window.close(); delete global.document; delete global.window; delete global.HTMLElement; delete global.MutationObserver; });
 }

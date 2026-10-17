@@ -203,7 +203,7 @@ export const SPARC_COMPOSITE_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = 
   version: 'v1', family: 'sparc-component', status: 'active', requiredFacts: ['controller.selectedAction'],
   promptId: definition.moveId, promptVersion: 'v2', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v2',
   renderer: 'sparc.nodes', historyAction: 'sparc-instruction',
-  promptPolicy: 'Teach only the selected target. Realize the requested components through shared primitives, ending with one question. Use a complete worked example or an actually generated teaching figure for rich content. Keep the case, notation, and relationships coherent across components, and make the following question isomorphic to the rich case. Never invent image URLs or substitute a different form when a particular form is requested. All generated text is plain text. Do not disclose internal scoring, identifiers, or rule metadata.',
+  promptPolicy: 'Teach only the selected target. Realize the requested components through shared primitives, ending with one question. Use a complete worked example or an actually generated teaching figure for rich content. Keep the case, notation, and relationships coherent across components, and make the following question isomorphic to the rich case. Never invent image URLs or substitute a different form when a particular form is requested. Instructional text uses Markdown with GFM tables; do not wrap the complete response in a code fence or include raw HTML. Do not disclose internal scoring, identifiers, or rule metadata.',
 }));
 
 export const SPARC_DYNAMIC_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = [
@@ -227,7 +227,7 @@ export const SPARC_CATEGORIZED_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] 
     version: 'v2', promptId: `${definition.promptId}.${responseFormat}`, promptVersion: 'v2',
     outputSchemaVersion: 'v3',
     // Category-aware wording is composed from authored target demands at request construction.
-    promptPolicy: 'Generate only the selected composition and response format. Respect the authored KC demands and shared category instructions. All text is plain text. Generate the selected instruction without repeating prior feedback.',
+    promptPolicy: 'Generate only the selected composition and response format. Respect the authored KC demands and shared category instructions. Instructional text uses Markdown with GFM tables; option labels remain plain text. Do not wrap the complete response in a code fence or include raw HTML. Generate the selected instruction without repeating prior feedback.',
   })));
 
 export const SPARC_FEEDBACK_MOVE_DEFINITION: SparcMoveDefinition = autotutorDialogueMove({

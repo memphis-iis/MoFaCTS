@@ -1,3 +1,8 @@
+import { decompressHistoryRecord } from '../common/historyCompression';
+import { createSparcMoveLibraryMethods } from './methods/sparcMoveLibraryMethods';
+import { createSparcInstructionalBrowseMethods } from './methods/sparcInstructionalBrowseMethods';
+import { createInstructionalBrowseStore } from './lib/sparcInstructionalBrowseStorage';
+import { createSparcMoveStore, ensureSparcMoveLibraryIndexes, projectSparcMoveHistory, removeSparcMoveUserRecords } from './lib/sparcMoveLibraryStorage';
 import { createProlificMethods } from './methods/prolificMethods';
 import { createProlificTestExperiment } from './lib/prolificTestExperiment';
 import { createProlificParticipationService } from './lib/prolificParticipation';
@@ -73,6 +78,7 @@ import { createSparcPromptImageMethods } from './methods/sparcPromptImageMethods
 import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
   removeSparcFigureAssetMetadata, removeSparcFigureUserDecisions, SparcFigureLibrary, withSparcFigureLibraryLock } from './lib/sparcFigureLibraryStorage';
 import { createSparcFigureBrowseStore, ensureSparcFigureBrowseIndexes } from './lib/sparcFigureBrowseStorage';
+import { consolidateSparcInstructionalLibrary, SparcInstructionalLibrary } from './lib/sparcInstructionalLibraryStorage';
 import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
 import { createSparcFigureVersionStore, ensureSparcFigureVersionIndexes, removeSparcFigureVersionMetadata } from './lib/sparcFigureVersionStorage';
 import { createProfileMethods } from './methods/profileMethods';
@@ -516,7 +522,7 @@ const analyticsMethods = createAnalyticsMethods({
   writeConditionState,
   serverConsole,
   Histories,
-  insertSparcHistoryBatch: records => insertSparcHistoryBatch(Histories.rawCollection(), records, () => MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession()),
+  insertSparcHistoryBatch: records => insertSparcHistoryBatch(Histories.rawCollection(), records, () => MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession(), projectSparcMoveHistory),
   StimulusCrowdStats,
   GlobalExperimentStates,
   Tdfs,
@@ -698,7 +704,7 @@ export const methods: any = {
       await removeSparcFigureAssetMetadata(assetId);
       await removeSparcFigureVersionMetadata(assetId);
     },
-    removeSparcFigureUserDecisions,
+    removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
     serverConsole,
     csvParser: PapaAny,
     usersCollection: MeteorAny.users,
@@ -1120,15 +1126,25 @@ export const asyncMethods: Record<string, unknown> = {
 
   ...speechMethods,
 
+  ...createSparcMoveLibraryMethods({ store: createSparcMoveStore(async (userId, tdfId, after) => (await Histories.find({ userId, TDFId: tdfId, eventType: 'sparc', _id: { $gt: after } }, { sort: { _id: 1 }, limit: 100 }).fetchAsync()).map(decompressHistoryRecord)), getApiKeyResolutionDeps, getMethodAuthorizationDeps,
+    timing: (stage, ms, count) => serverConsole('[SPARC move library]', { stage, ms, ...(count === undefined ? {} : { count }) }),
+    async figureReusable(assetId) {
+      return Boolean(await SparcFigureLibrary.findOneAsync({ ready: true, reusable: true, $or: [{ currentAssetId: assetId }, { _id: assetId, currentAssetId: { $exists: false } }] }));
+    },
+    async verifyFigure(assetId) {
+      if (!await DynamicAssets.collection.findOneAsync({ _id: assetId, 'meta.ready': true, 'meta.figureLibraryVersion': { $exists: true } })) throw new Error('Reusable figure asset is unavailable');
+    } }),
+  ...createSparcInstructionalBrowseMethods({ getMethodAuthorizationDeps,
+    ...createInstructionalBrowseStore(async ids => new Map((await DynamicAssets.collection.find({ _id: { $in: ids }, 'meta.ready': true,
+      'meta.figureLibraryVersion': { $exists: true } }, { fields: { _id: 1, 'meta.description': 1 } }).fetchAsync()).map((asset: { _id: string; meta: { description: string } }) => [String(asset._id), asset.meta.description]))),
+    browse: {
+      store: createSparcFigureBrowseStore(SparcInstructionalLibrary, work => withSparcFigureLibraryLock(work, 'browse')),
+      labels: createSparcFigureClusterLabeler(getApiKeyResolutionDeps, openRouterModelCatalogService),
+      progress: (stage, count) => serverConsole('[SPARC instructional grouping]', stage, count),
+    } }),
   ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary,
     figureLibrary: createSparcFigureLibraryStore(),
-    figureVersions: createSparcFigureVersionStore(),
-    figureBrowse: {
-      store: createSparcFigureBrowseStore(SparcFigureLibrary, work => withSparcFigureLibraryLock(work, 'browse')),
-      labels: createSparcFigureClusterLabeler(getApiKeyResolutionDeps, openRouterModelCatalogService),
-      progress: (stage, count) => serverConsole('[SPARC image grouping]', stage, count),
-    },
-    minimumFigureSimilarity: (Meteor.settings as { sparcFigures?: { minimumSimilarity?: number } }).sparcFigures?.minimumSimilarity }),
+    figureVersions: createSparcFigureVersionStore() }),
 
   ...createOpenRouterMethods({
     serverConsole,
@@ -1193,7 +1209,10 @@ registerServerRuntime({
 });
 
 Meteor.startup(async function() {
+  await consolidateSparcInstructionalLibrary((source, count) => serverConsole('[SPARC instructional library transfer]', { source, count }));
   await ensureSparcFigureLibraryIndexes();
+  await ensureSparcMoveLibraryIndexes();
+  await Histories.rawCollection().createIndex({ userId: 1, TDFId: 1, eventType: 1, _id: 1 });
   await ensureSparcFigureVersionIndexes();
   await ensureSparcFigureBrowseIndexes();
   await ensureProlificIndexes();

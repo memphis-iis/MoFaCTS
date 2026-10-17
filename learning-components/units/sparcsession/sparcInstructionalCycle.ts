@@ -170,7 +170,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     return { factType: 'instructional.menu', slots: { snapshotId: event.eventId, menuId: `${params.document.id}:menu:${event.time}`, status: 'pending', options } };
   };
   const generate: SparcProductionActionHandler = async ({ facts: current, ruleId, actionId }) => {
-    const request = { ...createSparcUtteranceRequestFromFacts(current), learnerText: String(event.payload?.input ||
+    const request = { ...createSparcUtteranceRequestFromFacts(current), historySessionId: params.core.sessionID, learnerText: String(event.payload?.input ||
       current.filter((fact) => fact.factType === 'dialogue.utterance' && fact.slots?.speaker === 'learner').at(-1)?.slots?.text || '') };
     if ((!request.learnerText && !isSparcCategorizedPolicy(params.document.instructionalController?.policyId))
       || request.sourceRuleId !== ruleId || request.selectedAction.snapshotId !== event.eventId
@@ -214,12 +214,22 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     [SPARC_FEEDBACK_ACTION]: async ({ facts: current, ruleId }) => {
       let transition = acceptedFeedback;
       if (!transition) {
-        const request = createSparcFeedbackRequest(current, event, ruleId);
-        const output = await params.generateTutorUtterance(request);
+        const request = { ...createSparcFeedbackRequest(current, event, ruleId), historySessionId: params.core.sessionID };
+        let feedbackSaved = false;
+        const output = await params.generateTutorUtterance({ ...request, onFeedback: async (text, reference) => {
+          const saved = createSparcInstructionTransition({ document: params.document, event, learnerText: request.learnerText!, request, generated: text, includeLearner: false });
+          for (const write of saved.writes) {
+            const operation = write.value as { node?: Record<string, unknown> };
+            if (operation.node) operation.node.primitiveReference = reference;
+          }
+          transition = { ...saved, transitionId: `${event.eventId}:feedback` };
+          await save(transition); feedbackSaved = true;
+        } });
         const realized = createSparcInstructionTransition({ document: params.document, event, learnerText: request.learnerText!, request, generated: output, includeLearner: false });
-        transition = { ...realized, transitionId: `${event.eventId}:feedback` };
-        await save(transition);
+        if (!feedbackSaved) { transition = { ...realized, transitionId: `${event.eventId}:feedback` };
+          await save(transition); }
       }
+      if (!transition) throw new Error('Feedback checkpoint was not saved');
       return { assertions: assertions(progressiveDialogueFacts({ transitions: [transition] })), writes: [] };
     },
     [SPARC_AUTOTUTOR_EVALUATE_ACTION]: async ({ facts: current }) => {
@@ -257,14 +267,18 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
           const prior = current.find(entry => entry.factType === fact.factType && entry.slots?.[identity] === fact.slots?.[identity]);
           return fact.slots?.[value] !== (prior?.slots?.[value] ?? 0);
         });
-        const records = scoreChangeFacts.map(fact => {
+        const evidenceChanges = scoreFacts.filter(fact => fact.factType === 'instructional.evidence'
+          && JSON.stringify(current.find(prior => prior.factType === fact.factType && prior.factId === fact.factId)?.slots) !== JSON.stringify(fact.slots));
+        const records = evidenceChanges.map(fact => historyRecord({ transitionId: `${event.eventId}:assessment:evidence:${fact.factId}`,
+          event, writes: factWrites([fact], event) }));
+        records.push(...scoreChangeFacts.map(fact => {
           const expectation = fact.factType === 'learningTarget.score';
           const id = String(expectation ? fact.slots?.clusterKC : fact.slots?.id);
           return historyRecord({ transitionId: `${event.eventId}:assessment:score:${expectation ? 'expectation' : 'misconception'}:${id}`,
             event, writes: factWrites([fact], event) }, changes?.filter(change => change.clusterKC === id));
-        });
+        }));
         records.push(historyRecord({ transitionId: `${event.eventId}:assessment`, event,
-          writes: [...factWrites(acceptedFacts.filter(fact => !['learningTarget.score', 'diagnostic.misconceptionScore'].includes(fact.factType)), event), ...learnerWrites] }));
+          writes: [...factWrites(acceptedFacts.filter(fact => !['learningTarget.score', 'diagnostic.misconceptionScore', 'instructional.evidence'].includes(fact.factType)), event), ...learnerWrites] }));
         if (!params.runtime.history.writeCanonicalHistoryBatch) throw new Error('SPARC assessments require an atomic history batch writer');
         await params.runtime.history.writeCanonicalHistoryBatch(records);
       }

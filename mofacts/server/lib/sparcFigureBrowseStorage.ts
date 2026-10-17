@@ -1,7 +1,7 @@
 import { Mongo } from 'meteor/mongo';
 import { collectionMongoName } from '../../common/collectionOwnership';
 import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
-import type { SparcFigureLibraryEntry } from './sparcFigureLibraryService';
+import type { InstructionalLibraryEntry } from './sparcInstructionalLibraryStorage';
 import type { BrowseMember, BrowseSnapshot, BrowseSource, SparcFigureBrowseStore } from './sparcFigureBrowseService';
 
 type BrowseDoc = { _id: string; kind: 'state' | 'snapshot' | 'member'; revision?: number; current?: string;
@@ -15,7 +15,7 @@ export async function invalidateSparcFigureBrowse() {
   await SparcFigureBrowse.rawCollection().updateOne({ _id: 'state' },
     { $inc: { revision: 1 }, $setOnInsert: { kind: 'state' } }, { upsert: true });
 }
-export function createSparcFigureBrowseStore(library: Mongo.Collection<SparcFigureLibraryEntry>,
+export function createSparcFigureBrowseStore(library: Mongo.Collection<InstructionalLibraryEntry>,
   withLock: SparcFigureBrowseStore['withLock']): SparcFigureBrowseStore {
   return {
     withLock,
@@ -27,8 +27,18 @@ export function createSparcFigureBrowseStore(library: Mongo.Collection<SparcFigu
     },
     async snapshot(id) { return (await SparcFigureBrowse.findOneAsync({ _id: id, kind: 'snapshot' }))?.snapshot; },
     async sourcePage(afterId) {
-      return await library.find({ ready: true, _id: { $gt: afterId } }, { sort: { _id: 1 }, limit: SPARC_FIGURE_LIBRARY_SETTINGS.batchSize,
-        fields: { _id: 1, version: 1, embeddingModel: 1, dimensions: 1, embedding: 1, situation: 1 } }).fetchAsync() as BrowseSource[];
+      const rows = await library.rawCollection().find({ _id: { $gt: afterId }, $or: [
+        { kind: 'image', ready: true }, { kind: { $in: ['feedback', 'explanation', 'richContent', 'question'] } },
+      ] }, { projection: { _id: 1, kind: 1, version: 1, embeddingVersion: 1, embeddingModel: 1, dimensions: 1, embedding: 1, situation: 1, requirements: 1 } })
+        .sort({ _id: 1 }).limit(SPARC_FIGURE_LIBRARY_SETTINGS.batchSize).toArray();
+      return rows.map(row => {
+        // Storage-specific source fields serve display labels only, never a second embedding.
+        const target = 'situation' in row ? JSON.parse(row.situation).target : JSON.parse(row.requirements);
+        const authored = target.selectedMisconception ?? target;
+        const targetTexts = row.kind === 'image' ? target.texts : Array.isArray(authored) ? authored : [authored.text];
+        return { _id: row._id, kind: row.kind, version: row.version, embeddingVersion: row.embeddingVersion, embeddingModel: row.embeddingModel,
+          dimensions: row.embedding.length, embedding: row.embedding, targetTexts };
+      }) as BrowseSource[];
     },
     async addMembers(members) {
       await SparcFigureBrowse.rawCollection().insertMany(members.map(member => ({ ...member, kind: 'member' as const,
@@ -50,12 +60,26 @@ export function createSparcFigureBrowseStore(library: Mongo.Collection<SparcFigu
       if ((await SparcFigureBrowse.findOneAsync('state'))?.current !== snapshotId) await SparcFigureBrowse.removeAsync({ snapshotId });
     },
     async members(snapshotId, clusterId, cursor) {
-      const selector = { kind: 'member' as const, snapshotId, clusterId,
-        ...(cursor ? { $or: [{ similarity: { $lt: cursor.similarity } }, { similarity: cursor.similarity, assetId: { $gt: cursor.assetId } }] } : {}) };
-      const rows = await SparcFigureBrowse.find(selector, { sort: { similarity: -1, assetId: 1 },
-        limit: SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize + 1,
-        fields: { _id: 0, snapshotId: 1, clusterId: 1, assetId: 1, similarity: 1 } }).fetchAsync();
-      return rows as BrowseMember[];
+      // Read the existing component type from its owner. Cached membership keeps
+      // only semantic assignment; changing display order needs no re-clustering.
+      const rows = await SparcFigureBrowse.rawCollection().aggregate<BrowseMember & Pick<BrowseSource, 'kind'>>([
+        { $match: { kind: 'member', snapshotId, clusterId } },
+        { $lookup: { from: collectionMongoName('SparcInstructionalLibrary'), localField: 'assetId', foreignField: '_id',
+          pipeline: [{ $project: { _id: 0, kind: 1 } }], as: 'component' } },
+        { $unwind: { path: '$component', preserveNullAndEmptyArrays: true } },
+        { $project: { _id: 0, snapshotId: 1, clusterId: 1, assetId: 1, similarity: 1, kind: '$component.kind' } },
+        ...(cursor ? [{ $match: { $or: [
+          { kind: { $gt: cursor.kind } },
+          { kind: cursor.kind, similarity: { $lt: cursor.similarity } },
+          { kind: cursor.kind, similarity: cursor.similarity, assetId: { $gt: cursor.assetId } },
+        ] } }] : []),
+        { $sort: { kind: 1, similarity: -1, assetId: 1 } },
+        { $limit: SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize + 1 },
+      ]).toArray();
+      if (rows.some(row => !['explanation', 'feedback', 'image', 'question', 'richContent'].includes(row.kind))) {
+        throw new Error('Grouped instructional component is missing or has an invalid type');
+      }
+      return rows;
     },
   };
 }

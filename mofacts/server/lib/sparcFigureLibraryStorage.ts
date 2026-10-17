@@ -4,9 +4,11 @@ import { collectionMongoName } from '../../common/collectionOwnership';
 import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import type { SparcFigureDecision, SparcFigureLibraryEntry, SparcFigureLibraryStore } from './sparcFigureLibraryService';
 import { invalidateSparcFigureBrowse } from './sparcFigureBrowseStorage';
+import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
 
 // Server-only. No embeddings, situation records, or learner decision ledger are published.
-export const SparcFigureLibrary = new Mongo.Collection<SparcFigureLibraryEntry>(collectionMongoName('SparcFigureLibrary'));
+// Typed image adapter; this does not create another collection or repository.
+export const SparcFigureLibrary = SparcInstructionalLibrary as unknown as Mongo.Collection<SparcFigureLibraryEntry>;
 type LibraryLease = { _id: string; kind: 'lease'; owner: string; expiresAt: Date };
 export const SparcFigureRequests = new Mongo.Collection<SparcFigureDecision | LibraryLease>(collectionMongoName('SparcFigureRequests'));
 
@@ -28,9 +30,9 @@ export async function removeSparcFigureUserDecisions(userId: string): Promise<vo
 }
 
 /** Serialize discovery plus generation across replicas so concurrent first encounters share an entry. */
-export async function withSparcFigureLibraryLock<T>(work: () => Promise<T>, scope: 'generation' | 'browse' = 'generation'): Promise<T> {
+export async function withSparcFigureLibraryLock<T>(work: () => Promise<T>, scope: string = 'generation'): Promise<T> {
   const raw = SparcFigureRequests.rawCollection();
-  const lockId = scope === 'generation' ? `lease:${SPARC_FIGURE_LIBRARY_SETTINGS.version}` : 'lease:sparc-figure-browse';
+  const lockId = scope !== 'browse' ? `lease:${SPARC_FIGURE_LIBRARY_SETTINGS.version}:${scope}` : 'lease:sparc-figure-browse';
   const owner = randomBytes(16).toString('hex');
   const deadline = Date.now() + 180000;
   for (;;) {
@@ -75,15 +77,15 @@ export function createSparcFigureLibraryStore(): SparcFigureLibraryStore {
     },
     async findEntry(assetId) { return await SparcFigureLibrary.findOneAsync(assetId) ?? undefined; },
     async saveEntry(entry) {
-      await SparcFigureLibrary.rawCollection().replaceOne({ _id: entry._id }, entry, { upsert: true });
+      await SparcFigureLibrary.rawCollection().replaceOne({ _id: entry._id }, { ...entry, kind: 'image' } as SparcFigureLibraryEntry, { upsert: true });
       if (entry.ready) await invalidateSparcFigureBrowse();
     },
     async candidates(query) {
       return await SparcFigureLibrary.find({ version: query.version, imageModel: query.imageModel,
         embeddingModel: query.embeddingModel, dimensions: query.dimensions, ready: true, reusable: true,
         _id: { $gt: query.afterId } }, { sort: { _id: 1 }, limit: SPARC_FIGURE_LIBRARY_SETTINGS.batchSize,
-        fields: { _id: 1, version: 1, imageModel: 1, embeddingModel: 1, dimensions: 1, embedding: 1, ready: 1, reusable: 1, currentAssetId: 1, revision: 1 } }).fetchAsync();
+        fields: { _id: 1, version: 1, imageModel: 1, embeddingModel: 1, embeddingVersion: 1, dimensions: 1, embedding: 1, ready: 1, reusable: 1, currentAssetId: 1, revision: 1 } }).fetchAsync();
     },
-    withLock: withSparcFigureLibraryLock,
+    withLock: (work, scope) => withSparcFigureLibraryLock(work, scope),
   };
 }

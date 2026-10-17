@@ -47,6 +47,7 @@ function scoreChangeBatch() {
   const event = { eventId: 'response-1', type: 'response-submitted', source: { pageKey, nodeId: 'learner-response-submit' },
     time: 1710000000000, payload: { input: 'A synthetic answer.', policyId: 'dynamic-instruction-agent-v2' } };
   return [
+    { suffix: 'assessment:evidence:expectation:s15', factType: 'instructional.evidence', slots: { id: 's15', demonstrated: ['Explains isolation'], incorrect: [], unresolved: ['Distinguish gene flow'], citations: [] } },
     { suffix: 'assessment:score:expectation:s15', factType: 'learningTarget.score', slots: { clusterKC: 's15', coverage: .3 } },
     { suffix: 'assessment:score:misconception:M02', factType: 'diagnostic.misconceptionScore', slots: { id: 'M02', supportStrength: 0 } },
     { suffix: 'assessment', factType: 'session.turnState', slots: { turnCount: 1 } },
@@ -67,8 +68,8 @@ describe('SPARC assessment batch authorization and loading', () => {
     });
     const methods = createAnalyticsMethods(deps as unknown as Parameters<typeof createAnalyticsMethods>[0]);
     await methods.insertHistory.call({ userId: 'learner-1' }, scoreChangeBatch());
-    expect(saved).to.have.length(3);
-    expect(new Set(saved.map(row => row._id)).size).to.equal(3);
+    expect(saved).to.have.length(4);
+    expect(new Set(saved.map(row => row._id)).size).to.equal(4);
     const loaded = await methods.getSparcHistoryForUnit.call({ userId: 'learner-1' }, 'learner-1', 'tdf-1', 0);
     expect(loaded).to.deep.equal(saved);
   });

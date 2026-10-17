@@ -1,7 +1,7 @@
 import { normalizeSparcFigureEmbedding } from './sparcFigureLibrary';
 
 export const SPARC_FIGURE_CLUSTERING = Object.freeze({
-  version: 'spherical-kmeans-silhouette-v1', sampleSize: 128, maxClusters: 12,
+  version: 'spherical-kmeans-silhouette-v3', sampleSize: 128, maxClusters: 12,
   iterations: 16, restarts: 2, minimumSilhouette: 0.2, scoreTolerance: 0.02,
 });
 export type SparcBrowseCluster = Readonly<{ id: string; label: string; count: number; representativeAssetId: string }>;
@@ -53,7 +53,7 @@ async function fit(vectors: number[][], k: number, first: number, yieldWork: () 
     if (stable) break;
   }
   assignments = vectors.map(vector => nearestFigureCenter(vector, centers).index);
-  if (centers.some((_, i) => assignments.filter(value => value === i).length < 2)) return undefined;
+  if (centers.some((_, i) => !assignments.includes(i))) return undefined;
   const loss = vectors.reduce((sum, vector, i) => sum + 1 - figureSimilarity(vector, centers[assignments[i]!]!), 0);
   return { centers, assignments, loss };
 }
@@ -67,6 +67,7 @@ function silhouette(distances: number[][], assignments: number[], k: number): nu
       sums[group]! += distances[i]![j]!; counts[group]!++;
     }
     const own = assignments[i]!;
+    // A singleton contributes zero: it has no within-group distance to estimate.
     if (!counts[own]) continue;
     const a = sums[own]! / counts[own]!;
     const b = Math.min(...counts.map((count, group) => group !== own && count ? sums[group]! / count : Infinity));
@@ -85,7 +86,8 @@ export async function fitSparcFigureClusters(input: readonly number[][], yieldWo
     loss: vectors.reduce((sum, vector) => sum + 1 - figureSimilarity(vector, center), 0) }];
   const distances = vectors.map(left => vectors.map(right => Math.max(0, 1 - figureSimilarity(left, right))));
   const candidates: Array<{ k: number; score: number; centers: number[][] }> = [];
-  const maximum = Math.min(SPARC_FIGURE_CLUSTERING.maxClusters, Math.floor(vectors.length / 3));
+  // Silhouette comparison needs 2 <= k < n; three figures can therefore split.
+  const maximum = Math.min(SPARC_FIGURE_CLUSTERING.maxClusters, vectors.length - 1);
   for (let k = 2; k <= maximum; k++) {
     let best: Awaited<ReturnType<typeof fit>>;
     for (let restart = 0; restart < SPARC_FIGURE_CLUSTERING.restarts; restart++) {

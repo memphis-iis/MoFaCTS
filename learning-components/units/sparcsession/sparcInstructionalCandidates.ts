@@ -1,4 +1,5 @@
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
+import { resolveClusterKcChain } from '../../runtime/clusterKcChain';
 import { isSparcCompetitivePolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
 
 export type SparcInstructionalTargetKind = 'expectation' | 'misconception';
@@ -11,10 +12,10 @@ export type SparcExpectationCandidate = {
   readonly coverage: number;
   readonly goalValue: number;
   readonly instructionalNeed: number;
-  readonly coherenceToAnchor: number;
-  readonly frontierScore: number;
-  readonly centralityScore: number;
-  readonly structuralPriorityScore: number;
+  readonly coherenceToAnchor?: number;
+  readonly frontierScore?: number;
+  readonly centralityScore?: number;
+  readonly structuralPriorityScore?: number;
   readonly priorityScore: number;
   readonly eligible: boolean;
   readonly rankWithinKind: number;
@@ -240,10 +241,12 @@ function candidateFact(
       isMaximumWithinKind: candidate.isMaximumWithinKind,
       ...(candidate.targetKind === 'expectation' ? {
         coverage: candidate.coverage,
-        coherenceToAnchor: candidate.coherenceToAnchor,
-        frontierScore: candidate.frontierScore,
-        centralityScore: candidate.centralityScore,
-        structuralPriorityScore: candidate.structuralPriorityScore,
+        ...(candidate.structuralPriorityScore !== undefined ? {
+          coherenceToAnchor: candidate.coherenceToAnchor,
+          frontierScore: candidate.frontierScore,
+          centralityScore: candidate.centralityScore,
+          structuralPriorityScore: candidate.structuralPriorityScore,
+        } : {}),
       } : {
         supportStrength: candidate.supportStrength,
       }),
@@ -272,34 +275,49 @@ export function projectSparcInstructionalCandidates(params: {
     'SPARC misconceptionThreshold',
     DEFAULT_MISCONCEPTION_THRESHOLD,
   ), 'SPARC misconceptionThreshold');
-  const expectationIds = requiredExpectationIds(params.facts);
+  let expectationIds = requiredExpectationIds(params.facts);
+  const startingKC = policy?.startingKC;
+  if (policy?.policy === 'kc-chain' && startingKC === undefined) {
+    throw new Error('KC chain progression requires sparcsession.startingKC on the unit');
+  }
+  if (startingKC !== undefined) {
+    if (typeof startingKC !== 'string' || !startingKC.trim()) throw new Error('Chain progression requires a nonempty startingKC');
+    expectationIds = resolveClusterKcChain(params.facts, expectationIds, startingKC);
+  }
   const expectationSet = new Set(expectationIds);
   const misconceptionIds = authoredMisconceptionIds(params.facts);
   const coverage = latestScores(params.facts, 'learningTarget.score', 'clusterKC', 'coverage');
   const support = latestScores(params.facts, 'diagnostic.misconceptionScore', 'id', 'supportStrength');
   const centrality = centralityByExpectation(params.facts);
   const relationships = relationshipMap(params.facts);
-  const configuredWeights = weights(options, policy);
+  const configuredWeights = startingKC === undefined ? weights(options, policy) : undefined;
   const anchorClusterKC = options.anchorClusterKC?.trim() || undefined;
   const excludeClusterKC = options.excludeClusterKC?.trim() || undefined;
   if (anchorClusterKC && !expectationSet.has(anchorClusterKC)) {
     throw new Error(`SPARC anchorClusterKC "${anchorClusterKC}" is not a required expectation`);
   }
 
-  const expectations = rankedExpectations(expectationIds.map((targetId) => {
+  const expectations = rankedExpectations(expectationIds.map((targetId, chainIndex) => {
     if (!centrality.has(targetId)) throw new Error(`SPARC candidate projection is missing kcGraph.node for "${targetId}"`);
     const currentCoverage = coverage.get(targetId) ?? 0;
     const instructionalNeed = coverageThreshold > 0
       ? rounded(Math.max(0, coverageThreshold - currentCoverage) / coverageThreshold)
       : 0;
+    if (startingKC !== undefined) return {
+      targetKind: 'expectation' as const,
+      targetId, targetKey: `expectation:${targetId}`,
+      coverage: currentCoverage, goalValue: coverageThreshold, instructionalNeed,
+      priorityScore: -chainIndex,
+      eligible: targetId !== excludeClusterKC && (options.includeCompletedExpectations === true || currentCoverage < coverageThreshold),
+    };
     const coherenceToAnchor = anchorClusterKC
       ? relationshipStrength(relationships, anchorClusterKC, targetId)
       : 0;
     const frontierScore = anchorClusterKC ? instructionalNeed * coherenceToAnchor : 0;
     const centralityScore = centrality.get(targetId) ?? 0;
-    const structuralPriorityScore = configuredWeights.frontierWeight * frontierScore
-      + configuredWeights.coherenceWeight * coherenceToAnchor
-      + configuredWeights.centralityWeight * centralityScore;
+    const structuralPriorityScore = configuredWeights!.frontierWeight * frontierScore
+      + configuredWeights!.coherenceWeight * coherenceToAnchor
+      + configuredWeights!.centralityWeight * centralityScore;
     return {
       targetKind: 'expectation' as const,
       targetId,

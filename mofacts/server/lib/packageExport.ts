@@ -462,6 +462,23 @@ async function preparePackageExportState(
     if (!rawStimuliFile) {
       throw new Meteor.Error(404, `TDF ${String(memberTdf?._id || '')} is missing its stimulus file`);
     }
+    // Graph facts belong to server-derived runtime data, never to portable lesson input.
+    const pages = (rawStimuliFile as any)?.setspec?.sparcPages;
+    for (const page of Array.isArray(pages) ? pages : []) {
+      if (Array.isArray(page?.display?.workingMemoryFacts)) {
+        page.display.workingMemoryFacts = page.display.workingMemoryFacts.filter((fact: any) =>
+          typeof fact?.factType !== 'string' || !fact.factType.startsWith('kcGraph.'));
+      }
+    }
+    const clusters = (rawStimuliFile as any)?.setspec?.clusters;
+    for (const cluster of Array.isArray(clusters) ? clusters : []) {
+      for (const stim of Array.isArray(cluster?.stims) ? cluster.stims : []) {
+        if (stim?.autoTutor) {
+          delete stim.autoTutor.expectationRelationships;
+          delete stim.autoTutor.expectationRelationshipProvenance;
+        }
+      }
+    }
 
     const setspec = (tutorDoc as { setspec?: Record<string, unknown> | null })?.setspec;
     if (setspec && typeof setspec === 'object') {

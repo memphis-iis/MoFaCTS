@@ -2864,6 +2864,15 @@
                           "grid_columns": 12
                         }
                       },
+                      "startingKC": {
+                        "title": "Starting knowledge component.",
+                        "description": "Exact clusterKC identity that starts this SPARC unit’s maximum-relationship chain. Practice selects the first KC in that chain below the coverage criterion.",
+                        "type": "string",
+                        "default": "",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
                       "pageId": {
                         "title": "SPARC page id.",
                         "description": "Explicit rawStimuliFile.setspec.sparcPages pageId to launch for this SPARC session. Required when a stimulus file contains multiple SPARC pages and useful for documenting single-page generated packages.",
@@ -5313,6 +5322,15 @@
                   "stimulusfile": {
                     "title": "Learning-session stimulus file.",
                     "description": "Optional learning-session-level stimulus filename used by content lookup workflows.",
+                    "type": "string",
+                    "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "startingKC": {
+                    "title": "Starting knowledge component.",
+                    "description": "Exact clusterKC identity that starts this SPARC unit’s maximum-relationship chain. Practice selects the first KC in that chain below the coverage criterion.",
                     "type": "string",
                     "default": "",
                     "options": {

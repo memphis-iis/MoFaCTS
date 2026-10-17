@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { SPARC_COMPOSITE_MOVE_DEFINITIONS, requireActiveSparcMoveDefinition } from './sparcMoveDefinitions';
-import { createSparcInstructionTransition, parseInstructionComponents } from './sparcInstructionalPrimitives';
+import { createSparcFeedbackRequest, createSparcInstructionTransition, parseInstructionComponents } from './sparcInstructionalPrimitives';
+import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
+import { primitiveContext } from './sparcMoveLibrary';
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief } from './sparcSupportedPrompt';
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
@@ -10,6 +12,42 @@ describe('SPARC instructional primitives', () => {
   const document = { id: 'page', schemaVersion: 2 as const, root: { id: 'root', kind: 'document' as const } };
   const event = { eventId: 'turn', type: 'response-submitted' as const, source: { pageKey: 'page', nodeId: 'input' }, time: 1 };
   const request = (action: string): SparcUtteranceRequest => ({ action, targetType: 'learningTarget', targetId: 'a', problemStatement: 'Explain A', contentTexts: ['A'], selectedAction: {}, responseModifiers: [], moveDefinition: requireActiveSparcMoveDefinition(action) });
+  for (const targetType of ['learningTarget', 'misconception'] as const) {
+    it(`binds ${targetType} feedback to the answered question through saved history, excluding other targets`, () => {
+      const expectation = targetType === 'learningTarget';
+      const targeted = request('instruction.dynamic.question.text');
+      const question = createSparcInstructionTransition({ document, event: { ...event, eventId: 'asked' }, learnerText: '',
+        request: { ...targeted, targetType }, generated: { explanation: null, richContent: null, question: 'Explain A?' }, includeLearner: false });
+      const history = progressiveDialogueFacts({ transitions: JSON.parse(JSON.stringify([question])) });
+      const facts: SparcWorkingMemoryFact[] = [
+        { factType: 'dialogue.problemStatement', slots: { text: 'Lesson topic' } },
+        { factType: 'instructional.assessmentSnapshot', slots: { snapshotId: 'turn' } },
+        { factType: 'controller.selectedAction', slots: { targetType: 'learningTarget', clusterKC: 'b' } },
+        { factType: 'autotutor.expectation', slots: { clusterKC: 'a', text: 'Authored A' } },
+        { factType: 'autotutor.misconception', slots: { id: 'a', text: 'Mistaken A' } },
+        { factType: 'autotutor.expectation', slots: { clusterKC: 'b', text: 'Unrelated chapter content'.repeat(2000) } },
+        { factType: 'learningTarget.score', slots: { clusterKC: 'a', coverage: .9 } },
+        { factType: 'diagnostic.misconceptionScore', slots: { id: 'a', supportStrength: .8 } },
+        ...['expectation', 'misconception'].flatMap(kind => ['a', 'b'].map(id => ({ factType: 'instructional.evidence',
+          slots: { kind, id, demonstrated: [kind + id], incorrect: [], unresolved: [] } }))),
+        { factType: 'dialogue.utterance', factId: 'earlier:question', slots: { speaker: 'tutor', eventId: 'earlier', targetType: 'learningTarget', targetId: 'b', text: 'Unrelated question' } },
+        ...history,
+      ];
+      const response = { ...event, payload: { input: 'My answer', questionId: 'asked:question' } };
+      const feedback = createSparcFeedbackRequest(facts, response, 'feedback-rule');
+      assert.equal(feedback.targetId, 'a');
+      assert.deepEqual(feedback.contentTexts, [expectation ? 'Authored A' : 'Mistaken A']);
+      assert.equal(feedback.dialogueHistory?.length, 1);
+      assert.equal(feedback.dialogueHistory?.[0]?.text, 'Explain A?');
+      assert.equal((feedback.plannerState as { assessment: unknown[] }).assessment.length, 2);
+      const context = primitiveContext(feedback, 'feedback', null);
+      assert.equal(JSON.parse(context.focus).length, 1);
+      assert.equal(JSON.parse(context.focus)[0].kind, expectation ? 'expectation' : 'misconception');
+      assert.ok(!JSON.stringify(feedback).includes('Unrelated'));
+      assert.throws(() => createSparcFeedbackRequest(facts.filter(fact => fact.factType !== 'dialogue.utterance'), response, 'feedback-rule'), /answered question/);
+      assert.throws(() => createSparcFeedbackRequest(facts, { ...response, payload: { ...response.payload, questionId: 'earlier:question' } }, 'feedback-rule'), /answered question/);
+    });
+  }
   it('realizes each selected composite in its registered order with a final question', () => {
     for (const definition of SPARC_COMPOSITE_MOVE_DEFINITIONS) {
       for (const richContent of ['<ol><li>Worked step</li></ol>', '<table><tr><th scope="col">A</th></tr><tr><td>1</td></tr></table>', '<img src="https://example.org/authored.png" alt="Authored diagram">', '<figure><img src="https://example.org/authored.png" alt="A"><figcaption>Figure A</figcaption></figure>']) {

@@ -149,24 +149,26 @@ function replayStateFacts(replayState: SparcReplayState): readonly SparcWorkingM
 }
 
 export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'transitions'>): readonly SparcWorkingMemoryFact[] {
-  return replayState.transitions.flatMap((transition) => transition.writes.flatMap((write) => {
+  const utterances = new Map<string, SparcWorkingMemoryFact>();
+  for (const transition of replayState.transitions) for (const write of transition.writes) {
     if (write.key !== SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY || !isRecord(write.value)) {
-      return [];
+      continue;
     }
     const operation = write.value;
     if (
       (operation.type !== 'append-node' && operation.type !== 'append-node-if-missing' && operation.type !== 'insert-node')
       || !isRecord(operation.node)
     ) {
-      return [];
+      continue;
     }
     const node = operation.node;
     const id = typeof node.id === 'string' ? node.id.trim() : '';
     const speaker = node.speaker === 'learner' || node.speaker === 'tutor' ? node.speaker : '';
     const text = typeof node.value === 'string' ? node.value.trim() : '';
     if ((node.atomType !== 'dialogue-utterance' && !(node.atomType === 'html-block' && node.turnEventId)) || !id || !speaker || !text) {
-      return [];
+      continue;
     }
+    if (operation.type === 'append-node-if-missing' && utterances.has(id)) continue;
     const optionalStringSlots = [
       'action',
       'targetType',
@@ -195,6 +197,7 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
       eventId: transition.event.eventId,
       time: transition.event.time,
     };
+    for (const key of ['primitiveReference', 'component']) if (node[key] !== undefined) slots[key] = node[key];
     if (node.figure !== undefined) slots.figure = parseSparcPromptFigure(node.figure);
     if (speaker === 'learner' && transition.event.type === 'response-submitted' && transition.event.payload?.questionId) {
       slots.responseFormat = 'multiple-choice';
@@ -209,12 +212,15 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
         slots[slot] = node[slot];
       }
     }
-    return [{
+    // A correction appends a new operation; its prior journal row stays intact.
+    utterances.delete(id);
+    utterances.set(id, {
       factId: id,
       factType: 'dialogue.utterance',
       slots,
-    }];
-  }));
+    });
+  }
+  return [...utterances.values()];
 }
 
 function eventFacts(event: SparcInterfaceEvent): readonly SparcWorkingMemoryFact[] {

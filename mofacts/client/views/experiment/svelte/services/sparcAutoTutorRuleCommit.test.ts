@@ -10,13 +10,73 @@ import { requireActiveSparcMoveDefinition } from '../../../../../../learning-com
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 
 describe('SPARC app instructional commit', () => {
+  it('uses the configured chain or reference anchor policy and resumes its accepted decision without injected candidate options', async () => {
+    for (const chain of [false, true]) for (const preceding of ['a', 'd']) {
+      clearSparcRuntimeState();
+      const ids = ['a', 'b', 'c', 'd'];
+      const strengths: Readonly<Record<string, number>> = { ab: .9, ac: .1, ad: .2, bc: .3, bd: .1, cd: .9 };
+      const strength = (a: string, b: string) => strengths[[a, b].sort().join('')]!;
+      const display = resolveSparcAccountPolicy({ pageKey: 'anchor-cycle', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
+        instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
+        autoTutorTargets: { expectations: ids.map(clusterKC => ({ clusterKC, text: `Recognize ${clusterKC}`, category: 'fact' })), misconceptions: [] },
+        clusterTargets: ids.map((clusterKC, clusterIndex) => ({ clusterKC, clusterIndex })),
+        workingMemoryFacts: [
+          ...(chain ? [
+            { factType: 'controller.targetSelectionPolicy', slots: { startingKC: 'a' } },
+            { factType: 'kcGraph.chain', slots: { startingKC: 'a', order: ['a', 'b', 'c', 'd'] } },
+          ] : []),
+          ...ids.map(clusterKC => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: ids.filter(other => other !== clusterKC).reduce((sum, other) => sum + strength(clusterKC, other), 0) / 3 } })),
+          ...ids.flatMap(source => ids.filter(target => source !== target).map(target => ({ factType: 'kcGraph.relationship', slots: { sourceClusterKC: source, targetClusterKC: target, strength: strength(source, target) } }))),
+          { factType: 'dialogue.source', slots: { topic: 'Anchor selection test' } },
+          { factType: 'dialogue.utterance', factId: 'opening:question', slots: { speaker: 'tutor', component: 'question', eventId: 'opening', targetType: 'learningTarget', targetId: preceding, text: 'Recognize the preceding KC.' } },
+        ],
+        nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Recognize the preceding KC.' },
+          { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' },
+          { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }],
+      }, true)!;
+      const rows: CanonicalHistoryRecord[] = [];
+      const targets: string[] = [];
+      let evaluations = 0;
+      let fail = true;
+      const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'],
+        currentDisplay: display, tdfId: 'anchor-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
+        sparcResult: { submittedNodes: { 'learner-response-input': 'The preceding KC is understood.' }, triggeredBy: 'learner-response-submit', timestamp: 100 },
+        scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === 'a' || clusterKC === 'd' ? .8 : .2 })) }; },
+        generateTutorUtterance: (request: SparcUtteranceRequest) => {
+          if (request.action === 'instruction.feedback') return 'That is correct.';
+          targets.push(request.targetId!);
+          if (fail) throw new Error('instruction interrupted');
+          const parts = request.moveDefinition.components!;
+          return { explanation: parts.includes('explanation') ? 'An explanation.' : null, richContent: parts.includes('richContent') ? 'A worked example.' : null, question: 'Recognize the next KC.',
+            ...(request.moveDefinition.responseFormat === 'multiple-choice' ? { choices: [{ id: 'yes', label: 'Correct case', correct: true }, { id: 'no', label: 'Incorrect case', correct: false }, { id: 'other', label: 'Unrelated case', correct: false }] } : {}) };
+        },
+        deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
+      };
+      const expected = chain || preceding === 'a' ? 'b' : 'c';
+      await assert.rejects(commitSparcAutoTutorSubmit(args), /instruction interrupted/);
+      assert.deepEqual(targets, [expected]);
+      const scope = { userId: 'u', TDFId: 'anchor-tdf', levelUnit: 0, pageKey: display.pageKey, display };
+      const accepted = readSparcResumeSnapshot(scope).replayState;
+      clearSparcRuntimeState(); hydrateSparcRuntimeHistory(JSON.parse(JSON.stringify(rows)));
+      assert.deepEqual(readSparcResumeSnapshot(scope).replayState, JSON.parse(JSON.stringify(accepted)));
+      fail = false;
+      const resumed = await commitSparcAutoTutorSubmit({ ...args, attemptId: 'reopened' });
+      assert.equal(resumed.committed, true);
+      assert.deepEqual(targets, [expected, expected]);
+      assert.equal(evaluations, 1);
+    }
+    clearSparcRuntimeState();
+  });
+
   it('publishes saved dynamic feedback to the surface before generating the next instruction', async () => {
     clearSparcRuntimeState();
     const display = resolveSparcAccountPolicy({ pageKey: 'dynamic-surface', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
       instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v1', policyVersion: 1 },
       autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A' }], misconceptions: [] },
       clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }],
-      workingMemoryFacts: [{ factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: .5 } }],
+      workingMemoryFacts: [{ factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: .5 } },
+        { factType: 'dialogue.utterance', factId: 'opening:question', slots: { speaker: 'tutor', component: 'question',
+          eventId: 'opening', targetType: 'learningTarget', targetId: 'a', text: 'Explain the topic.' } }],
       nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain the topic.' },
         { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' },
         { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }],
@@ -54,7 +114,10 @@ describe('SPARC app instructional commit', () => {
       instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'student-selected-v2', policyVersion: 1 },
       autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A' }, { clusterKC: 'b', text: 'Explain B' }], misconceptions: [] },
       clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }, { clusterIndex: 1, clusterKC: 'b' }],
-      workingMemoryFacts: ['a', 'b'].map((clusterKC) => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: 0.5 } })),
+      workingMemoryFacts: [
+        ...['a', 'b'].map((clusterKC) => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: 0.5 } })),
+        ...['a', 'b'].map(source => ({ factType: 'kcGraph.relationship', slots: { sourceClusterKC: source, targetClusterKC: source === 'a' ? 'b' : 'a', strength: .5 } })),
+      ],
       nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain the topic.' },
         { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input' },
         { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }],

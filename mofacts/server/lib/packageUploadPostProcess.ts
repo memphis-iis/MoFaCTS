@@ -2,10 +2,9 @@ import type { UploadedPackageFile } from './packageParser';
 import type { PackageUploadRuntimeState, ProcessPackageUploadDeps } from './packageUploadShared';
 import { resolvePreferredApiKey } from './apiKeyResolution';
 import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
-import {
-  AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
-  AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL,
-} from '../../common/lib/autoTutorRelationshipConstants';
+import { AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL } from '../../common/lib/autoTutorRelationshipConstants';
+import { generateMaximumKcChain } from './clusterKcChainSolver';
+import { resolveKcChainWorkerLoader } from './clusterKcChainWorkerRuntime';
 import {
   computeClusterKcRelationshipsFromEmbeddings,
   createClusterKcGraphFacts,
@@ -24,56 +23,6 @@ function getWorkingMemoryFacts(display: unknown) {
   return isRecord(display) && Array.isArray(display.workingMemoryFacts)
     ? display.workingMemoryFacts
     : [];
-}
-
-function collectGraphNodeClusterKcs(facts: readonly unknown[]): Set<string> {
-  return new Set(facts.flatMap((fact) => (
-    isRecord(fact)
-      && fact.factType === 'kcGraph.node'
-      && nonBlankString(fact.slots?.clusterKC)
-      ? [nonBlankString(fact.slots.clusterKC)]
-      : []
-  )));
-}
-
-function relationshipKey(sourceClusterKC: string, targetClusterKC: string) {
-  return `${sourceClusterKC}\u0000${targetClusterKC}`;
-}
-
-function collectGraphRelationshipKeys(facts: readonly unknown[]): Set<string> {
-  return new Set(facts.flatMap((fact) => {
-    if (!isRecord(fact) || fact.factType !== 'kcGraph.relationship') {
-      return [];
-    }
-    const sourceClusterKC = nonBlankString(fact.slots?.sourceClusterKC);
-    const targetClusterKC = nonBlankString(fact.slots?.targetClusterKC);
-    return sourceClusterKC && targetClusterKC
-      ? [relationshipKey(sourceClusterKC, targetClusterKC)]
-      : [];
-  }));
-}
-
-function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>) {
-  return left.size === right.size && [...left].every((value) => right.has(value));
-}
-
-function hasCompleteKcGraphFacts(params: {
-  readonly facts: readonly unknown[];
-  readonly nodes: readonly ClusterKcRelationshipNode[];
-}) {
-  const expectedNodeClusterKcs = new Set(params.nodes.map((node) => node.clusterKC));
-  if (!sameSet(collectGraphNodeClusterKcs(params.facts), expectedNodeClusterKcs)) {
-    return false;
-  }
-  const expectedRelationshipKeys = new Set<string>();
-  for (const source of params.nodes) {
-    for (const target of params.nodes) {
-      if (source.clusterKC !== target.clusterKC) {
-        expectedRelationshipKeys.add(relationshipKey(source.clusterKC, target.clusterKC));
-      }
-    }
-  }
-  return sameSet(collectGraphRelationshipKeys(params.facts), expectedRelationshipKeys);
 }
 
 function collectClusterKcRelationshipNodesFromExpectations(display: unknown): ClusterKcRelationshipNode[] {
@@ -118,6 +67,25 @@ async function ensureAutoTutorSparcGraph(args: {
     return;
   }
 
+  const startsByPage = new Map<string, Set<string>>();
+  for (const unit of tdf.content?.tdfs?.tutor?.unit ?? []) {
+    const config = unit?.sparcsession;
+    if (config?.startingKC === undefined) continue;
+    if (typeof config.startingKC !== 'string' || !config.startingKC.trim()) {
+      throw new Error('sparcsession.startingKC must be a nonempty clusterKC identity');
+    }
+    const pages = config.pageId ? setspec.sparcPages.filter((p: any) => p.pageId === config.pageId) : setspec.sparcPages;
+    if (pages.length !== 1 || pages[0]?.display?.unitType !== 'sparc-autotutor-dialogue') {
+      throw new Error('sparcsession.startingKC requires one selected AutoTutor page');
+    }
+    const page = pages[0];
+    const ids = collectClusterKcRelationshipNodesFromExpectations(page.display).map(n => n.clusterKC);
+    if (!ids.includes(config.startingKC.trim())) throw new Error('sparcsession.startingKC is not an expectation on the selected page');
+    const starts = startsByPage.get(page.pageId) ?? new Set<string>();
+    starts.add(config.startingKC.trim());
+    startsByPage.set(page.pageId, starts);
+  }
+
   let generatedPageCount = 0;
   for (const page of setspec.sparcPages) {
     const display = isRecord(page) ? page.display : null;
@@ -125,60 +93,48 @@ async function ensureAutoTutorSparcGraph(args: {
       continue;
     }
     const facts = getWorkingMemoryFacts(display);
+    if (facts.some((fact: any) => fact?.factType === 'controller.targetSelectionPolicy' && fact.slots?.policy === 'kc-chain')
+      && !startsByPage.get(page.pageId)?.size) {
+      throw new Error('KC chain progression requires sparcsession.startingKC on the unit');
+    }
     const nodes = collectClusterKcRelationshipNodesFromExpectations(display);
-    if (nodes.length === 0 || hasCompleteKcGraphFacts({ facts, nodes })) {
+    if (nodes.length === 0) {
       continue;
     }
 
-    if (nodes.length === 1) {
-      display.workingMemoryFacts = [
-        ...facts.filter((fact) => !isRecord(fact) || (fact.factType !== 'kcGraph.node' && fact.factType !== 'kcGraph.relationship')),
-        ...createClusterKcGraphFacts({ nodes, relationships: [] }),
-      ];
-      generatedPageCount += 1;
-      continue;
-    }
-
-    const keyResolution = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
-      userId: state.uploadActorUserId,
-      tdfId: tdf?._id,
-      kind: 'openrouter',
-    });
-    if (!keyResolution.apiKey) {
-      throw new Error('AutoTutor SPARC upload requires an OpenRouter key alternative to generate the KC relationship graph.');
-    }
-
-    const attemptedModels: string[] = [];
-    let embeddingResult: Awaited<ReturnType<typeof callOpenRouterEmbeddings>> | null = null;
-    let lastError: unknown;
-    for (const candidateModel of [AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL, AUTO_TUTOR_SECONDARY_EMBEDDING_MODEL]) {
-      attemptedModels.push(candidateModel);
-      try {
-        embeddingResult = await (deps.callOpenRouterEmbeddings ?? callOpenRouterEmbeddings)({
-          apiKey: keyResolution.apiKey,
-          model: candidateModel,
-          input: nodes.map((node) => node.description),
-          telemetry: {
-            surface: 'package-upload',
-            operation: 'sparc-kc-relationship-embedding',
-          },
-        });
-        break;
-      } catch (error) {
-        lastError = error;
+    let relationships: ReturnType<typeof computeClusterKcRelationshipsFromEmbeddings> = [];
+    if (nodes.length > 1) {
+      const keyResolution = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), {
+        userId: state.uploadActorUserId,
+        tdfId: tdf?._id,
+        kind: 'openrouter',
+      });
+      if (!keyResolution.apiKey) {
+        throw new Error('AutoTutor SPARC upload requires an OpenRouter key alternative to generate the KC relationship graph.');
       }
-    }
-    if (!embeddingResult) {
-      throw new Error(`AutoTutor SPARC graph generation failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
-    }
 
-    const relationships = computeClusterKcRelationshipsFromEmbeddings({
-      nodes,
-      embeddings: embeddingResult.embeddings,
-    });
+      const embeddingResult = await (deps.callOpenRouterEmbeddings ?? callOpenRouterEmbeddings)({
+        apiKey: keyResolution.apiKey,
+        model: AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
+        input: nodes.map((node) => node.description),
+        telemetry: {
+          surface: 'package-upload',
+          operation: 'sparc-kc-relationship-embedding',
+        },
+      });
+
+      relationships = computeClusterKcRelationshipsFromEmbeddings({
+        nodes,
+        embeddings: embeddingResult.embeddings,
+      });
+    }
     const graphFacts = createClusterKcGraphFacts({ nodes, relationships });
+    for (const startingKC of startsByPage.get(page.pageId) ?? []) {
+      const chain = await generateMaximumKcChain({ ids: nodes.map(n => n.clusterKC), startingKC, relationships }, resolveKcChainWorkerLoader());
+      graphFacts.push({ factType: 'kcGraph.chain', slots: { startingKC, ...chain } });
+    }
     display.workingMemoryFacts = [
-      ...facts.filter((fact) => !isRecord(fact) || (fact.factType !== 'kcGraph.node' && fact.factType !== 'kcGraph.relationship')),
+      ...facts.filter((fact) => !isRecord(fact) || !String(fact.factType).startsWith('kcGraph.')),
       ...graphFacts,
     ];
     generatedPageCount += 1;

@@ -1,7 +1,8 @@
+import { sparcInstructionalNeedText, SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { strict as assert } from 'node:assert';
 import { getOrGenerateSparcLibraryFigure, selectSparcLibraryFigure, type SparcFigureDecision,
   type SparcFigureLibraryEntry, type SparcFigureLibraryStore } from './sparcFigureLibraryService';
-import { sparcFigureSituationText, SPARC_FIGURE_LIBRARY_SETTINGS, normalizeSparcFigureEmbedding,
+import { SPARC_FIGURE_LIBRARY_SETTINGS, normalizeSparcFigureEmbedding,
   sparcFigureMinimumSimilarity } from '../../common/lib/sparcFigureLibrary';
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../common/lib/sparcPromptImage';
 
@@ -47,11 +48,11 @@ export function sparcLibraryFixture() {
 }
 
 describe('SPARC shared figure situation library', () => {
-  const situation = { targetType: 'learningTarget', targetTexts: ['Confidence is long-run interval coverage.'],
+  const situation = { target: { texts: ['Confidence is long-run interval coverage.'] }, evidence: [],
     currentValue: .2, assistance: 2.77, illustrationBrief: 'Repeated intervals and one fixed mean.' };
   function request(store: SparcFigureLibraryStore, id: string, overrides = {}) {
     return { store, identity: id, assetId: id, userId: 'admin', tdfId: 'lesson', sessionId: 'session',
-      situation: sparcFigureSituationText(situation), imagePrompt: 'Draw repeated intervals.', tutorMessage: 'Teaching intervals.',
+      situation: sparcInstructionalNeedText(situation), imagePrompt: 'Draw repeated intervals.', tutorMessage: 'Teaching intervals.',
       description: 'Intervals around a fixed mean.', displayWidth: 360, minimumSimilarity: .9,
       embed: async () => ({ vector: [1, 0], usage: { costUsd: .0001 } }),
       generate: async () => ({ usage: { costUsd: .00997 } }), ...overrides };
@@ -67,6 +68,21 @@ describe('SPARC shared figure situation library', () => {
     assert.equal(second.source, 'semantic'); assert.equal(second.assetId, first.assetId);
     assert.equal('usage' in second, false); assert.equal(calls, 1);
     assert.equal(f.entries.get('first')!.ready, true); assert.equal(f.entries.get('first')!.generation, undefined);
+  });
+
+  it('saves and searches images with the identical canonical instructional-need input', async () => {
+    const f = sparcLibraryFixture(), inputs: string[] = [];
+    const embed = async (input: string) => { inputs.push(input); return { vector: [3, 4] }; };
+    const first = await getOrGenerateSparcLibraryFigure(request(f.store, 'save', { embed }));
+    const entry = f.entries.get(first.assetId)!;
+    assert.equal(entry.situation, sparcInstructionalNeedText(situation));
+    assert.equal(entry.embeddingVersion, SPARC_INSTRUCTIONAL_NEED_VERSION);
+    assert.deepEqual(entry.embedding, [.6, .8]);
+    const reused = await getOrGenerateSparcLibraryFigure(request(f.store, 'retrieve', { userId: 'otherAdmin', embed,
+      generate: async () => { throw new Error('A matching saved figure must not generate another image'); } }));
+    assert.equal(reused.source, 'semantic');
+    assert.equal(reused.assetId, first.assetId);
+    assert.deepEqual(inputs, [entry.situation, entry.situation]);
   });
   it('generates a new figure below the similarity threshold', async () => {
     const f = sparcLibraryFixture();
@@ -118,9 +134,18 @@ describe('SPARC shared figure situation library', () => {
   it('rejects invalid configuration, embeddings, and unapproved identity/history fields', () => {
     assert.throws(() => sparcFigureMinimumSimilarity(1.1)); assert.throws(() => sparcFigureMinimumSimilarity('0.9'));
     assert.throws(() => normalizeSparcFigureEmbedding([0, 0])); assert.throws(() => normalizeSparcFigureEmbedding([NaN, 1]));
-    assert.throws(() => sparcFigureSituationText({ ...situation, userId: 'private-user' }));
-    assert.throws(() => sparcFigureSituationText({ ...situation, dialogueHistory: ['private answer'] }));
-    assert.equal(sparcFigureMinimumSimilarity(undefined), .9);
+    assert.throws(() => sparcInstructionalNeedText({ ...situation, userId: 'private-user' }));
+    assert.throws(() => sparcInstructionalNeedText({ ...situation, dialogueHistory: ['private answer'] }));
+    assert.equal(sparcFigureMinimumSimilarity(undefined), .992);
     assert.equal(SPARC_PROMPT_IMAGE_SETTINGS.model, 'openai/gpt-image-2.5-sunburst');
+  });
+  it('keeps accepted image decisions while preventing searches across representation versions', async () => {
+    const f = sparcLibraryFixture();
+    await getOrGenerateSparcLibraryFigure(request(f.store, 'seed'));
+    const entry = f.entries.get('seed')!;
+    assert.equal(entry.embeddingVersion, SPARC_INSTRUCTIONAL_NEED_VERSION);
+    entry.embeddingVersion = 'previous-representation';
+    assert.equal((await getOrGenerateSparcLibraryFigure(request(f.store, 'seed'))).source, 'resume');
+    await assert.rejects(selectSparcLibraryFigure(f.store, [1, 0], .992), /reindexing/);
   });
 });

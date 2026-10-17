@@ -2,6 +2,39 @@ import { strict as assert } from 'node:assert';
 import { insertSparcHistoryBatch } from './sparcHistoryBatchStorage';
 
 describe('Atomic SPARC score-change storage', () => {
+  it('commits history and its exposure projection together and rebuilds the projection on an idempotent retry', async () => {
+    type Row = Record<string, unknown> & { _id: string };
+    let saved: Row[] = [], projected: string[] = [];
+    let pendingRows: Row[] = [], pendingProjection: string[] = [];
+    let rejectProjection = true;
+    const session = {
+      async withTransaction(action: () => Promise<void>) {
+        pendingRows = [...saved]; pendingProjection = [...projected];
+        await action();
+        saved = pendingRows; projected = pendingProjection;
+      },
+      async endSession() {},
+    };
+    const collection = {
+      find: () => ({ toArray: async () => pendingRows }),
+      async insertMany(rows: readonly Row[]) { pendingRows.push(...rows); },
+    };
+    const project = async (rows: readonly Row[], active: typeof session) => {
+      assert.equal(active, session);
+      pendingProjection = rows.map(r => r._id);
+      if (rejectProjection) throw new Error('Exposure write interrupted');
+    };
+    const rows = [{ _id: 'question', value: 'A new case?' }];
+    await assert.rejects(insertSparcHistoryBatch(collection, rows, () => session, project), /Exposure write interrupted/);
+    assert.deepEqual(saved, []); assert.deepEqual(projected, []);
+    rejectProjection = false;
+    await insertSparcHistoryBatch(collection, rows, () => session, project);
+    assert.deepEqual(saved, rows); assert.deepEqual(projected, ['question']);
+    projected = [];
+    assert.equal((await insertSparcHistoryBatch(collection, rows, () => session, project)).length, 0);
+    assert.deepEqual(projected, ['question']);
+  });
+
   it('rolls back an interrupted batch, accepts a retry once, and rejects conflicting retries', async () => {
     type Row = Record<string, unknown> & { _id: string };
     let saved = new Map<string, Row>();

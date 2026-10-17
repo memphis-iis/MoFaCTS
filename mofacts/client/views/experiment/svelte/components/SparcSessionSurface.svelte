@@ -1,4 +1,5 @@
 <script>
+  import { sparcMoveLibraryClient } from "../services/sparcMoveLibraryClient";
   import { createEventDispatcher, onMount, tick } from 'svelte';
   import {
     resolveSparcControllerDisplay,
@@ -99,7 +100,7 @@
     dialogueSubmitErrorDetail = '';
     const timestamp = Date.now();
     try {
-      const provider = createSparcDialogueOpenRouterProvider({ policyId: currentDisplay.instructionalController.policyId,
+      const provider = createSparcDialogueOpenRouterProvider({ ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
       const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
         scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
@@ -568,7 +569,7 @@
       if (!sparcResult) {
         throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
       }
-      const provider = createSparcDialogueOpenRouterProvider({
+      const provider = createSparcDialogueOpenRouterProvider({ ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
         ...(currentDisplay.instructionalController?.policyId ? { policyId: currentDisplay.instructionalController.policyId } : {}),
         tdfId: typeof tdfId === 'string' ? tdfId : null,
         sessionId: openRouterSession.sessionIdForScope({
@@ -1333,6 +1334,11 @@
 
   .sparc-auto-tutor-submit :global(.sparc-button) {
     text-align: center;
+  }
+
+  .sparc-auto-tutor-submit :global(.sparc-button:not(:disabled):not(:hover)) {
+    background: var(--sparc-primary-action-surface-color);
+    color: var(--sparc-primary-action-text-color);
   }
 
   .sparc-auto-tutor-submit-error {

@@ -5,14 +5,14 @@ import { SPARC_PROMPT_IMAGE_SETTINGS, SPARC_PROMPT_IMAGE_PURPOSE as PURPOSE, par
 import { generateSparcPromptImage, type GeneratedSparcPromptImage } from '../lib/sparcPromptImageGeneration';
 import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/methodAuthorization';
-import { sparcFigureSituationText, sparcFigureMinimumSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS, type SparcFigureSituation } from '../../common/lib/sparcFigureLibrary';
+import { sparcFigureMinimumSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
+import { sparcInstructionalNeedText, type SparcInstructionalNeed } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
 import { getOrGenerateSparcLibraryFigure, currentSparcFigureAssetId, type SparcFigureInspection, type SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import type { SparcLibraryImagePage, SparcLibraryImageHistory } from '../../common/lib/sparcFigureLibrary';
 import type { SparcFigureVersionStore } from '../lib/sparcFigureVersions';
 import { parseSparcRaster } from '../lib/sparcRaster';
-import { getSparcFigureBrowseOverview, type SparcFigureBrowseDeps } from '../lib/sparcFigureBrowseService';
 
 type Asset = { _id: string; path?: string; type?: string; meta: Record<string, any> };
 type Deps = {
@@ -29,7 +29,6 @@ type Deps = {
   readFile?: (path: string) => Promise<Buffer>;
   figureLibrary?: SparcFigureLibraryStore;
   figureVersions?: SparcFigureVersionStore;
-  figureBrowse?: Omit<SparcFigureBrowseDeps, 'descriptions'>;
   minimumFigureSimilarity?: number | undefined;
   embedSituation?: (apiKey: string, input: string) => Promise<{ vector: number[]; usage?: { costUsd?: number } }>;
 };
@@ -95,7 +94,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
     ...(!reused ? { usage: asset.meta.usage } : {}),
   });
   return {
-    async generateSparcPromptImage(this: Context, params: { tdfId: string; sessionId: string; generationId: string; tutorMessage: string; imagePrompt: string; figureDescription: string; displayWidth: number; situation?: SparcFigureSituation }) {
+    async generateSparcPromptImage(this: Context, params: { tdfId: string; sessionId: string; generationId: string; tutorMessage: string; imagePrompt: string; figureDescription: string; displayWidth: number; situation?: SparcInstructionalNeed }) {
       const userId = await authorize(this);
       this.unblock?.();
       const tdfId = bounded(params?.tdfId, 'TDF identity', 200);
@@ -106,7 +105,8 @@ export function createSparcPromptImageMethods(deps: Deps) {
       const displayWidth = parseSparcPromptDisplayWidth(params?.displayWidth);
       parseSparcPromptFigure({ assetId: 'validation', description });
       const prompt = bounded(params?.imagePrompt, 'Image brief', SPARC_PROMPT_IMAGE_SETTINGS.maxPromptCharacters);
-      const situation = params.situation === undefined ? undefined : sparcFigureSituationText(params.situation);
+      const situation = params.situation === undefined ? undefined : sparcInstructionalNeedText(params.situation);
+      if (params.situation?.feedback !== undefined) throw new Meteor.Error(400, 'Feedback answers belong in private primitive requests, not shared image sources');
       const identity = digest(JSON.stringify([userId, tdfId, sessionId, generationId]));
       const assetId = identity.slice(0, 20);
       if (pending.has(identity)) return pending.get(identity);
@@ -208,67 +208,11 @@ export function createSparcPromptImageMethods(deps: Deps) {
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(asset.type ?? '') || bytes.length > SPARC_PROMPT_IMAGE_SETTINGS.maxBytes) throw new Meteor.Error(500, 'Invalid saved SPARC image');
       return { dataUrl: `data:${asset.type};base64,${bytes.toString('base64')}` };
     },
-    async getSparcLibraryClusters(this: Context) {
-      await authorize(this); this.unblock?.();
-      if (!deps.figureBrowse) throw new Meteor.Error(500, 'Image grouping is not configured');
-      let snapshot;
-      try { snapshot = await getSparcFigureBrowseOverview({ ...deps.figureBrowse, descriptions: async ids => {
-        if (!deps.figureLibrary) throw new Error('Image library is not configured');
-        const entries = await deps.figureLibrary.inspectEntries(ids);
-        const images = await inspectImages(entries);
-        return new Map(images.map(image => [image.libraryId, image.description]));
-      } }); } catch (error) {
-        if (error instanceof Meteor.Error) throw error;
-        throw new Meteor.Error('sparc-library-grouping-failed', error instanceof Error && /^The figure library changed/.test(error.message)
-          ? error.message : 'Could not build the image groups. Retry grouping or check the saved library records.');
-      }
-      if (!deps.figureLibrary) throw new Meteor.Error(500, 'Image library is not configured');
-      const entries: SparcFigureInspection[] = [];
-      for (let offset = 0; offset < snapshot.clusters.length; offset += SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize) {
-        entries.push(...await deps.figureLibrary.inspectEntries(snapshot.clusters.slice(offset, offset + SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize).map(cluster => cluster.representativeAssetId)));
-      }
-      const byId = new Map(entries.map(entry => [entry._id, entry]));
-      return { snapshotId: snapshot.snapshotId, total: snapshot.total, clusters: snapshot.clusters.map(cluster => {
-        const entry = byId.get(cluster.representativeAssetId);
-        if (!entry) throw new Meteor.Error(500, 'An image group is missing its representative');
-        return { ...cluster, representativeAssetId: currentSparcFigureAssetId(entry) };
-      }) };
-    },
     async listSparcLibraryImages(this: Context, params: { afterId?: string; snapshotId?: string; clusterId?: string; cursor?: string } = {}): Promise<SparcLibraryImagePage> {
       await authorize(this);
       if (!params || typeof params !== 'object' || Array.isArray(params)
-        || Object.keys(params).some(key => !['afterId', 'snapshotId', 'clusterId', 'cursor'].includes(key))) throw new Meteor.Error(400, 'Invalid image library request');
+        || Object.keys(params).some(key => !['afterId'].includes(key))) throw new Meteor.Error(400, 'Invalid image library request');
       if (!deps.figureLibrary) throw new Meteor.Error(500, 'SPARC figure library is not configured');
-      if (params.snapshotId !== undefined || params.clusterId !== undefined || params.cursor !== undefined) {
-        if (!deps.figureBrowse || typeof params.snapshotId !== 'string' || !/^[a-f0-9]{24}$/.test(params.snapshotId)
-          || typeof params.clusterId !== 'string' || !/^[a-f0-9]{24}$/.test(params.clusterId) || params.afterId !== undefined) {
-          throw new Meteor.Error(400, 'Invalid image group request');
-        }
-        const state = await deps.figureBrowse.store.state();
-        const snapshot = await deps.figureBrowse.store.snapshot(params.snapshotId);
-        if (!snapshot || state.current !== snapshot.snapshotId || state.revision !== snapshot.sourceRevision) throw new Meteor.Error('sparc-library-changed', 'The image library changed. Reopen the groups to refresh it.');
-        if (!snapshot.clusters.some(cluster => cluster.id === params.clusterId)) throw new Meteor.Error(404, 'Image group not found');
-        let cursor: { similarity: number; assetId: string } | undefined;
-        if (params.cursor !== undefined) {
-          if (typeof params.cursor !== 'string' || params.cursor.length > 100) throw new Meteor.Error(400, 'Invalid image group cursor');
-          const [score, assetId, extra] = params.cursor.split(',');
-          const similarity = Number(score);
-          if (!score || !Number.isFinite(similarity) || similarity < -1 || similarity > 1 || !assetId || !/^[a-zA-Z0-9]{1,20}$/.test(assetId) || extra !== undefined) throw new Meteor.Error(400, 'Invalid image group cursor');
-          cursor = { similarity, assetId };
-        }
-        const members = await deps.figureBrowse.store.members(snapshot.snapshotId, params.clusterId, cursor);
-        const page = members.slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize);
-        const entries = await deps.figureLibrary.inspectEntries(page.map(member => member.assetId));
-        const entryById = new Map(entries.map(entry => [entry._id, entry]));
-        const ordered = page.map(member => {
-          const entry = entryById.get(member.assetId);
-          if (!entry) throw new Meteor.Error(500, 'A grouped figure is missing its completed canonical asset');
-          return entry;
-        });
-        const images = await inspectImages(ordered);
-        const last = page[page.length - 1];
-        return { images, nextCursor: members.length > SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize && last ? `${last.similarity},${last.assetId}` : null };
-      }
       const afterId = params?.afterId === undefined ? '' : bounded(params.afterId, 'Image cursor', 20);
       if (afterId && !/^[a-zA-Z0-9]+$/.test(afterId)) throw new Meteor.Error(400, 'Invalid image cursor');
       const entries = await deps.figureLibrary.inspectPage(afterId);

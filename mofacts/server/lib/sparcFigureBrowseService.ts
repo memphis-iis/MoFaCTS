@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from 'crypto';
+import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { normalizeSparcFigureEmbedding, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { fitSparcFigureClusters, nearestFigureCenter, SPARC_FIGURE_CLUSTERING,
   type SparcBrowseOverview } from '../../common/lib/sparcFigureClustering';
 
-export type BrowseSource = { _id: string; version: string; embeddingModel: string; dimensions: number; embedding: number[]; situation: string };
+export type BrowseSource = { _id: string; kind: string; version: string; embeddingVersion: string; embeddingModel: string; dimensions: number; embedding: number[]; targetTexts: string[] };
 export type BrowseMember = { snapshotId: string; clusterId: string; assetId: string; similarity: number };
+export type BrowseMemberCursor = Pick<BrowseSource, 'kind'> & Pick<BrowseMember, 'similarity' | 'assetId'>;
 export type BrowseSnapshot = SparcBrowseOverview & { sourceRevision: number; algorithm: string };
 export type BrowseLabelInput = { id: string; examples: Array<{ description: string; targetTexts: string[] }> };
 export type SparcFigureBrowseStore = {
@@ -14,7 +16,7 @@ export type SparcFigureBrowseStore = {
   addMembers: (members: BrowseMember[]) => Promise<void>;
   publish: (snapshot: BrowseSnapshot) => Promise<boolean>;
   discard: (snapshotId: string) => Promise<void>;
-  members: (snapshotId: string, clusterId: string, cursor?: { similarity: number; assetId: string }) => Promise<BrowseMember[]>;
+  members: (snapshotId: string, clusterId: string, cursor?: BrowseMemberCursor) => Promise<Array<BrowseMember & Pick<BrowseSource, 'kind'>>>;
   withLock: <T>(work: () => Promise<T>) => Promise<T>;
 };
 export type SparcFigureBrowseDeps = {
@@ -25,7 +27,8 @@ export type SparcFigureBrowseDeps = {
   yieldWork?: () => Promise<void>;
 };
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
-const space = (row: BrowseSource) => JSON.stringify([row.version, row.embeddingModel, row.dimensions]);
+// Storage schemas and component types do not split a shared embedding space.
+const space = (row: BrowseSource) => JSON.stringify([row.embeddingVersion, row.embeddingModel, row.dimensions]);
 
 export function parseSparcClusterLabels(value: unknown, expected: string[]) {
   const labels = (value as { labels?: unknown })?.labels;
@@ -72,6 +75,7 @@ export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps):
     try {
       await scan(async rows => {
         for (const row of rows) {
+          if (row.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
           const key = space(row); const group = spaces.get(key) ?? { sample: [] };
           spaces.set(key, group);
           const priority = digest(row._id);
@@ -119,9 +123,8 @@ export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps):
         const inputs = batch.map(([id, cluster]) => ({ id, examples: cluster.representatives.map(({ row }) => {
           const description = descriptions.get(row._id);
           if (!description) throw new Error('A representative figure is missing its saved description');
-          const situation = JSON.parse(row.situation) as { targetTexts: string[] };
-          if (!Array.isArray(situation.targetTexts) || situation.targetTexts.some(text => typeof text !== 'string')) throw new Error('Invalid saved figure target texts');
-          return { description: description.slice(0, 2048), targetTexts: situation.targetTexts.map(text => text.slice(0, 2048)).slice(0, 20) };
+          if (!Array.isArray(row.targetTexts) || row.targetTexts.some(text => typeof text !== 'string')) throw new Error('Invalid saved instructional target texts');
+          return { description: description.slice(0, 2048), targetTexts: row.targetTexts.map(text => text.slice(0, 2048)).slice(0, 20) };
         }) }));
         const generated = await deps.labels(inputs);
         labels.push(...parseSparcClusterLabels({ labels: generated }, inputs.map(input => input.id)));

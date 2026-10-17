@@ -1,3 +1,7 @@
+import { realizeSparcPrimitive } from './sparcPrimitiveRealization';
+import { instructionalNeed } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
+import { selectedSparcEvidence, previousSparcQuestions, type SparcMoveLibraryClient, type SparcPrimitiveContent, type SparcPrimitiveKind, type SparcPrimitiveReference } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
+import { parseSparcEvidenceSummary, type SparcRetainedEvidence } from '../../../../../../learning-components/units/sparcsession/sparcEvidenceHistory';
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief, parseSparcPromptFigure, SPARC_SUPPORTED_PROMPT_JSON_SCHEMA, SPARC_SUPPORTED_PROMPT_SCHEMA_ID, SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY } from '../../../../../../learning-components/units/sparcsession/sparcSupportedPrompt';
 import { callSparcPromptImage, readSparcPromptImage, type CallSparcPromptImage, type ReadSparcPromptImage } from './sparcPromptImage';
 import { parseInstructionComponents, type SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
@@ -25,6 +29,7 @@ import type {
 import {
   requireBoundedSparcDialogueMessage,
   SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,
+  SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES,
   SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
 } from '../../../../../../learning-components/units/sparcsession/sparcDialogueTurnNodes';
 import {
@@ -36,6 +41,8 @@ import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { RecoverableWarning } from '../../../../../common/recoverableWarnings';
 import { describeSparcCitation } from './sparcCitationDiagnostics';
+
+const instructionTextBudget = `Each persisted instructional text field (tutorMessage, workedExample, figureDescription) must fit within ${SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS} characters AND ${SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES} JSON UTF-8 bytes. JSON quotes, escaped line breaks, and multibyte punctuation count toward the byte limit. Stay comfortably below it by writing concisely; preserve complete words and reasoning.`;
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -87,6 +94,7 @@ export type SparcDialogueLearnerResponseScoringTraceEvent =
     }>;
 
 export type SparcDialogueOpenRouterProviderOptions = {
+  readonly moveLibrary?: SparcMoveLibraryClient;
   readonly policyId?: string;
   readonly reportWarning?: (warning: RecoverableWarning) => void | Promise<void>;
   readonly tdfId?: string | null;
@@ -204,6 +212,9 @@ function buildSparcDialogueScoreJsonSchema(
   const targetIds = learningTargets.map((target) => String(target.clusterKC));
   const misconceptionIds = misconceptions.map((misconception) => String(misconception.id));
   const boundedEvidenceStrength = { type: 'number', minimum: 0, maximum: 1 };
+  const summary = { type: ['object', 'null'], additionalProperties: false, required: ['demonstrated', 'incorrect', 'unresolved'],
+    properties: Object.fromEntries(['demonstrated', 'incorrect', 'unresolved'].map(key => [key,
+      { type: 'array', maxItems: 6, items: { type: 'string', minLength: 1, maxLength: 240 } }])) };
   const learnerEvidence = {
     type: 'array',
     items: {
@@ -232,9 +243,9 @@ function buildSparcDialogueScoreJsonSchema(
             clusterKC: { type: 'string', enum: targetIds },
             evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
             evidenceStrength: boundedEvidenceStrength,
-            learnerEvidence,
+            learnerEvidence, summary,
           },
-          required: ['clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence'],
+          required: ['clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary'],
         },
       },
       diagnosticMisconceptionEvaluations: {
@@ -250,9 +261,9 @@ function buildSparcDialogueScoreJsonSchema(
               : { type: 'string' },
             evidenceDirection: { type: 'string', enum: ['supports', 'contradicts', 'unaddressed'] },
             evidenceStrength: boundedEvidenceStrength,
-            learnerEvidence,
+            learnerEvidence, summary,
           },
-          required: ['id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence'],
+          required: ['id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary'],
         },
       },
       learnerContribution: {
@@ -373,6 +384,7 @@ function parseEvidenceEnvelope(
     value.learningTargetEvaluations,
     'SPARC dialogue scoring learningTargetEvaluations',
   ).map((entry) => ({
+    ...(entry.summary != null ? { summary: parseSparcEvidenceSummary(entry.summary) } : {}),
     clusterKC: exactEvidenceId(entry.clusterKC, 'SPARC dialogue scoring learning target clusterKC'),
     evidenceDirection: evidenceDirection(
       entry.evidenceDirection,
@@ -394,6 +406,7 @@ function parseEvidenceEnvelope(
     value.diagnosticMisconceptionEvaluations,
     'SPARC dialogue scoring diagnosticMisconceptionEvaluations',
   ).map((entry) => ({
+    ...(entry.summary != null ? { summary: parseSparcEvidenceSummary(entry.summary) } : {}),
     id: exactEvidenceId(entry.id, 'SPARC dialogue scoring diagnostic misconception id'),
     evidenceDirection: evidenceDirection(
       entry.evidenceDirection,
@@ -457,12 +470,12 @@ function buildSparcUtteranceSystemPrompt(request: SparcUtteranceRequest): string
     moveDefinition.outputSchemaId === SPARC_SUPPORTED_PROMPT_SCHEMA_ID
       ? 'Generate tutorMessage and an aligned image-generation brief in one JSON response. The application owns the selected target, move metadata, and image generation.'
       : 'Generate only tutorMessage. The application owns the selected target and dialogue move metadata.',
-    `Keep tutorMessage within ${SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS} characters.`,
+    instructionTextBudget,
     'Do not expose internal ids, rule ids, rubric labels, scoring fields, or planner metadata in tutorMessage.',
     'Use only the authored lesson content and dialogue context supplied in the user message.',
     'Follow the selected runtime move policy.',
     'Lesson context role: Use the lesson context as background. The actual preceding tutor question determines what the current learner response answers.',
-    ...(request.targetType === 'feedback' ? ['Respond to the prior answer using its existing assessment and the actual preceding tutor problem. Do not choose a new instructional target or ask another question.'] : ['Active-target isolation: For every move except summary, choose the next question to elicit the currently selected expectation or address the selected misconception. Both the explanation and the question must serve that app-selected target in Relevant authored target content. Answering the question must give the learner an opportunity to demonstrate that target. The opening scenario, dialogue history, and acknowledgement context do not authorize introducing, explaining, comparing, or asking about another expectation or misconception. Do not preview or address a requirement outside the selected target. Finish the selected target before any transition to another target.']),
+    ...(request.targetType === 'feedback' ? ['Respond to the prior answer using its existing assessment and the actual preceding tutor problem. Do not choose a new instructional target or ask another question.', 'Write reusable instructional feedback about the expressed reasoning. Do not include learner names, account identifiers, personal details, or verbatim learner responses.'] : ['Active-target isolation: For every move except summary, choose the next question to elicit the currently selected expectation or address the selected misconception. Both the explanation and the question must serve that app-selected target in Relevant authored target content. Answering the question must give the learner an opportunity to demonstrate that target. The opening scenario, dialogue history, and acknowledgement context do not authorize introducing, explaining, comparing, or asking about another expectation or misconception. Do not preview or address a requirement outside the selected target. Finish the selected target before any transition to another target.']),
     'Acknowledgement boundary for every move: Usually begin with one brief, natural response to the substance of the learner\'s latest contribution or the progress it demonstrates. If there was no progress, use a neutral acknowledgement without agreeing with an incorrect claim. Speak directly to the learner rather than narrating the receipt or processing of their message. Do not say that you heard, received, noted, recorded, recognized, or processed the learner\'s answer or question. Do not use a fixed acknowledgement template, and avoid repeating the same opening pattern across nearby turns. Omit the acknowledgement when including one would sound artificial.',
     'Learner-language and terminology boundary for every move: Represent the learner\'s meaning faithfully, but do not mechanically reproduce their wording. In the tutor\'s own voice, use canonical authored terminology and silently normalize obvious misspellings, transcription errors, malformed grammar, and incorrect nonconceptual word choices. Do not attribute rubric language, unstated beliefs, or missing content to the learner. Do not interrupt the lesson to correct the learner\'s language unless the terminology distinction is itself instructionally relevant.',
     'Misconception boundary for every move: If the latest answer states or relies on a misconception, do not praise, endorse, validate, or describe that claim as correct, useful progress, close, or a good start. Acknowledge it neutrally, or give accurate corrective feedback when the selected move calls for feedback.',
@@ -518,7 +531,7 @@ function buildSparcUtteranceUserPrompt(request: SparcUtteranceRequest): string {
     targetContentLabel,
     JSON.stringify(request.targetContent ?? request.contentTexts, null, 2),
     '',
-    'Full dialogue history:',
+    request.targetType === 'feedback' ? 'Answered instructional move and current response:' : 'Full dialogue history:',
     JSON.stringify(request.dialogueHistory ?? [], null, 2),
     '',
     'Latest student answer (the primary source for any acknowledgement):',
@@ -549,12 +562,17 @@ export function createSparcDialogueOpenRouterProvider(
   const callResolvedOpenRouterJson = options.callResolvedOpenRouterJson ?? defaultCallResolvedOpenRouterJson;
   const imageGenerator = options.callSparcPromptImage ?? callSparcPromptImage;
   const imageReader = options.readSparcPromptImage ?? readSparcPromptImage;
+  const imageReads = new Map<string, ReturnType<ReadSparcPromptImage>>();
+  const readFigure = (id: string) => {
+    if (!imageReads.has(id)) imageReads.set(id, imageReader(id).catch(error => { imageReads.delete(id); throw error; }));
+    return imageReads.get(id)!;
+  };
   const withFigures = async (text: string, history: readonly Readonly<Record<string, unknown>>[]): Promise<OpenRouterRequestMessage> => {
     const figures = history.map((entry, index) => ({ figure: entry.figure, index })).filter(entry => entry.figure !== undefined);
     if (!figures.length) return { role: 'user', content: text };
     const images = await Promise.all(figures.map(async entry => {
       const figure = parseSparcPromptFigure(entry.figure);
-      return { index: entry.index, figure, dataUrl: (await imageReader(figure.assetId)).dataUrl };
+      return { index: entry.index, figure, dataUrl: (await readFigure(figure.assetId)).dataUrl };
     }));
     return { role: 'user', content: [{ type: 'text', text }, ...images.flatMap(entry => [
       { type: 'text' as const, text: `Actual tutor figure at dialogueHistory index ${entry.index}: ${entry.figure.description}` },
@@ -574,26 +592,46 @@ export function createSparcDialogueOpenRouterProvider(
       && !request.dialogueHistory?.some(entry => entry.role === 'student'));
     const context = () => JSON.stringify({ targetKind: request.targetType, targetContent: request.targetContent ?? request.contentTexts,
       ...(categorized ? { lessonTopic: request.problemStatement } : { openingContext: request.problemStatement }),
-      learnerText: request.learnerText, dialogueHistory: request.dialogueHistory,
+      assessment: { evidence: selectedSparcEvidence(request) },
       selectedMove: request.action, responseFormat: request.moveDefinition.responseFormat, requestedComponents: components,
       explanation, richContent, ...(figure ? { figure } : {}) });
+    let questionRejection: string | undefined;
+    let earlierQuestions: unknown = previousSparcQuestions(request);
+    const run = async (kind: Exclude<SparcPrimitiveKind, 'feedback'>, generate: () => Promise<SparcPrimitiveContent>) => {
+      const persist = async (content: SparcPrimitiveContent, reference?: SparcPrimitiveReference) => {
+        await request.onInstructionComponent?.(kind, content.text, content.figure, {
+          ...(content.choices ? { choices: content.choices } : {}), ...(content.supportHeading ? { supportHeading: content.supportHeading } : {}),
+          ...(reference ? { primitiveReference: reference } : {}),
+        });
+      };
+      if (!options.moveLibrary) { const content = await generate(); await persist(content); return content; }
+      if (!options.tdfId || !request.historySessionId || !request.onInstructionComponent) throw new Error('Move library requires durable primitive context');
+      return realizeSparcPrimitive({ request, kind, dependencies: { explanation, richContent, figure }, tdfId: options.tdfId, sessionId: request.historySessionId,
+        library: options.moveLibrary, persist, generate: async (rejection, prior) => { questionRejection = rejection; earlierQuestions = prior; return generate(); } });
+    };
     const realize = async (component: string, task: string, schema: OpenRouterJsonSchema) => {
-      const history = [...(request.dialogueHistory ?? []), ...(figure ? [{ role: 'tutor', text: richContent, figure }] : [])];
+      if (component === 'question') {
+        task += '\nDo not repeat these earlier questions: ' + JSON.stringify(earlierQuestions ?? []) + (questionRejection ? '\nRejected attempt: ' + questionRejection : '');
+      }
+      const history = figure ? [{ role: 'tutor', text: richContent, figure }] : [];
       const result = await callResolvedOpenRouterJson({
         tdfId: options.tdfId ?? null, ...(options.policyId ? { policyId: options.policyId } : {}), ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         temperature: 0.15, maxTokens: component === 'rich' ? 3000 : SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
         messages: [{ role: 'system', content: [
           'Return only JSON matching the schema. The production owns the target and requested composition.',
-          request.moveDefinition.promptPolicy,
+          instructionTextBudget,
           'Primitive boundary: The move policy describes the completed move. This call produces only the named primitive requested below. Only the question primitive may ask a learner question; explanation and rich primitives must contain no learner question, invitation, or response task.',
           'Use canonical authored terminology and silently normalize obvious nonconceptual language errors. Do not attribute unstated beliefs to the learner. Do not expose scoring, identifiers, or planner metadata.',
+          'Write reusable instructional content. Do not include learner names, account identifiers, personal details, or verbatim learner responses in the output.',
           request.learnerText
             ? 'Feedback has already been delivered. Do not repeat an acknowledgement or correction of the prior answer. Do not introduce another target.'
             : 'This is the first instructional move. No learner answer or feedback exists yet. Introduce the selected target without inventing an earlier answer, learner difficulty, acknowledgement, or correction.',
           ...(categorized && starting && component === 'explanation' ? [
             'Starting an expectation: give this selected concept a brief basis or purpose in the lesson topic before explaining it. A natural lead-in such as "When first thinking about ..." may help; name the conceptual task rather than using a generic welcome or assuming an opening scenario. Then explain only the selected target. Do not repeat this introductory framing in continuation moves.',
           ] : []),
-          'The actual preceding components in the context define the case, notation, and relationships. Preserve their meaning. All text is plain text, not HTML or executable markup.',
+          'Focus on unresolved authored requirements in the retained assessment. Treat demonstrated requirements as established unless there is conflicting evidence. Do not repeat prior feedback. Never invent a new requirement to prolong a target.',
+          'The actual preceding components in the context define the case, notation, and relationships. Preserve their meaning. Instructional text uses Markdown with GFM tables, not raw HTML or executable markup. Use a header and delimiter row for tables. Do not wrap instructional content in a code fence.',
+          request.moveDefinition.promptPolicy,
           task,
           ...(component === 'question' ? [
             'The question must directly elicit the selected target below. The lesson context and earlier dialogue are background; do not return to their target when it differs from the selected target. Supply any case information needed to answer this question. An isomorphic question preserves the actual rich case task and conceptual distinction, not merely its broad topic.',
@@ -609,9 +647,10 @@ export function createSparcDialogueOpenRouterProvider(
     };
     const text = async (component: string, task: string) => parseUtteranceEnvelope(await realize(component, task, SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA));
     if (components.includes('richContent') && richContent === null) {
+      const content = await run('richContent', async () => {
       const stringOrNull = { type: ['string', 'null'], maxLength: 2048 };
       const output = await realize('rich', [
-        categorized ? 'Choose worked-example, comparison, table, or figure to serve the authored category and KC demands. For nonimage support, supply plain-text content in workedExample and a short heading naming its instructional form. Worked examples use exactly Worked Example; comparisons use Comparison. Other headings name the form, not the topic. Figures use null for heading and have no displayed title or caption.' : 'Choose worked-example or figure based on pedagogical appropriateness. Prefer figures for models and worked examples for principles; either can teach conceptual reasoning.',
+        categorized ? 'Choose worked-example, comparison, table, or figure to serve the authored category and KC demands. For nonimage support, supply Markdown content in workedExample (use a GFM table for tabular comparisons) and a short heading naming its instructional form. Worked examples use exactly Worked Example; comparisons use Comparison. Other headings name the form, not the topic. Figures use null for heading and have no displayed title or caption.' : 'Choose worked-example or figure based on pedagogical appropriateness. Prefer figures for models and worked examples for principles; either can teach conceptual reasoning.',
         ...(categorized ? ['The support demonstrates only the selected KC task. Its result can be the required recognition, identification, explanation, or application; do not complete a larger domain procedure or calculate extra outcomes belonging to other KCs to make the example seem complete. The heading is rendered separately: do not repeat it inside workedExample content.'] : []),
         'For worked-example, supply a complete worked case in workedExample and use null for all figure fields. Include givens, reasoning, result, and a formula when useful.',
         'For figure, use null for workedExample and supply imagePrompt, figureDescription, and displayWidth. Illustrate the teaching case completely, with accurate relationships. figureDescription describes and explains only this teaching figure. Neither figureDescription nor imagePrompt may contain a learner question, a new practice case, or a response task. The separate question primitive will create the isomorphic question after the figure exists. Do not automatically omit a model feature as the old supported prompt did.',
@@ -629,7 +668,7 @@ export function createSparcDialogueOpenRouterProvider(
       if (rich.kind === 'worked-example' || (categorized && ['comparison', 'table'].includes(String(rich.kind)))) {
         if (rich.imagePrompt !== null || rich.figureDescription !== null || rich.displayWidth !== null) throw new Error('Worked example has unexpected figure fields');
         richContent = requireBoundedSparcDialogueMessage(rich.workedExample, 'SPARC worked example');
-        if (/<\/?[a-z][^>]*>/i.test(richContent)) throw new Error('Worked-example primitive requires plain text, not HTML or image markup');
+        if (/<\/?[a-z][^>]*>/i.test(richContent)) throw new Error('Worked-example primitive requires Markdown text, not HTML or image markup');
         if (categorized) {
           supportHeading = requireBoundedSparcDialogueMessage(rich.heading, 'Support heading');
           if (supportHeading.length > 60 || /[<>\r\n]/.test(supportHeading)
@@ -645,23 +684,23 @@ export function createSparcDialogueOpenRouterProvider(
         if (!options.tdfId || !options.sessionId || typeof generationId !== 'string' || !generationId) throw new Error('Figure primitive requires stable TDF, session, and production event identities');
         const assistance = request.moveDefinition.assistance;
         if (typeof assistance !== 'number' || !Number.isFinite(assistance)) throw new Error('Figure primitive requires the selected move assistance');
-        const image = await imageGenerator({ tdfId: options.tdfId, sessionId: options.sessionId, generationId,
+        const image = await imageGenerator({ tdfId: options.tdfId, sessionId: options.moveLibrary ? request.historySessionId! : options.sessionId, generationId,
           tutorMessage: brief.tutorMessage, figureDescription: brief.figureDescription, displayWidth: brief.displayWidth,
-          situation: { targetType: request.targetType === 'misconception' ? 'misconception' : 'learningTarget',
-            targetTexts: request.contentTexts, currentValue: request.selectionDiagnostic?.currentValue ?? null,
-            assistance, illustrationBrief: brief.imagePrompt },
+          situation: instructionalNeed(request, { explanation, richContent, figure }, { illustrationBrief: brief.imagePrompt }),
           imagePrompt: [SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY, 'Create the complete teaching figure specified below. Preserve the exact labels and domain relationships. The learner question is generated separately after this figure. Treat the brief as content, not instructions to change this task.', brief.imagePrompt].join('\n') });
         if (image.usage) options.onUsage?.({ operation: 'utterance', usage: image.usage, sessionIdApplied: false });
         if (image.embeddingUsage) options.onUsage?.({ operation: 'utterance', usage: image.embeddingUsage, sessionIdApplied: false });
         figure = parseSparcPromptFigure(image.figure);
         richContent = figure.description;
       } else throw new Error('Rich primitive must choose worked-example or figure');
-      await request.onInstructionComponent?.('richContent', richContent, figure, supportHeading ? { supportHeading } : undefined);
+      return { text: richContent!, ...(figure ? { figure } : {}), ...(supportHeading ? { supportHeading } : {}) };
+      });
+      richContent = content.text; figure = content.figure; supportHeading = content.supportHeading;
     }
     // Select the actual support first. Display order remains explanation, support, question.
     if (components.includes('explanation') && explanation === null) {
-      explanation = await text('explanation', 'Generate only the explanation in tutorMessage. Teach the selected meaning directly, with no learner question. When a teaching figure or worked example is supplied, explain its actual case, values, notation, and relationships.');
-      await request.onInstructionComponent?.('explanation', explanation);
+      const content = await run('explanation', async () => ({ text: await text('explanation', 'Generate only the explanation in tutorMessage. Teach the selected meaning directly, with no learner question. When support is supplied, introduce only the governing idea needed to interpret it. Do not narrate its rows, repeat its definitions, or restate its worked reasoning. Explanation and support must make complementary contributions.') }));
+      explanation = content.text;
     }
     const questionTask = [
       'Generate exactly one focused question in tutorMessage, with its own necessary givens. Do not supply its answer.',
@@ -670,8 +709,9 @@ export function createSparcDialogueOpenRouterProvider(
     ].join('\n');
     let question = request.realizedInstruction?.question;
     if (question === undefined) {
+      const content = await run('question', async () => {
       if (request.moveDefinition.responseFormat === 'multiple-choice') {
-        const parsed = await realize('question', questionTask + '\nReturn tutorMessage and choices. Options use stable short ids, plain-text labels, and a correct boolean; exactly one is correct. The correct boolean is an answer key, never visible question text.', {
+        const parsed = await realize('question', questionTask + '\nReturn tutorMessage and choices. Options use stable short ids, plain-text labels, and a correct boolean; exactly one is correct. The correct boolean is an answer key, never visible question text. Each option must express a complete, meaningfully distinct answer. Put shared context in the stem and keep labels concise, aiming below 160 characters and always within the 240-character limit. Rewrite an answer to fit; never cut off a word or proposition. Distractors must express a different conceptual claim, not differ through incomplete wording, misspellings, or invisible characters.', {
           type: 'object', additionalProperties: false, required: ['tutorMessage', 'choices'], properties: {
             tutorMessage: { type: 'string', minLength: 1, maxLength: 2048 },
             choices: { type: 'array', minItems: 3, maxItems: 4, items: { type: 'object', additionalProperties: false,
@@ -682,7 +722,9 @@ export function createSparcDialogueOpenRouterProvider(
         question = requireBoundedSparcDialogueMessage(parsed.tutorMessage, 'Multiple-choice question');
         choices = parseSparcQuestionChoices(parsed.choices);
       } else question = await text('question', questionTask);
-      await request.onInstructionComponent?.('question', question, undefined, choices ? { choices } : undefined);
+      return { text: question!, ...(choices ? { choices } : {}) };
+      });
+      question = content.text; choices = content.choices;
     }
     return parseInstructionComponents({ explanation, richContent, question, ...(figure ? { figure } : {}), ...(choices ? { choices } : {}), ...(supportHeading ? { supportHeading } : {}) }, request);
   };
@@ -717,6 +759,7 @@ export function createSparcDialogueOpenRouterProvider(
             '2. Use "question" when the learner’s primary conversational action genuinely requests information or confirmation. Use "answer" when the learner primarily offers an interpretation or attempted answer, even if it is hesitant or phrased with question-like intonation. A confirmation-shaped contribution such as "Are you saying Y?" or "Do we compute Y?" may be either a question or an answer; classify its function in context and score its instructional meaning the same either way. Include learnerQuestion with contentFocused true for an on-topic question, using the definition in step 1; use contentFocused false only for an off-topic, rude, lewd, illicit, or otherwise inappropriate question.',
             '3. Return exactly one learningTargetEvaluations entry for every supplied learning target and exactly one diagnosticMisconceptionEvaluations entry for every supplied misconception. Evaluate every proposition independently and copy every clusterKC and id exactly.',
             '3a. Every supports or contradicts evaluation must include at least one learnerEvidence citation. Copy each quote as an exact contiguous substring of a learner-authored source. Use source "dialogueHistory" with that entry’s zero-based dialogueHistoryIndex, or source "learnerText" with dialogueHistoryIndex null. Never cite tutor text. Every unaddressed evaluation must use an empty learnerEvidence array.',
+            'For each proposition whose descriptive evidence has changed, summarize demonstrated knowledge, the learner\'s incorrect claims, and unresolved authored requirements in brief phrases. In incorrect, state the learner\'s mistaken meaning, not the correct requirement they failed to satisfy; a merely unaddressed requirement belongs in unresolved. Use canonical authored terminology and consistent wording for equivalent requirements; preserve distinctions and retain prior wording when its meaning is unchanged. Return summary null when priorEvidence remains accurate or no evidence addresses this target yet. Stay within authored targets, retain earlier demonstrations, resolve later corrections, and never invent requirements. Exclude names, identifiers, quotations, and personal details.',
             '4. Assess instructional evidence cumulatively from every learner-authored turn in dialogueHistory together with learnerText. Study the learner’s trajectory and improvement: combine distinct complementary learner statements across turns when they form one developing explanation, and give later clarification, worked application, or self-correction full weight. Do not average turns, sum per-turn scores, or increase coverage merely because the learner repeats the same meaning.',
             '4a. Interpret the latest learner contribution as an answer to the immediately preceding tutor question. Resolve ordinary contextual references and elliptical answers from that question. A short phrase, choice, number, or confirmation can fully establish the requested proposition when it unambiguously fills the slot or relation the tutor asked for; do not require the learner to restate the lesson context or produce a standalone explanation before crediting that meaning.',
             '5. Tutor turns provide context for references, prompts, and the instructional trajectory, but tutor hints, assertions, corrections, and summaries are never learner evidence. Credit an idea supplied by the tutor only when the learner later adopts, explains, applies, or correctly confirms it.',
@@ -753,6 +796,7 @@ export function createSparcDialogueOpenRouterProvider(
             learningTargets,
             misconceptions,
             dialogueHistory,
+            priorEvidence: runtimeFacts.filter(f => f.factType === 'instructional.evidence').map(f => f.slots),
             learnerText,
             ...(event?.payload?.questionId ? { responseFormat: 'multiple-choice', selectedChoiceId: event.payload.choiceId } : {}),
             evaluationDirective: SPARC_SCORING_TERMINAL_DIRECTIVE,
@@ -797,6 +841,23 @@ export function createSparcDialogueOpenRouterProvider(
       stage: 'evidence-parsed',
       evidenceEnvelope,
     });
+    const retained: SparcRetainedEvidence[] = [];
+    for (const [kind, entries] of [['expectation', evidenceEnvelope.learningTargetEvaluations], ['misconception', evidenceEnvelope.diagnosticMisconceptionEvaluations]] as const) {
+      for (const entry of entries) {
+        if (!entry.summary) continue; // Null explicitly carries the prior descriptive evidence forward.
+        const citations = entry.learnerEvidence.flatMap(citation => {
+          const historical = citation.source === 'dialogueHistory' ? dialogueHistory[citation.dialogueHistoryIndex!] : undefined;
+          if (citation.source === 'dialogueHistory' && historical?.role !== 'student') return [];
+          const responseId = citation.source === 'learnerText' ? `${event?.eventId}:learner` : dialogueHistory[citation.dialogueHistoryIndex!]?.responseId;
+          if (typeof responseId !== 'string' || !responseId || responseId.startsWith('undefined:')) throw new Error('Evidence requires a stable learner response identity');
+          const source = citation.source === 'learnerText' ? learnerText : String(dialogueHistory[citation.dialogueHistoryIndex!]?.text);
+          const start = source.indexOf(citation.quote);
+          if (start < 0) return []; // Scoring already reports the mismatch; persist only verified source spans.
+          return [{ responseId, start, end: start + citation.quote.length }];
+        });
+        retained.push({ kind, id: 'clusterKC' in entry ? entry.clusterKC : entry.id, ...entry.summary, citations });
+      }
+    }
     const evaluation = {
       evidenceEnvelope,
       learnerResponseScore: reduceSparcLearnerResponseEvidence({
@@ -804,6 +865,7 @@ export function createSparcDialogueOpenRouterProvider(
         evidence: evidenceEnvelope,
       }),
     };
+    if (retained.length) Object.assign(evaluation.learnerResponseScore, { evidence: retained });
     if (mismatchCount > 0) {
       // One bounded event per valid scoring response; diagnostic failure must
       // never become a student-visible lesson failure or an unhandled rejection.
@@ -829,6 +891,7 @@ export function createSparcDialogueOpenRouterProvider(
 
     async generateTutorUtterance(request) {
       if (request.moveDefinition.components) return generateInstructionPrimitives(request);
+      const generate = async () => {
       const supported = request.moveDefinition.outputSchemaId === SPARC_SUPPORTED_PROMPT_SCHEMA_ID;
       const utteranceRequest: Parameters<CallResolvedOpenRouterJson>[0] = {
         tdfId: options.tdfId ?? null,
@@ -886,6 +949,16 @@ export function createSparcDialogueOpenRouterProvider(
         return parseSparcSupportedPrompt({ tutorMessage: image.tutorMessage, figure: image.figure });
       }
       return parseUtteranceEnvelope(result.parsedContent);
+      };
+      if (request.targetType === 'feedback' && options.moveLibrary) {
+        if (!options.tdfId || !request.historySessionId || !request.onFeedback) throw new Error('Shared feedback requires durable context');
+        const content = await realizeSparcPrimitive({ request, kind: 'feedback', dependencies: null,
+          tdfId: options.tdfId, sessionId: request.historySessionId, library: options.moveLibrary,
+          generate: async () => { const text = await generate(); if (typeof text !== 'string') throw new Error('Feedback must be text'); return { text }; },
+          persist: (content, reference) => request.onFeedback!(content.text, reference) });
+        return content.text;
+      }
+      return generate();
     },
   };
 }

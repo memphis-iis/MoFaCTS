@@ -34,6 +34,9 @@ export default defineConfig((Meteor) => {
     // those bundles to commonjs2, whose final `module.exports` crashes in a
     // browser script. Keep server and native-client output unchanged.
     ...rspackClientOutputContract(Meteor),
+    // HiGHS runs in a Node worker. Preserve its real npm files (including WASM)
+    // instead of turning its loader into a virtual Rspack module identifier.
+    ...(Meteor.isServer && Meteor.compileWithMeteor(['highs'])),
     // Split node_modules into a separate "vendor" chunk for parallel loading
     // and better browser caching (vendor chunk changes less often than app code).
     // Client-only — server must emit a single bundle file.

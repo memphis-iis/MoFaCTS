@@ -1,3 +1,4 @@
+import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { strict as assert } from 'node:assert';
 import { getSparcFigureBrowseOverview, parseSparcClusterLabels, type BrowseMember, type BrowseSnapshot,
   type BrowseSource, type SparcFigureBrowseStore } from './sparcFigureBrowseService';
@@ -17,9 +18,12 @@ export function figureBrowseFixture(input: BrowseSource[]) {
     },
     async discard(id) { if (id !== current) { snapshots.delete(id); for (let i = members.length - 1; i >= 0; i--) if (members[i]!.snapshotId === id) members.splice(i, 1); } },
     async members(snapshotId, clusterId, cursor) {
-      return members.filter(member => member.snapshotId === snapshotId && member.clusterId === clusterId
-        && (!cursor || member.similarity < cursor.similarity || (member.similarity === cursor.similarity && member.assetId > cursor.assetId)))
-        .sort((a, b) => b.similarity - a.similarity || a.assetId.localeCompare(b.assetId)).slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize + 1);
+      return members.filter(member => member.snapshotId === snapshotId && member.clusterId === clusterId)
+        .map(member => ({ ...member, kind: rows.find(row => row._id === member.assetId)!.kind }))
+        .filter(member => !cursor || member.kind > cursor.kind || member.kind === cursor.kind
+          && (member.similarity < cursor.similarity || member.similarity === cursor.similarity && member.assetId > cursor.assetId))
+        .sort((a, b) => a.kind.localeCompare(b.kind) || b.similarity - a.similarity || a.assetId.localeCompare(b.assetId))
+        .slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize + 1);
     },
     async withLock(work) {
       const previous = tail; let release!: () => void;
@@ -33,10 +37,28 @@ export function figureBrowseFixture(input: BrowseSource[]) {
   return { store, deps, rows, members, snapshots, labels: () => labels, invalidate: () => { revision++; } };
 }
 export function figureBrowseRows(n: number): BrowseSource[] {
-  return Array.from({ length: n }, (_, i) => ({ _id: String(i).padStart(20, '0'), version: 'v1', embeddingModel: 'synthetic-embedding',
-    dimensions: 2, embedding: i % 2 ? [.005 * (i % 7), 1] : [1, .005 * (i % 7)], situation: JSON.stringify({ targetTexts: ['Generalized conceptual understanding.'] }) }));
+  return Array.from({ length: n }, (_, i) => ({ _id: String(i).padStart(20, '0'), kind: 'image', version: 'v1', embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION, embeddingModel: 'synthetic-embedding',
+    dimensions: 2, embedding: i % 2 ? [.005 * (i % 7), 1] : [1, .005 * (i % 7)], targetTexts: ['Generalized conceptual understanding.'] }));
 }
 describe('SPARC cached semantic figure browsing', () => {
+  it('rebuilds outdated grouping and preserves a singleton topic in a five-figure library', async () => {
+    const vectors = [[1, 0, 0], [1, .01, 0], [0, 1, 0], [.01, 1, 0], [0, 0, 1]];
+    const rows = figureBrowseRows(5).map((row, i) => ({ ...row, dimensions: 3, embedding: vectors[i]! }));
+    const f = figureBrowseFixture(rows);
+    const original = await getSparcFigureBrowseOverview(f.deps);
+    assert.deepEqual(original.clusters.map(cluster => cluster.count).sort(), [1, 2, 2]);
+    f.snapshots.set(original.snapshotId, { ...original, algorithm: 'spherical-kmeans-silhouette-v1' });
+    const rebuilt = await getSparcFigureBrowseOverview(f.deps);
+    assert.notEqual(rebuilt.snapshotId, original.snapshotId);
+    assert.deepEqual(rebuilt.clusters.map(cluster => cluster.count).sort(), [1, 2, 2]);
+    const singleton = rebuilt.clusters.find(cluster => cluster.count === 1)!;
+    const members = await f.store.members(rebuilt.snapshotId, singleton.id);
+    assert.equal(members.length, 1);
+    assert.equal(members[0]!.assetId, rows[4]!._id);
+    assert.equal(singleton.representativeAssetId, rows[4]!._id);
+    assert.deepEqual(await getSparcFigureBrowseOverview(f.deps), rebuilt);
+    assert.equal(f.labels(), 2);
+  });
   it('streams all records, caches labels, isolates embedding spaces and orders paged members by their center', async () => {
     const f = figureBrowseFixture(figureBrowseRows(130));
     f.rows.push({ ...figureBrowseRows(1)[0]!, _id: 'different-space', embeddingModel: 'other-embedding', dimensions: 3, embedding: [1, 0, 0] });
@@ -50,7 +72,7 @@ describe('SPARC cached semantic figure browsing', () => {
     assert.equal(first.length, 25);
     assert.ok(first.every((member, i) => !i || first[i - 1]!.similarity >= member.similarity));
     const last = first[23]!;
-    const next = await f.store.members(snapshot.snapshotId, cluster.id, { similarity: last.similarity, assetId: last.assetId });
+    const next = await f.store.members(snapshot.snapshotId, cluster.id, { kind: last.kind, similarity: last.similarity, assetId: last.assetId });
     assert.ok(next.every(member => !first.slice(0, 24).some(prior => prior.assetId === member.assetId)));
     f.invalidate(); const updated = await getSparcFigureBrowseOverview(f.deps);
     assert.notEqual(updated.snapshotId, snapshot.snapshotId); assert.equal(f.labels(), 2);

@@ -1,3 +1,4 @@
+import { moveExposuresFromHistory } from '../lib/sparcMoveExposureProjection';
 import { isSparcAdminPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { worksheetHistoryWriteId, sameWorksheetWrite } from '../lib/worksheetHistoryWrite';
 import { sparcHistoryWriteId } from '../lib/sparcHistoryWrite';
@@ -715,8 +716,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       const eventId = transition?.event?.eventId;
       if (row.eventType !== 'sparc' || !eventId || !isSparcAdminPolicy(transition?.event?.payload?.policyId)
         || (index === records.length - 1 ? transition?.transitionId !== `${eventId}:assessment`
-          : !transition?.transitionId?.startsWith(`${eventId}:assessment:score:`) || transition.writes?.length !== 1
-            || !['learningTarget.score', 'diagnostic.misconceptionScore'].includes(transition.writes[0]?.value?.factType ?? ''))) {
+          : transition.writes?.length !== 1
+            || !(transition.transitionId?.startsWith(`${eventId}:assessment:score:`)
+              ? ['learningTarget.score', 'diagnostic.misconceptionScore'].includes(transition.writes[0]?.value?.factType ?? '')
+              : transition.transitionId?.startsWith(`${eventId}:assessment:evidence:`)
+                && transition.writes[0]?.value?.factType === 'instructional.evidence'))) {
         throw new Meteor.Error(400, 'SPARC batches require target score-change rows followed by the assessment completion row');
       }
       const id = sparcHistoryWriteId(row);
@@ -752,7 +756,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const worksheetId = worksheetHistoryWriteId(sanitizedHistoryRecord);
     const sparcId = sparcHistoryWriteId(sanitizedHistoryRecord);
     const durableId = worksheetId ?? sparcId;
-    if (durableId) {
+    if (sparcId && moveExposuresFromHistory(sanitizedHistoryRecord).length) {
+      if (!deps.insertSparcHistoryBatch) throw new Error('Atomic SPARC history storage is not configured');
+      const inserted = await deps.insertSparcHistoryBatch([{ ...sanitizedHistoryRecord, _id: sparcId }]);
+      if (!inserted.length) return;
+    } else if (durableId) {
       Object.assign(sanitizedHistoryRecord, { _id: durableId });
       try {
         await deps.Histories.insertAsync(sanitizedHistoryRecord);

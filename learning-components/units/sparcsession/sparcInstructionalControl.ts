@@ -130,13 +130,21 @@ export function projectSparcAutoTutorInstructionalFacts(params: {
   readonly candidateOptions?: SparcInstructionalCandidateOptions;
 }): SparcAutoTutorInstructionalProjection {
   assertSparcInstructionalControllerConfig(params.config);
+  const cycle = latestActiveCycle(params.facts);
+  // A completed expectation cycle still identifies the KC we are leaving.
+  // During misconception repair, replayed tutor instructions retain the last KC
+  // without introducing a second persisted focus or interpreting learner text.
+  const precedingKC = cycle?.slots?.targetKind === 'expectation'
+    ? stringSlot(cycle, 'targetId')
+    : stringSlot(params.facts.filter(fact => fact.factType === 'dialogue.utterance'
+      && fact.slots?.speaker === 'tutor' && fact.slots?.targetType === 'learningTarget').at(-1), 'targetId');
+  const anchorClusterKC = params.candidateOptions?.anchorClusterKC ?? precedingKC;
   const candidates = projectSparcInstructionalCandidates({
     snapshotId: params.snapshotId,
     facts: params.facts,
     policyId: params.config.policyId,
-    ...(params.candidateOptions ? { options: params.candidateOptions } : {}),
+    options: { ...params.candidateOptions, ...(anchorClusterKC ? { anchorClusterKC } : {}) },
   });
-  const cycle = latestActiveCycle(params.facts);
   let progress: SparcWorkingMemoryFact | undefined;
   let continuable = false;
   if (cycle) {

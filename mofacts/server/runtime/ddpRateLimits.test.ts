@@ -11,5 +11,8 @@ describe('DDP rate limits', function() {
     assert.equal(isRateLimitedOpenRouterMethod('callAiContentOpenRouterRequest'), true);
     assert.equal(isRateLimitedOpenRouterMethod('callResolvedOpenRouterJson'), true);
     assert.equal(isRateLimitedOpenRouterMethod('callResolvedOpenRouterEmbeddings'), true);
+    assert.equal(isRateLimitedOpenRouterMethod('lookupSparcPrimitive'), true);
+    assert.equal(isRateLimitedOpenRouterMethod('publishSparcPrimitive'), true);
+    assert.equal(isRateLimitedOpenRouterMethod('reviseSparcPrimitive'), true);
   });
 });

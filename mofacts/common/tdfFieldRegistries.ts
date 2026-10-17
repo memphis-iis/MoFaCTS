@@ -523,6 +523,10 @@ export const LEARNING_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
 
 export const SPARC_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
   ...LEARNING_SESSION_FIELD_REGISTRY,
+  startingKC: simpleField(stringField('', 12), {
+    brief: 'Starting knowledge component.',
+    verbose: 'Exact clusterKC identity that starts this SPARC unit’s maximum-relationship chain. Practice selects the first KC in that chain below the coverage criterion.'
+  }),
   pageId: simpleField(stringField('', 12), {
     brief: 'SPARC page id.',
     verbose: 'Explicit rawStimuliFile.setspec.sparcPages pageId to launch for this SPARC session. Required when a stimulus file contains multiple SPARC pages and useful for documenting single-page generated packages.'
@@ -780,6 +784,7 @@ export const LEARNING_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
 export const SPARC_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   ...LEARNING_SESSION_DIRECT_RUNTIME_KEYS,
   'pageId',
+  'startingKC',
 ]);
 
 

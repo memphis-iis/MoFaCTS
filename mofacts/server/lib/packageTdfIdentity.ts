@@ -113,6 +113,16 @@ function readExperimentTarget(file: UploadedPackageFile) {
   return String((file.contents as any)?.tutor?.setspec?.experimentTarget || '').trim().toLowerCase();
 }
 
+function containsKcGraphFact(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(containsKcGraphFact);
+  const record = value as Record<string, unknown>;
+  return (typeof record.factType === 'string' && record.factType.startsWith('kcGraph.'))
+    || Object.hasOwn(record, 'expectationRelationships')
+    || Object.hasOwn(record, 'expectationRelationshipProvenance')
+    || Object.values(record).some(containsKcGraphFact);
+}
+
 function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
   const tdfFiles = unzippedFiles.filter((file) => file.type === 'tdf');
   if (tdfFiles.length === 0) {
@@ -121,6 +131,12 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
 
   const packageEntriesByName = new Map<string, UploadedPackageFile>();
   for (const file of unzippedFiles) {
+    if (containsKcGraphFact(file.contents)) {
+      throw new Meteor.Error(
+        'package-kc-graph-forbidden',
+        `Package file "${file.name}" supplies KC graph values. KC graphs are generated from expectation embeddings; omit all kcGraph facts, expectationRelationships, and expectationRelationshipProvenance.`,
+      );
+    }
     const key = packageEntryKey(file.name);
     if (!key) {
       throw new Meteor.Error('invalid-package-filename', 'Package contains an empty filename.');

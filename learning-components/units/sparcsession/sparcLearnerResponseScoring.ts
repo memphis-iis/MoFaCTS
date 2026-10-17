@@ -1,3 +1,4 @@
+import { retainedEvidenceFacts, type SparcRetainedEvidence, type SparcEvidenceSummary } from './sparcEvidenceHistory';
 import { createSparcStableWorkingMemoryFactStateWrite } from './sparcWorkingMemoryState';
 import { expectationLogitChange } from '../../models/adaptive-logistic/probabilityCalculation';
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
@@ -39,6 +40,7 @@ export type SparcLearnerEvidenceCitation = {
 };
 
 export type SparcLearningTargetEvidence = {
+  readonly summary?: SparcEvidenceSummary;
   readonly clusterKC: string;
   readonly evidenceDirection: SparcEvidenceDirection;
   readonly evidenceStrength: number;
@@ -46,6 +48,7 @@ export type SparcLearningTargetEvidence = {
 };
 
 export type SparcDiagnosticMisconceptionEvidence = {
+  readonly summary?: SparcEvidenceSummary;
   readonly id: string;
   readonly evidenceDirection: SparcEvidenceDirection;
   readonly evidenceStrength: number;
@@ -69,6 +72,7 @@ export type SparcLearnerResponseEvidenceEnvelope = {
 };
 
 export type SparcLearnerResponseScoringResult = {
+  readonly evidence?: readonly SparcRetainedEvidence[];
   readonly learningTargetScores?: readonly SparcLearningTargetScoreInput[];
   readonly diagnosticMisconceptionScores?: readonly SparcDiagnosticMisconceptionScoreInput[];
   readonly learnerContribution?: {
@@ -398,7 +402,7 @@ export function createSparcLearnerResponseScoreFacts(params: {
   const knownMisconceptions = knownMisconceptionIds(params.facts);
   const previousCoverage = previousLearningTargetCoverage(params.facts);
   const previousSupportStrength = previousMisconceptionSupportStrength(params.facts);
-  const scoredFacts: SparcWorkingMemoryFact[] = [];
+  const scoredFacts: SparcWorkingMemoryFact[] = retainedEvidenceFacts(params.facts, params.score.evidence ?? []);
   const contributionType = params.score.learnerContribution?.type;
   const learningTargetUpdates = uniqueUpdatesById({
     inputs: params.score.learningTargetScores ?? [],

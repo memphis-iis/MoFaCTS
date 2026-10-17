@@ -28,6 +28,17 @@ export function resolveSparcSessionPageId(
   return trimmed || undefined;
 }
 
+export function resolveSparcSessionStartingKC(
+  unit: SparcSessionConfigUnit | null | undefined,
+): string | undefined {
+  const startingKC = resolveSparcSessionRuntimeConfig(unit)?.startingKC;
+  if (startingKC === undefined) return undefined;
+  if (typeof startingKC !== 'string' || !startingKC.trim()) {
+    throw new Error('sparcsession.startingKC must be a nonempty clusterKC identity');
+  }
+  return startingKC.trim();
+}
+
 export function resolveSparcSessionUnitMode(
   unit: SparcSessionConfigUnit | null | undefined,
 ): string {

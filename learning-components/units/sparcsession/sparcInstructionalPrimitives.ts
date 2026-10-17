@@ -1,3 +1,4 @@
+import type { SparcPrimitiveReference } from './sparcMoveLibrary';
 import { parseSparcSupportedPrompt, SPARC_SUPPORTED_PROMPT_SCHEMA_ID, type SparcSupportedPrompt } from './sparcSupportedPrompt';
 import type { SparcAuthoredDocument, SparcInterfaceEvent, SparcStateTransition, SparcStateWrite, SparcWorkingMemoryFact } from './sparcSessionContracts';
 import { buildSparcDialogueHistory, type SparcUtteranceRequest } from './sparcUtteranceRequest';
@@ -108,34 +109,51 @@ export function createSparcFeedbackRequest(facts: readonly SparcWorkingMemoryFac
   const contribution = facts.find((fact) => fact.factType === 'learnerResponse.contribution')?.slots;
   const learnerText = requireBoundedSparcDialogueMessage(event.payload?.input, 'SPARC feedback learner answer');
   const problem = facts.find((fact) => fact.factType === 'dialogue.problemStatement')?.slots?.text;
-  const assessment = facts.filter((fact) => ['learningTarget.score', 'diagnostic.misconceptionScore'].includes(fact.factType));
+  const question = facts.filter(fact => fact.factType === 'dialogue.utterance' && fact.slots?.speaker === 'tutor'
+    && ['learningTarget', 'misconception'].includes(String(fact.slots?.targetType))
+    && !['explanation', 'richContent'].includes(String(fact.slots?.component))
+    && ![':explanation', ':richContent'].some(suffix => String(fact.factId).endsWith(suffix))).at(-1);
+  const targetId = question?.slots?.targetId;
+  const targetType = question?.slots?.targetType;
+  if (typeof targetId !== 'string' || !targetId.trim()
+    || (event.payload?.questionId && event.payload.questionId !== question?.factId)) {
+    throw new Error('Feedback requires the answered question and its intended target');
+  }
+  const expectation = targetType === 'learningTarget';
+  const target = facts.find(fact => fact.factType === (expectation ? 'autotutor.expectation' : 'autotutor.misconception')
+    && fact.slots?.[expectation ? 'clusterKC' : 'id'] === targetId);
+  if (!target) throw new Error('Feedback question target is missing from authored content');
+  const assessment = facts.filter(fact => fact.factType === 'instructional.evidence'
+    ? fact.slots?.kind === (expectation ? 'expectation' : 'misconception') && fact.slots?.id === targetId
+    : fact.factType === (expectation ? 'learningTarget.score' : 'diagnostic.misconceptionScore')
+      && fact.slots?.[expectation ? 'clusterKC' : 'id'] === targetId);
   if (!facts.some((fact) => fact.factType === 'instructional.assessmentSnapshot' && fact.slots?.snapshotId === event.eventId)) {
     throw new Error('Feedback requires the current response assessment');
   }
   return {
     problemStatement: requireBoundedSparcDialogueMessage(problem, 'SPARC feedback problem statement'),
-    targetType: 'feedback', targetId: event.eventId, action: SPARC_FEEDBACK_MOVE_DEFINITION.moveId,
-    contentTexts: facts.filter((fact) => fact.factType === 'autotutor.expectation').map((fact) => String(fact.slots?.text)),
-    targetContent: facts.filter((fact) => ['autotutor.expectation', 'autotutor.misconception'].includes(fact.factType)).map((fact) => fact.slots),
+    targetType: 'feedback', targetId, action: SPARC_FEEDBACK_MOVE_DEFINITION.moveId,
+    contentTexts: [String(target.slots?.text)], targetContent: target.slots,
     selectedAction: { snapshotId: event.eventId, action: SPARC_FEEDBACK_MOVE_DEFINITION.moveId, sourceRuleId },
     moveDefinition: SPARC_FEEDBACK_MOVE_DEFINITION, sourceRuleId, responseModifiers: [], learnerText,
     ...(contribution ? { learnerContribution: contribution } : {}),
     plannerState: { assessment: assessment.map((fact) => ({ factType: fact.factType, ...fact.slots })) },
-    dialogueHistory: buildSparcDialogueHistory(facts),
+    dialogueHistory: buildSparcDialogueHistory(facts.filter(fact => fact.factType === 'dialogue.utterance'
+      && (fact.slots?.eventId === question?.slots?.eventId || fact.slots?.eventId === event.eventId))),
   };
 }
 
 export function createSparcInstructionComponentWrite(params: {
   document: SparcAuthoredDocument; event: SparcInterfaceEvent; request: SparcUtteranceRequest;
   component: 'explanation' | 'richContent' | 'question'; text: string; figure?: SparcPromptFigure;
-  details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'>;
+  details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'> & { primitiveReference?: SparcPrimitiveReference };
 }): SparcStateWrite {
   const transition = createSparcDialogueTurnTransition({ document: params.document, event: params.event,
     includeLearner: false, utteranceRequest: params.request, tutorText: params.text });
   const write = transition.writes[0]!;
   const operation = write.value as { node: Record<string, unknown> };
   return { ...write, value: { type: 'append-node', boxId: 'dialogue-flow', node: {
-    ...operation.node, id: `${params.event.eventId}:${params.component}`,
+    ...operation.node, id: `${params.event.eventId}:${params.component}`, component: params.component,
     atomType: params.component === 'richContent' && !params.figure ? 'html-block' : 'dialogue-utterance',
     assistance: params.request.moveDefinition.assistance, ...(params.figure ? { figure: params.figure } : {}),
     ...(params.details ?? {}),
