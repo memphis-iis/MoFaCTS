@@ -59,7 +59,10 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     return originalLoad.call(this, request, parent, isMain);
   };
   try {
-    if (process.argv.includes('--include-client-contracts')) require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
+    if (process.argv.includes('--include-client-contracts')) {
+      require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
+      require('../client/views/experiment/svelte/services/sparcCompoundInterestLiveEvaluation.test.ts');
+    }
     require('../client/views/experiment/svelte/services/sparcAutoTutorRuleCommit.test.ts');
     require('../client/views/experiment/svelte/services/sparcInstructionMarkdown.test.ts');
     require('../client/views/experiment/svelte/services/sparcPrimitiveRealization.test.ts');

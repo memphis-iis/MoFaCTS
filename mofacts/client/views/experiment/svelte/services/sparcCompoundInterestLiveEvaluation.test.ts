@@ -275,7 +275,7 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     expect(result.problemStatement).to.contain(
       'splitting that same 5% annual rate across more frequent compounding periods',
     );
-    expect(run.allRequirementsPassed).to.equal(true);
+    expect(run.allRequirementsPassed, run.message).to.equal(true);
     expect(run.overallOutcome).to.equal('all-requirements-passed');
     expect(run.studentOutcome).to.equal('graduated');
     expect(run.robustnessOutcome).to.equal('passed');

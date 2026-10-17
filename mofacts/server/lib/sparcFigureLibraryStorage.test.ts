@@ -50,7 +50,7 @@ describe('SPARC figure library Mongo contracts', function() {
     assert.deepEqual(Object.keys(page[0]!).sort(), ['_id', 'createdAt', 'imageModel', 'reusable', 'version']);
     assert.equal(page[0]!.reusable, false);
     assert.equal(await store.setReusable(entry._id, true), true);
-    assert.deepEqual(await store.findEntry(entry._id), { ...entry, reusable: true });
+    assert.deepEqual(await store.findEntry(entry._id), { ...entry, kind: 'image', reusable: true });
     assert.equal(await store.setReusable(entry._id, true), true);
     assert.equal(await store.setReusable('test-library-inspect-c', true), false);
     assert.equal(await store.setReusable('test-library-missing', false), false);

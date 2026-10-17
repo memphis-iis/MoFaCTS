@@ -227,6 +227,14 @@ function createFixture(): SparcCompoundInterestLiveEvaluationFixture {
       description: expectation.text,
       centrality: 0,
     })),
+    // Explicitly neutral graph for the deterministic fixture, including resumed anchors.
+    ...expectations.flatMap((source) => expectations
+      .filter((target) => target.clusterKC !== source.clusterKC)
+      .map((target) => fact('kcGraph.relationship', {
+        sourceClusterKC: source.clusterKC,
+        targetClusterKC: target.clusterKC,
+        strength: 0,
+      }))),
   ];
   const productionRules = createSparcProgressiveScaffoldingRules();
   const display: SparcTrialDisplay = {
