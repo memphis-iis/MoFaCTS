@@ -1,5 +1,7 @@
 # MoFaCTS AutoTutor Algorithm State Machine
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 This document describes the AutoTutor implementation in the MoFaCTS app repo. AutoTutor has two explicit state machines:
 
 - Operational state machine: runtime orchestration phases for a learner turn.

@@ -203,10 +203,10 @@ describe('analyticsMethods', function() {
     for (const admin of [false, true]) {
       const { deps, insertedHistory } = createAnalyticsDeps({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => admin }) });
       const methods = createAnalyticsMethods(deps as any);
-      for (const policyId of ['oet-boltzmann-v2', 'progressive-scaffolding-v1', 'student-selected-v2']) {
+      for (const policyId of ['dynamic-instruction-agent-v2', 'progressive-scaffolding-v1', 'dynamic-instruction-student-v2']) {
         const record = createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparcsession', sparc: { pageKey: 'p', stateTransition: {
           transitionId: `e:${policyId}`, event: {eventId: 'e', type: 'response-submitted', source: {pageKey: 'p', nodeId: 'root'}, time: 1, payload: {policyId}},
-          writes: policyId === 'student-selected-v2' ? [] : [{target: {pageKey: 'p', nodeId: 'root'}, key: 'workingMemoryFact', value: {factType: 'instructional.oet', slots: {logit: 0}}}],
+          writes: policyId === 'dynamic-instruction-student-v2' ? [] : [{target: {pageKey: 'p', nodeId: 'root'}, key: 'workingMemoryFact', value: {factType: 'instructional.oet', slots: {logit: 0}}}],
         } } });
         let error: any;
         try { await methods.insertHistory.call({userId: 'learner-1'}, record); } catch (caught) { error = caught; }

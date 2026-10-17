@@ -87,7 +87,6 @@ describe('lessonLaunchEntryRoute', function() {
     { unitname: 'Assessment Practice', assessmentsession: { clusterlist: '0' } },
     { unitname: 'SPARC Practice', sparcsession: { clusterlist: '0-6' } },
     { unitname: 'Video Practice', videosession: { questions: [] } },
-    { unitname: 'AutoTutor Practice', autotutorsession: {} },
   ]) {
     it(`routes initial ${unit.unitname} with instructions to instructions`, function() {
       const unitWithInstructions = {

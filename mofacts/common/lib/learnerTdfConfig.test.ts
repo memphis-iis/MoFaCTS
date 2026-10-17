@@ -211,7 +211,7 @@ describe('learner TDF config', function() {
     expect(reviewStudyField?.step).to.equal(1);
   });
 
-  it('keeps current learner-config unit fields scoped to learning sessions, not AutoTutor', function() {
+  it('keeps retired lesson metadata readable without offering learner-config unit fields', function() {
     const autoTutorUnit = { autotutorsession: {} };
     const learningUnit = { learningsession: {} };
     const unitFields = LEARNER_TDF_FIELD_DEFINITIONS.filter((definition) => definition.scope === 'unit');
@@ -340,7 +340,7 @@ describe('learner TDF config', function() {
     });
     const changedTdf = makeTdf();
     delete (changedTdf.tdfs.tutor.unit[0] as any).learningsession;
-    (changedTdf.tdfs.tutor.unit[0] as any).autotutorsession = {};
+    (changedTdf.tdfs.tutor.unit[0] as any).videosession = {};
 
     const validation = validateLearnerTdfConfig(changedTdf, config);
     const result = applyLearnerTdfConfig(changedTdf, config);

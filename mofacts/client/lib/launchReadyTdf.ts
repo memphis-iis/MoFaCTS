@@ -58,32 +58,6 @@ function isLaunchReadyContent(content: any, allowConditionRoot: boolean): boolea
   return allowConditionRoot && isConditionRootWithoutUnitArray(content);
 }
 
-function hasAutoTutorUnit(content: any): boolean {
-  const units = content?.tdfs?.tutor?.unit;
-  return Array.isArray(units) && units.some((unit: any) =>
-    unit && typeof unit === 'object' && unit.autotutorsession && typeof unit.autotutorsession === 'object'
-  );
-}
-
-function hasAutoTutorLaunchModel(content: any): boolean {
-  if (!hasAutoTutorUnit(content)) {
-    return true;
-  }
-  const setspec = content?.tdfs?.tutor?.setspec;
-  const units = content?.tdfs?.tutor?.unit;
-  return Array.isArray(units) && units.some((unit: any) => {
-    if (!unit || typeof unit !== 'object' || !unit.autotutorsession) {
-      return false;
-    }
-    const sessionModel = unit.autotutorsession.openRouterModel;
-    return (
-      typeof sessionModel === 'string' && sessionModel.trim().length > 0
-    ) || (
-      typeof setspec?.openRouterModel === 'string' && setspec.openRouterModel.trim().length > 0
-    );
-  });
-}
-
 function describeLaunchReadyFailure(tdfId: unknown, content: any): string {
   const units = content?.tdfs?.tutor?.unit;
   const unitSummary = Array.isArray(units)
@@ -147,7 +121,7 @@ export async function loadLaunchReadyTdf(
 
   let content = tdfDoc?.content;
 
-  if (!isLaunchReadyContent(content, allowConditionRoot) || !hasAutoTutorLaunchModel(content)) {
+  if (!isLaunchReadyContent(content, allowConditionRoot)) {
     clientConsole(1, `[${source}] TDF content is not launch-ready after subscription; fetching full TDF by id`, {
       currentTdfId,
     });
@@ -158,10 +132,6 @@ export async function loadLaunchReadyTdf(
   const isConditionRoot = isConditionRootWithoutUnitArray(content);
   if (!isLaunchReadyContent(content, allowConditionRoot)) {
     throw new Error(`[${source}] ${describeLaunchReadyFailure(currentTdfId, content)}`);
-  }
-
-  if (!hasAutoTutorLaunchModel(content)) {
-    throw new Error(`[${source}] AutoTutor TDF ${currentTdfId} is missing an effective OpenRouter model after full TDF load`);
   }
 
   if (isConditionRoot && !allowConditionRoot) {

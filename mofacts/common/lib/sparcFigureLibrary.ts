@@ -1,10 +1,10 @@
-import { AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL } from './autoTutorRelationshipConstants';
+import { SPARC_EMBEDDING_MODEL } from './sparcEmbeddingModel';
 import { SPARC_LIBRARY_SIMILARITY } from '../../../learning-components/runtime/sparcInstructionalNeed';
 
 /** Initial experimental cutoff, not an empirically calibrated correctness probability. */
 export const SPARC_FIGURE_LIBRARY_SETTINGS = Object.freeze({
   version: 'sparc-teaching-figure-library-v1',
-  embeddingModel: AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
+  embeddingModel: SPARC_EMBEDDING_MODEL,
   minimumSimilarity: SPARC_LIBRARY_SIMILARITY.minimumSimilarity,
   batchSize: 100,
   inspectionPageSize: 24,

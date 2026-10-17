@@ -12,11 +12,6 @@ export type LearningHistoryReadOptions = {
 };
 
 export type UnitEngineServerMethods = {
-  readonly getAutoTutorHistoryForUnit: (
-    userId: string,
-    tdfId: string,
-    unitNumber: number,
-  ) => Promise<unknown[]>;
   readonly getLearningHistoryForUnit: (
     userId: any,
     tdfId: any,
@@ -45,7 +40,6 @@ export type UnitEngineServerMethods = {
 
 export function getUnitEngineServerMethodNames(): Set<keyof UnitEngineServerMethods> {
   return new Set([
-    'getAutoTutorHistoryForUnit',
     'getLearningHistoryForUnit',
     'getSparcHistoryForUnit',
     'getResponseKCMapForTdf',

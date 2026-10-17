@@ -1,5 +1,7 @@
 # Modularity Readiness Audit
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 This audit records the current extension-boundary readiness checkpoint for AutoTutor/H5P-style component packages.
 
 ## Ready

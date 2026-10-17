@@ -74,6 +74,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     require('../server/methods/sparcInstructionalBrowseMethods.test.ts');
     require('../server/lib/sparcInstructionalLibraryMigration.test.ts');
     require('../server/lib/sparcFigureLibraryService.test.ts');
+    require('../server/methods/dashboardCacheMethods.test.ts');
     if (process.argv.includes('--include-history-contracts')) require('../server/methods/analyticsMethods.test.ts');
   } finally { Module._load = originalLoad; }
   tests.after(() => { dom.window.close(); delete global.document; delete global.window; delete global.HTMLElement; delete global.MutationObserver; });

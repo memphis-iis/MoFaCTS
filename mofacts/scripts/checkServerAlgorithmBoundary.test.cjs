@@ -39,7 +39,6 @@ test('permits validation modules and type-only server interfaces', () => {
 for (const prohibitedPath of [
   'learning-components/models/learnerModel.ts',
   'learning-components/units/sparcsession/runtime.ts',
-  'learning-components/units/autotutor/runtime.ts',
   'learning-components/units/assessment-session/runtime.ts',
   'learning-components/units/video-session/runtime.ts',
 ]) {

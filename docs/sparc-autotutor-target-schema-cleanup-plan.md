@@ -1,5 +1,7 @@
 # Clean SPARC AutoTutor Target Schema Conversion Plan
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 ## Summary
 
 This plan applies only to the ten identified **SPARC-backed AutoTutor TDFs** that run through ordinary `sparcsession`. It does not change legacy/original `autotutorsession`, and it does not change non-AutoTutor SPARC content.

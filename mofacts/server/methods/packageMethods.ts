@@ -633,8 +633,7 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
         if (!stim || typeof stim !== 'object') {
           return { result: false, errmsg: `Stim ${stimIdx} in cluster ${clusterIdx} is not an object.` };
         }
-        const autoTutorOwnsResponse = Object.prototype.hasOwnProperty.call(stim, 'autoTutor');
-        if (!autoTutorOwnsResponse && (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse'))) {
+        if (!stim.response || typeof stim.response !== 'object' || !Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse')) {
           return { result: false, errmsg: `Stim ${stimIdx} in cluster ${clusterIdx} missing correctResponse.` };
         }
         if (stim.display) {
@@ -683,15 +682,12 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     function extractClusterIndicesFromTDF(tdf: { tutor?: { unit?: unknown[]; unitTemplate?: unknown[] } }): number[] {
       const indices = new Set<number>();
       const units = [
-        ...((tdf.tutor?.unit || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string }; autotutorsession?: { cluster?: unknown } }>),
-        ...((tdf.tutor?.unitTemplate || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string }; autotutorsession?: { cluster?: unknown } }>)
+        ...((tdf.tutor?.unit || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string } }>),
+        ...((tdf.tutor?.unitTemplate || []) as Array<{ clusterIndex?: unknown; assessmentsession?: { clusterlist?: string } }>)
       ];
       for (const [_unitIdx, unit] of units.entries()) {
         if (Object.prototype.hasOwnProperty.call(unit, 'clusterIndex')) {
           indices.add(Number(unit.clusterIndex));
-        }
-        if (unit.autotutorsession && Object.prototype.hasOwnProperty.call(unit.autotutorsession, 'cluster')) {
-          indices.add(Number(unit.autotutorsession.cluster));
         }
         if (unit.assessmentsession && unit.assessmentsession.clusterlist) {
           const cl = unit.assessmentsession.clusterlist;

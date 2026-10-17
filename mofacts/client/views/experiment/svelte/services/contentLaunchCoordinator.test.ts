@@ -31,7 +31,7 @@ describe('content launch coordinator', function() {
     expect(resolveContentLaunchSurfaceKind({ currentTdfUnit: { assessmentsession: {} } })).to.equal('assessment');
     expect(resolveContentLaunchSurfaceKind({ currentTdfUnit: { videosession: {} } })).to.equal('video');
     expect(resolveContentLaunchSurfaceKind({ currentTdfUnit: { sparcsession: {} } })).to.equal('sparc');
-    expect(resolveContentLaunchSurfaceKind({ currentTdfUnit: { autotutorsession: {} } })).to.equal('autotutor');
+    expect(() => resolveContentLaunchSurfaceKind({ currentTdfUnit: { autotutorsession: {} } })).to.throw('standalone AutoTutor has been removed');
     expect(resolveContentLaunchSurfaceKind({ currentTdfUnit: { learningsession: {} } })).to.equal('flashcard');
   });
 

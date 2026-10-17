@@ -111,13 +111,13 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
       if (!stim || typeof stim !== 'object') {
         throw new Error(`Stim ${stimIdx} in cluster ${clusterIdx} of "${stimulusFileName}" is undefined or not an object.`);
       }
-      const autoTutorOwnsResponse = Boolean(stim.autoTutor);
+      if (Object.prototype.hasOwnProperty.call(stim, 'autoTutor')) {
+        throw new Error('Stimulus autoTutor scripts are no longer supported; standalone AutoTutor has been removed');
+      }
       const sparcOwnsResponse = stim.display?.type === 'sparc' && stim.display?.response && typeof stim.display.response === 'object';
       const sparcAutoTutorTargetOwnsResponse = isSparcAutoTutorTargetStim(stim, setspecHasSparcAutoTutorPage);
       if (!stim.response || typeof stim.response !== 'object') {
-        if (autoTutorOwnsResponse) {
-          stim.response = { correctResponse: '__AUTOTUTOR_SESSION__' };
-        } else if (sparcOwnsResponse) {
+        if (sparcOwnsResponse) {
           stim.response = { correctResponse: '__SPARC_COMPLETED__' };
         } else if (sparcAutoTutorTargetOwnsResponse) {
           stim.response = { correctResponse: '__SPARC_AUTOTUTOR_TARGET__' };
@@ -126,9 +126,7 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
         }
       }
       if (!Object.prototype.hasOwnProperty.call(stim.response, 'correctResponse')) {
-        if (autoTutorOwnsResponse) {
-          stim.response.correctResponse = '__AUTOTUTOR_SESSION__';
-        } else if (sparcOwnsResponse) {
+        if (sparcOwnsResponse) {
           stim.response.correctResponse = '__SPARC_COMPLETED__';
         } else if (sparcAutoTutorTargetOwnsResponse) {
           stim.response.correctResponse = '__SPARC_AUTOTUTOR_TARGET__';
@@ -173,7 +171,6 @@ function getNewItemFormat(stimFile: any, stimulusFileName: string, stimuliSetId:
         imageStimulus: stim.display?.imgSrc,
         videoStimulus: stim.display?.videoSrc,
         display: cloneDisplayObject(stim.display),
-        autoTutor: cloneDisplayObject(stim.autoTutor),
         alternateDisplays: stim.alternateDisplays,
       };
 

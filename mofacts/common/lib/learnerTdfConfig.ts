@@ -812,7 +812,7 @@ function normalizeLearnerTdfOverridesWithErrors(tdf: unknown, overrides: unknown
 
 export function unitHasConfigurableRuntime(unit: unknown): boolean {
   const unitType = detectTdfUnitType(unit);
-  return unitType === 'learning' || unitType === 'autotutor' || unitType === 'sparc';
+  return unitType === 'learning' || unitType === 'sparc';
 }
 
 export function buildLearnerTdfConfig(tdf: unknown, tdfId: string, overrides: unknown): LearnerTdfConfig {

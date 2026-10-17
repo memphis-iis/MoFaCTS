@@ -2,7 +2,7 @@ import type { UploadedPackageFile } from './packageParser';
 import type { PackageUploadRuntimeState, ProcessPackageUploadDeps } from './packageUploadShared';
 import { resolvePreferredApiKey } from './apiKeyResolution';
 import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
-import { AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL } from '../../common/lib/autoTutorRelationshipConstants';
+import { SPARC_EMBEDDING_MODEL } from '../../common/lib/sparcEmbeddingModel';
 import { generateMaximumKcChain } from './clusterKcChainSolver';
 import { resolveKcChainWorkerLoader } from './clusterKcChainWorkerRuntime';
 import {
@@ -115,7 +115,7 @@ async function ensureAutoTutorSparcGraph(args: {
 
       const embeddingResult = await (deps.callOpenRouterEmbeddings ?? callOpenRouterEmbeddings)({
         apiKey: keyResolution.apiKey,
-        model: AUTO_TUTOR_PRIMARY_EMBEDDING_MODEL,
+        model: SPARC_EMBEDDING_MODEL,
         input: nodes.map((node) => node.description),
         telemetry: {
           surface: 'package-upload',

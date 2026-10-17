@@ -1,5 +1,7 @@
 # SPARC AutoTutor Runtime Cleanup Plan
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 ## Summary
 
 This plan runs after the ten SPARC AutoTutor TDFs have been converted to remove duplicated authored AutoTutor facts.

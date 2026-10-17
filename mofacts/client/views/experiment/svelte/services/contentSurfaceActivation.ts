@@ -36,11 +36,6 @@ const adapters: Record<ContentSurfaceKind, ContentSurfaceAdapter> = {
     isInitialRenderReady: (input) => input.initializedForRender &&
       (input.videoInstructionVisible || input.videoPlayerReady),
   },
-  autotutor: {
-    kind: 'autotutor',
-    runtimeOwner: 'surface',
-    isInitialRenderReady: (input) => input.initializedForRender,
-  },
 };
 
 export function getContentSurfaceAdapter(surface: ContentSurfaceKind): ContentSurfaceAdapter {

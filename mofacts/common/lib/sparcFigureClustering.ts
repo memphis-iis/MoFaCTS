@@ -5,7 +5,8 @@ export const SPARC_FIGURE_CLUSTERING = Object.freeze({
   iterations: 16, restarts: 2, minimumSilhouette: 0.2, scoreTolerance: 0.02,
 });
 export type SparcBrowseCluster = Readonly<{ id: string; label: string; count: number; representativeAssetId: string }>;
-export type SparcBrowseOverview = Readonly<{ snapshotId: string; clusters: SparcBrowseCluster[]; total: number }>;
+export type SparcBrowseTopic = SparcBrowseCluster & Readonly<{ subclusters: SparcBrowseCluster[] }>;
+export type SparcBrowseOverview = Readonly<{ snapshotId: string; clusters: SparcBrowseTopic[]; total: number }>;
 export type SparcClusterFit = Readonly<{
   centers: number[][]; selectedK: number; scores: Array<{ k: number; silhouette: number | null; loss: number }>;
 }>;

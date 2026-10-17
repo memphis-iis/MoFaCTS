@@ -55,7 +55,6 @@ type TdfUnitState = Record<string, unknown> & {
   adaptiveUnitTemplate?: unknown[];
   countcompletion?: unknown;
   learningsession?: unknown;
-  autotutorsession?: unknown;
   deliverySettings?: Record<string, unknown>;
 };
 

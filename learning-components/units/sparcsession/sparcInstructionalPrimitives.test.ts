@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { SPARC_COMPOSITE_MOVE_DEFINITIONS, requireActiveSparcMoveDefinition } from './sparcMoveDefinitions';
+import { SPARC_CATEGORIZED_MOVE_DEFINITIONS, requireActiveSparcMoveDefinition } from './sparcMoveDefinitions';
 import { createSparcFeedbackRequest, createSparcInstructionTransition, parseInstructionComponents } from './sparcInstructionalPrimitives';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 import { primitiveContext } from './sparcMoveLibrary';
@@ -49,7 +49,7 @@ describe('SPARC instructional primitives', () => {
     });
   }
   it('realizes each selected composite in its registered order with a final question', () => {
-    for (const definition of SPARC_COMPOSITE_MOVE_DEFINITIONS) {
+    for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS.filter(move => move.responseFormat === 'text')) {
       for (const richContent of ['<ol><li>Worked step</li></ol>', '<table><tr><th scope="col">A</th></tr><tr><td>1</td></tr></table>', '<img src="https://example.org/authored.png" alt="Authored diagram">', '<figure><img src="https://example.org/authored.png" alt="A"><figcaption>Figure A</figcaption></figure>']) {
         const generated = { explanation: definition.components!.includes('explanation') ? 'Explanation' : null, richContent: definition.components!.includes('richContent') ? richContent : null, question: 'Explain A?' };
         const transition = createSparcInstructionTransition({ document, event, learnerText: 'A', request: request(definition.moveId), generated, includeLearner: false });
@@ -99,7 +99,7 @@ describe('SPARC instructional primitives', () => {
     const transition = createSparcInstructionTransition({ document, event, learnerText: 'A', request: request('pump'), generated: 'Tell me more about A.', includeLearner: false });
     assert.equal(transition.writes.length, 1);
     assert.equal((transition.writes[0]!.value as { node: { value: string } }).node.value, 'Tell me more about A.');
-    assert.throws(() => parseInstructionComponents({ question: 'Q?' }, request('instruction.explanation-question')));
-    assert.throws(() => parseInstructionComponents({ explanation: null, richContent: '<script>alert(1)</script>', question: 'Q?' }, request('instruction.rich-question')));
+    assert.throws(() => parseInstructionComponents({ question: 'Q?' }, request('instruction.dynamic.explanation-question.text')));
+    assert.throws(() => parseInstructionComponents({ explanation: null, richContent: '<script>alert(1)</script>', question: 'Q?' }, request('instruction.dynamic.explanation-rich-question.text')));
   });
 });

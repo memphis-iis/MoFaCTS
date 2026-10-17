@@ -22,7 +22,6 @@ import { AdaptiveUnitCoordinator } from '../../../../learning-components/units/s
 import { reconstructLearningStateFromHistory } from '../../../common/lib/historyReconstruction';
 import { hasScheduleArtifactForUnit } from './svelte/services/assessmentResume';
 import { createUnitEngineServerMethods } from './unitEngineServerMethods';
-import { callOpenRouterJson } from '../../lib/openRouterClient';
 import { setQuestionIndex } from './svelte/services/trialProgressionState';
 import {
   setAlternateDisplayIndex,
@@ -164,9 +163,6 @@ export function createAppUnitEngineRuntimeContext(): AppUnitEngineRuntimeContext
     },
     uiAlerts: {
       alertUser: (message) => alert(message),
-    },
-    aiProvider: {
-      callOpenRouterJson,
     },
     logging: {
       log: (level, ...args) => clientConsole(level, ...args),

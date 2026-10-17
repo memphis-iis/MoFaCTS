@@ -8,23 +8,7 @@ describe('unit engine creation contracts', function() {
     expect(resolveUnitEngineTypeForUnit({ videosession: {} }, 'unit-engine-contract-test')).to.equal('video');
     expect(resolveUnitEngineTypeForUnit({ learningsession: {} }, 'unit-engine-contract-test')).to.equal('model');
     expect(resolveUnitEngineTypeForUnit({ sparcsession: {} }, 'unit-engine-contract-test')).to.equal('sparc');
-    expect(resolveUnitEngineTypeForUnit({ autotutorsession: {} }, 'unit-engine-contract-test')).to.equal('autotutor');
     expect(resolveUnitEngineTypeForUnit({ unitinstructions: 'Read this first' }, 'unit-engine-contract-test')).to.equal('instruction-only');
-  });
-
-  it('keeps original AutoTutor and generated SPARC-backed AutoTutor runtime selection explicit', function() {
-    expect(resolveUnitEngineTypeForUnit({
-      unitname: 'Original AutoTutor',
-      autotutorsession: {
-        cluster: 0,
-      },
-    }, 'unit-engine-contract-test')).to.equal('autotutor');
-    expect(resolveUnitEngineTypeForUnit({
-      unitname: 'SPARC Session AutoTutor',
-      sparcsession: {
-        pageId: 'sparc-autotutor-fixture',
-      },
-    }, 'unit-engine-contract-test')).to.equal('sparc');
   });
 
   it('rejects units that declare both original AutoTutor and SPARC session selectors', function() {
@@ -37,7 +21,7 @@ describe('unit engine creation contracts', function() {
         pageId: 'sparc-autotutor-fixture',
       },
     }, 'unit-engine-contract-test')).to.throw(
-      'Unit "Ambiguous AutoTutor" declares multiple runnable unit shapes: sparcsession, autotutorsession. Choose exactly one session selector.',
+      'autotutorsession is no longer supported; standalone AutoTutor has been removed',
     );
   });
 
@@ -68,7 +52,7 @@ describe('unit engine creation contracts', function() {
       const message = (error as Error).message;
       expect(message).to.include('Cannot determine unit type for unit "Loose Notes"');
       expect(message).to.include(
-        'Expected assessmentsession, learningsession, sparcsession, videosession, autotutorsession, or instruction-only content',
+        'Expected assessmentsession, learningsession, sparcsession, videosession, or instruction-only content',
       );
       expect(message).to.include('Unit has: no runnable unit shape');
     }
@@ -95,7 +79,7 @@ describe('unit engine creation contracts', function() {
       expect(message).to.include("'model'");
       expect(message).to.include("'sparc'");
       expect(message).to.include("'video'");
-      expect(message).to.include("'autotutor'");
+      expect(message).not.to.include("'autotutor'");
       expect(message).to.include("'instruction-only'");
       expect(message).to.include('Unit has: learningsession');
     }

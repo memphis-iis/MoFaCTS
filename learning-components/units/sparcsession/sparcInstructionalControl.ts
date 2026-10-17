@@ -8,14 +8,14 @@ import type {
   SparcInstructionalControllerConfig,
   SparcWorkingMemoryFact,
 } from './sparcSessionContracts';
-import { isSparcCompetitivePolicy, isSparcStudentPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS, SPARC_AGENT_SELECTED_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
-export { SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID, SPARC_STUDENT_SELECTED_POLICY_ID, SPARC_AGENT_SELECTED_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
+import { isSparcCompetitivePolicy, isSparcStudentPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../runtime/sparcInstructionalPolicies';
+export { SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../runtime/sparcInstructionalPolicies';
 
 export const SPARC_AUTOTUTOR_ADAPTER_ID = 'sparc-autotutor-v1';
 export const SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_VERSION = 1;
 
 export function isSparcInstructionalCycle(config: SparcInstructionalControllerConfig | undefined): boolean {
-  return isSparcCompetitivePolicy(config?.policyId) || isSparcStudentPolicy(config?.policyId) || config?.policyId === SPARC_AGENT_SELECTED_POLICY_ID;
+  return isSparcCompetitivePolicy(config?.policyId) || isSparcStudentPolicy(config?.policyId);
 }
 
 export type SparcAutoTutorInstructionalProjection = {

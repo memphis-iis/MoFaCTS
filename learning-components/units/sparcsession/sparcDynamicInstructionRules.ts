@@ -1,5 +1,5 @@
 import type { SparcProductionRule, SparcProductionRuleCondition, SparcProductionRuleEffect, SparcFactPattern } from './sparcSessionContracts';
-import { SPARC_DYNAMIC_MOVE_DEFINITIONS, SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
+import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
 import { SPARC_TARGET_CATEGORIES } from '../../runtime/sparcTargetCategories';
 import { SPARC_INSTRUCTIONAL_COMPETITION_MODULE } from './sparcCompetitiveSelection';
 import { createSparcProgressiveScaffoldingRules, decisionEffects, instructionalTargetConditions, startedCycle } from './sparcProgressiveScaffoldingRules';
@@ -7,18 +7,12 @@ import { SPARC_MENU_ACTION, SPARC_NEXT_TARGET_ACTION, SPARC_STOP_ACTION } from '
 
 export const SPARC_FEEDBACK_ACTION = 'instruction.feedback';
 export const SPARC_DYNAMIC_TARGET_LOGIT = Math.log(0.8 / 0.2);
-export const SPARC_DYNAMIC_MENU_OPTIONS = [
-  { id: 'question', label: 'Question', action: 'instruction.dynamic.question' },
-  { id: 'explanation-question', label: 'Explanation and question', action: 'instruction.dynamic.explanation-question' },
-  { id: 'explanation-rich-question', label: 'Explanation with example or figure and question', action: 'instruction.dynamic.explanation-rich-question' },
-  { id: 'next-target', label: 'Move to the next KC', action: SPARC_NEXT_TARGET_ACTION },
-] as const;
 export const SPARC_CATEGORIZED_MENU_OPTIONS = [
   ...SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => ({
     id: move.moveId.substring('instruction.dynamic.'.length), action: move.moveId,
     label: `${move.components!.includes('richContent') ? 'Explanation with example or figure and question' : move.components!.includes('explanation') ? 'Explanation and question' : 'Question'} (${move.responseFormat === 'text' ? 'text answer' : 'multiple choice'})`,
   })),
-  SPARC_DYNAMIC_MENU_OPTIONS[3],
+  { id: 'next-target', label: 'Move to the next KC', action: SPARC_NEXT_TARGET_ACTION },
 ];
 const literal = (value: unknown) => ({ type: 'literal' as const, value });
 const variable = (name: string) => ({ type: 'variable' as const, name });
@@ -32,13 +26,13 @@ const undecided: SparcProductionRuleCondition = { type: 'not', pattern: { factTy
 const turn: SparcProductionRuleCondition = { factType: 'session.turnState', slots: { turnCount: bind('turnNumber') } };
 
 /** Rules own evaluation -> saved feedback -> selection; eligible move/format alternatives compete on one target. */
-export function createSparcDynamicInstructionRules(version: 'student' | 'agent', categorized = false): readonly SparcProductionRule[] {
-  const moves = categorized ? SPARC_CATEGORIZED_MOVE_DEFINITIONS : SPARC_DYNAMIC_MOVE_DEFINITIONS;
-  const options = categorized ? SPARC_CATEGORIZED_MENU_OPTIONS : SPARC_DYNAMIC_MENU_OPTIONS;
-  const categories = categorized ? SPARC_TARGET_CATEGORIES : [undefined];
+export function createSparcDynamicInstructionRules(version: 'student' | 'agent'): readonly SparcProductionRule[] {
+  const moves = SPARC_CATEGORIZED_MOVE_DEFINITIONS;
+  const options = SPARC_CATEGORIZED_MENU_OPTIONS;
+  const categories = SPARC_TARGET_CATEGORIES;
   const selectionContext = (kind: string, transition: string): SparcProductionRuleCondition[] => {
     const afterResponse: SparcProductionRuleCondition = { type: 'all', conditions: [event('response-submitted'), assessed, feedback] };
-    return [categorized && kind === 'expectation' && transition === 'start'
+    return [kind === 'expectation' && transition === 'start'
       ? { type: 'any', conditions: [event('document-loaded'), afterResponse] } : afterResponse];
   };
   const categoryCondition = (kind: string, category: string | undefined): SparcProductionRuleCondition[] => category === undefined ? [] : [{

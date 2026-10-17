@@ -52,7 +52,6 @@ describe('Learning component catalog', function() {
         reconstructLearningStateFromHistory: () => ({}),
       },
       serverMethods: {
-        getAutoTutorHistoryForUnit: async () => [],
         getLearningHistoryForUnit: async () => [],
         getSparcHistoryForUnit: async () => [],
         getResponseKCMapForTdf: async () => ({}),
@@ -82,20 +81,10 @@ describe('Learning component catalog', function() {
       uiAlerts: {
         alertUser() {},
       },
-      aiProvider: {
-        async callOpenRouterJson(options) {
-          return {
-            value: options.intent.parse({}),
-            rawContent: '{}',
-            responseBody: {},
-          };
-        },
-      },
     };
 
     expect([...getCreateUnitEngineCapabilitySet(adapter)].sort()).to.deep.equal([
       'adaptive-card-model',
-      'ai-provider',
       'assessment-state',
       'authz',
       'card-state',
@@ -112,7 +101,6 @@ describe('Learning component catalog', function() {
     expect([...getCreateUnitEngineCapabilitySet(adapterWithoutServerMethods)].sort())
       .not.to.include('server-methods');
     expect([...getCreateUnitEngineServerMethodSet(adapter)].sort()).to.deep.equal([
-      'getAutoTutorHistoryForUnit',
       'getLearningHistoryForUnit',
       'getResponseKCMapForTdf',
       'getSparcHistoryForUnit',
@@ -123,7 +111,6 @@ describe('Learning component catalog', function() {
     expect([...getCreateUnitEngineCapabilitySet({
       ...adapter,
       serverMethods: {
-        getAutoTutorHistoryForUnit: async () => [],
       } as any,
     })].sort()).not.to.include('server-methods');
   });
@@ -181,16 +168,9 @@ describe('Learning component catalog', function() {
       'mofacts.learning-session-unit',
       'mofacts.assessment-session-unit',
       'mofacts.video-session-unit',
-      'mofacts.autotutor-unit',
       'mofacts.sparcsession-unit',
     ]);
-    expect(summary.units.find((manifest) => manifest.id === 'mofacts.autotutor-unit'))
-      .to.deep.include({
-        id: 'mofacts.autotutor-unit',
-        kind: 'unit',
-        requiredCapabilities: ['ai-provider', 'history', 'logging', 'server-methods', 'session', 'stimuli'],
-        requiredServerMethods: ['getAutoTutorHistoryForUnit'],
-      });
+    expect(summary.units.some((manifest) => manifest.id === 'mofacts.autotutor-unit')).to.equal(false);
     expect(summary.units.find((manifest) => manifest.id === 'mofacts.learning-session-unit'))
       .to.deep.include({
         id: 'mofacts.learning-session-unit',

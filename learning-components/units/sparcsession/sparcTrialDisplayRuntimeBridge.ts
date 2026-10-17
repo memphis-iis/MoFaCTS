@@ -1,8 +1,7 @@
-import { SPARC_COMPETITIVE_POLICY_ID, isSparcDynamicPolicy, isSparcStudentPolicy, isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
 import { sparcTargetCategoryFields } from '../../runtime/sparcTargetCategories';
 import { savedSparcChoiceQuestions, parseSparcQuestionChoices } from './sparcMultipleChoiceQuestion';
 import { createSparcDynamicInstructionRules } from './sparcDynamicInstructionRules';
-import { createSparcCompetitiveRules } from './sparcCompetitiveSelection';
 import type {
   SparcTrialDisplay,
   SparcTrialResult,
@@ -46,8 +45,7 @@ import type {
 import type { SparcInstructionalCandidateOptions } from './sparcInstructionalCandidates';
 import { assertSparcInstructionalControllerConfig } from './sparcInstructionalControl';
 import { createSparcProgressiveScaffoldingRules } from './sparcProgressiveScaffoldingRules';
-import { isSparcInstructionalCycle, SPARC_STUDENT_SELECTED_POLICY_ID } from './sparcInstructionalControl';
-import { createSparcInstructionalCycleRules } from './sparcInstructionalCycleRules';
+import { isSparcInstructionalCycle } from './sparcInstructionalControl';
 import { commitSparcInstructionalCycle, currentSparcMenu, type SparcCycleResult } from './sparcInstructionalCycle';
 
 type DisplayNodeRecord = {
@@ -354,9 +352,7 @@ export function createSparcAuthoredDocumentFromTrialDisplay(params: {
     ? display.productionRules as readonly SparcProductionRule[]
     : [];
   const productionRules = display.unitType === 'sparc-autotutor-dialogue'
-    ? isSparcDynamicPolicy(instructionalController?.policyId) ? createSparcDynamicInstructionRules(isSparcStudentPolicy(instructionalController?.policyId) ? 'student' : 'agent', isSparcCategorizedPolicy(instructionalController?.policyId))
-      : instructionalController?.policyId === SPARC_COMPETITIVE_POLICY_ID ? createSparcCompetitiveRules() : isSparcInstructionalCycle(instructionalController)
-      ? createSparcInstructionalCycleRules(instructionalController?.policyId === SPARC_STUDENT_SELECTED_POLICY_ID ? 'student' : 'agent')
+    ? isSparcCategorizedPolicy(instructionalController?.policyId) ? createSparcDynamicInstructionRules(isSparcStudentPolicy(instructionalController?.policyId) ? 'student' : 'agent')
       : createSparcProgressiveScaffoldingRules()
     : directProductionRules;
   const initialState = Array.isArray(display.initialState)

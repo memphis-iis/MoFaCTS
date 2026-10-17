@@ -25,7 +25,7 @@ The active learner card experience uses Svelte components and state-machine-orie
 
 ## Learning Component Modularity
 
-Reusable unit behavior lives under `learning-components/`. The next modularity pass should harden component registration, explicit runtime capabilities, and unit/trial boundaries so new component families such as AutoTutor can be added without editing central app switchboards. See `../docs-developer/modularity-extension-boundary-plan.md`.
+Reusable unit behavior lives under `learning-components/`. Component registration and explicit runtime capabilities define unit/trial boundaries. SPARC owns current AutoTutor dialogue; the original standalone AutoTutor runtime is removed. See [the removal boundary](standalone-autotutor-removal.md). See `../docs-developer/modularity-extension-boundary-plan.md`.
 
 For current contributor work, treat `learning-components/` as the source root for unit behavior:
 

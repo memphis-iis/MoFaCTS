@@ -25,7 +25,6 @@ type LaunchSessionUnit = Record<string, unknown> & {
   learningsession?: unknown;
   unitname?: unknown;
   videosession?: unknown;
-  autotutorsession?: unknown;
 };
 
 export function createContentLaunchEnvironment({

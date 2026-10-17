@@ -1,5 +1,7 @@
 # AutoTutor Dialogue Planner Plan
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 ## Purpose
 
 MoFaCTS currently supports AutoTutor-style expectation and misconception tutoring, but the runtime asks the language model to do four jobs at once:

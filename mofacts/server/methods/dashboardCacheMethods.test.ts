@@ -223,87 +223,90 @@ describe('dashboardCacheMethods', function() {
     });
   });
 
-  it('keeps AutoTutor settings available for admins without advertising student learner settings', async function() {
-    const userId = 'learner-1';
-    const lessonDoc = {
-      _id: 'tdfAuto',
-      stimuliSetId: 'stim-set-auto',
-      ownerId: 'teacher-1',
-      content: {
-        fileName: 'autotutor.json',
-        isMultiTdf: false,
-        tdfs: {
-          tutor: {
-            setspec: {
-              lessonname: 'AutoTutor',
-              tags: [],
-              userselect: 'true',
-              audioInputEnabled: 'false',
-              audioPromptMode: 'silent'
-            },
-            unit: [
-              { autotutorsession: {} }
-            ],
+  for (const selector of ['sparcsession', 'autotutorsession']) {
+    it(`keeps ${selector} dashboard metadata readable without advertising student learner settings`, async function() {
+      const userId = 'learner-1';
+      const lessonDoc = {
+        _id: 'tdfAuto',
+        stimuliSetId: 'stim-set-auto',
+        ownerId: 'teacher-1',
+        content: {
+          fileName: 'autotutor.json',
+          isMultiTdf: false,
+          tdfs: {
+            tutor: {
+              setspec: {
+                lessonname: 'AutoTutor',
+                tags: [],
+                userselect: 'true',
+                audioInputEnabled: 'false',
+                audioPromptMode: 'silent'
+              },
+              unit: [
+                { [selector]: {} }
+              ],
+            }
           }
         }
-      }
-    };
-    const methods = createDashboardCacheMethods({
-      Meteor: {
-        Error: class MeteorError extends Error {
-          error: string;
-          constructor(error: string, reason?: string) {
-            super(reason || error);
-            this.error = error;
+      };
+      const methods = createDashboardCacheMethods({
+        Meteor: {
+          Error: class MeteorError extends Error {
+            error: string;
+            constructor(error: string, reason?: string) {
+              super(reason || error);
+              this.error = error;
+            }
           }
-        }
-      },
-      Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        find: () => ({ fetchAsync: async () => [] }),
-        findOneAsync: async () => null,
-        rawCollection: () => ({ distinct: async () => [] })
-      },
-      Tdfs: {
-        find: () => ({ fetchAsync: async () => [lessonDoc] }),
-        findOneAsync: async () => null
-      },
-      Assignments: { find: () => ({ fetchAsync: async () => [] }) },
-      Sections: { find: () => ({ fetchAsync: async () => [] }) },
-      SectionUserMap: { find: () => ({ fetchAsync: async () => [] }) },
-      UserDashboardCache: {
-        findOneAsync: async () => ({
-          userId,
-          tdfStats: {},
-          learnerTdfConfigs: {}
-        })
-      },
-      usersCollection: {
-        findOneAsync: async () => ({ _id: userId, accessedTDFs: [] }),
-        find: () => ({
-          fetchAsync: async () => [{
-            _id: 'teacher-1',
-            profile: { displayName: 'Professor Ada', avatarType: 'initials' },
-          }],
-        }),
-      },
-      DynamicSettings: { findOneAsync: async () => null },
-      serverConsole: () => {},
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true,
-      getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
-      redisBoundary: disabledRedisBoundary
-    });
+        },
+        Roles: { userIsInRoleAsync: async () => false },
+        Histories: {
+          find: () => ({ fetchAsync: async () => [] }),
+          findOneAsync: async () => null,
+          rawCollection: () => ({ distinct: async () => [] })
+        },
+        Tdfs: {
+          find: () => ({ fetchAsync: async () => [lessonDoc] }),
+          findOneAsync: async () => null
+        },
+        Assignments: { find: () => ({ fetchAsync: async () => [] }) },
+        Sections: { find: () => ({ fetchAsync: async () => [] }) },
+        SectionUserMap: { find: () => ({ fetchAsync: async () => [] }) },
+        UserDashboardCache: {
+          findOneAsync: async () => ({
+            userId,
+            tdfStats: {},
+            learnerTdfConfigs: {}
+          })
+        },
+        usersCollection: {
+          findOneAsync: async () => ({ _id: userId, accessedTDFs: [] }),
+          find: () => ({
+            fetchAsync: async () => [{
+              _id: 'teacher-1',
+              profile: { displayName: 'Professor Ada', avatarType: 'initials' },
+            }],
+          }),
+        },
+        DynamicSettings: { findOneAsync: async () => null },
+        serverConsole: () => {},
+        computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
+        canViewDashboardTdf: () => true,
+        getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
+        redisBoundary: disabledRedisBoundary
+      });
 
-    const snapshot = await (methods as any).getPracticeDashboardSnapshot.call({ userId });
+      const snapshot = await (methods as any).getPracticeDashboardSnapshot.call({ userId });
 
-    expect(snapshot.lessons).to.have.length(1);
-    expect(snapshot.lessons[0]).to.include({
-      TDFId: 'tdfAuto',
-      hasConfigurableSettings: true,
-      hasLearnerConfigurableSettings: false
+      expect(snapshot.lessons).to.have.length(1);
+      expect(snapshot.lessons[0]).to.include({
+        TDFId: 'tdfAuto',
+        firstContentUnitType: selector === 'sparcsession' ? 'sparc' : 'autotutor',
+        hasConfigurableSettings: selector === 'sparcsession',
+        hasLearnerConfigurableSettings: false
+      });
     });
-  });
+  }
 
   it('adds cached feature metadata from first content unit and configured key alternatives', async function() {
     const userId = 'learner-1';

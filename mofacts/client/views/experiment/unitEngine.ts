@@ -1,6 +1,5 @@
 import {
   createEmptyUnit as createEmptyUnitWithDeps,
-  createAutoTutorUnit as createAutoTutorUnitWithDeps,
   createUnitEngineByType as createUnitEngineByTypeWithDeps,
   createModelUnit as createModelUnitWithDeps,
   createScheduleUnit as createScheduleUnitWithDeps,
@@ -9,7 +8,7 @@ import {
 } from '../../../../learning-components/units/createUnitEngine';
 import { createAppUnitEngineRuntimeContext } from './unitEngineRuntimeContext';
 
-export {createScheduleUnit, createModelUnit, createEmptyUnit, createVideoUnit, createAutoTutorUnit};
+export {createScheduleUnit, createModelUnit, createEmptyUnit, createVideoUnit};
 
 async function createEmptyUnit(curExperimentData: any) {
   return await createEmptyUnitWithDeps(createAppUnitEngineRuntimeContext(), curExperimentData);
@@ -25,10 +24,6 @@ async function createScheduleUnit(curExperimentData: any) {
 
 async function createVideoUnit(curExperimentData: any) {
   return await createVideoUnitWithDeps(createAppUnitEngineRuntimeContext(), curExperimentData);
-}
-
-async function createAutoTutorUnit(curExperimentData: any) {
-  return await createAutoTutorUnitWithDeps(createAppUnitEngineRuntimeContext(), curExperimentData);
 }
 
 async function createUnitEngineByType(unitType: string, curExperimentData: any) {

@@ -17,7 +17,6 @@ describe('field registry section composition', function() {
       'tutor.unit[].assessmentsession',
       'tutor.unit[].assessmentsession.conditiontemplatesbygroup',
       'tutor.unit[].videosession',
-      'tutor.unit[].autotutorsession',
     ]);
   });
 

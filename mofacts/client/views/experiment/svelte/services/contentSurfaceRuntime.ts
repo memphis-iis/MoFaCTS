@@ -11,7 +11,6 @@ type UnitWithInstructions = {
   assessmentsession?: unknown;
   learningsession?: unknown;
   videosession?: unknown;
-  autotutorsession?: unknown;
 };
 
 export interface ContentSurfaceRuntimeSnapshot {

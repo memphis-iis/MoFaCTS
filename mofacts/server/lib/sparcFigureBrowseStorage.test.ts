@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { createSparcFigureBrowseStore, SparcFigureBrowse, invalidateSparcFigureBrowse } from './sparcFigureBrowseStorage';
 import { SparcFigureLibrary, withSparcFigureLibraryLock } from './sparcFigureLibraryStorage';
 import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
-import { SPARC_FIGURE_CLUSTERING } from '../../common/lib/sparcFigureClustering';
+import { SPARC_FIGURE_BROWSE_VERSION } from './sparcFigureBrowseService';
 
 // Supported isolated Meteor/Mongo environment only; never run against the localhost learner database.
 describe('SPARC semantic browse Mongo snapshots', function() {
@@ -28,8 +28,9 @@ describe('SPARC semantic browse Mongo snapshots', function() {
     const state = await store.state();
     await store.addMembers([{ snapshotId, clusterId: 'cluster', assetId: entry._id, similarity: .9 },
       { snapshotId, clusterId: 'cluster', assetId: 'test-browse-source-b', similarity: .8 }]);
-    const snapshot = { snapshotId, sourceRevision: state.revision, algorithm: SPARC_FIGURE_CLUSTERING.version, total: 2,
-      clusters: [{ id: 'cluster', label: 'Teaching concepts', count: 2, representativeAssetId: entry._id }] };
+    const snapshot = { snapshotId, sourceRevision: state.revision, algorithm: SPARC_FIGURE_BROWSE_VERSION, total: 2,
+      clusters: [{ id: 'topic', label: 'Teaching concepts', count: 2, representativeAssetId: entry._id,
+        subclusters: [{ id: 'cluster', label: 'Specific concept', count: 2, representativeAssetId: entry._id }] }] };
     assert.equal(await store.publish(snapshot), true);
     assert.equal((await store.state()).current, snapshotId);
     const members = await store.members(snapshotId, 'cluster');

@@ -37,7 +37,7 @@ Server methods are allowed only for database access, auth/authorization, secrets
 Current named method dependencies:
 
 - `mofacts.learning-session-unit`: `getLearningHistoryForUnit`, `getResponseKCMapForTdf`
-- `mofacts.autotutor-unit`: `getAutoTutorHistoryForUnit`
+- `mofacts.sparcsession-unit`: `getLearningHistoryForUnit`, `getResponseKCMapForTdf`, `getSparcHistoryForUnit`, `getStimulusCrowdStatsForDeck`
 
 ## History Rules
 

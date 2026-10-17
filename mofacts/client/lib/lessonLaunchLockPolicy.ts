@@ -6,7 +6,6 @@ type LaunchUnitLike = {
   learningsession?: unknown;
   sparcsession?: unknown;
   videosession?: unknown;
-  autotutorsession?: unknown;
   unitinstructions?: unknown;
   picture?: unknown;
   deliverySettings?: Record<string, unknown>;

@@ -31,7 +31,7 @@ describe('card readiness service', function() {
       { isVideoSession: true, videoUrl: '/video.mp4' },
     )).to.equal(true);
     expect(hasVideoSessionReadiness(
-      { unitname: 'AutoTutor', autotutorsession: {} },
+      { unitname: 'SPARC', sparcsession: {} },
       null,
       { videoUrl: '' },
     )).to.equal(true);

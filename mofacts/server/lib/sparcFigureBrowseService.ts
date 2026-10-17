@@ -29,6 +29,7 @@ export type SparcFigureBrowseDeps = {
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 // Storage schemas and component types do not split a shared embedding space.
 const space = (row: BrowseSource) => JSON.stringify([row.embeddingVersion, row.embeddingModel, row.dimensions]);
+export const SPARC_FIGURE_BROWSE_VERSION = `${SPARC_FIGURE_CLUSTERING.version}:two-level-v1`;
 
 export function parseSparcClusterLabels(value: unknown, expected: string[]) {
   const labels = (value as { labels?: unknown })?.labels;
@@ -43,12 +44,12 @@ export function parseSparcClusterLabels(value: unknown, expected: string[]) {
   });
 }
 
-/** Streaming full-library assignment; only a bounded sample per compatible space is retained. */
+/** Two semantic levels, each fitted from bounded samples; stored membership belongs to leaves only. */
 export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps): Promise<BrowseSnapshot> {
   const cached = async () => {
     const state = await deps.store.state();
     const snapshot = state.current ? await deps.store.snapshot(state.current) : undefined;
-    return snapshot?.sourceRevision === state.revision && snapshot.algorithm === SPARC_FIGURE_CLUSTERING.version ? snapshot : undefined;
+    return snapshot?.sourceRevision === state.revision && snapshot.algorithm === SPARC_FIGURE_BROWSE_VERSION ? snapshot : undefined;
   };
   const prior = await cached();
   if (prior) return prior;
@@ -60,6 +61,27 @@ export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps):
     const yieldWork = deps.yieldWork ?? (() => new Promise<void>(resolve => setImmediate(resolve)));
     type Group = { sample: Array<{ priority: string; vector: number[] }>; fit?: Awaited<ReturnType<typeof fitSparcFigureClusters>> };
     const spaces = new Map<string, Group>();
+    const topics = new Map<string, Group>();
+    const sample = (group: Group, row: BrowseSource, vector: number[]) => {
+      const priority = digest(row._id);
+      if (group.sample.length < SPARC_FIGURE_CLUSTERING.sampleSize || priority < group.sample[group.sample.length - 1]!.priority) {
+        group.sample.push({ priority, vector });
+        group.sample.sort((a, b) => a.priority.localeCompare(b.priority));
+        group.sample.length = Math.min(group.sample.length, SPARC_FIGURE_CLUSTERING.sampleSize);
+      }
+    };
+    const vectorFor = (row: BrowseSource) => {
+      if (row.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
+      const vector = normalizeSparcFigureEmbedding(row.embedding);
+      if (vector.length !== row.dimensions) throw new Error('Invalid stored figure embedding dimensions');
+      return vector;
+    };
+    const topicFor = (row: BrowseSource, vector: number[]) => {
+      const group = spaces.get(space(row));
+      if (!group?.fit) throw new Error('The instructional library changed during clustering');
+      const match = nearestFigureCenter(vector, group.fit.centers);
+      return { id: digest(`${space(row)}:${match.index}`).slice(0, 24), similarity: match.similarity };
+    };
     let count = 0;
     const scan = async (work: (rows: BrowseSource[]) => Promise<void>) => {
       let afterId = '';
@@ -75,39 +97,48 @@ export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps):
     try {
       await scan(async rows => {
         for (const row of rows) {
-          if (row.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
           const key = space(row); const group = spaces.get(key) ?? { sample: [] };
           spaces.set(key, group);
-          const priority = digest(row._id);
-          if (group.sample.length < SPARC_FIGURE_CLUSTERING.sampleSize || priority < group.sample[group.sample.length - 1]!.priority) {
-            const vector = normalizeSparcFigureEmbedding(row.embedding);
-            if (vector.length !== row.dimensions) throw new Error('Invalid stored figure embedding dimensions');
-            group.sample.push({ priority, vector });
-            group.sample.sort((a, b) => a.priority.localeCompare(b.priority));
-            group.sample.length = Math.min(group.sample.length, SPARC_FIGURE_CLUSTERING.sampleSize);
-          }
+          sample(group, row, vectorFor(row));
           count++;
         }
         deps.progress('sampling', count);
       });
       const groups = [...spaces.entries()].sort(([a], [b]) => a.localeCompare(b));
       for (const [, group] of groups) group.fit = await fitSparcFigureClusters(group.sample.map(row => row.vector), yieldWork);
+      let sampled = 0;
+      await scan(async rows => {
+        for (const row of rows) {
+          const vector = vectorFor(row), topic = topicFor(row, vector);
+          const group = topics.get(topic.id) ?? { sample: [] };
+          topics.set(topic.id, group); sample(group, row, vector); sampled++;
+        }
+        deps.progress('sampling-subgroups', sampled);
+      });
+      if (sampled !== count || (await deps.store.state()).revision !== revision) throw new Error('The instructional library changed during clustering');
+      for (const [, group] of [...topics.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+        group.fit = await fitSparcFigureClusters(group.sample.map(row => row.vector), yieldWork);
+      }
       const clusters = new Map<string, { count: number; representatives: Array<{ row: BrowseSource; similarity: number }> }>();
+      const children = new Map<string, Set<string>>();
+      const record = (id: string, row: BrowseSource, similarity: number) => {
+        const cluster = clusters.get(id) ?? { count: 0, representatives: [] };
+        clusters.set(id, cluster); cluster.count++;
+        cluster.representatives.push({ row, similarity });
+        cluster.representatives.sort((a, b) => b.similarity - a.similarity || a.row._id.localeCompare(b.row._id));
+        cluster.representatives.length = Math.min(3, cluster.representatives.length);
+      };
       let assigned = 0;
       await scan(async rows => {
         const members: BrowseMember[] = [];
         for (const row of rows) {
-          const group = spaces.get(space(row));
-          if (!group?.fit) throw new Error('The figure library changed during clustering');
-          const vector = normalizeSparcFigureEmbedding(row.embedding);
-          if (vector.length !== row.dimensions) throw new Error('Invalid stored figure embedding dimensions');
+          const vector = vectorFor(row), topic = topicFor(row, vector), group = topics.get(topic.id);
+          if (!group?.fit) throw new Error('The instructional library changed during clustering');
           const match = nearestFigureCenter(vector, group.fit.centers);
-          const clusterId = digest(`${space(row)}:${match.index}`).slice(0, 24);
-          const cluster = clusters.get(clusterId) ?? { count: 0, representatives: [] };
-          clusters.set(clusterId, cluster); cluster.count++;
-          cluster.representatives.push({ row, similarity: match.similarity });
-          cluster.representatives.sort((a, b) => b.similarity - a.similarity || a.row._id.localeCompare(b.row._id));
-          cluster.representatives.length = Math.min(3, cluster.representatives.length);
+          const clusterId = digest(`${topic.id}:subgroup:${match.index}`).slice(0, 24);
+          const childIds = children.get(topic.id) ?? new Set<string>();
+          children.set(topic.id, childIds); childIds.add(clusterId);
+          record(topic.id, row, topic.similarity); record(clusterId, row, match.similarity);
           members.push({ snapshotId, clusterId, assetId: row._id, similarity: match.similarity });
         }
         if (members.length) await deps.store.addMembers(members);
@@ -130,9 +161,14 @@ export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps):
         labels.push(...parseSparcClusterLabels({ labels: generated }, inputs.map(input => input.id)));
         deps.progress('labeling', labels.length);
       }
-      const snapshot: BrowseSnapshot = { snapshotId, sourceRevision: revision, algorithm: SPARC_FIGURE_CLUSTERING.version, total: count,
-        clusters: entries.map(([id, cluster]) => ({ id, label: labels.find(label => label.id === id)!.label,
-          count: cluster.count, representativeAssetId: cluster.representatives[0]!.row._id })).sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id)) };
+      const descriptor = (id: string) => {
+        const cluster = clusters.get(id)!;
+        return { id, label: labels.find(label => label.id === id)!.label, count: cluster.count,
+          representativeAssetId: cluster.representatives[0]!.row._id };
+      };
+      const byLabel = (a: { label: string; id: string }, b: { label: string; id: string }) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
+      const snapshot: BrowseSnapshot = { snapshotId, sourceRevision: revision, algorithm: SPARC_FIGURE_BROWSE_VERSION, total: count,
+        clusters: [...children].map(([id, childIds]) => ({ ...descriptor(id), subclusters: [...childIds].map(descriptor).sort(byLabel) })).sort(byLabel) };
       if (!await deps.store.publish(snapshot)) throw new Error('The figure library changed while labeling; reload the groups');
       return snapshot;
     } catch (error) { await deps.store.discard(snapshotId); throw error; }

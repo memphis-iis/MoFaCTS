@@ -8,8 +8,7 @@
   import { sanitizeSparcRichHtml } from '../services/sparcRichHtml';
   import { renderSparcInstructionMarkdown } from '../services/sparcInstructionMarkdown';
   import { shouldSubmitTextInputOnKeydown } from '../services/textInputComposition';
-  import { SPARC_INSTRUCTIONAL_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycleRules';
-  import { SPARC_DYNAMIC_MENU_OPTIONS, SPARC_CATEGORIZED_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcDynamicInstructionRules';
+  import { SPARC_CATEGORIZED_MENU_OPTIONS } from '../../../../../../learning-components/units/sparcsession/sparcDynamicInstructionRules';
   import { sparcQuestionAnswerNodes } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
   import { getSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 
@@ -18,7 +17,7 @@
   function isWorkedExample(component) {
     return component.id === `${component.turnEventId}:richContent`
       && component.figure === undefined
-      && [...SPARC_DYNAMIC_MENU_OPTIONS, ...SPARC_CATEGORIZED_MENU_OPTIONS].some((option) => option.action === component.action);
+      && SPARC_CATEGORIZED_MENU_OPTIONS.some((option) => option.action === component.action);
   }
 
   export let node;
@@ -216,7 +215,7 @@
       return '';
     }
     const action = String(candidate?.action || '').trim();
-    const actionLabel = [...SPARC_INSTRUCTIONAL_MENU_OPTIONS, ...SPARC_DYNAMIC_MENU_OPTIONS, ...SPARC_CATEGORIZED_MENU_OPTIONS].find(option => option.action === action)?.label ?? action;
+    const actionLabel = SPARC_CATEGORIZED_MENU_OPTIONS.find(option => option.action === action)?.label ?? action;
     const targetId = String(candidate?.targetId || '').trim();
     const targetKind = String(candidate?.selectionTargetKind || candidate?.targetType || '').trim();
     if (candidate?.competition) {

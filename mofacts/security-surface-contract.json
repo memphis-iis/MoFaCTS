@@ -314,10 +314,6 @@
       "access": "public-rate-limited"
     },
     {
-      "name": "getAutoTutorHistoryForUnit",
-      "access": "role-checked"
-    },
-    {
       "name": "getClassPerformanceByTDF",
       "access": "role-checked",
       "notes": "Existing instructor/class authorization retained; aggregates exclude historical assessment copies."
@@ -467,7 +463,7 @@
     {
       "name": "getSparcLibraryClusters",
       "access": "admin-only",
-      "notes": "Builds or reads a server-only derived browsing snapshot with automatically selected clusters. Shared administrator model labels bounded representative descriptions and authored target texts; no identities, responses or embeddings are sent to the labeler or returned to the browser. Cluster membership and cache leases are separate from instructional retrieval."
+      "notes": "Builds or reads a server-only derived browsing snapshot with two automatically selected semantic levels: topics and subgroups. Shared administrator model labels bounded representative descriptions and authored target texts; no identities, responses or embeddings are sent to the labeler or returned to the browser. Cluster membership and cache leases are separate from instructional retrieval."
     },
     {
       "name": "replaceSparcLibraryImage",
@@ -668,10 +664,6 @@
     },
     {
       "name": "normalizeOptionalString",
-      "access": "role-checked"
-    },
-    {
-      "name": "persistAutoTutorExpectationRelationships",
       "access": "role-checked"
     },
     {

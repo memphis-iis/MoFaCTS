@@ -6,6 +6,12 @@ import {
 } from '../../common/lib/stimuliResponseRepair';
 
 describe('stimuli response Unicode handling', function() {
+  it('rejects standalone scripts instead of generating an AutoTutor runtime response', function() {
+    expect(() => getNewItemFormat({ stimuli: { setspec: { clusters: [{ stims: [{
+      display: { text: 'Original prompt' }, autoTutor: {},
+    }] }] } } }, 'original.json', 1, {})).to.throw('standalone AutoTutor has been removed');
+  });
+
   it('preserves accented answers while stripping truly invisible characters', function() {
     expect(removeInvisibleUnicode('ni\u00f1o')).to.equal('ni\u00f1o');
     expect(removeInvisibleUnicode('energ\u00eda')).to.equal('energ\u00eda');

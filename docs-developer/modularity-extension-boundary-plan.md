@@ -1,5 +1,7 @@
 # Modularity Extension Boundary Starter Plan
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 Goal: make new learning components such as AutoTutor, H5P, video, assessment, or future domain-specific components installable through explicit registration and capability contracts, without editing central app switchboards for every new component.
 
 This is a starter plan, not a request to rewrite the runtime. The first pass should harden the boundaries already emerging in `learning-components/` and keep legacy Meteor paths as behavior-preserving facades.

@@ -15,7 +15,7 @@
   } from '../services/sparcControllerDialogueOpenRouter';
   import { createSparcOpenRouterSession } from '../services/sparcOpenRouterSession';
   import { readSparcResumeSnapshot } from '../services/sparcRuntimeState';
-  import { SPARC_STUDENT_SELECTED_POLICY_ID, isSparcDynamicPolicy, isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+  import { isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
   import { projectSparcInstructionMessages } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
@@ -808,8 +808,8 @@
     pendingSnapshot: pendingAutoTutorProgressSnapshot,
     submissionPending: dialogueSubmitPending,
   });
-  $: autoTutorDialogueCompleted = autoTutorDialogueMode && sparcDisplay?.instructionalController?.policyId !== SPARC_STUDENT_SELECTED_POLICY_ID && currentAutoTutorProgressSnapshot.completed
-    && (!isSparcDynamicPolicy(sparcDisplay?.instructionalController?.policyId) || !dialogueSubmitPending);
+  $: autoTutorDialogueCompleted = autoTutorDialogueMode && currentAutoTutorProgressSnapshot.completed
+    && (!isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId) || !dialogueSubmitPending);
   $: categorizedDialogue = autoTutorDialogueMode && isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId);
   $: dialogueScope = JSON.stringify([userId, tdfId, attemptId, levelUnit, sparcDisplay?.pageKey]);
   $: if (mounted && categorizedDialogue && engine && userId && tdfId && attemptId && subsetKind === 'question'

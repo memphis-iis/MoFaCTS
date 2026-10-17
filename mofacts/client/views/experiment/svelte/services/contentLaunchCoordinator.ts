@@ -10,7 +10,7 @@ export type ContentLaunchPhase =
   | 'active'
   | 'failed';
 
-export type ContentSurfaceKind = 'flashcard' | 'assessment' | 'sparc' | 'video' | 'autotutor';
+export type ContentSurfaceKind = 'flashcard' | 'assessment' | 'sparc' | 'video';
 
 export interface ContentLaunchIdentity {
   readonly userId: string;
@@ -32,7 +32,7 @@ export function canActivateContentInput(phase: ContentLaunchPhase, runtimeInputE
 }
 
 export function resolveContentSurfaceKind(
-  mode: 'flashcard' | 'sparc' | 'video' | 'autotutor',
+  mode: 'flashcard' | 'sparc' | 'video',
   currentTdfUnit: { assessmentsession?: unknown } | null | undefined,
 ): ContentSurfaceKind {
   return mode === 'flashcard' && currentTdfUnit?.assessmentsession

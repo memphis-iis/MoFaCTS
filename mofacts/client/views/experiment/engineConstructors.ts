@@ -1,4 +1,4 @@
-import { AUTO_TUTOR_UNIT, MODEL_UNIT, SPARC_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../../common/Definitions';
+import { MODEL_UNIT, SPARC_UNIT, SCHEDULE_UNIT, VIDEO_UNIT } from '../../../common/Definitions';
 import type { UnitEngineLike, UnitType } from '../../../common/types';
 import { createUnitEngineByType, getCreatableUnitEngineTypes } from './unitEngine';
 
@@ -48,13 +48,16 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
     throw new Error(`${source}: Cannot create unit engine without currentTdfUnit`);
   }
 
+  if (Object.prototype.hasOwnProperty.call(unit, 'autotutorsession')) {
+    throw new Error(`${source}: autotutorsession is no longer supported; standalone AutoTutor has been removed`);
+  }
+
   const runnableSessionShapes = getAvailableUnitShapes(unit).filter((shape) => (
     shape === 'gazecalibrationsession'
     || shape === 'assessmentsession'
     || shape === 'learningsession'
     || shape === 'sparcsession'
     || shape === 'videosession'
-    || shape === 'autotutorsession'
   ));
   if (runnableSessionShapes.length > 1) {
     const unitName = typeof unit.unitname === 'string' ? unit.unitname : '<unnamed>';
@@ -69,14 +72,13 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
   if (unit.videosession) return VIDEO_UNIT;
   if (unit.sparcsession) return SPARC_UNIT;
   if (unit.learningsession) return MODEL_UNIT;
-  if (unit.autotutorsession) return AUTO_TUTOR_UNIT;
   if (hasInstructionContent(unit)) return 'instruction-only';
 
   const unitName = typeof unit.unitname === 'string' ? unit.unitname : '<unnamed>';
   const shapes = getAvailableUnitShapes(unit);
   throw new Error(
     `${source}: Cannot determine unit type for unit "${unitName}". ` +
-    `Expected assessmentsession, learningsession, sparcsession, videosession, autotutorsession, or instruction-only content. ` +
+    `Expected assessmentsession, learningsession, sparcsession, videosession, or instruction-only content. ` +
     `Unit has: ${shapes.length ? shapes.join(', ') : 'no runnable unit shape'}`
   );
 }

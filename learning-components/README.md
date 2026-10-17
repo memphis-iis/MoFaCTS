@@ -20,7 +20,7 @@ Current extension boundaries:
 - `units/learning-session/`: model learning-session unit package, including learning/video session runtime-config interpretation and model-card selection behavior.
 - `units/sparcsession/`: SPARC session unit package; current wrapper over shared adaptive/logistic sequencing and target home for the reactive instructional document graph described in its README.
 - `units/assessment-session/`: assessment schedule unit package and authored schedule construction.
-- `units/autotutor/`: AutoTutor unit package, runtime contracts, saved state/history validation, and planning helpers.
+- `units/sparcsession/`: SPARC unit engine, instructional adapters and productions, assessment, selection, persistence, and replay. AutoTutor dialogue uses this engine; the standalone AutoTutor runtime has been removed.
 - `units/instruction/`: instruction-only unit-engine package.
 - `units/video-session/`: minimal video-session unit package and adaptive video question helpers.
 
@@ -43,7 +43,7 @@ Dependency direction: `app/` may import `learning-components/`; `learning-compon
 
 ## Component Package Checklist
 
-Use this checklist before adding a production component such as a deeper AutoTutor unit or another external-widget adapter:
+Use this checklist before adding a production component such as a new instructional unit or another external-widget adapter:
 
 1. Create one package folder under the relevant component family, for example `units/<component>/` or `trial-displays/<component>/`.
 2. Keep pedagogical behavior, display/result normalization, model policy, and authored-content interpretation in the package.

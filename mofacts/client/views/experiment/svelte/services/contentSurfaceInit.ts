@@ -112,7 +112,6 @@ interface TdfUnitLike extends UnknownRecord {
   assessmentsession?: unknown;
   videosession?: VideoSessionLike;
   learningsession?: unknown;
-  autotutorsession?: unknown;
   unitinstructions?: unknown;
   picture?: unknown;
   unitname?: string;

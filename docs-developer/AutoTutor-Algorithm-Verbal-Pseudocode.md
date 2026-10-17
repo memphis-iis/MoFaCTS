@@ -1,5 +1,7 @@
 # MoFaCTS AutoTutor Algorithm as Verbal Pseudocode
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 This document explains the AutoTutor control loop for a technically literate reader. It is grounded in the current implementation surfaces:
 
 - `learning-components/units/autotutor/AutoTutorStateMachine.ts`

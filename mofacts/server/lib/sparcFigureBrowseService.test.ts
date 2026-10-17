@@ -52,22 +52,22 @@ describe('SPARC cached semantic figure browsing', () => {
     assert.notEqual(rebuilt.snapshotId, original.snapshotId);
     assert.deepEqual(rebuilt.clusters.map(cluster => cluster.count).sort(), [1, 2, 2]);
     const singleton = rebuilt.clusters.find(cluster => cluster.count === 1)!;
-    const members = await f.store.members(rebuilt.snapshotId, singleton.id);
+    const members = await f.store.members(rebuilt.snapshotId, singleton.subclusters[0]!.id);
     assert.equal(members.length, 1);
     assert.equal(members[0]!.assetId, rows[4]!._id);
     assert.equal(singleton.representativeAssetId, rows[4]!._id);
     assert.deepEqual(await getSparcFigureBrowseOverview(f.deps), rebuilt);
-    assert.equal(f.labels(), 2);
+    assert.equal(f.labels(), 4);
   });
   it('streams all records, caches labels, isolates embedding spaces and orders paged members by their center', async () => {
-    const f = figureBrowseFixture(figureBrowseRows(130));
+    const f = figureBrowseFixture(figureBrowseRows(130).map((row, i) => ({ ...row, embedding: i % 2 ? [0, 1] : [1, 0] })));
     f.rows.push({ ...figureBrowseRows(1)[0]!, _id: 'different-space', embeddingModel: 'other-embedding', dimensions: 3, embedding: [1, 0, 0] });
     const snapshot = await getSparcFigureBrowseOverview(f.deps);
     assert.equal(snapshot.total, 131); assert.equal(snapshot.clusters.length, 3);
     assert.equal(f.members.length, 131);
     assert.equal(snapshot.clusters.reduce((sum, cluster) => sum + cluster.count, 0), 131);
-    assert.deepEqual(await getSparcFigureBrowseOverview(f.deps), snapshot); assert.equal(f.labels(), 1);
-    const cluster = snapshot.clusters.find(group => group.count > 24)!;
+    assert.deepEqual(await getSparcFigureBrowseOverview(f.deps), snapshot); assert.equal(f.labels(), 2);
+    const cluster = snapshot.clusters.find(group => group.count > 24)!.subclusters[0]!;
     const first = await f.store.members(snapshot.snapshotId, cluster.id);
     assert.equal(first.length, 25);
     assert.ok(first.every((member, i) => !i || first[i - 1]!.similarity >= member.similarity));
@@ -75,18 +75,57 @@ describe('SPARC cached semantic figure browsing', () => {
     const next = await f.store.members(snapshot.snapshotId, cluster.id, { kind: last.kind, similarity: last.similarity, assetId: last.assetId });
     assert.ok(next.every(member => !first.slice(0, 24).some(prior => prior.assetId === member.assetId)));
     f.invalidate(); const updated = await getSparcFigureBrowseOverview(f.deps);
-    assert.notEqual(updated.snapshotId, snapshot.snapshotId); assert.equal(f.labels(), 2);
+    assert.notEqual(updated.snapshotId, snapshot.snapshotId); assert.equal(f.labels(), 4);
   });
   it('serializes simultaneous builds and discards incomplete labels and obsolete source revisions', async () => {
     const f = figureBrowseFixture(figureBrowseRows(6));
     const [a, b] = await Promise.all([getSparcFigureBrowseOverview(f.deps), getSparcFigureBrowseOverview(f.deps)]);
-    assert.equal(a.snapshotId, b.snapshotId); assert.equal(f.labels(), 1);
+    assert.equal(a.snapshotId, b.snapshotId); assert.equal(f.labels(), 2);
     const malformed = figureBrowseFixture(figureBrowseRows(2));
     await assert.rejects(getSparcFigureBrowseOverview({ ...malformed.deps, labels: async () => [] }), /Incomplete/);
     assert.equal(malformed.members.length, 0); assert.equal(malformed.snapshots.size, 0);
     const changing = figureBrowseFixture(figureBrowseRows(2));
     await assert.rejects(getSparcFigureBrowseOverview({ ...changing.deps, labels: async batch => { changing.invalidate(); return batch.map(row => ({ id: row.id, label: 'Teaching concepts' })); } }), /changed while labeling/);
     assert.equal(changing.members.length, 0);
+  });
+  it('fits subgroups inside each topic and stores every component in exactly one leaf', async () => {
+    const rows = figureBrowseRows(16).map((row, i) => {
+      const subgroup = Math.floor(i / 4), detail = .3 + .1 * (i % 4 - 1.5);
+      return { ...row, kind: i % 2 ? 'explanation' : 'image', dimensions: 4,
+        embedding: subgroup < 2 ? [1, 0, subgroup ? -detail : detail, 0] : [0, 1, 0, subgroup === 2 ? detail : -detail] };
+    });
+    const f = figureBrowseFixture(rows), snapshot = await getSparcFigureBrowseOverview(f.deps);
+    assert.equal(snapshot.clusters.length, 2);
+    assert.deepEqual(snapshot.clusters.map(topic => topic.subclusters.length), [2, 2]);
+    const leafIds = snapshot.clusters.flatMap(topic => topic.subclusters.map(leaf => leaf.id));
+    assert.equal(new Set(leafIds).size, 4);
+    assert.equal(f.members.length, 16);
+    assert.equal(new Set(f.members.map(member => member.assetId)).size, 16);
+    assert.ok(f.members.every(member => leafIds.includes(member.clusterId)));
+    for (const topic of snapshot.clusters) {
+      assert.equal(topic.count, topic.subclusters.reduce((sum, leaf) => sum + leaf.count, 0));
+      assert.equal(f.members.filter(member => member.clusterId === topic.id).length, 0);
+      for (const leaf of topic.subclusters) {
+        const members = await f.store.members(snapshot.snapshotId, leaf.id);
+        assert.equal(members.length, leaf.count);
+        assert.ok(members.some(member => member.assetId === leaf.representativeAssetId));
+        assert.deepEqual(new Set(members.map(member => member.kind)), new Set(['image', 'explanation']));
+      }
+    }
+  });
+  it('keeps small topics navigable and rejects changes before subgroup fitting', async () => {
+    for (const count of [1, 2]) {
+      const f = figureBrowseFixture(figureBrowseRows(count));
+      const snapshot = await getSparcFigureBrowseOverview(f.deps);
+      assert.equal(snapshot.clusters.length, 1);
+      assert.equal(snapshot.clusters[0]!.subclusters.length, 1);
+      assert.equal(snapshot.clusters[0]!.subclusters[0]!.count, count);
+    }
+    const f = figureBrowseFixture(figureBrowseRows(8));
+    await assert.rejects(getSparcFigureBrowseOverview({ ...f.deps, progress: stage => {
+      if (stage === 'sampling-subgroups') f.invalidate();
+    } }), /changed during clustering/);
+    assert.equal(f.labels(), 0); assert.equal(f.members.length, 0);
   });
   it('supports an empty collection without provider calls and rejects missing or duplicate labels', async () => {
     const f = figureBrowseFixture([]);

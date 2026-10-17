@@ -1,5 +1,7 @@
 # AutoTutor Implementation Questions
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 Use this file to add decisions inline before implementation. Each question has an `Answer:` slot for notes, constraints, or final decisions.
 
 ## Content Model

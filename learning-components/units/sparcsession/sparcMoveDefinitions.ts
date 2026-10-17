@@ -192,21 +192,7 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
   }),
 ] as const satisfies readonly SparcMoveDefinition[]);
 
-export const SPARC_COMPOSITE_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = [
-  { moveId: 'instruction.question', components: ['question'], assistance: 0 },
-  { moveId: 'instruction.explanation-question', components: ['explanation', 'question'], assistance: 1 },
-  { moveId: 'instruction.rich-question', components: ['richContent', 'question'], assistance: 1.4 },
-  { moveId: 'instruction.explanation-rich-question', components: ['explanation', 'richContent', 'question'], assistance: 1.8 },
-].map((definition) => ({
-  ...definition,
-  components: definition.components as NonNullable<SparcMoveDefinition['components']>,
-  version: 'v1', family: 'sparc-component', status: 'active', requiredFacts: ['controller.selectedAction'],
-  promptId: definition.moveId, promptVersion: 'v2', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v2',
-  renderer: 'sparc.nodes', historyAction: 'sparc-instruction',
-  promptPolicy: 'Teach only the selected target. Realize the requested components through shared primitives, ending with one question. Use a complete worked example or an actually generated teaching figure for rich content. Keep the case, notation, and relationships coherent across components, and make the following question isomorphic to the rich case. Never invent image URLs or substitute a different form when a particular form is requested. Instructional text uses Markdown with GFM tables; do not wrap the complete response in a code fence or include raw HTML. Do not disclose internal scoring, identifiers, or rule metadata.',
-}));
-
-export const SPARC_DYNAMIC_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = [
+const categorizedMoveTemplates: readonly SparcMoveDefinition[] = [
   { moveId: 'instruction.dynamic.question', components: ['question'], assistance: 0 },
   { moveId: 'instruction.dynamic.explanation-question', components: ['explanation', 'question'], assistance: 1.8 },
   { moveId: 'instruction.dynamic.explanation-rich-question', components: ['explanation', 'richContent', 'question'], assistance: 2.77 },
@@ -220,7 +206,7 @@ export const SPARC_DYNAMIC_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = [
 }));
 
 /** Six complete moves share the existing component generator and node renderer. */
-export const SPARC_CATEGORIZED_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = SPARC_DYNAMIC_MOVE_DEFINITIONS.flatMap(definition =>
+export const SPARC_CATEGORIZED_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = categorizedMoveTemplates.flatMap(definition =>
   (['text', 'multiple-choice'] as const).map(responseFormat => ({
     ...definition, moveId: `${definition.moveId}.${responseFormat}`, responseFormat,
     assistance: Math.round((definition.assistance! + (responseFormat === 'text' ? -0.25 : 0.25)) * 100) / 100,
@@ -239,7 +225,7 @@ export const SPARC_FEEDBACK_MOVE_DEFINITION: SparcMoveDefinition = autotutorDial
 });
 
 export function getSparcMoveDefinition(moveId: string): SparcMoveDefinition | undefined {
-  return [...SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS, ...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS, ...SPARC_CATEGORIZED_MOVE_DEFINITIONS, SPARC_FEEDBACK_MOVE_DEFINITION].find((definition) => definition.moveId === moveId);
+  return [...SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS, ...SPARC_CATEGORIZED_MOVE_DEFINITIONS, SPARC_FEEDBACK_MOVE_DEFINITION].find((definition) => definition.moveId === moveId);
 }
 
 export function requireActiveSparcMoveDefinition(moveId: string): SparcMoveDefinition {

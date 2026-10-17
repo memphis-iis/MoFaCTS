@@ -81,7 +81,6 @@ function createRuntimeStimulus(params: {
     imageStimulus: params.rawStim.display?.imgSrc ?? params.flatStim?.imageStimulus,
     videoStimulus: params.rawStim.display?.videoSrc ?? params.flatStim?.videoStimulus,
     display: params.rawStim.display ?? params.flatStim?.display,
-    autoTutor: params.rawStim.autoTutor ?? params.flatStim?.autoTutor,
     alternateDisplays: params.rawStim.alternateDisplays ?? params.flatStim?.alternateDisplays,
   };
 }

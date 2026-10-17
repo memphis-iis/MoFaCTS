@@ -62,13 +62,15 @@ export function hasLaunchReadyTutorUnits(tdfContent: any): boolean {
     if (!unit || typeof unit !== 'object') {
       return false;
     }
+    if (Object.prototype.hasOwnProperty.call(unit, 'autotutorsession')) {
+      throw new Error('autotutorsession is no longer supported; standalone AutoTutor has been removed');
+    }
     return Boolean(
       unit.gazecalibrationsession ||
       unit.assessmentsession ||
       unit.learningsession ||
       unit.sparcsession ||
       unit.videosession ||
-      unit.autotutorsession ||
       unit.unitinstructions ||
       unit.picture
     );

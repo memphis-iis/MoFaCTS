@@ -1,5 +1,7 @@
 # AutoTutor and SPARC Architecture Merge Plan
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 ## Status
 
 This document is a design and implementation planning note. It replaces the narrower idea that AutoTutor should only use SPARC production rules.

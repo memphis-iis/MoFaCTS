@@ -1,5 +1,7 @@
 # Modularity Start Plan
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 This is the short handoff plan for moving from the current extension-boundary groundwork to practical AutoTutor/H5P-style component drop-ins.
 
 ## Current Readiness

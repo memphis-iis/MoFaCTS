@@ -1,6 +1,6 @@
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import { projectSparcAnsweredQuestionOperations } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
-import { isSparcCompetitivePolicy, isSparcDynamicPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { logistic, targetExpectancy } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
 import { calculateExpectationProbabilities } from '../../../../../../learning-components/models/adaptive-logistic/probabilityCalculation';
 import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
@@ -180,7 +180,7 @@ export function sparcHistoryForPolicy(records: readonly CanonicalHistoryRecord[]
 function snapshotProbabilities(document: SparcAuthoredDocument, replayState: SparcReplayState, records: readonly CanonicalHistoryRecord[], scope: SparcDurableScope) {
   const targets = expectationTargets(document);
   if (!isSparcCompetitivePolicy(document.instructionalController?.policyId)) {
-    if (isSparcDynamicPolicy(document.instructionalController?.policyId)) {
+    if (isSparcCategorizedPolicy(document.instructionalController?.policyId)) {
       const facts = buildSparcWorkingMemoryFacts({ document, replayState });
       return Object.fromEntries(targets.map(target => [target, Math.max(0.2, Number(facts.find(fact => fact.factType === 'learningTarget.score' && fact.slots?.clusterKC === target)?.slots?.coverage ?? 0.2))]));
     }

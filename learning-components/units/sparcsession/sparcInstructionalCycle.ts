@@ -1,13 +1,13 @@
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
-import { isSparcCompetitivePolicy, isSparcDynamicPolicy, isSparcStudentPolicy, isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
+import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
 import { SPARC_DYNAMIC_TARGET_LOGIT, SPARC_FEEDBACK_ACTION } from './sparcDynamicInstructionRules';
-import { advanceOet, competitiveAssessmentFacts, competitiveCandidateFacts, competitiveMoveFacts, selectCompetitiveActivation, SPARC_ADVANCE_OET_ACTION, targetOet } from './sparcCompetitiveSelection';
+import { competitiveAssessmentFacts, competitiveCandidateFacts, selectCompetitiveActivation } from './sparcCompetitiveSelection';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY, type SparcProgressiveNodeOperation } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import { assertCompletedDialogueReplayState, RESPONSE_LOCAL_FACT_TYPES, type SparcAutoTutorRuleTurnParams } from './sparcAutoTutorRuleRuntime';
 import { createSparcLearnerResponseScoreFacts, expectationLogitChangesFromScoreFacts } from './sparcLearnerResponseScoring';
 import { requireSparcInstructionalAdapter } from './sparcInstructionalAdapterRegistry';
-import { SPARC_COMPOSITE_MOVE_DEFINITIONS, SPARC_DYNAMIC_MOVE_DEFINITIONS, SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
+import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
 import { createSparcInstructionTransition, createSparcFeedbackRequest, createSparcInstructionComponentWrite, type SparcInstructionComponents } from './sparcInstructionalPrimitives';
 import { createSparcUtteranceRequestFromFacts, type SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts, progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
@@ -99,8 +99,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
 }): Promise<SparcCycleResult> {
   const student = isSparcStudentPolicy(params.document.instructionalController?.policyId);
   const competitive = isSparcCompetitivePolicy(params.document.instructionalController?.policyId);
-  const dynamic = isSparcDynamicPolicy(params.document.instructionalController?.policyId);
-  const dynamicMoves = isSparcCategorizedPolicy(params.document.instructionalController?.policyId) ? SPARC_CATEGORIZED_MOVE_DEFINITIONS : SPARC_DYNAMIC_MOVE_DEFINITIONS;
+  if (!isSparcCategorizedPolicy(params.document.instructionalController?.policyId)) throw new Error('Instructional cycles require a categorized policy');
+  const dynamicMoves = SPARC_CATEGORIZED_MOVE_DEFINITIONS;
   assertCompletedDialogueReplayState(params.replayState);
   const adapter = requireSparcInstructionalAdapter(params.document.instructionalController);
   const previous = params.replayState?.transitions ?? [];
@@ -119,9 +119,9 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   const acceptedAssessment = previous.find((transition) => transition.transitionId === `${event.eventId}:assessment`);
   const acceptedFeedback = previous.find((transition) => transition.transitionId === `${event.eventId}:feedback`);
   let facts = [...buildSparcWorkingMemoryFacts({ ...params, event })].filter((fact) => !RESPONSE_LOCAL_FACT_TYPES.has(fact.factType)
-    || (event.type === 'choice-selected' && ['learnerResponse.contribution', 'dialogue.learnerQuestion', ...(dynamic ? ['controller.completionState'] : [])].includes(fact.factType)));
+    || (event.type === 'choice-selected' && ['learnerResponse.contribution', 'dialogue.learnerQuestion', 'controller.completionState'].includes(fact.factType)));
   facts.push({ factType: 'dialogue.problemStatement', slots: { text: params.problemStatement } });
-  if (competitive) facts.push(...(dynamic ? dynamicMoves.map((move) => ({ factType: 'instructional.move', slots: { action: move.moveId, assistance: move.assistance } })) : competitiveMoveFacts()));
+  if (competitive) facts.push(...dynamicMoves.map((move) => ({ factType: 'instructional.move', slots: { action: move.moveId, assistance: move.assistance } })));
   let finalRecord: SparcCanonicalHistoryRecord | undefined;
   let generatedRequest: SparcUtteranceRequest | undefined;
   let generated = false;
@@ -150,10 +150,10 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   const projection = (current: readonly SparcWorkingMemoryFact[]) => {
     const projected = adapter.projectInstructionalFacts({
     snapshotId: event.eventId, facts: current, config: params.document.instructionalController!,
-    candidateOptions: { ...params.candidateOptions, ...(student ? { includeCompletedExpectations: !dynamic } : {}),
+    candidateOptions: { ...params.candidateOptions, ...(student ? { includeCompletedExpectations: false } : {}),
       ...(event.type === 'document-loaded' ? { weights: { frontierWeight: 0, coherenceWeight: 0, centralityWeight: 1 } } : {}) },
     });
-    return competitive ? { ...projected, facts: competitiveCandidateFacts([...current, ...projected.facts], dynamic ? SPARC_DYNAMIC_TARGET_LOGIT : undefined).slice(current.length) } : projected;
+    return competitive ? { ...projected, facts: competitiveCandidateFacts([...current, ...projected.facts], SPARC_DYNAMIC_TARGET_LOGIT).slice(current.length) } : projected;
   };
   const assertions = (values: readonly SparcWorkingMemoryFact[], persist = false) => values.map((fact) => ({ fact, persist,
     identitySlots: fact.factType === 'learningTarget.score' ? { clusterKC: fact.slots?.clusterKC }
@@ -311,12 +311,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       ]), writes: [] };
     },
     [SPARC_AUTOTUTOR_GENERATE_ACTION]: generate,
-    [SPARC_ADVANCE_OET_ACTION]: async ({ args, facts: current }) => {
-      const targetKey = String(args.targetKey);
-      return { assertions: assertions([{ factType: 'instructional.oet', factId: targetKey,
-        slots: { targetKey, logit: advanceOet(targetOet(current, targetKey), Number(args.increment)) } }], true), writes: [] };
-    },
-    ...Object.fromEntries([...SPARC_COMPOSITE_MOVE_DEFINITIONS, ...SPARC_DYNAMIC_MOVE_DEFINITIONS, ...SPARC_CATEGORIZED_MOVE_DEFINITIONS].map((definition) => [definition.moveId, generate])),
+    ...Object.fromEntries(SPARC_CATEGORIZED_MOVE_DEFINITIONS.map((definition) => [definition.moveId, generate])),
     [SPARC_MENU_ACTION]: async ({ args }) => {
       menuOffered = true;
       return { assertions: assertions([menuFrom(args)], true), writes: inputControls(event, false) };

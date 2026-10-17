@@ -1,5 +1,4 @@
 import {
-  booleanField,
   createClosedObjectSchema,
   simpleField,
   stringArrayField,
@@ -181,90 +180,6 @@ export const STIM_FIELD_REGISTRY: SectionFieldRegistry = {
     brief: 'Speech-hint exclusion list.',
     verbose: 'Comma-delimited words to exclude from speech-recognition matching, helping prevent false positives for common words.'
   }),
-  autoTutor: simpleField({
-    type: 'object',
-    title: 'AutoTutor Script',
-    additionalProperties: false,
-    required: ['id', 'topic', 'learningGoal', 'idealAnswer', 'expectations', 'misconceptions', 'dialogPolicy', 'summary'],
-    properties: {
-      id: stringField('', 6),
-      topic: stringField('', 6),
-      learningGoal: textareaField(''),
-      idealAnswer: textareaField(''),
-      expectations: {
-        type: 'array',
-        title: 'Expectations',
-        minItems: 1,
-        items: {
-          type: 'object',
-          title: 'Expectation',
-          additionalProperties: false,
-          required: ['id', 'label', 'proposition', 'hints', 'prompts', 'assertion'],
-          properties: {
-            id: stringField('', 4),
-            label: stringField('', 6),
-            proposition: textareaField(''),
-            acceptableVariants: stringArrayField('Acceptable Variants', 'Acceptable Variant'),
-            commonPartialAnswers: stringArrayField('Common Partial Answers', 'Common Partial Answer'),
-            hints: stringArrayField('Hints', 'Hint'),
-            prompts: {
-              type: 'array',
-              title: 'Prompts',
-              items: {
-                type: 'object',
-                title: 'Prompt',
-                additionalProperties: false,
-                required: ['stem', 'target'],
-                properties: {
-                  stem: textareaField(''),
-                  target: stringField('', 12),
-                },
-              },
-            },
-            assertion: textareaField(''),
-          },
-        },
-      },
-      misconceptions: {
-        type: 'array',
-        title: 'Misconceptions',
-        items: {
-          type: 'object',
-          title: 'Misconception',
-          additionalProperties: false,
-          required: ['id', 'label', 'misconception', 'detectionCues', 'contrastWithExpectations', 'correction', 'repairQuestion'],
-          properties: {
-            id: stringField('', 4),
-            label: stringField('', 6),
-            misconception: textareaField(''),
-            detectionCues: stringArrayField('Detection Cues', 'Detection Cue'),
-            contrastWithExpectations: stringArrayField('Contrasted Expectations', 'Expectation ID'),
-            correction: textareaField(''),
-            repairQuestion: textareaField(''),
-          },
-        },
-      },
-      dialogPolicy: {
-        type: 'object',
-        title: 'Dialogue Policy',
-        additionalProperties: false,
-        required: ['allowAnyOrder', 'requiredExpectations', 'completionRule'],
-        properties: {
-          allowAnyOrder: booleanField(true, 4),
-          requiredExpectations: stringArrayField('Required Expectations', 'Expectation ID'),
-          optionalExpectations: stringArrayField('Optional Expectations', 'Expectation ID'),
-          ifStudentIsClose: textareaField(''),
-          ifStudentIsWrong: textareaField(''),
-          ifStudentIsStuck: textareaField(''),
-          completionRule: textareaField(''),
-        },
-      },
-      summary: textareaField(''),
-    },
-  }, {
-    brief: 'AutoTutor curriculum script.',
-    verbose: 'Structured AutoTutor script for the first stim in a referenced AutoTutor cluster, including expectations, misconceptions, prompts, corrections, and summary.'
-  }),
   alternateDisplays: simpleField({
     type: 'array',
     title: 'Alternate Displays',
@@ -285,7 +200,6 @@ export const STIM_CLUSTER_DIRECT_RUNTIME_KEYS = Object.freeze([
 
 export const STIM_DIRECT_RUNTIME_KEYS = Object.freeze([
   'alternateDisplays',
-  'autoTutor',
   'optimalProb',
   'parameter',
   'speechHintExclusionList',

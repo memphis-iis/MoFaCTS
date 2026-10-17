@@ -44,6 +44,7 @@ type DashboardPracticeSnapshotDeps = {
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
 };
 
+// Original AutoTutor metadata remains readable for saved lessons; launch rejects it.
 type FirstContentUnitType = 'video' | 'autotutor' | 'assessment' | 'learning' | 'sparc' | 'conditionPool' | null;
 
 async function resolveAssignedRootTdfIdsForUser({
@@ -135,10 +136,11 @@ async function getDashboardVisibleTdfs(deps: DashboardPracticeSnapshotDeps, user
     'content.tdfs.tutor.setspec.speechAPIKey': 1,
     'content.tdfs.tutor.setspec.textToSpeechAPIKey': 1,
     'content.tdfs.tutor.unit.learningsession': 1,
-    'content.tdfs.tutor.unit.autotutorsession': 1,
     'content.tdfs.tutor.unit.assessmentsession': 1,
     'content.tdfs.tutor.unit.videosession': 1,
     'content.tdfs.tutor.unit.sparcsession': 1,
+    // Historical lesson classification only; no standalone execution is available.
+    'content.tdfs.tutor.unit.autotutorsession': 1,
     'content.tdfs.tutor.unit.unitinstructions': 1,
   };
 

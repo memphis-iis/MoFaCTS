@@ -20,7 +20,6 @@ export const learningComponentCapabilities = [
   'authz',
   'logging',
   'ui-alerts',
-  'ai-provider',
 ] as const;
 
 export type LearningComponentCapability = typeof learningComponentCapabilities[number];

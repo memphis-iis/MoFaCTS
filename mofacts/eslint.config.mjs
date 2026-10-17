@@ -116,6 +116,22 @@ export default [
     },
   },
   {
+    files: ['**/packages/ostrio-files/tests/**/*.js'],
+    rules: {
+      // Upstream global comments repeat the test globals declared above.
+      // Keep checking real duplicate declarations without editing bundled tests.
+      'no-redeclare': ['warn', { builtinGlobals: false }],
+    },
+  },
+  {
+    files: ['**/packages/ostrio-files/tests/helpers.js'],
+    languageOptions: { globals: { Tinytest: 'readonly' } },
+  },
+  {
+    files: ['**/packages/ostrio-files/worker.js', '**/packages/ostrio-files/worker.min.js'],
+    languageOptions: { globals: { FileReaderSync: 'readonly' } },
+  },
+  {
     files: ['**/*.ts', '**/*.tsx', '**/*.d.ts'],
     languageOptions: {
       parser: tsParser,

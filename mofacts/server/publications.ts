@@ -531,7 +531,6 @@ const TDF_LISTING_FIELDS = {
     'content.tdfs.tutor.setspec.audioPromptFeedbackVolume': 1,
     'content.tdfs.tutor.setspec.audioPromptFeedbackVoice': 1,
     'content.tdfs.tutor.unit.learningsession': 1,
-    'content.tdfs.tutor.unit.autotutorsession': 1
     // Includes only runtime markers from units; still excludes full unit content.
 };
 

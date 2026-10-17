@@ -1,5 +1,7 @@
 # Open-Core Verification Log
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 This log records concrete local verification evidence for Self-Hosted MoFaCTS readiness. It is not a substitute for the full clean self-hosted stack proof in `../../docs-developer/open-core-implementation-plan.md`.
 
 H5P entries below are retained only as dated verification history. H5P runtime and deployment support has since been removed; current content imports reject H5P fields explicitly.

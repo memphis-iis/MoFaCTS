@@ -3,7 +3,6 @@ import { createLearningProgressRuntimeController } from './learningProgressPanel
 import type { SessionSurfaceState } from './sessionSurfaceMode';
 
 const flashcardSurface: SessionSurfaceState = {
-  isAutoTutorSession: false,
   isVideoSession: false,
   mode: 'flashcard',
 };

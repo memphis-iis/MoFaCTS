@@ -1,5 +1,7 @@
 We need to refactor the MoFaCTS AutoTutor implementation so that the AutoTutor state machine earns an “A” for planner clarity, runtime orchestration, maintainability, augmentability, and conceptual clarity.
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 Repository: `memphis-iis/MoFaCTS`
 
 Relevant current files include, but are not limited to:

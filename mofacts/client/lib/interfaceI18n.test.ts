@@ -181,26 +181,15 @@ describe('interfaceI18n', function() {
   ] as const;
   const autoTutorLearnerPromptKeys = [
     'autoTutor.typeYourAnswer',
-    'autoTutor.introPrompt',
   ] as const;
   const autoTutorRuntimeKeys = [
     'autoTutor.progress',
     'autoTutor.expectations',
     'autoTutor.misconceptions',
-    'autoTutor.coveredIdeas',
     'autoTutor.coveredExpectations',
-    'autoTutor.activeMisconceptions',
     'autoTutor.misconceptionScore',
-    'autoTutor.unavailable',
-    'autoTutor.conversationComplete',
-    'autoTutor.loading',
     'autoTutor.serviceError',
-    'autoTutor.continueControls',
     'autoTutor.conversation',
-    'autoTutor.niceWorkComplete',
-    'autoTutor.costCapReached',
-    'autoTutor.turnLimitReached',
-    'autoTutor.sessionEnded',
     'autoTutor.oneTurn',
     'autoTutor.turnCount',
   ] as const;

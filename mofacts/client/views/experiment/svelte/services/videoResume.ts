@@ -5,7 +5,6 @@ type VideoResumeUnitLike = {
   videosession?: {
     videosource?: unknown;
   } | null;
-  autotutorsession?: unknown;
 };
 
 function toNonNegativeInteger(value: unknown): number {

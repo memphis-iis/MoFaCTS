@@ -129,7 +129,6 @@
     getCorrectAnswerImageSrc,
   } from '../services/flashcardControllerProps';
   import { getHiddenItems } from '../services/hiddenVisibilityRuntimeState';
-  import AutoTutorSession from './AutoTutorSession.svelte';
   import DisplayTimeoutFooter from './DisplayTimeoutFooter.svelte';
   import FlashcardSessionSurface from './FlashcardSessionSurface.svelte';
   import BlocksSessionSurface from './BlocksSessionSurface.svelte';
@@ -1199,13 +1198,10 @@
 <div
   class="content-surface"
   class:video-mode={sessionSurfaceShell.contentSurfaceClasses.videoMode}
-  class:auto-tutor-mode={sessionSurfaceShell.contentSurfaceClasses.autoTutorMode}
   bind:this={contentSurfaceElement}
   style={cardFontSizeStyle}
 >
-  {#if sessionContentSurface.showAutoTutorSession}
-    <AutoTutorSession on:complete={() => forceAdvanceToNextUnit('AutoTutor Complete')} />
-  {:else if sessionContentSurface.showVideoSession}
+  {#if sessionContentSurface.showVideoSession}
     <VideoSessionSurface
       worksheetProps={videoWorksheetProps}
       on:worksheetcomplete={() => send({ type: 'VIDEO_WORKSHEET_COMPLETE' })}
@@ -1403,10 +1399,6 @@
 
   .content-surface.video-mode {
     background-color: var(--app-text-color);
-  }
-
-  .content-surface.auto-tutor-mode {
-    background-color: var(--app-background-color);
   }
 
   .content-surface.video-mode :global(.video-session-mode) {

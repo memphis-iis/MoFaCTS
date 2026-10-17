@@ -27,7 +27,7 @@ This directory contains side-effectful runtime services and pure helpers used by
 - Keep `contentSurfaceInit.ts` as the launch bootstrap coordinator, but extract new domain-specific logic into a named service before it becomes another launch concern.
 - Keep shared AutoTutor/video/card surface decisions in `sessionSurfaceMode.ts`; `ContentSurface.svelte` should compose the selected surface and keep DOM/event wiring local.
 - Keep video-session bridge behavior in the video service/component files until the unit-runtime adapter design is implemented.
-- Keep AutoTutor integration in `autoTutorClient.ts` and `components/AutoTutorSession.svelte`; shared launch or machine changes should only cover behavior common to all unit kinds.
+- SPARC AutoTutor integration belongs to the SPARC controller/services and `components/SparcSessionSurface.svelte`; shared launch or machine changes should only cover behavior common to all supported unit kinds.
 - Keep history writes on the shared canonical path: standard cards go through `historyLogging.ts`, AutoTutor goes through its history runtime capability, and video-session events go through the shared compressed-history client helper. That helper stamps `historySchemaVersion`, compresses stable fields, and calls `insertHistory`; do not add raw `insertHistory` calls from new components.
 
 ## Fail-Clear Expectations

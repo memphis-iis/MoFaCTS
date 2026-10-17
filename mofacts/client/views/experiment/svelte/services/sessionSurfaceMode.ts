@@ -1,4 +1,4 @@
-export type SessionSurfaceMode = 'autotutor' | 'video' | 'sparc' | 'flashcard';
+export type SessionSurfaceMode = 'video' | 'sparc' | 'flashcard';
 
 type SessionUnitLike = {
   assessmentsession?: unknown;
@@ -13,14 +13,12 @@ type SessionSurfaceStateInput = {
 };
 
 export type SessionSurfaceState = {
-  isAutoTutorSession: boolean;
   isVideoSession: boolean;
   mode: SessionSurfaceMode;
 };
 
 export type SessionContentSurface = {
   mode: SessionSurfaceMode;
-  showAutoTutorSession: boolean;
   showVideoSession: boolean;
   showSparcSession: boolean;
   showFlashcardSession: boolean;
@@ -28,12 +26,10 @@ export type SessionContentSurface = {
 
 export type SessionSurfaceShell = {
   mode: SessionSurfaceMode;
-  isAutoTutorSession: boolean;
   isVideoSession: boolean;
   contentSurface: SessionContentSurface;
   contentSurfaceClasses: {
     videoMode: boolean;
-    autoTutorMode: boolean;
   };
   showLearningProgressPanel: boolean;
 };
@@ -76,10 +72,12 @@ type SessionInlineVideoInstructionInput = {
 
 export function resolveSessionSurfaceState(input: SessionSurfaceStateInput): SessionSurfaceState {
   const currentTdfUnit = input.currentTdfUnit || {};
-  const isAutoTutorSession = Boolean(currentTdfUnit.autotutorsession);
+  if (Object.prototype.hasOwnProperty.call(currentTdfUnit, 'autotutorsession')) {
+    throw new Error('autotutorsession is no longer supported; standalone AutoTutor has been removed');
+  }
   const isVideoSession = Boolean(currentTdfUnit.videosession);
   const isSparcSession = Boolean(currentTdfUnit.sparcsession);
-  const specializedSessionCount = [isAutoTutorSession, isVideoSession, isSparcSession]
+  const specializedSessionCount = [isVideoSession, isSparcSession]
     .filter(Boolean).length;
 
   if (specializedSessionCount > 1) {
@@ -87,9 +85,8 @@ export function resolveSessionSurfaceState(input: SessionSurfaceStateInput): Ses
   }
 
   return {
-    isAutoTutorSession,
     isVideoSession,
-    mode: isAutoTutorSession ? 'autotutor' : (isSparcSession ? 'sparc' : (isVideoSession ? 'video' : 'flashcard')),
+    mode: isSparcSession ? 'sparc' : (isVideoSession ? 'video' : 'flashcard'),
   };
 }
 
@@ -116,13 +113,12 @@ export function resolveSessionSurfaceDiagnostic(
 }
 
 export function resolveSessionContentSurface(surfaceState: SessionSurfaceState): SessionContentSurface {
-  if (!['autotutor', 'video', 'sparc', 'flashcard'].includes(surfaceState.mode)) {
+  if (!['video', 'sparc', 'flashcard'].includes(surfaceState.mode)) {
     throw new Error(`resolveSessionContentSurface received an unknown session surface mode "${String(surfaceState.mode)}"`);
   }
 
   return {
     mode: surfaceState.mode,
-    showAutoTutorSession: surfaceState.mode === 'autotutor',
     showVideoSession: surfaceState.mode === 'video',
     showSparcSession: surfaceState.mode === 'sparc',
     showFlashcardSession: surfaceState.mode === 'flashcard',
@@ -131,13 +127,11 @@ export function resolveSessionContentSurface(surfaceState: SessionSurfaceState):
 
 function assertValidSessionContentSurface(contentSurface: SessionContentSurface, prefix: string): void {
   const activeSurfaceCount = [
-    contentSurface.showAutoTutorSession,
     contentSurface.showVideoSession,
     contentSurface.showSparcSession,
     contentSurface.showFlashcardSession,
   ].filter(Boolean).length;
   const modeMatches =
-    (contentSurface.mode === 'autotutor' && contentSurface.showAutoTutorSession) ||
     (contentSurface.mode === 'video' && contentSurface.showVideoSession) ||
     (contentSurface.mode === 'sparc' && contentSurface.showSparcSession) ||
     (contentSurface.mode === 'flashcard' && contentSurface.showFlashcardSession);
@@ -152,12 +146,10 @@ export function resolveSessionSurfaceShell(input: SessionSurfaceShellInput): Ses
   const contentSurface = resolveSessionContentSurface(input.surfaceState);
   return {
     mode,
-    isAutoTutorSession: input.surfaceState.isAutoTutorSession,
     isVideoSession: input.surfaceState.isVideoSession,
     contentSurface,
     contentSurfaceClasses: {
       videoMode: mode === 'video',
-      autoTutorMode: mode === 'autotutor',
     },
     showLearningProgressPanel:
       (mode === 'flashcard' || mode === 'sparc') &&
@@ -208,7 +200,7 @@ export function resolveSessionSurfaceUnitEntryRoute(
 ): SessionSurfaceUnitEntryRoute {
   assertValidSessionContentSurface(contentSurface, 'resolveSessionSurfaceUnitEntryRoute');
 
-  return contentSurface.showAutoTutorSession || contentSurface.showVideoSession || contentSurface.showSparcSession
+  return contentSurface.showVideoSession || contentSurface.showSparcSession
     ? '/content'
     : '/instructions';
 }

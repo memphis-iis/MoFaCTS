@@ -34,10 +34,6 @@ import {
   VIDEO_SESSION_FIELD_REGISTRY,
 } from './tdfFieldRegistries.ts';
 import {
-  AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS,
-  AUTOTUTOR_SESSION_FIELD_REGISTRY,
-} from './autoTutorFieldRegistry.ts';
-import {
   STIM_CLUSTER_DIRECT_RUNTIME_KEYS,
   STIM_CLUSTER_FIELD_REGISTRY,
   STIM_DIRECT_RUNTIME_KEYS,
@@ -170,15 +166,11 @@ function createVideoSessionSchema(): Record<string, unknown> {
   return createClosedObjectSchema('Video Session', VIDEO_SESSION_FIELD_REGISTRY);
 }
 
-function createAutoTutorSessionSchema(): Record<string, unknown> {
-  return createClosedObjectSchema('AutoTutor Session', AUTOTUTOR_SESSION_FIELD_REGISTRY);
-}
-
 function createUnitSchema(title = 'Unit'): Record<string, unknown> {
   const schema = createClosedObjectSchema(title, UNIT_FIELD_REGISTRY);
   schema.allOf = [{
     if: { required: ['gazecalibrationsession'] },
-    then: { not: { anyOf: ['learningsession', 'assessmentsession', 'sparcsession', 'videosession', 'autotutorsession', 'adaptive']
+    then: { not: { anyOf: ['learningsession', 'assessmentsession', 'sparcsession', 'videosession', 'adaptive']
       .map(field => ({ required: [field] })) } },
   }];
   (schema.properties as Record<string, unknown>).deliverySettings = createUnitDeliverySettingsSchema();
@@ -186,7 +178,6 @@ function createUnitSchema(title = 'Unit'): Record<string, unknown> {
   (schema.properties as Record<string, unknown>).sparcsession = createSparcSessionSchema();
   (schema.properties as Record<string, unknown>).assessmentsession = createAssessmentSessionSchema();
   (schema.properties as Record<string, unknown>).videosession = createVideoSessionSchema();
-  (schema.properties as Record<string, unknown>).autotutorsession = createAutoTutorSessionSchema();
   return schema;
 }
 
@@ -368,10 +359,6 @@ export function createTdfTooltipMap(): Record<string, TooltipContent> {
       'unit[].videosession',
       'setspec.unitTemplate[].videosession',
     ]),
-    ...createTooltipMapForRegistry(AUTOTUTOR_SESSION_FIELD_REGISTRY, [
-      'unit[].autotutorsession',
-      'setspec.unitTemplate[].autotutorsession',
-    ]),
   };
 }
 
@@ -415,10 +402,6 @@ export function createTdfValidatorMap(): Record<string, ValidatorConfig> {
     ...createValidatorMapForRegistry(VIDEO_SESSION_FIELD_REGISTRY, [
       'unit[].videosession',
       'setspec.unitTemplate[].videosession',
-    ]),
-    ...createValidatorMapForRegistry(AUTOTUTOR_SESSION_FIELD_REGISTRY, [
-      'unit[].autotutorsession',
-      'setspec.unitTemplate[].autotutorsession',
     ]),
   };
 }
@@ -487,13 +470,6 @@ export const TDF_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
     registry: VIDEO_SESSION_FIELD_REGISTRY,
     directRuntimeKeys: VIDEO_SESSION_DIRECT_RUNTIME_KEYS,
   },
-  {
-    schemaLabel: 'tutor.unit[].autotutorsession',
-    schemaPath: ['tutor', 'unit', 'items', 'autotutorsession'],
-    tooltipPrefixes: ['unit[].autotutorsession', 'setspec.unitTemplate[].autotutorsession'],
-    registry: AUTOTUTOR_SESSION_FIELD_REGISTRY,
-    directRuntimeKeys: AUTOTUTOR_SESSION_DIRECT_RUNTIME_KEYS,
-  },
 ];
 
 export const STIM_REGISTRY_SECTIONS: RegistrySectionDescriptor[] = [
@@ -536,7 +512,6 @@ export const TDF_VALIDATION_COVERAGE = Object.freeze({
   assessmentsession: createValidationCoverageForRegistry(ASSESSMENT_SESSION_FIELD_REGISTRY),
   conditiontemplatesbygroup: createValidationCoverageForRegistry(ASSESSMENT_CONDITION_TEMPLATES_FIELD_REGISTRY),
   videosession: createValidationCoverageForRegistry(VIDEO_SESSION_FIELD_REGISTRY),
-  autotutorsession: createValidationCoverageForRegistry(AUTOTUTOR_SESSION_FIELD_REGISTRY),
 });
 
 export const STIM_VALIDATION_COVERAGE = Object.freeze({

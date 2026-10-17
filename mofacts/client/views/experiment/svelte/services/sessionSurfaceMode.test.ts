@@ -14,7 +14,6 @@ import {
 describe('session surface mode', function() {
   it('uses the flashcard surface when no specialized session is active', function() {
     expect(resolveSessionSurfaceState({})).to.deep.equal({
-      isAutoTutorSession: false,
       isVideoSession: false,
       mode: 'flashcard',
     });
@@ -30,26 +29,16 @@ describe('session surface mode', function() {
       currentTdfUnit: { sparcsession: {} },
     }))).to.deep.equal({
       mode: 'sparc',
-      showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: true,
       showFlashcardSession: false,
     });
   });
 
-  it('detects AutoTutor sessions from the current unit content', function() {
-    expect(resolveSessionSurfaceState({ currentTdfUnit: { autotutorsession: {} } })).to.deep.equal({
-      isAutoTutorSession: true,
-      isVideoSession: false,
-      mode: 'autotutor',
-    });
-
-    expect(() => resolveSessionSurfaceState({
-      currentTdfUnit: {
-        autotutorsession: {},
-        videosession: {},
-      },
-    })).to.throw('[Content Surface] A unit cannot define more than one specialized session type');
+  it('rejects retired units before choosing any rendering surface', function() {
+    for (const currentTdfUnit of [{ autotutorsession: {} }, { autotutorsession: {}, sparcsession: {} }]) {
+      expect(() => resolveSessionSurfaceState({ currentTdfUnit })).to.throw('standalone AutoTutor has been removed');
+    }
   });
 
   it('centralizes session diagnostic cluster-list precedence', function() {
@@ -74,7 +63,6 @@ describe('session surface mode', function() {
   it('describes the content surface that owns the render branch', function() {
     expect(resolveSessionContentSurface(resolveSessionSurfaceState({}))).to.deep.equal({
       mode: 'flashcard',
-      showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: false,
       showFlashcardSession: true,
@@ -83,17 +71,7 @@ describe('session surface mode', function() {
       currentTdfUnit: { videosession: {} },
     }))).to.deep.equal({
       mode: 'video',
-      showAutoTutorSession: false,
       showVideoSession: true,
-      showSparcSession: false,
-      showFlashcardSession: false,
-    });
-    expect(resolveSessionContentSurface(resolveSessionSurfaceState({
-      currentTdfUnit: { autotutorsession: {} },
-    }))).to.deep.equal({
-      mode: 'autotutor',
-      showAutoTutorSession: true,
-      showVideoSession: false,
       showSparcSession: false,
       showFlashcardSession: false,
     });
@@ -104,11 +82,9 @@ describe('session surface mode', function() {
       resolveSessionSurfaceState({}),
       resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } }),
       resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } }),
-      resolveSessionSurfaceState({ currentTdfUnit: { autotutorsession: {} } }),
     ]) {
       const surface = resolveSessionContentSurface(surfaceState);
       const activeSurfaceCount = [
-        surface.showAutoTutorSession,
         surface.showVideoSession,
         surface.showSparcSession,
         surface.showFlashcardSession,
@@ -121,7 +97,6 @@ describe('session surface mode', function() {
   it('fails clearly when a caller passes an invalid content surface adapter', function() {
     const invalidContentSurface = {
       mode: 'video' as const,
-      showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: false,
       showFlashcardSession: false,
@@ -146,7 +121,6 @@ describe('session surface mode', function() {
 
   it('fails clearly when deriving a content surface from an unknown mode', function() {
     expect(() => resolveSessionContentSurface({
-      isAutoTutorSession: false,
       isVideoSession: false,
       mode: 'unknown',
     } as unknown as ReturnType<typeof resolveSessionSurfaceState>)).to.throw(
@@ -224,9 +198,6 @@ describe('session surface mode', function() {
     expect(resolveSessionSurfaceUnitEntryRoute(
       resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { sparcsession: {} } })),
     )).to.equal('/content');
-    expect(resolveSessionSurfaceUnitEntryRoute(
-      resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { autotutorsession: {} } })),
-    )).to.equal('/content');
   });
 
   it('requires video readiness only for the active video content surface', function() {
@@ -236,9 +207,6 @@ describe('session surface mode', function() {
     expect(shouldRequireSessionVideoReadiness(
       resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { videosession: {} } })),
     )).to.equal(true);
-    expect(shouldRequireSessionVideoReadiness(
-      resolveSessionContentSurface(resolveSessionSurfaceState({ currentTdfUnit: { autotutorsession: {} } })),
-    )).to.equal(false);
   });
 
   it('describes flashcard shell behavior with learning progress enabled', function() {
@@ -248,18 +216,15 @@ describe('session surface mode', function() {
       learningProgressAvailable: true,
     })).to.deep.equal({
       mode: 'flashcard',
-      isAutoTutorSession: false,
       isVideoSession: false,
       contentSurface: {
         mode: 'flashcard',
-        showAutoTutorSession: false,
         showVideoSession: false,
         showSparcSession: false,
         showFlashcardSession: true,
       },
       contentSurfaceClasses: {
         videoMode: false,
-        autoTutorMode: false,
       },
       showLearningProgressPanel: true,
     });
@@ -280,7 +245,6 @@ describe('session surface mode', function() {
       learningProgressAvailable: true,
     }).contentSurface).to.deep.equal({
       mode: 'video',
-      showAutoTutorSession: false,
       showVideoSession: true,
       showSparcSession: false,
       showFlashcardSession: false,
@@ -299,28 +263,8 @@ describe('session surface mode', function() {
       learningProgressAvailable: true,
     }).contentSurface).to.deep.equal({
       mode: 'sparc',
-      showAutoTutorSession: false,
       showVideoSession: false,
       showSparcSession: true,
-      showFlashcardSession: false,
-    });
-    expect(resolveSessionSurfaceShell({
-      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { autotutorsession: {} } }),
-      progressPanelDisabled: false,
-      learningProgressAvailable: true,
-    })).to.deep.include({
-      mode: 'autotutor',
-      showLearningProgressPanel: false,
-    });
-    expect(resolveSessionSurfaceShell({
-      surfaceState: resolveSessionSurfaceState({ currentTdfUnit: { autotutorsession: {} } }),
-      progressPanelDisabled: false,
-      learningProgressAvailable: true,
-    }).contentSurface).to.deep.equal({
-      mode: 'autotutor',
-      showAutoTutorSession: true,
-      showVideoSession: false,
-      showSparcSession: false,
       showFlashcardSession: false,
     });
   });

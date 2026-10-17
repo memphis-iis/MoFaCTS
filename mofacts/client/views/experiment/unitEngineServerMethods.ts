@@ -20,12 +20,6 @@ export function createUnitEngineServerMethods(
   deps: UnitEngineServerMethodDeps,
 ): UnitEngineServerMethods {
   return {
-    getAutoTutorHistoryForUnit: async (userId, tdfId, unitNumber) => await deps.meteorCallAsync(
-      'getAutoTutorHistoryForUnit',
-      userId,
-      tdfId,
-      unitNumber,
-    ) as unknown[],
     getLearningHistoryForUnit: async (
       userId,
       tdfId,

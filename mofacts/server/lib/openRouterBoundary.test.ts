@@ -46,7 +46,6 @@ describe('OpenRouter server boundary', function() {
       ['..', '..', 'client', 'lib', 'openRouterClient'].join('/'),
       ['..', '..', 'client', 'lib', 'aiFlowLogger'].join('/'),
       ['..', '..', 'client', 'lib', 'jsonExtraction'].join('/'),
-      ['..', '..', 'client', 'lib', 'autoTutorRelationshipEngine'].join('/'),
     ];
     const offenders = collectTypeScriptFiles(serverRoot).filter((filePath) => {
       const source = fs.readFileSync(filePath, 'utf8');

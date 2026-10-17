@@ -7,7 +7,7 @@ The field registry is the source of truth for public TDF, stimulus, delivery-set
 - `fieldRegistry.ts`: delivery timing/settings fields and compatibility helpers for delivery settings.
 - `deliveryDisplayFieldRegistry.ts`: learner-facing delivery display settings.
 - `tdfFieldRegistries.ts`: TDF `setspec`, `unit`, `learningsession`, `assessmentsession`, `conditiontemplatesbygroup`, and `videosession` fields.
-- `autoTutorFieldRegistry.ts`: `autotutorsession` fields.
+- SPARC session fields belong to `tdfFieldRegistries.ts`; standalone `autotutorsession` and stimulus `autoTutor` scripts are unsupported.
 - `stimFieldRegistries.ts`: stimulus cluster, stimulus item, display, alternate display, and response fields.
 - `fieldRegistrySectionCore.ts`: shared field definition types, schema helpers, tooltip helpers, validator helpers, lifecycle helpers, and runtime coercion helpers.
 - `fieldRegistrySections.ts`: composition layer that turns domain registries into public schemas, tooltip maps, validator maps, validation coverage, and section descriptors.

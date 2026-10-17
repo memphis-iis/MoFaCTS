@@ -13,11 +13,6 @@ import {
   registerUnitEngineWithDeps,
   resetUnitEngineRegistryForTests,
 } from '../../learning-components/units/UnitEngineRegistry';
-import {
-  AUTO_TUTOR_SESSION_UNIT_TYPE,
-  type AutoTutorUnitEngine,
-} from '../../learning-components/units/autotutor/AutoTutorUnitEngine';
-import { autoTutorUnitComponentManifest } from '../../learning-components/units/autotutor/manifest';
 import { sampleEchoUnitFixtureDeps } from '../../learning-components/samples/echo-unit/fixtures';
 import { sampleEchoUnitComponentManifest } from '../../learning-components/samples/echo-unit/manifest';
 import { SAMPLE_ECHO_UNIT_TYPE } from '../../learning-components/samples/echo-unit/EchoUnitEngine';
@@ -273,34 +268,4 @@ describe('Learning component manifests', function() {
     expect(await engine.selectNextCard?.()).to.deep.equal({ testType: SAMPLE_ECHO_UNIT_TYPE });
   });
 
-  it('keeps the AutoTutor unit behind its own component manifest', async function() {
-    registerLearningComponent(autoTutorUnitComponentManifest, {
-      capabilities: new Set<LearningComponentCapability>(['session', 'stimuli', 'server-methods', 'history', 'logging', 'ai-provider']),
-      serverMethods: new Set(['getAutoTutorHistoryForUnit']),
-      registerUnitEngine,
-      registerUnitEngineWithDeps,
-      registerTrialDisplayAdapter() {
-        throw new Error('AutoTutor unit should not register trial display adapters');
-      },
-    });
-
-    expect(getRegisteredUnitEngineTypes()).to.deep.equal([AUTO_TUTOR_SESSION_UNIT_TYPE]);
-
-    const engine = await createRegisteredUnitEngine(AUTO_TUTOR_SESSION_UNIT_TYPE) as AutoTutorUnitEngine;
-    expect(engine.unitType).to.equal(AUTO_TUTOR_SESSION_UNIT_TYPE);
-    expect(engine.createInitialState).to.be.a('function');
-    expect(engine.scoreAndPlanTurn).to.be.a('function');
-    expect(engine.validateLearnerInput).to.be.a('function');
-  });
-
-  it('fails AutoTutor registration when app-owned runtime capabilities are missing', function() {
-    expect(() => registerLearningComponent(autoTutorUnitComponentManifest, {
-      capabilities: new Set<LearningComponentCapability>(['logging']),
-      registerUnitEngine,
-      registerUnitEngineWithDeps,
-      registerTrialDisplayAdapter() {
-        throw new Error('AutoTutor unit should not register trial display adapters');
-      },
-    })).to.throw('Learning component "mofacts.autotutor-unit" requires missing capabilities: session, stimuli, server-methods, history, ai-provider');
-  });
 });

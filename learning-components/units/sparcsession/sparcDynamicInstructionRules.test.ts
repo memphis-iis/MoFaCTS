@@ -1,6 +1,6 @@
 import type { SparcRetainedEvidence } from './sparcEvidenceHistory';
 import { strict as assert } from 'node:assert';
-import { SPARC_DYNAMIC_AGENT_POLICY_ID, SPARC_DYNAMIC_STUDENT_POLICY_ID, SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID, sparcPolicyForAccount } from '../../runtime/sparcInstructionalPolicies';
+import { SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID, sparcPolicyForAccount } from '../../runtime/sparcInstructionalPolicies';
 import { SPARC_TARGET_CATEGORIES, type SparcTargetCategory } from '../../runtime/sparcTargetCategories';
 import { createSparcDynamicInstructionRules, SPARC_CATEGORIZED_MENU_OPTIONS } from './sparcDynamicInstructionRules';
 import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
@@ -21,7 +21,7 @@ import type { SparcWorkingMemoryFact, SparcStateTransition } from './sparcSessio
 
 const transition = (row: CanonicalHistoryRecord) => (row.sparc as { stateTransition: SparcStateTransition }).stateTransition;
 
-function fixture(version: 'student' | 'agent', longIdentities = false, category?: SparcTargetCategory, targetCount = 7, misconceptionCount = 3) {
+function fixture(version: 'student' | 'agent', longIdentities = false, category: SparcTargetCategory = 'model-rule', targetCount = 7, misconceptionCount = 3) {
   const rows: CanonicalHistoryRecord[] = [];
   const requests: SparcUtteranceRequest[] = [];
   const ids = Array.from({ length: targetCount }, (_, i) => String.fromCharCode(97 + i)).map(id => longIdentities ? `dynamic.biology-species-speciation-hlw4e-ch21-001.kc.${id}` : id);
@@ -29,7 +29,7 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
   const pageKey = longIdentities ? 'sparc-dynamic-confidence-interval-agent-with-seven-long-target-identities' : 'dynamic-cycle';
   const source: SparcTrialDisplay = {
     pageKey, schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
-    instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: version === 'student' ? category ? SPARC_CATEGORIZED_STUDENT_POLICY_ID : SPARC_DYNAMIC_STUDENT_POLICY_ID : category ? SPARC_CATEGORIZED_AGENT_POLICY_ID : SPARC_DYNAMIC_AGENT_POLICY_ID, policyVersion: 1 },
+    instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: version === 'student' ? SPARC_CATEGORIZED_STUDENT_POLICY_ID : SPARC_CATEGORIZED_AGENT_POLICY_ID, policyVersion: 1 },
     autoTutorTargets: { expectations: ids.map(clusterKC => ({ clusterKC, text: `Explain ${clusterKC}`, ...(category ? { category } : {}) })),
       misconceptions: misconceptionIds.map(id => ({ id, text: `Misconception ${id}`, ...(category ? { category } : {}) })) },
     clusterTargets: ids.map((clusterKC, clusterIndex) => ({ clusterKC, clusterIndex })),
@@ -92,7 +92,17 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category?
     } },
   });
   const menu = () => currentSparcMenu(replaySparcHistory(rows));
-  const answer = (time = timestamp++) => submit({ submittedNodes: { 'learner-response-input': longIdentities ? 'A learner response about constructing and interpreting a confidence interval. '.repeat(8) : 'An answer.' }, triggeredBy: 'learner-response-submit', timestamp: time });
+  const answers = new Map<number, SparcTrialResult>();
+  const answer = (time = timestamp++) => {
+    const accepted = answers.get(time);
+    if (accepted) return submit(accepted);
+    const question = requests.at(-1)?.moveDefinition.responseFormat === 'multiple-choice'
+      ? savedSparcChoiceQuestions(replaySparcHistory(rows)).at(-1) : undefined;
+    const node = question ? `${String(question.id)}:answer:a` : 'learner-response-input';
+    const result = { submittedNodes: { [node]: question ? 'a' : longIdentities ? 'A learner response about constructing and interpreting a confidence interval. '.repeat(8) : 'An answer.' }, triggeredBy: question ? node : 'learner-response-submit', timestamp: time };
+    answers.set(time, result);
+    return submit(result);
+  };
   const choice = (id: string, time = timestamp++) => {
     const node = `${String(menu()?.slots?.menuId)}:${id}`;
     return submit({ submittedNodes: { [node]: id }, triggeredBy: node, timestamp: time });
@@ -266,7 +276,7 @@ describe('Dynamic instruction production cycles', () => {
     assert.equal(f.calls(), 1);
   });
   it('builds all 210 automatic variants with exact category conditions and the six approved assistance values', () => {
-    const rules = createSparcDynamicInstructionRules('agent', true).filter(rule => rule.module === 'dialogue.instructional-competition');
+    const rules = createSparcDynamicInstructionRules('agent').filter(rule => rule.module === 'dialogue.instructional-competition');
     assert.equal(rules.length, 210);
     assert.equal(new Set(rules.map(rule => rule.id)).size, 210);
     for (const category of SPARC_TARGET_CATEGORIES) {
@@ -300,7 +310,7 @@ describe('Dynamic instruction production cycles', () => {
     for (const id of ['a', 'b']) {
       const f = fixture('student', false, 'model-rule'); await f.answer(); await f.choice('question.multiple-choice');
       assert.equal((f.menu()!.slots!.options as unknown[]).length, 7);
-      await assert.rejects(f.answer(), /Select an option/);
+      await assert.rejects(f.submit({ submittedNodes: { 'learner-response-input': 'A typed answer.' }, triggeredBy: 'learner-response-submit', timestamp: 999 }), /Select an option/);
       const before = JSON.stringify(savedSparcChoiceQuestions(replaySparcHistory(f.rows)));
       await f.mcAnswer(id);
       assert.equal(f.calls(), 2);
@@ -352,70 +362,55 @@ describe('Dynamic instruction production cycles', () => {
       assert.throws(() => sparcPolicyForAccount(false, id), /admin account/);
     }
   });
-  it('preserves explicit new policies for admins and rejects non-admin entry', () => {
-    for (const id of [SPARC_DYNAMIC_AGENT_POLICY_ID, SPARC_DYNAMIC_STUDENT_POLICY_ID]) {
-      assert.equal(sparcPolicyForAccount(true, id), id);
-      assert.throws(() => sparcPolicyForAccount(false, id), /admin account/);
-    }
-  });
-  it('provides saved feedback before the student menu, with exactly three moves plus navigation', async () => {
-    const f = fixture('student'); await f.answer();
-    assert.equal(f.calls(), 1); assert.equal(f.requests.length, 1);
-    assert.deepEqual((f.menu()!.slots!.options as { id: string }[]).map(option => option.id), ['question', 'explanation-question', 'explanation-rich-question', 'next-target']);
-    assert.ok(f.rows.findIndex(row => transition(row).transitionId.endsWith(':feedback')) > f.rows.findIndex(row => transition(row).transitionId.endsWith(':assessment')));
-    await f.choice('explanation-rich-question');
-    assert.equal(f.calls(), 1); assert.equal(f.menu()!.slots!.status, 'consumed');
-    assert.equal(f.requests.at(-1)!.moveDefinition.assistance, 2.77);
-    await f.answer(); assert.equal(f.calls(), 2);
-  });
   it('keeps next-KC navigation separate from instruction and evaluation', async () => {
     const f = fixture('student'); await f.answer();
     const first = (f.menu()!.slots!.options as { targetId: string }[])[0]!.targetId;
     await f.choice('next-target');
     const next = (f.menu()!.slots!.options as { targetId: string }[])[0]!.targetId;
     assert.notEqual(next, first); assert.equal(f.calls(), 1); assert.equal(f.requests.length, 1);
-    await f.choice('question'); assert.equal(f.requests.at(-1)!.targetId, next);
+    await f.choice('question.text'); assert.equal(f.requests.at(-1)!.targetId, next);
   });
   it('uses fixed 80 percent competition, keeps the floor, and does not ramp OET', async () => {
     const f = fixture('agent'); f.scores(0); await f.answer();
     const request = f.requests.at(-1)!;
-    assert.equal(request.moveDefinition.assistance, 2.77);
+    assert.ok([2.52, 3.02].includes(request.moveDefinition.assistance!));
     assert.ok(Math.abs(request.competition!.oetLogit! - Math.log(4)) < 1e-9);
     assert.ok(Math.abs(logistic(targetExpectancy(f.facts(), 'expectation:a')) - .2) < 1e-9);
     assert.equal(f.facts().some(fact => fact.factType === 'instructional.oet' && Number(fact.slots?.logit) > -Math.log(4)), false);
-    await f.answer(); assert.equal(f.requests.at(-1)!.competition!.oetLogit, request.competition!.oetLogit);
+    if (request.moveDefinition.responseFormat === 'multiple-choice') await f.mcAnswer('a'); else await f.answer();
+    assert.equal(f.requests.at(-1)!.competition!.oetLogit, request.competition!.oetLogit);
   });
   it('automatically advances from a covered expectation to an unfinished expectation', async () => {
-    const f = fixture('student'); await f.answer(); await f.choice('question');
+    const f = fixture('student'); await f.answer(); await f.choice('question.text');
     f.firstTarget(.9); await f.answer();
     assert.equal((f.menu()!.slots!.options as { targetId: string }[])[0]!.targetId, 'b');
-    await f.choice('question'); assert.equal(f.requests.at(-1)!.targetId, 'b');
+    await f.choice('question.text'); assert.equal(f.requests.at(-1)!.targetId, 'b');
   });
   it('excludes covered expectations when selecting the first expectation after feedback', async () => {
     const f = fixture('student'); f.firstTarget(1); await f.answer();
     assert.equal((f.menu()!.slots!.options as { targetId: string }[])[0]!.targetId, 'b');
   });
   it('presents each composite as one message and preserves selected buttons between feedback and instruction after replay', async () => {
-    const f = fixture('student'); await f.answer(); await f.choice('explanation-rich-question');
+    const f = fixture('student'); await f.answer(); await f.choice('explanation-rich-question.text');
     const replay = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
     const nodes = applySparcProgressiveNodeOperations([], [
       ...collectSparcProgressiveNodeOperations(replay.transitions), ...projectSparcMenuOperations(replay),
     ]) as Record<string, unknown>[];
     const messages = projectSparcInstructionMessages(nodes.filter(node => node.atomType === 'dialogue-utterance'
       || node.atomType === 'html-block' || node.groupType === 'button-group'));
-    const index = messages.findIndex(node => node.action === 'instruction.dynamic.explanation-rich-question');
-    assert.equal(messages.filter(node => node.action === 'instruction.dynamic.explanation-rich-question').length, 1);
+    const index = messages.findIndex(node => node.action === 'instruction.dynamic.explanation-rich-question.text');
+    assert.equal(messages.filter(node => node.action === 'instruction.dynamic.explanation-rich-question.text').length, 1);
     assert.equal((messages[index]!.children as unknown[]).length, 3);
     assert.ok(String(messages[index - 1]!.id).endsWith(':selected'), JSON.stringify(messages.map(node => node.id)));
     const button = (messages[index - 1]!.children as Record<string, unknown>[])[0]!;
-    assert.equal(button.label, 'Explanation with example or figure and question');
+    assert.equal(button.label, 'Explanation with example or figure and question (text answer)');
     assert.equal(button.selected, true); assert.equal(button.readOnly, true);
-    await f.answer(); await f.choice('next-target'); await f.choice('question');
+    await f.answer(); await f.choice('next-target'); await f.choice('question.text');
     const markers = projectSparcMenuOperations(replaySparcHistory(f.rows)).filter(operation => operation.type === 'insert-node' && String(operation.node.id).endsWith(':selected'));
     assert.equal(markers.length, 3);
   });
   it('displays explanation before support even when support was realized and saved first', () => {
-    const action = 'instruction.dynamic.explanation-rich-question';
+    const action = 'instruction.dynamic.explanation-rich-question.text';
     const nodes = ['richContent', 'explanation', 'question'].map(component => ({
       id: `turn:${component}`, turnEventId: 'turn', action, atomType: 'dialogue-utterance', value: component,
     }));
@@ -427,9 +422,9 @@ describe('Dynamic instruction production cycles', () => {
   it('interrupts an expectation for a misconception and offers the same moves in both conditions', async () => {
     for (const version of ['student', 'agent'] as const) {
       const f = fixture(version); await f.answer();
-      if (version === 'student') await f.choice('question');
+      if (version === 'student') await f.choice('question.text');
       f.scores(.2, .8); await f.answer();
-      if (version === 'student') await f.choice('explanation-question');
+      if (version === 'student') await f.choice('explanation-question.text');
       assert.equal(f.requests.at(-1)!.targetType, 'misconception');
       assert.equal(f.requests.at(-1)!.targetId, 'm1');
       assert.ok(f.requests.at(-1)!.action.startsWith('instruction.dynamic.'));
@@ -475,13 +470,13 @@ describe('Dynamic instruction production cycles', () => {
   });
   it('retains the selected history button and permits retry only of the accepted student choice after failure', async () => {
     const f = fixture('student'); await f.answer(); f.fail(true);
-    await assert.rejects(f.choice('explanation-rich-question', 100), /question failed/);
+    await assert.rejects(f.choice('explanation-rich-question.text', 100), /question failed/);
     const operations = projectSparcMenuOperations(replaySparcHistory(f.rows));
     const active = operations.find(operation => operation.type === 'insert-node' && operation.node.id === 'instructional-choice-menu');
     assert.ok(active && active.type === 'insert-node');
     const buttons = active.node.children as Record<string, unknown>[];
-    assert.deepEqual(buttons.filter(button => !button.readOnly).map(button => button.value), ['explanation-rich-question']);
-    f.fail(false); await f.choice('explanation-rich-question', 100);
+    assert.deepEqual(buttons.filter(button => !button.readOnly).map(button => button.value), ['explanation-rich-question.text']);
+    f.fail(false); await f.choice('explanation-rich-question.text', 100);
     assert.equal(f.calls(), 1);
     assert.equal(projectSparcMenuOperations(replaySparcHistory(f.rows)).filter(operation => operation.type === 'insert-node' && String(operation.node.id).endsWith(':selected')).length, 1);
   });

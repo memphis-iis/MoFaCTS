@@ -5,10 +5,6 @@ import {
   ASSESSMENT_SESSION_UNIT_TYPE,
 } from './assessment-session/manifest';
 import {
-  AUTO_TUTOR_SESSION_UNIT_TYPE,
-} from './autotutor/AutoTutorUnitEngine';
-import { autoTutorUnitComponentManifest } from './autotutor/manifest';
-import {
   instructionUnitComponentManifest,
   INSTRUCTION_UNIT_TYPE,
 } from './instruction/manifest';
@@ -34,12 +30,10 @@ export const defaultUnitComponentManifests: readonly LearningComponentManifest<C
   sparcSessionUnitComponentManifest,
   assessmentSessionUnitComponentManifest,
   videoSessionUnitComponentManifest,
-  autoTutorUnitComponentManifest,
 ];
 
 export {
   ASSESSMENT_SESSION_UNIT_TYPE,
-  AUTO_TUTOR_SESSION_UNIT_TYPE,
   INSTRUCTION_UNIT_TYPE,
   LEARNING_SESSION_UNIT_TYPE,
   SPARC_SESSION_UNIT_TYPE,

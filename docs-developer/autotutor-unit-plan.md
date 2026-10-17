@@ -1,5 +1,7 @@
 # AutoTutor Unit Type Plan
 
+> Historical record: references to the original standalone AutoTutor runtime describe the earlier system. That runtime is removed; current AutoTutor instruction runs through SPARC. See `docs/standalone-autotutor-removal.md` in the application repository.
+
 ## Goal
 
 Add an AutoTutor unit type where each unit represents one AI-guided tutoring session around one question. The first implementation supports a single question per unit. The TDF wires the unit and model settings, the client Profile owns the provider key, and the stimulus file owns the structured AutoTutor curriculum script content.

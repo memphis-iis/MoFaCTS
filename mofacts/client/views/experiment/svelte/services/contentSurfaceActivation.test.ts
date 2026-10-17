@@ -17,20 +17,16 @@ describe('specialized content surface activation', function() {
     expect(getContentSurfaceAdapter('assessment').runtimeOwner).to.equal('shared-machine');
     expect(getContentSurfaceAdapter('sparc').runtimeOwner).to.equal('shared-machine');
     expect(getContentSurfaceAdapter('video').runtimeOwner).to.equal('shared-machine');
-    expect(getContentSurfaceAdapter('autotutor').runtimeOwner).to.equal('surface');
   });
 
   it('waits for the shared render initialization boundary', function() {
     expect(isSpecializedSurfaceReadyToCommit({
       ...base,
       initializedForRender: false,
-      surface: 'autotutor',
+      surface: 'sparc',
     })).to.equal(false);
   });
 
-  it('commits AutoTutor when its initialized component can render', function() {
-    expect(isSpecializedSurfaceReadyToCommit({ ...base, surface: 'autotutor' })).to.equal(true);
-  });
 
   it('waits for authored SPARC content', function() {
     expect(isSpecializedSurfaceReadyToCommit({ ...base, surface: 'sparc' })).to.equal(false);

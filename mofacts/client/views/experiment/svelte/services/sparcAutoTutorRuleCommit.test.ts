@@ -1,5 +1,5 @@
 import { resolveSparcAccountPolicy } from './sparcController';
-import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcDynamicPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { currentSparcMenu } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
 import { strict as assert } from 'node:assert';
 import { commitSparcAutoTutorSubmit } from './sparcAutoTutorRuleCommit';
@@ -71,10 +71,10 @@ describe('SPARC app instructional commit', () => {
   it('publishes saved dynamic feedback to the surface before generating the next instruction', async () => {
     clearSparcRuntimeState();
     const display = resolveSparcAccountPolicy({ pageKey: 'dynamic-surface', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
-      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v1', policyVersion: 1 },
-      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A' }], misconceptions: [] },
+      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
+      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A', category: 'model-rule' }], misconceptions: [] },
       clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }],
-      workingMemoryFacts: [{ factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: .5 } },
+      workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'Explain the lesson concepts.' } }, { factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: .5 } },
         { factType: 'dialogue.utterance', factId: 'opening:question', slots: { speaker: 'tutor', component: 'question',
           eventId: 'opening', targetType: 'learningTarget', targetId: 'a', text: 'Explain the topic.' } }],
       nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain the topic.' },
@@ -90,7 +90,7 @@ describe('SPARC app instructional commit', () => {
       generateTutorUtterance: request => {
         if (request.action === 'instruction.feedback') return 'Here is the correction.';
         assert.equal(publishedFeedback, true);
-        return { explanation: 'An explanation.', richContent: 'A complete worked example.', question: 'How does the new case work?' };
+        return { explanation: request.moveDefinition.components!.includes('explanation') ? 'An explanation.' : null, richContent: request.moveDefinition.components!.includes('richContent') ? 'A complete worked example.' : null, question: 'How does the new case work?', ...(request.moveDefinition.responseFormat === 'multiple-choice' ? { choices: [{id:'a',label:'A',correct:true},{id:'b',label:'B',correct:false},{id:'c',label:'C',correct:false}] } : {}) };
       },
       deps: { getIsAdmin: () => true, getUserId: () => 'u', writeHistory: async () => {}, writeHistoryBatch: async () => {} },
     });
@@ -100,9 +100,9 @@ describe('SPARC app instructional commit', () => {
     for (const policyId of SPARC_INSTRUCTIONAL_POLICY_IDS) {
       const display = { nodes: [], unitType: 'sparc-autotutor-dialogue', instructionalController: { adapterId: 'sparc-autotutor-v1', policyVersion: 1, policyId } };
       const admin = resolveSparcAccountPolicy(display, true)!;
-      assert.equal(admin.instructionalController?.policyId, policyId === 'student-selected-v2' || isSparcDynamicPolicy(policyId) ? policyId : 'oet-boltzmann-v2');
+      assert.equal(admin.instructionalController?.policyId, policyId);
       assert.equal(resolveSparcAccountPolicy(admin, true)?.instructionalController?.policyId, admin.instructionalController?.policyId);
-      if (isSparcDynamicPolicy(policyId)) assert.throws(() => resolveSparcAccountPolicy(display, false), /admin account/);
+      if (isSparcCategorizedPolicy(policyId)) assert.throws(() => resolveSparcAccountPolicy(display, false), /admin account/);
       else assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, 'progressive-scaffolding-v1');
       assert.equal(display.instructionalController.policyId, policyId);
     }
@@ -111,10 +111,10 @@ describe('SPARC app instructional commit', () => {
   it('commits student menu choices and expectation progression through the admin app path', async () => {
     clearSparcRuntimeState();
     const display = resolveSparcAccountPolicy({ pageKey: 'student-cycle', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
-      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'student-selected-v2', policyVersion: 1 },
-      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A' }, { clusterKC: 'b', text: 'Explain B' }], misconceptions: [] },
+      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-student-v2', policyVersion: 1 },
+      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A', category: 'model-rule' }, { clusterKC: 'b', text: 'Explain B', category: 'model-rule' }], misconceptions: [] },
       clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }, { clusterIndex: 1, clusterKC: 'b' }],
-      workingMemoryFacts: [
+      workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'Explain the lesson concepts.' } }, { factType: 'dialogue.utterance', factId: 'opening:question', slots: { speaker: 'tutor', component: 'question', eventId: 'opening', targetType: 'learningTarget', targetId: 'a', text: 'Explain A?' } },
         ...['a', 'b'].map((clusterKC) => ({ factType: 'kcGraph.node', slots: { clusterKC, centrality: 0.5 } })),
         ...['a', 'b'].map(source => ({ factType: 'kcGraph.relationship', slots: { sourceClusterKC: source, targetClusterKC: source === 'a' ? 'b' : 'a', strength: .5 } })),
       ],
@@ -128,15 +128,15 @@ describe('SPARC app instructional commit', () => {
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'student-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: ['a', 'b'].map((clusterKC) => ({ clusterKC, coverage: 0.2 })) }; },
-      generateTutorUtterance: (request: SparcUtteranceRequest) => { requests.push(request); return 'Here is a hint.'; },
+      generateTutorUtterance: (request: SparcUtteranceRequest) => { requests.push(request); return request.action === 'instruction.feedback' ? 'Here is feedback.' : { explanation: null, richContent: null, question: 'Explain A?' }; },
       deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'student-tdf', levelUnit: 0, pageKey: 'student-cycle', display };
     const menu = () => currentSparcMenu(readSparcResumeSnapshot(scope).replayState)!;
     const answer = { submittedNodes: { 'learner-response-input': 'An answer.' }, triggeredBy: 'learner-response-submit', timestamp: 10 };
     await commitSparcAutoTutorSubmit({ ...args, sparcResult: answer });
-    assert.equal(requests.length, 0);
-    assert.equal((menu().slots?.options as unknown[]).length, 6);
+    assert.equal(requests.length, 1);
+    assert.equal((menu().slots?.options as unknown[]).length, 7);
     const target = () => (menu().slots?.options as { targetId: string }[])[0]!.targetId;
     const firstTarget = target();
     const choose = (id: string, timestamp: number) => {
@@ -149,42 +149,42 @@ describe('SPARC app instructional commit', () => {
     const savedSnapshot = readSparcResumeSnapshot(scope);
     clearSparcRuntimeState(); hydrateSparcRuntimeHistory(JSON.parse(JSON.stringify(rows)));
     const loadedSnapshot = readSparcResumeSnapshot(scope);
-    assert.deepEqual(loadedSnapshot.replayState, savedSnapshot.replayState);
+    assert.deepEqual(loadedSnapshot.replayState, JSON.parse(JSON.stringify(savedSnapshot.replayState)));
     assert.deepEqual(loadedSnapshot.expectationProbabilities, savedSnapshot.expectationProbabilities);
-    assert.deepEqual(loadedSnapshot.nodeValues, savedSnapshot.nodeValues);
-    await choose('hint', 30);
+    assert.deepEqual(loadedSnapshot.nodeValues, JSON.parse(JSON.stringify(savedSnapshot.nodeValues)));
+    await choose('question.text', 30);
     assert.equal(evaluations, 1);
-    assert.equal(requests[0]!.action, 'hint');
-    assert.equal(requests[0]!.targetId, selectedTarget);
-    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: { ...args.deps, getIsAdmin: () => false }, sparcResult: answer }), /account policy changed/);
+    assert.equal(requests.at(-1)!.action, 'instruction.dynamic.question.text');
+    assert.equal(requests.at(-1)!.targetId, selectedTarget);
+    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: { ...args.deps, getIsAdmin: () => false }, sparcResult: answer }), /admin account/);
     clearSparcRuntimeState();
   });
 
   it('keeps accepted selection on provider failure and restores it through the app resume service', async () => {
     clearSparcRuntimeState();
     const display = { type: 'sparc', pageKey: 'app-cycle', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
-      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'oet-boltzmann-v2', policyVersion: 1 },
-      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A' }], misconceptions: [] },
+      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
+      autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A', category: 'model-rule' }], misconceptions: [] },
       clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }],
-      workingMemoryFacts: [{ factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: 1 } }],
+      workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'Explain the lesson concepts.' } }, { factType: 'dialogue.utterance', factId: 'opening:question', slots: { speaker: 'tutor', component: 'question', eventId: 'opening', targetType: 'learningTarget', targetId: 'a', text: 'Explain A?' } }, { factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: 1 } }],
       nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain A.' },
         { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input', value: '' },
         { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }],
     };
-    assert.equal(resolveSparcAccountPolicy(display, true)?.instructionalController?.policyId, 'oet-boltzmann-v2');
-    assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, 'progressive-scaffolding-v1');
+    assert.equal(resolveSparcAccountPolicy(display, true)?.instructionalController?.policyId, 'dynamic-instruction-agent-v2');
+    assert.throws(() => resolveSparcAccountPolicy(display, false), /admin account/);
     const rows: CanonicalHistoryRecord[] = [];
     let evaluations = 0; let fail = true;
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: [{ clusterKC: 'a', coverage: 0.2 }] }; },
-      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (fail) throw new Error('provider failed'); const parts = requireActiveSparcMoveDefinition(request.action).components; return parts ? { explanation: parts.includes('explanation') ? 'Explanation' : null, richContent: parts.includes('richContent') ? '<p>Example</p>' : null, question: 'What is A?' } : 'Tell me more.'; },
+      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new Error('provider failed'); const parts = requireActiveSparcMoveDefinition(request.action).components; return parts ? { explanation: parts.includes('explanation') ? 'Explanation' : null, richContent: parts.includes('richContent') ? '<p>Example</p>' : null, question: 'What is A?', ...(request.moveDefinition.responseFormat === 'multiple-choice' ? { choices: [{id:'a',label:'A',correct:true},{id:'b',label:'B',correct:false},{id:'c',label:'C',correct:false}] } : {}) } : 'Tell me more.'; },
       deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'tdf', levelUnit: 0, pageKey: display.pageKey, display };
     const choice = { submittedNodes: { 'learner-response-input': 'An answer.' }, timestamp: 10 };
     await assert.rejects(commitSparcAutoTutorSubmit({ ...args, sparcResult: choice }), /provider failed/);
-    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: {...args.deps, getIsAdmin: () => false}, sparcResult: choice }), /account policy changed/);
+    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: {...args.deps, getIsAdmin: () => false}, sparcResult: choice }), /admin account/);
     const accepted = readSparcResumeSnapshot(scope);
     assert.ok(accepted.replayState.transitions.some((transition) => transition.transitionId.endsWith(':decision')));
     clearSparcRuntimeState(); hydrateSparcRuntimeHistory(JSON.parse(JSON.stringify(rows)));

@@ -70,13 +70,13 @@ Server methods are allowed only for database access, authorization, secrets, or 
 Current named method dependencies:
 
 - `mofacts.learning-session-unit`: `getLearningHistoryForUnit`, `getResponseKCMapForTdf`
-- `mofacts.autotutor-unit`: `getAutoTutorHistoryForUnit`
+- `mofacts.sparcsession-unit`: `getLearningHistoryForUnit`, `getResponseKCMapForTdf`, `getSparcHistoryForUnit`, `getStimulusCrowdStatsForDeck`
 
 ## Current Component Packages
 
 - `learning-components/units/learning-session/`: model learning-session unit engine, runtime-config interpretation, card selection, prefetch/lock, and model preparation.
 - `learning-components/units/assessment-session/`: assessment schedule unit engine and authored schedule construction.
-- `learning-components/units/autotutor/`: AutoTutor unit manifest, runtime capability contracts, end-state semantics, saved state/history validation, generation config, and planning helpers.
+- `learning-components/units/sparcsession/`: SPARC unit engine, instructional adapters and productions, assessment, selection, persistence, and replay (including SPARC AutoTutor).
 - `learning-components/units/instruction/`: instruction-only unit-engine boundary for authored instruction units.
 - `learning-components/units/video-session/`: minimal video-session unit engine and adaptive video question helpers.
 - `learning-components/samples/echo-unit/`: test-only sample package showing the manifest and package shape.

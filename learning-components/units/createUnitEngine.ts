@@ -11,7 +11,6 @@ import { registerLearningComponents } from '../runtime/registerLearningComponent
 import { registerTrialDisplayAdapter } from '../runtime/TrialDisplayAdapterRegistry';
 import { defaultUnitComponentManifestsFromCatalog } from '../defaultLearningComponentCatalog';
 import type { LearningComponentCapability } from '../runtime/ComponentManifest';
-import type { AiProviderRuntime } from '../runtime/LearningComponentContext';
 import {
   getUnitEngineServerMethodNames,
   type UnitEngineServerMethods,
@@ -22,7 +21,6 @@ import type {
 } from './UnitEngineSessionKeys';
 import {
   ASSESSMENT_SESSION_UNIT_TYPE,
-  AUTO_TUTOR_SESSION_UNIT_TYPE,
   INSTRUCTION_UNIT_TYPE,
   LEARNING_SESSION_UNIT_TYPE,
   VIDEO_SESSION_UNIT_TYPE,
@@ -115,7 +113,6 @@ export interface CreateUnitEngineDeps {
   readonly progression: UnitEngineProgressionRuntime;
   readonly assessmentState: UnitEngineAssessmentStateRuntime;
   readonly uiAlerts: UnitEngineUserAlertsRuntime;
-  readonly aiProvider: AiProviderRuntime;
   readonly logging: UnitEngineLoggerRuntime;
 }
 
@@ -211,9 +208,6 @@ export function getCreateUnitEngineCapabilitySet(
   if (hasRuntimeFunctions(deps.uiAlerts, 'alertUser')) {
     capabilities.add('ui-alerts');
   }
-  if (hasRuntimeFunctions(deps.aiProvider, 'callOpenRouterJson')) {
-    capabilities.add('ai-provider');
-  }
   return capabilities;
 }
 
@@ -271,10 +265,6 @@ export async function createScheduleUnit(deps: CreateUnitEngineDeps, curExperime
 
 export async function createVideoUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
   return await createUnitEngineByType(deps, curExperimentData, VIDEO_SESSION_UNIT_TYPE);
-}
-
-export async function createAutoTutorUnit(deps: CreateUnitEngineDeps, curExperimentData: any) {
-  return await createUnitEngineByType(deps, curExperimentData, AUTO_TUTOR_SESSION_UNIT_TYPE);
 }
 
 export async function createUnitEngineByType(

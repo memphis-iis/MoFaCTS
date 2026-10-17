@@ -37,7 +37,6 @@ describe('runtime stimulus interpretation', function() {
       imageStimulus: undefined,
       videoStimulus: undefined,
       display: { text: 'Prompt' },
-      autoTutor: undefined,
       alternateDisplays: undefined,
     });
   });
