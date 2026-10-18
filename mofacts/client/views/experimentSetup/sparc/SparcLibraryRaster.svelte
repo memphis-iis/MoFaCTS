@@ -25,8 +25,16 @@
     loading = true; error = '';
     try {
       const result = await readSparcPromptImage(assetId);
-      const raster = interactive && !onSelect ? await (await fetch(result.dataUrl)).blob() : undefined;
-      if (alive) { dataUrl = result.dataUrl; if (raster) fullSizeUrl = URL.createObjectURL(raster); }
+      if (alive) {
+        if (interactive && !onSelect) {
+          // The authorized read validates this data URL; decode it without a CSP-governed fetch.
+          const [metadata, encoded] = result.dataUrl.split(',');
+          const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
+          const raster = new Blob([bytes.buffer], { type: metadata.slice(5, metadata.indexOf(';')) });
+          fullSizeUrl = URL.createObjectURL(raster);
+        }
+        dataUrl = result.dataUrl;
+      }
     } catch (failure) { if (alive) error = getErrorMessage(failure); }
     finally { if (alive) loading = false; }
   }
