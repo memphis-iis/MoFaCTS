@@ -350,7 +350,7 @@
         .mc-toggle-btn.btn-success {
             background-color: var(--app-success-color);
             border-color: var(--app-success-color);
-            color: var(--learning-card-primary-action-text-color);
+            color: var(--app-on-semantic-color);
         }
 
         .mc-toggle-btn.btn-success:hover {

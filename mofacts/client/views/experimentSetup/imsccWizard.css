@@ -4,8 +4,8 @@
 .imscc-wizard .wizard-steps::before { content: ''; position: absolute; top: 20px; left: 10%; right: 10%; height: 2px; background: var(--border-color); z-index: 0; }
 .imscc-wizard .step { flex: 1; text-align: center; position: relative; z-index: 1; }
 .imscc-wizard .step-number { display: inline-block; width: 40px; height: 40px; line-height: 40px; border-radius: var(--border-radius-circle); background: var(--learning-card-surface-color); border: 2px solid var(--border-color); color: var(--app-secondary-text-color); font-weight: bold; margin-bottom: var(--app-space-1); }
-.imscc-wizard .step.active .step-number { border-color: var(--app-info-color); background: var(--app-info-color); color: var(--app-primary-action-text-color); }
-.imscc-wizard .step.completed .step-number { border-color: var(--app-success-color); background: var(--app-success-color); color: var(--learning-card-primary-action-text-color); }
+.imscc-wizard .step.active .step-number { border-color: var(--app-info-color); background: var(--app-info-color); color: var(--app-on-semantic-color); }
+.imscc-wizard .step.completed .step-number { border-color: var(--app-success-color); background: var(--app-success-color); color: var(--app-on-semantic-color); }
 .imscc-wizard .step-label { display: block; font-size: calc(var(--app-font-size-base) * 0.75); color: var(--app-secondary-text-color); }
 .imscc-wizard .wizard-actions { display: flex; justify-content: space-between; gap: var(--app-space-2); margin-top: var(--app-space-3); padding-top: var(--app-space-3); border-top: 1px solid var(--border-color); }
 .imscc-wizard .wizard-card { margin-bottom: var(--app-space-3); }

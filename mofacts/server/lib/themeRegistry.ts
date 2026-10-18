@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { Meteor } from 'meteor/meteor';
 import { DynamicSettings } from '../../common/Collections';
 import { isValidThemeDensityScale, normalizeThemePropertyValue } from '../../common/themePropertyNormalization';
+import defaultTheme from '../../public/themes/mofacts-default.json';
 
 const { promises: fsp } = fs;
 
@@ -11,72 +12,20 @@ const THEME_LIBRARY_KEY = 'themeLibrary';
 const ACTIVE_THEME_KEY = 'customTheme';
 const DEFAULT_THEME_ID = 'mofacts-default';
 const PUBLIC_THEME_ENV = process.env.MOFACTS_DEFAULT_THEME_DIR;
+// A bundled promotion keeps the existing selection ID. Only these named
+// ownership transfers may replace a formerly custom entry in the saved library.
+const BUNDLED_THEME_PROMOTIONS: Readonly<Record<string, string>> = {
+  'imperial-dark-488a': 'Imperial Dark',
+};
 
 const FALLBACK_THEME = {
-  id: DEFAULT_THEME_ID,
-  themeName: 'Default',
-  enabled: true,
+  ...defaultTheme,
   properties: {
-    themeName: 'Default',
-    app_background_color: '#F2F2F2',
-    app_text_color: '#000000',
-    app_page_header_text_color: '#000000',
-    app_primary_action_surface_color: '#7ed957',
-    app_primary_action_text_color: '#000000',
-    app_accent_color: '#7ed957',
-    app_secondary_surface_color: '#d9d9d9',
-    app_secondary_text_color: '#000000',
-    learning_card_audio_icon_disabled_color: '#6c757d',
-    learning_card_audio_control_color: '#7ed957',
-    feedback_correct_color: '#00cc00',
-    feedback_error_color: '#ff0000',
-    navigation_text_color: '#000000',
-    navigation_surface_color: '#ffffff',
-    learning_card_surface_color: '#ffffff',
-    learning_card_stimulus_surface_color: '#ffffff',
-    media_video_overlay_surface_color: 'color-mix(in srgb, var(--learning-card-surface-color) 98%, transparent)',
-    media_video_overlay_backdrop_color: 'color-mix(in srgb, var(--app-text-color) 60%, transparent)',
-    app_surface_shadow: '0 4px 12px color-mix(in srgb, var(--app-text-color) 18%, transparent)',
-    learning_card_performance_divider_color: 'color-mix(in srgb, var(--app-text-color) 15%, transparent)',
-    app_loading_overlay_color: 'color-mix(in srgb, var(--app-background-color) 95%, transparent)',
-    learning_card_primary_action_surface_color: '#7FC89E',
-    learning_card_primary_action_text_color: '#000000',
-    practice_menu_accuracy_bar_fill_color: '#7ed957',
-    practice_menu_accuracy_bar_track_color: 'color-mix(in srgb, var(--app-text-color) 12%, transparent)',
-    practice_menu_underlay_image_url: '',
-    practice_menu_welcome_html: '<h1>Welcome back!</h1><p>Access your teaching tools, resources, and system functions.</p>',
-    practice_menu_first_practice_welcome_html: '<h1>Welcome!</h1><p>Choose a lesson below to begin your first practice session.</p>',
-    brand_display_label: '',
-    brand_logo_url: '/images/themes/brain-logo.png',
-    brand_favicon_16_url: '/images/themes/brain-16.png',
-    brand_favicon_32_url: '/images/themes/brain-32.png',
-    brand_apple_touch_icon_url: '/images/themes/brain-apple-touch-180.png',
-    brand_android_icon_192_url: '/images/themes/brain-android-192.png',
-    brand_android_icon_512_url: '/images/themes/brain-android-512.png',
-    brand_android_maskable_icon_192_url: '/images/themes/brain-maskable-192.png',
-    brand_android_maskable_icon_512_url: '/images/themes/brain-maskable-512.png',
-    auth_sign_in_description: 'A web-based adaptive learning system that uses spaced practice and retrieval to help you learn and retain information more effectively. Sign in to access your personalized learning experience.',
-    app_border_radius_sm: '8px',
-    app_border_radius_lg: '12px',
-    app_transition_instant: '10ms',
-    app_transition_fast: '100ms',
-    app_transition_smooth: '200ms',
-    app_font_stylesheet_url: '',
-    app_font_family: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-    app_heading_font_family: 'var(--app-font-family)',
-    app_font_size_base: '16px',
+    ...defaultTheme.properties,
     app_density_scale: '1',
-    app_button_height: '44px',
-    app_text_input_height: '36px',
-    app_button_border_darkness: 20,
-    app_button_hover_darkness: 15
   },
   metadata: {
-    name: 'Default',
-    version: 1,
-    author: 'system',
-    origin: 'system',
-    tags: ['default', 'baseline'],
+    ...defaultTheme.metadata,
     filename: 'mofacts-default.json',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -467,6 +416,19 @@ class ThemeRegistry {
 
     for (const theme of library) {
       if (theme?.metadata?.origin !== 'custom') {
+        continue;
+      }
+
+      const promotedName = BUNDLED_THEME_PROMOTIONS[theme.id];
+      const bundledEntry = this.getThemeEntry(theme.id);
+      if (promotedName && bundledEntry?.readOnly
+        && bundledEntry.data.metadata?.name === promotedName) {
+        if (theme.metadata.name !== promotedName) {
+          throw new Error(`Cannot promote theme "${theme.id}": stored name does not match "${promotedName}"`);
+        }
+        // persistLibrarySetting writes the system definition under the same ID;
+        // ensureActiveTheme then refreshes its snapshot without changing selection.
+        console.info(`[ThemeRegistry] Promoting ${promotedName} to a bundled system theme (${theme.id})`);
         continue;
       }
 

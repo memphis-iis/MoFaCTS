@@ -1,5 +1,5 @@
 export const SPARC_HTML_ALLOWED_TAGS = [
-  'a', 'abbr', 'aside', 'b', 'blockquote', 'br', 'code', 'dd', 'del', 'details', 'div', 'dl', 'dt', 'em',
+  'a', 'abbr', 'aside', 'b', 'blockquote', 'br', 'caption', 'code', 'col', 'colgroup', 'dd', 'del', 'details', 'div', 'dl', 'dt', 'em',
   'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'hr', 'i', 'iframe', 'img', 'input', 'label', 'li',
   'mark', 'ol', 'p', 'pre', 's', 'section', 'span', 'strong', 'sub', 'summary', 'sup',
   'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'u', 'ul',
@@ -7,8 +7,8 @@ export const SPARC_HTML_ALLOWED_TAGS = [
 
 export const SPARC_HTML_ALLOWED_ATTR = [
   'allowfullscreen', 'alt', 'checked', 'class', 'colspan', 'data-align', 'data-color', 'disabled',
-  'data-colwidth', 'data-oli-page-link', 'data-sparc-callout', 'data-type', 'height',
-  'href', 'loading', 'rel', 'rowspan', 'src', 'target', 'title', 'type', 'width',
+  'data-colwidth', 'data-oli-page-link', 'data-sparc-callout', 'data-type', 'headers', 'height',
+  'href', 'id', 'loading', 'rel', 'rowspan', 'scope', 'span', 'src', 'target', 'title', 'type', 'width',
 ] as const;
 
 export const SPARC_HTML_FORBID_ATTR = [
@@ -19,6 +19,8 @@ const ALIGNMENT_VALUES = new Set(['left', 'center', 'right', 'justify']);
 const COLOR_VALUES = new Set(['accent', 'correct', 'warning', 'error', 'muted']);
 const CALLOUT_VALUES = new Set(['info', 'success', 'warning', 'error']);
 const DATA_TYPE_VALUES = new Set(['taskList', 'taskItem']);
+const TABLE_SCOPE_VALUES = new Set(['row', 'col', 'rowgroup', 'colgroup']);
+let nextTableRenderId = 0;
 const ALLOWED_CLASSES = new Set([
   'oli-callout',
   'oli-definition',
@@ -125,12 +127,89 @@ function issue(path: string, message: string): string {
   return `${path}: ${message}`;
 }
 
+function ownTableCells(table: Element): Element[] {
+  return Array.from(table.querySelectorAll('th, td')).filter(cell => cell.closest('table') === table);
+}
+
+function tableSemanticsIssues(template: HTMLTemplateElement, path: string): string[] {
+  const issues: string[] = [];
+  template.content.querySelectorAll('table').forEach((table, tableIndex) => {
+    const tablePath = `${path} table[${tableIndex}]`;
+    const cells = ownTableCells(table);
+    const headers = new Map<string, Element>();
+    for (const cell of cells) {
+      if (cell.tagName.toLowerCase() === 'th' && cell.hasAttribute('id')) {
+        const id = cell.getAttribute('id')!;
+        if (!id || /\s/.test(id)) {
+          issues.push(issue(tablePath, 'table header id must be nonempty and contain no whitespace'));
+        } else if (headers.has(id)) {
+          issues.push(issue(tablePath, `duplicate table header id "${id}"`));
+        } else {
+          headers.set(id, cell);
+        }
+      }
+      if (cell.hasAttribute('scope') && (cell.tagName.toLowerCase() !== 'th'
+        || !TABLE_SCOPE_VALUES.has(cell.getAttribute('scope')!.trim().toLowerCase()))) {
+        issues.push(issue(tablePath, 'scope must be row, col, rowgroup or colgroup on a table header'));
+      }
+    }
+    for (const cell of cells) {
+      for (const id of (cell.getAttribute('headers') || '').split(/\s+/).filter(Boolean)) {
+        const header = headers.get(id);
+        if (!header || header === cell) {
+          issues.push(issue(tablePath, `headers reference "${id}" must identify another header in the same table`));
+        }
+      }
+    }
+  });
+  return issues;
+}
+
+export function validateSparcTableSemantics(value: unknown, path = 'SPARC rich HTML'): string[] {
+  const template = parseHtmlFragment(String(value || ''));
+  if (!template) throw new Error('SPARC table validation requires a DOM parser');
+  return tableSemanticsIssues(template, path);
+}
+
+/** Table IDs belong to this rendered fragment, never to saved content or app UI.
+ * Only header IDs and same-table references survive; repeated learner/library
+ * renderings and nested tables therefore cannot redirect each other's headers.
+ */
+function scopeTableSemanticsForRender(template: HTMLTemplateElement): void {
+  const renderId = ++nextTableRenderId;
+  template.content.querySelectorAll('[id], [headers], [scope]').forEach(element => {
+    const tag = element.tagName.toLowerCase();
+    const inTable = element.closest('table') !== null;
+    if (tag !== 'th' || !inTable) element.removeAttribute('id');
+    if ((tag !== 'th' && tag !== 'td') || !inTable) element.removeAttribute('headers');
+    if (tag !== 'th' || !inTable) element.removeAttribute('scope');
+  });
+  template.content.querySelectorAll('table').forEach((table, tableIndex) => {
+    const cells = ownTableCells(table);
+    const ids = new Map<string, string>();
+    cells.forEach((cell, cellIndex) => {
+      if (cell.hasAttribute('id')) {
+        const scopedId = `sparc-table-${renderId}-${tableIndex}-header-${cellIndex}`;
+        ids.set(cell.getAttribute('id')!, scopedId);
+        cell.setAttribute('id', scopedId);
+      }
+      if (cell.hasAttribute('scope')) cell.setAttribute('scope', cell.getAttribute('scope')!.trim().toLowerCase());
+    });
+    for (const cell of cells) {
+      if (cell.hasAttribute('headers')) {
+        cell.setAttribute('headers', (cell.getAttribute('headers') || '').split(/\s+/).filter(Boolean)
+          .map(id => ids.get(id)!).join(' '));
+      }
+    }
+  });
+}
+
 export function validateSparcRichHtml(value: unknown, path = 'SPARC rich HTML'): string[] {
   const template = parseHtmlFragment(String(value || ''));
   if (!template) {
     return [];
   }
-  const issues: string[] = [];
+  const issues = tableSemanticsIssues(template, path);
   template.content.querySelectorAll('*').forEach((element, index) => {
     const elementPath = `${path} element[${index}] <${element.tagName.toLowerCase()}>`;
     for (const attribute of Array.from(element.attributes)) {
@@ -199,7 +278,12 @@ export function sanitizeSparcRichHtml(
   sanitize: (dirty: string, config: Record<string, unknown>) => string,
 ): string {
   const normalized = normalizeSparcRichHtml(value);
-  const sanitized = sanitize(normalized, {
+  const template = parseHtmlFragment(normalized);
+  if (!template) throw new Error('SPARC rich HTML rendering requires a DOM parser');
+  const tableIssues = tableSemanticsIssues(template, 'SPARC rich HTML');
+  if (tableIssues.length) throw new Error(tableIssues.join('; '));
+  scopeTableSemanticsForRender(template);
+  const sanitized = sanitize(template.innerHTML, {
     ALLOWED_TAGS: SPARC_HTML_ALLOWED_TAGS,
     ALLOWED_ATTR: SPARC_HTML_ALLOWED_ATTR,
     FORBID_ATTR: SPARC_HTML_FORBID_ATTR,

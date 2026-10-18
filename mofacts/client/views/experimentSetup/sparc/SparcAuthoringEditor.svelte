@@ -5,6 +5,7 @@
   import {
     SPARC_RICH_TEXT_COLORS,
     normalizeSparcRichHtml,
+    validateSparcTableSemantics,
   } from '../../experiment/svelte/services/sparcRichHtml';
   import {
     clusterChoicesForAuthoring,
@@ -432,6 +433,9 @@
     if (updateNodeAuthoredValueAction(target, value)) {
       activeNodeId = nodeId;
       markChanged();
+      if (isRichTextNode(target)) {
+        visualErrorText = validateSparcTableSemantics(target.value).join('; ');
+      }
     }
   }
 

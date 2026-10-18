@@ -12,7 +12,7 @@
     --app-background-color: #F2F2F2;
     --app-text-color: #000000;
     --app-page-header-text-color: var(--app-text-color);
-    --app-accent-color: #7ed957;
+    --app-accent-color: #27641A;
     --focus-ring-color: color-mix(in srgb, var(--app-accent-color) 55%, var(--app-text-color));
     --surface-emphasis-color: var(--app-accent-color);
     --brand-primary-color: var(--app-accent-color);
@@ -23,9 +23,9 @@
     --app-secondary-surface-color: #d9d9d9;
     --app-secondary-text-color: #000000;
     --learning-card-audio-icon-disabled-color: #6c757d;
-    --learning-card-audio-control-color: #7ed957;
-    --feedback-correct-color: #00cc00;
-    --feedback-error-color: #ff0000;
+    --learning-card-audio-control-color: #27641A;
+    --feedback-correct-color: #126B30;
+    --feedback-error-color: #B42318;
     --navigation-surface-color: #ffffff;
     --learning-card-surface-color: #ffffff;
     --border-color: color-mix(in srgb, var(--app-text-color) 12%, transparent);
@@ -61,6 +61,10 @@
     --app-state-info-color: var(--app-info-color);
     --app-state-info-surface-color: var(--app-info-surface-color);
     --app-state-focus-ring-color: var(--focus-ring-color);
+    /* Semantic foregrounds are checked against the card surface. Inverting that
+       same pair gives their filled controls a readable label without a second
+       palette or additional saved theme property. */
+    --app-on-semantic-color: var(--learning-card-surface-color);
     --app-focus-shadow-color: color-mix(in srgb, var(--focus-ring-color) 25%, transparent);
     --app-error-shadow-color: color-mix(in srgb, var(--feedback-error-color) 25%, transparent);
     --app-warning-shadow-color: color-mix(in srgb, var(--app-warning-color) 30%, transparent);
@@ -936,14 +940,16 @@ input[type="file"]::file-selector-button:hover,
 
 .form-switch .form-check-input:checked {
     background-position: right center;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+    background-image: radial-gradient(circle closest-side, var(--app-on-semantic-color) 74%, transparent 75%);
     background-color: var(--app-accent-color);
 }
 
 .form-switch .form-check-input {
     width: 3em;
     height: 1.5em;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+    background-image: radial-gradient(circle closest-side, var(--app-secondary-text-color) 74%, transparent 75%);
+    background-size: 1.5em 1.5em;
+    background-repeat: no-repeat;
     background-color: var(--app-secondary-surface-color);
     background-position: left center;
     border-radius: var(--border-radius-pill);
@@ -1023,6 +1029,12 @@ input[type="range"]::-moz-range-progress,
     --bs-btn-font-size: inherit;
     --bs-btn-line-height: inherit;
     --bs-btn-padding-y: 0;
+    --bs-btn-hover-color: var(--app-primary-action-text-color);
+    --bs-btn-hover-bg: var(--btn-hover-bg);
+    --bs-btn-hover-border-color: var(--btn-hover-border);
+    --bs-btn-active-color: var(--bs-btn-hover-color);
+    --bs-btn-active-bg: var(--bs-btn-hover-bg);
+    --bs-btn-active-border-color: var(--bs-btn-hover-border-color);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1034,12 +1046,6 @@ input[type="range"]::-moz-range-progress,
     line-height: inherit;
     border-radius: var(--app-border-radius-sm);
     min-height: var(--app-button-height);
-}
-
-.btn-selected{
-    background-color: var(--app-accent-color);
-    border-color: var(--btn-accent-border);
-    color: var(--app-primary-action-text-color);
 }
 
 .btn-primary {
@@ -1057,19 +1063,19 @@ input[type="range"]::-moz-range-progress,
 .btn-success {
     background-color: var(--app-state-success-color);
     border-color: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
-    color: var(--learning-card-primary-action-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 .btn-warning {
     background-color: var(--app-state-warning-color);
     border-color: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
-    color: var(--app-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 .btn-danger {
     background-color: var(--app-state-error-color);
     border-color: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
-    color: var(--learning-card-primary-action-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 .btn-outline-secondary {
@@ -1087,38 +1093,39 @@ input[type="range"]::-moz-range-progress,
 .btn:hover, .btn-icon:hover{
     background-color: var(--btn-hover-bg);
     border-color: var(--btn-hover-border);
-    color: var(--app-text-color);
+    color: var(--app-primary-action-text-color);
 }
 
 .btn-primary:hover {
     background-color: var(--btn-hover-bg);
     border-color: var(--btn-hover-border);
-    color: var(--app-text-color);
+    color: var(--app-primary-action-text-color);
 }
 
 .btn-success:hover {
     background-color: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
     border-color: var(--app-state-success-color);
-    color: var(--learning-card-primary-action-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 .btn-warning:hover {
     background-color: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
     border-color: var(--app-state-warning-color);
-    color: var(--app-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 .btn-danger:hover,
 .btn-outline-danger:hover {
     background-color: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
     border-color: var(--app-state-error-color);
-    color: var(--learning-card-primary-action-text-color);
+    color: var(--app-on-semantic-color);
 }
 
+.btn-secondary:hover,
 .btn-outline-secondary:hover {
     background-color: var(--btn-secondary-hover-bg);
     border-color: var(--btn-secondary-border);
-    color: var(--app-text-color);
+    color: var(--app-secondary-text-color);
 }
 
 body .btn-primary {
@@ -1127,7 +1134,7 @@ body .btn-primary {
     --bs-btn-color: var(--app-primary-action-text-color);
     --bs-btn-hover-bg: var(--btn-hover-bg);
     --bs-btn-hover-border-color: var(--btn-hover-border);
-    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-hover-color: var(--app-primary-action-text-color);
     --bs-btn-disabled-bg: color-mix(in srgb, var(--app-primary-action-surface-color) 56%, var(--app-muted-surface-color));
     --bs-btn-disabled-border-color: color-mix(in srgb, var(--btn-border-color) 56%, var(--border-color));
     --bs-btn-disabled-color: color-mix(in srgb, var(--app-primary-action-text-color) 72%, var(--app-text-color));
@@ -1142,7 +1149,7 @@ body .btn-secondary {
     --bs-btn-color: var(--app-secondary-text-color);
     --bs-btn-hover-bg: var(--btn-secondary-hover-bg);
     --bs-btn-hover-border-color: var(--btn-secondary-border);
-    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-hover-color: var(--app-secondary-text-color);
     --bs-btn-disabled-bg: color-mix(in srgb, var(--app-secondary-surface-color) 56%, var(--app-muted-surface-color));
     --bs-btn-disabled-border-color: color-mix(in srgb, var(--btn-secondary-border) 56%, var(--border-color));
     --bs-btn-disabled-color: color-mix(in srgb, var(--app-secondary-text-color) 72%, var(--app-text-color));
@@ -1154,46 +1161,46 @@ body .btn-secondary {
 body .btn-success {
     --bs-btn-bg: var(--app-state-success-color);
     --bs-btn-border-color: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
-    --bs-btn-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-color: var(--app-on-semantic-color);
     --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-success-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
     --bs-btn-hover-border-color: var(--app-state-success-color);
-    --bs-btn-hover-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-hover-color: var(--app-on-semantic-color);
     --bs-btn-disabled-bg: color-mix(in srgb, var(--app-state-success-color) 56%, var(--app-muted-surface-color));
     --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-success-color) 56%, var(--border-color));
-    --bs-btn-disabled-color: color-mix(in srgb, var(--learning-card-primary-action-text-color) 72%, var(--app-text-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-on-semantic-color) 72%, var(--app-text-color));
     background-color: var(--app-state-success-color);
     border-color: var(--bs-btn-border-color);
-    color: var(--learning-card-primary-action-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 body .btn-warning {
     --bs-btn-bg: var(--app-state-warning-color);
     --bs-btn-border-color: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
-    --bs-btn-color: var(--app-text-color);
+    --bs-btn-color: var(--app-on-semantic-color);
     --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-warning-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
     --bs-btn-hover-border-color: var(--app-state-warning-color);
-    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-hover-color: var(--app-on-semantic-color);
     --bs-btn-disabled-bg: color-mix(in srgb, var(--app-state-warning-color) 56%, var(--app-muted-surface-color));
     --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-warning-color) 56%, var(--border-color));
-    --bs-btn-disabled-color: color-mix(in srgb, var(--app-text-color) 72%, var(--app-muted-surface-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-on-semantic-color) 72%, var(--app-muted-surface-color));
     background-color: var(--app-state-warning-color);
     border-color: var(--bs-btn-border-color);
-    color: var(--app-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 body .btn-danger {
     --bs-btn-bg: var(--app-state-error-color);
     --bs-btn-border-color: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-border-darkness, 20)) * 1%), var(--app-text-color) calc(var(--app-button-border-darkness, 20) * 1%));
-    --bs-btn-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-color: var(--app-on-semantic-color);
     --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
     --bs-btn-hover-border-color: var(--app-state-error-color);
-    --bs-btn-hover-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-hover-color: var(--app-on-semantic-color);
     --bs-btn-disabled-bg: color-mix(in srgb, var(--app-state-error-color) 56%, var(--app-muted-surface-color));
     --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-error-color) 56%, var(--border-color));
-    --bs-btn-disabled-color: color-mix(in srgb, var(--learning-card-primary-action-text-color) 72%, var(--app-text-color));
+    --bs-btn-disabled-color: color-mix(in srgb, var(--app-on-semantic-color) 72%, var(--app-text-color));
     background-color: var(--app-state-error-color);
     border-color: var(--bs-btn-border-color);
-    color: var(--learning-card-primary-action-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 body .btn-outline-secondary {
@@ -1202,7 +1209,7 @@ body .btn-outline-secondary {
     --bs-btn-color: var(--app-secondary-text-color);
     --bs-btn-hover-bg: var(--btn-secondary-hover-bg);
     --bs-btn-hover-border-color: var(--btn-secondary-border);
-    --bs-btn-hover-color: var(--app-text-color);
+    --bs-btn-hover-color: var(--app-secondary-text-color);
     --bs-btn-disabled-bg: transparent;
     --bs-btn-disabled-border-color: color-mix(in srgb, var(--btn-secondary-border) 56%, var(--border-color));
     --bs-btn-disabled-color: color-mix(in srgb, var(--app-secondary-text-color) 72%, var(--app-muted-surface-color));
@@ -1217,13 +1224,26 @@ body .btn-outline-danger {
     --bs-btn-color: var(--app-state-error-color);
     --bs-btn-hover-bg: color-mix(in srgb, var(--app-state-error-color) calc((100 - var(--app-button-hover-darkness, 15)) * 1%), var(--app-text-color) calc(var(--app-button-hover-darkness, 15) * 1%));
     --bs-btn-hover-border-color: var(--app-state-error-color);
-    --bs-btn-hover-color: var(--learning-card-primary-action-text-color);
+    --bs-btn-hover-color: var(--app-on-semantic-color);
     --bs-btn-disabled-bg: transparent;
     --bs-btn-disabled-border-color: color-mix(in srgb, var(--app-state-error-color) 56%, var(--border-color));
     --bs-btn-disabled-color: color-mix(in srgb, var(--app-state-error-color) 72%, var(--app-muted-surface-color));
     background-color: transparent;
     border-color: var(--app-state-error-color);
     color: var(--app-state-error-color);
+}
+
+body .btn-selected,
+body .btn-selected:hover,
+body .btn-selected:focus-visible {
+    --bs-btn-bg: var(--app-accent-color);
+    --bs-btn-color: var(--app-on-semantic-color);
+    --bs-btn-hover-bg: var(--app-accent-color);
+    --bs-btn-hover-color: var(--app-on-semantic-color);
+    --bs-btn-hover-border-color: var(--btn-accent-border);
+    background-color: var(--app-accent-color);
+    border-color: var(--btn-accent-border);
+    color: var(--app-on-semantic-color);
 }
 
 .btn-fixed{
@@ -1455,14 +1475,14 @@ body:has(.instructions-container) {
 .c-card-choices__button:focus-visible {
     background-color: var(--btn-hover-bg);
     border-color: var(--btn-hover-border);
-    color: var(--app-text-color);
+    color: var(--app-primary-action-text-color);
     transform: translateY(-1px);
 }
 
 .c-card-choices__button:is([aria-checked='true'], .is-selected) {
     background-color: var(--app-accent-color);
     border-color: var(--btn-accent-border);
-    color: var(--app-primary-action-text-color);
+    color: var(--app-on-semantic-color);
 }
 
 .c-card-choices__button:is([disabled], [aria-disabled='true']) {
@@ -2141,6 +2161,7 @@ table caption {
 
 .dropdown-item:hover {
     background-color: var(--accent-background-color, var(--app-accent-color));
+    color: var(--app-on-semantic-color);
     cursor: pointer;
 }
 
@@ -2706,7 +2727,7 @@ table caption {
 /* Alert audio - base styles */
 .alert-audio-100 {
     color: var(--feedback-error-color);
-    background-color: var(--accent-background-color, var(--app-accent-color));
+    background-color: var(--app-state-error-surface-color);
     padding: calc(20px * var(--app-density-scale));
     margin-top: 20px;
 }

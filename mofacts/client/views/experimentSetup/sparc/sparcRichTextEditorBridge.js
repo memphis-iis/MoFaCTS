@@ -1,4 +1,5 @@
 import { Editor } from '@tiptap/core';
+import { Mapping } from '@tiptap/pm/transform';
 import StarterKit from '@tiptap/starter-kit';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Underline } from '@tiptap/extension-underline';
@@ -9,15 +10,15 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Typography } from '@tiptap/extension-typography';
 import { Subscript } from '@tiptap/extension-subscript';
 import { Superscript } from '@tiptap/extension-superscript';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { TableHeader } from '@tiptap/extension-table-header';
+import {
+  SparcRichTextTable, SparcRichTextTableRow, SparcRichTextTableCell, SparcRichTextTableHeader,
+} from './sparcRichTextTable.ts';
 import { Image } from '@tiptap/extension-image';
 import { TaskList } from '@tiptap/extension-task-list';
 import { TaskItem } from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import { validateSparcTableSemantics } from '../../experiment/svelte/services/sparcRichHtml.ts';
 
 export function validHttpsUrl(value) {
   try {
@@ -35,7 +36,9 @@ function requiredRichTextMessage(messages, key) {
   return value;
 }
 
-export function createSparcRichTextEditor({ element, content, onUpdate, onRevision, messages = {} }) {
+export function createSparcRichTextEditor({ element, content, onUpdate, onRevision, onError, messages = {} }) {
+  const issues = validateSparcTableSemantics(content);
+  if (issues.length) throw new Error(issues.join('; '));
   return new Editor({
     element,
     extensions: [
@@ -51,10 +54,10 @@ export function createSparcRichTextEditor({ element, content, onUpdate, onRevisi
       Typography,
       Subscript,
       Superscript,
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
+      SparcRichTextTable.configure({ onTableError: onError }),
+      SparcRichTextTableRow,
+      SparcRichTextTableCell,
+      SparcRichTextTableHeader,
       Image.configure({ inline: false, allowBase64: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -87,11 +90,18 @@ export function createSparcRichTextController({
   let editor = null;
   let savedVisualRichTextRange = null;
 
+  function validTableDraft(html) {
+    const issues = validateSparcTableSemantics(html);
+    if (issues.length) setErrorText(issues.join('; '));
+    return issues.length === 0;
+  }
+
   function applyEditorHtmlUpdate(editorInstance) {
     const activeNode = getActiveNode();
     if (!isRichTextNode(activeNode)) {
       return;
     }
+    if (!validTableDraft(activeNode.value)) return;
     activeNode.value = normalizeHtml(editorInstance.getHTML());
     markChanged();
   }
@@ -103,6 +113,7 @@ export function createSparcRichTextController({
     }
     activeNode.value = normalizeHtml(value || '<p></p>');
     markChanged();
+    return validTableDraft(activeNode.value);
   }
 
   function activeVisualRichTextElementForSelection() {
@@ -129,10 +140,10 @@ export function createSparcRichTextController({
     }
     activeNode.value = normalizeHtml(element.innerHTML || '<p></p>');
     element.innerHTML = activeNode.value;
-    if (editor) {
+    markChanged();
+    if (editor && validTableDraft(activeNode.value)) {
       editor.commands.setContent(activeNode.value || '<p></p>', false);
     }
-    markChanged();
     rememberVisualRichTextSelection();
     onRevision();
   }
@@ -164,6 +175,7 @@ export function createSparcRichTextController({
     if (!editor || !getIsRichTextSelected()) {
       return;
     }
+    if (!validTableDraft(getActiveNode()?.value)) return;
     if (runVisualRichTextCommand(command, value)) {
       return;
     }
@@ -172,7 +184,8 @@ export function createSparcRichTextController({
       setErrorText(result.error);
       return;
     }
-    applyEditorHtmlUpdate(editor);
+    // TipTap's onUpdate owns accepted edits. A rejected table transaction must
+    // neither overwrite the current draft nor clear its validation error.
     onRevision();
   }
 
@@ -188,8 +201,8 @@ export function createSparcRichTextController({
   }
 
   function updateRichTextSource(value) {
-    setActiveRichTextHtml(value);
-    if (editor) {
+    const valid = setActiveRichTextHtml(value);
+    if (editor && valid) {
       editor.commands.setContent(getActiveNode()?.value || '<p></p>', false);
     }
   }
@@ -200,6 +213,7 @@ export function createSparcRichTextController({
     }
     const current = editor.getHTML();
     const next = normalizeHtml(node.value || '<p></p>');
+    if (!validTableDraft(next)) return;
     if (current !== next) {
       editor.commands.setContent(next, false);
     }
@@ -210,12 +224,15 @@ export function createSparcRichTextController({
     if (!element || editor) {
       return;
     }
+    const content = normalizeHtml(getActiveNode()?.value || '<p></p>');
+    if (!validTableDraft(content)) return;
     editor = createSparcRichTextEditor({
       element,
-      content: normalizeHtml(getActiveNode()?.value || '<p></p>'),
+      content,
       messages,
       onUpdate: applyEditorHtmlUpdate,
       onRevision,
+      onError: setErrorText,
     });
   }
 
@@ -380,56 +397,75 @@ function activeTableCell() {
   return (node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement)?.closest?.('td, th') || null;
 }
 
-function runVisualTableCommand(command) {
+function runVisualTableCommand(command, messages) {
   const cell = activeTableCell();
-  if (!cell) {
-    return false;
-  }
-  const row = cell.closest('tr');
-  const table = cell.closest('table');
-  if (!row || !table) {
-    return false;
-  }
-  if (command === 'table-add-row') {
-    const clone = row.cloneNode(true);
-    clone.querySelectorAll('th, td').forEach((entry) => {
-      entry.innerHTML = '<p></p>';
+  const table = cell?.closest('table');
+  const row = cell?.closest('tr');
+  if (!cell || !table || !row) return { updated: false, error: '' };
+  const commands = {
+    'table-add-row': 'addRowAfter', 'table-add-column': 'addColumnAfter',
+    'table-delete-row': 'deleteRow', 'table-delete-column': 'deleteColumn', 'table-delete': 'deleteTable',
+  };
+  const editorCommand = commands[command];
+  if (!editorCommand) return { updated: false, error: '' };
+  const issues = validateSparcTableSemantics(table.outerHTML);
+  if (issues.length) return { updated: false, error: issues.join('; ') };
+  const rowIndex = Array.from(table.rows).indexOf(row);
+  const cellIndex = Array.from(row.cells).indexOf(cell);
+  let error = '';
+  // Both authoring surfaces use the same grid commands and semantic guard.
+  // Transform only this table, so surrounding authored HTML is not reparsed.
+  const tableEditor = createSparcRichTextEditor({
+    element: document.createElement('div'), content: table.outerHTML, messages,
+    onUpdate() {}, onRevision() {}, onError(message) { error = message; },
+  });
+  try {
+    const modelTable = tableEditor.state.doc.firstChild;
+    const cellSources = [];
+    modelTable.forEach((modelRow, rowOffset, modelRowIndex) => {
+      modelRow.forEach((_modelCell, cellOffset, modelCellIndex) => {
+        cellSources.push({ position: 2 + rowOffset + cellOffset,
+          html: table.rows[modelRowIndex].cells[modelCellIndex].innerHTML });
+      });
     });
-    row.after(clone);
-    return true;
-  }
-  if (command === 'table-add-column') {
-    const index = Array.from(row.children).indexOf(cell);
-    table.querySelectorAll('tr').forEach((candidateRow) => {
-      const referenceCell = candidateRow.children[index] || candidateRow.lastElementChild;
-      const clone = (referenceCell || cell).cloneNode(false);
-      clone.innerHTML = '<p></p>';
-      referenceCell?.after(clone);
+    const mapping = new Mapping();
+    tableEditor.on('transaction', ({ transaction, appendedTransactions }) => {
+      for (const applied of [transaction, ...appendedTransactions]) mapping.appendMapping(applied.mapping);
     });
-    return true;
-  }
-  if (command === 'table-delete-row') {
-    row.remove();
-    if (!table.querySelector('tr')) {
-      table.remove();
+    let position = 2;
+    for (let index = 0; index < rowIndex; index++) position += modelTable.child(index).nodeSize;
+    const modelRow = modelTable.child(rowIndex);
+    for (let index = 0; index < cellIndex; index++) position += modelRow.child(index).nodeSize;
+    tableEditor.commands.setTextSelection(position + 2);
+    const accepted = tableEditor.commands[editorCommand]();
+    if (!accepted || error) return { updated: false, error };
+    const replacement = document.createElement('template');
+    replacement.innerHTML = tableEditor.getHTML();
+    const updatedTable = replacement.content.querySelector('table');
+    if (updatedTable) {
+      const survivingCells = new Map();
+      tableEditor.state.doc.firstChild.forEach((modelRow, rowOffset, modelRowIndex) => {
+        modelRow.forEach((_modelCell, cellOffset, modelCellIndex) => {
+          survivingCells.set(2 + rowOffset + cellOffset, updatedTable.rows[modelRowIndex].cells[modelCellIndex]);
+        });
+      });
+      for (const source of cellSources) {
+        // Map inside the opening cell token: setNodeMarkup changes that token
+        // for spans, while the authored cell contents survive unchanged.
+        const mapped = mapping.mapResult(source.position + 1, 1);
+        if (!mapped.deleted) {
+          const survivingCell = survivingCells.get(mapped.pos - 1);
+          if (!survivingCell) return { updated: false, error: 'SPARC table edit could not preserve an authored cell; no changes were applied.' };
+          survivingCell.innerHTML = source.html;
+        }
+      }
+      table.replaceWith(updatedTable);
     }
-    return true;
+    else table.remove();
+    return { updated: true, error: '' };
+  } finally {
+    tableEditor.destroy();
   }
-  if (command === 'table-delete-column') {
-    const index = Array.from(row.children).indexOf(cell);
-    table.querySelectorAll('tr').forEach((candidateRow) => {
-      candidateRow.children[index]?.remove();
-    });
-    if (!table.querySelector('td, th')) {
-      table.remove();
-    }
-    return true;
-  }
-  if (command === 'table-delete') {
-    table.remove();
-    return true;
-  }
-  return false;
 }
 
 export function runVisualRichTextCommandOnElement({ element, savedRange, command, value, colors, messages = {} }) {
@@ -500,8 +536,9 @@ export function runVisualRichTextCommandOnElement({ element, savedRange, command
   } else if (command === 'table') {
     insertHtmlAtVisualSelection('<table><tbody><tr><th><p></p></th><th><p></p></th><th><p></p></th></tr><tr><td><p></p></td><td><p></p></td><td><p></p></td></tr><tr><td><p></p></td><td><p></p></td><td><p></p></td></tr></tbody></table>');
   } else if (command.startsWith('table-')) {
-    if (!runVisualTableCommand(command)) {
-      return { handled: true, error: '', updatedHtml: '' };
+    const result = runVisualTableCommand(command, messages);
+    if (!result.updated) {
+      return { handled: true, error: result.error, updatedHtml: '' };
     }
   } else if (command === 'task-list') {
     insertHtmlAtVisualSelection('<ul data-type="taskList"><li data-type="taskItem"><label><input type="checkbox" disabled="disabled"> <span>Task</span></label></li></ul>');

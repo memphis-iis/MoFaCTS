@@ -77,6 +77,7 @@ describe('public experience theme contract', function() {
       path.join('server', 'lib', 'themeRegistry.ts'),
       path.join('public', 'themes', 'mofacts-default.json'),
       path.join('public', 'themes', 'dark-industrial.json'),
+      path.join('public', 'themes', 'imperial-dark.json'),
       path.join('public', 'themes', 'whimsical-refined.json'),
     ];
 

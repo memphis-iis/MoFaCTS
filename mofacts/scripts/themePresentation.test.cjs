@@ -35,6 +35,44 @@ describe('central application presentation', () => {
     }
   });
 
+  it('allows user zoom while preserving the responsive keyboard viewport', () => {
+    const shell = read('client/index.html');
+    const viewport = shell.match(/<meta\s+name="viewport"\s+content="([^"]+)"/);
+    assert.ok(viewport, 'The application must define its responsive viewport');
+    const settings = new Map(viewport[1].split(',').map(setting => setting.trim().split('=')));
+    assert.equal(settings.get('width'), 'device-width');
+    assert.equal(settings.get('initial-scale'), '1');
+    assert.equal(settings.get('interactive-widget'), 'resizes-content');
+    assert.equal(settings.has('maximum-scale'), false, 'Do not cap user zoom');
+    assert.notEqual(settings.get('user-scalable'), 'no', 'Do not disable user zoom');
+    assert.notEqual(settings.get('user-scalable'), '0', 'Do not disable user zoom');
+  });
+
+  it('keeps prose leading independent of the height used by mixed exercise cells and controls', () => {
+    const prose = ['.sparc-text-block', '.sparc-html-block:not(.sparc-instruction-content)', '.sparc-message-box'];
+    const controls = ['.sparc-text', '.sparc-header-cell', '.sparc-fraction-box', '.sparc-input', '.sparc-select', '.sparc-button'];
+    const leading = new Map();
+    css.walk(css.parse(instruction), { visit: 'Rule', enter(node) {
+      if (node.prelude?.type !== 'SelectorList') return;
+      const selectors = node.prelude.children.toArray().map(selector => css.generate(selector));
+      node.block.children.forEach(declaration => {
+        if (declaration.type !== 'Declaration' || declaration.property !== 'line-height') return;
+        const value = css.generate(declaration.value);
+        for (const selector of selectors) {
+          if (prose.includes(selector)) {
+            assert.doesNotMatch(value, /--app-text-input-height/, `${selector} must not use control height as prose leading`);
+          }
+          if (prose.includes(selector) || controls.includes(selector)) leading.set(selector, value);
+        }
+      });
+    } });
+    for (const selector of prose) assert.equal(leading.get(selector), 'var(--app-line-height-relaxed)', selector);
+    for (const selector of controls) {
+      const expected = selector === '.sparc-button' ? 'var(--app-button-line-height)' : 'var(--app-text-input-height)';
+      assert.equal(leading.get(selector), expected, selector);
+    }
+  });
+
   it('keeps ordinary and generated tables in the same central density, color and radius contract', () => {
     assert.match(classic, /table,\s*\.table\s*\{/);
     assert.match(classic, /padding: var\(--app-space-2\) var\(--app-space-3\)/);

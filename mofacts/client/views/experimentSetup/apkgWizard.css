@@ -54,13 +54,13 @@
 .apkg-wizard .wizard-steps .step.active .step-number {
   border-color: var(--app-info-color);
   background: var(--app-info-color);
-  color: var(--app-primary-action-text-color);
+  color: var(--app-on-semantic-color);
 }
 
 .apkg-wizard .wizard-steps .step.completed .step-number {
   border-color: var(--app-success-color);
   background: var(--app-success-color);
-  color: var(--learning-card-primary-action-text-color);
+  color: var(--app-on-semantic-color);
 }
 
 .apkg-wizard .wizard-steps .step-label {
@@ -86,9 +86,9 @@
 .apkg-wizard .tdf-config-card { border-left: 4px solid var(--app-info-color); }
 .apkg-wizard .tdf-config-card.editing { border-left-color: var(--app-warning-color); }
 .apkg-wizard .badge-text { background: var(--app-secondary-surface-color); color: var(--app-secondary-text-color); }
-.apkg-wizard .badge-image { background: var(--app-media-image-color); color: var(--learning-card-primary-action-text-color); }
-.apkg-wizard .badge-mixed { background: var(--app-media-mixed-color); color: var(--learning-card-primary-action-text-color); }
-.apkg-wizard .badge-audio { background: var(--app-media-audio-color); color: var(--app-primary-action-text-color); }
+.apkg-wizard .badge-image { background: var(--app-media-image-color); color: var(--app-on-semantic-color); }
+.apkg-wizard .badge-mixed { background: var(--app-media-mixed-color); color: var(--app-on-semantic-color); }
+.apkg-wizard .badge-audio { background: var(--app-media-audio-color); color: var(--app-on-semantic-color); }
 
 .apkg-wizard .fields-list { max-height: 400px; overflow-y: auto; }
 .apkg-wizard .wizard-card { margin-bottom: var(--app-space-3); }

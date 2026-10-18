@@ -9,7 +9,7 @@ switch-toggle {
  .switch-toggle input + label {
    padding: calc(7px * var(--app-density-scale));
    float:left;
-   color: var(--learning-card-primary-action-text-color);
+   color: var(--app-on-semantic-color);
    cursor: pointer;
    margin-bottom: 0px;
    border-color: var(--app-state-success-surface-color);

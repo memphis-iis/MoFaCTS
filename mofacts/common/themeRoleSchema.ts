@@ -70,6 +70,7 @@ export function buildThemeContrastSchema(
     text('app_text_color', 'learning_card_surface_color'),
     text('app_text_color', 'learning_card_stimulus_surface_color'),
     text('learning_card_primary_action_text_color', 'learning_card_primary_action_surface_color'),
+    text('app_accent_color', 'learning_card_surface_color'),
     text('feedback_correct_color', 'learning_card_surface_color'),
     text('feedback_error_color', 'learning_card_surface_color'),
     {

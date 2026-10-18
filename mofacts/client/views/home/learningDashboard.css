@@ -672,7 +672,7 @@
     overflow: hidden;
     border-radius: 50%;
     background: var(--app-accent-color);
-    color: var(--app-primary-action-text-color);
+    color: var(--app-on-semantic-color);
     font-size: calc(0.67rem * var(--app-density-scale));
     font-weight: 700;
     line-height: 1;

@@ -113,7 +113,7 @@
 .admin-progress-track,
 .admin-progress-row .progress { height: calc(8px * var(--app-density-scale)); min-height: 6px; border-radius: var(--border-radius-pill); background: var(--app-muted-surface-color); overflow: hidden; }
 .admin-progress-bar,
-.admin-progress-row .progress-bar { height: 100%; background-color: var(--app-info-color); color: var(--app-primary-action-text-color); transition: width var(--app-transition-smooth) ease; }
+.admin-progress-row .progress-bar { height: 100%; background-color: var(--app-info-color); color: var(--app-on-semantic-color); transition: width var(--app-transition-smooth) ease; }
 .admin-progress-row.admin-progress-success .admin-progress-bar,
 .admin-progress-row.admin-progress-success .progress-bar { background-color: var(--app-success-color); }
 .admin-progress-row.admin-progress-warning .admin-progress-bar,

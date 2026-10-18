@@ -838,6 +838,22 @@
     background: var(--learning-card-surface-color);
     color: var(--app-text-color);
     font: inherit;
+  }
+
+  /* Continuous prose follows reading typography, independently of control sizing. */
+  .sparc-text-block,
+  .sparc-html-block:not(.sparc-instruction-content),
+  .sparc-message-box {
+    line-height: var(--app-line-height-relaxed);
+  }
+
+  /* Preserve the aligned cells and controls used by mixed text/math exercises. */
+  .sparc-text,
+  .sparc-header-cell,
+  .sparc-fraction-box,
+  .sparc-input,
+  .sparc-select,
+  .sparc-button {
     line-height: var(--app-text-input-height);
   }
 

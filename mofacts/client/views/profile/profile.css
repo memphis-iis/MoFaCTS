@@ -114,7 +114,7 @@
   justify-content: center;
   overflow: hidden;
   background: var(--app-accent-color);
-  color: var(--app-primary-action-text-color);
+  color: var(--app-on-semantic-color);
   font-size: calc(var(--app-font-size-base) * 1.65);
   font-weight: 700;
   line-height: 1;
