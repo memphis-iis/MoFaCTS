@@ -277,11 +277,21 @@
                                                 <i class="fa fa-file-o" aria-hidden="true"></i> {{t 'content.files'}}
                                                 {{#if detailsReady}}({{stimFilesCount}}){{else}}(...){{/if}}
                                             </button>
+                                            {{#if canInspectImageLibrary}}
+                                            <label class="video-catalog-limit-label" for="video-catalog-limit-{{this._id}}">
+                                                {{t 'content.videoCatalogLimit'}}
+                                                <input type="number" id="video-catalog-limit-{{this._id}}" class="video-catalog-limit" min="1" max="1000" step="1" disabled={{videoCatalogRunning this._id}}>
+                                            </label>
+                                            <button type="button" class="build-video-catalog-btn asset-disclosure-button asset-meta-item" data-tdfid="{{this._id}}" disabled={{videoCatalogRunning this._id}}>
+                                                <i class="fa fa-film" aria-hidden="true"></i> {{t 'content.buildVideoCatalog'}}
+                                            </button>
+                                            {{/if}}
                                             <button type="button" class="manage-media-btn asset-disclosure-button asset-meta-item" data-tdfid="{{this._id}}" aria-controls="media-manager-{{this._id}}" aria-expanded="false">
                                                 <i class="fa fa-folder-open" aria-hidden="true"></i> {{t 'content.manageMedia'}}
                                                 {{#if assetsCount}}({{assetsCount}}){{else}}(0){{/if}}
                                             </button>
                                         </div>
+                                        {{#with videoCatalogMessage this._id}}<p role="status" class="admin-inline-feedback video-catalog-status">{{this}}</p>{{/with}}
                                         <div hidden id="stimuli-{{this._id}}" class="asset-toggle-content">
                                             {{#if detailsReady}}
                                                 {{#if stimFileInfo.length}}

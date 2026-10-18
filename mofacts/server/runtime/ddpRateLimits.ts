@@ -24,7 +24,9 @@ export function isRateLimitedOpenRouterMethod(name: string): boolean {
     'callResolvedOpenRouterEmbeddings',
     'lookupSparcPrimitive',
     'publishSparcPrimitive',
-    'reviseSparcPrimitive'
+    'reviseSparcPrimitive',
+    'prepareSparcVideoCatalogTarget',
+    'saveSparcVideoCatalogPassages'
   ].includes(name);
 }
 
@@ -33,6 +35,11 @@ export function registerDdpRateLimits(deps: DdpRateLimitDeps) {
     return;
   }
   rateLimitsRegistered = true;
+
+  DDPRateLimiter.addRule({ type: 'method', name: 'deleteSparcInstructionalComponent',
+    userId(userId: string | null | undefined) { return !!userId; } }, 60, 60000);
+  DDPRateLimiter.addRule({ type: 'method', name: 'getSparcAdministrativeRemovals',
+    userId(userId: string | null | undefined) { return !!userId; } }, 180, 60000);
 
   DDPRateLimiter.addRule({
     type: 'method',

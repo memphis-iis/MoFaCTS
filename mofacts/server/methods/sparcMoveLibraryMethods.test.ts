@@ -14,7 +14,7 @@ describe('Shared move-library authorization', () => {
     }
   });
   it('returns bounded public content metadata without embeddings or private context', async () => {
-    const methods = createSparcMoveLibraryMethods({ store: { list: async () => [{ _id: 'entry', kind: 'explanation', content: { text: 'Public instructional content' }, target: 'kc', move: 'move', reusable: true, createdAt: new Date(),
+    const methods = createSparcMoveLibraryMethods({ store: { list: async () => [{ _id: 'entry', kind: 'explanation', content: { text: 'Public instructional content' }, target: 'kc', move: 'move', createdAt: new Date(),
       embedding: [1, 0], context: { secret: 'private transcript' }, queryDigest: 'private' }] } as unknown as MoveStore,
       getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true }), getApiKeyResolutionDeps: () => { throw new Error(); },
       verifyFigure: async () => {}, figureReusable: async () => true });

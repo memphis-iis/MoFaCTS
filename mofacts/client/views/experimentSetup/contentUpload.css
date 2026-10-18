@@ -714,3 +714,7 @@
         width: 100%;
     }
 }
+
+.video-catalog-status { white-space: pre-line; overflow-wrap: anywhere; }
+.video-catalog-limit-label { display: inline-flex; align-items: center; gap: var(--app-space-1); margin: 0; font-weight: inherit; }
+.video-catalog-limit { width: 7ch; }

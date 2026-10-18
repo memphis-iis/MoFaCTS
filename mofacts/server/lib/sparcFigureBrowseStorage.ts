@@ -1,6 +1,7 @@
 import { Mongo } from 'meteor/mongo';
 import { collectionMongoName } from '../../common/collectionOwnership';
 import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
+import { SPARC_INSTRUCTIONAL_COMPONENT_KINDS, isSparcInstructionalComponentKind } from '../../common/lib/sparcInstructionalLibrary';
 import type { InstructionalLibraryEntry } from './sparcInstructionalLibraryStorage';
 import type { BrowseMember, BrowseSnapshot, BrowseSource, SparcFigureBrowseStore } from './sparcFigureBrowseService';
 
@@ -28,7 +29,7 @@ export function createSparcFigureBrowseStore(library: Mongo.Collection<Instructi
     async snapshot(id) { return (await SparcFigureBrowse.findOneAsync({ _id: id, kind: 'snapshot' }))?.snapshot; },
     async sourcePage(afterId) {
       const rows = await library.rawCollection().find({ _id: { $gt: afterId }, $or: [
-        { kind: 'image', ready: true }, { kind: { $in: ['feedback', 'explanation', 'richContent', 'question'] } },
+        { kind: 'image', ready: true }, { kind: { $in: SPARC_INSTRUCTIONAL_COMPONENT_KINDS.filter(kind => kind !== 'image') } },
       ] }, { projection: { _id: 1, kind: 1, version: 1, embeddingVersion: 1, embeddingModel: 1, dimensions: 1, embedding: 1, situation: 1, requirements: 1 } })
         .sort({ _id: 1 }).limit(SPARC_FIGURE_LIBRARY_SETTINGS.batchSize).toArray();
       return rows.map(row => {
@@ -59,18 +60,6 @@ export function createSparcFigureBrowseStore(library: Mongo.Collection<Instructi
     async discard(snapshotId) {
       if ((await SparcFigureBrowse.findOneAsync('state'))?.current !== snapshotId) await SparcFigureBrowse.removeAsync({ snapshotId });
     },
-    async memberships(snapshotId, assetIds) {
-      if (assetIds.length > 24) throw new Error('Instructional membership page exceeds 24 entries');
-      if (!assetIds.length) return [];
-      // Membership IDs already encode snapshot + component; the built-in _id
-      // index serves this bounded batch without scanning a snapshot or vectors.
-      const rows = await SparcFigureBrowse.rawCollection().find({ kind: 'member', snapshotId,
-        _id: { $in: assetIds.map(id => `${snapshotId}-${id}`) } }, { projection: { _id: 0, assetId: 1, clusterId: 1 } }).toArray();
-      return rows.map(row => {
-        if (!row.assetId || !row.clusterId) throw new Error('Invalid instructional group membership');
-        return { assetId: row.assetId, clusterId: row.clusterId };
-      });
-    },
     async members(snapshotId, clusterId, cursor) {
       // Read the existing component type from its owner. Cached membership keeps
       // only semantic assignment; changing display order needs no re-clustering.
@@ -88,7 +77,7 @@ export function createSparcFigureBrowseStore(library: Mongo.Collection<Instructi
         { $sort: { kind: 1, similarity: -1, assetId: 1 } },
         { $limit: SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize + 1 },
       ]).toArray();
-      if (rows.some(row => !['explanation', 'feedback', 'image', 'question', 'richContent'].includes(row.kind))) {
+      if (rows.some(row => !isSparcInstructionalComponentKind(row.kind))) {
         throw new Error('Grouped instructional component is missing or has an invalid type');
       }
       return rows;

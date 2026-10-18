@@ -190,6 +190,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       const node = (prior.writes[0]?.value as { node?: Record<string, unknown> })?.node;
       if (!node || typeof node.value !== 'string') throw new Error('Saved instructional primitive is invalid');
       realized[component] = node.value;
+      if (node.administrativeRemoval) realized.removedComponents = [...(realized.removedComponents ?? []), component];
+      if (node.video) realized.video = node.video as NonNullable<SparcInstructionComponents['video']>;
       if (node.figure) realized.figure = node.figure as NonNullable<SparcInstructionComponents['figure']>;
       if (node.choices) realized.choices = node.choices as NonNullable<SparcInstructionComponents['choices']>;
       if (node.supportHeading) realized.supportHeading = String(node.supportHeading);
@@ -208,7 +210,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     return { assertions: [...assertions(student ? [menuConsumed] : [], true)], writes: [...transition.writes.filter(write => {
       const id = (write.value as { node?: { id?: string } })?.node?.id;
       return !id || !savedComponents.has(id.substring(`${event.eventId}:`.length));
-    }), ...inputControls(event, request.moveDefinition.responseFormat !== 'multiple-choice')] };
+    }), ...inputControls(event, request.moveDefinition.responseFormat !== 'multiple-choice'
+      && !(typeof output === 'object' && 'removedComponents' in output && output.removedComponents?.includes('question')))] };
   };
   const actions: Record<string, SparcProductionActionHandler> = {
     [SPARC_FEEDBACK_ACTION]: async ({ facts: current, ruleId }) => {

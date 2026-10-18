@@ -3,6 +3,7 @@
   import SparcFigure from '../../experiment/svelte/components/SparcFigure.svelte';
   import { readSparcPromptImage } from '../../experiment/svelte/services/sparcPromptImage';
   import { getErrorMessage } from '../../../lib/errorUtils';
+  import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../../../learning-components/runtime/sparcAdministrativeRemoval';
   export let assetId;
   export let description;
   export let displayWidth = undefined;
@@ -16,6 +17,7 @@
   let dataUrl = '';
   let fullSizeUrl = '';
   let error = '';
+  let removed = false;
   let loading = false;
   let alive = true;
   $: figure = { assetId, description, ...(displayWidth !== undefined ? { displayWidth } : {}) };
@@ -25,6 +27,7 @@
     loading = true; error = '';
     try {
       const result = await readSparcPromptImage(assetId);
+      if (result.administrativeRemoval) { if (alive) removed = true; return; }
       if (alive) {
         if (interactive && !onSelect) {
           // The authorized read validates this data URL; decode it without a CSP-governed fetch.
@@ -48,7 +51,8 @@
 </script>
 
 <div class="sparc-library-raster" class:sparc-library-raster-thumbnail={thumbnail} bind:this={container} aria-busy={loading}>
-  {#if dataUrl}
+  {#if removed}<p>{SPARC_ADMINISTRATIVE_REMOVAL_TEXT}</p>
+  {:else if dataUrl}
     {#if onSelect}<div class="sparc-library-thumbnail">
       <div class="sparc-library-thumbnail-content" aria-hidden="true" inert><SparcFigure {figure} {image} compact={true} /></div>
       <button type="button" class="sparc-library-thumbnail-select" aria-label={selectionLabel} aria-pressed={selected} aria-controls={controlsId} on:click={onSelect}></button>

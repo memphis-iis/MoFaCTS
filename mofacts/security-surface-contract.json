@@ -471,16 +471,6 @@
       "notes": "Explicit administrator raster upload only; bounded PNG/JPEG/WebP validation, expected-current conflict check and idempotent immutable assets. A Mongo transaction publishes version history and the library current pointer together after durable file storage; no provider call or AI replacement primitive. Saved decisions are unchanged."
     },
     {
-      "name": "listSparcLibraryImageVersions",
-      "access": "admin-only",
-      "notes": "Indexed, revision-cursor listing of at most 24 prior admitted versions for one completed shared entry. Original and replacement assets remain readable; only descriptions, immutable IDs, dates, models and revisions are returned. No administrator identities, learner records or embeddings."
-    },
-    {
-      "name": "setSparcLibraryImageReusable",
-      "access": "admin-only",
-      "notes": "Sets only the existing reusable boolean on a completed canonical shared-library entry. Deprecated means reusable=false. Private assets, pending entries and invalid boolean inputs are rejected; image bytes and saved learner decisions are preserved."
-    },
-    {
       "name": "getStimDisplayTypeMap",
       "access": "role-checked"
     },
@@ -1009,7 +999,7 @@
     {
       "name": "listSparcInstructionalComponents",
       "access": "admin-only",
-      "notes": "Pages at most 24 shared components with existing subgroup IDs from the validated current browsing snapshot. Membership reads use exact indexed snapshot/component IDs; no embeddings or learner records are returned. All-component and subgroup pages reject stale snapshots."
+      "notes": "Pages at most 24 shared components within one selected subgroup of the validated current browsing snapshot. Reads require an admin account, an existing subgroup and a valid type/distance cursor; stale snapshots and all-component requests are rejected. No embeddings or learner records are returned."
     },
     {
       "name": "lookupSparcPrimitive",
@@ -1028,8 +1018,26 @@
       "access": "admin-only"
     },
     {
-      "name": "setSparcMoveReusable",
+      "name": "getSparcVideoCatalogTargets",
       "access": "admin-only"
+    },
+    {
+      "name": "prepareSparcVideoCatalogTarget",
+      "access": "admin-only"
+    },
+    {
+      "name": "saveSparcVideoCatalogPassages",
+      "access": "admin-only"
+    },
+    {
+      "name": "deleteSparcInstructionalComponent",
+      "access": "admin-only",
+      "notes": "Admin authorization precedes exact-ID permanent deletion; learner histories and models are not edited."
+    },
+    {
+      "name": "getSparcAdministrativeRemovals",
+      "access": "admin-only",
+      "notes": "Admin authorization precedes at most 100 exact-ID receipt lookups; returns removed IDs only, never content or learner records."
     }
   ],
   "publications": [

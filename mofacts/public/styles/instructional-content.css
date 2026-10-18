@@ -1434,6 +1434,21 @@
   overflow: hidden;
 }
 .sparc-library-thumbnail-content { pointer-events: none; }
+.sparc-library-video-thumbnail { display: grid; place-items: center; }
+.sparc-library-video-thumbnail img { width: 100%; height: 100%; object-fit: contain; }
+.sparc-library-video-duration { position: absolute; inset-inline-end: var(--app-space-2); inset-block-end: var(--app-space-2); padding-inline: var(--app-space-1); border-radius: var(--app-border-radius-sm); background: var(--learning-card-surface-color); color: var(--app-text-color); font-size: calc(var(--app-font-size-base) * .8); }
+.sparc-library-header { display: flex; align-items: baseline; flex-wrap: wrap; min-width: 0; gap: var(--app-space-1) var(--app-space-3); margin-block-end: var(--app-space-3); padding-block: var(--app-space-1); color: var(--app-text-color); }
+.sparc-library-header h1 { flex: 0 1 auto; min-width: 0; margin: 0; padding-inline-end: var(--app-space-3); border-inline-end: var(--app-border-width) solid var(--border-color); font-family: var(--app-heading-font-family); font-size: calc(var(--app-font-size-base) * 1.125); font-weight: var(--app-font-weight-bold); line-height: var(--app-line-height-normal); color: inherit; overflow-wrap: anywhere; }
+.sparc-library-breadcrumb { flex: 1 1 auto; min-width: 0; }
+.sparc-library-breadcrumb ol { list-style: none; margin: 0; padding: 0; white-space: normal; }
+.sparc-library-breadcrumb li { display: inline; }
+.sparc-library-breadcrumb a { color: inherit; text-underline-offset: .15em; }
+.sparc-library-breadcrumb :is(a, [aria-current]) { overflow-wrap: anywhere; }
+.sparc-library-breadcrumb .breadcrumb-separator { margin-inline: var(--app-space-2); }
+@media (max-width: 768px) {
+  .sparc-library-header h1 { flex-basis: 100%; padding-inline-end: 0; border-inline-end: 0; }
+  .sparc-library-breadcrumb { flex-basis: 100%; }
+}
 .sparc-library-caption {
   margin-block-start: var(--app-space-1);
   text-align: center;
@@ -1442,6 +1457,7 @@
 }
 .sparc-library-group-link {
   display: block;
+  min-height: 0;
   max-width: 100%;
   margin-inline: auto;
   padding: 0;
@@ -1669,3 +1685,15 @@
 }
 .sparc-html-block img { border-radius: var(--app-border-radius-sm); }
 .sparc-html-block :is(a, summary), .sparc-support-reference { text-underline-offset: 0.15em; }
+
+/* Catalog video support uses the same central presentation tokens as other SPARC support. */
+.sparc-video {
+  max-width: min(100%, 36rem);
+  overflow: hidden;
+  border: var(--app-border-width) solid var(--border-color);
+  border-radius: var(--app-border-radius-sm);
+  background: var(--learning-card-surface-color);
+  --plyr-color-main: var(--app-accent-color);
+}
+.sparc-worked-example .sparc-video { border: 0; }
+.sparc-video .unavailable { display: none; }

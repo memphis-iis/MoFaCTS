@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+export const readSparcAdministrativeRemovals = (ids: string[]): Promise<string[]> => Meteor.callAsync('getSparcAdministrativeRemovals', ids);
 import type { SparcMoveLibraryClient } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
 
 export const sparcMoveLibraryClient: SparcMoveLibraryClient = {

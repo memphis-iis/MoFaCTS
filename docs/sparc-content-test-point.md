@@ -7,8 +7,8 @@ Current target packages:
 
 - `C:\dev\mofacts_config\SPARC Fractions Addition`
 - `C:\dev\mofacts_config\SPARC Stoichiometry`
-- `C:\dev\mofacts_config\SPARC Categorized Confidence Interval`
-- `C:\dev\mofacts_config\SPARC Categorized Species and Speciation`
+- `C:\dev\mofacts_config\SPARC Confidence Interval`
+- `C:\dev\mofacts_config\SPARC Species and Speciation`
 
 The two instructional-cycle references and their runtime contracts are described
 in [SPARC instructional cycle](sparc-instructional-cycle.md). The original

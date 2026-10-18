@@ -13,25 +13,19 @@ export function sparcLibraryFixture() {
   const store: SparcFigureLibraryStore = {
     async inspectEntries(ids) {
       return [...entries.values()].filter(entry => ids.includes(entry._id) && entry.ready)
-        .map(({ _id, version, imageModel, createdAt, reusable, currentAssetId, revision }) => ({ _id, version, imageModel, createdAt, reusable, ...(currentAssetId === undefined ? {} : { currentAssetId }), ...(revision === undefined ? {} : { revision }) }));
-    },
-    async setReusable(id, reusable) {
-      const entry = entries.get(id);
-      if (!entry?.ready) return false;
-      entry.reusable = reusable;
-      return true;
+        .map(({ _id, version, imageModel, createdAt }) => ({ _id, version, imageModel, createdAt }));
     },
     async inspectPage(afterId) {
       return [...entries.values()].filter(entry => entry.ready && entry._id > afterId)
         .sort((a, b) => a._id.localeCompare(b._id)).slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize + 1)
-        .map(({ _id, version, imageModel, createdAt, reusable, currentAssetId, revision }) => ({ _id, version, imageModel, createdAt, reusable, ...(currentAssetId === undefined ? {} : { currentAssetId }), ...(revision === undefined ? {} : { revision }) }));
+        .map(({ _id, version, imageModel, createdAt }) => ({ _id, version, imageModel, createdAt }));
     },
     async findDecision(id, userId) { const value = decisions.get(id); return value?.userId === userId ? structuredClone(value) : undefined; },
     async saveDecision(decision) { if (!decisions.has(decision._id)) decisions.set(decision._id, structuredClone(decision)); },
     async findEntry(id) { const value = entries.get(id); return value ? structuredClone(value) : undefined; },
     async saveEntry(entry) { entries.set(entry._id, structuredClone(entry)); },
     async candidates(query) {
-      return [...entries.values()].filter(entry => entry._id > query.afterId && entry.ready && entry.reusable
+      return [...entries.values()].filter(entry => entry._id > query.afterId && entry.ready
         && entry.version === query.version && entry.imageModel === query.imageModel
         && entry.embeddingModel === query.embeddingModel && entry.dimensions === query.dimensions)
         .sort((a, b) => a._id.localeCompare(b._id)).slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.batchSize).map(entry => structuredClone(entry));
@@ -93,7 +87,7 @@ describe('SPARC shared figure situation library', () => {
   it('resumes the original decision without another embedding or generation after library changes', async () => {
     const f = sparcLibraryFixture();
     await getOrGenerateSparcLibraryFigure(request(f.store, 'first'));
-    f.entries.get('first')!.reusable = false;
+    f.entries.delete('first');
     const retry = await getOrGenerateSparcLibraryFigure(request(f.store, 'first', {
       situation: 'Changed situation', embed: async () => { throw new Error('Must not embed'); },
       generate: async () => { throw new Error('Must not generate'); } }));

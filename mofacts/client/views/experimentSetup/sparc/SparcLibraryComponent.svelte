@@ -3,18 +3,13 @@
   import { getErrorMessage } from '../../../lib/errorUtils';
   import SparcNode from '../../experiment/svelte/components/SparcNode.svelte';
   import { sparcLibraryPreviewNode } from './sparcLibraryPreview';
+  import SparcLibraryDelete from './SparcLibraryDelete.svelte';
   export let entry;
   export let onChanged = () => {};
-  export let onReuseChanged = () => {};
   let draft, saving = false, error = '', notice = '';
   $: previewNode = sparcLibraryPreviewNode(entry);
-  const labels = { feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question' };
+  const labels = { feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question', video: 'Video passage' };
   function edit() { draft = JSON.parse(JSON.stringify(entry.content)); error = ''; notice = ''; }
-  async function reuse() {
-    saving = true; error = '';
-    try { await meteorCallAsync('setSparcMoveReusable', entry.id, !entry.reusable); entry = { ...entry, reusable: !entry.reusable }; onReuseChanged(entry.id, entry.reusable); notice = 'Reuse status saved.'; }
-    catch (failure) { error = getErrorMessage(failure); } finally { saving = false; }
-  }
   async function save() {
     saving = true; error = '';
     try { await meteorCallAsync('reviseSparcPrimitive', entry.id, draft); draft = undefined; onChanged(); }
@@ -23,7 +18,7 @@
 </script>
 
 <article aria-label="Selected instructional component">
-  <h2>{labels[entry.kind]}{entry.reusable ? '' : ' · Excluded'}</h2>
+  <h2>{labels[entry.kind]}</h2>
   <p>{entry.move} · {entry.target}</p>
   {#if error}<p role="alert">{error}</p>{/if}
   {#if notice}<p role="status">{notice}</p>{/if}
@@ -41,8 +36,8 @@
   {:else}
     <SparcNode node={previewNode} />
     {#if entry.content.choices}<p>Correct answer: {entry.content.choices.filter(choice => choice.correct).map(choice => choice.label).join('; ')}</p>{/if}
-    <button class="btn btn-outline-primary" type="button" disabled={saving} on:click={edit}>Revise</button>
-    <button class="btn btn-outline-secondary" type="button" disabled={saving} on:click={reuse}>{entry.reusable ? 'Exclude from reuse' : 'Allow reuse'}</button>
+    {#if entry.kind !== 'video' && !entry.content.video}<button class="btn btn-outline-primary" type="button" disabled={saving} on:click={edit}>Revise</button>{/if}
+    <SparcLibraryDelete id={entry.id} disabled={saving} onDeleted={onChanged} />
   {/if}
 </article>
 

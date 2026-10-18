@@ -1,3 +1,4 @@
+import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
 import { parseSparcPromptFigure } from './sparcSupportedPrompt';
 import { isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
 import { requireSparcTargetCategory } from '../../runtime/sparcTargetCategories';
@@ -198,6 +199,7 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
       time: transition.event.time,
     };
     for (const key of ['primitiveReference', 'component']) if (node[key] !== undefined) slots[key] = node[key];
+    if (node.video !== undefined) slots.video = parseSparcVideoSegment(node.video);
     if (node.figure !== undefined) slots.figure = parseSparcPromptFigure(node.figure);
     if (speaker === 'learner' && transition.event.type === 'response-submitted' && transition.event.payload?.questionId) {
       slots.responseFormat = 'multiple-choice';

@@ -1,3 +1,8 @@
+import { createSparcVideoCatalogMethods } from './methods/sparcVideoCatalogMethods';
+import { createSparcLibraryCurationMethods } from './methods/sparcLibraryCurationMethods';
+import { SPARC_PROMPT_IMAGE_PURPOSE } from '../common/lib/sparcPromptImage';
+import { createSparcLibraryCuration, isSparcAdministrativeRemoval, readSparcAdministrativeRemovals } from './lib/sparcLibraryCurationStorage';
+import { ensureSparcVideoCatalogIndexes, findSparcVideoCandidates, sparcVideoReuseStatus } from './lib/sparcVideoCatalog';
 import { decompressHistoryRecord } from '../common/historyCompression';
 import { createSparcMoveLibraryMethods } from './methods/sparcMoveLibraryMethods';
 import { createSparcInstructionalBrowseMethods } from './methods/sparcInstructionalBrowseMethods';
@@ -79,7 +84,6 @@ import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
 import { createSparcFigureBrowseStore, ensureSparcFigureBrowseIndexes } from './lib/sparcFigureBrowseStorage';
 import { consolidateSparcInstructionalLibrary, SparcInstructionalLibrary } from './lib/sparcInstructionalLibraryStorage';
 import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
-import { createSparcFigureVersionStore, ensureSparcFigureVersionIndexes, removeSparcFigureVersionMetadata } from './lib/sparcFigureVersionStorage';
 import { createProfileMethods } from './methods/profileMethods';
 import { createSpeechMethods } from './methods/speechMethods';
 import { createSystemMethods } from './methods/systemMethods';
@@ -269,6 +273,16 @@ const {
 
 assertRequiredMeteorSettings();
 const storageBoundary = createStorageBoundary(Meteor.settings);
+const sparcLibraryCuration = createSparcLibraryCuration(async id => {
+  const asset = await DynamicAssets.collection.findOneAsync({ _id: id });
+  if (!asset) return;
+  if (asset.meta?.uploadPurpose !== SPARC_PROMPT_IMAGE_PURPOSE || asset.meta?.public !== false) throw new Error('Administrative removal requires a private SPARC teaching asset');
+  if (asset.meta.storageBackend === 's3') {
+    if (storageBoundary.backend !== 's3' || typeof asset.meta.storageKey !== 'string') throw new Error('SPARC asset storage owner mismatch');
+    await storageBoundary.deleteObject(asset.meta.storageKey);
+  }
+  await DynamicAssets.removeAsync({ _id: id });
+});
 const redisBoundary = createRedisBoundary(Meteor.settings);
 
 // SECURITY FIX: Removed insecure TLS configuration
@@ -701,7 +715,6 @@ export const methods: any = {
   ...createAdminMethods({
     removeSparcFigureAssetMetadata: async assetId => {
       await removeSparcFigureAssetMetadata(assetId);
-      await removeSparcFigureVersionMetadata(assetId);
     },
     removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
     serverConsole,
@@ -1032,10 +1045,20 @@ export const asyncMethods: Record<string, unknown> = {
 
   ...speechMethods,
 
+  ...createSparcLibraryCurationMethods({ getMethodAuthorizationDeps,
+    remove: id => withSparcFigureLibraryLock(() => sparcLibraryCuration.remove(id)), removed: readSparcAdministrativeRemovals }),
+  ...createSparcVideoCatalogMethods({ getMethodAuthorizationDeps, getApiKeyResolutionDeps,
+    loadTdf: async id => await Tdfs.findOneAsync({ _id: id }, { fields: { 'content.tdfs.tutor.setspec': 1, 'rawStimuliFile.setspec.sparcPages': 1 } }) ?? undefined }),
   ...createSparcMoveLibraryMethods({ store: createSparcMoveStore(async (userId, tdfId, after) => (await Histories.find({ userId, TDFId: tdfId, eventType: 'sparc', _id: { $gt: after } }, { sort: { _id: 1 }, limit: 100 }).fetchAsync()).map(decompressHistoryRecord)), getApiKeyResolutionDeps, getMethodAuthorizationDeps,
+    videoReuseStatus: sparcVideoReuseStatus,
+    async videoCandidates(vector, tdfId) {
+      const tdf = await Tdfs.findOneAsync({ _id: tdfId }, { fields: { 'content.tdfs.tutor.setspec.contentLanguage': 1 } });
+      const language = tdf?.content?.tdfs?.tutor?.setspec?.contentLanguage;
+      return typeof language === 'string' && language ? findSparcVideoCandidates(vector, language) : [];
+    },
     timing: (stage, ms, count) => serverConsole('[SPARC move library]', { stage, ms, ...(count === undefined ? {} : { count }) }),
     async figureReusable(assetId) {
-      return Boolean(await SparcFigureLibrary.findOneAsync({ ready: true, reusable: true, $or: [{ currentAssetId: assetId }, { _id: assetId, currentAssetId: { $exists: false } }] }));
+      return Boolean(await SparcFigureLibrary.findOneAsync({ ready: true, _id: assetId }));
     },
     async verifyFigure(assetId) {
       if (!await DynamicAssets.collection.findOneAsync({ _id: assetId, 'meta.ready': true, 'meta.figureLibraryVersion': { $exists: true } })) throw new Error('Reusable figure asset is unavailable');
@@ -1049,8 +1072,8 @@ export const asyncMethods: Record<string, unknown> = {
       progress: (stage, count) => serverConsole('[SPARC instructional grouping]', stage, count),
     } }),
   ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary,
-    figureLibrary: createSparcFigureLibraryStore(),
-    figureVersions: createSparcFigureVersionStore() }),
+    isRemoved: isSparcAdministrativeRemoval,
+    figureLibrary: createSparcFigureLibraryStore() }),
 
   ...createOpenRouterMethods({
     serverConsole,
@@ -1116,10 +1139,11 @@ registerServerRuntime({
 
 Meteor.startup(async function() {
   await consolidateSparcInstructionalLibrary((source, count) => serverConsole('[SPARC instructional library transfer]', { source, count }));
+  await sparcLibraryCuration.migrateExclusions(count => serverConsole('[SPARC administrative deletion migration]', { deleted: count }));
   await ensureSparcFigureLibraryIndexes();
   await ensureSparcMoveLibraryIndexes();
+  await ensureSparcVideoCatalogIndexes();
   await Histories.rawCollection().createIndex({ userId: 1, TDFId: 1, eventType: 1, _id: 1 });
-  await ensureSparcFigureVersionIndexes();
   await ensureSparcFigureBrowseIndexes();
   await ensureProlificIndexes();
   // Test provisioning checks exact lesson families without course/user scope.

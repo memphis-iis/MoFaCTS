@@ -1,6 +1,8 @@
 <script>
   import { relevantSupport } from '../services/sparcRelevantSupport';
+  import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../../../../learning-components/runtime/sparcAdministrativeRemoval';
   import DOMPurify from 'dompurify';
+  import SparcVideo from './SparcVideo.svelte';
   import SparcPromptFigure from './SparcPromptFigure.svelte';
   import LearningProgressChart from './LearningProgressChart.svelte';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
@@ -16,7 +18,7 @@
 
   function isWorkedExample(component) {
     return component.id === `${component.turnEventId}:richContent`
-      && component.figure === undefined
+      && component.figure === undefined && component.video === undefined
       && SPARC_CATEGORIZED_MENU_OPTIONS.some((option) => option.action === component.action);
   }
 
@@ -98,6 +100,7 @@
   }
 
   function getNodeValue(candidate) {
+    if (candidate?.administrativeRemoval) return SPARC_ADMINISTRATIVE_REMOVAL_TEXT;
     if (!candidate?.id) {
       return '';
     }
@@ -546,14 +549,18 @@
               role={workedExample || categorizedSupport ? 'group' : undefined}
               aria-label={heading}
             >
-              {#if component.primitiveReference?.priorNodeId}
+              {#if component.administrativeRemoval}
+                <p>{component.value}</p>
+              {:else if component.primitiveReference?.priorNodeId}
                 <a class="sparc-support-reference" data-sparc-reference={`sparc-primitive-${encodeURIComponent(component.primitiveReference.priorNodeId)}`}
                   href={`#sparc-primitive-${encodeURIComponent(component.primitiveReference.priorNodeId)}`}>Relevant earlier {component.component === 'explanation' ? 'explanation' : 'support'}</a>
               {:else}
               {#if heading}
                 <div class="sparc-worked-example-title" aria-hidden="true">{heading}</div>
               {/if}
-              {#if categorizedSupport && component.figure !== undefined}
+              {#if component.video !== undefined}
+                <SparcVideo video={component.video} />
+              {:else if categorizedSupport && component.figure !== undefined}
                 <SparcPromptFigure figure={component.figure} figureId={component.id} compact={true} />
               {:else}
                 <div class="sparc-instruction-content sparc-html-block">{@html renderSparcInstructionMarkdown(getNodeValue(component), DOMPurify.sanitize.bind(DOMPurify))}</div>
@@ -569,7 +576,9 @@
             </div>
           {/each}
         {:else}
-          {#if dialogueSpeaker(node) === 'tutor'}
+          {#if node.video !== undefined}
+            <SparcVideo video={node.video} />
+          {:else if dialogueSpeaker(node) === 'tutor'}
             <div class="sparc-instruction-content sparc-html-block">{@html renderSparcInstructionMarkdown(getNodeValue(node), DOMPurify.sanitize.bind(DOMPurify))}</div>
           {:else}
             <div>{getNodeValue(node)}</div>

@@ -3,8 +3,9 @@ import { transferInstructionalBatch } from './sparcInstructionalLibraryMigration
 import { collectionMongoName } from '../../common/collectionOwnership';
 import type { MoveEntry } from './sparcMoveLibraryService';
 import type { SparcFigureLibraryEntry } from './sparcFigureLibraryService';
+import type { VideoCatalogEntry } from './sparcVideoCatalogService';
 
-export type InstructionalLibraryEntry = MoveEntry | (SparcFigureLibraryEntry & { kind: 'image' });
+export type InstructionalLibraryEntry = MoveEntry | VideoCatalogEntry | (SparcFigureLibraryEntry & { kind: 'image' });
 /** One content collection. Figure and primitive stores are typed adapters to this owner. */
 export const SparcInstructionalLibrary = new Mongo.Collection<InstructionalLibraryEntry>(collectionMongoName('SparcInstructionalLibrary'));
 

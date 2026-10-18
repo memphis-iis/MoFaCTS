@@ -5,26 +5,27 @@ import { SPARC_MOVE_LIBRARY_VERSION, type SparcPrimitiveQuery } from '../../../l
 import { moveExposuresFromHistory } from './sparcMoveExposureProjection';
 
 function fixture() {
+  const removed = new Set<string>();
   const entries = new Map<string, MoveEntry>(), requests = new Map<string, MoveRequest>(), exposures = new Map<string, MoveExposure>(), leases = new Map<string, string>();
   let embeds = 0, exposureReads = 0;
   const store: MoveStore = {
     request: async id => { const r = requests.get(id); return r ? { ...r } : undefined; }, saveRequest: async r => { if (!requests.get(r._id)?.entryId) requests.set(r._id, { ...r }); return requests.get(r._id)!; },
     entry: async id => entries.get(id), saveEntry: async e => { if (!entries.has(e._id)) entries.set(e._id, e); },
-    candidates: async (kind, embeddingModel, after) => [...entries.values()].filter(e => e.kind === kind && e.embeddingModel === embeddingModel && e.reusable && e._id > after).sort((a, b) => a._id.localeCompare(b._id)).slice(0, 100),
+    candidates: async (kind, embeddingModel, after) => [...entries.values()].filter(e => e.kind === kind && e.embeddingModel === embeddingModel && e._id > after).sort((a, b) => a._id.localeCompare(b._id)).slice(0, 100),
     exposures: async (userId, tdfId) => { exposureReads++; return [...exposures.values()].filter(e => e.userId === userId && e.tdfId === tdfId); },
-    reservedQuestions: async (userId, tdfId) => [...requests.values()].filter(r => r.userId === userId && r.query.tdfId === tdfId && r.query.context.kind === 'question' && r.entryId).map(r => ({ _id: r._id, userId, tdfId, sessionId: r.query.sessionId, eventId: r.query.eventId,
+    reservedQuestions: async (userId, tdfId) => [...requests.values()].filter(r => r.userId === userId && r.query.tdfId === tdfId && r.query.context.kind === 'question' && r.entryId && entries.has(r.entryId)).map(r => ({ _id: r._id, userId, tdfId, sessionId: r.query.sessionId, eventId: r.query.eventId,
       kind: 'question', nodeId: `${r.query.eventId}:question`, entryId: r.entryId!, content: entries.get(r.entryId!)!.content, questionEmbedding: entries.get(r.entryId!)!.questionEmbedding! })),
     expose: async e => { exposures.set(e._id, e); },
     acquire: async (key, token) => { if (leases.has(key) && leases.get(key) !== token) return false; leases.set(key, token); return true; },
     release: async (key, token) => { if (leases.get(key) === token) leases.delete(key); },
     list: async () => [...entries.values()],
-    setReusable: async (id, reusable) => { entries.get(id)!.reusable = reusable; },
+    removed: async id => removed.has(id),
     saveQuestionEmbedding: async (id, vector, location) => { const item = location === 'entry' ? entries.get(id) : exposures.get(id); if (item) item.questionEmbedding = vector; },
-    revise: async (entry, previousId) => { entries.set(entry._id, entry); entries.get(previousId)!.reusable = false; },
+    revise: async entry => { entries.set(entry._id, entry); },
   };
   const make = (wait?: (ms: number) => Promise<void>) => createMoveLibraryService({ store, embeddingModel: 'fixture', ...(wait ? { wait } : {}),
     embed: async text => { embeds++; return text.includes('distinct') ? [0, 1] : [1, 0]; }, verifyFigure: async () => {} });
-  return { entries, requests, exposures, leases, store, make, counts: () => ({ embeds, exposureReads }) };
+  return { entries, removed, requests, exposures, leases, store, make, counts: () => ({ embeds, exposureReads }) };
 }
 function needText(value: string) { return sparcInstructionalNeedText({ target: { texts: [value] }, assistance: 2.52, evidence: [] }); }
 function query(eventId = 'one', kind: SparcPrimitiveQuery['context']['kind'] = 'explanation'): SparcPrimitiveQuery {
@@ -74,7 +75,7 @@ describe('Shared instructional primitive library', () => {
     assert.equal((await service.lookup('alice', q)).status, 'hit');
     await assert.rejects(service.lookup('bob', query('new')), /reindexing/);
   });
-  it('shares content across learners, highlights the original exposure, and restores accepted content after exclusion', async () => {
+  it('shares content across learners, highlights the original exposure, and stamps deleted accepted content', async () => {
     const f = fixture(), s = f.make(), q = query();
     const first = await s.lookup('alice', q); assert.equal(first.status, 'generate');
     if (first.status !== 'generate') throw new Error('Expected generation');
@@ -89,10 +90,10 @@ describe('Shared instructional primitive library', () => {
     assert.equal(again.reference.priorNodeId, 'one:explanation');
     await s.present('alice', query('three'), again.reference, 'three:explanation');
     const fourth = await f.make().lookup('alice', query('four')); assert.equal(fourth.status === 'hit' && fourth.reference.priorNodeId, 'one:explanation');
-    await f.store.setReusable(published.reference.entryId, false);
+    f.entries.delete(published.reference.entryId); f.removed.add(published.reference.entryId);
     assert.equal((await f.make().lookup('alice', q)).status, 'hit');
     assert.equal((await f.make().lookup('carol', query('five'))).status, 'generate');
-    assert.equal(f.entries.size, 1);
+    assert.equal(f.entries.size, 0);
   });
 
   it('uses embeddings without exact-context restrictions or a calibration gate', async () => {
@@ -164,15 +165,20 @@ describe('Shared instructional primitive library', () => {
     assert.equal(f.leases.size, 0);
   });
 
-  it('revises immutably while existing selections retain their old version', async () => {
+  it('revises the current item without creating catalog versions or altering exposures', async () => {
     const f = fixture(), s = f.make(), q = query();
     const first = await s.lookup('alice', q); if (first.status !== 'generate') throw new Error();
     const p = await s.publish('alice', first.ticket, { text: 'Original.' }); if (!p.accepted) throw new Error();
+    await s.present('alice', q, p.reference, 'one:explanation');
     const revised = await s.revise('admin', p.reference.entryId, { text: 'Revised.' });
-    assert.notEqual(revised, p.reference.entryId);
-    const resumed = await s.lookup('alice', q); assert.equal(resumed.status === 'hit' && resumed.content.text, 'Original.');
+    assert.equal(revised, p.reference.entryId);
+    const resumed = await s.lookup('alice', q); assert.equal(resumed.status === 'hit' && resumed.content.text, 'Revised.');
     const next = await f.make().lookup('bob', query('two')); assert.equal(next.status === 'hit' && next.content.text, 'Revised.');
-    assert.equal(f.entries.get(p.reference.entryId)?.reusable, false);
+    assert.equal(f.entries.has(p.reference.entryId), true);
+    assert.equal(f.entries.size, 1);
+    assert.equal([...f.exposures.values()][0]!.content.text, 'Original.');
+    const later = await s.lookup('alice', query('later'));
+    assert.equal(later.status === 'hit' && later.reference.priorNodeId, undefined);
   });
 
   it('validates context, active markup, and multiple-choice keys without requiring descriptors', async () => {
@@ -244,5 +250,28 @@ describe('Shared instructional primitive library', () => {
     assert.equal(rows.length, 2); assert.deepEqual(rows.map(e => e.kind), ['question', 'feedback']);
     assert.ok(rows[0]?.entryId.startsWith('historical:')); assert.equal(rows[1]?.entryId, 'saved-feedback');
     assert.deepEqual(moveExposuresFromHistory({ sparc: { stateTransition: { writes: [{ value: { factType: 'learningTarget.score' } }] } } }), []);
+  });
+});
+
+
+describe('Saved video primitive durability', () => {
+  it('stamps an accepted clip after administrative deletion and prevents subsequent reuse', async () => {
+    const f = fixture(); let available = true;
+    const video = { segmentId: 'a'.repeat(64), videoId: 'abcdefghijk', startSeconds: 10, endSeconds: 30,
+      transcript: 'Heritable variation exists before selection.', language: 'en', title: 'Selection', channel: 'Teaching' };
+    const service = createMoveLibraryService({ store: f.store, embeddingModel: 'fixture', embed: async () => [1, 0],
+      videoReuseStatus: async videos => new Map(videos.map(item => [item.segmentId, available])) });
+    const first = query('video-one', 'richContent');
+    const proposed = await service.lookup('alice', first); assert.equal(proposed.status, 'generate');
+    if (proposed.status !== 'generate') throw new Error('Expected generation');
+    const saved = await service.publish('alice', proposed.ticket, { text: video.transcript, video });
+    if (!saved.accepted) throw new Error('Expected saved video');
+    available = false;
+    f.entries.delete(saved.reference.entryId); f.removed.add(saved.reference.entryId);
+    const restored = await service.lookup('alice', first); assert.equal(restored.status, 'hit');
+    if (restored.status !== 'hit') throw new Error('Expected saved decision');
+    assert.equal(restored.content.text, 'Administrative removal');
+    assert.equal(restored.content.video, undefined);
+    assert.equal((await service.lookup('alice', query('video-two', 'richContent'))).status, 'generate');
   });
 });

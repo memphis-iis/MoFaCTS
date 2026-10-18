@@ -11,10 +11,8 @@ export const SPARC_FIGURE_LIBRARY_SETTINGS = Object.freeze({
 });
 
 export type SparcLibraryImage = Readonly<{
-  libraryId: string; assetId: string; description: string; createdAt: string; model: string; reusable: boolean; revision: number;
+  assetId: string; description: string; createdAt: string; model: string;
 }>;
-export type SparcLibraryImageVersion = Readonly<{ assetId: string; description: string; createdAt: string; model: string; revision: number }>;
-export type SparcLibraryImageHistory = Readonly<{ versions: SparcLibraryImageVersion[]; nextCursor: number | null }>;
 export type SparcLibraryImagePage = Readonly<{ images: SparcLibraryImage[]; nextCursor: string | null }>;
 
 export function sparcFigureMinimumSimilarity(value: unknown): number {

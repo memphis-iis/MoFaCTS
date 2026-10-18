@@ -1,3 +1,5 @@
+import { parseSparcVideoSegment, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
 import { createHash, randomBytes } from 'crypto';
 import { parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
 import { normalizeSparcFigureEmbedding, sparcFigureCosineSimilarity } from '../../common/lib/sparcFigureLibrary';
@@ -10,9 +12,9 @@ export const moveDigest = (value: unknown) => createHash('sha256').update(stable
 export type QuestionEmbedding = { model: string; text: string; vector: number[] };
 export type MoveEntry = {
   _id: string; version: string; context: SparcPrimitiveContext; kind: string; embeddingModel: string;
-  embedding: number[]; questionEmbedding?: QuestionEmbedding; content: SparcPrimitiveContent; reusable: boolean;
+  embedding: number[]; questionEmbedding?: QuestionEmbedding; content: SparcPrimitiveContent;
   embeddingVersion?: string;
-  createdAt: Date; requirements: string; move: string; target: string; previousEntryId?: string;
+  createdAt: Date; requirements: string; move: string; target: string;
 };
 export type MoveRequest = { _id: string; userId: string; query: SparcPrimitiveQuery; embedding: number[];
   embeddingVersion?: string;
@@ -31,9 +33,9 @@ export interface MoveStore {
   acquire(key: string, token: string): Promise<boolean>;
   release(key: string, token: string): Promise<void>;
   list(kind?: string, after?: string): Promise<MoveEntry[]>;
-  setReusable(id: string, reusable: boolean): Promise<void>;
+  removed(id: string): Promise<boolean>;
   saveQuestionEmbedding(id: string, embedding: QuestionEmbedding, location: 'entry' | 'exposure'): Promise<void>;
-  revise(entry: MoveEntry, previousId: string): Promise<void>;
+  revise(entry: MoveEntry): Promise<void>;
 }
 
 function bounded(value: unknown, label: string, max: number): asserts value is string {
@@ -41,8 +43,9 @@ function bounded(value: unknown, label: string, max: number): asserts value is s
 }
 export function validatePrimitiveContent(value: SparcPrimitiveContent, context: SparcPrimitiveContext): SparcPrimitiveContent {
   bounded(value?.text, 'primitive text', 2048);
-  if (Object.keys(value).some(k => !['text', 'figure', 'choices', 'supportHeading'].includes(k))) throw new Error('Unexpected primitive field');
+  if (Object.keys(value).some(k => !['text', 'figure', 'video', 'choices', 'supportHeading'].includes(k))) throw new Error('Unexpected primitive field');
   if (/<\s*(script|iframe|input|button|style)|\bon\w+\s*=|javascript:/i.test(value.text)) throw new Error('Unsafe instructional markup');
+  if (value.video) { if (context.kind !== 'richContent' || value.figure || value.supportHeading || value.text !== value.video.transcript) throw new Error('Video requires standalone rich support'); parseSparcVideoSegment(value.video); }
   if (value.figure) { if (context.kind !== 'richContent') throw new Error('Figure requires rich support'); parseSparcPromptFigure(value.figure); }
   if (value.supportHeading) { bounded(value.supportHeading, 'support heading', 60); if (context.kind !== 'richContent' || value.figure) throw new Error('Invalid support heading'); }
   if (context.kind === 'question') {
@@ -54,6 +57,7 @@ export function validatePrimitiveContent(value: SparcPrimitiveContent, context: 
 
 export function createMoveLibraryService(deps: { store: MoveStore; embeddingModel: string; minimumSimilarity?: number; questionNovelty?: number;
   embed(text: string, query: SparcPrimitiveQuery): Promise<number[]>; verifyFigure?(assetId: string): Promise<void>;
+  videoReuseStatus?(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>>;
   figureReusable?(assetId: string): Promise<boolean>;
   wait?(ms: number): Promise<void>; timing?(stage: string, ms: number, count?: number): void }) {
   const { store } = deps;
@@ -98,14 +102,24 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
   };
   const reference = (request: MoveRequest): SparcPrimitiveReference => ({ entryId: request.entryId!, version: SPARC_MOVE_LIBRARY_VERSION,
     source: request.source!, similarity: request.similarity ?? null });
+  const acceptedContent = async (request: MoveRequest): Promise<SparcPrimitiveContent> => {
+    if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true };
+    const entry = await store.entry(request.entryId!);
+    if (!entry) {
+      if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true };
+      throw new Error('Saved primitive is missing');
+    }
+    return entry.content;
+  };
   const existing = async (request: MoveRequest): Promise<SparcPrimitiveLookup> => {
     if (!request.entryId) return { status: 'generate', ticket: request._id,
       previousQuestions: [...new Map([...request.query.previousQuestions, ...(await priorFor(request.userId, request.query.tdfId)).filter(e => e.kind === 'question').map(e => e.content)].map(q => [q.text, q])).values()] };
-    const entry = await store.entry(request.entryId);
-    if (!entry) throw new Error('Saved primitive is missing');
-    const prior = (await priorFor(request.userId, request.query.tdfId)).find(e => e.entryId === entry._id && !e.priorNodeId && e.sessionId === request.query.sessionId && e.eventId !== request.query.eventId);
-    return { status: 'hit', content: entry.content, reference: { ...reference(request),
-      ...(prior && ['explanation', 'richContent'].includes(entry.kind) ? { priorNodeId: prior.nodeId } : {}) } };
+    const content = await acceptedContent(request);
+    if (content.administrativeRemoval) return { status: 'hit', content, reference: reference(request) };
+    const prior = (await priorFor(request.userId, request.query.tdfId)).find(e => e.entryId === request.entryId && stableMoveJson(e.content) === stableMoveJson(content)
+      && !e.priorNodeId && e.sessionId === request.query.sessionId && e.eventId !== request.query.eventId);
+    return { status: 'hit', content, reference: { ...reference(request),
+      ...(prior && ['explanation', 'richContent'].includes(request.query.context.kind) ? { priorNodeId: prior.nodeId } : {}) } };
   };
   const novel = async (embedding: number[], query: SparcPrimitiveQuery, userId: string) => {
     const prior = (await priorFor(userId, query.tdfId)).filter(e => e.kind === 'question' && !(e.eventId === query.eventId && e.sessionId === query.sessionId));
@@ -154,11 +168,15 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
           let after = '';
           for (;;) {
             const entries = await store.candidates(query.context.kind, deps.embeddingModel, after);
+            const videos = entries.flatMap(entry => entry.content.video ? [entry.content.video] : []);
+            if (videos.length && !deps.videoReuseStatus) throw new Error('Video reuse validation unavailable');
+            const videoStatus = videos.length ? await deps.videoReuseStatus!(videos) : new Map<string, boolean>();
             for (const entry of entries) {
               candidateCount++;
-              if (entry.embeddingModel !== deps.embeddingModel || !entry.reusable || entry.version !== SPARC_MOVE_LIBRARY_VERSION) continue;
+              if (entry.embeddingModel !== deps.embeddingModel || entry.version !== SPARC_MOVE_LIBRARY_VERSION) continue;
               if (entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
               if (entry.kind !== query.context.kind || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)) continue;
+              if (entry.content.video && videoStatus.get(entry.content.video.segmentId) !== true) continue;
               if (entry.content.figure && (!deps.figureReusable || !await deps.figureReusable(entry.content.figure.assetId))) continue;
               const similarity = sparcFigureCosineSimilarity(embedding, entry.embedding);
               if (similarity < minimumSimilarity) continue;
@@ -181,29 +199,31 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       const request = await store.request(ticket);
       if (!request || request.userId !== userId) throw new Error('Unknown primitive generation request');
       if (request.entryId) {
-        const entry = await store.entry(request.entryId); if (!entry) throw new Error('Accepted content is missing');
-        return { accepted: true as const, content: entry.content, reference: reference(request) };
+        return { accepted: true as const, content: await acceptedContent(request), reference: reference(request) };
       }
       if (request.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Pending primitive embedding requires reindexing');
       if (!await store.acquire(request.lockKey, request.leaseToken)) throw new Error('Primitive generation lease expired');
       try {
         validatePrimitiveContent(content, request.query.context);
+        if (content.video) {
+          if (!deps.videoReuseStatus) throw new Error('Video verification unavailable');
+          if ((await deps.videoReuseStatus([content.video])).get(content.video.segmentId) !== true) throw new Error('The catalog video was removed from new instruction');
+        }
         if (content.figure) { if (!deps.verifyFigure) throw new Error('Figure verification unavailable'); await deps.verifyFigure(content.figure.assetId); }
         const questionEmbedding = request.query.context.kind === 'question'
           ? { model: deps.embeddingModel, text: content.text, vector: await embed(content.text, request.query) } : undefined;
         return await withQuestionLock(userId, request.query, async () => {
           if (questionEmbedding && !await novel(questionEmbedding.vector, request.query, userId)) return { accepted: false as const, reason: 'Question is too similar to an earlier question. Generate a different question.' };
           const id = moveDigest([SPARC_MOVE_LIBRARY_VERSION, request.query.context.kind, deps.embeddingModel, request.embedding, content]);
-          if ((await store.entry(id))?.reusable === false) throw new Error('This content was excluded from reuse; generate different content');
+          if (await store.removed(id)) return { accepted: false as const, reason: 'This content was administratively removed. Generate different content.' };
           await store.saveEntry({ _id: id, version: SPARC_MOVE_LIBRARY_VERSION, context: request.query.context, kind: request.query.context.kind,
             embeddingModel: deps.embeddingModel, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
             embedding: request.embedding, ...(questionEmbedding ? { questionEmbedding } : {}), content,
             requirements: request.query.context.requirements, target: request.query.context.target, move: request.query.context.move,
-            reusable: true, createdAt: new Date() });
+            createdAt: new Date() });
           Object.assign(request, { entryId: id, source: 'generated', similarity: null });
           const accepted = await store.saveRequest(request);
-          const entry = await store.entry(accepted.entryId!); if (!entry) throw new Error('Accepted content is missing');
-          return { accepted: true as const, content: entry.content, reference: reference(accepted) };
+          return { accepted: true as const, content: await acceptedContent(accepted), reference: reference(accepted) };
         });
       } finally { await store.release(request.lockKey, request.leaseToken); }
     },
@@ -212,21 +232,28 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       if (!previous) throw new Error('Move-library entry not found');
       validatePrimitiveContent(content, previous.context);
       if (stableMoveJson(content) === stableMoveJson(previous.content)) return id;
+      if (content.video) {
+          if (!deps.videoReuseStatus) throw new Error('Video verification unavailable');
+          if ((await deps.videoReuseStatus([content.video])).get(content.video.segmentId) !== true) throw new Error('The catalog video was removed from new instruction');
+        }
       if (content.figure) { if (!deps.verifyFigure) throw new Error('Figure verification unavailable'); await deps.verifyFigure(content.figure.assetId); }
       const questionEmbedding = previous.kind === 'question' ? { model: deps.embeddingModel, text: content.text, vector: await embed(content.text, {
         tdfId: '', sessionId: 'admin-revision', eventId: id, context: previous.context, queryText: '', previousQuestions: [],
       }) } : undefined;
-      const entry: MoveEntry = { ...previous, _id: moveDigest([id, content]), previousEntryId: id, content,
-        ...(questionEmbedding ? { questionEmbedding } : {}), reusable: true, createdAt: new Date() };
-      await store.revise(entry, id);
+      const entry: MoveEntry = { ...previous, content, ...(questionEmbedding ? { questionEmbedding } : {}) };
+      await store.revise(entry);
       return entry._id;
     },
     async present(userId: string, query: SparcPrimitiveQuery, ref: SparcPrimitiveReference, nodeId: string) {
       const request = await store.request(moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]));
       if (!request || request.userId !== userId || request.entryId !== ref.entryId) throw new Error('Unaccepted primitive presentation');
       bounded(nodeId, 'presentation identity', 600);
+      if (await store.removed(ref.entryId)) return;
       const entry = await store.entry(ref.entryId);
-      if (!entry) throw new Error('Presented primitive is missing');
+      if (!entry) {
+        if (await store.removed(ref.entryId)) return;
+        throw new Error('Presented primitive is missing');
+      }
       await store.expose({ _id: request._id, userId, tdfId: query.tdfId, sessionId: query.sessionId, eventId: query.eventId,
         kind: entry.kind, nodeId, entryId: entry._id, content: entry.content, ...(ref.priorNodeId ? { priorNodeId: ref.priorNodeId } : {}), ...(entry.questionEmbedding ? { questionEmbedding: entry.questionEmbedding } : {}) });
       exposures.delete(moveDigest([userId, query.tdfId]));

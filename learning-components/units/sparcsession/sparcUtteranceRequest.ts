@@ -1,3 +1,4 @@
+import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
 import type { SparcPrimitiveReference } from './sparcMoveLibrary';
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
 import type { SparcInstructionComponents } from './sparcInstructionalPrimitives';
@@ -14,7 +15,7 @@ export type SparcUtteranceRequest = {
   readonly historySessionId?: string;
   readonly onFeedback?: (text: string, reference: SparcPrimitiveReference) => Promise<void>;
   readonly realizedInstruction?: Readonly<Partial<SparcInstructionComponents>>;
-  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure, details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading'> & { primitiveReference?: SparcPrimitiveReference }) => Promise<void>;
+  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure, details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading' | 'video'> & { primitiveReference?: SparcPrimitiveReference; administrativeRemoval?: true }) => Promise<void>;
   readonly problemStatement: string;
   readonly targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion' | 'feedback';
   readonly action: string;
@@ -135,6 +136,7 @@ export function buildSparcDialogueHistory(
       ...(fact.slots?.primitiveReference ? { primitiveReference: fact.slots.primitiveReference } : {}),
       text: stringSlot(fact, 'text') ?? '',
       ...(fact.slots?.responseFormat === 'multiple-choice' ? { responseFormat: 'multiple-choice' } : {}),
+      ...(fact.slots?.video !== undefined ? { video: parseSparcVideoSegment(fact.slots.video) } : {}),
       ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
     }))
     .filter((entry) => entry.text);
@@ -209,6 +211,7 @@ function targetContent(params: {
       return {
         clusterKC,
         text: stringSlot(fact, 'text') ?? '',
+      ...(fact.slots?.video !== undefined ? { video: parseSparcVideoSegment(fact.slots.video) } : {}),
       ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
         coverage,
         status: coverage >= coverageThreshold ? 'covered' : 'uncovered',
@@ -220,6 +223,7 @@ function targetContent(params: {
       return {
         id,
         text: stringSlot(fact, 'text') ?? '',
+      ...(fact.slots?.video !== undefined ? { video: parseSparcVideoSegment(fact.slots.video) } : {}),
       ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
         supportStrength,
         status: supportStrength >= misconceptionThreshold ? 'active' : 'inactive',

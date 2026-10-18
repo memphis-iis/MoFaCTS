@@ -29,6 +29,11 @@ This folder contains executable deployment examples and scripts for MoFaCTS. Hum
 
 ## Build Context
 
+Moving a prepared shared instructional library is a separate, explicit operator
+task. The [fresh-library seed guide](../docs/instructional-library-transfer.md)
+documents the export, checksummed bundle, dry run, and authorized import. Normal
+deployment does not execute it or copy learner records.
+
 Run Docker Compose from this folder.
 
 `docker-compose.yml` sets the build context to `../`, which resolves to the repository root that contains the application Dockerfile.

@@ -1,10 +1,12 @@
+import type { SparcVideoSegment } from './sparcVideo';
 import type { SparcPromptFigure } from '../../mofacts/common/lib/sparcPromptImage';
 import type { SparcQuestionChoice } from './sparcQuestionChoiceContract';
 
 export const SPARC_MOVE_LIBRARY_VERSION = 'sparc-moves-v1';
 export type SparcPrimitiveKind = 'feedback' | 'richContent' | 'explanation' | 'question';
 export type SparcPrimitiveContent = {
-  text: string; figure?: SparcPromptFigure; choices?: readonly SparcQuestionChoice[]; supportHeading?: string;
+  text: string; video?: SparcVideoSegment; figure?: SparcPromptFigure; choices?: readonly SparcQuestionChoice[]; supportHeading?: string;
+  administrativeRemoval?: true;
 };
 export type SparcPrimitiveReference = {
   entryId: string; version: string; source: 'generated' | 'retrieved'; similarity: number | null;
@@ -21,7 +23,7 @@ export type SparcPrimitiveQuery = {
 };
 export type SparcPrimitiveLookup =
   | { status: 'hit'; content: SparcPrimitiveContent; reference: SparcPrimitiveReference }
-  | { status: 'generate'; ticket: string; previousQuestions: { text: string }[] };
+  | { status: 'generate'; ticket: string; previousQuestions: { text: string }[]; videos?: SparcVideoSegment[] };
 export type SparcMoveLibraryClient = {
   lookup(query: SparcPrimitiveQuery): Promise<SparcPrimitiveLookup>;
   publish(ticket: string, content: SparcPrimitiveContent): Promise<{ accepted: true; content: SparcPrimitiveContent; reference: SparcPrimitiveReference } | { accepted: false; reason: string }>;

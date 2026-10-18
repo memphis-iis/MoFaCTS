@@ -1,3 +1,6 @@
+import { parseSparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
+import { parseSparcQuestionChoices } from '../../../learning-components/runtime/sparcQuestionChoiceContract';
 import { moveDigest, type MoveExposure } from './sparcMoveLibraryService';
 
 /** Pure projection of durable tutor output; assessment/learner rows create no exposures. */
@@ -8,7 +11,7 @@ export function moveExposuresFromHistory(record: Record<string, unknown>): MoveE
   for (const write of transition?.writes ?? []) {
     const nodes = write.value?.node ? [write.value.node] : write.value?.nodes ?? [];
     for (const node of nodes) {
-      if (typeof node.id !== 'string' || typeof node.value !== 'string' || node.speaker === 'learner') continue;
+      if (typeof node.id !== 'string' || typeof node.value !== 'string' || node.speaker === 'learner' || node.administrativeRemoval) continue;
       const ref = node.primitiveReference as { entryId?: string; priorNodeId?: string } | undefined;
       const kind = node.component ?? (node.id.endsWith(':question') ? 'question' : ref?.entryId ? 'feedback' : undefined);
       if (kind !== 'question' && !ref?.entryId) continue;
@@ -18,7 +21,10 @@ export function moveExposuresFromHistory(record: Record<string, unknown>): MoveE
         tdfId: record.TDFId, sessionId: record.sessionID, eventId, kind: String(kind), nodeId: node.id,
         entryId: ref?.entryId ?? `historical:${moveDigest(node.value)}`,
         ...(ref?.priorNodeId ? { priorNodeId: ref.priorNodeId } : {}),
-        content: { text: node.value } });
+        content: { text: node.value, ...(node.video ? { video: parseSparcVideoSegment(node.video) } : {}),
+          ...(node.figure ? { figure: parseSparcPromptFigure(node.figure) } : {}),
+          ...(node.choices ? { choices: parseSparcQuestionChoices(node.choices) } : {}),
+          ...(typeof node.supportHeading === 'string' ? { supportHeading: node.supportHeading } : {}) } });
     }
   }
   return result;

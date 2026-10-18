@@ -1,5 +1,6 @@
 <script>
-  import { sparcMoveLibraryClient } from "../services/sparcMoveLibraryClient";
+  import { sparcMoveLibraryClient, readSparcAdministrativeRemovals } from "../services/sparcMoveLibraryClient";
+  import { sparcContentReferenceIds, projectSparcAdministrativeRemovals } from '../../../../../../learning-components/runtime/sparcAdministrativeRemoval';
   import { createEventDispatcher, onMount, tick } from 'svelte';
   import {
     resolveSparcControllerDisplay,
@@ -87,6 +88,20 @@
   let mounted = false;
   let startedDialogueScope = '';
   let dialogueInitialized = false;
+  let checkedContentIds = new Set(), removedContentIds = new Set(), removalSignature = '', removalError = '';
+  async function checkContentRemovals(ids, signature) {
+    const unchecked = ids.filter(id => !checkedContentIds.has(id));
+    try {
+      const removed = [];
+      for (let offset = 0; offset < unchecked.length; offset += 100) {
+        removed.push(...await readSparcAdministrativeRemovals(unchecked.slice(offset, offset + 100)));
+      }
+      if (!mounted || removalSignature !== signature) return;
+      removedContentIds = new Set([...removedContentIds, ...removed]);
+      checkedContentIds = new Set([...checkedContentIds, ...unchecked]);
+      removalError = '';
+    } catch { if (mounted && removalSignature === signature) removalError = 'Saved instructional content could not be checked. Reload the lesson.'; }
+  }
   onMount(() => {
     mounted = true;
     return () => { mounted = false; };
@@ -817,8 +832,19 @@
     startCategorizedDialogue(sparcDisplay, dialogueScope);
   }
   $: autoTutorDialoguePrompt = autoTutorDialogueMode && !categorizedDialogue ? dialoguePrompt(topLevelNodes) : '';
-  $: autoTutorDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending
+  $: savedDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending
     ? { ...node, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];
+  $: contentReferenceIds = sparcContentReferenceIds(savedDialogueMessages);
+  $: contentReferenceSignature = JSON.stringify(contentReferenceIds);
+  $: if (mounted && contentReferenceSignature !== removalSignature) {
+    removalSignature = contentReferenceSignature;
+    checkContentRemovals(contentReferenceIds, contentReferenceSignature);
+  }
+  $: autoTutorDialogueMessages = projectSparcAdministrativeRemovals(savedDialogueMessages.filter(node =>
+    sparcContentReferenceIds([node]).every(id => checkedContentIds.has(id))), removedContentIds);
+  $: latestDialogueQuestion = savedDialogueMessages.flatMap(node => node.children || [node])
+    .filter(node => node.component === 'question' || String(node.id).endsWith(':question')).at(-1);
+  $: currentQuestionRemoved = !!latestDialogueQuestion && !!projectSparcAdministrativeRemovals([latestDialogueQuestion], removedContentIds)[0].administrativeRemoval;
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
   $: if (
     autoTutorDialogueMode
@@ -829,10 +855,10 @@
   }
   $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
   $: autoTutorDialogueSubmitNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-submit') : null;
-  $: autoTutorDialogueInputRenderNode = autoTutorDialogueInputNode && (dialogueSubmitPending || (categorizedDialogue && !dialogueInitialized))
+  $: autoTutorDialogueInputRenderNode = autoTutorDialogueInputNode && (dialogueSubmitPending || currentQuestionRemoved || contentReferenceIds.some(id => !checkedContentIds.has(id)) || (categorizedDialogue && !dialogueInitialized))
     ? { ...autoTutorDialogueInputNode, readOnly: true }
     : autoTutorDialogueInputNode;
-  $: autoTutorDialogueSubmitRenderNode = autoTutorDialogueSubmitNode && (dialogueSubmitPending || (categorizedDialogue && !dialogueInitialized))
+  $: autoTutorDialogueSubmitRenderNode = autoTutorDialogueSubmitNode && (dialogueSubmitPending || currentQuestionRemoved || contentReferenceIds.some(id => !checkedContentIds.has(id)) || (categorizedDialogue && !dialogueInitialized))
     ? { ...autoTutorDialogueSubmitNode, readOnly: true }
     : autoTutorDialogueSubmitNode;
   $: progressiveNodeOperationCount = progressiveNodeOperations.length;
@@ -861,6 +887,7 @@
       aria-label={platformText('autoTutor.conversation')}
       aria-busy={dialogueSubmitPending}
     >
+      {#if removalError}<p role="alert">{removalError}</p>{/if}
       {#each autoTutorDialogueMessages as node (node.id)}
         <SparcNode
           {node}

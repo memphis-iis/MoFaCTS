@@ -1,3 +1,4 @@
+import { buildSparcVideoCatalog } from './sparcVideoCatalogBuilder';
 import { formatPackageUpdateWarnings } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
@@ -90,6 +91,7 @@ type ContentUploadConfirmationPresentation = {
 };
 
 type ContentUploadInstance = Blaze.TemplateInstance & {
+  videoCatalogMessages: ReactiveDict; videoCatalogRunning: ReactiveDict; videoCatalogMounted: boolean;
   listPresentation: ReactiveVar<LoadableState<ContentUploadListResult>>;
   summaryPresentation: ReactiveVar<LoadableState<ContentUploadSummaryMap>>;
   quotaPresentation: ReactiveVar<LoadableState<UploadQuotaStatus>>;
@@ -553,6 +555,8 @@ function loadUploadQuotaStatus(instance: ContentUploadInstance): void {
 
 Template.contentUpload.helpers({
   canInspectImageLibrary() { return currentUserHasRole('admin'); },
+  videoCatalogMessage(id: string) { return (Template.instance() as ContentUploadInstance)?.videoCatalogMessages?.get(id); },
+  videoCatalogRunning(id: string) { return (Template.instance() as ContentUploadInstance)?.videoCatalogRunning?.get(id); },
   TdfFiles: function(this: any) {
     return TdfsCollection.find();
   },
@@ -972,6 +976,9 @@ Template.contentUpload.helpers({
 
   Template.contentUpload.onCreated(function(this: ContentUploadInstance & any) {
     this.currentUpload = new ReactiveVar(false);
+    this.videoCatalogMessages = new ReactiveDict();
+    this.videoCatalogRunning = new ReactiveDict();
+    this.videoCatalogMounted = true;
     this.curFilesToUpload = new ReactiveVar([]);
     this.uploadMessages = new ReactiveVar({});
     this.uploadMessageTimers = new Map();
@@ -1169,6 +1176,7 @@ Template.contentUpload.helpers({
 });
 
 Template.contentUpload.onDestroyed(function(this: ContentUploadInstance & any) {
+  this.videoCatalogMounted = false;
   // Clean up autoruns
   this.autoruns.forEach((ar: any) => ar.stop());
   this.listLifetime.destroy();
@@ -1264,6 +1272,26 @@ Template.contentUpload.events({
         event.currentTarget.checked = !isPublic;
       },
     });
+  },
+
+  'click .build-video-catalog-btn': async function(event: Event, template: any) {
+    event.preventDefault();
+    const button = event.currentTarget as HTMLButtonElement;
+    const id = button.dataset.tdfid;
+    const selector = button.closest('tr')?.querySelector<HTMLSelectElement>('.condition-tdf-selector');
+    const selectedId = selector ? selector.value : id;
+    if (!id || template.videoCatalogRunning.get(id)) return;
+    const limitInput = button.closest('tr')?.querySelector<HTMLInputElement>('.video-catalog-limit');
+    if (limitInput && !limitInput.reportValidity()) return;
+    const targetLimit = limitInput?.value ? limitInput.valueAsNumber : undefined;
+    template.videoCatalogRunning.set(id, true);
+    try {
+      if (!selectedId) throw new Error('Select a lesson package before building its video catalog');
+      await buildSparcVideoCatalog(selectedId, message => { if (template.videoCatalogMounted) template.videoCatalogMessages.set(id, message); }, () => template.videoCatalogMounted, targetLimit); }
+    catch (error) {
+      if (template.videoCatalogMounted) template.videoCatalogMessages.set(id, `${template.videoCatalogMessages.get(id) ?? ''}\n${error instanceof Error ? error.message : String(error)}`);
+    }
+    finally { if (template.videoCatalogMounted) template.videoCatalogRunning.set(id, false); }
   },
 
   // Open content editor for TDF (stimuli editing)

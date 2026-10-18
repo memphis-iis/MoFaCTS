@@ -1,3 +1,4 @@
+import { SPARC_VIDEO_EMBEDDING_VERSION } from '../../../learning-components/runtime/sparcVideo';
 import { createHash, randomBytes } from 'crypto';
 import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { normalizeSparcFigureEmbedding, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
@@ -17,7 +18,6 @@ export type SparcFigureBrowseStore = {
   publish: (snapshot: BrowseSnapshot) => Promise<boolean>;
   discard: (snapshotId: string) => Promise<void>;
   members: (snapshotId: string, clusterId: string, cursor?: BrowseMemberCursor) => Promise<Array<BrowseMember & Pick<BrowseSource, 'kind'>>>;
-  memberships: (snapshotId: string, assetIds: string[]) => Promise<Array<Pick<BrowseMember, 'assetId' | 'clusterId'>>>;
   withLock: <T>(work: () => Promise<T>) => Promise<T>;
 };
 export type SparcFigureBrowseDeps = {
@@ -72,7 +72,7 @@ export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps):
       }
     };
     const vectorFor = (row: BrowseSource) => {
-      if (row.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
+      if (row.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION && !(row.kind === 'video' && row.embeddingVersion === SPARC_VIDEO_EMBEDDING_VERSION)) throw new Error('Instructional library embeddings require reindexing');
       const vector = normalizeSparcFigureEmbedding(row.embedding);
       if (vector.length !== row.dimensions) throw new Error('Invalid stored figure embedding dimensions');
       return vector;

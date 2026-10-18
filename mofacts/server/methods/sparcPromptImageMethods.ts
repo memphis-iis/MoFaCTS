@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import fs from 'fs/promises';
+import path from 'path';
 import { SPARC_PROMPT_IMAGE_SETTINGS, SPARC_PROMPT_IMAGE_PURPOSE as PURPOSE, parseSparcPromptFigure, parseSparcPromptDisplayWidth } from '../../common/lib/sparcPromptImage';
 import { generateSparcPromptImage, type GeneratedSparcPromptImage } from '../lib/sparcPromptImageGeneration';
 import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
@@ -8,11 +9,11 @@ import { requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/metho
 import { sparcFigureMinimumSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { sparcInstructionalNeedText, type SparcInstructionalNeed } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
-import { getOrGenerateSparcLibraryFigure, currentSparcFigureAssetId, type SparcFigureInspection, type SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
+import { getOrGenerateSparcLibraryFigure, type SparcFigureInspection, type SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
 import type { createStorageBoundary } from '../lib/storageBoundary';
-import type { SparcLibraryImagePage, SparcLibraryImageHistory } from '../../common/lib/sparcFigureLibrary';
-import type { SparcFigureVersionStore } from '../lib/sparcFigureVersions';
+import type { SparcLibraryImagePage } from '../../common/lib/sparcFigureLibrary';
 import { parseSparcRaster } from '../lib/sparcRaster';
+import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
 
 type Asset = { _id: string; path?: string; type?: string; meta: Record<string, any> };
 type Deps = {
@@ -27,8 +28,10 @@ type Deps = {
   storageBoundary: ReturnType<typeof createStorageBoundary>;
   generateImage?: (apiKey: string, prompt: string) => Promise<GeneratedSparcPromptImage>;
   readFile?: (path: string) => Promise<Buffer>;
+  writeFile?: (path: string, bytes: Buffer) => Promise<void>;
+  removeFile?: (path: string) => Promise<void>;
+  isRemoved: (id: string) => Promise<boolean>;
   figureLibrary?: SparcFigureLibraryStore;
-  figureVersions?: SparcFigureVersionStore;
   minimumFigureSimilarity?: number | undefined;
   embedSituation?: (apiKey: string, input: string) => Promise<{ vector: number[]; usage?: { costUsd?: number } }>;
 };
@@ -47,26 +50,20 @@ export function createSparcPromptImageMethods(deps: Deps) {
   const findShared = (assetId: string, version: string = SPARC_FIGURE_LIBRARY_SETTINGS.version) => deps.DynamicAssets.collection.findOneAsync({ _id: assetId,
     'meta.uploadPurpose': PURPOSE, 'meta.public': false, 'meta.figureLibraryVersion': version });
   const minimumSimilarity = sparcFigureMinimumSimilarity(deps.minimumFigureSimilarity);
-  const resolveEntry = async (assetId: string) => {
-    const original = await deps.figureLibrary?.findEntry(assetId);
-    if (original) return original;
-    const version = await deps.figureVersions?.find(assetId);
-    return version ? await deps.figureLibrary?.findEntry(version.libraryId) : undefined;
-  };
   const imageMetadata = (entry: SparcFigureInspection, asset: Asset) => {
     if (asset.meta.figureLibraryVersion !== entry.version) throw new Meteor.Error(500, 'A library figure is missing its completed canonical asset');
-    return { libraryId: entry._id, assetId: asset._id, description: bounded(asset.meta.description, 'Saved figure description', 2048),
+    return { assetId: asset._id, description: bounded(asset.meta.description, 'Saved figure description', 2048),
       model: asset.meta.humanReplacement === true ? 'Human replacement' : entry.imageModel,
       createdAt: (asset.meta.humanReplacement === true ? new Date(asset.meta.replacedAt) : entry.createdAt).toISOString(),
-      reusable: entry.reusable, revision: entry.revision ?? 0 };
+    };
   };
   const inspectImages = async (entries: SparcFigureInspection[]) => {
-    const assets = entries.length ? await deps.DynamicAssets.collection.find({ _id: { $in: entries.map(currentSparcFigureAssetId) },
+    const assets = entries.length ? await deps.DynamicAssets.collection.find({ _id: { $in: entries.map(entry => entry._id) },
       'meta.uploadPurpose': PURPOSE, 'meta.public': false, 'meta.ready': true },
       { fields: { _id: 1, 'meta.description': 1, 'meta.figureLibraryVersion': 1, 'meta.humanReplacement': 1, 'meta.replacedAt': 1 } }).fetchAsync() : [];
     const byId = new Map(assets.map(asset => [asset._id, asset]));
     return entries.map(entry => {
-      const asset = byId.get(currentSparcFigureAssetId(entry));
+      const asset = byId.get(entry._id);
       if (!asset) throw new Meteor.Error(500, 'A library figure is missing its completed canonical asset');
       return imageMetadata(entry, asset);
     });
@@ -163,6 +160,8 @@ export function createSparcPromptImageMethods(deps: Deps) {
               return { usage: image.usage };
             } });
           const asset = await findShared(decision.assetId);
+          if (await deps.isRemoved(decision.assetId)) return { tutorMessage: SPARC_ADMINISTRATIVE_REMOVAL_TEXT,
+            figure: { assetId: decision.assetId, description: SPARC_ADMINISTRATIVE_REMOVAL_TEXT } };
           if (!asset || asset.meta.ready !== true) throw new Meteor.Error(500, 'SPARC library figure is missing its completed asset');
           return { ...envelope(asset, true), ...(decision.usage ? { usage: decision.usage } : {}),
             ...(decision.embeddingUsage ? { embeddingUsage: decision.embeddingUsage } : {}),
@@ -201,10 +200,19 @@ export function createSparcPromptImageMethods(deps: Deps) {
       const userId = await authorize(this);
       const assetId = bounded(assetIdValue, 'Image asset identity', 20);
       if (!/^[a-zA-Z0-9]+$/.test(assetId)) throw new Meteor.Error(400, 'Invalid image asset identity');
-      const entry = await resolveEntry(assetId);
+      if (await deps.isRemoved(assetId)) return { administrativeRemoval: true as const };
+      const entry = await deps.figureLibrary?.findEntry(assetId);
       const asset = await findOwned(assetId, userId) ?? (entry?.ready ? await findShared(assetId, entry.version) : undefined);
-      if (!asset || asset.meta.ready !== true) throw new Meteor.Error(404, 'SPARC image not found');
-      const bytes = await readBytes(asset);
+      if (!asset || asset.meta.ready !== true) {
+        if (await deps.isRemoved(assetId)) return { administrativeRemoval: true as const };
+        throw new Meteor.Error(404, 'SPARC image not found');
+      }
+      let bytes;
+      try { bytes = await readBytes(asset); }
+      catch (error) {
+        if (await deps.isRemoved(assetId)) return { administrativeRemoval: true as const };
+        throw error;
+      }
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(asset.type ?? '') || bytes.length > SPARC_PROMPT_IMAGE_SETTINGS.maxBytes) throw new Meteor.Error(500, 'Invalid saved SPARC image');
       return { dataUrl: `data:${asset.type};base64,${bytes.toString('base64')}` };
     },
@@ -220,86 +228,52 @@ export function createSparcPromptImageMethods(deps: Deps) {
       const images = await inspectImages(page);
       return { images, nextCursor: entries.length > SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize ? page[page.length - 1]!._id : null };
     },
-    async setSparcLibraryImageReusable(this: Context, params: { assetId: string; reusable: boolean }) {
-      await authorize(this);
-      const assetId = bounded(params?.assetId, 'Image asset identity', 20);
-      if (!/^[a-zA-Z0-9]+$/.test(assetId) || typeof params?.reusable !== 'boolean') {
-        throw new Meteor.Error(400, 'A valid image identity and boolean reuse status are required');
-      }
-      if (!deps.figureLibrary) throw new Meteor.Error(500, 'SPARC figure library is not configured');
-      const entry = await deps.figureLibrary.findEntry(assetId);
-      const asset = entry?.ready ? await findShared(currentSparcFigureAssetId(entry), entry.version) : undefined;
-      if (!asset || asset.meta.ready !== true || !await deps.figureLibrary.setReusable(assetId, params.reusable)) {
-        throw new Meteor.Error(404, 'Completed library image not found');
-      }
-      return { assetId, reusable: params.reusable };
-    },
-    async replaceSparcLibraryImage(this: Context, params: { libraryId: string; expectedAssetId: string; description: string; mediaType: string; base64: string }) {
-      const userId = await authorize(this); this.unblock?.();
-      const libraryId = bounded(params?.libraryId, 'Library identity', 20);
-      const expectedAssetId = bounded(params?.expectedAssetId, 'Current image identity', 20);
-      if (![libraryId, expectedAssetId].every(id => /^[a-zA-Z0-9]+$/.test(id))) throw new Meteor.Error(400, 'Invalid image identity');
-      if (!deps.figureLibrary || !deps.figureVersions) throw new Meteor.Error(500, 'Image replacement is not configured');
+    async replaceSparcLibraryImage(this: Context, params: { assetId: string; description: string; mediaType: string; base64: string }) {
+      await authorize(this); this.unblock?.();
+      const assetId = bounded(params?.assetId, 'Image identity', 20);
+      if (!/^[a-zA-Z0-9]+$/.test(assetId)) throw new Meteor.Error(400, 'Invalid image identity');
+      if (!deps.figureLibrary) throw new Meteor.Error(500, 'Image revision is not configured');
       const description = bounded(params?.description, 'Figure description', 2048);
       if (/[<>]/.test(description)) throw new Meteor.Error(400, 'Figure description must be plain text without markup');
       let raster;
       try { raster = parseSparcRaster(params?.mediaType, params?.base64); }
       catch (error) { throw new Meteor.Error(400, (error as Error).message); }
-      const identity = digest(JSON.stringify(['human-replacement', userId, libraryId, expectedAssetId, description,
-        raster.mediaType, createHash('sha256').update(raster.bytes).digest('hex')]));
-      const assetId = identity.slice(0, 20);
-      // Share the existing generation lease: retries across replicas cannot overwrite an admitted file.
-      return await deps.figureLibrary.withLock(async () => {
-        const entry = await deps.figureLibrary!.findEntry(libraryId);
-        if (!entry?.ready) throw new Meteor.Error(404, 'Completed library image not found');
-        const admitted = await deps.figureVersions!.find(assetId);
-        if (!admitted && currentSparcFigureAssetId(entry) !== expectedAssetId) throw new Meteor.Error(409, 'This image has changed. Reload the library before replacing it.');
-        let asset = await findShared(assetId, entry.version);
-        if (asset && asset.meta.replacementIdentity !== identity) throw new Meteor.Error(409, 'Replacement identity collision');
-        if (!asset) {
-          if (admitted) throw new Meteor.Error(500, 'An admitted replacement is missing its saved image');
-          if (await deps.DynamicAssets.collection.findOneAsync({ _id: assetId })) throw new Meteor.Error(409, 'Replacement identity collision');
-          const previous = await findShared(expectedAssetId, entry.version);
-          if (!previous || previous.meta.ready !== true) throw new Meteor.Error(500, 'The current image is missing its completed asset');
-          const fileName = `teaching-figure.${raster.extension}`;
-          const file = await deps.DynamicAssets.writeAsync(raster.bytes, { fileId: assetId, fileName, userId, type: raster.mediaType,
-            meta: { public: false, uploadPurpose: PURPOSE, figureLibraryVersion: entry.version, replacementIdentity: identity,
-              humanReplacement: true, replacedAt: new Date(), fileName, description,
-              tutorMessage: previous.meta.tutorMessage, ...(previous.meta.displayWidth === undefined ? {} : { displayWidth: previous.meta.displayWidth }),
-              ready: deps.storageBoundary.backend === 'local' } });
-          if (file._id !== assetId) throw new Meteor.Error(500, 'Image storage changed the replacement identity');
-          asset = await findShared(assetId, entry.version);
-          if (!asset) throw new Meteor.Error(500, 'Image storage did not persist the replacement');
+      return deps.figureLibrary.withLock(async () => {
+        const entry = await deps.figureLibrary!.findEntry(assetId);
+        const asset = entry?.ready ? await findShared(assetId, entry.version) : undefined;
+        if (!entry || !asset || asset.meta.ready !== true) throw new Meteor.Error(404, 'Completed library image not found');
+        let imagePath = asset.path;
+        if (deps.storageBoundary.backend === 's3') {
+          if (asset.meta.storageBackend !== 's3' || typeof asset.meta.storageKey !== 'string') throw new Meteor.Error(500, 'SPARC image storage owner mismatch');
+          await deps.storageBoundary.putObject(asset.meta.storageKey, raster.bytes, raster.mediaType);
+        } else {
+          if (!asset.path) throw new Meteor.Error(500, 'SPARC image has no local storage path');
+          imagePath = path.join(path.dirname(asset.path), `${assetId}.${raster.extension}`);
+          if (deps.writeFile) await deps.writeFile(imagePath, raster.bytes);
+          else {
+            const temporary = `${imagePath}.${randomBytes(8).toString('hex')}.tmp`;
+            try { await fs.writeFile(temporary, raster.bytes, { flag: 'wx' }); await fs.rename(temporary, imagePath); }
+            finally { await fs.rm(temporary, { force: true }); }
+          }
         }
-        await completeStorage(asset);
-        const updated = await deps.figureVersions!.publish({ libraryId, expectedAssetId, assetId, identity, userId });
-        return (await inspectImages([updated]))[0]!;
+        await deps.DynamicAssets.collection.updateAsync({ _id: assetId }, { $set: {
+          type: raster.mediaType, size: raster.bytes.length, extension: raster.extension, ext: raster.extension,
+          extensionWithDot: `.${raster.extension}`, name: `teaching-figure.${raster.extension}`,
+          'versions.original.type': raster.mediaType, 'versions.original.size': raster.bytes.length,
+          'versions.original.extension': raster.extension, 'meta.description': description,
+          'meta.humanReplacement': true, 'meta.replacedAt': new Date(),
+          'meta.fileName': `teaching-figure.${raster.extension}`,
+          ...(deps.storageBoundary.backend === 'local' ? { path: imagePath, 'versions.original.path': imagePath } : {}),
+        } });
+        if (deps.storageBoundary.backend === 'local' && asset.path && imagePath !== asset.path) {
+          if (deps.removeFile) await deps.removeFile(asset.path);
+          else await fs.rm(asset.path, { force: true });
+        }
+        await deps.figureLibrary!.saveEntry(entry);
+        const updated = await findShared(assetId, entry.version);
+        if (!updated) throw new Meteor.Error(404, 'This image was deleted');
+        return imageMetadata(entry, updated);
       });
-    },
-    async listSparcLibraryImageVersions(this: Context, params: { libraryId: string; beforeRevision?: number }): Promise<SparcLibraryImageHistory> {
-      await authorize(this);
-      const libraryId = bounded(params?.libraryId, 'Library identity', 20);
-      if (!/^[a-zA-Z0-9]+$/.test(libraryId)) throw new Meteor.Error(400, 'Invalid library identity');
-      if (!deps.figureLibrary || !deps.figureVersions) throw new Meteor.Error(500, 'Image history is not configured');
-      const entry = await deps.figureLibrary.findEntry(libraryId);
-      if (!entry?.ready) throw new Meteor.Error(404, 'Completed library image not found');
-      const currentRevision = entry.revision ?? 0;
-      const before = params.beforeRevision ?? currentRevision;
-      if (!Number.isSafeInteger(before) || before < 0 || before > currentRevision) throw new Meteor.Error(400, 'Invalid image history cursor');
-      const rows = await deps.figureVersions.history(libraryId, before);
-      const page = rows.slice(0, SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize);
-      const assets = page.length ? await deps.DynamicAssets.collection.find({ _id: { $in: page.map(row => row._id) },
-        'meta.uploadPurpose': PURPOSE, 'meta.public': false, 'meta.ready': true },
-        { fields: { _id: 1, 'meta.description': 1, 'meta.figureLibraryVersion': 1, 'meta.humanReplacement': 1 } }).fetchAsync() : [];
-      const byId = new Map(assets.map(asset => [asset._id, asset]));
-      const versions = page.map(row => {
-        const asset = byId.get(row._id);
-        if (!asset || asset.meta.figureLibraryVersion !== entry.version) throw new Meteor.Error(500, 'An old version is missing its saved image');
-        return { assetId: row._id, revision: row.revision, createdAt: row.createdAt.toISOString(),
-          model: asset.meta.humanReplacement === true ? 'Human replacement' : entry.imageModel,
-          description: bounded(asset.meta.description, 'Saved figure description', 2048) };
-      });
-      return { versions, nextCursor: rows.length > SPARC_FIGURE_LIBRARY_SETTINGS.inspectionPageSize ? page[page.length - 1]!.revision : null };
     },
   };
 }

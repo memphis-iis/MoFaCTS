@@ -7,19 +7,11 @@
   import SparcLibraryComponent from './SparcLibraryComponent.svelte';
   import SparcLibraryComponentPreview from './SparcLibraryComponentPreview.svelte';
   const lifetime = createTemplateLifetime();
-  const labels = { image: 'Image', feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question' };
+  const labels = { image: 'Image', feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question', video: 'Video passage' };
   let overview, selectedTopic, selectedCluster, selectedId, selectedPanel;
   let view = 'groups', entries = [], nextCursor = null, loading = false, error = '', initialized = false;
   $: selected = entries.find(entry => entry.id === selectedId);
-  $: groupsById = new Map((overview?.clusters ?? []).flatMap(topic => topic.subclusters.map(cluster => [cluster.id, { topic, cluster }])));
-  function openGroup(id) {
-    const group = groupsById.get(id);
-    selectedTopic = group.topic;
-    changeView('cluster', group.cluster);
-  }
   async function selectEntry(id) { selectedId = id; await tick(); if (!lifetime.isDestroyed()) selectedPanel?.scrollIntoView({ block: 'start', behavior: 'instant' }); }
-  function onReuseChanged(id, reusable) { entries = entries.map(entry => entry.id === id ? { ...entry, reusable, ...(entry.kind === 'image' ? { image: { ...entry.image, reusable } } : {}) } : entry); }
-  function onReplacement(image) { entries = entries.map(entry => entry.id === image.libraryId ? { ...entry, image } : entry); }
   async function load() {
     if (loading || lifetime.isDestroyed()) return;
     const generation = lifetime.begin(); loading = true; error = '';
@@ -28,8 +20,8 @@
         const result = await meteorCallAsync('getSparcLibraryClusters');
         if (!lifetime.isCurrent(generation)) return; overview = result;
       }
-      if (view === 'cluster' || view === 'all') {
-        const params = { snapshotId: overview.snapshotId, ...(view === 'cluster' ? { clusterId: selectedCluster.id, ...(nextCursor ? { cursor: nextCursor } : {}) } : (nextCursor ? { after: nextCursor } : {})) };
+      if (view === 'cluster') {
+        const params = { snapshotId: overview.snapshotId, clusterId: selectedCluster.id, ...(nextCursor ? { cursor: nextCursor } : {}) };
         const page = await meteorCallAsync('listSparcInstructionalComponents', params);
         if (!lifetime.isCurrent(generation)) return; entries = [...entries, ...page.entries]; nextCursor = page.nextCursor;
       }
@@ -46,34 +38,33 @@
     if (view === 'groups') overview = undefined;
     void load();
   }
-  onMount(() => { void load(); }); onDestroy(() => lifetime.destroy());
+  onMount(() => { void load().then(() => {
+    const topicId = new URLSearchParams(window.location.search).get('topic');
+    if (!topicId || lifetime.isDestroyed() || !overview) return;
+    const topic = overview.clusters.find(item => item.id === topicId);
+    if (!topic) { error = 'This instructional topic is no longer available. Reopen Topics to refresh it.'; return; }
+    changeView('subgroups', topic);
+  }); }); onDestroy(() => lifetime.destroy());
 </script>
 
 <div class="instructional-library">
-  <a class="btn btn-outline-secondary" href="/contentUpload">Back to content</a>
-  <h1>Instructional content library</h1>
-  <p>Choose a topic, then a subgroup to browse instructional components, including images.</p>
-  <div class="browse-controls" aria-label="Instructional library views">
-    <button type="button" class="btn btn-outline-primary" aria-pressed={view === 'groups'} on:click={() => changeView('groups')}>Topics</button>
-    <button type="button" class="btn btn-outline-primary" aria-pressed={view === 'all'} on:click={() => changeView('all')}>All components</button>
-  </div>
-  {#if view === 'subgroups' || view === 'cluster'}
-    <nav class="browse-path" aria-label="Library location">
-      <button type="button" class="btn btn-link" on:click={() => changeView('groups')}>Topics</button>
-      <span aria-hidden="true">/</span>
-      {#if view === 'cluster'}
-        <button type="button" class="btn btn-link" on:click={() => changeView('subgroups', selectedTopic)}>{selectedTopic.label}</button>
-        <span aria-hidden="true">/</span><span aria-current="page">{selectedCluster.label}</span>
-      {:else}<span aria-current="page">{selectedTopic.label}</span>{/if}
+  <header class="sparc-library-header">
+    <h1>Instructional content library</h1>
+    <nav class="sparc-library-breadcrumb" aria-label="Library location">
+      <ol>
+        <li>{#if view === 'groups'}<span aria-current="page">Topics</span>{:else}<a href="/sparcImageLibrary" on:click|preventDefault={() => changeView('groups')}>Topics</a>{/if}</li>
+        {#if selectedTopic}
+          <li><span class="breadcrumb-separator" aria-hidden="true">/</span>
+            {#if view === 'cluster'}<a href={'/sparcImageLibrary?topic=' + selectedTopic.id} on:click|preventDefault={() => changeView('subgroups', selectedTopic)}>{selectedTopic.label}</a>
+            {:else}<span aria-current="page">{selectedTopic.label}</span>{/if}
+          </li>
+        {/if}
+        {#if view === 'cluster'}<li><span class="breadcrumb-separator" aria-hidden="true">/</span><span aria-current="page">{selectedCluster.label}</span></li>{/if}
+      </ol>
     </nav>
-  {/if}
-  {#if view === 'subgroups'}<h2>{selectedTopic.label}</h2><p>{selectedTopic.count} components in {selectedTopic.subclusters.length} {selectedTopic.subclusters.length === 1 ? 'subgroup' : 'subgroups'}. Choose a subgroup to view its components.</p>{/if}
-  {#if view === 'cluster'}<h2>{selectedCluster.label}</h2><p>{selectedCluster.count} components, sorted by type, then from the group's center outward within each type.</p>{/if}
+  </header>
   {#if error}<p role="alert">{error}</p>{/if}
   {#if loading}<p role="status">{view === 'groups' ? 'Organizing instructional components…' : 'Loading instructional components…'}</p>{/if}
-  {#if view === 'groups' && overview}
-    <p>{overview.total} components in {overview.clusters.length} {overview.clusters.length === 1 ? 'topic' : 'topics'}.</p>
-  {/if}
   {#if (view === 'groups' && overview) || view === 'subgroups'}
     <div class="thumbnail-grid" aria-label={view === 'groups' ? 'Instructional content topics' : 'Instructional content subgroups'}>
       {#each (view === 'groups' ? overview.clusters : selectedTopic.subclusters) as cluster (cluster.id)}
@@ -87,40 +78,32 @@
       {/each}
     </div>
   {/if}
-  {#if (view === 'cluster' || view === 'all') && entries.length}
-    <section class="selected-image" bind:this={selectedPanel} aria-label="Selected instructional component">
-      {#if selected}
+  {#if view === 'cluster' && entries.length}
+    {#if selected}
+      <section class="selected-image" bind:this={selectedPanel} aria-label="Selected instructional component">
         {#key selected.id}
-          {#if selected.kind === 'image'}<SparcLibraryImage image={selected.image} {onReuseChanged} {onReplacement} />
-          {:else}<SparcLibraryComponent entry={selected} {onReuseChanged} onChanged={() => changeView('groups')} />{/if}
+          {#if selected.kind === 'image'}<SparcLibraryImage image={selected.image} onDeleted={() => changeView('groups')} onReplacement={() => changeView('groups')} />
+          {:else}<SparcLibraryComponent entry={selected} onChanged={() => changeView('groups')} />{/if}
         {/key}
-      {:else}<p>Select a component to inspect it above the grid.</p>{/if}
-    </section>
-    <div class="thumbnail-grid" aria-label={view === 'cluster' ? 'Components in this group' : 'All instructional components'}>
+      </section>
+    {/if}
+    <div class="thumbnail-grid" aria-label="Components in this group">
       {#each entries as entry, index (entry.id)}
         <div class="thumbnail-card" class:selected={selectedId === entry.id}>
           <SparcLibraryComponentPreview {entry} selected={selectedId === entry.id} onSelect={() => selectEntry(entry.id)} selectionLabel={'Inspect ' + labels[entry.kind].toLowerCase() + ' ' + (index + 1)} />
           <div class="sparc-library-caption">
-            <span>{labels[entry.kind]}{entry.reusable ? '' : ' · Excluded'}</span>
-            <button type="button" class="sparc-library-group-link" on:click={() => openGroup(entry.clusterId)}>{groupsById.get(entry.clusterId).cluster.label}</button>
+            <span>{labels[entry.kind]}</span>
           </div>
         </div>
       {/each}
     </div>
   {/if}
-  {#if initialized && !loading && (view === 'groups' ? !overview?.total : (view === 'cluster' || view === 'all') && !entries.length)}<p>No instructional components have been added yet.</p>{/if}
+  {#if initialized && !loading && (view === 'groups' ? !overview?.total : view === 'cluster' && !entries.length)}<p>No instructional components have been added yet.</p>{/if}
   {#if error || nextCursor}<button type="button" class="btn btn-outline-primary" disabled={loading} on:click={load}>{error ? 'Retry' : 'Show more components'}</button>{/if}
 </div>
 
 <style>
   .instructional-library { padding: var(--app-space-4-px); font-family: var(--app-font-family); font-size: var(--app-font-size-base); color: var(--app-text-color); line-height: var(--app-line-height-normal); }
-  h1, h2 { font-family: var(--app-heading-font-family); color: var(--app-page-header-text-color); font-weight: var(--app-font-weight-bold); line-height: var(--app-line-height-tight); }
-  /* Match the shared app header's theme-relative title size, rather than the global hero h1. */
-  h1 { font-size: calc(var(--app-font-size-base) * 1.5); margin-top: var(--app-space-4-px); margin-bottom: var(--app-space-3-px); }
-  h2 { font-size: calc(var(--app-font-size-base) * 1.25); margin-top: var(--app-space-4-px); margin-bottom: var(--app-space-2-px); }
-  .browse-controls { display: flex; gap: var(--app-space-3-px); margin-bottom: var(--app-space-4-px); }
-  .browse-path { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--app-space-2-px); }
-  .browse-path .btn { padding-inline: 0; white-space: normal; text-align: start; }
   .cluster-card { min-width: 0; }
   .selected-image { max-width: calc(960px * var(--app-density-scale)); margin-bottom: var(--app-space-4-px); scroll-margin-top: calc(var(--home-header-height) + var(--app-space-3-px)); }
   .thumbnail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(160px * var(--app-density-scale))), 1fr)); gap: var(--app-space-3-px); margin-bottom: var(--app-space-4-px); }

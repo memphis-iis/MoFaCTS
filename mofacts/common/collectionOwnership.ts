@@ -7,17 +7,16 @@ type CollectionOwnership = {
 };
 
 export const COLLECTION_OWNERSHIP = {
+  SparcInstructionalRemovals: { mongoName: 'sparc_instructional_removals', globalName: 'SparcInstructionalRemovals', owner: 'sparc-instructional-library', purpose: 'Content-free administrative deletion receipts for accurate reload placeholders and restartable asset cleanup; no learner data.' },
+  SparcVideoTranscripts: { mongoName: 'sparc_video_transcripts', globalName: 'SparcVideoTranscripts', owner: 'sparc-video-catalog', purpose: 'Cached timestamped YouTube captions and resumable passage selection; no video bytes or learner data.' },
+  SparcVideoCatalogTargets: { mongoName: 'sparc_video_catalog_targets', globalName: 'SparcVideoCatalogTargets', owner: 'sparc-video-catalog', purpose: 'Successful per-authored-target video selections and resumable preparation checkpoints.' },
   SparcInstructionalLibrary: { mongoName: 'sparc_instructional_library', globalName: 'SparcInstructionalLibrary', owner: 'sparc-instructional-library', purpose: 'Single shared repository of instructional components, including images, and their retrieval embeddings.' },
   SparcMoveRequests: { mongoName: 'sparc_move_requests', globalName: 'SparcMoveRequests', owner: 'sparc-move-library', purpose: 'Private resumable primitive selection and generation requests.' },
   SparcMoveExposures: { mongoName: 'sparc_move_exposures', globalName: 'SparcMoveExposures', owner: 'sparc-move-library', purpose: 'Private learner primitive and question presentation records.' },
-  SparcMoveManifests: { mongoName: 'sparc_move_manifests', globalName: 'SparcMoveManifests', owner: 'sparc-move-library', purpose: 'Shared complete move manifests referencing immutable primitives.' },
+  SparcMoveManifests: { mongoName: 'sparc_move_manifests', globalName: 'SparcMoveManifests', owner: 'sparc-move-library', purpose: 'Shared complete move manifests referencing current component IDs.' },
   SparcMoveLeases: { mongoName: 'sparc_move_leases', globalName: 'SparcMoveLeases', owner: 'sparc-move-library', purpose: 'Request-scoped generation leases.' },
   SparcMoveMigrations: { mongoName: 'sparc_move_migrations', globalName: 'SparcMoveMigrations', owner: 'sparc-move-library', purpose: 'Restartable per-learner historical exposure projection checkpoints.' },
 
-  SparcFigureVersions: {
-    mongoName: 'sparc_figure_versions', globalName: 'SparcFigureVersions', owner: 'sparc-figure-library',
-    purpose: 'Server-only immutable human replacement history; references original and replacement assets.',
-  },
   SparcFigureBrowse: {
     mongoName: 'sparc_figure_browse', globalName: 'SparcFigureBrowse', owner: 'sparc-figure-library',
     purpose: 'Server-only derived semantic browsing snapshots, revision state and paged cluster membership; no learner data.',

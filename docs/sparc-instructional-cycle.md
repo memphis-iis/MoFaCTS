@@ -176,7 +176,7 @@ Ordinary authenticated OpenRouter requests are limited by the existing DDP rule 
 feedback, support, explanation, and question; this limit accommodates those calls
 and author testing. Method authorization and public-demo AI quotas still apply.
 
-Initial packages live in `C:\dev\mofacts_config\SPARC Categorized Confidence Interval`.
+Initial packages live in `C:\dev\mofacts_config\SPARC Confidence Interval`.
 They have fresh TDF/page identities, preserve the seven expectation and three misconception
 texts, and select the two v2 policies. Source packages and learner history are
 not rewritten. Upload them only after the category-aware application runtime is available.
@@ -277,8 +277,8 @@ The retained family in `C:\dev\mofacts_config` is 14 packages in 12 directories:
 - AutoTutor Statistical Power
 - AutoTutor Stock Shorting
 - AutoTutor Working Memory Long Term Memory
-- SPARC Categorized Confidence Interval (agent and student)
-- SPARC Categorized Species and Speciation (agent and student)
+- SPARC Confidence Interval (agent and student)
+- SPARC Species and Speciation (agent and student)
 
 The ten AutoTutor packages use `sparcsession` and `progressive-scaffolding-v1` for
 both account roles. Each categorized directory contains one agent-v2 package and
@@ -319,6 +319,106 @@ Useful prior designs and acceptance accounts remain in the
 [historical wiki record](https://github.com/memphis-iis/mofacts/wiki/SPARC-Instructional-Cycle-Historical-Record).
 They do not establish current support for retired conditions.
 
+## Optional YouTube video catalog
+
+Video is an additional support form inside the existing rich-support primitive. It
+adds no production families, assistance values, learner menu choices, or unit types.
+The production selects the target and move; the rich primitive can select a catalog
+passage or an existing support form. Questions retain the selected text/MC format.
+
+**Preparation is explicit.** On Content, an administrator selects the desired package
+(or condition) and clicks **Build video catalog** in its row. **First KCs (blank = all)**
+optionally limits a run to the first N authored targets, before any video search or
+caption request. Targets follow package page order, expectations before misconceptions
+within each page; failed targets count toward the limit. Upload, package updates,
+and learner startup never launch catalog preparation. Keep the Content view open;
+leaving it stops client orchestration at the next saved checkpoint. Clicking the action
+again resumes selected sources, caption jobs, transcripts, and passage selections.
+The package must already declare `tutor.setspec.contentLanguage`; the builder never
+infers authored language from the interface, responses, speech settings, or account.
+
+For every authored expectation and misconception, the first version searches the
+complete authored KC text unchanged and takes only the top captioned, embeddable
+YouTube result. Package titles and condition labels are not search terms, and no
+model summarizes or screens the KC. Duplicate video/language pairs share one saved
+transcript. Supadata is called with `mode=native`, `text=false` and small caption
+chunks. No search result, missing captions, or no useful passages are reported as
+failures for that build, not saved exclusions. The next explicit build may try again;
+successful video selections and transcripts remain reusable preparation checkpoints.
+The builder does not try a second video. Authentication, quota, partial-response,
+and provider failures stop preparation visibly, without automatic retries,
+transcription, or provider switching. Existing-caption mode does not purchase AI
+transcription. Account subscription/recharge settings remain the account owner's
+responsibility; this action never changes them.
+
+The account's existing resolved dialogue model selects caption-ID ranges in bounded,
+overlapping transcript windows. Code derives actual timestamps and rejects invalid,
+duplicate, or greater-than-30-second intervals. Selected ranges are saved before
+embedding. Embeddings are requested in batches of at most 32; reruns skip saved
+segments. `SparcVideoTranscripts` and `SparcVideoCatalogTargets` own preparation artifacts;
+all completed instructional passages live in the existing `SparcInstructionalLibrary`.
+Origins retain package, page, target identity/type, and authored target text. A source
+can yield multiple passages or none, and its originating KC does not restrict reuse.
+Library listings, topic/subgroup membership, and pagination share the supported
+component-type definition; video passages appear alongside the other component types.
+Video thumbnails load YouTube's standard poster image from the saved video ID.
+
+**Server-only setup:** place these keys in the effective ignored Meteor settings file,
+then restart localhost using the canonical hotfix workflow. Never put them in a TDF,
+`settings.public`, tracked settings, or a client environment variable.
+
+```json
+{
+  "private": {
+    "sparcVideoCatalog": {
+      "youtubeApiKey": "YOUR_YOUTUBE_DATA_API_KEY",
+      "supadataApiKey": "YOUR_SUPADATA_KEY"
+    }
+  }
+}
+```
+
+Enable YouTube Data API v3 for the search key. Supadata's free tier can be used; each
+uncached selected video's caption retrieval consumes its applicable service credit.
+Search, dialogue-model and embedding costs are separate. Reruns reuse completed
+transcripts; interrupted external requests are not a guarantee of exactly-once billing.
+No provider SDK or other dependency is added.
+
+**Instruction and durability:** existing accepted-move retrieval runs first. On a rich
+primitive miss, the server reuses its saved need vector to rank same-language transcript
+passages with the existing embedding model and exact cosine search, in indexed pages
+of 100. Only the top three descriptors reach the generation call. This is passage
+relevance ranking, not the 0.992 near-duplicate content reuse test. Passage vectors have
+their own representation identity; compatible browsing groups remain separate.
+The existing rich call can select one supplied passage ID, or an ordinary support
+form if none is suitable. Empty catalogs simply provide no video option. Search,
+caption retrieval, segmentation, and visual analysis never run during instruction.
+
+The actual transcript grounds the explanation and question; unseen visual details are
+not assumed. Typed video descriptors are validated at persistence and rendering boundaries,
+not inserted as generated iframe markup. New reuse checks catalog availability in one
+indexed batch per candidate page. Accepted learner snapshots retain their exact video,
+interval and transcript; after administrative deletion, readers display **Administrative
+removal** instead of playing the deleted passage. The player uses YouTube's start/end API
+plus an independent playback-bound guard because seeking can clear YouTube's end setting.
+It preserves native controls, captions, attribution, localized accessible labels and
+inline errors. There is no automatic response submission or mastery credit for viewing.
+Videos remain on YouTube: no download, editing, or local media hosting is performed.
+Playback boundaries are not promised to be frame accurate.
+The initial YouTube request includes the saved interval, and the ready player cues
+its exact fractional start/end times. A pending start/seek is issued once rather than
+repeated every polling interval; the independent end guard remains active after seeking.
+
+Credential-free contracts can be run from `mofacts/` with
+`node scripts/sparcVideoCatalog.test.cjs`. They cover provider requests, catalog caching,
+resume, duration validation, access checks, actual-support grounding in text/MC moves,
+and administrative removal of accepted content on reload. They do not replace a Meteor/Mongo
+integration run or a real YouTube playback walkthrough. A localhost build of the first
+five Species and Speciation KCs saved 18 passages across two KCs; one candidate had
+no selected passages and two searches returned no result. Browser playback acceptance
+remains separate from this catalog-building evidence. Each `npm run test:ci` invocation still requires
+fresh explicit authorization.
+
 ## Shared Sunburst teaching-figure library — October 12, 2026
 
 The user selected GPT Image 2.5 Sunburst. The initial default is Medium quality, one image, automatic aspect ratio, pinned OpenAI routing with provider fallback disabled. High, Xhigh, Max, Low and Auto are available provider quality settings; they are not a separate reasoning-effort control. Sunburst requests use quality and do not send Seedream's resolution parameter. Dialogue-model settings remain account-controlled.
@@ -333,20 +433,20 @@ The server-only sparc_figure_library collection stores originating situation emb
 
 Nearest-neighbor search is exact cosine comparison across matching representation/image-model/embedding-model/dimension records, paged internally in batches of 100 with an index and bounded memory. Only candidate vector fields are read during search; the full library is never published to the client. Lookup cost grows with library size; this is not an approximate vector index or a capacity certification. Warm retrievals run concurrently. On a miss, a Mongo lease serializes discovery plus first generation across replicas and repeats the search before generating, so simultaneous close encounters can reuse the newly populated entry. Lease wait is bounded at 180 seconds; the lease expires after 15 minutes to recover from a stopped process and is released only by its owner.
 
-A durable pending entry preserves the original brief and embedding across provider/storage failures. Once the canonical asset is ready, the transient generation payload is removed and the per-learner decision points to that asset. Restart/retry reuses the saved decision even if the originating library entry is later excluded from new reuse. Setting its reusable flag to false removes an entry from future search while retaining its asset and prior learner histories.
+A durable pending entry preserves the original brief and embedding across provider/storage failures. Once the canonical asset is ready, the transient generation payload is removed and the per-learner decision points to that asset. Restart/retry retains the saved decision identity. Administrative deletion removes its catalog content and image files; a content-free deletion receipt makes a later reload display **Administrative removal** in the affected field. Learner histories and model values are not rewritten.
 
-Administrators can open **Content → Inspect image library** to inspect the entire shared teaching-figure repository at `/sparcImageLibrary`. The link is at the top of Content, rather than in a stimulus editor, because suitable figures can be reused across TDFs. **Groups** opens a compact grid with one example thumbnail, broad generated label and image count per semantic group. Click the example thumbnail or its label to open that group. Select a group to open a compact thumbnail grid sorted by component type (Explanation, Feedback, Image, Question, Support), then from closest to the center outward within each type. Server pagination uses type, similarity, and component identity together so types remain contiguous across Show more loads. The existing semantic groups and vectors are unchanged. Clicking a thumbnail displays that image and its description, deprecation and replacement controls above the grid; the selected thumbnail is highlighted. The initial group page shows the grid without selecting an image. **Show more images** appends another bounded page of thumbnails and retains the current selection. Choose **All images** for the complete collection using the same thumbnail grid and selected-image panel above it. Both views start without a selected image, retain the current selection when more thumbnails are loaded, and place deprecation, replacement and old-version controls on the selected full image card. The gallery includes all completed library entries across systems, image models and representation versions, including figures excluded from future reuse. Each image card shows its saved description, creation date, image model and reuse status; select the image to open it at full size. Incomplete generations and private supported-Prompt images are outside this shared repository.
+Administrators can open **Content → Inspect instructional content library** at `/sparcImageLibrary` to inspect shared components across lessons. **Topics** opens a compact grid with representative thumbnails, generated labels and counts. Select a topic and subgroup to browse components sorted by type (Explanation, Feedback, Image, Question, Support, Video passage), then from the subgroup's center outward within each type. Text breadcrumbs return to either grouping level; there is no all-components view. Selecting a thumbnail opens its inspection panel above the grid, with revision and deletion controls. **Show more components** appends another bounded page and retains the selection. Image inspection shows the saved description, creation date and image model, with full-size access. Deleted entries and incomplete generations are absent from the catalog.
 
 The gallery uses the active Theme tool's existing typography, density and semantic surface settings. Its main heading uses the same `1.5 * app_font_size_base` sizing as the shared app header, with `app_heading_font_family` and `app_page_header_text_color`; smaller headings and captions also scale from the base font size. Thumbnail heights and grid widths scale with `app_density_scale`. Image cards use the configured card/stimulus surfaces, large corner radius, text and border colors; the upload form uses the existing themed `form-control` styles and small corner radius. Buttons and focus styles continue through the shared theme rules. No new theme properties or server theme changes are required. The scoped gallery heading avoids inheriting the viewport-sized global hero heading rule.
 
 Header comparison covered Content, Courses, Assignments, Data, Admin Control Panel, Backups, Security Audits and Theme templates. These use the shared app header and compact `h5`/`h6` section headings; Theme's `h3` is part of the intentional landing-page preview. No common management-header correction was warranted by this review.
 
 
-`listSparcLibraryImages` requires the admin role and uses indexed cursors to return up to 24 entries per page. Cluster pages use batched field-limited membership, library metadata and canonical-asset reads; the All images view uses a batched canonical-asset lookup. The browser fetches image pixels as cards enter view, through the existing admin-only `getSparcPromptImage` reader. Embeddings, learner identifiers, session records and credentials are not returned. **Show more images** loads the next page. Missing canonical assets cause an explicit error rather than disappearing from the list. Inspection does not generate images. No new TDF/stimulus fields or provenance migration are needed.
+The admin-only `listSparcInstructionalComponents` reader returns at most 24 entries per page within a validated current subgroup. It uses batched, field-limited membership, library metadata and canonical-asset reads. The browser fetches image pixels as cards enter view through `getSparcPromptImage`. Embeddings, learner identifiers, session records and credentials are not returned. Unknown missing canonical assets cause an explicit error; deliberate administrative removals display the removal marker. Inspection does not generate content.
 
-Automatic grouping uses two levels of deterministic spherical k-means with cosine silhouette selection. First, a sample of at most 128 instructional-need embeddings per compatible representation-version/model/dimension space determines broad topics. A second streaming pass takes a separate bounded sample of at most 128 records within each topic, and the same algorithm selects its subgroups. A third pass assigns every completed component, including excluded components, to exactly one subgroup. Each level considers 2 through min(12, sample size minus one) groups, uses two deterministic initializations and at most 16 iterations, allows singletons with zero silhouette contribution, and selects the smallest candidate within 0.02 of the best score when that score reaches 0.20. Otherwise that topic has one subgroup; one- and two-item topics also retain one subgroup. The hierarchy stops after these two grouping levels. Counts and representative previews are cached for both levels; only leaf membership is stored. The `spherical-kmeans-silhouette-v3:two-level-v1` snapshot version invalidates flat browsing snapshots without changing content, retrieval embeddings, or learner decisions. Group counts are automatic browsing heuristics, not a claim of uniquely correct pedagogical topics. [Silhouette-based cluster selection reference](https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_silhouette_analysis.html).
+Automatic grouping uses two levels of deterministic spherical k-means with cosine silhouette selection. First, a sample of at most 128 instructional-need embeddings per compatible representation-version/model/dimension space determines broad topics. A second streaming pass takes a separate bounded sample of at most 128 records within each topic, and the same algorithm selects its subgroups. A third pass assigns every completed catalog component to exactly one subgroup. Each level considers 2 through min(12, sample size minus one) groups, uses two deterministic initializations and at most 16 iterations, allows singletons with zero silhouette contribution, and selects the smallest candidate within 0.02 of the best score when that score reaches 0.20. Otherwise that topic has one subgroup; one- and two-item topics also retain one subgroup. The hierarchy stops after these two grouping levels. Counts and representative previews are cached for both levels; only leaf membership is stored. The `spherical-kmeans-silhouette-v3:two-level-v1` snapshot version invalidates flat browsing snapshots without changing content, retrieval embeddings, or learner decisions. Group counts are automatic browsing heuristics, not a claim of uniquely correct pedagogical topics. [Silhouette-based cluster selection reference](https://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_silhouette_analysis.html).
 
-The grouping owner reads vectors internally in pages of 100, retains only the bounded samples and centers, yields between analysis steps and records stage/count progress. It stores derived snapshots and indexed membership documents in the server-only `sparc_figure_browse` collection. Completed-figure additions and explicit asset deletion invalidate the browsing revision; changing `reusable` does not change the semantic organization. A separate browsing lease serializes rebuilds without holding the image-generation lease. Publication checks the source revision so incomplete or obsolete builds are not accepted. Current snapshots remain cached, superseded snapshots expire after 30 minutes, and abandoned staging members expire after 24 hours. A stale group page asks the administrator to reopen Groups.
+The grouping owner reads vectors internally in pages of 100, retains only the bounded samples and centers, yields between analysis steps and records stage/count progress. It stores derived snapshots and indexed membership documents in the server-only `sparc_figure_browse` collection. Catalog additions, revisions and deletions invalidate the browsing snapshot. A separate browsing lease serializes rebuilds without holding the image-generation lease. Publication checks the source revision so incomplete or obsolete builds are not accepted. Current snapshots remain cached, superseded snapshots expire after 30 minutes, and abandoned staging members expire after 24 hours. A stale group page asks the administrator to reopen Topics.
 
 Small-library grouping verification, October 14, 2026: 276 isolated SPARC contracts, full-app typecheck and lint passed (28 existing vendor warnings, no errors). Added regressions cover a three-figure pair plus singleton, a five-figure 2/2/1 split with finite scores, singleton browse membership, and automatic replacement of an older algorithm snapshot. Signed-in localhost Chrome rebuilt the actual five-image library into Confidence Intervals and Coverage (2), Evolution and Population Change (2), and Homeostasis and Internal Stability (1); each group contained its expected figures. No retrieval embeddings, reuse flags, image versions or saved learner decisions were changed. The full Meteor integration suite was not run for this correction.
 
@@ -354,15 +454,7 @@ Broad English labels come from the three nearest representative figures' saved d
 
 Semantic-browsing verification, October 13, 2026: all 237 isolated SPARC contracts passed, along with full-app typecheck and lint (28 existing vendor warnings, no errors). Fixtures covered automatic separation, small/identical collections, bounded sampling, full membership across multiple source pages, compatible-space isolation, cached labels, concurrent builds, invalid labels, revision races, authorization and paged member ordering. A synthetic 128-vector, 3,072-dimension fit selected four separated groups in 296 ms; this is not a production capacity benchmark. Chrome at localhost displayed the generated Confidence Interval Coverage group with two images, opened its center-ordered members and verified deprecation across the group and All images views. The tested flag was restored. Mongo snapshot/index regressions were added but the full Meteor integration suite was not rerun. These are local checks, not deployment or publication.
 
-At the top of each card, **Deprecated** controls the existing `reusable` boolean: checked sets it to `false`, unchecked sets it to `true`. The admin-only `setSparcLibraryImageReusable` method requires a completed canonical library figure and a literal boolean, then atomically updates only that field. The control disables while saving, confirms a successful change inline and restores the previous checkbox state on failure. Deprecation removes the figure from subsequent candidate searches across all systems; it remains visible in the gallery and readable by saved lesson decisions. No image, embedding, learner history or saved decision is deleted. A decision already accepted before deprecation retains its original figure.
-
-**Human replacement and version history.** Each current card offers **Replace image**. An administrator uploads a PNG, JPEG or WebP image (up to 8 MB), previews it and supplies the replacement's plain-text description before saving. The replacement must serve the same teaching situation; it does not create a new semantic entry or embedding. **Old versions (N)** expands a paged, newest-first list of earlier images, including the original, with their original descriptions and dates. Old versions stay hidden until opened and do not become separate gallery entries or search candidates. There is no instructional AI replacement action and no image-provider call during a human upload.
-
-The library entry's `_id` remains its original asset ID and stable semantic identity. The optional `currentAssetId` and `revision` point to the active immutable version; before any replacement, the original ID is current and revision is zero. Gallery descriptors explicitly distinguish `libraryId` from the rendered `assetId`. Each accepted replacement receives a new asset ID; the server-only `sparc_figure_versions` collection retains its parent entry, revision, predecessor and private administrator provenance. Original revision zero is admitted into the version history during the first replacement. Old entries require no destructive migration. New semantic selections save the current asset ID, while existing per-learner decisions, lesson figure references, captions and pixels retain the exact version originally selected. Deprecation applies to the semantic entry and is preserved when replacing it.
-
-The existing generation lease serializes upload retries across replicas. Content and the expected-current ID determine an idempotent upload identity; stale edits reject with an instruction to reload. Local/S3 storage must complete before a snapshot/majority Mongo transaction admits the history records and advances the current pointer together. An interrupted upload remains private and unindexed, with a named retry path that completes the same saved asset; it never overwrites an admitted version. Retrying a previously completed upload after a later replacement returns the current image and does not rewind the entry. This uses the existing required Mongo replica-set runtime. The administrative all-content purge remains a separate explicitly destructive operation and cleans version metadata.
-
-Semantic membership continues to use the stable original entry ID, so replacement does not change cluster membership or duplicate a figure. Listings, label-source descriptions and representative thumbnails resolve to the current asset. Cached broad cluster labels remain associated with the unchanged teaching situation. Replacement records are not published, and the history method returns at most 24 safe descriptors per page, without learner identifiers, administrator identifiers, embeddings or raw situations. Generic file downloads retain the existing private-image restrictions.
+Image revision uses the existing generation lease to serialize writes across replicas. An administrator supplies a PNG, JPEG or WebP file of at most 8 MB and a plain-text description for the same instructional need. Storage replaces the current asset in place and refreshes its metadata under the same ID; no old image copies or version records are retained. Generic file downloads retain the existing private-image restrictions. The current deletion and revision contract is detailed below; the dated verification paragraphs that follow record earlier behavior, not support for retired version or exclusion controls.
 
 Replacement verification (October 13): 240 isolated SPARC contracts passed, including current-version semantic selection, original decision/byte/caption preservation, multi-version paging, cached-cluster hydration, concurrent stale editor rejection and interrupted S3-storage retries. Full-app typecheck passed; lint and security-surface checks passed with 28 existing vendor warnings and no errors. Signed-in Chrome exercised the actual administrator file upload, durable save and Mongo transaction, and rendered the preserved original beneath the current replacement through Old versions. The temporary deprecated QA entry, both version records and both raster files were removed afterward; the two pre-existing teaching entries were retained. A Mongo concurrency/transaction regression was added for the supported isolated Meteor suite; that full suite was not run. These are local checks, not production deployment.
 
@@ -474,13 +566,13 @@ cohort before relying on completed migration checkpoints; an older concurrent se
 would not populate the new exposure index.
 
 The existing `/sparcImageLibrary` route is titled **Instructional content library**.
-It opens with embedding-based groups spanning all instructional components, including
-images. **All components** provides a paged view of the same repository. Sanitized
-Markdown inspection, revision, and exclusion apply to text components. Revisions add
-an immutable entry and exclude their predecessor
-in one transaction; saved learner decisions continue to resolve the original entry.
-Image components retain raster inspection, replacement, and version controls within
-the same grouped browser. There are no separate image/content libraries or tabs.
+It opens with embedding-based topics spanning all instructional components, including
+images and video passages. Navigation follows Topics → topic → subgroup using a
+single-line breadcrumb of parent links and the current location. There is no flat
+all-components view. Sanitized
+Markdown inspection, revision, and deletion apply to text components. Revision
+updates the current item in place without retaining an older catalog copy. Image
+components provide raster inspection, revision and deletion within the same grouped browser. There are no separate image/content libraries or tabs.
 
 `SparcInstructionalLibrary` owns the single server-only `sparc_instructional_library`
 collection. The figure and primitive storage modules are typed adapters to this one
@@ -534,7 +626,7 @@ paused. This is an explicitly invoked job, not paid work at startup. Preserve
 accepted decisions; replace unfinished requests' private need inputs and vectors.
 Retrieval rejects an unconverted primary vector instead of mixing representations.
 Invalidate group snapshots after activation. Reindexing preserves content, IDs,
-assets, revisions, exclusions, exposures, and immutable version references.
+current assets, exposures, and administrative removal receipts.
 
 The real Gemini Embedding 001 evaluation used cached Luna 6 medium feedback and
 saved lesson content (including Astra 6 medium), with no new instructional generation.
@@ -654,7 +746,7 @@ not a guarantee of model output quality or full lesson acceptance.
 The user subsequently authorized replacing the unanswered test question while keeping
 its history. A correction appends a canonical `value-changed` transition and an
 `append-node` operation using the existing question node ID and original move identity.
-The revised library entry is immutable; history and its new exposure commit atomically.
+Revisions update the current catalog entry; already-recorded history and exposures remain unchanged.
 Prior journal rows and learner scores are not rewritten. Answer binding and dialogue
 facts resolve the active version by stable node ID, matching display replay. A correction
 must verify that the item is still unanswered before writing. Local verification passed
@@ -705,3 +797,13 @@ in this pass. The current changes passed 341 isolated tests, full application ty
 and lint (zero errors, 28 existing warnings). No full Meteor CI invocation, release,
 deployment, commit, or push was performed. Automatic retry after output-validation
 failure remains a pending user design decision; the observed recovery used manual reload.
+
+## Administrative deletion and revision (October 18, 2026)
+
+The instructional library has **Delete** and **Revise**, with no exclusion or deprecation state. Delete permanently removes the catalog entry. Image deletion removes its saved image and dependent support entries; video deletion removes dependent saved support. Completed-move manifests that reference deleted entries are removed because they are retrieval metadata, not learner history. Revision updates the current item in place. Text revisions replace its text and answer key as applicable; image revisions replace its raster and description. No parent links, predecessor records, old-version controls, or retained image revisions are supported.
+
+`server/lib/sparcLibraryCurationStorage.ts` owns deletion. Its content-free receipts contain only an ID, removal time, and transient cleanup markers while deletion is unfinished. They are outside the catalog and contain no text, embeddings, media, or learner data. Readers use these receipts to show **Administrative removal** in the original field rather than report an error or regenerate substitute content. An image field can be removed without erasing neighboring tutor text. Batched receipt lookup checks at most 100 exact IDs per request. A deleted multiple-choice question has no answer controls or replacement answer key. Unrelated missing/corrupt records and storage/network failures remain errors.
+
+The forward startup migration runs after collection consolidation. It removes existing `reusable: false` entries in pages of at most 100, records removal receipts, and unsets retired exclusion and predecessor fields on survivors. It also retires the old image-revision layout, keeping only the current image and deleting obsolete image assets and revision records. Catalog entries, shared manifests, and receipts change transactionally; image-file cleanup runs afterward and retains a retry marker until successful. A transient cleanup marker lets restart finish dependent and media deletion after the catalog item is removed. Restart repeats unfinished work safely, logs deletion counts and failures, and never edits learner histories, accepted decisions, exposures, or model state. Deletion is permanent: restoring content requires an operator backup, not a hidden archive or an Allow reuse control. The authorized existing-exclusion cleanup therefore has no in-app rollback.
+
+Run `node scripts/sparcLibraryCuration.test.cjs` for isolated selection, revision, authorization, and rendering contracts, and the required full typecheck/lint. Mongo transaction, migration, and physical media cleanup require the supported Meteor integration environment; every integration invocation requires fresh user authorization. The current transfer tool writes format v2 and rejects retired exclusion/predecessor fields; re-export a fresh bundle after migration instead of importing an old exclusion-bearing bundle. No authored TDF fields or lesson packages change.
