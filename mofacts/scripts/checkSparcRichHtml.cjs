@@ -95,8 +95,8 @@ function assertNormalizationUsesClassDataRepresentation() {
 }
 
 function assertRendererSupportsStoredRichTextHooks() {
-  const rendererSource = fs.readFileSync(
-    path.join(repoRoot, 'mofacts/client/views/experiment/svelte/components/SparcNode.svelte'),
+  const presentationSource = fs.readFileSync(
+    path.join(repoRoot, 'mofacts/public/styles/instructional-content.css'),
     'utf8',
   );
 
@@ -107,14 +107,13 @@ function assertRendererSupportsStoredRichTextHooks() {
     '.sparc-color-error',
     'ul[data-type="taskList"]',
     '[data-sparc-callout]',
-    '[data-sparc-callout="correct"]',
+    '[data-sparc-callout="success"]',
     '[data-sparc-callout="warning"]',
     '[data-sparc-callout="error"]',
-    '.sparc-html-block table',
     '.sparc-html-block figcaption',
     '.sparc-html-block .oli-embed iframe',
   ]) {
-    assert.match(rendererSource, new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(presentationSource, new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 }
 

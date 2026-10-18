@@ -13,7 +13,7 @@
     --app-text-color: #000000;
     --app-page-header-text-color: var(--app-text-color);
     --app-accent-color: #7ed957;
-    --focus-ring-color: var(--app-accent-color);
+    --focus-ring-color: color-mix(in srgb, var(--app-accent-color) 55%, var(--app-text-color));
     --surface-emphasis-color: var(--app-accent-color);
     --brand-primary-color: var(--app-accent-color);
     --app-primary-action-surface-color: #7ed957;
@@ -81,6 +81,8 @@
     --bs-border-color: var(--border-color);
     --app-font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     --app-heading-font-family: var(--app-font-family);
+    --app-reading-measure: 70ch;
+    --app-monospace-font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     --app-font-size-base: 16px;
     --app-font-weight-normal: 400;
     --app-font-weight-medium: 500;
@@ -1757,18 +1759,15 @@ body:has(.instructions-container) {
     visibility: visible;
 }
 
-/* Table responsive container */
+/* Central semantic tables: application screens, authored HTML and LLM Markdown
+ * all use this contract. Renderers must not supply competing table appearance.
+ */
 .table-responsive {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
 }
 
-.table-responsive table{
-    min-width: 700px; /* Ensure table has minimum width before scrolling */
-    margin-bottom: 0; /* Remove default Bootstrap margin */
-}
-
-/* Table styling */
+table,
 .table {
     --bs-table-color: var(--app-text-color);
     --bs-table-bg: var(--learning-card-surface-color);
@@ -1776,109 +1775,97 @@ body:has(.instructions-container) {
     --bs-table-striped-color: var(--app-text-color);
     --bs-table-striped-bg: var(--app-subtle-surface-color);
     --bs-table-active-color: var(--app-text-color);
-    --bs-table-active-bg: var(--app-selected-surface-color);
+    --bs-table-active-bg: var(--app-state-selected-surface-color);
     --bs-table-hover-color: var(--app-text-color);
-    --bs-table-hover-bg: var(--app-hover-surface-color);
+    --bs-table-hover-bg: var(--app-state-hover-surface-color);
     width: 100%;
-    border-collapse: collapse;
-    table-layout: auto; /* Allow columns to grow with content */
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: auto;
+    border: var(--app-border-width) solid var(--border-color);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
     color: var(--app-text-color);
-}
-
-/* Table cell base styling - applies to all cells */
-.table th,
-.table td {
-    white-space: normal;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    color: var(--app-text-color);
-    background-color: transparent;
-}
-
-/* Table header styling */
-thead {
-    background-color: var(--app-accent-color);
-    font-weight: 800;
-    border: 1px solid var(--app-accent-color);
-    color: var(--app-primary-action-text-color);
-}
-
-thead th {
-    padding: var(--app-space-3-px) clamp(var(--app-space-3-px), 2vw, var(--app-space-4-px));
-    text-align: left;
-    border-bottom: 2px solid var(--app-accent-color);
+    font-family: var(--app-font-family);
     font-size: var(--app-font-size-base);
-    font-weight: 700;
-    vertical-align: middle;
-    color: var(--app-primary-action-text-color);
+    line-height: var(--app-line-height-relaxed);
+    margin-block-end: var(--app-space-3);
+    overflow: clip;
 }
 
-/* First header cell gets left radius */
-thead th:first-child {
-    border-top-left-radius: var(--app-border-radius-sm);
-}
+.table-responsive > table { margin-block-end: 0; }
 
-/* Last header cell gets right radius */
-thead th:last-child {
-    border-top-right-radius: var(--app-border-radius-sm);
-}
-
-/* Table body styling */
-tbody tr {
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color var(--app-transition-fast) ease-in-out;
-}
-
-tbody tr:hover {
-    background-color: var(--app-hover-surface-color);
+table > :is(thead, tbody, tfoot) > tr > :is(th, td),
+.table > :not(caption) > * > * {
+    padding: var(--app-space-2) var(--app-space-3);
+    border: 0;
+    border-block-end: var(--app-border-width) solid var(--border-color);
+    background-color: var(--learning-card-surface-color);
     color: var(--app-text-color);
-}
-
-tbody td,
-tbody th {
-    padding: calc(10px * var(--app-density-scale)) clamp(var(--app-space-3-px), 2vw, var(--app-space-4-px));
+    font-weight: var(--app-font-weight-normal);
+    text-align: start;
     vertical-align: top;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    box-shadow: none;
+    transition: background-color var(--app-transition-fast) ease;
 }
 
-/* Striped rows */
-.table-striped tbody tr:nth-of-type(odd) {
+table > thead > tr > :is(th, td),
+.table > thead > tr > :is(th, td) {
+    --bs-table-bg: var(--app-secondary-surface-color);
+    --bs-table-color: var(--app-secondary-text-color);
+    background-color: var(--app-secondary-surface-color);
+    color: var(--app-secondary-text-color);
+    font-weight: var(--app-font-weight-semibold);
+}
+
+table > tbody > tr > th { font-weight: var(--app-font-weight-semibold); }
+
+table > thead > tr:first-child > :first-child,
+table:not(:has(> thead)) > tbody:first-of-type > tr:first-child > :first-child {
+    border-start-start-radius: max(0px, calc(var(--app-border-radius-sm) - var(--app-border-width)));
+}
+
+table > thead > tr:first-child > :last-child,
+table:not(:has(> thead)) > tbody:first-of-type > tr:first-child > :last-child {
+    border-start-end-radius: max(0px, calc(var(--app-border-radius-sm) - var(--app-border-width)));
+}
+
+table > :is(tbody, tfoot):last-child > tr:last-child > :first-child {
+    border-end-start-radius: max(0px, calc(var(--app-border-radius-sm) - var(--app-border-width)));
+}
+
+table > :is(tbody, tfoot):last-child > tr:last-child > :last-child {
+    border-end-end-radius: max(0px, calc(var(--app-border-radius-sm) - var(--app-border-width)));
+}
+
+table > :is(tbody, tfoot):last-child > tr:last-child > * { border-block-end: 0; }
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
     background-color: var(--app-subtle-surface-color);
-    color: var(--app-text-color);
 }
 
-.table-striped tbody tr:nth-of-type(odd):hover {
-    background-color: var(--app-hover-surface-color);
-    color: var(--app-text-color);
+table > tbody > tr:hover > *,
+.table > tbody > tr:hover > * {
+    background-color: var(--app-state-hover-surface-color);
 }
 
-/* Bordered tables */
-.table-bordered {
-    border: 1px solid var(--border-color);
+table > tfoot > tr > *,
+.table > tfoot > tr > * {
+    background-color: var(--app-subtle-surface-color);
+    font-weight: var(--app-font-weight-semibold);
 }
 
-.table-bordered th,
-.table-bordered td {
-    border: 1px solid var(--border-color);
+table caption {
+    caption-side: top;
+    padding-block: var(--app-space-2);
+    color: var(--app-page-header-text-color);
+    font-weight: var(--app-font-weight-semibold);
+    text-align: start;
 }
 
-/* Table footer styling */
-tfoot {
-    background-color: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
-    color: var(--app-text-color);
-    font-weight: 600;
-    border-top: 2px solid var(--app-accent-color);
-}
-
-tfoot td,
-tfoot th {
-    padding: var(--app-space-3-px) clamp(var(--app-space-3-px), 2vw, var(--app-space-4-px));
-}
-
-/* Light table header variant */
-.table-light {
-    background-color: color-mix(in srgb, var(--app-text-color) 5%, var(--learning-card-surface-color));
-    color: var(--app-text-color);
-}
+.table-light { --bs-table-bg: var(--app-subtle-surface-color); }
 
 /* ===== TABLE UTILITY CLASSES ===== */
 /* Column width utilities - use these classes on <th> or <td> elements */
@@ -2776,9 +2763,6 @@ tfoot th {
         margin-left:5vw;
     }
 
-    .table-responsive table{
-        min-width: 90vw;
-    }
 
     .input-box{
         position: relative;  /* Normal document flow - appears after stimulus/SR icon */
@@ -3091,3 +3075,6 @@ body:has(.content-container) > .theme-bootstrap {
     position: relative;
     background-color: var(--app-background-color);
 }
+
+/* Semantic emphasis follows the central typography contract. */
+strong, b { font-weight: var(--app-font-weight-bold); }

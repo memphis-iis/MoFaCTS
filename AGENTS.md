@@ -155,6 +155,8 @@ Run it from `mofacts/`. Do not substitute per-file checks or targeted `tsc` invo
 
 ## UI, Logging, And Client Behavior
 
+- The central application theme owns appearance. Authored and LLM markup underlays that theme; SPARC must not introduce independent visual decisions. Reuse central theme properties and shared presentation rules, including table padding and figure/table rounding. See `docs/theme-presentation.md`.
+
 - Never add raw client `console.*` for routine logging; use `mofacts/client/lib/clientLogger.ts`.
 - Preserve admin-controlled client verbosity behavior.
 - Use inline UI patterns instead of modal popups unless explicitly requested.

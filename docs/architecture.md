@@ -21,6 +21,8 @@ The learner-facing flow combines content from TDFs with adaptive scheduling logi
 
 ## Client Runtime
 
+The central application theme owns presentation, including generated instructional markup and shared tables. See [central application presentation](theme-presentation.md) for stylesheet ownership and verification.
+
 The active learner card experience uses Svelte components and state-machine-oriented runtime logic. Existing Meteor client code still provides routing, data subscriptions, account context, administrative workflows, and integration points.
 
 ## Learning Component Modularity

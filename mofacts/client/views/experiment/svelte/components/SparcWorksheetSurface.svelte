@@ -104,9 +104,3 @@
     </button>
   {/if}
 </section>
-
-<style>
-  .worksheet { overflow-y: auto; max-height: 80vh; padding: 1rem; background: var(--card-bg, white); }
-  .worksheet-question { margin-bottom: 1rem; padding: .75rem; border: 2px solid transparent; }
-  .worksheet-question.incorrect { border-color: var(--feedback-error-color); }
-</style>
