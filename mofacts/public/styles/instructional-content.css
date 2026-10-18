@@ -971,6 +971,13 @@
     border-color: var(--app-accent-color);
   }
 
+  @media (max-width: 768px) {
+    /* The reading surface and worked example already supply their own inset. */
+    .sparc-dialogue-utterance-tutor .sparc-dialogue-bubble {
+      padding-inline: 0;
+    }
+  }
+
   .sparc-dialogue-diagnostic {
     color: var(--app-secondary-text-color);
     font-family: var(--app-monospace-font-family);

@@ -1635,6 +1635,9 @@ body:has(.instructions-container) {
 
 .help-content {
     margin-top: var(--app-space-4);
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 .access-denied-page {
@@ -1826,7 +1829,10 @@ table > :is(thead, tbody, tfoot) > tr > :is(th, td),
     text-align: start;
     vertical-align: top;
     white-space: normal;
-    overflow-wrap: anywhere;
+    /* Preserve intrinsic word widths in tables; forced narrow block layouts may
+       still break an otherwise uncontainable identifier. */
+    overflow-wrap: break-word;
+    word-break: normal;
     box-shadow: none;
     transition: background-color var(--app-transition-fast) ease;
 }

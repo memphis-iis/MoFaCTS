@@ -235,6 +235,8 @@
     color: inherit;
     font-weight: inherit;
     text-align: inherit;
+    /* Opaque lesson names and file/target identifiers must fit stacked rows. */
+    overflow-wrap: anywhere;
 }
 
 .asset-cell-content {
