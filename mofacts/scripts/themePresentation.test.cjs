@@ -19,7 +19,9 @@ describe('central application presentation', () => {
       assert.doesNotMatch(source, /renderSparcInstructionMarkdown|\{@html|:global\((?:table|th|td)\)/);
     }
     const thumbnail = read('client/views/experimentSetup/sparc/SparcLibraryComponentPreview.svelte');
-    assert.doesNotMatch(thumbnail, /\.slice\(0, 600\)|font-size:/, 'Clipping must not change or restyle the source content');
+    assert.doesNotMatch(thumbnail, /\.slice\(0, 600\)|font-size:/, 'Miniatures must not change or restyle the source content');
+    const fitting = read('client/views/experimentSetup/sparc/SparcLibraryThumbnail.svelte');
+    assert.doesNotMatch(fitting, /<style\b|renderSparcInstructionMarkdown|\{@html/, 'Fitting must not own appearance or duplicate content rendering');
     for (const file of ['client/views/experiment/svelte/components/SparcPromptFigure.svelte', 'client/views/experimentSetup/sparc/SparcLibraryRaster.svelte']) {
       const source = read(file);
       assert.match(source, /<SparcFigure /);

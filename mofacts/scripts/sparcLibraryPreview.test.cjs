@@ -10,13 +10,15 @@ it('projects saved categorized support with the learner heading, figure and dura
     content: { text: '| A | B |\n| --- | --- |\n| 1 | 2 |', supportHeading: 'Comparison',
       figure: { assetId: 'image1', description: 'A comparison', displayWidth: 320 } } };
   const before = JSON.stringify(entry);
-  const projected = sparcLibraryPreviewNode(entry);
-  const support = projected.children[0];
-  assert.equal(support.id, `${support.turnEventId}:richContent`);
-  assert.equal(support.action, entry.move);
-  assert.equal(support.supportHeading, 'Comparison');
-  assert.deepEqual(support.figure, entry.content.figure);
-  assert.equal(support.value, entry.content.text);
+  for (const scope of ['inspection', 'thumbnail']) {
+    const projected = sparcLibraryPreviewNode(entry, scope);
+    const support = projected.children[0];
+    assert.equal(support.id, `${support.turnEventId}:richContent`);
+    assert.equal(support.action, entry.move);
+    assert.equal(support.supportHeading, 'Comparison');
+    assert.deepEqual(support.figure, entry.content.figure);
+    assert.equal(support.value, entry.content.text);
+  }
   assert.equal(JSON.stringify(entry), before, 'Inspection must not mutate saved content');
 });
 

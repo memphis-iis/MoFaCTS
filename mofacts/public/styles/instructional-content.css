@@ -1419,16 +1419,34 @@
     border-radius: var(--app-border-radius-sm);
   }
 
-/* Library wrappers constrain preview size and expose inspection actions only.
- * Their contents use the same learner node/figure presentation above.
+/* Library miniatures use the shared learner rendering at its reading measure.
+ * Only the fitting transform is measured at runtime; appearance belongs here.
  */
 .sparc-library-thumbnail {
   position: relative;
   width: 100%;
-  height: calc(160px * var(--app-density-scale));
+  aspect-ratio: 4 / 3;
+  box-sizing: border-box;
+  padding: var(--app-space-2);
+  border: var(--app-border-width) solid var(--border-color);
+  border-radius: var(--app-border-radius-sm);
+  background: var(--learning-card-surface-color);
   overflow: hidden;
 }
 .sparc-library-thumbnail-content { pointer-events: none; }
+.sparc-library-thumbnail-miniature {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--app-reading-measure) + var(--app-space-3) + var(--app-space-3));
+  transform-origin: top left;
+}
+.sparc-library-thumbnail-content .sparc-dialogue-speaker { display: none; }
+.sparc-library-thumbnail-miniature .sparc-instruction-content { overflow: visible; }
+.thumbnail-card.selected .sparc-library-thumbnail {
+  border-color: var(--app-accent-color);
+  outline: var(--app-border-width) solid var(--app-accent-color);
+}
 .sparc-library-thumbnail-select {
   position: absolute;
   inset: 0;
@@ -1445,11 +1463,10 @@
   outline-offset: calc(var(--app-border-width) * -2);
 }
 .sparc-library-raster { min-width: 0; }
-.sparc-library-raster-thumbnail .sparc-library-thumbnail {
-  height: calc(120px * var(--app-density-scale));
-}
+.sparc-library-raster-thumbnail .sparc-library-thumbnail-content { height: 100%; }
+.sparc-library-raster-thumbnail .sparc-prompt-figure { height: 100%; margin-block: 0; }
 .sparc-library-raster-thumbnail .sparc-prompt-figure img {
-  max-height: calc(120px * var(--app-density-scale));
+  height: 100%;
   object-fit: contain;
 }
 

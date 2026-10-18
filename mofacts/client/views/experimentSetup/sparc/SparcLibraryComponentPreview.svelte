@@ -2,18 +2,16 @@
   import SparcNode from '../../experiment/svelte/components/SparcNode.svelte';
   import { sparcLibraryPreviewNode } from './sparcLibraryPreview';
   import SparcLibraryRaster from './SparcLibraryRaster.svelte';
+  import SparcLibraryThumbnail from './SparcLibraryThumbnail.svelte';
   export let entry;
   export let onSelect;
   export let selectionLabel;
-  $: figure = entry.image ?? entry.content?.figure;
+  export let selected = undefined;
   $: previewNode = entry.kind !== 'image' ? sparcLibraryPreviewNode(entry, 'thumbnail') : undefined;
 </script>
 
-{#if figure}
-  <SparcLibraryRaster assetId={figure.assetId} description={figure.description} displayWidth={figure.displayWidth} thumbnail={true} {onSelect} {selectionLabel} />
+{#if entry.kind === 'image'}
+  <SparcLibraryRaster assetId={entry.image.assetId} description={entry.image.description} displayWidth={entry.image.displayWidth} thumbnail={true} {onSelect} {selectionLabel} {selected} />
 {:else}
-  <div class="sparc-library-thumbnail">
-    <div class="sparc-library-thumbnail-content" aria-hidden="true" inert><SparcNode node={previewNode} /></div>
-    <button type="button" class="sparc-library-thumbnail-select" aria-label={selectionLabel} on:click={onSelect}></button>
-  </div>
+  <SparcLibraryThumbnail {onSelect} {selectionLabel} {selected}><SparcNode node={previewNode} /></SparcLibraryThumbnail>
 {/if}

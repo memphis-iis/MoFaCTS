@@ -89,7 +89,7 @@
     <div class="thumbnail-grid" aria-label={view === 'cluster' ? 'Components in this group' : 'All instructional components'}>
       {#each entries as entry, index (entry.id)}
         <div class="thumbnail-card" class:selected={selectedId === entry.id}>
-          <SparcLibraryComponentPreview {entry} onSelect={() => selectEntry(entry.id)} selectionLabel={'Inspect ' + labels[entry.kind].toLowerCase() + ' ' + (index + 1)} />
+          <SparcLibraryComponentPreview {entry} selected={selectedId === entry.id} onSelect={() => selectEntry(entry.id)} selectionLabel={'Inspect ' + labels[entry.kind].toLowerCase() + ' ' + (index + 1)} />
           <span>{labels[entry.kind]}{entry.reusable ? '' : ' · Excluded'}</span>
         </div>
       {/each}
@@ -108,11 +108,10 @@
   .browse-controls { display: flex; gap: var(--app-space-3-px); margin-bottom: var(--app-space-4-px); }
   .browse-path { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--app-space-2-px); }
   .browse-path .btn { padding-inline: 0; white-space: normal; text-align: start; }
-  .cluster-card { min-width: 0; padding: var(--app-space-2-px); border: 1px solid var(--border-color); border-radius: var(--app-border-radius-lg); background: var(--learning-card-surface-color); }
+  .cluster-card { min-width: 0; }
   .cluster-select { width: 100%; margin-top: var(--app-space-2-px); white-space: normal; overflow-wrap: anywhere; font-size: calc(var(--app-font-size-base) * .85); }
   .selected-image { max-width: calc(960px * var(--app-density-scale)); margin-bottom: var(--app-space-4-px); scroll-margin-top: calc(var(--home-header-height) + var(--app-space-3-px)); }
   .thumbnail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(160px * var(--app-density-scale))), 1fr)); gap: var(--app-space-3-px); margin-bottom: var(--app-space-4-px); }
-  .thumbnail-card { min-width: 0; padding: var(--app-space-2-px); border: 2px solid var(--border-color); border-radius: var(--app-border-radius-lg); background: var(--learning-card-surface-color); }
-  .thumbnail-card.selected { border-color: var(--app-info-color); }
-  .thumbnail-card span { display: block; margin-top: var(--app-space-2-px); font-size: calc(var(--app-font-size-base) * .85); }
+  .thumbnail-card { min-width: 0; }
+  .thumbnail-card > span { display: block; margin-top: var(--app-space-2-px); font-size: calc(var(--app-font-size-base) * .85); }
 </style>
