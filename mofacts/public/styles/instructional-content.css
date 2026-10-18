@@ -1434,6 +1434,27 @@
   overflow: hidden;
 }
 .sparc-library-thumbnail-content { pointer-events: none; }
+.sparc-library-caption {
+  margin-block-start: var(--app-space-1);
+  text-align: center;
+  font-size: calc(var(--app-font-size-base) * .8);
+  line-height: var(--app-line-height-normal);
+}
+.sparc-library-group-link {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--app-accent-color);
+  background: transparent;
+  text-align: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 .sparc-library-thumbnail-miniature {
   position: absolute;
   top: 0;

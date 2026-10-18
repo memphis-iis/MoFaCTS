@@ -1008,7 +1008,8 @@
     },
     {
       "name": "listSparcInstructionalComponents",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Pages at most 24 shared components with existing subgroup IDs from the validated current browsing snapshot. Membership reads use exact indexed snapshot/component IDs; no embeddings or learner records are returned. All-component and subgroup pages reject stale snapshots."
     },
     {
       "name": "lookupSparcPrimitive",

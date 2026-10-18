@@ -31,10 +31,11 @@ export function createSparcInstructionalBrowseMethods(deps: {
       await authorize(this.userId);
       if (!params || typeof params !== 'object' || Array.isArray(params) || Object.keys(params).some(key => !['after', 'snapshotId', 'clusterId', 'cursor'].includes(key))) throw new Meteor.Error(400, 'Invalid instructional library request');
       const validId = (id: unknown) => typeof id === 'string' && /^[a-zA-Z0-9]{1,64}$/.test(id);
-      if (params.snapshotId !== undefined || params.clusterId !== undefined || params.cursor !== undefined) {
-        if (typeof params.snapshotId !== 'string' || !/^[a-f0-9]{24}$/.test(params.snapshotId) || typeof params.clusterId !== 'string' || !/^[a-f0-9]{24}$/.test(params.clusterId) || params.after !== undefined) throw new Meteor.Error(400, 'Invalid instructional group');
-        const state = await deps.browse.store.state(), snapshot = await deps.browse.store.snapshot(params.snapshotId);
-        if (!snapshot || state.current !== snapshot.snapshotId || state.revision !== snapshot.sourceRevision || snapshot.algorithm !== SPARC_FIGURE_BROWSE_VERSION) throw new Meteor.Error('sparc-library-changed', 'The instructional library changed. Reopen Topics to refresh it.');
+      if (typeof params.snapshotId !== 'string' || !/^[a-f0-9]{24}$/.test(params.snapshotId)) throw new Meteor.Error(400, 'Invalid instructional browsing snapshot');
+      const state = await deps.browse.store.state(), snapshot = await deps.browse.store.snapshot(params.snapshotId);
+      if (!snapshot || state.current !== snapshot.snapshotId || state.revision !== snapshot.sourceRevision || snapshot.algorithm !== SPARC_FIGURE_BROWSE_VERSION) throw new Meteor.Error('sparc-library-changed', 'The instructional library changed. Reopen Topics to refresh it.');
+      if (params.clusterId !== undefined || params.cursor !== undefined) {
+        if (typeof params.clusterId !== 'string' || !/^[a-f0-9]{24}$/.test(params.clusterId) || params.after !== undefined) throw new Meteor.Error(400, 'Invalid instructional group');
         if (!snapshot.clusters.some(cluster => cluster.subclusters.some(child => child.id === params.clusterId))) throw new Meteor.Error(404, 'Instructional subgroup not found');
         let cursor: BrowseMemberCursor | undefined;
         if (params.cursor !== undefined) {
@@ -45,10 +46,18 @@ export function createSparcInstructionalBrowseMethods(deps: {
           cursor = { kind, similarity, assetId: id! };
         }
         const members = await deps.browse.store.members(params.snapshotId, params.clusterId, cursor), page = members.slice(0, 24), last = page.at(-1);
-        return { entries: await ordered(page.map(member => member.assetId)), nextCursor: members.length > 24 && last ? `${last.kind},${last.similarity},${last.assetId}` : null };
+        return { entries: (await ordered(page.map(member => member.assetId))).map(entry => ({ ...entry, clusterId: params.clusterId! })), nextCursor: members.length > 24 && last ? `${last.kind},${last.similarity},${last.assetId}` : null };
       }
       if (params.after !== undefined && !validId(params.after)) throw new Meteor.Error(400, 'Invalid component cursor');
-      return deps.page(params.after ?? '');
+      const page = await deps.page(params.after ?? '');
+      const memberships = await deps.browse.store.memberships(params.snapshotId, page.entries.map(entry => entry.id));
+      const byId = new Map(memberships.map(member => [member.assetId, member.clusterId]));
+      const groups = new Set(snapshot.clusters.flatMap(topic => topic.subclusters.map(group => group.id)));
+      return { ...page, entries: page.entries.map(entry => {
+        const clusterId = byId.get(entry.id);
+        if (!clusterId || !groups.has(clusterId)) throw new Meteor.Error('sparc-library-changed', 'The instructional library changed. Reopen Topics to refresh it.');
+        return { ...entry, clusterId };
+      }) };
     },
   };
 }

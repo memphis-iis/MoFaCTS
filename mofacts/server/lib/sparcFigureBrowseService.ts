@@ -17,6 +17,7 @@ export type SparcFigureBrowseStore = {
   publish: (snapshot: BrowseSnapshot) => Promise<boolean>;
   discard: (snapshotId: string) => Promise<void>;
   members: (snapshotId: string, clusterId: string, cursor?: BrowseMemberCursor) => Promise<Array<BrowseMember & Pick<BrowseSource, 'kind'>>>;
+  memberships: (snapshotId: string, assetIds: string[]) => Promise<Array<Pick<BrowseMember, 'assetId' | 'clusterId'>>>;
   withLock: <T>(work: () => Promise<T>) => Promise<T>;
 };
 export type SparcFigureBrowseDeps = {

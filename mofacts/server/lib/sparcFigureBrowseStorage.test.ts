@@ -35,6 +35,9 @@ describe('SPARC semantic browse Mongo snapshots', function() {
     assert.equal((await store.state()).current, snapshotId);
     const members = await store.members(snapshotId, 'cluster');
     assert.deepEqual(members.map(member => member.similarity), [.9, .8]);
+    assert.deepEqual(await store.memberships(snapshotId, [entry._id]), [{ assetId: entry._id, clusterId: 'cluster' }]);
+    assert.deepEqual(await store.memberships(staleId, [entry._id]), []);
+    await assert.rejects(store.memberships(snapshotId, Array(25).fill(entry._id)), /exceeds 24/);
     assert.equal((await store.members(snapshotId, 'cluster', { kind: 'image', similarity: .9, assetId: entry._id })).length, 1);
     await store.discard(snapshotId);
     assert.deepEqual(await store.snapshot(snapshotId), snapshot);

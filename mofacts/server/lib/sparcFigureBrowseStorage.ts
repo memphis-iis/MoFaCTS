@@ -59,6 +59,18 @@ export function createSparcFigureBrowseStore(library: Mongo.Collection<Instructi
     async discard(snapshotId) {
       if ((await SparcFigureBrowse.findOneAsync('state'))?.current !== snapshotId) await SparcFigureBrowse.removeAsync({ snapshotId });
     },
+    async memberships(snapshotId, assetIds) {
+      if (assetIds.length > 24) throw new Error('Instructional membership page exceeds 24 entries');
+      if (!assetIds.length) return [];
+      // Membership IDs already encode snapshot + component; the built-in _id
+      // index serves this bounded batch without scanning a snapshot or vectors.
+      const rows = await SparcFigureBrowse.rawCollection().find({ kind: 'member', snapshotId,
+        _id: { $in: assetIds.map(id => `${snapshotId}-${id}`) } }, { projection: { _id: 0, assetId: 1, clusterId: 1 } }).toArray();
+      return rows.map(row => {
+        if (!row.assetId || !row.clusterId) throw new Error('Invalid instructional group membership');
+        return { assetId: row.assetId, clusterId: row.clusterId };
+      });
+    },
     async members(snapshotId, clusterId, cursor) {
       // Read the existing component type from its owner. Cached membership keeps
       // only semantic assignment; changing display order needs no re-clustering.

@@ -12,15 +12,30 @@ describe('Unified instructional component browsing', () => {
       ...(i % 3 ? { content: { text: 'Complete instructional explanation.' } } : { image: { libraryId: row._id, assetId: row._id, description: 'Saved instructional image.', revision: 0, createdAt: new Date(0).toISOString(), model: 'synthetic', reusable: true } }),
       target: 'kc', move: 'move', reusable: true, createdAt: new Date(0) } as InstructionalComponentSummary]));
     const methods = createSparcInstructionalBrowseMethods({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async id => id === 'admin' }),
-      browse: f.deps, inspect: async ids => ids.map(id => publicEntries.get(id)!).filter(Boolean), page: async () => ({ entries: [], nextCursor: null }) });
+      browse: f.deps, inspect: async ids => ids.map(id => publicEntries.get(id)!).filter(Boolean), page: async after => {
+        const entries = [...publicEntries.values()].filter(entry => entry.id > after).slice(0, 25);
+        return { entries: entries.slice(0, 24), nextCursor: entries.length > 24 ? entries[23]!.id : null };
+      } });
     const overview = await methods.getSparcLibraryClusters.call({ userId: 'admin' });
     assert.equal(overview.total, 60); assert.equal(overview.clusters.length, 2);
     assert.ok(overview.clusters.every(topic => topic.subclusters.every(leaf => leaf.representative)));
+    const all = await methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { snapshotId: overview.snapshotId });
+    assert.equal(all.entries.length, 24);
+    for (const entry of all.entries) {
+      assert.equal(entry.clusterId, f.members.find(member => member.snapshotId === overview.snapshotId && member.assetId === entry.id)!.clusterId);
+      assert.ok(overview.clusters.some(topic => topic.subclusters.some(group => group.id === entry.clusterId)));
+    }
+    const more = await methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { snapshotId: overview.snapshotId, after: all.nextCursor! });
+    assert.equal(more.entries.length, 24);
+    assert.ok(more.entries.every(entry => !all.entries.some(prior => prior.id === entry.id)));
+    assert.equal(JSON.stringify(all).includes('embedding'), false);
+    await assert.rejects(methods.listSparcInstructionalComponents.call({ userId: 'admin' }), /snapshot/);
     await assert.rejects(methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { snapshotId: overview.snapshotId, clusterId: overview.clusters[0]!.id }), /subgroup not found/);
     const params = { snapshotId: overview.snapshotId, clusterId: overview.clusters[0]!.subclusters[0]!.id };
     const first = await methods.listSparcInstructionalComponents.call({ userId: 'admin' }, params);
     assert.equal(first.entries.length, 24); assert.ok(first.nextCursor);
     assert.ok(first.entries.some(entry => entry.kind === 'image')); assert.ok(first.entries.some(entry => entry.kind === 'explanation'));
+    assert.ok(first.entries.every(entry => entry.clusterId === params.clusterId));
     assert.equal(JSON.stringify(first).includes('embedding'), false);
     const next = await methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { ...params, cursor: first.nextCursor! });
     assert.equal(next.entries.length, 6); assert.equal(next.nextCursor, null);
@@ -45,7 +60,10 @@ describe('Unified instructional component browsing', () => {
       await assert.rejects(methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { ...params, cursor }), /cursor/);
     }
     await assert.rejects(methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { ...params, clusterId: 'f'.repeat(24) }), /not found/);
+    f.members.splice(f.members.findIndex(member => member.assetId === all.entries[0]!.id), 1);
+    await assert.rejects(methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { snapshotId: overview.snapshotId }), /library changed/);
     f.invalidate(); await assert.rejects(methods.listSparcInstructionalComponents.call({ userId: 'admin' }, params), /library changed/);
+    await assert.rejects(methods.listSparcInstructionalComponents.call({ userId: 'admin' }, { snapshotId: overview.snapshotId }), /library changed/);
   });
   it('hydrates larger hierarchies in bounded inspection batches and rejects flat snapshots', async () => {
     const rows = figureBrowseRows(27), f = figureBrowseFixture(rows);

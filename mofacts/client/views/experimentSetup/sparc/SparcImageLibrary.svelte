@@ -11,6 +11,12 @@
   let overview, selectedTopic, selectedCluster, selectedId, selectedPanel;
   let view = 'groups', entries = [], nextCursor = null, loading = false, error = '', initialized = false;
   $: selected = entries.find(entry => entry.id === selectedId);
+  $: groupsById = new Map((overview?.clusters ?? []).flatMap(topic => topic.subclusters.map(cluster => [cluster.id, { topic, cluster }])));
+  function openGroup(id) {
+    const group = groupsById.get(id);
+    selectedTopic = group.topic;
+    changeView('cluster', group.cluster);
+  }
   async function selectEntry(id) { selectedId = id; await tick(); if (!lifetime.isDestroyed()) selectedPanel?.scrollIntoView({ block: 'start', behavior: 'instant' }); }
   function onReuseChanged(id, reusable) { entries = entries.map(entry => entry.id === id ? { ...entry, reusable, ...(entry.kind === 'image' ? { image: { ...entry.image, reusable } } : {}) } : entry); }
   function onReplacement(image) { entries = entries.map(entry => entry.id === image.libraryId ? { ...entry, image } : entry); }
@@ -18,11 +24,12 @@
     if (loading || lifetime.isDestroyed()) return;
     const generation = lifetime.begin(); loading = true; error = '';
     try {
-      if (view === 'groups') {
+      if (!overview) {
         const result = await meteorCallAsync('getSparcLibraryClusters');
         if (!lifetime.isCurrent(generation)) return; overview = result;
-      } else if (view !== 'subgroups') {
-        const params = view === 'cluster' ? { snapshotId: overview.snapshotId, clusterId: selectedCluster.id, ...(nextCursor ? { cursor: nextCursor } : {}) } : (nextCursor ? { after: nextCursor } : {});
+      }
+      if (view === 'cluster' || view === 'all') {
+        const params = { snapshotId: overview.snapshotId, ...(view === 'cluster' ? { clusterId: selectedCluster.id, ...(nextCursor ? { cursor: nextCursor } : {}) } : (nextCursor ? { after: nextCursor } : {})) };
         const page = await meteorCallAsync('listSparcInstructionalComponents', params);
         if (!lifetime.isCurrent(generation)) return; entries = [...entries, ...page.entries]; nextCursor = page.nextCursor;
       }
@@ -72,7 +79,10 @@
       {#each (view === 'groups' ? overview.clusters : selectedTopic.subclusters) as cluster (cluster.id)}
         <article class="cluster-card">
           <SparcLibraryComponentPreview entry={cluster.representative} onSelect={() => changeView(view === 'groups' ? 'subgroups' : 'cluster', cluster)} selectionLabel={'Open ' + cluster.label + (view === 'groups' ? ' topic' : ' subgroup')} />
-          <button type="button" class="btn btn-outline-primary cluster-select" on:click={() => changeView(view === 'groups' ? 'subgroups' : 'cluster', cluster)}>{cluster.label} · {cluster.count} components{view === 'groups' ? ' · ' + cluster.subclusters.length + (cluster.subclusters.length === 1 ? ' subgroup' : ' subgroups') : ''}</button>
+          <div class="sparc-library-caption">
+            <button type="button" class="sparc-library-group-link" on:click={() => changeView(view === 'groups' ? 'subgroups' : 'cluster', cluster)}>{cluster.label}</button>
+            <span>{cluster.count} components{view === 'groups' ? ' · ' + cluster.subclusters.length + (cluster.subclusters.length === 1 ? ' subgroup' : ' subgroups') : ''}</span>
+          </div>
         </article>
       {/each}
     </div>
@@ -90,7 +100,10 @@
       {#each entries as entry, index (entry.id)}
         <div class="thumbnail-card" class:selected={selectedId === entry.id}>
           <SparcLibraryComponentPreview {entry} selected={selectedId === entry.id} onSelect={() => selectEntry(entry.id)} selectionLabel={'Inspect ' + labels[entry.kind].toLowerCase() + ' ' + (index + 1)} />
-          <span>{labels[entry.kind]}{entry.reusable ? '' : ' · Excluded'}</span>
+          <div class="sparc-library-caption">
+            <span>{labels[entry.kind]}{entry.reusable ? '' : ' · Excluded'}</span>
+            <button type="button" class="sparc-library-group-link" on:click={() => openGroup(entry.clusterId)}>{groupsById.get(entry.clusterId).cluster.label}</button>
+          </div>
         </div>
       {/each}
     </div>
@@ -109,9 +122,7 @@
   .browse-path { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--app-space-2-px); }
   .browse-path .btn { padding-inline: 0; white-space: normal; text-align: start; }
   .cluster-card { min-width: 0; }
-  .cluster-select { width: 100%; margin-top: var(--app-space-2-px); white-space: normal; overflow-wrap: anywhere; font-size: calc(var(--app-font-size-base) * .85); }
   .selected-image { max-width: calc(960px * var(--app-density-scale)); margin-bottom: var(--app-space-4-px); scroll-margin-top: calc(var(--home-header-height) + var(--app-space-3-px)); }
   .thumbnail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(160px * var(--app-density-scale))), 1fr)); gap: var(--app-space-3-px); margin-bottom: var(--app-space-4-px); }
   .thumbnail-card { min-width: 0; }
-  .thumbnail-card > span { display: block; margin-top: var(--app-space-2-px); font-size: calc(var(--app-font-size-base) * .85); }
 </style>

@@ -17,6 +17,11 @@ export function figureBrowseFixture(input: BrowseSource[]) {
       snapshots.set(snapshot.snapshotId, snapshot); current = snapshot.snapshotId; return true;
     },
     async discard(id) { if (id !== current) { snapshots.delete(id); for (let i = members.length - 1; i >= 0; i--) if (members[i]!.snapshotId === id) members.splice(i, 1); } },
+    async memberships(snapshotId, assetIds) {
+      assert.ok(assetIds.length <= 24);
+      return members.filter(member => member.snapshotId === snapshotId && assetIds.includes(member.assetId))
+        .map(({ assetId, clusterId }) => ({ assetId, clusterId }));
+    },
     async members(snapshotId, clusterId, cursor) {
       return members.filter(member => member.snapshotId === snapshotId && member.clusterId === clusterId)
         .map(member => ({ ...member, kind: rows.find(row => row._id === member.assetId)!.kind }))
