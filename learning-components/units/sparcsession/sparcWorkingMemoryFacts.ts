@@ -1,7 +1,7 @@
 import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
 import { parseSparcPromptFigure } from './sparcSupportedPrompt';
 import { isSparcCategorizedPolicy } from '../../runtime/sparcInstructionalPolicies';
-import { requireSparcTargetCategory } from '../../runtime/sparcTargetCategories';
+import { requireSparcTargetCategory, sparcQuestionFormatFromAction } from '../../runtime/sparcTargetCategories';
 import type {
   SparcAuthoredDocument,
   SparcAuthoredNode,
@@ -201,8 +201,11 @@ export function progressiveDialogueFacts(replayState: Pick<SparcReplayState, 'tr
     for (const key of ['primitiveReference', 'component']) if (node[key] !== undefined) slots[key] = node[key];
     if (node.video !== undefined) slots.video = parseSparcVideoSegment(node.video);
     if (node.figure !== undefined) slots.figure = parseSparcPromptFigure(node.figure);
+    const questionFormat = sparcQuestionFormatFromAction(node.action);
+    if (questionFormat) slots.responseFormat = questionFormat;
     if (speaker === 'learner' && transition.event.type === 'response-submitted' && transition.event.payload?.questionId) {
-      slots.responseFormat = 'multiple-choice';
+      const question = utterances.get(String(transition.event.payload.questionId));
+      slots.responseFormat = question?.slots?.responseFormat;
     }
     for (const slot of optionalStringSlots) {
       if (typeof node[slot] === 'string' && node[slot].trim()) {

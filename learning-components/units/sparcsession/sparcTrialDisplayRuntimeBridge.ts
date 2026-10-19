@@ -1,6 +1,6 @@
 import { isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
-import { sparcTargetCategoryFields } from '../../runtime/sparcTargetCategories';
-import { savedSparcChoiceQuestions, parseSparcQuestionChoices } from './sparcMultipleChoiceQuestion';
+import { sparcTargetCategoryFields, sparcQuestionFormatFromAction, isSparcChoiceFormat } from '../../runtime/sparcTargetCategories';
+import { savedSparcQuestions, parseSparcQuestionChoices } from './sparcMultipleChoiceQuestion';
 import { createSparcDynamicInstructionRules } from './sparcDynamicInstructionRules';
 import type {
   SparcTrialDisplay,
@@ -824,13 +824,14 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
       learnerText = '';
     } else {
       const lastInstruction = replayState.transitions.filter((transition) => transition.transitionId.endsWith(':cycle')).at(-1);
-      const questions = savedSparcChoiceQuestions(replayState);
+      const questions = savedSparcQuestions(replayState);
       const question = questions.find(node => triggeredBy.startsWith(`${String(node.id)}:answer:`));
       const priorResponse = question ? replayState.transitions.find(transition => transition.event.type === 'response-submitted'
         && transition.event.source.nodeId === triggeredBy && transition.event.payload?.questionId === question.id)?.event : undefined;
       if (!priorResponse && (menu?.slots?.status === 'pending' || menu?.slots?.status === 'selected')) throw new Error('Select an offered instructional option before submitting another answer');
       if (question) {
-        const choices = parseSparcQuestionChoices(question.choices);
+        const format = sparcQuestionFormatFromAction(question.action);
+        const choices = parseSparcQuestionChoices(question.choices, format === 'true-false' ? 'true-false' : 'multiple-choice');
         const selected = choices.find(choice => triggeredBy === `${String(question.id)}:answer:${choice.id}`);
         if (!selected || params.result.submittedNodes[triggeredBy] !== selected.id) throw new Error('Invalid multiple-choice answer binding');
         if (!priorResponse && (question !== questions.at(-1) || question.turnEventId !== lastInstruction?.event.eventId
@@ -838,12 +839,15 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
         learnerText = selected.label;
         event = priorResponse ?? { eventId: `${params.pageKey}:response:${lastInstruction!.event.time}`, type: 'response-submitted',
           source: { pageKey: params.pageKey, nodeId: triggeredBy }, time: eventTime,
-          payload: { action: 'SubmitDialogueResponse', input: learnerText, triggeredBy, questionId: question.id, choiceId: selected.id, correct: selected.correct } };
+          payload: { action: 'SubmitDialogueResponse', input: learnerText, triggeredBy, questionId: question.id, responseFormat: format, choiceId: selected.id, correct: selected.correct } };
         if (event.payload?.choiceId !== selected.id) throw new Error('Conflicting multiple-choice answer');
       } else {
-        if (questions.length && questions.at(-1)?.turnEventId === lastInstruction?.event.eventId) throw new Error('Select an option for the current multiple-choice question');
+        const currentQuestion = questions.at(-1);
+        const format = sparcQuestionFormatFromAction(currentQuestion?.action);
+        if (currentQuestion?.turnEventId === lastInstruction?.event.eventId && isSparcChoiceFormat(format)) throw new Error('Select an option for the current multiple-choice question');
         const response = createSparcDialogueEventFromTrialResult({ ...params, result });
-        event = { ...response.event, time: eventTime, eventId: `${params.pageKey}:response:${lastInstruction?.event.time ?? 'opening'}` };
+        event = { ...response.event, time: eventTime, eventId: `${params.pageKey}:response:${lastInstruction?.event.time ?? 'opening'}`,
+          payload: { ...response.event.payload, ...(format ? { questionId: currentQuestion!.id, responseFormat: format } : {}) } };
         learnerText = response.learnerText;
       }
     }

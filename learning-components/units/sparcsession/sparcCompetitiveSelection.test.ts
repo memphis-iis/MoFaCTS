@@ -40,9 +40,14 @@ describe('Competitive target and replay contracts', () => {
     assert.throws(() => boltzmannProbabilities([0], 0), /positive temperature/);
     const rules = createSparcDynamicInstructionRules('agent').filter(rule => rule.module === 'dialogue.instructional-competition');
     const activations = rules.slice(0, 2).map((rule, i) => ({ ruleId: rule.id, assertedFacts: [], persistentAssertedFacts: [], persistentAssertedFactIdentitySlots: [], writes: [], messages: [], modelPracticeObservations: [], classifications: [], credits: [], terminatesProductionPhase: false, bindings: {
-      targetKey: 'expectation:a', expectancyLogit: boundedLogit(.2), assistance: i ? 3.02 : 2.52, oetLogit: Math.log(4),
+      targetKey: 'expectation:a', expectancyLogit: boundedLogit(.2), assistance: i ? 3 : 2.5, oetLogit: Math.log(4),
     } }));
     const selected = selectCompetitiveActivation(activations, rules, () => .7)!;
+    assert.equal(selected.bindings.temperature, .2);
+    const utilities = activations.map(activation => -Math.abs(activation.bindings.expectancyLogit
+      + activation.bindings.assistance - activation.bindings.oetLogit));
+    assert.ok(Math.abs(Number(selected.bindings.selectionProbability)
+      - boltzmannProbabilities(utilities, .2)[activations.findIndex(activation => activation.ruleId === selected.ruleId)]!) < 1e-12);
     assert.deepEqual(selected, selectCompetitiveActivation([...activations].reverse(), rules, () => .7));
     assert.ok(Number(selected.bindings.selectionProbability) > 0);
     assert.throws(() => selectCompetitiveActivation([...activations, { ...activations[0]!, bindings: { ...activations[0]!.bindings, targetKey: 'expectation:b' } }], rules), /share one instructional target/);

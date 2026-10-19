@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'crypto';
 import { parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
 import { normalizeSparcFigureEmbedding, sparcFigureCosineSimilarity } from '../../common/lib/sparcFigureLibrary';
 import { parseSparcQuestionChoices } from '../../../learning-components/runtime/sparcQuestionChoiceContract';
+import { isSparcChoiceFormat, validateSparcClozeQuestion, SPARC_QUESTION_RESPONSE_FORMATS } from '../../../learning-components/runtime/sparcTargetCategories';
 import { SPARC_MOVE_LIBRARY_VERSION, stableMoveJson, type SparcPrimitiveContent,
   type SparcPrimitiveContext, type SparcPrimitiveLookup, type SparcPrimitiveQuery, type SparcPrimitiveReference } from '../../../learning-components/runtime/sparcMoveLibraryContract';
 import { SPARC_INSTRUCTIONAL_NEED_VERSION, SPARC_LIBRARY_SIMILARITY, sparcInstructionalNeedText } from '../../../learning-components/runtime/sparcInstructionalNeed';
@@ -49,8 +50,10 @@ export function validatePrimitiveContent(value: SparcPrimitiveContent, context: 
   if (value.figure) { if (context.kind !== 'richContent') throw new Error('Figure requires rich support'); parseSparcPromptFigure(value.figure); }
   if (value.supportHeading) { bounded(value.supportHeading, 'support heading', 60); if (context.kind !== 'richContent' || value.figure) throw new Error('Invalid support heading'); }
   if (context.kind === 'question') {
-    if (context.responseFormat === 'multiple-choice') parseSparcQuestionChoices(value.choices);
+    if (!SPARC_QUESTION_RESPONSE_FORMATS.some(format => format === context.responseFormat)) throw new Error('Invalid question response format');
+    if (isSparcChoiceFormat(context.responseFormat)) parseSparcQuestionChoices(value.choices, context.responseFormat);
     else if (value.choices) throw new Error('Unexpected question choices');
+    if (context.responseFormat === 'cloze') validateSparcClozeQuestion(value.text);
   } else if (value.choices) throw new Error('Unexpected question metadata');
   return value;
 }
@@ -102,6 +105,20 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
   };
   const reference = (request: MoveRequest): SparcPrimitiveReference => ({ entryId: request.entryId!, version: SPARC_MOVE_LIBRARY_VERSION,
     source: request.source!, similarity: request.similarity ?? null });
+  const assignedContent = (request: MoveRequest, content: SparcPrimitiveContent): SparcPrimitiveContent => {
+    if (!content.choices) return content;
+    if (request.query.context.responseFormat === 'true-false') {
+      return { ...content, choices: parseSparcQuestionChoices(content.choices, 'true-false') };
+    }
+    // Assignment-specific hash ranks randomize display order while retries, including
+    // an interrupted first history write, reproduce the same IDs/labels/answer key.
+    // The shared catalog retains its authored order; history records the assigned list.
+    const choices = parseSparcQuestionChoices(content.choices)
+      .map(choice => ({ choice, rank: moveDigest([request._id, choice.id]) }))
+      .sort((left, right) => left.rank.localeCompare(right.rank) || left.choice.id.localeCompare(right.choice.id))
+      .map(({ choice }) => choice);
+    return { ...content, choices };
+  };
   const acceptedContent = async (request: MoveRequest): Promise<SparcPrimitiveContent> => {
     if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true };
     const entry = await store.entry(request.entryId!);
@@ -109,7 +126,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true };
       throw new Error('Saved primitive is missing');
     }
-    return entry.content;
+    return assignedContent(request, entry.content);
   };
   const existing = async (request: MoveRequest): Promise<SparcPrimitiveLookup> => {
     if (!request.entryId) return { status: 'generate', ticket: request._id,
@@ -255,7 +272,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         throw new Error('Presented primitive is missing');
       }
       await store.expose({ _id: request._id, userId, tdfId: query.tdfId, sessionId: query.sessionId, eventId: query.eventId,
-        kind: entry.kind, nodeId, entryId: entry._id, content: entry.content, ...(ref.priorNodeId ? { priorNodeId: ref.priorNodeId } : {}), ...(entry.questionEmbedding ? { questionEmbedding: entry.questionEmbedding } : {}) });
+        kind: entry.kind, nodeId, entryId: entry._id, content: assignedContent(request, entry.content), ...(ref.priorNodeId ? { priorNodeId: ref.priorNodeId } : {}), ...(entry.questionEmbedding ? { questionEmbedding: entry.questionEmbedding } : {}) });
       exposures.delete(moveDigest([userId, query.tdfId]));
     },
   };

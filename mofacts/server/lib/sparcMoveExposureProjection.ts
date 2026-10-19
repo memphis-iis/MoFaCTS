@@ -1,6 +1,7 @@
 import { parseSparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import { parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
 import { parseSparcQuestionChoices } from '../../../learning-components/runtime/sparcQuestionChoiceContract';
+import { sparcQuestionFormatFromAction } from '../../../learning-components/runtime/sparcTargetCategories';
 import { moveDigest, type MoveExposure } from './sparcMoveLibraryService';
 
 /** Pure projection of durable tutor output; assessment/learner rows create no exposures. */
@@ -23,7 +24,7 @@ export function moveExposuresFromHistory(record: Record<string, unknown>): MoveE
         ...(ref?.priorNodeId ? { priorNodeId: ref.priorNodeId } : {}),
         content: { text: node.value, ...(node.video ? { video: parseSparcVideoSegment(node.video) } : {}),
           ...(node.figure ? { figure: parseSparcPromptFigure(node.figure) } : {}),
-          ...(node.choices ? { choices: parseSparcQuestionChoices(node.choices) } : {}),
+          ...(node.choices ? { choices: parseSparcQuestionChoices(node.choices, sparcQuestionFormatFromAction(node.action) === 'true-false' ? 'true-false' : 'multiple-choice') } : {}),
           ...(typeof node.supportHeading === 'string' ? { supportHeading: node.supportHeading } : {}) } });
     }
   }

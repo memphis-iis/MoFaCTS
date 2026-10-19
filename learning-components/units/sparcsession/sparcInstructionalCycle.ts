@@ -1,4 +1,5 @@
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
+import { isSparcChoiceFormat } from '../../runtime/sparcTargetCategories';
 import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
 import { SPARC_DYNAMIC_TARGET_LOGIT, SPARC_FEEDBACK_ACTION } from './sparcDynamicInstructionRules';
 import { competitiveAssessmentFacts, competitiveCandidateFacts, selectCompetitiveActivation } from './sparcCompetitiveSelection';
@@ -210,7 +211,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     return { assertions: [...assertions(student ? [menuConsumed] : [], true)], writes: [...transition.writes.filter(write => {
       const id = (write.value as { node?: { id?: string } })?.node?.id;
       return !id || !savedComponents.has(id.substring(`${event.eventId}:`.length));
-    }), ...inputControls(event, request.moveDefinition.responseFormat !== 'multiple-choice'
+    }), ...inputControls(event, !isSparcChoiceFormat(request.moveDefinition.responseFormat)
       && !(typeof output === 'object' && 'removedComponents' in output && output.removedComponents?.includes('question')))] };
   };
   const actions: Record<string, SparcProductionActionHandler> = {

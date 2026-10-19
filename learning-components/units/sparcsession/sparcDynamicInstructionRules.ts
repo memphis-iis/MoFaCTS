@@ -1,6 +1,6 @@
 import type { SparcProductionRule, SparcProductionRuleCondition, SparcProductionRuleEffect, SparcFactPattern } from './sparcSessionContracts';
 import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
-import { SPARC_TARGET_CATEGORIES } from '../../runtime/sparcTargetCategories';
+import { SPARC_TARGET_CATEGORIES, SPARC_QUESTION_RESPONSE_LABELS } from '../../runtime/sparcTargetCategories';
 import { SPARC_INSTRUCTIONAL_COMPETITION_MODULE } from './sparcCompetitiveSelection';
 import { createSparcProgressiveScaffoldingRules, decisionEffects, instructionalTargetConditions, startedCycle } from './sparcProgressiveScaffoldingRules';
 import { SPARC_MENU_ACTION, SPARC_NEXT_TARGET_ACTION, SPARC_STOP_ACTION } from './sparcInstructionalCycleRules';
@@ -10,7 +10,7 @@ export const SPARC_DYNAMIC_TARGET_LOGIT = Math.log(0.8 / 0.2);
 export const SPARC_CATEGORIZED_MENU_OPTIONS = [
   ...SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => ({
     id: move.moveId.substring('instruction.dynamic.'.length), action: move.moveId,
-    label: `${move.components!.includes('richContent') ? 'Explanation with example or figure and question' : move.components!.includes('explanation') ? 'Explanation and question' : 'Question'} (${move.responseFormat === 'text' ? 'text answer' : 'multiple choice'})`,
+    label: `${move.components!.includes('richContent') ? 'Explanation with example or figure and question' : move.components!.includes('explanation') ? 'Explanation and question' : 'Question'} (${SPARC_QUESTION_RESPONSE_LABELS[move.responseFormat!]})`,
   })),
   { id: 'next-target', label: 'Move to the next KC', action: SPARC_NEXT_TARGET_ACTION },
 ];

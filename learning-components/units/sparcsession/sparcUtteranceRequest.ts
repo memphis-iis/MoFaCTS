@@ -135,7 +135,7 @@ export function buildSparcDialogueHistory(
       ...(fact.slots?.component ? { component: fact.slots.component } : {}),
       ...(fact.slots?.primitiveReference ? { primitiveReference: fact.slots.primitiveReference } : {}),
       text: stringSlot(fact, 'text') ?? '',
-      ...(fact.slots?.responseFormat === 'multiple-choice' ? { responseFormat: 'multiple-choice' } : {}),
+      ...(fact.slots?.responseFormat ? { responseFormat: fact.slots.responseFormat } : {}),
       ...(fact.slots?.video !== undefined ? { video: parseSparcVideoSegment(fact.slots.video) } : {}),
       ...(fact.slots?.figure !== undefined ? { figure: parseSparcPromptFigure(fact.slots.figure) } : {}),
     }))

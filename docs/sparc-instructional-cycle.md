@@ -130,7 +130,7 @@ startup resumes its saved decision/components and a completed or established att
 reloads without another generation. Existing v1/reference units retain their authored
 opening behavior.
 
-### Category-aware text and multiple choice
+### Category-aware instruction and response formats
 
 The v2 dynamic policies require `category` on every entry in
 `display.autoTutorTargets.expectations` and `.misconceptions`. Allowed complete combinations
@@ -140,23 +140,82 @@ understanding. App upload validation and runtime target construction reject miss
 invalid categories for these policies; they do not infer a category. Other policies do
 not acquire a new required field. The generated stimulus schema describes this field.
 
-`sparcDynamicInstructionRules.ts` builds 210 automatic instructional productions
-(five target transitions × three compositions × two response formats × seven categories),
+`sparcDynamicInstructionRules.ts` builds 420 automatic instructional productions
+(five target transitions × three compositions × four response formats × seven categories),
 plus evaluation, feedback, and stop. Student instruction selections explicitly match
 the same category. `sparcCategoryInstructions.ts` maintains the fact/model/rule, move,
-response-format, and synthesis blocks once. Generation composes them for the authored
-KC demands: recall, recognition, application, and/or explanation, integrating as many
-specified demands as feasible. No extra synthesis provider call or generation engine
-is introduced. The review workbook in `docs/sparc-primitive-instructions-proposal.xlsx`
-contains the corresponding 42 specifications and ten initial target assignments.
+response-format, and synthesis blocks once. The KC text identifies the knowledge;
+the assigned category supplies the learning-process focuses. Generation does not infer
+a separate recall-only, recognition-only, application-only, or explanation-only
+classification from KC wording. These can be overlapping demonstrations of the same KC.
 
-Complete-move assistance logits are question text −0.25 / MC 0.25;
-explanation text 1.55 / MC 2.05; rich text 2.52 / MC 3.02. These do not alter the
-0.2 expectation floor, fixed 0.8 OET, temperature 0.1, or current-target boundary.
-The registered move IDs append `.text` or `.multiple-choice` to the dynamic base action.
+| Category | Learning-process focuses used to construct the move |
+| --- | --- |
+| Fact | Memory and fluency through retrieval and recall |
+| Rule | Induction and refinement through varied cases, generalization, discrimination, and application |
+| Model | Understanding and sense-making through relationships, interpretation, self-explanation, prediction, or reconstruction |
+| Fact–rule | Retrieval and recall combined with induction and refinement |
+| Fact–model | Retrieval and recall combined with understanding and sense-making |
+| Model–rule (principle) | Induction and refinement combined with understanding the model-based rationale |
+| Fact–model–rule | All three focuses integrated around the same knowledge |
+
+This is the approved MoFaCTS adaptation of the learning-process relationships in
+[KLI Table 4 and its discussion](https://pact.cs.cmu.edu/pubs/KLI-KoedingerCorbettPerfetti2012-pre.pdf),
+not a claim that our seven combinations reproduce the paper's Table 3 taxonomy.
+The three instructional compositions supply support for those focuses; response
+formats constrain their expression and the resulting evidence. Combined categories
+receive every selected focus, integrated into one coherent move rather than unrelated
+tasks or every possible method on every turn. Model naming alone does not establish
+relational understanding; rule recitation alone does not establish generalization;
+a single correct response does not establish fluency. These generation instructions
+do not add scoring dimensions, category-specific assistance, or automatic credit.
+No extra synthesis provider call or generation engine is introduced.
+The review workbook in `docs/sparc-primitive-instructions-proposal.xlsx`
+contains the earlier 42 text/MC specifications and ten initial target assignments;
+the runtime now composes 84 specifications across all four response formats.
+
+Complete-move assistance logits are:
+
+| Composition | Text | Cloze | Multiple choice | True/false |
+| --- | ---: | ---: | ---: | ---: |
+| Question | 0.5 | 0.75 | 1 | 1.25 |
+| Explanation → Question | 1.5 | 1.75 | 2 | 2.25 |
+| Explanation → Example/figure → Question | 2.5 | 2.75 | 3 | 3.25 |
+
+Selection temperature is 0.2.
+The expectation floor remains 0.2, OET is fixed at 0.8, and the current-target boundary is unchanged.
+The registered move IDs append `.text`, `.cloze`, `.multiple-choice`, or `.true-false`
+to the dynamic base action. Student menus offer twelve instructional options plus next-KC navigation.
+
+Cloze uses the existing response box and one uniform `_____` blank for a meaningful
+word or short phrase, without a word bank or exact-match answer key. Completing it must
+require understanding the statement rather than grammar or word shape alone. The scorer
+can credit understanding of the entire statement and its relationships, without treating
+supplied wording as an independently produced explanation. Equivalent wording and ordinary
+typos are accepted semantically; no fixed cloze ceiling or multiplier is imposed.
+
+True/false reuses the choice controls with exactly two stable options, `true`/True then
+`false`/False. Their order stays fixed. The generator supplies one clear proposition and
+one correct flag, avoiding compound claims, double negatives, ambiguity, and wording tricks.
+Choosing False rejects the displayed statement; it does not endorse that statement or
+establish all alternative claims. Answer-key correctness remains distinct from KC coverage.
+Both typed and selected answers retain the saved question identity and actual format for scoring.
+
+The original format instructions draw on [Waterloo's item-writing guidance](https://uwaterloo.ca/centre-for-teaching-excellence/catalogs/tip-sheets/exam-questions-types-characteristics-and-suggestions)
+and the [Kansas Curriculum Center guide](https://www.vet.k-state.edu/academics/clinical-sciences/docs/writing-test-questions.pdf),
+especially its true/false and completion sections. Cloze prompts omit meaningful content,
+avoid grammatical/length clues, and specify numerical units or precision when needed.
+True/false prompts request varied truth values without predictable patterns or an extra
+explanation task. These are prompt-quality requirements; structural validators enforce
+one blank or the exact binary choices rather than claiming to certify semantic quality.
 
 Generated MC questions have three or four distinct options with stable IDs and exactly
-one correct answer. `sparcMultipleChoiceQuestion.ts` reuses TutorScript's semantic MC
+one correct answer. The library service randomizes their order separately for each
+assignment using stable hash ranks of the assignment identity and option IDs. Generated
+and retrieved questions follow the same assignment path; retrying an interrupted save
+reproduces the order. The ordered choices are retained in learner history and exposure
+records, while the shared catalog keeps its original list. Reloads render the saved
+order, and existing saved questions retain their order. `sparcMultipleChoiceQuestion.ts` reuses TutorScript's semantic MC
 expansion and standard buttons. Menu clicks remain `choice-selected`; MC answers become
 `response-submitted`, bound to a saved `questionId` and `choiceId`. The selected option's
 actual label is the learner contribution to the existing semantic evaluator; the saved
@@ -220,7 +279,7 @@ example or figure then an isomorphic question. They apply to expectation and mis
 targets. Figure versus worked example is chosen during realization, not as a fourth move.
 Question-only generation reuses the substantive focused-prompt instructions.
 
-The agent uses the existing distance utility and Boltzmann temperature 0.1, with fixed
+The agent uses the existing distance utility and Boltzmann temperature 0.2, with fixed
 `logit(0.8)` and a 0.2 initial expectancy/floor. It does not advance OET or add forgetting.
 The student chooses the same moves and can navigate to the next KC. Automatic target
 selection excludes covered expectations and advances once the current goal is met;
@@ -290,8 +349,8 @@ Intermediate student-selected, fixed-agent, competitive-scaffold, and v1 dynamic
 policies are retired together with their seven source packages in six variant
 directories and identified upload archives. Admin redirection to the competitive
 policy is removed. The categorized agent still uses `-abs(theta + assistance - OET)`,
-stable Boltzmann probabilities, temperature 0.1, expectancy floor 0.2, and fixed OET
-0.8. Its six assistance values and category-specific options remain as specified above.
+stable Boltzmann probabilities, temperature 0.2, expectancy floor 0.2, and fixed OET
+0.8. Its twelve assistance values and category-specific options remain as specified above.
 The categorized student retains the offered option and its target.
 
 ## History, installed lessons, and verification
@@ -497,7 +556,7 @@ validation, and matching live in `sparcMoveLibraryService.ts`,
   Instructional relevance is decided only by cosine similarity of embeddings, starting
   at the configured cutoff (currently 0.99). There is no exact-context filter,
   exact-text shortcut, or AI review of matches.
-  Selected authored meaning/demands, assistance, selected evidence, and actual case
+  Selected KC meaning and category, assistance, selected evidence, and actual case
   form the shared embedding input. Feedback adds the preceding question and learner
   answer; images add the illustration brief. Operational IDs and full prompt
   specifications are excluded.
@@ -602,7 +661,7 @@ labels for both levels use the existing administrator model and are cached.
 Images and text now call the same `instructionalNeed` projection and
 `buildSparcInstructionalNeed` / `sparcInstructionalNeedText` contract in
 `learning-components/runtime/sparcInstructionalNeed.ts`. The embedding describes
-only the selected authored target (including category and demands), available
+only the selected authored target (its meaning and category), available
 selected-target evidence, assistance, and actual realized case. Feedback adds the
 answered question and learner answer; images add their illustration brief. Missing
 historical evidence/category is not invented. Operational IDs, prompt/schema

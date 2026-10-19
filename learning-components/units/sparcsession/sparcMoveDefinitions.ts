@@ -1,4 +1,5 @@
 import { SPARC_SUPPORTED_PROMPT_SCHEMA_ID, SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY, SPARC_SUPPORTED_PROMPT_SIZING_POLICY } from './sparcSupportedPrompt';
+import { SPARC_QUESTION_RESPONSE_FORMATS } from '../../runtime/sparcTargetCategories';
 
 export type SparcMoveFamily =
   | 'autotutor-dialogue'
@@ -192,10 +193,12 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
   }),
 ] as const satisfies readonly SparcMoveDefinition[]);
 
-const categorizedMoveTemplates: readonly SparcMoveDefinition[] = [
-  { moveId: 'instruction.dynamic.question', components: ['question'], assistance: 0 },
-  { moveId: 'instruction.dynamic.explanation-question', components: ['explanation', 'question'], assistance: 1.8 },
-  { moveId: 'instruction.dynamic.explanation-rich-question', components: ['explanation', 'richContent', 'question'], assistance: 2.77 },
+const categorizedMoveTemplates: readonly (Omit<SparcMoveDefinition, 'assistance'> & {
+  readonly assistance: Readonly<Record<NonNullable<SparcMoveDefinition['responseFormat']>, number>>;
+})[] = [
+  { moveId: 'instruction.dynamic.question', components: ['question'], assistance: { text: 0.5, cloze: 0.75, 'multiple-choice': 1, 'true-false': 1.25 } },
+  { moveId: 'instruction.dynamic.explanation-question', components: ['explanation', 'question'], assistance: { text: 1.5, cloze: 1.75, 'multiple-choice': 2, 'true-false': 2.25 } },
+  { moveId: 'instruction.dynamic.explanation-rich-question', components: ['explanation', 'richContent', 'question'], assistance: { text: 2.5, cloze: 2.75, 'multiple-choice': 3, 'true-false': 3.25 } },
 ].map((definition) => ({
   ...definition, components: definition.components as NonNullable<SparcMoveDefinition['components']>,
   version: 'v1', family: 'sparc-component', status: 'active', requiredFacts: ['controller.selectedAction'],
@@ -205,15 +208,15 @@ const categorizedMoveTemplates: readonly SparcMoveDefinition[] = [
     + (definition.moveId === 'instruction.dynamic.question' ? '\n' + AUTOTUTOR_PROMPT_POLICY.split('\n').slice(4).join('\n') : ''),
 }));
 
-/** Six complete moves share the existing component generator and node renderer. */
+/** Twelve complete moves share the existing component generator and node renderer. */
 export const SPARC_CATEGORIZED_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = categorizedMoveTemplates.flatMap(definition =>
-  (['text', 'multiple-choice'] as const).map(responseFormat => ({
+  SPARC_QUESTION_RESPONSE_FORMATS.map(responseFormat => ({
     ...definition, moveId: `${definition.moveId}.${responseFormat}`, responseFormat,
-    assistance: Math.round((definition.assistance! + (responseFormat === 'text' ? -0.25 : 0.25)) * 100) / 100,
+    assistance: definition.assistance[responseFormat],
     version: 'v2', promptId: `${definition.promptId}.${responseFormat}`, promptVersion: 'v2',
     outputSchemaVersion: 'v3',
-    // Category-aware wording is composed from authored target demands at request construction.
-    promptPolicy: 'Generate only the selected composition and response format. Respect the authored KC demands and shared category instructions. Instructional text uses Markdown with GFM tables; option labels remain plain text. Do not wrap the complete response in a code fence or include raw HTML. Generate the selected instruction without repeating prior feedback.',
+    // Category-aware learning-process focuses are composed at request construction.
+    promptPolicy: 'Generate only the selected composition and response format. Teach the selected KC using the shared KLI category instructions. Instructional text uses Markdown with GFM tables; option labels remain plain text. Do not wrap the complete response in a code fence or include raw HTML. Generate the selected instruction without repeating prior feedback.',
   })));
 
 export const SPARC_FEEDBACK_MOVE_DEFINITION: SparcMoveDefinition = autotutorDialogueMove({

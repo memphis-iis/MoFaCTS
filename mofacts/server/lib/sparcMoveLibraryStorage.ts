@@ -38,7 +38,8 @@ async function saveMoveManifest(value: MoveExposure, session?: ClientSession, re
 export async function projectSparcMoveHistory(records: readonly Record<string, unknown>[], session?: ClientSession, rebuilding = false) {
   for (const row of records) for (const exposure of moveExposuresFromHistory(row)) {
     const entry = await SparcMoveLibrary.rawCollection().findOne({ _id: exposure.entryId }, session ? { session } : {});
-    if (entry && JSON.stringify(entry.content) === JSON.stringify(exposure.content) && entry.questionEmbedding) exposure.questionEmbedding = entry.questionEmbedding;
+    // Question vectors describe the stem; an assignment's option order does not change it.
+    if (entry?.questionEmbedding?.text === exposure.content.text) exposure.questionEmbedding = entry.questionEmbedding;
     await Exposures.rawCollection().updateOne({ _id: exposure._id }, { $setOnInsert: exposure }, { upsert: true, ...(session ? { session } : {}) });
     await saveMoveManifest(exposure, session, rebuilding);
   }

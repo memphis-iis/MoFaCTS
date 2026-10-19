@@ -1,10 +1,10 @@
 import type { SparcRetainedEvidence } from './sparcEvidenceHistory';
 import { strict as assert } from 'node:assert';
 import { SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID, sparcPolicyForAccount } from '../../runtime/sparcInstructionalPolicies';
-import { SPARC_TARGET_CATEGORIES, type SparcTargetCategory } from '../../runtime/sparcTargetCategories';
+import { SPARC_TARGET_CATEGORIES, isSparcChoiceFormat, type SparcTargetCategory } from '../../runtime/sparcTargetCategories';
 import { createSparcDynamicInstructionRules, SPARC_CATEGORIZED_MENU_OPTIONS } from './sparcDynamicInstructionRules';
 import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
-import { savedSparcChoiceQuestions, sparcQuestionAnswerNodes, projectSparcAnsweredQuestionOperations } from './sparcMultipleChoiceQuestion';
+import { savedSparcQuestions, sparcQuestionAnswerNodes, projectSparcAnsweredQuestionOperations } from './sparcMultipleChoiceQuestion';
 import { buildSparcDialogueHistory } from './sparcUtteranceRequest';
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
 import { commitSparcTrialDisplayAutoTutorRules } from './sparcTrialDisplayRuntimeBridge';
@@ -24,6 +24,7 @@ const transition = (row: CanonicalHistoryRecord) => (row.sparc as { stateTransit
 function fixture(version: 'student' | 'agent', longIdentities = false, category: SparcTargetCategory = 'model-rule', targetCount = 7, misconceptionCount = 3) {
   const rows: CanonicalHistoryRecord[] = [];
   const requests: SparcUtteranceRequest[] = [];
+  const scoredResponses: { learnerText: string; event: SparcStateTransition['event'] }[] = [];
   const ids = Array.from({ length: targetCount }, (_, i) => String.fromCharCode(97 + i)).map(id => longIdentities ? `dynamic.biology-species-speciation-hlw4e-ch21-001.kc.${id}` : id);
   const misconceptionIds = Array.from({ length: misconceptionCount }, (_, i) => `m${i + 1}`);
   const pageKey = longIdentities ? 'sparc-dynamic-confidence-interval-agent-with-seven-long-target-identities' : 'dynamic-cycle';
@@ -54,7 +55,7 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   const submit = (result?: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
     core: { userId: 'u', TDFId: 'dynamic', sessionID: 'session', levelUnit: 0 }, pageKey, display: source,
     ...(result ? { result } : {}), priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
-    scoreLearnerResponse: () => { calls++; return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === ids[0] ? firstCoverage ?? coverage : coverage })),
+    scoreLearnerResponse: response => { calls++; scoredResponses.push({ learnerText: response.learnerText, event: response.event }); return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === ids[0] ? firstCoverage ?? coverage : coverage })),
       evidence, diagnosticMisconceptionScores: misconceptionIds.map(id => ({ id, supportStrength: id === 'm1' ? support : 0 })) }; },
     generateTutorUtterance: async request => {
       requests.push(request);
@@ -73,12 +74,14 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
       if (explanation && !request.realizedInstruction?.explanation) await request.onInstructionComponent?.('explanation', explanation);
       if (richContent && !request.realizedInstruction?.richContent) await request.onInstructionComponent?.('richContent', richContent);
       if (failQuestion) throw new Error('question failed');
-      const question = request.realizedInstruction?.question ?? 'How does the rule apply to the new case?';
-      const choices = request.moveDefinition.responseFormat === 'multiple-choice' ? request.realizedInstruction?.choices ?? [
-        { id: 'a', label: 'The rule holds under its specified conditions.', correct: true },
+      const question = request.realizedInstruction?.question ?? (request.moveDefinition.responseFormat === 'cloze' ? 'The condition determines whether the _____ applies.' : 'How does the rule apply to the new case?');
+      const choices = request.realizedInstruction?.choices ?? (request.moveDefinition.responseFormat === 'true-false' ? [
+        { id: 'true', label: 'True', correct: false }, { id: 'false', label: 'False', correct: true },
+      ] : request.moveDefinition.responseFormat === 'multiple-choice' ? [
         { id: 'b', label: 'The rule holds under every condition.', correct: false },
         { id: 'c', label: 'The rule never holds.', correct: false },
-      ] : undefined;
+        { id: 'a', label: 'The rule holds under its specified conditions.', correct: true },
+      ] : undefined);
       if (!request.realizedInstruction?.question) await request.onInstructionComponent?.('question', question, undefined, choices ? { choices } : undefined);
       return { explanation, richContent, question, ...(choices ? { choices } : {}) };
     },
@@ -96,10 +99,11 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   const answer = (time = timestamp++) => {
     const accepted = answers.get(time);
     if (accepted) return submit(accepted);
-    const question = requests.at(-1)?.moveDefinition.responseFormat === 'multiple-choice'
-      ? savedSparcChoiceQuestions(replaySparcHistory(rows)).at(-1) : undefined;
-    const node = question ? `${String(question.id)}:answer:a` : 'learner-response-input';
-    const result = { submittedNodes: { [node]: question ? 'a' : longIdentities ? 'A learner response about constructing and interpreting a confidence interval. '.repeat(8) : 'An answer.' }, triggeredBy: question ? node : 'learner-response-submit', timestamp: time };
+    const question = isSparcChoiceFormat(requests.at(-1)?.moveDefinition.responseFormat)
+      ? savedSparcQuestions(replaySparcHistory(rows)).at(-1) : undefined;
+    const optionId = requests.at(-1)?.moveDefinition.responseFormat === 'true-false' ? 'false' : 'a';
+    const node = question ? `${String(question.id)}:answer:${optionId}` : 'learner-response-input';
+    const result = { submittedNodes: { [node]: question ? optionId : longIdentities ? 'A learner response about constructing and interpreting a confidence interval. '.repeat(8) : 'An answer.' }, triggeredBy: question ? node : 'learner-response-submit', timestamp: time };
     answers.set(time, result);
     return submit(result);
   };
@@ -109,17 +113,55 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   };
   const facts = () => Object.values(replaySparcHistory(rows).cells).map(cell => cell.value as SparcWorkingMemoryFact);
   const mcAnswer = (id: string, time = timestamp++) => {
-    const question = savedSparcChoiceQuestions(replaySparcHistory(rows)).at(-1)!;
+    const question = savedSparcQuestions(replaySparcHistory(rows)).at(-1)!;
     const node = `${String(question.id)}:answer:${id}`;
     return submit({ submittedNodes: { [node]: id }, triggeredBy: node, timestamp: time });
   };
-  return { source, rows, requests, submit, answer, choice, mcAnswer, menu, facts, evidence: (value: SparcRetainedEvidence[]) => { evidence = value; }, calls: () => calls,
+  return { source, rows, requests, scoredResponses, submit, answer, choice, mcAnswer, menu, facts, evidence: (value: SparcRetainedEvidence[]) => { evidence = value; }, calls: () => calls,
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
     fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; },
     failBatch: (value: boolean) => { failBatch = value; } };
 }
 
 describe('Dynamic instruction production cycles', () => {
+  it('binds typed cloze completions to the saved statement and retains raw evidence and format across replay', async () => {
+    const f = fixture('student', false, 'fact'); await f.answer(); await f.choice('question.cloze');
+    const question = savedSparcQuestions(replaySparcHistory(f.rows)).at(-1)!;
+    await assert.rejects(f.submit({ submittedNodes: { 'learner-response-input': '   ' }, triggeredBy: 'learner-response-submit', timestamp: 400 }), /exactly one answerable/);
+    await f.submit({ submittedNodes: { 'learner-response-input': 'polymorhpism' }, triggeredBy: 'learner-response-submit', timestamp: 401 });
+    assert.equal(f.scoredResponses.at(-1)!.learnerText, 'polymorhpism');
+    assert.equal(f.scoredResponses.at(-1)!.event.payload!.questionId, question.id);
+    assert.equal(f.scoredResponses.at(-1)!.event.payload!.responseFormat, 'cloze');
+    const history = buildSparcDialogueHistory(progressiveDialogueFacts(replaySparcHistory(JSON.parse(JSON.stringify(f.rows)))));
+    const learner = history.filter(entry => entry.role === 'student').at(-1)!;
+    assert.equal(learner.responseFormat, 'cloze'); assert.equal(learner.text, 'polymorhpism');
+    assert.equal(history.find(entry => entry.responseId === question.id)!.responseFormat, 'cloze');
+  });
+  it('binds both true/false judgments by ID and restores their fixed order and selected state', async () => {
+    for (const id of ['true', 'false']) {
+      const f = fixture('student', false, 'rule'); await f.answer(); await f.choice('question.true-false');
+      const question = savedSparcQuestions(replaySparcHistory(f.rows)).at(-1)!;
+      await assert.rejects(f.submit({ submittedNodes: { 'learner-response-input': 'False' }, triggeredBy: 'learner-response-submit', timestamp: 400 }), /Select an option/);
+      await f.mcAnswer(id, 401);
+      const response = f.scoredResponses.at(-1)!;
+      assert.equal(response.learnerText, id === 'true' ? 'True' : 'False');
+      assert.equal(response.event.payload!.responseFormat, 'true-false');
+      assert.equal(response.event.payload!.correct, id === 'false');
+      const replay = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
+      const operation = projectSparcAnsweredQuestionOperations(replay).find(op => 'node' in op && op.node.id === question.id)!;
+      assert.ok('node' in operation);
+      if ('node' in operation) {
+        const buttons = sparcQuestionAnswerNodes(operation.node, true).children as Record<string, unknown>[];
+        assert.deepEqual(buttons.map(button => button.label), ['True', 'False']);
+        assert.equal(buttons.find(button => button.selected)!.value, id);
+      }
+      assert.equal(buildSparcDialogueHistory(progressiveDialogueFacts(replay)).filter(entry => entry.role === 'student').at(-1)!.responseFormat, 'true-false');
+      await f.choice('question.true-false');
+      const staleId = id === 'true' ? 'false' : 'true';
+      const staleNode = `${String(question.id)}:answer:${staleId}`;
+      await assert.rejects(f.submit({ submittedNodes: { [staleNode]: staleId }, triggeredBy: staleNode, timestamp: 402 }), /Stale/);
+    }
+  });
   it('starts at the configured chain endpoint for both categorized policies and skips incidentally covered KCs', async () => {
     for (const version of ['agent', 'student'] as const) {
       const f = fixture(version, false, 'fact');
@@ -145,7 +187,7 @@ describe('Dynamic instruction production cycles', () => {
     const f = fixture('student', false, 'model-rule'); await f.answer(); await f.choice('question.multiple-choice');
     const before = JSON.stringify(f.rows);
     const replay = replaySparcHistory(f.rows);
-    const question = savedSparcChoiceQuestions(replay).at(-1)!;
+    const question = savedSparcQuestions(replay).at(-1)!;
     const original = replay.transitions.find(t => t.writes.some(w => (w.value as { node?: { id?: string } })?.node?.id === question.id))!;
     const write = original.writes.find(w => (w.value as { node?: { id?: string } })?.node?.id === question.id)!;
     const corrected = { ...question, value: 'Which complete claim applies?', choices: [
@@ -159,7 +201,7 @@ describe('Dynamic instruction production cycles', () => {
         writes: [{ ...write, value: { type: 'append-node', boxId: 'dialogue-flow', node: corrected } }] } }));
     assert.equal(JSON.stringify(f.rows.slice(0, -1)), before);
     const restored = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
-    const questions = savedSparcChoiceQuestions(restored);
+    const questions = savedSparcQuestions(restored);
     assert.equal(questions.filter(q => q.id === question.id).length, 1);
     assert.deepEqual(questions.at(-1)?.choices, corrected.choices);
     const facts = progressiveDialogueFacts(restored).filter(fact => fact.factId === question.id);
@@ -275,18 +317,18 @@ describe('Dynamic instruction production cycles', () => {
     await f.answer();
     assert.equal(f.calls(), 1);
   });
-  it('builds all 210 automatic variants with exact category conditions and the six approved assistance values', () => {
+  it('builds all 420 automatic variants with exact category conditions and the twelve approved assistance values', () => {
     const rules = createSparcDynamicInstructionRules('agent').filter(rule => rule.module === 'dialogue.instructional-competition');
-    assert.equal(rules.length, 210);
-    assert.equal(new Set(rules.map(rule => rule.id)).size, 210);
+    assert.equal(rules.length, 420);
+    assert.equal(new Set(rules.map(rule => rule.id)).size, 420);
     for (const category of SPARC_TARGET_CATEGORIES) {
       const variants = rules.filter(rule => rule.id.endsWith(`.${category}`));
-      assert.equal(variants.length, 30);
+      assert.equal(variants.length, 60);
       assert.ok(variants.every(rule => rule.when.some(condition => 'factType' in condition
         && ['autotutor.expectation', 'autotutor.misconception'].includes(condition.factType)
         && JSON.stringify(condition.slots?.category) === JSON.stringify({ type: 'literal', value: category }))));
     }
-    assert.deepEqual(SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => move.assistance), [-.25, .25, 1.55, 2.05, 2.52, 3.02]);
+    assert.deepEqual(SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => move.assistance), [.5, .75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25]);
   });
   it('routes every student category/composition/format combination to the same composed primitive and retains target transitions', async () => {
     for (const category of SPARC_TARGET_CATEGORIES) for (const option of SPARC_CATEGORIZED_MENU_OPTIONS.filter(option => option.id !== 'next-target')) {
@@ -299,9 +341,10 @@ describe('Dynamic instruction production cycles', () => {
       assert.equal(request.targetId, 'a');
       assert.ok(request.sourceRuleId!.endsWith(`.${category}`));
       for (const aspect of category.split('-')) assert.ok(request.moveDefinition.promptPolicy.includes(`${aspect.toUpperCase()}:`));
-      assert.ok(request.moveDefinition.promptPolicy.includes('Strategically integrate as many'));
+      assert.ok(request.moveDefinition.promptPolicy.includes('The KC text identifies the knowledge; its assigned KLI category supplies the learning-process focus'));
+      assert.ok(request.moveDefinition.promptPolicy.includes('Combine every selected category focus'));
       assert.equal(f.calls(), 1);
-      if (request.moveDefinition.responseFormat === 'multiple-choice') await f.mcAnswer('a'); else await f.answer();
+      await f.answer();
       assert.equal(f.calls(), 2);
       await f.choice('next-target'); assert.equal(f.calls(), 2);
     }
@@ -309,17 +352,18 @@ describe('Dynamic instruction production cycles', () => {
   it('binds MC answers to saved option identities and meanings, rejects stale/modified answers and restores the selected option', async () => {
     for (const id of ['a', 'b']) {
       const f = fixture('student', false, 'model-rule'); await f.answer(); await f.choice('question.multiple-choice');
-      assert.equal((f.menu()!.slots!.options as unknown[]).length, 7);
+      assert.equal((f.menu()!.slots!.options as unknown[]).length, 13);
       await assert.rejects(f.submit({ submittedNodes: { 'learner-response-input': 'A typed answer.' }, triggeredBy: 'learner-response-submit', timestamp: 999 }), /Select an option/);
-      const before = JSON.stringify(savedSparcChoiceQuestions(replaySparcHistory(f.rows)));
+      const before = JSON.stringify(savedSparcQuestions(replaySparcHistory(f.rows)));
       await f.mcAnswer(id);
       assert.equal(f.calls(), 2);
-      assert.equal(JSON.stringify(savedSparcChoiceQuestions(replaySparcHistory(f.rows))), before);
+      assert.equal(JSON.stringify(savedSparcQuestions(replaySparcHistory(f.rows))), before);
       const replay = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
       const restored = projectSparcAnsweredQuestionOperations(replay).find(operation => 'node' in operation && operation.node.choices)!;
       assert.ok('node' in restored);
       if ('node' in restored) {
         const answers = sparcQuestionAnswerNodes(restored.node, true).children as Record<string, unknown>[];
+        assert.deepEqual(answers.map(choice => choice.value), ['b', 'c', 'a']);
         assert.equal(answers.find(choice => choice.selected)?.value, id);
         assert.ok(answers.every(choice => choice.readOnly));
         assert.equal(answers.find(choice => choice.selected)?.label, id === 'a' ? 'The rule holds under its specified conditions.' : 'The rule holds under every condition.');
@@ -344,7 +388,7 @@ describe('Dynamic instruction production cycles', () => {
       const f = fixture('agent', false, category); await f.answer();
       assert.equal(f.requests.at(-1)!.targetId, 'a');
       assert.ok(f.requests.at(-1)!.sourceRuleId!.endsWith(`.${category}`));
-      const respond = () => f.requests.at(-1)!.moveDefinition.responseFormat === 'multiple-choice' ? f.mcAnswer('b') : f.answer();
+      const respond = () => f.answer();
       await respond(); assert.equal(f.requests.at(-1)!.targetId, 'a');
       f.scores(.3,.8); await respond(); assert.equal(f.requests.at(-1)!.targetId, 'm1');
       f.scores(.9,0); await respond();
@@ -373,7 +417,6 @@ describe('Dynamic instruction production cycles', () => {
   it('uses fixed 80 percent competition, keeps the floor, and does not ramp OET', async () => {
     const f = fixture('agent'); f.scores(0); await f.answer();
     const request = f.requests.at(-1)!;
-    assert.ok([2.52, 3.02].includes(request.moveDefinition.assistance!));
     assert.ok(Math.abs(request.competition!.oetLogit! - Math.log(4)) < 1e-9);
     assert.ok(Math.abs(logistic(targetExpectancy(f.facts(), 'expectation:a')) - .2) < 1e-9);
     assert.equal(f.facts().some(fact => fact.factType === 'instructional.oet' && Number(fact.slots?.logit) > -Math.log(4)), false);

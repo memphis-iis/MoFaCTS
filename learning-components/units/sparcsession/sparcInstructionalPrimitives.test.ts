@@ -7,11 +7,30 @@ import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief } from './sparcSupportedPrompt';
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
 import { buildSparcDialogueHistory } from './sparcUtteranceRequest';
+import { parseSparcQuestionChoices } from '../../runtime/sparcQuestionChoiceContract';
+import { composeSparcCategoryInstructions } from './sparcCategoryInstructions';
 
 describe('SPARC instructional primitives', () => {
   const document = { id: 'page', schemaVersion: 2 as const, root: { id: 'root', kind: 'document' as const } };
   const event = { eventId: 'turn', type: 'response-submitted' as const, source: { pageKey: 'page', nodeId: 'input' }, time: 1 };
   const request = (action: string): SparcUtteranceRequest => ({ action, targetType: 'learningTarget', targetId: 'a', problemStatement: 'Explain A', contentTexts: ['A'], selectedAction: {}, responseModifiers: [], moveDefinition: requireActiveSparcMoveDefinition(action) });
+  it('requires a substantive single cloze blank and keeps binary choices distinct from ordinary MC', () => {
+    const cloze = request('instruction.dynamic.question.cloze');
+    for (const question of ['No blank.', '_____ and _____.', '_____', 'A ____ blank.']) {
+      assert.throws(() => parseInstructionComponents({ explanation: null, richContent: null, question }, cloze), /exactly one/);
+    }
+    assert.equal(parseInstructionComponents({ explanation: null, richContent: null, question: 'Variation within a species is _____.' }, cloze).question, 'Variation within a species is _____.');
+    const choices = [{ id: 'true', label: 'True', correct: false }, { id: 'false', label: 'False', correct: true }];
+    assert.deepEqual(parseSparcQuestionChoices(choices, 'true-false'), choices);
+    assert.throws(() => parseSparcQuestionChoices(choices), /3 or 4/);
+    assert.throws(() => parseSparcQuestionChoices([...choices].reverse(), 'true-false'), /True then False/);
+    assert.throws(() => parseSparcQuestionChoices(choices.map(choice => ({ ...choice, correct: true })), 'true-false'), /exactly one/);
+    const prompt = composeSparcCategoryInstructions('model-rule', ['question'], 'cloze');
+    assert.ok(prompt.includes('must require understanding the statement'));
+    assert.ok(prompt.includes('grammar, word shape, or familiar phrasing makes a poor item'));
+    const binaryPrompt = composeSparcCategoryInstructions('rule', ['question'], 'true-false');
+    assert.ok(binaryPrompt.includes('one clear truth value')); assert.ok(binaryPrompt.includes('without predictable alternation'));
+  });
   for (const targetType of ['learningTarget', 'misconception'] as const) {
     it(`binds ${targetType} feedback to the answered question through saved history, excluding other targets`, () => {
       const expectation = targetType === 'learningTarget';

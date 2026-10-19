@@ -3,7 +3,7 @@ export { probabilityLogit as boundedLogit } from '../../models/adaptive-logistic
 import type { SparcProductionRule, SparcProductionRuleFiring, SparcWorkingMemoryFact } from './sparcSessionContracts';
 /** Probability-authored defaults. Initial expectancy is also its minimum. Selection uses natural logits. */
 export const SPARC_COMPETITIVE_DEFAULTS = Object.freeze({
-  initialExpectation: 0.2, initialOet: 0.2, temperature: 0.1,
+  initialExpectation: 0.2, initialOet: 0.2, temperature: 0.2,
 });
 export const SPARC_INSTRUCTIONAL_COMPETITION_MODULE = 'dialogue.instructional-competition';
 const MODULE = SPARC_INSTRUCTIONAL_COMPETITION_MODULE;

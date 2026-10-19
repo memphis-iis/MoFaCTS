@@ -200,6 +200,72 @@ describe('Shared instructional primitive library', () => {
     assert.equal((await s.lookup('bob', multipleChoice)).status, 'generate');
   });
 
+  it('validates and reuses cloze and true/false without substituting formats or shuffling binary answers', async () => {
+    for (const format of ['cloze', 'true-false'] as const) {
+      const f = fixture(), s = f.make(), q = query('new-format', 'question'); q.context.responseFormat = format;
+      const pending = await s.lookup('alice', q); if (pending.status !== 'generate') throw new Error();
+      if (format === 'cloze') {
+        for (const text of ['No blank here.', '_____ and _____', '_____', 'A ____ is incomplete.']) {
+          await assert.rejects(s.publish('alice', pending.ticket, { text }), /exactly one/);
+        }
+      }
+      const content = format === 'cloze' ? { text: 'Isolation restricts gene _____.' } : { text: 'Isolation increases gene flow.', choices: [
+        { id: 'true', label: 'True', correct: false }, { id: 'false', label: 'False', correct: true },
+      ] };
+      const accepted = await s.publish('alice', pending.ticket, content); if (!accepted.accepted) throw new Error();
+      assert.deepEqual(accepted.content, content);
+      const hit = await f.make().lookup('bob', q); if (hit.status !== 'hit') throw new Error();
+      assert.deepEqual(hit.content, content);
+      const other = { ...q, eventId: 'different-format', context: { ...q.context, responseFormat: format === 'cloze' ? 'text' : 'multiple-choice' } };
+      const mismatch = await f.make().lookup('charlie', other);
+      assert.equal(mismatch.status, 'generate');
+      if (format === 'true-false' && mismatch.status === 'generate') {
+        await assert.rejects(s.publish('charlie', mismatch.ticket, content), /3 or 4/);
+        await f.make().present('bob', q, hit.reference, 'new-format:question');
+        assert.deepEqual([...f.exposures.values()].find(e => e.userId === 'bob')!.content, content);
+      }
+    }
+  });
+
+  it('assigns stable shuffled MC options for generation and retrieval and records the displayed order', async () => {
+    const f = fixture(), s = f.make(), q = query('question', 'question');
+    q.context.responseFormat = 'multiple-choice';
+    const content = { text: 'Which claim describes isolation?', choices: [
+      { id: 'a', label: 'Isolation restricts gene flow.', correct: true },
+      { id: 'b', label: 'Isolation always increases gene flow.', correct: false },
+      { id: 'c', label: 'Isolation requires different continents.', correct: false },
+      { id: 'd', label: 'Isolation prevents all variation.', correct: false },
+    ] };
+    const original = JSON.parse(JSON.stringify(content));
+    const pending = await s.lookup('author', q); if (pending.status !== 'generate') throw new Error();
+    const generated = await s.publish('author', pending.ticket, content); if (!generated.accepted) throw new Error();
+    const publishedAgain = await f.make().publish('author', pending.ticket, content); if (!publishedAgain.accepted) throw new Error();
+    assert.deepEqual(publishedAgain.content, generated.content, 'uncertain publication retry must retain the assigned order');
+    const positions = new Set<number>(), orders = new Set<string>();
+    for (let index = 0; index < 32; index++) {
+      const user = `learner-${index}`;
+      const assigned = await f.make().lookup(user, q); if (assigned.status !== 'hit') throw new Error();
+      assert.deepEqual([...assigned.content.choices!].sort((a, b) => a.id.localeCompare(b.id)), original.choices);
+      positions.add(assigned.content.choices!.findIndex(choice => choice.correct));
+      orders.add(assigned.content.choices!.map(choice => choice.id).join(','));
+      const resumed = await f.make().lookup(user, JSON.parse(JSON.stringify(q))); if (resumed.status !== 'hit') throw new Error();
+      assert.deepEqual(resumed.content, assigned.content, 'reload before the first journal write must keep the order');
+      await f.make().present(user, q, assigned.reference, 'question:question');
+      const exposure = [...f.exposures.values()].find(entry => entry.userId === user)!;
+      assert.deepEqual(exposure.content, assigned.content);
+      const projected = moveExposuresFromHistory({ userId: user, TDFId: q.tdfId, sessionID: q.sessionId,
+        sparc: { stateTransition: { event: { eventId: q.eventId }, writes: [{ value: { node: {
+          id: 'question:question', component: 'question', value: assigned.content.text, choices: assigned.content.choices,
+          primitiveReference: assigned.reference,
+        } } }] } } });
+      assert.deepEqual(projected[0]!.content, exposure.content, 'history and exposure must retain the same assigned option order');
+    }
+    assert.equal(positions.size, 4, 'the fixed assignment samples place the correct answer in every position');
+    assert.ok(orders.size > 1);
+    assert.deepEqual(content, original, 'assignment must not mutate generated content');
+    assert.deepEqual(f.entries.get(generated.reference.entryId)!.content, original, 'the shared catalog retains its original list');
+  });
+
   it('rebuilds unidentified question vectors from text and preserves old accepted decisions', async () => {
     const f = fixture(), s = f.make(), q = query('one', 'question');
     const first = await s.lookup('alice', q); if (first.status !== 'generate') throw new Error();

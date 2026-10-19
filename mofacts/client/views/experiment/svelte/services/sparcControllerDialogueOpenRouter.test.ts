@@ -253,13 +253,20 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(prompts[0]).not.to.contain('Feedback has already been delivered');
     expect(prompts[1]).not.to.contain('Starting an expectation:');
   });
-  it('realizes all 42 category/composition/format specifications with the selected instructions and actual support', async function() {
+  it('realizes all 84 category/composition/format specifications with the selected instructions and actual support', async function() {
     for (const category of SPARC_TARGET_CATEGORIES) for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
       const observed: string[] = [];
       const provider = createSparcDialogueOpenRouterProvider({ callResolvedOpenRouterJson: async params => {
         const system = String(params.messages[0]!.content);
-        expect(system).to.contain('Strategically integrate as many');
-        for (const aspect of category.split('-')) expect(system).to.contain(`${aspect.toUpperCase()}:`);
+        expect(system).to.contain('The KC text identifies the knowledge; its assigned KLI category supplies the learning-process focus');
+        expect(system).to.contain('Combine every selected category focus');
+        expect(system).not.to.match(/authored KC demands|specified KC demands|as the authored KC requires|recall or recognition target/i);
+        for (const aspect of ['fact', 'model', 'rule']) {
+          expect(system.includes(`${aspect.toUpperCase()}:`)).to.equal(category.split('-').includes(aspect));
+        }
+        if (category.split('-').includes('fact')) expect(system).to.contain('FACT: Focus on memory and fluency through retrieval and recall');
+        if (category.split('-').includes('rule')) expect(system).to.contain('RULE: Focus on induction and refinement');
+        if (category.split('-').includes('model')) expect(system).to.contain('MODEL: Focus on understanding and sense-making');
         observed.push(params.intent.schemaName);
         if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: {
           kind: 'comparison', workedExample: 'Case A meets the decisive condition. Case B does not.', heading: 'Comparison',
@@ -270,15 +277,18 @@ describe('SPARC dialogue OpenRouter provider', function() {
           return { parsedContent: { tutorMessage: 'The condition determines whether the rule applies.' } };
         }
         expect(system).to.contain('RESPONSE FORMAT:');
-        return { parsedContent: { tutorMessage: 'Which case meets the specified condition?', ...(definition.responseFormat === 'multiple-choice' ? {
+        return { parsedContent: { tutorMessage: definition.responseFormat === 'cloze' ? 'Which case meets the specified _____?' : 'Which case meets the specified condition?', ...(definition.responseFormat === 'true-false' ? {
+          choices: [{ id: 'true', label: 'True', correct: true }, { id: 'false', label: 'False', correct: false }],
+        } : definition.responseFormat === 'multiple-choice' ? {
           choices: [{ id: 'a', label: 'Case A', correct: true }, { id: 'b', label: 'Case B', correct: false }, { id: 'c', label: 'Neither case', correct: false }],
         } : {}) } };
       } });
       const output = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId,
+        targetContent: { clusterKC: 'kc-a', text: 'A target text', category },
         moveDefinition: { ...definition, promptPolicy: composeSparcCategoryInstructions(category, definition.components!, definition.responseFormat!) } }) as SparcInstructionComponents;
       expect(output.question).to.contain('Which case');
       expect(observed).to.have.length(definition.components!.length);
-      if (definition.responseFormat === 'multiple-choice') expect(output.choices!.filter(choice => choice.correct)).to.have.length(1);
+      if (definition.responseFormat === 'multiple-choice' || definition.responseFormat === 'true-false') expect(output.choices!.filter(choice => choice.correct)).to.have.length(1);
       else expect(output.choices).to.equal(undefined);
       if (definition.components!.includes('richContent')) expect(output.supportHeading).to.equal('Comparison');
     }
@@ -445,10 +455,61 @@ describe('SPARC dialogue OpenRouter provider', function() {
     });
     const score = await provider.scoreLearnerResponse({
       display: dialogueDisplay(), learnerText, ...context,
-      event: { ...context.event, payload: { questionId: 'accepted-turn:question', choiceId: 'option-b', correct: true } },
+      event: { ...context.event, payload: { questionId: 'accepted-turn:question', responseFormat: 'multiple-choice', choiceId: 'option-b', correct: true } },
     } as Parameters<typeof provider.scoreLearnerResponse>[0]);
     expect(score.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
     expect(score.diagnosticMisconceptionScores).to.equal(undefined);
+  });
+
+  it('credits the meaning of a completed cloze statement without requiring an independently produced explanation', async () => {
+    const context = scorerContext(undefined, [{ speaker: 'tutor', text: 'Interest is calculated on the total _____, including earlier interest.' }]);
+    for (const learnerText of ['balance', 'balnce', 'account balance']) {
+      const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+        const input = JSON.parse(params.messages[1]!.content as string);
+        expect(input).to.include({ learnerText, responseFormat: 'cloze', questionId: 'cloze-question' });
+        expect(input).not.to.have.property('selectedChoiceId');
+        const system = String(params.messages[0]!.content);
+        expect(system).to.contain('understanding of the entire statement');
+        expect(system).to.contain('not as an isolated missing word');
+        expect(system).to.contain('without treating the supplied wording as an independently constructed explanation');
+        expect(system).to.contain('Do not impose a fixed cloze scoring ceiling');
+        expect(system).to.contain('Accept equivalent wording and ordinary typographical errors');
+        return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: .9,
+          learnerEvidence: latestLearnerEvidence(learnerText) }], diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }], learnerContribution: { type: 'answer' } } };
+      } });
+      const score = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText, ...context,
+        event: { ...context.event, payload: { questionId: 'cloze-question', responseFormat: 'cloze' } } } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+      expect(score.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: .9 }]);
+    }
+  });
+  it('interprets a False judgment as rejection of the saved statement rather than endorsement of its misconception', async () => {
+    const context = scorerContext(undefined, [{ speaker: 'tutor', text: 'Interest is calculated only on the original deposit.' }]);
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+      const input = JSON.parse(params.messages[1]!.content as string);
+      expect(input).to.include({ learnerText: 'False', responseFormat: 'true-false', selectedChoiceId: 'false' });
+      expect(input).not.to.have.property('correct');
+      const system = String(params.messages[0]!.content);
+      expect(system).to.contain('False rejects it');
+      expect(system).to.contain('does not endorse its false claim or establish every alternative');
+      return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: .7,
+        learnerEvidence: latestLearnerEvidence('False') }], diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'contradicts', evidenceStrength: .8, learnerEvidence: latestLearnerEvidence('False') }], learnerContribution: { type: 'answer' } } };
+    } });
+    const score = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText: 'False', ...context,
+      event: { ...context.event, payload: { questionId: 'binary-question', responseFormat: 'true-false', choiceId: 'false', correct: true } } } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(score.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: .7 }]);
+  });
+
+  it('does not award cloze coverage automatically when the semantic evaluator finds no demonstrated meaning', async () => {
+    const context = scorerContext(undefined, [{ speaker: 'tutor', text: 'Interest is calculated on the total _____, including earlier interest.' }]);
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+      const input = JSON.parse(params.messages[1]!.content as string);
+      expect(input).to.include({ learnerText: 'calendar', responseFormat: 'cloze' });
+      return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
+        diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }], learnerContribution: { type: 'answer' } } };
+    } });
+    const score = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText: 'calendar', ...context,
+      event: { ...context.event, payload: { questionId: 'cloze-question', responseFormat: 'cloze' } } } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(score.learningTargetScores).to.deep.equal([]);
   });
 
   it('scores learner responses through server-resolved OpenRouter without choosing a move', async function() {

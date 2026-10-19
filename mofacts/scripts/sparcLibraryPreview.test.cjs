@@ -41,3 +41,17 @@ it('retains plain feedback on the learner dialogue path without inventing instru
   assert.equal(result.value, '**Good reasoning.**');
   assert.equal(result.children, undefined);
 });
+
+it('previews cloze and true/false through their saved format without exposing an executable response', () => {
+  const cloze = sparcLibraryPreviewNode({ id: 'cloze1', kind: 'question', move: 'instruction.dynamic.question.cloze',
+    content: { text: 'Different phenotypes within one species are called _____.' } }).children[0];
+  assert.equal(cloze.value, 'Different phenotypes within one species are called _____.');
+  assert.equal(cloze.choices, undefined); assert.equal(cloze.readOnly, true);
+  const binary = sparcLibraryPreviewNode({ id: 'binary1', kind: 'question', move: 'instruction.dynamic.question.true-false',
+    content: { text: 'Polymorphism requires different species.', choices: [
+      { id: 'true', label: 'True', correct: false }, { id: 'false', label: 'False', correct: true },
+    ] } }).children[0];
+  const buttons = sparcQuestionAnswerNodes(binary, binary.readOnly).children;
+  assert.deepEqual(buttons.map(button => button.label), ['True', 'False']);
+  assert.ok(buttons.every(button => button.readOnly && !button.selected));
+});

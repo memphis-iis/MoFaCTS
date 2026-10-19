@@ -8,6 +8,7 @@ import { SPARC_FEEDBACK_MOVE_DEFINITION, getSparcMoveDefinition } from './sparcM
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
 import { createSparcDialogueTurnTransition, requireBoundedSparcDialogueMessage } from './sparcDialogueTurnNodes';
 import { parseSparcQuestionChoices, type SparcQuestionChoice } from './sparcMultipleChoiceQuestion';
+import { isSparcChoiceFormat, validateSparcClozeQuestion } from '../../runtime/sparcTargetCategories';
 
 export type SparcInstructionComponents = { readonly explanation: string | null; readonly richContent: string | null; readonly question: string; readonly video?: SparcVideoSegment; readonly figure?: SparcPromptFigure; readonly choices?: readonly SparcQuestionChoice[]; readonly supportHeading?: string; readonly removedComponents?: readonly ('explanation' | 'richContent' | 'question')[] };
 export type SparcGeneratedInstruction = string | { readonly text: string } | SparcInstructionComponents | SparcSupportedPrompt;
@@ -50,8 +51,9 @@ export function parseInstructionComponents(value: unknown, request: SparcUtteran
   const removed = record.removedComponents;
   if (removed !== undefined && (!Array.isArray(removed) || new Set(removed).size !== removed.length
     || removed.some(kind => !components.includes(kind) || record[kind] !== SPARC_ADMINISTRATIVE_REMOVAL_TEXT))) throw new Error('Invalid administrative removal presentation');
-  if (request.moveDefinition.responseFormat === 'multiple-choice' && !(removed as string[] | undefined)?.includes('question')) parseSparcQuestionChoices(record.choices);
+  if (isSparcChoiceFormat(request.moveDefinition.responseFormat) && !(removed as string[] | undefined)?.includes('question')) parseSparcQuestionChoices(record.choices, request.moveDefinition.responseFormat);
   else if (record.choices !== undefined) throw new Error('Text-response instruction cannot contain multiple-choice options');
+  if (request.moveDefinition.responseFormat === 'cloze' && !(removed as string[] | undefined)?.includes('question')) validateSparcClozeQuestion(String(record.question ?? ''));
   if (record.supportHeading !== undefined) {
     const heading = requireBoundedSparcDialogueMessage(record.supportHeading, 'Support heading');
     if (!components.includes('richContent') || record.figure || heading.length > 60 || /[<>\r\n]/.test(heading)) throw new Error('Invalid instructional support heading');

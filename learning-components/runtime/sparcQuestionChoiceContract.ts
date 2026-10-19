@@ -1,7 +1,9 @@
 export type SparcQuestionChoice = { readonly id: string; readonly label: string; readonly correct: boolean };
 
-export function parseSparcQuestionChoices(value: unknown): readonly SparcQuestionChoice[] {
-  if (!Array.isArray(value) || value.length < 3 || value.length > 4) throw new Error('Multiple-choice question requires 3 or 4 choices');
+export function parseSparcQuestionChoices(value: unknown, format: 'multiple-choice' | 'true-false' = 'multiple-choice'): readonly SparcQuestionChoice[] {
+  if (format === 'true-false') {
+    if (!Array.isArray(value) || value.length !== 2) throw new Error('True/false question requires exactly 2 choices');
+  } else if (!Array.isArray(value) || value.length < 3 || value.length > 4) throw new Error('Multiple-choice question requires 3 or 4 choices');
   const ids = new Set<string>();
   const labels = new Set<string>();
   const choices = value.map(choice => {
@@ -18,5 +20,7 @@ export function parseSparcQuestionChoices(value: unknown): readonly SparcQuestio
     return { id: choice.id, label, correct: choice.correct };
   });
   if (choices.filter(choice => choice.correct).length !== 1) throw new Error('Multiple-choice question requires exactly one correct option');
+  if (format === 'true-false' && (choices[0]?.id !== 'true' || choices[0]?.label !== 'True'
+    || choices[1]?.id !== 'false' || choices[1]?.label !== 'False')) throw new Error('True/false choices must be True then False with stable true/false IDs');
   return choices;
 }

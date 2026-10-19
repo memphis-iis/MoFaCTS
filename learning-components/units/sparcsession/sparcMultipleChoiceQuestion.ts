@@ -1,5 +1,6 @@
 import { expandSparcSemanticNodes } from '../../trial-displays/sparc/sparcSemanticNodes';
 import { parseSparcQuestionChoices } from '../../runtime/sparcQuestionChoiceContract';
+import { sparcQuestionFormatFromAction } from '../../runtime/sparcTargetCategories';
 import type { SparcReplayState } from './sparcStateReplay';
 import type { SparcProgressiveNodeOperation } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import { applySparcProgressiveNodeOperations, collectSparcProgressiveNodeOperations } from '../../trial-displays/sparc/sparcProgressiveNodes';
@@ -8,7 +9,7 @@ export { parseSparcQuestionChoices, type SparcQuestionChoice } from '../../runti
 
 /** Reuse TutorScript's semantic multiple-choice primitive; it owns the standard buttons. */
 export function sparcQuestionAnswerNodes(node: Record<string, unknown>, readOnly: boolean): Record<string, unknown> {
-  const choices = parseSparcQuestionChoices(node.choices);
+  const choices = parseSparcQuestionChoices(node.choices, sparcQuestionFormatFromAction(node.action) === 'true-false' ? 'true-false' : 'multiple-choice');
   const questionId = String(node.id);
   const expanded = expandSparcSemanticNodes([{ id: questionId, nodeType: 'semantic', semanticType: 'multiple-choice', prompt: { value: String(node.value) },
     choices: choices.map(choice => ({ ...choice, id: `${questionId}:answer:${choice.id}`, value: choice.id })) }])[0] as { children: Record<string, unknown>[] };
@@ -18,11 +19,11 @@ export function sparcQuestionAnswerNodes(node: Record<string, unknown>, readOnly
   })) };
 }
 
-export function savedSparcChoiceQuestions(replay: SparcReplayState): Record<string, unknown>[] {
+export function savedSparcQuestions(replay: SparcReplayState): Record<string, unknown>[] {
   // Resolve stable node identities exactly as the display does, including corrections.
   return applySparcProgressiveNodeOperations([], collectSparcProgressiveNodeOperations(replay.transitions))
     .filter((node): node is Record<string, unknown> => Boolean(node && typeof node === 'object'
-      && 'choices' in node && 'id' in node && String(node.id).endsWith(':question')));
+      && 'id' in node && String(node.id).endsWith(':question')));
 }
 
 export function projectSparcAnsweredQuestionOperations(replay: SparcReplayState): SparcProgressiveNodeOperation[] {
