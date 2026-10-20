@@ -15,9 +15,16 @@ describe('Competitive target and replay contracts', () => {
       assert.ok(Math.abs(logistic(targetExpectancy(replayed, key)) - Math.max(.2, coverage)) < 1e-9);
       const rawSum = history.filter(fact => fact.factType === 'instructional.modelObservation')
         .reduce((sum, fact) => sum + Number(fact.slots!.delta), 0);
-      assert.ok(Math.abs(rawSum - boundedLogit(coverage)) < 1e-9);
+      if (coverage === 0) assert.equal(history.length, 0, 'untouched targets need no model rows');
+      else assert.ok(Math.abs(rawSum - boundedLogit(coverage)) < 1e-9);
     }
     assert.equal(history.filter(fact => fact.slots?.kind === 'initial').length, 1);
+  });
+  it('omits unchanged model gains and completed OET values after replay', () => {
+    const scoreFacts = [{ factType: 'learningTarget.score', slots: { clusterKC: 'a', coverage: .9 } }];
+    const params = { scoreFacts, snapshotId: 'first', coverageThreshold: .8, misconceptionThreshold: .2 };
+    const first = competitiveAssessmentFacts({ ...params, facts: [] });
+    assert.deepEqual(competitiveAssessmentFacts({ ...params, snapshotId: 'next', facts: JSON.parse(JSON.stringify(first)) }), []);
   });
   it('orients only detected misconceptions and permits negative model changes', () => {
     const score = (supportStrength: number) => [{ factType: 'diagnostic.misconceptionScore', slots: { id: 'm', supportStrength } }];

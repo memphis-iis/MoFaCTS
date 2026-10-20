@@ -23,6 +23,30 @@ export type SparcAutoTutorInstructionalProjection = {
   readonly facts: readonly SparcWorkingMemoryFact[];
 };
 
+export function sparcInstructionalAnchor(facts: readonly SparcWorkingMemoryFact[]): string | undefined {
+  const cycle = latestActiveCycle(facts);
+  return cycle?.slots?.targetKind === 'expectation' ? stringSlot(cycle, 'targetId')
+    : stringSlot(facts.filter(fact => fact.factType === 'dialogue.utterance'
+      && fact.slots?.speaker === 'tutor' && fact.slots?.targetType === 'learningTarget').at(-1), 'targetId');
+}
+
+/** Assess the current KC and its strongest graph neighbors, independent of mastery. */
+export function sparcAssessmentClusterKcs(facts: readonly SparcWorkingMemoryFact[], limit = 4): ReadonlySet<string> {
+  if (!Number.isInteger(limit) || limit < 1) throw new Error('Assessment KC limit must be a positive integer');
+  const ids = facts.filter(fact => fact.factType === 'autotutor.expectation').map(fact => String(fact.slots?.clusterKC));
+  if (ids.length <= limit) return new Set(ids);
+  const anchor = sparcInstructionalAnchor(facts);
+  if (!anchor || !ids.includes(anchor)) throw new Error('SPARC assessment requires the current KC');
+  const neighbors = ids.filter(id => id !== anchor).map(id => {
+    const relationship = facts.find(fact => fact.factType === 'kcGraph.relationship'
+      && fact.slots?.sourceClusterKC === anchor && fact.slots?.targetClusterKC === id);
+    const strength = relationship?.slots?.strength;
+    if (typeof strength !== 'number' || !Number.isFinite(strength)) throw new Error(`SPARC assessment is missing the KC relationship from "${anchor}" to "${id}"`);
+    return { id, strength };
+  }).sort((a, b) => b.strength - a.strength || a.id.localeCompare(b.id));
+  return new Set([anchor, ...neighbors.slice(0, limit - 1).map(entry => entry.id)]);
+}
+
 function nonBlank(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -134,10 +158,7 @@ export function projectSparcAutoTutorInstructionalFacts(params: {
   // A completed expectation cycle still identifies the KC we are leaving.
   // During misconception repair, replayed tutor instructions retain the last KC
   // without introducing a second persisted focus or interpreting learner text.
-  const precedingKC = cycle?.slots?.targetKind === 'expectation'
-    ? stringSlot(cycle, 'targetId')
-    : stringSlot(params.facts.filter(fact => fact.factType === 'dialogue.utterance'
-      && fact.slots?.speaker === 'tutor' && fact.slots?.targetType === 'learningTarget').at(-1), 'targetId');
+  const precedingKC = sparcInstructionalAnchor(params.facts);
   const anchorClusterKC = params.candidateOptions?.anchorClusterKC ?? precedingKC;
   const candidates = projectSparcInstructionalCandidates({
     snapshotId: params.snapshotId,

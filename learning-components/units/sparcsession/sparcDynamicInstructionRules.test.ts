@@ -52,6 +52,8 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   let failModelAfter: number | undefined;
   let failBatch = false;
   let evidence: SparcRetainedEvidence[] = [];
+  let feedbackGate: Promise<void> | undefined;
+  let instructionStarted: (() => void) | undefined;
   const submit = (result?: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
     core: { userId: 'u', TDFId: 'dynamic', sessionID: 'session', levelUnit: 0 }, pageKey, display: source,
     ...(result ? { result } : {}), priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
@@ -63,9 +65,11 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
         assert.ok(request.plannerState);
         assert.equal(request.targetType, 'feedback');
         assert.ok(rows.some(row => transition(row).transitionId.endsWith(':assessment')));
+        await feedbackGate;
         return 'Your answer identifies the relevant idea; here is the correction.';
       }
-      if (request.learnerText) {
+      instructionStarted?.();
+      if (request.learnerText && version === 'student') {
         assert.ok(rows.some(row => transition(row).transitionId.endsWith(':feedback')));
         assert.ok(request.dialogueHistory?.some(entry => String(entry.text).includes('here is the correction')));
       }
@@ -120,10 +124,46 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   return { source, rows, requests, scoredResponses, submit, answer, choice, mcAnswer, menu, facts, evidence: (value: SparcRetainedEvidence[]) => { evidence = value; }, calls: () => calls,
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
     fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; },
-    failBatch: (value: boolean) => { failBatch = value; } };
+    failBatch: (value: boolean) => { failBatch = value; },
+    overlap: (gate: Promise<void>, started: () => void) => { feedbackGate = gate; instructionStarted = started; } };
 }
 
 describe('Dynamic instruction production cycles', () => {
+  it('starts agent instruction while feedback runs and saves feedback before instruction', async () => {
+    const f = fixture('agent');
+    let release!: () => void;
+    let started!: () => void;
+    const instruction = new Promise<void>(resolve => { started = resolve; });
+    f.overlap(new Promise<void>(resolve => { release = resolve; }), started);
+    const turn = f.answer();
+    try {
+      await instruction;
+      assert.equal(f.rows.some(row => transition(row).transitionId.endsWith(':feedback')), false);
+      assert.equal(f.rows.some(row => transition(row).transitionId.includes(':primitive:')), false);
+    } finally { release(); }
+    await turn;
+    const feedback = f.rows.findIndex(row => transition(row).transitionId.endsWith(':feedback'));
+    const primitive = f.rows.findIndex(row => transition(row).transitionId.includes(':primitive:'));
+    assert.ok(feedback >= 0 && primitive > feedback);
+  });
+  it('keeps instruction hidden after feedback fails and resumes the saved decision without rescoring', async () => {
+    const f = fixture('agent');
+    let rejectFeedback!: (error: Error) => void;
+    let started!: () => void;
+    const instruction = new Promise<void>(resolve => { started = resolve; });
+    f.overlap(new Promise<void>((_resolve, reject) => { rejectFeedback = reject; }), started);
+    const turn = f.answer(100);
+    await instruction;
+    rejectFeedback(new Error('feedback unavailable'));
+    await assert.rejects(turn, /feedback unavailable/);
+    assert.equal(f.rows.some(row => transition(row).transitionId.includes(':primitive:')), false);
+    const selected = f.requests.find(request => request.action !== 'instruction.feedback')!;
+    f.overlap(Promise.resolve(), () => {});
+    await f.answer(100);
+    assert.equal(f.calls(), 1);
+    assert.equal(f.requests.at(-1)!.action, selected.action);
+    assert.equal(f.requests.at(-1)!.targetId, selected.targetId);
+  });
   it('binds typed cloze completions to the saved statement and retains raw evidence and format across replay', async () => {
     const f = fixture('student', false, 'fact'); await f.answer(); await f.choice('question.cloze');
     const question = savedSparcQuestions(replaySparcHistory(f.rows)).at(-1)!;
@@ -260,6 +300,7 @@ describe('Dynamic instruction production cycles', () => {
   });
   it('accepts no partial score state when an assessment batch fails, then resumes accepted assessment without rescoring', async () => {
     const f = fixture('agent', true, 'fact-model', 24, 20);
+    f.scores(.3);
     f.failBatch(true);
     await assert.rejects(f.answer(100), /assessment write interrupted/);
     assert.equal(f.rows.length, 0);
@@ -536,7 +577,7 @@ describe('Dynamic instruction production cycles', () => {
     assert.equal(projectSparcMenuOperations(replaySparcHistory(f.rows)).filter(operation => operation.type === 'insert-node' && String(operation.node.id).endsWith(':selected')).length, 1);
   });
   it('bounds seven-target model updates and resumes interrupted persistence without rescoring or duplicate gains', async () => {
-    const f = fixture('agent', true); f.failModel(2);
+    const f = fixture('agent', true); f.scores(.3); f.failModel(2);
     await assert.rejects(f.answer(100), /model write interrupted/);
     assert.equal(f.calls(), 1); assert.equal(f.requests.length, 0);
     f.failModel(); await f.answer(100);

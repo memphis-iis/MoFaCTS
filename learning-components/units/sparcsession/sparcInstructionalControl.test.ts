@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { projectSparcAutoTutorInstructionalFacts } from './sparcInstructionalControl';
+import { projectSparcAutoTutorInstructionalFacts, sparcAssessmentClusterKcs } from './sparcInstructionalControl';
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
 import { replaySparcHistory } from './sparcStateReplay';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
@@ -43,6 +43,12 @@ function graphSelectionFacts(anchor: 'a' | 'd'): SparcWorkingMemoryFact[] {
 }
 
 describe('SPARC AutoTutor instructional projection', function() {
+  it('assesses the current KC and strongest neighbors regardless of mastery', () => {
+    assert.deepEqual([...sparcAssessmentClusterKcs(graphSelectionFacts('a'), 3)], ['kc-a', 'kc-b', 'kc-d']);
+    assert.deepEqual([...sparcAssessmentClusterKcs(graphSelectionFacts('d'), 3)], ['kc-d', 'kc-c', 'kc-a']);
+    const missing = graphSelectionFacts('a').filter(f => f.factType !== 'kcGraph.relationship');
+    assert.throws(() => sparcAssessmentClusterKcs(missing, 3), /missing the KC relationship/);
+  });
   it('uses the first uncovered chain KC regardless of centrality, need, anchor, or startup weights', function() {
     const facts = graphSelectionFacts('d');
     facts.push(fact('controller.targetSelectionPolicy', { startingKC: 'kc-a' }),

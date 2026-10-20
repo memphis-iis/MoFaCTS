@@ -15,6 +15,7 @@ import type { SparcLibraryImagePage } from '../../common/lib/sparcFigureLibrary'
 import { parseSparcRaster } from '../lib/sparcRaster';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
 import type { SparcVideoMatch } from '../lib/sparcVideoLibraryService';
+import { SPARC_VIDEO_MINIMUM_SIMILARITY } from '../../../learning-components/runtime/sparcVideo';
 
 type Asset = { _id: string; path?: string; type?: string; meta: Record<string, any> };
 type Deps = {
@@ -140,7 +141,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
             userId, tdfId, sessionId, situation, imagePrompt: prompt, tutorMessage, description, displayWidth, minimumSimilarity,
             findVideo: async vector => {
               if (!deps.findVideo) throw new Meteor.Error(500, 'SPARC video retrieval is not configured');
-              return deps.findVideo(vector, tdfId, minimumSimilarity);
+              return deps.findVideo(vector, tdfId, SPARC_VIDEO_MINIMUM_SIMILARITY);
             },
             embed: async input => {
               const resolvedKey = await key();

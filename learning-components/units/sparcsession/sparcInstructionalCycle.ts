@@ -1,7 +1,7 @@
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
 import { isSparcChoiceFormat } from '../../runtime/sparcTargetCategories';
 import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
-import { SPARC_DYNAMIC_TARGET_LOGIT, SPARC_FEEDBACK_ACTION } from './sparcDynamicInstructionRules';
+import { SPARC_DYNAMIC_TARGET_LOGIT, SPARC_FEEDBACK_ACTION, SPARC_FEEDBACK_STARTED } from './sparcDynamicInstructionRules';
 import { competitiveAssessmentFacts, competitiveCandidateFacts, selectCompetitiveActivation } from './sparcCompetitiveSelection';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY, type SparcProgressiveNodeOperation } from '../../trial-displays/sparc/sparcProgressiveNodes';
@@ -129,6 +129,13 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   let menuOffered = false;
   let stopped = false;
   let documentLoadFacts: readonly SparcWorkingMemoryFact[] = [];
+  let feedbackWork: Promise<{ ok: true; transition: SparcStateTransition } | { ok: false; error: unknown }> | undefined;
+  const waitForFeedback = async () => {
+    if (!feedbackWork) return;
+    const result = await feedbackWork;
+    if (!result.ok) throw result.error;
+    return result.transition;
+  };
   const historyRecord = (transition: SparcStateTransition, changes?: readonly ExpectationLogitChange[]) =>
     createSparcStateTransitionHistoryRecord({ core: params.core, transition, action: `sparc-${transition.transitionId.split(':').at(-1)}`,
       responseValue: event.type === 'response-submitted' ? event.payload?.input ?? '' : '',
@@ -200,11 +207,13 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     }
     const output = await params.generateTutorUtterance({ ...request, realizedInstruction: realized,
       onInstructionComponent: async (component, text, figure, details) => {
+        await waitForFeedback();
         const write = createSparcInstructionComponentWrite({ document: params.document, event, request, component, text, ...(figure ? { figure } : {}), ...(details ? { details } : {}) });
         await save({ transitionId: `${event.eventId}:primitive:${component}`, event, writes: [write] });
         savedComponents.add(component);
       },
     });
+    await waitForFeedback();
     const transition = createSparcInstructionTransition({ document: params.document, event, learnerText: request.learnerText, request, generated: output, includeLearner: false });
     generatedRequest = request;
     generated = true;
@@ -216,6 +225,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   };
   const actions: Record<string, SparcProductionActionHandler> = {
     [SPARC_FEEDBACK_ACTION]: async ({ facts: current, ruleId }) => {
+      const realizeFeedback = async (): Promise<SparcStateTransition> => {
       let transition = acceptedFeedback;
       if (!transition) {
         const request = { ...createSparcFeedbackRequest(current, event, ruleId), historySessionId: params.core.sessionID };
@@ -234,6 +244,13 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
           await save(transition); }
       }
       if (!transition) throw new Error('Feedback checkpoint was not saved');
+      return transition;
+      };
+      if (competitive) {
+        feedbackWork ??= realizeFeedback().then(transition => ({ ok: true as const, transition }), error => ({ ok: false as const, error }));
+        return { assertions: assertions([{ factType: SPARC_FEEDBACK_STARTED, slots: { snapshotId: event.eventId } }]), writes: [] };
+      }
+      const transition = await realizeFeedback();
       return { assertions: assertions(progressiveDialogueFacts({ transitions: [transition] })), writes: [] };
     },
     [SPARC_AUTOTUTOR_EVALUATE_ACTION]: async ({ facts: current }) => {
@@ -347,6 +364,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   }
   let execution: SparcProductionRuleExecution;
   let transition: SparcStateTransition;
+  try {
   if (acceptedDecision) {
     facts = [...facts.filter((fact) => !['instructional.decision', 'controller.selectedAction', 'instructional.activeCycle'].includes(fact.factType)), ...writtenFacts(acceptedDecision)];
     const decision = facts.find((fact) => fact.factType === 'instructional.decision');
@@ -355,6 +373,12 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     const rule = params.document.productionRules?.find((entry) => entry.id === ruleId);
     const invocation = rule?.then.find((effect) => effect.type === 'invoke-action' && (effect.actionId === action || effect.actionId === SPARC_AUTOTUTOR_GENERATE_ACTION));
     if (!invocation || invocation.type !== 'invoke-action') throw new Error('Accepted decision no longer matches its authored production');
+    if (competitive && event.type === 'response-submitted' && !acceptedFeedback) {
+      if (!acceptedAssessment) throw new Error('Accepted response decision requires its saved assessment');
+      const feedbackFacts = [...facts, ...writtenFacts(acceptedAssessment).filter(fact => RESPONSE_LOCAL_FACT_TYPES.has(fact.factType))];
+      await actions[SPARC_FEEDBACK_ACTION]!({ facts: [...feedbackFacts, ...projection(feedbackFacts).facts],
+        ruleId: 'instruction.dynamic.feedback', actionId: SPARC_FEEDBACK_ACTION, args: {} });
+    }
     const result = await actions[invocation.actionId]!({ facts, ruleId, actionId: invocation.actionId, args: {} });
     transition = { transitionId: `${event.eventId}:cycle`, event, writes: [...result.writes, ...factWrites(result.assertions.filter((entry) => entry.persist).map((entry) => entry.fact), event)] };
     execution = { initialFacts: facts, facts, firings: [], cycles: 0 };
@@ -368,6 +392,10 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     // trace also contains transient assertions and dialogue history; embedding it
     // here duplicates those records and makes each turn grow with the lesson.
     transition = { ...result, event, transitionId: `${event.eventId}:cycle` };
+  }
+  } finally {
+    // Do not leave a provider/history operation running after this turn fails.
+    await waitForFeedback();
   }
   if (documentLoadFacts.length) transition = { ...transition, writes: [...transition.writes, ...factWrites(documentLoadFacts, event)] };
   finalRecord = await save(transition);

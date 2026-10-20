@@ -75,7 +75,7 @@ describe('SPARC private supported Prompt image contracts', () => {
     const video = { segmentId: 'a'.repeat(64), videoId: 'abcdefghijk', language: 'en', title: 'Teaching', channel: 'Teaching',
       transcript: 'A complete teaching process.', startSeconds: 0, endSeconds: 20 };
     f.deps.findVideo = async (vector, tdfId, cutoff) => { searches++; assert.deepEqual(vector, [1, 0]);
-      assert.equal(tdfId, 'lesson'); assert.equal(cutoff, .992); return { video, similarity: 1 }; };
+      assert.equal(tdfId, 'lesson'); assert.equal(cutoff, .8); return { video, similarity: 1 }; };
     const teaching = { ...request, situation: { target: { texts: ['A process.'] }, evidence: [], assistance: 2.5, illustrationBrief: 'A complete teaching process.' } };
     await assert.rejects(f.methods.resolveSparcVisualSupport.call({ userId: 'student' }, teaching), /Permission denied/);
     await assert.rejects(f.methods.resolveSparcVisualSupport.call({}, teaching), /logged in|authenticated|Permission|not-authorized/i);

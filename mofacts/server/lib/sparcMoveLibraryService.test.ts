@@ -332,6 +332,25 @@ describe('Shared instructional primitive library', () => {
     assert.equal((await s.publish('alice', first.ticket, { text: 'Equivalent question wording?' })).accepted, true);
   });
 
+  it('checks question novelty in descending need similarity and stops at the first acceptable candidate', async () => {
+    const f = fixture(), seedService = f.make();
+    const lookup = await seedService.lookup('author', query('seed', 'question')); if (lookup.status !== 'generate') throw new Error();
+    await seedService.publish('author', lookup.ticket, { text: 'seed' });
+    const seed = [...f.entries.values()][0]!; f.entries.clear();
+    for (const [id, similarity, text] of [['a', .993, 'unused'], ['b', .995, 'novel'], ['c', 1, 'repeated']] as const) {
+      const entry = { ...seed, _id: id, embedding: [similarity, Math.sqrt(1 - similarity ** 2)], content: { text } };
+      delete entry.questionEmbedding;
+      f.entries.set(id, entry);
+    }
+    const embedded: string[] = [];
+    const service = createMoveLibraryService({ store: f.store, embeddingModel: 'fixture', embed: async text => {
+      embedded.push(text); return text === 'novel' ? [0, 1] : [1, 0];
+    } });
+    const result = await service.lookup('reader', { ...query('read', 'question'), previousQuestions: [{ text: 'earlier' }] });
+    assert.equal(result.status === 'hit' && result.content.text, 'novel');
+    assert.deepEqual(embedded.filter(text => ['unused', 'novel', 'repeated'].includes(text)), ['repeated', 'novel']);
+  });
+
   it('uses independent reuse and repetition cutoffs for retrieved questions', async () => {
     const vector = (cosine: number) => [cosine, Math.sqrt(1 - cosine ** 2)];
     const retrieve = async (questionSimilarity: number, contextSimilarity = 1) => {

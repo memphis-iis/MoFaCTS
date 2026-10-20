@@ -1,8 +1,8 @@
 import { normalizeSparcFigureEmbedding, sparcFigureCosineSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../common/lib/sparcPromptImage';
 import type { OpenRouterUsageSummary } from '../../common/lib/openRouterClient';
-import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
-import { parseSparcVideoSegment, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { SPARC_INSTRUCTIONAL_NEED_VERSION, sparcInstructionalNeedText } from '../../../learning-components/runtime/sparcInstructionalNeed';
+import { parseSparcVideoSegment, SPARC_VIDEO_MINIMUM_SIMILARITY, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import type { SparcVideoMatch } from './sparcVideoLibraryService';
 
 export type SparcFigureLibraryEntry = {
@@ -80,13 +80,15 @@ export async function getOrGenerateSparcLibraryVisual(params: {
     return { ...resume(accepted), source: 'semantic', embeddingUsage };
   };
   if (!await store.findEntry(params.assetId)) {
-    const embedded = await params.embed(params.situation);
-    embedding = normalizeSparcFigureEmbedding(embedded.vector);
-    embeddingUsage = embedded.usage;
-    const videoMatch = await params.findVideo(embedding);
+    // Catalog vectors describe passage content. Search them with the teaching
+    // target in prose, without image briefs, scores, or serialized need metadata.
+    const need = JSON.parse(sparcInstructionalNeedText(JSON.parse(params.situation)));
+    const videoEmbedding = await params.embed(need.target.texts.join('\n'));
+    embeddingUsage = videoEmbedding.usage;
+    const videoMatch = await params.findVideo(normalizeSparcFigureEmbedding(videoEmbedding.vector));
     if (videoMatch) {
         const video = parseSparcVideoSegment(videoMatch.video);
-        if (!Number.isFinite(videoMatch.similarity) || videoMatch.similarity < params.minimumSimilarity || videoMatch.similarity > 1) throw new Error('Video retrieval returned an ineligible match');
+        if (!Number.isFinite(videoMatch.similarity) || videoMatch.similarity < SPARC_VIDEO_MINIMUM_SIMILARITY || videoMatch.similarity > 1) throw new Error('Video retrieval returned an ineligible match');
         await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId,
           tdfId: params.tdfId, sessionId: params.sessionId, assetId: video.segmentId, video,
           source: 'semantic', similarity: videoMatch.similarity, createdAt: new Date() });
@@ -94,6 +96,13 @@ export async function getOrGenerateSparcLibraryVisual(params: {
         if (!accepted) throw new Error('SPARC visual library did not persist the selected video');
         return { ...resume(accepted), source: 'semantic', embeddingUsage };
     }
+    const embedded = await params.embed(params.situation);
+    embedding = normalizeSparcFigureEmbedding(embedded.vector);
+    embeddingUsage = Object.fromEntries((['promptTokens', 'cachedPromptTokens', 'cacheWritePromptTokens', 'completionTokens',
+      'totalTokens', 'costUsd', 'cacheDiscountUsd'] as const).flatMap(key => {
+      const first = videoEmbedding.usage?.[key], second = embedded.usage?.[key];
+      return typeof first === 'number' && typeof second === 'number' ? [[key, first + second]] : [];
+    }));
     const match = await selectSparcLibraryFigure(store, embedding, params.minimumSimilarity);
     if (match) return await acceptMatch(match);
   }

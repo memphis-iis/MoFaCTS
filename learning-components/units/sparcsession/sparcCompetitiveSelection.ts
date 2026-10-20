@@ -43,17 +43,26 @@ export function competitiveAssessmentFacts(params: {
     // An untriggered misconception is not a competing target or an observation.
     if (!expectation && !prior.length && raw < params.misconceptionThreshold) continue;
     const logit = boundedLogit(expectation ? raw : 1 - raw);
+    // Untouched expectations use the implicit initial expectancy. Compare against
+    // durable model observations, not scores: a score may already be saved when
+    // an interrupted model update resumes.
+    if (expectation && !prior.length && raw === 0) continue;
+    const priorLogit = targetLogitSum(params.facts, targetKey);
+    const difference = logit - priorLogit;
+    const delta = Math.abs(difference) <= Number.EPSILON * 8 * Math.max(1, Math.abs(logit), Math.abs(priorLogit)) ? 0 : difference;
+    if (!prior.length && delta === 0) continue;
     if (!prior.length) output.push({ factType: MODEL, factId: `${targetKey}:initial`,
       slots: { targetKey, targetKind, targetId, kind: 'initial', delta: boundedLogit(SPARC_COMPETITIVE_DEFAULTS.initialExpectation) } });
-    output.push({ factType: MODEL, factId: `${params.snapshotId}:${targetKey}`,
+    if (delta !== 0) output.push({ factType: MODEL, factId: `${params.snapshotId}:${targetKey}`,
       slots: { targetKey, targetKind, targetId, kind: 'gain', snapshotId: params.snapshotId,
         // Keep literal assessment changes in history. Subtract the raw sum, not
         // its floored selection value, so low assessments cannot accumulate debt.
-        delta: logit - targetLogitSum(params.facts, targetKey) } });
+        delta } });
 
     // Preserve the categorized assessment history contract. Selection uses fixed OET.
     const completed = expectation ? raw >= params.coverageThreshold : 1 - raw >= params.coverageThreshold;
-    if (completed) output.push({ factType: OET, factId: targetKey,
+    if (completed && !params.facts.some(entry => entry.factType === OET && entry.factId === targetKey
+      && entry.slots?.logit === boundedLogit(SPARC_COMPETITIVE_DEFAULTS.initialOet))) output.push({ factType: OET, factId: targetKey,
       slots: { targetKey, logit: boundedLogit(SPARC_COMPETITIVE_DEFAULTS.initialOet) } });
   }
   return output;

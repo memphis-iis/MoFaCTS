@@ -1,4 +1,8 @@
 import { parseSparcVideoSegment } from '../../../../../../learning-components/runtime/sparcVideo';
+import { sparcAssessmentClusterKcs, sparcInstructionalAnchor } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalControl';
+import { normalizeEmbeddingVector, cosineSimilarityScore } from '../../../../../../learning-components/runtime/vectorSimilarity';
+import { SPARC_EMBEDDING_MODEL } from '../../../../../common/lib/sparcEmbeddingModel';
+import { Meteor } from 'meteor/meteor';
 import { realizeSparcPrimitive } from './sparcPrimitiveRealization';
 import { instructionalNeed } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
 import { selectedSparcEvidence, previousSparcQuestions, type SparcMoveLibraryClient, type SparcPrimitiveContent, type SparcPrimitiveKind, type SparcPrimitiveReference } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
@@ -45,6 +49,7 @@ import type { RecoverableWarning } from '../../../../../common/recoverableWarnin
 import { describeSparcCitation } from './sparcCitationDiagnostics';
 
 const instructionTextBudget = 'Write concise, complete instructional text. Preserve the selected target, requested teaching action, and necessary reasoning.';
+const assessmentTargetVectors = new Map<string, Promise<number[][]>>();
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -102,6 +107,7 @@ export type SparcDialogueOpenRouterProviderOptions = {
   readonly tdfId?: string | null;
   readonly sessionId?: string;
   readonly callResolvedOpenRouterJson?: CallResolvedOpenRouterJson;
+  readonly embedAssessmentTargets?: (texts: string[]) => Promise<number[][]>;
   readonly callSparcPromptImage?: CallSparcPromptImage;
   readonly callSparcVisualSupport?: CallSparcVisualSupport;
   readonly onLearnerResponseScoringTrace?: (
@@ -576,6 +582,17 @@ export function createSparcDialogueOpenRouterProvider(
   readonly generateTutorUtterance: SparcUtteranceGenerator;
 } {
   const callResolvedOpenRouterJson = options.callResolvedOpenRouterJson ?? defaultCallResolvedOpenRouterJson;
+  // Providers are constructed per turn. Share at most four authored target sets
+  // across those instances, scoped to account, lesson, embedding model, and text.
+  // Injected providers have isolated caches. No learner text or evidence is embedded.
+  const vectorCache = options.embedAssessmentTargets ? new Map<string, Promise<number[][]>>() : assessmentTargetVectors;
+  const embedAssessmentTargets = options.embedAssessmentTargets ?? (async (input: string[]) => {
+    const result = await Meteor.callAsync('callResolvedOpenRouterEmbeddings', {
+      tdfId: options.tdfId, model: SPARC_EMBEDDING_MODEL, input,
+      telemetry: { surface: 'sparc-dialogue', operation: 'assessment-target-relationships' },
+    });
+    return result.embeddings as number[][];
+  });
   const callGeneratedJson = (request: Parameters<CallResolvedOpenRouterJson>[0], operation: Parameters<typeof callWithSparcOutputDiagnostics>[0]['operation']) =>
     callWithSparcOutputDiagnostics({ request, operation, call: callResolvedOpenRouterJson,
       reportWarning: options.reportWarning ?? reportRecoverableWarning,
@@ -774,8 +791,34 @@ export function createSparcDialogueOpenRouterProvider(
     event,
   }: Parameters<SparcTrialDisplayDialogueTurnScorer>[0]): Promise<SparcDialogueLearnerResponseEvaluation> => {
     const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
-    const learningTargets = targetSummaries(display);
-    const misconceptions = misconceptionSummaries(display);
+    const assessedKcs = sparcAssessmentClusterKcs(runtimeFacts);
+    const learningTargets = targetSummaries(display).filter(target => assessedKcs.has(String(target.clusterKC)));
+    let misconceptions = misconceptionSummaries(display);
+    if (misconceptions.length > 4) {
+      const allTargets = targetSummaries(display);
+      const anchor = sparcInstructionalAnchor(runtimeFacts);
+      const anchorIndex = allTargets.findIndex(target => target.clusterKC === anchor);
+      if (anchorIndex < 0) throw new Error('Misconception assessment requires the current KC');
+      const texts = [...allTargets, ...misconceptions].map(target => String(target.text));
+      const key = JSON.stringify([options.embedAssessmentTargets ? 'injected' : Meteor.userId(), options.tdfId, SPARC_EMBEDDING_MODEL, texts]);
+      if (!vectorCache.has(key)) {
+        const promise = embedAssessmentTargets(texts).then(vectors => {
+          if (vectors.length !== texts.length) throw new Error('Assessment embedding count does not match authored targets');
+          return vectors.map(vector => normalizeEmbeddingVector(vector));
+        });
+        if (vectorCache.size >= 4) vectorCache.delete(vectorCache.keys().next().value!);
+        vectorCache.set(key, promise);
+        void promise.catch(() => { if (vectorCache.get(key) === promise) vectorCache.delete(key); });
+      }
+      const vectors = await vectorCache.get(key)!;
+      const active = runtimeFacts.filter(f => f.factType === 'instructional.activeCycle' && f.slots?.targetKind === 'misconception'
+        && f.slots?.status === 'active').at(-1)?.slots?.targetId;
+      misconceptions = misconceptions.map((target, index) => ({ target, strength: cosineSimilarityScore({
+        normalizedA: vectors[anchorIndex]!, normalizedB: vectors[allTargets.length + index]!,
+      }) })).sort((a, b) => Number(b.target.id === active) - Number(a.target.id === active)
+        || b.strength - a.strength || String(a.target.id).localeCompare(String(b.target.id))).slice(0, 4).map(entry => entry.target);
+    }
+    const assessedMisconceptions = new Set(misconceptions.map(target => String(target.id)));
     const dialogueHistory = buildSparcDialogueHistory(runtimeFacts);
     const responseFormat = event?.payload?.responseFormat
       ?? dialogueHistory.find(entry => entry.responseId === event?.payload?.questionId)?.responseFormat;
@@ -794,7 +837,8 @@ export function createSparcDialogueOpenRouterProvider(
             learningTargets,
             misconceptions,
             dialogueHistory,
-            priorEvidence: runtimeFacts.filter(f => f.factType === 'instructional.evidence').map(f => f.slots),
+            priorEvidence: runtimeFacts.filter(f => f.factType === 'instructional.evidence'
+              && (f.slots?.kind === 'expectation' ? assessedKcs.has(String(f.slots?.id)) : assessedMisconceptions.has(String(f.slots?.id)))).map(f => f.slots),
             learnerText,
             ...(responseFormat ? { responseFormat } : {}),
             ...(event?.payload?.questionId ? { questionId: event.payload.questionId } : {}),
@@ -859,7 +903,8 @@ export function createSparcDialogueOpenRouterProvider(
     const evaluation = {
       evidenceEnvelope,
       learnerResponseScore: reduceSparcLearnerResponseEvidence({
-        facts: runtimeFacts,
+        facts: runtimeFacts.filter(f => (f.factType !== 'autotutor.expectation' || assessedKcs.has(String(f.slots?.clusterKC)))
+          && (f.factType !== 'autotutor.misconception' || assessedMisconceptions.has(String(f.slots?.id)))),
         evidence: evidenceEnvelope,
       }),
     };

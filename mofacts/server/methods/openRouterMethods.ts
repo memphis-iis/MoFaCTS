@@ -641,6 +641,9 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
       await deps.assertPublicDemoAiQuota(userId, String(this.connection?.clientAddress || 'unknown'));
       if (isRecord(params) && isSparcAdminPolicy(params.policyId)) {
         await requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId, roles: ['admin'], forbiddenMessage: 'Competitive and student-selected AutoTutor are restricted to admin accounts' });
+        // Independent feedback and instruction requests share one DDP connection.
+        // Release its method queue only after the account/policy checks succeed.
+        this.unblock?.();
       }
       return executeResolvedOpenRouterJson(deps, userId, params, 'json');
     },

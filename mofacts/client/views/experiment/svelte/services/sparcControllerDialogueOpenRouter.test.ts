@@ -521,6 +521,43 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
   });
 
+  it('limits assessment to graph neighbors and embedded misconceptions, reusing authored vectors across turns', async () => {
+    const expectations = Array.from({ length: 5 }, (_, i) => ({ clusterKC: `kc-${i}`, text: `Expectation ${i}` }));
+    const misconceptions = Array.from({ length: 6 }, (_, i) => ({ id: `mis-${i}`, text: `Misconception ${i}` }));
+    const targets = { expectations, misconceptions };
+    const context = scorerContext(targets);
+    (context.document.workingMemoryFacts as import('../../../../../../learning-components/units/sparcsession/sparcSessionContracts').SparcWorkingMemoryFact[]).push(
+      { factType: 'instructional.activeCycle', slots: { targetKind: 'expectation', targetId: 'kc-0', status: 'active' } },
+      ...expectations.slice(1).map((entry, i) => ({ factType: 'kcGraph.relationship', slots: {
+        sourceClusterKC: 'kc-0', targetClusterKC: entry.clusterKC, strength: .9 - i * .1,
+      } })),
+    );
+    let embeddings = 0;
+    const provider = createSparcDialogueOpenRouterProvider({
+      embedAssessmentTargets: async texts => { embeddings++; return texts.map(text => text.startsWith('Expectation') ? [1, 0]
+        : [Number(text.at(-1)) + 1, 1]); },
+      callResolvedOpenRouterJson: async params => {
+        const input = JSON.parse(params.messages[1]!.content as string);
+        expect(input.learningTargets.map((target: { clusterKC: string }) => target.clusterKC)).to.deep.equal(['kc-0', 'kc-1', 'kc-2', 'kc-3']);
+        expect(input.misconceptions.map((target: { id: string }) => target.id)).to.deep.equal(['mis-5', 'mis-4', 'mis-3', 'mis-2']);
+        return { parsedContent: {
+          learningTargetEvaluations: input.learningTargets.map((target: { clusterKC: string }) => ({ clusterKC: target.clusterKC,
+            evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] })),
+          diagnosticMisconceptionEvaluations: input.misconceptions.map((target: { id: string }) => ({ id: target.id,
+            evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] })),
+          learnerContribution: { type: 'other' },
+        } };
+      },
+    });
+    for (let i = 0; i < 2; i++) {
+      const score = await provider.scoreLearnerResponse({ display: { ...dialogueDisplay(), autoTutorTargets: targets }, learnerText: 'Okay.', ...context,
+      } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+      expect(score.learningTargetScores).to.deep.equal([]);
+      expect(score.diagnosticMisconceptionScores).to.equal(undefined);
+    }
+    expect(embeddings).to.equal(1);
+  });
+
   it('evaluates a selected MC meaning as evidence rather than converting its answer key into coverage', async function() {
     const context = scorerContext();
     const learnerText = 'Interest is calculated on the total balance.';

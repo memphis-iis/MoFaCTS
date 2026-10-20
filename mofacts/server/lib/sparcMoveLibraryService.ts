@@ -20,6 +20,10 @@ export type MoveEntry = {
 export type MoveRequest = { _id: string; userId: string; query: SparcPrimitiveQuery; embedding: number[];
   embeddingVersion?: string;
   lockKey: string; leaseToken: string; entryId?: string; source?: 'retrieved' | 'generated'; similarity?: number | null };
+export type MoveCandidate = Pick<MoveEntry, '_id' | 'version' | 'kind' | 'embeddingModel' | 'embeddingVersion' | 'embedding'> & {
+  context: Pick<SparcPrimitiveContext, 'responseFormat'>;
+  content?: Pick<SparcPrimitiveContent, 'video' | 'figure'>;
+};
 export type MoveExposure = { _id: string; userId: string; tdfId: string; eventId: string; sessionId: string; kind: string;
   nodeId: string; entryId: string; content: SparcPrimitiveContent; questionEmbedding?: QuestionEmbedding; priorNodeId?: string };
 export interface MoveStore {
@@ -27,7 +31,7 @@ export interface MoveStore {
   saveRequest(value: MoveRequest): Promise<MoveRequest>;
   entry(id: string): Promise<MoveEntry | undefined>;
   saveEntry(entry: MoveEntry): Promise<void>;
-  candidates(kind: string, embeddingModel: string, after: string): Promise<MoveEntry[]>;
+  candidates(kind: string, embeddingModel: string, after: string): Promise<MoveCandidate[]>;
   exposures(userId: string, tdfId: string): Promise<MoveExposure[]>;
   reservedQuestions(userId: string, tdfId: string): Promise<MoveExposure[]>;
   expose(value: MoveExposure): Promise<void>;
@@ -185,30 +189,43 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         return await withQuestionLock(userId, query, async () => {
           const searchStart = Date.now(); let candidateCount = 0;
           let best: { entry: MoveEntry; similarity: number } | undefined;
+          const ranked: Array<{ entry: MoveCandidate; similarity: number }> = [];
           let after = '';
           for (;;) {
             // A new visual move must resolve its brief through video -> image -> generation.
             // Accepted requests above still replay their original resource without reselection.
             if (query.context.supportKind === 'visual') break;
             const entries = await store.candidates(query.context.kind, deps.embeddingModel, after);
-            const videos = query.context.supportKind === 'written' ? [] : entries.flatMap(entry => entry.content.video ? [entry.content.video] : []);
-            if (videos.length && !deps.videoReuseStatus) throw new Error('Video reuse validation unavailable');
-            const videoStatus = videos.length ? await deps.videoReuseStatus!(videos) : new Map<string, boolean>();
             for (const entry of entries) {
               candidateCount++;
-              if (query.context.supportKind === 'written' && (entry.content.video || entry.content.figure)) continue;
+              if (query.context.supportKind === 'written' && (entry.content?.video || entry.content?.figure)) continue;
               if (entry.embeddingModel !== deps.embeddingModel || entry.version !== SPARC_MOVE_LIBRARY_VERSION) continue;
               if (entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
               if (entry.kind !== query.context.kind || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)) continue;
-              if (entry.content.video && videoStatus.get(entry.content.video.segmentId) !== true) continue;
-              if (entry.content.figure && (!deps.figureReusable || !await deps.figureReusable(entry.content.figure.assetId))) continue;
               const similarity = sparcFigureCosineSimilarity(embedding, entry.embedding);
               if (similarity < minimumSimilarity) continue;
-              if (query.context.kind === 'question' && !await novel(await questionVector(entry, query, 'entry'), query, userId)) continue;
-              if (!best || similarity > best.similarity) best = { entry, similarity };
+              ranked.push({ entry, similarity });
             }
             if (entries.length < 100) break;
             after = entries.at(-1)!._id;
+          }
+          ranked.sort((a, b) => b.similarity - a.similarity || a.entry._id.localeCompare(b.entry._id));
+          for (const candidate of ranked) {
+            const entry = await store.entry(candidate.entry._id);
+            if (!entry) continue; // Administrative removal may race the search.
+            if (stableMoveJson(entry.embedding) !== stableMoveJson(candidate.entry.embedding)
+              || entry.context.responseFormat !== candidate.entry.context.responseFormat
+              || entry.embeddingVersion !== candidate.entry.embeddingVersion || entry.version !== candidate.entry.version) {
+              throw new Error('Instructional library candidate changed during retrieval; resume the request');
+            }
+            if (entry.content.video) {
+              if (!deps.videoReuseStatus) throw new Error('Video reuse validation unavailable');
+              if ((await deps.videoReuseStatus([entry.content.video])).get(entry.content.video.segmentId) !== true) continue;
+            }
+            if (entry.content.figure && (!deps.figureReusable || !await deps.figureReusable(entry.content.figure.assetId))) continue;
+            if (query.context.kind === 'question' && !await novel(await questionVector(entry, query, 'entry'), query, userId)) continue;
+            best = { entry, similarity: candidate.similarity };
+            break;
           }
           deps.timing?.('library-search', Date.now() - searchStart, candidateCount);
           const request: MoveRequest = { _id: id, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION, lockKey, leaseToken: id };

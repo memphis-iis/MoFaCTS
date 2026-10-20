@@ -6,6 +6,7 @@ import { createSparcProgressiveScaffoldingRules, decisionEffects, instructionalT
 import { SPARC_MENU_ACTION, SPARC_NEXT_TARGET_ACTION, SPARC_STOP_ACTION } from './sparcInstructionalCycleRules';
 
 export const SPARC_FEEDBACK_ACTION = 'instruction.feedback';
+export const SPARC_FEEDBACK_STARTED = 'instructional.feedbackStarted';
 export const SPARC_DYNAMIC_TARGET_LOGIT = Math.log(0.8 / 0.2);
 export const SPARC_CATEGORIZED_MENU_OPTIONS = [
   ...SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => ({
@@ -25,13 +26,15 @@ const completion = (completed: boolean): SparcProductionRuleCondition => ({ fact
 const undecided: SparcProductionRuleCondition = { type: 'not', pattern: { factType: 'instructional.decision', slots: { snapshotId: bound('snapshotId') } } };
 const turn: SparcProductionRuleCondition = { factType: 'session.turnState', slots: { turnCount: bind('turnNumber') } };
 
-/** Rules own evaluation -> saved feedback -> selection; eligible move/format alternatives compete on one target. */
+/** Agent selection may overlap feedback; the cycle owner gates instruction display on saved feedback. */
 export function createSparcDynamicInstructionRules(version: 'student' | 'agent'): readonly SparcProductionRule[] {
   const moves = SPARC_CATEGORIZED_MOVE_DEFINITIONS;
   const options = SPARC_CATEGORIZED_MENU_OPTIONS;
   const categories = SPARC_TARGET_CATEGORIES;
+  const feedbackReady: SparcProductionRuleCondition = version === 'agent' ? { type: 'any', conditions: [feedback,
+    { factType: SPARC_FEEDBACK_STARTED, slots: { snapshotId: bound('snapshotId') } }] } : feedback;
   const selectionContext = (kind: string, transition: string): SparcProductionRuleCondition[] => {
-    const afterResponse: SparcProductionRuleCondition = { type: 'all', conditions: [event('response-submitted'), assessed, feedback] };
+    const afterResponse: SparcProductionRuleCondition = { type: 'all', conditions: [event('response-submitted'), assessed, feedbackReady] };
     return [kind === 'expectation' && transition === 'start'
       ? { type: 'any', conditions: [event('document-loaded'), afterResponse] } : afterResponse];
   };
@@ -41,10 +44,11 @@ export function createSparcDynamicInstructionRules(version: 'student' | 'agent')
   }];
   const evaluation = createSparcProgressiveScaffoldingRules().find((rule) => rule.id === 'dialogue.response.evaluate')!;
   const shared: SparcProductionRule[] = [evaluation, {
-    id: 'instruction.dynamic.feedback', when: [event('response-submitted'), assessed, { type: 'not', pattern: feedback }],
+    id: 'instruction.dynamic.feedback', when: [event('response-submitted'), assessed, { type: 'not', pattern: feedback },
+      { type: 'not', pattern: { factType: SPARC_FEEDBACK_STARTED, slots: { snapshotId: bound('snapshotId') } } }],
     then: [{ type: 'invoke-action', actionId: SPARC_FEEDBACK_ACTION }],
   }, {
-    id: 'instruction.dynamic.stop', when: [event('response-submitted'), assessed, feedback, completion(true), undecided],
+    id: 'instruction.dynamic.stop', when: [event('response-submitted'), assessed, feedbackReady, completion(true), undecided],
     then: [{ type: 'invoke-action', actionId: SPARC_STOP_ACTION }],
   }];
   if (version === 'agent') {

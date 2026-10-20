@@ -1,5 +1,47 @@
 # SPARC instructional cycle
 
+## Turn efficiency, October 20, 2026
+
+Assessment now evaluates at most four expectation KCs: the current KC and its three
+strongest graph neighbors, with deterministic identity ordering for tied strengths.
+It separately evaluates at most four misconceptions ranked by embedding similarity
+to the current KC, always retaining an active misconception within that four-item
+budget. For larger misconception sets, the dialogue provider embeds authored target
+and misconception texts and caches up to four target sets in memory, keyed by account,
+lesson, model, and exact authored text. These vectors contain no learner answers. Existing scores and
+evidence for unassessed targets carry forward. This deliberately trades detection of
+distant transfer on a given turn for a smaller assessment; it does not reset those KCs.
+
+The agent condition starts feedback and instruction generation concurrently after
+durable assessment. Authorized SPARC provider methods release the connection's DDP
+method queue before awaiting provider output so the requests can overlap on the server.
+Its transient `instructional.feedbackStarted` fact allows move
+selection; the cycle owner waits for saved feedback before saving or displaying any
+new instructional component and before completing the turn. Accepted decisions and
+components still resume without reselection. Failures drain the feedback operation
+before returning. The student condition still displays feedback before offering choices.
+This supersedes the earlier feedback-before-selection ordering described below.
+
+Model history omits untouched initial expectations, numerically unchanged gains, and
+unchanged OET values. The comparison uses durable model observations so an assessment
+saved before an interrupted model write can still finish on resume. Existing history
+requires no rewrite. Score and descriptive-evidence writes already omit unchanged values.
+
+Library search reads bounded pages of vectors and necessary metadata, ranks qualifying
+candidates by cosine similarity, then loads content and checks availability and question
+repetition in descending similarity order. It stops at the first acceptable candidate.
+The relevance and repetition cutoffs remain separate; no semantic suitability judge
+or additional relevance filter has been added. Exposure/manifest ownership is unchanged.
+
+Video queries use teaching-target prose against transcript vectors at a provisional
+0.80 cutoff. Image queries retain the complete instructional need at 0.992. One
+controlled biological-species case supported this separation; broader retrieval
+precision has not been established. Existing catalog vectors and decisions are unchanged.
+
+Joint explanation/question generation is not enabled: question retrieval depends on
+the realized explanation, so both misses cannot be known in advance under the current
+reuse-first contract. Model comparisons do not change saved model/provider settings.
+
 Accepted learner answers retain their review colors during practice and after reload.
 Only the selected multiple-choice or true/false option is green for a keyed correct
 answer or pink-red for an incorrect one. Text and cloze responses are green if that
@@ -518,16 +560,16 @@ No provider SDK or other dependency is added.
 support before requesting content. Written moves generate or retrieve a worked example,
 comparison, or table. The visual move requests only a reusable visual brief, description,
 and image display width from the dialogue model; its response contains no catalog IDs.
-The visual resolver embeds the canonical instructional need including that brief once,
-then searches eligible same-language video passages, searches images only after a video
+The visual resolver embeds the teaching-target prose for eligible same-language video passages,
+then embeds the canonical instructional need including the visual brief and searches images only after a video
 miss, and generates an image only after both searches miss. As before, a video is eligible
 only with an explicitly authored matching contentLanguage. Packages omitting that optional
 metadata have no eligible videos and continue to image search; no language is inferred.
-A missing package, malformed language, or failed catalog read remains an error. Each search uses the existing
-configured cosine cutoff (currently 0.992). A miss means a successful search with no
+A missing package, malformed language, or failed catalog read remains an error. Video search uses a provisional
+cosine cutoff of 0.80; image search retains 0.992. A miss means a successful search with no
 eligible match at or above that cutoff. Embedding, catalog, validation, storage, and
 provider errors propagate; none are converted into a miss. Both searches use the same
-query vector and existing embedding model. Video candidates retain transcript-passage
+embedding model with distinct query representations. Video candidates retain transcript-passage
 embeddings; images retain canonical instructional-need embeddings. No index rewrite or
 historical data migration is required.
 

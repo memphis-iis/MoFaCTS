@@ -42,13 +42,39 @@ function adminDeps(isAdmin = true, openRouterPrefixCachingEnabled?: boolean) {
 describe('openRouterMethods Admin Tests configuration', function() {
   it('rejects competitive AutoTutor provider requests before resolving a non-admin key', async function() {
     const methods = createOpenRouterMethods(adminDeps(false) as any);
+    const unblock = sinon.spy();
     for (const policyId of ['dynamic-instruction-agent-v2', 'dynamic-instruction-student-v2']) {
       let error: any;
-      try { await methods.callResolvedOpenRouterJson.call({userId: 'learner'}, {policyId}); }
+      try { await methods.callResolvedOpenRouterJson.call({userId: 'learner', unblock}, {policyId}); }
       catch (caught) { error = caught; }
       expect(error?.error).to.equal(403);
       expect(error?.message).to.contain('admin');
     }
+    expect(unblock.called).to.equal(false);
+  });
+
+  it('releases the authorized SPARC method queue before waiting for provider output', async function() {
+    const unblock = sinon.spy();
+    let release!: (response: Response) => void;
+    let started!: () => void;
+    const providerStarted = new Promise<void>(resolve => { started = resolve; });
+    sinon.stub(globalThis, 'fetch').callsFake(async () => {
+      expect(unblock.calledOnce).to.equal(true);
+      started();
+      return new Promise<Response>(resolve => { release = resolve; });
+    });
+    const deps = adminDeps();
+    const resolver = deps.getApiKeyResolutionDeps();
+    const methods = createOpenRouterMethods({ ...deps,
+      getApiKeyResolutionDeps: () => ({ ...resolver, getUserById: async () => null }),
+    } as any);
+    const pending = methods.callResolvedOpenRouterJson.call({ userId: 'admin-user', unblock }, {
+      policyId: 'dynamic-instruction-agent-v2',
+      messages: [{ role: 'user', content: 'Return ok.' }], intent: { title: 'SPARC concurrency test' },
+    });
+    try { await providerStarted; }
+    finally { release(new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200 })); }
+    await pending;
   });
 
   afterEach(function() {

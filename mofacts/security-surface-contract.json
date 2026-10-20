@@ -108,7 +108,7 @@
     {
       "name": "callResolvedOpenRouterJson",
       "access": "role-checked",
-      "notes": "Competitive and student-selected AutoTutor policy requests additionally require the admin role."
+      "notes": "Competitive and student-selected AutoTutor policy requests additionally require the admin role; authorized requests release the DDP queue so feedback and instruction may overlap."
     },
     {
       "name": "cancelPackageUpload",
@@ -247,7 +247,7 @@
     {
       "name": "resolveSparcVisualSupport",
       "access": "admin-only",
-      "notes": "Requires a bounded visual brief and identity-free instructional need. Embeds once, selects an eligible above-threshold catalog video, otherwise searches images and generates an image only on a valid miss. Service errors propagate. Saves the selected resource for replay; no model-selected video IDs."
+      "notes": "Requires a bounded visual brief and identity-free instructional need. Embeds prose teaching targets for transcript search at the video cutoff; after a video miss, embeds the complete need for image search at the image cutoff. Generates an image only on a valid miss. Service errors propagate. Saves the selected resource for replay; no model-selected video IDs."
     },
     {
       "name": "getAccessableTDFSForUser",

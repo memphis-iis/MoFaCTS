@@ -68,19 +68,19 @@ describe('SPARC shared figure situation library', () => {
     }));
     assert.deepEqual(retry.video, video); assert.equal(retry.source, 'resume'); assert.equal(searches, 1);
   });
-  it('uses the same brief embedding for video and image search, reusing an image only after a video miss', async () => {
+  it('uses a prose target for video, then the complete need for image search after a video miss', async () => {
     const f = sparcLibraryFixture();
     await getOrGenerateSparcLibraryVisual(request(f.store, 'seed'));
     const order: string[] = [];
     const candidates = f.store.candidates;
     f.store.candidates = async query => { order.push('image'); return candidates(query); };
     const result = await getOrGenerateSparcLibraryVisual(request(f.store, 'image', {
-      embed: async (input: string) => { assert.equal(input, sparcInstructionalNeedText(situation)); order.push('embed'); return { vector: [3, 0] }; },
+      embed: async (input: string) => { assert.equal(input, order.length ? sparcInstructionalNeedText(situation) : situation.target.texts[0]); order.push('embed'); return { vector: [3, 0] }; },
       findVideo: async (vector: number[]) => { assert.deepEqual(vector, [1, 0]); order.push('video'); return undefined; },
       generate: async () => { throw new Error('Image hit must not generate'); },
     }));
     assert.equal(result.assetId, 'seed'); assert.equal(result.source, 'semantic');
-    assert.deepEqual(order, ['embed', 'video', 'image']);
+    assert.deepEqual(order, ['embed', 'video', 'embed', 'image']);
   });
   it('returns the first durable resource if another replica saves a video while image generation is finishing', async () => {
     const f = sparcLibraryFixture();
@@ -104,7 +104,7 @@ describe('SPARC shared figure situation library', () => {
         findVideo: async () => { stage('video'); return undefined; },
         generate: async () => { stage('generate'); return {}; },
       }));
-      if (failure === 'none') { assert.equal((await work).source, 'generated'); assert.deepEqual(order, ['embed', 'video', 'image', 'image', 'generate']); }
+      if (failure === 'none') { assert.equal((await work).source, 'generated'); assert.deepEqual(order, ['embed', 'video', 'embed', 'image', 'image', 'generate']); }
       else { await assert.rejects(work, new RegExp(`${failure} unavailable`)); assert.equal(order.at(-1), failure); assert.equal(f.decisions.size, 0); }
     }
   });
@@ -133,7 +133,7 @@ describe('SPARC shared figure situation library', () => {
       generate: async () => { throw new Error('A matching saved figure must not generate another image'); } }));
     assert.equal(reused.source, 'semantic');
     assert.equal(reused.assetId, first.assetId);
-    assert.deepEqual(inputs, [entry.situation, entry.situation]);
+    assert.deepEqual(inputs, [situation.target.texts[0], entry.situation, situation.target.texts[0], entry.situation]);
   });
   it('generates a new figure below the similarity threshold', async () => {
     const f = sparcLibraryFixture();
