@@ -1,3 +1,4 @@
+import { createBrowserSnapshotStore } from '../../lib/browserSnapshotStore';
 import { initializeLearnerSettingsHost, destroyLearnerSettingsHost, learnerSettingsEvents, flushLearnerSettings, type LearnerConfigState } from '../shared/learnerTdfSettings';
 import { getLearnerTdfConfig, learnerConfigHasSetSpecAudioOverride } from '../../lib/learnerSettings';
 import type { LearnerTdfConfig } from '../../../common/lib/learnerTdfConfig';
@@ -162,24 +163,17 @@ function applyLearningDashboardSearch(instance: any, search: string) {
   instance.filteredTdfsList.set(filteredTdfs);
 }
 
+const practiceSnapshotStore = createBrowserSnapshotStore<PracticeDashboardSnapshot>(
+  dashboardSnapshotStorageKey,
+  (value: unknown, userId: string): value is PracticeDashboardSnapshot => {
+    const snapshot = value as PracticeDashboardSnapshot | null;
+    return snapshot?.version === PRACTICE_DASHBOARD_SNAPSHOT_VERSION
+      && snapshot.userId === userId && Array.isArray(snapshot.creators) && Array.isArray(snapshot.lessons);
+  },
+);
+
 function loadLocalPracticeDashboardSnapshot(userId: string): PracticeDashboardSnapshot | null {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return null;
-  }
-  const raw = window.localStorage.getItem(dashboardSnapshotStorageKey(userId));
-  if (!raw) {
-    return null;
-  }
-  const snapshot = JSON.parse(raw) as PracticeDashboardSnapshot;
-  if (
-    snapshot?.version !== PRACTICE_DASHBOARD_SNAPSHOT_VERSION ||
-    snapshot.userId !== userId ||
-    !Array.isArray(snapshot.creators) ||
-    !Array.isArray(snapshot.lessons)
-  ) {
-    throw new Error('[LearningDashboard] Local practice dashboard snapshot has an invalid shape');
-  }
-  return snapshot;
+  return practiceSnapshotStore.read(userId);
 }
 
 function saveLocalPracticeDashboardSnapshot(snapshot: PracticeDashboardSnapshot) {
@@ -194,7 +188,7 @@ function saveLocalPracticeDashboardSnapshot(snapshot: PracticeDashboardSnapshot)
       avatarImageData: null,
     })),
   };
-  window.localStorage.setItem(dashboardSnapshotStorageKey(snapshot.userId), JSON.stringify(localSnapshot));
+  practiceSnapshotStore.write(snapshot.userId, localSnapshot);
 }
 
 function formatSnapshotLesson(lesson: any, creators: PracticeDashboardCreator[]) {

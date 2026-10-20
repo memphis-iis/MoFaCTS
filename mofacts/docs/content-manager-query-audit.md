@@ -2,6 +2,43 @@
 
 Date: 2026-05-28
 
+## Superseded loading design (2026-10-20)
+
+The inventory and measurements below describe the earlier request/response implementation.
+Content Upload now retains all authorized compact metadata in a versioned, user-scoped browser
+snapshot. It displays that snapshot before synchronization and uses `contentUploadMetadata`
+to receive live TDF/dependency changes through Meteor Change Streams. The two list/summary RPCs
+have been removed. Client code constructs summaries, orders rows and handles 50-row display
+increments; Show more does not read the server. Expanded lesson/media details remain lazy.
+
+The publication observes only owned/shared TDFs and their referenced dependencies. It projects
+fields, replaces protected keys with presence flags, observes and reads dependencies in batches
+of at most 200, and uses database aggregation for affected asset counts. There is no persisted
+server summary collection. The earlier decision against a separate server read model still
+applies; it did not provide the persistent browser cache now required.
+
+Browser persistence uses the same helper as Practice, with a separate namespace/version. Complete
+live synchronization reconciles membership, including deletions/revocations. Cached display is
+provisional and never grants write/detail access. Logout removes upload snapshots, and identity
+changes stop the subscription. Corrupt storage and synchronization/write failures use existing
+inline errors and retry. There is no polling or alternate storage/loading path.
+
+Run isolated contracts with `node --test scripts/contentUploadCache.test.cjs` from `mofacts/`.
+These do not establish live Mongo Change Streams behavior; verify that separately through the
+canonical localhost watcher or the supported Meteor integration environment.
+
+The localhost integration runner is `node scripts/contentUploadCache.local.cjs`. It reads only
+canonical localhost configuration, creates synthetic records, checks two authenticated sessions
+and removes its fixtures in `finally`. It verifies insert/edit/delete, shared access, revocation,
+dependency removal, asset counts, stimulus identities, credential exclusion, reconnect and indexes.
+
+Local acceptance on 2026-10-20: isolated contracts passed; two-session live metadata insertion
+took 11 ms and editing took 46 ms in one run. The browser retained 139 metadata records (47
+accessible TDFs and their dependencies) in approximately 43 KB. With Meteor explicitly disconnected,
+navigation back to Content displayed 39 visible rows from browser storage in 537 ms, including
+client summary construction and initial DOM rendering. The connection was restored afterward.
+These are development-machine measurements, not production capacity or release verification.
+
 ## Runtime Index Creation
 
 - `mofacts/server/serverComposition.ts:893` calls `runServerStartup(...)` during server startup.

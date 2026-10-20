@@ -1,3 +1,4 @@
+import { publishContentUploadMetadata } from './lib/contentUploadMetadataPublication';
 import { createSparcVideoCatalogMethods } from './methods/sparcVideoCatalogMethods';
 import { createSparcLibraryCurationMethods } from './methods/sparcLibraryCurationMethods';
 import { SPARC_PROMPT_IMAGE_PURPOSE } from '../common/lib/sparcPromptImage';
@@ -1265,3 +1266,8 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     }
   });
 }
+
+// DDP-only metadata; clients own summary construction and persistent snapshots.
+Meteor.publish('contentUploadMetadata', async function() {
+  await publishContentUploadMetadata(this, { Tdfs, Stims, DynamicAssets, serverConsole });
+});

@@ -220,3 +220,16 @@ Authorized history exports append `Prolific Participant ID`, `Prolific Study ID`
 MoFaCTS records local completion and requests the completion redirect. It does not itself verify eligibility, approval, or payment. Configure completion-code actions and initial remuneration on Prolific. See the official [study URL/completion-code contract](https://docs.prolific.com/api-reference/studies/the-study-object), [bonus setup](https://docs.prolific.com/api-reference/bonuses/create-bonus-payments), and [non-idempotent bonus payment endpoint](https://docs.prolific.com/api-reference/bonuses/pay-bonus-payments).
 
 Run `node --test scripts/prolific.test.cjs scripts/ignoredTdfFields.test.cjs` from `mofacts/` for synthetic transport/persistence contracts, entry, schema/editor, export, and completion-retry coverage. CI includes these checks. Real Mongo unique-index/claim coverage is in `server/lib/prolificPersistence.test.ts`; learner integration and Meteor account/method coverage require the supported Meteor test environment. Every `npm run test:ci` invocation needs fresh explicit authorization. No live payment, approval, or message is part of automated tests.
+
+## Uploaded content table cache
+
+Content Upload immediately displays a versioned browser snapshot of the signed-in user's compact
+content metadata, then reconciles it through the authenticated `contentUploadMetadata` publication.
+While the page is open, server changes update the cache and affected summaries automatically.
+All available table metadata is cached; Show more displays another 50 rows locally. Full lesson
+and media details are loaded only when opened. Logout removes the private upload snapshots.
+
+The browser snapshot is provisional and never grants access to protected reads or writes. If
+synchronization or browser storage fails, the existing inline message and retry control report it.
+The practice menu shares the browser-snapshot storage helper, retaining its own version, key and
+background-refresh behavior. No authored TDF/stimulus fields or package formats changed.

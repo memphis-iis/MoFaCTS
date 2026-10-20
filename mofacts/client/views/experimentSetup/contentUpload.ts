@@ -1,3 +1,5 @@
+import { startContentUploadCache } from '../../lib/contentUploadCache';
+import { createContentUploadProjection } from './contentUploadProjection';
 import { buildSparcVideoCatalog } from './sparcVideoCatalogBuilder';
 import { formatPackageUpdateWarnings } from '../../lib/contentUpdateWarningsClient';
 import { Meteor } from 'meteor/meteor';
@@ -37,8 +39,6 @@ import './imsccWizard';
 import {
   buildRowSummaryPresentation,
   contentUploadAssetCount,
-  normalizeContentUploadListResult,
-  normalizeContentUploadSummaryMap,
   normalizeUploadQuotaStatus,
   type ContentUploadListResult,
   type ContentUploadSummaryMap,
@@ -51,15 +51,12 @@ const TdfsCollection = (globalThis as any).Tdfs;
 const DynamicAssetsCollection = (globalThis as any).DynamicAssets;
 
 // Throttle assets helper to prevent reactive loops during processPackageUpload
-let assetsHelperLastRun = 0;
 let assetsHelperCachedResult: any[] = [];
 let lastPendingSnapshot: any = null;
 let lastAssetsHelperStateLog = '';
-const ASSETS_HELPER_THROTTLE = 1000; // 1 second
 let lastSessionAssetsRefresh: any = null;
 const CONTENT_UPLOAD_LIST_LIMIT = 50;
 const DEBUG_SKIP_PACKAGE_PROCESSING = false;
-const SUMMARY_FETCH_THROTTLE = 1500;
 
 // Reactive trigger for forcing UI refresh after deletions
 const assetsRefreshTrigger = new ReactiveVar(0);
@@ -95,11 +92,7 @@ type ContentUploadInstance = Blaze.TemplateInstance & {
   listPresentation: ReactiveVar<LoadableState<ContentUploadListResult>>;
   summaryPresentation: ReactiveVar<LoadableState<ContentUploadSummaryMap>>;
   quotaPresentation: ReactiveVar<LoadableState<UploadQuotaStatus>>;
-  listLifetime: TemplateLifetime;
-  summaryLifetime: TemplateLifetime;
   quotaLifetime: TemplateLifetime;
-  nextListRequestId: number;
-  nextSummaryRequestId: number;
   nextQuotaRequestId: number;
   commandRegistry: ScopedAsyncCommandRegistry<ContentCommandResult>;
 };
@@ -129,13 +122,7 @@ function loadPending<T>(state: LoadableState<T>): boolean {
   return state.status === 'idle' || state.status === 'loading' || state.status === 'refreshing';
 }
 
-function contentListFailureText(error: unknown): string {
-  return `${contentText('content.uploadedContent')} ${contentText('content.failed')}: ${uploadErrorText(error)}`;
-}
 
-function summaryFailureText(error: unknown): string {
-  return `${contentText('content.summary')} ${contentText('content.failed')}: ${uploadErrorText(error)}`;
-}
 
 function summaryRowFailureText(): string {
   return `${contentText('content.summary')} ${contentText('content.failed')}`;
@@ -184,9 +171,6 @@ function uploadMessageIcon(level: UploadMessageLevel) {
   return 'fa-info-circle';
 }
 
-function contentUploadRefreshToken(): string {
-  return `${assetsRefreshTrigger.get()}-${Session.get('assetsRefreshTrigger') || 0}`;
-}
 
 function parseMediaAssetReference(reference: unknown) {
   const raw = typeof reference === 'string' ? reference.trim() : '';
@@ -375,7 +359,6 @@ function setAccessMessage(template: any, tdfId: any, text: any, level: any = 'in
     level,
   };
   template.accessMessages.set(next);
-  assetsHelperLastRun = 0;
   assetsHelperCachedResult = [];
 
   const existingTimer = template.accessMessageTimers?.get?.(tdfId);
@@ -389,7 +372,6 @@ function setAccessMessage(template: any, tdfId: any, text: any, level: any = 'in
     const cleaned = { ...latest };
     delete cleaned[tdfId];
     template.accessMessages.set(cleaned);
-    assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
     template.accessMessageTimers?.delete?.(tdfId);
   }, ACCESS_MESSAGE_TIMEOUT_MS);
@@ -436,7 +418,6 @@ async function addAccessorsForTdf(template: any, tdfId: any) {
     await MeteorAny.callAsync('assignAccessors', tdfId, mergedAccessors, []);
     $('#add-access-' + tdfId).val('');
     const addedCount = Math.max(mergedAccessors.length - currentAccessors.length, 0);
-    assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
     assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
     return {
@@ -448,10 +429,6 @@ async function addAccessorsForTdf(template: any, tdfId: any) {
   });
 }
 
-function invalidateAssetsRows(): void {
-  assetsHelperLastRun = 0;
-  assetsHelperCachedResult = [];
-}
 
 function listValue(instance: ContentUploadInstance): ContentUploadListResult | null {
   return readyLoadValue(instance.listPresentation.get());
@@ -459,73 +436,6 @@ function listValue(instance: ContentUploadInstance): ContentUploadListResult | n
 
 function summaryMapValue(instance: ContentUploadInstance): ContentUploadSummaryMap {
   return readyLoadValue(instance.summaryPresentation.get()) || {};
-}
-
-function loadContentUploadList(instance: ContentUploadInstance, limit: number): void {
-  const requestId = ++instance.nextListRequestId;
-  const generation = instance.listLifetime.begin();
-  instance.listPresentation.set(startLoad(instance.listPresentation.get(), requestId));
-  clientConsole(2, '[CONTENT UPLOAD] Fetching list ids via method', 'limit:', limit);
-
-  MeteorAny.callAsync('getContentUploadListIds', { limit })
-    .then((result: any) => {
-      if (!instance.listLifetime.isCurrent(generation)) return;
-      const listResult = normalizeContentUploadListResult(result);
-      instance.listPresentation.set(resolveLoad(
-        instance.listPresentation.get(),
-        requestId,
-        listResult,
-        (value) => value.ids.length === 0,
-      ));
-      invalidateAssetsRows();
-    })
-    .catch((err: any) => {
-      if (!instance.listLifetime.isCurrent(generation)) return;
-      instance.listPresentation.set(rejectLoad(
-        instance.listPresentation.get(),
-        requestId,
-        { message: contentListFailureText(err), retryable: true },
-      ));
-      if (!readyLoadValue(instance.listPresentation.get())) {
-        instance.summaryPresentation.set({ status: 'empty', value: {} });
-      }
-      invalidateAssetsRows();
-      clientConsole(1, '[CONTENT UPLOAD] List fetch failed:', err);
-    });
-}
-
-function loadContentUploadSummaries(instance: ContentUploadInstance, ids: string[]): void {
-  const requestId = ++instance.nextSummaryRequestId;
-  const generation = instance.summaryLifetime.begin();
-  if (ids.length === 0) {
-    instance.summaryPresentation.set({ status: 'empty', value: {} });
-    invalidateAssetsRows();
-    return;
-  }
-
-  instance.summaryPresentation.set(startLoad(instance.summaryPresentation.get(), requestId));
-  MeteorAny.callAsync('getContentUploadSummariesForIds', ids)
-    .then((summaries: any) => {
-      if (!instance.summaryLifetime.isCurrent(generation)) return;
-      const map = normalizeContentUploadSummaryMap(summaries);
-      instance.summaryPresentation.set(resolveLoad(
-        instance.summaryPresentation.get(),
-        requestId,
-        map,
-        () => false,
-      ));
-      invalidateAssetsRows();
-    })
-    .catch((err: any) => {
-      if (!instance.summaryLifetime.isCurrent(generation)) return;
-      instance.summaryPresentation.set(rejectLoad(
-        instance.summaryPresentation.get(),
-        requestId,
-        { message: summaryFailureText(err), retryable: true },
-      ));
-      invalidateAssetsRows();
-      clientConsole(1, '[CONTENT UPLOAD] Summary fetch failed:', err);
-    });
 }
 
 function loadUploadQuotaStatus(instance: ContentUploadInstance): void {
@@ -625,7 +535,6 @@ Template.contentUpload.helpers({
       const sessionRefresh = Session.get('assetsRefreshTrigger');
       if (sessionRefresh !== lastSessionAssetsRefresh) {
         lastSessionAssetsRefresh = sessionRefresh;
-        assetsHelperLastRun = 0;
         assetsHelperCachedResult = [];
       }
 
@@ -653,15 +562,6 @@ Template.contentUpload.helpers({
       const hasLiveRowSubs =
         (template.detailSubs && template.detailSubs.size > 0) ||
         (template.assetSubs && template.assetSubs.size > 0);
-
-      // Throttle: Don't run more than once per second
-      const now = Date.now();
-      // Never throttle while row-level subscriptions are active, otherwise
-      // readiness changes can be missed and "Loading..." labels may stick.
-      if (now - assetsHelperLastRun < ASSETS_HELPER_THROTTLE && !pendingSnapshotChanged && !hasLiveRowSubs) {
-        return assetsHelperCachedResult;
-      }
-      assetsHelperLastRun = now;
 
       const listReady = !listLoading || (Array.isArray(listIds) && listIds.length > 0);
       const allTDfs = listReady ? listIds : [];
@@ -1018,16 +918,8 @@ Template.contentUpload.helpers({
   this.listPresentation = new ReactiveVar<LoadableState<ContentUploadListResult>>({ status: 'idle' });
   this.summaryPresentation = new ReactiveVar<LoadableState<ContentUploadSummaryMap>>({ status: 'idle' });
   this.quotaPresentation = new ReactiveVar<LoadableState<UploadQuotaStatus>>({ status: 'idle' });
-  this.listLifetime = createTemplateLifetime();
-  this.summaryLifetime = createTemplateLifetime();
   this.quotaLifetime = createTemplateLifetime();
-  this.nextListRequestId = 0;
-  this.nextSummaryRequestId = 0;
   this.nextQuotaRequestId = 0;
-  this.lastListFetchKey = null;
-  this.lastListFetch = 0;
-  this.summaryFetchKey = null;
-    this.lastSummaryFetch = 0;
     this.listLimit = new ReactiveVar(CONTENT_UPLOAD_LIST_LIMIT);
     this.lastDdpStatus = null;
     this.accessMessages = new ReactiveVar({});
@@ -1049,7 +941,6 @@ Template.contentUpload.helpers({
     }
     const sub = this.subscribe('tdfForContentUploadDetails', tdfId);
     this.detailSubs.set(tdfId, sub);
-    assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
     assetRowRefreshTrigger.set(assetRowRefreshTrigger.get() + 1);
   };
@@ -1068,7 +959,6 @@ Template.contentUpload.helpers({
     }
     const sub = this.subscribe('assets', Meteor.userId(), stimSetId);
     this.assetSubs.set(tdfId, sub);
-    assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
     assetRowRefreshTrigger.set(assetRowRefreshTrigger.get() + 1);
   };
@@ -1078,43 +968,46 @@ Template.contentUpload.helpers({
     if (sub) {
       sub.stop();
       this.assetSubs.delete(tdfId);
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetRowRefreshTrigger.set(assetRowRefreshTrigger.get() + 1);
     }
   };
 
+  const project = createContentUploadProjection();
+  this.cachedContent = new ReactiveVar<{ ids: string[]; summaries: ContentUploadSummaryMap } | null>(null);
+  this.cacheError = new ReactiveVar('');
   this.autoruns.push(this.autorun(() => {
+    const value = this.cachedContent.get();
     const limit = this.listLimit.get();
-    const refreshToken = contentUploadRefreshToken();
-    const key = `${limit}-${refreshToken}`;
-    const now = Date.now();
-    if (this.lastListFetchKey === key && (now - this.lastListFetch) < SUMMARY_FETCH_THROTTLE) {
+    const error = this.cacheError.get();
+    if (!value) {
+      if (error) {
+        this.listPresentation.set({ status: 'error', message: error, retryable: true });
+        this.summaryPresentation.set({ status: 'empty', value: {} });
+      }
       return;
     }
-    this.lastListFetchKey = key;
-    this.lastListFetch = now;
-
-    loadContentUploadList(this, limit);
+    const list = { ids: value.ids.slice(0, limit), totalCount: value.ids.length, hasMore: value.ids.length > limit };
+    this.listPresentation.set(error
+      ? { status: 'refresh-error', value: list, message: error, retryable: true }
+      : { status: value.ids.length ? 'ready' : 'empty', value: list });
+    this.summaryPresentation.set({ status: value.ids.length ? 'ready' : 'empty', value: value.summaries });
   }));
-
-  this.autoruns.push(this.autorun(() => {
-    const ids = listValue(this)?.ids || [];
-    const refreshToken = contentUploadRefreshToken();
-    if (!Array.isArray(ids) || ids.length === 0) {
-      this.summaryPresentation.set({ status: 'empty', value: {} });
-      return;
-    }
-    const key = `${ids.slice().sort().join(',')}-${refreshToken}`;
-    const now = Date.now();
-    if (this.summaryFetchKey === key && (now - this.lastSummaryFetch) < SUMMARY_FETCH_THROTTLE) {
-      return;
-    }
-    this.summaryFetchKey = key;
-    this.lastSummaryFetch = now;
-
-    loadContentUploadSummaries(this, ids);
-  }));
+  const cacheRenderStart = performance.now();
+  this.contentCache = startContentUploadCache({
+    apply: (snapshot, source) => {
+      this.cacheError.set('');
+      this.cachedContent.set(project(snapshot.records));
+      if (source === 'local') Tracker.afterFlush(() => {
+        requestAnimationFrame(() => {
+          if (this.videoCatalogMounted) performance.measure('mofacts.contentUpload.cachedPaint', {
+            start: cacheRenderStart, end: performance.now(),
+          });
+        });
+      });
+    },
+    error: message => this.cacheError.set(message),
+  });
 
   this.autoruns.push(this.autorun(() => {
     const status = Meteor.status();
@@ -1177,10 +1070,9 @@ Template.contentUpload.helpers({
 
 Template.contentUpload.onDestroyed(function(this: ContentUploadInstance & any) {
   this.videoCatalogMounted = false;
+  this.contentCache?.stop();
   // Clean up autoruns
   this.autoruns.forEach((ar: any) => ar.stop());
-  this.listLifetime.destroy();
-  this.summaryLifetime.destroy();
   this.quotaLifetime.destroy();
   this.commandRegistry.destroy();
   if (this.overlayTimer) {
@@ -1229,12 +1121,11 @@ Template.contentUpload.events({
   },
   'click [data-content-list-retry]'(event: any, _template: ContentUploadInstance & any) {
     event.preventDefault();
-    assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
+    (_template as any).contentCache.retry();
   },
   'click [data-content-summary-retry]'(event: any, template: ContentUploadInstance & any) {
     event.preventDefault();
-    const ids = listValue(template)?.ids || [];
-    loadContentUploadSummaries(template, ids);
+    (template as any).contentCache.retry();
   },
   'click .admin-confirmation-confirm': function(event: any, template: any) {
     event.preventDefault();
@@ -1261,7 +1152,6 @@ Template.contentUpload.events({
     await template.commandRegistry.run(scope, async () => {
       await MeteorAny.callAsync('setTdfUserSelect', tdfId, isPublic);
       // Refresh the assets list
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       return { text: '' };
@@ -1592,7 +1482,6 @@ Template.contentUpload.events({
         assetId: packageAssetId,
         startedAt: new Date()
       });
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       await template.commandRegistry.run(`asset:${tdfId}`, async () => {
@@ -1600,7 +1489,6 @@ Template.contentUpload.events({
           await MeteorAny.callAsync('deletePackageFile', packageAssetId, { wholeFamily: true });
           
           // Invalidate cache and trigger reactive refresh
-          assetsHelperLastRun = 0;
           assetsHelperCachedResult = [];
           assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
           setUploadMessage(template, contentText('content.deletedPackage', { filename: fileName }), 'success', 'content-list');
@@ -1725,7 +1613,6 @@ Template.contentUpload.events({
       }
       const remainingAccessors = currentAccessors.filter((accessor: any) => accessor.userId !== revokedAccessorId);
       await MeteorAny.callAsync('assignAccessors', tdfId, remainingAccessors, [revokedAccessorId]);
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       return { text: contentText('content.userAccessRemoved') };
@@ -1751,7 +1638,6 @@ Template.contentUpload.events({
       const newOwner = lookup.users[0];
       await MeteorAny.callAsync('transferDataOwnership', tdfId, newOwner);
       $('#transfer-' + tdfId).val('');
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       return {
@@ -1766,7 +1652,6 @@ Template.contentUpload.events({
     event.preventDefault();
     const currentLimit = template.listLimit.get();
     template.listLimit.set(currentLimit + CONTENT_UPLOAD_LIST_LIMIT);
-    assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
     assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
   },
@@ -1899,7 +1784,6 @@ Template.contentUpload.events({
     await template.commandRegistry.run(`media:${tdfId}`, async () => {
       await MeteorAny.callAsync('removeAssetById', assetId);
       // Refresh the assets list
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       return { text: '' };
@@ -1959,7 +1843,6 @@ Template.contentUpload.events({
       await MeteorAny.callAsync('removeMultipleAssets', assetIds);
       
       // Refresh the assets list
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
       assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
       return { text: '' };
@@ -2087,7 +1970,6 @@ async function uploadMediaFiles(files: any, tdfId: any, template: any) {
 
   // Refresh the assets list after a short delay to ensure UI updates
   setTimeout(() => {
-    assetsHelperLastRun = 0;
     assetsHelperCachedResult = [];
     assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
   }, 300);
@@ -2111,7 +1993,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
   setUploadMessage(template, contentText('content.uploadingFile', { filename: file.name }), 'info');
 
   // Force immediate UI refresh
-  assetsHelperLastRun = 0;
   assetsHelperCachedResult = [];
 
   let uploadIntegrity: { expectedSize: number; sha256?: string } = { expectedSize: Number(file?.size) || 0 };
@@ -2169,7 +2050,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
       });
 
       // Refresh UI
-      assetsHelperLastRun = 0;
       assetsHelperCachedResult = [];
     });
 
@@ -2200,7 +2080,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
             progress: 0
           });
           setUploadMessage(template, message, 'error');
-          assetsHelperLastRun = 0;
           assetsHelperCachedResult = [];
         }
         clientConsole(1, '[UPLOAD] Upload failed:', error);
@@ -2222,7 +2101,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
               // Keep below 100% until the processed lesson row is actually visible.
               progress: 95
             });
-            assetsHelperLastRun = 0;
             assetsHelperCachedResult = [];
           }
 
@@ -2238,7 +2116,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                 error: message
               });
               setUploadMessage(template, message, 'warning');
-              assetsHelperLastRun = 0;
               assetsHelperCachedResult = [];
             }
             finish({ fileName: file.name, error: message });
@@ -2280,7 +2157,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                       error: message
                     });
                     setUploadMessage(template, message, 'error');
-                    assetsHelperLastRun = 0;
                     assetsHelperCachedResult = [];
                   }
                   clientConsole(1, '[UPLOAD] Package processing failed:', res.errmsg);
@@ -2302,7 +2178,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
               }
 
               // Invalidate cache and trigger reactive refresh after successful upload
-              assetsHelperLastRun = 0;
               assetsHelperCachedResult = [];
               assetsRefreshTrigger.set(assetsRefreshTrigger.get() + 1);
               finish({ fileName: file.name });
@@ -2318,7 +2193,6 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
                   error: message
                 });
                 setUploadMessage(template, message, 'error');
-                assetsHelperLastRun = 0;
                 assetsHelperCachedResult = [];
               }
               clientConsole(1, '[UPLOAD] Processing error:', err);
@@ -2335,11 +2209,9 @@ async function doPackageUpload(file: any, template: any): Promise<{ fileName: st
             });
             setUploadMessage(template, contentText('content.uploadedFile', { filename: file.name }), 'success');
           }
-          assetsHelperLastRun = 0;
           assetsHelperCachedResult = [];
           setTimeout(() => {
             template.pendingUploads.set(pendingUploadId, undefined);
-            assetsHelperLastRun = 0;
             assetsHelperCachedResult = [];
           }, 500);
           finish({ fileName: file.name });

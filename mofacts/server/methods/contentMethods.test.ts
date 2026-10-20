@@ -121,45 +121,6 @@ function createContentDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('contentMethods content upload summaries', function() {
-  it('returns compact summaries with batch asset counts for string and numeric stimuliSetId values', async function() {
-    let aggregatePipeline: any[] | null = null;
-    const deps = createContentDeps({
-      DynamicAssets: {
-        find: () => ({ fetchAsync: async () => [], countAsync: async () => 0 }),
-        findOneAsync: async () => null,
-        removeAsync: async () => undefined,
-        collection: {
-          rawCollection: () => ({
-            aggregate: (pipeline: any[]) => {
-              aggregatePipeline = pipeline;
-              return {
-                toArray: async () => [
-                  { _id: '42', count: 2 },
-                  { _id: 42, count: 1 }
-                ]
-              };
-            }
-          }),
-          updateAsync: async () => undefined
-        }
-      }
-    });
-    const methods = createContentMethods(deps);
-
-    const summaries = await methods.getContentUploadSummariesForIds.call({ userId: 'user-a' }, ['tdf-a', 'tdf-b']);
-
-    expect(aggregatePipeline).to.deep.equal([
-      { $match: { 'meta.stimuliSetId': { $in: ['42', 42] } } },
-      { $group: { _id: '$meta.stimuliSetId', count: { $sum: 1 } } }
-    ]);
-    expect(summaries.map((summary: any) => summary.assetCount)).to.deep.equal([3, 3]);
-    for (const summary of summaries as any[]) {
-      expect(summary).to.not.have.property('content');
-      expect(summary).to.not.have.property('stimuli');
-      expect(summary).to.not.have.property('rawStimuliFile');
-    }
-  });
-
   it('keeps asset publications limited to fields needed by client link and metadata views', function() {
     expect(DYNAMIC_ASSET_PUBLICATION_FIELDS).to.deep.equal({
       _id: 1,

@@ -324,14 +324,6 @@
       "notes": "Existing instructor/class authorization retained; aggregates exclude historical assessment copies."
     },
     {
-      "name": "getContentUploadListIds",
-      "access": "role-checked"
-    },
-    {
-      "name": "getContentUploadSummariesForIds",
-      "access": "role-checked"
-    },
-    {
       "name": "getCourseAssignmentEditorSnapshot",
       "access": "role-checked"
     },
@@ -1156,6 +1148,11 @@
       "name": "userHistory",
       "access": "authenticated-self",
       "notes": "Existing authenticated-self publication retained with sparse fields; includes original assessment answers and excludes historical copies."
+    },
+    {
+      "name": "contentUploadMetadata",
+      "access": "role-checked",
+      "notes": "Authenticated owner/shared metadata and referenced dependencies only; projected fields, credential presence flags, bounded dependency queries and asset-count aggregation. No full lessons, media or credentials. Client owns summaries and persistent cache."
     }
   ],
   "httpRoutes": [

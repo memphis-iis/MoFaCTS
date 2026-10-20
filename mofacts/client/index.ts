@@ -1,3 +1,4 @@
+import { clearContentUploadSnapshots } from './lib/contentUploadSnapshotStore';
 import './views/shared/prolificSaveError';
 import {ENTER_KEY} from '../common/Definitions';
 import '../common/Collections';
@@ -464,6 +465,8 @@ Accounts.onLogin(function() {
 });
 
 Accounts.onLogout(function() {
+  try { clearContentUploadSnapshots(); }
+  catch { clientConsole(1, '[ContentUpload] Could not clear browser cache on logout.'); }
   authSyncSeq++;
   lastAuthSyncedUserId = null;
   const clearedRoles = { admin: false, teacher: false };
