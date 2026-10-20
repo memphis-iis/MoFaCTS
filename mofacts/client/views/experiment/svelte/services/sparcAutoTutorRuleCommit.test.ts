@@ -167,6 +167,7 @@ describe('SPARC app instructional commit', () => {
     assert.notEqual(target(), firstTarget);
     const selectedTarget = target();
     const savedSnapshot = readSparcResumeSnapshot(scope);
+    assert.equal(savedSnapshot.nodeValues['student-cycle:response:opening:learner::correctness'], 'correct');
     clearSparcRuntimeState(); hydrateSparcRuntimeHistory(JSON.parse(JSON.stringify(rows)));
     const loadedSnapshot = readSparcResumeSnapshot(scope);
     assert.deepEqual(loadedSnapshot.replayState, JSON.parse(JSON.stringify(savedSnapshot.replayState)));

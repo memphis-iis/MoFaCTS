@@ -446,6 +446,22 @@ test('production authentication policy uses ambiguous errors and a 30-day sessio
   assert.match(authMethods, /requestPasswordReset:[\s\S]*?try \{[\s\S]*?finally \{[\s\S]*?waitForPasswordResetResponseFloor/);
 });
 
+test('application startup validates MongoDB before migrations, index creation and timers', () => {
+  const source = fs.readFileSync(new URL('../../server/serverComposition.ts', import.meta.url), 'utf8');
+  const parsed = ts.createSourceFile('serverComposition.ts', source, ts.ScriptTarget.Latest, true);
+  const callbacks = [];
+  function visit(node) {
+    if (ts.isCallExpression(node) && node.expression.getText(parsed) === 'Meteor.startup') callbacks.push(node.arguments[0]);
+    ts.forEachChild(node, visit);
+  }
+  visit(parsed);
+  assert.equal(callbacks.length, 1, 'Database-dependent startup has one composition owner');
+  const first = callbacks[0].body.statements[0].getText(parsed);
+  assert.match(first, /await validateMongoConnection\(Tdfs\.rawDatabase\(\), process\.env\)/);
+  const laterStartup = fs.readFileSync(new URL('../../server/startup/serverStartup.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(laterStartup, /validateMongoConnection/);
+});
+
 test('public Caddy example sends a one-year HSTS policy', () => {
   const source = fs.readFileSync(new URL('../../../deploy/Caddyfile.self-hosted.example', import.meta.url), 'utf8');
   assert.match(source, /header Strict-Transport-Security "max-age=31536000"/);

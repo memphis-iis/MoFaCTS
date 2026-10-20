@@ -36,6 +36,7 @@
   import { clientConsole } from '../../../../lib/clientLogger';
   import { redactSparcDialogueDiagnosticText } from '../services/sparcCitationDiagnostics';
   import { SparcOutputLimitRecoveryError } from '../services/sparcOutputLimitRecovery';
+  import { createSparcDialogueScroll } from '../services/sparcDialogueScroll';
 
   const dispatch = createEventDispatcher();
   const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
@@ -83,7 +84,6 @@
   let dialogueSubmitErrorDetail = '';
   let dialogueRecovery = null;
   let surfaceElement;
-  let autoTutorChatElement;
   let lastFeedbackRevealSignature = '';
   let observedProgressiveNodeOperationCount = 0;
   let observedAutoTutorDialogueSignature = '';
@@ -91,6 +91,26 @@
   let startedDialogueScope = '';
   let dialogueInitialized = false;
   let checkedContentIds = new Set(), removedContentIds = new Set(), removalSignature = '', removalError = '';
+  let figureReadyKeys = new Set();
+  let readinessScope = '';
+  let dialogueScroll;
+
+  function figureStateReporter(scope) {
+    return ({ figureId, assetId, status }) => {
+      if (!mounted || scope !== dialogueScope) return;
+      if (!savedDialogueMessages.some(node => node.id === figureId && node.figure?.assetId === assetId)) return;
+      const key = JSON.stringify([scope, figureId, assetId]);
+      if (figureReadyKeys.has(key) === (status === 'ready')) return;
+      const next = new Set(figureReadyKeys);
+      if (status === 'ready') next.add(key); else next.delete(key);
+      figureReadyKeys = next;
+    };
+  }
+
+  function componentReady(node, scope, readyKeys) {
+    return node.administrativeRemoval || node.primitiveReference?.priorNodeId || !node.figure
+      || readyKeys.has(JSON.stringify([scope, node.id, node.figure.assetId]));
+  }
   async function checkContentRemovals(ids, signature) {
     const unchecked = ids.filter(id => !checkedContentIds.has(id));
     try {
@@ -149,7 +169,10 @@
         const nextControl = surfaceElement?.querySelector('[data-sparc-retry]')
           || surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
           || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
-        nextControl?.focus();
+        if (dialogueScroll?.isFollowing()) {
+          nextControl?.focus({ preventScroll: true });
+          dialogueScroll.schedule();
+        }
       }
     }
   }
@@ -285,10 +308,10 @@
 
   function dialogueNodes(nodes = [], options = {}) {
     const includeOpening = options.includeOpening === true;
-    return projectSparcInstructionMessages(flattenNodes(nodes).filter((node) => (
+    return flattenNodes(nodes).filter((node) => (
       (node?.atomType === 'dialogue-utterance' || (node?.atomType === 'html-block' && node?.turnEventId) || node?.id === 'instructional-choice-menu' || (node?.groupType === 'button-group' && node.id?.endsWith(':selected')))
       && (includeOpening || node.id !== 'opening-tutor-message')
-    )));
+    ));
   }
 
   function firstNodeById(nodes = [], id) {
@@ -732,7 +755,10 @@
       const nextControl = surfaceElement?.querySelector('[data-sparc-retry]')
         || surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
         || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
-      nextControl?.focus();
+      if (dialogueScroll?.isFollowing()) {
+        nextControl?.focus({ preventScroll: true });
+        dialogueScroll.schedule();
+      }
     }
   }
 
@@ -771,12 +797,13 @@
   }
 
   async function scrollAfterProgressiveNodeAdditions() {
+    if (autoTutorDialogueMode) return;
     await tick();
     if (typeof window === 'undefined') {
       return;
     }
     window.requestAnimationFrame(() => {
-      scrollSparcScrollableNodesToBottom();
+      if (!autoTutorDialogueMode) scrollSparcScrollableNodesToBottom();
     });
   }
 
@@ -789,16 +816,28 @@
     ].join(':')).join('|');
   }
 
+  function focusTextResponse(element) {
+    tick().then(() => {
+      if (!element.isConnected || !dialogueScroll?.isFollowing()) return;
+      element.querySelector('textarea, input')?.focus({ preventScroll: true });
+      dialogueScroll.schedule();
+    });
+  }
+
+  function followDialogue(element) {
+    const controller = createSparcDialogueScroll(element, element.querySelector('.sparc-auto-tutor-content'));
+    dialogueScroll = controller;
+    return {
+      destroy() {
+        controller.destroy();
+        if (dialogueScroll === controller) dialogueScroll = undefined;
+      },
+    };
+  }
+
   async function scrollAutoTutorChatToLatest() {
     await tick();
-    if (!autoTutorChatElement || typeof window === 'undefined') {
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      if (autoTutorChatElement) {
-        autoTutorChatElement.scrollTop = autoTutorChatElement.scrollHeight;
-      }
-    });
+    dialogueScroll?.schedule();
   }
 
   $: sparcDisplay = resolveSparcControllerDisplay(display, '[SparcSessionSurface]');
@@ -851,6 +890,14 @@
     && (!isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId) || !dialogueSubmitPending);
   $: categorizedDialogue = autoTutorDialogueMode && isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId);
   $: dialogueScope = JSON.stringify([userId, tdfId, attemptId, levelUnit, sparcDisplay?.pageKey]);
+  $: if (readinessScope !== dialogueScope) {
+    readinessScope = dialogueScope;
+    figureReadyKeys = new Set();
+    checkedContentIds = new Set();
+    removedContentIds = new Set();
+    removalError = '';
+  }
+  $: reportFigureState = figureStateReporter(dialogueScope);
   $: if (dialogueRecovery && dialogueRecovery.scope !== dialogueScope) dialogueRecovery = null;
   $: if (mounted && categorizedDialogue && engine && userId && tdfId && attemptId && subsetKind === 'question'
     && startedDialogueScope !== dialogueScope && !dialogueSubmitPending) {
@@ -860,16 +907,21 @@
   $: savedDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending || dialogueRecovery
     ? { ...node, readOnly: true, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];
   $: contentReferenceIds = sparcContentReferenceIds(savedDialogueMessages);
-  $: contentReferenceSignature = JSON.stringify(contentReferenceIds);
+  $: contentReferenceSignature = JSON.stringify([dialogueScope, contentReferenceIds]);
   $: if (mounted && contentReferenceSignature !== removalSignature) {
     removalSignature = contentReferenceSignature;
     checkContentRemovals(contentReferenceIds, contentReferenceSignature);
   }
-  $: autoTutorDialogueMessages = projectSparcAdministrativeRemovals(savedDialogueMessages.filter(node =>
-    sparcContentReferenceIds([node]).every(id => checkedContentIds.has(id))), removedContentIds);
+  $: autoTutorDialogueMessages = projectSparcInstructionMessages(
+    projectSparcAdministrativeRemovals(savedDialogueMessages, removedContentIds), {
+      canReveal: node => sparcContentReferenceIds([node]).every(id => checkedContentIds.has(id)),
+      isReady: node => componentReady(node, dialogueScope, figureReadyKeys),
+    });
   $: latestDialogueQuestion = savedDialogueMessages.flatMap(node => node.children || [node])
     .filter(node => node.component === 'question' || String(node.id).endsWith(':question')).at(-1);
   $: currentQuestionRemoved = !!latestDialogueQuestion && !!projectSparcAdministrativeRemovals([latestDialogueQuestion], removedContentIds)[0].administrativeRemoval;
+  $: currentQuestionVisible = !latestDialogueQuestion || autoTutorDialogueMessages.flatMap(node => node.children || [node])
+    .some(node => node.id === latestDialogueQuestion.id && componentReady(node, dialogueScope, figureReadyKeys));
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
   $: if (
     autoTutorDialogueMode
@@ -880,12 +932,12 @@
   }
   $: autoTutorDialogueInputNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-input') : null;
   $: autoTutorDialogueSubmitNode = autoTutorDialogueMode ? firstNodeById(topLevelNodes, 'learner-response-submit') : null;
-  $: autoTutorDialogueInputRenderNode = autoTutorDialogueInputNode && (dialogueSubmitPending || dialogueRecovery || currentQuestionRemoved || contentReferenceIds.some(id => !checkedContentIds.has(id)) || (categorizedDialogue && !dialogueInitialized))
-    ? { ...autoTutorDialogueInputNode, readOnly: true }
-    : autoTutorDialogueInputNode;
-  $: autoTutorDialogueSubmitRenderNode = autoTutorDialogueSubmitNode && (dialogueSubmitPending || dialogueRecovery || currentQuestionRemoved || contentReferenceIds.some(id => !checkedContentIds.has(id)) || (categorizedDialogue && !dialogueInitialized))
-    ? { ...autoTutorDialogueSubmitNode, readOnly: true }
-    : autoTutorDialogueSubmitNode;
+  $: showAutoTutorTextResponse = autoTutorDialogueMode
+    && !!autoTutorDialogueInputNode && !!autoTutorDialogueSubmitNode
+    && !autoTutorDialogueInputNode.readOnly && !autoTutorDialogueSubmitNode.readOnly
+    && !dialogueSubmitPending && !dialogueRecovery && !autoTutorDialogueCompleted
+    && !currentQuestionRemoved && currentQuestionVisible && contentReferenceIds.every(id => checkedContentIds.has(id))
+    && (!categorizedDialogue || dialogueInitialized);
   $: progressiveNodeOperationCount = progressiveNodeOperations.length;
   $: if (progressiveNodeOperationCount > observedProgressiveNodeOperationCount) {
     scrollAfterProgressiveNodeAdditions();
@@ -906,12 +958,14 @@
     </header>{/if}
     <SparcAutoTutorProgress snapshot={autoTutorProgressSnapshot} />
 
+    {#key dialogueScope}
     <section
-      bind:this={autoTutorChatElement}
       class="sparc-auto-tutor-chat"
       aria-label={platformText('autoTutor.conversation')}
       aria-busy={dialogueSubmitPending}
+      use:followDialogue
     >
+      <div class="sparc-auto-tutor-content">
       {#if removalError}<p role="alert">{removalError}</p>{/if}
       {#each autoTutorDialogueMessages as node (node.id)}
         <SparcNode
@@ -927,6 +981,7 @@
           onNodeCommit={handleNodeValueCommit}
           onNodeFocus={handleNodeFocus}
           onButtonActivate={handleButtonActivate}
+          onFigureState={reportFigureState}
         />
       {/each}
       {#if dialogueSubmitPending}
@@ -946,9 +1001,7 @@
           </div>
         </div>
       {/if}
-    </section>
 
-    <footer class="sparc-auto-tutor-input-bar">
       {#if autoTutorDialogueCompleted}
         <button
           type="button"
@@ -957,11 +1010,13 @@
         >
           {platformText('common.continue')}
         </button>
-      {:else if autoTutorDialogueInputNode}
+      {/if}
+      {#if showAutoTutorTextResponse}
+      <div class="sparc-auto-tutor-input-bar" use:focusTextResponse>
         <div class="sparc-auto-tutor-input">
           {#key `${autoTutorDialogueInputNode.id}:${dialogueInputResetVersion}`}
           <SparcNode
-            node={autoTutorDialogueInputRenderNode}
+            node={autoTutorDialogueInputNode}
             {adminDiagnosticMode}
             {nodeValues}
             {learningProgressSnapshot}
@@ -977,11 +1032,10 @@
           />
           {/key}
         </div>
-      {/if}
-      {#if !autoTutorDialogueCompleted && autoTutorDialogueSubmitNode}
+
         <div class="sparc-auto-tutor-submit">
           <SparcNode
-            node={autoTutorDialogueSubmitRenderNode}
+            node={autoTutorDialogueSubmitNode}
             {adminDiagnosticMode}
             {nodeValues}
             {learningProgressSnapshot}
@@ -995,8 +1049,8 @@
             onButtonActivate={handleButtonActivate}
           />
         </div>
+      </div>
       {/if}
-    </footer>
     {#if dialogueRecovery}
       <div class="sparc-auto-tutor-recovery">
         <p role="status">{platformText('autoTutor.responseRetry')}</p>
@@ -1016,6 +1070,9 @@
         </p>
       {/if}
     {/if}
+      </div>
+    </section>
+    {/key}
   {:else if sparcDisplay?.topbar?.title}
     <div class="sparc-topbar">
       <div class="sparc-topbar-title">{sparcDisplay.topbar.title}</div>

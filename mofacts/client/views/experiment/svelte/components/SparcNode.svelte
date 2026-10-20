@@ -36,6 +36,7 @@
   export let onNodeEnter = () => {};
   export let onNodeFocus = () => {};
   export let onButtonActivate = () => {};
+  export let onFigureState = () => {};
 
   let activeTabId = '';
   let activePanelId = '';
@@ -532,9 +533,17 @@
       class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
       data-node-id={node.id}
       data-sparc-speaker={dialogueSpeaker(node)}
+      class:sparc-correctness-correct={dialogueSpeaker(node) === 'learner' && getNodeCorrectness(node) === 'correct'}
+      class:sparc-correctness-incorrect={dialogueSpeaker(node) === 'learner' && getNodeCorrectness(node) === 'incorrect'}
       use:relevantSupport
     >
-      <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}</div>
+      <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}
+        {#if dialogueSpeaker(node) === 'learner' && getNodeCorrectness(node)}
+          <span class="visually-hidden">{sparcText(node.responseFormat === 'multiple-choice' || node.responseFormat === 'true-false'
+            ? getNodeCorrectness(node) === 'correct' ? 'feedback.correct' : 'feedback.incorrect'
+            : getNodeCorrectness(node) === 'correct' ? 'autoTutor.responseGain' : 'autoTutor.responseNoGain')}: </span>
+        {/if}
+      </div>
       <div class="sparc-dialogue-bubble">
         {#if node.children?.length}
           {#each node.children as component (component.id)}
@@ -561,12 +570,12 @@
               {#if component.video !== undefined}
                 <SparcVideo video={component.video} />
               {:else if categorizedSupport && component.figure !== undefined}
-                <SparcPromptFigure figure={component.figure} figureId={component.id} compact={true} />
+                <SparcPromptFigure figure={component.figure} figureId={component.id} compact={true} {onFigureState} />
               {:else}
                 <div class="sparc-instruction-content sparc-html-block">{@html renderSparcInstructionMarkdown(getNodeValue(component), DOMPurify.sanitize.bind(DOMPurify))}</div>
               {/if}
               {#if component.figure !== undefined && !categorizedSupport}
-                <SparcPromptFigure figure={component.figure} figureId={component.id} />
+                <SparcPromptFigure figure={component.figure} figureId={component.id} {onFigureState} />
               {/if}
               {/if}
               {#if component.choices}
@@ -584,7 +593,7 @@
             <div>{getNodeValue(node)}</div>
           {/if}
           {#if node.figure !== undefined}
-            <SparcPromptFigure figure={node.figure} figureId={node.id} />
+            <SparcPromptFigure figure={node.figure} figureId={node.id} {onFigureState} />
           {/if}
         {/if}
         {#if dialogueProductionRuleLabel(node)}
@@ -705,6 +714,9 @@
       on:click={() => authoringSelectOnly ? onNodeFocus(node.id) : onButtonActivate(node)}
     >
       {buttonLabel(node)}
+      {#if node.questionId && node.selected && getNodeCorrectness(node)}
+        <span class="visually-hidden"> — {sparcText(getNodeCorrectness(node) === 'correct' ? 'feedback.correct' : 'feedback.incorrect')}</span>
+      {/if}
     </button>
   {:else}
     <div class="sparc-atom sparc-unknown" class:sparc-authoring-selected={node.id === authoringSelectedNodeId} data-node-id={node.id}>{node.atomType || 'unknown'}</div>

@@ -48,6 +48,7 @@
       <path d="m15 6-6 6 6 6" />
     </svg>
     <span>{platformText('learningProgress.progress')}</span>
+    <span class="sparc-auto-tutor-turns">{formatTurnCount(snapshot.turnCount)}</span>
   </summary>
   <section class="sparc-auto-tutor-progress" aria-label={platformText('autoTutor.progress')}>
 
@@ -101,8 +102,5 @@
     </div>
   </div>
 
-  <div class="sparc-auto-tutor-turns">
-    {formatTurnCount(snapshot.turnCount)}
-  </div>
 </section>
 </details>

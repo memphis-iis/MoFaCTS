@@ -29,7 +29,6 @@ import { getLocalStoragePaths, getStorageBackend } from '../lib/storageBoundary'
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
 import { reconcileInterruptedTdfMutationJobs } from '../lib/tdfMutationRecovery';
-import { formatMongoConnectionValidation, validateMongoConnection } from '../lib/mongoConnectionValidation';
 import { applyDdpContainment } from '../lib/ddpContainment';
 import {
   createFailedPasswordResponseEnvelope,
@@ -353,9 +352,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
       ? ' (isolated Change Streams qualification)'
       : ' (Change Streams required)'),
   );
-
-  const mongoConnection = await validateMongoConnection(deps.Tdfs.rawDatabase(), process.env);
-  deps.serverConsole(1, `[MongoDB] ${formatMongoConnectionValidation(mongoConnection)}`);
 
   await purgeLearnerUnitAnalyticsCache({
     database: deps.Tdfs.rawDatabase(),

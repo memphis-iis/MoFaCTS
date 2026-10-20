@@ -195,6 +195,22 @@ when it exits, while lint and the pre-commit hook reject any such entries left
 in the application dependency manifest. Do not commit these `meteortesting:*`
 resolutions as application dependencies.
 
+The integration and image-smoke jobs use the explicit `ubuntu-22.04` runner and
+one workflow-owned MongoDB image pin (`CI_MONGO_IMAGE`, currently `mongo:8.0.34`).
+The runner's documented Linux 6.8 kernel is compatible with MongoDB 8.0.
+Linux 6.19 through 7.0.13 is incompatible with MongoDB's allocator; a host preflight
+rejects that range before database startup or image building. Maintain this runner
+and image pair in `.github/workflows/ci.yml`; move to a newer supported runner only
+after its kernel satisfies the same compatibility check and the full integration
+and image-smoke jobs pass. Do not bypass MongoDB's kernel check or substitute an
+older MongoDB major version. See [MongoDB 8.0 release notes](https://www.mongodb.com/docs/manual/release-notes/8.0/)
+and the [GitHub runner image inventory](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2204-Readme.md).
+
+The application startup callback validates MongoDB database identity, version,
+topology and required authentication before migrations, index creation, cleanup,
+or background timers. Invalid topology must fail at that boundary with the
+connection validator's redacted diagnostic, before transactional work starts.
+
 CI waits for the explicitly named test MongoDB container to accept a ping and
 then become writable primary in `mofacts-ci-rs`. The readiness helper fails
 immediately when the container stops, limits probe attempts, and records

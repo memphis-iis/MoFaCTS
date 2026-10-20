@@ -4,20 +4,20 @@ import { SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID,
 import { SPARC_TARGET_CATEGORIES, isSparcChoiceFormat, type SparcTargetCategory } from '../../runtime/sparcTargetCategories';
 import { createSparcDynamicInstructionRules, SPARC_CATEGORIZED_MENU_OPTIONS } from './sparcDynamicInstructionRules';
 import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
-import { savedSparcQuestions, sparcQuestionAnswerNodes, projectSparcAnsweredQuestionOperations } from './sparcMultipleChoiceQuestion';
+import { savedSparcQuestions, sparcQuestionAnswerNodes, projectSparcAnsweredQuestionOperations, projectSparcResponseCorrectness } from './sparcMultipleChoiceQuestion';
 import { buildSparcDialogueHistory } from './sparcUtteranceRequest';
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
-import { commitSparcTrialDisplayAutoTutorRules } from './sparcTrialDisplayRuntimeBridge';
+import { createSparcAuthoredDocumentFromTrialDisplay, commitSparcTrialDisplayAutoTutorRules } from './sparcTrialDisplayRuntimeBridge';
 import { currentSparcMenu, projectSparcMenuOperations } from './sparcInstructionalCycle';
 import { projectSparcInstructionMessages } from './sparcInstructionalPrimitives';
 import { applySparcProgressiveNodeOperations, collectSparcProgressiveNodeOperations } from '../../trial-displays/sparc/sparcProgressiveNodes';
-import { replaySparcHistory } from './sparcStateReplay';
+import { createEmptySparcReplayState, replaySparcHistory } from './sparcStateReplay';
 import { createSparcStateTransitionHistoryRecord } from './sparcStateTransitionHistory';
 import { logistic, targetExpectancy } from './sparcCompetitiveSelection';
 import type { CanonicalHistoryRecord } from '../../runtime/historyEnvelope';
 import type { SparcTrialDisplay, SparcTrialResult } from '../../trial-displays/sparc/SparcTrialDisplayAdapter';
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
-import type { SparcWorkingMemoryFact, SparcStateTransition } from './sparcSessionContracts';
+import type { SparcAuthoredDocument, SparcWorkingMemoryFact, SparcStateTransition } from './sparcSessionContracts';
 
 const transition = (row: CanonicalHistoryRecord) => (row.sparc as { stateTransition: SparcStateTransition }).stateTransition;
 
@@ -154,6 +154,9 @@ describe('Dynamic instruction production cycles', () => {
         const buttons = sparcQuestionAnswerNodes(operation.node, true).children as Record<string, unknown>[];
         assert.deepEqual(buttons.map(button => button.label), ['True', 'False']);
         assert.equal(buttons.find(button => button.selected)!.value, id);
+        const review = projectSparcResponseCorrectness(createSparcAuthoredDocumentFromTrialDisplay({ pageKey: f.source.pageKey!, display: f.source }), replay);
+        assert.equal(review[`${String(question.id)}:answer:${id}::correctness`], id === 'false' ? 'correct' : 'incorrect');
+
       }
       assert.equal(buildSparcDialogueHistory(progressiveDialogueFacts(replay)).filter(entry => entry.role === 'student').at(-1)!.responseFormat, 'true-false');
       await f.choice('question.true-false');
@@ -369,6 +372,11 @@ describe('Dynamic instruction production cycles', () => {
         assert.equal(answers.find(choice => choice.selected)?.label, id === 'a' ? 'The rule holds under its specified conditions.' : 'The rule holds under every condition.');
       }
       const response = replay.transitions.find(entry => entry.event.payload?.choiceId === id)!.event;
+      const review = projectSparcResponseCorrectness(createSparcAuthoredDocumentFromTrialDisplay({ pageKey: f.source.pageKey!, display: f.source }), replay);
+      assert.equal(review[`${String(restored.node.id)}:answer:${id}::correctness`], id === 'a' ? 'correct' : 'incorrect');
+      assert.equal(review[`${response.eventId}:learner::correctness`], id === 'a' ? 'correct' : 'incorrect');
+      assert.equal(Object.keys(review).filter(key => key.includes(':answer:')).length, 1);
+
       const original = collectSparcProgressiveNodeOperations(replay.transitions);
       const projected = projectSparcAnsweredQuestionOperations(replay);
       assert.deepEqual(projected.map(operation => 'node' in operation ? operation.node.id : operation), original.map(operation => 'node' in operation ? operation.node.id : operation));
@@ -541,5 +549,52 @@ describe('Dynamic instruction production cycles', () => {
     assert.equal(updates.length, 7);
     const combined = { ...transition(f.rows[0]!), writes: f.rows.filter(row => /:assessment(?::score:|:model:|$)/.test(transition(row).transitionId)).flatMap(row => transition(row).writes) };
     assert.ok(Buffer.byteLength(JSON.stringify({ ...(f.rows[0]!.sparc as object), stateTransition: combined })) > 16384);
+  });
+});
+
+
+describe('SPARC historical response review', () => {
+  const document: SparcAuthoredDocument = { id: 'review', schemaVersion: 2,
+    root: { id: 'root', kind: 'document', children: [] },
+    workingMemoryFacts: [
+      { factType: 'learningTarget.score', slots: { clusterKC: 'kc', coverage: .4 } },
+      { factType: 'diagnostic.misconceptionScore', slots: { id: 'm', supportStrength: .7 } },
+    ] };
+  const score = (kind: 'expectation' | 'misconception', value: number) => ({ target: { pageKey: 'review', nodeId: 'root' },
+    key: `workingMemoryFact:${kind}`, value: kind === 'expectation'
+      ? { factType: 'learningTarget.score', slots: { clusterKC: 'kc', coverage: value } }
+      : { factType: 'diagnostic.misconceptionScore', slots: { id: 'm', supportStrength: value } } });
+  const response = (id: string, suffix: string, writes: SparcStateTransition['writes'], format = 'text'): SparcStateTransition => ({
+    transitionId: `${id}:${suffix}`, event: { eventId: id, type: 'response-submitted', time: 1,
+      source: { pageKey: 'review', nodeId: 'learner-response-input' }, payload: { input: 'Synthetic answer', responseFormat: format } }, writes });
+  const review = (transitions: SparcStateTransition[]) => projectSparcResponseCorrectness(document, { ...createEmptySparcReplayState(), transitions });
+  it('colors any positive gain, repairs, unchanged and worsening assessments by their own saved values', () => {
+    const transitions = [
+      response('small', 'assessment:score:expectation:kc', [score('expectation', .401)]),
+      response('small', 'assessment', []),
+      response('same', 'assessment', []),
+      response('repair', 'dialogue-turn', [score('expectation', .401), score('misconception', .6)], 'cloze'),
+      response('worse', 'assessment:score:misconception:m', [score('misconception', .8)]),
+      response('worse', 'assessment', []),
+      response('later', 'assessment', [score('expectation', .9)]),
+    ];
+    const expected = { 'small:learner::correctness': 'correct', 'same:learner::correctness': 'incorrect',
+      'repair:learner::correctness': 'correct', 'worse:learner::correctness': 'incorrect', 'later:learner::correctness': 'correct' };
+    assert.deepEqual(review(transitions), expected);
+    assert.deepEqual(review(JSON.parse(JSON.stringify(transitions))), expected);
+    assert.deepEqual(review(transitions.slice(0, -1)), Object.fromEntries(Object.entries(expected).filter(([key]) => !key.startsWith('later:'))));
+  });
+  it('leaves pending and unassessed history neutral and colors the atomic checkpoint after retry', () => {
+    const pending = response('pending', 'decision', []);
+    const changed = response('pending', 'assessment:score:expectation:kc', [score('expectation', .5)]);
+    assert.deepEqual(review([pending]), {});
+    assert.deepEqual(review([pending, changed]), {});
+    assert.deepEqual(review([response('old', 'dialogue-turn', [])]), {});
+    assert.deepEqual(review([pending, changed, response('pending', 'assessment', [])]), { 'pending:learner::correctness': 'correct' });
+  });
+  it('uses authored initial scores and treats missing first-response scores as the runtime zero baseline', () => {
+    assert.deepEqual(review([response('initial', 'dialogue-turn', [score('expectation', .4), score('misconception', .7)])]), { 'initial:learner::correctness': 'incorrect' });
+    const fresh = { ...document, workingMemoryFacts: [] };
+    assert.deepEqual(projectSparcResponseCorrectness(fresh, { ...createEmptySparcReplayState(), transitions: [response('fresh', 'dialogue-turn', [score('expectation', .01)])] }), { 'fresh:learner::correctness': 'correct' });
   });
 });

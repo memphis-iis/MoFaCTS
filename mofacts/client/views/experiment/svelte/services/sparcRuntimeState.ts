@@ -1,5 +1,5 @@
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
-import { projectSparcAnsweredQuestionOperations } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
+import { projectSparcAnsweredQuestionOperations, projectSparcResponseCorrectness } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
 import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { logistic, targetExpectancy } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
 import { calculateExpectationProbabilities } from '../../../../../../learning-components/models/adaptive-logistic/probabilityCalculation';
@@ -150,6 +150,7 @@ export function projectSparcReplayStateToNodeValues(
     }
   }
   const progressiveNodeOperations = [...projectSparcAnsweredQuestionOperations(replayState), ...projectSparcMenuOperations(replayState)];
+  Object.assign(nodeValues, projectSparcResponseCorrectness(document, replayState));
   if (progressiveNodeOperations.length > 0) {
     nodeValues[SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY] = progressiveNodeOperations;
   }

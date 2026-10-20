@@ -6,9 +6,11 @@
   export let figure;
   export let figureId;
   export let compact = false;
+  export let onFigureState = () => {};
   $: validated = parseSparcPromptFigure(figure);
-  $: image = readSparcPromptImage(validated.assetId);
+  $: assetId = validated.assetId;
+  $: image = readSparcPromptImage(assetId);
 </script>
 
-<SparcFigure {figure} {figureId} {compact} {image} />
+<SparcFigure {figure} {figureId} {compact} {image} {onFigureState} />
 

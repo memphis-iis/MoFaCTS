@@ -46,6 +46,7 @@ if (typeof underscoreAny.display !== 'function') {
 }
 import { BackupJobs, TdfMutationJobs } from '../common/Collections';
 import { runServerStartup } from './startup/serverStartup';
+import { formatMongoConnectionValidation, validateMongoConnection } from './lib/mongoConnectionValidation';
 import { createStorageBoundary, getLocalStoragePaths } from './lib/storageBoundary';
 import { createRedisBoundary } from './lib/redisBoundary';
 import { registerServerRuntime } from './runtime/serverRuntime';
@@ -1145,6 +1146,8 @@ registerServerRuntime({
 });
 
 Meteor.startup(async function() {
+  const mongoConnection = await validateMongoConnection(Tdfs.rawDatabase(), process.env);
+  serverConsole(1, `[MongoDB] ${formatMongoConnectionValidation(mongoConnection)}`);
   await consolidateSparcInstructionalLibrary((source, count) => serverConsole('[SPARC instructional library transfer]', { source, count }));
   await sparcLibraryCuration.migrateExclusions(count => serverConsole('[SPARC administrative deletion migration]', { deleted: count }));
   await ensureSparcFigureLibraryIndexes();

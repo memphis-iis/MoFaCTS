@@ -1,4 +1,51 @@
 # SPARC instructional cycle
+
+Accepted learner answers retain their review colors during practice and after reload.
+Only the selected multiple-choice or true/false option is green for a keyed correct
+answer or pink-red for an incorrect one. Text and cloze responses are green if that
+response's saved assessment increased any expectation coverage or reduced any
+misconception support; otherwise they are pink-red. Any positive gain qualifies,
+independently of the controller's meaningful-gain threshold. Pending or unassessed
+answers remain neutral. Colors come from each response's own saved assessment;
+later progress does not recolor earlier answers, and review never rescores history.
+
+
+Text-response controls appear inline after the current tutor content only when the
+active move requires a typed answer, including cloze. Multiple-choice and true/false
+questions end with their answer options. The text field and Submit are hidden during
+initialization, generation, instructional menus, recovery, and completion. A newly
+active text field receives keyboard focus while the learner is following the latest
+content; completion Continue
+and recovery controls remain within the conversation. The Progress caption includes
+the localized turn count, followed by the expectation and misconception meter rows.
+
+Instructional moves reveal only the available prefix of their prescribed component
+order: explanation, support, question, omitting components the move does not request.
+Support may be generated and saved first, but waits for its explanation before
+appearing. Ready pieces appear together without timed pauses. Administrative-removal
+checks apply per component, so checking a new component does not hide earlier content.
+Removal receipts and references to earlier content retain their ordered positions.
+A figure's loading status may appear after the explanation, but the question and its
+response controls wait for the actual image to load and decode. Figure or content-check
+failures remain inline and block later pieces. Video support requires its checked
+player shell to render, not playback or completion. These are presentation rules;
+generation, saved identities, assessment, and resume checkpoints are unchanged.
+
+The conversation owns one scroll-following controller. New content and media resizing
+follow the bottom while the learner remains within 48 CSS pixels of it. Scrolling
+farther up preserves reading position and keyboard focus until the learner returns
+to the bottom. Resize observers and queued scroll updates are released on unmount.
+
+Local regression commands from `mofacts/`: `node --test scripts/sparcDialogueScroll.test.cjs`,
+`node --conditions=browser --test scripts/sparcOutputLimitSurface.test.cjs`, and
+`node --test scripts/sparcReadingOrderBrowser.test.cjs`. The browser test requires the
+supported watcher at localhost:3200 and installed Chrome. It mounts the production
+surface, nodes, and figure components in a synthetic page on that origin, with service
+boundaries injected and video playback replaced by a player-shell fixture. It uses
+no account, saved learner data, provider calls, or submissions; generated fixture
+files and screenshots stay under ignored root `tmp/`. This does not replace full
+Meteor integration coverage.
+
 SPARC AutoTutor displays select one runtime-owned production set through
 `instructionalController` (`adapterId: "sparc-autotutor-v1"`, `policyVersion: 1`):
 

@@ -5,6 +5,17 @@ const execFileAsync = promisify(execFile);
 const MAX_ATTEMPTS = 60;
 const DIAGNOSTIC_FORMAT = 'status={{.State.Status}} exitCode={{.State.ExitCode}} oomKilled={{.State.OOMKilled}} error={{json .State.Error}} image={{.Config.Image}} imageId={{.Image}}';
 
+// MongoDB 8.0's allocator is incompatible with Linux 6.19 through 7.0.13.
+// CI owns this host contract; never bypass the database's own startup check.
+function assertCiMongoKernel(kernelRelease) {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(kernelRelease);
+  if (!match) throw new Error('CI MongoDB requires a recognizable Linux kernel version.');
+  const [major, minor, patch] = match.slice(1).map(Number);
+  if ((major === 6 && minor >= 19) || (major === 7 && minor === 0 && patch < 14)) {
+    throw new Error(`CI MongoDB cannot run on Linux ${kernelRelease}; use a supported runner with Linux below 6.19 or at least 7.0.14.`);
+  }
+}
+
 function validateContainerName(containerName) {
   if (typeof containerName !== 'string' || !/^mofacts-ci-[a-z0-9-]+$/.test(containerName)) {
     throw new Error('Only explicitly named mofacts-ci containers may be inspected.');
@@ -73,6 +84,13 @@ async function reportCiContainerDiagnostics(containerName, dependencies = {}) {
 
 async function main(args) {
   const [action, containerName, phase, replicaSetName] = args;
+  if (action === 'host' && args.length === 1) {
+    const kernelRelease = require('node:os').release();
+    if (process.platform !== 'linux') throw new Error('The CI MongoDB host check requires Linux.');
+    assertCiMongoKernel(kernelRelease);
+    console.log(`CI MongoDB kernel compatibility passed: Linux ${kernelRelease}`);
+    return;
+  }
   if (action === 'diagnostics' && args.length >= 2) {
     // Validate the whole list before reading any container.
     args.slice(1).forEach(validateContainerName);
@@ -80,7 +98,7 @@ async function main(args) {
     return;
   }
   if (action !== 'wait' || (phase === 'ping' ? args.length !== 3 : args.length !== 4)) {
-    throw new Error('Use wait <CI container> ping, wait <CI container> primary <set name>, or diagnostics <CI containers>.');
+    throw new Error('Use host, wait <CI container> ping, wait <CI container> primary <set name>, or diagnostics <CI containers>.');
   }
   try {
     await waitForCiMongo(containerName, phase, replicaSetName);
@@ -97,4 +115,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { MAX_ATTEMPTS, waitForCiMongo, reportCiContainerDiagnostics };
+module.exports = { MAX_ATTEMPTS, assertCiMongoKernel, waitForCiMongo, reportCiContainerDiagnostics };

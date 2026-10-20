@@ -3,12 +3,25 @@ const test = require('node:test');
 const vm = require('node:vm');
 const {
   MAX_ATTEMPTS,
+  assertCiMongoKernel,
   waitForCiMongo,
   reportCiContainerDiagnostics,
 } = require('./ciMongoReadiness.cjs');
 
 const container = 'mofacts-ci-mongodb';
 const result = (exitCode = 0, stdout = '', stderr = '') => ({ exitCode, stdout, stderr });
+
+test('CI MongoDB accepts compatible host kernels and rejects the allocator incompatibility range', () => {
+  for (const release of ['5.15.0-azure', '6.8.0-1064-azure', '6.18.99', '7.0.14', '7.1.0-azure', '8.0.0']) {
+    assert.doesNotThrow(() => assertCiMongoKernel(release));
+  }
+  for (const release of ['6.19.0', '6.19.8', '6.20.0', '7.0.0-1017-azure', '7.0.13']) {
+    assert.throws(() => assertCiMongoKernel(release), /cannot run on Linux/);
+  }
+  for (const release of ['', 'unknown', '7.0']) {
+    assert.throws(() => assertCiMongoKernel(release), /recognizable Linux kernel/);
+  }
+});
 
 test('CI Mongo readiness tolerates initial connection refusal while the container is running', async () => {
   let probes = 0;

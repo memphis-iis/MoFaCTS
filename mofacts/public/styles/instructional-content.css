@@ -134,7 +134,16 @@
     border: 0;
     background: transparent;
     overflow-y: auto;
+    overflow-anchor: none;
     box-sizing: border-box;
+  }
+
+  .sparc-auto-tutor-content {
+    display: flex;
+    flex-direction: column;
+    gap: inherit;
+    flex: 0 0 auto;
+    min-width: 0;
   }
 
   .sparc-auto-tutor-pending-turn {
@@ -219,7 +228,7 @@
     grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 12rem);
     gap: var(--app-space-2);
     align-items: stretch;
-    padding-top: var(--app-space-1);
+    padding: var(--app-space-1);
     box-sizing: border-box;
   }
 
@@ -261,8 +270,8 @@
   }
 
   .sparc-auto-tutor-continue {
-    grid-column: 1 / -1;
-    justify-self: end;
+    flex: 0 0 auto;
+    align-self: flex-end;
     min-width: 8rem;
     border-color: var(--learning-card-primary-action-surface-color);
     background: var(--learning-card-primary-action-surface-color);
@@ -1391,6 +1400,7 @@
   .sparc-button.sparc-correctness-correct {
     background: var(--app-state-success-surface-color);
     border-color: var(--feedback-correct-color);
+    outline-color: var(--feedback-correct-color);
   }
 
   .sparc-button-yellow {
@@ -1400,6 +1410,23 @@
   .sparc-button.sparc-correctness-incorrect {
     background: var(--app-state-error-surface-color);
     border-color: var(--feedback-error-color);
+    outline-color: var(--feedback-error-color);
+  }
+
+  .sparc-dialogue-utterance-learner.sparc-correctness-correct .sparc-dialogue-bubble {
+    background: var(--app-state-success-surface-color);
+    border: calc(var(--app-border-width) * 2) solid var(--feedback-correct-color);
+  }
+
+  .sparc-dialogue-utterance-learner.sparc-correctness-incorrect .sparc-dialogue-bubble {
+    background: var(--app-state-error-surface-color);
+    border: calc(var(--app-border-width) * 2) solid var(--feedback-error-color);
+  }
+
+  .sparc-button.worksheet-selected.sparc-correctness-correct,
+  .sparc-button.worksheet-selected.sparc-correctness-incorrect {
+    color: var(--app-text-color);
+    opacity: 1;
   }
 
   .sparc-style-green {
@@ -1645,6 +1672,8 @@
   }
 
   .sparc-auto-tutor-turns {
+    margin-inline-start: auto;
+    white-space: nowrap;
     color: var(--app-secondary-text-color);
     font-size: calc(var(--app-font-size-base) * 0.74);
   }

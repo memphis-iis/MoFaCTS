@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { SPARC_CATEGORIZED_MOVE_DEFINITIONS, requireActiveSparcMoveDefinition } from './sparcMoveDefinitions';
-import { createSparcFeedbackRequest, createSparcInstructionTransition, parseInstructionComponents } from './sparcInstructionalPrimitives';
+import { createSparcFeedbackRequest, createSparcInstructionTransition, parseInstructionComponents, projectSparcInstructionMessages } from './sparcInstructionalPrimitives';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 import { primitiveContext } from './sparcMoveLibrary';
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
@@ -11,6 +11,49 @@ import { parseSparcQuestionChoices } from '../../runtime/sparcQuestionChoiceCont
 import { composeSparcCategoryInstructions } from './sparcCategoryInstructions';
 
 describe('SPARC instructional primitives', () => {
+  it('reveals only the available prefix for every composition and arrival order without changing saved nodes', () => {
+    for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
+      const components = definition.components!;
+      const permutations = <T,>(items: readonly T[]): T[][] => items.length === 0 ? [[]]
+        : items.flatMap((item, i) => permutations(items.filter((_, j) => i !== j)).map(rest => [item, ...rest]));
+      for (const order of permutations(components)) {
+        const nodes = order.map(component => ({ id: `turn:${component}`, turnEventId: 'turn',
+          action: definition.moveId, atomType: 'dialogue-utterance', value: component }));
+        const snapshot = JSON.stringify(nodes);
+        for (let count = 0; count <= nodes.length; count++) {
+          const available = nodes.slice(0, count);
+          const missing = components.findIndex(component => !available.some(node => node.value === component));
+          const expected = components.slice(0, missing === -1 ? components.length : missing);
+          const projected = projectSparcInstructionMessages(available);
+          assert.deepEqual(projected.flatMap(node => node.children ?? []).map(node => node.value), expected);
+          assert.equal(projected.length, expected.length ? 1 : 0);
+          // Reloads reconstruct exactly the same visible prefix.
+          assert.deepEqual(projectSparcInstructionMessages(JSON.parse(JSON.stringify(available))), projected);
+        }
+        assert.equal(JSON.stringify(nodes), snapshot);
+      }
+    }
+  });
+  it('keeps checked explanation visible, holds the question through figure loading, and accepts receipts and links', () => {
+    const action = 'instruction.dynamic.explanation-visual-question.text';
+    const nodes = ['richContent', 'question', 'explanation'].map(component => ({
+      id: `turn:${component}`, turnEventId: 'turn', action, value: component,
+    }));
+    const values = (options: NonNullable<Parameters<typeof projectSparcInstructionMessages>[1]> = {}) =>
+      projectSparcInstructionMessages(nodes, options).flatMap(node => node.children ?? []).map(node => node.value);
+    assert.deepEqual(values({ canReveal: node => node.value !== 'richContent' }), ['explanation']);
+    assert.deepEqual(values({ isReady: node => node.value !== 'richContent' }), ['explanation', 'richContent']);
+    assert.deepEqual(values(), ['explanation', 'richContent', 'question']);
+    const receipt = { ...nodes[0]!, administrativeRemoval: true };
+    const link = { ...nodes[0]!, primitiveReference: { priorNodeId: 'earlier' } };
+    for (const support of [receipt, link]) {
+      assert.equal(projectSparcInstructionMessages([support, ...nodes.slice(1)], {
+        isReady: node => node.value !== 'richContent' || !!node.administrativeRemoval || !!node.primitiveReference,
+      })[0]!.children!.length, 3);
+    }
+    const menu = { id: 'menu', children: [{ id: 'option' }] };
+    assert.deepEqual(projectSparcInstructionMessages([menu]), [menu]);
+  });
   const document = { id: 'page', schemaVersion: 2 as const, root: { id: 'root', kind: 'document' as const } };
   const event = { eventId: 'turn', type: 'response-submitted' as const, source: { pageKey: 'page', nodeId: 'input' }, time: 1 };
   const request = (action: string): SparcUtteranceRequest => ({ action, targetType: 'learningTarget', targetId: 'a', problemStatement: 'Explain A', contentTexts: ['A'], selectedAction: {}, responseModifiers: [], moveDefinition: requireActiveSparcMoveDefinition(action) });

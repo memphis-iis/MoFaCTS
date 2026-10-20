@@ -15,7 +15,10 @@ export type SparcGeneratedInstruction = string | { readonly text: string } | Spa
 
 /** Primitives retain their durable identities but form one learner-facing move. */
 type InstructionMessageNode = Record<string, unknown> & { children?: InstructionMessageNode[] };
-export function projectSparcInstructionMessages(nodes: readonly InstructionMessageNode[]): InstructionMessageNode[] {
+export function projectSparcInstructionMessages(nodes: readonly InstructionMessageNode[], readiness: {
+  canReveal?: (node: InstructionMessageNode) => boolean;
+  isReady?: (node: InstructionMessageNode) => boolean;
+} = {}): InstructionMessageNode[] {
   const messages: InstructionMessageNode[] = [];
   const moves = new Map<string, InstructionMessageNode>();
   for (const node of nodes) {
@@ -33,12 +36,22 @@ export function projectSparcInstructionMessages(nodes: readonly InstructionMessa
       messages.push(message);
     }
     message.children!.push(node);
-    // Realization can select rich support first; the production still owns display order.
-    const componentIndex = (child: InstructionMessageNode) => components.indexOf(
-      String(child.id ?? '').substring(`${child.turnEventId}:`.length) as 'explanation' | 'richContent' | 'question');
-    message.children!.sort((left, right) => componentIndex(left) - componentIndex(right));
   }
-  return messages;
+  return messages.flatMap(message => {
+    if (moves.get(`${message.turnEventId}:${message.action}`) !== message) {
+      return readiness.canReveal?.(message) === false ? [] : [message];
+    }
+    const components = getSparcMoveDefinition(String(message.action))!.components!;
+    const children: InstructionMessageNode[] = [];
+    for (const component of components) {
+      const child = message.children!.find(node => node.id === `${node.turnEventId}:${component}`);
+      if (!child || readiness.canReveal?.(child) === false) break;
+      children.push(child);
+      // A loading support occupies its place, but cannot release the question.
+      if (readiness.isReady?.(child) === false) break;
+    }
+    return children.length ? [{ ...message, children }] : [];
+  });
 }
 
 export function parseInstructionComponents(value: unknown, request: SparcUtteranceRequest): SparcInstructionComponents {

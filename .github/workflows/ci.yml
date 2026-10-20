@@ -6,9 +6,12 @@ on:
   push:
     branches: [main]
 
+env:
+  CI_MONGO_IMAGE: mongo:8.0.34
+
 jobs:
   lint-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       source_digest: ${{ steps.source_observation.outputs.source_digest }}
       source_commit: ${{ steps.source_observation.outputs.source_commit }}
@@ -26,6 +29,10 @@ jobs:
           node-version: '24.15.0'
           cache: npm
           cache-dependency-path: mofacts/package-lock.json
+
+      - name: Verify CI MongoDB host compatibility
+        working-directory: .
+        run: node mofacts/scripts/ciMongoReadiness.cjs host
 
       - name: Capture build and supplemental test inputs
         id: capture
@@ -125,6 +132,10 @@ jobs:
         working-directory: ${{ steps.capture.outputs.test_app }}
         run: node --test scripts/prolific.test.cjs scripts/ignoredTdfFields.test.cjs
 
+      - name: SPARC rendered surface contracts
+        working-directory: ${{ steps.capture.outputs.test_app }}
+        run: node --conditions=browser --test scripts/sparcOutputLimitSurface.test.cjs
+
       - name: Install CI browser
         working-directory: ${{ steps.capture.outputs.test_app }}
         run: ./node_modules/.bin/playwright install --with-deps chromium
@@ -139,7 +150,7 @@ jobs:
           docker run -d \
             --name mofacts-ci-mongodb \
             --publish 127.0.0.1:27018:27017 \
-            mongo:8.0 \
+            "$CI_MONGO_IMAGE" \
             --replSet mofacts-ci-rs \
             --bind_ip_all
           node '${{ steps.capture.outputs.test_app }}/scripts/ciMongoReadiness.cjs' wait mofacts-ci-mongodb ping
@@ -207,7 +218,7 @@ jobs:
 
   docker-amd64-smoke:
     needs: lint-and-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -216,6 +227,9 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.15.0'
+
+      - name: Verify CI MongoDB host compatibility
+        run: node mofacts/scripts/ciMongoReadiness.cjs host
 
       - name: Build amd64 application image
         run: |
@@ -252,7 +266,7 @@ jobs:
           mongo=mofacts-ci-mongo-standalone
           app=mofacts-ci-app-standalone
           docker network create "$network"
-          docker run -d --name "$mongo" --network "$network" mongo:8.0
+          docker run -d --name "$mongo" --network "$network" "$CI_MONGO_IMAGE"
           node mofacts/scripts/ciMongoReadiness.cjs wait "$mongo" ping
           docker run -d \
             --name "$app" \
@@ -284,7 +298,7 @@ jobs:
           mongo=mofacts-ci-mongo-amd64
           app=mofacts-ci-app-amd64
           docker network create "$network"
-          docker run -d --name "$mongo" --network "$network" mongo:8.0 --replSet mofacts-ci-rs --bind_ip_all
+          docker run -d --name "$mongo" --network "$network" "$CI_MONGO_IMAGE" --replSet mofacts-ci-rs --bind_ip_all
           node mofacts/scripts/ciMongoReadiness.cjs wait "$mongo" ping
           docker exec "$mongo" mongosh --quiet --eval \
             'rs.initiate({_id:"mofacts-ci-rs",members:[{_id:0,host:"mofacts-ci-mongo-amd64:27017"}]})'
