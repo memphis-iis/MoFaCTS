@@ -894,8 +894,10 @@ and full resume, but does not establish browser highlighting acceptance or reuse
 The student-selected condition was not taken through a second complete biology lesson
 in this pass. The current changes passed 341 isolated tests, full application typecheck,
 and lint (zero errors, 28 existing warnings). No full Meteor CI invocation, release,
-deployment, commit, or push was performed. Automatic retry after output-validation
-failure remains a pending user design decision; the observed recovery used manual reload.
+deployment, commit, or push was performed. At that time automatic retry after
+output-validation failure was a pending user design decision; the observed recovery
+used manual reload. The subsequently authorized bounded regeneration and inline retry
+contract is documented in [Recoverable system warnings](recoverable-system-warnings.md#sparc-generated-text-limits).
 
 ## Administrative deletion and revision (October 18, 2026)
 

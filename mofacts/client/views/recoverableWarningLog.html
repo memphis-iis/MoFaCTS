@@ -21,7 +21,7 @@
                 {{#each rows}}
                   <li class="border-bottom py-3">
                     <div><time>{{warningTime createdAt}}</time> · <code>{{details.code}}</code></div>
-                    <p>{{warningMessage details.mismatchCount}}</p>
+                    <p>{{warningMessage details}}</p>
                     {{#if details.tdfId}}<code class="text-break">{{details.tdfId}}</code>{{/if}}
                   </li>
                 {{else}}

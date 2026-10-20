@@ -726,7 +726,8 @@
     },
     {
       "name": "reportRecoverableWarning",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Exact allowlisted citation and output-limit diagnostics only; bounded text-free fields, server-owned reporter identity, and existing rate limit. Reads remain admin-only."
     },
     {
       "name": "requestPasswordReset",

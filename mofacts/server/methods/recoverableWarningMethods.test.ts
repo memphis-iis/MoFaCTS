@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { createRecoverableWarningMethods } from './recoverableWarningMethods';
-import { RECOVERABLE_WARNING_ACTION, type RecoverableWarningRow } from '../../common/recoverableWarnings';
+import { RECOVERABLE_WARNING_ACTION, type RecoverableWarning, type RecoverableWarningRow, type SparcOutputLimitWarning } from '../../common/recoverableWarnings';
 
 function fixture(rows: RecoverableWarningRow[] = []) {
   const writes: Record<string, unknown>[] = [];
@@ -22,6 +22,34 @@ async function rejected(operation: () => Promise<unknown>) {
 }
 
 describe('recoverable warning log methods', function() {
+  it('stores text-free output-limit outcomes and rejects forged, unbounded, or text-bearing metadata', async function() {
+    const { methods, writes } = fixture();
+    const outputWarning: SparcOutputLimitWarning = { code: 'autotutor.outputLimit', tdfId: 'tdf-demo',
+      operation: 'utterance', field: 'tutorMessage', unit: 'json-utf8-bytes', observedSize: 2050,
+      limit: 2048, attempts: 2, outcome: 'regenerated' };
+    for (const outcome of ['regenerated', 'retry-needed', 'failed'] as const) {
+      await methods.reportRecoverableWarning.call({ userId: 'learner' }, { ...outputWarning, outcome });
+    }
+    expect(writes).to.have.length(3);
+    expect(writes[0]!.details).to.deep.equal(outputWarning);
+    expect(writes[0]!.actorUserId).to.equal('learner');
+    for (const payload of [
+      { ...outputWarning, text: 'Never accept student or tutor text' },
+      { ...outputWarning, field: 'arbitrary text' },
+      { ...outputWarning, operation: 'arbitrary operation' },
+      { ...outputWarning, outcome: 'unknown' },
+      { ...outputWarning, unit: 'unknown' },
+      { ...outputWarning, attempts: 100 },
+      { ...outputWarning, observedSize: 10000001 },
+      { ...outputWarning, limit: -1 },
+      { ...outputWarning, observedSize: 2048 },
+      { ...outputWarning, observedSize: 1.5 },
+      { ...outputWarning, createdAt: new Date() },
+      { ...outputWarning, actorUserId: 'another-user' },
+    ]) await rejected(() => methods.reportRecoverableWarning.call({ userId: 'learner' }, payload as RecoverableWarning));
+    await rejected(() => methods.reportRecoverableWarning.call({}, outputWarning));
+    expect(writes).to.have.length(3);
+  });
   it('accepts bounded authenticated reports and derives identity and time on the server', async function() {
     const { methods, writes } = fixture();
     await methods.reportRecoverableWarning.call({ userId: 'learner' }, warning);

@@ -4,7 +4,7 @@ import { Template } from 'meteor/templating';
 import { getActiveUiLocale } from '../lib/interfaceLocaleState';
 import { translatePlatformString } from '../lib/interfaceI18n';
 import type { PlatformStringKey } from '../lib/interfaceI18nResources';
-import type { RecoverableWarningCursor, RecoverableWarningPage } from '../../common/recoverableWarnings';
+import type { RecoverableWarning, RecoverableWarningCursor, RecoverableWarningPage } from '../../common/recoverableWarnings';
 import './recoverableWarningLog.html';
 
 type Instance = Blaze.TemplateInstance & {
@@ -40,8 +40,15 @@ Template.recoverableWarningLog.helpers({
   warningText(key: PlatformStringKey) {
     return translatePlatformString(getActiveUiLocale(), key);
   },
-  warningMessage(count: number) {
-    return translatePlatformString(getActiveUiLocale(), 'adminTests.warningMismatch', { count });
+  warningMessage(warning: RecoverableWarning) {
+    if (warning.code === 'autotutor.outputLimit') {
+      return translatePlatformString(getActiveUiLocale(), 'adminTests.warningOutputLimit', {
+        operation: warning.operation, field: warning.field, size: warning.observedSize,
+        limit: warning.limit, unit: warning.unit, attempts: warning.attempts,
+        outcome: translatePlatformString(getActiveUiLocale(), `adminTests.warningOutputLimit.${warning.outcome}`),
+      });
+    }
+    return translatePlatformString(getActiveUiLocale(), 'adminTests.warningMismatch', { count: warning.mismatchCount });
   },
   warningTime(date: Date) { return date.toLocaleString(getActiveUiLocale()); },
   rows() { return (Template.instance() as Instance).warningPage.get()?.rows; },

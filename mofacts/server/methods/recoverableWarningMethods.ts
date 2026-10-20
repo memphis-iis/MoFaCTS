@@ -25,19 +25,33 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
   return {
     async reportRecoverableWarning(this: Context, warning: RecoverableWarning) {
       const userId = requireAuthenticatedUser(this.userId);
-      check(warning, {
+      const boundedSize = Match.Where((value: unknown) => Number.isInteger(value) && Number(value) > 0 && Number(value) <= 10000000);
+      check(warning, Match.OneOf({
         code: Match.Where((value: unknown) => value === 'autotutor.citationMismatch'),
         tdfId: Match.OneOf(null, identifier),
         mismatchCount: Match.Where((value: unknown) => Number.isInteger(value)
           && Number(value) > 0 && Number(value) <= 10000),
-      });
+      }, {
+        code: 'autotutor.outputLimit',
+        tdfId: Match.OneOf(null, identifier),
+        operation: Match.OneOf('utterance', 'explanation', 'question', 'rich', 'visual'),
+        field: Match.OneOf('tutorMessage', 'workedExample', 'figureDescription', 'imagePrompt', 'heading', 'choices.label'),
+        unit: Match.OneOf('characters', 'json-utf8-bytes'),
+        observedSize: boundedSize,
+        limit: boundedSize,
+        attempts: 2,
+        outcome: Match.OneOf('regenerated', 'retry-needed', 'failed'),
+      }));
+      if (warning.code === 'autotutor.outputLimit' && warning.observedSize <= warning.limit) {
+        throw new Error('Output-limit warning requires an exceeded limit');
+      }
       await deps.auditLog.insertAsync({
         action: RECOVERABLE_WARNING_ACTION,
         actorUserId: userId,
         targetUserId: null,
         // This is a client-reported diagnostic, not a server-verified scoring result.
         origin: 'client',
-        details: { code: warning.code, tdfId: warning.tdfId, mismatchCount: warning.mismatchCount },
+        details: { ...warning },
         createdAt: new Date(),
       });
       return true;

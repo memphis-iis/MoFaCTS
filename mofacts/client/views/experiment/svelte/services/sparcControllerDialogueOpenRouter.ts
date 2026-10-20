@@ -41,6 +41,7 @@ import {
 } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
 import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
+import { callWithSparcOutputLimitRecovery } from './sparcOutputLimitRecovery';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { RecoverableWarning } from '../../../../../common/recoverableWarnings';
 import { describeSparcCitation } from './sparcCitationDiagnostics';
@@ -579,6 +580,13 @@ export function createSparcDialogueOpenRouterProvider(
   readonly generateTutorUtterance: SparcUtteranceGenerator;
 } {
   const callResolvedOpenRouterJson = options.callResolvedOpenRouterJson ?? defaultCallResolvedOpenRouterJson;
+  const callGeneratedJson = (request: Parameters<CallResolvedOpenRouterJson>[0], operation: Parameters<typeof callWithSparcOutputLimitRecovery>[0]['operation']) =>
+    callWithSparcOutputLimitRecovery({ request, operation, call: callResolvedOpenRouterJson,
+      reportWarning: options.reportWarning ?? reportRecoverableWarning,
+      onResult: result => {
+        if (result.usage) options.onUsage?.({ operation: 'utterance', usage: result.usage, sessionIdApplied: result.sessionIdApplied === true });
+      },
+    });
   const imageGenerator = options.callSparcPromptImage ?? callSparcPromptImage;
   const visualResolver = options.callSparcVisualSupport ?? callSparcVisualSupport;
   const imageReader = options.readSparcPromptImage ?? readSparcPromptImage;
@@ -637,12 +645,12 @@ export function createSparcDialogueOpenRouterProvider(
       return realizeSparcPrimitive({ request, kind, dependencies: { explanation, richContent, figure }, tdfId: options.tdfId, sessionId: request.historySessionId,
         library: options.moveLibrary, persist, generate: async (rejection, prior) => { questionRejection = rejection; earlierQuestions = prior; return generate(); } });
     };
-    const realize = async (component: string, task: string, schema: OpenRouterJsonSchema) => {
+    const realize = async (component: 'explanation' | 'question' | 'rich' | 'visual', task: string, schema: OpenRouterJsonSchema) => {
       if (component === 'question') {
         task += '\nDo not repeat these earlier questions: ' + JSON.stringify(earlierQuestions ?? []) + (questionRejection ? '\nRejected attempt: ' + questionRejection : '');
       }
       const history = figure ? [{ role: 'tutor', text: richContent, figure }] : [];
-      const result = await callResolvedOpenRouterJson({
+      const result = await callGeneratedJson({
         tdfId: options.tdfId ?? null, ...(options.policyId ? { policyId: options.policyId } : {}), ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         temperature: 0.15, maxTokens: component === 'rich' ? 3000 : SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
         messages: [{ role: 'system', content: [
@@ -670,11 +678,10 @@ export function createSparcDialogueOpenRouterProvider(
         intent: { title: `MoFaCTS SPARC ${component} primitive`, schemaName: `mofacts_sparc_${component}_primitive`, schema, strictSchema: true,
           missingContentMessage: `SPARC ${component} primitive returned no content.` },
         telemetry: { surface: 'sparc-dialogue-runtime', operation: `generate-${component}`, componentId: 'mofacts.sparc-session-unit', unitType: 'sparcsession' },
-      });
-      if (result.usage) options.onUsage?.({ operation: 'utterance', usage: result.usage, sessionIdApplied: result.sessionIdApplied === true });
+      }, component);
       return result.parsedContent;
     };
-    const text = async (component: string, task: string) => parseUtteranceEnvelope(await realize(component, task, SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA));
+    const text = async (component: 'explanation' | 'question', task: string) => parseUtteranceEnvelope(await realize(component, task, SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA));
     if (components.includes('richContent') && richContent === null) {
       const content = await run('richContent', async () => {
       const stringOrNull = { type: ['string', 'null'], maxLength: 2048 };
@@ -937,14 +944,7 @@ export function createSparcDialogueOpenRouterProvider(
           unitType: 'sparcsession',
         },
       };
-      const result = await callResolvedOpenRouterJson(utteranceRequest);
-      if (result.usage) {
-        options.onUsage?.({
-          operation: 'utterance',
-          usage: result.usage,
-          sessionIdApplied: result.sessionIdApplied === true,
-        });
-      }
+      const result = await callGeneratedJson(utteranceRequest, 'utterance');
       if (supported) {
         const brief = parseSparcSupportedPromptBrief(result.parsedContent);
         const generationId = request.selectedAction.snapshotId;

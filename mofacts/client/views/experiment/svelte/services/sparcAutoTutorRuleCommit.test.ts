@@ -2,7 +2,8 @@ import { resolveSparcAccountPolicy } from './sparcController';
 import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { currentSparcMenu } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
 import { strict as assert } from 'node:assert';
-import { commitSparcAutoTutorSubmit } from './sparcAutoTutorRuleCommit';
+import { commitSparcAutoTutorSubmit, commitSparcAutoTutorDocumentLoad } from './sparcAutoTutorRuleCommit';
+import { SparcOutputLimitRecoveryError } from './sparcOutputLimitRecovery';
 import { clearSparcRuntimeState, hydrateSparcRuntimeHistory, readSparcResumeSnapshot } from './sparcRuntimeState';
 import { commitSparcTrialDisplayAutoTutorRules } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
@@ -179,7 +180,7 @@ describe('SPARC app instructional commit', () => {
     clearSparcRuntimeState();
   });
 
-  it('keeps accepted selection on provider failure and restores it through the app resume service', async () => {
+  it('keeps accepted selection on output-limit exhaustion and resumes it without another answer or assessment', async () => {
     clearSparcRuntimeState();
     const display = { type: 'sparc', pageKey: 'app-cycle', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
       instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
@@ -197,21 +198,25 @@ describe('SPARC app instructional commit', () => {
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: [{ clusterKC: 'a', coverage: 0.2 }] }; },
-      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new Error('provider failed'); return instructionFixture(request); },
+      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new SparcOutputLimitRecoveryError(); return instructionFixture(request); },
       deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'tdf', levelUnit: 0, pageKey: display.pageKey, display };
     const choice = { submittedNodes: { 'learner-response-input': 'An answer.' }, timestamp: 10 };
-    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, sparcResult: choice }), /provider failed/);
+    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, sparcResult: choice }), SparcOutputLimitRecoveryError);
     await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: {...args.deps, getIsAdmin: () => false}, sparcResult: choice }), /admin account/);
     const accepted = readSparcResumeSnapshot(scope);
     assert.ok(accepted.replayState.transitions.some((transition) => transition.transitionId.endsWith(':decision')));
+    const acceptedRows = rows.slice();
     clearSparcRuntimeState(); hydrateSparcRuntimeHistory(JSON.parse(JSON.stringify(rows)));
     fail = false;
-    const result = await commitSparcAutoTutorSubmit({ ...args, attemptId: 'reopened', sparcResult: choice });
+    const result = await commitSparcAutoTutorDocumentLoad({ ...args, attemptId: 'reopened' });
     assert.equal(result.committed, true); assert.equal(evaluations, 1);
     assert.equal(result.sparcNodeValues['learner-response-input'], '');
     assert.ok(rows.every((row) => row.sessionID === rows[0]!.sessionID));
+    assert.deepEqual(rows.slice(0, acceptedRows.length), acceptedRows);
+    const transitions = rows.map(row => (row.sparc as { stateTransition: { transitionId: string } }).stateTransition.transitionId);
+    assert.equal(new Set(transitions).size, transitions.length, 'Retry must not duplicate feedback, assessment, selection, or components');
     await assert.rejects(commitSparcAutoTutorSubmit({ ...args, userId: 'another', sparcResult: choice }), /authenticated user/);
     clearSparcRuntimeState();
   });
