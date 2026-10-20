@@ -166,17 +166,11 @@ describe('createSparcDialogueTurnTransition', function() {
     );
   });
 
-  it('rejects a dialogue message that cannot fit the durable per-message contract', function() {
-    assert.throws(
-      () => createSparcDialogueTurnTransition({
-        document: document(),
-        event,
-        learnerText: 'a'.repeat(SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES),
-        utteranceRequest,
-        tutorText: 'A tutor reply',
-      }),
-      /SPARC learner dialogue text exceeds 2048 JSON UTF-8 bytes/,
-    );
+  it('retains dialogue text above the advisory size threshold', function() {
+    const text = 'é'.repeat(SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES + 1);
+    const transition = createSparcDialogueTurnTransition({ document: document(), event,
+      learnerText: text, utteranceRequest, tutorText: text });
+    assert.ok(JSON.stringify(transition).includes(text));
   });
 
   it('keeps maximum supported dialogue messages within the SPARC history extension budget', function() {

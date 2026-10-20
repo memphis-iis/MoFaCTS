@@ -14,7 +14,7 @@ export function parseSparcQuestionChoices(value: unknown, format: 'multiple-choi
     }
     const label = typeof choice.label === 'string' ? choice.label.trim() : '';
     if (!label) throw new Error('Multiple-choice option label is required');
-    if (label.length > 240 || /<\/?[a-z][^>]*>/i.test(label)) throw new Error('Multiple-choice option requires short plain text');
+    if (/<\/?[a-z][^>]*>/i.test(label)) throw new Error('Multiple-choice option requires short plain text');
     if (ids.has(choice.id) || labels.has(label)) throw new Error('Multiple-choice options must have distinct identities and labels');
     ids.add(choice.id); labels.add(label);
     return { id: choice.id, label, correct: choice.correct };

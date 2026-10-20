@@ -28,16 +28,30 @@ describe('Primitive retrieval or generation boundary', () => {
     await realizeSparcPrimitive({ request, kind: 'explanation', dependencies: null, tdfId: 'lesson', sessionId: 'attempt', library,
       generate: async () => ({ text: 'Concurrent draft.' }), persist: async content => { assert.equal(content.text, 'Already accepted.'); } });
   });
-  it('bounds question regeneration and never presents a rejected question', async () => {
+  it('generates a question once with earlier questions and journals before presentation', async () => {
+    const calls: string[] = [];
+    const generated = { text: 'Which barrier keeps these birds apart?' };
+    const library: SparcMoveLibraryClient = {
+      lookup: async () => ({ status: 'generate', ticket: 'ticket', previousQuestions: [{ text: 'What separates these populations?' }] }),
+      publish: async (_ticket, content) => { assert.deepEqual(content, generated); calls.push('publish'); return { accepted: true, content, reference: ref }; },
+      present: async () => { calls.push('present'); },
+    };
+    const content = await realizeSparcPrimitive({ request, kind: 'question', dependencies: null, tdfId: 'lesson', sessionId: 'attempt', library,
+      generate: async prior => { assert.deepEqual(prior, [{ text: 'What separates these populations?' }]); calls.push('generate'); return generated; },
+      persist: async () => { calls.push('journal'); } });
+    assert.deepEqual(content, generated);
+    assert.deepEqual(calls, ['generate', 'publish', 'journal', 'present']);
+  });
+  it('generates once with earlier questions and reports a publication rejection without retrying', async () => {
     let attempts = 0;
     const library: SparcMoveLibraryClient = {
       lookup: async () => ({ status: 'generate', ticket: 'ticket', previousQuestions: [{ text: 'Already asked?' }] }),
-      publish: async () => ({ accepted: false, reason: 'Same task' }), present: async () => { throw new Error('Unexpected presentation'); },
+      publish: async () => ({ accepted: false, reason: 'This content was administratively removed. Generate different content.' }), present: async () => { throw new Error('Unexpected presentation'); },
     };
     await assert.rejects(realizeSparcPrimitive({ request, kind: 'question', dependencies: null, tdfId: 'lesson', sessionId: 'attempt', library,
-      generate: async (rejection, prior) => { if (attempts) assert.equal(rejection, 'Same task'); assert.equal(prior?.length, 1); attempts++; return { text: 'Paraphrase?' }; },
-      persist: async () => { throw new Error('Unexpected journal'); } }), /three attempts/);
-    assert.equal(attempts, 3);
+      generate: async prior => { assert.deepEqual(prior, [{ text: 'Already asked?' }]); attempts++; return { text: 'Paraphrase?' }; },
+      persist: async () => { throw new Error('Unexpected journal'); } }), /administratively removed/);
+    assert.equal(attempts, 1);
   });
   it('does not acknowledge a failed journal write', async () => {
     const library: SparcMoveLibraryClient = { lookup: async () => ({ status: 'hit', content: { text: 'Accepted' }, reference: ref }),

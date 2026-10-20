@@ -39,8 +39,8 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
         unit: Match.OneOf('characters', 'json-utf8-bytes'),
         observedSize: boundedSize,
         limit: boundedSize,
-        attempts: 2,
-        outcome: Match.OneOf('regenerated', 'retry-needed', 'failed'),
+        attempts: Match.OneOf(1, 2),
+        outcome: Match.OneOf('continued', 'regenerated', 'retry-needed', 'failed'),
       }));
       if (warning.code === 'autotutor.outputLimit' && warning.observedSize <= warning.limit) {
         throw new Error('Output-limit warning requires an exceeded limit');

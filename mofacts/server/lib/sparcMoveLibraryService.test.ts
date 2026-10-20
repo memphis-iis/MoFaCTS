@@ -34,6 +34,22 @@ function query(eventId = 'one', kind: SparcPrimitiveQuery['context']['kind'] = '
 }
 
 describe('Shared instructional primitive library', () => {
+  it('publishes, presents, and retrieves text above advisory size thresholds unchanged', async () => {
+    const f = fixture(); const service = f.make(); const q = query();
+    const text = 'A complete explanation. '.repeat(140).trim();
+    const lookup = await service.lookup('learner', q);
+    assert.equal(lookup.status, 'generate');
+    if (lookup.status !== 'generate') throw new Error('Expected a generation ticket');
+    const published = await service.publish('learner', lookup.ticket, { text });
+    if (!published.accepted) throw new Error('Expected accepted content');
+    await service.present('learner', q, published.reference, 'explanation-node');
+    assert.equal(published.content.text, text);
+    assert.equal([...f.exposures.values()][0]!.content.text, text);
+    const resumed = await service.lookup('learner', q);
+    assert.equal(resumed.status, 'hit');
+    if (resumed.status === 'hit') assert.equal(resumed.content.text, text);
+  });
+
   it('keeps written support separate and resolves each new visual request instead of bypassing video-first retrieval', async () => {
     const f = fixture();
     const s = createMoveLibraryService({ store: f.store, embeddingModel: 'fixture', embed: async () => [1, 0],
@@ -149,7 +165,7 @@ describe('Shared instructional primitive library', () => {
     assert.throws(() => make(.9, NaN), /minimum cosine similarity/);
   });
 
-  it('rejects repeated questions across attempts, accepts different evidence, and keeps learner exposure private', async () => {
+  it('excludes similar retrieved questions across attempts but accepts generated questions and keeps learner exposure private', async () => {
     const f = fixture(), s = f.make(), q = query('one', 'question');
     const first = await s.lookup('alice', q); if (first.status !== 'generate') throw new Error();
     const p = await s.publish('alice', first.ticket, { text: 'What separates these populations?' });
@@ -159,12 +175,13 @@ describe('Shared instructional primitive library', () => {
     const blocked = await f.make().lookup('alice', next); assert.equal(blocked.status, 'generate');
     if (blocked.status !== 'generate') throw new Error();
     const generated = await s.publish('alice', blocked.ticket, { text: 'Which barrier keeps these birds apart?' });
-    assert.equal(generated.accepted, false);
-    assert.equal(f.leases.size, 0, 'rejection must release the generation lease');
-    const different = await s.publish('alice', blocked.ticket, { text: 'Make a distinct prediction about removing the barrier.' });
-    assert.equal(different.accepted, true);
+    assert.equal(generated.accepted, true);
+    if (!generated.accepted) throw new Error('Expected generated question to be accepted');
+    assert.equal(generated.content.text, 'Which barrier keeps these birds apart?');
+    assert.equal(f.leases.size, 0, 'acceptance must release the generation lease');
     assert.equal((await f.make().lookup('bob', query('two', 'question'))).status, 'hit');
     await assert.rejects(s.publish('bob', blocked.ticket, { text: 'tampered' }), /Unknown/);
+    assert.equal((await f.make().lookup('alice', { ...next, eventId: 'three' })).status, 'generate');
   });
 
   it('waits for a concurrent matching generator and uses its published content', async () => {
@@ -176,7 +193,7 @@ describe('Shared instructional primitive library', () => {
     assert.equal(waits, 1); assert.equal(f.entries.size, 1); assert.equal(f.leases.size, 0);
   });
 
-  it('reserves accepted questions across concurrent tabs before either presentation is journaled', async () => {
+  it('accepts generated questions across concurrent tabs and reserves them against later retrieval', async () => {
     const f = fixture(), first = f.make(), second = f.make();
     const a = await first.lookup('alice', query('tab-a', 'question'));
     const b = await second.lookup('alice', { ...query('tab-b', 'question'), queryText: needText('another pending context') });
@@ -185,9 +202,10 @@ describe('Shared instructional primitive library', () => {
       first.publish('alice', a.ticket, { text: 'First wording?' }),
       second.publish('alice', b.ticket, { text: 'Second wording?' }),
     ]);
-    assert.equal(results.filter(r => r.accepted).length, 1);
+    assert.equal(results.filter(r => r.accepted).length, 2);
     assert.equal(f.exposures.size, 0);
     assert.equal(f.leases.size, 0);
+    assert.equal((await f.make().lookup('alice', query('later', 'question'))).status, 'generate');
   });
 
   it('revises the current item without creating catalog versions or altering exposures', async () => {
@@ -306,28 +324,27 @@ describe('Shared instructional primitive library', () => {
     assert.equal(entry._id, accepted.reference.entryId);
   });
 
-  it('retains supplied prior questions through a generation miss and checks their text embeddings', async () => {
+  it('retains supplied prior questions through a generation miss without vetoing generated text', async () => {
     const f = fixture(), s = f.make(), q = query('one', 'question');
     q.previousQuestions = [{ text: 'An earlier question from the conversation?' }];
     const first = await s.lookup('alice', q); if (first.status !== 'generate') throw new Error();
     assert.equal(first.previousQuestions.length, 1);
-    assert.equal((await s.publish('alice', first.ticket, { text: 'Equivalent question wording?' })).accepted, false);
+    assert.equal((await s.publish('alice', first.ticket, { text: 'Equivalent question wording?' })).accepted, true);
   });
 
-  it('uses independent reuse and repetition cutoffs with the approved operating defaults', async () => {
-    const f = fixture(), first = f.make();
-    const q = query('first', 'question');
-    const lookup = await first.lookup('alice', q); if (lookup.status !== 'generate') throw new Error();
-    const saved = await first.publish('alice', lookup.ticket, { text: 'Original question?' }); if (!saved.accepted) throw new Error();
-    await first.present('alice', q, saved.reference, 'first:question');
+  it('uses independent reuse and repetition cutoffs for retrieved questions', async () => {
     const vector = (cosine: number) => [cosine, Math.sqrt(1 - cosine ** 2)];
-    const service = createMoveLibraryService({ store: f.store, embeddingModel: 'fixture', embed: async text =>
-      text === 'Repeated wording?' ? vector(.89) : text === 'Different question?' ? vector(.87) : vector(.98) });
-    const next = await service.lookup('alice', query('next', 'question')); if (next.status !== 'generate') throw new Error();
-    const other = await service.lookup('bob', { ...query('other', 'question'), queryText: needText('Other learner context') });
-    assert.equal(other.status, 'generate', '0.98 context similarity must not pass the 0.99 reuse cutoff');
-    assert.equal((await service.publish('alice', next.ticket, { text: 'Repeated wording?' })).accepted, false);
-    assert.equal((await service.publish('alice', next.ticket, { text: 'Different question?' })).accepted, true);
+    const retrieve = async (questionSimilarity: number, contextSimilarity = 1) => {
+      const f = fixture(), first = f.make();
+      const lookup = await first.lookup('author', query('first', 'question')); if (lookup.status !== 'generate') throw new Error();
+      const saved = await first.publish('author', lookup.ticket, { text: 'Original question?' }); if (!saved.accepted) throw new Error();
+      const service = createMoveLibraryService({ store: f.store, embeddingModel: 'fixture', embed: async text =>
+        text === 'Earlier question?' ? vector(questionSimilarity) : vector(contextSimilarity) });
+      return service.lookup('learner', { ...query('next', 'question'), previousQuestions: [{ text: 'Earlier question?' }] });
+    };
+    assert.equal((await retrieve(.89)).status, 'generate', 'question similarity above 0.88 excludes retrieval');
+    assert.equal((await retrieve(.87)).status, 'hit', 'question similarity below 0.88 permits retrieval');
+    assert.equal((await retrieve(.87, .98)).status, 'generate', '0.98 context similarity must not pass the 0.992 reuse cutoff');
   });
 
   it('projects old question histories and new primitive references without treating learner text as exposure', () => {

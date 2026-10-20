@@ -727,7 +727,7 @@
     {
       "name": "reportRecoverableWarning",
       "access": "authenticated-self",
-      "notes": "Exact allowlisted citation and output-limit diagnostics only; bounded text-free fields, server-owned reporter identity, and existing rate limit. Reads remain admin-only."
+      "notes": "Exact allowlisted citation and advisory output-size diagnostics (including continued content) only; bounded text-free fields, server-owned reporter identity, and existing rate limit. Reads remain admin-only."
     },
     {
       "name": "requestPasswordReset",
@@ -1009,7 +1009,8 @@
     },
     {
       "name": "publishSparcPrimitive",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Admin authorization and learner-owned generation ticket precede content validation and publication. Generated questions are not vetoed for semantic similarity; content safety and administrative-removal checks remain enforced."
     },
     {
       "name": "reviseSparcPrimitive",

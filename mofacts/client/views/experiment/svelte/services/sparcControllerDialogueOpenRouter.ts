@@ -4,7 +4,7 @@ import { instructionalNeed } from '../../../../../../learning-components/units/s
 import { selectedSparcEvidence, previousSparcQuestions, type SparcMoveLibraryClient, type SparcPrimitiveContent, type SparcPrimitiveKind, type SparcPrimitiveReference } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
 import { parseSparcEvidenceSummary, type SparcRetainedEvidence } from '../../../../../../learning-components/units/sparcsession/sparcEvidenceHistory';
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief, parseSparcPromptFigure, SPARC_SUPPORTED_PROMPT_JSON_SCHEMA, SPARC_SUPPORTED_PROMPT_SCHEMA_ID, SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY } from '../../../../../../learning-components/units/sparcsession/sparcSupportedPrompt';
-import { callSparcPromptImage, callSparcVisualSupport, readSparcPromptImage, type CallSparcPromptImage, type CallSparcVisualSupport, type ReadSparcPromptImage } from './sparcPromptImage';
+import { callSparcPromptImage, callSparcVisualSupport, type CallSparcPromptImage, type CallSparcVisualSupport } from './sparcPromptImage';
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../../../../common/lib/sparcPromptImage';
 import { parseInstructionComponents, type SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
 import { parseSparcQuestionChoices } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
@@ -30,9 +30,7 @@ import type {
   SparcUtteranceGenerator,
 } from '../../../../../../learning-components/units/sparcsession/sparcAutoTutorRuleRuntime';
 import {
-  requireBoundedSparcDialogueMessage,
-  SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,
-  SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES,
+  requireSparcDialogueText,
   SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
 } from '../../../../../../learning-components/units/sparcsession/sparcDialogueTurnNodes';
 import {
@@ -41,12 +39,12 @@ import {
 } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
 import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
-import { callWithSparcOutputLimitRecovery } from './sparcOutputLimitRecovery';
+import { callWithSparcOutputDiagnostics } from './sparcOutputDiagnostics';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { RecoverableWarning } from '../../../../../common/recoverableWarnings';
 import { describeSparcCitation } from './sparcCitationDiagnostics';
 
-const instructionTextBudget = `Each persisted instructional text field (tutorMessage, workedExample, figureDescription) must fit within ${SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS} characters AND ${SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES} JSON UTF-8 bytes. JSON quotes, escaped line breaks, and multibyte punctuation count toward the byte limit. Stay comfortably below it by writing concisely; preserve complete words and reasoning.`;
+const instructionTextBudget = 'Write concise, complete instructional text. Preserve the selected target, requested teaching action, and necessary reasoning.';
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -106,7 +104,6 @@ export type SparcDialogueOpenRouterProviderOptions = {
   readonly callResolvedOpenRouterJson?: CallResolvedOpenRouterJson;
   readonly callSparcPromptImage?: CallSparcPromptImage;
   readonly callSparcVisualSupport?: CallSparcVisualSupport;
-  readonly readSparcPromptImage?: ReadSparcPromptImage;
   readonly onLearnerResponseScoringTrace?: (
     event: SparcDialogueLearnerResponseScoringTraceEvent,
   ) => void;
@@ -119,8 +116,7 @@ const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
   properties: {
     tutorMessage: {
       type: 'string',
-      minLength: 1,
-      maxLength: SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,
+      minLength: 1
     },
   },
   required: ['tutorMessage'],
@@ -234,7 +230,7 @@ function buildSparcDialogueScoreJsonSchema(
   const boundedEvidenceStrength = { type: 'number', minimum: 0, maximum: 1 };
   const summary = { type: ['object', 'null'], additionalProperties: false, required: ['demonstrated', 'incorrect', 'unresolved'],
     properties: Object.fromEntries(['demonstrated', 'incorrect', 'unresolved'].map(key => [key,
-      { type: 'array', maxItems: 6, items: { type: 'string', minLength: 1, maxLength: 240 } }])) };
+      { type: 'array', maxItems: 6, items: { type: 'string', minLength: 1 } }])) };
   const learnerEvidence = {
     type: 'array',
     items: {
@@ -472,7 +468,7 @@ function parseUtteranceEnvelope(value: unknown): string {
   if (!tutorMessage) {
     throw new Error('SPARC dialogue utterance response requires tutorMessage');
   }
-  return requireBoundedSparcDialogueMessage(tutorMessage, 'SPARC dialogue utterance response tutorMessage');
+  return requireSparcDialogueText(tutorMessage, 'SPARC dialogue utterance response tutorMessage');
 }
 
 const SPARC_AUTOTUTOR_UTTERANCE_ENVELOPE_SCHEMA = Object.freeze({
@@ -580,8 +576,8 @@ export function createSparcDialogueOpenRouterProvider(
   readonly generateTutorUtterance: SparcUtteranceGenerator;
 } {
   const callResolvedOpenRouterJson = options.callResolvedOpenRouterJson ?? defaultCallResolvedOpenRouterJson;
-  const callGeneratedJson = (request: Parameters<CallResolvedOpenRouterJson>[0], operation: Parameters<typeof callWithSparcOutputLimitRecovery>[0]['operation']) =>
-    callWithSparcOutputLimitRecovery({ request, operation, call: callResolvedOpenRouterJson,
+  const callGeneratedJson = (request: Parameters<CallResolvedOpenRouterJson>[0], operation: Parameters<typeof callWithSparcOutputDiagnostics>[0]['operation']) =>
+    callWithSparcOutputDiagnostics({ request, operation, call: callResolvedOpenRouterJson,
       reportWarning: options.reportWarning ?? reportRecoverableWarning,
       onResult: result => {
         if (result.usage) options.onUsage?.({ operation: 'utterance', usage: result.usage, sessionIdApplied: result.sessionIdApplied === true });
@@ -589,27 +585,6 @@ export function createSparcDialogueOpenRouterProvider(
     });
   const imageGenerator = options.callSparcPromptImage ?? callSparcPromptImage;
   const visualResolver = options.callSparcVisualSupport ?? callSparcVisualSupport;
-  const imageReader = options.readSparcPromptImage ?? readSparcPromptImage;
-  const imageReads = new Map<string, ReturnType<ReadSparcPromptImage>>();
-  const readFigure = (id: string) => {
-    if (!imageReads.has(id)) imageReads.set(id, imageReader(id).catch(error => { imageReads.delete(id); throw error; }));
-    return imageReads.get(id)!;
-  };
-  const withFigures = async (text: string, history: readonly Readonly<Record<string, unknown>>[]): Promise<OpenRouterRequestMessage> => {
-    const figures = history.map((entry, index) => ({ figure: entry.figure, index })).filter(entry => entry.figure !== undefined);
-    if (!figures.length) return { role: 'user', content: text };
-    const images = await Promise.all(figures.map(async entry => {
-      const figure = parseSparcPromptFigure(entry.figure);
-      const saved = await readFigure(figure.assetId);
-      return { index: entry.index, figure, ...saved };
-    }));
-    return { role: 'user', content: [{ type: 'text', text }, ...images.flatMap(entry => entry.administrativeRemoval ? [
-      { type: 'text' as const, text: `Tutor figure at dialogueHistory index ${entry.index}: Administrative removal` },
-    ] : [
-      { type: 'text' as const, text: `Actual tutor figure at dialogueHistory index ${entry.index}: ${entry.figure.description}` },
-      { type: 'image_url' as const, image_url: { url: entry.dataUrl } },
-    ])] };
-  };
   const generateInstructionPrimitives = async (request: SparcUtteranceRequest): Promise<SparcInstructionComponents> => {
     const components = request.moveDefinition.components!;
     let explanation: string | null = request.realizedInstruction?.explanation ?? null;
@@ -628,7 +603,6 @@ export function createSparcDialogueOpenRouterProvider(
       assessment: { evidence: selectedSparcEvidence(request) },
       selectedMove: request.action, responseFormat: request.moveDefinition.responseFormat, requestedComponents: components,
       explanation, richContent, ...(supportHeading ? { supportHeading } : {}), ...(video ? { video } : {}), ...(figure ? { figure } : {}) });
-    let questionRejection: string | undefined;
     let earlierQuestions: unknown = previousSparcQuestions(request);
     const run = async (kind: Exclude<SparcPrimitiveKind, 'feedback'>, generate: () => Promise<SparcPrimitiveContent>) => {
       const persist = async (content: SparcPrimitiveContent, reference?: SparcPrimitiveReference) => {
@@ -643,13 +617,14 @@ export function createSparcDialogueOpenRouterProvider(
       if (!options.moveLibrary) { const content = await generate(); await persist(content); return content; }
       if (!options.tdfId || !request.historySessionId || !request.onInstructionComponent) throw new Error('Move library requires durable primitive context');
       return realizeSparcPrimitive({ request, kind, dependencies: { explanation, richContent, figure }, tdfId: options.tdfId, sessionId: request.historySessionId,
-        library: options.moveLibrary, persist, generate: async (rejection, prior) => { questionRejection = rejection; earlierQuestions = prior; return generate(); } });
+        library: options.moveLibrary, persist, generate: async prior => { earlierQuestions = prior; return generate(); } });
     };
     const realize = async (component: 'explanation' | 'question' | 'rich' | 'visual', task: string, schema: OpenRouterJsonSchema) => {
       if (component === 'question') {
-        task += '\nDo not repeat these earlier questions: ' + JSON.stringify(earlierQuestions ?? []) + (questionRejection ? '\nRejected attempt: ' + questionRejection : '');
+        task += '\nCreate one fresh question for the selected target. Use the earlier questions below as context for choosing a different task or case, not as templates to paraphrase. Change task-relevant givens, relationships, conditions, or the decision the learner must make; changing only names, wording, or option order does not create a new task. For a conceptual question without numerical givens, use a different concrete situation or application of the same concept.'
+          + '\nPreserve the selected target, move, response format, and level of assistance. If support is supplied, keep the question isomorphic to that actual support while using a new practice case. Do not broaden the target or add requirements merely to make the question different. Supply all information needed to answer the new question.'
+          + '\nEarlier questions (reference context only): ' + JSON.stringify(earlierQuestions ?? []);
       }
-      const history = figure ? [{ role: 'tutor', text: richContent, figure }] : [];
       const result = await callGeneratedJson({
         tdfId: options.tdfId ?? null, ...(options.policyId ? { policyId: options.policyId } : {}), ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         temperature: 0.15, maxTokens: component === 'rich' ? 3000 : SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
@@ -674,7 +649,7 @@ export function createSparcDialogueOpenRouterProvider(
             'The question must directly elicit the selected target below. The lesson context and earlier dialogue are background; do not return to their target when it differs from the selected target. Supply any case information needed to answer this question. An isomorphic question preserves the actual rich case task and conceptual distinction, not merely its broad topic.',
             `Selected target for this question: ${JSON.stringify({ type: request.targetType, texts: request.contentTexts })}`,
           ] : []),
-        ].join('\n') }, await withFigures(context(), history)],
+        ].join('\n') }, { role: 'user', content: context() }],
         intent: { title: `MoFaCTS SPARC ${component} primitive`, schemaName: `mofacts_sparc_${component}_primitive`, schema, strictSchema: true,
           missingContentMessage: `SPARC ${component} primitive returned no content.` },
         telemetry: { surface: 'sparc-dialogue-runtime', operation: `generate-${component}`, componentId: 'mofacts.sparc-session-unit', unitType: 'sparcsession' },
@@ -684,7 +659,7 @@ export function createSparcDialogueOpenRouterProvider(
     const text = async (component: 'explanation' | 'question', task: string) => parseUtteranceEnvelope(await realize(component, task, SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA));
     if (components.includes('richContent') && richContent === null) {
       const content = await run('richContent', async () => {
-      const stringOrNull = { type: ['string', 'null'], maxLength: 2048 };
+      const stringOrNull = { type: ['string', 'null'] };
       const visual = request.moveDefinition.supportKind === 'visual';
       const written = request.moveDefinition.supportKind === 'written';
       const output = await realize(visual ? 'visual' : 'rich', [
@@ -700,13 +675,13 @@ export function createSparcDialogueOpenRouterProvider(
         ] : []),
       ].join('\n'), visual ? {
         type: 'object', additionalProperties: false, required: ['imagePrompt', 'figureDescription', 'displayWidth'],
-        properties: { imagePrompt: { type: 'string', minLength: 1, maxLength: 8000 },
-          figureDescription: { type: 'string', minLength: 1, maxLength: 2048 }, displayWidth: { type: 'integer', minimum: SPARC_PROMPT_IMAGE_SETTINGS.minDisplayWidth, maximum: SPARC_PROMPT_IMAGE_SETTINGS.maxDisplayWidth } },
+        properties: { imagePrompt: { type: 'string', minLength: 1 },
+          figureDescription: { type: 'string', minLength: 1 }, displayWidth: { type: 'integer', minimum: SPARC_PROMPT_IMAGE_SETTINGS.minDisplayWidth, maximum: SPARC_PROMPT_IMAGE_SETTINGS.maxDisplayWidth } },
       } : {
         type: 'object', additionalProperties: false, required: ['kind', 'workedExample', 'imagePrompt', 'figureDescription', 'displayWidth', ...(categorized ? ['heading'] : [])],
         properties: { kind: { type: 'string', enum: written ? ['worked-example', 'comparison', 'table'] : ['worked-example', 'figure'] }, workedExample: stringOrNull,
-          imagePrompt: { type: ['string', 'null'], maxLength: 8000 }, figureDescription: stringOrNull,
-          displayWidth: { type: ['integer', 'null'] }, ...(categorized ? { heading: { type: ['string', 'null'], maxLength: 60 } } : {}) },
+          imagePrompt: { type: ['string', 'null'] }, figureDescription: stringOrNull,
+          displayWidth: { type: ['integer', 'null'] }, ...(categorized ? { heading: { type: ['string', 'null'] } } : {}) },
       });
       if (!output || typeof output !== 'object' || Array.isArray(output)) throw new Error('Rich primitive requires an object');
       if (Object.keys(output).length !== (visual ? 3 : categorized ? 6 : 5)) throw new Error('Invalid rich primitive fields');
@@ -714,10 +689,10 @@ export function createSparcDialogueOpenRouterProvider(
       if ((visual && rich.kind !== 'figure') || (written && rich.kind === 'figure')) throw new Error('Rich support must follow the selected move');
       if (rich.kind === 'worked-example' || (categorized && ['comparison', 'table'].includes(String(rich.kind)))) {
         if (rich.imagePrompt !== null || rich.figureDescription !== null || rich.displayWidth !== null) throw new Error('Worked example has unexpected figure fields');
-        richContent = requireBoundedSparcDialogueMessage(rich.workedExample, 'SPARC worked example');
+        richContent = requireSparcDialogueText(rich.workedExample, 'SPARC worked example');
         if (/<\/?[a-z][^>]*>/i.test(richContent)) throw new Error('Worked-example primitive requires Markdown text, not HTML or image markup');
         if (categorized) {
-          supportHeading = requireBoundedSparcDialogueMessage(rich.heading, 'Support heading');
+          supportHeading = requireSparcDialogueText(rich.heading, 'Support heading');
           if (supportHeading.length > 60 || /[<>\r\n]/.test(supportHeading)
             || (rich.kind === 'worked-example' && supportHeading !== 'Worked Example')
             || (rich.kind === 'comparison' && supportHeading !== 'Comparison')) throw new Error('Invalid instructional support heading');
@@ -761,7 +736,7 @@ export function createSparcDialogueOpenRouterProvider(
         : 'Generate exactly one focused question in tutorMessage, with its own necessary givens. Do not supply its answer.',
       ...(video ? ['The actual support is a YouTube passage. Ground the question in its supplied transcript and pursue the selected category learning-process focuses. Do not ask about visual details that the transcript does not establish.'] : []),
       ...(categorized ? ['Return only the question stem and necessary givens, without repeating the explanation, definitions, model conclusions, or worked reasoning already supplied. Do not state a definition or relationship that this question asks the learner to supply or recognize. A formula or other fact needed as an input to an application may be included when it is not itself the requested answer.'] : []),
-      richContent ? (categorized ? 'Use the actual support to pursue the category learning-process focuses. For rule induction/refinement, construct a structurally analogous new case; for model understanding/sense-making, elicit reasoning about the represented relationships; for fact memory/fluency, elicit retrieval of the selected association. Combine the selected focuses in one coherent task within the response format. Do not ask the learner merely to copy a displayed answer.' : 'Use the actual worked example or actual generated figure supplied in context to construct an isomorphic question. Preserve the underlying relationship/task structure while using a new case, context, or inputs. Conceptual reasoning is valid. Do not ask the learner to copy a demonstrated result.') : 'The question must flow from the supplied explanation when present and elicit the selected target.',
+      richContent ? (categorized ? 'Use the actual support to pursue the category learning-process focuses. For rule induction/refinement, construct a structurally analogous new case; for model understanding/sense-making, elicit reasoning about the represented relationships; for fact memory/fluency, elicit retrieval of the selected association. Combine the selected focuses in one coherent task within the response format. Do not ask the learner merely to copy a displayed answer.' : 'Use the actual worked example or saved figure description supplied in context to construct an isomorphic question. Preserve the underlying relationship/task structure while using a new case, context, or inputs. Conceptual reasoning is valid. Do not ask the learner to copy a demonstrated result.') : 'The question must flow from the supplied explanation when present and elicit the selected target.',
     ].join('\n');
     let question = request.realizedInstruction?.question;
     if (question === undefined) {
@@ -772,13 +747,13 @@ export function createSparcDialogueOpenRouterProvider(
           ? '\nReturn tutorMessage and exactly two choices in fixed order: {id: "true", label: "True", correct: boolean}, then {id: "false", label: "False", correct: boolean}. Exactly one correct flag is true. The statement and flags must agree. Do not put the answer key in visible text.'
           : '\nReturn tutorMessage and choices. Options use stable short ids, plain-text labels, and a correct boolean; exactly one is correct. The correct boolean is an answer key, never visible question text. Each option must express a complete, meaningfully distinct answer. Put shared context in the stem and keep labels concise, aiming below 160 characters and always within the 240-character limit. Rewrite an answer to fit; never cut off a word or proposition. Distractors must express a different conceptual claim, not differ through incomplete wording, misspellings, or invisible characters.'), {
           type: 'object', additionalProperties: false, required: ['tutorMessage', 'choices'], properties: {
-            tutorMessage: { type: 'string', minLength: 1, maxLength: 2048 },
+            tutorMessage: { type: 'string', minLength: 1 },
             choices: { type: 'array', minItems: trueFalse ? 2 : 3, maxItems: trueFalse ? 2 : 4, items: { type: 'object', additionalProperties: false,
-              required: ['id', 'label', 'correct'], properties: { id: trueFalse ? { type: 'string', enum: ['true', 'false'] } : { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,24}$' }, label: trueFalse ? { type: 'string', enum: ['True', 'False'] } : { type: 'string', minLength: 1, maxLength: 240 }, correct: { type: 'boolean' } } } },
+              required: ['id', 'label', 'correct'], properties: { id: trueFalse ? { type: 'string', enum: ['true', 'false'] } : { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,24}$' }, label: trueFalse ? { type: 'string', enum: ['True', 'False'] } : { type: 'string', minLength: 1 }, correct: { type: 'boolean' } } } },
           },
         });
         if (!isRecord(parsed) || Object.keys(parsed).length !== 2) throw new Error('Invalid multiple-choice question output');
-        question = requireBoundedSparcDialogueMessage(parsed.tutorMessage, 'Multiple-choice question');
+        question = requireSparcDialogueText(parsed.tutorMessage, 'Multiple-choice question');
         choices = parseSparcQuestionChoices(parsed.choices, request.moveDefinition.responseFormat);
       } else {
         question = await text('question', questionTask);
@@ -841,9 +816,7 @@ export function createSparcDialogueOpenRouterProvider(
           unitType: 'sparcsession',
         },
     };
-    const scoringUser = scoringRequest.messages[1]!;
-    const scoringMessages = [scoringRequest.messages[0]!, await withFigures(scoringUser.content as string, dialogueHistory)];
-    const result = await callResolvedOpenRouterJson({ ...scoringRequest, messages: scoringMessages });
+    const result = await callResolvedOpenRouterJson(scoringRequest);
     if (result.usage) {
       options.onUsage?.({
         operation: 'scoring',
@@ -928,7 +901,8 @@ export function createSparcDialogueOpenRouterProvider(
           role: 'system',
           content: buildSparcUtteranceSystemPrompt(request),
         }, {
-          ...await withFigures(buildSparcUtteranceUserPrompt(request), request.dialogueHistory ?? []),
+          role: 'user',
+          content: buildSparcUtteranceUserPrompt(request),
         }],
         intent: {
           title: 'MoFaCTS SPARC Dialogue Utterance',

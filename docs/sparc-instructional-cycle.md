@@ -611,7 +611,7 @@ Deprecation-control verification, October 13, 2026: all 231 isolated SPARC contr
 
 Repository-inspection verification, October 13, 2026: 229 isolated SPARC contracts and three route-policy checks passed, along with full-app typecheck and lint (28 existing vendor warnings, no errors). In signed-in Chrome at localhost, the Content link opened the gallery and both existing canonical figures rendered with descriptions and reuse status. The full-size link opened an image tab whose title reported the saved raster dimensions. Paging across 25 figures, inclusion of excluded/older-version figures, omission of private state and authorization failures were checked with injected fixtures. The Mongo-specific inspection regression was added but not run in the full Meteor integration suite. This records local verification, not production deployment.
 
-The rich primitive selects or generates its actual support first. Both explanation and isomorphic-question generation then receive the selected figure's pixels and saved description, so they can use its actual case and values. The displayed composite remains one box in explanation/support/question order. The existing worked-example and no-rich paths retain their requested compositions.
+The rich primitive selects or generates its actual support first. Both explanation and isomorphic-question generation then receive the selected figure's saved description as text, so they can use its described case and values without fetching or attaching image pixels to the dialogue request. The displayed composite remains one box in explanation/support/question order. The existing worked-example and no-rich paths retain their requested compositions.
 
 Provider comparison: one 16:9 confidence-interval figure per quality level, with the same prompt and streaming off, produced Low $0.00517 / 10.7 seconds; Medium $0.00997 / 13.2 seconds; High $0.03391 / 23.4 seconds; Xhigh $0.05908 / 30.8 seconds; Max $0.13090 / 54.8 seconds; Auto $0.03391 / 24.1 seconds. All six preserved the central long-run-coverage concept. Numeric placement was approximate; no general reliability rate is established by this one case. Recraft V4.1 Pro cost $0.21 / 9.6 seconds and produced substantial counting, geometry, dot-placement, and text errors. Local comparison images, screenshots, prompt, and the HTML gallery are saved under the SPARC working browser-acceptance folder.
 
@@ -658,12 +658,18 @@ validation, and matching live in `sparcMoveLibraryService.ts`,
   primitive ahead of the video search. Accepted requests resume without reselection.
   Existing image assets and historical decisions remain readable, and figures saved
   before the primitive library remain available through the image search.
-- Question repetition is checked using embeddings of the actual question text,
+- Retrieved question repetition is checked using embeddings of the actual question text,
   against this learner's accepted/presented questions in the lesson, including earlier
   attempts. Its separate cutoff is currently 0.88. No generated descriptor,
   question decomposition, or separate evidence/judgment rules are used. A learner
-  question lease serializes acceptance across tabs. Generated questions get at most three
-  attempts; exhaustion leaves an explicit resumable error.
+  question lease serializes acceptance across tabs. On a retrieval miss, the question
+  is generated once. Its initial prompt uses earlier questions as reference context
+  and requests a different task or case through changed givens, relationships,
+  conditions, or learner decisions, rather than paraphrasing or renaming. The
+  selected target, assistance, response format, and support alignment are preserved. Generated questions
+  are not rejected for semantic similarity and are not automatically regenerated.
+  Content validation and administrative-removal checks still apply; publication
+  rejection reports its actual reason.
 - Retrieval hits make no instructional-generation call. Assessment still runs.
   Immutable image reads are coalesced within the turn, stable prompt instructions
   precede variable move instructions, and existing provider session correlation is
@@ -943,8 +949,7 @@ in this pass. The current changes passed 341 isolated tests, full application ty
 and lint (zero errors, 28 existing warnings). No full Meteor CI invocation, release,
 deployment, commit, or push was performed. At that time automatic retry after
 output-validation failure was a pending user design decision; the observed recovery
-used manual reload. The subsequently authorized bounded regeneration and inline retry
-contract is documented in [Recoverable system warnings](recoverable-system-warnings.md#sparc-generated-text-limits).
+used manual reload. The current advisory size-warning contract is documented in [Recoverable system warnings](recoverable-system-warnings.md#sparc-generated-text-sizes).
 
 ## Administrative deletion and revision (October 18, 2026)
 
@@ -955,3 +960,7 @@ The instructional library has **Delete** and **Revise**, with no exclusion or de
 The forward startup migration runs after collection consolidation. It removes existing `reusable: false` entries in pages of at most 100, records removal receipts, and unsets retired exclusion and predecessor fields on survivors. It also retires the old image-revision layout, keeping only the current image and deleting obsolete image assets and revision records. Catalog entries, shared manifests, and receipts change transactionally; image-file cleanup runs afterward and retains a retry marker until successful. A transient cleanup marker lets restart finish dependent and media deletion after the catalog item is removed. Restart repeats unfinished work safely, logs deletion counts and failures, and never edits learner histories, accepted decisions, exposures, or model state. Deletion is permanent: restoring content requires an operator backup, not a hidden archive or an Allow reuse control. The authorized existing-exclusion cleanup therefore has no in-app rollback.
 
 Run `node scripts/sparcLibraryCuration.test.cjs` for isolated selection, revision, authorization, and rendering contracts, and the required full typecheck/lint. Mongo transaction, migration, and physical media cleanup require the supported Meteor integration environment; every integration invocation requires fresh user authorization. The current transfer tool writes format v2 and rejects retired exclusion/predecessor fields; re-export a fresh bundle after migration instead of importing an old exclusion-bearing bundle. No authored TDF fields or lesson packages change.
+
+SPARC dialogue requests use saved teaching-figure descriptions as text context for explanation, question generation, feedback, and scoring. They do not fetch or attach raster images to the dialogue model. The system-owned image-generation endpoint and private learner image rendering retain their separate responsibilities.
+
+Generated-text size thresholds are advisory: output exceeding them is logged to the Recoverable Warning Log and continues unchanged. No size-driven regeneration or learner retry prompt is used. See [Recoverable system warnings](recoverable-system-warnings.md#sparc-generated-text-sizes).

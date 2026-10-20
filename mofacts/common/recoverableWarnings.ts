@@ -10,8 +10,8 @@ export type SparcOutputLimitWarning = Readonly<{
   unit: 'characters' | 'json-utf8-bytes';
   observedSize: number;
   limit: number;
-  attempts: 2;
-  outcome: 'regenerated' | 'retry-needed' | 'failed';
+  attempts: 1 | 2;
+  outcome: 'continued' | 'regenerated' | 'retry-needed' | 'failed';
 }>;
 
 export type RecoverableWarning = Readonly<{

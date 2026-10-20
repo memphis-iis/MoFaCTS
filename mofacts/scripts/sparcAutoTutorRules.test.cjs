@@ -61,7 +61,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   try {
     if (process.argv.includes('--include-client-contracts')) {
       require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
-      require('../client/views/experiment/svelte/services/sparcOutputLimitRecovery.test.ts');
+      require('../client/views/experiment/svelte/services/sparcOutputDiagnostics.test.ts');
       require('../client/views/experiment/svelte/services/sparcCompoundInterestLiveEvaluation.test.ts');
     }
     require('../client/views/experiment/svelte/services/sparcAutoTutorRuleCommit.test.ts');

@@ -35,7 +35,6 @@
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { clientConsole } from '../../../../lib/clientLogger';
   import { redactSparcDialogueDiagnosticText } from '../services/sparcCitationDiagnostics';
-  import { SparcOutputLimitRecoveryError } from '../services/sparcOutputLimitRecovery';
   import { createSparcDialogueScroll } from '../services/sparcDialogueScroll';
 
   const dispatch = createEventDispatcher();
@@ -82,7 +81,6 @@
   let pendingAutoTutorProgressSnapshot = null;
   let dialogueSubmitError = '';
   let dialogueSubmitErrorDetail = '';
-  let dialogueRecovery = null;
   let surfaceElement;
   let lastFeedbackRevealSignature = '';
   let observedProgressiveNodeOperationCount = 0;
@@ -135,7 +133,6 @@
     dialogueSubmitPending = true;
     dialogueSubmitError = '';
     dialogueSubmitErrorDetail = '';
-    dialogueRecovery = null;
     const timestamp = Date.now();
     try {
       const provider = createSparcDialogueOpenRouterProvider({ ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
@@ -155,19 +152,14 @@
       if (!mounted || dialogueScope !== scope) return;
       dispatchSparcNodeValues(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit,
         pageKey: currentDisplay.pageKey, display: currentDisplay }).nodeValues, timestamp);
-      if (error instanceof SparcOutputLimitRecoveryError) {
-        dialogueRecovery = { scope, retry: () => startCategorizedDialogue(currentDisplay, scope) };
-      } else {
-        dialogueSubmitError = platformText('autoTutor.serviceError');
-        dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
-        clientConsole(1, '[SPARC][Dialogue] initialization failed', { detail: dialogueSubmitErrorDetail });
-      }
+      dialogueSubmitError = platformText('sparc.serviceError');
+      dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
+      clientConsole(1, '[SPARC][Dialogue] initialization failed', { detail: dialogueSubmitErrorDetail });
     } finally {
       dialogueSubmitPending = false;
       if (mounted && dialogueScope === scope) {
         await tick();
-        const nextControl = surfaceElement?.querySelector('[data-sparc-retry]')
-          || surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
+        const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
           || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
         if (dialogueScroll?.isFollowing()) {
           nextControl?.focus({ preventScroll: true });
@@ -718,7 +710,7 @@
   }
 
   async function submitAutoTutorDialogue(detail) {
-    if (dialogueSubmitPending || dialogueRecovery) {
+    if (dialogueSubmitPending) {
       return;
     }
     pendingAutoTutorProgressSnapshot = autoTutorProgressSnapshot;
@@ -733,40 +725,24 @@
     try {
       await handleSparcSubmit(detail);
     } catch (error) {
-      if (error instanceof SparcOutputLimitRecoveryError) {
-        const scope = dialogueScope;
-        // Resume the journaled event, not a new response or assessment.
-        dialogueRecovery = { scope, retry: categorizedDialogue
-          ? () => startCategorizedDialogue(sparcDisplay, scope)
-          : () => submitAutoTutorDialogue(detail) };
-      } else {
-        restoreDialogueInputs(submittedInputValues);
-        dispatchSparcNodeValues(submittedInputValues, detail?.timestamp);
-        dialogueSubmitError = platformText('autoTutor.serviceError');
-        dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
-        clientConsole(1, '[SPARC][Dialogue] submission failed', {
-          detail: dialogueSubmitErrorDetail,
-        });
-      }
+      restoreDialogueInputs(submittedInputValues);
+      dispatchSparcNodeValues(submittedInputValues, detail?.timestamp);
+      dialogueSubmitError = platformText('sparc.serviceError');
+      dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
+      clientConsole(1, '[SPARC][Dialogue] submission failed', {
+        detail: dialogueSubmitErrorDetail,
+      });
     } finally {
       dialogueSubmitPending = false;
       pendingAutoTutorProgressSnapshot = null;
       await tick();
-      const nextControl = surfaceElement?.querySelector('[data-sparc-retry]')
-        || surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
+      const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
         || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
       if (dialogueScroll?.isFollowing()) {
         nextControl?.focus({ preventScroll: true });
         dialogueScroll.schedule();
       }
     }
-  }
-
-  async function retryTutorResponse() {
-    if (!dialogueRecovery || dialogueSubmitPending) return;
-    const recovery = dialogueRecovery;
-    dialogueRecovery = null;
-    if (recovery.scope === dialogueScope) await recovery.retry();
   }
 
   function handleAutoTutorContinue() {
@@ -886,7 +862,7 @@
     pendingSnapshot: pendingAutoTutorProgressSnapshot,
     submissionPending: dialogueSubmitPending,
   });
-  $: autoTutorDialogueCompleted = autoTutorDialogueMode && !dialogueRecovery && currentAutoTutorProgressSnapshot.completed
+  $: autoTutorDialogueCompleted = autoTutorDialogueMode && currentAutoTutorProgressSnapshot.completed
     && (!isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId) || !dialogueSubmitPending);
   $: categorizedDialogue = autoTutorDialogueMode && isSparcCategorizedPolicy(sparcDisplay?.instructionalController?.policyId);
   $: dialogueScope = JSON.stringify([userId, tdfId, attemptId, levelUnit, sparcDisplay?.pageKey]);
@@ -898,13 +874,12 @@
     removalError = '';
   }
   $: reportFigureState = figureStateReporter(dialogueScope);
-  $: if (dialogueRecovery && dialogueRecovery.scope !== dialogueScope) dialogueRecovery = null;
   $: if (mounted && categorizedDialogue && engine && userId && tdfId && attemptId && subsetKind === 'question'
     && startedDialogueScope !== dialogueScope && !dialogueSubmitPending) {
     startCategorizedDialogue(sparcDisplay, dialogueScope);
   }
   $: autoTutorDialoguePrompt = autoTutorDialogueMode && !categorizedDialogue ? dialoguePrompt(topLevelNodes) : '';
-  $: savedDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending || dialogueRecovery
+  $: savedDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending
     ? { ...node, readOnly: true, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];
   $: contentReferenceIds = sparcContentReferenceIds(savedDialogueMessages);
   $: contentReferenceSignature = JSON.stringify([dialogueScope, contentReferenceIds]);
@@ -935,7 +910,7 @@
   $: showAutoTutorTextResponse = autoTutorDialogueMode
     && !!autoTutorDialogueInputNode && !!autoTutorDialogueSubmitNode
     && !autoTutorDialogueInputNode.readOnly && !autoTutorDialogueSubmitNode.readOnly
-    && !dialogueSubmitPending && !dialogueRecovery && !autoTutorDialogueCompleted
+    && !dialogueSubmitPending && !autoTutorDialogueCompleted
     && !currentQuestionRemoved && currentQuestionVisible && contentReferenceIds.every(id => checkedContentIds.has(id))
     && (!categorizedDialogue || dialogueInitialized);
   $: progressiveNodeOperationCount = progressiveNodeOperations.length;
@@ -1051,14 +1026,6 @@
         </div>
       </div>
       {/if}
-    {#if dialogueRecovery}
-      <div class="sparc-auto-tutor-recovery">
-        <p role="status">{platformText('autoTutor.responseRetry')}</p>
-        <button type="button" class="btn btn-primary" data-sparc-retry on:click={retryTutorResponse} disabled={dialogueSubmitPending}>
-          {platformText('common.tryAgain')}
-        </button>
-      </div>
-    {/if}
     {#if dialogueSubmitError}
       <p class="sparc-auto-tutor-submit-error" role="alert">
         {dialogueSubmitError}

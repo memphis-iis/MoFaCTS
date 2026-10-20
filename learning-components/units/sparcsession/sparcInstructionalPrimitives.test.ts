@@ -140,7 +140,6 @@ describe('SPARC instructional primitives', () => {
     for (const figure of [
       { assetId: 'https://example.org/image.png', description: 'Image' },
       { assetId: 'image123', description: '<script>run()</script>' },
-      { assetId: 'image123', description: 'A'.repeat(2049) },
       { assetId: 'image123', description: '' },
       { assetId: 'image123', description: 'Image', dataUrl: 'data:image/png;base64,123' },
     ]) assert.throws(() => parseSparcSupportedPrompt({ tutorMessage: 'Q?', figure }));

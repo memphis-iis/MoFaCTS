@@ -6,7 +6,7 @@ import type { SparcAuthoredDocument, SparcInterfaceEvent, SparcStateTransition, 
 import { buildSparcDialogueHistory, type SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { SPARC_FEEDBACK_MOVE_DEFINITION, getSparcMoveDefinition } from './sparcMoveDefinitions';
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
-import { createSparcDialogueTurnTransition, requireBoundedSparcDialogueMessage } from './sparcDialogueTurnNodes';
+import { createSparcDialogueTurnTransition, requireSparcDialogueText } from './sparcDialogueTurnNodes';
 import { parseSparcQuestionChoices, type SparcQuestionChoice } from './sparcMultipleChoiceQuestion';
 import { isSparcChoiceFormat, validateSparcClozeQuestion } from '../../runtime/sparcTargetCategories';
 
@@ -68,8 +68,8 @@ export function parseInstructionComponents(value: unknown, request: SparcUtteran
   else if (record.choices !== undefined) throw new Error('Text-response instruction cannot contain multiple-choice options');
   if (request.moveDefinition.responseFormat === 'cloze' && !(removed as string[] | undefined)?.includes('question')) validateSparcClozeQuestion(String(record.question ?? ''));
   if (record.supportHeading !== undefined) {
-    const heading = requireBoundedSparcDialogueMessage(record.supportHeading, 'Support heading');
-    if (!components.includes('richContent') || record.figure || heading.length > 60 || /[<>\r\n]/.test(heading)) throw new Error('Invalid instructional support heading');
+    const heading = requireSparcDialogueText(record.supportHeading, 'Support heading');
+    if (!components.includes('richContent') || record.figure || /[<>\r\n]/.test(heading)) throw new Error('Invalid instructional support heading');
   }
   if (record.video !== undefined) {
     if (!components.includes('richContent') || record.figure || record.supportHeading || record.richContent !== (record.video as SparcVideoSegment).transcript) throw new Error('Video requires standalone rich support');
@@ -80,7 +80,7 @@ export function parseInstructionComponents(value: unknown, request: SparcUtteran
     parseSparcPromptFigure(record.figure);
   }
   for (const component of ['explanation', 'richContent', 'question'] as const) {
-    if (components.includes(component)) requireBoundedSparcDialogueMessage(record[component], `SPARC ${component}`);
+    if (components.includes(component)) requireSparcDialogueText(record[component], `SPARC ${component}`);
     else if (record[component] !== null) throw new Error(`Unexpected ${component} in selected instruction`);
   }
   if (typeof record.richContent === 'string' && /<(script|iframe|input|button|style)\b|\bon\w+\s*=|javascript:/i.test(record.richContent)) {
@@ -101,7 +101,7 @@ export function createSparcInstructionTransition(params: {
   const composite = params.request.moveDefinition.components ? parseInstructionComponents(params.generated, params.request) : undefined;
   const supported = params.request.moveDefinition.outputSchemaId === SPARC_SUPPORTED_PROMPT_SCHEMA_ID
     ? parseSparcSupportedPrompt(params.generated) : undefined;
-  const tutorText = supported?.tutorMessage ?? composite?.question ?? requireBoundedSparcDialogueMessage(
+  const tutorText = supported?.tutorMessage ?? composite?.question ?? requireSparcDialogueText(
     typeof params.generated === 'string' ? params.generated : 'text' in params.generated ? params.generated.text : undefined,
     'SPARC tutor utterance');
   const transition = createSparcDialogueTurnTransition({
@@ -133,7 +133,7 @@ export function createSparcInstructionTransition(params: {
 /** Feedback binds the assessed response, never a next instructional decision. */
 export function createSparcFeedbackRequest(facts: readonly SparcWorkingMemoryFact[], event: SparcInterfaceEvent, sourceRuleId: string): SparcUtteranceRequest {
   const contribution = facts.find((fact) => fact.factType === 'learnerResponse.contribution')?.slots;
-  const learnerText = requireBoundedSparcDialogueMessage(event.payload?.input, 'SPARC feedback learner answer');
+  const learnerText = requireSparcDialogueText(event.payload?.input, 'SPARC feedback learner answer');
   const problem = facts.find((fact) => fact.factType === 'dialogue.problemStatement')?.slots?.text;
   const question = facts.filter(fact => fact.factType === 'dialogue.utterance' && fact.slots?.speaker === 'tutor'
     && ['learningTarget', 'misconception'].includes(String(fact.slots?.targetType))
@@ -157,7 +157,7 @@ export function createSparcFeedbackRequest(facts: readonly SparcWorkingMemoryFac
     throw new Error('Feedback requires the current response assessment');
   }
   return {
-    problemStatement: requireBoundedSparcDialogueMessage(problem, 'SPARC feedback problem statement'),
+    problemStatement: requireSparcDialogueText(problem, 'SPARC feedback problem statement'),
     targetType: 'feedback', targetId, action: SPARC_FEEDBACK_MOVE_DEFINITION.moveId,
     contentTexts: [String(target.slots?.text)], targetContent: target.slots,
     selectedAction: { snapshotId: event.eventId, action: SPARC_FEEDBACK_MOVE_DEFINITION.moveId, sourceRuleId },

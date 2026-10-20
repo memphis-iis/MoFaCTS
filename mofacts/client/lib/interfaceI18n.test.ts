@@ -188,7 +188,7 @@ describe('interfaceI18n', function() {
     'autoTutor.misconceptions',
     'autoTutor.coveredExpectations',
     'autoTutor.misconceptionScore',
-    'autoTutor.serviceError',
+    'sparc.serviceError',
     'autoTutor.conversation',
     'autoTutor.oneTurn',
     'autoTutor.turnCount',

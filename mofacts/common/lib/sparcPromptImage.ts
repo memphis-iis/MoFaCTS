@@ -34,7 +34,7 @@ export function parseSparcPromptFigure(value: unknown): SparcPromptFigure {
   if (Object.keys(figure).some(key => !['assetId', 'description', 'displayWidth'].includes(key)) || typeof figure.assetId !== 'string'
     || !/^[a-zA-Z0-9]{1,20}$/.test(figure.assetId)
     || typeof figure.description !== 'string' || !figure.description.trim()
-    || figure.description.length > 2048 || /[<>]/.test(figure.description)) {
+    || /[<>]/.test(figure.description)) {
     throw new Error('Invalid supported Prompt figure fields');
   }
   return { assetId: figure.assetId, description: figure.description.trim(),

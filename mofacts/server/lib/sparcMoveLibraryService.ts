@@ -43,14 +43,14 @@ function bounded(value: unknown, label: string, max: number): asserts value is s
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`Invalid ${label}`);
 }
 export function validatePrimitiveContent(value: SparcPrimitiveContent, context: SparcPrimitiveContext): SparcPrimitiveContent {
-  bounded(value?.text, 'primitive text', 2048);
+  if (typeof value?.text !== 'string' || !value.text.trim()) throw new Error('Invalid primitive text');
   if (Object.keys(value).some(k => !['text', 'figure', 'video', 'choices', 'supportHeading'].includes(k))) throw new Error('Unexpected primitive field');
   if (context.supportKind === 'visual' && !value.video && !value.figure) throw new Error('The visual move requires a video or image');
   if (context.supportKind === 'written' && (value.video || value.figure)) throw new Error('The written move cannot select visual support');
   if (/<\s*(script|iframe|input|button|style)|\bon\w+\s*=|javascript:/i.test(value.text)) throw new Error('Unsafe instructional markup');
   if (value.video) { if (context.kind !== 'richContent' || value.figure || value.supportHeading || value.text !== value.video.transcript) throw new Error('Video requires standalone rich support'); parseSparcVideoSegment(value.video); }
   if (value.figure) { if (context.kind !== 'richContent') throw new Error('Figure requires rich support'); parseSparcPromptFigure(value.figure); }
-  if (value.supportHeading) { bounded(value.supportHeading, 'support heading', 60); if (context.kind !== 'richContent' || value.figure) throw new Error('Invalid support heading'); }
+  if (value.supportHeading) { if (typeof value.supportHeading !== 'string' || !value.supportHeading.trim()) throw new Error('Invalid support heading'); if (context.kind !== 'richContent' || value.figure) throw new Error('Invalid support heading'); }
   if (context.kind === 'question') {
     if (!SPARC_QUESTION_RESPONSE_FORMATS.some(format => format === context.responseFormat)) throw new Error('Invalid question response format');
     if (isSparcChoiceFormat(context.responseFormat)) parseSparcQuestionChoices(value.choices, context.responseFormat);
@@ -163,7 +163,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         || new Set(query.context.components).size !== query.context.components.length || !query.context.components.includes(query.context.kind)
         || !Array.isArray(query.previousQuestions) || query.previousQuestions.length > 1000) throw new Error('Invalid primitive request');
       for (const key of ['target', 'move', 'responseFormat', 'requirements', 'focus', 'dependencies', 'specification'] as const) bounded(query.context[key], `context ${key}`, 30000);
-      for (const question of query.previousQuestions) bounded(question?.text, 'previous question', 2048);
+      for (const question of query.previousQuestions) if (typeof question?.text !== 'string' || !question.text.trim()) throw new Error('Invalid previous question');
       const id = moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]);
       const saved = await store.request(id);
       if (saved) {
@@ -237,7 +237,6 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         const questionEmbedding = request.query.context.kind === 'question'
           ? { model: deps.embeddingModel, text: content.text, vector: await embed(content.text, request.query) } : undefined;
         return await withQuestionLock(userId, request.query, async () => {
-          if (questionEmbedding && !await novel(questionEmbedding.vector, request.query, userId)) return { accepted: false as const, reason: 'Question is too similar to an earlier question. Generate a different question.' };
           const id = moveDigest([SPARC_MOVE_LIBRARY_VERSION, request.query.context.kind, deps.embeddingModel, request.embedding, content]);
           if (await store.removed(id)) return { accepted: false as const, reason: 'This content was administratively removed. Generate different content.' };
           await store.saveEntry({ _id: id, version: SPARC_MOVE_LIBRARY_VERSION, context: request.query.context, kind: request.query.context.kind,

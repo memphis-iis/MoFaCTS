@@ -1,4 +1,3 @@
-import { getJsonUtf8ByteLength } from '../../runtime/historyEnvelope';
 import type { HistoryRuntime } from '../../runtime/LearningComponentContext';
 import { SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY } from '../../trial-displays/sparc/sparcProgressiveNodes';
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
@@ -12,22 +11,10 @@ import type {
   SparcStateWrite,
 } from './sparcSessionContracts';
 
+// Advisory generation thresholds; exceeded sizes are logged without rejecting text.
 export const SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES = 2 * 1024;
 export const SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS = 2 * 1024;
 export const SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS = 2096;
-
-export class SparcDialogueMessageLimitError extends Error {
-  constructor(
-    readonly field: string,
-    readonly unit: 'characters' | 'json-utf8-bytes',
-    readonly observedSize: number,
-    readonly limit: number,
-  ) {
-    const description = unit === 'characters' ? 'characters' : 'JSON UTF-8 bytes';
-    super(`${field} exceeds ${limit} ${description}: ${observedSize} ${unit === 'characters' ? 'characters' : 'bytes'}`);
-    this.name = 'SparcDialogueMessageLimitError';
-  }
-}
 
 export type SparcDialogueTurnNodeOptions = {
   readonly boxId?: string;
@@ -51,19 +38,11 @@ function requireNonBlank(value: unknown, label: string): string {
   return normalized;
 }
 
-export function requireBoundedSparcDialogueMessage(
+export function requireSparcDialogueText(
   value: unknown,
   label: string,
 ): string {
-  const text = requireNonBlank(value, label);
-  if (text.length > SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS) {
-    throw new SparcDialogueMessageLimitError(label, 'characters', text.length, SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS);
-  }
-  const bytes = getJsonUtf8ByteLength(text);
-  if (bytes > SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES) {
-    throw new SparcDialogueMessageLimitError(label, 'json-utf8-bytes', bytes, SPARC_DIALOGUE_MAX_PERSISTED_MESSAGE_BYTES);
-  }
-  return text;
+  return requireNonBlank(value, label);
 }
 
 function utteranceNode(params: {
@@ -152,8 +131,8 @@ export function createSparcDialogueTurnTransition(params: {
   }
   const eventId = requireNonBlank(params.event.eventId, 'SPARC dialogue eventId');
   const learnerText = params.includeLearner === false ? undefined
-    : requireBoundedSparcDialogueMessage(params.learnerText, 'SPARC learner dialogue text');
-  const tutorText = requireBoundedSparcDialogueMessage(params.tutorText, 'SPARC tutor dialogue text');
+    : requireSparcDialogueText(params.learnerText, 'SPARC learner dialogue text');
+  const tutorText = requireSparcDialogueText(params.tutorText, 'SPARC tutor dialogue text');
   const boxId = requireNonBlank(params.options?.boxId ?? 'dialogue-flow', 'SPARC dialogue boxId');
   const productionRuleId = params.utteranceRequest.sourceRuleId;
   const productionRuleName = [

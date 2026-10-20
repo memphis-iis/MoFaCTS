@@ -3,7 +3,6 @@ import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcCategorizedPolicy } from '../../
 import { currentSparcMenu } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
 import { strict as assert } from 'node:assert';
 import { commitSparcAutoTutorSubmit, commitSparcAutoTutorDocumentLoad } from './sparcAutoTutorRuleCommit';
-import { SparcOutputLimitRecoveryError } from './sparcOutputLimitRecovery';
 import { clearSparcRuntimeState, hydrateSparcRuntimeHistory, readSparcResumeSnapshot } from './sparcRuntimeState';
 import { commitSparcTrialDisplayAutoTutorRules } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
@@ -199,12 +198,12 @@ describe('SPARC app instructional commit', () => {
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: [{ clusterKC: 'a', coverage: 0.2 }] }; },
-      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new SparcOutputLimitRecoveryError(); return instructionFixture(request); },
+      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new Error('Synthetic provider failure'); return instructionFixture(request); },
       deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'tdf', levelUnit: 0, pageKey: display.pageKey, display };
     const choice = { submittedNodes: { 'learner-response-input': 'An answer.' }, timestamp: 10 };
-    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, sparcResult: choice }), SparcOutputLimitRecoveryError);
+    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, sparcResult: choice }), /Synthetic provider failure/);
     await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: {...args.deps, getIsAdmin: () => false}, sparcResult: choice }), /admin account/);
     const accepted = readSparcResumeSnapshot(scope);
     assert.ok(accepted.replayState.transitions.some((transition) => transition.transitionId.endsWith(':decision')));

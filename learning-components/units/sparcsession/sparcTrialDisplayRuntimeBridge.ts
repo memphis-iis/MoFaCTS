@@ -20,7 +20,7 @@ import {
   type SparcAutoTutorRuleTurnResult,
   type SparcUtteranceGenerator,
 } from './sparcAutoTutorRuleRuntime';
-import { requireBoundedSparcDialogueMessage } from './sparcDialogueTurnNodes';
+import { requireSparcDialogueText } from './sparcDialogueTurnNodes';
 import { replaySparcDocumentHistory } from './sparcDocumentReplay';
 import {
   applySparcStateTransition,
@@ -863,7 +863,7 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     display: params.display,
     result: params.result,
   });
-  const learnerText = requireBoundedSparcDialogueMessage(
+  const learnerText = requireSparcDialogueText(
     submittedLearnerText,
     'SPARC learner dialogue text',
   );

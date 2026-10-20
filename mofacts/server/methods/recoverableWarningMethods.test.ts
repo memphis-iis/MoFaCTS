@@ -30,7 +30,8 @@ describe('recoverable warning log methods', function() {
     for (const outcome of ['regenerated', 'retry-needed', 'failed'] as const) {
       await methods.reportRecoverableWarning.call({ userId: 'learner' }, { ...outputWarning, outcome });
     }
-    expect(writes).to.have.length(3);
+    await methods.reportRecoverableWarning.call({ userId: 'learner' }, { ...outputWarning, attempts: 1, outcome: 'continued' });
+    expect(writes).to.have.length(4);
     expect(writes[0]!.details).to.deep.equal(outputWarning);
     expect(writes[0]!.actorUserId).to.equal('learner');
     for (const payload of [
@@ -48,7 +49,7 @@ describe('recoverable warning log methods', function() {
       { ...outputWarning, actorUserId: 'another-user' },
     ]) await rejected(() => methods.reportRecoverableWarning.call({ userId: 'learner' }, payload as RecoverableWarning));
     await rejected(() => methods.reportRecoverableWarning.call({}, outputWarning));
-    expect(writes).to.have.length(3);
+    expect(writes).to.have.length(4);
   });
   it('accepts bounded authenticated reports and derives identity and time on the server', async function() {
     const { methods, writes } = fixture();

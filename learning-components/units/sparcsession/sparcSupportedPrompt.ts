@@ -1,4 +1,4 @@
-import { requireBoundedSparcDialogueMessage } from './sparcDialogueTurnNodes';
+import { requireSparcDialogueText } from './sparcDialogueTurnNodes';
 import { parseSparcPromptFigure, parseSparcPromptDisplayWidth, SPARC_PROMPT_IMAGE_SETTINGS, type SparcPromptFigure } from '../../../mofacts/common/lib/sparcPromptImage';
 export { parseSparcPromptFigure, type SparcPromptFigure } from '../../../mofacts/common/lib/sparcPromptImage';
 
@@ -11,9 +11,9 @@ export type SparcSupportedPromptBrief = Readonly<{ tutorMessage: string; imagePr
 export const SPARC_SUPPORTED_PROMPT_JSON_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['tutorMessage', 'imagePrompt', 'figureDescription', 'displayWidth'],
   properties: {
-    tutorMessage: { type: 'string', minLength: 1, maxLength: 2048 },
-    imagePrompt: { type: 'string', minLength: 1, maxLength: 8000 },
-    figureDescription: { type: 'string', minLength: 1, maxLength: 2048 },
+    tutorMessage: { type: 'string', minLength: 1 },
+    imagePrompt: { type: 'string', minLength: 1 },
+    figureDescription: { type: 'string', minLength: 1 },
     displayWidth: { type: 'integer', minimum: SPARC_PROMPT_IMAGE_SETTINGS.minDisplayWidth, maximum: SPARC_PROMPT_IMAGE_SETTINGS.maxDisplayWidth },
   },
 };
@@ -28,19 +28,19 @@ function object(value: unknown, fields: readonly string[]): Record<string, unkno
 
 export function parseSparcSupportedPromptBrief(value: unknown): SparcSupportedPromptBrief {
   const output = object(value, ['tutorMessage', 'imagePrompt', 'figureDescription', 'displayWidth']);
-  if (typeof output.imagePrompt !== 'string' || !output.imagePrompt.trim() || output.imagePrompt.length > 8000) {
+  if (typeof output.imagePrompt !== 'string' || !output.imagePrompt.trim()) {
     throw new Error('Supported Prompt requires a bounded image-generation brief');
   }
   return {
-    tutorMessage: requireBoundedSparcDialogueMessage(output.tutorMessage, 'Supported Prompt tutor message'),
+    tutorMessage: requireSparcDialogueText(output.tutorMessage, 'Supported Prompt tutor message'),
     imagePrompt: output.imagePrompt.trim(),
-    figureDescription: requireBoundedSparcDialogueMessage(output.figureDescription, 'Supported Prompt figure description'),
+    figureDescription: requireSparcDialogueText(output.figureDescription, 'Supported Prompt figure description'),
     displayWidth: parseSparcPromptDisplayWidth(output.displayWidth),
   };
 }
 
 export function parseSparcSupportedPrompt(value: unknown): SparcSupportedPrompt {
   const output = object(value, ['tutorMessage', 'figure']);
-  return { tutorMessage: requireBoundedSparcDialogueMessage(output.tutorMessage, 'Supported Prompt tutor message'),
+  return { tutorMessage: requireSparcDialogueText(output.tutorMessage, 'Supported Prompt tutor message'),
     figure: parseSparcPromptFigure(output.figure) };
 }

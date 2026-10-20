@@ -9,7 +9,7 @@ const ts = require('typescript');
 const { JSDOM } = require('jsdom');
 require('./registerHistoryTypescript.cjs');
 
-it('renders inline response controls through choice, text, reload, pending, recovery and completion states', async () => {
+it('renders inline response controls through choice, text, reload, pending and completion states', async () => {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { pretendToBeVisual: true });
   for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'HTMLMediaElement', 'HTMLInputElement', 'HTMLFormElement', 'HTMLSelectElement', 'Element', 'Document', 'Node', 'Text', 'Comment', 'Event', 'CustomEvent', 'MouseEvent', 'MutationObserver']) {
     Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
@@ -22,10 +22,8 @@ it('renders inline response controls through choice, text, reload, pending, reco
     if (request === 'meteor/tracker') return { Tracker: {} };
     return originalLoad.call(this, request, parent, main);
   };
-  const { SparcOutputLimitRecoveryError } = require('../client/views/experiment/svelte/services/sparcOutputLimitRecovery.ts');
   const { compile } = require('svelte/compiler');
   const { mount, unmount, tick, flushSync } = require('svelte');
-  const { translatePlatformString } = require('../client/lib/interfaceI18n.ts');
   function component(source, name) {
     const filename = path.resolve(__dirname, name);
     const generated = compile(source, { filename, generate: 'client' }).js.code;
@@ -41,14 +39,14 @@ it('renders inline response controls through choice, text, reload, pending, reco
     {#if node.atomType === 'button'}<button disabled={node.readOnly} on:click={() => onButtonActivate(node)}>{node.label}</button>
     {:else if node.atomType === 'text-input'}<input readonly={node.readOnly} value={nodeValues[node.id] ?? node.value ?? ''} on:keydown={event => { if (event.key === 'Enter') onNodeEnter(node.id, event.currentTarget.value); }} />
     {:else}<p>{node.value || ''}</p>{/if}`, 'surfaceNodeFixture.svelte');
-  let loads = 0, submissions = 0, failLoad = true, failSubmit = false, completed = false, turnCount = 2, ordinaryFailure = false, holdSubmit, holdLoad;
+  let loads = 0, submissions = 0, completed = false, turnCount = 2, ordinaryFailure = false, holdSubmit, holdLoad;
   const stubs = {
     sparcMoveLibraryClient: { sparcMoveLibraryClient: {}, readSparcAdministrativeRemovals: async () => [] },
     sparcAdministrativeRemoval: { sparcContentReferenceIds: () => [], projectSparcAdministrativeRemovals: nodes => nodes },
     sparcController: { resolveSparcControllerDisplay: display => display, resolveSparcControllerResult: (_display, detail) => detail },
     sparcAutoTutorRuleCommit: { isSparcAutoTutorDisplay: () => true,
-      commitSparcAutoTutorDocumentLoad: async () => { loads++; if (holdLoad) await holdLoad; if (failLoad) throw new SparcOutputLimitRecoveryError(); return { sparcNodeValues: {} }; },
-      commitSparcAutoTutorSubmit: async () => { submissions++; if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); if (failSubmit) throw new SparcOutputLimitRecoveryError(); return { sparcNodeValues: {} }; },
+      commitSparcAutoTutorDocumentLoad: async () => { loads++; if (holdLoad) await holdLoad; return { sparcNodeValues: {} }; },
+      commitSparcAutoTutorSubmit: async () => { submissions++; if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
     },
     sparcControllerDialogueOpenRouter: { createSparcDialogueOpenRouterProvider: () => ({}) },
     sparcOpenRouterSession: { createSparcOpenRouterSession: () => ({ sessionIdForScope: () => 'test' }) },
@@ -63,6 +61,7 @@ it('renders inline response controls through choice, text, reload, pending, reco
     sparcCitationDiagnostics: { redactSparcDialogueDiagnosticText: text => text },
   };
   Module._load = function(request, parent, main) {
+    if (request === 'meteor/tracker') return { Tracker: {} };
     if (request === './TestSurface.svelte') return surface;
     if (request.endsWith('/SparcAutoTutorProgress.svelte')) return component(fs.readFileSync(path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcAutoTutorProgress.svelte'), 'utf8'), path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcAutoTutorProgress.svelte'));
     if (request.endsWith('.svelte')) return request.endsWith('/SparcNode.svelte') ? node : empty;
@@ -91,28 +90,9 @@ it('renders inline response controls through choice, text, reload, pending, reco
     </script><Surface {...current} />`, 'surfaceWrapper.svelte');
     app = mount(wrapper, { target, props: { initial: props } });
     await settle();
-    const assertRecovery = () => {
-      assert.ok(target.querySelector('[data-sparc-retry]'));
-      assert.equal(target.querySelector('input'), null);
-      assert.equal(target.querySelector('.sparc-auto-tutor-input-bar'), null);
-      assert.equal(target.querySelector('[data-sparc-retry]'), document.activeElement);
-      assert.match(target.textContent, /saved progress is retained/);
-      assert.doesNotMatch(target.textContent, /configuration or service error|Technical detail/);
-      assert.equal(target.querySelector('[role="status"]').textContent, translatePlatformString('en', 'autoTutor.responseRetry'));
-    };
-    assertRecovery(); assert.equal(loads, 1);
-    target.querySelector('[data-sparc-retry]').click(); await settle();
-    assertRecovery(); assert.equal(loads, 2, 'Repeated exhaustion must not loop automatically');
-    failLoad = false;
-    target.querySelector('[data-sparc-retry]').click(); await settle();
-    assert.equal(loads, 3); assert.equal(target.querySelector('[data-sparc-retry]'), null);
-    assert.equal(target.querySelector('input').readOnly, false);
-    failSubmit = true;
-    target.querySelector('.sparc-auto-tutor-submit button').click(); await settle();
-    assertRecovery(); assert.equal(submissions, 1);
-    target.querySelector('[data-sparc-retry]').click(); await settle();
-    assert.equal(loads, 4); assert.equal(submissions, 1, 'Student retry continues accepted work instead of submitting another answer');
     assert.equal(target.querySelector('[data-sparc-retry]'), null);
+    assert.doesNotMatch(target.textContent, /another moment|Try again/);
+    assert.equal(loads, 1);
     const assertText = () => {
       const chat = target.querySelector('.sparc-auto-tutor-chat');
       assert.ok(chat.querySelector('.sparc-auto-tutor-input-bar input'));
@@ -139,7 +119,6 @@ it('renders inline response controls through choice, text, reload, pending, reco
       app.update({ ...display, nodes: [{ id: 'cloze-question', atomType: 'dialogue-utterance', value: 'Fill the blank: ___' }, ...display.nodes] });
       await settle(); assertText();
     }
-    failSubmit = false;
     ordinaryFailure = true;
     const input = target.querySelector('input');
     input.value = 'My draft answer';
@@ -147,6 +126,7 @@ it('renders inline response controls through choice, text, reload, pending, reco
     await settle(); assertText();
     assert.equal(target.querySelector('input').value, 'My draft answer');
     assert.match(target.querySelector('[role="alert"]').textContent, /service/i);
+    assert.equal(submissions, 1);
     ordinaryFailure = false;
     let releaseSubmit;
     holdSubmit = new Promise(resolve => { releaseSubmit = resolve; });

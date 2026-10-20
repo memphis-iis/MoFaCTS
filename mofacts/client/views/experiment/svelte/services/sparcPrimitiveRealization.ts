@@ -8,7 +8,7 @@ import { clientConsole } from '../../../../lib/clientLogger';
 export async function realizeSparcPrimitive(params: {
   request: SparcUtteranceRequest; kind: SparcPrimitiveKind; dependencies: unknown;
   tdfId: string; sessionId: string; library: SparcMoveLibraryClient;
-  generate(rejection?: string, previousQuestions?: SparcPrimitiveQuery['previousQuestions']): Promise<SparcPrimitiveContent>;
+  generate(previousQuestions?: SparcPrimitiveQuery['previousQuestions']): Promise<SparcPrimitiveContent>;
   persist(content: SparcPrimitiveContent, reference: SparcPrimitiveReference): Promise<void>;
 }): Promise<SparcPrimitiveContent> {
   const callStartedAtMs = Date.now();
@@ -29,17 +29,10 @@ export async function realizeSparcPrimitive(params: {
     let reference: SparcPrimitiveReference;
     if (result.status === 'hit') { content = result.content; reference = result.reference; }
     else {
-      let accepted: SparcPrimitiveReference | undefined;
-      let rejection: string | undefined;
-      let generated: SparcPrimitiveContent | undefined;
-      for (let attempt = 0; attempt < (kind === 'question' ? 3 : 1); attempt++) {
-        generated = await params.generate(rejection, result.previousQuestions);
-        const saved = await params.library.publish(result.ticket, generated);
-        if (saved.accepted) { accepted = saved.reference; generated = saved.content; break; }
-        rejection = saved.reason;
-      }
-      if (!accepted || !generated) throw new Error('Could not produce a sufficiently distinct question after three attempts. Your saved progress is retained.');
-      content = generated; reference = accepted;
+      const generated = await params.generate(result.previousQuestions);
+      const saved = await params.library.publish(result.ticket, generated);
+      if (!saved.accepted) throw new Error(saved.reason);
+      content = saved.content; reference = saved.reference;
     }
     source = reference.source;
     await params.persist(content, reference);

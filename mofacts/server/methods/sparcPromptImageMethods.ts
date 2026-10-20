@@ -44,6 +44,10 @@ function bounded(value: unknown, label: string, max: number): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Meteor.Error(400, `${label} is required and must be bounded`);
   return value.trim();
 }
+function instructionalText(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !value.trim()) throw new Meteor.Error(400, `${label} is required`);
+  return value.trim();
+}
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /** Admin experiment only. Teaching-library assets are shared; other session assets retain ownership. */
@@ -56,7 +60,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
   const minimumSimilarity = sparcFigureMinimumSimilarity(deps.minimumFigureSimilarity);
   const imageMetadata = (entry: SparcFigureInspection, asset: Asset) => {
     if (asset.meta.figureLibraryVersion !== entry.version) throw new Meteor.Error(500, 'A library figure is missing its completed canonical asset');
-    return { assetId: asset._id, description: bounded(asset.meta.description, 'Saved figure description', 2048),
+    return { assetId: asset._id, description: instructionalText(asset.meta.description, 'Saved figure description'),
       model: asset.meta.humanReplacement === true ? 'Human replacement' : entry.imageModel,
       createdAt: (asset.meta.humanReplacement === true ? new Date(asset.meta.replacedAt) : entry.createdAt).toISOString(),
     };
@@ -89,7 +93,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
     await deps.DynamicAssets.collection.updateAsync({ _id: asset._id }, { $set: { 'meta.ready': true, 'meta.storageBackend': 's3', 'meta.storageKey': storageKey } });
   };
   const envelope = (asset: Asset, reused: boolean) => ({
-    tutorMessage: bounded(asset.meta.tutorMessage, 'Saved tutor message', 2048),
+    tutorMessage: instructionalText(asset.meta.tutorMessage, 'Saved tutor message'),
     figure: parseSparcPromptFigure({ assetId: asset._id, description: asset.meta.description,
       ...(Object.prototype.hasOwnProperty.call(asset.meta, 'displayWidth') ? { displayWidth: asset.meta.displayWidth } : {}) }),
     ...(!reused ? { usage: asset.meta.usage } : {}),
@@ -103,11 +107,11 @@ export function createSparcPromptImageMethods(deps: Deps) {
       const tdfId = bounded(params?.tdfId, 'TDF identity', 200);
       const sessionId = bounded(params?.sessionId, 'Session identity', 200);
       const generationId = bounded(params?.generationId, 'Generation identity', 500);
-      const tutorMessage = bounded(params?.tutorMessage, 'Tutor message', 2048);
-      const description = bounded(params?.figureDescription, 'Figure description', 2048);
+      const tutorMessage = instructionalText(params?.tutorMessage, 'Tutor message');
+      const description = instructionalText(params?.figureDescription, 'Figure description');
       const displayWidth = parseSparcPromptDisplayWidth(params?.displayWidth);
       parseSparcPromptFigure({ assetId: 'validation', description });
-      const prompt = bounded(params?.imagePrompt, 'Image brief', SPARC_PROMPT_IMAGE_SETTINGS.maxPromptCharacters);
+      const prompt = instructionalText(params?.imagePrompt, 'Image brief');
       const situation = params.situation === undefined ? undefined : sparcInstructionalNeedText(params.situation);
       if (params.situation?.feedback !== undefined) throw new Meteor.Error(400, 'Feedback answers belong in private primitive requests, not shared image sources');
       const identity = digest(JSON.stringify([userId, tdfId, sessionId, generationId]));

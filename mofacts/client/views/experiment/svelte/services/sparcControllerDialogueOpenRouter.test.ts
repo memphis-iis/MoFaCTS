@@ -12,7 +12,6 @@ import {
   type SparcDialogueOpenRouterUsageEvent,
 } from './sparcControllerDialogueOpenRouter.ts';
 import { createEmptySparcReplayState } from '../../../../../../learning-components/units/sparcsession/sparcStateReplay';
-import { SparcOutputLimitRecoveryError } from './sparcOutputLimitRecovery';
 import {
   SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,
   SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
@@ -71,6 +70,7 @@ function dialogueDisplay(): SparcControllerDisplay {
 type ScorerDialogueEntry = Readonly<{
   speaker: 'learner' | 'tutor';
   text: string;
+  figure?: { assetId: string; description: string; displayWidth: number };
 }>;
 
 function scorerContext(
@@ -93,7 +93,7 @@ function scorerContext(
         slots: { id: 'mis-1', supportStrength: 0.5 },
       }, ...dialogueHistory.map((entry) => ({
         factType: 'dialogue.utterance',
-        slots: { speaker: entry.speaker, text: entry.text },
+        slots: { speaker: entry.speaker, text: entry.text, ...(entry.figure ? { figure: entry.figure } : {}) },
       }))],
       root: { id: 'root', kind: 'document' as const },
     },
@@ -204,43 +204,31 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
-  it('recovers only the unfinished primitive and never persists oversized output or repeats accepted support', async () => {
+  it('retains oversized explanation and question text in one generated move without regeneration', async () => {
     const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text');
     const generated: string[] = [];
     const saved: Partial<SparcInstructionComponents> = {};
     const warnings: unknown[] = [];
-    let retry = false;
-    let richCalls = 0;
+    const text = 'An explanation with complete reasoning. '.repeat(80).trim();
     const provider = createSparcDialogueOpenRouterProvider({
       reportWarning: warning => { warnings.push(warning); },
       async callResolvedOpenRouterJson(params) {
-        const kind = params.intent.schemaName;
-        generated.push(kind);
-        if (kind.includes('rich_primitive')) return { parsedContent: { kind: 'worked-example', heading: 'Worked Example',
-          workedExample: ++richCalls === 1 ? 'a'.repeat(2048) : 'A complete worked case.', imagePrompt: null, figureDescription: null, displayWidth: null } };
-        return { parsedContent: { tutorMessage: kind.includes('explanation_primitive') ? 'The governing idea.' : retry ? 'Which case applies?' : 'a'.repeat(2048) } };
+        generated.push(params.intent.schemaName);
+        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'worked-example', heading: 'Worked Example',
+          workedExample: text, imagePrompt: null, figureDescription: null, displayWidth: null } };
+        return { parsedContent: { tutorMessage: text } };
       },
     });
-    const request = { ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
-      onInstructionComponent: async (kind: 'explanation' | 'richContent' | 'question', text: string, _figure: unknown, details: unknown) => {
-        expect(text.length).to.be.lessThan(2048);
-        Object.assign(saved, { [kind]: text }, details);
-      },
-    };
-    let failure: unknown;
-    try { await provider.generateTutorUtterance(request); } catch (error) { failure = error; }
-    expect(failure).to.be.instanceOf(SparcOutputLimitRecoveryError);
-    expect(saved).to.include({ richContent: 'A complete worked case.', explanation: 'The governing idea.' });
-    expect(saved).not.to.have.property('question');
-    const count = generated.length;
-    retry = true;
-    const result = await provider.generateTutorUtterance({ ...request, realizedInstruction: saved }) as SparcInstructionComponents;
-    expect(result.question).to.equal('Which case applies?');
-    expect(generated.slice(count)).to.deep.equal(['mofacts_sparc_question_primitive']);
-    expect(warnings).to.have.length(2);
+    const result = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
+      onInstructionComponent: async (kind, value) => { Object.assign(saved, { [kind]: value }); },
+    }) as SparcInstructionComponents;
+    expect(result).to.include({ richContent: text, explanation: text, question: text });
+    expect(saved).to.include({ richContent: text, explanation: text, question: text });
+    expect(generated).to.have.length(3);
+    expect(warnings).to.have.length(6);
   });
 
-  it('regenerates an oversized figure brief before creating any image', async () => {
+  it('logs an oversized figure brief and creates the image without regeneration', async () => {
     let calls = 0;
     let images = 0;
     const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'lesson', sessionId: 'session',
@@ -251,13 +239,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
           figureDescription: calls === 1 ? 'a'.repeat(2048) : 'The process.', displayWidth: 360 } };
       },
       async callSparcPromptImage(params) {
-        images++; expect(calls).to.equal(2);
-        expect(params.figureDescription).to.equal('The process.');
+        images++; expect(calls).to.equal(1);
+        expect(params.figureDescription).to.equal('a'.repeat(2048));
         return { tutorMessage: params.tutorMessage, figure: { assetId: 'image123', description: params.figureDescription, displayWidth: 360 } };
       },
     });
     await provider.generateTutorUtterance({ ...utteranceRequestFor('prompt-supported', 'learningTarget'), selectedAction: { snapshotId: 'same-event' } });
     expect(images).to.equal(1);
+    expect(calls).to.equal(1);
   });
   it('retrieves every instructional primitive before any generation and journals using the canonical history session', async function() {
     const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text');
@@ -265,7 +254,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'opaque-provider-correlation',
       async callResolvedOpenRouterJson() { throw new Error('No generation should run on a library hit'); },
       async callSparcPromptImage() { throw new Error('No image generation should run on a library hit'); },
-      async readSparcPromptImage() { throw new Error('No image read is needed when all components are retrieved'); },
       moveLibrary: {
         async lookup(query) {
           expect(query.sessionId).to.equal('canonical-history-session');
@@ -314,7 +302,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
       const observed: string[] = [];
       const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
         async callSparcVisualSupport(params) { return { figure: { assetId: 'image123', description: params.figureDescription, displayWidth: 360 } }; },
-        async readSparcPromptImage() { return { dataUrl: 'data:image/png;base64,AAAA' }; },
         callResolvedOpenRouterJson: async params => {
         const system = String(params.messages[0]!.content);
         expect(system).to.contain('The KC text identifies the knowledge; its assigned KLI category supplies the learning-process focus');
@@ -387,11 +374,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
     }
   });
 
-  it('keeps generation on the selected evidence and current components while retaining earlier questions only for novelty', async function() {
+  it('guides the initial question with earlier questions and accepts the first output without a repetition check', async function() {
     const evidence = { kind: 'expectation', id: 'kc-a', demonstrated: ['Known A'], incorrect: [], unresolved: ['Remaining A'] };
     const calls: string[] = [];
     const provider = createSparcDialogueOpenRouterProvider({
-      async readSparcPromptImage() { throw new Error('An unrelated historical figure must not be loaded'); },
       async callResolvedOpenRouterJson(params) {
         const system = String(params.messages[0]!.content);
         const context = JSON.parse(String(params.messages[1]!.content));
@@ -401,12 +387,17 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(JSON.stringify(params.messages)).not.to.include('UNRELATED');
         const question = params.intent.schemaName.includes('question_primitive');
         expect(system.includes('Earlier question?')).to.equal(question);
-        if (question) expect(context.explanation).to.equal('Current explanation.');
+        if (question) {
+          expect(context.explanation).to.equal('Current explanation.');
+          expect(system).to.include('different task or case');
+          expect(system).to.include('changing only names, wording, or option order does not create a new task');
+          expect(system).to.include('Do not broaden the target or add requirements');
+        }
         calls.push(params.intent.schemaName);
-        return { parsedContent: { tutorMessage: question ? 'New question?' : 'Current explanation.' } };
+        return { parsedContent: { tutorMessage: question ? 'Earlier question?' : 'Current explanation.' } };
       },
     });
-    await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.dynamic.explanation-question.text',
+    const output = await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.dynamic.explanation-question.text',
       moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-question.text'),
       learnerText: 'UNRELATED previous answer',
       plannerState: { evidence: [evidence, { ...evidence, id: 'kc-b', demonstrated: ['UNRELATED target'] },
@@ -416,6 +407,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         { role: 'tutor', text: 'Earlier question?', responseId: 'old:question' }, { role: 'student', text: 'UNRELATED answer' }],
     });
     expect(calls).to.have.length(2);
+    expect(output).to.deep.equal({ explanation: 'Current explanation.', richContent: null, question: 'Earlier question?' });
   });
 
   it('rejects rich output that cannot be rendered or invents an image asset', async function() {
@@ -437,7 +429,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
     let explanations = 0;
     let questions = 0;
     const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
-      async readSparcPromptImage(assetId) { expect(assetId).to.equal('image123'); return { dataUrl: 'data:image/png;base64,AAAA' }; },
       async callSparcVisualSupport(params) {
         images++; expect(params.imagePrompt).to.include('complete teaching figure');
         return { tutorMessage: params.tutorMessage, figure: { assetId: 'image123', description: params.figureDescription, displayWidth: params.displayWidth } };
@@ -445,7 +436,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
       async callResolvedOpenRouterJson(params) {
         if (params.intent.schemaName.includes('explanation_primitive')) {
           explanations++; expect(images).to.equal(1);
-          expect(JSON.stringify(params.messages[1]!.content)).to.include('data:image/png;base64,AAAA');
+          expect(params.messages[1]!.content).to.be.a('string');
+          expect(String(params.messages[1]!.content)).to.include('Three different intervals and one fixed mean.');
+          expect(JSON.stringify(params.messages)).not.to.include('data:image/');
           return { parsedContent: { tutorMessage: 'The parameter stays fixed across repeated samples.' } };
         }
         if (params.intent.schemaName.includes('visual_primitive')) {
@@ -460,7 +453,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
         const content = params.messages[1]!.content;
         expect(JSON.stringify(content)).to.include('parameter stays fixed');
         expect(JSON.stringify(content)).to.include('Three different intervals');
-        expect(JSON.stringify(content)).to.include('data:image/png;base64,AAAA');
+        expect(content).to.be.a('string');
+        expect(JSON.stringify(params.messages)).not.to.include('data:image/');
         if (questions === 1) throw new Error('question provider failed');
         return { parsedContent: { tutorMessage: 'In a new repeated-sampling experiment, which quantity stays fixed?' } };
       },
@@ -503,6 +497,30 @@ describe('SPARC dialogue OpenRouter provider', function() {
       moveDefinition: requireActiveSparcMoveDefinition('instruction.feedback'), plannerState: { assessment: [{ clusterKC: 'kc-a', coverage: .4 }] } });
     expect(result).to.equal('The parameter is fixed; the intervals vary.');
   });
+  it('scores a figure-supported answer using its saved description without image input', async function() {
+    const figure = { assetId: 'image123', description: 'A balance that includes earlier interest.', displayWidth: 360 };
+    const learnerText = 'Interest is calculated on the total balance.';
+    const provider = createSparcDialogueOpenRouterProvider({
+      async callResolvedOpenRouterJson(params) {
+        expect(params.messages.every(message => typeof message.content === 'string')).to.equal(true);
+        const input = JSON.parse(params.messages[1]!.content as string);
+        expect(input.dialogueHistory[0].figure.description).to.equal(figure.description);
+        expect(JSON.stringify(params.messages)).not.to.include('image_url');
+        expect(JSON.stringify(params.messages)).not.to.include('data:image/');
+        return { parsedContent: {
+          learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
+            learnerEvidence: latestLearnerEvidence('total balance') }],
+          diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
+          learnerContribution: { type: 'answer' },
+        } };
+      },
+    });
+    const score = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText,
+      ...scorerContext(undefined, [{ speaker: 'tutor', text: 'How is interest calculated?', figure }]),
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(score.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
+  });
+
   it('evaluates a selected MC meaning as evidence rather than converting its answer key into coverage', async function() {
     const context = scorerContext();
     const learnerText = 'Interest is calculated on the total balance.';
@@ -1185,7 +1203,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.learnerContribution?.type).to.equal('answer');
   });
 
-  it('generates an aligned brief then a private image and supplies that image on later turns', async function() {
+  it('generates an aligned brief then a private image and supplies only its saved description on later turns', async function() {
     const utteranceRequest = utteranceRequestFor('prompt-supported', 'learningTarget');
     const figure = { assetId: 'image123', description: 'Two stages separated by an unfinished middle step.', displayWidth: 360 };
     let jsonCalls = 0;
@@ -1199,8 +1217,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
           return { parsedContent: { tutorMessage: 'What happens between these stages?', imagePrompt: 'A polished illustration with its middle step omitted.', figureDescription: figure.description, displayWidth: figure.displayWidth } };
         }
         const content = params.messages[1]!.content;
-        expect(Array.isArray(content)).to.equal(true);
-        expect(content).to.deep.include({ type: 'image_url', image_url: { url: 'data:image/png;base64,aW1hZ2U=' } });
+        expect(content).to.be.a('string');
+        expect(content).to.include(figure.description);
+        expect(content).not.to.include('data:image/');
+        expect(content).not.to.include('image_url');
         return { parsedContent: { tutorMessage: 'What is the next step?' } };
       },
       async callSparcPromptImage(params) {
@@ -1212,10 +1232,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(params.imagePrompt).to.contain('middle step omitted');
         expect(params.imagePrompt).to.contain('compact canvas shape');
         return { tutorMessage: params.tutorMessage, figure };
-      },
-      async readSparcPromptImage(assetId) {
-        expect(assetId).to.equal(figure.assetId);
-        return { dataUrl: 'data:image/png;base64,aW1hZ2U=' };
       },
     });
     expect(await provider.generateTutorUtterance({ ...utteranceRequest, selectedAction: { snapshotId: 'event' } }))
@@ -1248,32 +1264,17 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect((error as Error).message).to.equal('SPARC dialogue utterance response requires tutorMessage');
   });
 
-  it('returns a recoverable signal after bounded regeneration of an oversized provider utterance', async function() {
+  it('returns oversized provider text unchanged and logs its size after a single call', async () => {
     let calls = 0;
     const warnings: unknown[] = [];
+    const text = 'a'.repeat(SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS + 1);
     const provider = createSparcDialogueOpenRouterProvider({
       reportWarning: warning => { warnings.push(warning); },
-      async callResolvedOpenRouterJson() {
-        calls++;
-        return {
-          parsedContent: {
-            tutorMessage: 'a'.repeat(SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS + 1),
-          },
-        };
-      },
+      async callResolvedOpenRouterJson() { calls++; return { parsedContent: { tutorMessage: text } }; },
     });
-
-    let error: unknown;
-    try {
-      await provider.generateTutorUtterance(utteranceRequest);
-    } catch (caught) {
-      error = caught;
-    }
-
-    expect(error).to.be.instanceOf(Error);
-    expect(error).to.be.instanceOf(SparcOutputLimitRecoveryError);
-    expect(calls).to.equal(2);
-    expect(warnings).to.have.length(1);
+    expect(await provider.generateTutorUtterance(utteranceRequest)).to.equal(text);
+    expect(calls).to.equal(1);
+    expect(warnings).to.have.length(2);
   });
 
   it('returns constrained tutor text while the application retains target and move ownership', async function() {
@@ -1293,7 +1294,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
             tutorMessage: {
               type: 'string',
               minLength: 1,
-              maxLength: SPARC_DIALOGUE_MAX_MESSAGE_CHARACTERS,
             },
           },
           required: ['tutorMessage'],
