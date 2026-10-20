@@ -14,6 +14,22 @@ resolution and submission share the same access check without substituting a pol
 Retired and unknown identifiers fail explicitly. Upload and runtime use the same
 supported-policy contract and `sparc-autotutor-v1` adapter, at policy version 1.
 
+Assessment infers the authored requirements elicited by the actual question and credits
+the meaning demonstrated by a correct contextual answer, respecting response format.
+It does not demand an unrequested justification or infer untested parts of the KC.
+Retained unresolved evidence identifies specific remaining authored meaning a follow-up
+could elicit; this uses the existing evidence fields and whole-KC coverage rubric.
+The prompt groups this work into five responsibilities: contextual interpretation,
+cumulative evidence, separation of student evidence from supplied information, direction
+and coverage, and citations with remaining requirements. Coverage uses the minimum
+distinct substantive authored requirements, weighted equally; relations retain their
+participants, roles, and direction together. An unresolved defining connection earns
+no partial credit for merely naming a participant. Strength 0 means none, 0.5 half,
+and 1 all; intermediate fractions remain available. Examples and repeated explanations
+do not create requirements. Format-specific instructions appear only for formats in
+the current response or retained dialogue. These are model-inferred judgments, not
+an empirically calibrated proficiency measure.
+
 ## Dynamic instruction
 
 For units without a configured `sparcsession.startingKC`, target ranking derives its anchor from the saved current expectation cycle,
@@ -140,8 +156,8 @@ understanding. App upload validation and runtime target construction reject miss
 invalid categories for these policies; they do not infer a category. Other policies do
 not acquire a new required field. The generated stimulus schema describes this field.
 
-`sparcDynamicInstructionRules.ts` builds 420 automatic instructional productions
-(five target transitions × three compositions × four response formats × seven categories),
+`sparcDynamicInstructionRules.ts` builds 560 automatic instructional productions
+(five target transitions × four compositions × four response formats × seven categories),
 plus evaluation, feedback, and stop. Student instruction selections explicitly match
 the same category. `sparcCategoryInstructions.ts` maintains the fact/model/rule, move,
 response-format, and synthesis blocks once. The KC text identifies the knowledge;
@@ -172,7 +188,7 @@ do not add scoring dimensions, category-specific assistance, or automatic credit
 No extra synthesis provider call or generation engine is introduced.
 The review workbook in `docs/sparc-primitive-instructions-proposal.xlsx`
 contains the earlier 42 text/MC specifications and ten initial target assignments;
-the runtime now composes 84 specifications across all four response formats.
+the runtime now composes 112 specifications across all four response formats.
 
 Complete-move assistance logits are:
 
@@ -180,12 +196,13 @@ Complete-move assistance logits are:
 | --- | ---: | ---: | ---: | ---: |
 | Question | 0.5 | 0.75 | 1 | 1.25 |
 | Explanation → Question | 1.5 | 1.75 | 2 | 2.25 |
-| Explanation → Example/figure → Question | 2.5 | 2.75 | 3 | 3.25 |
+| Explanation → Written example/comparison → Question | 2.5 | 2.75 | 3 | 3.25 |
+| Explanation → Visual support → Question | 2.5 | 2.75 | 3 | 3.25 |
 
 Selection temperature is 0.2.
 The expectation floor remains 0.2, OET is fixed at 0.8, and the current-target boundary is unchanged.
 The registered move IDs append `.text`, `.cloze`, `.multiple-choice`, or `.true-false`
-to the dynamic base action. Student menus offer twelve instructional options plus next-KC navigation.
+to the dynamic base action. Student menus offer sixteen instructional options plus next-KC navigation.
 
 Cloze uses the existing response box and one uniform `_____` blank for a meaningful
 word or short phrase, without a word bank or exact-match answer key. Completing it must
@@ -229,6 +246,8 @@ without a displayed caption or heading and retain their accessible description a
 provider context. Nonimage support is framed with a compact form heading: Worked Example,
 Comparison, or a short table/form label. Ordinary explanation remains unframed. Figure-library
 retrieval, authorization, immutable asset versions, and saved decisions retain their owners.
+Generated references use the support's actual visible heading (for example, "the comparison").
+"Below" is optional; references follow the learner's reading order: explanation, support, question.
 
 Ordinary authenticated OpenRouter requests are limited by the existing DDP rule to
 600 requests per hour. A rich instructional turn can use separate calls for scoring,
@@ -274,9 +293,11 @@ matching cutoffs.
 The feedback action identifies correct content and corrects the specific error or omission,
 with enough explanation to understand the correction. It does not ask a new question.
 
-The three moves are question; explanation then question; and explanation then worked
-example or figure then an isomorphic question. They apply to expectation and misconception
-targets. Figure versus worked example is chosen during realization, not as a fourth move.
+The four compositions are question; explanation then question; explanation with
+written example/comparison then question; and explanation with visual support then
+question. They apply to expectation and misconception targets. The production chooses
+written versus visual support before realization. Visual retrieval selects video,
+image reuse, or image generation through the ordered resolver.
 Question-only generation reuses the substantive focused-prompt instructions.
 
 The agent uses the existing distance utility and Boltzmann temperature 0.2, with fixed
@@ -443,15 +464,32 @@ Search, dialogue-model and embedding costs are separate. Reruns reuse completed
 transcripts; interrupted external requests are not a guarantee of exactly-once billing.
 No provider SDK or other dependency is added.
 
-**Instruction and durability:** existing accepted-move retrieval runs first. On a rich
-primitive miss, the server reuses its saved need vector to rank same-language transcript
-passages with the existing embedding model and exact cosine search, in indexed pages
-of 100. Only the top three descriptors reach the generation call. This is passage
-relevance ranking, not the 0.992 near-duplicate content reuse test. Passage vectors have
-their own representation identity; compatible browsing groups remain separate.
-The existing rich call can select one supplied passage ID, or an ordinary support
-form if none is suitable. Empty catalogs simply provide no video option. Search,
-caption retrieval, segmentation, and visual analysis never run during instruction.
+**Instruction and durability:** the production selects written support or visual
+support before requesting content. Written moves generate or retrieve a worked example,
+comparison, or table. The visual move requests only a reusable visual brief, description,
+and image display width from the dialogue model; its response contains no catalog IDs.
+The visual resolver embeds the canonical instructional need including that brief once,
+then searches eligible same-language video passages, searches images only after a video
+miss, and generates an image only after both searches miss. As before, a video is eligible
+only with an explicitly authored matching contentLanguage. Packages omitting that optional
+metadata have no eligible videos and continue to image search; no language is inferred.
+A missing package, malformed language, or failed catalog read remains an error. Each search uses the existing
+configured cosine cutoff (currently 0.992). A miss means a successful search with no
+eligible match at or above that cutoff. Embedding, catalog, validation, storage, and
+provider errors propagate; none are converted into a miss. Both searches use the same
+query vector and existing embedding model. Video candidates retain transcript-passage
+embeddings; images retain canonical instructional-need embeddings. No index rewrite or
+historical data migration is required.
+
+New visual requests do not reuse an entire cached rich primitive ahead of this ordering.
+Accepted primitive requests and visual decisions resume their original resource without
+another search. The existing per-user decision ledger stores either the image identity
+or a validated video snapshot (its segment ID occupies the existing assetId decision
+key). Interrupted image generation retains its original pending brief and vector. Private
+incomplete supported prompts continue using their separate image-only behavior.
+`resolveSparcVisualSupport` is admin-only and shares the bounded authenticated OpenRouter
+rate limit. Live YouTube search, caption retrieval, segmentation, and visual analysis
+remain explicit catalog preparation work and never run during instruction.
 
 The actual transcript grounds the explanation and question; unseen visual details are
 not assumed. Typed video descriptors are validated at persistence and rendering boundaries,
@@ -564,13 +602,12 @@ validation, and matching live in `sparcMoveLibraryService.ts`,
   in this conversation, it becomes an accessible link and highlight of the original
   support, with the prescribed move's unchanged assistance value. Saved decisions,
   content validation, embedding-model consistency, and library exclusions remain enforced.
-- Rich support is looked up before generating an image brief. On a miss, the
-  existing image service uses its embedding lookup before generating a canonical image.
-  Existing image assets,
-  versions, curation controls, and historical decisions are retained. A deprecated
-  or superseded figure is ineligible for a new primitive hit; accepted histories
-  still use their original asset. Figures saved before the primitive library remain
-  available through the image service's embedding lookup.
+- Written rich support uses primitive retrieval before generation and cannot reuse a
+  video or image. New visual moves request a visual brief and resolve video, image,
+  then generated image in that order, rather than reusing a complete cached rich
+  primitive ahead of the video search. Accepted requests resume without reselection.
+  Existing image assets and historical decisions remain readable, and figures saved
+  before the primitive library remain available through the image search.
 - Question repetition is checked using embeddings of the actual question text,
   against this learner's accepted/presented questions in the lesson, including earlier
   attempts. Its separate cutoff is currently 0.88. No generated descriptor,

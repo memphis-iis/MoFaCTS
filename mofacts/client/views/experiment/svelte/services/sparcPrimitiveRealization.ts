@@ -1,4 +1,3 @@
-import type { SparcVideoSegment } from '../../../../../../learning-components/runtime/sparcVideo';
 import { primitiveContext, instructionalNeed, previousSparcQuestions, type SparcMoveLibraryClient, type SparcPrimitiveKind, type SparcPrimitiveContent,
   type SparcPrimitiveReference, type SparcPrimitiveQuery } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
@@ -9,7 +8,7 @@ import { clientConsole } from '../../../../lib/clientLogger';
 export async function realizeSparcPrimitive(params: {
   request: SparcUtteranceRequest; kind: SparcPrimitiveKind; dependencies: unknown;
   tdfId: string; sessionId: string; library: SparcMoveLibraryClient;
-  generate(rejection?: string, previousQuestions?: SparcPrimitiveQuery['previousQuestions'], videos?: SparcVideoSegment[]): Promise<SparcPrimitiveContent>;
+  generate(rejection?: string, previousQuestions?: SparcPrimitiveQuery['previousQuestions']): Promise<SparcPrimitiveContent>;
   persist(content: SparcPrimitiveContent, reference: SparcPrimitiveReference): Promise<void>;
 }): Promise<SparcPrimitiveContent> {
   const callStartedAtMs = Date.now();
@@ -34,7 +33,7 @@ export async function realizeSparcPrimitive(params: {
       let rejection: string | undefined;
       let generated: SparcPrimitiveContent | undefined;
       for (let attempt = 0; attempt < (kind === 'question' ? 3 : 1); attempt++) {
-        generated = await params.generate(rejection, result.previousQuestions, result.videos);
+        generated = await params.generate(rejection, result.previousQuestions);
         const saved = await params.library.publish(result.ticket, generated);
         if (saved.accepted) { accepted = saved.reference; generated = saved.content; break; }
         rejection = saved.reason;

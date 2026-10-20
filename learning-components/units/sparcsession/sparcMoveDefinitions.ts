@@ -12,6 +12,7 @@ export type SparcMoveStatus = 'active';
 export type SparcMoveDefinition = {
   readonly responseFormat?: import('../../runtime/sparcTargetCategories').SparcQuestionResponseFormat;
   readonly components?: readonly ('explanation' | 'richContent' | 'question')[];
+  readonly supportKind?: 'written' | 'visual';
   readonly assistance?: number;
   readonly moveId: string;
   readonly version: string;
@@ -194,26 +195,28 @@ export const SPARC_AUTOTUTOR_DIALOGUE_MOVE_DEFINITIONS = Object.freeze([
 ] as const satisfies readonly SparcMoveDefinition[]);
 
 const categorizedMoveTemplates: readonly (Omit<SparcMoveDefinition, 'assistance'> & {
+  readonly components: NonNullable<SparcMoveDefinition['components']>;
   readonly assistance: Readonly<Record<NonNullable<SparcMoveDefinition['responseFormat']>, number>>;
 })[] = [
   { moveId: 'instruction.dynamic.question', components: ['question'], assistance: { text: 0.5, cloze: 0.75, 'multiple-choice': 1, 'true-false': 1.25 } },
   { moveId: 'instruction.dynamic.explanation-question', components: ['explanation', 'question'], assistance: { text: 1.5, cloze: 1.75, 'multiple-choice': 2, 'true-false': 2.25 } },
-  { moveId: 'instruction.dynamic.explanation-rich-question', components: ['explanation', 'richContent', 'question'], assistance: { text: 2.5, cloze: 2.75, 'multiple-choice': 3, 'true-false': 3.25 } },
+  { moveId: 'instruction.dynamic.explanation-rich-question', supportKind: 'written' as const, components: ['explanation', 'richContent', 'question'], assistance: { text: 2.5, cloze: 2.75, 'multiple-choice': 3, 'true-false': 3.25 } },
+  { moveId: 'instruction.dynamic.explanation-visual-question', supportKind: 'visual' as const, components: ['explanation', 'richContent', 'question'], assistance: { text: 2.5, cloze: 2.75, 'multiple-choice': 3, 'true-false': 3.25 } },
 ].map((definition) => ({
   ...definition, components: definition.components as NonNullable<SparcMoveDefinition['components']>,
   version: 'v1', family: 'sparc-component', status: 'active', requiredFacts: ['controller.selectedAction'],
-  promptId: definition.moveId, promptVersion: 'v1', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v2',
+  promptId: definition.moveId, promptVersion: definition.components.includes('richContent') ? 'v2' : 'v1', outputSchemaId: 'sparc.instruction-components', outputSchemaVersion: 'v2',
   renderer: 'sparc.nodes', historyAction: 'sparc-instruction',
   promptPolicy: 'Teach only the selected expectation or the correct distinction for the selected misconception. Generate a new case appropriate to that target; the opening is context, not a limit on subsequent cases. The requested components share the actual case, notation, and relationships. A worked example may include a formula and complete reasoning. Prefer figures for illustrating models and worked examples for applying principles; choose pedagogically within the selected rich move. End with one focused question with its own necessary givens. For rich instruction, that question must be isomorphic to the actual selected support, with a new case or inputs rather than copying the demonstrated answer. Do not repeat feedback already given. Do not expose internal scores or rule metadata.'
     + (definition.moveId === 'instruction.dynamic.question' ? '\n' + AUTOTUTOR_PROMPT_POLICY.split('\n').slice(4).join('\n') : ''),
 }));
 
-/** Twelve complete moves share the existing component generator and node renderer. */
+/** Four compositions in four response formats share the component generator and node renderer. */
 export const SPARC_CATEGORIZED_MOVE_DEFINITIONS: readonly SparcMoveDefinition[] = categorizedMoveTemplates.flatMap(definition =>
   SPARC_QUESTION_RESPONSE_FORMATS.map(responseFormat => ({
     ...definition, moveId: `${definition.moveId}.${responseFormat}`, responseFormat,
     assistance: definition.assistance[responseFormat],
-    version: 'v2', promptId: `${definition.promptId}.${responseFormat}`, promptVersion: 'v2',
+    version: 'v3', promptId: `${definition.promptId}.${responseFormat}`, promptVersion: definition.components.includes('richContent') ? 'v4' : 'v3',
     outputSchemaVersion: 'v3',
     // Category-aware learning-process focuses are composed at request construction.
     promptPolicy: 'Generate only the selected composition and response format. Teach the selected KC using the shared KLI category instructions. Instructional text uses Markdown with GFM tables; option labels remain plain text. Do not wrap the complete response in a code fence or include raw HTML. Generate the selected instruction without repeating prior feedback.',

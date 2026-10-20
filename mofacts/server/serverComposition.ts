@@ -2,7 +2,7 @@ import { createSparcVideoCatalogMethods } from './methods/sparcVideoCatalogMetho
 import { createSparcLibraryCurationMethods } from './methods/sparcLibraryCurationMethods';
 import { SPARC_PROMPT_IMAGE_PURPOSE } from '../common/lib/sparcPromptImage';
 import { createSparcLibraryCuration, isSparcAdministrativeRemoval, readSparcAdministrativeRemovals } from './lib/sparcLibraryCurationStorage';
-import { ensureSparcVideoCatalogIndexes, findSparcVideoCandidates, sparcVideoReuseStatus } from './lib/sparcVideoCatalog';
+import { ensureSparcVideoCatalogIndexes, findSparcLibraryVideo, sparcVideoReuseStatus } from './lib/sparcVideoCatalog';
 import { decompressHistoryRecord } from '../common/historyCompression';
 import { createSparcMoveLibraryMethods } from './methods/sparcMoveLibraryMethods';
 import { createSparcInstructionalBrowseMethods } from './methods/sparcInstructionalBrowseMethods';
@@ -1051,11 +1051,6 @@ export const asyncMethods: Record<string, unknown> = {
     loadTdf: async id => await Tdfs.findOneAsync({ _id: id }, { fields: { 'content.tdfs.tutor.setspec': 1, 'rawStimuliFile.setspec.sparcPages': 1 } }) ?? undefined }),
   ...createSparcMoveLibraryMethods({ store: createSparcMoveStore(async (userId, tdfId, after) => (await Histories.find({ userId, TDFId: tdfId, eventType: 'sparc', _id: { $gt: after } }, { sort: { _id: 1 }, limit: 100 }).fetchAsync()).map(decompressHistoryRecord)), getApiKeyResolutionDeps, getMethodAuthorizationDeps,
     videoReuseStatus: sparcVideoReuseStatus,
-    async videoCandidates(vector, tdfId) {
-      const tdf = await Tdfs.findOneAsync({ _id: tdfId }, { fields: { 'content.tdfs.tutor.setspec.contentLanguage': 1 } });
-      const language = tdf?.content?.tdfs?.tutor?.setspec?.contentLanguage;
-      return typeof language === 'string' && language ? findSparcVideoCandidates(vector, language) : [];
-    },
     timing: (stage, ms, count) => serverConsole('[SPARC move library]', { stage, ms, ...(count === undefined ? {} : { count }) }),
     async figureReusable(assetId) {
       return Boolean(await SparcFigureLibrary.findOneAsync({ ready: true, _id: assetId }));
@@ -1073,6 +1068,16 @@ export const asyncMethods: Record<string, unknown> = {
     } }),
   ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary,
     isRemoved: isSparcAdministrativeRemoval,
+    async findVideo(vector, tdfId, minimumSimilarity) {
+      const tdf = await Tdfs.findOneAsync({ _id: tdfId }, { fields: { 'content.tdfs.tutor.setspec.contentLanguage': 1 } });
+      if (!tdf) throw new Error('Visual retrieval requires the saved package');
+      const language = tdf?.content?.tdfs?.tutor?.setspec?.contentLanguage;
+      // Preserve existing eligibility: video passages require an explicitly authored matching language.
+      // contentLanguage is optional; its absence excludes videos, rather than inventing a language.
+      if (language === undefined || language === '') return undefined;
+      if (typeof language !== 'string') throw new Error('Video retrieval requires a valid package contentLanguage');
+      return findSparcLibraryVideo(vector, language, minimumSimilarity);
+    },
     figureLibrary: createSparcFigureLibraryStore() }),
 
   ...createOpenRouterMethods({

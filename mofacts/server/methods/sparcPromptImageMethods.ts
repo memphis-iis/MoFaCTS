@@ -9,11 +9,12 @@ import { requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/metho
 import { sparcFigureMinimumSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { sparcInstructionalNeedText, type SparcInstructionalNeed } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
-import { getOrGenerateSparcLibraryFigure, type SparcFigureInspection, type SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
+import { getOrGenerateSparcLibraryVisual, type SparcFigureInspection, type SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import type { SparcLibraryImagePage } from '../../common/lib/sparcFigureLibrary';
 import { parseSparcRaster } from '../lib/sparcRaster';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
+import type { SparcVideoMatch } from '../lib/sparcVideoLibraryService';
 
 type Asset = { _id: string; path?: string; type?: string; meta: Record<string, any> };
 type Deps = {
@@ -34,8 +35,11 @@ type Deps = {
   figureLibrary?: SparcFigureLibraryStore;
   minimumFigureSimilarity?: number | undefined;
   embedSituation?: (apiKey: string, input: string) => Promise<{ vector: number[]; usage?: { costUsd?: number } }>;
+  findVideo?: (vector: number[], tdfId: string, minimumSimilarity: number) => Promise<SparcVideoMatch | undefined>;
 };
 type Context = { userId?: string | null; unblock?: () => void };
+type ImageRequest = { tdfId: string; sessionId: string; generationId: string; tutorMessage: string;
+  imagePrompt: string; figureDescription: string; displayWidth: number; situation?: SparcInstructionalNeed };
 function bounded(value: unknown, label: string, max: number): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Meteor.Error(400, `${label} is required and must be bounded`);
   return value.trim();
@@ -90,10 +94,12 @@ export function createSparcPromptImageMethods(deps: Deps) {
       ...(Object.prototype.hasOwnProperty.call(asset.meta, 'displayWidth') ? { displayWidth: asset.meta.displayWidth } : {}) }),
     ...(!reused ? { usage: asset.meta.usage } : {}),
   });
-  return {
-    async generateSparcPromptImage(this: Context, params: { tdfId: string; sessionId: string; generationId: string; tutorMessage: string; imagePrompt: string; figureDescription: string; displayWidth: number; situation?: SparcInstructionalNeed }) {
-      const userId = await authorize(this);
-      this.unblock?.();
+  const generate = async (context: Context, params: ImageRequest, visual: boolean) => {
+      const userId = await authorize(context);
+      context.unblock?.();
+      if (visual && params?.situation === undefined) throw new Meteor.Error(400, 'Visual support requires the instructional need and visual brief');
+      if (visual && !params.situation?.illustrationBrief) throw new Meteor.Error(400, 'Visual support requires a visual brief in its embedding input');
+      if (!visual && params?.situation !== undefined) throw new Meteor.Error(400, 'Complete teaching visuals must use resolveSparcVisualSupport');
       const tdfId = bounded(params?.tdfId, 'TDF identity', 200);
       const sessionId = bounded(params?.sessionId, 'Session identity', 200);
       const generationId = bounded(params?.generationId, 'Generation identity', 500);
@@ -110,6 +116,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
       const work = (async () => {
         const historical = await findOwned(assetId, userId);
         if (historical && historical.meta.figureLibraryVersion === undefined) {
+          if (visual) throw new Meteor.Error(409, 'A private incomplete prompt image cannot satisfy a complete visual-support request');
           if (historical.meta.generationIdentity !== identity) throw new Meteor.Error(409, 'SPARC image identity collision');
           await completeStorage(historical);
           return envelope(historical, true);
@@ -125,8 +132,12 @@ export function createSparcPromptImageMethods(deps: Deps) {
             }
             return apiKey;
           };
-          const decision = await getOrGenerateSparcLibraryFigure({ store: deps.figureLibrary, identity, assetId,
+          const decision = await getOrGenerateSparcLibraryVisual({ store: deps.figureLibrary, identity, assetId,
             userId, tdfId, sessionId, situation, imagePrompt: prompt, tutorMessage, description, displayWidth, minimumSimilarity,
+            findVideo: async vector => {
+              if (!deps.findVideo) throw new Meteor.Error(500, 'SPARC video retrieval is not configured');
+              return deps.findVideo(vector, tdfId, minimumSimilarity);
+            },
             embed: async input => {
               const resolvedKey = await key();
               if (deps.embedSituation) return await deps.embedSituation(resolvedKey, input);
@@ -159,6 +170,11 @@ export function createSparcPromptImageMethods(deps: Deps) {
               await completeStorage(asset);
               return { usage: image.usage };
             } });
+          if (decision.video) {
+            if (await deps.isRemoved(decision.video.segmentId)) throw new Meteor.Error('sparc-visual-removed', 'The selected video was administratively removed');
+            return { video: decision.video, ...(decision.embeddingUsage ? { embeddingUsage: decision.embeddingUsage } : {}),
+              libraryMatch: { source: decision.source, similarity: decision.similarity } };
+          }
           const asset = await findShared(decision.assetId);
           if (await deps.isRemoved(decision.assetId)) return { tutorMessage: SPARC_ADMINISTRATIVE_REMOVAL_TEXT,
             figure: { assetId: decision.assetId, description: SPARC_ADMINISTRATIVE_REMOVAL_TEXT } };
@@ -195,6 +211,13 @@ export function createSparcPromptImageMethods(deps: Deps) {
       })();
       pending.set(identity, work);
       try { return await work; } finally { pending.delete(identity); }
+  };
+  return {
+    async generateSparcPromptImage(this: Context, params: Omit<ImageRequest, 'situation'>) {
+      return generate(this, params, false);
+    },
+    async resolveSparcVisualSupport(this: Context, params: ImageRequest & { situation: SparcInstructionalNeed }) {
+      return generate(this, params, true);
     },
     async getSparcPromptImage(this: Context, assetIdValue: string) {
       const userId = await authorize(this);

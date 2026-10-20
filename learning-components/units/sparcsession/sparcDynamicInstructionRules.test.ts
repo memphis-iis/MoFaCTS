@@ -317,18 +317,18 @@ describe('Dynamic instruction production cycles', () => {
     await f.answer();
     assert.equal(f.calls(), 1);
   });
-  it('builds all 420 automatic variants with exact category conditions and the twelve approved assistance values', () => {
+  it('builds all 560 automatic variants with exact category conditions and the shared assistance values for written and visual support', () => {
     const rules = createSparcDynamicInstructionRules('agent').filter(rule => rule.module === 'dialogue.instructional-competition');
-    assert.equal(rules.length, 420);
-    assert.equal(new Set(rules.map(rule => rule.id)).size, 420);
+    assert.equal(rules.length, 560);
+    assert.equal(new Set(rules.map(rule => rule.id)).size, 560);
     for (const category of SPARC_TARGET_CATEGORIES) {
       const variants = rules.filter(rule => rule.id.endsWith(`.${category}`));
-      assert.equal(variants.length, 60);
+      assert.equal(variants.length, 80);
       assert.ok(variants.every(rule => rule.when.some(condition => 'factType' in condition
         && ['autotutor.expectation', 'autotutor.misconception'].includes(condition.factType)
         && JSON.stringify(condition.slots?.category) === JSON.stringify({ type: 'literal', value: category }))));
     }
-    assert.deepEqual(SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => move.assistance), [.5, .75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25]);
+    assert.deepEqual(SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => move.assistance), [.5, .75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 2.5, 2.75, 3, 3.25]);
   });
   it('routes every student category/composition/format combination to the same composed primitive and retains target transitions', async () => {
     for (const category of SPARC_TARGET_CATEGORIES) for (const option of SPARC_CATEGORIZED_MENU_OPTIONS.filter(option => option.id !== 'next-target')) {
@@ -352,7 +352,7 @@ describe('Dynamic instruction production cycles', () => {
   it('binds MC answers to saved option identities and meanings, rejects stale/modified answers and restores the selected option', async () => {
     for (const id of ['a', 'b']) {
       const f = fixture('student', false, 'model-rule'); await f.answer(); await f.choice('question.multiple-choice');
-      assert.equal((f.menu()!.slots!.options as unknown[]).length, 13);
+      assert.equal((f.menu()!.slots!.options as unknown[]).length, 17);
       await assert.rejects(f.submit({ submittedNodes: { 'learner-response-input': 'A typed answer.' }, triggeredBy: 'learner-response-submit', timestamp: 999 }), /Select an option/);
       const before = JSON.stringify(savedSparcQuestions(replaySparcHistory(f.rows)));
       await f.mcAnswer(id);
@@ -446,7 +446,7 @@ describe('Dynamic instruction production cycles', () => {
     assert.equal((messages[index]!.children as unknown[]).length, 3);
     assert.ok(String(messages[index - 1]!.id).endsWith(':selected'), JSON.stringify(messages.map(node => node.id)));
     const button = (messages[index - 1]!.children as Record<string, unknown>[])[0]!;
-    assert.equal(button.label, 'Explanation with example or figure and question (text answer)');
+    assert.equal(button.label, 'Explanation with written example or comparison and question (text answer)');
     assert.equal(button.selected, true); assert.equal(button.readOnly, true);
     await f.answer(); await f.choice('next-target'); await f.choice('question.text');
     const markers = projectSparcMenuOperations(replaySparcHistory(f.rows)).filter(operation => operation.type === 'insert-node' && String(operation.node.id).endsWith(':selected'));
@@ -482,18 +482,20 @@ describe('Dynamic instruction production cycles', () => {
       assert.equal((transition(f.rows.at(-1)!).writes.at(-1)!.value as { node: { readOnly: boolean } }).node.readOnly, true);
     }
   });
-  it('resumes saved support and feedback without another score or selection', async () => {
+  it('resumes the selected components and feedback without another score or selection', async () => {
     const f = fixture('agent'); f.fail(true);
     await assert.rejects(f.answer(100), /question failed/);
     const original = f.requests.at(-1)!;
-    assert.ok(f.rows.some(row => transition(row).transitionId.endsWith(':primitive:richContent')));
+    const savedComponents = original.moveDefinition.components!.filter(component => component !== 'question');
+    for (const component of savedComponents) assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(`:primitive:${component}`)).length, 1);
     f.fail(false); await f.answer(100);
     assert.equal(f.calls(), 1);
     assert.equal(f.requests.filter(request => request.action === 'instruction.feedback').length, 1);
     assert.equal(f.requests.at(-1)!.action, original.action);
-    assert.ok(f.requests.at(-1)!.realizedInstruction?.explanation);
-    assert.ok(f.requests.at(-1)!.realizedInstruction?.richContent);
-    assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':primitive:richContent')).length, 1);
+    for (const component of savedComponents) {
+      assert.ok(f.requests.at(-1)!.realizedInstruction?.[component]);
+      assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(`:primitive:${component}`)).length, 1);
+    }
   });
   it('continues interrupted established instruction on document reload without rescoring or repeating saved feedback and support', async () => {
     for (const version of ['agent', 'student'] as const) {
@@ -507,7 +509,9 @@ describe('Dynamic instruction production cycles', () => {
       assert.deepEqual(counts(), before);
       assert.equal(f.requests.at(-1)!.selectedAction.snapshotId, accepted.selectedAction.snapshotId);
       assert.equal(f.requests.at(-1)!.action, accepted.action);
-      assert.ok(f.requests.at(-1)!.realizedInstruction?.richContent);
+      for (const component of accepted.moveDefinition.components!.filter(component => component !== 'question')) {
+        assert.ok(f.requests.at(-1)!.realizedInstruction?.[component]);
+      }
       const rows = f.rows.length; await f.submit(); assert.equal(f.rows.length, rows);
     }
   });

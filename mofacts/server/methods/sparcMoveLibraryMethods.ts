@@ -10,7 +10,7 @@ import type { SparcPrimitiveQuery, SparcPrimitiveContent, SparcPrimitiveReferenc
 type Context = { userId?: string | null; unblock?: () => void };
 export function createSparcMoveLibraryMethods(deps: { store: MoveStore; minimumSimilarity?: number | undefined; questionNovelty?: number | undefined;
   getMethodAuthorizationDeps(): MethodAuthorizationDeps; getApiKeyResolutionDeps(): ApiKeyResolutionDeps;
-  videoReuseStatus?(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>>; videoCandidates?(vector: number[], tdfId: string): Promise<SparcVideoSegment[]>;
+  videoReuseStatus?(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>>;
   verifyFigure(assetId: string): Promise<void>; figureReusable(assetId: string): Promise<boolean>; timing?(stage: string, ms: number, count?: number): void }) {
   const auth = (ctx: Context) => requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId: ctx.userId, roles: ['admin'] });
   const service = (userId: string) => createMoveLibraryService({ store: deps.store, embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel,
@@ -27,13 +27,7 @@ export function createSparcMoveLibraryMethods(deps: { store: MoveStore; minimumS
   return {
     async lookupSparcPrimitive(this: Context, query: SparcPrimitiveQuery) {
       const userId = await auth(this); this.unblock?.();
-      const result = await service(userId).lookup(userId, query);
-      if (result.status === 'generate' && query.context.kind === 'richContent' && deps.videoCandidates) {
-        const request = await deps.store.request(result.ticket);
-        if (!request || request.userId !== userId) throw new Meteor.Error(403, 'Video retrieval requires the saved primitive request');
-        return { ...result, videos: await deps.videoCandidates(request.embedding, query.tdfId) };
-      }
-      return result;
+      return service(userId).lookup(userId, query);
     },
     async publishSparcPrimitive(this: Context, ticket: string, content: SparcPrimitiveContent) {
       const userId = await auth(this); this.unblock?.(); return service(userId).publish(userId, ticket, content);

@@ -16,6 +16,7 @@ export type SparcPrimitiveContext = {
   version: typeof SPARC_MOVE_LIBRARY_VERSION; kind: SparcPrimitiveKind; target: string;
   move: string; assistance: number; responseFormat: string; requirements: string;
   focus: string; dependencies: string; components: SparcPrimitiveKind[]; specification: string;
+  supportKind?: 'written' | 'visual';
 };
 export type SparcPrimitiveQuery = {
   tdfId: string; sessionId: string; eventId: string; context: SparcPrimitiveContext;
@@ -23,7 +24,7 @@ export type SparcPrimitiveQuery = {
 };
 export type SparcPrimitiveLookup =
   | { status: 'hit'; content: SparcPrimitiveContent; reference: SparcPrimitiveReference }
-  | { status: 'generate'; ticket: string; previousQuestions: { text: string }[]; videos?: SparcVideoSegment[] };
+  | { status: 'generate'; ticket: string; previousQuestions: { text: string }[] };
 export type SparcMoveLibraryClient = {
   lookup(query: SparcPrimitiveQuery): Promise<SparcPrimitiveLookup>;
   publish(ticket: string, content: SparcPrimitiveContent): Promise<{ accepted: true; content: SparcPrimitiveContent; reference: SparcPrimitiveReference } | { accepted: false; reason: string }>;

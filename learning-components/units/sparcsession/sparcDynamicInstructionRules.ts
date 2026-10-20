@@ -10,7 +10,7 @@ export const SPARC_DYNAMIC_TARGET_LOGIT = Math.log(0.8 / 0.2);
 export const SPARC_CATEGORIZED_MENU_OPTIONS = [
   ...SPARC_CATEGORIZED_MOVE_DEFINITIONS.map(move => ({
     id: move.moveId.substring('instruction.dynamic.'.length), action: move.moveId,
-    label: `${move.components!.includes('richContent') ? 'Explanation with example or figure and question' : move.components!.includes('explanation') ? 'Explanation and question' : 'Question'} (${SPARC_QUESTION_RESPONSE_LABELS[move.responseFormat!]})`,
+    label: `${move.supportKind === 'visual' ? 'Explanation with visual support and question' : move.components!.includes('richContent') ? 'Explanation with written example or comparison and question' : move.components!.includes('explanation') ? 'Explanation and question' : 'Question'} (${SPARC_QUESTION_RESPONSE_LABELS[move.responseFormat!]})`,
   })),
   { id: 'next-target', label: 'Move to the next KC', action: SPARC_NEXT_TARGET_ACTION },
 ];

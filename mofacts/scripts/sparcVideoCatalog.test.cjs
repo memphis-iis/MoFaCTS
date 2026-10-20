@@ -5,6 +5,8 @@ Object.assign(globalThis, { describe: tests.describe, it: tests.it, beforeEach: 
 require('../common/lib/sparcVideo.test.ts');
 require('../server/lib/sparcVideoProviders.test.ts');
 require('../server/lib/sparcVideoCatalogService.test.ts');
+require('../server/lib/sparcVideoLibraryService.test.ts');
+require('../server/lib/sparcFigureLibraryService.test.ts');
 require('../server/lib/sparcMoveLibraryService.test.ts');
 
 // Same injected-client boundary used by the existing isolated SPARC contract runner.
@@ -18,6 +20,7 @@ Module._load = function(request, parent, isMain) {
   if (request === 'meteor/session') return { Session: { get: () => undefined } };
   if (request === 'meteor/tracker') return { Tracker: {} };
   if (request === 'meteor/check') return { check: () => {} };
+  if (request === 'meteor/ddp-rate-limiter') return { DDPRateLimiter: {} };
   if (request === '../lib/sparcVideoCatalog' && parent.filename.endsWith('sparcVideoCatalogMethods.ts')) return {
     createMongoSparcVideoCatalog() { throw new Error('Unauthorized catalog storage access'); },
     sparcVideoCatalogTargets: require('../server/lib/sparcVideoCatalogService.ts').sparcVideoCatalogTargets,
@@ -28,4 +31,6 @@ try {
   require('../client/views/experimentSetup/sparcVideoCatalogBuilder.test.ts');
   require('../client/views/experiment/svelte/services/sparcVideoInstruction.test.ts');
   require('../server/methods/sparcVideoCatalogMethods.test.ts');
+  require('../server/methods/sparcPromptImageMethods.test.ts');
+  require('../server/runtime/ddpRateLimits.test.ts');
 } finally { Module._load = originalLoad; }

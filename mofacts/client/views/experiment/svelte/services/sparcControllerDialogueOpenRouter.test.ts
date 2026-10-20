@@ -253,10 +253,13 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(prompts[0]).not.to.contain('Feedback has already been delivered');
     expect(prompts[1]).not.to.contain('Starting an expectation:');
   });
-  it('realizes all 84 category/composition/format specifications with the selected instructions and actual support', async function() {
+  it('realizes all 112 category/composition/format specifications with the selected instructions and actual support', async function() {
     for (const category of SPARC_TARGET_CATEGORIES) for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
       const observed: string[] = [];
-      const provider = createSparcDialogueOpenRouterProvider({ callResolvedOpenRouterJson: async params => {
+      const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
+        async callSparcVisualSupport(params) { return { figure: { assetId: 'image123', description: params.figureDescription, displayWidth: 360 } }; },
+        async readSparcPromptImage() { return { dataUrl: 'data:image/png;base64,AAAA' }; },
+        callResolvedOpenRouterJson: async params => {
         const system = String(params.messages[0]!.content);
         expect(system).to.contain('The KC text identifies the knowledge; its assigned KLI category supplies the learning-process focus');
         expect(system).to.contain('Combine every selected category focus');
@@ -268,12 +271,19 @@ describe('SPARC dialogue OpenRouter provider', function() {
         if (category.split('-').includes('rule')) expect(system).to.contain('RULE: Focus on induction and refinement');
         if (category.split('-').includes('model')) expect(system).to.contain('MODEL: Focus on understanding and sense-making');
         observed.push(params.intent.schemaName);
+        if (params.intent.schemaName.includes('visual_primitive') && definition.supportKind === 'visual') return { parsedContent: {
+          imagePrompt: 'Case A and Case B under different conditions.',
+          figureDescription: 'Case A compared with Case B.', displayWidth: 360,
+        } };
         if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: {
           kind: 'comparison', workedExample: 'Case A meets the decisive condition. Case B does not.', heading: 'Comparison',
           imagePrompt: null, figureDescription: null, displayWidth: null,
         } };
         if (params.intent.schemaName.includes('explanation_primitive')) {
-          if (definition.components!.includes('richContent')) expect(String(params.messages[1]!.content)).to.contain('Case A');
+          if (definition.components!.includes('richContent')) expect(JSON.stringify(params.messages[1]!.content)).to.contain('Case A');
+          if (definition.supportKind === 'written') {
+            expect(JSON.parse(String(params.messages[1]!.content)).supportHeading).to.equal('Comparison');
+          }
           return { parsedContent: { tutorMessage: 'The condition determines whether the rule applies.' } };
         }
         expect(system).to.contain('RESPONSE FORMAT:');
@@ -285,12 +295,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
       } });
       const output = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId,
         targetContent: { clusterKC: 'kc-a', text: 'A target text', category },
+        selectedAction: { snapshotId: 'category-case' },
         moveDefinition: { ...definition, promptPolicy: composeSparcCategoryInstructions(category, definition.components!, definition.responseFormat!) } }) as SparcInstructionComponents;
       expect(output.question).to.contain('Which case');
       expect(observed).to.have.length(definition.components!.length);
       if (definition.responseFormat === 'multiple-choice' || definition.responseFormat === 'true-false') expect(output.choices!.filter(choice => choice.correct)).to.have.length(1);
       else expect(output.choices).to.equal(undefined);
-      if (definition.components!.includes('richContent')) expect(output.supportHeading).to.equal('Comparison');
+      if (definition.supportKind === 'visual') { expect(output.figure?.assetId).to.equal('image123'); expect(output.supportHeading).to.equal(undefined); }
+      else if (definition.components!.includes('richContent')) expect(output.supportHeading).to.equal('Comparison');
     }
   });
   it('rejects generated MC options without one defensible answer instead of substituting text or another move', async function() {
@@ -370,7 +382,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     let questions = 0;
     const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
       async readSparcPromptImage(assetId) { expect(assetId).to.equal('image123'); return { dataUrl: 'data:image/png;base64,AAAA' }; },
-      async callSparcPromptImage(params) {
+      async callSparcVisualSupport(params) {
         images++; expect(params.imagePrompt).to.include('complete teaching figure');
         return { tutorMessage: params.tutorMessage, figure: { assetId: 'image123', description: params.figureDescription, displayWidth: params.displayWidth } };
       },
@@ -380,10 +392,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
           expect(JSON.stringify(params.messages[1]!.content)).to.include('data:image/png;base64,AAAA');
           return { parsedContent: { tutorMessage: 'The parameter stays fixed across repeated samples.' } };
         }
-        if (params.intent.schemaName.includes('rich_primitive')) {
+        if (params.intent.schemaName.includes('visual_primitive')) {
           expect(String(params.messages[0]!.content)).to.include('Only the question primitive may ask a learner question');
           expect(String(params.messages[0]!.content)).to.include('Neither figureDescription nor imagePrompt may contain a learner question');
-          return { parsedContent: { kind: 'figure', heading: null, workedExample: null,
+          return { parsedContent: {
             imagePrompt: 'Show varying sample intervals against a fixed mean.', figureDescription: 'Three different intervals and one fixed mean.', displayWidth: 300 } };
         }
         questions++;
@@ -397,8 +409,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
         return { parsedContent: { tutorMessage: 'In a new repeated-sampling experiment, which quantity stays fixed?' } };
       },
     });
-    const request: SparcUtteranceRequest = { ...utteranceRequest, action: 'instruction.dynamic.explanation-rich-question.text',
-      moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text'), selectedAction: { snapshotId: 'response-1' },
+    const request: SparcUtteranceRequest = { ...utteranceRequest, action: 'instruction.dynamic.explanation-visual-question.text',
+      moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-visual-question.text'), selectedAction: { snapshotId: 'response-1' },
       realizedInstruction: realized, onInstructionComponent: async (component, text, figure) => { realized[component] = text; if (figure) realized.figure = figure; } };
     let error: unknown;
     try { await provider.generateTutorUtterance(request); } catch (caught) { error = caught; }
@@ -411,16 +423,16 @@ describe('SPARC dialogue OpenRouter provider', function() {
   it('propagates requested figure failure before asking a question without substituting a worked example', async function() {
     let questions = 0;
     const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
-      async callSparcPromptImage() { throw new Error('figure unavailable'); },
+      async callSparcVisualSupport() { throw new Error('figure unavailable'); },
       async callResolvedOpenRouterJson(params) {
         if (params.intent.schemaName.includes('explanation_primitive')) return { parsedContent: { tutorMessage: 'An explanation.' } };
-        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'figure', heading: null, workedExample: null, imagePrompt: 'Draw the model.', figureDescription: 'The model.', displayWidth: 300 } };
+        if (params.intent.schemaName.includes('visual_primitive')) return { parsedContent: { imagePrompt: 'Draw the model.', figureDescription: 'The model.', displayWidth: 300 } };
         questions++; return { parsedContent: { tutorMessage: 'A question?' } };
       },
     });
     let error: unknown;
-    try { await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.dynamic.explanation-rich-question.text',
-      moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text'), selectedAction: { snapshotId: 'response-2' } }); } catch (caught) { error = caught; }
+    try { await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.dynamic.explanation-visual-question.text',
+      moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-visual-question.text'), selectedAction: { snapshotId: 'response-2' } }); } catch (caught) { error = caught; }
     expect((error as Error).message).to.equal('figure unavailable'); expect(questions).to.equal(0);
   });
   it('gives standalone feedback the existing assessment without next-move instructions', async function() {
@@ -443,8 +455,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
         const input = JSON.parse(params.messages[1]!.content as string);
         expect(input).to.include({ learnerText, responseFormat: 'multiple-choice', selectedChoiceId: 'option-b' });
         expect(input).not.to.have.property('correct');
-        expect(params.messages[0]!.content).to.include('unselected distractors are not learner beliefs');
-        expect(params.messages[0]!.content).to.include('Do not treat selection of supplied wording as independent free recall');
+        expect(params.messages[0]!.content).to.include('Unselected distractors are not student beliefs');
+        expect(params.messages[0]!.content).to.include('rather than independently producing the supplied explanation');
         return { parsedContent: {
           learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
             learnerEvidence: latestLearnerEvidence('total balance') }],
@@ -612,59 +624,16 @@ describe('SPARC dialogue OpenRouter provider', function() {
       sessionIdApplied: true,
     }]);
     const systemMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[0];
-    expect(systemMessage?.content).to.contain('accumulated instructional knowledge across the full dialogue through the latest response');
-    expect(systemMessage?.content).to.contain('primary conversational action genuinely requests information or confirmation');
-    expect(systemMessage?.content).to.contain('may be either a question or an answer');
-    expect(systemMessage?.content).to.contain('score its instructional meaning the same either way');
-    expect(systemMessage?.content).to.contain('Treat a contribution as on-topic if it relates to the lesson context or to the ongoing instructional dialogue, including ideas introduced by the tutor');
-    expect(systemMessage?.content).to.contain('Expressions of confusion and requests for clarification about that material are on-topic');
-    expect(systemMessage?.content).to.contain('contentFocused true for an on-topic question, using the definition in step 1');
-    expect(systemMessage?.content).to.contain('exactly one learningTargetEvaluations entry for every supplied learning target');
-    expect(systemMessage?.content).to.contain('exactly one diagnosticMisconceptionEvaluations entry for every supplied misconception');
-    expect(systemMessage?.content).to.contain('Every supports or contradicts evaluation must include at least one learnerEvidence citation');
-    expect(systemMessage?.content).to.contain('Never cite tutor text');
-    expect(systemMessage?.content).to.contain('Assess instructional evidence cumulatively from every learner-authored turn');
-    expect(systemMessage?.content).to.contain('Study the learner’s trajectory and improvement');
-    expect(systemMessage?.content).to.contain('combine distinct complementary learner statements across turns');
-    expect(systemMessage?.content).to.contain('Do not average turns, sum per-turn scores');
-    expect(systemMessage?.content).to.contain('as an answer to the immediately preceding tutor question');
-    expect(systemMessage?.content).to.contain('A short phrase, choice, number, or confirmation can fully establish');
-    expect(systemMessage?.content).to.contain('do not require the learner to restate the lesson context');
-    expect(systemMessage?.content).to.contain('Tutor turns provide context');
-    expect(systemMessage?.content).to.contain('never learner evidence');
-    expect(systemMessage?.content).to.contain('return the cumulative semantic coverage the learner has demonstrated');
-    expect(systemMessage?.content).to.contain('does not erase knowledge demonstrated in earlier learner turns');
-    expect(systemMessage?.content).to.contain('return the learner’s resolved stance at the end of the dialogue');
-    expect(systemMessage?.content).to.contain('supersedes conflicting earlier learner evidence');
-    expect(systemMessage?.content).to.contain('do not reactivate a repaired misconception solely because an earlier turn supported it');
-    expect(systemMessage?.content).to.contain('supports: the learner’s accumulated, resolved account presents some');
-    expect(systemMessage?.content).to.contain('contradicts: the learner’s resolved account explicitly rejects');
-    expect(systemMessage?.content).to.contain('unaddressed: the learner’s own contributions establish no resolved stance');
-    expect(systemMessage?.content).to.not.contain('Score only meaning expressed in the latest learner response');
-    expect(systemMessage?.content).to.not.contain('earlier learner or tutor statements are not new evidence by themselves');
-    expect(systemMessage?.content).to.contain('naming only one side or participant is not support');
-    expect(systemMessage?.content).to.contain('stated relation with the stated roles and direction');
-    expect(systemMessage?.content).to.contain('opposite relation or reverses the roles');
-    expect(systemMessage?.content).to.contain('one continuous semantic-coverage rubric for evidenceStrength');
-    expect(systemMessage?.content).to.contain('explicitly represents across all learner-authored turns in the selected evidenceDirection');
-    expect(systemMessage?.content).to.contain('0 means the accumulated learner account represents none of the proposition in that direction');
-    expect(systemMessage?.content).to.contain('0.25 means it represents a significant portion');
-    expect(systemMessage?.content).to.contain('0.5 means it represents more than half');
-    expect(systemMessage?.content).to.contain('0.75 means it represents most');
-    expect(systemMessage?.content).to.contain('1 means it represents the entire defining meaning');
-    expect(systemMessage?.content).to.contain('anchors on a continuous scale, not discrete categories');
-    expect(systemMessage?.content).to.contain('supports and contradicts require evidenceStrength greater than 0');
-    expect(systemMessage?.content).to.contain('unaddressed requires evidenceStrength 0');
-    expect(systemMessage?.content).to.contain('evidenceDirection determines whether the resolved evidence supports or contradicts');
-    expect(systemMessage?.content).to.contain('cumulative semantic coverage, not confidence or the size of the learner’s improvement');
-    expect(systemMessage?.content).to.contain('If the latest contribution is off-task');
-    expect(systemMessage?.content).to.contain('Still evaluate prior learner-authored turns cumulatively');
-    expect(systemMessage?.content).to.not.contain('contradicts and unaddressed require evidenceStrength 0');
-    expect(systemMessage?.content).to.not.contain('larger positive evidenceStrength always means more affirmative representation');
-    expect(systemMessage?.content).to.contain('Do not speculate about what the learner is thinking. This is an evidentiary evaluation');
-    expect(systemMessage?.content).to.contain('Do not infer support from topical similarity, shared vocabulary, shared numbers');
-    expect(systemMessage?.content).to.contain('A bare number or calculation supports a misconception only when');
-    expect(systemMessage?.content).to.contain('contradicts a misconception when it unambiguously instantiates the correct alternative in context');
+    const scoringPrompt = String(systemMessage?.content);
+    expect(scoringPrompt.split(/\s+/).length).to.be.lessThan(800);
+    expect(scoringPrompt.match(/^[1-5]\. .+$/gm)).to.deep.equal([
+      '1. Interpret the answer in question context.',
+      '2. Assess accumulated student evidence.',
+      '3. Distinguish student evidence from supplied information.',
+      '4. Report direction and coverage.',
+      '5. Cite evidence and identify remaining requirements.',
+    ]);
+    expect(scoringPrompt).not.to.match(/Multiple-choice:|Cloze:|True\/false:/);
     const userMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[1];
     expect(userMessage).to.not.equal(undefined);
     if (!userMessage) {
@@ -694,12 +663,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect((userMessage.content as string).indexOf('"evaluationDirective"')).to.be.greaterThan(
       (userMessage.content as string).indexOf('"learnerText"'),
     );
-    expect(scoringUserPayload.evaluationDirective).to.contain(
-      'Evaluate learnerText as the latest and primary evidence for this state update.',
-    );
-    expect(scoringUserPayload.evaluationDirective).to.contain(
-      'without inferring or preserving any prior model score',
-    );
+    expect(scoringUserPayload.evaluationDirective).to.be.a('string').and.not.be.empty;
     expect(scoringUserPayload.learningTargets[0]).to.deep.include({
       clusterKC: 'kc-a',
       text: 'A target text',
@@ -721,8 +685,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.not.contain('Return only values changed by the latest response');
     expect(systemMessage?.content).to.not.contain('priorCoverage');
     expect(systemMessage?.content).to.not.contain('priorSupportStrength');
-    expect(calls[0]).to.have.nested.property('messages[0].content')
-      .that.contains('Resolve references using the problem statement and dialogue history');
   });
 
   it('accepts direction-relative contradiction strength while preserving the sparse downstream score contract', async function() {

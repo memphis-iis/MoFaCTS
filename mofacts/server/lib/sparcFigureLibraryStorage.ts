@@ -2,7 +2,7 @@ import { Mongo } from 'meteor/mongo';
 import { randomBytes } from 'crypto';
 import { collectionMongoName } from '../../common/collectionOwnership';
 import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
-import type { SparcFigureDecision, SparcFigureLibraryEntry, SparcFigureLibraryStore } from './sparcFigureLibraryService';
+import type { SparcVisualDecision, SparcFigureLibraryEntry, SparcFigureLibraryStore } from './sparcFigureLibraryService';
 import { invalidateSparcFigureBrowse } from './sparcFigureBrowseStorage';
 import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
 import { isSparcAdministrativeRemoval } from './sparcLibraryCurationStorage';
@@ -11,7 +11,7 @@ import { isSparcAdministrativeRemoval } from './sparcLibraryCurationStorage';
 // Typed image adapter; this does not create another collection or repository.
 export const SparcFigureLibrary = SparcInstructionalLibrary as unknown as Mongo.Collection<SparcFigureLibraryEntry>;
 type LibraryLease = { _id: string; kind: 'lease'; owner: string; expiresAt: Date };
-export const SparcFigureRequests = new Mongo.Collection<SparcFigureDecision | LibraryLease>(collectionMongoName('SparcFigureRequests'));
+export const SparcFigureRequests = new Mongo.Collection<SparcVisualDecision | LibraryLease>(collectionMongoName('SparcFigureRequests'));
 
 export async function ensureSparcFigureLibraryIndexes() {
   await SparcFigureLibrary.rawCollection().createIndex({ version: 1, imageModel: 1, embeddingModel: 1, dimensions: 1, ready: 1, _id: 1 });

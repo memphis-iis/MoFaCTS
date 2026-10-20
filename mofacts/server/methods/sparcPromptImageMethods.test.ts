@@ -22,6 +22,7 @@ describe('SPARC private supported Prompt image contracts', () => {
       }),
       storageBoundary: { backend: 'local' },
       figureLibrary,
+      async findVideo(_vector: number[], _tdfId: string, _minimumSimilarity: number): Promise<import('../lib/sparcVideoLibraryService').SparcVideoMatch | undefined> { return undefined; },
       async embedSituation() { return { vector: [1, 0], usage: { costUsd: .0001 } }; },
       DynamicAssets: {
         collection: {
@@ -69,11 +70,38 @@ describe('SPARC private supported Prompt image contracts', () => {
   }
   const request = { tdfId: 'lesson', sessionId: 'session', generationId: 'turn', tutorMessage: 'What happens in the empty middle stage?', imagePrompt: 'Show two stages, leaving the intervening process unillustrated.', figureDescription: 'Two visible stages with an empty area between them.', displayWidth: 360 };
 
+  it('authorizes visual resolution, returns a catalog video without image work and resumes its saved decision', async () => {
+    const library = sparcLibraryFixture(), f = fixture(library.store); let searches = 0;
+    const video = { segmentId: 'a'.repeat(64), videoId: 'abcdefghijk', language: 'en', title: 'Teaching', channel: 'Teaching',
+      transcript: 'A complete teaching process.', startSeconds: 0, endSeconds: 20 };
+    f.deps.findVideo = async (vector, tdfId, cutoff) => { searches++; assert.deepEqual(vector, [1, 0]);
+      assert.equal(tdfId, 'lesson'); assert.equal(cutoff, .992); return { video, similarity: 1 }; };
+    const teaching = { ...request, situation: { target: { texts: ['A process.'] }, evidence: [], assistance: 2.5, illustrationBrief: 'A complete teaching process.' } };
+    await assert.rejects(f.methods.resolveSparcVisualSupport.call({ userId: 'student' }, teaching), /Permission denied/);
+    await assert.rejects(f.methods.resolveSparcVisualSupport.call({}, teaching), /logged in|authenticated|Permission|not-authorized/i);
+    assert.equal(searches, 0);
+    const first = await f.methods.resolveSparcVisualSupport.call({ userId: 'admin' }, teaching) as { video: unknown };
+    assert.deepEqual(first.video, video); assert.equal(f.providerCalls(), 0); assert.equal(f.assets.size, 0);
+    f.deps.embedSituation = async () => { throw new Error('Must not re-embed'); };
+    const resumed = await f.methods.resolveSparcVisualSupport.call({ userId: 'admin' }, teaching) as typeof first;
+    assert.deepEqual(resumed.video, video); assert.equal(searches, 1);
+  });
+  it('propagates video search failure without searching or generating an image, and requires the visual brief', async () => {
+    const library = sparcLibraryFixture(), f = fixture(library.store);
+    f.deps.findVideo = async () => { throw new Error('Video storage unavailable'); };
+    library.store.candidates = async () => { throw new Error('Must not search images after a service error'); };
+    const situation = { target: { texts: ['A process.'] }, evidence: [], assistance: 2.5 };
+    await assert.rejects(f.methods.resolveSparcVisualSupport.call({ userId: 'admin' }, { ...request, situation }), /visual brief/);
+    await assert.rejects(f.methods.resolveSparcVisualSupport.call({ userId: 'admin' }, { ...request,
+      situation: { ...situation, illustrationBrief: 'A complete process.' } }), /Video storage unavailable/);
+    assert.equal(f.providerCalls(), 0); assert.equal(library.decisions.size, 0);
+  });
+
   const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3XcAAAAASUVORK5CYII=';
   it('revises the current image without adding catalog items, assets or revision links', async () => {
     const library = sparcLibraryFixture(); const f = fixture(library.store);
-    const teaching = { ...request, situation: { target: { texts: ['Long-run coverage.'] }, evidence: [], assistance: 2.77 } };
-    const original = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as { figure: { assetId: string } };
+    const teaching = { ...request, situation: { target: { texts: ['Long-run coverage.'] }, evidence: [], assistance: 2.77, illustrationBrief: 'A complete teaching model.' } };
+    const original = await f.methods.resolveSparcVisualSupport.call({ userId: 'admin' }, teaching) as { figure: { assetId: string } };
     const assetId = original.figure.assetId;
     const revised = await f.methods.replaceSparcLibraryImage.call({ userId: 'otherAdmin' }, {
       assetId, description: 'Corrected teaching figure.', mediaType: 'image/png', base64: png,
@@ -137,15 +165,15 @@ describe('SPARC private supported Prompt image contracts', () => {
     const library = sparcLibraryFixture(); const f = fixture(library.store);
     const teaching = { ...request, tutorMessage: 'The complete teaching figure.', imagePrompt: 'Draw the full model.',
       figureDescription: 'A fixed mean and repeated intervals.', situation: { target: { texts: ['Long-run interval coverage.'] }, evidence: [], currentValue: .2, assistance: 2.77, illustrationBrief: 'Draw the full model.' } };
-    const first = await f.methods.generateSparcPromptImage.call({ userId: 'admin' }, teaching) as { figure: { assetId: string; description: string }; usage?: unknown };
-    const second = await f.methods.generateSparcPromptImage.call({ userId: 'otherAdmin' }, { ...teaching,
+    const first = await f.methods.resolveSparcVisualSupport.call({ userId: 'admin' }, teaching) as { figure: { assetId: string; description: string }; usage?: unknown };
+    const second = await f.methods.resolveSparcVisualSupport.call({ userId: 'otherAdmin' }, { ...teaching,
       sessionId: 'another-session', figureDescription: 'A different proposed description.' }) as typeof first;
     assert.deepEqual(first.figure, second.figure); assert.equal(second.usage, undefined); assert.equal(f.providerCalls(), 1);
     assert.equal(library.decisions.size, 2);
     const shared = await f.methods.getSparcPromptImage.call({ userId: 'otherAdmin' }, first.figure.assetId);
     assert.ok(shared.dataUrl!.startsWith('data:image/png;base64,'));
     await assert.rejects(f.methods.getSparcPromptImage.call({ userId: 'student' }, first.figure.assetId), /Permission denied/);
-    await assert.rejects(f.methods.generateSparcPromptImage.call({ userId: 'student' }, teaching), /Permission denied/);
+    await assert.rejects(f.methods.resolveSparcVisualSupport.call({ userId: 'student' }, teaching), /Permission denied/);
   });
 
   it('blocks unauthorized generation before calling the provider', async () => {

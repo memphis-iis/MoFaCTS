@@ -6,8 +6,29 @@ import { commitSparcAutoTutorSubmit } from './sparcAutoTutorRuleCommit';
 import { clearSparcRuntimeState, hydrateSparcRuntimeHistory, readSparcResumeSnapshot } from './sparcRuntimeState';
 import { commitSparcTrialDisplayAutoTutorRules } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
-import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
+import type { SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
+
+function instructionFixture(request: SparcUtteranceRequest): SparcInstructionComponents {
+  const components = request.moveDefinition.components!;
+  const format = request.moveDefinition.responseFormat!;
+  const questions = {
+    text: 'Which case meets the condition?',
+    cloze: 'The case meeting the condition is _____.',
+    'multiple-choice': 'Which case meets the condition?',
+    'true-false': 'Case A meets the condition.',
+  };
+  return {
+    explanation: components.includes('explanation') ? 'An explanation of the condition.' : null,
+    richContent: components.includes('richContent') ? 'A complete worked example.' : null,
+    question: questions[format],
+    ...(format === 'true-false' ? { choices: [
+      { id: 'true', label: 'True', correct: true }, { id: 'false', label: 'False', correct: false },
+    ] } : format === 'multiple-choice' ? { choices: [
+      { id: 'a', label: 'Case A', correct: true }, { id: 'b', label: 'Case B', correct: false }, { id: 'c', label: 'Neither case', correct: false },
+    ] } : {}),
+  };
+}
 
 describe('SPARC app instructional commit', () => {
   it('uses the configured chain or reference anchor policy and resumes its accepted decision without injected candidate options', async () => {
@@ -46,9 +67,7 @@ describe('SPARC app instructional commit', () => {
           if (request.action === 'instruction.feedback') return 'That is correct.';
           targets.push(request.targetId!);
           if (fail) throw new Error('instruction interrupted');
-          const parts = request.moveDefinition.components!;
-          return { explanation: parts.includes('explanation') ? 'An explanation.' : null, richContent: parts.includes('richContent') ? 'A worked example.' : null, question: 'Recognize the next KC.',
-            ...(request.moveDefinition.responseFormat === 'multiple-choice' ? { choices: [{ id: 'yes', label: 'Correct case', correct: true }, { id: 'no', label: 'Incorrect case', correct: false }, { id: 'other', label: 'Unrelated case', correct: false }] } : {}) };
+          return instructionFixture(request);
         },
         deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
       };
@@ -90,7 +109,7 @@ describe('SPARC app instructional commit', () => {
       generateTutorUtterance: request => {
         if (request.action === 'instruction.feedback') return 'Here is the correction.';
         assert.equal(publishedFeedback, true);
-        return { explanation: request.moveDefinition.components!.includes('explanation') ? 'An explanation.' : null, richContent: request.moveDefinition.components!.includes('richContent') ? 'A complete worked example.' : null, question: 'How does the new case work?', ...(request.moveDefinition.responseFormat === 'multiple-choice' ? { choices: [{id:'a',label:'A',correct:true},{id:'b',label:'B',correct:false},{id:'c',label:'C',correct:false}] } : {}) };
+        return instructionFixture(request);
       },
       deps: { getIsAdmin: () => true, getUserId: () => 'u', writeHistory: async () => {}, writeHistoryBatch: async () => {} },
     });
@@ -128,7 +147,7 @@ describe('SPARC app instructional commit', () => {
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'student-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: ['a', 'b'].map((clusterKC) => ({ clusterKC, coverage: 0.2 })) }; },
-      generateTutorUtterance: (request: SparcUtteranceRequest) => { requests.push(request); return request.action === 'instruction.feedback' ? 'Here is feedback.' : { explanation: null, richContent: null, question: 'Explain A?' }; },
+      generateTutorUtterance: (request: SparcUtteranceRequest) => { requests.push(request); return request.action === 'instruction.feedback' ? 'Here is feedback.' : instructionFixture(request); },
       deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'student-tdf', levelUnit: 0, pageKey: 'student-cycle', display };
@@ -136,7 +155,7 @@ describe('SPARC app instructional commit', () => {
     const answer = { submittedNodes: { 'learner-response-input': 'An answer.' }, triggeredBy: 'learner-response-submit', timestamp: 10 };
     await commitSparcAutoTutorSubmit({ ...args, sparcResult: answer });
     assert.equal(requests.length, 1);
-    assert.equal((menu().slots?.options as unknown[]).length, 7);
+    assert.equal((menu().slots?.options as unknown[]).length, 17);
     const target = () => (menu().slots?.options as { targetId: string }[])[0]!.targetId;
     const firstTarget = target();
     const choose = (id: string, timestamp: number) => {
@@ -178,7 +197,7 @@ describe('SPARC app instructional commit', () => {
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: [{ clusterKC: 'a', coverage: 0.2 }] }; },
-      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new Error('provider failed'); const parts = requireActiveSparcMoveDefinition(request.action).components; return parts ? { explanation: parts.includes('explanation') ? 'Explanation' : null, richContent: parts.includes('richContent') ? '<p>Example</p>' : null, question: 'What is A?', ...(request.moveDefinition.responseFormat === 'multiple-choice' ? { choices: [{id:'a',label:'A',correct:true},{id:'b',label:'B',correct:false},{id:'c',label:'C',correct:false}] } : {}) } : 'Tell me more.'; },
+      generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new Error('provider failed'); return instructionFixture(request); },
       deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'tdf', levelUnit: 0, pageKey: display.pageKey, display };

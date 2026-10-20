@@ -34,6 +34,31 @@ function query(eventId = 'one', kind: SparcPrimitiveQuery['context']['kind'] = '
 }
 
 describe('Shared instructional primitive library', () => {
+  it('keeps written support separate and resolves each new visual request instead of bypassing video-first retrieval', async () => {
+    const f = fixture();
+    const s = createMoveLibraryService({ store: f.store, embeddingModel: 'fixture', embed: async () => [1, 0],
+      verifyFigure: async () => {}, figureReusable: async () => true });
+    const generic = query('saved-image', 'richContent');
+    const generated = await s.lookup('alice', generic); if (generated.status !== 'generate') throw new Error();
+    const content = { text: 'A teaching image.', figure: { assetId: 'image123', description: 'A teaching image.' } };
+    await s.publish('alice', generated.ticket, content);
+    const video = { segmentId: 'a'.repeat(64), videoId: 'abcdefghijk', startSeconds: 0, endSeconds: 20,
+      transcript: 'A teaching passage.', language: 'en', title: 'Teaching', channel: 'Teaching' };
+    const seed = [...f.entries.values()][0]!;
+    f.entries.set('video-entry', { ...seed, _id: 'video-entry', content: { text: video.transcript, video } });
+    // No videoReuseStatus dependency is installed: a written request must not inspect video availability.
+    const written = query('written', 'richContent'); written.context.supportKind = 'written';
+    const write = await s.lookup('alice', written); assert.equal(write.status, 'generate');
+    if (write.status !== 'generate') throw new Error();
+    await assert.rejects(s.publish('alice', write.ticket, content), /written move/);
+    const visual = query('visual', 'richContent'); visual.context.supportKind = 'visual';
+    const select = await s.lookup('alice', visual); assert.equal(select.status, 'generate');
+    if (select.status !== 'generate') throw new Error();
+    await assert.rejects(s.publish('alice', select.ticket, { text: 'A written example.' }), /visual move/);
+    await s.publish('alice', select.ticket, content);
+    assert.equal((await s.lookup('alice', visual)).status, 'hit', 'accepted visual decisions replay unchanged');
+    assert.equal((await s.lookup('alice', { ...visual, eventId: 'another-visual' })).status, 'generate');
+  });
   it('embeds the same canonical need for saving and retrieval of every primitive type', async () => {
     for (const kind of ['explanation', 'feedback', 'richContent', 'question'] as const) {
       const f = fixture(), inputs: string[] = [];

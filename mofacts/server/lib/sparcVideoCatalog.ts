@@ -4,7 +4,7 @@ import { collectionMongoName } from '../../common/collectionOwnership';
 import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
 import { invalidateSparcFigureBrowse } from './sparcFigureBrowseStorage';
 import { withSparcFigureLibraryLock } from './sparcFigureLibraryStorage';
-import { sparcFigureCosineSimilarity } from '../../common/lib/sparcFigureLibrary';
+import { selectSparcLibraryVideo } from './sparcVideoLibraryService';
 import { SPARC_EMBEDDING_MODEL } from '../../common/lib/sparcEmbeddingModel';
 import { parseSparcVideoSegment, SPARC_VIDEO_EMBEDDING_VERSION, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import { searchSparcVideo, fetchSparcVideoCaptions } from './sparcVideoProviders';
@@ -38,24 +38,14 @@ export function createMongoSparcVideoCatalog(deps: Pick<Parameters<typeof create
     wait: ms => new Promise(resolve => setTimeout(resolve, ms)) });
 }
 
-/** Passage ranking is semantic search, not the near-duplicate primitive reuse test. */
-export async function findSparcVideoCandidates(vector: number[], language: string): Promise<SparcVideoSegment[]> {
-  const best: { score: number; video: SparcVideoSegment }[] = [];
-  let after = '';
-  for (;;) {
-    const rows = await SparcInstructionalLibrary.find({ kind: 'video', embeddingVersion: SPARC_VIDEO_EMBEDDING_VERSION,
+/** Video retrieval owns selection; the text model never receives a catalog-ID menu. */
+export async function findSparcLibraryVideo(vector: number[], language: string, minimumSimilarity: number) {
+  return selectSparcLibraryVideo({ vector, language, minimumSimilarity, page: async after =>
+    await SparcInstructionalLibrary.find({ kind: 'video', embeddingVersion: SPARC_VIDEO_EMBEDDING_VERSION,
       embeddingModel: SPARC_EMBEDDING_MODEL, 'content.video.language': language, _id: { $gt: after } },
-      { fields: { _id: 1, embedding: 1, 'content.video': 1 }, sort: { _id: 1 }, limit: 100 }).fetchAsync();
-    for (const row of rows) {
-      if (row.embedding.length !== vector.length) throw new Error('Video catalog embedding dimensions do not match the instructional need');
-      best.push({ score: sparcFigureCosineSimilarity(vector, row.embedding), video: parseSparcVideoSegment('content' in row ? row.content.video : null) });
-      best.sort((a, b) => b.score - a.score || a.video.segmentId.localeCompare(b.video.segmentId));
-      best.length = Math.min(best.length, 3);
-    }
-    if (rows.length < 100) break;
-    after = rows.at(-1)!._id;
-  }
-  return best.map(item => item.video);
+      { fields: { _id: 1, embedding: 1, 'content.video': 1 }, sort: { _id: 1 }, limit: 100 }).fetchAsync()
+      .then(rows => rows.map(row => ({ _id: row._id, embedding: row.embedding,
+        content: { video: parseSparcVideoSegment('content' in row ? row.content.video : null) } }))) });
 }
 /** One indexed batch per candidate page; deliberately removed sources cannot be selected. */
 export async function sparcVideoReuseStatus(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>> {

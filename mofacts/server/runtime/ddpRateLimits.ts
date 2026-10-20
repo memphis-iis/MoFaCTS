@@ -25,6 +25,7 @@ export function isRateLimitedOpenRouterMethod(name: string): boolean {
     'lookupSparcPrimitive',
     'publishSparcPrimitive',
     'reviseSparcPrimitive',
+    'resolveSparcVisualSupport',
     'prepareSparcVideoCatalogTarget',
     'saveSparcVideoCatalogPassages'
   ].includes(name);

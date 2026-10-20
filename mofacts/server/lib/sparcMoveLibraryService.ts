@@ -45,6 +45,8 @@ function bounded(value: unknown, label: string, max: number): asserts value is s
 export function validatePrimitiveContent(value: SparcPrimitiveContent, context: SparcPrimitiveContext): SparcPrimitiveContent {
   bounded(value?.text, 'primitive text', 2048);
   if (Object.keys(value).some(k => !['text', 'figure', 'video', 'choices', 'supportHeading'].includes(k))) throw new Error('Unexpected primitive field');
+  if (context.supportKind === 'visual' && !value.video && !value.figure) throw new Error('The visual move requires a video or image');
+  if (context.supportKind === 'written' && (value.video || value.figure)) throw new Error('The written move cannot select visual support');
   if (/<\s*(script|iframe|input|button|style)|\bon\w+\s*=|javascript:/i.test(value.text)) throw new Error('Unsafe instructional markup');
   if (value.video) { if (context.kind !== 'richContent' || value.figure || value.supportHeading || value.text !== value.video.transcript) throw new Error('Video requires standalone rich support'); parseSparcVideoSegment(value.video); }
   if (value.figure) { if (context.kind !== 'richContent') throw new Error('Figure requires rich support'); parseSparcPromptFigure(value.figure); }
@@ -154,6 +156,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       bounded(query?.tdfId, 'lesson identity', 200); bounded(query.sessionId, 'session identity', 200); bounded(query.eventId, 'event identity', 500);
       bounded(query.queryText, 'instructional context', 30000);
       if (query.context?.version !== SPARC_MOVE_LIBRARY_VERSION || !['feedback', 'explanation', 'richContent', 'question'].includes(query.context.kind)
+        || (query.context.supportKind !== undefined && (query.context.kind !== 'richContent' || !['written', 'visual'].includes(query.context.supportKind)))
         || !Number.isFinite(query.context.assistance) || stableMoveJson(query.context).length > 60000
         || !Array.isArray(query.context.components) || query.context.components.length < 1 || query.context.components.length > 3
         || query.context.components.some(k => !['feedback', 'explanation', 'richContent', 'question'].includes(k))
@@ -184,12 +187,16 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
           let best: { entry: MoveEntry; similarity: number } | undefined;
           let after = '';
           for (;;) {
+            // A new visual move must resolve its brief through video -> image -> generation.
+            // Accepted requests above still replay their original resource without reselection.
+            if (query.context.supportKind === 'visual') break;
             const entries = await store.candidates(query.context.kind, deps.embeddingModel, after);
-            const videos = entries.flatMap(entry => entry.content.video ? [entry.content.video] : []);
+            const videos = query.context.supportKind === 'written' ? [] : entries.flatMap(entry => entry.content.video ? [entry.content.video] : []);
             if (videos.length && !deps.videoReuseStatus) throw new Error('Video reuse validation unavailable');
             const videoStatus = videos.length ? await deps.videoReuseStatus!(videos) : new Map<string, boolean>();
             for (const entry of entries) {
               candidateCount++;
+              if (query.context.supportKind === 'written' && (entry.content.video || entry.content.figure)) continue;
               if (entry.embeddingModel !== deps.embeddingModel || entry.version !== SPARC_MOVE_LIBRARY_VERSION) continue;
               if (entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
               if (entry.kind !== query.context.kind || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)) continue;

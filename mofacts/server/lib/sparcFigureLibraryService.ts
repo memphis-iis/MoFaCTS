@@ -2,6 +2,8 @@ import { normalizeSparcFigureEmbedding, sparcFigureCosineSimilarity, SPARC_FIGUR
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../common/lib/sparcPromptImage';
 import type { OpenRouterUsageSummary } from '../../common/lib/openRouterClient';
 import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
+import { parseSparcVideoSegment, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import type { SparcVideoMatch } from './sparcVideoLibraryService';
 
 export type SparcFigureLibraryEntry = {
   _id: string; kind?: 'image'; version: string; imageModel: string; embeddingModel: string; dimensions: number;
@@ -9,22 +11,25 @@ export type SparcFigureLibraryEntry = {
   embeddingVersion?: string;
   generation?: { imagePrompt: string; tutorMessage: string; description: string; displayWidth: number };
 };
-export type SparcFigureDecision = {
+export type SparcVisualDecision = {
   _id: string; kind: 'decision'; userId: string; tdfId: string; sessionId: string;
+  /** Existing image decision key; for video this holds the catalog segment identity. */
   assetId: string; source: 'generated' | 'semantic'; similarity: number | null; createdAt: Date;
+  video?: SparcVideoSegment;
 };
 export type SparcFigureLibraryStore = {
   inspectEntries: (assetIds: string[]) => Promise<SparcFigureInspection[]>;
   inspectPage: (afterId: string) => Promise<SparcFigureInspection[]>;
-  findDecision: (identity: string, userId: string) => Promise<SparcFigureDecision | undefined>;
-  saveDecision: (decision: SparcFigureDecision) => Promise<void>;
+  findDecision: (identity: string, userId: string) => Promise<SparcVisualDecision | undefined>;
+  saveDecision: (decision: SparcVisualDecision) => Promise<void>;
   findEntry: (assetId: string) => Promise<SparcFigureLibraryEntry | undefined>;
   saveEntry: (entry: SparcFigureLibraryEntry) => Promise<void>;
   candidates: (query: { version: string; imageModel: string; embeddingModel: string; dimensions: number; afterId: string }) => Promise<SparcFigureLibraryEntry[]>;
   withLock: <T>(work: () => Promise<T>, scope?: string) => Promise<T>;
 };
 export type SparcFigureInspection = Pick<SparcFigureLibraryEntry, '_id' | 'version' | 'imageModel' | 'createdAt'>;
-type SparcFigureLibraryResult = { assetId: string; source: 'resume' | 'semantic' | 'generated'; similarity: number | null;
+type SparcVisualLibraryResult = { assetId: string; source: 'resume' | 'semantic' | 'generated'; similarity: number | null;
+  video?: SparcVideoSegment;
   usage?: OpenRouterUsageSummary | undefined; embeddingUsage?: OpenRouterUsageSummary | undefined };
 
 /** One exact cosine search, paged on the server; no similarity reranker or critic call. */
@@ -48,37 +53,54 @@ export async function selectSparcLibraryFigure(store: SparcFigureLibraryStore, e
   }
 }
 
-export async function getOrGenerateSparcLibraryFigure(params: {
+export async function getOrGenerateSparcLibraryVisual(params: {
   store: SparcFigureLibraryStore; identity: string; assetId: string; userId: string; tdfId: string; sessionId: string;
   situation: string; imagePrompt: string; tutorMessage: string; description: string; displayWidth: number;
   minimumSimilarity: number;
   embed: (input: string) => Promise<{ vector: number[]; usage?: OpenRouterUsageSummary }>;
   generate: (entry: SparcFigureLibraryEntry) => Promise<{ usage?: OpenRouterUsageSummary }>;
-}): Promise<SparcFigureLibraryResult> {
+  findVideo: (vector: number[]) => Promise<SparcVideoMatch | undefined>;
+}): Promise<SparcVisualLibraryResult> {
   const { store } = params;
   const prior = await store.findDecision(params.identity, params.userId);
-  if (prior) return { assetId: prior.assetId, source: 'resume' as const, similarity: prior.similarity };
+  const resume = (decision: SparcVisualDecision): SparcVisualLibraryResult => {
+    if (decision.video && decision.assetId !== decision.video.segmentId) throw new Error('Saved visual resource identity mismatch');
+    return { assetId: decision.assetId, source: 'resume', similarity: decision.similarity,
+      ...(decision.video ? { video: parseSparcVideoSegment(decision.video) } : {}) };
+  };
+  if (prior) return resume(prior);
   let embedding: number[] | undefined;
   let embeddingUsage: OpenRouterUsageSummary | undefined;
-  const acceptMatch = async (match: { entry: SparcFigureLibraryEntry; similarity: number }): Promise<SparcFigureLibraryResult> => {
+  const acceptMatch = async (match: { entry: SparcFigureLibraryEntry; similarity: number }): Promise<SparcVisualLibraryResult> => {
     await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId,
       tdfId: params.tdfId, sessionId: params.sessionId, assetId: match.entry._id,
       source: 'semantic', similarity: match.similarity, createdAt: new Date() });
     const accepted = await store.findDecision(params.identity, params.userId);
     if (!accepted) throw new Error('SPARC figure library did not persist the selected figure');
-    return { assetId: accepted.assetId, source: 'semantic', similarity: accepted.similarity, embeddingUsage };
+    return { ...resume(accepted), source: 'semantic', embeddingUsage };
   };
   if (!await store.findEntry(params.assetId)) {
     const embedded = await params.embed(params.situation);
     embedding = normalizeSparcFigureEmbedding(embedded.vector);
     embeddingUsage = embedded.usage;
+    const videoMatch = await params.findVideo(embedding);
+    if (videoMatch) {
+        const video = parseSparcVideoSegment(videoMatch.video);
+        if (!Number.isFinite(videoMatch.similarity) || videoMatch.similarity < params.minimumSimilarity || videoMatch.similarity > 1) throw new Error('Video retrieval returned an ineligible match');
+        await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId,
+          tdfId: params.tdfId, sessionId: params.sessionId, assetId: video.segmentId, video,
+          source: 'semantic', similarity: videoMatch.similarity, createdAt: new Date() });
+        const accepted = await store.findDecision(params.identity, params.userId);
+        if (!accepted) throw new Error('SPARC visual library did not persist the selected video');
+        return { ...resume(accepted), source: 'semantic', embeddingUsage };
+    }
     const match = await selectSparcLibraryFigure(store, embedding, params.minimumSimilarity);
     if (match) return await acceptMatch(match);
   }
   // Warm retrievals run concurrently. Only a miss or interrupted generation acquires the lease.
   return store.withLock(async () => {
     const resumed = await store.findDecision(params.identity, params.userId);
-    if (resumed) return { assetId: resumed.assetId, source: 'resume' as const, similarity: resumed.similarity, embeddingUsage };
+    if (resumed) return { ...resume(resumed), embeddingUsage };
     // A durable pending entry keeps the original situation and brief after provider/storage failure.
     let entry = await store.findEntry(params.assetId);
     if (!entry) {
@@ -101,6 +123,9 @@ export async function getOrGenerateSparcLibraryFigure(params: {
     await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId,
       tdfId: params.tdfId, sessionId: params.sessionId, assetId: entry._id,
       source: 'generated', similarity: null, createdAt: new Date() });
-    return { assetId: entry._id, source: 'generated' as const, similarity: null, usage: generated.usage, embeddingUsage };
+    const accepted = await store.findDecision(params.identity, params.userId);
+    if (!accepted) throw new Error('SPARC visual library did not persist the generated image decision');
+    return { ...resume(accepted), source: accepted.assetId === entry._id && !accepted.video ? 'generated' : 'resume',
+      usage: generated.usage, embeddingUsage };
   }, 'generation');
 }
