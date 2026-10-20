@@ -44,10 +44,14 @@ export function createSparcVideoCatalogMethods(deps: {
       await authorize(this); return targets(tdfId);
     },
     async prepareSparcVideoCatalogTarget(this: Context, tdfId: string, id: string) {
-      const userId = await authorize(this); this.unblock?.(); return service(userId).prepare(await selected(tdfId, id));
+      const userId = await authorize(this); this.unblock?.();
+      const target = await selected(tdfId, id);
+      return service(userId).prepare(target);
     },
     async saveSparcVideoCatalogPassages(this: Context, tdfId: string, id: string, ranges: SparcVideoRange[]) {
-      const userId = await authorize(this); this.unblock?.(); return service(userId).save(await selected(tdfId, id), ranges);
+      const userId = await authorize(this); this.unblock?.();
+      const target = await selected(tdfId, id);
+      return service(userId).save(target, ranges);
     },
   };
 }

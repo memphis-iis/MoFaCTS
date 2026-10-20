@@ -39,6 +39,7 @@ import './imsccWizard';
 import {
   buildRowSummaryPresentation,
   contentUploadAssetCount,
+  contentUploadSupportsSparcVideoCatalog,
   normalizeUploadQuotaStatus,
   type ContentUploadListResult,
   type ContentUploadSummaryMap,
@@ -465,6 +466,13 @@ function loadUploadQuotaStatus(instance: ContentUploadInstance): void {
 
 Template.contentUpload.helpers({
   canInspectImageLibrary() { return currentUserHasRole('admin'); },
+  canBuildVideoCatalog(id: string) {
+    const summary = summaryMapValue(Template.instance() as ContentUploadInstance)[id];
+    return currentUserHasRole('admin') && contentUploadSupportsSparcVideoCatalog(summary, Session.get(`selectedConditionFor_${id}`) ?? id);
+  },
+  selectedConditionAttrs(rootId: string, id: string) {
+    return (Session.get(`selectedConditionFor_${rootId}`) ?? rootId) === id ? { selected: true } : null;
+  },
   videoCatalogMessage(id: string) { return (Template.instance() as ContentUploadInstance)?.videoCatalogMessages?.get(id); },
   videoCatalogRunning(id: string) { return (Template.instance() as ContentUploadInstance)?.videoCatalogRunning?.get(id); },
   TdfFiles: function(this: any) {
@@ -1171,6 +1179,7 @@ Template.contentUpload.events({
     const selector = button.closest('tr')?.querySelector<HTMLSelectElement>('.condition-tdf-selector');
     const selectedId = selector ? selector.value : id;
     if (!id || template.videoCatalogRunning.get(id)) return;
+    if (!currentUserHasRole('admin') || !contentUploadSupportsSparcVideoCatalog(summaryMapValue(template)[id], selectedId ?? '')) return;
     const limitInput = button.closest('tr')?.querySelector<HTMLInputElement>('.video-catalog-limit');
     if (limitInput && !limitInput.reportValidity()) return;
     const targetLimit = limitInput?.value ? limitInput.valueAsNumber : undefined;

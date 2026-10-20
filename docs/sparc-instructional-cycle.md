@@ -407,8 +407,11 @@ The production selects the target and move; the rich primitive can select a cata
 passage or an existing support form. Questions retain the selected text/MC format.
 
 **Preparation is explicit.** On Content, an administrator selects the desired package
-(or condition) and clicks **Build video catalog** in its row. **First KCs (blank = all)**
-optionally limits a run to the first N authored targets, before any video search or
+(or condition) and clicks **Build video catalog** in its row. The build action and
+KC-limit control appear only when the selected package or condition has a SPARC
+session referencing an authored AutoTutor page. Other lesson types do not offer these
+controls, and the server rejects their catalog requests before provider or storage work.
+**First KCs (blank = all)** optionally limits a run to the first N authored targets, before any video search or
 caption request. Targets follow package page order, expectations before misconceptions
 within each page; failed targets count toward the limit. Upload, package updates,
 and learner startup never launch catalog preparation. Keep the Content view open;

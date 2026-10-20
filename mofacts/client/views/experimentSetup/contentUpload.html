@@ -277,7 +277,7 @@
                                                 <i class="fa fa-file-o" aria-hidden="true"></i> {{t 'content.files'}}
                                                 {{#if detailsReady}}({{stimFilesCount}}){{else}}(...){{/if}}
                                             </button>
-                                            {{#if canInspectImageLibrary}}
+                                            {{#if canBuildVideoCatalog this._id}}
                                             <label class="video-catalog-limit-label" for="video-catalog-limit-{{this._id}}">
                                                 {{t 'content.videoCatalogLimit'}}
                                                 <input type="number" id="video-catalog-limit-{{this._id}}" class="video-catalog-limit" min="1" max="1000" step="1" disabled={{videoCatalogRunning this._id}}>
@@ -291,7 +291,9 @@
                                                 {{#if assetsCount}}({{assetsCount}}){{else}}(0){{/if}}
                                             </button>
                                         </div>
-                                        {{#with videoCatalogMessage this._id}}<p role="status" class="admin-inline-feedback video-catalog-status">{{this}}</p>{{/with}}
+                                        {{#if canBuildVideoCatalog this._id}}
+                                            {{#with videoCatalogMessage this._id}}<p role="status" class="admin-inline-feedback video-catalog-status">{{this}}</p>{{/with}}
+                                        {{/if}}
                                         <div hidden id="stimuli-{{this._id}}" class="asset-toggle-content">
                                             {{#if detailsReady}}
                                                 {{#if stimFileInfo.length}}
@@ -471,9 +473,10 @@
                                                 <select id="tdf-selector-{{_id}}"
                                                         class="form-select form-select-sm condition-tdf-selector"
                                                         data-root-tdfid="{{_id}}">
-                                                    <option value="{{_id}}">{{t 'content.rootTdf'}} ({{lessonName}})</option>
+                                                    <option value="{{_id}}" {{selectedConditionAttrs _id _id}}>{{t 'content.rootTdf'}} ({{lessonName}})</option>
                                                     {{#each conditions}}
                                                         <option value="{{this.tdfId}}"
+                                                                {{selectedConditionAttrs ../_id this.tdfId}}
                                                                 {{disabledAttr this.tdfId}}>
                                                             {{this.condition}}
                                                             {{#unless this.tdfId}} ({{t 'content.notFoundMarker'}}){{/unless}}

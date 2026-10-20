@@ -98,8 +98,8 @@ describe('SPARC explicit video catalog preparation', () => {
     assert.ok(!('ranges' in resumed)); assert.equal(f.counts().embeddings, 0); assert.equal(f.counts().downloads, 1);
   });
   it('uses authored expectations and misconceptions, and requires the authored content language', () => {
-    const tdf = { content: { tdfs: { tutor: { setspec: { lessonname: 'Biology', contentLanguage: 'en' } } } },
-      rawStimuliFile: { setspec: { sparcPages: [{ pageId: 'page', display: { autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Variation exists.' }], misconceptions: [{ id: 'm', text: 'Selection is intentional.' }] } } }] } } };
+    const tdf = { content: { tdfs: { tutor: { setspec: { lessonname: 'Biology', contentLanguage: 'en' }, unit: [{ sparcsession: { pageId: 'page' } }] } } },
+      rawStimuliFile: { setspec: { sparcPages: [{ pageId: 'page', display: { unitType: 'sparc-autotutor-dialogue', autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Variation exists.' }], misconceptions: [{ id: 'm', text: 'Selection is intentional.' }] } } }] } } };
     const rows = sparcVideoCatalogTargets('tdf', tdf); assert.equal(rows.length, 2); assert.equal(rows[1]!.targetKind, 'misconception');
     tdf.content.tdfs.tutor.setspec.contentLanguage = '';
     assert.throws(() => sparcVideoCatalogTargets('tdf', tdf), /contentLanguage/);

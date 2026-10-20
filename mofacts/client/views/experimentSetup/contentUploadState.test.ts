@@ -2,12 +2,24 @@ import { expect } from 'chai';
 import {
   buildRowSummaryPresentation,
   contentUploadAssetCount,
+  contentUploadSupportsSparcVideoCatalog,
   normalizeContentUploadListResult,
   normalizeContentUploadSummaryMap,
   normalizeUploadQuotaStatus,
 } from './contentUploadState';
 
 describe('contentUploadState', function() {
+  it('offers catalog preparation only for the selected eligible SPARC package or condition', () => {
+    const summary = { _id: 'root', supportsSparcVideoCatalog: false, conditions: [
+      { tdfId: 'sparc', supportsSparcVideoCatalog: true }, { tdfId: 'practice', supportsSparcVideoCatalog: false },
+    ] };
+    expect(contentUploadSupportsSparcVideoCatalog(summary, 'root')).to.equal(false);
+    expect(contentUploadSupportsSparcVideoCatalog(summary, 'sparc')).to.equal(true);
+    expect(contentUploadSupportsSparcVideoCatalog(summary, 'practice')).to.equal(false);
+    expect(contentUploadSupportsSparcVideoCatalog(summary, 'missing')).to.equal(false);
+    expect(contentUploadSupportsSparcVideoCatalog(undefined, 'sparc')).to.equal(false);
+    expect(contentUploadSupportsSparcVideoCatalog({ _id: 'sparc', supportsSparcVideoCatalog: true }, 'sparc')).to.equal(true);
+  });
   it('normalizes list method results without inventing has-more state', function() {
     expect(normalizeContentUploadListResult({ ids: [123, 'abc'], totalCount: 3 })).to.deep.equal({
       ids: ['123', 'abc'],

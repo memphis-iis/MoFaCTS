@@ -1016,15 +1016,18 @@
     },
     {
       "name": "getSparcVideoCatalogTargets",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Admin authorization precedes target reads; only packages with a SPARC session selecting an authored AutoTutor page are eligible."
     },
     {
       "name": "prepareSparcVideoCatalogTarget",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Admin authorization and SPARC package/target eligibility precede catalog storage, credentials and provider work."
     },
     {
       "name": "saveSparcVideoCatalogPassages",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Admin authorization and SPARC package/target eligibility precede catalog storage, credentials and embedding work."
     },
     {
       "name": "deleteSparcInstructionalComponent",

@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { SPARC_EMBEDDING_MODEL } from '../../common/lib/sparcEmbeddingModel';
+import { supportsSparcVideoCatalog } from '../../common/lib/sparcVideoCatalog';
 import { normalizeSparcFigureEmbedding } from '../../common/lib/sparcFigureLibrary';
 import { parseSparcVideoSegment, sparcVideoPassages, SPARC_VIDEO_EMBEDDING_VERSION,
   type SparcVideoCaption, type SparcVideoRange } from '../../../learning-components/runtime/sparcVideo';
@@ -22,6 +23,7 @@ export interface VideoCatalogStore {
 }
 
 export function sparcVideoCatalogTargets(tdfId: string, tdf: Record<string, any>): CatalogTarget[] {
+  if (!supportsSparcVideoCatalog(tdf)) throw new Error('Video catalogs are available only for SPARC AutoTutor systems');
   const settings = tdf?.content?.tdfs?.tutor?.setspec;
   const language = settings?.contentLanguage;
   if (typeof language !== 'string' || !/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(language)) throw new Error('Set the package contentLanguage before building its video catalog');

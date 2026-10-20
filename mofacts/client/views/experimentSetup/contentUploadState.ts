@@ -54,6 +54,12 @@ export function contentUploadAssetCount(summary: any): number | null {
   return typeof summary?.assetCount === 'number' ? summary.assetCount : null;
 }
 
+export function contentUploadSupportsSparcVideoCatalog(summary: any, selectedTdfId: string): boolean {
+  const selected = selectedTdfId === summary?._id ? summary
+    : Array.isArray(summary?.conditions) ? summary.conditions.find((condition: any) => condition.tdfId === selectedTdfId) : undefined;
+  return selected?.supportsSparcVideoCatalog === true;
+}
+
 export function normalizeUploadQuotaStatus(status: any): UploadQuotaStatus {
   return {
     unlimited: status?.unlimited === true,

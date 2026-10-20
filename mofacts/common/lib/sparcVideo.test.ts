@@ -1,6 +1,25 @@
 import assert from 'node:assert/strict';
 import { parseSparcVideoSegment, sparcVideoPassages } from '../../../learning-components/runtime/sparcVideo';
+import { supportsSparcVideoCatalog } from './sparcVideoCatalog';
 const video = { segmentId: 'a'.repeat(64), videoId: 'abcdefghijk', startSeconds: 40, endSeconds: 70, transcript: 'A complete explanation.', language: 'en', title: 'Biology', channel: 'Teaching' };
+
+describe('SPARC video catalog eligibility', () => {
+  it('requires a SPARC session that selects an authored AutoTutor page', () => {
+    const rawStimuliFile = { setspec: { sparcPages: [{ pageId: 'biology', display: { unitType: 'sparc-autotutor-dialogue' } }] } };
+    const lesson = (unit: unknown[]) => ({ content: { tdfs: { tutor: { unit } } }, rawStimuliFile });
+    assert.equal(supportsSparcVideoCatalog(lesson([{ sparcsession: { pageId: 'biology' } }])), true);
+    assert.equal(supportsSparcVideoCatalog(lesson([{ unitinstructions: 'Start' }, { sparcsession: {} }])), true);
+    for (const unit of [[], [{ learningsession: {} }], [{ assessmentsession: {} }], [{ videosession: {} }],
+      [{ autotutorsession: {} }], [{ sparcsession: { pageId: 'other' } }]]) {
+      assert.equal(supportsSparcVideoCatalog(lesson(unit)), false);
+    }
+    assert.equal(supportsSparcVideoCatalog({ content: { tdfs: { tutor: { unit: [{ sparcsession: {} }] } } } }), false);
+    assert.equal(supportsSparcVideoCatalog({ ...lesson([{ sparcsession: {} }]), rawStimuliFile: {
+      setspec: { sparcPages: [{ pageId: 'biology', display: { nodes: [] } }] },
+    } }), false);
+    assert.equal(supportsSparcVideoCatalog(undefined), false);
+  });
+});
 describe('SPARC immutable video intervals', () => {
   it('accepts a 30-second YouTube interval and rejects unbounded or executable descriptors', () => {
     assert.deepEqual(parseSparcVideoSegment(video), video);

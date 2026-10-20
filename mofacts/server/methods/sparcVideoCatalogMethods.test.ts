@@ -11,8 +11,20 @@ describe('SPARC video catalog authorization', () => {
   });
   it('reports missing authored language as a visible validation error', async () => {
     const methods = createSparcVideoCatalogMethods({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true }),
-      getApiKeyResolutionDeps: () => { throw new Error('Credentials must not be reached'); }, loadTdf: async () => ({}) });
+      getApiKeyResolutionDeps: () => { throw new Error('Credentials must not be reached'); }, loadTdf: async () => ({
+        content: { tdfs: { tutor: { unit: [{ sparcsession: { pageId: 'page' } }] } } },
+        rawStimuliFile: { setspec: { sparcPages: [{ pageId: 'page', display: { unitType: 'sparc-autotutor-dialogue' } }] } },
+      }) });
     await assert.rejects(methods.getSparcVideoCatalogTargets.call({ userId: 'admin' }, 'lesson'),
       (error: any) => error.error === 400 && /contentLanguage/.test(error.reason));
+  });
+  it('rejects non-SPARC packages at every catalog entry point before reaching credentials or storage', async () => {
+    const methods = createSparcVideoCatalogMethods({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => true }),
+      getApiKeyResolutionDeps: () => { throw new Error('Credentials must not be reached'); },
+      loadTdf: async () => ({ content: { tdfs: { tutor: { unit: [{ learningsession: {} }] } } } }) });
+    for (const method of Object.values(methods)) {
+      await assert.rejects((method as (...args: unknown[]) => Promise<unknown>).call({ userId: 'admin' }, 'lesson', 'target', []),
+        (error: any) => error.error === 400 && /only for SPARC AutoTutor systems/.test(error.reason));
+    }
   });
 });
