@@ -183,6 +183,10 @@ test-process contract: database name `meteor`,
 Playwright/Chromium, and non-self-hosted/no-Redis mode. `MONGO_URL` remains
 owned by Meteor's local test database or CI's replica-set container. A local
 invocation requires fresh maintainer authorization.
+`server-test-entry.js` recursively discovers server test files, including
+`server/lib/clusterKcChainSolver.test.ts`. Its real worker/HiGHS integration runs
+as part of this Meteor server suite, not as a separate command. The pure SPARC
+Node runner excludes that Meteor-dependent module.
 The source-owned browser-test package makes that Playwright contract portable
 across the supported Linux CI job and an explicitly authorized Windows run.
 Meteor resolves the dynamically selected test driver into `.meteor/versions`

@@ -20,6 +20,7 @@ mofacts/settings.json
 docker-out/
 outputs/
 tmp/
+.codex-remote-attachments/
 \#*\#
 *~
 mofacts/private/certs/*

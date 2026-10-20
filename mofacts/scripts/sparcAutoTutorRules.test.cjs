@@ -22,7 +22,7 @@ const suites = [
   'sparcTrialDisplayControllerDialogueBridge',
 ];
 require('../common/lib/sparcFigureClustering.test.ts');
-require('../server/lib/clusterKcChainSolver.test.ts');
+// Meteor-dependent KC-chain integration is discovered by server-test-entry.js.
 require('../../learning-components/runtime/sparcInstructionalNeed.test.ts');
 require('../server/lib/sparcInstructionalEmbeddingMigration.test.ts');
 require('../server/lib/sparcFigureBrowseService.test.ts');
