@@ -113,9 +113,9 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
     answers.set(time, result);
     return submit(result);
   };
-  const choice = (id: string, time = timestamp++) => {
+  const choice = (id: string, time = timestamp++, nextKC = false) => {
     const node = `${String(menu()?.slots?.menuId)}:${id}`;
-    return submit({ submittedNodes: { [node]: id }, triggeredBy: node, timestamp: time });
+    return submit({ submittedNodes: { [node]: id, ...(nextKC ? { [`${String(menu()?.slots?.menuId)}:next-target`]: 'next-target' } : {}) }, triggeredBy: node, timestamp: time });
   };
   const facts = () => Object.values(replaySparcHistory(rows).cells).map(cell => cell.value as SparcWorkingMemoryFact);
   const mcAnswer = (id: string, time = timestamp++) => {
@@ -460,12 +460,15 @@ describe('Dynamic instruction production cycles', () => {
       const response = replay.transitions.find(entry => entry.event.payload?.choiceId === id)!.event;
       const review = projectSparcResponseCorrectness(createSparcAuthoredDocumentFromTrialDisplay({ pageKey: f.source.pageKey!, display: f.source }), replay);
       assert.equal(review[`${String(restored.node.id)}:answer:${id}::correctness`], id === 'a' ? 'correct' : 'incorrect');
-      assert.equal(review[`${response.eventId}:learner::correctness`], id === 'a' ? 'correct' : 'incorrect');
+      assert.equal(review[`${response.eventId}:learner::correctness`], undefined);
       assert.equal(Object.keys(review).filter(key => key.includes(':answer:')).length, 1);
 
       const original = collectSparcProgressiveNodeOperations(replay.transitions);
       const projected = projectSparcAnsweredQuestionOperations(replay);
-      assert.deepEqual(projected.map(operation => 'node' in operation ? operation.node.id : operation), original.map(operation => 'node' in operation ? operation.node.id : operation));
+      assert.ok(original.some(operation => 'node' in operation && operation.node.id === `${response.eventId}:learner`), 'Canonical learner evidence remains recorded');
+      assert.deepEqual(projected.map(operation => 'node' in operation ? operation.node.id : operation), original
+        .filter(operation => !('node' in operation) || operation.node.id !== `${response.eventId}:learner`)
+        .map(operation => 'node' in operation ? operation.node.id : operation));
       assert.equal(response.type, 'response-submitted');
       assert.equal(response.payload!.correct, id === 'a');
       assert.equal(response.payload!.input, id === 'a' ? 'The rule holds under its specified conditions.' : 'The rule holds under every condition.');
@@ -508,6 +511,38 @@ describe('Dynamic instruction production cycles', () => {
     assert.notEqual(next, first); assert.equal(f.calls(), 1); assert.equal(f.requests.length, 1);
     await f.choice('question.text'); assert.equal(f.requests.at(-1)!.targetId, next);
   });
+  it('generates every chosen move on the offered next KC in one event, without another menu or assessment', async () => {
+    for (const option of SPARC_CATEGORIZED_MENU_OPTIONS.filter(entry => entry.id !== 'next-target')) {
+      const f = fixture('student'); await f.submit();
+      const offered = f.menu()!.slots!.options as { id: string; targetId: string }[];
+      const next = offered.find(entry => entry.id === 'next-target')!.targetId;
+      assert.notEqual(next, offered[0]!.targetId);
+      await f.choice(option.id, 100, true);
+      assert.equal(f.calls(), 0);
+      assert.equal(f.requests.length, 1);
+      assert.equal(f.requests[0]!.action, option.action);
+      assert.equal(f.requests[0]!.targetId, next);
+      assert.equal(f.menu()!.slots!.status, 'consumed');
+      await f.submit();
+      assert.equal(f.requests.length, 1, 'Completed combined choice must not generate twice on reload');
+    }
+  });
+  it('restores and retries the chosen move and next KC after generation fails', async () => {
+    const f = fixture('student'); await f.submit();
+    const next = (f.menu()!.slots!.options as { id: string; targetId: string }[]).find(entry => entry.id === 'next-target')!.targetId;
+    f.fail(true);
+    await assert.rejects(f.choice('explanation-rich-question.text', 100, true), /question failed/);
+    const projected = projectSparcMenuOperations(replaySparcHistory(f.rows));
+    const menu = projected.find(operation => operation.type === 'insert-node' && operation.node.id === 'instructional-choice-menu');
+    assert.ok(menu && menu.type === 'insert-node');
+    const selected = menu.node.children as { optionId: string; selected: boolean }[];
+    assert.deepEqual(selected.filter(option => option.selected).map(option => option.optionId), ['explanation-rich-question.text', 'next-target']);
+    await assert.rejects(f.choice('explanation-rich-question.text', 101, false), /Conflicting instructional choice target/);
+    f.fail(false); await f.submit();
+    assert.equal(f.requests.at(-1)!.targetId, next);
+    assert.equal(f.requests.at(-1)!.action, 'instruction.dynamic.explanation-rich-question.text');
+    assert.equal(f.calls(), 0);
+  });
   it('uses fixed 80 percent competition, keeps the floor, and does not ramp OET', async () => {
     const f = fixture('agent'); f.scores(0); await f.answer();
     const request = f.requests.at(-1)!;
@@ -545,6 +580,22 @@ describe('Dynamic instruction production cycles', () => {
     await f.answer(); await f.choice('next-target'); await f.choice('question.text');
     const markers = projectSparcMenuOperations(replaySparcHistory(f.rows)).filter(operation => operation.type === 'insert-node' && String(operation.node.id).endsWith(':selected'));
     assert.equal(markers.length, 3);
+  });
+  it('reconstructs completed same/next KC choices from saved offers and event targets without rewriting history', async () => {
+    for (const nextKC of [false, true]) {
+      const f = fixture('student'); await f.submit();
+      await f.choice('explanation-visual-question.cloze', 100, nextKC);
+      await f.answer();
+      const saved = JSON.parse(JSON.stringify(f.rows));
+      const before = JSON.stringify(saved);
+      const operations = projectSparcMenuOperations(replaySparcHistory(saved));
+      const marker = operations.find(operation => operation.type === 'insert-node' && String(operation.node.id).endsWith(':selected'));
+      assert.ok(marker && marker.type === 'insert-node');
+      const choices = marker.node.children as { value: string; selected: boolean; readOnly: boolean }[];
+      assert.deepEqual(choices.map(choice => choice.value), ['explanation-visual-question.cloze', ...(nextKC ? ['next-target'] : [])]);
+      assert.ok(choices.every(choice => choice.selected && choice.readOnly));
+      assert.equal(JSON.stringify(saved), before);
+    }
   });
   it('displays explanation before support even when support was realized and saved first', () => {
     const action = 'instruction.dynamic.explanation-rich-question.text';

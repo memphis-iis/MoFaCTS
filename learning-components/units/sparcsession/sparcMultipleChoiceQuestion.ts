@@ -34,8 +34,14 @@ export function projectSparcAnsweredQuestionOperations(replay: SparcReplayState)
     .map(transition => [transition.event.eventId, transition.event]));
   const answers = new Map([...responses.values()].filter(event => event.payload?.questionId)
     .map(event => [event.payload!.questionId, event]));
-  // Annotate the original operation, retaining its chronological position in the dialogue.
-  return collectSparcProgressiveNodeOperations(replay.transitions).map(operation => {
+  // A selection stays visible in its original question. Preserve the canonical
+  // contribution for assessment/context, but do not echo it as a chat message.
+  // Typed/cloze messages and all surviving operations retain their chronology.
+  return collectSparcProgressiveNodeOperations(replay.transitions).filter(operation => {
+    if (!('node' in operation) || operation.node.speaker !== 'learner') return true;
+    const response = responses.get(String(operation.node.turnEventId));
+    return response?.payload?.choiceId === undefined;
+  }).map(operation => {
     if (!('node' in operation)) return operation;
     const node = operation.node;
     if (node.speaker === 'learner') {
@@ -102,7 +108,7 @@ export function projectSparcResponseCorrectness(document: SparcAuthoredDocument,
         correct = [...updates].some(([key, value]) => key.startsWith('expectation:')
           ? value > (scores.get(key) ?? 0) : value < (scores.get(key) ?? 0));
       }
-      values[`${id}:learner::correctness`] = correct ? 'correct' : 'incorrect';
+      if (event.payload?.choiceId === undefined) values[`${id}:learner::correctness`] = correct ? 'correct' : 'incorrect';
     }
     if (event.type !== 'response-submitted' || assessed) for (const [key, value] of updates) scores.set(key, value);
   }

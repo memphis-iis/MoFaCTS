@@ -166,10 +166,8 @@ it('renders inline response controls through choice, text, reload, pending and c
         assert.equal(target.querySelector('.sparc-auto-tutor-skeleton-lines'), null);
         const values = runtimeEvents.at(-1).sparcNodeValues;
         assert.equal(values[`${selectedId}::correctness`], correct ? 'correct' : 'incorrect');
-        const learner = values.operations.at(-1).node;
-        assert.equal(learner.value, choices[0].label);
-        assert.equal(learner.responseFormat, format);
-        assert.equal(values[`${learner.id}::correctness`], correct ? 'correct' : 'incorrect');
+        assert.equal(values.operations, undefined, 'A click must not append a learner utterance');
+        assert.equal(target.querySelector('.sparc-dialogue-utterance-learner'), null, 'Do not echo the selected option as learner speech');
         releaseChoice(); await settle(); holdSubmit = null;
       }
     }

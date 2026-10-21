@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { rspack, NormalModuleReplacementPlugin } = require('@rspack/core');
 
-async function buildFixture() {
+async function buildFixture({ captureSubmissions = false } = {}) {
   const app = path.resolve(__dirname, '..');
   fs.mkdirSync(path.join(app, '../tmp'), { recursive: true });
   const directory = fs.mkdtempSync(path.join(app, '../tmp/sparc-reading-'));
@@ -16,7 +16,9 @@ async function buildFixture() {
   stub('sparcController', 'export const resolveSparcControllerDisplay = display => display; export const resolveSparcControllerResult = (_display, detail) => detail;');
   stub('sparcAutoTutorRuleCommit', `export const isSparcAutoTutorDisplay = () => true;
     export const commitSparcAutoTutorDocumentLoad = async () => ({ sparcNodeValues: {} });
-    export const commitSparcAutoTutorSubmit = async () => { throw Error('Unexpected submission'); };`);
+    export const commitSparcAutoTutorSubmit = async params => {
+      ${captureSubmissions ? 'window.fixture.submissions.push(params.sparcResult); return { sparcNodeValues: {} };' : "throw Error('Unexpected submission');"}
+    };`);
   stub('sparcControllerDialogueOpenRouter', 'export const createSparcDialogueOpenRouterProvider = () => ({});');
   stub('sparcOpenRouterSession', "export const createSparcOpenRouterSession = () => ({ sessionIdForScope: () => 'synthetic' });");
   stub('sparcRuntimeState', 'export const readSparcResumeSnapshot = () => ({ nodeValues: {} });');
@@ -38,7 +40,7 @@ async function buildFixture() {
   const entry = write('entry.js', `import { mount, unmount, tick } from 'svelte';
     import Fixture from ${JSON.stringify(wrapper.replaceAll('\\', '/'))};
     let instance;
-    window.fixture = { checkRemovals: async () => [], readImage: async () => { throw Error('Unconfigured image'); },
+    window.fixture = { submissions: [], checkRemovals: async () => [], readImage: async () => { throw Error('Unconfigured image'); },
       async mount(props) { if (instance) await unmount(instance); instance = mount(Fixture, { target: document.querySelector('#fixture'), props: { initial: props } }); await tick(); },
       async update(props) { instance.update(props); await tick(); },
       async destroy() { if (instance) await unmount(instance); instance = undefined; await tick(); }

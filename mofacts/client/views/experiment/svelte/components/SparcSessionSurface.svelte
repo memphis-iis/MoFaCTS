@@ -422,7 +422,7 @@
     dialogueInputResetVersion += 1;
   }
 
-  function handleButtonActivate(node) {
+  function handleButtonActivate(node, nextTargetOption = null) {
     if (authoringSelectOnly) {
       handleNodeFocus(node?.id);
       return;
@@ -431,8 +431,10 @@
       ? { [node.id]: node.value ?? node.submitValue ?? buttonLabel(node) }
       : {};
     if ((node?.menuId && node?.optionId) || node?.questionId) {
-      void submitAutoTutorDialogue({ submittedNodes: buttonSubmission, triggeredBy: node.id, timestamp: Date.now() });
-      return;
+      return submitAutoTutorDialogue({ submittedNodes: {
+        ...buttonSubmission,
+        ...(nextTargetOption ? { [nextTargetOption.id]: nextTargetOption.value } : {}),
+      }, triggeredBy: node.id, timestamp: Date.now() });
     }
     if (!isSubmitButton(node)) {
       void handleSparcAction({
@@ -549,25 +551,21 @@
         sparcResult.triggeredBy === `${question.id}:answer:${option.id}`
         && sparcResult.submittedNodes?.[sparcResult.triggeredBy] === option.id)
       : undefined;
-    const learnerText = choice?.label
-      ?? String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
+    // A clicked answer is represented by its original option, not a learner
+    // utterance. Typed/cloze responses still receive their own message.
+    if (choice) return { [`${sparcResult.triggeredBy}::correctness`]: choice.correct ? 'correct' : 'incorrect' };
+    const learnerText = String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
     if (!learnerText) return {};
     const eventId = `optimistic:${sparcResult.timestamp}:${sparcResult.triggeredBy || 'submit'}`;
     const learnerId = `${eventId}:learner`;
-    const correctness = choice?.correct ? 'correct' : 'incorrect';
     return {
       [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: [
         ...currentSparcProgressiveNodeOperations(),
         { type: 'append-node-if-missing', boxId: 'dialogue-flow', node: {
           id: learnerId, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'learner',
           value: learnerText, turnEventId: eventId, optimistic: true,
-          ...(choice ? { responseFormat } : {}),
         } },
       ],
-      ...(choice ? {
-        [`${learnerId}::correctness`]: correctness,
-        [`${sparcResult.triggeredBy}::correctness`]: correctness,
-      } : {}),
     };
   }
 
@@ -841,6 +839,54 @@
     };
   }
 
+  // This surface owns both the floating Progress control and the conversation.
+  // Reserve its measured footprint only when it would cover the first history
+  // row at scrollTop=0; keep desktop rows and other conversation starts compact.
+  function keepHistoryClearOfProgress(content) {
+    const viewport = content.parentElement;
+    const summary = viewport.parentElement.querySelector('.sparc-auto-tutor-progress-popout > summary');
+    let clearance = 0;
+    let observedRow;
+    let frame;
+    const fit = () => {
+      frame = undefined;
+      const first = content.firstElementChild;
+      const row = first?.matches('.sparc-student-move-history') ? first.querySelector('.sparc-student-menu-size') : null;
+      if (row !== observedRow) {
+        if (observedRow) observer.unobserve(observedRow);
+        observedRow = row;
+        if (row) observer.observe(row);
+      }
+      let next = 0;
+      if (row) {
+        const control = summary.getBoundingClientRect();
+        const rect = row.getBoundingClientRect();
+        const unpaddedTop = rect.top + viewport.scrollTop - clearance;
+        if (rect.left < control.right && rect.right > control.left) {
+          const gap = parseFloat(getComputedStyle(content).rowGap);
+          next = Math.max(0, control.bottom - unpaddedTop + gap);
+        }
+      }
+      if (Math.abs(next - clearance) > 0.5) {
+        clearance = next;
+        content.style.paddingBlockStart = `${clearance}px`;
+      }
+    };
+    const schedule = () => { if (frame === undefined) frame = window.requestAnimationFrame(fit); };
+    const observer = new ResizeObserver(schedule);
+    observer.observe(content);
+    observer.observe(viewport);
+    observer.observe(summary);
+    const children = new MutationObserver(schedule);
+    children.observe(content, { childList: true });
+    schedule();
+    return { destroy() {
+      observer.disconnect();
+      children.disconnect();
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+    } };
+  }
+
   async function scrollAutoTutorChatToLatest() {
     await tick();
     dialogueScroll?.schedule();
@@ -970,7 +1016,7 @@
       aria-busy={dialogueSubmitPending}
       use:followDialogue
     >
-      <div class="sparc-auto-tutor-content">
+      <div class="sparc-auto-tutor-content" use:keepHistoryClearOfProgress>
       {#if removalError}<p role="alert">{removalError}</p>{/if}
       {#each autoTutorDialogueMessages as node (node.id)}
         <SparcNode

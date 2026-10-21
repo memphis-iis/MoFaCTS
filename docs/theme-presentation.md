@@ -1,5 +1,41 @@
 # Central application presentation
 
+The SPARC student move menu uses three connected button columns without visible
+headings or radio controls. Segment height is 80% of the central theme button
+height; all columns use the same theme-derived padding. Same KC is initially
+selected, and the shorter KC column is vertically centered. Selected segments use
+the primary action color pair; alternatives remain clickable with a subdued
+surface. There is no column focus outline; keyboard focus stays visible on the
+individual button. The renderer measures the unwrapped menu and applies one
+scale to its width and height when needed, preserving its aspect ratio and
+preventing label wrapping. Resize observation also follows theme and locale
+changes. Run `node --test scripts/sparcStudentMoveMenu.test.cjs` from `mofacts/`
+for the production-component interaction, equal-padding, localization, and
+proportional-fit checks in Default and Dark Industrial.
+
+Past student choices reuse that presenter as one read-only row containing only
+the selected KC, move, and question type. They use the same compact labels,
+padding, theme colors, and proportional scaling, without the worksheet selection
+outline that can extend beyond the conversation's scroll boundary. The surface
+also measures the floating Progress header and reserves clearance only when it
+would cover the first history row at scrollTop zero. The progress card retains
+its floating behavior; no opaque header region or fixed-height spacer is added.
+
+Question answer lists in tutor dialogue begin one prose line height below the
+question text, using the central font-size and relaxed-line-height properties.
+This spacing applies to both multiple-choice and true/false questions, including
+selected and read-only answers.
+Answer buttons use the same compact vertical and horizontal padding as typed
+learner replies, with no full-size button minimum height. Multi-line option
+labels still grow naturally. Clicked selections are marked in their original
+question only; they are not echoed in a separate learner chat bubble. The
+display projection preserves canonical answer evidence and model context, while
+typed and cloze responses retain their own learner messages.
+
+Tutor message boxes occupy 88% of the conversation width, aligned to the start
+edge, leaving visible space toward the learner side on both desktop and phones.
+Learner message boxes retain their existing alignment to the opposite edge.
+
 The application theme selected through the admin Theme screen owns appearance throughout MoFaCTS. Authored and LLM-generated markup supplies semantic structure underneath that theme: headings, emphasis, lists, tables, figures, callouts, and choices. SPARC supplies instructional behavior and rendering semantics, not a separate visual theme.
 
 Generated SPARC instruction follows one pipeline: Markdown parsing, HTML sanitization,
@@ -40,7 +76,6 @@ Verify that an existing image renders in inspection and opens at its original re
 
 Run `node scripts/sparcInstructionalBrowseMethods.test.cjs`, `node scripts/themePresentation.test.cjs`, `node scripts/bundledThemeContrast.test.cjs`, `node scripts/themeRegistryPromotion.test.cjs`, and `node scripts/checkSparcRichHtml.cjs` from `mofacts/` for the focused presentation contracts, in addition to required application checks. Contrast checks cover every bundled theme and shared interaction/state pair. Visual review uses one light theme (Default) and one dark theme (Dark Industrial), at desktop and narrow widths; verify a newly bundled theme's registration and preserved settings as well. Restore the original personal theme after review. Test existing instruction without submitting learner responses merely to inspect styling.
 
-SPARC learner replies use compact theme padding and preserve line breaks only in the learner text, so template whitespace does not create empty lines. Pending tutor work uses a compact rotating spinner and localized activity text from the active assessment or instructional component; reduced-motion users receive the same status without animation. The progress card floats over the conversation with an opaque card surface and no surrounding opaque layout region, both expanded and collapsed. The left practice-menu tab fits its text without extra padding. On touch devices automatic response focus targets the non-editable response region; tapping the input starts text entry. Desktop keyboard focus remains on the input. Multiple-choice and true/false selections receive immediate answer-key correctness on the selected option and learner reply while assessment and feedback continue; text responses retain assessment-based review.
 Mobile images allow native scrolling, panning, and zooming (`touch-action: auto`).
 Do not restrict images to `pinch-zoom`: that blocks one-finger scrolling initiated
 on the image and panning across its enlarged view. The conversation column retains
@@ -48,3 +83,4 @@ its existing scroll ownership. Run `node --test scripts/imageTouchNavigation.tes
 with Playwright's Chromium installed to check upward/downward image-originated
 scrolling, two-finger pinch zoom, and left/right panning in SPARC and stimulus images.
 
+SPARC learner replies use compact theme padding and preserve line breaks only in the learner text, so template whitespace does not create empty lines. Pending tutor work uses a compact rotating spinner and localized activity text from the active assessment or instructional component; reduced-motion users receive the same status without animation. The progress card floats over the conversation with an opaque card surface and no surrounding opaque layout region, both expanded and collapsed. The left practice-menu tab fits its text without extra padding. On touch devices automatic response focus targets the non-editable response region; tapping the input starts text entry. Desktop keyboard focus remains on the input. Multiple-choice and true/false selections receive immediate answer-key correctness on the selected option while assessment and feedback continue; no learner-reply echo is rendered. Typed and cloze responses retain assessment-based review on their own messages.

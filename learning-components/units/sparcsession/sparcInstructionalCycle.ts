@@ -57,14 +57,22 @@ export function projectSparcMenuOperations(replay: SparcReplayState): SparcProgr
       }
       const fact = write.value as SparcWorkingMemoryFact;
       if (fact?.factType !== 'instructional.menu' || fact.slots?.status !== 'selected') continue;
-      const option = (fact.slots.options as MenuOption[]).find(entry => entry.id === fact.slots!.selectedOptionId);
+      const offered = fact.slots.options as MenuOption[];
+      const option = offered.find(entry => entry.id === fact.slots!.selectedOptionId);
       if (!option) throw new Error('Saved instructional choice is missing its offered option');
+      const next = offered.find(entry => entry.id === 'next-target');
+      const selectedNext = option.id === 'next-target' || (next && transition.event.payload?.targetId === next.targetId
+        && transition.event.payload?.targetKind === next.targetKind
+        && (next.targetId !== option.targetId || next.targetKind !== option.targetKind));
       const id = `${String(fact.slots.menuId)}:selected`;
+      const choiceNode = (choice: MenuOption) => ({
+        id: `${id}:${choice.id}`, nodeType: 'atomic' as const, atomType: 'button', label: choice.label,
+        value: choice.id, selected: true, readOnly: true,
+      });
       selected.push({ type: 'insert-node', boxId: 'dialogue-flow', ...(anchor ? { afterNodeId: anchor } : {}), node: {
-        id, nodeType: 'group', groupType: 'button-group', children: [{
-          id: `${id}:${option.id}`, nodeType: 'atomic', atomType: 'button', label: option.label,
-          value: option.id, selected: true, readOnly: true,
-        }],
+        id, nodeType: 'group', groupType: 'button-group', children: [choiceNode(option),
+          ...(selectedNext && option.id !== 'next-target' && next ? [choiceNode(next)] : []),
+        ],
       } });
       anchor = id;
     }
@@ -75,11 +83,17 @@ export function projectSparcMenuOperations(replay: SparcReplayState): SparcProgr
   if (!menu) return orderedSelections;
   const pending = menu.slots?.status === 'pending' || menu.slots?.status === 'selected';
   const options = pending ? menu.slots?.options as MenuOption[] : [];
+  const selectedEvent = replay.transitions.find(transition => transition.event.type === 'choice-selected'
+    && transition.event.payload?.menuId === menu.slots?.menuId)?.event;
+  const selectedOption = options.find(option => option.id === menu.slots?.selectedOptionId);
+  const selectedNext = selectedEvent && selectedOption && (selectedEvent.payload?.targetId !== selectedOption.targetId
+    || selectedEvent.payload?.targetKind !== selectedOption.targetKind);
   return [...orderedSelections, { type: 'insert-node', boxId: 'dialogue-flow', node: {
     id: 'instructional-choice-menu', nodeType: 'group', groupType: 'button-group',
     label: pending ? 'Choose what to do next' : '',
     children: options.map((option) => ({ id: `${String(menu.slots?.menuId)}:${option.id}`, nodeType: 'atomic', atomType: 'button', label: option.label,
       value: option.id, menuId: menu.slots?.menuId, optionId: option.id,
+      selected: menu.slots?.status === 'selected' && (option.id === menu.slots.selectedOptionId || (option.id === 'next-target' && Boolean(selectedNext))),
       readOnly: menu.slots?.status === 'selected' && menu.slots.selectedOptionId !== option.id })),
   } }];
 }
@@ -111,7 +125,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     if (policyId && policyId !== params.document.instructionalController!.policyId) throw new Error('Cannot resume a different instructional version');
   }
   const acceptedEvent = previous.find((transition) => transition.event.eventId === params.event.eventId)?.event;
-  if (acceptedEvent && (acceptedEvent.payload?.input !== params.event.payload?.input || acceptedEvent.payload?.optionId !== params.event.payload?.optionId)) {
+  if (acceptedEvent && (acceptedEvent.payload?.input !== params.event.payload?.input || acceptedEvent.payload?.optionId !== params.event.payload?.optionId
+    || acceptedEvent.payload?.targetId !== params.event.payload?.targetId || acceptedEvent.payload?.targetKind !== params.event.payload?.targetKind)) {
     throw new Error('Conflicting submission for an accepted instructional event');
   }
   const event: SparcInterfaceEvent = acceptedEvent ?? { ...params.event, payload: { ...params.event.payload, policyId: params.document.instructionalController!.policyId } };
@@ -359,8 +374,10 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     const pending = params.replayState && currentSparcMenu(params.replayState);
     if (!acceptedDecision) {
       const option = (pending?.slots?.options as MenuOption[] | undefined)?.find((entry) => entry.id === event.payload?.optionId);
+      const nextTarget = (pending?.slots?.options as MenuOption[] | undefined)?.find(entry => entry.id === 'next-target');
+      const matchesTarget = (candidate?: MenuOption) => Boolean(candidate && candidate.targetId === event.payload?.targetId && candidate.targetKind === event.payload?.targetKind);
       if (!student || pending?.slots?.status !== 'pending' || pending.slots.menuId !== event.payload?.menuId || !option
-        || option.targetId !== event.payload?.targetId || option.targetKind !== event.payload?.targetKind) throw new Error('Stale or invalid instructional choice');
+        || (!matchesTarget(option) && !matchesTarget(nextTarget))) throw new Error('Stale or invalid instructional choice');
     }
     facts.push(...projection(facts).facts);
   }

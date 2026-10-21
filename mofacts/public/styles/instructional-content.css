@@ -864,8 +864,8 @@
   .sparc-dialogue-utterance-tutor {
     align-self: flex-start;
     align-items: flex-start;
-    width: 100%;
-    max-width: 100%;
+    width: 88%;
+    max-width: 88%;
     min-width: 0;
   }
 
@@ -896,15 +896,17 @@
   .sparc-dialogue-bubble .sparc-group-answer-list {
     width: 100%;
     max-width: var(--app-reading-measure);
+    margin-block-start: calc(var(--app-font-size-base) * var(--app-line-height-relaxed));
   }
 
   .sparc-group-answer-list > .sparc-group-body > .sparc-button,
   .sparc-group[data-sparc-glue="answer-list"] > .sparc-group-body > .sparc-button {
     width: 100%;
+    min-height: 0;
     text-align: start;
     font-weight: var(--app-font-weight-normal);
     line-height: var(--app-line-height-relaxed);
-    padding: var(--app-space-3);
+    padding: var(--app-space-1) var(--app-space-2);
     white-space: normal;
     overflow-wrap: anywhere;
   }
@@ -1700,3 +1702,78 @@
 }
 .sparc-worked-example .sparc-video { border: 0; }
 .sparc-video .unavailable { display: none; }
+
+/* Student move selection: intrinsic, unwrapped columns are measured by their
+ * renderer and uniformly reduced to the available width, including height. */
+.sparc-student-move-menu {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+.sparc-student-menu-size { position: relative; max-width: 100%; }
+.sparc-student-menu-grid {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  align-items: center;
+  gap: var(--app-space-2);
+  width: max-content;
+  font-family: var(--app-font-family);
+  font-size: calc(var(--app-font-size-base) * 0.8);
+  line-height: var(--app-line-height-tight);
+  transform-origin: top left;
+}
+.sparc-student-menu-grid:dir(rtl) { transform-origin: top right; }
+.sparc-student-move-history .sparc-student-menu-grid {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+}
+.sparc-student-menu-column {
+  display: grid;
+  grid-auto-rows: minmax(calc(var(--app-button-height) * 0.8), auto);
+  border: var(--app-border-width) solid var(--btn-border-color);
+  border-radius: var(--app-border-radius-sm);
+  overflow: hidden;
+  background: var(--learning-card-surface-color);
+}
+.sparc-student-menu-column button {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: calc(var(--app-space-1) * 0.5) var(--app-space-2);
+  border: 0;
+  border-radius: 0;
+  background: var(--learning-card-surface-color);
+  color: var(--app-text-color);
+  font: inherit;
+  font-weight: var(--app-font-weight-normal);
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sparc-student-menu-column button + button {
+  border-block-start: var(--app-border-width) solid var(--border-color);
+}
+.sparc-student-menu-column.has-selection button[aria-pressed="false"] {
+  background: var(--app-state-disabled-surface-color);
+  color: color-mix(in srgb, var(--app-text-color) 70%, var(--learning-card-surface-color));
+}
+.sparc-student-menu-column button:hover:not(:disabled) {
+  background: var(--app-state-hover-surface-color);
+  color: var(--app-text-color);
+}
+.sparc-student-menu-column button[aria-pressed="true"] {
+  background: var(--app-primary-action-surface-color);
+  color: var(--app-primary-action-text-color);
+}
+.sparc-student-menu-column button:focus-visible {
+  outline: calc(var(--app-border-width) * 2) solid var(--app-state-focus-ring-color);
+  outline-offset: calc(var(--app-border-width) * -3);
+}
+.sparc-student-menu-column button:disabled { cursor: default; }

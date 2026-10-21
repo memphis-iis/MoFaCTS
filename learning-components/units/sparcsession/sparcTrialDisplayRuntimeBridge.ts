@@ -819,8 +819,18 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     let event: SparcInterfaceEvent;
     let learnerText: string;
     if (priorChoice || option) {
+      // A factored menu submits the offered move and, optionally, the existing
+      // next-target option together. Bind the move directly to that offered KC.
+      const nextTarget = (menu?.slots?.options as Record<string, unknown>[] | undefined)?.find(entry => entry.id === 'next-target');
+      const nextTargetNodeId = `${menuId}:next-target`;
+      const selectsNext = Object.prototype.hasOwnProperty.call(result.submittedNodes, nextTargetNodeId);
+      if (selectsNext && (!nextTarget || result.submittedNodes[nextTargetNodeId] !== 'next-target')) throw new Error('Invalid next-KC selection');
+      const target = selectsNext ? nextTarget! : option;
+      if (priorChoice && target && (priorChoice.payload?.targetId !== target.targetId || priorChoice.payload?.targetKind !== target.targetKind)) {
+        throw new Error('Conflicting instructional choice target');
+      }
       event = priorChoice ?? { eventId: `${menuId}:choice`, type: 'choice-selected', source: { pageKey: params.pageKey, nodeId: triggeredBy }, time: eventTime,
-        payload: { menuId, optionId: option!.id, targetId: option!.targetId, targetKind: option!.targetKind } };
+        payload: { menuId, optionId: option!.id, targetId: target!.targetId, targetKind: target!.targetKind } };
       learnerText = '';
     } else {
       const lastInstruction = replayState.transitions.filter((transition) => transition.transitionId.endsWith(':cycle')).at(-1);

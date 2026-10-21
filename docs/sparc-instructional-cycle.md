@@ -307,7 +307,23 @@ Complete-move assistance logits are:
 Selection temperature is 0.2.
 The expectation floor remains 0.2, OET is fixed at 0.8, and the current-target boundary is unchanged.
 The registered move IDs append `.text`, `.cloze`, `.multiple-choice`, or `.true-false`
-to the dynamic base action. Student menus offer sixteen instructional options plus next-KC navigation.
+to the dynamic base action. Student menus present those sixteen instructional options as
+three compact columns: Same/Next KC, four move compositions, and four question formats.
+Only Same KC is selected initially. Selecting both a composition and format starts
+the move immediately, using the KC choice already made. A combined Next KC choice
+binds the selected move directly to the offered next target in one event; it does
+not open another menu or assess a learner answer. Existing offered-option identities,
+target validation, accepted decisions, and generation recovery remain in use.
+The presentation uses connected full-width buttons, one selection per column,
+subdued but clickable alternatives, and no radio controls or visible headers.
+It measures the intrinsic unwrapped menu and uniformly scales its width and height
+to fit its container. The central theme owns all appearance, including segment
+height at 80% of the theme button height and equal padding in every column.
+Completed choices display a read-only row of the three selected buttons through
+the same presenter. Replay reconstructs Same/Next KC from the saved offered
+targets and accepted event, preserving the underlying records without migration.
+Earlier navigation-only decisions display their recorded Next KC choice alone;
+they do not invent a composition or question format that was not selected.
 
 Cloze uses the existing response box and one uniform `_____` blank for a meaningful
 word or short phrase, without a word bank or exact-match answer key. Completing it must
@@ -345,6 +361,11 @@ answer key records correctness without directly inventing KC coverage. Choosing 
 explanation does not establish that the learner independently produced it. Free-text
 submission is disabled while an MC question is active. Stale/tampered options reject,
 accepted responses score once, and reload retains option order and the selected answer.
+The selected option is the only visible record of an MC or true/false answer;
+neither immediate click feedback nor replay adds a learner-speech echo. Canonical
+response evidence remains available for assessment and instructional context,
+without rewriting histories or changing score/model updates. Typed and cloze
+responses continue to display their learner messages.
 
 Rich support realizes before dependent explanation/question generation. Images are framed
 without a displayed caption or heading and retain their accessible description and saved

@@ -181,7 +181,7 @@ it('keeps real SPARC components ordered through checks, image decoding, restore,
 });
 
 
-it('retains assessed answer colors on real SPARC buttons and bubbles after reload in both themes and viewport sizes', { timeout: 120000 }, async () => {
+it('retains assessed choices without chat echoes and keeps typed-answer bubbles after reload in both themes and viewport sizes', { timeout: 120000 }, async () => {
   require('./registerHistoryTypescript.cjs');
   const { projectSparcResponseCorrectness, projectSparcAnsweredQuestionOperations } = require('../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion.ts');
   const { applySparcProgressiveNodeOperations } = require('../../learning-components/trial-displays/sparc/sparcProgressiveNodes.ts');
@@ -253,9 +253,13 @@ it('retains assessed answer colors on real SPARC buttons and bubbles after reloa
           for (const check of checks) {
             const outcome = check.correct ? 'correct' : 'incorrect';
             const bubble = page.locator(`[data-node-id="${check.learnerId}"]`);
-            assert.match(await bubble.getAttribute('class'), new RegExp(`sparc-correctness-${outcome}`));
             const choice = check.format === 'multiple-choice' || check.format === 'true-false';
-            assert.match(await bubble.innerText(), new RegExp(choice ? check.correct ? 'Correct' : 'Incorrect' : check.correct ? 'Response made progress' : 'Response made no progress'));
+            if (choice) {
+              assert.equal(await bubble.count(), 0, 'A clicked choice is shown once in its question, without learner speech');
+            } else {
+              assert.match(await bubble.getAttribute('class'), new RegExp(`sparc-correctness-${outcome}`));
+              assert.match(await bubble.innerText(), new RegExp(check.correct ? 'Response made progress' : 'Response made no progress'));
+            }
             if (choice) {
               const selected = page.locator(`[data-node-id="${check.questionId}:answer:${check.selected}"]`);
               assert.equal(await selected.getAttribute('aria-pressed'), 'true');
@@ -272,6 +276,11 @@ it('retains assessed answer colors on real SPARC buttons and bubbles after reloa
               const rgb = expectedBorder.slice(1).match(/../g).map(value => parseInt(value, 16)).join(', ');
               assert.equal(colors.border, `rgb(${rgb})`);
               assert.equal(colors.outline, `rgb(${rgb})`);
+              const padding = await selected.evaluate(element => ({ top: getComputedStyle(element).paddingTop, bottom: getComputedStyle(element).paddingBottom, minHeight: getComputedStyle(element).minHeight }));
+              const typedPadding = await page.locator('[data-node-id="answer4:learner"] .sparc-dialogue-bubble').evaluate(element => ({ top: getComputedStyle(element).paddingTop, bottom: getComputedStyle(element).paddingBottom }));
+              assert.equal(padding.top, typedPadding.top, 'Choice vertical padding matches a typed learner response');
+              assert.equal(padding.bottom, typedPadding.bottom);
+              assert.equal(padding.minHeight, '0px', 'No full-size button minimum height adds extra space');
             }
           }
           assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

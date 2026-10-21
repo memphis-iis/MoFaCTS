@@ -3,6 +3,7 @@
   import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../../../../learning-components/runtime/sparcAdministrativeRemoval';
   import DOMPurify from 'dompurify';
   import SparcVideo from './SparcVideo.svelte';
+  import SparcStudentMoveMenu from './SparcStudentMoveMenu.svelte';
   import SparcPromptFigure from './SparcPromptFigure.svelte';
   import LearningProgressChart from './LearningProgressChart.svelte';
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
@@ -310,7 +311,13 @@
   $: activePanelItems = activePanel ? buildRenderItems(activePanel.children || []) : [];
 </script>
 
-{#if node && nodeIsVisible(node) && node?.nodeType === 'group'}
+{#if node?.id === 'instructional-choice-menu' && nodeIsVisible(node) && !authoringSelectOnly}
+  {#key node.children?.[0]?.menuId}
+    <SparcStudentMoveMenu {node} onActivate={onButtonActivate} />
+  {/key}
+{:else if node?.groupType === 'button-group' && node.id?.endsWith(':selected') && nodeIsVisible(node) && !authoringSelectOnly}
+  <SparcStudentMoveMenu {node} history={true} />
+{:else if node && nodeIsVisible(node) && node?.nodeType === 'group'}
   <div
     class={`sparc-group sparc-group-${node.groupType || 'generic'}`}
     class:sparc-authoring-selected={node.id === authoringSelectedNodeId}
