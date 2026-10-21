@@ -54,6 +54,7 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   let evidence: SparcRetainedEvidence[] = [];
   let feedbackGate: Promise<void> | undefined;
   let instructionStarted: (() => void) | undefined;
+  let beforeQuestion: (() => Promise<void>) | undefined;
   const submit = (result?: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
     core: { userId: 'u', TDFId: 'dynamic', sessionID: 'session', levelUnit: 0 }, pageKey, display: source,
     ...(result ? { result } : {}), priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
@@ -77,6 +78,7 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
       const richContent = request.moveDefinition.components!.includes('richContent') ? request.realizedInstruction?.richContent ?? 'In the worked case, apply the rule to get 4.' : null;
       if (explanation && !request.realizedInstruction?.explanation) await request.onInstructionComponent?.('explanation', explanation);
       if (richContent && !request.realizedInstruction?.richContent) await request.onInstructionComponent?.('richContent', richContent);
+      await beforeQuestion?.();
       if (failQuestion) throw new Error('question failed');
       const question = request.realizedInstruction?.question ?? (request.moveDefinition.responseFormat === 'cloze' ? 'The condition determines whether the _____ applies.' : 'How does the rule apply to the new case?');
       const choices = request.realizedInstruction?.choices ?? (request.moveDefinition.responseFormat === 'true-false' ? [
@@ -125,10 +127,53 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
     fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; },
     failBatch: (value: boolean) => { failBatch = value; },
-    overlap: (gate: Promise<void>, started: () => void) => { feedbackGate = gate; instructionStarted = started; } };
+    overlap: (gate: Promise<void>, started: () => void) => { feedbackGate = gate; instructionStarted = started; },
+    beforeQuestion: (gate: () => Promise<void>) => { beforeQuestion = gate; } };
 }
 
 describe('Dynamic instruction production cycles', () => {
+  for (const version of ['agent', 'student'] as const) for (const targetCount of [1, 7, 32]) for (const startup of [false, true]) for (const resumedFirst of [false, true]) {
+    it(`journals identical overlapping ${version} ${startup ? 'startup' : 'response'} continuations with ${targetCount} targets when ${resumedFirst ? 'resume' : 'original'} finishes first`, async () => {
+      const f = fixture(version, false, 'model-rule', targetCount, targetCount === 32 ? 24 : 0);
+      f.scores(.4); f.firstTarget(.45);
+      for (const fact of f.source.workingMemoryFacts as SparcWorkingMemoryFact[]) {
+        const slots = fact.slots as Record<string, unknown>;
+        if (fact.factType === 'kcGraph.node') slots.centrality = (String(slots.clusterKC).charCodeAt(0) % 7 + 1) / 10;
+        if (fact.factType === 'kcGraph.relationship') slots.strength = ((String(slots.sourceClusterKC).charCodeAt(0) + String(slots.targetClusterKC).charCodeAt(0)) % 8 + 1) / 10;
+      }
+      const releases: (() => void)[] = [];
+      const waiters: (() => void)[] = [];
+      const waitFor = async (count: number) => { while (releases.length < count) await new Promise<void>(resolve => waiters.push(resolve)); };
+      if (version === 'student') await (startup ? f.submit() : f.answer());
+      f.beforeQuestion(() => new Promise<void>(resolve => { releases.push(resolve); waiters.shift()?.(); }));
+      const original = version === 'student' ? f.choice('explanation-question.cloze') : startup ? f.submit() : f.answer();
+      await waitFor(1);
+      const resumed = f.submit();
+      try {
+        await waitFor(2);
+        releases[resumedFirst ? 1 : 0]!();
+        await (resumedFirst ? resumed : original);
+        releases[resumedFirst ? 0 : 1]!();
+        await Promise.all([original, resumed]);
+        const accepted = new Map<string, CanonicalHistoryRecord>();
+        const repeated: string[] = [];
+        for (const row of f.rows) {
+          const id = transition(row).transitionId;
+          const prior = accepted.get(id);
+          if (prior) { assert.deepEqual(row, prior, `Retry must preserve the entire ${id} history record`); repeated.push(id); }
+          else accepted.set(id, row);
+        }
+        assert.equal(repeated.filter(id => id.endsWith(':primitive:question')).length, 1);
+        assert.equal(repeated.filter(id => id.endsWith(':cycle')).length, 1);
+        assert.equal(f.calls(), startup ? 0 : 1, 'Resume must not assess the response again');
+        assert.doesNotThrow(() => replaySparcHistory(f.rows));
+      } finally {
+        for (const release of releases) release();
+        await Promise.allSettled([original, resumed]);
+      }
+    });
+  }
+
   it('starts agent instruction while feedback runs and saves feedback before instruction', async () => {
     const f = fixture('agent');
     let release!: () => void;

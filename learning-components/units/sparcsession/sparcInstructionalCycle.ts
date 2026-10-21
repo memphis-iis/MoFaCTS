@@ -23,6 +23,7 @@ import type { SparcReplayState } from './sparcStateReplay';
 import type { SparcCanonicalHistoryRecord, SparcInterfaceEvent, SparcStateTransition, SparcStateWrite, SparcWorkingMemoryFact, SparcProductionActionHandler, SparcProductionRuleExecution } from './sparcSessionContracts';
 
 type MenuOption = { id: string; label: string; action: string; targetId: string; targetKind: 'expectation' | 'misconception' };
+const DECISION_STATE_FACT_TYPES = new Set(['instructional.decision', 'controller.selectedAction', 'instructional.activeCycle']);
 export type SparcCycleResult = {
   readonly transition: SparcStateTransition;
   readonly historyRecord?: SparcCanonicalHistoryRecord;
@@ -150,7 +151,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     if (acceptedDecision) return;
     const menu = current.find((fact) => fact.factType === 'instructional.menu');
     await save({ transitionId: `${event.eventId}:decision`, event, writes: factWrites([
-      ...current.filter((fact) => ['instructional.decision', 'controller.selectedAction', 'instructional.activeCycle', 'dialogue.responseModifier', 'instructional.oet'].includes(fact.factType)),
+      ...current.filter((fact) => DECISION_STATE_FACT_TYPES.has(fact.factType) || ['dialogue.responseModifier', 'instructional.oet'].includes(fact.factType)),
       ...(student ? [{ factType: 'instructional.menu', slots: { ...menu?.slots, snapshotId: event.eventId,
         status: 'selected', selectedOptionId: event.payload?.optionId } }] : []),
     ], event) });
@@ -189,7 +190,8 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
       throw new Error('Instructional decision changed the offered target');
     }
     const menu = current.find((fact) => fact.factType === 'instructional.menu');
-    const menuConsumed = { factType: 'instructional.menu', slots: { ...menu?.slots, snapshotId: event.eventId, status: 'consumed' } };
+    const menuConsumed = { factType: 'instructional.menu', slots: { ...menu?.slots, snapshotId: event.eventId,
+      status: 'consumed', ...(student ? { selectedOptionId: event.payload?.optionId } : {}) } };
     await saveDecision(current);
     const realized: Partial<{ -readonly [K in keyof SparcInstructionComponents]: SparcInstructionComponents[K] }> = {};
     const savedComponents = new Set<string>();
@@ -366,7 +368,12 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
   let transition: SparcStateTransition;
   try {
   if (acceptedDecision) {
-    facts = [...facts.filter((fact) => !['instructional.decision', 'controller.selectedAction', 'instructional.activeCycle'].includes(fact.factType)), ...writtenFacts(acceptedDecision)];
+    // Rebuild this response's assessment projection before continuing its saved
+    // decision. Its candidate diagnostics are part of persisted tutor nodes, so
+    // omitting them makes an overlapping original/resumed write conflict.
+    if (acceptedAssessment) facts.push(...writtenFacts(acceptedAssessment).filter(fact => RESPONSE_LOCAL_FACT_TYPES.has(fact.factType)));
+    facts = [...facts.filter((fact) => !DECISION_STATE_FACT_TYPES.has(fact.factType)), ...writtenFacts(acceptedDecision)];
+    facts.push(...projection(facts).facts);
     const decision = facts.find((fact) => fact.factType === 'instructional.decision');
     const ruleId = String(decision?.slots?.sourceRuleId);
     const action = String(decision?.slots?.action);
@@ -398,6 +405,11 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     await waitForFeedback();
   }
   if (documentLoadFacts.length) transition = { ...transition, writes: [...transition.writes, ...factWrites(documentLoadFacts, event)] };
+  // The decision checkpoint already owns these facts. Both generation paths
+  // finish with the same controls/completion writes rather than repeating the
+  // original production's decision assertions only on its first execution.
+  if (generated) transition = { ...transition, writes: transition.writes.filter(write =>
+    !DECISION_STATE_FACT_TYPES.has((write.value as SparcWorkingMemoryFact)?.factType)) };
   finalRecord = await save(transition);
   return { transition, historyRecord: finalRecord, execution, ...(generatedRequest ? { utteranceRequest: generatedRequest } : {}) };
 }

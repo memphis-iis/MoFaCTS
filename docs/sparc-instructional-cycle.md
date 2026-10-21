@@ -186,6 +186,16 @@ they are not rewritten. Interrupted later model updates, feedback, or instructio
 reuse the accepted assessment without another evaluation or duplicate score rows.
 Ordinary non-SPARC history continues to use its existing single-record writer.
 
+Resuming an accepted instructional decision restores its response-local assessment
+facts and candidate projection before generating remaining components. Selection
+diagnostics therefore match the original execution. The decision checkpoint owns
+the decision, selected-action, and active-cycle facts; generated cycle completion
+does not repeat those assertions. Overlapping original and resumed executions
+produce identical component and completion records under the existing strict
+history conflict checks. Student-selected completion retains the selected option
+consistently in both executions. Completed saved cycles are reused without rewriting them;
+no history migration or learner reset is required.
+
 ### Maximum-relationship KC progression
 
 Set `unit.sparcsession.startingKC` to the exact expectation `clusterKC` identity.
