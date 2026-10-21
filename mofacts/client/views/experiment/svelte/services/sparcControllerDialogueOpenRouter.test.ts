@@ -257,6 +257,37 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(warnings).to.have.length(6);
   });
 
+  it('logs an oversized support heading and persists it unchanged without regeneration', async () => {
+    const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text');
+    const heading = 'Table of conditions and outcomes for comparing the available instructional cases';
+    const warnings: unknown[] = [];
+    let calls = 0;
+    let savedHeading: string | undefined;
+    const provider = createSparcDialogueOpenRouterProvider({
+      reportWarning: warning => { warnings.push(warning); },
+      async callResolvedOpenRouterJson(params) {
+        calls++;
+        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: {
+          kind: 'table', heading, workedExample: '| Case | Outcome |\n| --- | --- |\n| A | Applies |',
+          imagePrompt: null, figureDescription: null, displayWidth: null,
+        } };
+        expect(JSON.parse(String(params.messages[1]!.content)).supportHeading).to.equal(heading);
+        return { parsedContent: { tutorMessage: 'Compare the conditions in each case.' } };
+      },
+    });
+    const result = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
+      onInstructionComponent: async (kind, _text, _figure, metadata) => {
+        if (kind === 'richContent') savedHeading = metadata?.supportHeading;
+      },
+    }) as SparcInstructionComponents;
+    expect(result.supportHeading).to.equal(heading);
+    expect(savedHeading).to.equal(heading);
+    expect(calls).to.equal(3);
+    expect(warnings).to.have.length(1);
+    expect(warnings[0]).to.include({ code: 'autotutor.outputLimit', field: 'heading',
+      observedSize: heading.length, limit: 60, attempts: 1, outcome: 'continued' });
+  });
+
   it('logs an oversized figure brief and creates the image without regeneration', async () => {
     let calls = 0;
     let images = 0;

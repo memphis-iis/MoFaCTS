@@ -715,7 +715,7 @@ export function createSparcDialogueOpenRouterProvider(
         if (/<\/?[a-z][^>]*>/i.test(richContent)) throw new Error('Worked-example primitive requires Markdown text, not HTML or image markup');
         if (categorized) {
           supportHeading = requireSparcDialogueText(rich.heading, 'Support heading');
-          if (supportHeading.length > 60 || /[<>\r\n]/.test(supportHeading)
+          if (/[<>\r\n]/.test(supportHeading)
             || (rich.kind === 'worked-example' && supportHeading !== 'Worked Example')
             || (rich.kind === 'comparison' && supportHeading !== 'Comparison')) throw new Error('Invalid instructional support heading');
           if (richContent.split(/\r?\n/)[0]!.trim() === supportHeading) throw new Error('Support content must omit its separately rendered heading');
