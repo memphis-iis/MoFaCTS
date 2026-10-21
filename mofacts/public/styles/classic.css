@@ -2854,14 +2854,9 @@ table caption {
         touch-action: manipulation;
     }
 
+    /* Images remain native scroll/pan surfaces, including after pinch zoom. */
     img {
-        touch-action: pinch-zoom;
-    }
-
-    /* Blaze card stimulus image touch action */
-    #questionImage.stimulus-image,
-    #displayContainer .stimulus-image {
-        touch-action: pinch-zoom;
+        touch-action: auto;
     }
 
     a.content-link {
