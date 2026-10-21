@@ -4,6 +4,7 @@ import { currentSparcMenu } from '../../../../../../learning-components/units/sp
 import { strict as assert } from 'node:assert';
 import { commitSparcAutoTutorSubmit, commitSparcAutoTutorDocumentLoad } from './sparcAutoTutorRuleCommit';
 import { clearSparcRuntimeState, hydrateSparcRuntimeHistory, readSparcResumeSnapshot } from './sparcRuntimeState';
+import { buildSparcAutoTutorProgressSnapshot } from './sparcAutoTutorProgress';
 import { commitSparcTrialDisplayAutoTutorRules } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
@@ -87,7 +88,7 @@ describe('SPARC app instructional commit', () => {
     clearSparcRuntimeState();
   });
 
-  it('publishes saved dynamic feedback to the surface before generating the next instruction', async () => {
+  it('publishes accepted assessment progress before feedback and instruction, but never after a failed save', async () => {
     clearSparcRuntimeState();
     const display = resolveSparcAccountPolicy({ pageKey: 'dynamic-surface', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
       instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
@@ -101,18 +102,38 @@ describe('SPARC app instructional commit', () => {
         { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }],
     }, true)!;
     let publishedFeedback = false;
-    await commitSparcAutoTutorSubmit({ engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'],
+    let batchAccepted = false;
+    let rejectBatch = true;
+    let publications = 0;
+    let publishedCoverage = 0;
+    const args: Parameters<typeof commitSparcAutoTutorSubmit>[0] = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'],
       currentDisplay: display, tdfId: 'dynamic-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       sparcResult: { submittedNodes: { 'learner-response-input': 'An answer.' }, triggeredBy: 'learner-response-submit', timestamp: 101 },
       scoreLearnerResponse: () => ({ learningTargetScores: [{ clusterKC: 'a', coverage: .2 }] }),
-      onNodeValues: values => { publishedFeedback = JSON.stringify(values).includes('Here is the correction.'); },
+      onNodeValues: values => {
+        assert.equal(batchAccepted, true, 'Only durably accepted scores may be displayed');
+        publications++;
+        const progress = buildSparcAutoTutorProgressSnapshot({ display, runtimeNodeValues: values });
+        publishedCoverage = progress.coveredExpectations;
+        assert.equal(progress.turnCount, 1);
+        publishedFeedback = JSON.stringify(values).includes('Here is the correction.');
+      },
       generateTutorUtterance: request => {
+        assert.equal(publishedCoverage, .2, 'Assessment credit must be visible before any generation');
         if (request.action === 'instruction.feedback') return 'Here is the correction.';
         assert.equal(publishedFeedback, true);
         return instructionFixture(request);
       },
-      deps: { getIsAdmin: () => true, getUserId: () => 'u', writeHistory: async () => {}, writeHistoryBatch: async () => {} },
-    });
+      deps: { getIsAdmin: () => true, getUserId: () => 'u', writeHistory: async () => {}, writeHistoryBatch: async () => {
+        if (rejectBatch) throw new Error('Assessment storage unavailable');
+        batchAccepted = true;
+      } },
+    };
+    await assert.rejects(commitSparcAutoTutorSubmit(args), /Assessment storage unavailable/);
+    assert.equal(publications, 0);
+    rejectBatch = false;
+    await commitSparcAutoTutorSubmit(args);
+    assert.ok(publications > 1, 'Assessment and later tutor content are published separately');
     clearSparcRuntimeState();
   });
   it('uses the package choice for admins and preserves the deterministic non-admin route', () => {

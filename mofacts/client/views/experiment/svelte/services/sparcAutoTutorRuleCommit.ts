@@ -187,6 +187,7 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
         // Publish replay state only after every row has been durably accepted.
         for (const record of records) rememberSparcRuntimeHistoryRecord(record);
         writtenHistoryCount += records.length;
+        await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
       },
       async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
         if (params.deps?.writeHistory) {

@@ -666,6 +666,9 @@
           scoreLearnerResponse: provider.scoreLearnerResponse,
           generateTutorUtterance: provider.generateTutorUtterance,
           onNodeValues: async values => {
+            // These values follow durable history acceptance, including assessment.
+            // Show credited progress while feedback and instruction are still pending.
+            pendingAutoTutorProgressSnapshot = null;
             dispatchSparcNodeValues(values, sparcResult.timestamp);
             await tick();
           },

@@ -36,7 +36,8 @@ it('renders inline response controls through choice, text, reload, pending and c
     return compiledModule.exports.default;
   }
   const empty = component('<div></div>', 'emptySurfaceChild.svelte');
-  let node, reportActivity;
+  let node, reportActivity, publishNodeValues;
+  let coveredExpectations = 0;
   let loads = 0, submissions = 0, completed = false, turnCount = 2, ordinaryFailure = false, holdSubmit, holdLoad;
   const stubs = {
     sparcMoveLibraryClient: { sparcMoveLibraryClient: {}, readSparcAdministrativeRemovals: async () => [] },
@@ -44,7 +45,7 @@ it('renders inline response controls through choice, text, reload, pending and c
     sparcController: { resolveSparcControllerDisplay: display => display, resolveSparcControllerResult: (_display, detail) => detail },
     sparcAutoTutorRuleCommit: { isSparcAutoTutorDisplay: () => true,
       commitSparcAutoTutorDocumentLoad: async () => { loads++; if (holdLoad) await holdLoad; return { sparcNodeValues: {} }; },
-      commitSparcAutoTutorSubmit: async () => { submissions++; reportActivity?.('assessment'); if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
+      commitSparcAutoTutorSubmit: async params => { submissions++; publishNodeValues = params.onNodeValues; reportActivity?.('assessment'); if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
     },
     sparcControllerDialogueOpenRouter: { createSparcDialogueOpenRouterProvider: options => { reportActivity = options.onActivity; return {}; } },
     sparcOpenRouterSession: { createSparcOpenRouterSession: () => ({ sessionIdForScope: () => 'test' }) },
@@ -53,7 +54,8 @@ it('renders inline response controls through choice, text, reload, pending and c
     sparcProductionRuleActionCommit: { commitSparcProductionRuleAction: async () => ({}) },
     sparcBoxLayout: { buildSparcBoxedNodeGroups: () => [] },
     sparcProgressiveNodes: { SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY: 'operations', applySparcProgressiveNodeOperations: nodes => nodes },
-    sparcAutoTutorProgress: { buildSparcAutoTutorProgressSnapshot: () => ({ completed, turnCount, coveredExpectations: 0, requiredExpectations: 2, misconceptionScore: 0, totalMisconceptions: 1 }), selectSparcAutoTutorProgressSnapshotForRender: ({ currentSnapshot }) => currentSnapshot },
+    sparcAutoTutorProgress: { ...require('../client/views/experiment/svelte/services/sparcAutoTutorProgress.ts'),
+      buildSparcAutoTutorProgressSnapshot: () => ({ completed, turnCount, coveredExpectations, requiredExpectations: 2, misconceptionScore: 0, totalMisconceptions: 1 }) },
     interfaceLocaleState: { getActiveUiLocale: () => 'en' },
     sparcCitationDiagnostics: { redactSparcDialogueDiagnosticText: text => text },
   };
@@ -194,6 +196,22 @@ it('renders inline response controls through choice, text, reload, pending and c
     target.querySelector('.sparc-auto-tutor-submit button').click();
     await settle(); assertNoText();
     assert.ok(target.querySelector('.sparc-auto-tutor-pending-turn'));
+    assert.match(target.querySelector('summary').textContent, /2 turns/);
+    assert.equal(target.querySelector('[role="meter"]').getAttribute('aria-valuenow'), '0');
+    coveredExpectations = 2;
+    turnCount = 3;
+    completed = true;
+    app.update({ ...display }); await settle();
+    assert.equal(target.querySelector('[role="meter"]').getAttribute('aria-valuenow'), '0', 'Hold the prior score until assessment is accepted');
+    await publishNodeValues({}); await settle();
+    assert.equal(target.querySelector('[role="meter"]').getAttribute('aria-valuenow'), '2', 'Show accepted credit before tutor generation finishes');
+    assert.match(target.querySelector('summary').textContent, /3 turns/);
+    assert.ok(target.querySelector('.sparc-auto-tutor-pending-turn'));
+    assert.equal(target.querySelector('.sparc-auto-tutor-continue'), null, 'Completion navigation still waits for the tutor turn');
+    assertNoText();
+    completed = false;
+    turnCount = 2;
+    app.update({ ...display }); await settle();
     releaseSubmit(); await settle(); holdSubmit = null; assertText();
     completed = true;
     app.update({ ...display }); await settle(); assertNoText();

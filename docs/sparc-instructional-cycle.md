@@ -186,6 +186,12 @@ they are not rewritten. Interrupted later model updates, feedback, or instructio
 reuse the accepted assessment without another evaluation or duplicate score rows.
 Ordinary non-SPARC history continues to use its existing single-record writer.
 
+Categorized SPARC publishes progress immediately after the assessment batch is
+durably accepted. The progress card releases its pre-answer snapshot at that
+checkpoint, so scores and turn count update while feedback and the next instruction
+are still being prepared. Failed assessment writes publish no credit. Response
+controls and completion navigation still wait for the pending tutor turn to finish.
+
 Resuming an accepted instructional decision restores its response-local assessment
 facts and candidate projection before generating remaining components. Selection
 diagnostics therefore match the original execution. The decision checkpoint owns
