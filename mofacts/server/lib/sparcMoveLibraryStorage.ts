@@ -78,7 +78,7 @@ export function createSparcMoveStore(readHistory: (userId: string, tdfId: string
     },
     candidates: async (kind, embeddingModel, after) => SparcMoveLibrary.find({ kind, embeddingModel, _id: { $gt: after } }, {
       sort: { _id: 1 }, limit: 100, fields: { _id: 1, kind: 1, version: 1, embeddingModel: 1, embeddingVersion: 1,
-        embedding: 1, 'context.responseFormat': 1, 'content.video': 1, 'content.figure': 1 },
+        embedding: 1, 'context.responseFormat': 1, 'context.readingLevel': 1, 'content.video': 1, 'content.figure': 1 },
     }).fetchAsync(),
     async reservedQuestions(userId, tdfId) {
       // Accepted questions reserve their task even if presentation is interrupted in another tab.

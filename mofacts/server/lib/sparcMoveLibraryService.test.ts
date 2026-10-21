@@ -34,6 +34,28 @@ function query(eventId = 'one', kind: SparcPrimitiveQuery['context']['kind'] = '
 }
 
 describe('Shared instructional primitive library', () => {
+  it('reuses text only at the requested reading level, including historical unbiased entries', async () => {
+    const f = fixture(), service = f.make();
+    const original = query('original');
+    const first = await service.lookup('alice', original);
+    if (first.status !== 'generate') throw new Error('Expected generation');
+    await service.publish('alice', first.ticket, { text: 'Regular explanation.' });
+    for (const readingLevel of ['high-school-freshman', 'college-freshman'] as const) {
+      const q = query(readingLevel); q.context.readingLevel = readingLevel;
+      const found = await service.lookup('bob', q);
+      assert.equal(found.status, 'generate');
+      if (found.status !== 'generate') throw new Error('Expected generation for a distinct audience');
+      await service.publish('bob', found.ticket, { text: 'Audience-specific explanation.' });
+      const repeated = await service.lookup('carol', { ...q, eventId: `${readingLevel}-again` });
+      assert.equal(repeated.status, 'hit');
+      if (repeated.status === 'hit') assert.equal(repeated.content.text, 'Audience-specific explanation.');
+    }
+    const regular = query('regular-again'); regular.context.readingLevel = 'unbiased';
+    const found = await service.lookup('dave', regular);
+    assert.equal(found.status, 'hit');
+    if (found.status === 'hit') assert.equal(found.content.text, 'Regular explanation.');
+    assert.equal(f.entries.size, 3, 'Identical wording for different audiences retains separate reading-level identities');
+  });
   it('publishes, presents, and retrieves text above advisory size thresholds unchanged', async () => {
     const f = fixture(); const service = f.make(); const q = query();
     const text = 'A complete explanation. '.repeat(140).trim();

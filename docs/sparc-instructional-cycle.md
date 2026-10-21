@@ -686,13 +686,32 @@ complete instruction manifests reference their accepted immutable entry versions
 The canonical lesson session identifies decisions. The separate opaque OpenRouter
 cache-session ID is not a persistence identity.
 
+### Generated text reading level
+
+`unit.sparcsession.readingLevel` offers `unbiased` (the default when omitted),
+`high-school-freshman`, and `college-freshman` in the TDF editor. Unbiased adds no
+audience instruction. The other options add directions for vocabulary, sentence
+structure, and explanations of technical terms to learner-facing text generation:
+feedback, questions and choices, explanations, worked examples, tables, headings,
+and figure descriptions. They preserve factual qualifications, KC requirements,
+assistance, and response format. Scoring, target/move selection, embeddings, image
+generation instructions, authored text, and existing media are unchanged. This is
+prompt guidance, not a measured or guaranteed reading grade.
+
+Shared text reuse requires the same reading level. Entries without a reading-level
+field belong to the unbiased setting; no data migration is required. Saved decisions
+still replay their originally accepted content. Start a separate lesson for a clean
+comparison rather than changing the setting on an in-progress attempt. Each new
+library entry records its reading level, including when identical wording happens
+to be produced for different audiences.
+
 `learning-components/runtime/sparcMoveLibraryContract.ts` owns the transport contract;
 `units/sparcsession/sparcMoveLibrary.ts` builds the pedagogical request context.
 The client `sparcPrimitiveRealization.ts` owns the branch. Server storage, authorization,
 validation, and matching live in `sparcMoveLibraryService.ts`,
 `sparcMoveLibraryStorage.ts`, and `sparcMoveLibraryMethods.ts`.
 
-- Candidates share the requested primitive type and, for questions, response format.
+- Candidates share the requested primitive type, text reading level, and, for questions, response format.
   Instructional relevance is decided only by cosine similarity of embeddings, starting
   at the configured cutoff (currently 0.99). There is no exact-context filter,
   exact-text shortcut, or AI review of matches.

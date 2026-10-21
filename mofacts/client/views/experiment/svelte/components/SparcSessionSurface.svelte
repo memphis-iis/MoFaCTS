@@ -37,6 +37,8 @@
   import { redactSparcDialogueDiagnosticText } from '../services/sparcCitationDiagnostics';
   import { createSparcDialogueScroll } from '../services/sparcDialogueScroll';
 
+  import { resolveSparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
+
   const dispatch = createEventDispatcher();
   const platformText = (key, values) => translatePlatformString(getActiveUiLocale(), key, values);
   const openRouterSession = createSparcOpenRouterSession();
@@ -135,7 +137,7 @@
     dialogueSubmitErrorDetail = '';
     const timestamp = Date.now();
     try {
-      const provider = createSparcDialogueOpenRouterProvider({ ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
+      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
       const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
         scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
@@ -607,7 +609,7 @@
       if (!sparcResult) {
         throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
       }
-      const provider = createSparcDialogueOpenRouterProvider({ ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
+      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
         ...(currentDisplay.instructionalController?.policyId ? { policyId: currentDisplay.instructionalController.policyId } : {}),
         tdfId: typeof tdfId === 'string' ? tdfId : null,
         sessionId: openRouterSession.sessionIdForScope({

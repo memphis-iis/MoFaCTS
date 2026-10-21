@@ -2798,6 +2798,20 @@
                           "grid_columns": 12
                         }
                       },
+                      "readingLevel": {
+                        "title": "Audience for generated SPARC text.",
+                        "description": "unbiased leaves text prompts unchanged (also the default when omitted). high-school-freshman and college-freshman guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.",
+                        "type": "string",
+                        "enum": [
+                          "unbiased",
+                          "high-school-freshman",
+                          "college-freshman"
+                        ],
+                        "default": "unbiased",
+                        "options": {
+                          "grid_columns": 12
+                        }
+                      },
                       "startingKC": {
                         "title": "Starting knowledge component.",
                         "description": "Exact clusterKC identity that starts this SPARC unit’s maximum-relationship chain. Practice selects the first KC in that chain below the coverage criterion.",
@@ -5121,6 +5135,20 @@
                     "description": "Optional learning-session-level stimulus filename used by content lookup workflows.",
                     "type": "string",
                     "default": "",
+                    "options": {
+                      "grid_columns": 12
+                    }
+                  },
+                  "readingLevel": {
+                    "title": "Audience for generated SPARC text.",
+                    "description": "unbiased leaves text prompts unchanged (also the default when omitted). high-school-freshman and college-freshman guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.",
+                    "type": "string",
+                    "enum": [
+                      "unbiased",
+                      "high-school-freshman",
+                      "college-freshman"
+                    ],
+                    "default": "unbiased",
                     "options": {
                       "grid_columns": 12
                     }

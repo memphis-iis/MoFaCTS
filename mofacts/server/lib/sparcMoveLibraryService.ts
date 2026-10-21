@@ -1,4 +1,5 @@
 import { parseSparcVideoSegment, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { resolveSparcReadingLevel } from '../../../learning-components/runtime/sparcReadingLevel';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
 import { createHash, randomBytes } from 'crypto';
 import { parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
@@ -21,7 +22,7 @@ export type MoveRequest = { _id: string; userId: string; query: SparcPrimitiveQu
   embeddingVersion?: string;
   lockKey: string; leaseToken: string; entryId?: string; source?: 'retrieved' | 'generated'; similarity?: number | null };
 export type MoveCandidate = Pick<MoveEntry, '_id' | 'version' | 'kind' | 'embeddingModel' | 'embeddingVersion' | 'embedding'> & {
-  context: Pick<SparcPrimitiveContext, 'responseFormat'>;
+  context: Pick<SparcPrimitiveContext, 'responseFormat' | 'readingLevel'>;
   content?: Pick<SparcPrimitiveContent, 'video' | 'figure'>;
 };
 export type MoveExposure = { _id: string; userId: string; tdfId: string; eventId: string; sessionId: string; kind: string;
@@ -167,6 +168,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         || new Set(query.context.components).size !== query.context.components.length || !query.context.components.includes(query.context.kind)
         || !Array.isArray(query.previousQuestions) || query.previousQuestions.length > 1000) throw new Error('Invalid primitive request');
       for (const key of ['target', 'move', 'responseFormat', 'requirements', 'focus', 'dependencies', 'specification'] as const) bounded(query.context[key], `context ${key}`, 30000);
+      const readingLevel = resolveSparcReadingLevel(query.context.readingLevel);
       for (const question of query.previousQuestions) if (typeof question?.text !== 'string' || !question.text.trim()) throw new Error('Invalid previous question');
       const id = moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]);
       const saved = await store.request(id);
@@ -202,6 +204,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
               if (entry.embeddingModel !== deps.embeddingModel || entry.version !== SPARC_MOVE_LIBRARY_VERSION) continue;
               if (entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
               if (entry.kind !== query.context.kind || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)) continue;
+              if (resolveSparcReadingLevel(entry.context.readingLevel) !== readingLevel) continue;
               const similarity = sparcFigureCosineSimilarity(embedding, entry.embedding);
               if (similarity < minimumSimilarity) continue;
               ranked.push({ entry, similarity });
@@ -214,6 +217,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
             const entry = await store.entry(candidate.entry._id);
             if (!entry) continue; // Administrative removal may race the search.
             if (stableMoveJson(entry.embedding) !== stableMoveJson(candidate.entry.embedding)
+              || resolveSparcReadingLevel(entry.context.readingLevel) !== readingLevel
               || entry.context.responseFormat !== candidate.entry.context.responseFormat
               || entry.embeddingVersion !== candidate.entry.embeddingVersion || entry.version !== candidate.entry.version) {
               throw new Error('Instructional library candidate changed during retrieval; resume the request');
@@ -254,7 +258,9 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         const questionEmbedding = request.query.context.kind === 'question'
           ? { model: deps.embeddingModel, text: content.text, vector: await embed(content.text, request.query) } : undefined;
         return await withQuestionLock(userId, request.query, async () => {
-          const id = moveDigest([SPARC_MOVE_LIBRARY_VERSION, request.query.context.kind, deps.embeddingModel, request.embedding, content]);
+          const readingLevel = resolveSparcReadingLevel(request.query.context.readingLevel);
+          const id = moveDigest([SPARC_MOVE_LIBRARY_VERSION, request.query.context.kind, deps.embeddingModel, request.embedding, content,
+            ...(readingLevel === 'unbiased' ? [] : [readingLevel])]);
           if (await store.removed(id)) return { accepted: false as const, reason: 'This content was administratively removed. Generate different content.' };
           await store.saveEntry({ _id: id, version: SPARC_MOVE_LIBRARY_VERSION, context: request.query.context, kind: request.query.context.kind,
             embeddingModel: deps.embeddingModel, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,

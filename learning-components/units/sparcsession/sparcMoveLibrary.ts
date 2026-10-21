@@ -1,4 +1,5 @@
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
+import { resolveSparcReadingLevel, type SparcReadingLevel } from '../../runtime/sparcReadingLevel';
 import { buildSparcInstructionalNeed, type SparcInstructionalNeed } from '../../runtime/sparcInstructionalNeed';
 import { SPARC_MOVE_LIBRARY_VERSION, stableMoveJson, type SparcPrimitiveContext, type SparcPrimitiveKind } from '../../runtime/sparcMoveLibraryContract';
 export * from '../../runtime/sparcMoveLibraryContract';
@@ -28,8 +29,9 @@ export function instructionalNeed(request: SparcUtteranceRequest, dependencies: 
   });
 }
 
-export function primitiveContext(request: SparcUtteranceRequest, kind: SparcPrimitiveKind, dependencies: unknown): SparcPrimitiveContext {
+export function primitiveContext(request: SparcUtteranceRequest, kind: SparcPrimitiveKind, dependencies: unknown, readingLevel?: SparcReadingLevel): SparcPrimitiveContext {
   return { version: SPARC_MOVE_LIBRARY_VERSION, kind, target: request.targetId,
+    readingLevel: resolveSparcReadingLevel(readingLevel),
     move: request.action, assistance: request.moveDefinition.assistance ?? 0,
     responseFormat: request.moveDefinition.responseFormat ?? 'text', requirements: stableMoveJson(request.targetContent ?? request.contentTexts),
     specification: stableMoveJson({ version: request.moveDefinition.version,

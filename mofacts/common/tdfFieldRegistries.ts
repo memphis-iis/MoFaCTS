@@ -1,4 +1,5 @@
 import { PROLIFIC_COMPLETION_URL } from './prolific.ts';
+import { SPARC_READING_LEVELS } from '../../learning-components/runtime/sparcReadingLevel.ts';
 import {
   enumStringField,
   GOOGLE_STT_LANGUAGE_CODES,
@@ -523,6 +524,10 @@ export const LEARNING_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
 
 export const SPARC_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
   ...LEARNING_SESSION_FIELD_REGISTRY,
+  readingLevel: simpleField(enumStringField([...SPARC_READING_LEVELS], 'unbiased', 12), {
+    brief: 'Audience for generated SPARC text.',
+    verbose: 'unbiased leaves text prompts unchanged (also the default when omitted). high-school-freshman and college-freshman guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.'
+  }),
   startingKC: simpleField(stringField('', 12), {
     brief: 'Starting knowledge component.',
     verbose: 'Exact clusterKC identity that starts this SPARC unit’s maximum-relationship chain. Practice selects the first KC in that chain below the coverage criterion.'
@@ -783,6 +788,7 @@ export const LEARNING_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
 
 export const SPARC_SESSION_DIRECT_RUNTIME_KEYS = Object.freeze([
   ...LEARNING_SESSION_DIRECT_RUNTIME_KEYS,
+  'readingLevel',
   'pageId',
   'startingKC',
 ]);

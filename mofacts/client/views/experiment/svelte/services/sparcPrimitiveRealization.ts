@@ -3,10 +3,12 @@ import { primitiveContext, instructionalNeed, previousSparcQuestions, type Sparc
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { sparcInstructionalNeedText } from '../../../../../../learning-components/runtime/sparcInstructionalNeed';
 import { clientConsole } from '../../../../lib/clientLogger';
+import type { SparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
 
 /** Retrieval and generation share their context; the accepted content is journaled before exposure. */
 export async function realizeSparcPrimitive(params: {
   request: SparcUtteranceRequest; kind: SparcPrimitiveKind; dependencies: unknown;
+  readingLevel?: SparcReadingLevel;
   tdfId: string; sessionId: string; library: SparcMoveLibraryClient;
   generate(previousQuestions?: SparcPrimitiveQuery['previousQuestions']): Promise<SparcPrimitiveContent>;
   persist(content: SparcPrimitiveContent, reference: SparcPrimitiveReference): Promise<void>;
@@ -15,7 +17,7 @@ export async function realizeSparcPrimitive(params: {
   const callStartedAt = new Date(callStartedAtMs).toISOString();
   const callStartedAtMonotonic = performance.now();
   const { request, kind } = params;
-  const context = primitiveContext(request, kind, params.dependencies);
+  const context = primitiveContext(request, kind, params.dependencies, params.readingLevel);
   const previousQuestions = previousSparcQuestions(request);
   const eventId = String(request.selectedAction.snapshotId ?? '');
   if (!eventId) throw new Error('Primitive retrieval requires a production event');

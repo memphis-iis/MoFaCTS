@@ -81,7 +81,7 @@ it('renders inline response controls through choice, text, reload, pending and c
       { id: 'learner-response-input', atomType: 'text-input', value: 'An answer' },
       { id: 'learner-response-submit', atomType: 'button', label: 'Submit' },
     ] };
-    const props = { display, engine: {}, userId: 'user', tdfId: 'tdf', attemptId: 'attempt', levelUnit: 0, subsetKind: 'question' };
+    const props = { display, engine: { curUnit: { sparcsession: {} } }, userId: 'user', tdfId: 'tdf', attemptId: 'attempt', levelUnit: 0, subsetKind: 'question' };
     const wrapper = component(`<script>
       import Surface from './TestSurface.svelte';
       export let initial;

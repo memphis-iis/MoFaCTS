@@ -47,6 +47,7 @@ import { callWithSparcOutputDiagnostics } from './sparcOutputDiagnostics';
 import { clientConsole } from '../../../../lib/clientLogger';
 import type { RecoverableWarning } from '../../../../../common/recoverableWarnings';
 import { describeSparcCitation } from './sparcCitationDiagnostics';
+import { resolveSparcReadingLevel, sparcReadingLevelInstruction, type SparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
 
 const instructionTextBudget = 'Write concise, complete instructional text. Preserve the selected target, requested teaching action, and necessary reasoning.';
 const assessmentTargetVectors = new Map<string, Promise<number[][]>>();
@@ -101,6 +102,7 @@ export type SparcDialogueLearnerResponseScoringTraceEvent =
     }>;
 
 export type SparcDialogueOpenRouterProviderOptions = {
+  readonly readingLevel?: SparcReadingLevel;
   readonly moveLibrary?: SparcMoveLibraryClient;
   readonly policyId?: string;
   readonly reportWarning?: (warning: RecoverableWarning) => void | Promise<void>;
@@ -582,6 +584,8 @@ export function createSparcDialogueOpenRouterProvider(
   readonly generateTutorUtterance: SparcUtteranceGenerator;
 } {
   const callResolvedOpenRouterJson = options.callResolvedOpenRouterJson ?? defaultCallResolvedOpenRouterJson;
+  const readingLevel = resolveSparcReadingLevel(options.readingLevel);
+  const readingInstruction = sparcReadingLevelInstruction(readingLevel);
   // Providers are constructed per turn. Share at most four authored target sets
   // across those instances, scoped to account, lesson, embedding model, and text.
   // Injected providers have isolated caches. No learner text or evidence is embedded.
@@ -633,7 +637,7 @@ export function createSparcDialogueOpenRouterProvider(
       };
       if (!options.moveLibrary) { const content = await generate(); await persist(content); return content; }
       if (!options.tdfId || !request.historySessionId || !request.onInstructionComponent) throw new Error('Move library requires durable primitive context');
-      return realizeSparcPrimitive({ request, kind, dependencies: { explanation, richContent, figure }, tdfId: options.tdfId, sessionId: request.historySessionId,
+      return realizeSparcPrimitive({ request, kind, readingLevel, dependencies: { explanation, richContent, figure }, tdfId: options.tdfId, sessionId: request.historySessionId,
         library: options.moveLibrary, persist, generate: async prior => { earlierQuestions = prior; return generate(); } });
     };
     const realize = async (component: 'explanation' | 'question' | 'rich' | 'visual', task: string, schema: OpenRouterJsonSchema) => {
@@ -648,6 +652,7 @@ export function createSparcDialogueOpenRouterProvider(
         messages: [{ role: 'system', content: [
           'Return only JSON matching the schema. The production owns the target and requested composition.',
           instructionTextBudget,
+          ...(readingInstruction ? [readingInstruction] : []),
           'Primitive boundary: The move policy describes the completed move. This call produces only the named primitive requested below. Only the question primitive may ask a learner question; explanation and rich primitives must contain no learner question, invitation, or response task.',
           'Use canonical authored terminology and silently normalize obvious nonconceptual language errors. Do not attribute unstated beliefs to the learner. Do not expose scoring, identifiers, or planner metadata.',
           'Write reusable instructional content. Do not include learner names, account identifiers, personal details, or verbatim learner responses in the output.',
@@ -944,7 +949,7 @@ export function createSparcDialogueOpenRouterProvider(
         maxTokens: supported ? 3000 : SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
         messages: [{
           role: 'system',
-          content: buildSparcUtteranceSystemPrompt(request),
+          content: [buildSparcUtteranceSystemPrompt(request), ...(readingInstruction ? [readingInstruction] : [])].join('\n'),
         }, {
           role: 'user',
           content: buildSparcUtteranceUserPrompt(request),
@@ -989,7 +994,7 @@ export function createSparcDialogueOpenRouterProvider(
       };
       if (request.targetType === 'feedback' && options.moveLibrary) {
         if (!options.tdfId || !request.historySessionId || !request.onFeedback) throw new Error('Shared feedback requires durable context');
-        const content = await realizeSparcPrimitive({ request, kind: 'feedback', dependencies: null,
+        const content = await realizeSparcPrimitive({ request, kind: 'feedback', readingLevel, dependencies: null,
           tdfId: options.tdfId, sessionId: request.historySessionId, library: options.moveLibrary,
           generate: async () => { const text = await generate(); if (typeof text !== 'string') throw new Error('Feedback must be text'); return { text }; },
           persist: (content, reference) => request.onFeedback!(content.text, reference) });

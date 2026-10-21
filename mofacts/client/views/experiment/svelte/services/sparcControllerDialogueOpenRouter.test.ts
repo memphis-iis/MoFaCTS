@@ -204,6 +204,35 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
+  it('adds audience directions to every text primitive and leaves scoring prompts unchanged', async () => {
+    for (const readingLevel of [undefined, 'unbiased', 'high-school-freshman', 'college-freshman'] as const) {
+      const generated: string[] = [], scoring: string[] = [];
+      const provider = createSparcDialogueOpenRouterProvider({ ...(readingLevel ? { readingLevel } : {}),
+        async callResolvedOpenRouterJson(params) {
+          const system = String(params.messages[0]!.content);
+          if (params.intent.schemaName === 'mofacts_sparc_dialogue_score') {
+            scoring.push(system); throw new Error('scoring captured');
+          }
+          generated.push(system);
+          if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'worked-example', heading: 'Worked Example',
+            workedExample: 'A complete teaching example.', imagePrompt: null, figureDescription: null, displayWidth: null } };
+          return { parsedContent: { tutorMessage: 'A complete tutor response.' } };
+        },
+      });
+      await provider.generateTutorUtterance(utteranceRequest);
+      const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text');
+      await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition });
+      expect(generated).to.have.length(4);
+      for (const prompt of generated) {
+        if (readingLevel === 'high-school-freshman') expect(prompt).to.include('a freshman high school student (grade 9)');
+        else if (readingLevel === 'college-freshman') expect(prompt).to.include('a freshman college student (first year)');
+        else expect(prompt).not.to.include('For learner-facing text only');
+      }
+      try { await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText: 'An answer.', ...scorerContext() } as Parameters<typeof provider.scoreLearnerResponse>[0]); } catch (error) { expect(String(error)).to.include('scoring captured'); }
+      expect(scoring).to.have.length(1);
+      expect(scoring[0]).not.to.include('For learner-facing text only');
+    }
+  });
   it('retains oversized explanation and question text in one generated move without regeneration', async () => {
     const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text');
     const generated: string[] = [];
