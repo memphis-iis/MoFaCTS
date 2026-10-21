@@ -590,7 +590,7 @@
           {:else if dialogueSpeaker(node) === 'tutor'}
             <div class="sparc-instruction-content sparc-html-block">{@html renderSparcInstructionMarkdown(getNodeValue(node), DOMPurify.sanitize.bind(DOMPurify))}</div>
           {:else}
-            <div>{getNodeValue(node)}</div>
+            <div class="sparc-learner-response-text">{getNodeValue(node)}</div>
           {/if}
           {#if node.figure !== undefined}
             <SparcPromptFigure figure={node.figure} figureId={node.id} {onFigureState} />

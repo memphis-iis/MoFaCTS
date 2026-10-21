@@ -437,9 +437,11 @@
 
 .app-practice-menu-toggle {
     order: 2;
-    width: calc(23px * var(--app-density-scale));
-    min-width: calc(23px * var(--app-density-scale));
-    height: calc(104px * var(--app-density-scale));
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;

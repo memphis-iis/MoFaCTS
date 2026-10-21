@@ -24,6 +24,8 @@
     SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY,
     applySparcProgressiveNodeOperations,
   } from '../../../../../../learning-components/trial-displays/sparc/sparcProgressiveNodes';
+  import { parseSparcQuestionChoices } from '../../../../../../learning-components/runtime/sparcQuestionChoiceContract';
+  import { sparcQuestionFormatFromAction, isSparcChoiceFormat } from '../../../../../../learning-components/runtime/sparcTargetCategories';
   import SparcNode from './SparcNode.svelte';
   import SparcAutoTutorProgress from './SparcAutoTutorProgress.svelte';
   import {
@@ -36,7 +38,6 @@
   import { clientConsole } from '../../../../lib/clientLogger';
   import { redactSparcDialogueDiagnosticText } from '../services/sparcCitationDiagnostics';
   import { createSparcDialogueScroll } from '../services/sparcDialogueScroll';
-
   import { resolveSparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
 
   const dispatch = createEventDispatcher();
@@ -80,6 +81,22 @@
   let feedbackFadeElement;
   let dialogueInputResetVersion = 0;
   let dialogueSubmitPending = false;
+  let dialogueActivity = 'common.loading';
+
+  function reportDialogueActivity(activity) {
+    dialogueActivity = `sparc.activity.${activity}`;
+  }
+
+  // Focus the response region on touch devices; only a direct field tap edits text.
+  function focusDialogueControl(control) {
+    if (!control) return;
+    const touchTextEntry = window.matchMedia('(any-pointer: coarse)').matches
+      && control.matches('textarea, input');
+    const target = touchTextEntry
+      ? control.closest('.sparc-auto-tutor-input-bar')
+      : control;
+    target?.focus({ preventScroll: true });
+  }
   let pendingAutoTutorProgressSnapshot = null;
   let dialogueSubmitError = '';
   let dialogueSubmitErrorDetail = '';
@@ -133,11 +150,12 @@
     startedDialogueScope = scope;
     dialogueInitialized = false;
     dialogueSubmitPending = true;
+    dialogueActivity = 'common.loading';
     dialogueSubmitError = '';
     dialogueSubmitErrorDetail = '';
     const timestamp = Date.now();
     try {
-      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
+      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: reportDialogueActivity, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
       const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
         scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
@@ -164,7 +182,7 @@
         const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
           || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
         if (dialogueScroll?.isFollowing()) {
-          nextControl?.focus({ preventScroll: true });
+          focusDialogueControl(nextControl);
           dialogueScroll.schedule();
         }
       }
@@ -304,6 +322,9 @@
     const includeOpening = options.includeOpening === true;
     return flattenNodes(nodes).filter((node) => (
       (node?.atomType === 'dialogue-utterance' || (node?.atomType === 'html-block' && node?.turnEventId) || node?.id === 'instructional-choice-menu' || (node?.groupType === 'button-group' && node.id?.endsWith(':selected')))
+      // Grouped instructions are presentation containers, not another primitive.
+      // flattenNodes visits their children; the projector groups those exactly once.
+      && !(node.turnEventId && node.id === `${node.turnEventId}:instruction` && Array.isArray(node.children))
       && (includeOpening || node.id !== 'opening-tutor-message')
     ));
   }
@@ -519,28 +540,35 @@
     return Array.isArray(operations) ? operations : [];
   }
 
-  function buildOptimisticDialogueLearnerOperations(candidateDisplay, sparcResult) {
-    if (!isSparcAutoTutorDisplay(candidateDisplay)) {
-      return [];
-    }
-    const learnerText = String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
-    if (!learnerText) {
-      return [];
-    }
+  function buildOptimisticDialogueLearnerValues(candidateDisplay, sparcResult) {
+    if (!isSparcAutoTutorDisplay(candidateDisplay)) return {};
+    const question = latestDialogueQuestion;
+    const responseFormat = sparcQuestionFormatFromAction(question?.action);
+    const choice = isSparcChoiceFormat(responseFormat)
+      ? parseSparcQuestionChoices(question.choices, responseFormat).find(option =>
+        sparcResult.triggeredBy === `${question.id}:answer:${option.id}`
+        && sparcResult.submittedNodes?.[sparcResult.triggeredBy] === option.id)
+      : undefined;
+    const learnerText = choice?.label
+      ?? String(sparcResult?.submittedNodes?.['learner-response-input'] ?? '').trim();
+    if (!learnerText) return {};
     const eventId = `optimistic:${sparcResult.timestamp}:${sparcResult.triggeredBy || 'submit'}`;
-    return [{
-      type: 'append-node-if-missing',
-      boxId: 'dialogue-flow',
-      node: {
-        id: `${eventId}:learner`,
-        nodeType: 'atomic',
-        atomType: 'dialogue-utterance',
-        speaker: 'learner',
-        value: learnerText,
-        turnEventId: eventId,
-        optimistic: true,
-      },
-    }];
+    const learnerId = `${eventId}:learner`;
+    const correctness = choice?.correct ? 'correct' : 'incorrect';
+    return {
+      [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: [
+        ...currentSparcProgressiveNodeOperations(),
+        { type: 'append-node-if-missing', boxId: 'dialogue-flow', node: {
+          id: learnerId, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'learner',
+          value: learnerText, turnEventId: eventId, optimistic: true,
+          ...(choice ? { responseFormat } : {}),
+        } },
+      ],
+      ...(choice ? {
+        [`${learnerId}::correctness`]: correctness,
+        [`${sparcResult.triggeredBy}::correctness`]: correctness,
+      } : {}),
+    };
   }
 
   function dispatchRuntimeEvent(event) {
@@ -609,7 +637,7 @@
       if (!sparcResult) {
         throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
       }
-      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
+      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: reportDialogueActivity, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
         ...(currentDisplay.instructionalController?.policyId ? { policyId: currentDisplay.instructionalController.policyId } : {}),
         tdfId: typeof tdfId === 'string' ? tdfId : null,
         sessionId: openRouterSession.sessionIdForScope({
@@ -618,14 +646,10 @@
           pageKey: currentDisplay.pageKey,
         }),
       });
-      const priorProgressiveOperations = currentSparcProgressiveNodeOperations();
-      const optimisticOperations = buildOptimisticDialogueLearnerOperations(currentDisplay, sparcResult);
-      if (optimisticOperations.length > 0) {
+      const optimisticValues = buildOptimisticDialogueLearnerValues(currentDisplay, sparcResult);
+      if (Object.keys(optimisticValues).length > 0) {
         dispatchSparcNodeValues({
-          [SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY]: [
-            ...priorProgressiveOperations,
-            ...optimisticOperations,
-          ],
+          ...optimisticValues,
           ...clearedDialogueInputValuePatch(currentDisplay.nodes),
         }, sparcResult.timestamp);
       }
@@ -717,6 +741,7 @@
     }
     pendingAutoTutorProgressSnapshot = autoTutorProgressSnapshot;
     dialogueSubmitPending = true;
+    dialogueActivity = 'common.loading';
     dialogueSubmitError = '';
     dialogueSubmitErrorDetail = '';
     const submittedInputValues = dialogueInputValuePatch(
@@ -741,7 +766,7 @@
       const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
         || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
       if (dialogueScroll?.isFollowing()) {
-        nextControl?.focus({ preventScroll: true });
+        focusDialogueControl(nextControl);
         dialogueScroll.schedule();
       }
     }
@@ -797,7 +822,7 @@
   function focusTextResponse(element) {
     tick().then(() => {
       if (!element.isConnected || !dialogueScroll?.isFollowing()) return;
-      element.querySelector('textarea, input')?.focus({ preventScroll: true });
+      focusDialogueControl(element.querySelector('textarea, input'));
       dialogueScroll.schedule();
     });
   }
@@ -966,15 +991,12 @@
           class="sparc-auto-tutor-pending-turn"
           data-sparc-speaker="tutor"
           role="status"
-          aria-label={platformText('common.loading')}
+          aria-atomic="true"
         >
           <div class="sparc-auto-tutor-pending-speaker" aria-hidden="true">Tutor</div>
-          <div class="sparc-auto-tutor-pending-bubble" aria-hidden="true">
-            <span class="sparc-auto-tutor-pending-swirl"></span>
-            <span class="sparc-auto-tutor-skeleton-lines">
-              <span class="sparc-auto-tutor-skeleton-line"></span>
-              <span class="sparc-auto-tutor-skeleton-line sparc-auto-tutor-skeleton-line-short"></span>
-            </span>
+          <div class="sparc-auto-tutor-pending-bubble">
+            <span class="sparc-auto-tutor-pending-spinner" aria-hidden="true"></span>
+            <span>{platformText(dialogueActivity)}</span>
           </div>
         </div>
       {/if}
@@ -989,7 +1011,7 @@
         </button>
       {/if}
       {#if showAutoTutorTextResponse}
-      <div class="sparc-auto-tutor-input-bar" use:focusTextResponse>
+      <div class="sparc-auto-tutor-input-bar" tabindex="-1" use:focusTextResponse>
         <div class="sparc-auto-tutor-input">
           {#key `${autoTutorDialogueInputNode.id}:${dialogueInputResetVersion}`}
           <SparcNode

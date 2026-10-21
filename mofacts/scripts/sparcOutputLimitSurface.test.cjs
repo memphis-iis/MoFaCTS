@@ -15,6 +15,7 @@ it('renders inline response controls through choice, text, reload, pending and c
     Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
   }
   globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
+  dom.window.matchMedia = () => ({ matches: false });
   // JSDOM has no layout observer. Real geometry is covered by the browser fixture.
   globalThis.ResizeObserver = class { observe() {} disconnect() {} };
   const originalLoad = Module._load;
@@ -35,10 +36,7 @@ it('renders inline response controls through choice, text, reload, pending and c
     return compiledModule.exports.default;
   }
   const empty = component('<div></div>', 'emptySurfaceChild.svelte');
-  const node = component(`<script>export let node = {}; export let nodeValues = {}; export let onNodeEnter = () => {}; export let onButtonActivate = () => {};</script>
-    {#if node.atomType === 'button'}<button disabled={node.readOnly} on:click={() => onButtonActivate(node)}>{node.label}</button>
-    {:else if node.atomType === 'text-input'}<input readonly={node.readOnly} value={nodeValues[node.id] ?? node.value ?? ''} on:keydown={event => { if (event.key === 'Enter') onNodeEnter(node.id, event.currentTarget.value); }} />
-    {:else}<p>{node.value || ''}</p>{/if}`, 'surfaceNodeFixture.svelte');
+  let node, reportActivity;
   let loads = 0, submissions = 0, completed = false, turnCount = 2, ordinaryFailure = false, holdSubmit, holdLoad;
   const stubs = {
     sparcMoveLibraryClient: { sparcMoveLibraryClient: {}, readSparcAdministrativeRemovals: async () => [] },
@@ -46,13 +44,12 @@ it('renders inline response controls through choice, text, reload, pending and c
     sparcController: { resolveSparcControllerDisplay: display => display, resolveSparcControllerResult: (_display, detail) => detail },
     sparcAutoTutorRuleCommit: { isSparcAutoTutorDisplay: () => true,
       commitSparcAutoTutorDocumentLoad: async () => { loads++; if (holdLoad) await holdLoad; return { sparcNodeValues: {} }; },
-      commitSparcAutoTutorSubmit: async () => { submissions++; if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
+      commitSparcAutoTutorSubmit: async () => { submissions++; reportActivity?.('assessment'); if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
     },
-    sparcControllerDialogueOpenRouter: { createSparcDialogueOpenRouterProvider: () => ({}) },
+    sparcControllerDialogueOpenRouter: { createSparcDialogueOpenRouterProvider: options => { reportActivity = options.onActivity; return {}; } },
     sparcOpenRouterSession: { createSparcOpenRouterSession: () => ({ sessionIdForScope: () => 'test' }) },
     sparcRuntimeState: { readSparcResumeSnapshot: () => ({ nodeValues: {} }) },
     sparcInstructionalPolicies: { isSparcCategorizedPolicy: () => true },
-    sparcInstructionalPrimitives: { projectSparcInstructionMessages: nodes => nodes },
     sparcProductionRuleActionCommit: { commitSparcProductionRuleAction: async () => ({}) },
     sparcBoxLayout: { buildSparcBoxedNodeGroups: () => [] },
     sparcProgressiveNodes: { SPARC_PROGRESSIVE_NODE_OPERATIONS_VALUE_KEY: 'operations', applySparcProgressiveNodeOperations: nodes => nodes },
@@ -63,13 +60,17 @@ it('renders inline response controls through choice, text, reload, pending and c
   Module._load = function(request, parent, main) {
     if (request === 'meteor/tracker') return { Tracker: {} };
     if (request === './TestSurface.svelte') return surface;
+    if (request === './captureRuntime.cjs') return { capture: event => runtimeEvents.push(event.detail) };
     if (request.endsWith('/SparcAutoTutorProgress.svelte')) return component(fs.readFileSync(path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcAutoTutorProgress.svelte'), 'utf8'), path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcAutoTutorProgress.svelte'));
     if (request.endsWith('.svelte')) return request.endsWith('/SparcNode.svelte') ? node : empty;
     const stub = stubs[request.split('/').at(-1)];
     return stub ?? originalLoad.call(this, request, parent, main);
   };
   let app, surface;
+  const runtimeEvents = [];
   try {
+    const nodePath = path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcNode.svelte');
+    node = component(fs.readFileSync(nodePath, 'utf8'), nodePath);
     const surfacePath = path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcSessionSurface.svelte');
     surface = component(fs.readFileSync(surfacePath, 'utf8'), surfacePath);
     const settle = async () => {
@@ -78,16 +79,17 @@ it('renders inline response controls through choice, text, reload, pending and c
     };
     const target = document.body;
     const display = { unitType: 'sparc-autotutor-dialogue', pageKey: 'page', instructionalController: { policyId: 'dynamic-instruction-agent-v2' }, nodes: [
-      { id: 'learner-response-input', atomType: 'text-input', value: 'An answer' },
-      { id: 'learner-response-submit', atomType: 'button', label: 'Submit' },
+      { id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input', value: 'An answer' },
+      { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' },
     ] };
     const props = { display, engine: { curUnit: { sparcsession: {} } }, userId: 'user', tdfId: 'tdf', attemptId: 'attempt', levelUnit: 0, subsetKind: 'question' };
     const wrapper = component(`<script>
       import Surface from './TestSurface.svelte';
+      import { capture } from './captureRuntime.cjs';
       export let initial;
       let current = initial;
       export function update(display) { current = { ...current, display }; }
-    </script><Surface {...current} />`, 'surfaceWrapper.svelte');
+    </script><Surface {...current} on:runtimeevent={capture} />`, 'surfaceWrapper.svelte');
     app = mount(wrapper, { target, props: { initial: props } });
     await settle();
     assert.equal(target.querySelector('[data-sparc-retry]'), null);
@@ -106,9 +108,31 @@ it('renders inline response controls through choice, text, reload, pending and c
       assert.equal(target.querySelector('.sparc-auto-tutor-submit'), null);
     };
     assertText();
+    const { projectSparcInstructionMessages } = require('../../learning-components/units/sparcsession/sparcInstructionalPrimitives.ts');
+    const comparisonNodes = ['richContent', 'explanation', 'question'].map(kind => ({
+      id: `comparison-turn:${kind}`, turnEventId: 'comparison-turn', nodeType: 'atomic',
+      atomType: kind === 'richContent' ? 'html-block' : 'dialogue-utterance', speaker: 'tutor',
+      action: 'instruction.dynamic.explanation-rich-question.text', component: kind,
+      value: kind === 'richContent' ? '| Feature | First | Second |\n| --- | --- | --- |\n| **One comparison** | A | B |'
+        : kind === 'explanation' ? 'Interpret the two cases.' : 'Which case differs?',
+      ...(kind === 'richContent' ? { supportHeading: 'Comparison' } : {}),
+    }));
+    const groupedComparison = projectSparcInstructionMessages(comparisonNodes);
+    for (const messages of [comparisonNodes, groupedComparison,
+      [{ ...groupedComparison[0], atomType: 'html-block' }],
+      JSON.parse(JSON.stringify(groupedComparison)),
+    ]) {
+      app.update({ ...display, nodes: [...messages, ...display.nodes] }); await settle();
+      assert.equal(target.querySelectorAll('.sparc-worked-example').length, 1, 'A comparison has one themed owner');
+      assert.equal(target.querySelectorAll('.sparc-worked-example table').length, 1, 'Markdown becomes a semantic table inside its themed support');
+      assert.equal(target.querySelectorAll('.sparc-worked-example strong').length, 1, 'Emphasis renders once');
+      assert.equal((target.textContent.match(/One comparison/g) || []).length, 1, 'Support must not also appear through a second message path');
+      assert.doesNotMatch(target.textContent, /\| --- |\*\*One comparison\*\*/);
+      assertText();
+    }
     for (const format of ['multiple-choice', 'true-false', 'menu']) {
       const choiceDisplay = { ...display, nodes: [
-        { id: 'question', atomType: 'dialogue-utterance', value: format },
+        { id: 'question', nodeType: 'atomic', atomType: 'dialogue-utterance', value: format },
         ...display.nodes.map(node => ({ ...node, readOnly: true })),
       ] };
       app.update(choiceDisplay); await settle(); assertNoText();
@@ -116,9 +140,46 @@ it('renders inline response controls through choice, text, reload, pending and c
       await unmount(app);
       app = mount(wrapper, { target, props: { initial: { ...props, display: choiceDisplay } } });
       await settle(); assertNoText();
-      app.update({ ...display, nodes: [{ id: 'cloze-question', atomType: 'dialogue-utterance', value: 'Fill the blank: ___' }, ...display.nodes] });
+      app.update({ ...display, nodes: [{ id: 'cloze-question', nodeType: 'atomic', atomType: 'dialogue-utterance', value: 'Fill the blank: ___' }, ...display.nodes] });
       await settle(); assertText();
     }
+    // Answer-key review must precede the awaited tutor assessment for both formats.
+    for (const format of ['multiple-choice', 'true-false']) {
+      for (const correct of [true, false]) {
+        const choices = format === 'true-false'
+          ? [{ id: 'true', label: 'True', correct }, { id: 'false', label: 'False', correct: !correct }]
+          : [{ id: 'a', label: 'Case A', correct }, { id: 'b', label: 'Case B', correct: !correct }, { id: 'c', label: 'Case C', correct: false }];
+        const questionId = `immediate-${format}:question`;
+        const question = { id: questionId, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor',
+          component: 'question', turnEventId: `immediate-${format}`, value: 'Synthetic question', action: `instruction.dynamic.question.${format}`, choices };
+        let releaseChoice;
+        holdSubmit = new Promise(resolve => { releaseChoice = resolve; });
+        app.update({ ...display, nodes: [question, ...display.nodes.map(node => ({ ...node, readOnly: true }))] });
+        await settle();
+        const selectedId = `${questionId}:answer:${choices[0].id}`;
+        target.querySelector(`[data-node-id="${selectedId}"]`).click();
+        await settle();
+        assert.ok(target.querySelector('.sparc-auto-tutor-pending-spinner'));
+        assert.match(target.querySelector('[role="status"]').textContent, /Assessing your answer/);
+        assert.equal(target.querySelector('.sparc-auto-tutor-skeleton-lines'), null);
+        const values = runtimeEvents.at(-1).sparcNodeValues;
+        assert.equal(values[`${selectedId}::correctness`], correct ? 'correct' : 'incorrect');
+        const learner = values.operations.at(-1).node;
+        assert.equal(learner.value, choices[0].label);
+        assert.equal(learner.responseFormat, format);
+        assert.equal(values[`${learner.id}::correctness`], correct ? 'correct' : 'incorrect');
+        releaseChoice(); await settle(); holdSubmit = null;
+      }
+    }
+    dom.window.matchMedia = () => ({ matches: true });
+    app.update({ ...display }); await settle();
+    assert.equal(document.activeElement, target.querySelector('.sparc-auto-tutor-input-bar'));
+    target.querySelector('input').focus();
+    assert.equal(document.activeElement, target.querySelector('input'));
+    dom.window.matchMedia = () => ({ matches: false });
+    await unmount(app);
+    app = mount(wrapper, { target, props: { initial: props } }); await settle();
+    submissions = 0;
     ordinaryFailure = true;
     const input = target.querySelector('input');
     input.value = 'My draft answer';

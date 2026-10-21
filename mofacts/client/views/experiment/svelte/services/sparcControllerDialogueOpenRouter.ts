@@ -103,6 +103,7 @@ export type SparcDialogueLearnerResponseScoringTraceEvent =
 
 export type SparcDialogueOpenRouterProviderOptions = {
   readonly readingLevel?: SparcReadingLevel;
+  readonly onActivity?: (activity: 'assessment' | 'feedback' | 'richContent' | 'explanation' | 'question' | 'visual') => void;
   readonly moveLibrary?: SparcMoveLibraryClient;
   readonly policyId?: string;
   readonly reportWarning?: (warning: RecoverableWarning) => void | Promise<void>;
@@ -626,6 +627,7 @@ export function createSparcDialogueOpenRouterProvider(
       explanation, richContent, ...(supportHeading ? { supportHeading } : {}), ...(video ? { video } : {}), ...(figure ? { figure } : {}) });
     let earlierQuestions: unknown = previousSparcQuestions(request);
     const run = async (kind: Exclude<SparcPrimitiveKind, 'feedback'>, generate: () => Promise<SparcPrimitiveContent>) => {
+      options.onActivity?.(kind);
       const persist = async (content: SparcPrimitiveContent, reference?: SparcPrimitiveReference) => {
         if (content.administrativeRemoval && !removedComponents.includes(kind)) removedComponents.push(kind);
         await request.onInstructionComponent?.(kind, content.text, content.figure, {
@@ -728,6 +730,7 @@ export function createSparcDialogueOpenRouterProvider(
         if (!options.tdfId || !options.sessionId || typeof generationId !== 'string' || !generationId) throw new Error('Figure primitive requires stable TDF, session, and production event identities');
         const assistance = request.moveDefinition.assistance;
         if (typeof assistance !== 'number' || !Number.isFinite(assistance)) throw new Error('Figure primitive requires the selected move assistance');
+        options.onActivity?.('visual');
         const support = await visualResolver({ tdfId: options.tdfId, sessionId: options.moveLibrary ? request.historySessionId! : options.sessionId, generationId,
           tutorMessage: brief.tutorMessage, figureDescription: brief.figureDescription, displayWidth: brief.displayWidth,
           situation: instructionalNeed(request, { explanation, richContent, figure }, { illustrationBrief: brief.imagePrompt }),
@@ -933,11 +936,13 @@ export function createSparcDialogueOpenRouterProvider(
   };
   return {
     async scoreLearnerResponse(params) {
+      options.onActivity?.('assessment');
       const evaluation = await scoreLearnerResponseWithEvidence(params);
       return evaluation.learnerResponseScore;
     },
 
     async generateTutorUtterance(request) {
+      options.onActivity?.(request.targetType === 'feedback' ? 'feedback' : 'explanation');
       if (request.moveDefinition.components) return generateInstructionPrimitives(request);
       const generate = async () => {
       const supported = request.moveDefinition.outputSchemaId === SPARC_SUPPORTED_PROMPT_SCHEMA_ID;
