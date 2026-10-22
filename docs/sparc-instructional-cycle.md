@@ -155,12 +155,27 @@ width inside their own horizontal scroll container on small screens. Answer opti
 use normal-weight, start-aligned text with 1.5 line spacing. Subtle support surfaces
 and spacing replace nested conversation/support borders.
 
-Administrator production and selection metadata is visible only after opening the
-Details disclosure below the corresponding output. Each output has its own closed-by-
-default panel; the existing administrator gate controls whether it is rendered at all.
-The panel slides down when opened, respects reduced-motion settings, and supports
-native keyboard toggling and Escape from its toggle. Disclosure state is presentation
-state only and does not enter learner history.
+Consecutive outputs from the same speaker share one Tutor or Learner label. Each
+administrator production output has a small asterisk inside its lower trailing edge,
+using the bubble's existing inset without a separate metadata row or added vertical
+padding. Hovering, focusing, or tapping the asterisk shows its production and selection
+metadata in an overlay. Escape or clicking outside dismisses it. The existing
+administrator gate controls whether diagnostics are rendered at all; this presentation
+does not modify learner history.
+
+Rejected stale choice submissions report `sparc.staleQuestion` through the existing
+administrator Recoverable Warning Log. Reports contain lesson/page and question/node/
+cycle identifiers, replay guard flags, transition count, and a presentation snapshot
+captured before pending disables the clicked control. They contain no question,
+answer, generated content, or provider payload. The existing authenticated reporting,
+rate limit, exact field validation, server-owned reporter/time, and admin-only reads
+apply. Reporting is best effort and cannot replace the original rejection or alter
+learning state. These are client-reported diagnostics, not verified scoring evidence.
+
+SPARC units omit the left practice-tools menu. The practice header reserves the
+return button's natural width and keeps its label on one line; long lesson titles
+wrap within the remaining space, with at most two visible lines. The header contains
+both controls above the learning canvas.
 
 ### Assessment change records and full resume
 

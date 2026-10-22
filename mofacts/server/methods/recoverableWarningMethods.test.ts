@@ -22,6 +22,28 @@ async function rejected(operation: () => Promise<unknown>) {
 }
 
 describe('recoverable warning log methods', function() {
+  it('persists bounded stale-question flags and rejects extra content or forged identity', async function() {
+    const { methods, writes } = fixture();
+    const stale = { code: 'sparc.staleQuestion' as const, tdfId: 'tdf-demo', pageKey: 'page',
+      diagnostic: { submittedNodeId: 'old:question:answer:b', submittedQuestionId: 'old:question', currentQuestionId: 'new:question',
+        submittedQuestionTurnEventId: 'old', currentCycleEventId: 'new', questionIsLatest: false,
+        questionMatchesCycle: false, questionAlreadyAnswered: true, transitionCount: 12 },
+      presentation: { displayedQuestionId: 'new:question', submittedButtonPresent: true,
+        submittedButtonDisabled: false, submittedButtonSelected: false, submissionPending: false } };
+    await methods.reportRecoverableWarning.call({ userId: 'learner' }, stale);
+    expect(writes[0]!.details).to.deep.equal(stale);
+    expect(writes[0]!.actorUserId).to.equal('learner');
+    for (const bad of [
+      { ...stale, diagnostic: { ...stale.diagnostic, answer: 'Private answer' } },
+      { ...stale, diagnostic: { ...stale.diagnostic, submittedNodeId: 'x'.repeat(513) } },
+      { ...stale, diagnostic: { ...stale.diagnostic, transitionCount: -1 } },
+      { ...stale, presentation: { ...stale.presentation, submittedButtonDisabled: 'false' } },
+      { ...stale, presentation: { ...stale.presentation, text: 'Private question' } },
+      { ...stale, actorUserId: 'another' },
+    ]) await rejected(() => methods.reportRecoverableWarning.call({ userId: 'learner' }, bad as RecoverableWarning));
+    await rejected(() => methods.reportRecoverableWarning.call({}, stale));
+    expect(writes).to.have.length(1);
+  });
   it('stores text-free output-limit outcomes and rejects forged, unbounded, or text-bearing metadata', async function() {
     const { methods, writes } = fixture();
     const outputWarning: SparcOutputLimitWarning = { code: 'autotutor.outputLimit', tdfId: 'tdf-demo',

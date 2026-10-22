@@ -7,6 +7,31 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const { buildFixture } = require('./sparcReadingOrderFixture.cjs');
 
+it('captures question and actual button flags before pending disables an MC submission', { timeout: 120000 }, async () => {
+  const fixture = await buildFixture({ captureSubmissions: true });
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.route('http://localhost:3200/__sparc-diagnostic-fixture', route => route.fulfill({
+      contentType: 'text/html', body: '<html><body><main id="fixture"></main></body></html>',
+    }));
+    await page.goto('http://localhost:3200/__sparc-diagnostic-fixture');
+    await page.addScriptTag({ content: fixture.source });
+    await page.evaluate(() => window.fixture.mount({ engine: { curUnit: { sparcsession: { readingLevel: 'unbiased' } } },
+      userId: 'synthetic', tdfId: 'synthetic', attemptId: 'synthetic', levelUnit: 0, subsetKind: 'question',
+      display: { pageKey: 'diagnostic', unitType: 'sparc-autotutor-dialogue', instructionalController: { policyId: 'dynamic-instruction-agent-v2' },
+        nodes: [{ id: 'turn:question', turnEventId: 'turn', component: 'question', speaker: 'tutor', nodeType: 'atomic', atomType: 'dialogue-utterance',
+          action: 'instruction.dynamic.question.multiple-choice', value: 'Private question content', choices: [
+            { id: 'a', label: 'Private A', correct: true }, { id: 'b', label: 'Private B', correct: false }, { id: 'c', label: 'Private C', correct: false },
+          ] }] } }));
+    await page.locator('[data-node-id="turn:question:answer:b"]').click();
+    const presentations = await page.evaluate(() => window.fixture.submissionPresentations);
+    assert.deepEqual(presentations, [{ displayedQuestionId: 'turn:question', submittedButtonPresent: true,
+      submittedButtonDisabled: false, submittedButtonSelected: false, submissionPending: false }]);
+    assert.doesNotMatch(JSON.stringify(presentations), /Private/);
+  } finally { await browser.close(); fs.rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
 it('keeps real SPARC components ordered through checks, image decoding, restore, focus and manual scrolling', { timeout: 120000 }, async () => {
   const health = await fetch('http://localhost:3200/health');
   assert.equal(health.ok, true, 'Start the supported localhost watcher before this test');
@@ -38,7 +63,8 @@ it('keeps real SPARC components ordered through checks, image decoding, restore,
     const question = component('question', { primitiveReference: { entryId: 'question1' } });
     const controls = [{ id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input', value: '' }, { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }];
     const display = nodes => ({ unitType: 'sparc-autotutor-dialogue', pageKey: 'page', instructionalController: { policyId: 'dynamic-instruction-agent-v2' }, nodes: [...nodes, ...controls] });
-    const props = nodes => ({ display: display(nodes), engine: {}, userId: 'synthetic', tdfId: 'synthetic', attemptId: 'synthetic', levelUnit: 0, subsetKind: 'question' });
+    // Initialization reads the active unit even when provider calls are stubbed.
+    const props = nodes => ({ display: display(nodes), engine: { curUnit: { sparcsession: { readingLevel: 'unbiased' } } }, userId: 'synthetic', tdfId: 'synthetic', attemptId: 'synthetic', levelUnit: 0, subsetKind: 'question' });
     const update = nodes => page.evaluate(display => window.fixture.update({ display }), display(nodes));
     const visible = () => page.locator('.sparc-instruction-component').evaluateAll(nodes => nodes.map(node => node.id.split('%3A').at(-1)));
     const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));

@@ -4,7 +4,7 @@ import { SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID,
 import { SPARC_TARGET_CATEGORIES, isSparcChoiceFormat, type SparcTargetCategory } from '../../runtime/sparcTargetCategories';
 import { createSparcDynamicInstructionRules, SPARC_CATEGORIZED_MENU_OPTIONS } from './sparcDynamicInstructionRules';
 import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from './sparcMoveDefinitions';
-import { savedSparcQuestions, sparcQuestionAnswerNodes, projectSparcAnsweredQuestionOperations, projectSparcResponseCorrectness } from './sparcMultipleChoiceQuestion';
+import { savedSparcQuestions, sparcQuestionAnswerNodes, projectSparcAnsweredQuestionOperations, projectSparcResponseCorrectness, SparcStaleQuestionError } from './sparcMultipleChoiceQuestion';
 import { buildSparcDialogueHistory } from './sparcUtteranceRequest';
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
 import { createSparcAuthoredDocumentFromTrialDisplay, commitSparcTrialDisplayAutoTutorRules } from './sparcTrialDisplayRuntimeBridge';
@@ -132,6 +132,26 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
 }
 
 describe('Dynamic instruction production cycles', () => {
+  it('diagnoses a rejected old choice after an MC-to-cloze transition without retaining response text', async () => {
+    const f = fixture('student', false, 'rule');
+    await f.answer(); await f.choice('explanation-rich-question.multiple-choice');
+    const old = savedSparcQuestions(replaySparcHistory(f.rows)).at(-1)!;
+    await f.mcAnswer('a'); await f.choice('explanation-rich-question.cloze');
+    const replay = replaySparcHistory(f.rows);
+    const current = savedSparcQuestions(replay).at(-1)!;
+    const nodeId = `${String(old.id)}:answer:b`;
+    const count = f.rows.length;
+    await assert.rejects(f.submit({ submittedNodes: { [nodeId]: 'b' }, triggeredBy: nodeId, timestamp: 500 }), error => {
+      assert.ok(error instanceof SparcStaleQuestionError);
+      assert.equal(error.message, 'Stale multiple-choice question');
+      assert.deepEqual(error.diagnostic, { submittedNodeId: nodeId, submittedQuestionId: old.id,
+        currentQuestionId: current.id, submittedQuestionTurnEventId: old.turnEventId,
+        currentCycleEventId: current.turnEventId, questionIsLatest: false, questionMatchesCycle: false,
+        questionAlreadyAnswered: true, transitionCount: replay.transitions.length });
+      return true;
+    });
+    assert.equal(f.rows.length, count);
+  });
   for (const version of ['agent', 'student'] as const) for (const targetCount of [1, 7, 32]) for (const startup of [false, true]) for (const resumedFirst of [false, true]) {
     it(`journals identical overlapping ${version} ${startup ? 'startup' : 'response'} continuations with ${targetCount} targets when ${resumedFirst ? 'resume' : 'original'} finishes first`, async () => {
       const f = fixture(version, false, 'model-rule', targetCount, targetCount === 32 ? 24 : 0);

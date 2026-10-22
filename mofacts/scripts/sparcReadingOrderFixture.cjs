@@ -17,7 +17,7 @@ async function buildFixture({ captureSubmissions = false } = {}) {
   stub('sparcAutoTutorRuleCommit', `export const isSparcAutoTutorDisplay = () => true;
     export const commitSparcAutoTutorDocumentLoad = async () => ({ sparcNodeValues: {} });
     export const commitSparcAutoTutorSubmit = async params => {
-      ${captureSubmissions ? 'window.fixture.submissions.push(params.sparcResult); return { sparcNodeValues: {} };' : "throw Error('Unexpected submission');"}
+      ${captureSubmissions ? 'window.fixture.submissions.push(params.sparcResult); window.fixture.submissionPresentations.push(params.submissionPresentation); return { sparcNodeValues: {} };' : "throw Error('Unexpected submission');"}
     };`);
   stub('sparcControllerDialogueOpenRouter', 'export const createSparcDialogueOpenRouterProvider = () => ({});');
   stub('sparcOpenRouterSession', "export const createSparcOpenRouterSession = () => ({ sessionIdForScope: () => 'synthetic' });");
@@ -40,7 +40,7 @@ async function buildFixture({ captureSubmissions = false } = {}) {
   const entry = write('entry.js', `import { mount, unmount, tick } from 'svelte';
     import Fixture from ${JSON.stringify(wrapper.replaceAll('\\', '/'))};
     let instance;
-    window.fixture = { submissions: [], checkRemovals: async () => [], readImage: async () => { throw Error('Unconfigured image'); },
+    window.fixture = { submissions: [], submissionPresentations: [], checkRemovals: async () => [], readImage: async () => { throw Error('Unconfigured image'); },
       async mount(props) { if (instance) await unmount(instance); instance = mount(Fixture, { target: document.querySelector('#fixture'), props: { initial: props } }); await tick(); },
       async update(props) { instance.update(props); await tick(); },
       async destroy() { if (instance) await unmount(instance); instance = undefined; await tick(); }

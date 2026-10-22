@@ -1,5 +1,8 @@
 import { sparcPolicyForAccount, isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { clientConsole } from '../../../../lib/clientLogger';
+import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
+import type { SparcAnswerSubmissionPresentation, SparcStaleQuestionWarning } from '../../../../../common/recoverableWarnings';
+import { SparcStaleQuestionError } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type {
   SparcControllerDisplay,
@@ -45,6 +48,7 @@ type SparcControllerDialogueEngine = UnitEngineLike & {
 };
 
 type SparcControllerDialogueCommitDeps = {
+  readonly reportWarning?: (warning: SparcStaleQuestionWarning) => void | Promise<void>;
   readonly getIsAdmin?: () => boolean;
   readonly getUserId?: () => string | null;
   readonly writeHistory?: (historyRecord: CanonicalHistoryRecord) => Promise<void>;
@@ -98,6 +102,7 @@ function requireSparcControllerDialogueDisplay(display: unknown): SparcControlle
 }
 
 type SparcAutoTutorCommitParams = {
+  readonly submissionPresentation?: SparcAnswerSubmissionPresentation;
   readonly engine: UnitEngineLike | null | undefined;
   readonly currentDisplay: unknown;
   readonly sparcResult?: SparcControllerResult;
@@ -162,49 +167,61 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
   const startedAt = Date.now();
   let writtenHistoryCount = 0;
 
-  await engine.commitSparcTrialDisplayAutoTutorRules({
-    core: {
-      TDFId: tdfId,
-      sessionID: String(priorHistoryRecords.at(-1)?.sessionID ?? `${attemptId}:${sparcDisplay.instructionalController!.policyId}:${startedAt}`),
-      levelUnit,
-      userId,
-    },
-    pageKey: sparcDisplay.pageKey,
-    display: sparcDisplay,
-    ...(params.sparcResult ? { result: params.sparcResult } : {}),
-    document: sparcRuntime.document,
-    replayState: sparcRuntime.replayState,
-    priorHistoryRecords,
-    scoreLearnerResponse: params.scoreLearnerResponse,
-    generateTutorUtterance: params.generateTutorUtterance,
-    history: {
-      async writeCanonicalHistoryBatch(records) {
-        if (params.deps?.writeHistoryBatch) await params.deps.writeHistoryBatch(records);
-        else {
-          if (params.deps?.writeHistory) throw new Error('Injected SPARC history requires an atomic batch writer');
-          await insertCompressedHistoryBatch(records);
-        }
-        // Publish replay state only after every row has been durably accepted.
-        for (const record of records) rememberSparcRuntimeHistoryRecord(record);
-        writtenHistoryCount += records.length;
-        await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
+  try {
+    await engine.commitSparcTrialDisplayAutoTutorRules({
+      core: {
+        TDFId: tdfId,
+        sessionID: String(priorHistoryRecords.at(-1)?.sessionID ?? `${attemptId}:${sparcDisplay.instructionalController!.policyId}:${startedAt}`),
+        levelUnit,
+        userId,
       },
-      async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
-        if (params.deps?.writeHistory) {
-          await params.deps.writeHistory(historyRecord);
-        } else {
-          await insertCompressedHistory(historyRecord as Record<string, unknown>);
-        }
-        rememberSparcRuntimeHistoryRecord(historyRecord);
-        writtenHistoryCount += 1;
-        const transitionId = (historyRecord.sparc as { stateTransition?: { transitionId?: string } })?.stateTransition?.transitionId ?? '';
-        if (isSparcCategorizedPolicy(sparcDisplay.instructionalController?.policyId)
-          && (transitionId.endsWith(':feedback') || transitionId.includes(':primitive:'))) {
+      pageKey: sparcDisplay.pageKey,
+      display: sparcDisplay,
+      ...(params.sparcResult ? { result: params.sparcResult } : {}),
+      document: sparcRuntime.document,
+      replayState: sparcRuntime.replayState,
+      priorHistoryRecords,
+      scoreLearnerResponse: params.scoreLearnerResponse,
+      generateTutorUtterance: params.generateTutorUtterance,
+      history: {
+        async writeCanonicalHistoryBatch(records) {
+          if (params.deps?.writeHistoryBatch) await params.deps.writeHistoryBatch(records);
+          else {
+            if (params.deps?.writeHistory) throw new Error('Injected SPARC history requires an atomic batch writer');
+            await insertCompressedHistoryBatch(records);
+          }
+          // Publish replay state only after every row has been durably accepted.
+          for (const record of records) rememberSparcRuntimeHistoryRecord(record);
+          writtenHistoryCount += records.length;
           await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
-        }
+        },
+        async writeCanonicalHistory(historyRecord: CanonicalHistoryRecord) {
+          if (params.deps?.writeHistory) {
+            await params.deps.writeHistory(historyRecord);
+          } else {
+            await insertCompressedHistory(historyRecord as Record<string, unknown>);
+          }
+          rememberSparcRuntimeHistoryRecord(historyRecord);
+          writtenHistoryCount += 1;
+          const transitionId = (historyRecord.sparc as { stateTransition?: { transitionId?: string } })?.stateTransition?.transitionId ?? '';
+          if (isSparcCategorizedPolicy(sparcDisplay.instructionalController?.policyId)
+            && (transitionId.endsWith(':feedback') || transitionId.includes(':primitive:'))) {
+            await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
+          }
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    if (error instanceof SparcStaleQuestionError) {
+      const warning: SparcStaleQuestionWarning = { code: 'sparc.staleQuestion', tdfId,
+        pageKey: sparcDisplay.pageKey, diagnostic: error.diagnostic, presentation: params.submissionPresentation ?? null };
+      void Promise.resolve().then(() => (params.deps?.reportWarning ?? reportRecoverableWarning)(warning)).catch(() => {
+        clientConsole(1, '[SPARC] Unable to persist stale-question diagnostic.');
+      });
+    }
+    throw error;
+  }
+
   clientConsole(2, '[SPARC][Dialogue] committed controller turn', {
     pageKey: sparcDisplay.pageKey,
     tdfId,

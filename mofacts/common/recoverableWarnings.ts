@@ -1,4 +1,21 @@
 // Allowlisted diagnostic events only; never carry learner text or provider payloads.
+import type { SparcStaleQuestionDiagnostic } from '../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
+
+export type SparcAnswerSubmissionPresentation = Readonly<{
+  displayedQuestionId: string | null;
+  submittedButtonPresent: boolean;
+  submittedButtonDisabled: boolean | null;
+  submittedButtonSelected: boolean | null;
+  submissionPending: boolean;
+}>;
+
+export type SparcStaleQuestionWarning = Readonly<{
+  code: 'sparc.staleQuestion';
+  tdfId: string | null;
+  pageKey: string;
+  diagnostic: SparcStaleQuestionDiagnostic;
+  presentation: SparcAnswerSubmissionPresentation | null;
+}>;
 export const RECOVERABLE_WARNING_ACTION = 'system.recoverableWarning';
 export const RECOVERABLE_WARNING_PAGE_SIZE = 50;
 
@@ -18,7 +35,7 @@ export type RecoverableWarning = Readonly<{
   code: 'autotutor.citationMismatch';
   tdfId: string | null;
   mismatchCount: number;
-}> | SparcOutputLimitWarning;
+}> | SparcOutputLimitWarning | SparcStaleQuestionWarning;
 
 export type RecoverableWarningCursor = Readonly<{ createdAt: Date; id: string }>;
 export type RecoverableWarningRow = Readonly<{

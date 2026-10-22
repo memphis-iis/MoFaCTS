@@ -394,12 +394,31 @@
 }
 
 .practice-top-header .page-title {
+    flex: 1 1 0;
     min-width: 0;
-    max-width: min(54vw, 52rem);
+    max-width: none;
+    height: auto;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     /* Practice lesson names are contextual chrome, not a second page heading. */
     font-size: calc(var(--app-font-size-base) * 1.25);
+}
+
+.practice-app .practice-top-header {
+    height: auto;
+    min-height: var(--home-header-height);
+    box-sizing: border-box;
+    padding-block: var(--app-space-1-px);
+}
+
+.practice-top-header .header-right {
+    flex: 0 0 auto;
 }
 
 .practice-return-button {
@@ -1070,13 +1089,11 @@ html.learning-progress-panel-viewport-open .practice-top-header {
 
 @media (max-width: 640px) {
     .practice-top-header .page-title {
-        max-width: 48vw;
         font-size: calc(var(--app-font-size-base) * 0.98);
     }
 
     .practice-return-button {
-        max-width: 46vw;
-        white-space: normal;
+        white-space: nowrap;
         line-height: 1.1;
         padding-left: calc(0.55rem * var(--app-density-scale));
         padding-right: calc(0.55rem * var(--app-density-scale));

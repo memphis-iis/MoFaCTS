@@ -26,6 +26,8 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
     async reportRecoverableWarning(this: Context, warning: RecoverableWarning) {
       const userId = requireAuthenticatedUser(this.userId);
       const boundedSize = Match.Where((value: unknown) => Number.isInteger(value) && Number(value) > 0 && Number(value) <= 10000000);
+      const questionIdentifier = Match.Where((value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,512}$/.test(value));
+      const nullableQuestionIdentifier = Match.OneOf(null, questionIdentifier);
       check(warning, Match.OneOf({
         code: Match.Where((value: unknown) => value === 'autotutor.citationMismatch'),
         tdfId: Match.OneOf(null, identifier),
@@ -41,6 +43,28 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
         limit: boundedSize,
         attempts: Match.OneOf(1, 2),
         outcome: Match.OneOf('continued', 'regenerated', 'retry-needed', 'failed'),
+      }, {
+        code: 'sparc.staleQuestion',
+        tdfId: Match.OneOf(null, identifier),
+        pageKey: questionIdentifier,
+        diagnostic: {
+          submittedNodeId: questionIdentifier,
+          submittedQuestionId: questionIdentifier,
+          currentQuestionId: nullableQuestionIdentifier,
+          submittedQuestionTurnEventId: nullableQuestionIdentifier,
+          currentCycleEventId: nullableQuestionIdentifier,
+          questionIsLatest: Boolean,
+          questionMatchesCycle: Boolean,
+          questionAlreadyAnswered: Boolean,
+          transitionCount: Match.Where((value: unknown) => Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 10000000),
+        },
+        presentation: Match.OneOf(null, {
+          displayedQuestionId: nullableQuestionIdentifier,
+          submittedButtonPresent: Boolean,
+          submittedButtonDisabled: Match.OneOf(null, Boolean),
+          submittedButtonSelected: Match.OneOf(null, Boolean),
+          submissionPending: Boolean,
+        }),
       }));
       if (warning.code === 'autotutor.outputLimit' && warning.observedSize <= warning.limit) {
         throw new Error('Output-limit warning requires an exceeded limit');

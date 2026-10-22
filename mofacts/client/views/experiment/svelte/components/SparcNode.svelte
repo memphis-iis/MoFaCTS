@@ -27,7 +27,23 @@
   export let adminDiagnosticMode = false;
   export let nodeValues = {};
   export let learningProgressSnapshot = null;
-  let diagnosticPanelOpen = false;
+  export let showDialogueSpeaker = true;
+  let diagnosticMarker;
+  let diagnosticTooltip;
+
+  function showProductionDetails() {
+    diagnosticTooltip.showPopover();
+    const marker = diagnosticMarker.getBoundingClientRect();
+    const panel = diagnosticTooltip.getBoundingClientRect();
+    const inset = 8;
+    diagnosticTooltip.style.left = `${Math.max(inset, Math.min(marker.right - panel.width, window.innerWidth - panel.width - inset))}px`;
+    diagnosticTooltip.style.top = `${Math.max(inset, marker.top >= panel.height + inset
+      ? marker.top - panel.height : Math.min(marker.bottom, window.innerHeight - panel.height - inset))}px`;
+  }
+
+  function hideProductionDetails() {
+    diagnosticTooltip?.hidePopover();
+  }
   export let authoringSelectedNodeId = '';
   export let authoringSelectOnly = false;
   export let inputLanguage = '';
@@ -311,6 +327,10 @@
   $: activePanelItems = activePanel ? buildRenderItems(activePanel.children || []) : [];
 </script>
 
+<svelte:window on:resize={hideProductionDetails} on:scroll|capture={(event) => {
+  if (!diagnosticTooltip?.contains(event.target)) hideProductionDetails();
+}} />
+
 {#if node?.id === 'instructional-choice-menu' && nodeIsVisible(node) && !authoringSelectOnly}
   {#key node.children?.[0]?.menuId}
     <SparcStudentMoveMenu {node} onActivate={onButtonActivate} />
@@ -544,14 +564,15 @@
       class:sparc-correctness-incorrect={dialogueSpeaker(node) === 'learner' && getNodeCorrectness(node) === 'incorrect'}
       use:relevantSupport
     >
-      <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}
-        {#if dialogueSpeaker(node) === 'learner' && getNodeCorrectness(node)}
-          <span class="visually-hidden">{sparcText(node.responseFormat === 'multiple-choice' || node.responseFormat === 'true-false'
-            ? getNodeCorrectness(node) === 'correct' ? 'feedback.correct' : 'feedback.incorrect'
-            : getNodeCorrectness(node) === 'correct' ? 'autoTutor.responseGain' : 'autoTutor.responseNoGain')}: </span>
-        {/if}
-      </div>
-      <div class="sparc-dialogue-bubble">
+      {#if showDialogueSpeaker}
+        <div class="sparc-dialogue-speaker">{dialogueSpeakerLabel(node)}</div>
+      {/if}
+      {#if dialogueSpeaker(node) === 'learner' && getNodeCorrectness(node)}
+        <span class="visually-hidden">{sparcText(node.responseFormat === 'multiple-choice' || node.responseFormat === 'true-false'
+          ? getNodeCorrectness(node) === 'correct' ? 'feedback.correct' : 'feedback.incorrect'
+          : getNodeCorrectness(node) === 'correct' ? 'autoTutor.responseGain' : 'autoTutor.responseNoGain')}: </span>
+      {/if}
+      <div class="sparc-dialogue-bubble" class:sparc-has-production-marker={!!dialogueProductionRuleLabel(node)}>
         {#if node.children?.length}
           {#each node.children as component (component.id)}
             {@const workedExample = isWorkedExample(component)}
@@ -604,21 +625,34 @@
           {/if}
         {/if}
         {#if dialogueProductionRuleLabel(node)}
-          <details class="sparc-production-details" bind:open={diagnosticPanelOpen}>
-            <summary on:keydown={(event) => {
+          <button type="button" class="sparc-production-marker"
+            bind:this={diagnosticMarker}
+            aria-label={sparcText('dashboard.details')}
+            aria-describedby={`sparc-production-${node.id}`}
+            on:mouseenter={showProductionDetails}
+            on:mouseleave={(event) => {
+              if (document.activeElement !== diagnosticMarker && !diagnosticTooltip.contains(event.relatedTarget)) hideProductionDetails();
+            }}
+            on:focus={showProductionDetails}
+            on:blur={hideProductionDetails}
+            on:click={showProductionDetails}
+            on:keydown={(event) => {
               if (event.key === 'Escape') {
-                diagnosticPanelOpen = false;
+                hideProductionDetails();
                 event.preventDefault();
                 event.stopPropagation();
               }
-            }}>{sparcText('dashboard.details')}</summary>
-            <div class="sparc-production-panel">
+            }}>*</button>
+            <div class="sparc-production-panel" id={`sparc-production-${node.id}`}
+              bind:this={diagnosticTooltip} popover="auto" role="tooltip"
+              on:mouseleave={(event) => {
+                if (!diagnosticMarker.contains(event.relatedTarget)) hideProductionDetails();
+              }}>
               <div class="sparc-dialogue-diagnostic">production: {dialogueProductionRuleLabel(node)}</div>
               {#if dialogueSelectionLabel(node)}
                 <div class="sparc-dialogue-diagnostic sparc-dialogue-diagnostic-selection">selected: {dialogueSelectionLabel(node)}</div>
               {/if}
             </div>
-          </details>
         {/if}
       </div>
     </div>

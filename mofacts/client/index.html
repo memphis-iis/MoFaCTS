@@ -95,7 +95,9 @@
           </div>
         </header>
 
-        {{> appPracticeMenu}}
+        {{#if showPracticeToolsMenu}}
+          {{> appPracticeMenu}}
+        {{/if}}
 
         {{#if showPageNumbers}}
           {{> curPageNumbers}}

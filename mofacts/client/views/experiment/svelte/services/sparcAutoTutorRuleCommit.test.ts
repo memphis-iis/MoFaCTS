@@ -5,6 +5,8 @@ import { strict as assert } from 'node:assert';
 import { commitSparcAutoTutorSubmit, commitSparcAutoTutorDocumentLoad } from './sparcAutoTutorRuleCommit';
 import { clearSparcRuntimeState, hydrateSparcRuntimeHistory, readSparcResumeSnapshot } from './sparcRuntimeState';
 import { buildSparcAutoTutorProgressSnapshot } from './sparcAutoTutorProgress';
+import { SparcStaleQuestionError } from '../../../../../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion';
+import type { SparcStaleQuestionWarning } from '../../../../../common/recoverableWarnings';
 import { commitSparcTrialDisplayAutoTutorRules } from '../../../../../../learning-components/units/sparcsession/sparcTrialDisplayRuntimeBridge';
 import type { CanonicalHistoryRecord } from '../../../../../../learning-components/runtime/historyEnvelope';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
@@ -32,6 +34,42 @@ function instructionFixture(request: SparcUtteranceRequest): SparcInstructionCom
 }
 
 describe('SPARC app instructional commit', () => {
+  it('reports stale-question state without answer text and preserves rejection when reporting fails', async () => {
+    for (const reportingFails of [false, true]) {
+      clearSparcRuntimeState();
+      const reports: SparcStaleQuestionWarning[] = [];
+      const error = new SparcStaleQuestionError({ submittedNodeId: 'old:question:answer:b', submittedQuestionId: 'old:question',
+        currentQuestionId: 'new:question', submittedQuestionTurnEventId: 'old', currentCycleEventId: 'new',
+        questionIsLatest: false, questionMatchesCycle: false, questionAlreadyAnswered: true, transitionCount: 12 });
+      const presentation = { displayedQuestionId: 'new:question', submittedButtonPresent: true,
+        submittedButtonDisabled: false, submittedButtonSelected: false, submissionPending: false };
+      const args: Parameters<typeof commitSparcAutoTutorSubmit>[0] = {
+        engine: { commitSparcTrialDisplayAutoTutorRules: async () => { throw error; } } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'],
+        currentDisplay: { pageKey: 'diagnostic', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
+          instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
+          autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A', category: 'rule' }], misconceptions: [] },
+          clusterTargets: [{ clusterKC: 'a', clusterIndex: 0 }],
+          workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'Explain the synthetic lesson.' } },
+            { factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: 1 } }],
+          nodes: [{ id: 'opening-tutor-message', nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'tutor', value: 'Explain A.' }] },
+        tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0, submissionPresentation: presentation,
+        sparcResult: { submittedNodes: { 'learner-response-input': 'SECRET-LEARNER-TEXT' }, triggeredBy: 'old:question:answer:b', timestamp: 1 },
+        scoreLearnerResponse: () => { throw new Error('No scoring expected'); }, generateTutorUtterance: () => { throw new Error('No generation expected'); },
+        deps: { getUserId: () => 'u', getIsAdmin: () => true, reportWarning: warning => {
+          reports.push(warning); if (reportingFails) throw new Error('Diagnostic sink unavailable');
+        } },
+      };
+      await assert.rejects(commitSparcAutoTutorSubmit(args), caught => caught === error);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.deepEqual(reports, [{ code: 'sparc.staleQuestion', tdfId: 'tdf', pageKey: 'diagnostic', diagnostic: error.diagnostic, presentation }]);
+      assert.ok(!JSON.stringify(reports).includes('SECRET-LEARNER-TEXT'));
+      await assert.rejects(commitSparcAutoTutorSubmit({ ...args, engine: {
+        commitSparcTrialDisplayAutoTutorRules: async () => { throw new Error('Unrelated provider error'); },
+      } as unknown as typeof args.engine }), /Unrelated provider error/);
+      assert.equal(reports.length, 1);
+    }
+    clearSparcRuntimeState();
+  });
   it('uses the configured chain or reference anchor policy and resumes its accepted decision without injected candidate options', async () => {
     for (const chain of [false, true]) for (const preceding of ['a', 'd']) {
       clearSparcRuntimeState();

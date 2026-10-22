@@ -727,7 +727,7 @@
     {
       "name": "reportRecoverableWarning",
       "access": "authenticated-self",
-      "notes": "Exact allowlisted citation and advisory output-size diagnostics (including continued content) only; bounded text-free fields, server-owned reporter identity, and existing rate limit. Reads remain admin-only."
+        "notes": "Exact allowlisted citation, advisory output-size, and SPARC stale-question diagnostics only; bounded text-free identifiers and state flags, server-owned reporter identity, and existing rate limit. Reads remain admin-only."
     },
     {
       "name": "requestPasswordReset",

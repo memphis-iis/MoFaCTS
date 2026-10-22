@@ -1,6 +1,6 @@
 import { isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
 import { sparcTargetCategoryFields, sparcQuestionFormatFromAction, isSparcChoiceFormat } from '../../runtime/sparcTargetCategories';
-import { savedSparcQuestions, parseSparcQuestionChoices } from './sparcMultipleChoiceQuestion';
+import { savedSparcQuestions, parseSparcQuestionChoices, SparcStaleQuestionError } from './sparcMultipleChoiceQuestion';
 import { createSparcDynamicInstructionRules } from './sparcDynamicInstructionRules';
 import type {
   SparcTrialDisplay,
@@ -844,8 +844,17 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
         const choices = parseSparcQuestionChoices(question.choices, format === 'true-false' ? 'true-false' : 'multiple-choice');
         const selected = choices.find(choice => triggeredBy === `${String(question.id)}:answer:${choice.id}`);
         if (!selected || params.result.submittedNodes[triggeredBy] !== selected.id) throw new Error('Invalid multiple-choice answer binding');
-        if (!priorResponse && (question !== questions.at(-1) || question.turnEventId !== lastInstruction?.event.eventId
-          || replayState.transitions.some(transition => transition.event.payload?.questionId === question.id))) throw new Error('Stale multiple-choice question');
+        const questionAlreadyAnswered = replayState.transitions.some(transition => transition.event.payload?.questionId === question.id);
+        if (!priorResponse && (question !== questions.at(-1) || question.turnEventId !== lastInstruction?.event.eventId || questionAlreadyAnswered)) {
+          throw new SparcStaleQuestionError({
+            submittedNodeId: triggeredBy,
+            submittedQuestionId: String(question.id), currentQuestionId: String(questions.at(-1)!.id),
+            submittedQuestionTurnEventId: typeof question.turnEventId === 'string' ? question.turnEventId : null,
+            currentCycleEventId: lastInstruction?.event.eventId ?? null,
+            questionIsLatest: question === questions.at(-1), questionMatchesCycle: question.turnEventId === lastInstruction?.event.eventId,
+            questionAlreadyAnswered, transitionCount: replayState.transitions.length,
+          });
+        }
         learnerText = selected.label;
         event = priorResponse ?? { eventId: `${params.pageKey}:response:${lastInstruction!.event.time}`, type: 'response-submitted',
           source: { pageKey: params.pageKey, nodeId: triggeredBy }, time: eventTime,

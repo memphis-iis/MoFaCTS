@@ -883,6 +883,10 @@ Template.registerHelper('themeBootstrapClass', function() {
 Template.registerHelper('isPracticeChrome', function() {
   return getAuthenticatedChromeMode() === 'practice';
 });
+Template.registerHelper('showPracticeToolsMenu', function() {
+  return getAuthenticatedChromeMode() === 'practice'
+    && !Session.get('currentTdfUnit')?.sparcsession;
+});
 Template.registerHelper('showAppFooter', function() {
   if (getAuthenticatedChromeMode() === 'practice') {
     return false;

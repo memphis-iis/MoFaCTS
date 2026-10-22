@@ -625,7 +625,7 @@
     dispatchSparcNodeValues(sparcNodeValues, sparcResult.timestamp);
   }
 
-  async function commitSparcSubmitProductionRules(detail) {
+  async function commitSparcSubmitProductionRules(detail, submissionPresentation) {
     if (subsetKind !== 'question') {
       return { canSubmit: true };
     }
@@ -654,6 +654,7 @@
       let result;
       try {
         result = await commitSparcAutoTutorSubmit({
+          submissionPresentation,
           engine,
           currentDisplay,
           sparcResult,
@@ -714,8 +715,8 @@
     };
   }
 
-  async function handleSparcSubmit(detail) {
-    const { canSubmit, productionRuleSubmit } = await commitSparcSubmitProductionRules(detail);
+  async function handleSparcSubmit(detail, submissionPresentation) {
+    const { canSubmit, productionRuleSubmit } = await commitSparcSubmitProductionRules(detail, submissionPresentation);
     if (!canSubmit) {
       return;
     }
@@ -740,6 +741,18 @@
     if (dialogueSubmitPending) {
       return;
     }
+    // Capture the actual control before the pending state disables/replaces it.
+    const submittedButton = Array.from(surfaceElement?.querySelectorAll('button[data-node-id]') || [])
+      .find(button => button.getAttribute('data-node-id') === detail?.triggeredBy);
+    const displayedQuestion = autoTutorDialogueMessages.flatMap(node => node.children || [node])
+      .filter(node => node.component === 'question' || String(node.id).endsWith(':question')).at(-1);
+    const submissionPresentation = {
+      displayedQuestionId: displayedQuestion?.id || null,
+      submittedButtonPresent: !!submittedButton,
+      submittedButtonDisabled: submittedButton ? submittedButton.disabled : null,
+      submittedButtonSelected: submittedButton?.hasAttribute('aria-pressed') ? submittedButton.getAttribute('aria-pressed') === 'true' : null,
+      submissionPending: dialogueSubmitPending,
+    };
     pendingAutoTutorProgressSnapshot = autoTutorProgressSnapshot;
     dialogueSubmitPending = true;
     dialogueActivity = 'common.loading';
@@ -751,7 +764,7 @@
     );
     clearDialogueInputs();
     try {
-      await handleSparcSubmit(detail);
+      await handleSparcSubmit(detail, submissionPresentation);
     } catch (error) {
       restoreDialogueInputs(submittedInputValues);
       dispatchSparcNodeValues(submittedInputValues, detail?.timestamp);
@@ -1018,9 +1031,10 @@
     >
       <div class="sparc-auto-tutor-content" use:keepHistoryClearOfProgress>
       {#if removalError}<p role="alert">{removalError}</p>{/if}
-      {#each autoTutorDialogueMessages as node (node.id)}
+      {#each autoTutorDialogueMessages as node, index (node.id)}
         <SparcNode
           {node}
+          showDialogueSpeaker={index === 0 || (node.speaker === 'learner') !== (autoTutorDialogueMessages[index - 1].speaker === 'learner')}
           {adminDiagnosticMode}
           {nodeValues}
           {learningProgressSnapshot}
@@ -1042,7 +1056,9 @@
           role="status"
           aria-atomic="true"
         >
-          <div class="sparc-auto-tutor-pending-speaker" aria-hidden="true">Tutor</div>
+          {#if !autoTutorDialogueMessages.length || autoTutorDialogueMessages.at(-1).speaker === 'learner'}
+            <div class="sparc-auto-tutor-pending-speaker" aria-hidden="true">Tutor</div>
+          {/if}
           <div class="sparc-auto-tutor-pending-bubble">
             <span class="sparc-auto-tutor-pending-spinner" aria-hidden="true"></span>
             <span>{platformText(dialogueActivity)}</span>

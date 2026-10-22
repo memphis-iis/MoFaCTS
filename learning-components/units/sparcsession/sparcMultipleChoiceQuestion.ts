@@ -10,6 +10,25 @@ import { applySparcProgressiveNodeOperations, collectSparcProgressiveNodeOperati
 
 export { parseSparcQuestionChoices, type SparcQuestionChoice } from '../../runtime/sparcQuestionChoiceContract';
 
+export type SparcStaleQuestionDiagnostic = Readonly<{
+  submittedNodeId: string;
+  submittedQuestionId: string;
+  currentQuestionId: string | null;
+  submittedQuestionTurnEventId: string | null;
+  currentCycleEventId: string | null;
+  questionIsLatest: boolean;
+  questionMatchesCycle: boolean;
+  questionAlreadyAnswered: boolean;
+  transitionCount: number;
+}>;
+
+export class SparcStaleQuestionError extends Error {
+  constructor(readonly diagnostic: SparcStaleQuestionDiagnostic) {
+    super('Stale multiple-choice question');
+    this.name = 'SparcStaleQuestionError';
+  }
+}
+
 /** Reuse TutorScript's semantic multiple-choice primitive; it owns the standard buttons. */
 export function sparcQuestionAnswerNodes(node: Record<string, unknown>, readOnly: boolean): Record<string, unknown> {
   const choices = parseSparcQuestionChoices(node.choices, sparcQuestionFormatFromAction(node.action) === 'true-false' ? 'true-false' : 'multiple-choice');

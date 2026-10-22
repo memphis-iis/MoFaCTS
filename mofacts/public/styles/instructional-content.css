@@ -975,44 +975,48 @@
     border-top: 0;
   }
 
-  .sparc-production-details {
-    margin-top: var(--app-space-3);
-    max-width: 100%;
-    white-space: normal;
+  .sparc-has-production-marker {
+    position: relative;
+    /* The marker sits in the existing bubble inset, without a metadata row. */
+    padding-inline-end: var(--app-space-3);
   }
 
-  .sparc-production-details summary {
-    width: fit-content;
-    padding: var(--app-space-1) var(--app-space-2);
+  .sparc-production-marker {
+    position: absolute;
+    inset-inline-end: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
     color: var(--app-secondary-text-color);
-    font-size: calc(var(--app-font-size-base) * 0.875);
-    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    cursor: help;
     border-radius: var(--app-border-radius-sm);
   }
 
-  .sparc-production-details summary:focus-visible {
+  .sparc-production-marker:focus-visible {
     outline: calc(var(--app-border-width) * 2) solid var(--app-state-focus-ring-color);
     outline-offset: 2px;
   }
 
   .sparc-production-panel {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(36rem, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    overflow: auto;
     padding: var(--app-space-3);
     background: var(--app-state-disabled-surface-color);
+    color: var(--app-text-color);
+    border: var(--app-border-width) solid var(--app-accent-color);
     border-inline-start: calc(var(--app-border-width) * 2) solid var(--app-accent-color);
     border-radius: var(--app-border-radius-sm);
-  }
-
-  .sparc-production-details[open] .sparc-production-panel {
-    animation: production-panel-reveal var(--app-transition-smooth) ease-out;
-  }
-
-  @keyframes production-panel-reveal {
-    from { opacity: 0; transform: translateY(-0.5rem); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .sparc-production-details[open] .sparc-production-panel { animation: none; }
+    white-space: normal;
   }
 
   .sparc-html-block .oli-definition,
