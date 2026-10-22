@@ -9,6 +9,9 @@ const Module = require('node:module');
 // XState transitions, assessment engine, and player bridge are the real modules.
 const originalLoad = Module._load;
 Module._load = function(request, parent, isMain) {
+  if (request === 'meteor/session') {
+    return { Session: { get: () => undefined } };
+  }
   if (request.endsWith('/clientLogger') || request === './clientLogger') {
     return { clientConsole: () => undefined };
   }
@@ -37,6 +40,7 @@ for (const filename of [
   '../common/fieldRegistrySections.test.ts',
   '../common/lib/deliverySettings.test.ts',
   '../client/lib/deliverySettingsValidator.test.ts',
+  '../client/lib/deliverySettingsResolver.test.ts',
   '../client/lib/instructionLaunchMapping.test.ts',
   '../client/views/experiment/assessmentPreparedInput.test.ts',
 ]) require(path.resolve(__dirname, filename));

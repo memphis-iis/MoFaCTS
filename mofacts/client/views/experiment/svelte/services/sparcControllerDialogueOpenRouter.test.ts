@@ -205,7 +205,7 @@ function utteranceRequestFor(
 
 describe('SPARC dialogue OpenRouter provider', function() {
   it('adds audience directions to every text primitive and leaves scoring prompts unchanged', async () => {
-    for (const readingLevel of [undefined, 'unbiased', 'high-school-freshman', 'college-freshman'] as const) {
+    for (const readingLevel of [undefined, 'unbiased', 'junior-high-freshman', 'high-school-freshman', 'college-freshman'] as const) {
       const generated: string[] = [], scoring: string[] = [];
       const provider = createSparcDialogueOpenRouterProvider({ ...(readingLevel ? { readingLevel } : {}),
         async callResolvedOpenRouterJson(params) {
@@ -224,7 +224,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
       await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition });
       expect(generated).to.have.length(4);
       for (const prompt of generated) {
-        if (readingLevel === 'high-school-freshman') expect(prompt).to.include('a freshman high school student (grade 9)');
+        if (readingLevel === 'junior-high-freshman') expect(prompt).to.include('a junior high freshman (grade 6)');
+        else if (readingLevel === 'high-school-freshman') expect(prompt).to.include('a freshman high school student (grade 9)');
         else if (readingLevel === 'college-freshman') expect(prompt).to.include('a freshman college student (first year)');
         else expect(prompt).not.to.include('For learner-facing text only');
       }

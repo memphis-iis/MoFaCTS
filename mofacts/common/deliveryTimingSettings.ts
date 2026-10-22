@@ -1,7 +1,7 @@
 import { DELIVERY_SETTINGS_DEFAULTS, normalizeDeliverySettingsSource, normalizeDeliverySettingValue } from './fieldRegistry';
 type DeliverySettingsRecord = Record<string, unknown>;
-function isDeliverySettingValue(value: unknown): value is string | number | boolean | undefined {
-  return value === undefined || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+function isDeliverySettingValue(value: unknown): value is string | number | boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 export function selectDeliverySettingsSource(source: unknown, experimentXCond: unknown): unknown {
   if (!Array.isArray(source)) {
@@ -25,6 +25,8 @@ export function pickTimingRuntimeSettings(source: unknown, experimentXCond: unkn
   const result: DeliverySettingsRecord = {};
   for (const key of Object.keys(DELIVERY_SETTINGS_DEFAULTS)) {
     const value = normalizedSource[key];
+    // Missing fields inherit from the enclosing scope; normalizing undefined
+    // would manufacture zero/false/blank overrides and erase those settings.
     if (isDeliverySettingValue(value)) {
       result[key] = normalizeDeliverySettingValue(key, value);
     }

@@ -9,6 +9,7 @@ describe('SPARC text reading level', () => {
     for (const value of [null, '', 'graduate', true, 9]) assert.throws(() => resolveSparcReadingLevel(value), /readingLevel must be/);
   });
   it('targets the requested audience without lowering conceptual requirements', () => {
+    assert.match(sparcReadingLevelInstruction('junior-high-freshman'), /junior high freshman \(grade 6\)/);
     assert.match(sparcReadingLevelInstruction('high-school-freshman'), /grade 9/);
     assert.match(sparcReadingLevelInstruction('college-freshman'), /first year/);
     assert.match(sparcReadingLevelInstruction('high-school-freshman'), /without lowering the learning standard/);

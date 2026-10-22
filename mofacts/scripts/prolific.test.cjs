@@ -194,6 +194,17 @@ describe('participation persistence and session boundaries', () => {
     assert.equal((await f.participation.checkpoint(p.userId)).completionUrl, undefined);
     assert.equal(f.db.participants.rows[0].sessions.length, 1);
   });
+  it('inherits lesson lockouts when a unit only overrides another delivery setting', async () => {
+    const f = fixture(), p = await started(f);
+    await progress(f, p, { currentUnitNumber: 1, lastUnitCompleted: 0 });
+    const tutor = f.Tdfs.rows[0].content.tdfs.tutor;
+    tutor.deliverySettings = [{ lockoutminutes: 5 }, { lockoutminutes: 15 }];
+    tutor.unit[1].deliverySettings = { optimalThreshold: 0.8 };
+    f.states.rows[0].experimentState.experimentXCond = 1;
+    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 15);
+    tutor.unit[1].deliverySettings.lockoutminutes = 0;
+    assert.equal(await f.participation.validateLockout(p.userId, 'root', 1), 0);
+  });
   it('does not count initial pre-work lockouts or mid-unit progress', async () => {
     const f = fixture(), p = await started(f);
     for (const state of [{ currentUnitNumber: 0 }, ...[-1, null, undefined, '', false].map(lastUnitCompleted => ({ currentUnitNumber: 1, lastUnitCompleted }))]) {

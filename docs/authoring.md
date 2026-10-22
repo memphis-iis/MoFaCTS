@@ -38,6 +38,8 @@ MoFaCTS supports multiple stimulus and response formats, including:
 
 ## Authoring Guidance
 
+Delivery settings resolve from runtime defaults, then `tutor.deliverySettings`, then the selected unit's `deliverySettings` (including its selected condition entry). Omitted fields inherit; explicit `0`, `false`, and empty-string values override the enclosing scope. A unit that only sets adaptive controls must retain lesson-wide response and feedback durations.
+
 Trial type and duration control answer feedback. Drill trials (`d`), including video checkpoint questions, use `deliverySettings.correctprompt` after a correct answer and `deliverySettings.reviewstudy` after an incorrect answer or timeout. Durations are in milliseconds; zero skips that outcome's feedback phase. Test trials (`t` and button tests `h`) show no answer feedback even when those durations are positive. Study trials (`s`) display the answer using `purestudy`. There are no separate correct/incorrect feedback visibility switches. History records omit feedback text and type when the trial does not have an answer-feedback phase.
 
 Assessment schedule entries retain their authored input method on initial display, prepared transitions, and resume. A `b` entry uses buttons even for a single-answer introduction; an `f` entry retains typed input.

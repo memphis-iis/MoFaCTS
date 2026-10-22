@@ -40,7 +40,7 @@ describe('Shared instructional primitive library', () => {
     const first = await service.lookup('alice', original);
     if (first.status !== 'generate') throw new Error('Expected generation');
     await service.publish('alice', first.ticket, { text: 'Regular explanation.' });
-    for (const readingLevel of ['high-school-freshman', 'college-freshman'] as const) {
+    for (const readingLevel of ['junior-high-freshman', 'high-school-freshman', 'college-freshman'] as const) {
       const q = query(readingLevel); q.context.readingLevel = readingLevel;
       const found = await service.lookup('bob', q);
       assert.equal(found.status, 'generate');
@@ -54,7 +54,7 @@ describe('Shared instructional primitive library', () => {
     const found = await service.lookup('dave', regular);
     assert.equal(found.status, 'hit');
     if (found.status === 'hit') assert.equal(found.content.text, 'Regular explanation.');
-    assert.equal(f.entries.size, 3, 'Identical wording for different audiences retains separate reading-level identities');
+    assert.equal(f.entries.size, 4, 'Identical wording for different audiences retains separate reading-level identities');
   });
   it('publishes, presents, and retrieves text above advisory size thresholds unchanged', async () => {
     const f = fixture(); const service = f.make(); const q = query();

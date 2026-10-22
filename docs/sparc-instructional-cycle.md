@@ -731,7 +731,8 @@ cache-session ID is not a persistence identity.
 ### Generated text reading level
 
 `unit.sparcsession.readingLevel` offers `unbiased` (the default when omitted),
-`high-school-freshman`, and `college-freshman` in the TDF editor. Unbiased adds no
+`junior-high-freshman` (grade 6), `high-school-freshman` (grade 9), and
+`college-freshman` (first year) in the TDF editor. Unbiased adds no
 audience instruction. The other options add directions for vocabulary, sentence
 structure, and explanations of technical terms to learner-facing text generation:
 feedback, questions and choices, explanations, worked examples, tables, headings,

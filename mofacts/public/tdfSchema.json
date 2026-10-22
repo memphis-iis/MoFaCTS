@@ -2800,10 +2800,11 @@
                       },
                       "readingLevel": {
                         "title": "Audience for generated SPARC text.",
-                        "description": "unbiased leaves text prompts unchanged (also the default when omitted). high-school-freshman and college-freshman guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.",
+                        "description": "unbiased leaves text prompts unchanged (also the default when omitted). junior-high-freshman (grade 6), high-school-freshman (grade 9), and college-freshman (first year) guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.",
                         "type": "string",
                         "enum": [
                           "unbiased",
+                          "junior-high-freshman",
                           "high-school-freshman",
                           "college-freshman"
                         ],
@@ -5141,10 +5142,11 @@
                   },
                   "readingLevel": {
                     "title": "Audience for generated SPARC text.",
-                    "description": "unbiased leaves text prompts unchanged (also the default when omitted). high-school-freshman and college-freshman guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.",
+                    "description": "unbiased leaves text prompts unchanged (also the default when omitted). junior-high-freshman (grade 6), high-school-freshman (grade 9), and college-freshman (first year) guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.",
                     "type": "string",
                     "enum": [
                       "unbiased",
+                      "junior-high-freshman",
                       "high-school-freshman",
                       "college-freshman"
                     ],

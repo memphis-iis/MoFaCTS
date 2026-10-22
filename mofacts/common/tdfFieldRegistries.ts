@@ -526,7 +526,7 @@ export const SPARC_SESSION_FIELD_REGISTRY: SectionFieldRegistry = {
   ...LEARNING_SESSION_FIELD_REGISTRY,
   readingLevel: simpleField(enumStringField([...SPARC_READING_LEVELS], 'unbiased', 12), {
     brief: 'Audience for generated SPARC text.',
-    verbose: 'unbiased leaves text prompts unchanged (also the default when omitted). high-school-freshman and college-freshman guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.'
+    verbose: 'unbiased leaves text prompts unchanged (also the default when omitted). junior-high-freshman (grade 6), high-school-freshman (grade 9), and college-freshman (first year) guide vocabulary and sentence structure in generated learner-facing text without changing concepts, scoring, or assistance.'
   }),
   startingKC: simpleField(stringField('', 12), {
     brief: 'Starting knowledge component.',
