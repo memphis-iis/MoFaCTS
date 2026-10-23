@@ -22,6 +22,16 @@ reaches the server cannot be restored after a browser closes; failed saves must 
 start assessment or present successful acceptance. Unsubmitted drafts are outside
 this contract.
 
+## Content-removal lookup diagnostics
+
+Content-removal receipt lookup failures are retained in the existing recoverable-warning
+log as `sparc.contentRemovalCheckFailed`, with bounded, credential-redacted error name,
+code and message plus the lesson and reference count. Reporter identity and time are
+server-owned; reads remain admin-only. Successful lookups and confirmed removal markers
+are unchanged. Reporting failure preserves the original lookup rejection and logs both
+causes through the admin-controlled client logger. No learner answers, content, stacks,
+or provider payloads are included.
+
 ## Sparse assessment output, October 22, 2026
 
 The evaluator returns entries only for selected targets supported or contradicted by
@@ -138,6 +148,15 @@ policy for admins and non-admins. Categorized policies remain admin-only. Displa
 resolution and submission share the same access check without substituting a policy.
 Retired and unknown identifiers fail explicitly. Upload and runtime use the same
 supported-policy contract and `sparc-autotutor-v1` adapter, at policy version 1.
+
+Assessment receives the same retained demonstrated/unresolved requirement lists used
+to guide question generation in `priorEvidence`. It reassesses that existing KC
+requirement decomposition, carries earlier demonstrations forward, and combines them
+with newly resolved requirements when calculating cumulative coverage. A later answer
+need not repeat earlier demonstrations; absence alone cannot make them unresolved again.
+The evaluator infers a decomposition only when none exists yet, rather than inventing
+a new set on each turn. This changes assessment instructions, without a new scoring
+pass, question validator, TDF field, or history migration.
 
 Assessment infers the authored requirements elicited by the actual question and credits
 the meaning demonstrated by a correct contextual answer, respecting response format.
@@ -875,6 +894,11 @@ all-components view. Sanitized
 Markdown inspection, revision, and deletion apply to text components. Revision
 updates the current item in place without retaining an older catalog copy. Image
 components provide raster inspection, revision and deletion within the same grouped browser. There are no separate image/content libraries or tabs.
+
+Library thumbnails and expanded inspections display each saved component independently
+through the shared learner renderer. They do not apply learner sequence-readiness
+gates: a saved question or support remains visible without its sibling explanation.
+Preview controls remain read-only and cannot submit learner responses.
 
 `SparcInstructionalLibrary` owns the single server-only `sparc_instructional_library`
 collection. The figure and primitive storage modules are typed adapters to this one

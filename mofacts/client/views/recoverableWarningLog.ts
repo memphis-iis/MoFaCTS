@@ -41,7 +41,7 @@ Template.recoverableWarningLog.helpers({
     return translatePlatformString(getActiveUiLocale(), key);
   },
   warningMessage(warning: RecoverableWarning) {
-    if (warning.code === 'sparc.staleQuestion') return JSON.stringify(warning);
+    if (warning.code === 'sparc.staleQuestion' || warning.code === 'sparc.contentRemovalCheckFailed') return JSON.stringify(warning);
     if (warning.code === 'autotutor.outputLimit') {
       return translatePlatformString(getActiveUiLocale(), 'adminTests.warningOutputLimit', {
         operation: warning.operation, field: warning.field, size: warning.observedSize,

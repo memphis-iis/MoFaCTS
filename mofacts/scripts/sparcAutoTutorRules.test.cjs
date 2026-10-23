@@ -45,15 +45,17 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   const Module = require('node:module');
   const { JSDOM } = require('jsdom');
   const originalLoad = Module._load;
+  // Match module identity: injected method transports must be shared by all importers.
+  const meteorModule = { Meteor: { Error: class MeteorError extends Error {
+    constructor(code, reason) { super(reason); this.error = code; this.reason = reason; }
+  }, callAsync: () => { throw new Error('Unexpected live Meteor call in isolated contracts'); } } };
   const dom = new JSDOM('');
   global.document = dom.window.document;
   global.window = dom.window;
   global.HTMLElement = dom.window.HTMLElement;
   global.MutationObserver = dom.window.MutationObserver;
   Module._load = function(request, parent, isMain) {
-    if (request === 'meteor/meteor') return { Meteor: { Error: class MeteorError extends Error {
-      constructor(code, reason) { super(reason); this.error = code; this.reason = reason; }
-    }, callAsync: () => { throw new Error('Unexpected live Meteor call in isolated contracts'); } } };
+    if (request === 'meteor/meteor') return meteorModule;
     if (request === 'meteor/tracker') return { Tracker: {} };
     if (request === 'meteor/session') return { Session: { get: () => undefined } };
     if (request === 'meteor/check') return { check: () => {} };
@@ -64,6 +66,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     if (process.argv.includes('--include-client-contracts')) {
       require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
       require('../client/views/experiment/svelte/services/sparcOutputDiagnostics.test.ts');
+      require('../client/views/experiment/svelte/services/sparcMoveLibraryClient.test.ts');
       require('../client/views/experiment/svelte/services/sparcCompoundInterestLiveEvaluation.test.ts');
     }
     require('../client/views/experiment/svelte/services/sparcAutoTutorRuleCommit.test.ts');

@@ -8,6 +8,7 @@ import {
   type RecoverableWarningPage,
 } from '../../common/recoverableWarnings';
 import { requireAuthenticatedUser } from '../lib/methodAuthorization';
+import { redactSparcDialogueDiagnosticText } from '../../common/lib/sparcDiagnosticText';
 
 type RecordValue = Record<string, unknown>;
 type Context = { userId?: string | null };
@@ -44,6 +45,15 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
         attempts: Match.OneOf(1, 2),
         outcome: Match.OneOf('continued', 'regenerated', 'retry-needed', 'failed'),
       }, {
+        code: 'sparc.contentRemovalCheckFailed',
+        tdfId: Match.OneOf(null, identifier),
+        referenceCount: Match.Where((value: unknown) => Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 100),
+        error: {
+          name: Match.Where((value: unknown) => typeof value === 'string' && value.length <= 80),
+          code: Match.Where((value: unknown) => typeof value === 'string' && value.length <= 80),
+          message: Match.Where((value: unknown) => typeof value === 'string' && value.length <= 800),
+        },
+      }, {
         code: 'sparc.staleQuestion',
         tdfId: Match.OneOf(null, identifier),
         pageKey: questionIdentifier,
@@ -75,7 +85,9 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
         targetUserId: null,
         // This is a client-reported diagnostic, not a server-verified scoring result.
         origin: 'client',
-        details: { ...warning },
+        details: warning.code === 'sparc.contentRemovalCheckFailed'
+          ? { ...warning, error: Object.fromEntries(Object.entries(warning.error).map(([key, value]) => [key, redactSparcDialogueDiagnosticText(value).slice(0, key === 'message' ? 800 : 80)])) }
+          : { ...warning },
         createdAt: new Date(),
       });
       return true;

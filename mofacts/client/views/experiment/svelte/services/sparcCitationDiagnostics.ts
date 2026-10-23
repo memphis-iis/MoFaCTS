@@ -1,3 +1,5 @@
+import { redactSparcDialogueDiagnosticText } from '../../../../../common/lib/sparcDiagnosticText';
+
 // Keep source alignment separate from the text retained in browser diagnostics.
 // Match locations are observations only: never use them to repair a citation.
 export function summarizeSparcCitation(
@@ -47,15 +49,6 @@ export function summarizeSparcCitation(
     matchingTutorCount,
     quoteMatchesLatest: matches(learnerText),
   };
-}
-
-export function redactSparcDialogueDiagnosticText(text: string): string {
-  return text
-    .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
-    .replace(/\b(?:mongodb(?:\+srv)?|postgres(?:ql)?):\/\/\S+/gi, '[redacted connection string]')
-    .replace(/\bAIza[0-9A-Za-z_-]{20,}\b/g, '[redacted API key]')
-    .replace(/\bsk-(?:or-v1-)?[0-9A-Za-z_-]{16,}\b/g, '[redacted API key]')
-    .replace(/sk-or-v1-[A-Za-z0-9_-]+/g, '[redacted OpenRouter key]');
 }
 
 export function describeSparcCitation(

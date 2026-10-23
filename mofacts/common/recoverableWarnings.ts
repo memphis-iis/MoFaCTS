@@ -19,6 +19,13 @@ export type SparcStaleQuestionWarning = Readonly<{
 export const RECOVERABLE_WARNING_ACTION = 'system.recoverableWarning';
 export const RECOVERABLE_WARNING_PAGE_SIZE = 50;
 
+export type SparcContentRemovalCheckWarning = Readonly<{
+  code: 'sparc.contentRemovalCheckFailed';
+  tdfId: string | null;
+  referenceCount: number;
+  error: { name: string; code: string; message: string };
+}>;
+
 export type SparcOutputLimitWarning = Readonly<{
   code: 'autotutor.outputLimit';
   tdfId: string | null;
@@ -35,7 +42,7 @@ export type RecoverableWarning = Readonly<{
   code: 'autotutor.citationMismatch';
   tdfId: string | null;
   mismatchCount: number;
-}> | SparcOutputLimitWarning | SparcStaleQuestionWarning;
+}> | SparcOutputLimitWarning | SparcStaleQuestionWarning | SparcContentRemovalCheckWarning;
 
 export type RecoverableWarningCursor = Readonly<{ createdAt: Date; id: string }>;
 export type RecoverableWarningRow = Readonly<{

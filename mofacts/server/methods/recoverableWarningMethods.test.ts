@@ -22,6 +22,26 @@ async function rejected(operation: () => Promise<unknown>) {
 }
 
 describe('recoverable warning log methods', function() {
+  it('stores bounded removal-check errors with server redaction and rejects extra fields', async function() {
+    const { methods, writes } = fixture();
+    const connection = new URL('mongodb://host/db');
+    connection.username = 'synthetic-user';
+    connection.password = 'synthetic-password';
+    const report = { code: 'sparc.contentRemovalCheckFailed' as const, tdfId: 'lesson', referenceCount: 3,
+      error: { name: 'Error', code: '503', message: `Unavailable ${connection}` } };
+    await methods.reportRecoverableWarning.call({ userId: 'learner' }, report);
+    expect(writes[0]!.details).to.deep.equal({ ...report,
+      error: { ...report.error, message: 'Unavailable [redacted connection string]' } });
+    for (const bad of [
+      { ...report, referenceCount: 101 },
+      { ...report, error: { ...report.error, message: 'x'.repeat(801) } },
+      { ...report, error: { ...report.error, stack: 'Private payload' } },
+      { ...report, learnerText: 'Private answer' },
+      { ...report, actorUserId: 'another' },
+    ]) await rejected(() => methods.reportRecoverableWarning.call({ userId: 'learner' }, bad as RecoverableWarning));
+    await rejected(() => methods.reportRecoverableWarning.call({}, report));
+    expect(writes).to.have.length(1);
+  });
   it('persists bounded stale-question flags and rejects extra content or forged identity', async function() {
     const { methods, writes } = fixture();
     const stale = { code: 'sparc.staleQuestion' as const, tdfId: 'tdf-demo', pageKey: 'page',

@@ -36,7 +36,7 @@
   import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
   import { translatePlatformString } from '../../../../lib/interfaceI18n';
   import { clientConsole } from '../../../../lib/clientLogger';
-  import { redactSparcDialogueDiagnosticText } from '../services/sparcCitationDiagnostics';
+  import { redactSparcDialogueDiagnosticText } from '../../../../../common/lib/sparcDiagnosticText';
   import { createSparcDialogueScroll } from '../services/sparcDialogueScroll';
   import { resolveSparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
 
@@ -133,7 +133,7 @@
     try {
       const removed = [];
       for (let offset = 0; offset < unchecked.length; offset += 100) {
-        removed.push(...await readSparcAdministrativeRemovals(unchecked.slice(offset, offset + 100)));
+        removed.push(...await readSparcAdministrativeRemovals(unchecked.slice(offset, offset + 100), tdfId));
       }
       if (!mounted || removalSignature !== signature) return;
       removedContentIds = new Set([...removedContentIds, ...removed]);

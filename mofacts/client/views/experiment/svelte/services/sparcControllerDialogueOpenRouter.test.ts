@@ -226,6 +226,46 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(result).not.to.have.property('evidence');
   });
 
+  it('passes the same retained KC requirements to question generation and cumulative reassessment', async function() {
+    const prior = { kind: 'expectation' as const, id: 'kc-a',
+      demonstrated: ['Giving method instructions before work differs from requesting an explanation afterward.'],
+      unresolved: ['Use domain knowledge to choose the workflow.'] };
+    const learnerText = 'Check archive records first, then compare captions.';
+    let generatedEvidence: unknown;
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+      const input = JSON.parse(String(params.messages[1]!.content));
+      if (params.intent.schemaName.includes('question_primitive')) {
+        generatedEvidence = input.assessment.evidence;
+        return { parsedContent: { tutorMessage: 'Which research method uses the curator’s source expertise?', choices: [
+          { id: 'a', label: learnerText, correct: true },
+          { id: 'b', label: 'Use the newest caption.', correct: false },
+          { id: 'c', label: 'Explain any chosen approach afterward.', correct: false },
+        ] } };
+      }
+      expect(input.priorEvidence.map(({ citations: _citations, ...requirements }: Record<string, unknown>) => requirements)).to.deep.equal(generatedEvidence);
+      expect(input.priorEvidence).to.deep.equal([{ ...prior, citations: [] }]);
+      const instructions = String(params.messages[0]!.content);
+      expect(instructions).to.include('evaluate which exact unresolved requirements the answer now demonstrates');
+      expect(instructions).to.include('do not invent a different decomposition or extra requirements on each turn');
+      expect(instructions).to.include('including carried earlier demonstrations and newly resolved requirements');
+      return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 1,
+        learnerEvidence: latestLearnerEvidence(learnerText),
+        summary: { demonstrated: [...prior.demonstrated, ...prior.unresolved], unresolved: [] } }],
+      diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' } } };
+    } });
+    const action = 'instruction.dynamic.question.multiple-choice';
+    await provider.generateTutorUtterance({ ...utteranceRequest, action, moveDefinition: requireActiveSparcMoveDefinition(action),
+      plannerState: { evidence: [prior] } });
+    const context = scorerContext();
+    const result = await provider.scoreLearnerResponse({ ...context, display: dialogueDisplay(), learnerText,
+      document: { ...context.document, workingMemoryFacts: [...context.document.workingMemoryFacts,
+        { factType: 'instructional.evidence', factId: 'expectation:kc-a', slots: { ...prior, incorrect: [], citations: [] } }] },
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(result.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 1 }]);
+    expect(result.evidence![0]!.demonstrated).to.deep.equal([...prior.demonstrated, ...prior.unresolved]);
+    expect(result.evidence![0]!.unresolved).to.deep.equal([]);
+  });
+
   it('rejects incorrect-claim fields in KC summaries instead of retaining them as KC evidence', async function() {
     const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson() {
       return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: .5,

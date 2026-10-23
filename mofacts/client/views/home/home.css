@@ -439,9 +439,8 @@
 
 .app-practice-menu {
     --practice-menu-width: calc(280px * var(--app-density-scale));
-    --practice-menu-anchor-y: 66.6667%;
     position: fixed;
-    top: var(--practice-menu-anchor-y);
+    top: var(--practice-menu-anchor-y, 66.6667%);
     left: 0;
     z-index: 15;
     transform: translate(calc(-1 * var(--practice-menu-width)), -50%);
@@ -456,11 +455,9 @@
 
 .app-practice-menu-toggle {
     order: 2;
-    width: auto;
-    min-width: 0;
-    min-height: 0;
-    height: auto;
-    padding: 0;
+    width: calc(23px * var(--app-density-scale));
+    min-width: calc(23px * var(--app-density-scale));
+    height: calc(104px * var(--app-density-scale));
     display: inline-flex;
     align-items: center;
     justify-content: center;

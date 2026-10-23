@@ -4,6 +4,28 @@ const { it } = require('node:test');
 const assert = require('node:assert/strict');
 const { sparcLibraryPreviewNode } = require('../client/views/experimentSetup/sparc/sparcLibraryPreview.ts');
 const { sparcQuestionAnswerNodes } = require('../../learning-components/units/sparcsession/sparcMultipleChoiceQuestion.ts');
+const { SPARC_CATEGORIZED_MOVE_DEFINITIONS } = require('../../learning-components/units/sparcsession/sparcMoveDefinitions.ts');
+
+it('previews every categorized component independently of its missing sequence siblings', () => {
+  for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
+    for (const kind of definition.components) {
+      const entry = { id: 'independent1', kind, move: definition.moveId, content: { text: `Saved ${kind}` } };
+      const before = JSON.stringify(entry);
+      for (const scope of ['inspection', 'thumbnail']) {
+        const preview = sparcLibraryPreviewNode(entry, scope);
+        assert.ok(preview, `${definition.moveId}: ${kind} ${scope} must be visible`);
+        assert.equal(preview.children.length, 1);
+        const component = preview.children[0];
+        assert.equal(component.id, `library:${scope}:${entry.id}:${kind}`);
+        assert.equal(component.component, kind);
+        assert.equal(component.action, entry.move);
+        assert.equal(component.value, entry.content.text);
+        assert.equal(component.readOnly, true);
+      }
+      assert.equal(JSON.stringify(entry), before);
+    }
+  }
+});
 
 it('projects saved categorized support with the learner heading, figure and durable display width intact', () => {
   const entry = { id: 'support1', kind: 'richContent', move: 'instruction.dynamic.explanation-rich-question.text',

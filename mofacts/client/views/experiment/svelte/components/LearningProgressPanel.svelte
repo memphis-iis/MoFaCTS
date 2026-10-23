@@ -21,6 +21,25 @@
     setOpen(!open);
   }
 
+  // The practice menu lives in the app shell, so share this tab's viewport center.
+  function alignPracticeMenu(node) {
+    const root = document.documentElement;
+    const align = () => {
+      const bounds = node.getBoundingClientRect();
+      root.style.setProperty('--practice-menu-anchor-y', `${bounds.top + bounds.height / 2}px`);
+    };
+    const observer = new ResizeObserver(align);
+    observer.observe(node);
+    observer.observe(node.parentElement.parentElement);
+    window.addEventListener('resize', align);
+    align();
+    return { destroy() {
+      observer.disconnect();
+      window.removeEventListener('resize', align);
+      root.style.removeProperty('--practice-menu-anchor-y');
+    } };
+  }
+
   function handleKeydown(event) {
     if (event.key === 'Escape' && open) {
       setOpen(false);
@@ -49,6 +68,7 @@
     class:learning-progress-toggle-open={open}
     aria-controls="learning-progress-panel"
     aria-expanded={open}
+    use:alignPracticeMenu
     on:click={handleToggle}
   >
     <span class="learning-progress-toggle-icon" aria-hidden="true"></span>
