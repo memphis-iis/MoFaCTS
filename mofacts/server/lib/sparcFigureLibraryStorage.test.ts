@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { createSparcFigureLibraryStore, SparcFigureLibrary, SparcFigureRequests } from './sparcFigureLibraryStorage';
 import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { SPARC_PROMPT_IMAGE_SETTINGS } from '../../common/lib/sparcPromptImage';
+import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 
 // Run only in the supported isolated Meteor/Mongo test environment, never by the pure runner.
 describe('SPARC figure library Mongo contracts', function() {
@@ -9,7 +10,7 @@ describe('SPARC figure library Mongo contracts', function() {
     await SparcFigureLibrary.removeAsync({ _id: /^test-library-/ });
     await SparcFigureRequests.removeAsync({ _id: /^test-library-/ });
   });
-  it('serializes overlapping generation work with owner-specific Mongo leases', async function() {
+  it('serializes administrative maintenance with owner-specific Mongo leases', async function() {
     const store = createSparcFigureLibraryStore(); let active = 0; let maximum = 0;
     const work = () => store.withLock(async () => {
       active++; maximum = Math.max(maximum, active);
@@ -23,12 +24,11 @@ describe('SPARC figure library Mongo contracts', function() {
     const store = createSparcFigureLibraryStore();
     const entry = { _id: 'test-library-ready', version: SPARC_FIGURE_LIBRARY_SETTINGS.version,
       imageModel: SPARC_PROMPT_IMAGE_SETTINGS.model, embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel,
-      dimensions: 2, situation: 'Synthetic situation', embedding: [1, 0], ready: true, createdAt: new Date() };
+      dimensions: 2, situation: 'Synthetic situation', embedding: [1, 0], embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION, ready: true, createdAt: new Date() };
     await store.saveEntry(entry);
     await store.saveEntry({ ...entry, _id: 'test-library-pending', ready: false });
-    const candidates = await store.candidates({ ...entry, afterId: '' });
-    assert.ok(candidates.some(candidate => candidate._id === entry._id));
-    assert.ok(!candidates.some(candidate => candidate._id === 'test-library-pending'));
+    assert.ok(await store.findVisual(entry._id, 'en'));
+    assert.equal(await store.findVisual('test-library-pending', 'en'), undefined);
     const decision = { _id: 'test-library-decision', kind: 'decision' as const, userId: 'synthetic-admin',
       tdfId: 'synthetic-lesson', sessionId: 'synthetic-session', assetId: entry._id,
       source: 'semantic' as const, similarity: 1, createdAt: new Date() };

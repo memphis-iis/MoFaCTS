@@ -16,6 +16,20 @@ const disabledRedisBoundary = {
 };
 
 describe('dashboardCacheMethods', function() {
+  it('counts one assessed dialogue response across sparse checkpoints and bundled turns', function() {
+    const event = { eventId: 'answer-1', type: 'response-submitted' };
+    const rows = ['submission', 'assessment:score:kc', 'assessment:evidence:kc', 'assessment', 'decision', 'feedback', 'primitive:richContent', 'primitive:explanation', 'primitive:question', 'cycle']
+      .map((stage, index) => ({ _id: String(index), levelUnitType: 'sparc', time: 1000,
+        sparc: { stateTransition: { transitionId: `${event.eventId}:${stage}`, event } } }));
+    const reduce = (records: typeof rows) => records.reduce((stats, row) => applyDashboardHistoryRecordToStats(stats, row, 'Lesson', () => 0), undefined as ReturnType<typeof computeCacheStats> | undefined);
+    expect(computeCacheStats(rows, 'Lesson', () => 0).totalTrials).to.equal(1);
+    expect(reduce(rows)?.totalTrials).to.equal(1);
+    expect(reduce(rows.filter(row => !row.sparc.stateTransition.transitionId.includes(':assessment:')))?.totalTrials).to.equal(1);
+    const bundled = { ...rows[0]!, sparc: { stateTransition: { transitionId: 'answer-2:dialogue-turn', event: { eventId: 'answer-2', type: 'response-submitted' } } } };
+    expect(computeCacheStats([...rows, bundled], 'Lesson', () => 0).totalTrials).to.equal(2);
+    expect(computeCacheStats([{ ...bundled, sparc: { stateTransition: { ...bundled.sparc.stateTransition, event: { eventId: 'answer-2', type: 'document-loaded' } } } }], 'Lesson', () => 0).totalTrials).to.equal(0);
+  });
+
   it('computeCacheStats calculates aggregate metrics', function() {
     const history = [
       {
@@ -122,7 +136,7 @@ describe('dashboardCacheMethods', function() {
         findOneAsync: async () => {
           queryCounts.cacheFindOne++;
           return ({
-          userId,
+          userId, version: DASHBOARD_CACHE_VERSION, lastUpdated: new Date(),
           tdfStats: {
             tdfA: {
               displayName: 'Lesson A',
@@ -216,7 +230,7 @@ describe('dashboardCacheMethods', function() {
       tdfsFind: 2,
       usersFindOne: 1,
       usersFind: 1,
-      cacheFindOne: 1,
+      cacheFindOne: 2,
       sectionUserMapFind: 1,
       sectionsFind: 0,
       assignmentsFind: 0
@@ -274,7 +288,7 @@ describe('dashboardCacheMethods', function() {
         SectionUserMap: { find: () => ({ fetchAsync: async () => [] }) },
         UserDashboardCache: {
           findOneAsync: async () => ({
-            userId,
+            userId, version: DASHBOARD_CACHE_VERSION, lastUpdated: new Date(),
             tdfStats: {},
             learnerTdfConfigs: {}
           })
@@ -422,7 +436,7 @@ describe('dashboardCacheMethods', function() {
       UserDashboardCache: {
         findOneAsync: async () => {
           queryCounts.cacheFindOne++;
-          return { userId, tdfStats: {}, learnerTdfConfigs: {} };
+          return { userId, version: DASHBOARD_CACHE_VERSION, lastUpdated: new Date(), tdfStats: {}, learnerTdfConfigs: {} };
         }
       },
       usersCollection: {
@@ -478,7 +492,7 @@ describe('dashboardCacheMethods', function() {
     expect(queryCounts).to.deep.equal({
       tdfsFind: 2,
       usersFindOne: 1,
-      cacheFindOne: 1,
+      cacheFindOne: 2,
       dynamicSettingsFindOne: 1
     });
   });
@@ -746,111 +760,6 @@ describe('dashboardCacheMethods', function() {
     expect(usageSummary.averageItemsPracticed).to.equal(6);
     expect(usageSummary.practicedSystemCount).to.equal(2);
     expect(new Date(usageSummary.lastActivityDate!).toISOString()).to.equal('2026-02-13T00:00:00.000Z');
-  });
-
-  it('applyDashboardHistoryRecord incrementally updates stats without reading history and preserves learner TDF configs', async function() {
-    const userId = 'learner-1';
-    let cacheDoc: any = {
-      userId,
-      version: DASHBOARD_CACHE_VERSION,
-      tdfStats: {},
-      learnerTdfConfigs: {
-        tdfA: {
-          source: { tdfId: 'tdfA', unitCount: 0, unitSignature: [] },
-          overrides: { setspec: { audioPromptMode: 'feedback' } }
-        }
-      }
-    };
-    let lastModifier: any = null;
-    const lockKeys: string[] = [];
-    let historyFindCount = 0;
-
-    const methods = createDashboardCacheMethods({
-      Meteor: {
-        Error: class MeteorError extends Error {
-          error: string;
-          constructor(error: string, reason?: string) {
-            super(reason || error);
-            this.error = error;
-          }
-        }
-      },
-      Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        find: () => {
-          historyFindCount++;
-          return { fetchAsync: async () => [] };
-        },
-        rawCollection: () => ({ distinct: async () => [] })
-      },
-      Tdfs: {
-        findOneAsync: async (selector: any) => {
-          if (selector._id === 'tdfA') {
-            return {
-              _id: 'tdfA',
-              content: {
-                fileName: 'tdf-a.json',
-                tdfs: { tutor: { setspec: { lessonname: 'Lesson A' } } }
-              }
-            };
-          }
-          return null;
-        },
-        find: () => ({ fetchAsync: async () => [] })
-      },
-      UserDashboardCache: {
-        findOneAsync: async () => cacheDoc,
-        upsertAsync: async (_selector: any, modifier: any) => {
-          lastModifier = modifier;
-          cacheDoc = {
-            ...cacheDoc,
-            ...(modifier.$set || {})
-          };
-        }
-      },
-      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
-      DynamicSettings: { findOneAsync: async () => null },
-      serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true,
-      getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
-      redisBoundary: {
-        enabled: true,
-        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
-          lockKeys.push(key);
-          return await work();
-        }
-      }
-    });
-
-    const result = await methods.applyDashboardHistoryRecord.call({ userId }, {
-      _id: 'h1',
-      userId,
-      TDFId: 'tdfA',
-      outcome: 'correct',
-      CFEndLatency: 1000,
-      CFFeedbackLatency: 500,
-      stimuliSetId: 'set-a',
-      stimulusKC: 'stim-a',
-      clusterKC: 'cluster-a',
-      recordedServerTime: new Date('2026-05-01T00:00:00.000Z'),
-      levelUnitType: 'model'
-    });
-
-    expect(result.success).to.equal(true);
-    expect(result.action).to.equal('updated');
-    expect(historyFindCount).to.equal(0);
-    expect(lockKeys).to.deep.equal(['dashboard-cache:increment:learner-1']);
-    expect(lastModifier.$set).to.not.have.property('learnerTdfConfigs');
-    expect(cacheDoc.learnerTdfConfigs.tdfA.overrides.setspec.audioPromptMode).to.equal('feedback');
-    expect(cacheDoc.tdfStats.tdfA).to.include({
-      totalTrials: 1,
-      correctTrials: 1,
-      totalTimeMs: 1500,
-      itemsPracticedCount: 1,
-      totalSessions: 1,
-      lastProcessedHistoryId: 'h1'
-    });
   });
 
   it('incremental history application preserves distinct item and session-day aggregates', function() {

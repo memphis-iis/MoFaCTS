@@ -7,7 +7,6 @@ import { invalidateSparcFigureBrowse } from './sparcFigureBrowseStorage';
 type Removal = { _id: string; removedAt: Date; removeAsset?: true; cleanupKind?: string };
 /** IDs only, not an archive: distinguishes deliberate deletion from corruption or storage failure. */
 export const SparcInstructionalRemovals = new Mongo.Collection<Removal>(collectionMongoName('SparcInstructionalRemovals'));
-const mongoManifestCollection = () => MongoInternals.defaultRemoteCollectionDriver().mongo.db.collection(collectionMongoName('SparcMoveManifests'));
 export const isSparcAdministrativeRemoval = async (id: string) => Boolean(await SparcInstructionalRemovals.findOneAsync(id, { fields: { _id: 1 } }));
 export async function readSparcAdministrativeRemovals(ids: string[]) {
   return (await SparcInstructionalRemovals.find({ _id: { $in: ids } }, { fields: { _id: 1 }, limit: 100 }).fetchAsync()).map(row => row._id);
@@ -20,8 +19,6 @@ export async function deleteSparcInstructionalEntries(ids: string[], session: Cl
     filter: { _id }, update: { $setOnInsert: { removedAt: new Date() } }, upsert: true,
   } })), { session });
   await SparcInstructionalLibrary.rawCollection().deleteMany({ _id: { $in: ids } }, { session });
-  // Manifests are shared retrieval metadata, not learner history or accepted decisions.
-  await mongoManifestCollection().deleteMany({ entries: { $in: ids } }, { session });
 }
 
 export function createSparcLibraryCuration(removeAsset: (id: string) => Promise<void>) {
@@ -80,7 +77,6 @@ export function createSparcLibraryCuration(removeAsset: (id: string) => Promise<
       await raw.createIndex({ 'content.video.segmentId': 1, _id: 1 });
       await SparcInstructionalRemovals.rawCollection().createIndex({ cleanupKind: 1, _id: 1 });
       await SparcInstructionalRemovals.rawCollection().createIndex({ removeAsset: 1, _id: 1 });
-      await mongoManifestCollection().createIndex({ entries: 1 });
       for (;;) {
         const pending = await SparcInstructionalRemovals.find({ cleanupKind: { $exists: true } }, { limit: 100 }).fetchAsync();
         for (const receipt of pending) await remove(receipt._id);

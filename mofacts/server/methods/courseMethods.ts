@@ -439,10 +439,6 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     return await getCourseSnapshotCache().invalidateCourseSnapshotsForAssignment(assignmentId, reason);
   }
 
-  async function refreshCourseSnapshotAfterPractice(userId: string, TDFId: string) {
-    return await getCourseSnapshotCache().refreshCourseSnapshotAfterPractice(userId, TDFId);
-  }
-
   async function fetchNormalizedAssignmentSummaries(courseId: string) {
     const rows = await deps.Assignments.find(
       { courseId },
@@ -1600,7 +1596,6 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     invalidateCourseSnapshotForUser,
     invalidateCourseSnapshotsForCourse,
     invalidateCourseSnapshotsForAssignment,
-    refreshCourseSnapshotAfterPractice,
     getTdfsAssignedToStudent,
     getTdfNamesAssignedByInstructor,
     getTdfIdsByOwnerId,

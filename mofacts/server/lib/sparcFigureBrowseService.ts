@@ -72,7 +72,8 @@ export async function getSparcFigureBrowseOverview(deps: SparcFigureBrowseDeps):
       }
     };
     const vectorFor = (row: BrowseSource) => {
-      if (row.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION && !(row.kind === 'video' && row.embeddingVersion === SPARC_VIDEO_EMBEDDING_VERSION)) throw new Error('Instructional library embeddings require reindexing');
+      // Visual rich-content records reuse their selected video's transcript vector.
+      if (row.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION && !(['video', 'richContent'].includes(row.kind) && row.embeddingVersion === SPARC_VIDEO_EMBEDDING_VERSION)) throw new Error('Instructional library embeddings require reindexing');
       const vector = normalizeSparcFigureEmbedding(row.embedding);
       if (vector.length !== row.dimensions) throw new Error('Invalid stored figure embedding dimensions');
       return vector;

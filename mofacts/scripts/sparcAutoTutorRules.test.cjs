@@ -26,6 +26,7 @@ require('../common/lib/sparcFigureClustering.test.ts');
 // Meteor-dependent KC-chain integration is discovered by server-test-entry.js.
 require('../../learning-components/runtime/sparcInstructionalNeed.test.ts');
 require('../../learning-components/runtime/sparcReadingLevel.test.ts');
+require('../../learning-components/runtime/sparcEmbeddingIndex.test.ts');
 require('../server/lib/sparcInstructionalEmbeddingMigration.test.ts');
 require('../server/lib/sparcFigureBrowseService.test.ts');
 require('../server/lib/sparcHistoryBatchStorage.test.ts');
@@ -57,6 +58,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   Module._load = function(request, parent, isMain) {
     if (request === 'meteor/meteor') return meteorModule;
     if (request === 'meteor/tracker') return { Tracker: {} };
+    if (request === 'meteor/mongo') return { Mongo: {} };
     if (request === 'meteor/session') return { Session: { get: () => undefined } };
     if (request === 'meteor/check') return { check: () => {} };
     if (request === 'meteor/random') return { Random: { secret: () => require('node:crypto').randomBytes(32).toString('hex') } };
@@ -65,6 +67,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   try {
     if (process.argv.includes('--include-client-contracts')) {
       require('../client/views/experiment/svelte/services/sparcControllerDialogueOpenRouter.test.ts');
+      require('../client/views/experiment/svelte/services/sparcLocalRetrieval.test.ts');
       require('../client/views/experiment/svelte/services/sparcOutputDiagnostics.test.ts');
       require('../client/views/experiment/svelte/services/sparcMoveLibraryClient.test.ts');
       require('../client/views/experiment/svelte/services/sparcCompoundInterestLiveEvaluation.test.ts');

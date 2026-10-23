@@ -20,9 +20,8 @@ describe('SPARC video resolved from the selected visual-support move', () => {
       let resolutions = 0;
       const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'biology', sessionId: 'provider-session',
         moveLibrary: {
-          async lookup(query) { return { status: 'generate', ticket: query.context.kind, previousQuestions: [] }; },
-          async publish(ticket, content) { return { accepted: true, content, reference: { entryId: ticket, version: 'sparc-moves-v1', source: 'generated', similarity: null } }; },
-          async present() {},
+          async lookup(query) { return { status: 'generate', ticket: { query, embedding: [] }, previousQuestions: [] }; },
+          async publish(ticket, content) { return { accepted: true, content, reference: { entryId: ticket.query.context.kind, version: 'sparc-moves-v1', source: 'generated', similarity: null } }; },
         },
         async callResolvedOpenRouterJson(params) {
           calls++;

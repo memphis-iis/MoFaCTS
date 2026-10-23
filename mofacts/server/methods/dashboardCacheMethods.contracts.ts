@@ -25,6 +25,7 @@ export interface DashboardHistoryRecord {
   levelUnit?: number | string | null;
   sessionID?: string | null;
   CFNote?: string | null;
+  sparc?: { stateTransition?: { transitionId?: string; event?: { eventId?: string; type?: string } } };
 }
 
 export interface DashboardTdfStats {

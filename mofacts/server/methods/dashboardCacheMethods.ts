@@ -37,6 +37,9 @@ const DASHBOARD_HISTORY_FIELDS = {
   userId: 1,
   levelUnitType: 1,
   modelEvidenceSource: 1,
+  'sparc.stateTransition.transitionId': 1,
+  'sparc.stateTransition.event.eventId': 1,
+  'sparc.stateTransition.event.type': 1,
 };
 
 type DashboardCacheDeps = {
@@ -82,7 +85,15 @@ function isAutoTutorRecord(record: DashboardHistoryRecord): boolean {
 }
 
 function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): boolean {
-  return !isAssessmentHistoryCopy(record);
+  if (isAssessmentHistoryCopy(record)) return false;
+  const transition = record.sparc?.stateTransition;
+  // Non-dialogue SPARC trial records retain their existing trial semantics.
+  if (record.levelUnitType !== 'sparc' || !transition) return true;
+  const event = transition.event;
+  return event?.type === 'response-submitted' && typeof event.eventId === 'string'
+    && (transition.transitionId === `${event.eventId}:assessment`
+      || transition.transitionId === `${event.eventId}:dialogue-turn`);
+
 }
 
 function resolveDashboardModelStimulusKey(record: DashboardHistoryRecord): string | null {
@@ -500,7 +511,10 @@ export function createDashboardCacheMethods({
   });
 
   const methods = {
-    ...practiceSnapshotMethods,
+    async getPracticeDashboardSnapshot(this: any) {
+      await methods.ensureDashboardCacheCurrent.call(this);
+      return practiceSnapshotMethods.getPracticeDashboardSnapshot.call(this);
+    },
     ...learnerConfigMethods,
 
     initializeDashboardCache: async function(this: any, userId: string | null = null) {
@@ -726,87 +740,6 @@ export function createDashboardCacheMethods({
             action: 'current',
             tdfCount: cacheTdfCount
           };
-        }
-      );
-    },
-
-    applyDashboardHistoryRecord: async function(this: any, historyRecord: DashboardHistoryRecord) {
-      const userId = this.userId;
-      if (!userId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in');
-      }
-      if (historyRecord.userId !== userId) {
-        throw new Meteor.Error('not-authorized', 'Dashboard history must belong to the current user');
-      }
-      const TDFId = normalizeOptionalId(historyRecord.TDFId);
-      if (!TDFId) {
-        throw new Meteor.Error('invalid-args', 'Dashboard history requires a TDFId');
-      }
-      if (!shouldCountDashboardHistoryRecord(historyRecord)) {
-        return { success: true, action: 'ignored', newRecords: 0 };
-      }
-
-      const family = await lessonFamilies.resolveLessonFamilyForTdf(TDFId, {
-        _id: 1,
-        'content.fileName': 1,
-        'content.tdfs.tutor.setspec.lessonname': 1,
-        'content.tdfs.tutor.setspec.condition': 1,
-        'content.tdfs.tutor.setspec.conditionTdfIds': 1,
-      });
-      if (!family) {
-        return { success: false, error: 'TDF not found' };
-      }
-
-      const parentRoot = family.roots.find((root: any) => String(root?._id || '') !== TDFId);
-      const targetTdf = parentRoot || family.target;
-      const targetTdfId = String(targetTdf?._id || TDFId);
-      const displayName = targetTdf?.content?.tdfs?.tutor?.setspec?.lessonname
-        || family.target?.content?.tdfs?.tutor?.setspec?.lessonname
-        || 'Unnamed';
-
-      return await redisBoundary.withLock(
-        `dashboard-cache:increment:${userId}`,
-        120000,
-        async () => {
-          let cache = await UserDashboardCache.findOneAsync({ userId });
-          if (!cache || cache.version !== DASHBOARD_CACHE_VERSION) {
-            const rebuilt = await methods.initializeDashboardCache.call(this);
-            return { success: true, action: 'rebuilt', newRecords: rebuilt.tdfCount };
-          }
-
-          const currentStats = cache.tdfStats?.[targetTdfId] as DashboardTdfStats | undefined;
-          if (historyRecord._id && currentStats?.lastProcessedHistoryId === historyRecord._id) {
-            return { success: true, action: 'duplicate', newRecords: 0 };
-          }
-          const stats = applyDashboardHistoryRecordToStats(
-            currentStats,
-            historyRecord,
-            displayName,
-            computePracticeTimeMs
-          );
-          const updatedTdfStats = {
-            ...(cache.tdfStats || {}),
-            [targetTdfId]: stats
-          };
-
-          await UserDashboardCache.upsertAsync(
-            { userId },
-            {
-              $set: {
-                userId,
-                tdfStats: updatedTdfStats,
-                summary: computeSummaryStats(updatedTdfStats),
-                usageSummary: computeUsageSummary(updatedTdfStats),
-                lastUpdated: new Date(),
-                version: DASHBOARD_CACHE_VERSION
-              },
-              $setOnInsert: {
-                createdAt: new Date()
-              }
-            }
-          );
-
-          return { success: true, action: 'updated', newRecords: 1 };
         }
       );
     },

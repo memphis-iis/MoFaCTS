@@ -4,9 +4,7 @@ import { collectionMongoName } from '../../common/collectionOwnership';
 import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
 import { invalidateSparcFigureBrowse } from './sparcFigureBrowseStorage';
 import { withSparcFigureLibraryLock } from './sparcFigureLibraryStorage';
-import { selectSparcLibraryVideo } from './sparcVideoLibraryService';
-import { SPARC_EMBEDDING_MODEL } from '../../common/lib/sparcEmbeddingModel';
-import { parseSparcVideoSegment, SPARC_VIDEO_EMBEDDING_VERSION, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { parseSparcVideoSegment, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import { searchSparcVideo, fetchSparcVideoCaptions } from './sparcVideoProviders';
 import { createSparcVideoCatalog, type VideoSource, type VideoTargetState, type VideoCatalogStore } from './sparcVideoCatalogService';
 import { isSparcAdministrativeRemoval, readSparcAdministrativeRemovals } from './sparcLibraryCurationStorage';
@@ -38,15 +36,6 @@ export function createMongoSparcVideoCatalog(deps: Pick<Parameters<typeof create
     wait: ms => new Promise(resolve => setTimeout(resolve, ms)) });
 }
 
-/** Video retrieval owns selection; the text model never receives a catalog-ID menu. */
-export async function findSparcLibraryVideo(vector: number[], language: string, minimumSimilarity: number) {
-  return selectSparcLibraryVideo({ vector, language, minimumSimilarity, page: async after =>
-    await SparcInstructionalLibrary.find({ kind: 'video', embeddingVersion: SPARC_VIDEO_EMBEDDING_VERSION,
-      embeddingModel: SPARC_EMBEDDING_MODEL, 'content.video.language': language, _id: { $gt: after } },
-      { fields: { _id: 1, embedding: 1, 'content.video': 1 }, sort: { _id: 1 }, limit: 100 }).fetchAsync()
-      .then(rows => rows.map(row => ({ _id: row._id, embedding: row.embedding,
-        content: { video: parseSparcVideoSegment('content' in row ? row.content.video : null) } }))) });
-}
 /** One indexed batch per candidate page; deliberately removed sources cannot be selected. */
 export async function sparcVideoReuseStatus(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>> {
   for (const video of videos) parseSparcVideoSegment(video);

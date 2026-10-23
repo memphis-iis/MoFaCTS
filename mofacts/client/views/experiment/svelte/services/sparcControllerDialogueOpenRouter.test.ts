@@ -399,12 +399,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
           reference: { entryId: `saved-${query.context.kind}`, version: 'sparc-moves-v1', source: 'retrieved', similarity: .99 } };
         },
         async publish() { throw new Error('Retrieved content must not be republished'); },
-        async present(query, _reference, nodeId) {
-          expect(query.sessionId).to.equal('canonical-history-session');
-          expect(nodeId).to.equal(`event:${query.context.kind}`);
-          expect(order.at(-1)).to.equal(`persist:${query.context.kind}`);
-          order.push(`present:${query.context.kind}`);
-        },
       },
     });
     const result = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
@@ -412,7 +406,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       onInstructionComponent: async kind => { order.push(`persist:${kind}`); } }) as SparcInstructionComponents;
     expect(result.question).to.equal('Saved question');
     expect(result.figure?.assetId).to.equal('image123');
-    expect(order).to.deep.equal(['richContent', 'explanation', 'question'].flatMap(kind => [`lookup:${kind}`, `persist:${kind}`, `present:${kind}`]));
+    expect(order).to.deep.equal(['richContent', 'explanation', 'question'].flatMap(kind => [`lookup:${kind}`, `persist:${kind}`]));
   });
 
   it('orients a starting explanation to the selected KC without inventing an opening answer or feedback', async function() {
@@ -682,6 +676,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
         } };
       },
     });
+    await provider.prepareAssessment({ ...dialogueDisplay(), autoTutorTargets: targets });
+    expect(embeddings).to.equal(1);
     for (let i = 0; i < 2; i++) {
       const score = await provider.scoreLearnerResponse({ display: { ...dialogueDisplay(), autoTutorTargets: targets }, learnerText: 'Okay.', ...context,
       } as Parameters<typeof provider.scoreLearnerResponse>[0]);

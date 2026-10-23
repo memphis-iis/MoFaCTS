@@ -1,4 +1,3 @@
-import { moveExposuresFromHistory } from '../lib/sparcMoveExposureProjection';
 import { isSparcAdminPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { worksheetHistoryWriteId, sameWorksheetWrite } from '../lib/worksheetHistoryWrite';
 import { sparcHistoryWriteId } from '../lib/sparcHistoryWrite';
@@ -93,7 +92,6 @@ type AnalyticsMethodsDeps = {
   ) => Promise<unknown>;
   getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
-  onHistoryInserted?: (context: MethodContext, historyRecord: UnknownRecord) => Promise<void>;
   insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string })[]) => Promise<readonly UnknownRecord[]>;
 };
 
@@ -731,14 +729,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!deps.insertSparcHistoryBatch) throw new Error('Atomic SPARC assessment history storage is not configured');
     const inserted = await deps.insertSparcHistoryBatch(prepared);
     for (const row of inserted) await recordStimulusCrowdOutcome(deps.StimulusCrowdStats, row);
-    if (inserted.length && deps.onHistoryInserted) {
-      try { await deps.onHistoryInserted(context, inserted[inserted.length - 1]!); }
-      catch (error) {
-        deps.serverConsole('[insertHistory] Dashboard cache update failed after assessment batch', {
-          ...historyDiagnosticMetadata(inserted[inserted.length - 1]!), errorType: error instanceof Error ? error.name : typeof error,
-        });
-      }
-    }
+
   }
 
   async function insertHistory(this: MethodContext, historyRecord: UnknownRecord | UnknownRecord[]) {
@@ -756,11 +747,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const worksheetId = worksheetHistoryWriteId(sanitizedHistoryRecord);
     const sparcId = sparcHistoryWriteId(sanitizedHistoryRecord);
     const durableId = worksheetId ?? sparcId;
-    if (sparcId && moveExposuresFromHistory(sanitizedHistoryRecord).length) {
-      if (!deps.insertSparcHistoryBatch) throw new Error('Atomic SPARC history storage is not configured');
-      const inserted = await deps.insertSparcHistoryBatch([{ ...sanitizedHistoryRecord, _id: sparcId }]);
-      if (!inserted.length) return;
-    } else if (durableId) {
+    if (durableId) {
       Object.assign(sanitizedHistoryRecord, { _id: durableId });
       try {
         await deps.Histories.insertAsync(sanitizedHistoryRecord);
@@ -779,16 +766,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const crowdStatsStartTime = Date.now();
     await recordStimulusCrowdOutcome(deps.StimulusCrowdStats, sanitizedHistoryRecord);
     const crowdStatsMs = elapsedMsSince(crowdStatsStartTime);
-    if (deps.onHistoryInserted) {
-      try {
-        await deps.onHistoryInserted(this, sanitizedHistoryRecord);
-      } catch (error) {
-        deps.serverConsole('[insertHistory] Dashboard cache update failed after history insert', {
-          ...historyDiagnosticMetadata(sanitizedHistoryRecord),
-          errorType: error instanceof Error ? error.name : typeof error,
-        });
-      }
-    }
 
     if (INSERT_HISTORY_TIMING_ENABLED) {
       deps.serverConsole('[insertHistory timing]', {

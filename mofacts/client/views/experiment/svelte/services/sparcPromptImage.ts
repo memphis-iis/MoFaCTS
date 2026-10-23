@@ -4,6 +4,7 @@ import type { OpenRouterUsageSummary } from '../../../../lib/openRouterClient';
 import type { SparcInstructionalNeed } from '../../../../../../learning-components/runtime/sparcInstructionalNeed';
 import type { SparcSavedImage } from '../../../../../../learning-components/runtime/sparcAdministrativeRemoval';
 import type { SparcVideoSegment } from '../../../../../../learning-components/runtime/sparcVideo';
+import { SPARC_VISUAL_MINIMUM_SIMILARITY } from '../../../../../common/lib/sparcRetrieval';
 
 export type CallSparcPromptImage = (params: {
   tdfId: string; sessionId: string; generationId: string;
@@ -23,7 +24,19 @@ function call(name: string, value: unknown): Promise<unknown> {
   return meteor.callAsync(name, value);
 }
 export const callSparcPromptImage: CallSparcPromptImage = params => call('generateSparcPromptImage', params) as ReturnType<CallSparcPromptImage>;
-export const callSparcVisualSupport: CallSparcVisualSupport = params => call('resolveSparcVisualSupport', params) as ReturnType<CallSparcVisualSupport>;
+export const callSparcVisualSupport: CallSparcVisualSupport = async params => {
+  const [{ embedSparcTexts }, { prepareSparcLocalRetrieval }, { sparcInstructionalNeedText }, { Session }] = await Promise.all([
+    import('./sparcLocalEmbeddings'), import('./sparcLocalRetrieval'),
+    import('../../../../../../learning-components/runtime/sparcInstructionalNeed'), import('meteor/session'),
+  ]);
+  const language = Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage ?? '';
+  let embeddingUsage: OpenRouterUsageSummary | undefined;
+  const [embedding] = await embedSparcTexts(params.tdfId, [sparcInstructionalNeedText(params.situation)], usage => { embeddingUsage = usage; });
+  const index = await prepareSparcLocalRetrieval({ kind: 'visual', language });
+  const selection = index.maximum(embedding!, SPARC_VISUAL_MINIMUM_SIMILARITY);
+  const result = await call('resolveSparcVisualSupport', { ...params, embedding, selection, language }) as Awaited<ReturnType<CallSparcVisualSupport>>;
+  return { ...result, ...(embeddingUsage ? { embeddingUsage } : {}) };
+};
 export const readSparcPromptImage: ReadSparcPromptImage = async assetId => {
   const result = await call('getSparcPromptImage', assetId) as { dataUrl?: unknown; administrativeRemoval?: unknown };
   if (result?.administrativeRemoval === true && result.dataUrl === undefined) return { administrativeRemoval: true };

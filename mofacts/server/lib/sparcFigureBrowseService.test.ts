@@ -1,3 +1,4 @@
+import { SPARC_VIDEO_EMBEDDING_VERSION } from '../../../learning-components/runtime/sparcVideo';
 import { SPARC_INSTRUCTIONAL_NEED_VERSION } from '../../../learning-components/runtime/sparcInstructionalNeed';
 import { strict as assert } from 'node:assert';
 import { getSparcFigureBrowseOverview, parseSparcClusterLabels, type BrowseMember, type BrowseSnapshot,
@@ -41,6 +42,12 @@ export function figureBrowseRows(n: number): BrowseSource[] {
     dimensions: 2, embedding: i % 2 ? [.005 * (i % 7), 1] : [1, .005 * (i % 7)], targetTexts: ['Generalized conceptual understanding.'] }));
 }
 describe('SPARC cached semantic figure browsing', () => {
+  it('browses visual component records with the selected video transcript vector', async () => {
+    const f = figureBrowseFixture([{ ...figureBrowseRows(1)[0]!, kind: 'richContent', embeddingVersion: SPARC_VIDEO_EMBEDDING_VERSION }]);
+    const snapshot = await getSparcFigureBrowseOverview(f.deps);
+    assert.equal(snapshot.total, 1);
+    assert.equal(f.members.length, 1);
+  });
   it('rebuilds outdated grouping and preserves a singleton topic in a five-figure library', async () => {
     const vectors = [[1, 0, 0], [1, .01, 0], [0, 1, 0], [.01, 1, 0], [0, 0, 1]];
     const rows = figureBrowseRows(5).map((row, i) => ({ ...row, dimensions: 3, embedding: vectors[i]! }));

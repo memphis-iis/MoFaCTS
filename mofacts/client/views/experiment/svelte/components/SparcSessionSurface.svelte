@@ -1,5 +1,7 @@
 <script>
   import { sparcMoveLibraryClient, readSparcAdministrativeRemovals } from "../services/sparcMoveLibraryClient";
+  import { prepareSparcPracticeRetrieval } from '../services/sparcLocalRetrieval';
+  import { Session } from 'meteor/session';
   import { sparcContentReferenceIds, projectSparcAdministrativeRemovals } from '../../../../../../learning-components/runtime/sparcAdministrativeRemoval';
   import { createEventDispatcher, onMount, tick } from 'svelte';
   import {
@@ -157,6 +159,8 @@
     try {
       const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: reportDialogueActivity, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
+      await Promise.all([provider.prepareAssessment(currentDisplay), prepareSparcPracticeRetrieval(resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel),
+        Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage ?? '')]);
       const result = await commitSparcAutoTutorDocumentLoad({ engine, currentDisplay, tdfId, userId, attemptId, levelUnit,
         scoreLearnerResponse: provider.scoreLearnerResponse, generateTutorUtterance: provider.generateTutorUtterance,
         onNodeValues: async values => {
@@ -1119,6 +1123,12 @@
       <p class="sparc-auto-tutor-submit-error" role="alert">
         {dialogueSubmitError}
       </p>
+      {#if categorizedDialogue && !dialogueInitialized}
+        <button type="button" class="btn btn-primary" disabled={dialogueSubmitPending}
+          on:click={() => startCategorizedDialogue(sparcDisplay, dialogueScope)}>
+          {platformText('common.tryAgain')}
+        </button>
+      {/if}
       {#if dialogueSubmitErrorDetail}
         <p class="sparc-auto-tutor-submit-error-detail">
           <span>Technical detail:</span>

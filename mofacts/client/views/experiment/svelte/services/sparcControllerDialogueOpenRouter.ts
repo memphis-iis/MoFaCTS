@@ -45,12 +45,13 @@ import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-compone
 import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
 import { callWithSparcOutputDiagnostics } from './sparcOutputDiagnostics';
 import { clientConsole } from '../../../../lib/clientLogger';
+import { embedSparcTexts } from './sparcLocalEmbeddings';
 import type { RecoverableWarning } from '../../../../../common/recoverableWarnings';
 import { describeSparcCitation } from './sparcCitationDiagnostics';
 import { resolveSparcReadingLevel, sparcReadingLevelInstruction, type SparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
 
 const instructionTextBudget = 'Write concise, complete instructional text. Preserve the selected target, requested teaching action, and necessary reasoning.';
-const assessmentTargetVectors = new Map<string, Promise<number[][]>>();
+const assessmentTargetVectors = new Map<string, number[][]>();
 
 export type CallResolvedOpenRouterJson = (params: {
   readonly tdfId?: string | null;
@@ -590,6 +591,7 @@ function defaultCallResolvedOpenRouterJson(params: Parameters<CallResolvedOpenRo
 export function createSparcDialogueOpenRouterProvider(
   options: SparcDialogueOpenRouterProviderOptions,
 ): {
+  readonly prepareAssessment: (display: SparcControllerDisplay) => Promise<void>;
   readonly scoreLearnerResponse: SparcTrialDisplayDialogueTurnScorer;
   readonly generateTutorUtterance: SparcUtteranceGenerator;
 } {
@@ -599,14 +601,22 @@ export function createSparcDialogueOpenRouterProvider(
   // Providers are constructed per turn. Share at most four authored target sets
   // across those instances, scoped to account, lesson, embedding model, and text.
   // Injected providers have isolated caches. No learner text or evidence is embedded.
-  const vectorCache = options.embedAssessmentTargets ? new Map<string, Promise<number[][]>>() : assessmentTargetVectors;
-  const embedAssessmentTargets = options.embedAssessmentTargets ?? (async (input: string[]) => {
-    const result = await Meteor.callAsync('callResolvedOpenRouterEmbeddings', {
-      tdfId: options.tdfId, model: SPARC_EMBEDDING_MODEL, input,
-      telemetry: { surface: 'sparc-dialogue', operation: 'assessment-target-relationships' },
-    });
-    return result.embeddings as number[][];
-  });
+  const vectorCache = options.embedAssessmentTargets ? new Map<string, number[][]>() : assessmentTargetVectors;
+  const embedAssessmentTargets = options.embedAssessmentTargets ?? ((input: string[]) => embedSparcTexts(options.tdfId, input));
+  const assessmentVectors = async (display: SparcControllerDisplay): Promise<number[][]> => {
+    const texts = [...targetSummaries(display), ...misconceptionSummaries(display)].map(target => String(target.text));
+    const key = JSON.stringify([options.embedAssessmentTargets ? 'injected' : Meteor.userId(), options.tdfId, SPARC_EMBEDDING_MODEL, texts]);
+    if (!vectorCache.has(key)) {
+      const loaded = await embedAssessmentTargets(texts);
+      if (loaded.length !== texts.length) throw new Error('Assessment embedding count does not match authored targets');
+      if (vectorCache.size >= 4) vectorCache.delete(vectorCache.keys().next().value!);
+      vectorCache.set(key, loaded.map(vector => normalizeEmbeddingVector(vector)));
+    }
+    return vectorCache.get(key)!;
+  };
+  const prepareAssessment = async (display: SparcControllerDisplay): Promise<void> => {
+    if (misconceptionSummaries(display).length > 4) await assessmentVectors(display);
+  };
   const callGeneratedJson = (request: Parameters<CallResolvedOpenRouterJson>[0], operation: Parameters<typeof callWithSparcOutputDiagnostics>[0]['operation']) =>
     callWithSparcOutputDiagnostics({ request, operation, call: callResolvedOpenRouterJson,
       reportWarning: options.reportWarning ?? reportRecoverableWarning,
@@ -696,7 +706,7 @@ export function createSparcDialogueOpenRouterProvider(
       const visual = request.moveDefinition.supportKind === 'visual';
       const written = request.moveDefinition.supportKind === 'written';
       const output = await realize(visual ? 'visual' : 'rich', [
-        visual ? 'The selected move requires visual support. Return a reusable, medium-independent visual brief in imagePrompt: describe what the learner needs to see, including the objects, labels, relationships or process. The library will search videos, then images, then generate an image from this brief. Do not choose a resource, invent a resource ID, or require video-only features. Return only imagePrompt, figureDescription, and displayWidth; the latter two describe the intended visual and its image presentation.'
+        visual ? 'The selected move requires visual support. Return a reusable, medium-independent visual brief in imagePrompt: describe what the learner needs to see, including the objects, labels, relationships or process. One local similarity search selects the best video or image; if none meets the visual threshold, an image is generated from this brief. Do not choose a resource, invent a resource ID, or require video-only features. Return only imagePrompt, figureDescription, and displayWidth; the latter two describe the intended visual and its image presentation.'
           : categorized ? 'Choose worked-example, comparison, or table to serve the learning-process focuses supplied by the assigned KLI category. Supply Markdown content in workedExample (use a GFM table for tabular comparisons) and a short heading naming its instructional form. Worked examples use exactly Worked Example; comparisons use Comparison. Other headings name the form, not the topic. Use null for the figure fields.' : 'Choose worked-example or figure based on pedagogical appropriateness. Prefer figures for models and worked examples for principles; either can teach conceptual reasoning.',
         ...(categorized ? ['The support teaches only the selected KC through its category learning-process focuses; do not complete a larger domain procedure or calculate extra outcomes belonging to other KCs to make the example seem complete.'] : []),
         ...(!visual ? ['For worked-example, supply a complete worked case in workedExample and use null for all figure fields. Include givens, reasoning, result, and a formula when useful. The heading is rendered separately: do not repeat it inside workedExample content.'] : []),
@@ -816,18 +826,7 @@ export function createSparcDialogueOpenRouterProvider(
       const anchor = sparcInstructionalAnchor(runtimeFacts);
       const anchorIndex = allTargets.findIndex(target => target.clusterKC === anchor);
       if (anchorIndex < 0) throw new Error('Misconception assessment requires the current KC');
-      const texts = [...allTargets, ...misconceptions].map(target => String(target.text));
-      const key = JSON.stringify([options.embedAssessmentTargets ? 'injected' : Meteor.userId(), options.tdfId, SPARC_EMBEDDING_MODEL, texts]);
-      if (!vectorCache.has(key)) {
-        const promise = embedAssessmentTargets(texts).then(vectors => {
-          if (vectors.length !== texts.length) throw new Error('Assessment embedding count does not match authored targets');
-          return vectors.map(vector => normalizeEmbeddingVector(vector));
-        });
-        if (vectorCache.size >= 4) vectorCache.delete(vectorCache.keys().next().value!);
-        vectorCache.set(key, promise);
-        void promise.catch(() => { if (vectorCache.get(key) === promise) vectorCache.delete(key); });
-      }
-      const vectors = await vectorCache.get(key)!;
+      const vectors = await assessmentVectors(display);
       const active = runtimeFacts.filter(f => f.factType === 'instructional.activeCycle' && f.slots?.targetKind === 'misconception'
         && f.slots?.status === 'active').at(-1)?.slots?.targetId;
       misconceptions = misconceptions.map((target, index) => ({ target, strength: cosineSimilarityScore({
@@ -944,6 +943,7 @@ export function createSparcDialogueOpenRouterProvider(
     return evaluation;
   };
   return {
+    prepareAssessment,
     async scoreLearnerResponse(params) {
       options.onActivity?.('assessment');
       const evaluation = await scoreLearnerResponseWithEvidence(params);

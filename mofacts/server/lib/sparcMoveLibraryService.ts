@@ -1,46 +1,32 @@
-import { parseSparcVideoSegment, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { parseSparcVideoSegment, SPARC_VIDEO_EMBEDDING_VERSION, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import { resolveSparcReadingLevel } from '../../../learning-components/runtime/sparcReadingLevel';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 import { parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
-import { normalizeSparcFigureEmbedding, sparcFigureCosineSimilarity } from '../../common/lib/sparcFigureLibrary';
+import type { SparcRetrievalSelection } from '../../common/lib/sparcRetrieval';
 import { parseSparcQuestionChoices } from '../../../learning-components/runtime/sparcQuestionChoiceContract';
 import { isSparcChoiceFormat, validateSparcClozeQuestion, SPARC_QUESTION_RESPONSE_FORMATS } from '../../../learning-components/runtime/sparcTargetCategories';
 import { SPARC_MOVE_LIBRARY_VERSION, stableMoveJson, type SparcPrimitiveContent,
-  type SparcPrimitiveContext, type SparcPrimitiveLookup, type SparcPrimitiveQuery, type SparcPrimitiveReference } from '../../../learning-components/runtime/sparcMoveLibraryContract';
+  type SparcPrimitiveTicket, type SparcPrimitiveContext, type SparcPrimitiveLookup, type SparcPrimitiveQuery, type SparcPrimitiveReference } from '../../../learning-components/runtime/sparcMoveLibraryContract';
 import { SPARC_INSTRUCTIONAL_NEED_VERSION, SPARC_LIBRARY_SIMILARITY, sparcInstructionalNeedText } from '../../../learning-components/runtime/sparcInstructionalNeed';
 
 export const moveDigest = (value: unknown) => createHash('sha256').update(stableMoveJson(value)).digest('hex');
-export type QuestionEmbedding = { model: string; text: string; vector: number[] };
 export type MoveEntry = {
   _id: string; version: string; context: SparcPrimitiveContext; kind: string; embeddingModel: string;
-  embedding: number[]; questionEmbedding?: QuestionEmbedding; content: SparcPrimitiveContent;
+  embedding: number[]; content: SparcPrimitiveContent;
   embeddingVersion?: string;
   createdAt: Date; requirements: string; move: string; target: string;
 };
 export type MoveRequest = { _id: string; userId: string; query: SparcPrimitiveQuery; embedding: number[];
   embeddingVersion?: string;
-  lockKey: string; leaseToken: string; entryId?: string; source?: 'retrieved' | 'generated'; similarity?: number | null };
-export type MoveCandidate = Pick<MoveEntry, '_id' | 'version' | 'kind' | 'embeddingModel' | 'embeddingVersion' | 'embedding'> & {
-  context: Pick<SparcPrimitiveContext, 'responseFormat' | 'readingLevel'>;
-  content?: Pick<SparcPrimitiveContent, 'video' | 'figure'>;
-};
-export type MoveExposure = { _id: string; userId: string; tdfId: string; eventId: string; sessionId: string; kind: string;
-  nodeId: string; entryId: string; content: SparcPrimitiveContent; questionEmbedding?: QuestionEmbedding; priorNodeId?: string };
+  entryId?: string; source?: 'retrieved' | 'generated'; similarity?: number | null };
 export interface MoveStore {
   request(id: string): Promise<MoveRequest | undefined>;
   saveRequest(value: MoveRequest): Promise<MoveRequest>;
   entry(id: string): Promise<MoveEntry | undefined>;
   saveEntry(entry: MoveEntry): Promise<void>;
-  candidates(kind: string, embeddingModel: string, after: string): Promise<MoveCandidate[]>;
-  exposures(userId: string, tdfId: string): Promise<MoveExposure[]>;
-  reservedQuestions(userId: string, tdfId: string): Promise<MoveExposure[]>;
-  expose(value: MoveExposure): Promise<void>;
-  acquire(key: string, token: string): Promise<boolean>;
-  release(key: string, token: string): Promise<void>;
   list(kind?: string, after?: string): Promise<MoveEntry[]>;
   removed(id: string): Promise<boolean>;
-  saveQuestionEmbedding(id: string, embedding: QuestionEmbedding, location: 'entry' | 'exposure'): Promise<void>;
   revise(entry: MoveEntry): Promise<void>;
 }
 
@@ -65,69 +51,20 @@ export function validatePrimitiveContent(value: SparcPrimitiveContent, context: 
   return value;
 }
 
-export function createMoveLibraryService(deps: { store: MoveStore; embeddingModel: string; minimumSimilarity?: number; questionNovelty?: number;
-  embed(text: string, query: SparcPrimitiveQuery): Promise<number[]>; verifyFigure?(assetId: string): Promise<void>;
+export function createMoveLibraryService(deps: { store: MoveStore; embeddingModel: string;
+  verifyFigure?(assetId: string): Promise<void>;
   videoReuseStatus?(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>>;
-  figureReusable?(assetId: string): Promise<boolean>;
-  wait?(ms: number): Promise<void>; timing?(stage: string, ms: number, count?: number): void }) {
+}) {
   const { store } = deps;
-  const wait = deps.wait ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
-  const withQuestionLock = async <T>(userId: string, query: SparcPrimitiveQuery, work: () => Promise<T>): Promise<T> => {
-    if (query.context.kind !== 'question') return work();
-    const key = moveDigest(['question-reservation', userId, query.tdfId]), token = randomBytes(16).toString('hex');
-    const start = Date.now();
-    while (!await store.acquire(key, token)) {
-      if (Date.now() - start >= 120000) throw new Error('Another question is being accepted for this learner. Resume this saved move shortly.');
-      await wait(500);
-    }
-    exposures.delete(moveDigest([userId, query.tdfId]));
-    try { return await work(); } finally { await store.release(key, token); }
-  };
-  const exposures = new Map<string, Promise<MoveExposure[]>>();
-  const priorFor = (userId: string, tdfId: string) => {
-    const key = moveDigest([userId, tdfId]);
-    if (!exposures.has(key)) exposures.set(key, Promise.all([store.exposures(userId, tdfId), store.reservedQuestions(userId, tdfId)])
-      .then(([shown, reserved]) => [...new Map([...reserved, ...shown].map(e => [e._id, e])).values()]));
-    return exposures.get(key)!;
-  };
-  const vectors = new Map<string, Promise<number[]>>();
-  const embed = (text: string, query: SparcPrimitiveQuery) => {
-    if (!vectors.has(text)) vectors.set(text, (async () => {
-      const start = Date.now(); const vector = normalizeSparcFigureEmbedding(await deps.embed(text, query));
-      deps.timing?.('embedding', Date.now() - start); return vector;
-    })());
-    return vectors.get(text)!;
-  };
-  const minimumSimilarity = deps.minimumSimilarity ?? SPARC_LIBRARY_SIMILARITY.minimumSimilarity;
-  const questionNovelty = deps.questionNovelty ?? SPARC_LIBRARY_SIMILARITY.questionNovelty;
-  if ([minimumSimilarity, questionNovelty].some(value => !Number.isFinite(value) || value < 0 || value > 1)) throw new Error('Move minimum cosine similarity must be between 0 and 1');
-  // The cache identifies its actual input and embedding model. Unidentified derived
-  // vectors are recomputed; historical content and accepted decisions never change.
-  const questionVector = async (item: { _id: string; content: SparcPrimitiveContent; questionEmbedding?: QuestionEmbedding }, query: SparcPrimitiveQuery, location: 'entry' | 'exposure') => {
-    if (item.questionEmbedding?.model !== deps.embeddingModel || item.questionEmbedding.text !== item.content.text) {
-      item.questionEmbedding = { model: deps.embeddingModel, text: item.content.text, vector: await embed(item.content.text, query) };
-      await store.saveQuestionEmbedding(item._id, item.questionEmbedding, location);
-    }
-    return item.questionEmbedding.vector;
-  };
   const reference = (request: MoveRequest): SparcPrimitiveReference => ({ entryId: request.entryId!, version: SPARC_MOVE_LIBRARY_VERSION,
     source: request.source!, similarity: request.similarity ?? null });
   const assignedContent = (request: MoveRequest, content: SparcPrimitiveContent): SparcPrimitiveContent => {
     if (!content.choices) return content;
-    if (request.query.context.responseFormat === 'true-false') {
-      return { ...content, choices: parseSparcQuestionChoices(content.choices, 'true-false') };
-    }
-    // Assignment-specific hash ranks randomize display order while retries, including
-    // an interrupted first history write, reproduce the same IDs/labels/answer key.
-    // The shared catalog retains its authored order; history records the assigned list.
-    const choices = parseSparcQuestionChoices(content.choices)
-      .map(choice => ({ choice, rank: moveDigest([request._id, choice.id]) }))
-      .sort((left, right) => left.rank.localeCompare(right.rank) || left.choice.id.localeCompare(right.choice.id))
-      .map(({ choice }) => choice);
-    return { ...content, choices };
+    if (request.query.context.responseFormat === 'true-false') return { ...content, choices: parseSparcQuestionChoices(content.choices, 'true-false') };
+    return { ...content, choices: parseSparcQuestionChoices(content.choices).map(choice => ({ choice, rank: moveDigest([request._id, choice.id]) }))
+      .sort((a, b) => a.rank.localeCompare(b.rank) || a.choice.id.localeCompare(b.choice.id)).map(({ choice }) => choice) };
   };
   const acceptedContent = async (request: MoveRequest): Promise<SparcPrimitiveContent> => {
-    if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true };
     const entry = await store.entry(request.entryId!);
     if (!entry) {
       if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true };
@@ -135,174 +72,90 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
     }
     return assignedContent(request, entry.content);
   };
-  const existing = async (request: MoveRequest): Promise<SparcPrimitiveLookup> => {
-    if (!request.entryId) return { status: 'generate', ticket: request._id,
-      previousQuestions: [...new Map([...request.query.previousQuestions, ...(await priorFor(request.userId, request.query.tdfId)).filter(e => e.kind === 'question').map(e => e.content)].map(q => [q.text, q])).values()] };
-    const content = await acceptedContent(request);
-    if (content.administrativeRemoval) return { status: 'hit', content, reference: reference(request) };
-    const prior = (await priorFor(request.userId, request.query.tdfId)).find(e => e.entryId === request.entryId && stableMoveJson(e.content) === stableMoveJson(content)
-      && !e.priorNodeId && e.sessionId === request.query.sessionId && e.eventId !== request.query.eventId);
-    return { status: 'hit', content, reference: { ...reference(request),
-      ...(prior && ['explanation', 'richContent'].includes(request.query.context.kind) ? { priorNodeId: prior.nodeId } : {}) } };
-  };
-  const novel = async (embedding: number[], query: SparcPrimitiveQuery, userId: string) => {
-    const prior = (await priorFor(userId, query.tdfId)).filter(e => e.kind === 'question' && !(e.eventId === query.eventId && e.sessionId === query.sessionId));
-    for (const item of prior) {
-      if (sparcFigureCosineSimilarity(embedding, await questionVector(item, query, 'exposure')) >= questionNovelty) return false;
+  const existing = async (request: MoveRequest, selected?: MoveEntry): Promise<SparcPrimitiveLookup> => request.entryId
+    ? { status: 'hit', content: selected?._id === request.entryId ? assignedContent(request, selected.content) : await acceptedContent(request), reference: reference(request) }
+    : { status: 'generate', ticket: { query: request.query, embedding: request.embedding }, previousQuestions: request.query.previousQuestions };
+  const verifyContent = async (content: SparcPrimitiveContent, context: SparcPrimitiveContext) => {
+    validatePrimitiveContent(content, context);
+    if (content.video && (!deps.videoReuseStatus || (await deps.videoReuseStatus([content.video])).get(content.video.segmentId) !== true)) {
+      throw new Error('The selected video is unavailable');
     }
-    for (const q of query.previousQuestions) {
-      if (prior.some(e => e.content.text === q.text)) continue;
-      if (sparcFigureCosineSimilarity(embedding, await embed(q.text, query)) >= questionNovelty) return false;
+    if (content.figure) {
+      if (!deps.verifyFigure) throw new Error('Figure verification unavailable');
+      await deps.verifyFigure(content.figure.assetId);
     }
-    return true;
   };
-  return {
-    async lookup(userId: string, query: SparcPrimitiveQuery): Promise<SparcPrimitiveLookup> {
+  const validateQuery = (query: SparcPrimitiveQuery, embedding: number[]) => {
       bounded(query?.tdfId, 'lesson identity', 200); bounded(query.sessionId, 'session identity', 200); bounded(query.eventId, 'event identity', 500);
       bounded(query.queryText, 'instructional context', 30000);
       if (query.context?.version !== SPARC_MOVE_LIBRARY_VERSION || !['feedback', 'explanation', 'richContent', 'question'].includes(query.context.kind)
         || (query.context.supportKind !== undefined && (query.context.kind !== 'richContent' || !['written', 'visual'].includes(query.context.supportKind)))
         || !Number.isFinite(query.context.assistance) || stableMoveJson(query.context).length > 60000
-        || !Array.isArray(query.context.components) || query.context.components.length < 1 || query.context.components.length > 3
-        || query.context.components.some(k => !['feedback', 'explanation', 'richContent', 'question'].includes(k))
-        || new Set(query.context.components).size !== query.context.components.length || !query.context.components.includes(query.context.kind)
+        || !Array.isArray(query.context.components) || query.context.components.length > 3 || !query.context.components.includes(query.context.kind)
+        || new Set(query.context.components).size !== query.context.components.length
+        || query.context.components.some(kind => !['feedback', 'explanation', 'richContent', 'question'].includes(kind))
         || !Array.isArray(query.previousQuestions) || query.previousQuestions.length > 1000) throw new Error('Invalid primitive request');
-      for (const key of ['target', 'move', 'responseFormat', 'requirements', 'focus', 'dependencies', 'specification'] as const) bounded(query.context[key], `context ${key}`, 30000);
-      const readingLevel = resolveSparcReadingLevel(query.context.readingLevel);
       for (const question of query.previousQuestions) if (typeof question?.text !== 'string' || !question.text.trim()) throw new Error('Invalid previous question');
+      for (const key of ['target', 'move', 'responseFormat', 'requirements', 'focus', 'dependencies', 'specification'] as const) bounded(query.context[key], 'context ' + key, 30000);
+      resolveSparcReadingLevel(query.context.readingLevel);
+      if (!Array.isArray(embedding) || (!embedding.length && query.context.supportKind !== 'visual') || embedding.length > 8192 || embedding.some(n => typeof n !== 'number' || !Number.isFinite(n))) throw new Error('Invalid query embedding');
+      if (query.context.supportKind === 'visual' && embedding.length) throw new Error('Visual primitives do not use retrieval embeddings');
+      if (sparcInstructionalNeedText(JSON.parse(query.queryText)) !== query.queryText) throw new Error('Noncanonical instructional need');
+  };
+  return {
+    async lookup(userId: string, query: SparcPrimitiveQuery, selection: SparcRetrievalSelection, embedding: number[]): Promise<SparcPrimitiveLookup> {
+      validateQuery(query, embedding);
+      if (selection !== null && (!selection || typeof selection.entryId !== 'string' || !selection.entryId || selection.entryId.length > 200 || !Number.isFinite(selection.similarity)
+        || selection.similarity < SPARC_LIBRARY_SIMILARITY.minimumSimilarity || selection.similarity > 1)) throw new Error('Invalid local retrieval selection');
       const id = moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]);
       const saved = await store.request(id);
-      if (saved) {
-        if (saved.userId !== userId) throw new Error('Primitive request ownership mismatch');
-        if (!saved.entryId && saved.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Pending primitive embedding requires reindexing');
-        return existing(saved);
+      if (saved) { if (saved.userId !== userId) throw new Error('Primitive request ownership mismatch'); return existing(saved); }
+      if (!selection) return { status: 'generate', ticket: { query, embedding }, previousQuestions: query.previousQuestions };
+      let selected: MoveEntry | undefined;
+      if (selection) {
+        const entry = await store.entry(selection.entryId);
+        if (!entry) throw new Error('The locally selected component was removed; refresh its cache');
+        if (entry.kind !== query.context.kind || entry.version !== SPARC_MOVE_LIBRARY_VERSION
+          || entry.embeddingModel !== deps.embeddingModel || entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION
+          || resolveSparcReadingLevel(entry.context.readingLevel) !== resolveSparcReadingLevel(query.context.readingLevel)
+          || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)
+          || (query.context.supportKind === 'written' && (entry.content.video || entry.content.figure))) throw new Error('Local selection is outside the requested category');
+        selected = entry;
       }
-      if (sparcInstructionalNeedText(JSON.parse(query.queryText)) !== query.queryText) throw new Error('Noncanonical instructional need');
-      const embedding = await embed(query.queryText, query);
-      const lockKey = moveDigest([query.context.kind, query.queryText]);
-      const waiting = Date.now();
-      while (!await store.acquire(lockKey, id)) {
-        if (Date.now() - waiting >= 120000) throw new Error('An identical primitive is still being generated. Your saved move can be resumed.');
-        await wait(500);
-      }
-      deps.timing?.('library-wait', Date.now() - waiting);
-      // Search after acquiring the lease: another learner may have completed it while we waited.
-      try {
-        return await withQuestionLock(userId, query, async () => {
-          const searchStart = Date.now(); let candidateCount = 0;
-          let best: { entry: MoveEntry; similarity: number } | undefined;
-          const ranked: Array<{ entry: MoveCandidate; similarity: number }> = [];
-          let after = '';
-          for (;;) {
-            // A new visual move must resolve its brief through video -> image -> generation.
-            // Accepted requests above still replay their original resource without reselection.
-            if (query.context.supportKind === 'visual') break;
-            const entries = await store.candidates(query.context.kind, deps.embeddingModel, after);
-            for (const entry of entries) {
-              candidateCount++;
-              if (query.context.supportKind === 'written' && (entry.content?.video || entry.content?.figure)) continue;
-              if (entry.embeddingModel !== deps.embeddingModel || entry.version !== SPARC_MOVE_LIBRARY_VERSION) continue;
-              if (entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Instructional library embeddings require reindexing');
-              if (entry.kind !== query.context.kind || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)) continue;
-              if (resolveSparcReadingLevel(entry.context.readingLevel) !== readingLevel) continue;
-              const similarity = sparcFigureCosineSimilarity(embedding, entry.embedding);
-              if (similarity < minimumSimilarity) continue;
-              ranked.push({ entry, similarity });
-            }
-            if (entries.length < 100) break;
-            after = entries.at(-1)!._id;
-          }
-          ranked.sort((a, b) => b.similarity - a.similarity || a.entry._id.localeCompare(b.entry._id));
-          for (const candidate of ranked) {
-            const entry = await store.entry(candidate.entry._id);
-            if (!entry) continue; // Administrative removal may race the search.
-            if (stableMoveJson(entry.embedding) !== stableMoveJson(candidate.entry.embedding)
-              || resolveSparcReadingLevel(entry.context.readingLevel) !== readingLevel
-              || entry.context.responseFormat !== candidate.entry.context.responseFormat
-              || entry.embeddingVersion !== candidate.entry.embeddingVersion || entry.version !== candidate.entry.version) {
-              throw new Error('Instructional library candidate changed during retrieval; resume the request');
-            }
-            if (entry.content.video) {
-              if (!deps.videoReuseStatus) throw new Error('Video reuse validation unavailable');
-              if ((await deps.videoReuseStatus([entry.content.video])).get(entry.content.video.segmentId) !== true) continue;
-            }
-            if (entry.content.figure && (!deps.figureReusable || !await deps.figureReusable(entry.content.figure.assetId))) continue;
-            if (query.context.kind === 'question' && !await novel(await questionVector(entry, query, 'entry'), query, userId)) continue;
-            best = { entry, similarity: candidate.similarity };
-            break;
-          }
-          deps.timing?.('library-search', Date.now() - searchStart, candidateCount);
-          const request: MoveRequest = { _id: id, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION, lockKey, leaseToken: id };
-          if (best) Object.assign(request, { entryId: best.entry._id, source: 'retrieved', similarity: best.similarity });
-          const accepted = await store.saveRequest(request);
-          if (best) await store.release(lockKey, id);
-          return existing(accepted);
-        });
-      } catch (error) { await store.release(lockKey, id); throw error; }
+      const request: MoveRequest = { _id: id, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
+        ...(selection ? { entryId: selection.entryId, source: 'retrieved', similarity: selection.similarity } : {}) };
+      return existing(await store.saveRequest(request), selected);
     },
-    async publish(userId: string, ticket: string, content: SparcPrimitiveContent) {
-      const request = await store.request(ticket);
-      if (!request || request.userId !== userId) throw new Error('Unknown primitive generation request');
-      if (request.entryId) {
-        return { accepted: true as const, content: await acceptedContent(request), reference: reference(request) };
+    async publish(userId: string, ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent) {
+      const { query, embedding } = ticket;
+      validateQuery(query, embedding);
+      const requestId = moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]);
+      const request = await store.request(requestId) ?? { _id: requestId, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION };
+      if (request.userId !== userId) throw new Error('Primitive request ownership mismatch');
+      if (request.entryId) return { accepted: true as const, content: await acceptedContent(request), reference: reference(request) };
+      if (request.query.context.supportKind !== 'visual' && request.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Pending primitive embedding requires reindexing');
+      await verifyContent(content, request.query.context);
+      if (request.query.context.supportKind === 'visual') {
+        // The selected media already owns its vector. No second provider request is needed.
+        const resource = await store.entry(content.video?.segmentId ?? content.figure!.assetId);
+        if (!resource?.embedding?.length || resource.embeddingVersion !== (content.video ? SPARC_VIDEO_EMBEDDING_VERSION : SPARC_INSTRUCTIONAL_NEED_VERSION) || resource.embeddingModel !== deps.embeddingModel) throw new Error('Visual resource has no valid embedding');
+        request.embedding = resource.embedding;
+        request.embeddingVersion = resource.embeddingVersion;
       }
-      if (request.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Pending primitive embedding requires reindexing');
-      if (!await store.acquire(request.lockKey, request.leaseToken)) throw new Error('Primitive generation lease expired');
-      try {
-        validatePrimitiveContent(content, request.query.context);
-        if (content.video) {
-          if (!deps.videoReuseStatus) throw new Error('Video verification unavailable');
-          if ((await deps.videoReuseStatus([content.video])).get(content.video.segmentId) !== true) throw new Error('The catalog video was removed from new instruction');
-        }
-        if (content.figure) { if (!deps.verifyFigure) throw new Error('Figure verification unavailable'); await deps.verifyFigure(content.figure.assetId); }
-        const questionEmbedding = request.query.context.kind === 'question'
-          ? { model: deps.embeddingModel, text: content.text, vector: await embed(content.text, request.query) } : undefined;
-        return await withQuestionLock(userId, request.query, async () => {
-          const readingLevel = resolveSparcReadingLevel(request.query.context.readingLevel);
-          const id = moveDigest([SPARC_MOVE_LIBRARY_VERSION, request.query.context.kind, deps.embeddingModel, request.embedding, content,
-            ...(readingLevel === 'unbiased' ? [] : [readingLevel])]);
-          if (await store.removed(id)) return { accepted: false as const, reason: 'This content was administratively removed. Generate different content.' };
-          await store.saveEntry({ _id: id, version: SPARC_MOVE_LIBRARY_VERSION, context: request.query.context, kind: request.query.context.kind,
-            embeddingModel: deps.embeddingModel, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
-            embedding: request.embedding, ...(questionEmbedding ? { questionEmbedding } : {}), content,
-            requirements: request.query.context.requirements, target: request.query.context.target, move: request.query.context.move,
-            createdAt: new Date() });
-          Object.assign(request, { entryId: id, source: 'generated', similarity: null });
-          const accepted = await store.saveRequest(request);
-          return { accepted: true as const, content: await acceptedContent(accepted), reference: reference(accepted) };
-        });
-      } finally { await store.release(request.lockKey, request.leaseToken); }
+      const id = moveDigest([SPARC_MOVE_LIBRARY_VERSION, request._id, content]);
+      await store.saveEntry({ _id: id, version: SPARC_MOVE_LIBRARY_VERSION, context: request.query.context, kind: request.query.context.kind,
+        embeddingModel: deps.embeddingModel, embeddingVersion: request.embeddingVersion!, embedding: request.embedding, content,
+        requirements: request.query.context.requirements, target: request.query.context.target, move: request.query.context.move, createdAt: new Date() });
+      Object.assign(request, { entryId: id, source: 'generated', similarity: null });
+      const accepted = await store.saveRequest(request);
+      return { accepted: true as const, content: accepted.entryId === id ? assignedContent(accepted, content) : await acceptedContent(accepted), reference: reference(accepted) };
     },
     async revise(userId: string, id: string, content: SparcPrimitiveContent) {
       const previous = await store.entry(id);
       if (!previous) throw new Error('Move-library entry not found');
-      validatePrimitiveContent(content, previous.context);
-      if (stableMoveJson(content) === stableMoveJson(previous.content)) return id;
-      if (content.video) {
-          if (!deps.videoReuseStatus) throw new Error('Video verification unavailable');
-          if ((await deps.videoReuseStatus([content.video])).get(content.video.segmentId) !== true) throw new Error('The catalog video was removed from new instruction');
-        }
-      if (content.figure) { if (!deps.verifyFigure) throw new Error('Figure verification unavailable'); await deps.verifyFigure(content.figure.assetId); }
-      const questionEmbedding = previous.kind === 'question' ? { model: deps.embeddingModel, text: content.text, vector: await embed(content.text, {
-        tdfId: '', sessionId: 'admin-revision', eventId: id, context: previous.context, queryText: '', previousQuestions: [],
-      }) } : undefined;
-      const entry: MoveEntry = { ...previous, content, ...(questionEmbedding ? { questionEmbedding } : {}) };
-      await store.revise(entry);
-      return entry._id;
-    },
-    async present(userId: string, query: SparcPrimitiveQuery, ref: SparcPrimitiveReference, nodeId: string) {
-      const request = await store.request(moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]));
-      if (!request || request.userId !== userId || request.entryId !== ref.entryId) throw new Error('Unaccepted primitive presentation');
-      bounded(nodeId, 'presentation identity', 600);
-      if (await store.removed(ref.entryId)) return;
-      const entry = await store.entry(ref.entryId);
-      if (!entry) {
-        if (await store.removed(ref.entryId)) return;
-        throw new Error('Presented primitive is missing');
-      }
-      await store.expose({ _id: request._id, userId, tdfId: query.tdfId, sessionId: query.sessionId, eventId: query.eventId,
-        kind: entry.kind, nodeId, entryId: entry._id, content: assignedContent(request, entry.content), ...(ref.priorNodeId ? { priorNodeId: ref.priorNodeId } : {}), ...(entry.questionEmbedding ? { questionEmbedding: entry.questionEmbedding } : {}) });
-      exposures.delete(moveDigest([userId, query.tdfId]));
+      await verifyContent(content, previous.context);
+      if (stableMoveJson(content) !== stableMoveJson(previous.content)) await store.revise({ ...previous, content });
+      return id;
     },
   };
 }

@@ -1,5 +1,90 @@
 # SPARC instructional cycle
 
+## Practice history and initialization lifecycle, October 23, 2026
+
+Practice history saves do not rebuild dashboard or course summaries. Dashboard
+entry refreshes its history cache before reading dashboard or course snapshots;
+last-used unit and resume state still save during practice. Dashboard cache
+version 8 counts one assessed SPARC response, excluding intermediate checkpoints
+and per-KC evidence copies. Older cache totals rebuild on dashboard access.
+
+Failed browser retrieval attempts stop their subscription and observer, clear
+partial vectors, and leave the category cache. A failed categorized-dialogue
+initialization exposes the existing localized Try again action. Each explicit
+attempt reinitializes the failed work; there is no automatic retry loop or
+substitution for invalid data. The learner cannot submit before initialization
+succeeds. Retired exposure and manifest records are not migrated or deleted by
+these changes; the existing user-deletion owner retains access to retired
+user-specific exposure records.
+
+## Practice round-trip reduction, October 23, 2026
+
+A local cache miss returns its query and vector directly to generation without a
+server lookup or pending-request write. Publication validates this request under
+the authenticated account and saves its accepted decision. A hit still fetches
+and accepts the exact selected ID. Publication returns the already-held content
+when its decision wins; a concurrently accepted decision remains authoritative.
+Persisted history restores presented components. If publication succeeded but
+history did not, a repeated generation may produce a draft; publication returns
+the existing accepted content before that content is journaled.
+
+Canonical history is the sole record of presented components. Obsolete exposure
+and move-manifest projections and the separate `presentSparcPrimitive` method
+have been removed. Assessment batches retain atomic, idempotent persistence.
+Component persistence is still awaited and failures propagate. Excluding provider
+calls, a new generated component now uses publication plus history persistence
+(two calls rather than lookup, publication, history, presentation); a retrieved
+component uses selected-ID lookup plus history persistence (two rather than three).
+
+Visual primitives skip both primitive search and query embedding before their
+brief is generated. The later combined image/video search remains the only visual
+search. When storing the visual component, the server reuses the selected media's
+existing vector for catalog browsing; it never stores an empty placeholder vector.
+Authored assessment target vectors, when more than four misconceptions require
+selection, are prepared alongside library caches during initialization. Scoring
+uses the same completed-vector cache. Component generation order, provider retry
+policy, and cache retention policy are unchanged. No stored learner data is
+rewritten, and no TDF fields change. Client and server must use the updated
+structured publication-ticket contract together.
+
+## Browser-owned practice retrieval, October 23, 2026
+
+This contract supersedes server candidate searches, question novelty rejection,
+video-first/image-second selection, and coordinated practice generation described below.
+The browser loads live category indexes before the first learner response. The
+authenticated admin-only `sparcRetrievalEmbeddings` publication projects only IDs and
+embedding vectors from indexed category selectors. These are DDP cache documents,
+not another stored library. Additions, vector changes and removals update the local
+index. Account changes stop subscriptions and clear their normalized vectors.
+
+Each row is normalized once on cache insertion/update. Each lookup normalizes its
+query once, computes dot products in one pass, and returns exactly the maximum
+with deterministic ID ordering for ties. There is no candidate sorting, secondary
+evaluation, repetition rejection, or database paging during a practice search.
+Text component reuse keeps its 0.992 threshold and existing reading-level/question
+response-type categories. Images and matching-language videos compete in a single
+visual index with one query and a shared **0.95** threshold. An absent authored
+content language excludes videos without inferring one from the interface locale.
+Only the winning content is fetched by ID; a stale/deleted selection fails clearly.
+
+Completed query embeddings are cached in browser memory, scoped to account, lesson,
+model and exact input text. Missing embeddings use the existing authenticated API
+proxy so provider keys remain server-side. Concurrent cache misses and generation
+requests are independent: no shared in-flight promise, generation lease, polling,
+global image lock, second visual search, or duplicate-generation suppression.
+Two misses may create two copies, each with its own content identity.
+The authenticated embedding proxy releases the connection's DDP method queue after
+its access/credential checks so independent provider calls can overlap as well.
+
+The server validates category membership on the selected record and persists
+content, accepted decisions, presentation history and removal receipts. Saved
+decisions resume the same presented content without changing historical ownership.
+Administrative curation/browse rebuild locks are outside the practice path and
+remain owned by those maintenance operations. No learner-history rewrite or TDF
+schema change is required. Existing indexes are supplemented for vector-only cache
+initialization. Cache loading intentionally covers the complete requested category,
+with Mongo transport batches and no content, media, or private history payloads.
+
 ## Durable learner submission, October 23, 2026
 
 Categorized instructional cycles save the existing `response-submitted` event as a

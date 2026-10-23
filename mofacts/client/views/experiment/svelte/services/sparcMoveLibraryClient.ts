@@ -4,6 +4,8 @@ import { reportRecoverableWarning } from '../../../../lib/recoverableWarnings';
 import { redactSparcDialogueDiagnosticText } from '../../../../../common/lib/sparcDiagnosticText';
 import type { SparcContentRemovalCheckWarning } from '../../../../../common/recoverableWarnings';
 import type { SparcMoveLibraryClient } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
+import { embedSparcTexts } from './sparcLocalEmbeddings';
+import { SPARC_LIBRARY_SIMILARITY } from '../../../../../../learning-components/runtime/sparcInstructionalNeed';
 
 export async function readSparcAdministrativeRemovals(ids: string[], tdfId: string | null): Promise<string[]> {
   try {
@@ -26,8 +28,26 @@ export async function readSparcAdministrativeRemovals(ids: string[], tdfId: stri
   }
 }
 
-export const sparcMoveLibraryClient: SparcMoveLibraryClient = {
-  lookup: query => Meteor.callAsync('lookupSparcPrimitive', query),
-  publish: (ticket, content) => Meteor.callAsync('publishSparcPrimitive', ticket, content),
-  present: (query, reference, nodeId) => Meteor.callAsync('presentSparcPrimitive', query, reference, nodeId),
-};
+export function createSparcMoveLibraryClient(
+  prepare: typeof import('./sparcLocalRetrieval').prepareSparcLocalRetrieval,
+): SparcMoveLibraryClient {
+  return {
+    async lookup(query) {
+      const { kind, readingLevel, responseFormat, supportKind } = query.context;
+      if (supportKind === 'visual') return { status: 'generate', ticket: { query, embedding: [] }, previousQuestions: query.previousQuestions };
+      const [embedding] = await embedSparcTexts(query.tdfId, [query.queryText]);
+      // Visual resources have one combined image/video index, searched once after the brief exists.
+      const selection = (await prepare({ kind, responseFormat,
+        ...(readingLevel ? { readingLevel } : {}), ...(supportKind ? { supportKind } : {}) }))
+        .maximum(embedding!, SPARC_LIBRARY_SIMILARITY.minimumSimilarity);
+      if (!selection) return { status: 'generate', ticket: { query, embedding: embedding! }, previousQuestions: query.previousQuestions };
+      return Meteor.callAsync('lookupSparcPrimitive', query, selection, embedding);
+    },
+    publish: (ticket, content) => Meteor.callAsync('publishSparcPrimitive', ticket, content),
+  };
+}
+
+export const sparcMoveLibraryClient = createSparcMoveLibraryClient(async category => {
+  const { prepareSparcLocalRetrieval } = await import('./sparcLocalRetrieval');
+  return prepareSparcLocalRetrieval(category);
+});

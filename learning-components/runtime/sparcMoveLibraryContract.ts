@@ -24,13 +24,13 @@ export type SparcPrimitiveQuery = {
   tdfId: string; sessionId: string; eventId: string; context: SparcPrimitiveContext;
   queryText: string; previousQuestions: { text: string }[];
 };
+export type SparcPrimitiveTicket = { query: SparcPrimitiveQuery; embedding: number[] };
 export type SparcPrimitiveLookup =
   | { status: 'hit'; content: SparcPrimitiveContent; reference: SparcPrimitiveReference }
-  | { status: 'generate'; ticket: string; previousQuestions: { text: string }[] };
+  | { status: 'generate'; ticket: SparcPrimitiveTicket; previousQuestions: { text: string }[] };
 export type SparcMoveLibraryClient = {
   lookup(query: SparcPrimitiveQuery): Promise<SparcPrimitiveLookup>;
-  publish(ticket: string, content: SparcPrimitiveContent): Promise<{ accepted: true; content: SparcPrimitiveContent; reference: SparcPrimitiveReference } | { accepted: false; reason: string }>;
-  present(query: SparcPrimitiveQuery, reference: SparcPrimitiveReference, nodeId: string): Promise<void>;
+  publish(ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent): Promise<{ accepted: true; content: SparcPrimitiveContent; reference: SparcPrimitiveReference } | { accepted: false; reason: string }>;
 };
 
 export function stableMoveJson(value: unknown): string {

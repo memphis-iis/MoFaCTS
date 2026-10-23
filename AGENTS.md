@@ -76,7 +76,7 @@ When instructions compete, use this order:
 - New unit types should go through the unit-engine registry and expose explicit lifecycle methods.
 - Do not duplicate legacy behavior in `mofacts/client/views/experiment/unitEngine.ts`; keep that path as an app dependency facade.
 - Learning components should depend on explicit runtime context/dependency interfaces.
-- SPARC teaching-figure retrieval and persistence are owned by the server image/library services; see `docs/sparc-instructional-cycle.md`. Administrative deletion preserves learner decisions and model/history records, removes catalog content and media, and uses content-free removal receipts to display "Administrative removal" on reload.
+- SPARC practice retrieval and embedding caches belong to the browser. Search uses the single maximum cosine similarity in the requested category; image and video candidates compete in one local search at 0.95. Independent generation calls do not coordinate through locks, polling, or shared in-flight work. Server image/library services own content persistence, exact-ID reads, authorization and secret-bearing provider calls; see `docs/sparc-instructional-cycle.md`. Administrative deletion preserves learner decisions and model/history records, removes catalog content and media, and uses content-free removal receipts to display "Administrative removal" on reload.
 - Avoid reaching from `learning-components/` into deep Meteor client/server paths unless a temporary facade is already documented and behavior-preserving.
 - If an alternate runtime path is intentional, name it by the domain behavior it provides. Do not call a deliberate path a fallback.
 - Do not add recovery behavior that masks a broken invariant.
@@ -176,6 +176,7 @@ The local hotfix loop under `deploy/` is the fast source-watching application wo
 ## Server Method Design
 
 - Keep the server minimized; the client should do as much processor work as safely possible.
+- Practice history saves must not rebuild dashboard or course summaries. Refresh those summaries on dashboard entry; persist last-used unit and resume state during practice.
 - The normal lint workflow enforces that production server modules cannot directly or transitively import learner-executable code under `learning-components/models/` or `learning-components/units/`; type-only server-interface imports are ignored.
 - Add server methods only for database access, authentication or authorization enforcement, encryption, secrets, or external API calls that cannot safely run on the client.
 - Do not add pure-compute methods to `mofacts/server/methods.ts`.

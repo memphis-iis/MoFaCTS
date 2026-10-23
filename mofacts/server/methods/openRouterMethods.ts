@@ -696,6 +696,9 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
       if (!model) {
         throw new Meteor.Error('no-openrouter-model', 'OpenRouter embedding model is required');
       }
+      // Independent browser cache misses must not serialize behind this connection's provider call.
+      // Authentication, quota, credential and model checks have completed above.
+      this.unblock?.();
       try {
         const embeddingOptions: Parameters<typeof callOpenRouterEmbeddings>[0] = {
           apiKey: keyResolution.apiKey,

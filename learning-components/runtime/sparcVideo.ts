@@ -6,8 +6,6 @@ export type SparcVideoSegment = {
 export type SparcVideoCaption = { id: number; text: string; startSeconds: number; endSeconds: number };
 export type SparcVideoRange = { firstCaptionId: number; lastCaptionId: number };
 export const SPARC_VIDEO_EMBEDDING_VERSION = 'sparc-transcript-passage-v1';
-/** Content-query/transcript cutoff; distinct from same-need text/image reuse. */
-export const SPARC_VIDEO_MINIMUM_SIMILARITY = 0.8;
 export const SPARC_VIDEO_MAX_SECONDS = 30;
 
 export function parseSparcVideoSegment(value: unknown): SparcVideoSegment {

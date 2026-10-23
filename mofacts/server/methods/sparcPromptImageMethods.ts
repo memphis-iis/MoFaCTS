@@ -6,16 +6,14 @@ import { SPARC_PROMPT_IMAGE_SETTINGS, SPARC_PROMPT_IMAGE_PURPOSE as PURPOSE, par
 import { generateSparcPromptImage, type GeneratedSparcPromptImage } from '../lib/sparcPromptImageGeneration';
 import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
 import { requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/methodAuthorization';
-import { sparcFigureMinimumSimilarity, SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
+import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { sparcInstructionalNeedText, type SparcInstructionalNeed } from '../../../learning-components/runtime/sparcInstructionalNeed';
-import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
+import type { SparcRetrievalSelection } from '../../common/lib/sparcRetrieval';
 import { getOrGenerateSparcLibraryVisual, type SparcFigureInspection, type SparcFigureLibraryStore } from '../lib/sparcFigureLibraryService';
 import type { createStorageBoundary } from '../lib/storageBoundary';
 import type { SparcLibraryImagePage } from '../../common/lib/sparcFigureLibrary';
 import { parseSparcRaster } from '../lib/sparcRaster';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
-import type { SparcVideoMatch } from '../lib/sparcVideoLibraryService';
-import { SPARC_VIDEO_MINIMUM_SIMILARITY } from '../../../learning-components/runtime/sparcVideo';
 
 type Asset = { _id: string; path?: string; type?: string; meta: Record<string, any> };
 type Deps = {
@@ -34,13 +32,10 @@ type Deps = {
   removeFile?: (path: string) => Promise<void>;
   isRemoved: (id: string) => Promise<boolean>;
   figureLibrary?: SparcFigureLibraryStore;
-  minimumFigureSimilarity?: number | undefined;
-  embedSituation?: (apiKey: string, input: string) => Promise<{ vector: number[]; usage?: { costUsd?: number } }>;
-  findVideo?: (vector: number[], tdfId: string, minimumSimilarity: number) => Promise<SparcVideoMatch | undefined>;
 };
 type Context = { userId?: string | null; unblock?: () => void };
 type ImageRequest = { tdfId: string; sessionId: string; generationId: string; tutorMessage: string;
-  imagePrompt: string; figureDescription: string; displayWidth: number; situation?: SparcInstructionalNeed };
+  imagePrompt: string; figureDescription: string; displayWidth: number; situation?: SparcInstructionalNeed; selection?: SparcRetrievalSelection; embedding?: number[]; language?: string };
 function bounded(value: unknown, label: string, max: number): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Meteor.Error(400, `${label} is required and must be bounded`);
   return value.trim();
@@ -53,12 +48,10 @@ const digest = (value: string) => createHash('sha256').update(value).digest('hex
 
 /** Admin experiment only. Teaching-library assets are shared; other session assets retain ownership. */
 export function createSparcPromptImageMethods(deps: Deps) {
-  const pending = new Map<string, Promise<unknown>>();
   const authorize = (context: Context) => requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId: context.userId, roles: ['admin'] });
   const findOwned = (assetId: string, userId: string) => deps.DynamicAssets.collection.findOneAsync({ _id: assetId, userId, 'meta.uploadPurpose': PURPOSE, 'meta.public': false });
   const findShared = (assetId: string, version: string = SPARC_FIGURE_LIBRARY_SETTINGS.version) => deps.DynamicAssets.collection.findOneAsync({ _id: assetId,
     'meta.uploadPurpose': PURPOSE, 'meta.public': false, 'meta.figureLibraryVersion': version });
-  const minimumSimilarity = sparcFigureMinimumSimilarity(deps.minimumFigureSimilarity);
   const imageMetadata = (entry: SparcFigureInspection, asset: Asset) => {
     if (asset.meta.figureLibraryVersion !== entry.version) throw new Meteor.Error(500, 'A library figure is missing its completed canonical asset');
     return { assetId: asset._id, description: instructionalText(asset.meta.description, 'Saved figure description'),
@@ -116,16 +109,8 @@ export function createSparcPromptImageMethods(deps: Deps) {
       const situation = params.situation === undefined ? undefined : sparcInstructionalNeedText(params.situation);
       if (params.situation?.feedback !== undefined) throw new Meteor.Error(400, 'Feedback answers belong in private primitive requests, not shared image sources');
       const identity = digest(JSON.stringify([userId, tdfId, sessionId, generationId]));
-      const assetId = identity.slice(0, 20);
-      if (pending.has(identity)) return pending.get(identity);
+      const assetId = randomBytes(10).toString('hex');
       const work = (async () => {
-        const historical = await findOwned(assetId, userId);
-        if (historical && historical.meta.figureLibraryVersion === undefined) {
-          if (visual) throw new Meteor.Error(409, 'A private incomplete prompt image cannot satisfy a complete visual-support request');
-          if (historical.meta.generationIdentity !== identity) throw new Meteor.Error(409, 'SPARC image identity collision');
-          await completeStorage(historical);
-          return envelope(historical, true);
-        }
         if (situation !== undefined) {
           if (!deps.figureLibrary) throw new Meteor.Error(500, 'SPARC figure library is not configured');
           let apiKey: string | undefined;
@@ -137,28 +122,11 @@ export function createSparcPromptImageMethods(deps: Deps) {
             }
             return apiKey;
           };
+          if (params.selection === undefined || !Array.isArray(params.embedding) || typeof params.language !== 'string') throw new Meteor.Error(400, 'Visual support requires the browser selection and query embedding');
           const decision = await getOrGenerateSparcLibraryVisual({ store: deps.figureLibrary, identity, assetId,
-            userId, tdfId, sessionId, situation, imagePrompt: prompt, tutorMessage, description, displayWidth, minimumSimilarity,
-            findVideo: async vector => {
-              if (!deps.findVideo) throw new Meteor.Error(500, 'SPARC video retrieval is not configured');
-              return deps.findVideo(vector, tdfId, SPARC_VIDEO_MINIMUM_SIMILARITY);
-            },
-            embed: async input => {
-              const resolvedKey = await key();
-              if (deps.embedSituation) return await deps.embedSituation(resolvedKey, input);
-              try {
-                const result = await callOpenRouterEmbeddings({ apiKey: resolvedKey,
-                  model: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel, input: [input] });
-                return { vector: result.embeddings[0]!, ...(result.costUsd === undefined ? {} : { usage: { costUsd: result.costUsd } }) };
-              } catch { throw new Meteor.Error('sparc-figure-embedding-failed', 'SPARC figure situation embedding failed'); }
-            },
+            userId, tdfId, sessionId, situation, imagePrompt: prompt, tutorMessage, description, displayWidth,
+            selection: params.selection, embedding: params.embedding, language: params.language,
             generate: async entry => {
-              const saved = await findOwned(entry._id, userId);
-              if (saved) {
-                if (saved.meta.generationIdentity !== identity || saved.meta.figureLibraryVersion !== entry.version) throw new Meteor.Error(409, 'SPARC library asset identity collision');
-                await completeStorage(saved);
-                return { usage: saved.meta.usage };
-              }
               if (entry.ready || !entry.generation) throw new Meteor.Error(500, 'SPARC library figure is missing its canonical asset');
               let image: GeneratedSparcPromptImage;
               try { image = await (deps.generateImage ?? generateSparcPromptImage)(await key(), entry.generation.imagePrompt); }
@@ -177,7 +145,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
             } });
           if (decision.video) {
             if (await deps.isRemoved(decision.video.segmentId)) throw new Meteor.Error('sparc-visual-removed', 'The selected video was administratively removed');
-            return { video: decision.video, ...(decision.embeddingUsage ? { embeddingUsage: decision.embeddingUsage } : {}),
+            return { video: decision.video,
               libraryMatch: { source: decision.source, similarity: decision.similarity } };
           }
           const asset = await findShared(decision.assetId);
@@ -185,7 +153,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
             figure: { assetId: decision.assetId, description: SPARC_ADMINISTRATIVE_REMOVAL_TEXT } };
           if (!asset || asset.meta.ready !== true) throw new Meteor.Error(500, 'SPARC library figure is missing its completed asset');
           return { ...envelope(asset, true), ...(decision.usage ? { usage: decision.usage } : {}),
-            ...(decision.embeddingUsage ? { embeddingUsage: decision.embeddingUsage } : {}),
+
             libraryMatch: { source: decision.source, similarity: decision.similarity } };
         }
         let asset = await findOwned(assetId, userId);
@@ -214,8 +182,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
         await completeStorage(asset);
         return envelope(asset, false);
       })();
-      pending.set(identity, work);
-      try { return await work; } finally { pending.delete(identity); }
+      return work;
   };
   return {
     async generateSparcPromptImage(this: Context, params: Omit<ImageRequest, 'situation'>) {

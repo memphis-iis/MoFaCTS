@@ -150,11 +150,6 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
     deps.serverConsole('[CourseSnapshot] invalidated assignment snapshots', { assignmentId, reason, result: updateCount(result) });
   }
 
-  async function refreshCourseSnapshotAfterPractice(userId: string, TDFId: string) {
-    await invalidateCourseSnapshotForUser(userId, 'progress-updated');
-    deps.serverConsole('[CourseSnapshot] refreshed after practice progress update', { userId, TDFId });
-  }
-
   async function cachedSnapshotAssignmentsExist(existing: any) {
     const assignmentIds: string[] = Array.isArray(existing?.assignmentIds)
       ? [...new Set<string>(existing.assignmentIds.map((id: unknown) => normalizeOptionalString(id)).filter((id: string | null): id is string => !!id))]
@@ -339,6 +334,10 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
   async function ensureLearnerCoursesSnapshot(userId: string): Promise<LearnerCoursesSnapshot> {
     const existing = await deps.CourseLearnerSnapshotCache.findOneAsync({ userId, version: COURSE_SNAPSHOT_VERSION });
     if (existing?.snapshot && existing.invalidatedAt === null && existing.version === COURSE_SNAPSHOT_VERSION) {
+      const dashboard = await deps.UserDashboardCache.findOneAsync({ userId }, { fields: { lastUpdated: 1 } });
+      if (dashboard?.lastUpdated && new Date(dashboard.lastUpdated).getTime() > new Date(existing.generatedAt).getTime()) {
+        return await rebuildLearnerCoursesSnapshot(userId, 'dashboard-updated');
+      }
       if (!await cachedSnapshotAssignmentsExist(existing)) {
         return await rebuildLearnerCoursesSnapshot(userId, 'stale-assignment-reference');
       }
@@ -357,6 +356,5 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
     invalidateCourseSnapshotForUser,
     invalidateCourseSnapshotsForCourse,
     invalidateCourseSnapshotsForAssignment,
-    refreshCourseSnapshotAfterPractice,
   };
 }

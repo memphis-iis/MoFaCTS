@@ -1,39 +1,27 @@
 import type { SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import { Meteor } from 'meteor/meteor';
 import { requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/methodAuthorization';
-import { resolvePreferredApiKey, type ApiKeyResolutionDeps } from '../lib/apiKeyResolution';
-import { callOpenRouterEmbeddings } from '../../common/lib/openRouterClient';
 import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
 import { createMoveLibraryService, type MoveStore } from '../lib/sparcMoveLibraryService';
-import type { SparcPrimitiveQuery, SparcPrimitiveContent, SparcPrimitiveReference } from '../../../learning-components/units/sparcsession/sparcMoveLibrary';
+import type { SparcPrimitiveQuery, SparcPrimitiveContent, SparcPrimitiveTicket } from '../../../learning-components/units/sparcsession/sparcMoveLibrary';
+import type { SparcRetrievalSelection } from '../../common/lib/sparcRetrieval';
 
 type Context = { userId?: string | null; unblock?: () => void };
-export function createSparcMoveLibraryMethods(deps: { store: MoveStore; minimumSimilarity?: number | undefined; questionNovelty?: number | undefined;
-  getMethodAuthorizationDeps(): MethodAuthorizationDeps; getApiKeyResolutionDeps(): ApiKeyResolutionDeps;
+export function createSparcMoveLibraryMethods(deps: { store: MoveStore;
+  getMethodAuthorizationDeps(): MethodAuthorizationDeps;
   videoReuseStatus?(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>>;
-  verifyFigure(assetId: string): Promise<void>; figureReusable(assetId: string): Promise<boolean>; timing?(stage: string, ms: number, count?: number): void }) {
+  verifyFigure(assetId: string): Promise<void> }) {
   const auth = (ctx: Context) => requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId: ctx.userId, roles: ['admin'] });
-  const service = (userId: string) => createMoveLibraryService({ store: deps.store, embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel,
+  const service = () => createMoveLibraryService({ store: deps.store, embeddingModel: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel,
     ...(deps.videoReuseStatus ? { videoReuseStatus: deps.videoReuseStatus } : {}),
-    ...(deps.timing ? { timing: deps.timing } : {}),
-    ...(deps.minimumSimilarity === undefined ? {} : { minimumSimilarity: deps.minimumSimilarity }), verifyFigure: deps.verifyFigure, figureReusable: deps.figureReusable,
-    ...(deps.questionNovelty === undefined ? {} : { questionNovelty: deps.questionNovelty }),
-    async embed(text, query) {
-      const credentials = await resolvePreferredApiKey(deps.getApiKeyResolutionDeps(), { userId, tdfId: query.tdfId, kind: 'openrouter' });
-      if (!credentials.apiKey) throw new Meteor.Error(403, 'Move retrieval requires the configured embedding service');
-      const result = await callOpenRouterEmbeddings({ apiKey: credentials.apiKey, model: SPARC_FIGURE_LIBRARY_SETTINGS.embeddingModel, input: [text] });
-      return result.embeddings[0]!;
-    } });
+    verifyFigure: deps.verifyFigure });
   return {
-    async lookupSparcPrimitive(this: Context, query: SparcPrimitiveQuery) {
+    async lookupSparcPrimitive(this: Context, query: SparcPrimitiveQuery, selection: SparcRetrievalSelection, embedding: number[]) {
       const userId = await auth(this); this.unblock?.();
-      return service(userId).lookup(userId, query);
+      return service().lookup(userId, query, selection, embedding);
     },
-    async publishSparcPrimitive(this: Context, ticket: string, content: SparcPrimitiveContent) {
-      const userId = await auth(this); this.unblock?.(); return service(userId).publish(userId, ticket, content);
-    },
-    async presentSparcPrimitive(this: Context, query: SparcPrimitiveQuery, reference: SparcPrimitiveReference, nodeId: string) {
-      const userId = await auth(this); return service(userId).present(userId, query, reference, nodeId);
+    async publishSparcPrimitive(this: Context, ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent) {
+      const userId = await auth(this); this.unblock?.(); return service().publish(userId, ticket, content);
     },
     async listSparcMoveLibrary(this: Context, kind: string | null = null, after = '') {
       await auth(this);
@@ -45,7 +33,7 @@ export function createSparcMoveLibraryMethods(deps: { store: MoveStore; minimumS
     async reviseSparcPrimitive(this: Context, id: string, content: SparcPrimitiveContent) {
       const userId = await auth(this); this.unblock?.();
       if (typeof id !== 'string' || !/^[a-f0-9]{64}$/.test(id)) throw new Meteor.Error(400, 'Invalid library entry');
-      return service(userId).revise(userId, id, content);
+      return service().revise(userId, id, content);
     },
   };
 }

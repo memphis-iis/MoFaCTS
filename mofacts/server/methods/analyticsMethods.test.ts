@@ -237,10 +237,10 @@ describe('analyticsMethods', function() {
           source: { pageKey: 'page', nodeId: `menu:${optionId}` }, payload: { optionId } }, writes: [] } } });
     await Promise.all([methods.insertHistory.call({ userId: 'learner-1' }, choice('question')),
       methods.insertHistory.call({ userId: 'learner-1' }, choice('question'))]);
-    expect(stored.size).to.equal(1); expect(updates).to.equal(1);
+    expect(stored.size).to.equal(1); expect(updates).to.equal(0);
     let conflict: any;
     try { await methods.insertHistory.call({ userId: 'learner-1' }, choice('next-target')); } catch (error) { conflict = error; }
-    expect(conflict?.error).to.equal('sparc-history-conflict'); expect(updates).to.equal(1);
+    expect(conflict?.error).to.equal('sparc-history-conflict'); expect(updates).to.equal(0);
     let denied: any;
     try { await methods.insertHistory.call({ userId: 'learner-2' }, choice('question')); } catch (error) { denied = error; }
     expect(denied?.error).to.equal(403);
@@ -264,7 +264,7 @@ describe('analyticsMethods', function() {
       input: '', responseValue: '', sparc: { pageKey: 'worksheet', sourceAddress: {pageKey:'worksheet',nodeId:'root'},
         worksheet: { attemptId:'attempt', checkpointIndex:0, sequence:1, writeId:'write', kind:'start', order:['q'], deadline:2000 } } });
     await Promise.all([methods.insertHistory.call({userId:'learner-1'},record), methods.insertHistory.call({userId:'learner-1'},record)]);
-    expect(stored.size).to.equal(1); expect(updates).to.equal(1);
+    expect(stored.size).to.equal(1); expect(updates).to.equal(0);
     let conflict: any;
     try { await methods.insertHistory.call({userId:'learner-1'},{...record,time:1710000001000}); } catch(error) { conflict = error; }
     expect(conflict?.error).to.equal('worksheet-history-conflict'); expect(stored.size).to.equal(1);
@@ -468,52 +468,13 @@ describe('analyticsMethods', function() {
     });
   });
 
-  it('insertHistory invokes the dashboard summary hook after durable history insert', async function() {
-    const hookRecords: Record<string, unknown>[] = [];
-    const { deps, insertedHistory } = createAnalyticsDeps({
-      onHistoryInserted: async (_context: unknown, historyRecord: Record<string, unknown>) => {
-        hookRecords.push(historyRecord);
-      },
-    });
+  it('saves history without invoking dashboard maintenance', async function() {
+    let dashboardCalls = 0;
+    const { deps, insertedHistory } = createAnalyticsDeps({ onHistoryInserted: async () => { dashboardCalls++; } });
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
-
     await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord());
-
     expect(insertedHistory).to.have.length(1);
-    expect(hookRecords).to.have.length(1);
-    const persistedHookRecord = hookRecords[0]!;
-    expect(persistedHookRecord).to.equal(insertedHistory[0]);
-    expect(persistedHookRecord).to.include({
-      userId: 'learner-1',
-      TDFId: 'tdf-1',
-      eventId: 101,
-    });
-    expect(persistedHookRecord.recordedServerTime).to.be.a('number');
-  });
-
-  it('insertHistory keeps the durable history write when the dashboard hook fails', async function() {
-    const { deps, insertedHistory, logEntries } = createAnalyticsDeps({
-      onHistoryInserted: async () => {
-        throw new Error('sensitive cache failure learner-1 answer');
-      },
-    });
-    const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
-
-    await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord());
-
-    expect(insertedHistory).to.have.length(1);
-    const failureLog = logEntries.find((entry) => String(entry[0]).includes('Dashboard cache update failed'));
-    expect(failureLog).to.not.equal(undefined);
-    expect(failureLog?.[1]).to.deep.include({
-      eventCategory: 'model',
-      historySchemaVersion: 1,
-      errorType: 'Error',
-    });
-    const serializedLog = JSON.stringify(failureLog);
-    expect(serializedLog).to.not.include('learner-1');
-    expect(serializedLog).to.not.include('tdf-1');
-    expect(serializedLog).to.not.include('sensitive cache failure');
-    expect(serializedLog).to.not.include('"answer"');
+    expect(dashboardCalls).to.equal(0);
   });
 
   it('downloadOwnHistoryAcrossTdfs returns a streaming download URL without building the TSV payload', async function() {

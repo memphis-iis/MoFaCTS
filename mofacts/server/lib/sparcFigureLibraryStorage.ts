@@ -1,3 +1,5 @@
+import { sparcRetrievalSelector } from './sparcRetrievalSelector';
+import { parseSparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import { Mongo } from 'meteor/mongo';
 import { randomBytes } from 'crypto';
 import { collectionMongoName } from '../../common/collectionOwnership';
@@ -16,6 +18,7 @@ export const SparcFigureRequests = new Mongo.Collection<SparcVisualDecision | Li
 export async function ensureSparcFigureLibraryIndexes() {
   await SparcFigureLibrary.rawCollection().createIndex({ version: 1, imageModel: 1, embeddingModel: 1, dimensions: 1, ready: 1, _id: 1 });
   await SparcFigureLibrary.rawCollection().createIndex({ ready: 1, _id: 1 });
+  await SparcFigureLibrary.rawCollection().createIndex({ kind: 1, embeddingModel: 1, embeddingVersion: 1, ready: 1, _id: 1 });
   await SparcFigureRequests.rawCollection().createIndex({ kind: 1, userId: 1, assetId: 1 });
   await SparcFigureRequests.rawCollection().createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, partialFilterExpression: { kind: 'lease' } });
 }
@@ -30,8 +33,8 @@ export async function removeSparcFigureUserDecisions(userId: string): Promise<vo
   await SparcFigureRequests.removeAsync({ kind: 'decision', userId });
 }
 
-/** Serialize discovery plus generation across replicas so concurrent first encounters share an entry. */
-export async function withSparcFigureLibraryLock<T>(work: () => Promise<T>, scope: string = 'generation'): Promise<T> {
+/** Serialize administrative curation and browse rebuilds; never used by practice generation. */
+export async function withSparcFigureLibraryLock<T>(work: () => Promise<T>, scope: string = 'curation'): Promise<T> {
   const raw = SparcFigureRequests.rawCollection();
   const lockId = scope !== 'browse' ? `lease:${SPARC_FIGURE_LIBRARY_SETTINGS.version}:${scope}` : 'lease:sparc-figure-browse';
   const owner = randomBytes(16).toString('hex');
@@ -78,11 +81,12 @@ export function createSparcFigureLibraryStore(): SparcFigureLibraryStore {
       await SparcFigureLibrary.rawCollection().replaceOne({ _id: entry._id }, { ...entry, kind: 'image' } as SparcFigureLibraryEntry, { upsert: true });
       if (entry.ready) await invalidateSparcFigureBrowse();
     },
-    async candidates(query) {
-      return await SparcFigureLibrary.find({ version: query.version, imageModel: query.imageModel,
-        embeddingModel: query.embeddingModel, dimensions: query.dimensions, ready: true,
-        _id: { $gt: query.afterId } }, { sort: { _id: 1 }, limit: SPARC_FIGURE_LIBRARY_SETTINGS.batchSize,
-        fields: { _id: 1, version: 1, imageModel: 1, embeddingModel: 1, embeddingVersion: 1, dimensions: 1, embedding: 1, ready: 1 } }).fetchAsync();
+    async findVisual(id, language) {
+      const row = await SparcInstructionalLibrary.findOneAsync({ ...sparcRetrievalSelector({ kind: 'visual', language }), _id: id });
+      if (!row) return undefined;
+      if (row.kind === 'video') return { video: parseSparcVideoSegment(row.content.video) };
+      if (row.kind !== 'image') throw new Error('Selected resource is not visual');
+      return { entry: row as SparcFigureLibraryEntry };
     },
     withLock: (work, scope) => withSparcFigureLibraryLock(work, scope),
   };

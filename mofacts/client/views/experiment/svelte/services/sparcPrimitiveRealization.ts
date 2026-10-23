@@ -29,7 +29,17 @@ export async function realizeSparcPrimitive(params: {
     const result = await params.library.lookup(query);
     let content: SparcPrimitiveContent;
     let reference: SparcPrimitiveReference;
-    if (result.status === 'hit') { content = result.content; reference = result.reference; }
+    if (result.status === 'hit') {
+      content = result.content; reference = result.reference;
+      if (kind === 'explanation' || kind === 'richContent') {
+        const prior = request.dialogueHistory?.find(entry => {
+          const saved = entry.primitiveReference as SparcPrimitiveReference | undefined;
+          return entry.role === 'tutor' && saved?.entryId === reference.entryId && !saved.priorNodeId
+            && typeof entry.responseId === 'string' && !entry.responseId.startsWith(`${eventId}:`);
+        });
+        if (prior) reference = { ...reference, priorNodeId: String(prior.responseId) };
+      }
+    }
     else {
       const generated = await params.generate(result.previousQuestions);
       const saved = await params.library.publish(result.ticket, generated);
@@ -38,7 +48,6 @@ export async function realizeSparcPrimitive(params: {
     }
     source = reference.source;
     await params.persist(content, reference);
-    await params.library.present(query, reference, `${eventId}:${kind === 'feedback' ? 'tutor' : kind}`);
     status = 'returned';
     return content;
   } finally {

@@ -186,6 +186,7 @@ function currentCourseFromAssignment(instance: CoursesTemplateInstance, assignme
 }
 
 async function reloadCoursesSnapshot(instance: CoursesTemplateInstance) {
+  await meteorCallAsync('ensureDashboardCacheCurrent');
   const snapshot = await meteorCallAsync('getLearnerCoursesSnapshot') as LearnerCoursesSnapshot;
   instance.snapshot.set(snapshot);
   return snapshot;

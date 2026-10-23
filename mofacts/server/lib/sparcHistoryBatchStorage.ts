@@ -11,8 +11,7 @@ type Collection<TSession> = {
 };
 
 /** The existing history IDs arbitrate retries; the Mongo transaction prevents partial assessments. */
-export async function insertSparcHistoryBatch<TSession extends Session>(collection: Collection<TSession>, records: readonly Row[], startSession: () => TSession,
-  project?: (records: readonly Row[], session: TSession) => Promise<void>): Promise<readonly Row[]> {
+export async function insertSparcHistoryBatch<TSession extends Session>(collection: Collection<TSession>, records: readonly Row[], startSession: () => TSession): Promise<readonly Row[]> {
   const session = startSession();
   try {
     let inserted: Row[] = [];
@@ -29,8 +28,6 @@ export async function insertSparcHistoryBatch<TSession extends Session>(collecti
         }
       }
       if (inserted.length) await collection.insertMany(inserted, { session });
-      // Projection and canonical history commit together, including idempotent retries.
-      if (project) await project(records, session);
     }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
     return inserted;
   } finally { await session.endSession(); }

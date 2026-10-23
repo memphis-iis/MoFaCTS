@@ -5,7 +5,7 @@ Object.assign(globalThis, { describe: tests.describe, it: tests.it, beforeEach: 
 require('../common/lib/sparcVideo.test.ts');
 require('../server/lib/sparcVideoProviders.test.ts');
 require('../server/lib/sparcVideoCatalogService.test.ts');
-require('../server/lib/sparcVideoLibraryService.test.ts');
+require('../../learning-components/runtime/sparcEmbeddingIndex.test.ts');
 require('../server/lib/sparcFigureLibraryService.test.ts');
 require('../server/lib/sparcMoveLibraryService.test.ts');
 
