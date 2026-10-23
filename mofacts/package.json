@@ -90,7 +90,7 @@
     "acorn": "8.15.0",
     "connect": "^3.7.0",
     "deep-chat": "^2.4.2",
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.4.17",
     "double-metaphone": "^2.0.0",
     "fast-xml-parser": "^5.7.1",
     "highs": "1.15.4",
