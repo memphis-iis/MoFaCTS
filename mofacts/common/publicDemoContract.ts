@@ -3,6 +3,18 @@ export const PUBLIC_DEMO_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
 export type PublicDemoKind = typeof PUBLIC_DEMO_KINDS[number];
 
+// Reserved authoring markers. These identify protected content; they do not
+// themselves grant anonymous launch access.
+export function isPublicDemoTutor(tutor: unknown): boolean {
+  const setspec = (tutor as { setspec?: { experimentTarget?: unknown; tags?: unknown } } | null)?.setspec;
+  const target = typeof setspec?.experimentTarget === 'string'
+    ? setspec.experimentTarget.trim().toLowerCase() : '';
+  return target.startsWith('public-demo-') ||
+    (Array.isArray(setspec?.tags) && setspec.tags.some(
+      (tag) => typeof tag === 'string' && tag.trim().toLowerCase() === 'public-demo',
+    ));
+}
+
 export type PublicDemoDefinition = {
   experimentTarget: string;
   launchPath: string;

@@ -58,6 +58,25 @@ const citedLearnerEvidence = [{
 }];
 
 describe('sparcLearnerResponseScoring', function() {
+  it('preserves omitted KC coverage and active misconception support without emitting score changes', function() {
+    const facts = document.workingMemoryFacts!;
+    const evidence: SparcLearnerResponseEvidenceEnvelope = {
+      learningTargetEvaluations: [], diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' },
+    };
+    const empty = reduceSparcLearnerResponseEvidence({ facts, evidence });
+    assert.deepEqual(empty.learningTargetScores, []);
+    assert.equal(empty.diagnosticMisconceptionScores, undefined);
+    const partial = reduceSparcLearnerResponseEvidence({ facts, evidence: { ...evidence,
+      learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: .8,
+        learnerEvidence: citedLearnerEvidence }],
+    } });
+    assert.deepEqual(partial.learningTargetScores, [{ clusterKC: 'kc-a', coverage: .8 }]);
+    assert.equal(partial.diagnosticMisconceptionScores, undefined);
+    const updated = createSparcLearnerResponseScoreFacts({ facts, score: partial });
+    assert.equal(updated.find(f => f.factType === 'learningTarget.score' && f.slots?.clusterKC === 'kc-b')?.slots?.coverage, .1);
+    assert.equal(updated.find(f => f.factType === 'diagnostic.misconceptionScore' && f.slots?.id === 'm1')?.slots?.supportStrength, .2);
+  });
+
   it('reduces complete overlapping E1-E4 evidence and clears only contradicted misconceptions', function() {
     const facts = [
       ...['e1', 'e2', 'e3', 'e4'].map((clusterKC) => fact('autotutor.expectation', { clusterKC })),
@@ -161,7 +180,7 @@ describe('sparcLearnerResponseScoring', function() {
     assert.equal(score.diagnosticMisconceptionScores, undefined);
   });
 
-  it('requires a complete exact set of authored evidence identifiers', function() {
+  it('allows omitted targets while rejecting unknown and duplicate evidence identifiers', function() {
     const completeEvidence: SparcLearnerResponseEvidenceEnvelope = {
       learningTargetEvaluations: [{
         clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
@@ -177,9 +196,6 @@ describe('sparcLearnerResponseScoring', function() {
       readonly evidence: SparcLearnerResponseEvidenceEnvelope;
       readonly message: RegExp;
     }> = [{
-      evidence: { ...completeEvidence, learningTargetEvaluations: completeEvidence.learningTargetEvaluations.slice(0, 1) },
-      message: /missing learning target clusterKC "kc-b"/,
-    }, {
       evidence: {
         ...completeEvidence,
         learningTargetEvaluations: [{

@@ -8,6 +8,8 @@
 mofacts/packages/ostrio-files/.npm/
 # prepareWebGazerAssets.cjs regenerates these from locked WebGazer + source licenses.
 mofacts/public/webgazer/
+# prepareMediaPipeAssets.cjs regenerates WASM; keep the source-owned model/notices.
+mofacts/public/mediapipe/wasm/
 
 # Rspack compiler outputs; their scripts, configuration and lockfiles stay captured.
 mofacts/_build/

@@ -1,5 +1,41 @@
 # SPARC instructional cycle
 
+## Durable learner submission, October 23, 2026
+
+Categorized instructional cycles save the existing `response-submitted` event as a
+`:submission` transition before calling the assessor. This checkpoint owns the
+learner utterance and disables its input controls; the event retains the existing
+question/choice identity and canonical lesson, page, attempt, and course scope.
+The app publishes the answer only after the history writer acknowledges it.
+Submission alone awards no score, model update, assessed turn, or completion.
+
+Document startup resumes a saved submission whose assessment is unfinished using
+the saved answer and the pre-response scoring context. Accepted assessment, feedback,
+decisions, and instructional components continue through their existing checkpoints.
+Retries use the original event and transition identities. Concurrent differing writes
+remain explicit conflicts rather than replacing accepted work.
+
+Existing histories whose learner utterance is owned by the assessment remain readable
+without migration or rewriting. New assessments do not append a second learner node.
+No TDF fields, provider settings, or server endpoints change. An answer that never
+reaches the server cannot be restored after a browser closes; failed saves must not
+start assessment or present successful acceptance. Unsubmitted drafts are outside
+this contract.
+
+## Sparse assessment output, October 22, 2026
+
+The evaluator returns entries only for selected targets supported or contradicted by
+learner evidence. Unaddressed targets are omitted; omitted scores and retained evidence
+carry forward without synthetic evaluations or history records. Unknown and duplicate
+target identities remain errors. The four-KC/four-misconception selection is unchanged.
+KC summaries contain demonstrated and unresolved requirements. Incorrect claims appear
+only in misconception summaries, including in subsequent scoring and teaching context.
+Existing saved evidence retains its established storage shape; new KC summaries store
+an empty incorrect-claims list at that boundary, without rewriting prior learner history.
+Learner quotations remain required for returned evaluations: they validate source
+attribution and are saved as response IDs and character spans when a summary changes.
+Instructional content uses descriptive summaries rather than those quotation spans.
+
 ## Turn efficiency, October 20, 2026
 
 Assessment now evaluates at most four expectation KCs: the current KC and its three

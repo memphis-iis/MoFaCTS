@@ -206,7 +206,7 @@ export async function unitIsFinished(_reason: string): Promise<void> {
       await meteorCallAsync('incrementTdfConditionCount', rootTdfId, curConditionNumber);
     }
 
-    leaveTarget = curTdfUnit?.gazecalibrationsession ? '/content' : resolveSessionSurfaceUnitEntryRoute(resolveSessionContentSurface(resolveSessionSurfaceState({
+    leaveTarget = (curTdfUnit?.gazecalibrationsession || curTdfUnit?.skeletondemosession) ? '/content' : resolveSessionSurfaceUnitEntryRoute(resolveSessionContentSurface(resolveSessionSurfaceState({
       currentTdfUnit: curTdfUnit,
     })));
   } else {

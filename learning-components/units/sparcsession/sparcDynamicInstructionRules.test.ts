@@ -51,6 +51,9 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   let failQuestion = false;
   let failModelAfter: number | undefined;
   let failBatch = false;
+  let failScoring = false;
+  let failSubmission = false;
+  let loseSubmissionAck = false;
   let evidence: SparcRetainedEvidence[] = [];
   let feedbackGate: Promise<void> | undefined;
   let instructionStarted: (() => void) | undefined;
@@ -58,7 +61,11 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
   const submit = (result?: SparcTrialResult) => commitSparcTrialDisplayAutoTutorRules({
     core: { userId: 'u', TDFId: 'dynamic', sessionID: 'session', levelUnit: 0 }, pageKey, display: source,
     ...(result ? { result } : {}), priorHistoryRecords: JSON.parse(JSON.stringify(rows)),
-    scoreLearnerResponse: response => { calls++; scoredResponses.push({ learnerText: response.learnerText, event: response.event }); return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === ids[0] ? firstCoverage ?? coverage : coverage })),
+    scoreLearnerResponse: response => { calls++; scoredResponses.push({ learnerText: response.learnerText, event: response.event });
+      assert.ok(rows.some(row => transition(row).transitionId === `${response.event.eventId}:submission`));
+      assert.ok(!response.replayState.transitions.some(entry => entry.event.eventId === response.event.eventId), 'Scoring receives the pre-response context');
+      if (failScoring) throw new Error('assessment provider interrupted');
+      return { learningTargetScores: ids.map(clusterKC => ({ clusterKC, coverage: clusterKC === ids[0] ? firstCoverage ?? coverage : coverage })),
       evidence, diagnosticMisconceptionScores: misconceptionIds.map(id => ({ id, supportStrength: id === 'm1' ? support : 0 })) }; },
     generateTutorUtterance: async request => {
       requests.push(request);
@@ -95,9 +102,11 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
       if (failBatch) throw new Error('assessment write interrupted');
       rows.push(...records);
     }, writeCanonicalHistory: async record => {
+      if (failSubmission && transition(record).transitionId.endsWith(':submission')) throw new Error('submission storage unavailable');
       if (transition(record).transitionId.includes(':assessment:model:') && failModelAfter !== undefined
         && rows.filter(row => transition(row).transitionId.includes(':assessment:model:')).length >= failModelAfter) throw new Error('model write interrupted');
       rows.push(record);
+      if (loseSubmissionAck && transition(record).transitionId.endsWith(':submission')) throw new Error('submission acknowledgement lost');
     } },
   });
   const menu = () => currentSparcMenu(replaySparcHistory(rows));
@@ -127,11 +136,84 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
     scores: (value: number, misconception = 0) => { coverage = value; support = misconception; }, firstTarget: (value: number) => { firstCoverage = value; },
     fail: (value: boolean) => { failQuestion = value; }, failModel: (after?: number) => { failModelAfter = after; },
     failBatch: (value: boolean) => { failBatch = value; },
+    failScoring: (value: boolean) => { failScoring = value; }, failSubmission: (value: boolean) => { failSubmission = value; },
+    loseSubmissionAck: (value: boolean) => { loseSubmissionAck = value; },
     overlap: (gate: Promise<void>, started: () => void) => { feedbackGate = gate; instructionStarted = started; },
     beforeQuestion: (gate: () => Promise<void>) => { beforeQuestion = gate; } };
 }
 
 describe('Dynamic instruction production cycles', () => {
+  it('recovers a persisted submission after its acknowledgement is lost without saving it twice', async () => {
+    const f = fixture('agent'); f.loseSubmissionAck(true);
+    await assert.rejects(f.answer(), /acknowledgement lost/);
+    assert.equal(f.calls(), 0); assert.equal(f.rows.length, 1);
+    f.loseSubmissionAck(false); await f.submit();
+    assert.equal(f.calls(), 1);
+    assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':submission')).length, 1);
+  });
+  it('resumes existing assessment-owned answers without rewriting their history', async () => {
+    const f = fixture('agent'); f.fail(true);
+    await assert.rejects(f.answer(), /question failed/);
+    const submission = transition(f.rows.find(row => transition(row).transitionId.endsWith(':submission'))!);
+    // Representative pre-checkpoint history: the assessment owns the learner node.
+    const older = f.rows.filter(row => !transition(row).transitionId.endsWith(':submission')).map(row => {
+      if (!transition(row).transitionId.endsWith(':assessment')) return row;
+      return { ...row, sparc: { ...row.sparc as object, stateTransition: {
+        ...transition(row), writes: [...transition(row).writes, submission.writes[0]!],
+      } } };
+    });
+    f.rows.splice(0, f.rows.length, ...JSON.parse(JSON.stringify(older)));
+    const original = JSON.stringify(f.rows);
+    f.fail(false); await f.submit();
+    assert.equal(f.calls(), 1);
+    assert.equal(JSON.stringify(f.rows.slice(0, older.length)), original);
+    assert.ok(!f.rows.some(row => transition(row).transitionId.endsWith(':submission')));
+    assert.equal(progressiveDialogueFacts(replaySparcHistory(f.rows)).filter(fact => fact.slots?.speaker === 'learner').length, 1);
+  });
+  for (const version of ['agent', 'student'] as const) {
+    it(`restores a submitted text answer before assessment and resumes it on document load (${version})`, async () => {
+      const f = fixture(version);
+      f.failSubmission(true);
+      await assert.rejects(f.answer(100), /submission storage unavailable/);
+      assert.equal(f.calls(), 0); assert.equal(f.rows.length, 0);
+      f.failSubmission(false); f.failScoring(true);
+      await assert.rejects(f.answer(100), /assessment provider interrupted/);
+      assert.equal(f.rows.length, 1);
+      const submission = transition(f.rows[0]!);
+      assert.equal(submission.event.payload?.input, 'An answer.');
+      const restored = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
+      assert.equal(progressiveDialogueFacts(restored).filter(f => f.slots?.speaker === 'learner').length, 1);
+      assert.ok(!Object.values(restored.cells).some(cell => (cell.value as SparcWorkingMemoryFact)?.factType === 'session.turnState'));
+      await assert.rejects(f.submit({ submittedNodes: { 'learner-response-input': 'Changed answer' }, timestamp: 101 }), /Conflicting submission/);
+      f.failScoring(false);
+      await f.submit();
+      assert.equal(f.calls(), 2, 'Only the interrupted evaluation is repeated');
+      assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':submission')).length, 1);
+      assert.equal(progressiveDialogueFacts(replaySparcHistory(f.rows)).filter(f => f.slots?.speaker === 'learner').length, 1);
+      assert.equal(f.facts().find(f => f.factType === 'session.turnState')?.slots?.turnCount, 1);
+      const count = f.rows.length;
+      await f.submit();
+      assert.equal(f.rows.length, count); assert.equal(f.calls(), 2);
+    });
+  }
+  it('restores an accepted choice and its support while assessment is unfinished', async () => {
+    const f = fixture('student', false, 'rule');
+    await f.answer(); await f.choice('explanation-rich-question.multiple-choice');
+    const before = savedSparcQuestions(replaySparcHistory(f.rows));
+    const question = before.at(-1)!;
+    f.failScoring(true);
+    await assert.rejects(f.mcAnswer('b'), /assessment provider interrupted/);
+    const replay = replaySparcHistory(JSON.parse(JSON.stringify(f.rows)));
+    assert.deepEqual(savedSparcQuestions(replay), before);
+    const shown = projectSparcAnsweredQuestionOperations(replay).find(op => 'node' in op && op.node.id === question.id)!;
+    assert.ok('node' in shown);
+    assert.equal(shown.node.selectedChoiceId, 'b'); assert.equal(shown.node.readOnly, true);
+    const accepted = f.rows.slice();
+    f.failScoring(false); await f.submit();
+    assert.deepEqual(f.rows.slice(0, accepted.length), accepted);
+    assert.equal(f.scoredResponses.at(-1)!.event.payload?.questionId, question.id);
+    assert.equal(f.scoredResponses.at(-1)!.learnerText, 'The rule holds under every condition.');
+  });
   it('diagnoses a rejected old choice after an MC-to-cloze transition without retaining response text', async () => {
     const f = fixture('student', false, 'rule');
     await f.answer(); await f.choice('explanation-rich-question.multiple-choice');
@@ -368,7 +450,8 @@ describe('Dynamic instruction production cycles', () => {
     f.scores(.3);
     f.failBatch(true);
     await assert.rejects(f.answer(100), /assessment write interrupted/);
-    assert.equal(f.rows.length, 0);
+    assert.equal(f.rows.length, 1);
+    assert.ok(transition(f.rows[0]!).transitionId.endsWith(':submission'), 'The answer survives without any partial assessment');
     f.failBatch(false); f.failModel(2);
     await assert.rejects(f.answer(100), /model write interrupted/);
     assert.equal(f.calls(), 2);

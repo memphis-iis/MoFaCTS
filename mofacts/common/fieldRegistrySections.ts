@@ -170,8 +170,15 @@ function createUnitSchema(title = 'Unit'): Record<string, unknown> {
   const schema = createClosedObjectSchema(title, UNIT_FIELD_REGISTRY);
   schema.allOf = [{
     if: { required: ['gazecalibrationsession'] },
-    then: { not: { anyOf: ['learningsession', 'assessmentsession', 'sparcsession', 'videosession', 'adaptive']
+    then: { not: { anyOf: ['learningsession', 'assessmentsession', 'sparcsession', 'videosession', 'skeletondemosession', 'adaptive']
       .map(field => ({ required: [field] })) } },
+  }, {
+    if: { required: ['skeletondemosession'] },
+    then: {
+      not: { anyOf: ['learningsession', 'assessmentsession', 'sparcsession', 'videosession', 'gazecalibrationsession', 'adaptive']
+        .map(field => ({ required: [field] })) },
+      properties: { gazeTracking: { const: false } },
+    },
   }];
   (schema.properties as Record<string, unknown>).deliverySettings = createUnitDeliverySettingsSchema();
   (schema.properties as Record<string, unknown>).learningsession = createLearningSessionSchema();

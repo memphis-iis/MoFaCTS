@@ -2,6 +2,9 @@
 
 MoFaCTS uses Tutor Definition Files (TDFs) to define adaptive learning content.
 
+For a camera-only unit with a live body skeleton and no scoring or recording,
+see [the skeleton demo unit](skeleton-demo.md).
+
 ## What A TDF Describes
 
 A TDF can define:

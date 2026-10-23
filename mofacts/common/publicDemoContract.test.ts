@@ -4,9 +4,16 @@ import {
   PUBLIC_DEMO_LIFETIME_MS,
   parsePublicDemoRequest,
   publicDemoExpiresAt,
+  isPublicDemoTutor,
 } from './publicDemoContract';
 
 describe('publicDemoContract', function() {
+  it('reserves demo targets and tags without treating ordinary experiments as demos', function() {
+    expect(isPublicDemoTutor({ setspec: { experimentTarget: ' PUBLIC-DEMO-ai-fluency ' } })).to.equal(true);
+    expect(isPublicDemoTutor({ setspec: { tags: ['public-demo'] } })).to.equal(true);
+    expect(isPublicDemoTutor({ setspec: { experimentTarget: 'study-1', tags: ['demo'] } })).to.equal(false);
+    expect(isPublicDemoTutor(null)).to.equal(false);
+  });
   it('accepts only the three allowlisted kinds with no client-supplied launch fields', function() {
     expect(parsePublicDemoRequest({ kind: 'student' })).to.equal('student');
     expect(parsePublicDemoRequest({ kind: 'teacher' })).to.equal('teacher');

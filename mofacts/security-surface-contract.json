@@ -660,7 +660,7 @@
     {
       "name": "processPackageUpload",
       "access": "role-checked",
-      "notes": "Existing content-management authorization and package identity preflight remain required. Update summaries include structuralWarnings before content writes."
+      "notes": "Existing content-management authorization and package identity preflight remain required. Public demo uploads and replacements require the acting uploader to be an admin. Update summaries include structuralWarnings before content writes."
     },
     {
       "name": "provisionExperimentUser",
@@ -793,12 +793,12 @@
     {
       "name": "saveTdfContent",
       "access": "role-checked",
-      "notes": "Content-management authorization is rechecked on every save. Risky authored-unit updates return confirmation-required with expectedRevision; confirmed writes compare tdfRevision atomically."
+      "notes": "Content-management authorization is rechecked on every save. Public demo content requires admin status independently of ownership or sharing. Risky authored-unit updates return confirmation-required with expectedRevision; confirmed writes compare tdfRevision atomically."
     },
     {
       "name": "saveTdfStimuli",
       "access": "role-checked",
-      "notes": "Content-management authorization is rechecked on every save. Question reductions return confirmation-required with expectedRevision; confirmed writes compare tdfRevision atomically."
+      "notes": "Content-management authorization is rechecked on every save. Public demo content requires admin status independently of ownership or sharing. Question reductions return confirmation-required with expectedRevision; confirmed writes compare tdfRevision atomically."
     },
     {
       "name": "saveUserSpeechAPIKey",

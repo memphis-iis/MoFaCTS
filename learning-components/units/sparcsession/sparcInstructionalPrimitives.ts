@@ -1,4 +1,5 @@
 import { parseSparcVideoSegment, type SparcVideoSegment } from '../../runtime/sparcVideo';
+import { sparcEvidenceContext } from './sparcEvidenceHistory';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../runtime/sparcAdministrativeRemoval';
 import type { SparcPrimitiveReference } from './sparcMoveLibrary';
 import { parseSparcSupportedPrompt, SPARC_SUPPORTED_PROMPT_SCHEMA_ID, type SparcSupportedPrompt } from './sparcSupportedPrompt';
@@ -163,7 +164,8 @@ export function createSparcFeedbackRequest(facts: readonly SparcWorkingMemoryFac
     selectedAction: { snapshotId: event.eventId, action: SPARC_FEEDBACK_MOVE_DEFINITION.moveId, sourceRuleId },
     moveDefinition: SPARC_FEEDBACK_MOVE_DEFINITION, sourceRuleId, responseModifiers: [], learnerText,
     ...(contribution ? { learnerContribution: contribution } : {}),
-    plannerState: { assessment: assessment.map((fact) => ({ factType: fact.factType, ...fact.slots })) },
+    plannerState: { assessment: assessment.map((fact) => ({ factType: fact.factType,
+      ...sparcEvidenceContext(fact.slots ?? {}) })) },
     dialogueHistory: buildSparcDialogueHistory(facts.filter(fact => fact.factType === 'dialogue.utterance'
       && (fact.slots?.eventId === question?.slots?.eventId || fact.slots?.eventId === event.eventId))),
   };

@@ -1,8 +1,14 @@
 import { strict as assert } from 'node:assert';
-import { retainedEvidenceFacts, parseSparcEvidenceSummary } from './sparcEvidenceHistory';
+import { retainedEvidenceFacts, parseSparcEvidenceSummary, sparcEvidenceContext } from './sparcEvidenceHistory';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 
 describe('Retained instructional evidence', () => {
+  it('excludes saved KC incorrect claims from provider context while retaining misconception claims', () => {
+    const kc = { kind: 'expectation', demonstrated: ['Known'], incorrect: ['Prior claim'], unresolved: ['Remaining'] };
+    assert.deepEqual(sparcEvidenceContext(kc), { kind: 'expectation', demonstrated: ['Known'], unresolved: ['Remaining'] });
+    assert.deepEqual(sparcEvidenceContext({ ...kc, kind: 'misconception' }), { ...kc, kind: 'misconception' });
+    assert.deepEqual(kc.incorrect, ['Prior claim']);
+  });
   const facts: SparcWorkingMemoryFact[] = [{ factType: 'autotutor.expectation', slots: { clusterKC: 'species' } }];
   it('retains descriptions within an authored target and points to canonical learner spans', () => {
     const [fact] = retainedEvidenceFacts(facts, [{ kind: 'expectation', id: 'species', demonstrated: ['Explains gene flow'],

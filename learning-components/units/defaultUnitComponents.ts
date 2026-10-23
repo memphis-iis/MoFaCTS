@@ -22,10 +22,12 @@ import {
 } from './video-session/manifest';
 
 import { gazeCalibrationUnitComponentManifest } from './gaze-calibration/manifest';
+import { skeletonDemoUnitComponentManifest } from './skeleton-demo/manifest';
 
 export const defaultUnitComponentManifests: readonly LearningComponentManifest<CreateUnitEngineDeps>[] = [
   instructionUnitComponentManifest,
   gazeCalibrationUnitComponentManifest,
+  skeletonDemoUnitComponentManifest,
   learningSessionUnitComponentManifest,
   sparcSessionUnitComponentManifest,
   assessmentSessionUnitComponentManifest,

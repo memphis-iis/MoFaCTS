@@ -45,7 +45,7 @@ function resolveUnitEntrySurface(unit: TdfUnitLike, unitType: UnitType): UnitEnt
     unit.picture
   );
 
-  if (unitType === 'gaze-calibration') return 'content';
+  if (unitType === 'gaze-calibration' || unitType === 'skeleton-demo') return 'content';
   return unitType === 'instruction-only' || instructionSurfaceIsPresent
     ? 'instructions'
     : 'content';
@@ -74,7 +74,7 @@ export function resolveLessonLaunchEntryRoute(params: {
   }
 
   const unitType = resolveUnitEngineTypeForUnit(firstUnit, 'lessonLaunch.entryRoute');
-  if (unitType === 'gaze-calibration') return { route: '/content', currentUnitNumber: 0, currentTdfUnit: firstUnit, curUnitInstructionsSeen: true };
+  if (unitType === 'gaze-calibration' || unitType === 'skeleton-demo') return { route: '/content', currentUnitNumber: 0, currentTdfUnit: firstUnit, curUnitInstructionsSeen: true };
   const entrySurface = resolveUnitEntrySurface(firstUnit, unitType);
 
   return entrySurface === 'instructions'

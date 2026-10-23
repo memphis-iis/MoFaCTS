@@ -101,7 +101,8 @@ export async function prepareLessonLaunchContext(params: PrepareLessonLaunchPara
   markLaunchLoadingTiming?.('getExperimentState:complete', { source });
   const launchProgress = resolveCardLaunchProgress(persistedExperimentState, unitCount);
   const resumedUnitNumber = launchProgress.persistedUnitNumber;
-  if (!launchProgress.moduleCompleted && resumedUnitNumber !== null && content?.tdfs?.tutor?.unit?.[resumedUnitNumber]?.gazecalibrationsession) {
+  const resumedUnit = resumedUnitNumber === null ? undefined : content?.tdfs?.tutor?.unit?.[resumedUnitNumber];
+  if (!launchProgress.moduleCompleted && resumedUnitNumber !== null && (resumedUnit?.gazecalibrationsession || resumedUnit?.skeletondemosession)) {
     Session.set('currentUnitNumber', resumedUnitNumber);
     Session.set('currentTdfUnit', content.tdfs.tutor.unit[resumedUnitNumber]);
   }

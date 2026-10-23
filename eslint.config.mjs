@@ -20,6 +20,7 @@ export default [
       'mofacts/public/build-assets/**',
       'mofacts/public/build-chunks/**',
       'mofacts/public/webgazer/**',
+      'mofacts/public/mediapipe/wasm/**',
       'mofacts/private/build-assets/**',
       'mofacts/private/build-chunks/**',
       'deploy/local-data/**',

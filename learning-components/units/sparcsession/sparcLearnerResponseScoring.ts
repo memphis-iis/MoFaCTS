@@ -181,7 +181,7 @@ function requireExactEvidenceId(value: unknown, label: string): string {
   return value;
 }
 
-function completeEvidenceById<T>(params: {
+function evidenceById<T>(params: {
   readonly evaluations: readonly T[];
   readonly identity: (evaluation: T) => unknown;
   readonly knownIds: ReadonlySet<string>;
@@ -200,11 +200,6 @@ function completeEvidenceById<T>(params: {
       throw new Error(`SPARC learner-response evidence contains duplicate ${params.label} "${id}"`);
     }
     evaluationsById.set(id, evaluation);
-  }
-  for (const id of params.knownIds) {
-    if (!evaluationsById.has(id)) {
-      throw new Error(`SPARC learner-response evidence is missing ${params.label} "${id}"`);
-    }
   }
   return evaluationsById;
 }
@@ -264,13 +259,13 @@ export function reduceSparcLearnerResponseEvidence(params: {
   const knownMisconceptions = knownMisconceptionIds(params.facts);
   const previousCoverage = previousLearningTargetCoverage(params.facts);
   const previousSupportStrength = previousMisconceptionSupportStrength(params.facts);
-  const learningTargetEvaluations = completeEvidenceById({
+  const learningTargetEvaluations = evidenceById({
     evaluations: params.evidence.learningTargetEvaluations,
     identity: (evaluation) => evaluation.clusterKC,
     knownIds: knownClusterKcs,
     label: 'learning target clusterKC',
   });
-  const misconceptionEvaluations = completeEvidenceById({
+  const misconceptionEvaluations = evidenceById({
     evaluations: params.evidence.diagnosticMisconceptionEvaluations,
     identity: (evaluation) => evaluation.id,
     knownIds: knownMisconceptions,
@@ -279,8 +274,10 @@ export function reduceSparcLearnerResponseEvidence(params: {
   const learningTargetScores: SparcLearningTargetScoreInput[] = [];
   const diagnosticMisconceptionScores: SparcDiagnosticMisconceptionScoreInput[] = [];
 
+  // Omitted targets carry their existing scores forward without a synthetic record.
   for (const clusterKC of knownClusterKcs) {
-    const evaluation = learningTargetEvaluations.get(clusterKC)!;
+    const evaluation = learningTargetEvaluations.get(clusterKC);
+    if (!evaluation) continue;
     const evidence = validatedEvidence({
       direction: evaluation.evidenceDirection,
       strength: evaluation.evidenceStrength,
@@ -293,7 +290,8 @@ export function reduceSparcLearnerResponseEvidence(params: {
   }
 
   for (const id of knownMisconceptions) {
-    const evaluation = misconceptionEvaluations.get(id)!;
+    const evaluation = misconceptionEvaluations.get(id);
+    if (!evaluation) continue;
     const evidence = validatedEvidence({
       direction: evaluation.evidenceDirection,
       strength: evaluation.evidenceStrength,

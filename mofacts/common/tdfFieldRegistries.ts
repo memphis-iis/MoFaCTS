@@ -364,6 +364,10 @@ export const SETSPEC_FIELD_REGISTRY: SectionFieldRegistry = {
 
 
 export const UNIT_FIELD_REGISTRY: SectionFieldRegistry = {
+  skeletondemosession: simpleField({ type: 'object', properties: {}, additionalProperties: false }, {
+    brief: 'Live webcam skeleton demo unit.',
+    verbose: 'Displays local MediaPipe body landmarks. No scoring, recording, or pose history. Cannot coexist with another session selector, gaze tracking, or adaptive transitions.',
+  }),
   gazeTracking: simpleField({ type: 'boolean', default: false }, {
     brief: 'Show webcam gaze estimates during this unit.',
     verbose: 'Requires session calibration. Visual prototype only; no gaze data is saved.',

@@ -1,6 +1,6 @@
 // `autotutor` is retained as metadata for saved lessons and historical dashboards;
 // it is not an interactive authoring type or a registered learner engine.
-export type TdfUnitType = 'learning' | 'assessment' | 'video' | 'instructions' | 'autotutor' | 'sparc' | 'gaze-calibration';
+export type TdfUnitType = 'learning' | 'assessment' | 'video' | 'instructions' | 'autotutor' | 'sparc' | 'gaze-calibration' | 'skeleton-demo';
 
 export const INTERACTIVE_TDF_UNIT_TYPES: readonly TdfUnitType[] = Object.freeze([
   'learning',
@@ -14,6 +14,7 @@ export function detectTdfUnitType(unit: unknown): TdfUnitType | null {
     return null;
   }
   const record = unit as Record<string, unknown>;
+  if (record.skeletondemosession && typeof record.skeletondemosession === 'object') return 'skeleton-demo';
   if (Object.prototype.hasOwnProperty.call(record, 'autotutorsession')) {
     return 'autotutor';
   }

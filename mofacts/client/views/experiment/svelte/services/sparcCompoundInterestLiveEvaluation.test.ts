@@ -565,11 +565,12 @@ describe('SPARC Compound Interest live evaluation harness', function() {
     );
     const invalidEnvelope: SparcLearnerResponseEvidenceEnvelope = {
       ...baseEnvelope,
+      learningTargetEvaluations: baseEnvelope.learningTargetEvaluations.filter(evaluation => evaluation.evidenceDirection !== 'unaddressed'),
       diagnosticMisconceptionEvaluations: baseEnvelope.diagnosticMisconceptionEvaluations.map(
         (evaluation) => evaluation.id === 'M1'
           ? { ...evaluation, evidenceDirection: 'supports' as const, evidenceStrength: 0 }
           : evaluation,
-      ),
+      ).filter(evaluation => evaluation.evidenceDirection !== 'unaddressed'),
     };
     let providerCreationCount = 0;
     const result = await runSparcCompoundInterestLiveEvaluation({

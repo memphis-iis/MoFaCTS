@@ -6,6 +6,7 @@
   import ContentSurface from './ContentSurface.svelte';
   import GazeCalibration from './GazeCalibration.svelte';
   import GazeDot from './GazeDot.svelte';
+  import SkeletonDemoUnit from './SkeletonDemoUnit.svelte';
   import { contentSurfaceRevision } from '../services/contentSurfaceInstance';
   import { unitIsFinished } from '../services/unitProgression';
   import { gazeState, getGazeContext, setGazeContext, cancelGazeCalibration } from '../services/gazeTracking';
@@ -27,7 +28,7 @@
     const file = Session.get('currentTdfFile');
     const number = Session.get('currentUnitNumber');
     unit = Session.get('currentTdfUnit');
-    const entryKey = `${Session.get('currentTdfId')}:${number}:${Boolean(unit?.gazecalibrationsession)}:${unit?.gazeTracking === true}`;
+    const entryKey = `${Session.get('currentTdfId')}:${number}:${Boolean(unit?.gazecalibrationsession)}:${Boolean(unit?.skeletondemosession)}:${unit?.gazeTracking === true}`;
     if (lastUnit !== entryKey) {
       initialCalibrationPending = unit?.gazeTracking === true &&
         (getGazeContext().lessonId !== String(tdfId || '') || !get(gazeState).calibrated);
@@ -45,7 +46,8 @@
     if (unit?.gazecalibrationsession || initialCalibrationPending) finishLaunchLoading('gaze-calibration-ready');
   });
   $: calibrationUnit = Boolean(unit?.gazecalibrationsession);
-  $: enabled = unit?.gazeTracking === true;
+  $: skeletonDemoUnit = Boolean(unit?.skeletondemosession);
+  $: enabled = unit?.gazeTracking === true && !skeletonDemoUnit;
   $: setGazeContext({ lessonId: String(tdfId || ''), unitId: Number(unitId), enabled: enabled && !calibrationUnit });
   async function completeCalibration() {
     if (calibrationUnit) {
@@ -72,7 +74,11 @@
   }
 </script>
 
-{#if calibrationUnit}
+{#if skeletonDemoUnit}
+  {#key lastUnit}
+    <SkeletonDemoUnit />
+  {/key}
+{:else if calibrationUnit}
   {#if engineError}<p role="alert">{engineError}</p>{:else}<GazeCalibration on:complete={completeCalibration} />{/if}
 {:else}
   {#if !initialCalibrationPending}

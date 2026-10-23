@@ -9,6 +9,12 @@ export type SparcRetainedEvidence = SparcEvidenceSummary & {
   citations: { responseId: string; start: number; end: number }[];
 };
 
+/** Shared provider context projection; saved KC evidence may still contain the storage field. */
+export function sparcEvidenceContext(record: Readonly<Record<string, unknown>>) {
+  const { incorrect, ...evidence } = record;
+  return evidence.kind === 'expectation' ? evidence : { ...evidence, incorrect };
+}
+
 export function parseSparcEvidenceSummary(value: unknown): SparcEvidenceSummary {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Assessment requires an evidence summary');
   const record = value as Record<string, unknown>;

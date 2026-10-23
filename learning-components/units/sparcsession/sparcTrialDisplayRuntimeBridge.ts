@@ -786,6 +786,12 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     && record.userId === params.core.userId && record.TDFId === params.core.TDFId
     && record.levelUnit === params.core.levelUnit);
   const core = origin ? { ...params.core, sessionID: requireNonBlank(origin.sessionID, 'SPARC resumed attempt identity') } : params.core;
+  const scoreResponse = (event: SparcInterfaceEvent, problemStatement: string, learnerText: string, result: SparcTrialResult) => {
+    // The current answer is supplied separately, not duplicated in dialogue history.
+    const beforeResponse = replaySparcDocumentHistory(document, params.priorHistoryRecords.filter(record =>
+      (record.sparc as { stateTransition?: { event?: { eventId?: string } } })?.stateTransition?.event?.eventId !== event.eventId));
+    return params.scoreLearnerResponse({ document, replayState: beforeResponse, event, problemStatement, learnerText, display: params.display, result });
+  };
   if (!params.result) {
     if (!isSparcCategorizedPolicy(document.instructionalController?.policyId)) throw new Error('Automatic document startup requires a categorized policy');
     const previous = replayState.transitions;
@@ -803,7 +809,17 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     };
     const problemStatement = requireSparcDialogueProblemStatement(params.display);
     const dialogueTurn = await commitSparcInstructionalCycle({ ...params, core, document, replayState, event, problemStatement,
-      scoreLearnerResponse: () => { throw new Error('Resumed instruction requires its accepted assessment; document startup cannot evaluate a learner response'); },
+      scoreLearnerResponse: () => {
+        if (event.type !== 'response-submitted' || !previous.some(entry => entry.transitionId === `${event.eventId}:submission`)) {
+          throw new Error('Resumed assessment requires a durably accepted learner submission');
+        }
+        const learnerText = requireSparcDialogueText(event.payload?.input, 'Saved learner response');
+        const result: SparcTrialResult = { timestamp: event.time, triggeredBy: event.source.nodeId,
+          submittedNodes: event.payload?.choiceId !== undefined
+            ? { [event.source.nodeId]: event.payload.choiceId }
+            : { 'learner-response-input': learnerText } };
+        return scoreResponse(event, problemStatement, learnerText, result);
+      },
       runtime: { history: params.history },
     });
     return { document, event, learnerText: String(event.payload?.input ?? ''), dialogueTurn };
@@ -872,7 +888,7 @@ export async function commitSparcTrialDisplayAutoTutorRules(params: {
     }
     const problemStatement = requireSparcDialogueProblemStatement(params.display);
     const dialogueTurn = await commitSparcInstructionalCycle({ ...params, core, document, replayState, event, problemStatement,
-      scoreLearnerResponse: () => params.scoreLearnerResponse({ document, replayState, event, problemStatement, learnerText, display: params.display, result }),
+      scoreLearnerResponse: () => scoreResponse(event, problemStatement, learnerText, result),
       runtime: { history: params.history },
     });
     return { document, event, learnerText, dialogueTurn };

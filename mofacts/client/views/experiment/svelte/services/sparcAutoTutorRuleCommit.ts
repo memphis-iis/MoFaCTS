@@ -205,7 +205,7 @@ async function commitSparcAutoTutorEvent(params: SparcAutoTutorCommitParams): Pr
           writtenHistoryCount += 1;
           const transitionId = (historyRecord.sparc as { stateTransition?: { transitionId?: string } })?.stateTransition?.transitionId ?? '';
           if (isSparcCategorizedPolicy(sparcDisplay.instructionalController?.policyId)
-            && (transitionId.endsWith(':feedback') || transitionId.includes(':primitive:'))) {
+            && (transitionId.endsWith(':submission') || transitionId.endsWith(':feedback') || transitionId.includes(':primitive:'))) {
             await params.onNodeValues?.(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit, pageKey: sparcDisplay.pageKey, display: sparcDisplay }).nodeValues);
           }
         },

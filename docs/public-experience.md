@@ -46,6 +46,8 @@ The overview and ordinary authentication surfaces use the same semantic applicat
 
 Demo packages are authored in the canonical `mofacts_config` repository and must be uploaded through the normal package workflow before the corresponding route is available. No config content is published automatically by the application source change.
 
+Public demo content is reserved for administrators. A TDF with an `experimentTarget` beginning with `public-demo-` or a `public-demo` tag requires an administrator to upload it. This check uses the acting uploader's role, independently of ownership, sharing, teacher status, or other upload permissions. Replacing an existing demo requires administrator status even if the replacement removes its demo markers. The content and stimulus editors also require administrator status to edit demo lessons, and only administrators can add demo markers through the content editor. These markers reserve content management; they do not extend the three-kind automatic-login allowlist. Editable packages live in lesson folders under `C:\dev\mofacts_config`; upload ZIPs live directly in that repository root.
+
 ## Standalone practice settings and reset
 
 Every lesson in Practice exposes **Settings**, including video, assessment, and instruction lessons. The panel shows only applicable personal settings. **Reset test progress → Confirm reset** removes the caller's saved history and attempt state for the whole lesson family, including prequiz answers and generated adaptive sequences; the next launch starts anew. Cancel leaves progress intact. This reset cannot be undone.

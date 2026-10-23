@@ -1,0 +1,12 @@
+MediaPipe Pose Landmarker demonstration assets
+Copyright Google LLC. Licensed under Apache License, Version 2.0 (see LICENSE).
+
+Model: pose_landmarker_full, float16, version 1
+Source: https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+SHA-256: 5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1
+Model card: https://storage.googleapis.com/mediapipe-assets/Model%20Card%20BlazePose%20GHUM%203D.pdf
+Model bundle license confirmation: https://github.com/google-ai-edge/mediapipe/issues/6306
+
+Runtime WASM is copied at install time from @mediapipe/tasks-vision 0.10.35.
+Source: https://github.com/google-ai-edge/mediapipe
+No runtime assets or models are fetched from a third-party CDN by this demo.

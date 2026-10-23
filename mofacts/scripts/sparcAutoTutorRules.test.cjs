@@ -9,6 +9,7 @@ Object.assign(globalThis, {
 const suites = [
   'sparcMoveDefinitions',
   'sparcExpectationHistory',
+  'sparcLearnerResponseScoring',
   'sparcInstructionalPrimitives',
   'sparcInstructionalCycle',
   'sparcCompetitiveSelection',

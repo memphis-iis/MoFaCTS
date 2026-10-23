@@ -1,4 +1,5 @@
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
+import { sparcEvidenceContext } from './sparcEvidenceHistory';
 import { resolveSparcReadingLevel, type SparcReadingLevel } from '../../runtime/sparcReadingLevel';
 import { buildSparcInstructionalNeed, type SparcInstructionalNeed } from '../../runtime/sparcInstructionalNeed';
 import { SPARC_MOVE_LIBRARY_VERSION, stableMoveJson, type SparcPrimitiveContext, type SparcPrimitiveKind } from '../../runtime/sparcMoveLibraryContract';
@@ -9,7 +10,8 @@ export function selectedSparcEvidence(request: SparcUtteranceRequest) {
   const targetKind = request.targetType === 'learningTarget' ? 'expectation' : request.targetType === 'misconception' ? 'misconception' : undefined;
   return (planner?.evidence ?? planner?.assessment?.filter(e => e.factType === 'instructional.evidence') ?? [])
     .filter(e => e.id === request.targetId && (!targetKind || e.kind === targetKind))
-    .map(e => ({ kind: e.kind, id: e.id, demonstrated: e.demonstrated, incorrect: e.incorrect, unresolved: e.unresolved }));
+    .map(e => sparcEvidenceContext({ kind: e.kind, id: e.id, demonstrated: e.demonstrated,
+      incorrect: e.incorrect, unresolved: e.unresolved }));
 }
 
 export function previousSparcQuestions(request: SparcUtteranceRequest) {

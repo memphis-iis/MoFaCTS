@@ -162,6 +162,15 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     await params.runtime.history.writeCanonicalHistory(record);
     return record;
   };
+  // Receiving the learner's action is independent of assessment/provider success.
+  // Older assessments already contain this utterance; never rewrite those rows.
+  const learnerWrites: SparcStateWrite[] = event.type === 'response-submitted' ? [
+      { target: { pageKey: params.document.id, nodeId: 'root' }, key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
+        value: { type: 'append-node', boxId: 'dialogue-flow', node: { id: `${event.eventId}:learner`, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'learner', value: event.payload?.input, turnEventId: event.eventId } } },
+  ] : [];
+  if (event.type === 'response-submitted' && !acceptedEvent) {
+    await save({ transitionId: `${event.eventId}:submission`, event, writes: [...learnerWrites, ...inputControls(event, false)] });
+  }
   const saveDecision = async (current: readonly SparcWorkingMemoryFact[]) => {
     if (acceptedDecision) return;
     const menu = current.find((fact) => fact.factType === 'instructional.menu');
@@ -272,7 +281,6 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     },
     [SPARC_AUTOTUTOR_EVALUATE_ACTION]: async ({ facts: current }) => {
       let acceptedFacts: SparcWorkingMemoryFact[];
-      let learnerWrites: SparcStateWrite[] = [];
       if (acceptedAssessment) {
         // Score changes live in their own rows. Rehydrate carried values before
         // continuing an accepted assessment, including existing bundled histories.
@@ -295,8 +303,6 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
         acceptedFacts = [...scoreFacts, ...derived.map((fact) => fact.factType === 'controller.completionState'
           ? { ...fact, slots: { ...fact.slots, completed, reason: completed ? 'required-coverage' : 'in-progress' } } : fact)];
         const changes = competitive ? undefined : expectationLogitChangesFromScoreFacts(current, scoreFacts);
-        learnerWrites = [{ target: { pageKey: params.document.id, nodeId: 'root' }, key: SPARC_PROGRESSIVE_NODE_OPERATION_STATE_KEY,
-          value: { type: 'append-node', boxId: 'dialogue-flow', node: { id: `${event.eventId}:learner`, nodeType: 'atomic', atomType: 'dialogue-utterance', speaker: 'learner', value: event.payload?.input, turnEventId: event.eventId } } }];
         const scoreChangeFacts = scoreFacts.filter((fact) => {
           const expectation = fact.factType === 'learningTarget.score';
           if (!expectation && fact.factType !== 'diagnostic.misconceptionScore') return false;
@@ -316,7 +322,7 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
             event, writes: factWrites([fact], event) }, changes?.filter(change => change.clusterKC === id));
         }));
         records.push(historyRecord({ transitionId: `${event.eventId}:assessment`, event,
-          writes: [...factWrites(acceptedFacts.filter(fact => !['learningTarget.score', 'diagnostic.misconceptionScore', 'instructional.evidence'].includes(fact.factType)), event), ...learnerWrites] }));
+          writes: factWrites(acceptedFacts.filter(fact => !['learningTarget.score', 'diagnostic.misconceptionScore', 'instructional.evidence'].includes(fact.factType)), event) }));
         if (!params.runtime.history.writeCanonicalHistoryBatch) throw new Error('SPARC assessments require an atomic history batch writer');
         await params.runtime.history.writeCanonicalHistoryBatch(records);
       }

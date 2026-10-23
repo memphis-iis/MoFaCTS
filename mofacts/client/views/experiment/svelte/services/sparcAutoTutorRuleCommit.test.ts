@@ -149,6 +149,13 @@ describe('SPARC app instructional commit', () => {
       sparcResult: { submittedNodes: { 'learner-response-input': 'An answer.' }, triggeredBy: 'learner-response-submit', timestamp: 101 },
       scoreLearnerResponse: () => ({ learningTargetScores: [{ clusterKC: 'a', coverage: .2 }] }),
       onNodeValues: values => {
+        if (!batchAccepted) {
+          const progress = buildSparcAutoTutorProgressSnapshot({ display, runtimeNodeValues: values });
+          assert.equal(progress.turnCount, 0);
+          assert.equal(progress.coveredExpectations, 0);
+          assert.ok(JSON.stringify(values).includes('An answer.'));
+          return;
+        }
         assert.equal(batchAccepted, true, 'Only durably accepted scores may be displayed');
         publications++;
         const progress = buildSparcAutoTutorProgressSnapshot({ display, runtimeNodeValues: values });

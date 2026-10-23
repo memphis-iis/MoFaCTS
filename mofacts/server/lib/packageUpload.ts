@@ -16,6 +16,7 @@ import { postProcessUploadedTdfs } from './packageUploadPostProcess';
 import { applyPackageUploadSideEffects } from './packageUploadSideEffects';
 import { preflightPackageTdfIdentities, type PackageTdfIdentityMode } from './packageTdfIdentity';
 import { assertValidTdfExpressions } from '../../common/lib/tdfExpressionValidation';
+import { isPublicDemoTutor } from '../../common/publicDemoContract';
 
 const INCOMPLETE_UPLOAD_MESSAGE = 'The uploaded ZIP appears incomplete or truncated. Please upload the file again.';
 
@@ -252,6 +253,9 @@ export async function processPackageUploadWorkflow(
     await policy.prepareParsedPackage?.({ unzippedFiles, owner, isTeacherOrAdmin });
     for (const tdfFile of unzippedFiles.filter((file) => file.type === 'tdf')) {
       const contents = typeof tdfFile.contents === 'string' ? JSON.parse(tdfFile.contents) : tdfFile.contents;
+      if (!actingUserIsAdmin && isPublicDemoTutor((contents as { tutor?: unknown })?.tutor)) {
+        throw new Meteor.Error(403, 'Only administrators can upload public demo lessons');
+      }
       assertValidTdfExpressions({ tutor: (contents as { tutor?: unknown })?.tutor }, `${tdfFile.name}.tutor`);
     }
 
@@ -264,6 +268,14 @@ export async function processPackageUploadWorkflow(
       ...(policy.identityMode ? { identityMode: policy.identityMode } : {}),
     });
     state.identityPlan = identityPlan;
+    if (!actingUserIsAdmin) {
+      for (const entry of identityPlan.entries) {
+        const content = entry.beforeImage?.content as { tdfs?: { tutor?: unknown } } | undefined;
+        if (isPublicDemoTutor(content?.tdfs?.tutor)) {
+          throw new Meteor.Error(403, 'Only administrators can replace public demo lessons');
+        }
+      }
+    }
     if (!state.mutationJobId) {
       const createdAt = new Date();
       const expiresAt = new Date(createdAt.getTime() + UPLOAD_PLAN_TTL_MS);

@@ -5,7 +5,7 @@ import type { SparcTrialResult } from '../../../learning-components/trial-displa
 
 export type SparcControllerResult = SparcTrialResult;
 
-export type UnitType = 'schedule' | 'video' | 'model' | 'sparc' | 'instruction-only' | 'gaze-calibration';
+export type UnitType = 'schedule' | 'video' | 'model' | 'sparc' | 'instruction-only' | 'gaze-calibration' | 'skeleton-demo';
 
 export type VideoCheckpointBehavior = 'none' | 'pause' | 'all' | 'some' | 'adaptive' | 'worksheet';
 

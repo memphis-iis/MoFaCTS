@@ -1,5 +1,6 @@
 import { createBaseUnitEngine } from './createBaseUnitEngine';
 import { GAZE_CALIBRATION_UNIT_TYPE } from './gaze-calibration/manifest';
+import { SKELETON_DEMO_UNIT_TYPE } from './skeleton-demo/manifest';
 import {
   createRegisteredUnitEngine,
   getRegisteredUnitEngineTypes,
@@ -276,12 +277,12 @@ export async function createUnitEngineByType(
   if (!hasRegisteredUnitEngine(unitType)) {
     throw new Error(`No unit engine registered for "${String(unitType || '').trim()}"`);
   }
-  // Calibration owns its complete lifecycle and has no practice stimuli or model.
+  // Display-only units own their lifecycle and have no practice stimuli or model.
   // Construct it through the registry without the stimulus-dependent practice base.
-  if (unitType === GAZE_CALIBRATION_UNIT_TYPE) {
+  if (unitType === GAZE_CALIBRATION_UNIT_TYPE || unitType === SKELETON_DEMO_UNIT_TYPE) {
     const engine = await createRegisteredUnitEngine(unitType, deps);
     if (typeof engine.init !== 'function' || typeof engine.loadResumeState !== 'function') {
-      throw new Error('Gaze calibration engine must provide its complete lifecycle');
+      throw new Error(`${unitType} engine must provide its complete lifecycle`);
     }
     await engine.init();
     return engine;

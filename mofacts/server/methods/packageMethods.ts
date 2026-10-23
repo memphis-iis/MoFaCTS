@@ -1,5 +1,6 @@
 import { getContentUpdateWarnings, type ContentUpdateWarning, type ContentUpdateConfirmation, type ContentUpdateReview } from '../../common/lib/contentUpdateWarnings';
 import { Meteor } from 'meteor/meteor';
+import { isPublicDemoTutor } from '../../common/publicDemoContract';
 import { check, Match } from 'meteor/check';
 import { parsePackageZip, type UploadedPackageFile } from '../lib/packageParser';
 import { processPackageUploadWorkflow } from '../lib/packageUpload';
@@ -1047,6 +1048,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     if (!canManage) {
       throw new Meteor.Error('not-authorized', 'You do not have permission to edit this content');
     }
+    if (isPublicDemoTutor(tdf.content?.tdfs?.tutor) &&
+        !(this.userId && await deps.userIsInRoleAsync(this.userId, ['admin']))) {
+      throw new Meteor.Error(403, 'Only administrators can edit public demo lessons');
+    }
     const autoTutorValidation = validateAutoTutorContent({
       tdf: tdf.content?.tdfs,
       stimuli: updatedRawStimuliFile,
@@ -1130,6 +1135,10 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     }
 
     const tdfContentToSave = mergeEditorContentPreservingSourceShape(tdf.content, tdfContent, TDF_CONTENT_SCHEMA);
+    if ((isPublicDemoTutor(tdf.content?.tdfs?.tutor) || isPublicDemoTutor(tdfContentToSave.tdfs?.tutor)) &&
+        !(this.userId && await deps.userIsInRoleAsync(this.userId, ['admin']))) {
+      throw new Meteor.Error(403, 'Only administrators can designate or edit public demo lessons');
+    }
     try {
       assertValidTdfExpressions(tdfContentToSave, 'tdfs.tutor');
     } catch (error: unknown) {

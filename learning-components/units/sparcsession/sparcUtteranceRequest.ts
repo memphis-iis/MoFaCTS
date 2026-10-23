@@ -1,4 +1,5 @@
 import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
+import { sparcEvidenceContext } from './sparcEvidenceHistory';
 import type { SparcPrimitiveReference } from './sparcMoveLibrary';
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
 import type { SparcInstructionComponents } from './sparcInstructionalPrimitives';
@@ -277,7 +278,7 @@ function plannerState(facts: readonly SparcWorkingMemoryFact[]): unknown {
     return [...latest.values()];
   };
   return {
-    evidence: factsByType(facts, 'instructional.evidence').map(fact => fact.slots),
+    evidence: factsByType(facts, 'instructional.evidence').map(fact => sparcEvidenceContext(fact.slots ?? {})),
     expectations: latestByIdentity('learningTarget.score', 'clusterKC'),
     misconceptions: latestByIdentity('diagnostic.misconceptionScore', 'id'),
     activeCycle: latestFact(facts, 'instructional.activeCycle')?.slots ?? null,

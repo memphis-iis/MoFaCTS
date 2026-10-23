@@ -20,6 +20,7 @@ function setup() {
       },
     },
     userCanManageTdf: async () => authorized,
+    userIsInRoleAsync: async () => false,
     canonicalizeStimDisplayMediaRefs: async () => {},
     canonicalizeFlatStimuliMediaRefs: async () => {},
     processAudioFilesForTDF: async () => {},
@@ -32,6 +33,17 @@ function setup() {
 // These exercise the authorized read/review/CAS boundary; package archive and
 // upload-plan integrity remain covered by the package workflow integration tests.
 describe('editor structural update confirmation', function() {
+  it('prevents an authorized non-admin owner from adding or removing demo markers', async function() {
+    const h = setup();
+    const proposed = structuredClone(h.doc.content);
+    proposed.tdfs.tutor.setspec.experimentTarget = 'public-demo-test';
+    await assert.rejects(() => h.methods.saveTdfContent.call({ userId: 'owner' }, h.doc._id, proposed), /Only administrators/);
+    h.doc.content.tdfs.tutor.setspec.tags = ['public-demo'];
+    delete proposed.tdfs.tutor.setspec.experimentTarget;
+    await assert.rejects(() => h.methods.saveTdfContent.call({ userId: 'owner' }, h.doc._id, proposed), /Only administrators/);
+    await assert.rejects(() => h.methods.saveTdfStimuli.call({ userId: 'owner' }, h.doc._id, h.doc.rawStimuliFile, []), /Only administrators/);
+    assert.equal(h.writes.length, 0);
+  });
   for (const method of ['saveTdfContent', 'saveTdfStimuli'] as const) {
     it(`${method}: risky review does not write, cancel leaves content intact, owner confirmation writes`, async function() {
       const h = setup();

@@ -5,6 +5,7 @@ import { createUnitEngineByType, getCreatableUnitEngineTypes } from './unitEngin
 type CurExperimentData = Record<string, unknown>;
 
 interface EngineUnitLike {
+  skeletondemosession?: unknown;
   gazecalibrationsession?: unknown;
   unitname?: unknown;
   assessmentsession?: unknown;
@@ -28,6 +29,7 @@ function getAvailableUnitShapes(unit: EngineUnitLike | null | undefined): string
   }
 
   const shapes: string[] = [];
+  if (unit.skeletondemosession) shapes.push('skeletondemosession');
   if (unit.gazecalibrationsession) shapes.push('gazecalibrationsession');
   if (unit.assessmentsession) shapes.push('assessmentsession');
   if (unit.learningsession) shapes.push('learningsession');
@@ -53,7 +55,8 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
   }
 
   const runnableSessionShapes = getAvailableUnitShapes(unit).filter((shape) => (
-    shape === 'gazecalibrationsession'
+    shape === 'skeletondemosession'
+    || shape === 'gazecalibrationsession'
     || shape === 'assessmentsession'
     || shape === 'learningsession'
     || shape === 'sparcsession'
@@ -67,6 +70,13 @@ export function resolveUnitEngineTypeForUnit(unit: EngineUnitLike | null | undef
     );
   }
 
+  if (unit.skeletondemosession) {
+    const settings = unit as EngineUnitLike & { gazeTracking?: unknown; adaptive?: unknown };
+    if (settings.gazeTracking === true || settings.adaptive) {
+      throw new Error(`${source}: Skeleton demo cannot enable gaze tracking or adaptive transitions`);
+    }
+    return 'skeleton-demo';
+  }
   if (unit.gazecalibrationsession) return 'gaze-calibration';
   if (unit.assessmentsession) return SCHEDULE_UNIT;
   if (unit.videosession) return VIDEO_UNIT;

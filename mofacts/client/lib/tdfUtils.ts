@@ -66,6 +66,7 @@ export function hasLaunchReadyTutorUnits(tdfContent: any): boolean {
       throw new Error('autotutorsession is no longer supported; standalone AutoTutor has been removed');
     }
     return Boolean(
+      unit.skeletondemosession ||
       unit.gazecalibrationsession ||
       unit.assessmentsession ||
       unit.learningsession ||

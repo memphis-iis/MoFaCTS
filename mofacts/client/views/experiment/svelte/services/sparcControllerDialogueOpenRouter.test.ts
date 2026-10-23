@@ -204,6 +204,40 @@ function utteranceRequestFor(
 }
 
 describe('SPARC dialogue OpenRouter provider', function() {
+  it('returns no evaluations for unaddressed targets and separates KC and misconception summaries', async function() {
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+      const schema = params.intent.schema as { properties: Record<string, {
+        minItems: number; items: { properties: { evidenceDirection: { enum: string[] }; summary: { required: string[] } } };
+      }> };
+      const kc = schema.properties.learningTargetEvaluations;
+      const misconception = schema.properties.diagnosticMisconceptionEvaluations;
+      expect(kc!.minItems).to.equal(0);
+      expect(misconception!.minItems).to.equal(0);
+      expect(kc!.items.properties.evidenceDirection.enum).to.deep.equal(['supports', 'contradicts']);
+      expect(kc!.items.properties.summary.required).to.deep.equal(['demonstrated', 'unresolved']);
+      expect(misconception!.items.properties.summary.required).to.deep.equal(['demonstrated', 'incorrect', 'unresolved']);
+      expect(params.messages[0]!.content).to.include('Omit unaddressed targets entirely');
+      return { parsedContent: { learningTargetEvaluations: [], diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' } } };
+    } });
+    const result = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText: 'Okay.', ...scorerContext(),
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(result.learningTargetScores).to.deep.equal([]);
+    expect(result).not.to.have.property('diagnosticMisconceptionScores');
+    expect(result).not.to.have.property('evidence');
+  });
+
+  it('rejects incorrect-claim fields in KC summaries instead of retaining them as KC evidence', async function() {
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson() {
+      return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: .5,
+        learnerEvidence: latestLearnerEvidence('A matters'), summary: { demonstrated: [], incorrect: ['Mistaken claim'], unresolved: [] } }],
+      diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' } } };
+    } });
+    let error: unknown;
+    try { await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText: 'A matters.', ...scorerContext(),
+    } as Parameters<typeof provider.scoreLearnerResponse>[0]); } catch (caught) { error = caught; }
+    expect(String(error)).to.include('incorrect claims belong to misconceptions');
+  });
+
   it('adds audience directions to every text primitive and leaves scoring prompts unchanged', async () => {
     for (const readingLevel of [undefined, 'unbiased', 'junior-high-freshman', 'high-school-freshman', 'college-freshman'] as const) {
       const generated: string[] = [], scoring: string[] = [];
@@ -436,7 +470,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
   });
 
   it('guides the initial question with earlier questions and accepts the first output without a repetition check', async function() {
-    const evidence = { kind: 'expectation', id: 'kc-a', demonstrated: ['Known A'], incorrect: [], unresolved: ['Remaining A'] };
+    const evidence = { kind: 'expectation', id: 'kc-a', demonstrated: ['Known A'], unresolved: ['Remaining A'] };
     const calls: string[] = [];
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
@@ -571,7 +605,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         return { parsedContent: {
           learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
             learnerEvidence: latestLearnerEvidence('total balance') }],
-          diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
+          diagnosticMisconceptionEvaluations: [],
           learnerContribution: { type: 'answer' },
         } };
       },
@@ -602,10 +636,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(input.learningTargets.map((target: { clusterKC: string }) => target.clusterKC)).to.deep.equal(['kc-0', 'kc-1', 'kc-2', 'kc-3']);
         expect(input.misconceptions.map((target: { id: string }) => target.id)).to.deep.equal(['mis-5', 'mis-4', 'mis-3', 'mis-2']);
         return { parsedContent: {
-          learningTargetEvaluations: input.learningTargets.map((target: { clusterKC: string }) => ({ clusterKC: target.clusterKC,
-            evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] })),
-          diagnosticMisconceptionEvaluations: input.misconceptions.map((target: { id: string }) => ({ id: target.id,
-            evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] })),
+          learningTargetEvaluations: [],
+          diagnosticMisconceptionEvaluations: [],
           learnerContribution: { type: 'other' },
         } };
       },
@@ -632,7 +664,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         return { parsedContent: {
           learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
             learnerEvidence: latestLearnerEvidence('total balance') }],
-          diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
+          diagnosticMisconceptionEvaluations: [],
           learnerContribution: { type: 'answer', confidence: 0.9 },
         } };
       },
@@ -659,7 +691,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(system).to.contain('Do not impose a fixed cloze scoring ceiling');
         expect(system).to.contain('Accept equivalent wording and ordinary typographical errors');
         return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: .9,
-          learnerEvidence: latestLearnerEvidence(learnerText) }], diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }], learnerContribution: { type: 'answer' } } };
+          learnerEvidence: latestLearnerEvidence(learnerText) }], diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' } } };
       } });
       const score = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText, ...context,
         event: { ...context.event, payload: { questionId: 'cloze-question', responseFormat: 'cloze' } } } as Parameters<typeof provider.scoreLearnerResponse>[0]);
@@ -688,8 +720,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
       const input = JSON.parse(params.messages[1]!.content as string);
       expect(input).to.include({ learnerText: 'calendar', responseFormat: 'cloze' });
-      return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
-        diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }], learnerContribution: { type: 'answer' } } };
+      return { parsedContent: { learningTargetEvaluations: [],
+        diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' } } };
     } });
     const score = await provider.scoreLearnerResponse({ display: dialogueDisplay(), learnerText: 'calendar', ...context,
       event: { ...context.event, payload: { questionId: 'cloze-question', responseFormat: 'cloze' } } } as Parameters<typeof provider.scoreLearnerResponse>[0]);
@@ -724,12 +756,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
               evidenceStrength: 0.6,
               learnerEvidence: latestLearnerEvidence('I think A matters.'),
             }],
-            diagnosticMisconceptionEvaluations: [{
-              id: 'mis-1',
-              evidenceDirection: 'unaddressed',
-              evidenceStrength: 0,
-              learnerEvidence: [],
-            }],
+            diagnosticMisconceptionEvaluations: [],
             learnerContribution: {
               type: 'answer',
               confidence: 0.8,
@@ -773,12 +800,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       evidenceStrength: 0.6,
       learnerEvidence: latestLearnerEvidence('I think A matters.'),
     }]);
-    expect(completedEvent.evaluation.evidenceEnvelope.diagnosticMisconceptionEvaluations).to.deep.equal([{
-      id: 'mis-1',
-      evidenceDirection: 'unaddressed',
-      evidenceStrength: 0,
-      learnerEvidence: [],
-    }]);
+    expect(completedEvent.evaluation.evidenceEnvelope.diagnosticMisconceptionEvaluations).to.deep.equal([]);
     expect(completedEvent.evaluation.learnerResponseScore).to.deep.equal(score);
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.nested.property('intent.schemaName', 'mofacts_sparc_dialogue_score');
@@ -894,18 +916,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
       async callResolvedOpenRouterJson() {
         return {
           parsedContent: {
-            learningTargetEvaluations: [{
-              clusterKC: 'kc-a',
-              evidenceDirection: 'unaddressed',
-              evidenceStrength: 0,
-              learnerEvidence: [],
-            }],
-            diagnosticMisconceptionEvaluations: [{
-              id: 'mis-1',
-              evidenceDirection: 'unaddressed',
-              evidenceStrength: 0,
-              learnerEvidence: [],
-            }],
+            learningTargetEvaluations: [],
+            diagnosticMisconceptionEvaluations: [],
             learnerContribution: {
               type: 'question',
             },
@@ -966,60 +978,40 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(score.learnerContribution).to.deep.equal({ type: 'off-task' });
   });
 
-  it('rejects incomplete, inconsistent, unknown, and duplicate evidence at the provider boundary', async function() {
+  it('rejects unaddressed, inconsistent, unknown, and duplicate evidence at the provider boundary', async function() {
     const invalidEnvelopes = [{
       learningTargetEvaluations: [{
         clusterKC: 'unknown-kc', evidenceDirection: 'supports', evidenceStrength: 0.6,
         learnerEvidence: latestLearnerEvidence('I am responding to the current problem.'),
       }],
-      diagnosticMisconceptionEvaluations: [{
-        id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-        learnerEvidence: [],
-      }],
+      diagnosticMisconceptionEvaluations: [],
       learnerContribution: { type: 'answer' },
     }, {
-      learningTargetEvaluations: [{
-        clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-        learnerEvidence: [],
-      }],
+      learningTargetEvaluations: [],
       diagnosticMisconceptionEvaluations: [
         { id: 'mis-1', evidenceDirection: 'supports', evidenceStrength: 0.5, learnerEvidence: latestLearnerEvidence('I am responding to the current problem.') },
         { id: 'mis-1', evidenceDirection: 'supports', evidenceStrength: 0.8, learnerEvidence: latestLearnerEvidence('I am responding to the current problem.') },
       ],
       learnerContribution: { type: 'answer' },
     }, {
-      learningTargetEvaluations: [],
-      diagnosticMisconceptionEvaluations: [{
-        id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-        learnerEvidence: [],
-      }],
-      learnerContribution: { type: 'answer' },
-    }, {
       learningTargetEvaluations: [{
         clusterKC: 'kc-a', evidenceDirection: 'unaddressed', evidenceStrength: 0.2,
         learnerEvidence: [],
       }],
-      diagnosticMisconceptionEvaluations: [{
-        id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-        learnerEvidence: [],
-      }],
+      diagnosticMisconceptionEvaluations: [],
       learnerContribution: { type: 'answer' },
     }, {
       learningTargetEvaluations: [{
         clusterKC: 'kc-a', evidenceDirection: 'contradicts', evidenceStrength: 0,
         learnerEvidence: latestLearnerEvidence('I am responding to the current problem.'),
       }],
-      diagnosticMisconceptionEvaluations: [{
-        id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0,
-        learnerEvidence: [],
-      }],
+      diagnosticMisconceptionEvaluations: [],
       learnerContribution: { type: 'answer' },
     }];
     const expectedMessages = [
       'unknown learning target clusterKC "unknown-kc"',
       'duplicate diagnostic misconception id "mis-1"',
-      'missing learning target clusterKC "kc-a"',
-      'evidenceStrength must be 0 when evidenceDirection is unaddressed',
+      'must be supports or contradicts; omit unaddressed targets',
       'evidenceStrength must be greater than 0 when evidenceDirection is contradicts',
     ];
 
@@ -1047,7 +1039,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       expect((error as Error).message).to.contain(expectedMessages[index]);
       expect(observedTrace.map((event) => event.stage)).to.deep.equal([
         'provider-response',
-        'evidence-parsed',
+        ...(index === 2 ? [] : ['evidence-parsed']),
       ]);
       expect(observedTrace[0]).to.deep.equal({
         stage: 'provider-response',
@@ -1099,7 +1091,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       learnerEvidence: latestLearnerEvidence('Latest evidence.'),
       direction: 'unaddressed' as const,
       strength: 0,
-      message: 'learnerEvidence must be empty when evidenceDirection is unaddressed',
+      message: 'must be supports or contradicts; omit unaddressed targets',
     }];
 
     for (const invalid of invalidCitations) {
@@ -1113,12 +1105,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
                 evidenceStrength: invalid.strength ?? 0.5,
                 learnerEvidence: invalid.learnerEvidence,
               }],
-              diagnosticMisconceptionEvaluations: [{
-                id: 'mis-1',
-                evidenceDirection: 'unaddressed',
-                evidenceStrength: 0,
-                learnerEvidence: [],
-              }],
+              diagnosticMisconceptionEvaluations: [],
               learnerContribution: { type: 'answer' },
             },
           };
@@ -1163,9 +1150,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
               clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
               learnerEvidence: [citation],
             }],
-            diagnosticMisconceptionEvaluations: [{
-              id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
-            }],
+            diagnosticMisconceptionEvaluations: [],
             learnerContribution: { type: 'answer' },
           } };
         },
@@ -1220,7 +1205,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
 
   it('retains summaries but saves only verified learner citations when the provider mixes valid and invalid references', async function() {
     const warnings: unknown[] = [];
-    const summary = { demonstrated: ['A matters'], incorrect: [], unresolved: [] };
+    const summary = { demonstrated: ['A matters'], unresolved: [] };
     const provider = createSparcDialogueOpenRouterProvider({
       reportWarning: warning => { warnings.push(warning); },
       async callResolvedOpenRouterJson() {
@@ -1228,7 +1213,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
           learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6, summary,
             learnerEvidence: [...latestLearnerEvidence('A matters'), ...latestLearnerEvidence('A paraphrase'),
               ...dialogueLearnerEvidence(0, 'Tutor claim.'), ...dialogueLearnerEvidence(99, 'Missing response')] }],
-          diagnosticMisconceptionEvaluations: [{ id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [] }],
+          diagnosticMisconceptionEvaluations: [],
           learnerContribution: { type: 'answer' },
         } };
       },
@@ -1237,7 +1222,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       ...scorerContext(undefined, [{ speaker: 'tutor', text: 'Tutor claim.' }]),
     } as Parameters<typeof provider.scoreLearnerResponse>[0]);
     expect(result.learningTargetScores).to.deep.equal([{ clusterKC: 'kc-a', coverage: 0.6 }]);
-    expect(result.evidence).to.deep.equal([{ kind: 'expectation', id: 'kc-a', ...summary,
+    expect(result.evidence).to.deep.equal([{ kind: 'expectation', id: 'kc-a', ...summary, incorrect: [],
       citations: [{ responseId: 'score-event:learner', start: 0, end: 9 }] }]);
     expect(warnings).to.have.length(1);
     expect(warnings[0]).to.have.property('mismatchCount', 3);
@@ -1256,9 +1241,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
               clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.6,
               learnerEvidence: latestLearnerEvidence('Paraphrased evidence.'),
             }],
-            diagnosticMisconceptionEvaluations: [{
-              id: 'mis-1', evidenceDirection: 'unaddressed', evidenceStrength: 0, learnerEvidence: [],
-            }],
+            diagnosticMisconceptionEvaluations: [],
             learnerContribution: { type: 'answer' },
           } };
         },
@@ -1575,7 +1558,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.required).to.deep.equal([
           'clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
-        expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 2, maxItems: 2 });
+        expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 0, maxItems: 2 });
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.clusterKC?.enum)
           .to.deep.equal(['compound.e1', 'compound.e2']);
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.evidenceStrength)
@@ -1586,7 +1569,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.required).to.deep.equal([
           'id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
-        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 1, maxItems: 1 });
+        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 0, maxItems: 1 });
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties?.id?.enum)
           .to.deep.equal(['M1']);
         return {

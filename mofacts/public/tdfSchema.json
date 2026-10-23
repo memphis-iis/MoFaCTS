@@ -927,6 +927,13 @@
                 "type": "object",
                 "title": "Unit Template",
                 "properties": {
+                  "skeletondemosession": {
+                    "title": "Live webcam skeleton demo unit.",
+                    "description": "Displays local MediaPipe body landmarks. No scoring, recording, or pose history. Cannot coexist with another session selector, gaze tracking, or adaptive transitions.",
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  },
                   "gazeTracking": {
                     "title": "Show webcam gaze estimates during this unit.",
                     "description": "Requires session calibration. Visual prototype only; no gaze data is saved.",
@@ -3245,10 +3252,63 @@
                           },
                           {
                             "required": [
+                              "skeletondemosession"
+                            ]
+                          },
+                          {
+                            "required": [
                               "adaptive"
                             ]
                           }
                         ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "skeletondemosession"
+                      ]
+                    },
+                    "then": {
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "learningsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "assessmentsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "sparcsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "videosession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "gazecalibrationsession"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "adaptive"
+                            ]
+                          }
+                        ]
+                      },
+                      "properties": {
+                        "gazeTracking": {
+                          "const": false
+                        }
                       }
                     }
                   }
@@ -3269,6 +3329,13 @@
             "type": "object",
             "title": "Unit",
             "properties": {
+              "skeletondemosession": {
+                "title": "Live webcam skeleton demo unit.",
+                "description": "Displays local MediaPipe body landmarks. No scoring, recording, or pose history. Cannot coexist with another session selector, gaze tracking, or adaptive transitions.",
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              },
               "gazeTracking": {
                 "title": "Show webcam gaze estimates during this unit.",
                 "description": "Requires session calibration. Visual prototype only; no gaze data is saved.",
@@ -5587,10 +5654,63 @@
                       },
                       {
                         "required": [
+                          "skeletondemosession"
+                        ]
+                      },
+                      {
+                        "required": [
                           "adaptive"
                         ]
                       }
                     ]
+                  }
+                }
+              },
+              {
+                "if": {
+                  "required": [
+                    "skeletondemosession"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "learningsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "assessmentsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "sparcsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "videosession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "gazecalibrationsession"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "adaptive"
+                        ]
+                      }
+                    ]
+                  },
+                  "properties": {
+                    "gazeTracking": {
+                      "const": false
+                    }
                   }
                 }
               }
