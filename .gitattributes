@@ -1,2 +1,3 @@
 *.sh text eol=lf
 Dockerfile text eol=lf
+mofacts/packages/**/npm-shrinkwrap.json text eol=lf

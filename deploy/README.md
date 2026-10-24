@@ -36,6 +36,11 @@ deployment does not execute it or copy learner records.
 
 Run Docker Compose from this folder.
 
+Source-owned Meteor package shrinkwraps use LF line endings, enforced by
+`.gitattributes`. Fresh Windows checkouts must preserve those bytes so Linux
+Meteor dependency synchronization does not change only the line endings and
+fail the Docker build's dependency checksums.
+
 `docker-compose.yml` sets the build context to `../`, which resolves to the repository root that contains the application Dockerfile.
 
 Private settings files under `deploy/` are ignored by Docker build context. Production and self-hosted settings must be copied to the server separately and mounted into the app container at `/run/mofacts/settings.json`.
