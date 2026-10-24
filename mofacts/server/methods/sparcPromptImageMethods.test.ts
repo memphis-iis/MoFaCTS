@@ -207,16 +207,16 @@ describe('SPARC private supported Prompt image contracts', () => {
     assert.equal(Object.prototype.hasOwnProperty.call(asset.meta, 'displayWidth'), false);
     assert.equal(f.providerCalls(), 1);
   });
-  it('uses the pinned Sunburst quality request and rejects active markup or a mislabeled raster response', async () => {
+  it('uses the pinned Nano Banana 2 resolution request and rejects active markup or a mislabeled raster response', async () => {
     const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
     const fakeFetch = (result: unknown) => (async (_url: unknown, options: RequestInit) => {
       const body = JSON.parse(String(options.body));
-      assert.equal(body.model, 'openai/gpt-image-2.5-sunburst');
-      assert.equal(body.quality, 'medium');
-      assert.equal(body.resolution, undefined);
-      assert.equal(body.aspect_ratio, 'auto');
+      assert.equal(body.model, 'google/gemini-3.1-flash-image-preview');
+      assert.equal(body.quality, undefined);
+      assert.equal(body.resolution, '1K');
+      assert.equal(body.aspect_ratio, undefined);
       assert.equal(body.n, 1);
-      assert.deepEqual(body.provider, { only: ['openai'], allow_fallbacks: false });
+      assert.deepEqual(body.provider, { only: ['google-ai-studio'], allow_fallbacks: false });
       return { ok: true, json: async () => result };
     }) as unknown as typeof fetch;
     const image = await generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type: 'image/png', b64_json: png.toString('base64') }], usage: { cost: .0336 } }));

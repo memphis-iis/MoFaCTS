@@ -1,9 +1,8 @@
 /** System-owned image settings; the dialogue model remains account-configured. */
 export const SPARC_PROMPT_IMAGE_SETTINGS = Object.freeze({
-  model: 'openai/gpt-image-2.5-sunburst',
-  quality: 'medium',
-  aspectRatio: 'auto',
-  provider: 'openai',
+  model: 'google/gemini-3.1-flash-image-preview',
+  resolution: '1K',
+  provider: 'google-ai-studio',
   maxBytes: 8 * 1024 * 1024,
   maxPromptCharacters: 12000,
   minDisplayWidth: 240,

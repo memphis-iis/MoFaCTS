@@ -11,7 +11,7 @@ export async function generateSparcPromptImage(apiKey: string, prompt: string, f
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'MoFaCTS SPARC Supported Prompt' },
     body: JSON.stringify({
       model: SPARC_PROMPT_IMAGE_SETTINGS.model, prompt, n: 1,
-      quality: SPARC_PROMPT_IMAGE_SETTINGS.quality, aspect_ratio: SPARC_PROMPT_IMAGE_SETTINGS.aspectRatio,
+      resolution: SPARC_PROMPT_IMAGE_SETTINGS.resolution,
       provider: { only: [SPARC_PROMPT_IMAGE_SETTINGS.provider], allow_fallbacks: false },
     }),
     signal: AbortSignal.timeout(180000),
