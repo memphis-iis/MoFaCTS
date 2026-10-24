@@ -32,16 +32,20 @@ export function isBlankIdentityValue(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === 'string' && value.trim().length === 0);
 }
 
-type HistoryOrigin = { levelUnitType?: unknown; modelEvidenceSource?: unknown };
+type HistoryOrigin = { levelUnitType?: unknown; modelEvidenceSource?: unknown; tdfDeletedAt?: unknown };
 
 /** Permanent exclusion of the redundant copies written by the old assessment logger. */
 export function isAssessmentHistoryCopy(record: HistoryOrigin): boolean {
   return record.levelUnitType === 'model' && record.modelEvidenceSource === 'assessment';
 }
 
+export function isOperationalHistoryRecord(record: HistoryOrigin): boolean {
+  return record.tdfDeletedAt === undefined && !isAssessmentHistoryCopy(record);
+}
+
 /** Compose with the caller's authorization and activity scope; never use for raw backups. */
 export function operationalHistorySelector() {
-  return { $nor: [{ levelUnitType: 'model', modelEvidenceSource: 'assessment' }] };
+  return { tdfDeletedAt: { $exists: false }, $nor: [{ levelUnitType: 'model', modelEvidenceSource: 'assessment' }] };
 }
 
 export function modelPracticeHistorySelector() {
@@ -50,7 +54,7 @@ export function modelPracticeHistorySelector() {
 
 export function isModelPracticeHistoryRecord(record: HistoryOrigin): boolean {
   return (record.levelUnitType === 'model' || record.levelUnitType === 'schedule')
-    && !isAssessmentHistoryCopy(record);
+    && isOperationalHistoryRecord(record);
 }
 
 function identityValuesMatch(left: unknown, right: unknown): boolean {

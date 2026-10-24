@@ -1,4 +1,4 @@
-import { modelPracticeHistorySelector } from '../../common/historyEnvelope';
+import { modelPracticeHistorySelector, operationalHistorySelector } from '../../common/historyEnvelope';
 import { expect } from 'chai';
 import { progressiveRevisionId } from '../lib/progressiveAssignmentRevision';
 import { createAnalyticsMethods } from './analyticsMethods';
@@ -199,6 +199,45 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('analyticsMethods', function() {
+  it('refuses to merge a deleted or differently scoped state into an active system', async () => {
+    for (const previous of [
+      { userId: 'learner-1', TDFId: 'tdf-1', tdfDeletedAt: new Date() },
+      { userId: 'learner-1', TDFId: 'old-tdf' },
+      { userId: 'other-learner', TDFId: 'tdf-1' },
+    ]) {
+      let writes = 0;
+      const { deps } = createAnalyticsDeps({ GlobalExperimentStates: {
+        findOneAsync: async () => ({ _id: 'old-state', ...previous, experimentState: { progress: 99 } }),
+        updateAsync: async () => { writes++; return 1; },
+      } });
+      let error: any;
+      try { await createAnalyticsMethods(deps as any).setExperimentState.call({ userId: 'learner-1' }, 'learner-1', 'tdf-1', 'old-state', {}, 'test'); }
+      catch (caught) { error = caught; }
+      expect(error?.error).to.equal(403);
+      expect(writes).to.equal(0);
+    }
+  });
+
+  it('rejects writes after system deletion even when authorization was cached', async () => {
+    const { deps, insertedHistory } = createAnalyticsDeps();
+    const methods = createAnalyticsMethods(deps as any);
+    await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord());
+    deps.Tdfs.findOneAsync = async () => null as any;
+    let error: any;
+    try { await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord()); }
+    catch (caught) { error = caught; }
+    expect(error?.error).to.equal(404);
+    expect(insertedHistory.length).to.equal(1);
+  });
+
+  it('does not return retained deleted-system resume state', async () => {
+    const { deps } = createAnalyticsDeps({ GlobalExperimentStates: { find: (selector: any) => {
+      expect(selector).to.deep.equal({ userId: 'learner-1', TDFId: 'deleted', tdfDeletedAt: { $exists: false } });
+      return { fetchAsync: async () => [] };
+    } } });
+    expect(await createAnalyticsMethods(deps as any).getExperimentState.call({ userId: 'learner-1' }, 'learner-1', 'deleted')).to.deep.equal({ id: null });
+  });
+
   it('requires admin authority for competitive policy and OET writes even with a forged policy label', async function() {
     for (const admin of [false, true]) {
       const { deps, insertedHistory } = createAnalyticsDeps({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => admin }) });
@@ -321,7 +360,7 @@ describe('analyticsMethods', function() {
     )).to.equal(2);
     expect(selectors).to.deep.equal([{
       userId: 'learner-1', TDFId: 'tdf-1', levelUnitType: 'video', levelUnit: 2,
-      studentResponseType: 'ATTEMPT', outcome: { $in: ['correct', 'incorrect'] },
+      studentResponseType: 'ATTEMPT', outcome: { $in: ['correct', 'incorrect'] }, ...operationalHistorySelector(),
     }]);
   });
 

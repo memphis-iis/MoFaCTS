@@ -1,5 +1,5 @@
 import { computePracticeTimeMs } from '../../lib/practiceTime';
-import { isBlankIdentityValue, isAssessmentHistoryCopy } from '../historyEnvelope';
+import { isBlankIdentityValue, isOperationalHistoryRecord } from '../historyEnvelope';
 import { normalizeClusterKC } from '../../../learning-components/runtime/sharedModelPracticeIdentity';
 import { createStimulusKey } from '../../../learning-components/runtime/historyStimulusIdentity';
 
@@ -321,7 +321,7 @@ export function reconstructLearningStateFromHistory(
   options: LearningReconstructionOptions = {},
 ): LearningReconstructionResult {
   const orderedRows: OrderedLearningHistoryRecord[] = (historyRows || [])
-    .filter((row) => !isAssessmentHistoryCopy(row))
+    .filter((row) => isOperationalHistoryRecord(row))
     .map((row, index) => ({
       ...row,
       time: toFiniteTime(row?.time, 'time'),

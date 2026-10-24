@@ -2,8 +2,37 @@ import { expect } from 'chai';
 import { createTdfRuntimeLifecycleHelpers } from './tdfRuntimeLifecycle';
 
 describe('tdfRuntimeLifecycle', function() {
+  it('retains original data and makes repeated deletion idempotent', async () => {
+    const rows: Array<Record<string, any>> = [
+      { TDFId: 'deleted', userId: 'synthetic-user', outcome: 'correct' },
+      { TDFId: 'active', userId: 'synthetic-user', outcome: 'incorrect' },
+    ];
+    const states: Array<Record<string, any>> = [{ TDFId: 'deleted', experimentState: { progress: 7 } }];
+    const collection = (records: Array<Record<string, any>>) => ({
+      updateAsync: async (selector: any, modifier: any) => {
+        for (const row of records) if (row.TDFId === selector.TDFId && row.tdfDeletedAt === undefined) Object.assign(row, modifier.$set);
+        return 1;
+      },
+    });
+    const helpers = createTdfRuntimeLifecycleHelpers({
+      Assignments: { find: () => ({ fetchAsync: async () => [] }), removeAsync: async () => 0 },
+      Histories: collection(rows), GlobalExperimentStates: collection(states),
+      invalidateCourseSnapshotsForCourse: async () => {}, invalidateCourseSnapshotsForAssignment: async () => {},
+    });
+    await helpers.deleteTdfRuntimeData('deleted');
+    const archived = JSON.stringify({ rows, states });
+    await helpers.deleteTdfRuntimeData('deleted');
+    expect(JSON.stringify({ rows, states })).to.equal(archived);
+    expect(rows.length).to.equal(2);
+    expect(rows[0]!.outcome).to.equal('correct');
+    expect(rows[0]!.tdfDeletedAt).to.be.instanceOf(Date);
+    expect(rows[1]).not.to.have.property('tdfDeletedAt');
+    expect(states[0]!.experimentState).to.deep.equal({ progress: 7 });
+  });
+
   it('invalidates course snapshots when deleting assigned TDF runtime data', async function() {
     const removedSelectors: Array<{ collection: string; selector: Record<string, unknown> }> = [];
+    const archived: Array<{ collection: string; selector: any; modifier: any; options: any }> = [];
     const invalidatedAssignments: Array<{ assignmentId: string; reason: string }> = [];
     const invalidatedCourses: Array<{ courseId: string; reason: string }> = [];
     const helpers = createTdfRuntimeLifecycleHelpers({
@@ -21,14 +50,14 @@ describe('tdfRuntimeLifecycle', function() {
         },
       },
       Histories: {
-        removeAsync: async (selector) => {
-          removedSelectors.push({ collection: 'Histories', selector });
+        updateAsync: async (selector, modifier, options) => {
+          archived.push({ collection: 'Histories', selector, modifier, options });
           return 4;
         },
       },
       GlobalExperimentStates: {
-        removeAsync: async (selector) => {
-          removedSelectors.push({ collection: 'GlobalExperimentStates', selector });
+        updateAsync: async (selector, modifier, options) => {
+          archived.push({ collection: 'GlobalExperimentStates', selector, modifier, options });
           return 2;
         },
       },
@@ -47,9 +76,13 @@ describe('tdfRuntimeLifecycle', function() {
         collection: 'Assignments',
         selector: { $or: [{ TDFId: 'tdf-1' }, { memberTdfIds: 'tdf-1' }] },
       },
-      { collection: 'Histories', selector: { TDFId: 'tdf-1' } },
-      { collection: 'GlobalExperimentStates', selector: { TDFId: 'tdf-1' } },
     ]);
+    expect(archived.map(row => row.collection)).to.deep.equal(['Histories', 'GlobalExperimentStates']);
+    for (const row of archived) {
+      expect(row.selector).to.deep.equal({ TDFId: 'tdf-1', tdfDeletedAt: { $exists: false } });
+      expect(row.modifier.$set.tdfDeletedAt).to.be.instanceOf(Date);
+      expect(row.options).to.deep.equal({ multi: true });
+    }
     expect(invalidatedAssignments).to.deep.equal([
       { assignmentId: 'assignment-a', reason: 'tdf-deleted' },
       { assignmentId: 'assignment-b', reason: 'tdf-deleted' },

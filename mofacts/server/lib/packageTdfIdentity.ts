@@ -199,15 +199,18 @@ function validatePackageContent(unzippedFiles: UploadedPackageFile[]) {
 
 async function allocateUnusedTdfId(
   deps: IdentityDeps,
-  reservedIds: Set<string>
+  reservedIds: Set<string>,
+  packageAssetId: string,
+  fileName: string,
 ) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const candidate = `tdf_${crypto.randomBytes(12).toString('hex')}`;
-    if (!TDF_ID_PATTERN.test(candidate) || reservedIds.has(candidate)) continue;
-    const existing = await deps.Tdfs.findOneAsync({ _id: candidate }, { fields: { _id: 1 } });
-    if (!existing) return candidate;
+  // The upload asset owns a new installation. Keep its reviewed identity stable
+  // across preflight/confirmation, but never reuse an absent incoming identity.
+  const candidate = `tdf_${hashValue([packageAssetId, packageEntryKey(fileName)]).slice(0, 24)}`;
+  const existing = await deps.Tdfs.findOneAsync({ _id: candidate }, { fields: { _id: 1 } });
+  if (reservedIds.has(candidate) || existing) {
+    throw new Meteor.Error('tdf-id-allocation-failed', 'This upload identity is already in use. Upload a new package.');
   }
-  throw new Meteor.Error('tdf-id-allocation-failed', 'Could not allocate a unique TDF id for this package.');
+  return candidate;
 }
 
 export async function preflightPackageTdfIdentities(args: {
@@ -261,14 +264,15 @@ export async function preflightPackageTdfIdentities(args: {
     }
   }
 
-  const reservedIds = new Set(existingById.keys());
+  const reservedIds = new Set([...existingById.keys(), ...incomingIds]);
   const entries: PackageTdfIdentityEntry[] = [];
   const entryByFileName = new Map<string, PackageTdfIdentityEntry>();
-  const entryByTdfId = new Map<string, PackageTdfIdentityEntry>();
+  const entryByIncomingTdfId = new Map<string, PackageTdfIdentityEntry>();
 
   for (const file of tdfFiles) {
     const incomingTdfId = incomingIdByFile.get(file) || null;
-    const tdfId = incomingTdfId || await allocateUnusedTdfId(deps, reservedIds);
+    const tdfId = incomingTdfId && existingById.has(incomingTdfId)
+      ? incomingTdfId : await allocateUnusedTdfId(deps, reservedIds, packageAssetId, file.name);
     reservedIds.add(tdfId);
     const entry: PackageTdfIdentityEntry = {
       fileName: file.name,
@@ -299,7 +303,7 @@ export async function preflightPackageTdfIdentities(args: {
     };
     entries.push(entry);
     entryByFileName.set(packageEntryKey(entry.fileName), entry);
-    entryByTdfId.set(entry.tdfId, entry);
+    if (incomingTdfId) entryByIncomingTdfId.set(incomingTdfId, entry);
   }
 
   const targetOwners = new Map<string, PackageTdfIdentityEntry>();
@@ -353,7 +357,7 @@ export async function preflightPackageTdfIdentities(args: {
       const conditionName = conditions[index]!;
       const suppliedConditionId = identityMode === 'copy' ? null : suppliedConditionIds[index] || null;
       const localByName = entryByFileName.get(packageEntryKey(conditionName)) || null;
-      const localById = suppliedConditionId ? entryByTdfId.get(suppliedConditionId) || null : null;
+      const localById = suppliedConditionId ? entryByIncomingTdfId.get(suppliedConditionId) || null : null;
 
       if (suppliedConditionId) {
         if (!localById) {
@@ -368,13 +372,13 @@ export async function preflightPackageTdfIdentities(args: {
             `TDF "${file.name}" references condition file "${conditionName}", but that child is not in the package.`
           );
         }
-        if (localByName.tdfId !== suppliedConditionId) {
+        if (localByName !== localById) {
           throw new Meteor.Error(
             'condition-identity-mismatch',
             `TDF "${file.name}" maps condition "${conditionName}" to a different tdfId than its packaged child.`
           );
         }
-        entry.conditionTdfIds.push(suppliedConditionId);
+        entry.conditionTdfIds.push(localById.tdfId);
         continue;
       }
 

@@ -134,7 +134,7 @@
     {
       "name": "confirmPackageUpload",
       "access": "role-checked",
-      "notes": "Only the bound uploader may confirm an unexpired plan. Archive integrity and identity revisions are rechecked; changed plans fail before writes."
+      "notes": "Existing authenticated plan ownership and revision checks retained; deleted systems cannot be recreated as active updates."
     },
     {
       "name": "copyTdf",
@@ -175,7 +175,8 @@
     },
     {
       "name": "deletePackageFile",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Existing whole-family and ownership checks retained; deletion archives learner records and removes active content."
     },
     {
       "name": "deleteTheme",
@@ -342,7 +343,8 @@
     },
     {
       "name": "getExperimentState",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Self-scoped reads exclude retained records marked tdfDeletedAt."
     },
     {
       "name": "getHiddenStimulusKCsFromHistory",
@@ -835,7 +837,8 @@
     },
     {
       "name": "setExperimentState",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Resume writes require current system existence and state ownership; archived or differently scoped state cannot be merged."
     },
     {
       "name": "setLockoutTimeStamp",
@@ -1000,7 +1003,7 @@
     {
       "name": "publishSparcPrimitive",
       "access": "admin-only",
-      "notes": "Admin authorization precedes validation of the structured query/vector ticket; request identity is derived from the authenticated user and canonical lesson/session/event. Publication preserves the accepted decision and validates complete matched instructions and nested support media references. Generated questions are not vetoed for semantic similarity; content safety and administrative-removal checks remain enforced."
+      "notes": "Existing authorization and payload validation retained; the browser computes embeddings for publication without storing them in learner checkpoints."
     },
     {
       "name": "reviseSparcPrimitive",

@@ -173,6 +173,7 @@ export async function processParsedPackageTdfs(args: {
           packageAssetId,
           conditionTdfIds: identity.conditionTdfIds,
           expectedRevision: identity.targetRevision,
+          action: identity.action,
         };
         const ret = await deps.upsertPackage(record, owner);
         if (ret && (ret as { result?: unknown }).result === false) {

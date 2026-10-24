@@ -1,4 +1,4 @@
-import { isAssessmentHistoryCopy } from '../../../../common/historyEnvelope';
+import { isOperationalHistoryRecord } from '../../../../common/historyEnvelope';
 import type {
   LearnerAnalyticsActivityDay,
   LearnerAnalyticsHistoryRow,
@@ -53,7 +53,7 @@ function recentDateKeys(nowMs: number, timeZone: string, count: number): string[
 }
 
 function countable(row: LearnerAnalyticsHistoryRow): boolean {
-  return !isAssessmentHistoryCopy(row);
+  return isOperationalHistoryRecord(row);
 }
 
 function itemIdentity(row: LearnerAnalyticsHistoryRow): string | null {

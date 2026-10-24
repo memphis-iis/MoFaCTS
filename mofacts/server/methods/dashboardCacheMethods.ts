@@ -3,7 +3,7 @@ import type {
   DashboardHistoryRecord,
   DashboardTdfStats,
 } from './dashboardCacheMethods.contracts';
-import { createStimulusKey, isBlankIdentityValue, isAssessmentHistoryCopy, isModelPracticeHistoryRecord, operationalHistorySelector } from '../../common/historyEnvelope';
+import { createStimulusKey, isBlankIdentityValue, isOperationalHistoryRecord, isModelPracticeHistoryRecord, operationalHistorySelector } from '../../common/historyEnvelope';
 import { curSemester } from '../../common/Definitions';
 import {
   DASHBOARD_CACHE_VERSION,
@@ -85,7 +85,7 @@ function isAutoTutorRecord(record: DashboardHistoryRecord): boolean {
 }
 
 function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): boolean {
-  if (isAssessmentHistoryCopy(record)) return false;
+  if (!isOperationalHistoryRecord(record)) return false;
   const transition = record.sparc?.stateTransition;
   // Non-dialogue SPARC trial records retain their existing trial semantics.
   if (record.levelUnitType !== 'sparc' || !transition) return true;

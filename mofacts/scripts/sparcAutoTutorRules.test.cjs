@@ -82,6 +82,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     global.__meteor_bootstrap__ = { serverDir: require('node:path').resolve(__dirname, '..') };
     require('../server/lib/packageUploadPostProcess.test.ts');
     require('../server/lib/packageTdfIdentity.test.ts');
+    require('../server/lib/tdfRuntimeLifecycle.test.ts');
     require('../server/lib/packageExport.test.ts');
     require('../server/methods/sparcPromptImageMethods.test.ts');
     require('../server/methods/sparcMoveLibraryMethods.test.ts');

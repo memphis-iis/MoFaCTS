@@ -1,7 +1,7 @@
 import { outputFields } from '../../common/Definitions';
 import { getHistory } from '../orm';
 import { legacyTrim } from '../../common/underscoreCompat';
-import { isAssessmentHistoryCopy } from '../../common/historyEnvelope';
+import { isOperationalHistoryRecord } from '../../common/historyEnvelope';
 
 const PROLIFIC_COLUMNS = ['Prolific Participant ID', 'Prolific Study ID', 'Prolific Submission ID'];
 const FIELDSDS: string[] = [...outputFields, ...PROLIFIC_COLUMNS];
@@ -67,7 +67,7 @@ export async function writeHistoryExport(
     const userIds = [...new Set(batch.map(h => h.userId).filter(id => typeof id === 'string'))] as string[];
     const identities = new Map((loadParticipationIdentities ? await loadParticipationIdentities(userIds) : []).map(p => [p.userId, p]));
     for (const raw of batch) {
-      if (isAssessmentHistoryCopy(raw)) continue;
+      if (!isOperationalHistoryRecord(raw)) continue;
       try {
         const history = getHistory(raw);
         const p = identities.get(raw.userId);

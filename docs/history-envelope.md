@@ -50,6 +50,12 @@ Current event-type vocabulary:
 
 New event types must be stable, documented here, added to `HISTORY_EVENT_TYPES` in `learning-components/runtime/historyEnvelope.ts`, and covered by envelope or component contract tests before use.
 
+## Deleted systems
+
+System deletion marks retained histories and experiment states with server-owned `tdfDeletedAt`. Operational reads and model reconstruction exclude those records; raw database backups retain them. Uploading an absent TDF creates a fresh installation identity, while overwriting an existing TDF preserves its identity. No existing learner rows are migrated by deploying this change.
+
+SPARC instruction checkpoints retain the composed content and publication query, but never the query embedding. Publication obtains that derived vector through the browser embedding cache; after reload it computes the vector again from the saved query without regenerating the instruction or repeating retrieval. The 16 KiB extension and 32 KiB wire limits remain enforced.
+
 ## Extension Fields
 
 Known component extension fields:

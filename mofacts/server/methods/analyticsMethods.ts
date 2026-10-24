@@ -405,15 +405,13 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const conditionTdfId = deps.normalizeCanonicalId((state as any)?.conditionTdfId);
     const needsRootAccessCheck = !cachedAt || (Date.now() - cachedAt) > EXPERIMENT_ACCESS_CACHE_TTL;
 
-    let rootTdf: any = null;
-    if (needsRootAccessCheck || conditionTdfId) {
-      rootTdf = await deps.Tdfs.findOneAsync(
-        { _id: normalizedRootTdfId },
-        { fields: { ownerId: 1, accessors: 1, 'content.tdfs.tutor.setspec': 1 } }
-      );
-      if (!rootTdf) {
-        throw new Meteor.Error(404, 'Root TDF not found');
-      }
+    // Cached authorization never establishes that the system still exists.
+    const rootTdf: any = await deps.Tdfs.findOneAsync(
+      { _id: normalizedRootTdfId },
+      { fields: { ownerId: 1, accessors: 1, 'content.tdfs.tutor.setspec': 1 } }
+    );
+    if (!rootTdf) {
+      throw new Meteor.Error(404, 'Root TDF not found');
     }
 
     if (needsRootAccessCheck) {
@@ -498,7 +496,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
   }
 
   async function getExperimentState(userId: string, TDFId: string) {
-    const experimentStateRet = await deps.GlobalExperimentStates.find({ userId, TDFId }).fetchAsync();
+    const experimentStateRet = await deps.GlobalExperimentStates.find({ userId, TDFId, tdfDeletedAt: { $exists: false } }).fetchAsync();
     if (experimentStateRet.length <= 1) {
       const doc = experimentStateRet[0];
       const state = doc?.experimentState || {};
@@ -544,8 +542,15 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     });
     const experimentStateRet = await deps.GlobalExperimentStates.findOneAsync({ _id: experimentStateId });
     if (experimentStateRet != null) {
+      if (experimentStateRet.userId !== userId || experimentStateRet.TDFId !== TDFId || experimentStateRet.tdfDeletedAt !== undefined) {
+        throw new Meteor.Error(403, 'Resume state does not belong to this active system and learner');
+      }
       const updatedExperimentState = Object.assign(experimentStateRet.experimentState, newExperimentState);
-      await deps.GlobalExperimentStates.updateAsync({ _id: experimentStateId }, { $set: { experimentState: updatedExperimentState } });
+      const updated = await deps.GlobalExperimentStates.updateAsync(
+        { _id: experimentStateId, userId, TDFId, tdfDeletedAt: { $exists: false } },
+        { $set: { experimentState: updatedExperimentState } },
+      );
+      if (!updated) throw new Meteor.Error('experiment-state-unavailable', 'Resume state became unavailable while saving');
       return updatedExperimentState;
     }
     await deps.GlobalExperimentStates.insertAsync({ userId, TDFId, experimentState: newExperimentState });
@@ -1293,6 +1298,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: Number(levelUnit),
       studentResponseType: 'ATTEMPT',
       outcome: { $in: ['correct', 'incorrect'] },
+      ...operationalHistorySelector(),
     }).countAsync();
   }
 
@@ -1308,6 +1314,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       levelUnit: Number(levelUnit),
       studentResponseType: 'ATTEMPT',
       outcome: { $in: ['correct', 'incorrect'] },
+      ...operationalHistorySelector(),
     }).countAsync();
   }
 

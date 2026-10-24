@@ -298,7 +298,7 @@ export async function processPackageUploadWorkflow(
         cleanupAt: identityPlan.updates.length > 0 ? expiresAt : undefined,
       });
     }
-    if (identityPlan.updates.length > 0 && policy.confirmedIdentityFingerprint !== identityPlan.fingerprint) {
+    if ((identityPlan.updates.length > 0 || policy.confirmedIdentityFingerprint) && policy.confirmedIdentityFingerprint !== identityPlan.fingerprint) {
       return {
         status: 'confirmation-required',
         uploadPlanId: state.mutationJobId,

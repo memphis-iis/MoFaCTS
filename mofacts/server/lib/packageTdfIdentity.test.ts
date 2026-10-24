@@ -121,7 +121,7 @@ describe('packageTdfIdentity', function() {
     assert.match(plan.entries[0]?.tdfId || '', /^tdf_[a-f0-9]{24}$/);
   });
 
-  it('updates an exact manageable tdfId and preserves an unused portable id for creation', async function() {
+  it('updates an exact manageable tdfId and allocates a fresh installation for an absent id', async function() {
     const existing = { _id: 'known-id', ownerId: 'owner-1', stimuliSetId: 9, content: { fileName: 'old.json' } };
     const updatePlan = await preflightPackageTdfIdentities({
       unzippedFiles: packageFiles(tdfFile('renamed.json', { tdfId: 'known-id' })),
@@ -139,7 +139,32 @@ describe('packageTdfIdentity', function() {
     assert.equal(updatePlan.entries[0]?.action, 'update');
     assert.equal(updatePlan.entries[0]?.tdfId, 'known-id');
     assert.equal(createPlan.entries[0]?.action, 'create');
-    assert.equal(createPlan.entries[0]?.tdfId, 'portable-id');
+    assert.notEqual(createPlan.entries[0]?.tdfId, 'portable-id');
+  });
+
+  it('re-upload after deletion isolates retained history and remaps every family member', async () => {
+    const files = packageFiles(tdfFile('root.json', { tdfId: 'deleted-root', conditions: ['child.json'], conditionTdfIds: ['deleted-child'] }),
+      tdfFile('child.json', { tdfId: 'deleted-child' }));
+    const args = { unzippedFiles: files, packageAssetId: 'fresh-upload', ownerId: 'owner', deps: deps() };
+    const plan = await preflightPackageTdfIdentities(args);
+    const repeat = await preflightPackageTdfIdentities(args);
+    assert.equal(plan.fingerprint, repeat.fingerprint);
+    const [root, child] = plan.entries;
+    assert.notEqual(root!.tdfId, 'deleted-root');
+    assert.notEqual(child!.tdfId, 'deleted-child');
+    assert.deepEqual(root!.conditionTdfIds, [child!.tdfId]);
+    assert.ok(plan.entries.every(entry => entry.action === 'create' && entry.beforeImage === null));
+    const next = await preflightPackageTdfIdentities({ ...args, packageAssetId: 'later-upload' });
+    assert.notEqual(next.entries[0]!.tdfId, root!.tdfId);
+  });
+
+  it('keeps mixed create/update confirmation identities stable', async () => {
+    const args = { unzippedFiles: packageFiles(tdfFile('active.json', { tdfId: 'active' }), tdfFile('new.json')),
+      packageAssetId: 'mixed', ownerId: 'owner', deps: deps([{ _id: 'active', tdfRevision: 3 }]) };
+    const plan = await preflightPackageTdfIdentities(args);
+    assert.equal(plan.fingerprint, (await preflightPackageTdfIdentities(args)).fingerprint);
+    assert.equal(plan.entries[0]!.tdfId, 'active');
+    assert.equal(plan.entries[0]!.action, 'update');
   });
 
   it('rejects unauthorized, malformed, and duplicate ids before persistence', async function() {

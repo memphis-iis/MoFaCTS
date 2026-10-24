@@ -10,10 +10,10 @@ type TdfRuntimeLifecycleDeps = {
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
   Histories: {
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options: UnknownRecord) => Promise<unknown>;
   };
   GlobalExperimentStates: {
-    removeAsync: (selector: UnknownRecord) => Promise<unknown>;
+    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options: UnknownRecord) => Promise<unknown>;
   };
   invalidateCourseSnapshotsForCourse: (courseId: string, reason: string) => Promise<unknown>;
   invalidateCourseSnapshotsForAssignment: (assignmentId: string, reason: string) => Promise<unknown>;
@@ -46,8 +46,12 @@ export function createTdfRuntimeLifecycleHelpers(deps: TdfRuntimeLifecycleDeps) 
     ];
 
     await deps.Assignments.removeAsync({ $or: [{ TDFId: normalizedTdfId }, { memberTdfIds: normalizedTdfId }] });
-    await deps.Histories.removeAsync({ TDFId: normalizedTdfId });
-    await deps.GlobalExperimentStates.removeAsync({ TDFId: normalizedTdfId });
+    // Retain source records, but permanently exclude this installation's data.
+    // The selector makes retrying deletion preserve its original archive time.
+    const selector = { TDFId: normalizedTdfId, tdfDeletedAt: { $exists: false } };
+    const modifier = { $set: { tdfDeletedAt: new Date() } };
+    await deps.Histories.updateAsync(selector, modifier, { multi: true });
+    await deps.GlobalExperimentStates.updateAsync(selector, modifier, { multi: true });
 
     for (const assignmentId of affectedAssignmentIds) {
       await deps.invalidateCourseSnapshotsForAssignment(assignmentId, 'tdf-deleted');

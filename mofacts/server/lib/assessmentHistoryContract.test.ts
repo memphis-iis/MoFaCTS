@@ -39,7 +39,7 @@ describe('single-record assessment history contract', function() {
         assert.equal(isModelPracticeHistoryRecord(row), ['model', 'schedule'].includes(unit) && !duplicate);
       }
     }
-    assert.deepEqual(operationalHistorySelector(), { $nor: [{ levelUnitType: 'model', modelEvidenceSource: 'assessment' }] });
+    assert.deepEqual(operationalHistorySelector(), { tdfDeletedAt: { $exists: false }, $nor: [{ levelUnitType: 'model', modelEvidenceSource: 'assessment' }] });
     assert.deepEqual(modelPracticeHistorySelector(), { levelUnitType: { $in: ['model', 'schedule'] }, ...operationalHistorySelector() });
   });
 
@@ -49,6 +49,16 @@ describe('single-record assessment history contract', function() {
       assert.doesNotThrow(() => assertCanonicalHistoryEnvelope(row));
       assert.throws(() => assertCanonicalHistoryEnvelope({ ...row, KCId: 'wrong-item' }), /Identity mismatch|identity mismatch/);
     }
+  });
+
+  it('excludes retained deleted-system evidence from model reconstruction across matching KCs', () => {
+    const active = answer({ TDFId: 'active', modelEvidenceSource: 'learning' });
+    const deleted = answer({ TDFId: 'deleted', modelEvidenceSource: 'learning', tdfDeletedAt: new Date(), outcome: 'incorrect' });
+    const preserved = JSON.stringify(deleted);
+    assert.equal(isModelPracticeHistoryRecord(deleted), false);
+    assert.deepEqual(readSharedModelPracticeEvents([deleted, active]), readSharedModelPracticeEvents([active]));
+    assert.deepEqual(reconstructLearningStateFromHistory([deleted, active]), reconstructLearningStateFromHistory([active]));
+    assert.equal(JSON.stringify(deleted), preserved);
   });
 
   it('reconstructs identical model state from a historical pair or its original alone, before and after reload', function() {
@@ -99,7 +109,7 @@ describe('single-record assessment history contract', function() {
     const original = answer();
     const practice = answer({ levelUnitType: 'model', modelEvidenceSource: 'learning' });
     let output = '';
-    await writeHistoryExport([original, copy(original), practice], (chunk) => { output += chunk; }, (error) => { throw error; });
+    await writeHistoryExport([original, copy(original), practice, answer({ tdfDeletedAt: new Date(), TDFId: 'deleted' })], (chunk) => { output += chunk; }, (error) => { throw error; });
     const rows = output.trimEnd().split('\n').map((line) => line.split('\t'));
     assert.equal(rows.length, 3);
     const originIndex = rows[0]!.indexOf('Level (Unittype)');

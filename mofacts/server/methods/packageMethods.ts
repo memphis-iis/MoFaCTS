@@ -74,6 +74,7 @@ type TdfPayload = {
 };
 
 type PackagePayload = {
+  action: 'create' | 'update';
   tdfId: string;
   fileName: string;
   packageFile?: string;
@@ -806,6 +807,9 @@ export function createPackageMethods(deps: PackageMethodsDeps) {
     assertValidTdfExpressions(Tdf, `${packageJSON.fileName}.tdfs.tutor`);
     const lessonName = deps.legacyTrim(Tdf.tutor.setspec.lessonname);
     const prev = await deps.Tdfs.findOneAsync({ _id: tdfId });
+    if ((packageJSON.action === 'update') !== Boolean(prev)) {
+      throw new Meteor.Error('tdf-revision-conflict', 'The system was created or deleted after upload review. Upload the package again.');
+    }
     if (prev?._id && !(await deps.userCanManageTdf(ownerId, prev))) {
       return {
         result: false,

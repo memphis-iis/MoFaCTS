@@ -14,6 +14,7 @@ export {
   isBlankIdentityValue,
   isModelPracticeHistoryRecord,
   isAssessmentHistoryCopy,
+  isOperationalHistoryRecord,
   operationalHistorySelector,
   modelPracticeHistorySelector,
 } from '../../learning-components/runtime/historyStimulusIdentity';
