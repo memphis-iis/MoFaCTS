@@ -7,6 +7,7 @@ import sinon from 'sinon';
 import { Random } from 'meteor/random';
 import { expect } from 'chai';
 import { compressHistoryRecord } from '../common/historyCompression';
+import { SERVER_VERBOSITY_SETTING } from '../common/loggingSettings';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
@@ -30,7 +31,7 @@ const PasswordResetTokensAny = (globalThis as any).PasswordResetTokens as any;
 (Meteor.settings as any).auth.requireEmailVerification = false;
 
 type RemovableCollection = {
-  removeAsync: (selector: Record<string, never>) => Promise<unknown>;
+  removeAsync: (selector: Record<string, unknown>) => Promise<unknown>;
 };
 
 function requireRemovableCollection(collection: unknown, name: string): RemovableCollection {
@@ -55,7 +56,6 @@ async function clearServerCompositionCollections() {
     ['Assignments', AssignmentsAny],
     ['AuthThrottleState', AuthThrottleStateAny],
     ['Courses', CoursesAny],
-    ['DynamicSettings', DynamicSettingsAny],
     ['GlobalExperimentStates', GlobalExperimentStatesAny],
     ['Histories', HistoriesAny],
     ['StimulusCrowdStats', StimulusCrowdStatsAny],
@@ -71,10 +71,28 @@ async function clearServerCompositionCollections() {
     ['Meteor.roleAssignment', (Meteor as any).roleAssignment],
   ];
 
-  await Promise.all(
-    collections.map(([name, collection]) => requireRemovableCollection(collection, name).removeAsync({})),
-  );
+  await Promise.all([
+    ...collections.map(([name, collection]) => requireRemovableCollection(collection, name).removeAsync({})),
+    // The running server observes this startup-owned record throughout the suite.
+    requireRemovableCollection(DynamicSettingsAny, 'DynamicSettings').removeAsync({
+      _id: { $ne: SERVER_VERBOSITY_SETTING.id },
+    }),
+  ]);
 }
+
+describe('server composition test cleanup', function() {
+  it('preserves the live server verbosity setting while removing test settings', async function() {
+    const setting = await DynamicSettingsAny.findOneAsync(SERVER_VERBOSITY_SETTING.id);
+    expect(setting, 'startup must initialize the required server verbosity setting').to.exist;
+    const temporaryId = `test-cleanup-${Random.id()}`;
+    await DynamicSettingsAny.insertAsync({ _id: temporaryId, value: 2 });
+
+    await clearServerCompositionCollections();
+
+    expect(await DynamicSettingsAny.findOneAsync(SERVER_VERBOSITY_SETTING.id)).to.deep.equal(setting);
+    expect(await DynamicSettingsAny.findOneAsync(temporaryId)).to.equal(undefined);
+  });
+});
 
 function createServerHistoryRecord(overrides: Record<string, unknown> = {}) {
   return compressHistoryRecord({
