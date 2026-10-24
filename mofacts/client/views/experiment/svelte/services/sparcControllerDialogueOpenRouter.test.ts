@@ -1,3 +1,4 @@
+import { createSparcStateTransitionHistoryRecord } from '../../../../../../learning-components/units/sparcsession/sparcStateTransitionHistory';
 import { expect } from 'chai';
 import type { SparcControllerDisplay } from './sparcController';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
@@ -633,7 +634,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
         moveLibrary: {
           async lookup(query) {
             expect(query.context.kind).to.be.oneOf(['instruction', 'question']);
-            return { status: 'generate', ticket: { query, embedding: [1, 0] }, previousQuestions: [] };
+            const embedding = Array.from({ length: 4096 }, (_, index) => Math.sin(index) / 64);
+            expect(Buffer.byteLength(JSON.stringify(embedding))).to.be.greaterThan(16384);
+            return { status: 'generate', ticket: { query, embedding }, previousQuestions: [] };
           },
           async publish(ticket, content) {
             if (ticket.query.context.kind === 'instruction') {
@@ -649,6 +652,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
       const attempt = () => provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
         selectedAction: { snapshotId: 'same-event' }, historySessionId: 'lesson-session', ...(checkpoint ? { instructionCheckpoint: structuredClone(checkpoint) } : {}),
         onInstructionCheckpoint: async next => {
+          if (next.ticket) expect(next.ticket).not.to.have.property('embedding');
+          createSparcStateTransitionHistoryRecord({ core: { userId: 'user', TDFId: 'lesson', sessionID: 'session', levelUnit: 0 },
+            transition: { transitionId: `startup:instruction:${next.stage}`, event: { eventId: 'startup', type: 'document-loaded',
+              source: { pageKey: 'page', nodeId: 'root' }, time: 1 },
+              writes: [{ target: { pageKey: 'page', nodeId: 'root' }, key: 'instructionalComposition', value: next }] } });
           if (failure === `${next.stage}-before` && !failed) { failed = true; throw new Error('interrupted'); }
           checkpoint = structuredClone(next);
           if (failure === `${next.stage}-after` && !failed) { failed = true; throw new Error('interrupted'); }

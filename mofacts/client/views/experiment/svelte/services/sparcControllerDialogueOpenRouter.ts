@@ -7,7 +7,7 @@ import { SPARC_EMBEDDING_MODEL } from '../../../../../common/lib/sparcEmbeddingM
 import { Meteor } from 'meteor/meteor';
 import { realizeSparcPrimitive } from './sparcPrimitiveRealization';
 import { instructionalNeed, primitiveContext } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
-import { selectedSparcEvidence, previousSparcQuestions, type SparcMoveLibraryClient, type SparcPrimitiveContent, type SparcPrimitiveReference, type SparcInstructionCheckpoint, type SparcPrimitiveTicket } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
+import { selectedSparcEvidence, previousSparcQuestions, type SparcMoveLibraryClient, type SparcPrimitiveContent, type SparcPrimitiveReference, type SparcInstructionCheckpoint } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
 import { parseSparcEvidenceSummary, sparcEvidenceContext, type SparcRetainedEvidence } from '../../../../../../learning-components/units/sparcsession/sparcEvidenceHistory';
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief, parseSparcPromptFigure, SPARC_SUPPORTED_PROMPT_JSON_SCHEMA, SPARC_SUPPORTED_PROMPT_SCHEMA_ID, SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY } from '../../../../../../learning-components/units/sparcsession/sparcSupportedPrompt';
 import { callSparcPromptImage, callSparcVisualSupport, type CallSparcPromptImage, type CallSparcVisualSupport } from './sparcPromptImage';
@@ -716,7 +716,7 @@ export function createSparcDialogueOpenRouterProvider(
       const hasSupport = components.includes('richContent');
       const visual = hasSupport && request.moveDefinition.supportKind === 'visual';
       const written = hasSupport && request.moveDefinition.supportKind === 'written';
-      let ticket: SparcPrimitiveTicket | undefined = checkpoint?.ticket;
+      let ticket: SparcInstructionCheckpoint['ticket'] = checkpoint?.ticket;
       if (options.moveLibrary && !request.onInstructionCheckpoint) throw new Error('Matched instruction requires durable checkpoints');
       if (!checkpoint && (explanation !== null || richContent !== null)) throw new Error('An incomplete unpaired instruction cannot resume as a matched instruction');
       if (!checkpoint && options.moveLibrary) {
@@ -726,7 +726,7 @@ export function createSparcDialogueOpenRouterProvider(
           queryText: sparcInstructionalNeedText(instructionalNeed(request, {})) };
         const found = await options.moveLibrary.lookup(query);
         if (found.status === 'hit') await saveInstruction({ stage: 'accepted', content: found.content, reference: found.reference });
-        else ticket = found.ticket;
+        else ticket = { query: found.ticket.query };
       }
       if (!checkpoint) {
         const properties: Record<string, unknown> = { tutorMessage: { type: 'string', minLength: 1 } };

@@ -16,6 +16,10 @@ retain the existing text similarity threshold; visual retrieval remains one
 local maximum at 0.95. Old separate entries are not combined into pairs, migrated,
 or deleted. Feedback and question entries retain their own reuse behavior.
 
+Checkpoint publication tickets retain the query but never its embedding vector.
+Publication reads the browser embedding cache, recomputing the vector from the
+saved query after reload. Existing history size limits remain enforced.
+
 The canonical event journals `instruction:composed` before media resolution,
 `instruction:resolved` after a requested visual succeeds, and
 `instruction:accepted` after library acceptance. The composed checkpoint holds

@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert';
+import { expect } from 'chai';
+import type { SparcPrimitiveQuery, SparcPrimitiveTicket } from '../../../../../../learning-components/runtime/sparcMoveLibraryContract';
 import { Meteor } from 'meteor/meteor';
-import { readSparcAdministrativeRemovals } from './sparcMoveLibraryClient';
+import { createSparcMoveLibraryClient, readSparcAdministrativeRemovals } from './sparcMoveLibraryClient';
 
 describe('Content-removal lookup diagnostics', () => {
   it('returns successful removal reads without reporting a failure', async () => {
@@ -37,5 +39,40 @@ describe('Content-removal lookup diagnostics', () => {
         assert.ok(!JSON.stringify(reports).includes(connection.password));
       } finally { Meteor.callAsync = original; }
     }
+  });
+});
+
+
+describe('Instruction publication embedding ownership', () => {
+  it('rebuilds a resumed query embedding and reuses its browser cache for retries', async () => {
+    const originalCall = Meteor.callAsync;
+    const originalUser = Meteor.userId;
+    const content = { text: 'A saved matched explanation.' };
+    const query = { tdfId: 'embedding-ownership-lesson', queryText: 'A saved instructional need.',
+      context: { kind: 'instruction', supportKind: 'visual' } } as SparcPrimitiveQuery;
+    let embeddings = 0;
+    let publications = 0;
+    Meteor.userId = () => 'embedding-ownership-user';
+    Meteor.callAsync = (async (method: string, payload: SparcPrimitiveTicket & { input: string[] }, saved: unknown) => {
+      if (method === 'callResolvedOpenRouterEmbeddings') {
+        embeddings++;
+        expect(payload.input).to.deep.equal([query.queryText]);
+        return { embeddings: [[3, 4]] };
+      }
+      expect(method).to.equal('publishSparcPrimitive');
+      expect(payload).to.deep.equal({ query, embedding: [0.6, 0.8] });
+      expect(saved).to.deep.equal(content);
+      publications++;
+      return { accepted: true, content };
+    }) as typeof Meteor.callAsync;
+    try {
+      const client = createSparcMoveLibraryClient(async () => { throw new Error('Resume must not repeat retrieval'); });
+      const checkpointTicket = JSON.parse(JSON.stringify({ query }));
+      await client.publish(checkpointTicket, content);
+      await client.publish(checkpointTicket, content);
+      expect(embeddings).to.equal(1);
+      expect(publications).to.equal(2);
+      expect(checkpointTicket).not.to.have.property('embedding');
+    } finally { Meteor.callAsync = originalCall; Meteor.userId = originalUser; }
   });
 });

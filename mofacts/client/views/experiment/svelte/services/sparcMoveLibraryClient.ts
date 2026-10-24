@@ -43,7 +43,11 @@ export function createSparcMoveLibraryClient(
       if (!selection) return { status: 'generate', ticket: { query, embedding: embedding! }, previousQuestions: query.previousQuestions };
       return Meteor.callAsync('lookupSparcPrimitive', query, selection, embedding);
     },
-    publish: (ticket, content) => Meteor.callAsync('publishSparcPrimitive', ticket, content),
+    async publish({ query }, content) {
+      const embedding = query.context.kind !== 'instruction' && query.context.supportKind === 'visual'
+        ? [] : (await embedSparcTexts(query.tdfId, [query.queryText]))[0]!;
+      return Meteor.callAsync('publishSparcPrimitive', { query, embedding }, content);
+    },
   };
 }
 

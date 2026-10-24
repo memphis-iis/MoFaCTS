@@ -32,7 +32,7 @@ export type SparcPrimitiveLookup =
   | { status: 'generate'; ticket: SparcPrimitiveTicket; previousQuestions: { text: string }[] };
 export type SparcMoveLibraryClient = {
   lookup(query: SparcPrimitiveQuery): Promise<SparcPrimitiveLookup>;
-  publish(ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent): Promise<{ accepted: true; content: SparcPrimitiveContent; reference: SparcPrimitiveReference } | { accepted: false; reason: string }>;
+  publish(ticket: Pick<SparcPrimitiveTicket, 'query'>, content: SparcPrimitiveContent): Promise<{ accepted: true; content: SparcPrimitiveContent; reference: SparcPrimitiveReference } | { accepted: false; reason: string }>;
 };
 
 export function stableMoveJson(value: unknown): string {
@@ -46,6 +46,7 @@ export type SparcInstructionCheckpoint = {
   stage: 'composed' | 'resolved' | 'accepted';
   content: SparcPrimitiveContent;
   visualBrief?: { imagePrompt: string; displayWidth: number };
-  ticket?: SparcPrimitiveTicket;
+  /** Embeddings are browser-owned derived data, never durable learner history. */
+  ticket?: Pick<SparcPrimitiveTicket, 'query'>;
   reference?: SparcPrimitiveReference;
 };
