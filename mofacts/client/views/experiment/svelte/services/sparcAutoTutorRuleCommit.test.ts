@@ -1,3 +1,4 @@
+import { SPARC_INSTRUCTIONAL_COMPETITION_MODULE } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
 import { resolveSparcAccountPolicy } from './sparcController';
 import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { currentSparcMenu } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
@@ -34,6 +35,76 @@ function instructionFixture(request: SparcUtteranceRequest): SparcInstructionCom
 }
 
 describe('SPARC app instructional commit', () => {
+  it('publishes the accepted instruction while its question is pending, only after a successful save', async () => {
+    for (const rejectAcceptance of [true, false]) {
+      clearSparcRuntimeState();
+      const display = { pageKey: 'early-instruction', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
+        instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-agent-v2', policyVersion: 1 },
+        autoTutorTargets: { expectations: [{ clusterKC: 'a', text: 'Explain A', category: 'model-rule' }], misconceptions: [] },
+        clusterTargets: [{ clusterIndex: 0, clusterKC: 'a' }],
+        workingMemoryFacts: [{ factType: 'dialogue.source', slots: { topic: 'Explain the synthetic lesson.' } },
+          { factType: 'kcGraph.node', slots: { clusterKC: 'a', centrality: 1 } }],
+        nodes: [{ id: 'learner-response-input', nodeType: 'atomic', atomType: 'text-input', readOnly: true },
+          { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit', readOnly: true }],
+      };
+      const rows: CanonicalHistoryRecord[] = [];
+      let published: Record<string, unknown> = {};
+      let releaseQuestion!: () => void;
+      let signalAccepted!: () => void;
+      const questionGate = new Promise<void>(resolve => { releaseQuestion = resolve; });
+      const accepted = new Promise<void>(resolve => { signalAccepted = resolve; });
+      let questionStarted = false;
+      const pending = commitSparcAutoTutorDocumentLoad({
+        engine: { commitSparcTrialDisplayAutoTutorRules: (params: Parameters<typeof commitSparcTrialDisplayAutoTutorRules>[0]) =>
+          commitSparcTrialDisplayAutoTutorRules({ ...params, document: { ...params.document!,
+            productionRules: params.document!.productionRules!.filter(rule => rule.module !== SPARC_INSTRUCTIONAL_COMPETITION_MODULE
+              || rule.id.includes('instruction.dynamic.explanation-rich-question.text')),
+          } }) } as unknown as Parameters<typeof commitSparcAutoTutorDocumentLoad>[0]['engine'],
+        currentDisplay: display, tdfId: 'early-instruction-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
+        scoreLearnerResponse: () => { throw new Error('No assessment on initial load'); },
+        generateTutorUtterance: async request => {
+          const output = instructionFixture(request);
+          assert.ok(output.explanation && output.richContent, 'This opening move must include both instruction components');
+          const content = { text: output.explanation, support: { text: output.richContent } };
+          await request.onInstructionCheckpoint!({ stage: 'composed', content });
+          assert.ok(!JSON.stringify(published).includes(output.explanation), 'Draft instruction must remain hidden');
+          await request.onInstructionCheckpoint!({ stage: 'accepted', content });
+          questionStarted = true;
+          signalAccepted();
+          await questionGate;
+          await request.onInstructionComponent!('question', output.question!, undefined, output.choices ? { choices: output.choices } : {});
+          return output;
+        },
+        onNodeValues: values => {
+          assert.ok(rows.some(row => (row.sparc as { stateTransition: { transitionId: string } }).stateTransition.transitionId.endsWith(':instruction:accepted')),
+            'Instruction must be durably accepted before it is displayed');
+          published = values;
+        },
+        deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async row => {
+          const id = (row.sparc as { stateTransition: { transitionId: string } }).stateTransition.transitionId;
+          if (rejectAcceptance && id.endsWith(':instruction:accepted')) throw new Error('Instruction save rejected');
+          rows.push(row);
+        } },
+      });
+      if (rejectAcceptance) {
+        await assert.rejects(pending, /Instruction save rejected/);
+        assert.equal(questionStarted, false);
+        assert.deepEqual(published, {});
+      } else {
+        await Promise.race([accepted, pending]);
+        try {
+          assert.equal(questionStarted, true);
+          const visible = JSON.stringify(published);
+          assert.ok(visible.includes('An explanation of the condition.'), 'Accepted explanation must appear before the question finishes');
+          assert.ok(visible.includes('A complete worked example.'), 'Matched support must appear with its explanation');
+          assert.ok(!visible.includes('Which case meets the condition?'), 'Question is still pending');
+          assert.ok(!rows.some(row => (row.sparc as { stateTransition: { transitionId: string } }).stateTransition.transitionId.endsWith(':cycle')));
+        } finally { releaseQuestion(); await pending; }
+      }
+    }
+    clearSparcRuntimeState();
+  });
+
   it('reports stale-question state without answer text and preserves rejection when reporting fails', async () => {
     for (const reportingFails of [false, true]) {
       clearSparcRuntimeState();

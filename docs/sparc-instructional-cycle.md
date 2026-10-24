@@ -24,7 +24,9 @@ The canonical event journals `instruction:composed` before media resolution,
 `instruction:resolved` after a requested visual succeeds, and
 `instruction:accepted` after library acceptance. The composed checkpoint holds
 the brief; resolved checkpoints hold the media; the accepted checkpoint appends
-both display nodes together. Written instructions advance directly from composed
+both display nodes together and immediately refreshes the visible instruction,
+while the question is still generating and response controls remain disabled.
+Written instructions advance directly from composed
 to accepted. Each save is awaited before the next operation. Question persistence
 and cycle completion precede enabling learner input. The existing history owner
 provides idempotent writes; no new lock, polling, or automatic retry is added.
