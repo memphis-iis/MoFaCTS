@@ -82,13 +82,16 @@ test('live demo runs real local inference and releases the camera on stop, exit 
   page.on('pageerror', error => errors.push(error.message));
   // A blank canvas is synthetic camera input; inference must report no body.
   await page.addInitScript(() => {
-    window.cameraTest = { streams: [], denied: false, requestedAudio: false };
+    window.cameraTest = { streams: [], denied: false, unavailable: false, requestedAudio: false, directions: [] };
     Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async options => {
       window.cameraTest.requestedAudio ||= options.audio !== false;
+      window.cameraTest.directions.push(options.video.facingMode);
       if (window.cameraTest.denied) throw new DOMException('Synthetic denial', 'NotAllowedError');
-      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480;
+      if (window.cameraTest.unavailable) throw new DOMException('Synthetic missing camera', 'OverconstrainedError');
+      const rear = options.video.facingMode.exact === 'environment';
+      const canvas = document.createElement('canvas'); canvas.width = rear ? 480 : 640; canvas.height = rear ? 640 : 480;
       const context = canvas.getContext('2d');
-      context.fillStyle = 'white'; context.fillRect(0, 0, 640, 480);
+      context.fillStyle = 'white'; context.fillRect(0, 0, canvas.width, canvas.height);
       const stream = canvas.captureStream(15);
       window.cameraTest.streams.push(stream);
       return stream;
@@ -98,7 +101,7 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     const url = new URL(route.request().url());
     if (url.origin !== 'http://localhost:3200') { externalRequests.push(url.origin); return route.abort(); }
     if (url.pathname === '/__skeleton-fixture') return route.fulfill({ contentType: 'text/html',
-      body: '<!doctype html><html><body><main></main><script src="/__skeleton-fixture/fixture.js"></script></body></html>' });
+      body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main></main><script src="/__skeleton-fixture/fixture.js"></script></body></html>' });
     if (url.pathname.startsWith('/__skeleton-fixture/')) {
       const filename = path.basename(url.pathname);
       return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(directory, filename)) });
@@ -107,14 +110,59 @@ test('live demo runs real local inference and releases the camera on stop, exit 
   });
   try {
     await page.goto('http://localhost:3200/__skeleton-fixture');
+    await page.addStyleTag({ content: fs.readFileSync(path.join(app, 'public/styles/classic.css'), 'utf8') });
     await page.addStyleTag({ content: fs.readFileSync(path.join(app, 'client/views/theme.css'), 'utf8') });
     await page.evaluate(() => window.fixture.mount());
+    assert.equal(await page.getByRole('button', { name: 'Switch camera to rear', includeHidden: true }).isVisible(), false);
+    await page.setViewportSize({ width: 390, height: 667 });
+    await page.getByRole('button', { name: 'Switch camera to rear' }).waitFor();
+    async function checkMobileLayout() {
+      const geometry = await page.evaluate(() => {
+        const preview = document.querySelector('.pose-camera-mirror').getBoundingClientRect();
+        const video = document.querySelector('video');
+        return { preview: { width: preview.width, height: preview.height },
+          ratio: video.videoWidth ? video.videoWidth / video.videoHeight : 4 / 3,
+          width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth,
+          controls: [...document.querySelectorAll('.skeleton-demo-controls button')].map(button => {
+            const rect = button.getBoundingClientRect();
+            return { top: rect.top, bottom: rect.bottom, height: rect.height };
+          }) };
+      });
+      assert.ok(geometry.scrollWidth <= geometry.width, 'No horizontal scrolling');
+      assert.ok(geometry.preview.height <= geometry.height / 2 + 1, 'Preview fits half the mobile viewport height');
+      assert.ok(Math.abs(geometry.preview.width / geometry.preview.height - geometry.ratio) < 0.01, 'Overlay geometry matches uncropped video');
+      assert.ok(geometry.controls.every(rect => rect.top >= 0 && rect.bottom < geometry.height && rect.height >= 44), 'Controls are visible with touch-sized targets');
+    }
+    await checkMobileLayout();
     assert.equal(await page.evaluate(() => window.fixture.practiceMounts), 0);
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor({ timeout: 45000 });
     assert.equal(await page.locator('video').evaluate(video => video.videoWidth), 640);
     assert.equal(await page.locator('svg circle').count(), 0, 'No fabricated body on blank camera input');
     assert.equal(await page.evaluate(() => window.cameraTest.requestedAudio), false);
+    await page.getByRole('button', { name: 'Switch camera to rear' }).click();
+    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
+    assert.deepEqual(await page.evaluate(() => window.cameraTest.directions.at(-1)), { exact: 'environment' });
+    assert.equal(await page.locator('.pose-camera-mirror').evaluate(element => getComputedStyle(element).transform), 'none');
+    assert.equal(await page.evaluate(() => window.cameraTest.streams.slice(0, -1).every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
+    for (const viewport of [{ width: 390, height: 667 }, { width: 320, height: 568 }, { width: 667, height: 375 }]) {
+      await page.setViewportSize(viewport);
+      await checkMobileLayout();
+      await page.screenshot({ path: path.join(app, `../tmp/skeleton-mobile-${viewport.width}.png`), fullPage: true });
+    }
+    await page.setViewportSize({ width: 390, height: 667 });
+    await page.getByRole('button', { name: 'Switch camera to front' }).click();
+    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
+    assert.deepEqual(await page.evaluate(() => window.cameraTest.directions.at(-1)), { exact: 'user' });
+    assert.equal(await page.locator('.pose-camera-mirror').evaluate(element => getComputedStyle(element).transform), 'matrix(-1, 0, 0, 1, 0, 0)');
+    await page.evaluate(() => { window.cameraTest.unavailable = true; });
+    await page.getByRole('button', { name: 'Switch camera to rear' }).click();
+    await page.getByRole('alert').filter({ hasText: 'selected camera is unavailable' }).waitFor();
+    assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
+    await page.evaluate(() => { window.cameraTest.unavailable = false; });
+    await page.getByRole('button', { name: 'Switch camera to front' }).click();
+    await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
     await page.getByRole('button', { name: 'Stop camera', exact: true }).click();
     assert.equal(await page.evaluate(() => window.cameraTest.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);

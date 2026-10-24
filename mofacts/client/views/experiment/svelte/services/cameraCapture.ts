@@ -15,7 +15,11 @@ export function createCameraCapture() {
     }
   }
 
-  async function start(target: HTMLVideoElement, onEnded: () => void): Promise<void> {
+  async function start(
+    target: HTMLVideoElement,
+    onEnded: () => void,
+    facingMode?: 'user' | 'environment',
+  ): Promise<void> {
     stop();
     const token = generation;
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -23,7 +27,9 @@ export function createCameraCapture() {
     }
     const acquired = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+      // Initial webcam access prefers the front camera; an explicit switch must
+      // obtain the requested direction or report failure, never silently ignore it.
+      video: { facingMode: facingMode ? { exact: facingMode } : 'user', width: { ideal: 960 }, height: { ideal: 720 } },
     });
     if (token !== generation) {
       acquired.getTracks().forEach(track => track.stop());

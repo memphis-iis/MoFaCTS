@@ -4,14 +4,22 @@
   export let videoElement: HTMLVideoElement;
   export let observation: PoseObservation | null = null;
   export let connections: readonly PoseConnection[] = [];
+  export let mirrored = true;
+  let aspectRatio = 4 / 3;
+  function updateAspectRatio(): void {
+    if (videoElement.videoWidth && videoElement.videoHeight) {
+      aspectRatio = videoElement.videoWidth / videoElement.videoHeight;
+    }
+  }
   $: points = observation?.landmarks ?? [];
 </script>
 
 <div class="pose-camera-preview">
-  <div class="pose-camera-mirror">
+  <div class="pose-camera-mirror" class:mirrored style={`--pose-aspect-ratio: ${aspectRatio}`}>
     <!-- A silent, live camera preview has no prerecorded audio to caption. -->
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video bind:this={videoElement} muted playsinline aria-label="Live camera preview" />
+    <video bind:this={videoElement} muted playsinline on:loadedmetadata={updateAspectRatio}
+      on:resize={updateAspectRatio} aria-label="Live camera preview"></video>
     <svg viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
       {#each connections as connection}
         {#if isVisiblePoseLandmark(points[connection.start]) && isVisiblePoseLandmark(points[connection.end])}

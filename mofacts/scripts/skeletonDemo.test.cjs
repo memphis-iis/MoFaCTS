@@ -102,6 +102,37 @@ test('camera start/stop detaches the preview and releases every acquired track',
   assert.equal(stops, 1);
 });
 
+test('camera switching releases the old stream before requesting the exact direction', async () => {
+  const tracks = [];
+  const requests = [];
+  let ended = 0;
+  let deny = false;
+  const api = load('client/views/experiment/svelte/services/cameraCapture.ts', {
+    navigator: { mediaDevices: { async getUserMedia(options) {
+      assert.ok(tracks.every(track => track.stopped), 'Release previous camera before acquiring another');
+      requests.push(options);
+      if (deny) throw new DOMException('No rear camera', 'OverconstrainedError');
+      const track = { stopped: false, stop() { this.stopped = true; }, addEventListener(name, listener) { this.ended = listener; } };
+      tracks.push(track);
+      return { getTracks: () => [track], getVideoTracks: () => [track] };
+    } } },
+  });
+  const camera = api.createCameraCapture();
+  const video = { srcObject: null, pause() {}, async play() {} };
+  await camera.start(video, () => ended++);
+  await camera.start(video, () => ended++, 'environment');
+  tracks[0].ended();
+  assert.equal(ended, 0, 'Old camera events cannot stop the new camera');
+  await camera.start(video, () => ended++, 'user');
+  assert.deepEqual(requests.map(request => request.video.facingMode.exact || request.video.facingMode), ['user', 'environment', 'user']);
+  assert.ok(requests.every(request => request.audio === false));
+  deny = true;
+  await assert.rejects(camera.start(video, () => ended++, 'environment'), { name: 'OverconstrainedError' });
+  assert.equal(requests.length, 4, 'An unavailable direction must not request a substitute camera');
+  assert.equal(video.srcObject, null);
+  assert.ok(tracks.every(track => track.stopped));
+});
+
 test('pose tracker bounds frames, clears inference on stop, and closes late models', async () => {
   let frame;
   let closed = 0;

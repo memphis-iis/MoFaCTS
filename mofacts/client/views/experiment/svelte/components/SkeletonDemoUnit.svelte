@@ -18,6 +18,7 @@
   let active = false;
   let starting = false;
   let completing = false;
+  let facingMode: 'user' | 'environment' | undefined;
   let mounted = true;
   let generation = 0;
   let engine: Awaited<ReturnType<typeof initializeEngine>> | null = null;
@@ -47,7 +48,7 @@
     starting = true;
     status = 'Starting camera and loading body tracking…';
     try {
-      await camera.start(videoElement, fail);
+      await camera.start(videoElement, fail, facingMode);
       if (token !== generation) return;
       await tracking.start(videoElement, (frame, edges) => {
         if (token !== generation) return;
@@ -60,9 +61,22 @@
       starting = false;
       active = true;
       status = 'Looking for a person…';
-    } catch {
-      if (token === generation) fail();
+    } catch (cause) {
+      if (token === generation) {
+        fail();
+        if (facingMode && cause instanceof DOMException && (cause.name === 'OverconstrainedError' || cause.name === 'NotFoundError')) {
+          error = 'The selected camera is unavailable. Use Switch camera to select the other camera, then try Start camera again.';
+        }
+      }
     }
+  }
+
+  function switchCamera(): void {
+    if (starting || completing) return;
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    error = '';
+    if (active) void start();
+    else status = `${facingMode === 'environment' ? 'Rear' : 'Front'} camera selected. Choose Start camera to begin.`;
   }
 
   async function complete(): Promise<void> {
@@ -99,17 +113,21 @@
 <svelte:window on:pagehide={stop} />
 <section class="skeleton-demo" aria-label="Skeleton demo">
   <h2>Skeleton demo</h2>
-  <p>Start the camera, then move your head, shoulders, and arms to inspect the skeleton overlay.
-    The preview is mirrored. Camera images and body positions stay on this device and are not recorded or saved.</p>
-  <PoseCameraPreview bind:videoElement {observation} {connections} />
-  <p role="status">{status}</p>
-  {#if error}<p role="alert">{error}</p>{/if}
+  <p>Start the camera, then move your head, shoulders, and arms to inspect the skeleton overlay.</p>
   <div class="skeleton-demo-controls">
     {#if active || starting}
       <button type="button" class="btn btn-secondary" on:click={stop}>Stop camera</button>
     {:else}
       <button type="button" class="btn btn-secondary" disabled={!engine || completing} on:click={start}>Start camera</button>
     {/if}
+    <button type="button" class="btn btn-secondary skeleton-demo-switch-camera"
+      disabled={!engine || starting || completing} on:click={switchCamera}
+      aria-label={`Switch camera to ${facingMode === 'environment' ? 'front' : 'rear'}`}>Switch camera</button>
     <button type="button" class="btn btn-primary" disabled={!engine || completing} on:click={complete}>Continue</button>
   </div>
+  <p role="status">{status}</p>
+  {#if error}<p role="alert">{error}</p>{/if}
+  <PoseCameraPreview bind:videoElement {observation} {connections} mirrored={facingMode !== 'environment'} />
+  <p>Camera images and body positions stay on this device and are not recorded or saved.
+    The front camera preview is mirrored; the rear camera preview is not.</p>
 </section>

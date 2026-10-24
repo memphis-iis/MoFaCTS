@@ -12,6 +12,10 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--app-space-2);
+    margin-bottom: var(--app-space-2);
+}
+.skeleton-demo-switch-camera {
+    display: none;
 }
 .pose-camera-preview {
     overflow: hidden;
@@ -21,12 +25,17 @@
 }
 .pose-camera-mirror {
     position: relative;
+    width: 100%;
+    aspect-ratio: var(--pose-aspect-ratio);
+    margin-inline: auto;
+}
+.pose-camera-mirror.mirrored {
     transform: scaleX(-1);
 }
 .pose-camera-mirror video {
     display: block;
     width: 100%;
-    height: auto;
+    height: 100%;
 }
 .pose-camera-mirror svg {
     position: absolute;
@@ -46,6 +55,23 @@
     stroke: var(--learning-card-surface-color);
     stroke-width: 1px;
     vector-effect: non-scaling-stroke;
+}
+
+@media (max-width: 767px), (any-pointer: coarse) {
+    .skeleton-demo-switch-camera {
+        display: inline-flex;
+    }
+    .skeleton-demo-controls .btn {
+        min-height: max(44px, var(--app-button-height));
+        flex: 1 1 auto;
+    }
+    .pose-camera-mirror {
+        max-width: min(100%, calc(50svh * var(--pose-aspect-ratio)));
+    }
+    .skeleton-demo {
+        padding: var(--app-space-2);
+        padding-bottom: max(var(--app-space-3), env(safe-area-inset-bottom));
+    }
 }
 
 .theme-loading-placeholder {
