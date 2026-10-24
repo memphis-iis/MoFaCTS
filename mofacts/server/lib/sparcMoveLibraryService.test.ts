@@ -13,6 +13,15 @@ function fixture() {
     return { entries, requests, removed, reads, service: createMoveLibraryService({ store, embeddingModel: 'fixture', videoReuseStatus: async videos => new Map(videos.map(video => [video.segmentId, true])), verifyFigure: async () => { } }) };
 }
 describe('Client-selected instructional persistence', () => {
+    it('accepts a local maximum at 0.95 and rejects a score below it before reading content', async () => {
+        const f = fixture();
+        const saved = await f.service.publish('a', { query: query('seed'), embedding: [1, 0] }, { text: 'Reusable instruction.' });
+        const hit = await f.service.lookup('b', query('boundary'), { entryId: saved.reference.entryId, similarity: 0.95 }, [1, 0]);
+        assert.equal(hit.status, 'hit');
+        const reads = f.reads.length;
+        await assert.rejects(f.service.lookup('c', query('below-boundary'), { entryId: saved.reference.entryId, similarity: 0.949999 }, [1, 0]), /Invalid local retrieval selection/);
+        assert.equal(f.reads.length, reads);
+    });
     it('fetches only the selected content and preserves its accepted decision on resume', async () => {
         const f = fixture(), q = query(), miss = await f.service.lookup('a', q, null, [1, 0]);
         if (miss.status !== 'generate')

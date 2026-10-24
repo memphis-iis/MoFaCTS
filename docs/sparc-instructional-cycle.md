@@ -12,7 +12,7 @@ then-explanation generation sequence described in older sections below.
 The existing library stores an `instruction` entry as one matched unit: `text`
 is its explanation and optional `support` contains the companion text, heading,
 and media reference. Browser indexes distinguish instruction support types and
-retain the existing text similarity threshold; visual retrieval remains one
+use the same 0.95 similarity threshold for text and visuals; visual retrieval remains one
 local maximum at 0.95. Old separate entries are not combined into pairs, migrated,
 or deleted. Feedback and question entries retain their own reuse behavior.
 
@@ -102,7 +102,7 @@ Each row is normalized once on cache insertion/update. Each lookup normalizes it
 query once, computes dot products in one pass, and returns exactly the maximum
 with deterministic ID ordering for ties. There is no candidate sorting, secondary
 evaluation, repetition rejection, or database paging during a practice search.
-Text component reuse keeps its 0.992 threshold and existing reading-level/question
+Text component reuse keeps its 0.95 threshold and existing reading-level/question
 response-type categories. Images and matching-language videos compete in a single
 visual index with one query and a shared **0.95** threshold. An absent authored
 content language excludes videos without inferring one from the interface locale.
@@ -206,7 +206,7 @@ The relevance and repetition cutoffs remain separate; no semantic suitability ju
 or additional relevance filter has been added. Exposure/manifest ownership is unchanged.
 
 Video queries use teaching-target prose against transcript vectors at a provisional
-0.80 cutoff. Image queries retain the complete instructional need at 0.992. One
+0.80 cutoff. Image queries retain the complete instructional need at 0.95. One
 controlled biological-species case supported this separation; broader retrieval
 precision has not been established. Existing catalog vectors and decisions are unchanged.
 
@@ -799,7 +799,7 @@ miss, and generates an image only after both searches miss. As before, a video i
 only with an explicitly authored matching contentLanguage. Packages omitting that optional
 metadata have no eligible videos and continue to image search; no language is inferred.
 A missing package, malformed language, or failed catalog read remains an error. Video search uses a provisional
-cosine cutoff of 0.80; image search retains 0.992. A miss means a successful search with no
+cosine cutoff of 0.80; image search retains 0.95. A miss means a successful search with no
 eligible match at or above that cutoff. Embedding, catalog, validation, storage, and
 provider errors propagate; none are converted into a miss. Both searches use the same
 embedding model with distinct query representations. Video candidates retain transcript-passage
@@ -849,7 +849,7 @@ For complete teaching figures, the first sufficiently novel instructional situat
 
 The situation embedding includes the selected target type and authored target texts, current target value when available, move assistance, and the planned illustration brief. The shared representation excludes account/session IDs, raw responses, and dialogue history. The existing primary embedding model, google/gemini-embedding-001, is used without switching to another model on failure. An embedding failure fails the selected move clearly.
 
-The initial image experiment used 0.90. Images and text now share the 0.992 reuse cutoff in `SPARC_LIBRARY_SIMILARITY`; these values are experimental operating cutoffs, not correctness probabilities. The separate Meteor settings overrides were removed. The shared input contract and representation identity are in `learning-components/runtime/sparcInstructionalNeed.ts`. Match scores and source (generated versus semantic reuse) are retained in the private decision ledger. Reuse incurs an embedding request, but no image-generation request; resuming the same decision incurs neither.
+The initial image experiment used 0.90. Images and text now share the 0.95 reuse cutoff in `SPARC_LIBRARY_SIMILARITY`; these values are experimental operating cutoffs, not correctness probabilities. The separate Meteor settings overrides were removed. The shared input contract and representation identity are in `learning-components/runtime/sparcInstructionalNeed.ts`. Match scores and source (generated versus semantic reuse) are retained in the private decision ledger. Reuse incurs an embedding request, but no image-generation request; resuming the same decision incurs neither.
 
 The server-only sparc_figure_library collection stores originating situation embeddings and stable image IDs. sparc_figure_requests stores each account/TDF/session/production-event decision and temporary generation leases. DynamicAssets owns canonical image bytes and descriptions. No new TDF fields, learner controls, package changes, dependencies, or historical migration are required. Current SPARC admin-only access remains in force; generic asset routes still deny these images. Existing private assets retain their ownership and original pairing.
 
@@ -1083,8 +1083,8 @@ current assets, exposures, and administrative removal receipts.
 The real Gemini Embedding 001 evaluation used cached Luna 6 medium feedback and
 saved lesson content (including Astra 6 medium), with no new instructional generation.
 At 0.99, one corrected answer incorrectly retrieved prior error-correcting feedback
-(similarity 0.99180791). Tightening reuse to 0.992 rejected every observed negative
-comparison and retained one of four approved feedback paraphrases (0.99250575),
+(similarity 0.99180791). Tightening reuse to 0.95 rejected every observed negative
+comparison and retained one of four approved feedback paraphrases (0.9550575),
 compared with three of four in the earlier representation. The production matcher
 confirmed zero wrong reuses across 40 negative feedback comparisons. Six minor image-brief
 wording variations retrieved their intended image; none of 15 pairs of different
@@ -1122,7 +1122,7 @@ The user specified embedding-only instructional matching on October 15, 2026, re
 primitive type and question response format. Testing started at 0.90 without a
 calibration gate. After inspecting errors, the user approved separate reuse and
 repetition cutoffs and required feedback to recognize correct answers. Reuse now defaults
-to 0.992 for both text and images; question repetition remains 0.88. Both values
+to 0.95 for both text and images; question repetition remains 0.88. Both values
 are owned by `SPARC_LIBRARY_SIMILARITY` in the shared instructional-need contract.
 The separate image/text settings overrides have been removed. Cutoffs are
 experimental operating values, not correctness probabilities. Additional matching rules

@@ -2,8 +2,8 @@ import { SPARC_TARGET_CATEGORIES, type SparcTargetCategory } from './sparcTarget
 
 /** Representation identity is metadata, never part of the embedded instructional meaning. */
 export const SPARC_INSTRUCTIONAL_NEED_VERSION = 'sparc-instructional-need-v1';
-// Started at .99; .99180791 incorrectly reused feedback for a corrected answer.
-export const SPARC_LIBRARY_SIMILARITY = Object.freeze({ minimumSimilarity: 0.992 });
+// The browser search and server acceptance share the requested 0.95 reuse boundary.
+export const SPARC_LIBRARY_SIMILARITY = Object.freeze({ minimumSimilarity: 0.95 });
 
 export type SparcInstructionalNeed = {
   target: { texts: string[]; category?: SparcTargetCategory };

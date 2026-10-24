@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { buildSparcInstructionalNeed, sparcInstructionalNeedText } from './sparcInstructionalNeed';
+import { buildSparcInstructionalNeed, sparcInstructionalNeedText, SPARC_LIBRARY_SIMILARITY } from './sparcInstructionalNeed';
 import { instructionalNeed } from '../units/sparcsession/sparcMoveLibrary';
 import type { SparcUtteranceRequest } from '../units/sparcsession/sparcUtteranceRequest';
 
@@ -12,6 +12,9 @@ const request = { targetType: 'learningTarget', targetId: 'kc-one', contentTexts
   ] }, dialogueHistory: [{ role: 'tutor', component: 'question', text: 'What prevents gene flow?' }], learnerText: 'Isolation.' } as unknown as SparcUtteranceRequest;
 
 describe('Shared instructional need representation', () => {
+  it('uses the requested 0.95 library reuse boundary', () => {
+    assert.equal(SPARC_LIBRARY_SIMILARITY.minimumSimilarity, 0.95);
+  });
   it('uses one deterministic input for image and text common fields and omits operational metadata', () => {
     const ordinary = instructionalNeed(request, { figure: { assetId: 'asset-one', description: 'Separated populations.' } });
     const image = instructionalNeed(request, { figure: { assetId: 'asset-two', description: 'Separated populations.' } }, { illustrationBrief: 'Draw separated populations.' });
