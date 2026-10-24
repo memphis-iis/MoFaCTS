@@ -13,13 +13,15 @@ async function buildFixture({ captureSubmissions = false } = {}) {
   const stub = (name, source) => { replacements[name] = write(`${name}.js`, source); };
   stub('sparcMoveLibraryClient', `export const sparcMoveLibraryClient = {};
     export const readSparcAdministrativeRemovals = ids => window.fixture.checkRemovals(ids);`);
+  stub('sparcLocalRetrieval', 'export const prepareSparcPracticeRetrieval = async () => {};');
+  stub('meteorSession', 'export const Session = { get: () => undefined };');
   stub('sparcController', 'export const resolveSparcControllerDisplay = display => display; export const resolveSparcControllerResult = (_display, detail) => detail;');
   stub('sparcAutoTutorRuleCommit', `export const isSparcAutoTutorDisplay = () => true;
     export const commitSparcAutoTutorDocumentLoad = async () => ({ sparcNodeValues: {} });
     export const commitSparcAutoTutorSubmit = async params => {
       ${captureSubmissions ? 'window.fixture.submissions.push(params.sparcResult); window.fixture.submissionPresentations.push(params.submissionPresentation); return { sparcNodeValues: {} };' : "throw Error('Unexpected submission');"}
     };`);
-  stub('sparcControllerDialogueOpenRouter', 'export const createSparcDialogueOpenRouterProvider = () => ({});');
+  stub('sparcControllerDialogueOpenRouter', 'export const createSparcDialogueOpenRouterProvider = () => ({ prepareAssessment: async () => {} });');
   stub('sparcOpenRouterSession', "export const createSparcOpenRouterSession = () => ({ sessionIdForScope: () => 'synthetic' });");
   stub('sparcRuntimeState', 'export const readSparcResumeSnapshot = () => ({ nodeValues: {} });');
   stub('sparcProductionRuleActionCommit', "export const commitSparcProductionRuleAction = () => { throw Error('Unexpected production action'); };");
@@ -54,6 +56,7 @@ async function buildFixture({ captureSubmissions = false } = {}) {
       { test: /\.ts$/, exclude: /node_modules/, type: 'javascript/auto', use: [{ loader: 'builtin:swc-loader', options: { jsc: { parser: { syntax: 'typescript' }, target: 'es2022' } } }] },
     ] },
     plugins: [new NormalModuleReplacementPlugin(/./, resource => {
+      if (resource.request === 'meteor/session') { resource.request = replacements.meteorSession; return; }
       const name = resource.request.split('/').at(-1);
       if (name === 'sparcPromptImage' && !resource.request.includes('/services/')) return;
       if (replacements[name]) resource.request = replacements[name];

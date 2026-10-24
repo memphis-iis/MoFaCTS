@@ -38,8 +38,17 @@ it('renders inline response controls through choice, text, reload, pending and c
   const empty = component('<div></div>', 'emptySurfaceChild.svelte');
   let node, reportActivity, publishNodeValues;
   let coveredExpectations = 0;
+  let holdAssessment, holdRetrieval, initializationFailure = '';
+  let assessmentsPrepared = 0, retrievalsPrepared = 0;
   let loads = 0, submissions = 0, completed = false, turnCount = 2, ordinaryFailure = false, holdSubmit, holdLoad;
   const stubs = {
+    sparcLocalRetrieval: { prepareSparcPracticeRetrieval: async (readingLevel, language) => {
+      retrievalsPrepared++;
+      assert.equal(readingLevel, 'unbiased');
+      assert.equal(language, 'en');
+      if (holdRetrieval) await holdRetrieval;
+      if (initializationFailure === 'retrieval') throw new Error('Synthetic retrieval initialization failure');
+    } },
     sparcMoveLibraryClient: { sparcMoveLibraryClient: {}, readSparcAdministrativeRemovals: async () => [] },
     sparcAdministrativeRemoval: { sparcContentReferenceIds: () => [], projectSparcAdministrativeRemovals: nodes => nodes },
     sparcController: { resolveSparcControllerDisplay: display => display, resolveSparcControllerResult: (_display, detail) => detail },
@@ -47,7 +56,12 @@ it('renders inline response controls through choice, text, reload, pending and c
       commitSparcAutoTutorDocumentLoad: async () => { loads++; if (holdLoad) await holdLoad; return { sparcNodeValues: {} }; },
       commitSparcAutoTutorSubmit: async params => { submissions++; publishNodeValues = params.onNodeValues; reportActivity?.('assessment'); if (holdSubmit) await holdSubmit; if (ordinaryFailure) throw new Error('Synthetic service failure'); return { sparcNodeValues: {} }; },
     },
-    sparcControllerDialogueOpenRouter: { createSparcDialogueOpenRouterProvider: options => { reportActivity = options.onActivity; return {}; } },
+    sparcControllerDialogueOpenRouter: { createSparcDialogueOpenRouterProvider: options => { reportActivity = options.onActivity; return { prepareAssessment: async currentDisplay => {
+      assessmentsPrepared++;
+      assert.equal(currentDisplay.pageKey, 'page');
+      if (holdAssessment) await holdAssessment;
+      if (initializationFailure === 'assessment') throw new Error('Synthetic assessment initialization failure');
+    } }; } },
     sparcOpenRouterSession: { createSparcOpenRouterSession: () => ({ sessionIdForScope: () => 'test' }) },
     sparcRuntimeState: { readSparcResumeSnapshot: () => ({ nodeValues: {} }) },
     sparcInstructionalPolicies: { isSparcCategorizedPolicy: () => true },
@@ -61,6 +75,10 @@ it('renders inline response controls through choice, text, reload, pending and c
   };
   Module._load = function(request, parent, main) {
     if (request === 'meteor/tracker') return { Tracker: {} };
+    if (request === 'meteor/session') return { Session: { get: key => {
+      assert.equal(key, 'currentTdfFile');
+      return { tdfs: { tutor: { setspec: { contentLanguage: 'en' } } } };
+    } } };
     if (request === './TestSurface.svelte') return surface;
     if (request === './captureRuntime.cjs') return { capture: event => runtimeEvents.push(event.detail) };
     if (request.endsWith('/SparcAutoTutorProgress.svelte')) return component(fs.readFileSync(path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcAutoTutorProgress.svelte'), 'utf8'), path.resolve(__dirname, '../client/views/experiment/svelte/components/SparcAutoTutorProgress.svelte'));
@@ -230,6 +248,58 @@ it('renders inline response controls through choice, text, reload, pending and c
     app = mount(wrapper, { target, props: { initial: props } });
     await settle(); assertNoText();
     releaseLoad(); await settle(); holdLoad = null; assertText();
+
+    // Both preparation services must finish before document load or answer entry.
+    for (const firstReady of ['assessment', 'retrieval']) {
+      await unmount(app);
+      const initialLoads = loads;
+      const initialAssessments = assessmentsPrepared, initialRetrievals = retrievalsPrepared;
+      let releaseAssessment, releaseRetrieval;
+      holdAssessment = new Promise(resolve => { releaseAssessment = resolve; });
+      holdRetrieval = new Promise(resolve => { releaseRetrieval = resolve; });
+      app = mount(wrapper, { target, props: { initial: props } });
+      await settle(); assertNoText();
+      assert.ok(target.querySelector('.sparc-auto-tutor-pending-turn'));
+      assert.equal(assessmentsPrepared, initialAssessments + 1);
+      assert.equal(retrievalsPrepared, initialRetrievals + 1);
+      assert.equal(loads, initialLoads);
+      if (firstReady === 'assessment') releaseAssessment(); else releaseRetrieval();
+      await settle(); assertNoText();
+      assert.equal(loads, initialLoads, 'One ready service cannot start the dialogue');
+      releaseAssessment(); releaseRetrieval();
+      await settle(); assertText();
+      assert.equal(loads, initialLoads + 1);
+      holdAssessment = holdRetrieval = null;
+    }
+
+    // A preparation failure stays failed until the learner explicitly retries.
+    for (const failedService of ['assessment', 'retrieval']) {
+      await unmount(app);
+      initializationFailure = failedService;
+      const initialLoads = loads;
+      const initialAssessments = assessmentsPrepared, initialRetrievals = retrievalsPrepared;
+      app = mount(wrapper, { target, props: { initial: props } });
+      await settle(); assertNoText();
+      assert.equal(loads, initialLoads);
+      assert.match(target.querySelector('[role="alert"]').textContent, /service/i);
+      assert.match(target.querySelector('.sparc-auto-tutor-submit-error-detail').textContent,
+        new RegExp('Synthetic ' + failedService + ' initialization failure'));
+      assert.equal(target.querySelector('.sparc-auto-tutor-pending-turn'), null);
+      const retry = Array.from(target.querySelectorAll('button')).find(button => /Try again/i.test(button.textContent));
+      assert.ok(retry);
+      assert.equal(retry.disabled, false);
+      initializationFailure = '';
+      app.update({ ...display }); await settle(); assertNoText();
+      assert.equal(assessmentsPrepared, initialAssessments + 1, 'Rendering must not automatically retry');
+      assert.equal(retrievalsPrepared, initialRetrievals + 1);
+      assert.equal(loads, initialLoads);
+      retry.click(); await settle(); assertText();
+      assert.equal(assessmentsPrepared, initialAssessments + 2);
+      assert.equal(retrievalsPrepared, initialRetrievals + 2);
+      assert.equal(loads, initialLoads + 1);
+      assert.equal(target.querySelector('[role="alert"]'), null);
+      assert.doesNotMatch(target.textContent, /Try again|initialization failure/);
+    }
   } finally {
     if (app) await unmount(app);
     Module._load = originalLoad;
