@@ -18,8 +18,8 @@ export function createCameraCapture() {
   async function start(
     target: HTMLVideoElement,
     onEnded: () => void,
-    facingMode?: 'user' | 'environment',
-  ): Promise<void> {
+    deviceId?: string,
+  ): Promise<{ deviceId: string | undefined; cameraIds: string[]; mirrored: boolean }> {
     stop();
     const token = generation;
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -27,9 +27,10 @@ export function createCameraCapture() {
     }
     const acquired = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      // Initial webcam access prefers the front camera; an explicit switch must
-      // obtain the requested direction or report failure, never silently ignore it.
-      video: { facingMode: facingMode ? { exact: facingMode } : 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+      // Initial access permits a normal desktop webcam. Switching selects an
+      // enumerated device, not a facing direction that webcams may not report.
+      video: { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' }),
+        width: { ideal: 960 }, height: { ideal: 720 } },
     });
     if (token !== generation) {
       acquired.getTracks().forEach(track => track.stop());
@@ -43,6 +44,17 @@ export function createCameraCapture() {
     target.srcObject = acquired;
     try {
       await target.play();
+      // Permission must be granted before the browser exposes camera identities.
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (token !== generation) throw new DOMException('Camera start was cancelled', 'AbortError');
+      const track = acquired.getVideoTracks()[0];
+      if (!track) throw new Error('The camera returned no video track.');
+      const settings = track.getSettings();
+      return {
+        deviceId: settings.deviceId,
+        cameraIds: devices.filter(device => device.kind === 'videoinput' && device.deviceId).map(device => device.deviceId),
+        mirrored: settings.facingMode !== 'environment',
+      };
     } catch (error) {
       if (token === generation) stop();
       throw error;

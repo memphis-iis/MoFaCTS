@@ -13,12 +13,16 @@
   let videoElement: HTMLVideoElement;
   let observation: PoseObservation | null = null;
   let connections: readonly PoseConnection[] = [];
+  let handConnections: readonly PoseConnection[] = [];
   let status = 'Choose Start camera to see your skeleton.';
   let error = '';
   let active = false;
   let starting = false;
   let completing = false;
-  let facingMode: 'user' | 'environment' | undefined;
+  let cameraIds: string[] = [];
+  let currentCameraId: string | undefined;
+  let mirrored = true;
+  $: canSwitchCamera = active && cameraIds.length > 1 && cameraIds.includes(currentCameraId ?? '');
   let mounted = true;
   let generation = 0;
   let engine: Awaited<ReturnType<typeof initializeEngine>> | null = null;
@@ -31,8 +35,11 @@
     camera.stop();
     observation = null;
     connections = [];
+    handConnections = [];
     active = false;
     starting = false;
+    cameraIds = [];
+    currentCameraId = undefined;
     status = 'Camera stopped. Choose Start camera to try again.';
   }
 
@@ -41,21 +48,27 @@
     error = 'Camera or pose tracking is unavailable. Check camera permission, close other camera applications, and try Start camera again.';
   }
 
-  async function start(): Promise<void> {
+  async function start(deviceId?: string): Promise<void> {
     stop();
     const token = generation;
     error = '';
     starting = true;
-    status = 'Starting camera and loading body tracking…';
+    status = 'Opening camera…';
     try {
-      await camera.start(videoElement, fail, facingMode);
+      const capture = await camera.start(videoElement, fail, deviceId);
       if (token !== generation) return;
-      await tracking.start(videoElement, (frame, edges) => {
+      cameraIds = capture.cameraIds;
+      currentCameraId = capture.deviceId;
+      mirrored = capture.mirrored;
+      status = 'Loading body and finger tracking…';
+      await tracking.start(videoElement, (frame, edges, handEdges) => {
         if (token !== generation) return;
         observation = frame;
         connections = edges;
-        status = frame.landmarks.length ? 'Body detected. Move your arms and compare the skeleton with your position.'
-          : 'No body detected. Keep your head and shoulders in view and move back if needed.';
+        handConnections = handEdges;
+        status = frame.landmarks.length || frame.hands.length
+          ? `${frame.landmarks.length ? 'Body detected' : 'No body detected'} · ${frame.hands.length} ${frame.hands.length === 1 ? 'hand' : 'hands'} detected`
+          : 'No body detected. Bring your body or hands into view.';
       }, fail);
       if (token !== generation) return;
       starting = false;
@@ -64,19 +77,20 @@
     } catch (cause) {
       if (token === generation) {
         fail();
-        if (facingMode && cause instanceof DOMException && (cause.name === 'OverconstrainedError' || cause.name === 'NotFoundError')) {
-          error = 'The selected camera is unavailable. Use Switch camera to select the other camera, then try Start camera again.';
+        if (cause instanceof DOMException && (cause.name === 'OverconstrainedError' || cause.name === 'NotFoundError')) {
+          error = deviceId ? 'The selected camera is unavailable. Choose Start camera to reopen your default camera.'
+            : `The browser could not open a camera for this page (${cause.name}).`;
+        } else if (cause instanceof DOMException && cause.name === 'NotReadableError') {
+          error = 'The camera is busy or could not send video. Stop other camera previews, then try Start camera again.';
         }
       }
     }
   }
 
   function switchCamera(): void {
-    if (starting || completing) return;
-    facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    error = '';
-    if (active) void start();
-    else status = `${facingMode === 'environment' ? 'Rear' : 'Front'} camera selected. Choose Start camera to begin.`;
+    if (!canSwitchCamera || starting || completing) return;
+    const next = (cameraIds.indexOf(currentCameraId!) + 1) % cameraIds.length;
+    void start(cameraIds[next]);
   }
 
   async function complete(): Promise<void> {
@@ -112,22 +126,22 @@
 <svelte:document on:visibilitychange={visibilityChanged} />
 <svelte:window on:pagehide={stop} />
 <section class="skeleton-demo" aria-label="Skeleton demo">
-  <h2>Skeleton demo</h2>
-  <p>Start the camera, then move your head, shoulders, and arms to inspect the skeleton overlay.</p>
+  <div class="skeleton-demo-toolbar">
+  <p class="skeleton-demo-instructions">Move your body and fingers to explore the tracking.</p>
   <div class="skeleton-demo-controls">
     {#if active || starting}
       <button type="button" class="btn btn-secondary" on:click={stop}>Stop camera</button>
     {:else}
-      <button type="button" class="btn btn-secondary" disabled={!engine || completing} on:click={start}>Start camera</button>
+      <button type="button" class="btn btn-secondary" disabled={!engine || completing} on:click={() => start()}>Start camera</button>
     {/if}
-    <button type="button" class="btn btn-secondary skeleton-demo-switch-camera"
-      disabled={!engine || starting || completing} on:click={switchCamera}
-      aria-label={`Switch camera to ${facingMode === 'environment' ? 'front' : 'rear'}`}>Switch camera</button>
+    {#if canSwitchCamera}<button type="button" class="btn btn-secondary" disabled={starting || completing}
+      on:click={switchCamera}>Switch camera</button>{/if}
     <button type="button" class="btn btn-primary" disabled={!engine || completing} on:click={complete}>Continue</button>
   </div>
-  <p role="status">{status}</p>
-  {#if error}<p role="alert">{error}</p>{/if}
-  <PoseCameraPreview bind:videoElement {observation} {connections} mirrored={facingMode !== 'environment'} />
-  <p>Camera images and body positions stay on this device and are not recorded or saved.
-    The front camera preview is mirrored; the rear camera preview is not.</p>
+  </div>
+  <div class="skeleton-demo-status">
+    {#if error}<p role="alert">{error}</p>{:else}<p role="status">{status}</p>{/if}
+  </div>
+  <PoseCameraPreview bind:videoElement {observation} {connections} {handConnections} {mirrored} />
+  <p class="skeleton-demo-privacy">Processed on this device. Nothing recorded or uploaded.</p>
 </section>

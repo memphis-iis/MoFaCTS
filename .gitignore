@@ -21,6 +21,7 @@ docker-out/
 outputs/
 tmp/
 .codex-remote-attachments/
+.codex-attachments/
 \#*\#
 *~
 mofacts/private/certs/*

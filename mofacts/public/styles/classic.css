@@ -3100,3 +3100,92 @@ body:has(.content-container) > .theme-bootstrap {
 
 /* Semantic emphasis follows the central typography contract. */
 strong, b { font-weight: var(--app-font-weight-bold); }
+
+/* The live demo uses the remaining lesson viewport; video and overlays share
+   one proportionally fitted frame. Appearance follows the application theme. */
+.practice-content:has(.skeleton-demo) .app-page-root {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex: 1;
+    padding: 0;
+}
+.skeleton-demo {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: var(--app-space-1);
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    padding: var(--app-space-2);
+    color: var(--app-text-color);
+    font-family: var(--app-font-family);
+}
+.skeleton-demo p { margin: 0; }
+.skeleton-demo-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--app-space-1) var(--app-space-2);
+}
+.skeleton-demo-instructions,
+.skeleton-demo-status,
+.skeleton-demo-privacy {
+    font-size: calc(var(--app-font-size-base) * 0.875);
+    line-height: var(--app-line-height-normal);
+}
+.skeleton-demo-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-space-1);
+}
+.skeleton-demo-controls .btn {
+    min-height: max(36px, calc(var(--app-button-height) * 0.85));
+    padding: var(--app-space-1) var(--app-space-2);
+    font-size: calc(var(--app-font-size-base) * 0.875);
+}
+.pose-camera-preview {
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: var(--app-border-radius-sm);
+    background: var(--learning-card-surface-color);
+}
+.pose-camera-mirror {
+    position: relative;
+    aspect-ratio: var(--pose-aspect-ratio);
+}
+.pose-camera-mirror.mirrored { transform: scaleX(-1); }
+.pose-camera-mirror video { display: block; width: 100%; height: 100%; }
+.pose-camera-mirror svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+}
+.pose-camera-mirror line {
+    stroke: var(--app-accent-color);
+    stroke-width: 4px;
+    vector-effect: non-scaling-stroke;
+}
+.pose-camera-mirror circle {
+    fill: var(--app-accent-color);
+    stroke: var(--learning-card-surface-color);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+}
+.pose-camera-hand line { stroke-width: 2px; }
+@media (max-width: 767px), (any-pointer: coarse) {
+    .skeleton-demo-controls .btn { min-height: max(44px, var(--app-button-height)); }
+}

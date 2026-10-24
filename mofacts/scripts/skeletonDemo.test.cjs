@@ -89,9 +89,10 @@ test('camera releases streams granted after cancellation and never requests audi
 
 test('camera start/stop detaches the preview and releases every acquired track', async () => {
   let stops = 0;
-  const track = { stop() { stops++; }, addEventListener() {} };
+  const track = { stop() { stops++; }, addEventListener() {}, getSettings: () => ({ deviceId: 'webcam' }) };
   const api = load('client/views/experiment/svelte/services/cameraCapture.ts', {
-    navigator: { mediaDevices: { async getUserMedia() { return { getTracks: () => [track], getVideoTracks: () => [track] }; } } },
+    navigator: { mediaDevices: { async getUserMedia() { return { getTracks: () => [track], getVideoTracks: () => [track] }; },
+      async enumerateDevices() { return [{ kind: 'videoinput', deviceId: 'webcam' }]; } } },
   });
   const camera = api.createCameraCapture();
   const video = { srcObject: null, pause() {}, async play() {} };
@@ -102,7 +103,7 @@ test('camera start/stop detaches the preview and releases every acquired track',
   assert.equal(stops, 1);
 });
 
-test('camera switching releases the old stream before requesting the exact direction', async () => {
+test('camera switching releases the old stream before requesting the exact device ID', async () => {
   const tracks = [];
   const requests = [];
   let ended = 0;
@@ -112,22 +113,23 @@ test('camera switching releases the old stream before requesting the exact direc
       assert.ok(tracks.every(track => track.stopped), 'Release previous camera before acquiring another');
       requests.push(options);
       if (deny) throw new DOMException('No rear camera', 'OverconstrainedError');
-      const track = { stopped: false, stop() { this.stopped = true; }, addEventListener(name, listener) { this.ended = listener; } };
+      const track = { stopped: false, stop() { this.stopped = true; }, addEventListener(name, listener) { this.ended = listener; },
+        getSettings: () => ({ deviceId: options.video.deviceId?.exact || 'front' }) };
       tracks.push(track);
       return { getTracks: () => [track], getVideoTracks: () => [track] };
-    } } },
+    }, async enumerateDevices() { return ['front', 'rear'].map(deviceId => ({ kind: 'videoinput', deviceId })); } } },
   });
   const camera = api.createCameraCapture();
   const video = { srcObject: null, pause() {}, async play() {} };
   await camera.start(video, () => ended++);
-  await camera.start(video, () => ended++, 'environment');
+  await camera.start(video, () => ended++, 'rear');
   tracks[0].ended();
   assert.equal(ended, 0, 'Old camera events cannot stop the new camera');
-  await camera.start(video, () => ended++, 'user');
-  assert.deepEqual(requests.map(request => request.video.facingMode.exact || request.video.facingMode), ['user', 'environment', 'user']);
+  await camera.start(video, () => ended++, 'front');
+  assert.deepEqual(requests.map(request => request.video.deviceId?.exact), [undefined, 'rear', 'front']);
   assert.ok(requests.every(request => request.audio === false));
   deny = true;
-  await assert.rejects(camera.start(video, () => ended++, 'environment'), { name: 'OverconstrainedError' });
+  await assert.rejects(camera.start(video, () => ended++, 'rear'), { name: 'OverconstrainedError' });
   assert.equal(requests.length, 4, 'An unavailable direction must not request a substitute camera');
   assert.equal(video.srcObject, null);
   assert.ok(tracks.every(track => track.stopped));
@@ -137,6 +139,7 @@ test('pose tracker bounds frames, clears inference on stop, and closes late mode
   let frame;
   let closed = 0;
   let detections = 0;
+  let handDetections = 0;
   let samples = 0;
   let create;
   const api = load('client/views/experiment/svelte/services/poseTracking.ts', {
@@ -146,21 +149,57 @@ test('pose tracker bounds frames, clears inference on stop, and closes late mode
   }, { '@mediapipe/tasks-vision': {
     FilesetResolver: { async forVisionTasks() { return {}; } },
     PoseLandmarker: { POSE_CONNECTIONS: [], createFromOptions() { return new Promise(resolve => { create = resolve; }); } },
+    HandLandmarker: { HAND_CONNECTIONS: [{ start: 0, end: 1 }], async createFromOptions(_files, options) {
+      assert.equal(options.numHands, 2);
+      return { close() { closed++; }, detectForVideo() {
+        handDetections++;
+        return { landmarks: [Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0 }))] };
+      } };
+    } },
   } });
   const tracking = api.createPoseTracking();
   const video = { readyState: 2, currentTime: 0, videoWidth: 640, videoHeight: 480 };
   const model = { close() { closed++; }, detectForVideo() { detections++; return { landmarks: [] }; } };
-  const pending = tracking.start(video, () => { samples++; }, assert.fail);
+  const pending = tracking.start(video, observation => {
+    samples++;
+    assert.equal(observation.hands.length, 1);
+    assert.equal(observation.hands[0].length, 21);
+    assert.equal(api.isInFrameLandmark(observation.hands[0][0]), true, 'Hand landmarks do not require pose visibility');
+    assert.equal(api.isVisiblePoseLandmark(observation.hands[0][0]), false);
+  }, assert.fail);
   await new Promise(resolve => setImmediate(resolve));
   create(model); await pending;
   frame(100); video.currentTime++;
   frame(110); frame(180);
-  assert.equal(detections, 2); assert.equal(samples, 2);
+  assert.equal(detections, 2); assert.equal(handDetections, 2); assert.equal(samples, 2);
   const stale = frame;
   tracking.stop(); stale(300);
-  assert.equal(detections, 2); assert.equal(closed, 1); assert.equal(frame, null);
+  assert.equal(detections, 2); assert.equal(closed, 2); assert.equal(frame, null);
   const cancelled = tracking.start(video, assert.fail, assert.fail);
   await new Promise(resolve => setImmediate(resolve));
   tracking.stop(); create(model); await cancelled;
+  assert.equal(closed, 3);
+});
+
+test('late hand initialization is closed on cancellation and a failed hand model releases the pose model', async () => {
+  let createHand;
+  let rejectHand;
+  let closed = 0;
+  const api = load('client/views/experiment/svelte/services/poseTracking.ts', {
+    document: { hidden: false }, requestAnimationFrame: assert.fail, cancelAnimationFrame() {},
+  }, { '@mediapipe/tasks-vision': {
+    FilesetResolver: { async forVisionTasks() { return {}; } },
+    PoseLandmarker: { async createFromOptions() { return { close() { closed++; } }; } },
+    HandLandmarker: { createFromOptions() { return new Promise((resolve, reject) => { createHand = resolve; rejectHand = reject; }); } },
+  } });
+  const tracking = api.createPoseTracking();
+  const pending = tracking.start({}, assert.fail, assert.fail);
+  await new Promise(resolve => setImmediate(resolve));
+  tracking.stop(); createHand({ close() { closed++; } }); await pending;
   assert.equal(closed, 2);
+  const failed = tracking.start({}, assert.fail, assert.fail);
+  await new Promise(resolve => setImmediate(resolve));
+  rejectHand(new Error('Hand model unavailable'));
+  await assert.rejects(failed, /Hand model unavailable/);
+  assert.equal(closed, 3);
 });

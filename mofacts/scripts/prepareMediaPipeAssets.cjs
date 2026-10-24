@@ -11,4 +11,8 @@ const checksum = crypto.createHash('sha256').update(model).digest('hex');
 if (checksum !== '5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1') {
   throw new Error('MediaPipe Full Pose model checksum does not match the pinned version');
 }
+const handModel = fs.readFileSync(path.join(app, 'public/mediapipe/hand_landmarker.task'));
+if (crypto.createHash('sha256').update(handModel).digest('hex') !== 'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1') {
+  throw new Error('MediaPipe Hand Landmarker model checksum does not match the pinned version');
+}
 fs.cpSync(path.join(packageRoot, 'wasm'), path.join(app, 'public/mediapipe/wasm'), { recursive: true });
