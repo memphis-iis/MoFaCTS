@@ -37,7 +37,7 @@ export function createRecoverableWarningMethods(deps: Dependencies) {
       }, {
         code: 'autotutor.outputLimit',
         tdfId: Match.OneOf(null, identifier),
-        operation: Match.OneOf('utterance', 'explanation', 'question', 'rich', 'visual'),
+        operation: Match.OneOf('instruction', 'utterance', 'explanation', 'question', 'rich', 'visual'),
         field: Match.OneOf('tutorMessage', 'workedExample', 'figureDescription', 'imagePrompt', 'heading', 'choices.label'),
         unit: Match.OneOf('characters', 'json-utf8-bytes'),
         observedSize: boundedSize,

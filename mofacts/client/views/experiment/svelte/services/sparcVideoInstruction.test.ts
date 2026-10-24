@@ -6,7 +6,7 @@ import { createSparcDialogueOpenRouterProvider } from './sparcControllerDialogue
 import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import type { SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
-import type { SparcPrimitiveContent } from '../../../../../../learning-components/runtime/sparcMoveLibraryContract';
+import type { SparcPrimitiveContent, SparcInstructionCheckpoint } from '../../../../../../learning-components/runtime/sparcMoveLibraryContract';
 import { sparcLibraryPreviewNode } from '../../../experimentSetup/sparc/sparcLibraryPreview';
 
 const video = { segmentId: 'a'.repeat(64), videoId: 'abcdefghijk', startSeconds: 12, endSeconds: 32,
@@ -18,6 +18,7 @@ describe('SPARC video resolved from the selected visual-support move', () => {
       const persisted: SparcPrimitiveContent[] = [];
       let calls = 0;
       let resolutions = 0;
+      let checkpoint: SparcInstructionCheckpoint | undefined;
       const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'biology', sessionId: 'provider-session',
         moveLibrary: {
           async lookup(query) { return { status: 'generate', ticket: { query, embedding: [] }, previousQuestions: [] }; },
@@ -26,11 +27,9 @@ describe('SPARC video resolved from the selected visual-support move', () => {
         async callResolvedOpenRouterJson(params) {
           calls++;
           assert.ok(!JSON.stringify(params.intent.schema).includes('videoSegmentId'));
-          if (params.intent.schemaName.includes('visual_primitive')) {
-            assert.ok(String(params.messages[0]!.content).includes('Keep dimensions, canvas layout, rendering instructions'));
-            assert.ok(!String(params.messages[0]!.content).includes('Choose a compact canvas shape'));
-          }
-          if (params.intent.schemaName.includes('visual_primitive')) return { parsedContent: { imagePrompt: 'Heritable variation and reproductive success across generations.',
+          if (params.intent.schemaName.includes('instruction_primitive')) return { parsedContent: {
+            tutorMessage: 'Selection changes populations across generations.', kind: 'figure', workedExample: null, heading: null,
+            imagePrompt: 'Heritable variation and reproductive success across generations.',
             figureDescription: 'A population with heritable variation.', displayWidth: 360 } };
           assert.ok(JSON.stringify(params.messages).includes(video.transcript));
           if (params.intent.schemaName.includes('question')) {
@@ -52,6 +51,7 @@ describe('SPARC video resolved from the selected visual-support move', () => {
         contentTexts: ['Heritable variation precedes selection.'], targetContent: { clusterKC: 'kc-a', text: 'Heritable variation precedes selection.', category: 'model' },
         action: definition.moveId, moveDefinition: definition, responseModifiers: [], selectedAction: { snapshotId: 'event' },
         learnerText: '', dialogueHistory: [], historySessionId: 'history-session',
+        onInstructionCheckpoint: async value => { checkpoint = value; if (value.stage === 'accepted') persisted.push(value.content); },
         onInstructionComponent: async (_kind, text, figure, details) => { persisted.push({ text, ...(figure ? { figure } : {}), ...details }); },
       };
       const output = await provider.generateTutorUtterance(request) as SparcInstructionComponents;
@@ -59,10 +59,10 @@ describe('SPARC video resolved from the selected visual-support move', () => {
         event: { eventId: 'event', type: 'response-submitted', source: { pageKey: 'page', nodeId: 'input' }, time: 1 }, learnerText: '', request, generated: output, includeLearner: false });
       const restoredFacts = progressiveDialogueFacts({ transitions: JSON.parse(JSON.stringify([transition])) });
       assert.ok(buildSparcDialogueHistory(restoredFacts).some(entry => JSON.stringify(entry.video) === JSON.stringify(video)));
-      assert.deepEqual(output.video, video); assert.equal(persisted[0]!.video?.segmentId, video.segmentId);
-      assert.equal(calls, 3); assert.equal(resolutions, 1); assert.equal(Boolean(output.choices), format === 'multiple-choice');
-      const resumed = await provider.generateTutorUtterance({ ...request, realizedInstruction: output }) as SparcInstructionComponents;
-      assert.deepEqual(resumed.video, video); assert.equal(calls, 3); assert.equal(resolutions, 1);
+      assert.deepEqual(output.video, video); assert.equal(persisted[0]!.support?.video?.segmentId, video.segmentId);
+      assert.equal(calls, 2); assert.equal(resolutions, 1); assert.equal(Boolean(output.choices), format === 'multiple-choice');
+      const resumed = await provider.generateTutorUtterance({ ...request, instructionCheckpoint: checkpoint!, realizedInstruction: output }) as SparcInstructionComponents;
+      assert.deepEqual(resumed.video, video); assert.equal(calls, 2); assert.equal(resolutions, 1);
       const preview = sparcLibraryPreviewNode({ id: video.segmentId, kind: 'video', move: 'catalog-video', content: { text: video.transcript, video } });
       assert.deepEqual(preview!.video, video);
     }

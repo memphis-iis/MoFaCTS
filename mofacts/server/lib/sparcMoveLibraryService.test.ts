@@ -27,6 +27,25 @@ describe('Client-selected instructional persistence', () => {
         assert.ok(f.reads.every(id => id === saved.reference.entryId));
         assert.deepEqual(await f.service.lookup('b', query('two'), { entryId: 'different', similarity: 1 }, [0, 1]), hit);
     });
+    it('publishes and retrieves a matched instruction without mixing support or accepting a partial pair', async () => {
+        const f = fixture(), q = query('paired', 'instruction');
+        q.context.components = ['explanation', 'richContent', 'question']; q.context.supportKind = 'written';
+        const ticket = { query: q, embedding: [1, 0] };
+        await assert.rejects(f.service.publish('a', ticket, { text: 'Unpaired explanation' }), /composition/);
+        const content = { text: 'The governing idea.', support: { text: 'A matching worked case.', supportHeading: 'Worked Example' } };
+        const saved = await f.service.publish('a', ticket, content);
+        const retry = await f.service.publish('a', ticket, { text: 'Different explanation', support: { text: 'Different case' } });
+        assert.deepEqual(retry, saved, 'Lost publication acknowledgements preserve the entire accepted pair');
+        const hit = await f.service.lookup('b', q, { entryId: saved.reference.entryId, similarity: .999 }, [1, 0]);
+        assert.equal(hit.status, 'hit');
+        if (hit.status === 'hit') assert.deepEqual(hit.content, content);
+        const visual = structuredClone(q); visual.context.supportKind = 'visual';
+        await assert.rejects(f.service.lookup('c', visual, { entryId: saved.reference.entryId, similarity: .999 }, [1, 0]), /category/);
+        f.entries.delete(saved.reference.entryId); f.removed.add(saved.reference.entryId);
+        const removed = await f.service.publish('a', ticket, content);
+        assert.equal(removed.content.administrativeRemoval, true);
+        assert.equal(removed.content.support?.administrativeRemoval, true);
+    });
     it('generates independent identical copies on concurrent misses without waiting', async () => {
         const f = fixture();
         const misses = await Promise.all([f.service.lookup('a', query('a'), null, [1, 0]), f.service.lookup('b', query('b'), null, [1, 0])]);

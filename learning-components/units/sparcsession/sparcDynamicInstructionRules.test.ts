@@ -83,8 +83,7 @@ function fixture(version: 'student' | 'agent', longIdentities = false, category:
       }
       const explanation = request.moveDefinition.components!.includes('explanation') ? request.realizedInstruction?.explanation ?? 'An explanation of the target.' : null;
       const richContent = request.moveDefinition.components!.includes('richContent') ? request.realizedInstruction?.richContent ?? 'In the worked case, apply the rule to get 4.' : null;
-      if (explanation && !request.realizedInstruction?.explanation) await request.onInstructionComponent?.('explanation', explanation);
-      if (richContent && !request.realizedInstruction?.richContent) await request.onInstructionComponent?.('richContent', richContent);
+      if (explanation && !request.instructionCheckpoint) await request.onInstructionCheckpoint?.({ stage: 'accepted', content: { text: explanation, ...(richContent ? { support: { text: richContent } } : {}) } });
       await beforeQuestion?.();
       if (failQuestion) throw new Error('question failed');
       const question = request.realizedInstruction?.question ?? (request.moveDefinition.responseFormat === 'cloze' ? 'The condition determines whether the _____ applies.' : 'How does the rule apply to the new case?');
@@ -730,19 +729,31 @@ describe('Dynamic instruction production cycles', () => {
       assert.equal((transition(f.rows.at(-1)!).writes.at(-1)!.value as { node: { readOnly: boolean } }).node.readOnly, true);
     }
   });
+  it('journals and replays the paired display nodes in one accepted instruction transition', async () => {
+    const f = fixture('student'); await f.answer(); f.fail(true);
+    await assert.rejects(f.choice('explanation-rich-question.text', 100), /question failed/);
+    const accepted = f.rows.map(transition).filter(row => row.transitionId.endsWith(':instruction:accepted'));
+    assert.equal(accepted.length, 1);
+    const nodes = accepted[0]!.writes.filter(write => write.key !== 'instructionalComposition').map(write => (write.value as { node: { component: string } }).node);
+    assert.deepEqual(nodes.map(node => node.component), ['explanation', 'richContent']);
+    assert.ok(!f.rows.some(row => /:primitive:(explanation|richContent)$/.test(transition(row).transitionId)));
+    f.fail(false); await f.submit();
+    assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':instruction:accepted')).length, 1);
+    assert.equal(f.requests.at(-1)!.instructionCheckpoint?.stage, 'accepted');
+  });
   it('resumes the selected components and feedback without another score or selection', async () => {
     const f = fixture('agent'); f.fail(true);
     await assert.rejects(f.answer(100), /question failed/);
     const original = f.requests.at(-1)!;
     const savedComponents = original.moveDefinition.components!.filter(component => component !== 'question');
-    for (const component of savedComponents) assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(`:primitive:${component}`)).length, 1);
+    if (savedComponents.length) assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':instruction:accepted')).length, 1);
     f.fail(false); await f.answer(100);
     assert.equal(f.calls(), 1);
     assert.equal(f.requests.filter(request => request.action === 'instruction.feedback').length, 1);
     assert.equal(f.requests.at(-1)!.action, original.action);
     for (const component of savedComponents) {
       assert.ok(f.requests.at(-1)!.realizedInstruction?.[component]);
-      assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(`:primitive:${component}`)).length, 1);
+      assert.equal(f.rows.filter(row => transition(row).transitionId.endsWith(':instruction:accepted')).length, 1);
     }
   });
   it('continues interrupted established instruction on document reload without rescoring or repeating saved feedback and support', async () => {
@@ -752,7 +763,7 @@ describe('Dynamic instruction production cycles', () => {
       else { f.fail(true); await assert.rejects(f.answer(100), /question failed/); }
       const accepted = f.requests.at(-1)!;
       const counts = () => ({ scores: f.calls(), feedback: f.rows.filter(row => transition(row).transitionId.endsWith(':feedback')).length,
-        support: f.rows.filter(row => transition(row).transitionId.endsWith(':primitive:richContent')).length });
+        support: f.rows.filter(row => transition(row).transitionId.endsWith(':instruction:accepted')).length });
       const before = counts(); f.fail(false); await f.submit();
       assert.deepEqual(counts(), before);
       assert.equal(f.requests.at(-1)!.selectedAction.snapshotId, accepted.selectedAction.snapshotId);

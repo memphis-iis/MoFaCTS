@@ -1,3 +1,4 @@
+import type { SparcInstructionCheckpoint } from '../../runtime/sparcMoveLibraryContract';
 import type { ExpectationLogitChange } from '../../runtime/expectationLogitHistory';
 import { isSparcChoiceFormat } from '../../runtime/sparcTargetCategories';
 import { isSparcCompetitivePolicy, isSparcCategorizedPolicy, isSparcStudentPolicy } from '../../runtime/sparcInstructionalPolicies';
@@ -219,19 +220,50 @@ export async function commitSparcInstructionalCycle(params: SparcAutoTutorRuleTu
     await saveDecision(current);
     const realized: Partial<{ -readonly [K in keyof SparcInstructionComponents]: SparcInstructionComponents[K] }> = {};
     const savedComponents = new Set<string>();
-    for (const prior of previous.filter(entry => entry.transitionId.startsWith(`${event.eventId}:primitive:`))) {
-      const component = prior.transitionId.split(':').at(-1) as 'explanation' | 'richContent' | 'question';
+    for (const prior of previous.filter(entry => entry.transitionId === `${event.eventId}:primitive:question`)) {
       const node = (prior.writes[0]?.value as { node?: Record<string, unknown> })?.node;
-      if (!node || typeof node.value !== 'string') throw new Error('Saved instructional primitive is invalid');
-      realized[component] = node.value;
-      if (node.administrativeRemoval) realized.removedComponents = [...(realized.removedComponents ?? []), component];
-      if (node.video) realized.video = node.video as NonNullable<SparcInstructionComponents['video']>;
-      if (node.figure) realized.figure = node.figure as NonNullable<SparcInstructionComponents['figure']>;
+      if (!node || typeof node.value !== 'string') throw new Error('Saved instructional question is invalid');
+      realized.question = node.value;
+      if (node.administrativeRemoval) realized.removedComponents = ['question'];
       if (node.choices) realized.choices = node.choices as NonNullable<SparcInstructionComponents['choices']>;
-      if (node.supportHeading) realized.supportHeading = String(node.supportHeading);
-      savedComponents.add(component);
+      savedComponents.add('question');
     }
-    const output = await params.generateTutorUtterance({ ...request, realizedInstruction: realized,
+    const checkpoints = previous.filter(entry => ['composed', 'resolved', 'accepted'].some(stage => entry.transitionId === `${event.eventId}:instruction:${stage}`));
+    const instructionCheckpoint = checkpoints.at(-1)?.writes.find(write => write.key === 'instructionalComposition')?.value as SparcInstructionCheckpoint | undefined;
+    if (instructionCheckpoint?.stage === 'accepted') {
+      const { content } = instructionCheckpoint;
+      realized.explanation = content.text;
+      savedComponents.add('explanation');
+      if (content.support) {
+        realized.richContent = content.support.text;
+        if (content.support.figure) realized.figure = content.support.figure;
+        if (content.support.video) realized.video = content.support.video;
+        if (content.support.supportHeading) realized.supportHeading = content.support.supportHeading;
+        savedComponents.add('richContent');
+      }
+    }
+    const output = await params.generateTutorUtterance({ ...request, realizedInstruction: realized, ...(instructionCheckpoint ? { instructionCheckpoint } : {}),
+      onInstructionCheckpoint: async checkpoint => {
+        const writes: SparcStateWrite[] = [{ target: { pageKey: params.document.id, nodeId: 'root' }, key: 'instructionalComposition', value: checkpoint }];
+        if (checkpoint.stage === 'accepted') {
+          await waitForFeedback();
+          for (const component of ['explanation', 'richContent'] as const) {
+            const content = component === 'explanation' ? checkpoint.content : checkpoint.content.support;
+            if (!content) continue;
+            writes.push(createSparcInstructionComponentWrite({ document: params.document, event, request, component, text: content.text,
+              ...(content.figure ? { figure: content.figure } : {}), details: {
+                ...(content.video ? { video: content.video } : {}), ...(content.supportHeading ? { supportHeading: content.supportHeading } : {}),
+                ...(checkpoint.reference ? { primitiveReference: checkpoint.reference } : {}),
+                ...(content.administrativeRemoval ? { administrativeRemoval: true as const } : {}),
+              } }));
+          }
+        }
+        await save({ transitionId: `${event.eventId}:instruction:${checkpoint.stage}`, event, writes });
+        if (checkpoint.stage === 'accepted') {
+          savedComponents.add('explanation');
+          if (checkpoint.content.support) savedComponents.add('richContent');
+        }
+      },
       onInstructionComponent: async (component, text, figure, details) => {
         await waitForFeedback();
         const write = createSparcInstructionComponentWrite({ document: params.document, event, request, component, text, ...(figure ? { figure } : {}), ...(details ? { details } : {}) });

@@ -21,7 +21,8 @@ export function sparcRetrievalSelector(value: unknown): Record<string, unknown> 
   ];
   else selector['context.readingLevel'] = category.readingLevel;
   if (category.kind === 'question') selector['context.responseFormat'] = category.responseFormat;
-  if (category.supportKind === 'written') {
+  if (category.kind === 'instruction') selector['context.supportKind'] = category.supportKind ?? { $exists: false };
+  if (category.kind !== 'instruction' && category.supportKind === 'written') {
     selector['content.video'] = { $exists: false }; selector['content.figure'] = { $exists: false };
   }
   return selector;

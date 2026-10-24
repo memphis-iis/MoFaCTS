@@ -7,7 +7,7 @@
   import SparcLibraryComponent from './SparcLibraryComponent.svelte';
   import SparcLibraryComponentPreview from './SparcLibraryComponentPreview.svelte';
   const lifetime = createTemplateLifetime();
-  const labels = { image: 'Image', feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question', video: 'Video passage' };
+  const labels = { instruction: 'Instruction', image: 'Image', feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question', video: 'Video passage' };
   let overview, selectedTopic, selectedCluster, selectedId, selectedPanel;
   let view = 'groups', entries = [], nextCursor = null, loading = false, error = '', initialized = false;
   $: selected = entries.find(entry => entry.id === selectedId);

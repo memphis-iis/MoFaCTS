@@ -41,6 +41,6 @@ export function primitiveContext(request: SparcUtteranceRequest, kind: SparcPrim
       outputSchemaId: request.moveDefinition.outputSchemaId, outputSchemaVersion: request.moveDefinition.outputSchemaVersion,
       promptPolicy: request.moveDefinition.promptPolicy }),
     components: kind === 'feedback' ? ['feedback'] : [...(request.moveDefinition.components ?? [kind])],
-    ...(kind === 'richContent' && request.moveDefinition.supportKind ? { supportKind: request.moveDefinition.supportKind } : {}),
+    ...((kind === 'richContent' || kind === 'instruction') && request.moveDefinition.supportKind ? { supportKind: request.moveDefinition.supportKind } : {}),
     focus: stableMoveJson(selectedSparcEvidence(request)), dependencies: stableMoveJson(dependencies) };
 }

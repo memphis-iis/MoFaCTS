@@ -29,7 +29,7 @@ export type SparcContentRemovalCheckWarning = Readonly<{
 export type SparcOutputLimitWarning = Readonly<{
   code: 'autotutor.outputLimit';
   tdfId: string | null;
-  operation: 'utterance' | 'explanation' | 'question' | 'rich' | 'visual';
+  operation: 'instruction' | 'utterance' | 'explanation' | 'question' | 'rich' | 'visual';
   field: 'tutorMessage' | 'workedExample' | 'figureDescription' | 'imagePrompt' | 'heading' | 'choices.label';
   unit: 'characters' | 'json-utf8-bytes';
   observedSize: number;

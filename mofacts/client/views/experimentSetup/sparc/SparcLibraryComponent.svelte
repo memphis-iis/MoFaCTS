@@ -8,7 +8,7 @@
   export let onChanged = () => {};
   let draft, saving = false, error = '', notice = '';
   $: previewNode = sparcLibraryPreviewNode(entry);
-  const labels = { feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question', video: 'Video passage' };
+  const labels = { instruction: 'Instruction', feedback: 'Feedback', explanation: 'Explanation', richContent: 'Support', question: 'Question', video: 'Video passage' };
   function edit() { draft = JSON.parse(JSON.stringify(entry.content)); error = ''; notice = ''; }
   async function save() {
     saving = true; error = '';
@@ -24,8 +24,10 @@
   {#if notice}<p role="status">{notice}</p>{/if}
   {#if draft}
     <form on:submit|preventDefault={save}>
-      <label>Instructional text (Markdown)<textarea class="form-control" rows="8" bind:value={draft.text} maxlength="2048" required></textarea></label>
-      {#if draft.supportHeading !== undefined}<label>Support heading<input class="form-control" bind:value={draft.supportHeading} maxlength="60" /></label>{/if}
+      {#each draft.support ? [draft, draft.support] : [draft] as part}
+      <label>Instructional text (Markdown)<textarea class="form-control" rows="8" bind:value={part.text} maxlength="2048" required></textarea></label>
+      {#if part.supportHeading !== undefined}<label>Support heading<input class="form-control" bind:value={part.supportHeading} maxlength="60" /></label>{/if}
+      {/each}
       {#each draft.choices ?? [] as choice, index}
         <label>Option {index + 1}<input class="form-control" bind:value={choice.label} maxlength="240" required /></label>
         <label><input type="checkbox" bind:checked={choice.correct} /> Correct answer</label>
@@ -36,7 +38,7 @@
   {:else}
     <SparcNode node={previewNode} />
     {#if entry.content.choices}<p>Correct answer: {entry.content.choices.filter(choice => choice.correct).map(choice => choice.label).join('; ')}</p>{/if}
-    {#if entry.kind !== 'video' && !entry.content.video}<button class="btn btn-outline-primary" type="button" disabled={saving} on:click={edit}>Revise</button>{/if}
+    {#if entry.kind !== 'video' && !entry.content.video && !entry.content.support?.video}<button class="btn btn-outline-primary" type="button" disabled={saving} on:click={edit}>Revise</button>{/if}
     <SparcLibraryDelete id={entry.id} disabled={saving} onDeleted={onChanged} />
   {/if}
 </article>

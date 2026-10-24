@@ -97,10 +97,10 @@ export async function prepareSparcLocalRetrieval(value: SparcRetrievalCategory):
 /** Load category vectors before the first learner response; later practice searches stay local. */
 export async function prepareSparcPracticeRetrieval(readingLevel: SparcReadingLevel, language: string): Promise<void> {
   await Promise.all([
-    ...['feedback', 'explanation'].map(kind => prepareSparcLocalRetrieval({
-      kind: kind as 'feedback' | 'explanation', readingLevel, responseFormat: 'text',
+    ...['feedback', 'instruction'].map(kind => prepareSparcLocalRetrieval({
+      kind: kind as 'feedback' | 'instruction', readingLevel, responseFormat: 'text',
     })),
-    prepareSparcLocalRetrieval({ kind: 'richContent', readingLevel, responseFormat: 'text', supportKind: 'written' }),
+    ...(['written', 'visual'] as const).map(supportKind => prepareSparcLocalRetrieval({ kind: 'instruction', readingLevel, responseFormat: 'text', supportKind })),
     ...['text', 'multiple-choice', 'cloze', 'true-false'].map(responseFormat => prepareSparcLocalRetrieval({ kind: 'question', readingLevel, responseFormat })),
     prepareSparcLocalRetrieval({ kind: 'visual', language }),
   ]);

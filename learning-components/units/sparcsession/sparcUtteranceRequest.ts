@@ -1,6 +1,6 @@
 import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
 import { sparcEvidenceContext } from './sparcEvidenceHistory';
-import type { SparcPrimitiveReference } from './sparcMoveLibrary';
+import type { SparcPrimitiveReference, SparcInstructionCheckpoint } from './sparcMoveLibrary';
 import { parseSparcPromptFigure, type SparcPromptFigure } from './sparcSupportedPrompt';
 import type { SparcInstructionComponents } from './sparcInstructionalPrimitives';
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
@@ -15,8 +15,10 @@ export type SparcUtteranceRequest = {
   /** Canonical lesson-session identity; distinct from provider prefix-cache correlation. */
   readonly historySessionId?: string;
   readonly onFeedback?: (text: string, reference: SparcPrimitiveReference) => Promise<void>;
+  readonly instructionCheckpoint?: SparcInstructionCheckpoint;
+  readonly onInstructionCheckpoint?: (checkpoint: SparcInstructionCheckpoint) => Promise<void>;
   readonly realizedInstruction?: Readonly<Partial<SparcInstructionComponents>>;
-  readonly onInstructionComponent?: (component: 'explanation' | 'richContent' | 'question', text: string, figure?: SparcPromptFigure, details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading' | 'video'> & { primitiveReference?: SparcPrimitiveReference; administrativeRemoval?: true }) => Promise<void>;
+  readonly onInstructionComponent?: (component: 'question', text: string, figure?: SparcPromptFigure, details?: Pick<SparcInstructionComponents, 'choices' | 'supportHeading' | 'video'> & { primitiveReference?: SparcPrimitiveReference; administrativeRemoval?: true }) => Promise<void>;
   readonly problemStatement: string;
   readonly targetType: 'learningTarget' | 'misconception' | 'learnerQuestion' | 'completion' | 'feedback';
   readonly action: string;

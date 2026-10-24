@@ -149,6 +149,7 @@
   });
 
   async function startCategorizedDialogue(currentDisplay, scope) {
+    if (dialogueSubmitPending && startedDialogueScope === scope) return;
     startedDialogueScope = scope;
     dialogueInitialized = false;
     dialogueSubmitPending = true;
@@ -157,7 +158,7 @@
     dialogueSubmitErrorDetail = '';
     const timestamp = Date.now();
     try {
-      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: reportDialogueActivity, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
+      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
       await Promise.all([provider.prepareAssessment(currentDisplay), prepareSparcPracticeRetrieval(resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel),
         Session.get('currentTdfFile')?.tdfs?.tutor?.setspec?.contentLanguage ?? '')]);
@@ -180,7 +181,7 @@
       dialogueSubmitErrorDetail = dialogueSubmissionErrorDetail(error);
       clientConsole(1, '[SPARC][Dialogue] initialization failed', { detail: dialogueSubmitErrorDetail });
     } finally {
-      dialogueSubmitPending = false;
+      if (mounted && dialogueScope === scope) dialogueSubmitPending = false;
       if (mounted && dialogueScope === scope) {
         await tick();
         const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
@@ -630,6 +631,7 @@
   }
 
   async function commitSparcSubmitProductionRules(detail, submissionPresentation) {
+    const scope = dialogueScope;
     if (subsetKind !== 'question') {
       return { canSubmit: true };
     }
@@ -639,7 +641,7 @@
       if (!sparcResult) {
         throw new Error(describeSparcBoundaryContext(currentDisplay, '[SparcSessionSurface] SPARC dialogue submit received for non-SPARC display'));
       }
-      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: reportDialogueActivity, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
+      const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}),
         ...(currentDisplay.instructionalController?.policyId ? { policyId: currentDisplay.instructionalController.policyId } : {}),
         tdfId: typeof tdfId === 'string' ? tdfId : null,
         sessionId: openRouterSession.sessionIdForScope({
@@ -669,6 +671,7 @@
           scoreLearnerResponse: provider.scoreLearnerResponse,
           generateTutorUtterance: provider.generateTutorUtterance,
           onNodeValues: async values => {
+            if (!mounted || dialogueScope !== scope) return;
             // These values follow durable history acceptance, including assessment.
             // Show credited progress while feedback and instruction are still pending.
             pendingAutoTutorProgressSnapshot = null;
@@ -677,11 +680,13 @@
           },
         });
       } catch (error) {
+        if (!mounted || dialogueScope !== scope) throw error;
         // Accepted assessment/selection remains visible even if the subsequent provider call fails.
         dispatchSparcNodeValues(readSparcResumeSnapshot({ userId, TDFId: tdfId, levelUnit,
           pageKey: currentDisplay.pageKey, display: currentDisplay }).nodeValues, sparcResult.timestamp);
         throw error;
       }
+      if (!mounted || dialogueScope !== scope) return { canSubmit: false, dialogueSubmit: true };
       dispatch('runtimewatchedstatechanged');
       dispatchSparcNodeValues(result.sparcNodeValues, sparcResult.timestamp);
       return { canSubmit: false, dialogueSubmit: true };
@@ -745,6 +750,7 @@
     if (dialogueSubmitPending) {
       return;
     }
+    const submissionScope = dialogueScope;
     // Capture the actual control before the pending state disables/replaces it.
     const submittedButton = Array.from(surfaceElement?.querySelectorAll('button[data-node-id]') || [])
       .find(button => button.getAttribute('data-node-id') === detail?.triggeredBy);
@@ -770,6 +776,7 @@
     try {
       await handleSparcSubmit(detail, submissionPresentation);
     } catch (error) {
+      if (!mounted || dialogueScope !== submissionScope) return;
       restoreDialogueInputs(submittedInputValues);
       dispatchSparcNodeValues(submittedInputValues, detail?.timestamp);
       dialogueSubmitError = platformText('sparc.serviceError');
@@ -778,14 +785,16 @@
         detail: dialogueSubmitErrorDetail,
       });
     } finally {
-      dialogueSubmitPending = false;
-      pendingAutoTutorProgressSnapshot = null;
-      await tick();
-      const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
-        || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
-      if (dialogueScroll?.isFollowing()) {
-        focusDialogueControl(nextControl);
-        dialogueScroll.schedule();
+      if (mounted && dialogueScope === submissionScope) {
+        dialogueSubmitPending = false;
+        pendingAutoTutorProgressSnapshot = null;
+        await tick();
+        const nextControl = surfaceElement?.querySelector('[data-node-id="instructional-choice-menu"] button:not(:disabled)')
+          || surfaceElement?.querySelector('textarea:not(:disabled):not([readonly]), input:not(:disabled):not([readonly])');
+        if (dialogueScroll?.isFollowing()) {
+          focusDialogueControl(nextControl);
+          dialogueScroll.schedule();
+        }
       }
     }
   }

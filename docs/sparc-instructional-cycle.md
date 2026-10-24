@@ -1,5 +1,40 @@
 # SPARC instructional cycle
 
+## Joint instruction composition and durable stages, October 24, 2026
+
+Explanation and requested support are composed together in one structured AI
+response. Written support is finished in that response; visual support supplies
+the matching brief and description for the existing combined image/video search
+or image generation. The practice question remains a separate call using the
+completed explanation and actual support. This supersedes the separate support-
+then-explanation generation sequence described in older sections below.
+
+The existing library stores an `instruction` entry as one matched unit: `text`
+is its explanation and optional `support` contains the companion text, heading,
+and media reference. Browser indexes distinguish instruction support types and
+retain the existing text similarity threshold; visual retrieval remains one
+local maximum at 0.95. Old separate entries are not combined into pairs, migrated,
+or deleted. Feedback and question entries retain their own reuse behavior.
+
+The canonical event journals `instruction:composed` before media resolution,
+`instruction:resolved` after a requested visual succeeds, and
+`instruction:accepted` after library acceptance. The composed checkpoint holds
+the brief; resolved checkpoints hold the media; the accepted checkpoint appends
+both display nodes together. Written instructions advance directly from composed
+to accepted. Each save is awaited before the next operation. Question persistence
+and cycle completion precede enabling learner input. The existing history owner
+provides idempotent writes; no new lock, polling, or automatic retry is added.
+
+Retries and reloads use the last durable checkpoint, preserving the explanation
+and its brief instead of regenerating completed work. Lost publication
+acknowledgements use the existing accepted library decision. Old incomplete
+unpaired moves are not resumed as matched instructions. Historical completed
+nodes remain readable. Navigation guards discard late UI updates from another
+scope. Loading messages are Preparing instruction, optional Preparing visual
+support, and Preparing question; display order remains explanation, support,
+question. Client and server must be released together for the new instruction
+payload and checkpoint contract. No TDF authoring fields change.
+
 ## Practice history and initialization lifecycle, October 23, 2026
 
 Practice history saves do not rebuild dashboard or course summaries. Dashboard

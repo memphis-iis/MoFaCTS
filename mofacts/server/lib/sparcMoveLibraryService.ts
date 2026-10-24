@@ -1,11 +1,11 @@
-import { parseSparcVideoSegment, SPARC_VIDEO_EMBEDDING_VERSION, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { validatePrimitiveContent } from '../../../learning-components/runtime/sparcPrimitiveContent';
+export { validatePrimitiveContent } from '../../../learning-components/runtime/sparcPrimitiveContent';
+import { SPARC_VIDEO_EMBEDDING_VERSION, type SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
 import { resolveSparcReadingLevel } from '../../../learning-components/runtime/sparcReadingLevel';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
 import { createHash } from 'crypto';
-import { parseSparcPromptFigure } from '../../common/lib/sparcPromptImage';
 import type { SparcRetrievalSelection } from '../../common/lib/sparcRetrieval';
 import { parseSparcQuestionChoices } from '../../../learning-components/runtime/sparcQuestionChoiceContract';
-import { isSparcChoiceFormat, validateSparcClozeQuestion, SPARC_QUESTION_RESPONSE_FORMATS } from '../../../learning-components/runtime/sparcTargetCategories';
 import { SPARC_MOVE_LIBRARY_VERSION, stableMoveJson, type SparcPrimitiveContent,
   type SparcPrimitiveTicket, type SparcPrimitiveContext, type SparcPrimitiveLookup, type SparcPrimitiveQuery, type SparcPrimitiveReference } from '../../../learning-components/runtime/sparcMoveLibraryContract';
 import { SPARC_INSTRUCTIONAL_NEED_VERSION, SPARC_LIBRARY_SIMILARITY, sparcInstructionalNeedText } from '../../../learning-components/runtime/sparcInstructionalNeed';
@@ -33,23 +33,6 @@ export interface MoveStore {
 function bounded(value: unknown, label: string, max: number): asserts value is string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`Invalid ${label}`);
 }
-export function validatePrimitiveContent(value: SparcPrimitiveContent, context: SparcPrimitiveContext): SparcPrimitiveContent {
-  if (typeof value?.text !== 'string' || !value.text.trim()) throw new Error('Invalid primitive text');
-  if (Object.keys(value).some(k => !['text', 'figure', 'video', 'choices', 'supportHeading'].includes(k))) throw new Error('Unexpected primitive field');
-  if (context.supportKind === 'visual' && !value.video && !value.figure) throw new Error('The visual move requires a video or image');
-  if (context.supportKind === 'written' && (value.video || value.figure)) throw new Error('The written move cannot select visual support');
-  if (/<\s*(script|iframe|input|button|style)|\bon\w+\s*=|javascript:/i.test(value.text)) throw new Error('Unsafe instructional markup');
-  if (value.video) { if (context.kind !== 'richContent' || value.figure || value.supportHeading || value.text !== value.video.transcript) throw new Error('Video requires standalone rich support'); parseSparcVideoSegment(value.video); }
-  if (value.figure) { if (context.kind !== 'richContent') throw new Error('Figure requires rich support'); parseSparcPromptFigure(value.figure); }
-  if (value.supportHeading) { if (typeof value.supportHeading !== 'string' || !value.supportHeading.trim()) throw new Error('Invalid support heading'); if (context.kind !== 'richContent' || value.figure) throw new Error('Invalid support heading'); }
-  if (context.kind === 'question') {
-    if (!SPARC_QUESTION_RESPONSE_FORMATS.some(format => format === context.responseFormat)) throw new Error('Invalid question response format');
-    if (isSparcChoiceFormat(context.responseFormat)) parseSparcQuestionChoices(value.choices, context.responseFormat);
-    else if (value.choices) throw new Error('Unexpected question choices');
-    if (context.responseFormat === 'cloze') validateSparcClozeQuestion(value.text);
-  } else if (value.choices) throw new Error('Unexpected question metadata');
-  return value;
-}
 
 export function createMoveLibraryService(deps: { store: MoveStore; embeddingModel: string;
   verifyFigure?(assetId: string): Promise<void>;
@@ -67,7 +50,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
   const acceptedContent = async (request: MoveRequest): Promise<SparcPrimitiveContent> => {
     const entry = await store.entry(request.entryId!);
     if (!entry) {
-      if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true };
+      if (await store.removed(request.entryId!)) return { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true, ...(request.query.context.kind === 'instruction' && request.query.context.components.includes('richContent') ? { support: { text: SPARC_ADMINISTRATIVE_REMOVAL_TEXT, administrativeRemoval: true as const } } : {}) };
       throw new Error('Saved primitive is missing');
     }
     return assignedContent(request, entry.content);
@@ -77,29 +60,30 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
     : { status: 'generate', ticket: { query: request.query, embedding: request.embedding }, previousQuestions: request.query.previousQuestions };
   const verifyContent = async (content: SparcPrimitiveContent, context: SparcPrimitiveContext) => {
     validatePrimitiveContent(content, context);
-    if (content.video && (!deps.videoReuseStatus || (await deps.videoReuseStatus([content.video])).get(content.video.segmentId) !== true)) {
+    const media = context.kind === 'instruction' ? content.support : content;
+    if (media?.video && (!deps.videoReuseStatus || (await deps.videoReuseStatus([media.video])).get(media.video.segmentId) !== true)) {
       throw new Error('The selected video is unavailable');
     }
-    if (content.figure) {
+    if (media?.figure) {
       if (!deps.verifyFigure) throw new Error('Figure verification unavailable');
-      await deps.verifyFigure(content.figure.assetId);
+      await deps.verifyFigure(media.figure.assetId);
     }
   };
   const validateQuery = (query: SparcPrimitiveQuery, embedding: number[]) => {
       bounded(query?.tdfId, 'lesson identity', 200); bounded(query.sessionId, 'session identity', 200); bounded(query.eventId, 'event identity', 500);
       bounded(query.queryText, 'instructional context', 30000);
-      if (query.context?.version !== SPARC_MOVE_LIBRARY_VERSION || !['feedback', 'explanation', 'richContent', 'question'].includes(query.context.kind)
-        || (query.context.supportKind !== undefined && (query.context.kind !== 'richContent' || !['written', 'visual'].includes(query.context.supportKind)))
+      if (query.context?.version !== SPARC_MOVE_LIBRARY_VERSION || !['feedback', 'explanation', 'richContent', 'question', 'instruction'].includes(query.context.kind)
+        || (query.context.supportKind !== undefined && (!['richContent', 'instruction'].includes(query.context.kind) || !['written', 'visual'].includes(query.context.supportKind)))
         || !Number.isFinite(query.context.assistance) || stableMoveJson(query.context).length > 60000
-        || !Array.isArray(query.context.components) || query.context.components.length > 3 || !query.context.components.includes(query.context.kind)
+        || !Array.isArray(query.context.components) || query.context.components.length > 3 || !(query.context.kind === 'instruction' ? query.context.components.includes('explanation') : query.context.components.includes(query.context.kind))
         || new Set(query.context.components).size !== query.context.components.length
         || query.context.components.some(kind => !['feedback', 'explanation', 'richContent', 'question'].includes(kind))
         || !Array.isArray(query.previousQuestions) || query.previousQuestions.length > 1000) throw new Error('Invalid primitive request');
       for (const question of query.previousQuestions) if (typeof question?.text !== 'string' || !question.text.trim()) throw new Error('Invalid previous question');
       for (const key of ['target', 'move', 'responseFormat', 'requirements', 'focus', 'dependencies', 'specification'] as const) bounded(query.context[key], 'context ' + key, 30000);
       resolveSparcReadingLevel(query.context.readingLevel);
-      if (!Array.isArray(embedding) || (!embedding.length && query.context.supportKind !== 'visual') || embedding.length > 8192 || embedding.some(n => typeof n !== 'number' || !Number.isFinite(n))) throw new Error('Invalid query embedding');
-      if (query.context.supportKind === 'visual' && embedding.length) throw new Error('Visual primitives do not use retrieval embeddings');
+      if (!Array.isArray(embedding) || (!embedding.length && (query.context.kind === 'instruction' || query.context.supportKind !== 'visual')) || embedding.length > 8192 || embedding.some(n => typeof n !== 'number' || !Number.isFinite(n))) throw new Error('Invalid query embedding');
+      if (query.context.kind !== 'instruction' && query.context.supportKind === 'visual' && embedding.length) throw new Error('Visual primitives do not use retrieval embeddings');
       if (sparcInstructionalNeedText(JSON.parse(query.queryText)) !== query.queryText) throw new Error('Noncanonical instructional need');
   };
   return {
@@ -119,7 +103,9 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
           || entry.embeddingModel !== deps.embeddingModel || entry.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION
           || resolveSparcReadingLevel(entry.context.readingLevel) !== resolveSparcReadingLevel(query.context.readingLevel)
           || (entry.kind === 'question' && entry.context.responseFormat !== query.context.responseFormat)
+          || (query.context.kind === 'instruction' && (entry.context.supportKind !== query.context.supportKind || stableMoveJson(entry.context.components) !== stableMoveJson(query.context.components)))
           || (query.context.supportKind === 'written' && (entry.content.video || entry.content.figure))) throw new Error('Local selection is outside the requested category');
+        await verifyContent(entry.content, query.context);
         selected = entry;
       }
       const request: MoveRequest = { _id: id, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
@@ -135,7 +121,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       if (request.entryId) return { accepted: true as const, content: await acceptedContent(request), reference: reference(request) };
       if (request.query.context.supportKind !== 'visual' && request.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Pending primitive embedding requires reindexing');
       await verifyContent(content, request.query.context);
-      if (request.query.context.supportKind === 'visual') {
+      if (request.query.context.kind !== 'instruction' && request.query.context.supportKind === 'visual') {
         // The selected media already owns its vector. No second provider request is needed.
         const resource = await store.entry(content.video?.segmentId ?? content.figure!.assetId);
         if (!resource?.embedding?.length || resource.embeddingVersion !== (content.video ? SPARC_VIDEO_EMBEDDING_VERSION : SPARC_INSTRUCTIONAL_NEED_VERSION) || resource.embeddingModel !== deps.embeddingModel) throw new Error('Visual resource has no valid embedding');

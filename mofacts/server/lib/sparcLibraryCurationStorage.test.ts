@@ -34,6 +34,7 @@ describe('Instructional library curation Mongo contract', () => {
   });
   it('deletes dependent support in bounded pages and finishes interrupted asset cleanup on retry', async () => {
     await library().insertMany([{ _id: 'curationTestImage', kind: 'image', ready: true },
+      { _id: 'curationTestPair', kind: 'instruction', content: { text: 'Matched explanation', support: { text: 'Description', figure: { assetId: 'curationTestImage' } } } },
       ...Array.from({ length: 105 }, (_, i) => ({ _id: `curationTestSupport${i}`, kind: 'richContent', content: { figure: { assetId: 'curationTestImage' } } })),
     ]);
     let fail = true;
@@ -45,6 +46,6 @@ describe('Instructional library curation Mongo contract', () => {
     await owner.remove('curationTestImage');
     const receipt = await SparcInstructionalRemovals.findOneAsync('curationTestImage');
     assert.deepEqual(Object.keys(receipt!).sort(), ['_id', 'removedAt']);
-    assert.equal(await SparcInstructionalRemovals.find({ _id: /^curationTest/ }).countAsync(), 106);
+    assert.equal(await SparcInstructionalRemovals.find({ _id: /^curationTest/ }).countAsync(), 107);
   });
 });

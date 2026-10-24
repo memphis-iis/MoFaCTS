@@ -176,6 +176,7 @@ The local hotfix loop under `deploy/` is the fast source-watching application wo
 ## Server Method Design
 
 - Keep the server minimized; the client should do as much processor work as safely possible.
+- SPARC explanation and requested support are composed and reused as one matched instruction. Persist composition before media resolution and accept both display nodes together before generating its question.
 - Practice history saves must not rebuild dashboard or course summaries. Refresh those summaries on dashboard entry; persist last-used unit and resume state during practice.
 - The normal lint workflow enforces that production server modules cannot directly or transitively import learner-executable code under `learning-components/models/` or `learning-components/units/`; type-only server-interface imports are ignored.
 - Add server methods only for database access, authentication or authorization enforcement, encryption, secrets, or external API calls that cannot safely run on the client.

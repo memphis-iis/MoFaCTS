@@ -720,7 +720,7 @@
     {
       "name": "reportRecoverableWarning",
       "access": "authenticated-self",
-      "notes": "Allowlisted citation, advisory output-size, SPARC stale-question and content-removal-check diagnostics only. Removal-check errors retain bounded credential-redacted name, code and message without learner content, provider payloads or stacks. Server-owned reporter identity and existing rate limit; reads remain admin-only."
+      "notes": "Allowlisted citation, advisory output-size (including joint instruction generation), SPARC stale-question and content-removal-check diagnostics only. Removal-check errors retain bounded credential-redacted name, code and message without learner content, provider payloads or stacks. Server-owned reporter identity and existing rate limit; reads remain admin-only."
     },
     {
       "name": "requestPasswordReset",
@@ -995,12 +995,12 @@
     {
       "name": "lookupSparcPrimitive",
       "access": "admin-only",
-      "notes": "Persists the browser-selected maximum or its independent generation request; exact-ID content retrieval and category validation only. No server vector search, novelty checks, leases, or embedding API calls."
+      "notes": "Persists the browser-selected maximum or its independent generation request; exact-ID content retrieval and category validation only, including complete matched instruction pairs. No server vector search, novelty checks, leases, or embedding API calls."
     },
     {
       "name": "publishSparcPrimitive",
       "access": "admin-only",
-      "notes": "Admin authorization precedes validation of the structured query/vector ticket; request identity is derived from the authenticated user and canonical lesson/session/event. Publication preserves the accepted decision and validates content and media references. Generated questions are not vetoed for semantic similarity; content safety and administrative-removal checks remain enforced."
+      "notes": "Admin authorization precedes validation of the structured query/vector ticket; request identity is derived from the authenticated user and canonical lesson/session/event. Publication preserves the accepted decision and validates complete matched instructions and nested support media references. Generated questions are not vetoed for semantic similarity; content safety and administrative-removal checks remain enforced."
     },
     {
       "name": "reviseSparcPrimitive",
@@ -1152,7 +1152,7 @@
     {
       "name": "sparcRetrievalEmbeddings",
       "access": "admin-only",
-      "notes": "Live browser-owned retrieval index. Authenticated admins only; category filters run in the database and publish IDs and embedding vectors only. No content, media, learner evidence, API keys, server ranking, or generated caches."
+      "notes": "Live browser-owned retrieval index. Authenticated admins only; category filters (including instruction support type) run in the database and publish IDs and embedding vectors only. No content, media, learner evidence, API keys, server ranking, or generated caches."
     }
   ],
   "httpRoutes": [

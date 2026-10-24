@@ -21,6 +21,7 @@ export async function removeSparcMoveUserRecords(userId: string) {
 export async function ensureSparcMoveLibraryIndexes() {
   await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, embeddingModel: 1, _id: 1 });
   await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, embeddingModel: 1, embeddingVersion: 1, 'context.readingLevel': 1, 'context.responseFormat': 1, _id: 1 });
+  await SparcMoveLibrary.rawCollection().createIndex({ kind: 1, version: 1, embeddingModel: 1, embeddingVersion: 1, 'context.readingLevel': 1, 'context.supportKind': 1, _id: 1 });
   await Requests.rawCollection().createIndex({ userId: 1, 'query.tdfId': 1, 'query.context.kind': 1, entryId: 1 });
 }
 export function createSparcMoveStore(): MoveStore {
@@ -45,7 +46,7 @@ export function createSparcMoveStore(): MoveStore {
       const saved = await SparcMoveLibrary.rawCollection().updateOne({ _id: entry._id }, { $setOnInsert: entry }, { upsert: true });
       if (saved.upsertedCount) await invalidateSparcFigureBrowse();
     },
-    list: async (kind, after = '') => SparcMoveLibrary.find({ _id: { $gt: after }, kind: kind ?? { $in: ['feedback', 'explanation', 'richContent', 'question'] } }, { sort: { _id: 1 }, limit: 25 }).fetchAsync(),
+    list: async (kind, after = '') => SparcMoveLibrary.find({ _id: { $gt: after }, kind: kind ?? { $in: ['instruction', 'feedback', 'explanation', 'richContent', 'question'] } }, { sort: { _id: 1 }, limit: 25 }).fetchAsync(),
     removed: isSparcAdministrativeRemoval,
     async revise(entry) {
       const result = await SparcMoveLibrary.rawCollection().replaceOne({ _id: entry._id }, entry);

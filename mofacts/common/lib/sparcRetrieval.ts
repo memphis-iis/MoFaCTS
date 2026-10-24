@@ -21,7 +21,7 @@ export function parseSparcRetrievalCategory(value: unknown): SparcRetrievalCateg
     }
     return { kind: 'visual', language: record.language };
   }
-  if (!['feedback', 'explanation', 'richContent', 'question'].includes(String(record.kind))
+  if (!['feedback', 'explanation', 'richContent', 'question', 'instruction'].includes(String(record.kind))
     || Object.keys(record).some(key => !['kind', 'readingLevel', 'responseFormat', 'supportKind'].includes(key))
     || typeof record.responseFormat !== 'string' || record.responseFormat.length > 100
     || (record.supportKind !== undefined && record.supportKind !== 'written' && record.supportKind !== 'visual')) {

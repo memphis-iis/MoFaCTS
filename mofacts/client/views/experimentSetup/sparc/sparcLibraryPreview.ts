@@ -20,5 +20,10 @@ export function sparcLibraryPreviewNode(entry: {
   // A catalog entry is independently inspectable. Learner sequence readiness
   // applies to complete teaching moves, not to their individual saved components.
   if (entry.kind === 'feedback' || entry.kind === 'video') return component;
-  return { ...component, id: `${turnEventId}:instruction`, children: [component] };
+  const children = entry.kind === 'instruction' ? [
+    { ...component, id: `${turnEventId}:explanation`, component: 'explanation' },
+    ...(entry.content.support ? [{ ...component, id: `${turnEventId}:richContent`, component: 'richContent',
+      value: entry.content.support.text, ...entry.content.support }] : []),
+  ] : [component];
+  return { ...component, id: `${turnEventId}:instruction`, children };
 }

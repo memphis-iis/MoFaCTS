@@ -31,6 +31,8 @@ require('../server/lib/sparcInstructionalEmbeddingMigration.test.ts');
 require('../server/lib/sparcFigureBrowseService.test.ts');
 require('../server/lib/sparcHistoryBatchStorage.test.ts');
 require('../server/lib/sparcMoveLibraryService.test.ts');
+require('../server/lib/sparcRetrievalSelector.test.ts');
+require('../client/views/experimentSetup/sparc/sparcLibraryPreview.test.ts');
 require('../../learning-components/units/sparcsession/sparcEvidenceHistory.test.ts');
 if (process.argv.includes('--include-general-rules')) {
   suites.push('sparcProductionRuleEvaluator', 'sparcTrialDisplayRuntimeBridge');

@@ -288,7 +288,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
             scoring.push(system); throw new Error('scoring captured');
           }
           generated.push(system);
-          if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'worked-example', heading: 'Worked Example',
+          if (params.intent.schemaName.includes('instruction_primitive') && 'workedExample' in (params.intent.schema as { properties: Record<string, unknown> }).properties) return { parsedContent: { tutorMessage: 'A complete explanation.', kind: 'worked-example', heading: 'Worked Example',
             workedExample: 'A complete teaching example.', imagePrompt: null, figureDescription: null, displayWidth: null } };
           return { parsedContent: { tutorMessage: 'A complete tutor response.' } };
         },
@@ -296,7 +296,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       await provider.generateTutorUtterance(utteranceRequest);
       const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text');
       await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition });
-      expect(generated).to.have.length(4);
+      expect(generated).to.have.length(3);
       for (const prompt of generated) {
         if (readingLevel === 'junior-high-freshman') expect(prompt).to.include('a junior high freshman (grade 6)');
         else if (readingLevel === 'high-school-freshman') expect(prompt).to.include('a freshman high school student (grade 9)');
@@ -318,17 +318,18 @@ describe('SPARC dialogue OpenRouter provider', function() {
       reportWarning: warning => { warnings.push(warning); },
       async callResolvedOpenRouterJson(params) {
         generated.push(params.intent.schemaName);
-        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'worked-example', heading: 'Worked Example',
+        if (params.intent.schemaName.includes('instruction_primitive') && 'workedExample' in (params.intent.schema as { properties: Record<string, unknown> }).properties) return { parsedContent: { tutorMessage: text, kind: 'worked-example', heading: 'Worked Example',
           workedExample: text, imagePrompt: null, figureDescription: null, displayWidth: null } };
         return { parsedContent: { tutorMessage: text } };
       },
     });
     const result = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
+      onInstructionCheckpoint: async checkpoint => { if (checkpoint.stage === 'accepted') Object.assign(saved, { explanation: checkpoint.content.text, richContent: checkpoint.content.support?.text }); },
       onInstructionComponent: async (kind, value) => { Object.assign(saved, { [kind]: value }); },
     }) as SparcInstructionComponents;
     expect(result).to.include({ richContent: text, explanation: text, question: text });
     expect(saved).to.include({ richContent: text, explanation: text, question: text });
-    expect(generated).to.have.length(3);
+    expect(generated).to.have.length(2);
     expect(warnings).to.have.length(6);
   });
 
@@ -342,8 +343,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
       reportWarning: warning => { warnings.push(warning); },
       async callResolvedOpenRouterJson(params) {
         calls++;
-        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: {
-          kind: 'table', heading, workedExample: '| Case | Outcome |\n| --- | --- |\n| A | Applies |',
+        if (params.intent.schemaName.includes('instruction_primitive') && 'workedExample' in (params.intent.schema as { properties: Record<string, unknown> }).properties) return { parsedContent: {
+          tutorMessage: 'Compare the conditions in each case.', kind: 'table', heading, workedExample: '| Case | Outcome |\n| --- | --- |\n| A | Applies |',
           imagePrompt: null, figureDescription: null, displayWidth: null,
         } };
         expect(JSON.parse(String(params.messages[1]!.content)).supportHeading).to.equal(heading);
@@ -351,13 +352,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
       },
     });
     const result = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
-      onInstructionComponent: async (kind, _text, _figure, metadata) => {
-        if (kind === 'richContent') savedHeading = metadata?.supportHeading;
-      },
+      onInstructionCheckpoint: async checkpoint => { if (checkpoint.stage === 'accepted') savedHeading = checkpoint.content.support?.supportHeading; },
     }) as SparcInstructionComponents;
     expect(result.supportHeading).to.equal(heading);
     expect(savedHeading).to.equal(heading);
-    expect(calls).to.equal(3);
+    expect(calls).to.equal(2);
     expect(warnings).to.have.length(1);
     expect(warnings[0]).to.include({ code: 'autotutor.outputLimit', field: 'heading',
       observedSize: heading.length, limit: 60, attempts: 1, outcome: 'continued' });
@@ -383,7 +382,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(images).to.equal(1);
     expect(calls).to.equal(1);
   });
-  it('retrieves every instructional primitive before any generation and journals using the canonical history session', async function() {
+  it('retrieves a complete matched instruction before question generation and journals using the canonical history session', async function() {
     const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text');
     const order: string[] = [];
     const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'opaque-provider-correlation',
@@ -395,7 +394,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
           expect(query.context.specification).to.contain(definition.promptVersion);
           order.push(`lookup:${query.context.kind}`);
           return { status: 'hit', content: { text: `Saved ${query.context.kind}`,
-            ...(query.context.kind === 'richContent' ? { figure: { assetId: 'image123', description: 'Saved figure', displayWidth: 300 } } : {}) },
+            ...(query.context.kind === 'instruction' ? { support: { text: 'A complete saved worked case.', supportHeading: 'Worked Example' } } : {}) },
           reference: { entryId: `saved-${query.context.kind}`, version: 'sparc-moves-v1', source: 'retrieved', similarity: .99 } };
         },
         async publish() { throw new Error('Retrieved content must not be republished'); },
@@ -403,10 +402,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
     });
     const result = await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
       selectedAction: { snapshotId: 'event' }, historySessionId: 'canonical-history-session',
+      onInstructionCheckpoint: async checkpoint => { order.push(`persist:instruction:${checkpoint.stage}`); },
       onInstructionComponent: async kind => { order.push(`persist:${kind}`); } }) as SparcInstructionComponents;
     expect(result.question).to.equal('Saved question');
-    expect(result.figure?.assetId).to.equal('image123');
-    expect(order).to.deep.equal(['richContent', 'explanation', 'question'].flatMap(kind => [`lookup:${kind}`, `persist:${kind}`]));
+    expect(result.richContent).to.equal('A complete saved worked case.');
+    expect(order).to.deep.equal(['lookup:instruction', 'persist:instruction:accepted', 'lookup:question', 'persist:question']);
   });
 
   it('orients a starting explanation to the selected KC without inventing an opening answer or feedback', async function() {
@@ -416,7 +416,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       prompts.push(String(params.messages[0]?.content));
       expect(String(params.messages[1]?.content)).to.contain('"lessonTopic":"Confidence intervals"');
       expect(String(params.messages[1]?.content)).not.to.contain('openingContext');
-      return { parsedContent: { tutorMessage: params.intent.schemaName.includes('explanation_primitive')
+      return { parsedContent: { tutorMessage: params.intent.schemaName.includes('instruction_primitive')
         ? 'When first thinking about interval construction, begin with an estimate.' : 'How is the interval constructed?' } };
     } });
     await provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
@@ -443,21 +443,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
         if (category.split('-').includes('rule')) expect(system).to.contain('RULE: Focus on induction and refinement');
         if (category.split('-').includes('model')) expect(system).to.contain('MODEL: Focus on understanding and sense-making');
         observed.push(params.intent.schemaName);
-        if (params.intent.schemaName.includes('visual_primitive') && definition.supportKind === 'visual') return { parsedContent: {
-          imagePrompt: 'Case A and Case B under different conditions.',
-          figureDescription: 'Case A compared with Case B.', displayWidth: 360,
+        if (params.intent.schemaName.includes('instruction_primitive')) return { parsedContent: {
+          tutorMessage: 'The condition determines whether the rule applies.',
+          ...(definition.supportKind === 'visual' ? { kind: 'figure', workedExample: null, heading: null,
+            imagePrompt: 'Case A and Case B under different conditions.', figureDescription: 'Case A compared with Case B.', displayWidth: 360 }
+            : definition.components!.includes('richContent') ? { kind: 'comparison', workedExample: 'Case A meets the decisive condition. Case B does not.', heading: 'Comparison',
+              imagePrompt: null, figureDescription: null, displayWidth: null } : {}),
         } };
-        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: {
-          kind: 'comparison', workedExample: 'Case A meets the decisive condition. Case B does not.', heading: 'Comparison',
-          imagePrompt: null, figureDescription: null, displayWidth: null,
-        } };
-        if (params.intent.schemaName.includes('explanation_primitive')) {
-          if (definition.components!.includes('richContent')) expect(JSON.stringify(params.messages[1]!.content)).to.contain('Case A');
-          if (definition.supportKind === 'written') {
-            expect(JSON.parse(String(params.messages[1]!.content)).supportHeading).to.equal('Comparison');
-          }
-          return { parsedContent: { tutorMessage: 'The condition determines whether the rule applies.' } };
-        }
+        if (definition.components!.includes('richContent')) expect(String(params.messages[1]!.content)).to.contain('Case A');
         expect(system).to.contain('RESPONSE FORMAT:');
         return { parsedContent: { tutorMessage: definition.responseFormat === 'cloze' ? 'Which case meets the specified _____?' : 'Which case meets the specified condition?', ...(definition.responseFormat === 'true-false' ? {
           choices: [{ id: 'true', label: 'True', correct: true }, { id: 'false', label: 'False', correct: false }],
@@ -470,7 +463,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         selectedAction: { snapshotId: 'category-case' },
         moveDefinition: { ...definition, promptPolicy: composeSparcCategoryInstructions(category, definition.components!, definition.responseFormat!) } }) as SparcInstructionComponents;
       expect(output.question).to.contain('Which case');
-      expect(observed).to.have.length(definition.components!.length);
+      expect(observed).to.have.length(definition.components!.includes('explanation') ? 2 : 1);
       if (definition.responseFormat === 'multiple-choice' || definition.responseFormat === 'true-false') expect(output.choices!.filter(choice => choice.correct)).to.have.length(1);
       else expect(output.choices).to.equal(undefined);
       if (definition.supportKind === 'visual') { expect(output.figure?.assetId).to.equal('image123'); expect(output.supportHeading).to.equal(undefined); }
@@ -496,8 +489,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
       const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
         expect(params.intent.schema).to.have.property('additionalProperties', false);
         expect(params.messages[0]!.content).to.include(definition.promptPolicy);
-        if (params.intent.schemaName.includes('rich_primitive')) return { parsedContent: { kind: 'worked-example', heading: 'Worked Example', workedExample: output.richContent, imagePrompt: null, figureDescription: null, displayWidth: null } };
-        return { parsedContent: { tutorMessage: params.intent.schemaName.includes('explanation_primitive') ? output.explanation : output.question } };
+        if (params.intent.schemaName.includes('instruction_primitive') && 'workedExample' in (params.intent.schema as { properties: Record<string, unknown> }).properties) return { parsedContent: { tutorMessage: output.explanation, kind: 'worked-example', heading: 'Worked Example', workedExample: output.richContent, imagePrompt: null, figureDescription: null, displayWidth: null } };
+        return { parsedContent: { tutorMessage: params.intent.schemaName.includes('instruction_primitive') ? output.explanation : output.question } };
       } });
       expect(await provider.generateTutorUtterance({ ...utteranceRequest, action, moveDefinition: definition })).to.deep.equal(output);
     }
@@ -541,15 +534,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
 
   it('rejects rich output that cannot be rendered or invents an image asset', async function() {
     for (const richContent of ['<svg><circle /></svg>', '<img src="https://example.org/invented.png" alt="A diagram">']) {
-      const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
-        if (params.intent.schemaName.includes('explanation_primitive')) return { parsedContent: { tutorMessage: 'Explanation.' } };
-        return { parsedContent: { kind: 'worked-example', heading: 'Worked Example', workedExample: richContent, imagePrompt: null, figureDescription: null, displayWidth: null } };
+      const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson() {
+        return { parsedContent: { tutorMessage: 'Explanation.', kind: 'worked-example', heading: 'Worked Example', workedExample: richContent, imagePrompt: null, figureDescription: null, displayWidth: null } };
       } });
       let error: unknown;
       try { await provider.generateTutorUtterance({ ...utteranceRequest, action: 'instruction.dynamic.explanation-rich-question.text',
         moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-rich-question.text') }); } catch (caught) { error = caught; }
       expect(error).to.be.instanceOf(Error);
-      expect((error as Error).message).to.include('Markdown text');
+      expect((error as Error).message).to.include('Invalid written support');
     }
   });
   it('uses the actual generated figure and explanation for the isomorphic question and resumes saved support', async function() {
@@ -563,18 +555,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
         return { tutorMessage: params.tutorMessage, figure: { assetId: 'image123', description: params.figureDescription, displayWidth: params.displayWidth } };
       },
       async callResolvedOpenRouterJson(params) {
-        if (params.intent.schemaName.includes('explanation_primitive')) {
-          explanations++; expect(images).to.equal(1);
-          expect(params.messages[1]!.content).to.be.a('string');
-          expect(String(params.messages[1]!.content)).to.include('Three different intervals and one fixed mean.');
+        if (params.intent.schemaName.includes('instruction_primitive')) {
+          explanations++; expect(images).to.equal(0);
           expect(JSON.stringify(params.messages)).not.to.include('data:image/');
-          return { parsedContent: { tutorMessage: 'The parameter stays fixed across repeated samples.' } };
-        }
-        if (params.intent.schemaName.includes('visual_primitive')) {
-          expect(String(params.messages[0]!.content)).to.include('Only the question primitive may ask a learner question');
-          expect(String(params.messages[0]!.content)).to.include('Neither figureDescription nor imagePrompt may contain a learner question');
-          return { parsedContent: {
-            imagePrompt: 'Show varying sample intervals against a fixed mean.', figureDescription: 'Three different intervals and one fixed mean.', displayWidth: 300 } };
+          return { parsedContent: { tutorMessage: 'The parameter stays fixed across repeated samples.', kind: 'figure', workedExample: null, heading: null,
+            imagePrompt: 'Three intervals and a fixed mean.', figureDescription: 'Three different intervals and one fixed mean.', displayWidth: 360 } };
         }
         questions++;
         expect(String(params.messages[0]!.content)).to.include('Selected target for this question:');
@@ -590,6 +575,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     });
     const request: SparcUtteranceRequest = { ...utteranceRequest, action: 'instruction.dynamic.explanation-visual-question.text',
       moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-visual-question.text'), selectedAction: { snapshotId: 'response-1' },
+      onInstructionCheckpoint: async (checkpoint: import('../../../../../../learning-components/runtime/sparcMoveLibraryContract').SparcInstructionCheckpoint) => { Object.assign(request, { instructionCheckpoint: checkpoint }); },
       realizedInstruction: realized, onInstructionComponent: async (component, text, figure) => { realized[component] = text; if (figure) realized.figure = figure; } };
     let error: unknown;
     try { await provider.generateTutorUtterance(request); } catch (caught) { error = caught; }
@@ -604,8 +590,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'tdf', sessionId: 'session',
       async callSparcVisualSupport() { throw new Error('figure unavailable'); },
       async callResolvedOpenRouterJson(params) {
-        if (params.intent.schemaName.includes('explanation_primitive')) return { parsedContent: { tutorMessage: 'An explanation.' } };
-        if (params.intent.schemaName.includes('visual_primitive')) return { parsedContent: { imagePrompt: 'Draw the model.', figureDescription: 'The model.', displayWidth: 300 } };
+        if (params.intent.schemaName.includes('instruction_primitive')) return { parsedContent: { tutorMessage: 'An explanation.', kind: 'figure', workedExample: null, heading: null, imagePrompt: 'Draw the model.', figureDescription: 'The model.', displayWidth: 300 } };
         questions++; return { parsedContent: { tutorMessage: 'A question?' } };
       },
     });
@@ -614,6 +599,76 @@ describe('SPARC dialogue OpenRouter provider', function() {
       moveDefinition: requireActiveSparcMoveDefinition('instruction.dynamic.explanation-visual-question.text'), selectedAction: { snapshotId: 'response-2' } }); } catch (caught) { error = caught; }
     expect((error as Error).message).to.equal('figure unavailable'); expect(questions).to.equal(0);
   });
+  for (const failure of ['composed-before', 'composed-after', 'visual', 'resolved-before', 'resolved-after', 'publish-after', 'accepted-before', 'accepted-after', 'question'] as const) {
+    it(`resumes the matched instruction at its durable boundary after ${failure} failure`, async () => {
+      const definition = requireActiveSparcMoveDefinition('instruction.dynamic.explanation-visual-question.text');
+      let checkpoint: import('../../../../../../learning-components/runtime/sparcMoveLibraryContract').SparcInstructionCheckpoint | undefined;
+      let failed = false, compositions = 0, visuals = 0, questions = 0, publications = 0;
+      let accepted: import('../../../../../../learning-components/runtime/sparcMoveLibraryContract').SparcPrimitiveContent | undefined;
+      const activities: string[] = [];
+      const provider = createSparcDialogueOpenRouterProvider({ tdfId: 'lesson', sessionId: 'provider-session',
+        onActivity: activity => { activities.push(activity); },
+        async callResolvedOpenRouterJson(params) {
+          if (params.intent.schemaName.includes('instruction_primitive')) {
+            compositions++;
+            return { parsedContent: { tutorMessage: 'The parameter remains fixed.', kind: 'figure', workedExample: null, heading: null,
+              imagePrompt: 'Show three intervals against the same fixed parameter.', figureDescription: 'Three intervals and one parameter.', displayWidth: 360 } };
+          }
+          questions++;
+          expect(checkpoint?.stage).to.equal('accepted');
+          const context = JSON.parse(String(params.messages[1]!.content));
+          expect(context.explanation).to.equal('The parameter remains fixed.');
+          expect(context.figure.assetId).to.equal('image123');
+          if (failure === 'question' && !failed) { failed = true; throw new Error('interrupted'); }
+          return { parsedContent: { tutorMessage: 'What varies across samples?' } };
+        },
+        async callSparcVisualSupport(params) {
+          visuals++;
+          expect(checkpoint?.stage).to.equal('composed');
+          expect(params.imagePrompt).to.include(checkpoint!.visualBrief!.imagePrompt);
+          expect(checkpoint!.content.text).to.equal('The parameter remains fixed.');
+          if (failure === 'visual' && !failed) { failed = true; throw new Error('interrupted'); }
+          return { figure: { assetId: 'image123', description: params.figureDescription, displayWidth: 360 } };
+        },
+        moveLibrary: {
+          async lookup(query) {
+            expect(query.context.kind).to.be.oneOf(['instruction', 'question']);
+            return { status: 'generate', ticket: { query, embedding: [1, 0] }, previousQuestions: [] };
+          },
+          async publish(ticket, content) {
+            if (ticket.query.context.kind === 'instruction') {
+              publications++;
+              accepted ??= structuredClone(content);
+              if (failure === 'publish-after' && !failed) { failed = true; throw new Error('interrupted'); }
+              return { accepted: true, content: accepted, reference: { entryId: 'instruction-entry', version: 'sparc-moves-v1', source: 'generated', similarity: null } };
+            }
+            return { accepted: true, content, reference: { entryId: 'question-entry', version: 'sparc-moves-v1', source: 'generated', similarity: null } };
+          },
+        },
+      });
+      const attempt = () => provider.generateTutorUtterance({ ...utteranceRequest, action: definition.moveId, moveDefinition: definition,
+        selectedAction: { snapshotId: 'same-event' }, historySessionId: 'lesson-session', ...(checkpoint ? { instructionCheckpoint: structuredClone(checkpoint) } : {}),
+        onInstructionCheckpoint: async next => {
+          if (failure === `${next.stage}-before` && !failed) { failed = true; throw new Error('interrupted'); }
+          checkpoint = structuredClone(next);
+          if (failure === `${next.stage}-after` && !failed) { failed = true; throw new Error('interrupted'); }
+        }, onInstructionComponent: async () => {},
+      });
+      let error: unknown;
+      try { await attempt(); } catch (caught) { error = caught; }
+      expect((error as Error).message).to.equal('interrupted');
+      const output = await attempt() as SparcInstructionComponents;
+      expect(output.explanation).to.equal('The parameter remains fixed.');
+      expect(output.figure?.assetId).to.equal('image123');
+      expect(compositions).to.equal(failure === 'composed-before' ? 2 : 1);
+      expect(visuals).to.equal(failure === 'visual' || failure === 'resolved-before' ? 2 : 1);
+      expect(questions).to.equal(failure === 'question' ? 2 : 1);
+      expect(publications).to.equal(['publish-after', 'accepted-before'].includes(failure) ? 2 : 1);
+      expect(activities).not.to.include('explanation');
+      expect(activities).not.to.include('richContent');
+    });
+  }
+
   it('gives standalone feedback the existing assessment without next-move instructions', async function() {
     const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
       expect(params.messages[0]!.content).to.include('Do not choose a new instructional target or ask another question');

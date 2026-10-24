@@ -58,9 +58,9 @@ export function createSparcLibraryCuration(removeAsset: (id: string) => Promise<
         if (count < 100) return;
       }
     };
-    if (kind === 'video') await removeDependents({ 'content.video.segmentId': id });
+    if (kind === 'video') await removeDependents({ $or: [{ 'content.video.segmentId': id }, { 'content.support.video.segmentId': id }] });
     if (kind === 'image') {
-      await removeDependents({ 'content.figure.assetId': id });
+      await removeDependents({ $or: [{ 'content.figure.assetId': id }, { 'content.support.figure.assetId': id }] });
       await SparcInstructionalRemovals.updateAsync(id, { $set: { removeAsset: true } });
     }
     await invalidateSparcFigureBrowse();
@@ -75,6 +75,8 @@ export function createSparcLibraryCuration(removeAsset: (id: string) => Promise<
       await raw.createIndex({ reusable: 1, _id: 1 });
       await raw.createIndex({ 'content.figure.assetId': 1, _id: 1 });
       await raw.createIndex({ 'content.video.segmentId': 1, _id: 1 });
+      await raw.createIndex({ 'content.support.figure.assetId': 1, _id: 1 });
+      await raw.createIndex({ 'content.support.video.segmentId': 1, _id: 1 });
       await SparcInstructionalRemovals.rawCollection().createIndex({ cleanupKind: 1, _id: 1 });
       await SparcInstructionalRemovals.rawCollection().createIndex({ removeAsset: 1, _id: 1 });
       for (;;) {
