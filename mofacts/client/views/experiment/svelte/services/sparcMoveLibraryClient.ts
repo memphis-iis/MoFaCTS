@@ -5,7 +5,7 @@ import { redactSparcDialogueDiagnosticText } from '../../../../../common/lib/spa
 import type { SparcContentRemovalCheckWarning } from '../../../../../common/recoverableWarnings';
 import type { SparcMoveLibraryClient } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
 import { embedSparcTexts } from './sparcLocalEmbeddings';
-import { SPARC_LIBRARY_SIMILARITY } from '../../../../../../learning-components/runtime/sparcInstructionalNeed';
+import { sparcLibraryMinimumSimilarity } from '../../../../../../learning-components/runtime/sparcInstructionalNeed';
 
 export async function readSparcAdministrativeRemovals(ids: string[], tdfId: string | null): Promise<string[]> {
   try {
@@ -39,7 +39,7 @@ export function createSparcMoveLibraryClient(
       // Visual resources have one combined image/video index, searched once after the brief exists.
       const selection = (await prepare({ kind, responseFormat,
         ...(readingLevel ? { readingLevel } : {}), ...(supportKind ? { supportKind } : {}) }))
-        .maximum(embedding!, SPARC_LIBRARY_SIMILARITY.minimumSimilarity);
+        .maximum(embedding!, sparcLibraryMinimumSimilarity(kind));
       if (!selection) return { status: 'generate', ticket: { query, embedding: embedding! }, previousQuestions: query.previousQuestions };
       return Meteor.callAsync('lookupSparcPrimitive', query, selection, embedding);
     },

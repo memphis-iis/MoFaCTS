@@ -8,7 +8,7 @@ import type { SparcRetrievalSelection } from '../../common/lib/sparcRetrieval';
 import { parseSparcQuestionChoices } from '../../../learning-components/runtime/sparcQuestionChoiceContract';
 import { SPARC_MOVE_LIBRARY_VERSION, stableMoveJson, type SparcPrimitiveContent,
   type SparcPrimitiveTicket, type SparcPrimitiveContext, type SparcPrimitiveLookup, type SparcPrimitiveQuery, type SparcPrimitiveReference } from '../../../learning-components/runtime/sparcMoveLibraryContract';
-import { SPARC_INSTRUCTIONAL_NEED_VERSION, SPARC_LIBRARY_SIMILARITY, sparcInstructionalNeedText } from '../../../learning-components/runtime/sparcInstructionalNeed';
+import { SPARC_INSTRUCTIONAL_NEED_VERSION, sparcLibraryMinimumSimilarity, sparcInstructionalNeedText } from '../../../learning-components/runtime/sparcInstructionalNeed';
 
 export const moveDigest = (value: unknown) => createHash('sha256').update(stableMoveJson(value)).digest('hex');
 export type MoveEntry = {
@@ -90,7 +90,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
     async lookup(userId: string, query: SparcPrimitiveQuery, selection: SparcRetrievalSelection, embedding: number[]): Promise<SparcPrimitiveLookup> {
       validateQuery(query, embedding);
       if (selection !== null && (!selection || typeof selection.entryId !== 'string' || !selection.entryId || selection.entryId.length > 200 || !Number.isFinite(selection.similarity)
-        || selection.similarity < SPARC_LIBRARY_SIMILARITY.minimumSimilarity || selection.similarity > 1)) throw new Error('Invalid local retrieval selection');
+        || selection.similarity < sparcLibraryMinimumSimilarity(query.context.kind) || selection.similarity > 1)) throw new Error('Invalid local retrieval selection');
       const id = moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]);
       const saved = await store.request(id);
       if (saved) { if (saved.userId !== userId) throw new Error('Primitive request ownership mismatch'); return existing(saved); }

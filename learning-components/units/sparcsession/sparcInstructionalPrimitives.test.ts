@@ -6,11 +6,29 @@ import { primitiveContext } from './sparcMoveLibrary';
 import type { SparcUtteranceRequest } from './sparcUtteranceRequest';
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief } from './sparcSupportedPrompt';
 import { progressiveDialogueFacts } from './sparcWorkingMemoryFacts';
-import { buildSparcDialogueHistory } from './sparcUtteranceRequest';
+import { buildSparcAssessmentDialogueHistory, buildSparcDialogueHistory } from './sparcUtteranceRequest';
 import { parseSparcQuestionChoices } from '../../runtime/sparcQuestionChoiceContract';
 import { composeSparcCategoryInstructions } from './sparcCategoryInstructions';
 
 describe('SPARC instructional primitives', () => {
+    it('projects assessment questions, answers and feedback without teaching prose or delivery metadata', () => {
+        const facts: SparcWorkingMemoryFact[] = [
+            { factType: 'dialogue.utterance', factId: 'turn:explanation', slots: { speaker: 'tutor', component: 'explanation', text: 'Long explanation. '.repeat(500) } },
+            { factType: 'dialogue.utterance', factId: 'turn:richContent', slots: { speaker: 'tutor', component: 'richContent', text: 'Worked reasoning. '.repeat(500) } },
+            { factType: 'dialogue.utterance', factId: 'turn:question', slots: { speaker: 'tutor', component: 'question', text: 'Which grows?', targetId: 'kc-one', responseFormat: 'multiple-choice',
+                figure: { assetId: 'asset', description: 'Unneeded image description.', displayWidth: 300 }, primitiveReference: { entryId: 'library', similarity: 1 } } },
+            { factType: 'dialogue.utterance', factId: 'answer', slots: { speaker: 'learner', text: 'The balance.', responseFormat: 'multiple-choice' } },
+            { factType: 'dialogue.utterance', factId: 'feedback', slots: { speaker: 'tutor', targetType: 'feedback', targetId: 'kc-one', text: 'Correct: interest joins the balance.' } },
+        ];
+        const original = JSON.stringify(facts);
+        assert.deepEqual(buildSparcAssessmentDialogueHistory(facts), [
+            { role: 'tutor', responseId: 'turn:question', text: 'Which grows?', targetId: 'kc-one', responseFormat: 'multiple-choice' },
+            { role: 'student', responseId: 'answer', text: 'The balance.', responseFormat: 'multiple-choice' },
+            { role: 'tutor', responseId: 'feedback', text: 'Correct: interest joins the balance.', targetId: 'kc-one' },
+        ]);
+        assert.equal(JSON.stringify(facts), original);
+        assert.equal(buildSparcDialogueHistory(facts).length, 5, 'Instruction delivery and durable history keep the complete lesson');
+    });
   it('reveals only the available prefix for every composition and arrival order without changing saved nodes', () => {
     for (const definition of SPARC_CATEGORIZED_MOVE_DEFINITIONS) {
       const components = definition.components!;

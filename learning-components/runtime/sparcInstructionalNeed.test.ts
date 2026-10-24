@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { buildSparcInstructionalNeed, sparcInstructionalNeedText, SPARC_LIBRARY_SIMILARITY } from './sparcInstructionalNeed';
+import { buildSparcInstructionalNeed, sparcInstructionalNeedText, sparcLibraryMinimumSimilarity, SPARC_LIBRARY_SIMILARITY } from './sparcInstructionalNeed';
+import { SparcEmbeddingIndex } from './sparcEmbeddingIndex';
 import { instructionalNeed } from '../units/sparcsession/sparcMoveLibrary';
 import type { SparcUtteranceRequest } from '../units/sparcsession/sparcUtteranceRequest';
 
@@ -12,8 +13,16 @@ const request = { targetType: 'learningTarget', targetId: 'kc-one', contentTexts
   ] }, dialogueHistory: [{ role: 'tutor', component: 'question', text: 'What prevents gene flow?' }], learnerText: 'Isolation.' } as unknown as SparcUtteranceRequest;
 
 describe('Shared instructional need representation', () => {
-  it('uses the requested 0.95 library reuse boundary', () => {
+  it('uses 0.975 for feedback and keeps other components at 0.95', () => {
     assert.equal(SPARC_LIBRARY_SIMILARITY.minimumSimilarity, 0.95);
+    assert.equal(sparcLibraryMinimumSimilarity('feedback'), 0.975);
+    const index = new SparcEmbeddingIndex();
+    index.set('candidate', [0.96, 0.28]);
+    assert.equal(index.maximum([1, 0], sparcLibraryMinimumSimilarity('feedback')), null);
+    for (const kind of ['instruction', 'question', 'explanation', 'richContent'] as const) {
+      assert.equal(sparcLibraryMinimumSimilarity(kind), 0.95);
+      assert.equal(index.maximum([1, 0], sparcLibraryMinimumSimilarity(kind))?.entryId, 'candidate');
+    }
   });
   it('uses one deterministic input for image and text common fields and omits operational metadata', () => {
     const ordinary = instructionalNeed(request, { figure: { assetId: 'asset-one', description: 'Separated populations.' } });

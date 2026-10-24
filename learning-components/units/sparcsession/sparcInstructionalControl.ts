@@ -13,6 +13,7 @@ export { SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../runtime/sparcInst
 
 export const SPARC_AUTOTUTOR_ADAPTER_ID = 'sparc-autotutor-v1';
 export const SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_VERSION = 1;
+export const SPARC_ASSESSMENT_TARGET_LIMIT = 4;
 
 export function isSparcInstructionalCycle(config: SparcInstructionalControllerConfig | undefined): boolean {
   return isSparcCompetitivePolicy(config?.policyId) || isSparcStudentPolicy(config?.policyId);
@@ -31,7 +32,7 @@ export function sparcInstructionalAnchor(facts: readonly SparcWorkingMemoryFact[
 }
 
 /** Assess the current KC and its strongest graph neighbors, independent of mastery. */
-export function sparcAssessmentClusterKcs(facts: readonly SparcWorkingMemoryFact[], limit = 4): ReadonlySet<string> {
+export function sparcAssessmentClusterKcs(facts: readonly SparcWorkingMemoryFact[], limit = SPARC_ASSESSMENT_TARGET_LIMIT): ReadonlySet<string> {
   if (!Number.isInteger(limit) || limit < 1) throw new Error('Assessment KC limit must be a positive integer');
   const ids = facts.filter(fact => fact.factType === 'autotutor.expectation').map(fact => String(fact.slots?.clusterKC));
   if (ids.length <= limit) return new Set(ids);

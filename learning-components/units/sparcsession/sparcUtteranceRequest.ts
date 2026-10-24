@@ -145,6 +145,23 @@ export function buildSparcDialogueHistory(
     .filter((entry) => entry.text);
 }
 
+/** Assessment sees questions, learner contributions and conversational feedback, not teaching prose.
+ * Response identities stay local for citation resolution; they are not model context.
+ * Independent tutor dialogue has no composite component and remains conversational context.
+ */
+export function buildSparcAssessmentDialogueHistory(facts: readonly SparcWorkingMemoryFact[]) {
+  return factsByType(facts, 'dialogue.utterance')
+    .filter(fact => fact.slots?.speaker === 'learner'
+      || !['explanation', 'richContent'].includes(String(fact.slots?.component)))
+    .map(fact => ({
+      role: fact.slots?.speaker === 'learner' ? 'student' as const : 'tutor' as const,
+      responseId: fact.factId,
+      text: stringSlot(fact, 'text') ?? '',
+      ...(stringSlot(fact, 'targetId') ? { targetId: stringSlot(fact, 'targetId') } : {}),
+      ...(stringSlot(fact, 'responseFormat') ? { responseFormat: stringSlot(fact, 'responseFormat') } : {}),
+    })).filter(entry => entry.text);
+}
+
 function learningTargetContent(facts: readonly SparcWorkingMemoryFact[], clusterKC: string): unknown {
   const source = factsByType(facts, 'autotutor.expectation')
     .find((fact) => stringSlot(fact, 'clusterKC') === clusterKC);

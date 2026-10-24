@@ -9,6 +9,7 @@ import { SPARC_TARGET_CATEGORIES } from '../../../../../../learning-components/r
 import { composeSparcCategoryInstructions } from '../../../../../../learning-components/units/sparcsession/sparcCategoryInstructions';
 import {
   createSparcDialogueOpenRouterProvider,
+  type CallResolvedOpenRouterJson,
   type SparcDialogueLearnerResponseScoringTraceEvent,
   type SparcDialogueOpenRouterUsageEvent,
 } from './sparcControllerDialogueOpenRouter.ts';
@@ -71,6 +72,10 @@ function dialogueDisplay(): SparcControllerDisplay {
 type ScorerDialogueEntry = Readonly<{
   speaker: 'learner' | 'tutor';
   text: string;
+  component?: string;
+  targetId?: string;
+  responseId?: string;
+  responseFormat?: string;
   figure?: { assetId: string; description: string; displayWidth: number };
 }>;
 
@@ -93,8 +98,11 @@ function scorerContext(
         factType: 'diagnostic.misconceptionScore',
         slots: { id: 'mis-1', supportStrength: 0.5 },
       }, ...dialogueHistory.map((entry) => ({
+        ...(entry.responseId ? { factId: entry.responseId } : {}),
         factType: 'dialogue.utterance',
-        slots: { speaker: entry.speaker, text: entry.text, ...(entry.figure ? { figure: entry.figure } : {}) },
+        slots: { speaker: entry.speaker, text: entry.text, ...(entry.figure ? { figure: entry.figure } : {}),
+          ...(entry.component ? { component: entry.component } : {}), ...(entry.targetId ? { targetId: entry.targetId } : {}),
+          ...(entry.responseFormat ? { responseFormat: entry.responseFormat } : {}) },
       }))],
       root: { id: 'root', kind: 'document' as const },
     },
@@ -689,14 +697,16 @@ describe('SPARC dialogue OpenRouter provider', function() {
       moveDefinition: requireActiveSparcMoveDefinition('instruction.feedback'), plannerState: { assessment: [{ clusterKC: 'kc-a', coverage: .4 }] } });
     expect(result).to.equal('The parameter is fixed; the intervals vary.');
   });
-  it('scores a figure-supported answer using its saved description without image input', async function() {
+  it('scores a figure-supported answer from question and KC text without sending its figure context', async function() {
     const figure = { assetId: 'image123', description: 'A balance that includes earlier interest.', displayWidth: 360 };
     const learnerText = 'Interest is calculated on the total balance.';
     const provider = createSparcDialogueOpenRouterProvider({
       async callResolvedOpenRouterJson(params) {
         expect(params.messages.every(message => typeof message.content === 'string')).to.equal(true);
         const input = JSON.parse(params.messages[1]!.content as string);
-        expect(input.dialogueHistory[0].figure.description).to.equal(figure.description);
+        expect(input.dialogueHistory).to.deep.equal([{ role: 'tutor', text: 'How is interest calculated?' }]);
+        expect(JSON.stringify(params.messages)).not.to.include(figure.description);
+        expect(input.learningTargets[0]).to.have.all.keys('clusterKC', 'text');
         expect(JSON.stringify(params.messages)).not.to.include('image_url');
         expect(JSON.stringify(params.messages)).not.to.include('data:image/');
         return { parsedContent: {
@@ -918,7 +928,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     }]);
     const systemMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[0];
     const scoringPrompt = String(systemMessage?.content);
-    expect(scoringPrompt.split(/\s+/).length).to.be.lessThan(800);
+    expect(scoringPrompt.split(/\s+/).length).to.be.lessThan(1000);
     expect(scoringPrompt.match(/^[1-5]\. .+$/gm)).to.deep.equal([
       '1. Interpret the answer in question context.',
       '2. Assess accumulated student evidence.',
@@ -926,7 +936,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
       '4. Report direction and coverage.',
       '5. Cite evidence and identify remaining requirements.',
     ]);
-    expect(scoringPrompt).not.to.match(/Multiple-choice:|Cloze:|True\/false:/);
+    expect(scoringPrompt).to.match(/Multiple-choice:/);
+    expect(scoringPrompt).to.match(/Cloze:/);
+    expect(scoringPrompt).to.match(/True\/false:/);
     const userMessage = (calls[0] as { messages: Array<{ role: string; content: string }> }).messages[1];
     expect(userMessage).to.not.equal(undefined);
     if (!userMessage) {
@@ -935,13 +947,11 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const scoringUserPayload = JSON.parse(userMessage.content);
     expect(scoringUserPayload).to.deep.include({
       learnerText: 'I think A matters.',
-      problemStatement: 'Suppose $1,000 earns 5% interest and interest remains in the account. How does the balance grow?',
     });
     expect(Object.keys(scoringUserPayload)).to.deep.equal([
-      'problemStatement',
+      'dialogueHistory',
       'learningTargets',
       'misconceptions',
-      'dialogueHistory',
       'priorEvidence',
       'learnerText',
       'evaluationDirective',
@@ -950,6 +960,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
       role: 'tutor',
       text: 'What happens after the first year?',
     }]);
+    expect(scoringUserPayload).not.to.have.property('problemStatement');
     expect((userMessage.content as string).indexOf('"learnerText"')).to.be.greaterThan(
       (userMessage.content as string).indexOf('"dialogueHistory"'),
     );
@@ -978,6 +989,59 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.not.contain('Return only values changed by the latest response');
     expect(systemMessage?.content).to.not.contain('priorCoverage');
     expect(systemMessage?.content).to.not.contain('priorSupportStrength');
+  });
+
+  it('keeps assessment instructions and schema stable while appending only assessment dialogue before changing KC context', async function() {
+    const calls: Array<Parameters<CallResolvedOpenRouterJson>[0]> = [];
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
+      calls.push(params);
+      return { parsedContent: { learningTargetEvaluations: [], diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' } } };
+    } });
+    const history: ScorerDialogueEntry[] = [
+      { speaker: 'tutor', component: 'explanation', text: 'EXCLUDED explanation. '.repeat(500) },
+      { speaker: 'tutor', component: 'richContent', text: 'EXCLUDED support. '.repeat(500) },
+      { speaker: 'tutor', component: 'question', responseId: 'question-one', targetId: 'kc-a', responseFormat: 'text', text: 'What grows?',
+        figure: { assetId: 'excluded-asset', description: 'EXCLUDED visual context.', displayWidth: 300 } },
+      { speaker: 'learner', responseId: 'answer-one', text: 'A grows.' },
+      { speaker: 'tutor', text: 'Correct: A grows.' },
+    ];
+    await provider.scoreLearnerResponse({ ...scorerContext(undefined, history), display: dialogueDisplay(), learnerText: 'A grows.' } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    const changedTargets = { expectations: [{ clusterKC: 'new-kc', text: 'A new proposition.' }], misconceptions: [] };
+    await provider.scoreLearnerResponse({ ...scorerContext(changedTargets, [...history,
+      { speaker: 'tutor', component: 'question', responseId: 'question-two', targetId: 'new-kc', responseFormat: 'cloze', text: 'The new relation is _____.' },
+    ]), display: { ...dialogueDisplay(), autoTutorTargets: changedTargets }, learnerText: 'The new relation.' } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(calls[1]!.messages[0]).to.deep.equal(calls[0]!.messages[0]);
+    expect(calls[1]!.intent.schema).to.deep.equal(calls[0]!.intent.schema);
+    const firstText = calls[0]!.messages[1]!.content as string;
+    const secondText = calls[1]!.messages[1]!.content as string;
+    const first = JSON.parse(firstText), second = JSON.parse(secondText);
+    expect(first.dialogueHistory).to.deep.equal([
+      { role: 'tutor', text: 'What grows?', targetId: 'kc-a', responseFormat: 'text' },
+      { role: 'student', text: 'A grows.' },
+      { role: 'tutor', text: 'Correct: A grows.' },
+    ]);
+    expect(firstText).not.to.match(/EXCLUDED|excluded-asset|responseId|problemStatement|displayWidth|primitiveReference/);
+    expect(first.learningTargets[0]).to.have.all.keys('clusterKC', 'text');
+    expect(second.learningTargets).to.deep.equal(changedTargets.expectations);
+    expect(secondText.startsWith('{"dialogueHistory":' + JSON.stringify(first.dialogueHistory).slice(0, -1))).to.equal(true);
+  });
+
+  it('resolves citations against compact assessment indexes while retaining the original learner response identity', async function() {
+    const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson() {
+      return { parsedContent: { learningTargetEvaluations: [{ clusterKC: 'kc-a', evidenceDirection: 'supports', evidenceStrength: 0.8,
+        learnerEvidence: dialogueLearnerEvidence(1, 'A grows.'), summary: { demonstrated: ['A grows.'], unresolved: [] } }],
+        diagnosticMisconceptionEvaluations: [], learnerContribution: { type: 'answer' } } };
+    } });
+    const context = scorerContext(undefined, [
+      { speaker: 'tutor', component: 'explanation', text: 'Long explanation.' },
+      { speaker: 'tutor', component: 'question', text: 'What grows?' },
+      { speaker: 'learner', responseId: 'original-learner-answer', text: 'A grows.' },
+      { speaker: 'tutor', text: 'Correct.' },
+    ]);
+    const before = JSON.stringify(context.document);
+    const score = await provider.scoreLearnerResponse({ ...context, display: dialogueDisplay(), learnerText: 'I agree.' } as Parameters<typeof provider.scoreLearnerResponse>[0]);
+    expect(score.evidence?.[0]?.citations).to.deep.equal([{ responseId: 'original-learner-answer', start: 0, end: 8 }]);
+    expect(JSON.stringify(context.document)).to.equal(before);
   });
 
   it('accepts direction-relative contradiction strength while preserving the sparse downstream score contract', async function() {
@@ -1634,7 +1698,6 @@ describe('SPARC dialogue OpenRouter provider', function() {
         };
         const userMessage = JSON.parse(params.messages[1]?.content as string ?? '{}') as Record<string, unknown>;
         expect(userMessage).to.deep.include({
-          problemStatement: 'Suppose $1,000 earns 5% interest and interest remains in the account. How does the balance grow?',
           learnerText: latestLearnerText,
         });
         expect(userMessage.dialogueHistory).to.deep.equal(cumulativeDialogueHistory.map((entry) => ({
@@ -1657,9 +1720,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.required).to.deep.equal([
           'clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
-        expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 0, maxItems: 2 });
-        expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.clusterKC?.enum)
-          .to.deep.equal(['compound.e1', 'compound.e2']);
+        expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 0, maxItems: 4 });
+        expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.clusterKC)
+          .to.deep.equal({ type: 'string', minLength: 1 });
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.evidenceStrength)
           .to.include({ minimum: 0, maximum: 1 });
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties).to.have.all.keys(
@@ -1668,9 +1731,9 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.required).to.deep.equal([
           'id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
-        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 0, maxItems: 1 });
-        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties?.id?.enum)
-          .to.deep.equal(['M1']);
+        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 0, maxItems: 4 });
+        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties?.id)
+          .to.deep.equal({ type: 'string', minLength: 1 });
         return {
           parsedContent: {
             learningTargetEvaluations: [{

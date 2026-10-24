@@ -13,6 +13,17 @@ function fixture() {
     return { entries, requests, removed, reads, service: createMoveLibraryService({ store, embeddingModel: 'fixture', videoReuseStatus: async videos => new Map(videos.map(video => [video.segmentId, true])), verifyFigure: async () => { } }) };
 }
 describe('Client-selected instructional persistence', () => {
+    it('accepts feedback at 0.975 and rejects lower scores before reading content', async () => {
+        const f = fixture();
+        const saved = await f.service.publish('a', { query: query('feedback-seed', 'feedback'), embedding: [1, 0] }, { text: 'Feedback for this answer.' });
+        const hit = await f.service.lookup('b', query('feedback-boundary', 'feedback'), { entryId: saved.reference.entryId, similarity: 0.975 }, [1, 0]);
+        assert.equal(hit.status, 'hit');
+        const reads = f.reads.length;
+        for (const similarity of [0.95, 0.974999]) {
+            await assert.rejects(f.service.lookup('c', query('feedback-below-' + similarity, 'feedback'), { entryId: saved.reference.entryId, similarity }, [1, 0]), /Invalid local retrieval selection/);
+        }
+        assert.equal(f.reads.length, reads);
+    });
     it('accepts a local maximum at 0.95 and rejects a score below it before reading content', async () => {
         const f = fixture();
         const saved = await f.service.publish('a', { query: query('seed'), embedding: [1, 0] }, { text: 'Reusable instruction.' });

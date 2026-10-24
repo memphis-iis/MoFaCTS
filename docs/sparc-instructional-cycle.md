@@ -2,6 +2,35 @@
 
 ## Joint instruction composition and durable stages, October 24, 2026
 
+### Assessment context and prompt-cache reuse
+
+Assessment uses its own projection of questions, learner answers, and conversational
+feedback. Composite explanation and rich-support nodes, media descriptions, library
+references, and the lesson background statement are excluded. Each question needs its
+own necessary givens. KC/misconception context contains only identities and proposition
+text for the existing selected subset; question history carries its target identity and
+response format. Matching accumulated descriptive evidence is still supplied.
+This projection does not alter saved dialogue, lesson rendering, or resume records.
+Citation indexes refer to the projected assessment history; the local projection retains
+the original learner response identities for durable source-span citations, without
+sending those identities to the model.
+
+The assessment system instructions and response schema are fixed across KCs and
+response formats. The schema permits up to four evaluations per target kind; the
+existing evidence reducer rejects unknown or duplicate identities against the actual
+selected subset before accepting scores. In the user message, append-only assessment
+dialogue precedes changing target/evidence data so new KCs do not invalidate the
+earlier conversation prefix.
+
+The existing prefix-caching setting controls OpenRouter session routing affinity.
+It does not guarantee a cache hit. The application continues to record provider-reported
+cache reads, writes and prompt-token counts. Model/provider-specific cache enablement,
+minimum prefix size and expiry still apply; no provider is silently substituted and
+no automatic prompt-cache speedup is claimed without measured cache usage. See
+[OpenRouter prompt caching](https://openrouter.ai/docs/guides/best-practices/prompt-caching).
+
+### Instruction composition
+
 Explanation and requested support are composed together in one structured AI
 response. Written support is finished in that response; visual support supplies
 the matching brief and description for the existing combined image/video search
@@ -12,9 +41,10 @@ then-explanation generation sequence described in older sections below.
 The existing library stores an `instruction` entry as one matched unit: `text`
 is its explanation and optional `support` contains the companion text, heading,
 and media reference. Browser indexes distinguish instruction support types and
-use the same 0.95 similarity threshold for text and visuals; visual retrieval remains one
-local maximum at 0.95. Old separate entries are not combined into pairs, migrated,
-or deleted. Feedback and question entries retain their own reuse behavior.
+use 0.95 for instruction and question reuse. Feedback uses 0.975; visual retrieval
+remains one local maximum at 0.95. Browser search and server acceptance use the
+same category-specific threshold. Old separate entries are not combined into pairs,
+migrated, or deleted.
 
 Checkpoint publication tickets retain the query but never its embedding vector.
 Publication reads the browser embedding cache, recomputing the vector from the
@@ -102,8 +132,8 @@ Each row is normalized once on cache insertion/update. Each lookup normalizes it
 query once, computes dot products in one pass, and returns exactly the maximum
 with deterministic ID ordering for ties. There is no candidate sorting, secondary
 evaluation, repetition rejection, or database paging during a practice search.
-Text component reuse keeps its 0.95 threshold and existing reading-level/question
-response-type categories. Images and matching-language videos compete in a single
+Text component reuse uses 0.975 for feedback and 0.95 for other components, retaining
+the existing reading-level/question response-type categories. Images and matching-language videos compete in a single
 visual index with one query and a shared **0.95** threshold. An absent authored
 content language excludes videos without inferring one from the interface locale.
 Only the winning content is fetched by ID; a stale/deleted selection fails clearly.
@@ -849,7 +879,7 @@ For complete teaching figures, the first sufficiently novel instructional situat
 
 The situation embedding includes the selected target type and authored target texts, current target value when available, move assistance, and the planned illustration brief. The shared representation excludes account/session IDs, raw responses, and dialogue history. The existing primary embedding model, google/gemini-embedding-001, is used without switching to another model on failure. An embedding failure fails the selected move clearly.
 
-The initial image experiment used 0.90. Images and text now share the 0.95 reuse cutoff in `SPARC_LIBRARY_SIMILARITY`; these values are experimental operating cutoffs, not correctness probabilities. The separate Meteor settings overrides were removed. The shared input contract and representation identity are in `learning-components/runtime/sparcInstructionalNeed.ts`. Match scores and source (generated versus semantic reuse) are retained in the private decision ledger. Reuse incurs an embedding request, but no image-generation request; resuming the same decision incurs neither.
+The initial image experiment used 0.90. Feedback now uses 0.975; other text and images use 0.95. `SPARC_LIBRARY_SIMILARITY` owns these experimental operating cutoffs, which are not correctness probabilities. The separate Meteor settings overrides were removed. The shared input contract and representation identity are in `learning-components/runtime/sparcInstructionalNeed.ts`. Match scores and source (generated versus semantic reuse) are retained in the private decision ledger. Reuse incurs an embedding request, but no image-generation request; resuming the same decision incurs neither.
 
 The server-only sparc_figure_library collection stores originating situation embeddings and stable image IDs. sparc_figure_requests stores each account/TDF/session/production-event decision and temporary generation leases. DynamicAssets owns canonical image bytes and descriptions. No new TDF fields, learner controls, package changes, dependencies, or historical migration are required. Current SPARC admin-only access remains in force; generic asset routes still deny these images. Existing private assets retain their ownership and original pairing.
 
@@ -1121,9 +1151,11 @@ The clustering algorithm was deliberately unchanged.
 The user specified embedding-only instructional matching on October 15, 2026, retaining
 primitive type and question response format. Testing started at 0.90 without a
 calibration gate. After inspecting errors, the user approved separate reuse and
-repetition cutoffs and required feedback to recognize correct answers. Reuse now defaults
-to 0.95 for both text and images; question repetition remains 0.88. Both values
-are owned by `SPARC_LIBRARY_SIMILARITY` in the shared instructional-need contract.
+repetition cutoffs and required feedback to recognize correct answers. The October 24
+production trial prompted a feedback-only reuse cutoff of 0.975; other text and
+images remain at 0.95. `SPARC_LIBRARY_SIMILARITY` owns the reuse cutoffs, and
+`sparcLibraryMinimumSimilarity` selects the same primitive threshold for browser
+search and server acceptance. The historical question-repetition cutoff was 0.88.
 The separate image/text settings overrides have been removed. Cutoffs are
 experimental operating values, not correctness probabilities. Additional matching rules
 or evaluation criteria require the user's approval.

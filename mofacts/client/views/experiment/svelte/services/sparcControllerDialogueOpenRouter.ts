@@ -1,6 +1,6 @@
 import { validatePrimitiveContent } from '../../../../../../learning-components/runtime/sparcPrimitiveContent';
 import { parseSparcVideoSegment } from '../../../../../../learning-components/runtime/sparcVideo';
-import { sparcAssessmentClusterKcs, sparcInstructionalAnchor } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalControl';
+import { SPARC_ASSESSMENT_TARGET_LIMIT, sparcAssessmentClusterKcs, sparcInstructionalAnchor } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalControl';
 import { normalizeEmbeddingVector, cosineSimilarityScore } from '../../../../../../learning-components/runtime/vectorSimilarity';
 import { sparcInstructionalNeedText } from '../../../../../../learning-components/runtime/sparcInstructionalNeed';
 import { SPARC_EMBEDDING_MODEL } from '../../../../../common/lib/sparcEmbeddingModel';
@@ -39,7 +39,7 @@ import {
   SPARC_DIALOGUE_UTTERANCE_MAX_TOKENS,
 } from '../../../../../../learning-components/units/sparcsession/sparcDialogueTurnNodes';
 import {
-  buildSparcDialogueHistory,
+  buildSparcAssessmentDialogueHistory,
   type SparcUtteranceRequest,
 } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import { buildSparcWorkingMemoryFacts } from '../../../../../../learning-components/units/sparcsession/sparcWorkingMemoryFacts';
@@ -133,7 +133,7 @@ const SPARC_DIALOGUE_UTTERANCE_JSON_SCHEMA: OpenRouterJsonSchema = {
   required: ['tutorMessage'],
 };
 
-export function buildSparcScoringSystemPrompt(formats: readonly unknown[]): string {
+export function buildSparcScoringSystemPrompt(): string {
   return [
     'Evaluate demonstrated knowledge, comparing meanings rather than keywords. Return only JSON matching the schema. Return at most one evaluation per supplied learning target or misconception, only when student evidence supports or contradicts it; copy identities exactly. Omit unaddressed targets entirely; omission preserves prior scores and evidence.',
     '1. Interpret the answer in question context.',
@@ -141,7 +141,7 @@ export function buildSparcScoringSystemPrompt(formats: readonly unknown[]): stri
     '2. Assess accumulated student evidence.',
     'Reassess the requirements within each KC, using its matching priorEvidence entry. Its demonstrated and unresolved lists are the existing requirement decomposition used to guide instruction, not a new whole-KC assessment to start over. Carry earlier demonstrated requirements forward and evaluate which exact unresolved requirements the answer now demonstrates. Combine complementary student contributions across dialogueHistory and learnerText; the latest answer need not repeat earlier demonstrations. Move newly demonstrated requirements out of unresolved and include them with the earlier demonstrations in the updated summary. Do not drop earlier demonstrations or make them unresolved again merely because they are absent from the latest answer. For conflicting accounts, use the latest resolved student correction. Repetition adds no coverage; an off-task response adds no evidence and erases none. Assess expressed meaning, not prior numeric scores or inferred private beliefs.',
     '3. Distinguish student evidence from supplied information.',
-    'Tutor text and media establish context, not student knowledge. Credit supplied ideas only when the student subsequently adopts, explains, applies, or correctly confirms them. Merely mentioning, quoting, or asking about an idea establishes no stance. Interpret evidence according to the response format; never convert an answer-key flag directly into KC coverage.',
+    'Tutor questions and feedback establish context, not student knowledge. Credit supplied ideas only when the student subsequently adopts, explains, applies, or correctly confirms them. Merely mentioning, quoting, or asking about an idea establishes no stance. Interpret evidence according to the response format; never convert an answer-key flag directly into KC coverage.',
     '4. Report direction and coverage.',
     'Evaluate each authored proposition independently: supports means the student endorses some defining meaning; contradicts means the student explicitly rejects or replaces it; unaddressed means no resolved stance is expressed. Negating a misconception contradicts it. A number counts only when its contextual meaning unambiguously establishes that stance.',
     'When priorEvidence supplies a requirement decomposition, reassess that same set of requirements against the authored KC; do not invent a different decomposition or extra requirements on each turn. When no prior decomposition exists, infer the minimum distinct substantive requirements needed to represent the authored proposition. Keep a relation’s participants, roles, and direction together: do not split it into credit for naming individual participants. An unresolved defining connection is unaddressed, not partial support. Include conditions that change the claim’s validity. Examples, repeated wording, and explanatory restatements do not create extra requirements.',
@@ -149,9 +149,10 @@ export function buildSparcScoringSystemPrompt(formats: readonly unknown[]): stri
     '5. Cite evidence and identify remaining requirements.',
     'For each returned evaluation, cite at least one exact contiguous student-authored substring: source dialogueHistory with its zero-based index, or learnerText with index null. Never cite tutor wording. When descriptive evidence changes, summarize demonstrated meaning and specific unresolved authored requirements a follow-up could elicit. Include actual incorrect claims only in misconception summaries; learning-target summaries contain only demonstrated and unresolved requirements. An untested requirement is unresolved, not incorrect; exclude requirements already demonstrated. Use stable canonical terminology without names, identifiers, quotations, or personal details. Return summary null when priorEvidence is still accurate. Never invent requirements.',
     'Classify the latest conversational action: answer for an attempted answer or interpretation, question for a genuine information or confirmation request, off-task only when unrelated to both the lesson and ongoing dialogue, otherwise other. Confusion is on-topic. Score expressed meaning regardless of classification. For question, include learnerQuestion.contentFocused true when on-topic and appropriate, otherwise false.',
-    ...(formats.includes('multiple-choice') ? ['Multiple-choice: Selection endorses the chosen meaning in its question context, demonstrating recognition or discrimination rather than independently producing the supplied explanation. Unselected distractors are not student beliefs.'] : []),
-    ...(formats.includes('cloze') ? ['Cloze: Evaluate understanding of the entire statement, not as an isolated missing word, without treating the supplied wording as an independently constructed explanation. Accept equivalent wording and ordinary typographical errors. Cite the typed completion. Grammar-only filling gives no conceptual credit. Do not impose a fixed cloze scoring ceiling, multiplier, or automatic full credit.'] : []),
-    ...(formats.includes('true-false') ? ['True/false: True endorses the saved statement; False rejects it. Rejecting a false statement does not endorse its false claim or establish every alternative. Credit the judgment in its actual conditions, not an independently produced explanation.'] : []),
+    'Apply each format rule only to contributions using that responseFormat.',
+    'Multiple-choice: Selection endorses the chosen meaning in its question context, demonstrating recognition or discrimination rather than independently producing the supplied explanation. Unselected distractors are not student beliefs.',
+    'Cloze: Evaluate understanding of the entire statement, not as an isolated missing word, without treating the supplied wording as an independently constructed explanation. Accept equivalent wording and ordinary typographical errors. Cite the typed completion. Grammar-only filling gives no conceptual credit. Do not impose a fixed cloze scoring ceiling, multiplier, or automatic full credit.',
+    'True/false: True endorses the saved statement; False rejects it. Rejecting a false statement does not endorse its false claim or establish every alternative. Credit the judgment in its actual conditions, not an independently produced explanation.',
   ].join('\n');
 }
 
@@ -232,12 +233,9 @@ function misconceptionSummaries(
     });
 }
 
-function buildSparcDialogueScoreJsonSchema(
-  learningTargets: readonly Record<string, unknown>[],
-  misconceptions: readonly Record<string, unknown>[],
-): OpenRouterJsonSchema {
-  const targetIds = learningTargets.map((target) => String(target.clusterKC));
-  const misconceptionIds = misconceptions.map((misconception) => String(misconception.id));
+function buildSparcDialogueScoreJsonSchema(): OpenRouterJsonSchema {
+  // Keep the schema prefix identical across selected KCs. The evidence reducer validates
+  // identities and uniqueness against the actual selected targets before accepting scores.
   const boundedEvidenceStrength = { type: 'number', minimum: 0, maximum: 1 };
   const summary = (keys: string[]) => ({ type: ['object', 'null'], additionalProperties: false, required: keys,
     properties: Object.fromEntries(keys.map(key => [key,
@@ -263,12 +261,12 @@ function buildSparcDialogueScoreJsonSchema(
       learningTargetEvaluations: {
         type: 'array',
         minItems: 0,
-        maxItems: targetIds.length,
+        maxItems: SPARC_ASSESSMENT_TARGET_LIMIT,
         items: {
           type: 'object',
           additionalProperties: false,
           properties: {
-            clusterKC: { type: 'string', enum: targetIds },
+            clusterKC: { type: 'string', minLength: 1 },
             evidenceDirection: { type: 'string', enum: ['supports', 'contradicts'] },
             evidenceStrength: boundedEvidenceStrength,
             learnerEvidence, summary: summary(['demonstrated', 'unresolved']),
@@ -279,14 +277,12 @@ function buildSparcDialogueScoreJsonSchema(
       diagnosticMisconceptionEvaluations: {
         type: 'array',
         minItems: 0,
-        maxItems: misconceptionIds.length,
+        maxItems: SPARC_ASSESSMENT_TARGET_LIMIT,
         items: {
           type: 'object',
           additionalProperties: false,
           properties: {
-            id: misconceptionIds.length > 0
-              ? { type: 'string', enum: misconceptionIds }
-              : { type: 'string' },
+            id: { type: 'string', minLength: 1 },
             evidenceDirection: { type: 'string', enum: ['supports', 'contradicts'] },
             evidenceStrength: boundedEvidenceStrength,
             learnerEvidence, summary: summary(['demonstrated', 'incorrect', 'unresolved']),
@@ -844,7 +840,6 @@ export function createSparcDialogueOpenRouterProvider(
   const scoreLearnerResponseWithEvidence = async ({
     display,
     learnerText,
-    problemStatement,
     document,
     replayState,
     event,
@@ -853,7 +848,7 @@ export function createSparcDialogueOpenRouterProvider(
     const assessedKcs = sparcAssessmentClusterKcs(runtimeFacts);
     const learningTargets = targetSummaries(display).filter(target => assessedKcs.has(String(target.clusterKC)));
     let misconceptions = misconceptionSummaries(display);
-    if (misconceptions.length > 4) {
+    if (misconceptions.length > SPARC_ASSESSMENT_TARGET_LIMIT) {
       const allTargets = targetSummaries(display);
       const anchor = sparcInstructionalAnchor(runtimeFacts);
       const anchorIndex = allTargets.findIndex(target => target.clusterKC === anchor);
@@ -864,10 +859,10 @@ export function createSparcDialogueOpenRouterProvider(
       misconceptions = misconceptions.map((target, index) => ({ target, strength: cosineSimilarityScore({
         normalizedA: vectors[anchorIndex]!, normalizedB: vectors[allTargets.length + index]!,
       }) })).sort((a, b) => Number(b.target.id === active) - Number(a.target.id === active)
-        || b.strength - a.strength || String(a.target.id).localeCompare(String(b.target.id))).slice(0, 4).map(entry => entry.target);
+        || b.strength - a.strength || String(a.target.id).localeCompare(String(b.target.id))).slice(0, SPARC_ASSESSMENT_TARGET_LIMIT).map(entry => entry.target);
     }
     const assessedMisconceptions = new Set(misconceptions.map(target => String(target.id)));
-    const dialogueHistory = buildSparcDialogueHistory(runtimeFacts);
+    const dialogueHistory = buildSparcAssessmentDialogueHistory(runtimeFacts);
     const responseFormat = event?.payload?.responseFormat
       ?? dialogueHistory.find(entry => entry.responseId === event?.payload?.questionId)?.responseFormat;
     const scoringRequest: Parameters<CallResolvedOpenRouterJson>[0] = {
@@ -877,14 +872,16 @@ export function createSparcDialogueOpenRouterProvider(
         temperature: 0,
         messages: [{
           role: 'system',
-          content: buildSparcScoringSystemPrompt([responseFormat, ...dialogueHistory.map(entry => entry.responseFormat)]),
+          content: buildSparcScoringSystemPrompt(),
         }, {
           role: 'user',
           content: JSON.stringify({
-            problemStatement,
+            // Append-only conversation comes first, before changing targets and evidence.
+            dialogueHistory: dialogueHistory.map(entry => ({ role: entry.role, text: entry.text,
+              ...(entry.targetId ? { targetId: entry.targetId } : {}),
+              ...(entry.responseFormat ? { responseFormat: entry.responseFormat } : {}) })),
             learningTargets,
             misconceptions,
-            dialogueHistory,
             priorEvidence: runtimeFacts.filter(f => f.factType === 'instructional.evidence'
               && (f.slots?.kind === 'expectation' ? assessedKcs.has(String(f.slots?.id)) : assessedMisconceptions.has(String(f.slots?.id)))).map(f => sparcEvidenceContext(f.slots!)),
             learnerText,
@@ -897,7 +894,7 @@ export function createSparcDialogueOpenRouterProvider(
         intent: {
           title: 'MoFaCTS SPARC Dialogue Scoring',
           schemaName: 'mofacts_sparc_dialogue_score',
-          schema: buildSparcDialogueScoreJsonSchema(learningTargets, misconceptions),
+          schema: buildSparcDialogueScoreJsonSchema(),
           missingContentMessage: 'OpenRouter SPARC dialogue scoring response did not include message content.',
           strictSchema: true,
         },

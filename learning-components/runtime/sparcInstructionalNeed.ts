@@ -1,9 +1,14 @@
 import { SPARC_TARGET_CATEGORIES, type SparcTargetCategory } from './sparcTargetCategories';
+import type { SparcPrimitiveKind } from './sparcMoveLibraryContract';
 
 /** Representation identity is metadata, never part of the embedded instructional meaning. */
 export const SPARC_INSTRUCTIONAL_NEED_VERSION = 'sparc-instructional-need-v1';
-// The browser search and server acceptance share the requested 0.95 reuse boundary.
-export const SPARC_LIBRARY_SIMILARITY = Object.freeze({ minimumSimilarity: 0.95 });
+// Browser search and server acceptance share the same category-specific reuse boundary.
+export const SPARC_LIBRARY_SIMILARITY = Object.freeze({ minimumSimilarity: 0.95, feedbackMinimumSimilarity: 0.975 });
+
+export function sparcLibraryMinimumSimilarity(kind: SparcPrimitiveKind): number {
+  return kind === 'feedback' ? SPARC_LIBRARY_SIMILARITY.feedbackMinimumSimilarity : SPARC_LIBRARY_SIMILARITY.minimumSimilarity;
+}
 
 export type SparcInstructionalNeed = {
   target: { texts: string[]; category?: SparcTargetCategory };
