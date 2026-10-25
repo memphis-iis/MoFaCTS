@@ -12,7 +12,9 @@ Tracking is shared across drill, test, study, SPARC, video, and AutoTutor surfac
 
 ## Setup and evaluation
 
-`npm install` prepares pinned WebGazer 3.5.3 MediaPipe assets in the ignored `mofacts/public/webgazer` directory. If dependencies were installed with scripts disabled, run `node scripts/prepareWebGazerAssets.cjs` from `mofacts/`. Generated assets must be available in the application build. The tracker is GPL-3.0-or-later; its packaged MediaPipe assets retain their upstream notices.
+`npm install` prepares pinned WebGazer 3.5.3 MediaPipe assets in the ignored `mofacts/public/webgazer` directory. If dependencies were installed with scripts disabled, run `node scripts/prepareWebGazerAssets.cjs` from `mofacts/`. Generated assets must be available in the application build. The tracker is GPL-3.0-or-later; its packaged MediaPipe assets retain their upstream notices. Asset preparation also replaces the pinned MediaPipe Embind string-compiling helpers with equivalent ordinary JavaScript closures in both WASM runtimes. The application keeps its CSP prohibition on `unsafe-eval`; WebAssembly uses the existing `wasm-unsafe-eval` permission. Preparation checks upstream runtime checksums and fails if they change, requiring a compatibility review. Generated notices identify this modification.
+
+Run `node --test scripts/webGazerCsp.test.cjs scripts/gazeTracking.test.cjs` from `mofacts/` to check binding equivalence, real Chromium WASM initialization under CSP, and calibration lifecycle behavior. The browser test needs the existing Playwright Chromium installation and uses no camera or learner data.
 
 An isolated example lives in the canonical configuration repository under `Gaze Tracking Prototype`. Load its TDF and stimulus file through the normal content workflow. It contains calibration, tracked study and drill, an untracked test, and a tracked test.
 
