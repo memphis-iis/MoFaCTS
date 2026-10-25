@@ -87,3 +87,6 @@ mofacts/public/webgazer/
 # Pinned MediaPipe WASM copied from the npm dependency by postinstall
 mofacts/public/mediapipe/wasm/
 !mofacts/public/mediapipe/NOTICE.txt
+
+# Source-owned notices distributed with browser dependencies
+!mofacts/public/licenses/three-LICENSE.txt

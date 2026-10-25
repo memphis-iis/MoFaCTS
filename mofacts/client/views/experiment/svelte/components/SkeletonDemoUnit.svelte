@@ -2,6 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { Session } from 'meteor/session';
   import PoseCameraPreview from './PoseCameraPreview.svelte';
+  import HandCubeOverlay from './HandCubeOverlay.svelte';
+  import { createHandRotationController, type HandRotationResult } from '../../../../../../learning-components/units/skeleton-demo/handRotation';
   import { createCameraCapture } from '../services/cameraCapture';
   import { createPoseTracking, type PoseObservation, type PoseConnection } from '../services/poseTracking';
   import { initializeEngine } from '../services/unitEngineService';
@@ -28,10 +30,20 @@
   let engine: Awaited<ReturnType<typeof initializeEngine>> | null = null;
   const camera = createCameraCapture();
   const tracking = createPoseTracking();
+  const gesture = createHandRotationController();
+  let rotation: HandRotationResult['rotation'] = null;
+  let cubeReady = false;
+  let cubeFailed = false;
+  function cubeUnavailable(): void {
+    cubeFailed = true; cubeReady = false; stop();
+    error = 'The 3D cube is unavailable. Reload this page with WebGL enabled to try again.';
+  }
 
   function stop(): void {
     generation++;
     tracking.stop();
+    gesture.reset();
+    rotation = null;
     camera.stop();
     observation = null;
     connections = [];
@@ -66,9 +78,12 @@
         observation = frame;
         connections = edges;
         handConnections = handEdges;
-        status = frame.landmarks.length || frame.hands.length
-          ? `${frame.landmarks.length ? 'Body detected' : 'No body detected'} · ${frame.hands.length} ${frame.hands.length === 1 ? 'hand' : 'hands'} detected`
-          : 'No body detected. Bring your body or hands into view.';
+        const control = gesture.update(frame, mirrored);
+        rotation = control.rotation;
+        const detection = frame.landmarks.length ? 'Body detected' : 'No body detected';
+        status = `${detection} · ${control.state === 'controlling' ? 'Controlling cube and axes. Turn your hand.'
+          : control.state === 'ignored' ? 'Movement ignored. Turn more slowly.'
+            : 'Show thumb, index and middle fingertips apart.'}`;
       }, fail);
       if (token !== generation) return;
       starting = false;
@@ -127,12 +142,12 @@
 <svelte:window on:pagehide={stop} />
 <section class="skeleton-demo" aria-label="Skeleton demo">
   <div class="skeleton-demo-toolbar">
-  <p class="skeleton-demo-instructions">Move your body and fingers to explore the tracking.</p>
+  <p class="skeleton-demo-instructions">Spread three fingertips. Slow turns move the cube and axes; fast movements are ignored.</p>
   <div class="skeleton-demo-controls">
     {#if active || starting}
       <button type="button" class="btn btn-secondary" on:click={stop}>Stop camera</button>
     {:else}
-      <button type="button" class="btn btn-secondary" disabled={!engine || completing} on:click={() => start()}>Start camera</button>
+      <button type="button" class="btn btn-secondary" disabled={!engine || completing || !cubeReady || cubeFailed} on:click={() => start()}>Start camera</button>
     {/if}
     {#if canSwitchCamera}<button type="button" class="btn btn-secondary" disabled={starting || completing}
       on:click={switchCamera}>Switch camera</button>{/if}
@@ -142,6 +157,8 @@
   <div class="skeleton-demo-status">
     {#if error}<p role="alert">{error}</p>{:else}<p role="status">{status}</p>{/if}
   </div>
-  <PoseCameraPreview bind:videoElement {observation} {connections} {handConnections} {mirrored} />
+  <PoseCameraPreview bind:videoElement {observation} {connections} {handConnections} {mirrored}>
+    <HandCubeOverlay {rotation} onReady={() => { if (!cubeFailed) cubeReady = true; }} onError={cubeUnavailable} />
+  </PoseCameraPreview>
   <p class="skeleton-demo-privacy">Processed on this device. Nothing recorded or uploaded.</p>
 </section>

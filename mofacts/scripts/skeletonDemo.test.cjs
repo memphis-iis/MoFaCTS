@@ -13,6 +13,7 @@ function load(relative, globals = {}, imports = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(code, { exports, DOMException, ...globals, require(name) {
+    if (name.endsWith('/skeleton-demo/handRotation')) return load('../learning-components/units/skeleton-demo/handRotation.ts');
     if (!(name in imports)) throw Error(`Unexpected dependency ${name}`);
     return imports[name];
   } });
@@ -153,7 +154,9 @@ test('pose tracker bounds frames, clears inference on stop, and closes late mode
       assert.equal(options.numHands, 2);
       return { close() { closed++; }, detectForVideo() {
         handDetections++;
-        return { landmarks: [Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0 }))] };
+        return { landmarks: [Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0 }))],
+          worldLandmarks: [Array.from({ length: 21 }, () => ({ x: 0.01, y: 0.02, z: 0.03 }))],
+          handedness: [[{ categoryName: 'Right', score: 0.95 }]] };
       } };
     } },
   } });
@@ -164,6 +167,8 @@ test('pose tracker bounds frames, clears inference on stop, and closes late mode
     samples++;
     assert.equal(observation.hands.length, 1);
     assert.equal(observation.hands[0].length, 21);
+    assert.equal(observation.handWorldLandmarks[0][0].z, 0.03);
+    assert.equal(observation.handedness[0], 'Right');
     assert.equal(api.isInFrameLandmark(observation.hands[0][0]), true, 'Hand landmarks do not require pose visibility');
     assert.equal(api.isVisiblePoseLandmark(observation.hands[0][0]), false);
   }, assert.fail);

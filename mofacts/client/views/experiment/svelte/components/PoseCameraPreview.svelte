@@ -19,7 +19,8 @@
 </script>
 
 <div class="pose-camera-preview" bind:clientWidth={availableWidth} bind:clientHeight={availableHeight}>
-  <div class="pose-camera-mirror" class:mirrored style={`--pose-aspect-ratio: ${aspectRatio}; width: ${fittedWidth}px`}>
+  <div class="pose-camera-frame" style={`--pose-aspect-ratio: ${aspectRatio}; width: ${fittedWidth}px`}>
+  <div class="pose-camera-mirror" class:mirrored>
     <!-- A silent, live camera preview has no prerecorded audio to caption. -->
     <!-- svelte-ignore a11y_media_has_caption -->
     <video bind:this={videoElement} muted playsinline on:loadedmetadata={updateAspectRatio}
@@ -50,5 +51,7 @@
         </g>
       {/each}
     </svg>
+  </div>
+  <slot />
   </div>
 </div>

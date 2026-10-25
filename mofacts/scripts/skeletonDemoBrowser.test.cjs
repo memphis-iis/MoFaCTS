@@ -11,7 +11,7 @@ const app = path.resolve(__dirname, '..');
 const shellStylesheets = [...fs.readFileSync(path.join(app, 'client/index.html'), 'utf8')
   .matchAll(/<link\b[^>]*>/g)].map(match => match[0]).filter(tag => /rel="stylesheet"/.test(tag)).join('\n');
 
-async function buildFixture() {
+async function buildFixture(syntheticTracking = false) {
   const temporaryRoot = path.join(app, '../tmp');
   fs.mkdirSync(temporaryRoot, { recursive: true });
   const directory = fs.mkdtempSync(path.join(temporaryRoot, 'skeleton-demo-'));
@@ -20,6 +20,15 @@ async function buildFixture() {
   };
   const replacements = {};
   const stub = (name, body) => { replacements[name] = write(`${name.replaceAll('/', '-')}.js`, body); };
+  if (syntheticTracking) {
+    const tracker = path.join(app, 'client/views/experiment/svelte/services/poseTracking.ts').replaceAll('\\', '/');
+    stub('poseTracking', `export { isInFrameLandmark, isVisiblePoseLandmark } from ${JSON.stringify(tracker)};
+      export function createPoseTracking() {
+        let callback = null;
+        window.handTest = { emit(frame) { callback?.(frame, [], []); } };
+        return { async start(video, onFrame) { callback = onFrame; }, stop() { callback = null; } };
+      }`);
+  }
   const engine = path.join(app, '../learning-components/units/skeleton-demo/manifest.ts').replaceAll('\\', '/');
   stub('meteor/session', `const listeners = new Set();
     const units = [{ skeletondemosession: {} }, { skeletondemosession: {} }, { unitinstructions: 'Practice boundary' }];
@@ -109,7 +118,7 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     const url = new URL(route.request().url());
     if (url.origin !== 'http://localhost:3200') { externalRequests.push(url.origin); return route.abort(); }
     if (url.pathname === '/__skeleton-fixture') return route.fulfill({ contentType: 'text/html',
-      body: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">${shellStylesheets}</head><body><div class="theme-bootstrap theme-bootstrap-ready"><div class="app home-app practice-app"><div class="main practice-main"><header class="top-header practice-top-header"><h1 class="page-title">Skeleton demo</h1><div class="header-right"><button class="btn practice-return-button">Save and return</button></div></header><main class="content practice-content"><div class="app-page-root container"><div id="content-root" class="content-container"></div></div></main></div></div></div><script src="/__skeleton-fixture/fixture.js"></script></body></html>` });
+      body: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${shellStylesheets}</head><body><div class="theme-bootstrap theme-bootstrap-ready"><div class="app home-app practice-app"><div class="main practice-main"><header class="top-header practice-top-header"><h1 class="page-title">Skeleton demo</h1><div class="header-right"><button class="btn practice-return-button">Save and return</button></div></header><main class="content practice-content"><div class="app-page-root container"><div id="content-root" class="content-container"></div></div></main></div></div></div><script src="/__skeleton-fixture/fixture.js"></script></body></html>` });
     if (url.pathname.startsWith('/__skeleton-fixture/')) {
       const filename = path.basename(url.pathname);
       return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(directory, filename)) });
@@ -120,6 +129,8 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await page.goto('http://localhost:3200/__skeleton-fixture');
     await page.addStyleTag({ content: fs.readFileSync(path.join(app, 'client/views/home/home.css'), 'utf8') });
     await page.evaluate(() => window.fixture.mount());
+    await page.locator('.hand-cube-overlay canvas').waitFor();
+    assert.equal(await page.locator('.hand-cube-axis-label').allTextContents().then(labels => labels.join('')), 'XYZ');
     assert.equal(await page.getByRole('button', { name: 'Switch camera' }).count(), 0);
     await page.setViewportSize({ width: 390, height: 667 });
     async function checkMobileLayout() {
@@ -134,9 +145,16 @@ test('live demo runs real local inference and releases the camera on stop, exit 
       });
       const geometry = await page.evaluate(() => {
         const preview = document.querySelector('.pose-camera-mirror').getBoundingClientRect();
+        const cube = document.querySelector('.hand-cube-overlay canvas').getBoundingClientRect();
         const video = document.querySelector('video');
         const stage = document.querySelector('.pose-camera-preview').getBoundingClientRect();
         return { preview: { width: preview.width, height: preview.height },
+          cube: { width: cube.width, height: cube.height, x: cube.x, y: cube.y },
+          aligned: Math.abs(cube.x - preview.x) < 1 && Math.abs(cube.y - preview.y) < 1,
+          labelsInside: [...document.querySelectorAll('.hand-cube-axis-label')].every(label => {
+            const rect = label.getBoundingClientRect();
+            return rect.left >= cube.left && rect.right <= cube.right && rect.top >= cube.top && rect.bottom <= cube.bottom;
+          }),
           stage: { width: stage.width, height: stage.height },
           ratio: video.videoWidth ? video.videoWidth / video.videoHeight : Number(getComputedStyle(document.querySelector('.pose-camera-mirror')).getPropertyValue('--pose-aspect-ratio')),
           width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth,
@@ -149,6 +167,9 @@ test('live demo runs real local inference and releases the camera on stop, exit 
           }) };
       });
       assert.ok(geometry.scrollWidth <= geometry.width, 'No horizontal scrolling');
+      assert.ok(geometry.aligned && Math.abs(geometry.cube.width - geometry.preview.width) < 1
+        && Math.abs(geometry.cube.height - geometry.preview.height) < 1, '3D canvas aligns with the complete preview');
+      assert.ok(geometry.labelsInside, 'All axis labels fit inside the preview');
       assert.deepEqual(geometry.scrolling, [], `No page or nested container needs a scrollbar: ${JSON.stringify(geometry)}`);
       assert.ok(geometry.preview.height <= geometry.stage.height + 1 && geometry.preview.width <= geometry.stage.width + 1, 'Video fits available space');
       assert.ok(Math.abs(geometry.preview.width / geometry.preview.height - geometry.ratio) < 0.01, 'Overlay geometry matches uncropped video');
@@ -181,6 +202,7 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
     assert.equal(await page.evaluate(() => window.cameraTest.selections.at(-1)), 'front');
     assert.equal(await page.locator('.pose-camera-mirror').evaluate(element => getComputedStyle(element).transform), 'matrix(-1, 0, 0, 1, 0, 0)');
+    assert.equal(await page.locator('.hand-cube-overlay').evaluate(element => getComputedStyle(element).transform), 'none', 'Axis labels must not mirror');
     await page.evaluate(() => { window.cameraTest.unavailable = true; });
     await page.getByRole('button', { name: 'Switch camera' }).click();
     await page.getByRole('alert').filter({ hasText: 'selected camera is unavailable' }).waitFor();
@@ -193,6 +215,13 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
+    // A lost graphics context must stop the camera and clearly disable control.
+    await page.locator('.hand-cube-overlay canvas').evaluate(canvas => {
+      canvas.getContext('webgl2').getExtension('WEBGL_lose_context').loseContext();
+    });
+    await page.getByRole('alert').filter({ hasText: '3D cube is unavailable' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Start camera', exact: true }).isDisabled(), true);
+    assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     assert.equal(await page.evaluate(() => window.fixture.completions), 1);
     assert.equal(await page.evaluate(() => window.cameraTest.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
@@ -212,6 +241,102 @@ test('live demo runs real local inference and releases the camera on stop, exit 
   } finally {
     await browser.close();
     // The fixture directory was created directly under the ignored workspace tmp root.
+    assert.equal(path.dirname(directory), path.resolve(app, '../tmp'));
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('slow hand motion rotates immediately, fast motion is ignored, and the next slow frame resumes', { timeout: 60000 }, async () => {
+  const directory = await buildFixture(true);
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', { value: async () => [] });
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => {
+      const video = document.createElement('canvas'); video.width = 640; video.height = 480;
+      video.getContext('2d').fillRect(0, 0, 640, 480);
+      return video.captureStream(15);
+    } });
+  });
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.origin !== 'http://localhost:3200') return route.abort();
+    if (url.pathname === '/__skeleton-fixture') return route.fulfill({ contentType: 'text/html', body:
+      `<!doctype html><html><head><meta charset="utf-8">${shellStylesheets}</head><body><div id="content-root" style="height:600px;width:800px"></div><script src="/__skeleton-fixture/fixture.js"></script></body></html>` });
+    if (url.pathname.startsWith('/__skeleton-fixture/')) return route.fulfill({ contentType: 'text/javascript',
+      body: fs.readFileSync(path.join(directory, path.basename(url.pathname))) });
+    return route.continue();
+  });
+  try {
+    await page.goto('http://localhost:3200/__skeleton-fixture');
+    await page.evaluate(() => window.fixture.mount());
+    await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+    await page.getByRole('button', { name: 'Stop camera', exact: true }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'Looking for a person' }).waitFor();
+    // Isolate the transparent cube's pixels from the moving fingertip SVG below it.
+    await page.addStyleTag({ content: '.pose-camera-mirror { visibility: hidden; }' });
+    const canvas = page.locator('.hand-cube-overlay canvas');
+    async function emit(timestamp, degrees) {
+      await page.evaluate(({ timestamp, degrees }) => {
+        const angle = degrees * Math.PI / 180;
+        const world = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }));
+        for (const [i, x, y] of [[4, -0.03, 0.02], [8, 0, -0.04], [12, 0.03, 0.02]]) {
+          world[i] = { x: x * Math.cos(angle) - y * Math.sin(angle), y: x * Math.sin(angle) + y * Math.cos(angle), z: 0 };
+        }
+        const image = world.map(p => ({ x: 0.5 + p.x, y: 0.5 + p.y, z: p.z }));
+        image[0] = { x: 0.5, y: 0.55, z: 0 };
+        image[5] = { x: 0.45, y: 0.475, z: 0 };
+        image[17] = { x: 0.55, y: 0.475, z: 0 };
+        window.handTest.emit({ landmarks: [], hands: [image], handWorldLandmarks: [world], handedness: ['Right'],
+          timestamp, width: 640, height: 480 });
+      }, { timestamp, degrees });
+    }
+    await emit(0, 0);
+    const original = await canvas.screenshot();
+    const axisLabels = () => page.locator('.hand-cube-axis-label').evaluateAll(labels => labels.map(label => [label.style.left, label.style.top]));
+    const initialLabels = await axisLabels();
+    await emit(67, 10);
+    await page.getByRole('status').filter({ hasText: 'Controlling cube' }).waitFor();
+    const turned = await canvas.screenshot();
+    assert.equal(turned.equals(original), false, 'An accepted rotation must change actual rendered pixels');
+    const turnedLabels = await axisLabels();
+    assert.notDeepEqual(turnedLabels, initialLabels, 'Axis labels follow the rotating coordinate frame');
+    await emit(134, 100);
+    await page.getByRole('status').filter({ hasText: 'Movement ignored' }).waitFor();
+    assert.equal((await canvas.screenshot()).equals(turned), true, 'Fast reset must not rotate the cube');
+    assert.deepEqual(await axisLabels(), turnedLabels, 'Reset freezes the axes too');
+    await emit(201, 105);
+    await page.getByRole('status').filter({ hasText: 'Controlling cube' }).waitFor();
+    assert.equal((await canvas.screenshot()).equals(turned), false, 'The very next slow observation must rotate, without a stillness period');
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await page.getByRole('button', { name: 'Start camera', exact: true }).waitFor();
+    assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
+    const stopped = await canvas.screenshot();
+    await emit(1100, 0);
+    assert.equal((await canvas.screenshot()).equals(stopped), true, 'Stopped tracking cannot rotate');
+    await page.evaluate(() => window.fixture.destroy());
+    assert.equal(await page.locator('.hand-cube-overlay canvas').count(), 0);
+    assert.deepEqual(errors, []);
+
+    // Unsupported graphics is an explicit failure before any camera acquisition.
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+        return type.startsWith('webgl') ? null : original.call(this, type, ...args);
+      };
+    });
+    await page.reload();
+    await page.evaluate(() => window.fixture.mount());
+    await page.getByRole('alert').filter({ hasText: '3D cube is unavailable' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Start camera', exact: true }).isDisabled(), true);
+    await page.evaluate(() => window.fixture.destroy());
+  } finally {
+    await browser.close();
     assert.equal(path.dirname(directory), path.resolve(app, '../tmp'));
     fs.rmSync(directory, { recursive: true, force: true });
   }

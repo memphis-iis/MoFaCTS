@@ -1,8 +1,12 @@
 import type { PoseLandmarker, HandLandmarker, NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { HAND_ROTATION_LIMITS } from '../../../../../../learning-components/units/skeleton-demo/handRotation';
+import type { HandPoint } from '../../../../../../learning-components/units/skeleton-demo/handRotation';
 
 export interface PoseObservation {
   readonly landmarks: readonly NormalizedLandmark[];
   readonly hands: readonly (readonly NormalizedLandmark[])[];
+  readonly handWorldLandmarks: readonly (readonly HandPoint[])[];
+  readonly handedness: readonly string[];
   // Monotonic inference timestamp, not a claim of sensor capture time.
   readonly timestamp: number;
   readonly width: number;
@@ -80,7 +84,12 @@ export function createPoseTracking() {
         try {
           const result = created.detectForVideo(video, timestamp);
           const handResult = hands.detectForVideo(video, timestamp);
-          onFrame({ landmarks: result.landmarks[0] ?? [], hands: handResult.landmarks, timestamp,
+          onFrame({ landmarks: result.landmarks[0] ?? [], hands: handResult.landmarks,
+            handWorldLandmarks: handResult.worldLandmarks,
+            handedness: handResult.handedness.map(categories => {
+              const hand = categories[0];
+              return hand && hand.score >= HAND_ROTATION_LIMITS.minHandednessConfidence ? hand.categoryName : '';
+            }), timestamp,
             width: video.videoWidth, height: video.videoHeight }, PoseLandmarker.POSE_CONNECTIONS, HandLandmarker.HAND_CONNECTIONS);
         } catch (error) {
           stop();

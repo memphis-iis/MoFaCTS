@@ -26,6 +26,14 @@ Dependency package license files and license metadata must be preserved in distr
 
 ## Local Third-Party Code
 
+### Three.js
+
+The skeleton demo uses `three@0.186.1` (MIT), with `@types/three@0.186.0`
+development definitions. Upstream: https://github.com/mrdoob/three.js.
+The complete runtime copyright and permission notice is preserved in
+`mofacts/public/licenses/three-LICENSE.txt`, served with the application at
+`/licenses/three-LICENSE.txt`. Preserve this notice in application distributions.
+
 ### Recorder.js
 
 Files:
