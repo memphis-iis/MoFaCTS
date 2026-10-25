@@ -22,13 +22,16 @@ export interface FigureGestureResult {
   readonly selection: FigureId | null;
   readonly rotation: { readonly axis: Vec; readonly angle: number } | null;
   readonly scaleFactor: number | null;
+  readonly selectionHint?: string | undefined;
 }
 export const FIGURE_GESTURE_LIMITS = Object.freeze({
   maxGapMs: 250, maxAngularSpeed: 720 * Math.PI / 180, maxTranslationSpeed: 6,
   maxScaleSpeed: 4.5, maxShapeChange: 0.12, minTriangleArea: 0.08,
   identityDistance: 3, minHandednessConfidence: 0.7,
-  spreadEnter: 0.0254, spreadExit: 0.020, pinchEnter: 0.012, pinchExit: 0.018,
-  selectionOpen: 0.020, resizeDoublingHeight: 0.25,
+  spreadEnter: 0.0254, spreadExit: 0.020,
+  // Both pinch gestures permit separated landmarks when the finger pads meet.
+  // Ratios use 3D palm width (index MCP to little-finger MCP), not camera distance.
+  pinchEnter: 0.50, pinchExit: 0.70, resizeDoublingHeight: 0.25,
 });
 const add = (a: Vec, b: Vec): Vec => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a: Vec, b: Vec): Vec => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -39,17 +42,19 @@ const unit = (a: Vec) => scale(a, 1 / length(a));
 const finite = (p: HandPoint | undefined): p is HandPoint => Boolean(p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
 const inside = (p: Vec, r: GestureRect) => p[0] >= r.left && p[0] <= r.left + r.width && p[1] >= r.top && p[1] <= r.top + r.height;
 interface Sample {
-  center: Vec; palmSize: number; tips: Vec[]; cursor: Vec; thumb: Vec; index: Vec;
-  distances: number[]; basis: Vec[] | null; shape: number[]; timestamp: number;
+  center: Vec; palmSize: number; tips: Vec[]; cursor: Vec; thumb: Vec; index: Vec; pinchCenter: Vec;
+  distances: number[]; pinchRatios: number[]; basis: Vec[] | null; shape: number[]; timestamp: number;
 }
 function sample(frame: FigureGestureFrame, index: number, mirrored: boolean, preview: GestureRect): Sample | null {
   const image = frame.hands[index]; const world = frame.handWorldLandmarks[index];
   if (!image || !world || ![0, 4, 5, 8, 12, 17].every(i => finite(image[i]) && finite(world[i]))) return null;
-  if (![0, 4, 5, 8, 12, 17].every(i => image[i]!.x >= 0 && image[i]!.x <= 1 && image[i]!.y >= 0 && image[i]!.y <= 1)) return null;
+  if (![4, 8, 12].every(i => image[i]!.x >= 0 && image[i]!.x <= 1 && image[i]!.y >= 0 && image[i]!.y <= 1)) return null;
   const screen = (i: number): Vec => [image[i]!.x * frame.width / frame.height, image[i]!.y, 0];
   const pixel = (i: number): Vec => [preview.left + (mirrored ? 1 - image[i]!.x : image[i]!.x) * preview.width, preview.top + image[i]!.y * preview.height, 0];
   const palmSize = length(sub(screen(5), screen(17)));
   if (palmSize < 0.01) return null;
+  const worldPalmWidth = Math.hypot(world[5]!.x - world[17]!.x, world[5]!.y - world[17]!.y, world[5]!.z - world[17]!.z);
+  if (worldPalmWidth <= 1e-6) return null;
   const tips: Vec[] = [4, 8, 12].map(i => [world[i]!.x * (mirrored ? -1 : 1), -world[i]!.y, -world[i]!.z]);
   const sides = [sub(tips[1]!, tips[0]!), sub(tips[2]!, tips[1]!), sub(tips[0]!, tips[2]!)];
   const distances = sides.map(length); const perimeter = distances.reduce((a, b) => a + b, 0);
@@ -58,7 +63,8 @@ function sample(frame: FigureGestureFrame, index: number, mirrored: boolean, pre
   const x = usable ? unit(sides[0]!) : null;
   const z = usable ? unit(normal) : null;
   return { center: scale(add(add(screen(0), screen(5)), screen(17)), 1 / 3), palmSize, tips,
-    cursor: scale([4, 8, 12].map(pixel).reduce(add, [0, 0, 0]), 1 / 3), thumb: pixel(4), index: pixel(8), distances,
+    cursor: scale([4, 8, 12].map(pixel).reduce(add, [0, 0, 0]), 1 / 3), thumb: pixel(4), index: pixel(8),
+    pinchCenter: scale(add(pixel(4), pixel(8)), 0.5), distances, pinchRatios: distances.map(d => d / worldPalmWidth),
     basis: x && z ? [x, cross(z, x), z] : null, shape: distances.map(d => perimeter ? d / perimeter : 0), timestamp: frame.timestamp };
 }
 // Full relative rotation R = currentBasis * previousBasis^T; quaternion extraction
@@ -92,21 +98,25 @@ export function createFigureGestureController() {
   let lastMirrored: boolean | null = null;
   let activeFigure: FigureId | null = null;
   let layoutKey = '';
+  // One prior valid sample per hand checks selection continuity, including the
+  // non-owner; `previous` separately follows the current manipulation owner.
+  let lastSamples = new Map<string, Sample>();
   const pinchArmed = new Map<string, boolean>();
-  function reset(): void {
-    owner = null; previous = null; mode = 'inactive'; lastTimestamp = null; lastMirrored = null; pinchArmed.clear(); layoutKey = '';
+  function resetReferences(): void {
+    owner = null; previous = null; mode = 'inactive'; lastTimestamp = null; lastMirrored = null; layoutKey = ''; lastSamples.clear();
   }
+  function reset(): void { resetReferences(); pinchArmed.clear(); }
   function update(frame: FigureGestureFrame, mirrored: boolean, context: FigureGestureContext): FigureGestureResult {
     const out = (state: FigureGestureResult['state'] = 'waiting', extra: Partial<FigureGestureResult> = {}): FigureGestureResult =>
       ({ mode, state, selection: null, rotation: null, scaleFactor: null, ...extra });
     if (!Number.isFinite(frame.timestamp) || !(frame.width > 0) || !(frame.height > 0)
       || !Number.isFinite(frame.width) || !Number.isFinite(frame.height) || !(context.preview.width > 0) || !(context.preview.height > 0)
       || frame.hands.length !== frame.handWorldLandmarks.length || frame.hands.length !== frame.handedness.length) {
-      reset(); return out();
+      resetReferences(); return out();
     }
     const key = JSON.stringify([context.preview, context.palette, context.targets, frame.width, frame.height]);
     if ((lastTimestamp !== null && (frame.timestamp <= lastTimestamp || frame.timestamp - lastTimestamp > FIGURE_GESTURE_LIMITS.maxGapMs))
-      || (lastMirrored !== null && mirrored !== lastMirrored) || (layoutKey && key !== layoutKey)) reset();
+      || (lastMirrored !== null && mirrored !== lastMirrored) || (layoutKey && key !== layoutKey)) resetReferences();
     if (context.activeFigure !== activeFigure) { previous = null; mode = 'inactive'; }
     activeFigure = context.activeFigure; layoutKey = key; lastTimestamp = frame.timestamp; lastMirrored = mirrored;
     const samples = new Map<string, Sample>();
@@ -115,61 +125,81 @@ export function createFigureGestureController() {
       const current = sample(frame, i, mirrored, context.preview);
       if (current) samples.set(label, current);
     });
-    for (const label of pinchArmed.keys()) if (!samples.has(label)) pinchArmed.delete(label);
+    const priorSamples = lastSamples;
+    lastSamples = samples;
+    // Tracking loss clears motion references, not the open/consumed pinch latch.
+    // A held pinch cannot repeat after a dropout; an observed opening is not lost.
     // Observe opening across the preview, before a hand claims palette control.
     // Only an accepted selection (or triple pinch) consumes that opening.
     for (const [label, s] of samples) {
-      if (s.distances[0]! >= FIGURE_GESTURE_LIMITS.selectionOpen) pinchArmed.set(label, true);
-      else if (Math.max(...s.distances) <= FIGURE_GESTURE_LIMITS.pinchEnter) pinchArmed.set(label, false);
+      const prior = priorSamples.get(label);
+      if (prior && length(sub(s.center, prior.center)) / prior.palmSize > FIGURE_GESTURE_LIMITS.identityDistance) {
+        pinchArmed.delete(label); continue;
+      }
+      if (s.pinchRatios[0]! >= FIGURE_GESTURE_LIMITS.pinchExit) pinchArmed.set(label, true);
+      else if (Math.max(...s.pinchRatios) <= FIGURE_GESTURE_LIMITS.pinchEnter) pinchArmed.set(label, false);
     }
+    // Palette selection belongs to either valid hand, independently of the hand
+    // retained for rotation/scaling. Only an accepted selection transfers control.
+    const limits = FIGURE_GESTURE_LIMITS;
+    const overPalette = (s: Sample) => inside(s.pinchCenter, context.palette) || inside(s.cursor, context.palette) || inside(s.thumb, context.palette) || inside(s.index, context.palette);
+    const paletteHands = [...samples].filter(([, s]) => overPalette(s));
+    // Resolve simultaneous selections deterministically, preferring the owner.
+    paletteHands.sort(([a], [b]) => a === owner ? -1 : b === owner ? 1 : a.localeCompare(b));
+    let selectionHint: string | undefined;
+    for (const [label, s] of paletteHands) {
+      const triple = Math.max(...s.pinchRatios) <= (label === owner && mode === 'scaling' ? limits.pinchExit : limits.pinchEnter);
+      const target = context.targets.find(t => inside(s.pinchCenter, t.bounds));
+      const hint = triple ? 'Keep the middle finger apart to select a figure.'
+        : !target ? 'Place the center of your thumb–index pinch over a figure button.'
+          : pinchArmed.get(label) !== true ? 'Open thumb and index, then pinch to select again.'
+            : s.pinchRatios[0]! > limits.pinchEnter ? 'Pinch thumb and index together to select.'
+              : Math.min(s.pinchRatios[1]!, s.pinchRatios[2]!) <= limits.pinchEnter ? 'Keep the middle finger apart from thumb and index.' : undefined;
+      if (!hint && target) {
+        owner = label; previous = s; mode = 'palette'; pinchArmed.set(label, false);
+        return out('controlling', { selection: target.id });
+      }
+      selectionHint ??= hint;
+    }
+    if (!samples.size) selectionHint = frame.hands.length ? 'Hand tracking is incomplete or uncertain. Keep the whole hand in view.'
+      : 'No hands detected. Bring a hand into view.';
     if (owner !== null && !samples.has(owner)) { owner = null; previous = null; mode = 'inactive'; }
     if (owner === null) {
-      owner = [...samples].find(([, s]) => inside(s.cursor, context.palette) || inside(s.thumb, context.palette) || inside(s.index, context.palette)
-        || (activeFigure && (Math.max(...s.distances) <= FIGURE_GESTURE_LIMITS.pinchEnter
+      owner = [...samples].find(([, s]) => overPalette(s)
+        || (activeFigure && (Math.max(...s.pinchRatios) <= FIGURE_GESTURE_LIMITS.pinchEnter
           || (s.basis && Math.min(...s.distances) >= FIGURE_GESTURE_LIMITS.spreadEnter))))?.[0] ?? null;
     }
     const current = owner === null ? null : samples.get(owner)!;
     const prior = previous; const priorMode = mode;
     previous = current;
-    if (!current || !owner) { mode = 'inactive'; return out(); }
-    const limits = FIGURE_GESTURE_LIMITS;
+    if (!current || !owner) { mode = 'inactive'; return out('waiting', { selectionHint }); }
     if (prior && length(sub(current.center, prior.center)) / prior.palmSize > limits.identityDistance) {
       mode = 'inactive'; pinchArmed.delete(owner); return out('ignored');
     }
-    const minimum = Math.min(...current.distances), maximum = Math.max(...current.distances);
+    const minimum = Math.min(...current.distances), maximum = Math.max(...current.pinchRatios);
     const triple = maximum <= (priorMode === 'scaling' ? limits.pinchExit : limits.pinchEnter);
-    const overPalette = inside(current.cursor, context.palette) || inside(current.thumb, context.palette) || inside(current.index, context.palette);
     // Triple pinch consumes two-finger pinch recognition even over the palette.
     if (triple) pinchArmed.set(owner, false);
-    const armed = pinchArmed.get(owner) === true;
-    if (overPalette) {
+    if (overPalette(current)) {
       mode = 'palette';
-      if (!triple && armed && current.distances[0]! <= limits.pinchEnter
-        && current.distances[1]! >= limits.spreadEnter && current.distances[2]! >= limits.spreadEnter) {
-        const target = context.targets.find(t => inside(current.thumb, t.bounds) && inside(current.index, t.bounds));
-        if (target) {
-          pinchArmed.set(owner, false);
-          return out('controlling', { selection: target.id });
-        }
-      }
-      return out();
+      return out('waiting', { selectionHint });
     }
     mode = !activeFigure ? 'inactive' : triple ? 'scaling'
       : current.basis && minimum >= (priorMode === 'rotation' ? limits.spreadExit : limits.spreadEnter) ? 'rotation' : 'inactive';
-    if (!prior || mode === 'inactive' || mode !== priorMode) return out();
+    if (!prior || mode === 'inactive' || mode !== priorMode) return out('waiting', { selectionHint });
     const dt = (current.timestamp - prior.timestamp) / 1000;
     const translation = length(sub(current.center, prior.center)) / ((current.palmSize + prior.palmSize) / 2) / dt;
     const sizeSpeed = Math.abs(Math.log(current.palmSize / prior.palmSize)) / dt;
     if (translation > limits.maxTranslationSpeed || sizeSpeed > limits.maxScaleSpeed) return out('ignored');
     if (mode === 'scaling') {
       const dy = (prior.cursor[1] - current.cursor[1]) / context.preview.height;
-      return out('controlling', { scaleFactor: 2 ** (dy / limits.resizeDoublingHeight) });
+      return out('controlling', { scaleFactor: 2 ** (dy / limits.resizeDoublingHeight), selectionHint });
     }
     if (!prior.basis || !current.basis) return out();
     const rotation = orientationChange(prior.basis, current.basis);
     const shapeChange = Math.max(...current.shape.map((value, i) => Math.abs(value - prior.shape[i]!)));
     if (rotation.angle / dt > limits.maxAngularSpeed || shapeChange > limits.maxShapeChange) return out('ignored');
-    return out('controlling', { rotation });
+    return out('controlling', { rotation, selectionHint });
   }
   return { update, reset };
 }

@@ -131,8 +131,8 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await page.evaluate(() => window.fixture.mount());
     await page.getByRole('button', { name: 'Cube', exact: true }).click();
     await page.locator('.figure-wireframe').waitFor();
-    assert.equal(await page.locator('.figure-vertex-label').count(), 8);
-    assert.equal(await page.locator('.figure-tick').count(), 12);
+    assert.equal(await page.locator('.figure-wireframe .figure-vertex-label').count(), 8);
+    assert.equal(await page.locator('.figure-wireframe .figure-tick').count(), 12);
     assert.equal(await page.getByRole('button', { name: 'Switch camera' }).count(), 0);
     await page.setViewportSize({ width: 390, height: 667 });
     async function checkMobileLayout() {
@@ -273,23 +273,33 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
     await page.goto('http://localhost:3200/__skeleton-fixture');
     await page.evaluate(() => window.fixture.mount());
     assert.equal(await page.locator('.figure-wireframe').count(), 0, 'No figure selected initially');
+    for (const [name, edgeCount, letters] of [['Cube', 12, 'ABCDEFGH'], ['Pyramid', 8, 'ABCDE']]) {
+      const miniature = page.getByRole('button', { name, exact: true }).locator('.figure-miniature');
+      await miniature.waitFor({ state: 'visible' });
+      assert.equal(await miniature.locator('[data-edge]').count(), edgeCount);
+      assert.equal(await miniature.locator('.figure-tick').count(), edgeCount);
+      assert.equal(await miniature.locator('.figure-hidden-edge').count(), 3);
+      assert.equal((await miniature.locator('.figure-vertex-label').allTextContents()).join(''), letters);
+      assert.equal(await miniature.locator('.figure-length-label').textContent(), 'AB = 1 unit');
+    }
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'Looking for a person' }).waitFor();
     let timestamp = 0;
     async function emit(options = {}) {
       await page.evaluate(({ timestamp, options }) => {
-        const { gesture = 'spread', angle = 0, tilt = 0, target = null, y = .5 } = options;
+        const { gesture = 'spread', angle = 0, tilt = 0, target = null, y = .5, keepOwner = false, rememberOwner = false } = options;
         const host = document.querySelector('.figure-overlay').getBoundingClientRect();
-        let x = .7; let cy = y;
+        let x = options.x ?? .7; let cy = y;
         if (target) {
-          const button = [...document.querySelectorAll('.figure-palette-button')].find(b => b.textContent.trim() === target).getBoundingClientRect();
+          const button = [...document.querySelectorAll('.figure-palette-button')].find(b => b.querySelector('span').textContent.trim() === target).getBoundingClientRect();
           x = (button.x + button.width / 2 - host.x) / host.width;
           cy = (button.y + button.height / 2 - host.y) / host.height;
         }
         if (document.querySelector('.pose-camera-mirror').classList.contains('mirrored')) x = 1 - x;
         const world = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }));
-        const positions = gesture === 'triple' ? [[-.003, 0], [.003, 0], [0, .004]]
-          : gesture === 'pinch' ? [[-.003, 0], [.003, 0], [.04, -.04]] : [[-.03, .02], [0, -.04], [.03, .02]];
+        world[5] = { x: -.03, y: 0, z: 0 }; world[17] = { x: .03, y: 0, z: 0 };
+        const positions = gesture === 'triple' ? [[-.012, 0], [.012, 0], [0, .016]]
+          : gesture === 'pinch' ? [[-.009, 0], [.009, 0], [.04, -.04]] : [[-.03, .02], [0, -.04], [.03, .02]];
         [4, 8, 12].forEach((i, j) => {
           const [px, py] = positions[j]; const a = angle * Math.PI / 180, t = tilt * Math.PI / 180;
           const tx = px * Math.cos(a) - py * Math.sin(a), ty = px * Math.sin(a) + py * Math.cos(a);
@@ -297,13 +307,16 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
         });
         const image = world.map(p => ({ x: x + p.x, y: cy + p.y, z: p.z }));
         image[0] = { x, y: cy + .05, z: 0 }; image[5] = { x: x - .05, y: cy - .025, z: 0 }; image[17] = { x: x + .05, y: cy - .025, z: 0 };
-        window.handTest.emit({ landmarks: [], hands: [image], handWorldLandmarks: [world], handedness: ['Right'], timestamp, width: 640, height: 480 });
+        if (rememberOwner) window.handTest.owner = { image, world };
+        const owner = window.handTest.owner;
+        window.handTest.emit({ landmarks: [], hands: keepOwner ? [owner.image, image] : [image],
+          handWorldLandmarks: keepOwner ? [owner.world, world] : [world], handedness: keepOwner ? ['Right', 'Left'] : ['Right'], timestamp, width: 640, height: 480 });
       }, { timestamp, options });
       timestamp += 100;
     }
     const geometry = () => page.locator('.figure-wireframe g[data-edge]').evaluateAll(edges => edges.map(edge => edge.outerHTML).join(''));
     // Open away from the palette; close before arriving over the icon.
-    await emit(); await emit({ gesture: 'pinch' }); await emit({ target: 'Cube', gesture: 'pinch' });
+    await emit({ x: .3 }); await emit({ x: .3, gesture: 'pinch' }); await emit({ target: 'Cube', gesture: 'pinch' });
     await page.locator('.figure-wireframe').waitFor();
     assert.equal(await page.getByRole('button', { name: 'Cube', exact: true }).getAttribute('aria-pressed'), 'true');
     for (const mirrored of [true, false]) {
@@ -325,8 +338,8 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
     }
     await page.locator('.pose-camera-mirror').evaluate(e => e.classList.add('mirrored'));
     await page.screenshot({ path: path.join(app, '../tmp/skeleton-demo-palette-tracking.png'), fullPage: true });
-    assert.equal(await page.locator('.figure-tick').count(), 12);
-    assert.equal(await page.locator('.figure-vertex-label').allTextContents().then(labels => labels.sort().join('')), 'ABCDEFGH');
+    assert.equal(await page.locator('.figure-wireframe .figure-tick').count(), 12);
+    assert.equal(await page.locator('.figure-wireframe .figure-vertex-label').allTextContents().then(labels => labels.sort().join('')), 'ABCDEFGH');
     assert.equal(await page.locator('.figure-hidden-edge').first().evaluate(e => getComputedStyle(e).opacity), '0.3');
     await emit(); await emit(); const original = await geometry();
     await emit({ tilt: 15 }); assert.notEqual(await geometry(), original, 'Tilt itself rotates the figure');
@@ -335,16 +348,17 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
     await emit({ tilt: 110 }); assert.notEqual(await geometry(), tilted, 'Next slower increment resumes immediately');
     await emit({ gesture: 'triple', y: .85 }); await emit({ gesture: 'triple', y: .85 });
     for (let i = 1; i <= 10; i++) await emit({ gesture: 'triple', y: .85 - i * .05 });
-    assert.equal(await page.locator('.figure-length-label').textContent(), 'AB = 4 units');
+    assert.equal(await page.locator('.figure-wireframe .figure-length-label').textContent(), 'AB = 4 units');
     await emit({ gesture: 'triple', y: .4 });
-    const savedLength = await page.locator('.figure-length-label').textContent();
+    const savedLength = await page.locator('.figure-wireframe .figure-length-label').textContent();
     assert.notEqual(savedLength, 'AB = 4 units', 'Downward reversal responds immediately at the upper limit');
-    await emit({ target: 'Pyramid' }); await emit({ target: 'Pyramid' }); await emit({ target: 'Pyramid', gesture: 'pinch' });
+    await emit({ rememberOwner: true });
+    await emit({ target: 'Pyramid', keepOwner: true }); await emit({ target: 'Pyramid', gesture: 'pinch', keepOwner: true });
     assert.equal(await page.getByRole('button', { name: 'Pyramid', exact: true }).getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('.figure-vertex-label').count(), 5); assert.equal(await page.locator('.figure-tick').count(), 8);
-    assert.equal(await page.locator('.figure-length-label').textContent(), 'AB = 1 unit');
+    assert.equal(await page.locator('.figure-wireframe .figure-vertex-label').count(), 5); assert.equal(await page.locator('.figure-wireframe .figure-tick').count(), 8);
+    assert.equal(await page.locator('.figure-wireframe .figure-length-label').textContent(), 'AB = 1 unit');
     await page.getByRole('button', { name: 'Cube', exact: true }).focus(); await page.keyboard.press('Enter');
-    assert.equal(await page.locator('.figure-length-label').textContent(), savedLength, 'Keyboard selection restores saved size');
+    assert.equal(await page.locator('.figure-wireframe .figure-length-label').textContent(), savedLength, 'Keyboard selection restores saved size');
     await page.evaluate(() => { window.visibilityTestStream = document.querySelector('video').srcObject; });
     for (const [cameraVisible, wireframeVisible] of [[true, true], [true, false], [false, true], [false, false]]) {
       for (const [name, visible] of [['Camera visibility', cameraVisible], ['Wireframe visibility', wireframeVisible]]) {

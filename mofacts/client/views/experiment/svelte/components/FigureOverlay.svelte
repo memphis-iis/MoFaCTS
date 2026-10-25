@@ -3,6 +3,7 @@
   import { createFigureGestureController, type FigureGestureFrame, type FigureGestureResult, type GestureRect } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
   import type { FigureId } from '../../../../../../learning-components/units/skeleton-demo/figureGeometry';
   import type { createFigureScene, FigureProjection } from '../services/figureScene';
+  import FigureWireframe from './FigureWireframe.svelte';
   export let onReady: () => void;
   export let onError: () => void;
   let host: HTMLDivElement;
@@ -14,6 +15,7 @@
   let scene: ReturnType<typeof createFigureScene> | null = null;
   let projection: FigureProjection | null = null;
   let activeFigure: FigureId | null = null;
+  let thumbnails: Record<FigureId, FigureProjection> | null = null;
   const gesture = createFigureGestureController();
   function render(): void {
     if (!scene) return;
@@ -35,7 +37,7 @@
     let mounted = true;
     void import('../services/figureScene').then(({ createFigureScene }) => {
       if (!mounted) return;
-      scene = createFigureScene(); render(); onReady();
+      scene = createFigureScene(); thumbnails = { cube: scene.thumbnail('cube'), pyramid: scene.thumbnail('pyramid') }; render(); onReady();
     }).catch(() => { if (mounted) onError(); });
     return () => { mounted = false; gesture.reset(); scene = null; };
   });
@@ -45,31 +47,18 @@
   <aside class="card figure-palette" aria-label="Figures" bind:this={palette}>
     <button type="button" class={`btn figure-palette-button ${activeFigure === 'cube' ? 'btn-primary' : 'btn-outline-secondary'}`} aria-pressed={activeFigure === 'cube'} disabled={!scene}
       on:click={() => select('cube')} bind:this={cubeButton}>
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="5" width="22" height="22" /></svg>
+      {#if thumbnails}<FigureWireframe projection={thumbnails.cube} miniature />{/if}
       <span>Cube</span>
     </button>
     <button type="button" class={`btn figure-palette-button ${activeFigure === 'pyramid' ? 'btn-primary' : 'btn-outline-secondary'}`} aria-pressed={activeFigure === 'pyramid'} disabled={!scene}
       on:click={() => select('pyramid')} bind:this={pyramidButton}>
-      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 L29 27 L3 27 Z" /></svg>
+      {#if thumbnails}<FigureWireframe projection={thumbnails.pyramid} miniature />{/if}
       <span>Pyramid</span>
     </button>
   </aside>
   <div class="figure-display" bind:clientWidth={width} bind:clientHeight={height}>
     {#if projection}
-      <svg class="figure-wireframe" width="100%" height="100%" role="img" aria-label={`${projection.name}, ${projection.lengthLabel.text}`}>
-        {#each [false, true] as visible}
-          {#each projection.edges.filter(edge => edge.visible === visible) as edge (edge.id)}
-            <g class:figure-hidden-edge={!visible} data-edge={edge.id}>
-              <line x1={edge.from.x} y1={edge.from.y} x2={edge.to.x} y2={edge.to.y} stroke-dasharray={visible ? undefined : '6 5'} />
-              <line class="figure-tick" x1={edge.tickStart.x} y1={edge.tickStart.y} x2={edge.tickEnd.x} y2={edge.tickEnd.y} />
-            </g>
-          {/each}
-        {/each}
-        {#each projection.vertices as vertex (vertex.id)}
-          <text class="figure-vertex-label" x={vertex.x} y={vertex.y}>{vertex.id}</text>
-        {/each}
-        <text class="figure-length-label" x={projection.lengthLabel.x} y={projection.lengthLabel.y - (projection.lengthLabel.lines.length - 1) * 8}>{#each projection.lengthLabel.lines as line, i}<tspan x={projection.lengthLabel.x} dy={i === 0 ? 0 : 16}>{line}</tspan>{/each}</text>
-      </svg>
+      <FigureWireframe {projection} />
     {:else}
       <p class="figure-empty">Pinch over a figure on the left to select it.</p>
     {/if}

@@ -80,6 +80,7 @@
         const control = figureSurface.update(frame, mirrored);
         const detection = frame.landmarks.length ? 'Body detected' : 'No body detected';
         status = `${detection} · ${control.selection ? 'Figure selected.' : control.state === 'ignored' ? 'Fast movement ignored.'
+          : control.selectionHint ? control.selectionHint
           : control.mode === 'rotation' ? 'Rotate with three fingertips spread apart.'
             : control.mode === 'scaling' ? 'Triple pinch: move up to enlarge, down to shrink.'
               : 'Pinch over a figure on the left to select it.'}`;

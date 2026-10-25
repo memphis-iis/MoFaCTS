@@ -52,6 +52,50 @@ test('hidden edges, congruence ticks and vertex labels follow real geometry', as
     assert.equal(p.lengthLabel.text, 'AB = 1 unit');
   }
 });
+
+test('palette thumbnails reuse exact annotated projection and never change active figure state', async () => {
+  for (const [id, edges, vertices] of [['cube', 12, 8], ['pyramid', 8, 5]]) {
+    const scene = await sceneFactory();
+    const p = scene.thumbnail(id);
+    assert.equal(p.edges.length, edges); assert.equal(p.vertices.length, vertices);
+    assert.equal(p.edges.filter(e => !e.visible).length, 3);
+    assert.equal(p.lengthLabel.text, 'AB = 1 unit');
+    assert.equal(scene.activeFigure, null);
+    scene.select(id);
+    scene.apply(control({ scaleFactor: 4 }));
+    const full = scene.project(240, 220);
+    for (let i = 0; i < edges; i++) {
+      assert.equal(p.edges[i].visible, full.edges[i].visible);
+      for (const point of ['from', 'to', 'tickStart', 'tickEnd']) {
+        near(p.edges[i][point].x, full.edges[i][point].x);
+        near(p.edges[i][point].y, full.edges[i][point].y);
+      }
+    }
+    scene.apply(control({ scaleFactor: 2, rotation: { axis: [0, 1, 0], angle: .3 } }));
+    const before = JSON.stringify(scene.project(800, 600));
+    assert.equal(JSON.stringify(scene.thumbnail(id)), JSON.stringify(p));
+    assert.equal(JSON.stringify(scene.project(800, 600)), before);
+  }
+});
+
+test('letter and AB anchors keep their fixed 3D relationship through rotation and scaling', async () => {
+  for (const id of ['cube', 'pyramid']) for (const size of [.25, 1, 4]) {
+    const scene = await sceneFactory(); scene.select(id); scene.apply(control({ scaleFactor: size }));
+    for (let i = 0; i < 90; i++) {
+      scene.apply(control({ rotation: { axis: [0, 1, 0], angle: .07 } }));
+      const p = scene.project(800, 600);
+      for (const label of p.vertices) {
+        const edge = p.edges.find(e => e.id.includes(label.id));
+        const vertex = edge.id[0] === label.id ? edge.from : edge.to;
+        near(label.x - 400, (vertex.x - 400) * 1.25);
+        near(label.y - 300, (vertex.y - 300) * 1.25);
+      }
+      const ab = p.edges.find(e => e.id === 'AB');
+      near(p.lengthLabel.x - 400, ((ab.from.x + ab.to.x) / 2 - 400) * 1.5);
+      near(p.lengthLabel.y - 300, ((ab.from.y + ab.to.y) / 2 - 300) * 1.5);
+    }
+  }
+});
 test('rotation pivots at the centroid, changes visibility and retains each figure state', async () => {
   const scene = await sceneFactory(); scene.select('cube'); const original = scene.project(800, 600);
   scene.apply(control({ rotation: { axis: [0, 0, 1], angle: 1 }, scaleFactor: 2 }));

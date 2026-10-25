@@ -20,13 +20,16 @@ one demo unit and a stimulus file containing `"clusters": []`.
 
 Choose Start camera and grant camera permission. The live preview shows
 visible body, hand, and finger landmarks and connecting lines; keep the head, shoulders, arms, and hands
-in view. A left-hand palette offers Cube (square icon) and Pyramid (triangle
-icon). Initially no figure is active. Position your camera-tracked thumb and
+in view. A left-hand palette offers Cube and Pyramid as miniature labeled 3D
+wireframes, using the same exact geometry, projection, hidden edges, midpoint
+equality ticks, and AB annotation as the main display. Initially no figure is active. Position your camera-tracked thumb and
 index finger over an icon and pinch them together, keeping the middle finger
-apart. Both fingertips must land inside that button. Opening anywhere in the
+apart. Aim the center between thumb and index at that button. Opening anywhere in the
 preview arms selection; closing just before reaching the button does not discard
 it. An accepted selection consumes the pinch; open again before another
-selection. Holding it does not repeatedly select. The body/hand wireframe draws
+selection. Holding it does not repeatedly select. Brief tracking loss preserves
+whether the pinch was opened or consumed, while clearing motion references.
+The body/hand wireframe draws
 above the icons, while the camera image stays behind them. Buttons also support
 click, touch, and keyboard activation. The palette consumes gestures without
 rotating or resizing the figure.
@@ -36,6 +39,10 @@ edges are solid; hidden edges and their equality ticks are dashed/faded at 30%
 opacity (ticks remain short solid strokes). All edges carry a single midpoint
 tick, and AB displays the current length. No XYZ axes appear. The cube has
 vertices A-H; the square pyramid has A-D around the base and E at the apex.
+Vertex letters and the AB annotation have fixed anchors in the solid's 3D
+coordinates and rotate/scale with it. Text remains upright and screen-sized.
+There is no per-frame collision rearrangement or independent label clamping;
+labels can overlap when their 3D anchors line up in the camera view.
 All edges initially measure 1 unit. The pyramid's height is 1/sqrt(2), with the
 solid centroid one-quarter of that height above the base. Both figures rotate
 and scale about their volume centroid, with a fixed orthographic view. Each
@@ -49,7 +56,12 @@ label, within 0.25-4 units. One-quarter of the preview height doubles/halves siz
 Each new gesture establishes a fresh reference, without requiring stillness.
 Slow movements apply; fast movements are ignored. The next slower increment
 resumes immediately without replaying ignored motion. A second hand remains
-visible without taking over while the controlling hand is identifiable.
+visible without taking over rotation/resizing while the controlling hand is
+identifiable. Either valid hand can select a palette figure, even while the
+other controls rotation/resizing. An accepted selection transfers ownership and
+establishes a fresh movement reference. The existing status area explains
+selection blockers: missing/uncertain tracking, fingertips outside a common
+button, a pinch that needs reopening, or the middle finger too close.
 
 The controls, demonstration canvas, and palette use the application's shared
 `card` styles. Surface colors, text, borders, rounding, buttons, and figure
@@ -135,7 +147,7 @@ describes each triangle; currentBasis * previousBasis^T supplies the full
 relative rotation. Mirroring is applied to gesture coordinates, not the text;
 camera-space rotation is mapped into the 3D view. Gain is 1:1. Hand identity uses handedness and image
 position, never detection-array order. Ambiguous/missing identity, invalid or
-out-of-frame landmarks, narrow triangles, and gaps over 250 ms require a fresh
+out-of-frame fingertips, narrow triangles, and gaps over 250 ms require a fresh
 reference. The first valid observation establishes that reference; the next
 valid movement is evaluated immediately. There is no settling timer.
 
@@ -147,10 +159,17 @@ changes have no separate acceleration threshold. Shape checks use
 normalized edge proportions (maximum change 0.12), and the
 triangle area ratio must be at least 0.08. Handedness confidence must be at least 0.7.
 Rotation enters when all pairwise distances reach 25.4 mm and exits when any
-falls below 20 mm. Triple pinch enters when all distances are at most 12 mm,
-exiting when any exceeds 18 mm. It takes priority over two-finger selection.
-A selecting thumb-index pinch closes at 12 mm; reopening to 20 mm enables a
-new selection. The middle finger must remain at least 25.4 mm from both tips.
+falls below 20 mm, subject to triple-pinch priority. Both pinch gestures use
+distances divided by estimated 3D palm width, measured between the index and
+little-finger base landmarks. A pinch closes at 50% and opens at 70% of that
+width. Selection uses the thumb-index distance and requires the middle finger
+to remain more than 50% of palm width from both tips. Triple pinch uses the
+largest of all three distances and takes priority over selection and rotation.
+Fingertip landmarks need not touch. For a 60 mm estimated palm width, the
+thresholds are 30 mm and 42 mm. These are prototype values for physical testing.
+Finite palm landmarks may lie outside the preview when reaching toward an edge;
+the three fingertips must remain in view. Stop/switch/hide clears pinch latches
+as well as motion references; tracking gaps only clear motion references.
 Distances are MediaPipe estimates, not calibrated physical measurements.
 
 Screen translation uses the palm center and width. Absolute log palm-size change
@@ -208,8 +227,9 @@ landscape sizes, transitions
 between demo units and back to the practice surface, permission failure, and
 absence of third-party requests. It checks palette/label layout and unmirrored
 text at desktop and narrow portrait/landscape sizes. A synthetic-hand fixture
-feeds the real Svelte classifier/display path: camera pinch selects both figures,
-tilt changes projected geometry, fast rotation leaves it unchanged, the next slow
+feeds the real Svelte classifier/display path: camera pinch selects both figures, including selection by the second hand while
+the first retains control. It verifies both annotated palette miniatures.
+Tilt changes projected geometry, fast rotation leaves it unchanged, the next slow
 rotation resumes, triple pinch resizes, and reversing at a size limit responds
 immediately. It verifies retained figure state, keyboard selection, hidden-tab
 shutdown, unmounting, and explicit display-module failure.
@@ -220,7 +240,8 @@ and Dark Industrial theme properties.
 Geometry tests verify all unit edges, tetrahedral-volume centroids, hidden edges,
 ticks, fixed orthographic scaling, size clamping and framing at varied rotations.
 Pure gesture tests cover thresholds/hysteresis, mutually exclusive modes,
-mirroring and target bounds, pinch latching, hand continuity and invalid data.
+mirroring and target bounds, pinch latching, selection across hand ownership,
+selection-blocking hints, hand continuity and invalid data.
 The browser fixture requires the canonical
 localhost watcher. A person must still inspect tracking alignment and responsiveness
 with a physical camera; automated lifecycle checks do not establish that quality.
