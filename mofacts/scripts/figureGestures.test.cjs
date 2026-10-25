@@ -82,6 +82,26 @@ test('reopening enables a second pinch, while both fingertips must hit the same 
   c.update(frame(268, [hand({ x: .155, y: .3 })]), false, context);
   assert.equal(c.update(frame(335, [hand({ x: .155, y: .3, gesture: 'pinch' })]), false, context).selection, null);
 });
+
+test('opening before entering the palette arms selection, including closing before reaching the button', () => {
+  for (const mirrored of [false, true]) {
+    const c = createFigureGestureController();
+    const ctx = { ...context, activeFigure: null };
+    const x = value => mirrored ? 1 - value : value;
+    start(c, { x: x(.3), y: .3 }, ctx, mirrored);
+    c.update(frame(67, [hand({ x: x(.16), y: .3, gesture: 'pinch' })]), mirrored, ctx);
+    assert.equal(c.update(frame(134, [hand({ x: x(.07), y: .3, gesture: 'pinch' })]), mirrored, ctx).selection, 'cube');
+    assert.equal(c.update(frame(201, [hand({ x: x(.07), y: .6, gesture: 'pinch' })]), mirrored, ctx).selection, null,
+      'Holding the accepted pinch cannot select a second figure');
+  }
+});
+
+test('closing near a button does not consume selection before both tips hit it', () => {
+  const c = createFigureGestureController();
+  start(c, { x: .12, y: .3 });
+  assert.equal(c.update(frame(67, [hand({ x: .155, y: .3, gesture: 'pinch' })]), false, context).selection, null);
+  assert.equal(c.update(frame(134, [hand({ x: .15, y: .3, gesture: 'pinch' })]), false, context).selection, 'cube');
+});
 test('triple pinch takes priority and palette space never rotates or resizes', () => {
   const c = createFigureGestureController(); start(c, { x: .07, y: .3 });
   const triple = c.update(frame(67, [hand({ x: .07, y: .3, gesture: 'triple' })]), false, context);

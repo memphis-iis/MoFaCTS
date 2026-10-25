@@ -116,6 +116,12 @@ export function createFigureGestureController() {
       if (current) samples.set(label, current);
     });
     for (const label of pinchArmed.keys()) if (!samples.has(label)) pinchArmed.delete(label);
+    // Observe opening across the preview, before a hand claims palette control.
+    // Only an accepted selection (or triple pinch) consumes that opening.
+    for (const [label, s] of samples) {
+      if (s.distances[0]! >= FIGURE_GESTURE_LIMITS.selectionOpen) pinchArmed.set(label, true);
+      else if (Math.max(...s.distances) <= FIGURE_GESTURE_LIMITS.pinchEnter) pinchArmed.set(label, false);
+    }
     if (owner !== null && !samples.has(owner)) { owner = null; previous = null; mode = 'inactive'; }
     if (owner === null) {
       owner = [...samples].find(([, s]) => inside(s.cursor, context.palette) || inside(s.thumb, context.palette) || inside(s.index, context.palette)
@@ -134,15 +140,17 @@ export function createFigureGestureController() {
     const triple = maximum <= (priorMode === 'scaling' ? limits.pinchExit : limits.pinchEnter);
     const overPalette = inside(current.cursor, context.palette) || inside(current.thumb, context.palette) || inside(current.index, context.palette);
     // Triple pinch consumes two-finger pinch recognition even over the palette.
+    if (triple) pinchArmed.set(owner, false);
     const armed = pinchArmed.get(owner) === true;
-    if (current.distances[0]! >= limits.selectionOpen) pinchArmed.set(owner, true);
-    else if (current.distances[0]! <= limits.pinchEnter) pinchArmed.set(owner, false);
     if (overPalette) {
       mode = 'palette';
       if (!triple && armed && current.distances[0]! <= limits.pinchEnter
         && current.distances[1]! >= limits.spreadEnter && current.distances[2]! >= limits.spreadEnter) {
         const target = context.targets.find(t => inside(current.thumb, t.bounds) && inside(current.index, t.bounds));
-        if (target) return out('controlling', { selection: target.id });
+        if (target) {
+          pinchArmed.set(owner, false);
+          return out('controlling', { selection: target.id });
+        }
       }
       return out();
     }

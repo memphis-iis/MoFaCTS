@@ -23,8 +23,11 @@ visible body, hand, and finger landmarks and connecting lines; keep the head, sh
 in view. A left-hand palette offers Cube (square icon) and Pyramid (triangle
 icon). Initially no figure is active. Position your camera-tracked thumb and
 index finger over an icon and pinch them together, keeping the middle finger
-apart. Both fingertips must land inside that button. Opening the pinch enables
-another selection; holding it does not repeatedly select. Buttons also support
+apart. Both fingertips must land inside that button. Opening anywhere in the
+preview arms selection; closing just before reaching the button does not discard
+it. An accepted selection consumes the pinch; open again before another
+selection. Holding it does not repeatedly select. The body/hand wireframe draws
+above the icons, while the camera image stays behind them. Buttons also support
 click, touch, and keyboard activation. The palette consumes gestures without
 rotating or resizing the figure.
 

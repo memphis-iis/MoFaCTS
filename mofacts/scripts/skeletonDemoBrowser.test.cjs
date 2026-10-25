@@ -25,7 +25,7 @@ async function buildFixture(syntheticTracking = false) {
     stub('poseTracking', `export { isInFrameLandmark, isVisiblePoseLandmark } from ${JSON.stringify(tracker)};
       export function createPoseTracking() {
         let callback = null;
-        window.handTest = { emit(frame) { callback?.(frame, [], []); } };
+        window.handTest = { emit(frame) { callback?.(frame, [], [{ start: 4, end: 8 }]); } };
         return { async start(video, onFrame) { callback = onFrame; }, stop() { callback = null; } };
       }`);
   }
@@ -187,7 +187,9 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await page.getByRole('button', { name: 'Switch camera' }).click();
     await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
     assert.equal(await page.evaluate(() => window.cameraTest.selections.at(-1)), 'rear');
-    assert.equal(await page.locator('.pose-camera-mirror').evaluate(element => getComputedStyle(element).transform), 'none');
+    for (const layer of ['video', 'svg']) {
+      assert.equal(await page.locator(`.pose-camera-mirror > ${layer}`).evaluate(element => getComputedStyle(element).transform), 'none');
+    }
     assert.equal(await page.evaluate(() => window.cameraTest.streams.slice(0, -1).every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
     for (const viewport of [{ width: 1920, height: 1080 }, { width: 1280, height: 720 }, { width: 390, height: 667 }, { width: 320, height: 568 }, { width: 667, height: 375 }]) {
       await page.setViewportSize(viewport);
@@ -203,7 +205,9 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await page.getByRole('button', { name: 'Switch camera' }).click();
     await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
     assert.equal(await page.evaluate(() => window.cameraTest.selections.at(-1)), 'front');
-    assert.equal(await page.locator('.pose-camera-mirror').evaluate(element => getComputedStyle(element).transform), 'matrix(-1, 0, 0, 1, 0, 0)');
+    for (const layer of ['video', 'svg']) {
+      assert.equal(await page.locator(`.pose-camera-mirror > ${layer}`).evaluate(element => getComputedStyle(element).transform), 'matrix(-1, 0, 0, 1, 0, 0)');
+    }
     assert.equal(await page.locator('.figure-overlay').evaluate(element => getComputedStyle(element).transform), 'none', 'Figure text must not mirror');
     await page.evaluate(() => { window.cameraTest.unavailable = true; });
     await page.getByRole('button', { name: 'Switch camera' }).click();
@@ -298,9 +302,29 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
       timestamp += 100;
     }
     const geometry = () => page.locator('.figure-wireframe g[data-edge]').evaluateAll(edges => edges.map(edge => edge.outerHTML).join(''));
-    await emit({ target: 'Cube' }); await emit({ target: 'Cube', gesture: 'pinch' });
+    // Open away from the palette; close before arriving over the icon.
+    await emit(); await emit({ gesture: 'pinch' }); await emit({ target: 'Cube', gesture: 'pinch' });
     await page.locator('.figure-wireframe').waitFor();
     assert.equal(await page.getByRole('button', { name: 'Cube', exact: true }).getAttribute('aria-pressed'), 'true');
+    for (const mirrored of [true, false]) {
+      const layers = await page.evaluate(mirrored => {
+        const mirror = document.querySelector('.pose-camera-mirror');
+        mirror.classList.toggle('mirrored', mirrored);
+        const tracking = mirror.querySelector('svg');
+        // Include the otherwise non-interactive tracking layer in paint-order hit testing.
+        tracking.style.pointerEvents = 'auto';
+        const button = document.querySelector('.figure-palette-button');
+        const r = button.getBoundingClientRect();
+        const stack = document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        const result = { tracking: stack.indexOf(tracking), button: stack.indexOf(button), video: stack.indexOf(mirror.querySelector('video')) };
+        tracking.style.removeProperty('pointer-events');
+        return result;
+      }, mirrored);
+      assert.ok(layers.tracking >= 0 && layers.tracking < layers.button && layers.button < layers.video,
+        `Tracking paints above clickable icons, video below (mirrored=${mirrored}): ${JSON.stringify(layers)}`);
+    }
+    await page.locator('.pose-camera-mirror').evaluate(e => e.classList.add('mirrored'));
+    await page.screenshot({ path: path.join(app, '../tmp/skeleton-demo-palette-tracking.png'), fullPage: true });
     assert.equal(await page.locator('.figure-tick').count(), 12);
     assert.equal(await page.locator('.figure-vertex-label').allTextContents().then(labels => labels.sort().join('')), 'ABCDEFGH');
     assert.equal(await page.locator('.figure-hidden-edge').first().evaluate(e => getComputedStyle(e).opacity), '0.3');

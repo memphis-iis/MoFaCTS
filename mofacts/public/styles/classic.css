@@ -3167,12 +3167,14 @@ strong, b { font-weight: var(--app-font-weight-bold); }
 }
 .pose-camera-frame {
     position: relative;
+    isolation: isolate;
     aspect-ratio: var(--pose-aspect-ratio);
 }
 .pose-camera-mirror { width: 100%; height: 100%; position: relative; }
 .pose-camera-mirror .pose-layer-hidden { visibility: hidden; }
 .figure-overlay {
     position: absolute;
+    z-index: 1;
     inset: 0;
     display: grid;
     grid-template-columns: minmax(64px, 18%) minmax(0, 1fr);
@@ -3189,10 +3191,12 @@ strong, b { font-weight: var(--app-font-weight-bold); }
 .figure-wireframe text { fill: var(--app-text-color); text-anchor: middle; dominant-baseline: central; font-size: var(--app-font-size-base); paint-order: stroke; stroke: var(--learning-card-surface-color); stroke-width: 3px; stroke-linejoin: round; }
 .figure-wireframe .figure-length-label { font-size: calc(var(--app-font-size-base) * 0.875); }
 .figure-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: var(--app-space-2); font-size: calc(var(--app-font-size-base) * 0.875); }
-.pose-camera-mirror.mirrored { transform: scaleX(-1); }
-.pose-camera-mirror video { display: block; width: 100%; height: 100%; }
+.pose-camera-mirror.mirrored > video,
+.pose-camera-mirror.mirrored > svg { transform: scaleX(-1); }
+.pose-camera-mirror video { position: relative; z-index: 0; display: block; width: 100%; height: 100%; }
 .pose-camera-mirror svg {
     position: absolute;
+    z-index: 2;
     inset: 0;
     width: 100%;
     height: 100%;
