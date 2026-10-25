@@ -2,8 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { Session } from 'meteor/session';
   import PoseCameraPreview from './PoseCameraPreview.svelte';
-  import HandCubeOverlay from './HandCubeOverlay.svelte';
-  import { createHandRotationController, type HandRotationResult } from '../../../../../../learning-components/units/skeleton-demo/handRotation';
+  import FigureOverlay from './FigureOverlay.svelte';
   import { createCameraCapture } from '../services/cameraCapture';
   import { createPoseTracking, type PoseObservation, type PoseConnection } from '../services/poseTracking';
   import { initializeEngine } from '../services/unitEngineService';
@@ -24,26 +23,26 @@
   let cameraIds: string[] = [];
   let currentCameraId: string | undefined;
   let mirrored = true;
+  let cameraVisible = true;
+  let wireframeVisible = true;
   $: canSwitchCamera = active && cameraIds.length > 1 && cameraIds.includes(currentCameraId ?? '');
   let mounted = true;
   let generation = 0;
   let engine: Awaited<ReturnType<typeof initializeEngine>> | null = null;
   const camera = createCameraCapture();
   const tracking = createPoseTracking();
-  const gesture = createHandRotationController();
-  let rotation: HandRotationResult['rotation'] = null;
-  let cubeReady = false;
-  let cubeFailed = false;
-  function cubeUnavailable(): void {
-    cubeFailed = true; cubeReady = false; stop();
-    error = 'The 3D cube is unavailable. Reload this page with WebGL enabled to try again.';
+  let figureSurface: FigureOverlay;
+  let figureReady = false;
+  let figureFailed = false;
+  function figureUnavailable(): void {
+    figureFailed = true; figureReady = false; stop();
+    error = 'The 3D figures are unavailable. Reload this page to try again.';
   }
 
   function stop(): void {
     generation++;
     tracking.stop();
-    gesture.reset();
-    rotation = null;
+    figureSurface?.resetGestures();
     camera.stop();
     observation = null;
     connections = [];
@@ -78,12 +77,12 @@
         observation = frame;
         connections = edges;
         handConnections = handEdges;
-        const control = gesture.update(frame, mirrored);
-        rotation = control.rotation;
+        const control = figureSurface.update(frame, mirrored);
         const detection = frame.landmarks.length ? 'Body detected' : 'No body detected';
-        status = `${detection} · ${control.state === 'controlling' ? 'Controlling cube and axes. Turn your hand.'
-          : control.state === 'ignored' ? 'Movement ignored. Turn more slowly.'
-            : 'Show thumb, index and middle fingertips apart.'}`;
+        status = `${detection} · ${control.selection ? 'Figure selected.' : control.state === 'ignored' ? 'Fast movement ignored.'
+          : control.mode === 'rotation' ? 'Rotate with three fingertips spread apart.'
+            : control.mode === 'scaling' ? 'Triple pinch: move up to enlarge, down to shrink.'
+              : 'Pinch over a figure on the left to select it.'}`;
       }, fail);
       if (token !== generation) return;
       starting = false;
@@ -141,24 +140,40 @@
 <svelte:document on:visibilitychange={visibilityChanged} />
 <svelte:window on:pagehide={stop} />
 <section class="skeleton-demo" aria-label="Skeleton demo">
-  <div class="skeleton-demo-toolbar">
-  <p class="skeleton-demo-instructions">Spread three fingertips. Slow turns move the cube and axes; fast movements are ignored.</p>
+  <div class="card skeleton-demo-controls-card">
+  <div class="card-body skeleton-demo-toolbar">
+  <p class="skeleton-demo-instructions">Pinch an icon to select. Spread three fingers to rotate; triple pinch and move up/down to resize.</p>
+  <div class="skeleton-demo-control-row">
   <div class="skeleton-demo-controls">
     {#if active || starting}
       <button type="button" class="btn btn-secondary" on:click={stop}>Stop camera</button>
     {:else}
-      <button type="button" class="btn btn-secondary" disabled={!engine || completing || !cubeReady || cubeFailed} on:click={() => start()}>Start camera</button>
+      <button type="button" class="btn btn-secondary" disabled={!engine || completing || !figureReady || figureFailed} on:click={() => start()}>Start camera</button>
     {/if}
     {#if canSwitchCamera}<button type="button" class="btn btn-secondary" disabled={starting || completing}
       on:click={switchCamera}>Switch camera</button>{/if}
     <button type="button" class="btn btn-primary" disabled={!engine || completing} on:click={complete}>Continue</button>
   </div>
+  <div class="skeleton-demo-controls skeleton-demo-visibility" role="group" aria-label="Visible layers">
+    <button type="button" class={`btn ${cameraVisible ? 'btn-primary' : 'btn-secondary'}`} aria-label="Camera visibility"
+      aria-pressed={cameraVisible} title="Show or hide the camera view; gesture tracking continues"
+      on:click={() => cameraVisible = !cameraVisible}>
+      <i class="fa fa-video-camera" aria-hidden="true"></i> Camera <span>{cameraVisible ? 'On' : 'Off'}</span>
+    </button>
+    <button type="button" class={`btn ${wireframeVisible ? 'btn-primary' : 'btn-secondary'}`} aria-label="Wireframe visibility"
+      aria-pressed={wireframeVisible} title="Show or hide body and hand tracking lines; gesture tracking continues"
+      on:click={() => wireframeVisible = !wireframeVisible}>
+      <i class="fa fa-share-alt" aria-hidden="true"></i> Wireframe <span>{wireframeVisible ? 'On' : 'Off'}</span>
+    </button>
+  </div>
   </div>
   <div class="skeleton-demo-status">
     {#if error}<p role="alert">{error}</p>{:else}<p role="status">{status}</p>{/if}
   </div>
-  <PoseCameraPreview bind:videoElement {observation} {connections} {handConnections} {mirrored}>
-    <HandCubeOverlay {rotation} onReady={() => { if (!cubeFailed) cubeReady = true; }} onError={cubeUnavailable} />
+  </div>
+  </div>
+  <PoseCameraPreview bind:videoElement {observation} {connections} {handConnections} {mirrored} {cameraVisible} {wireframeVisible}>
+    <FigureOverlay bind:this={figureSurface} onReady={() => { if (!figureFailed) figureReady = true; }} onError={figureUnavailable} />
   </PoseCameraPreview>
   <p class="skeleton-demo-privacy">Processed on this device. Nothing recorded or uploaded.</p>
 </section>

@@ -6,6 +6,8 @@
   export let connections: readonly PoseConnection[] = [];
   export let handConnections: readonly PoseConnection[] = [];
   export let mirrored = true;
+  export let cameraVisible = true;
+  export let wireframeVisible = true;
   let aspectRatio = 4 / 3;
   let availableWidth = 0;
   let availableHeight = 0;
@@ -18,14 +20,14 @@
   $: points = observation?.landmarks ?? [];
 </script>
 
-<div class="pose-camera-preview" bind:clientWidth={availableWidth} bind:clientHeight={availableHeight}>
+<div class="card pose-camera-preview" bind:clientWidth={availableWidth} bind:clientHeight={availableHeight}>
   <div class="pose-camera-frame" style={`--pose-aspect-ratio: ${aspectRatio}; width: ${fittedWidth}px`}>
   <div class="pose-camera-mirror" class:mirrored>
     <!-- A silent, live camera preview has no prerecorded audio to caption. -->
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video bind:this={videoElement} muted playsinline on:loadedmetadata={updateAspectRatio}
+    <video class:pose-layer-hidden={!cameraVisible} aria-hidden={!cameraVisible} bind:this={videoElement} muted playsinline on:loadedmetadata={updateAspectRatio}
       on:resize={updateAspectRatio} aria-label="Live camera preview"></video>
-    <svg viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
+    <svg class:pose-layer-hidden={!wireframeVisible} viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
       {#each connections as connection}
         {#if isVisiblePoseLandmark(points[connection.start]) && isVisiblePoseLandmark(points[connection.end])}
           <line x1={points[connection.start].x} y1={points[connection.start].y}

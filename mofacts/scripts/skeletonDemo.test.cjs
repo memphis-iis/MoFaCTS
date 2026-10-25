@@ -13,7 +13,7 @@ function load(relative, globals = {}, imports = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(code, { exports, DOMException, ...globals, require(name) {
-    if (name.endsWith('/skeleton-demo/handRotation')) return load('../learning-components/units/skeleton-demo/handRotation.ts');
+    if (name.endsWith('/skeleton-demo/figureGestures')) return load('../learning-components/units/skeleton-demo/figureGestures.ts');
     if (!(name in imports)) throw Error(`Unexpected dependency ${name}`);
     return imports[name];
   } });

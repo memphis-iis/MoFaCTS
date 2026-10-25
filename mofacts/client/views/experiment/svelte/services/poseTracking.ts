@@ -1,6 +1,6 @@
 import type { PoseLandmarker, HandLandmarker, NormalizedLandmark } from '@mediapipe/tasks-vision';
-import { HAND_ROTATION_LIMITS } from '../../../../../../learning-components/units/skeleton-demo/handRotation';
-import type { HandPoint } from '../../../../../../learning-components/units/skeleton-demo/handRotation';
+import { FIGURE_GESTURE_LIMITS } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
+import type { HandPoint } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
 
 export interface PoseObservation {
   readonly landmarks: readonly NormalizedLandmark[];
@@ -88,7 +88,7 @@ export function createPoseTracking() {
             handWorldLandmarks: handResult.worldLandmarks,
             handedness: handResult.handedness.map(categories => {
               const hand = categories[0];
-              return hand && hand.score >= HAND_ROTATION_LIMITS.minHandednessConfidence ? hand.categoryName : '';
+              return hand && hand.score >= FIGURE_GESTURE_LIMITS.minHandednessConfidence ? hand.categoryName : '';
             }), timestamp,
             width: video.videoWidth, height: video.videoHeight }, PoseLandmarker.POSE_CONNECTIONS, HandLandmarker.HAND_CONNECTIONS);
         } catch (error) {

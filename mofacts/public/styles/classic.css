@@ -3115,8 +3115,8 @@ strong, b { font-weight: var(--app-font-weight-bold); }
 .skeleton-demo {
     box-sizing: border-box;
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    gap: var(--app-space-1);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: var(--app-space-2);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -3128,12 +3128,19 @@ strong, b { font-weight: var(--app-font-weight-bold); }
 }
 .skeleton-demo p { margin: 0; }
 .skeleton-demo-toolbar {
+    display: grid;
+    gap: var(--app-space-2);
+}
+.skeleton-demo-controls-card { min-width: 0; }
+.skeleton-demo-control-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--app-space-1) var(--app-space-2);
 }
+.skeleton-demo-status { color: var(--app-secondary-text-color); }
+.skeleton-demo-privacy { color: var(--app-secondary-text-color); text-align: center; }
 .skeleton-demo-instructions,
 .skeleton-demo-status,
 .skeleton-demo-privacy {
@@ -3146,6 +3153,7 @@ strong, b { font-weight: var(--app-font-weight-bold); }
     gap: var(--app-space-1);
 }
 .skeleton-demo-controls .btn {
+    gap: var(--app-space-1);
     min-height: max(36px, calc(var(--app-button-height) * 0.85));
     padding: var(--app-space-1) var(--app-space-2);
     font-size: calc(var(--app-font-size-base) * 0.875);
@@ -3156,32 +3164,31 @@ strong, b { font-weight: var(--app-font-weight-bold); }
     min-height: 0;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--border-color);
-    border-radius: var(--app-border-radius-sm);
-    background: var(--learning-card-surface-color);
 }
 .pose-camera-frame {
     position: relative;
     aspect-ratio: var(--pose-aspect-ratio);
 }
 .pose-camera-mirror { width: 100%; height: 100%; position: relative; }
-.hand-cube-overlay {
+.pose-camera-mirror .pose-layer-hidden { visibility: hidden; }
+.figure-overlay {
     position: absolute;
     inset: 0;
+    display: grid;
+    grid-template-columns: minmax(64px, 18%) minmax(0, 1fr);
     pointer-events: none;
     color: var(--app-text-color);
 }
-.hand-cube-overlay canvas { display: block; width: 100%; height: 100%; }
-.hand-cube-axis-label {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    padding: 0 var(--app-space-1);
-    border-radius: var(--app-border-radius-sm);
-    background: var(--learning-card-surface-color);
-    color: var(--app-text-color);
-    font-size: calc(var(--app-font-size-base) * 0.875);
-    line-height: var(--app-line-height-normal);
-}
+.figure-palette { display: flex; flex-direction: column; justify-content: center; align-self: center; gap: var(--app-space-1); padding: var(--app-space-1); margin: var(--app-space-1); min-width: 0; pointer-events: auto; }
+.figure-palette-button { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 44px; padding: var(--app-space-1); font-size: calc(var(--app-font-size-base) * 0.75); }
+.figure-palette-button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; }
+.figure-display { min-width: 0; min-height: 0; position: relative; }
+.figure-wireframe { display: block; overflow: hidden; }
+.figure-wireframe line { stroke: var(--app-accent-color); stroke-width: 2; stroke-linecap: round; }
+.figure-hidden-edge { opacity: 0.3; }
+.figure-wireframe text { fill: var(--app-text-color); text-anchor: middle; dominant-baseline: central; font-size: var(--app-font-size-base); paint-order: stroke; stroke: var(--learning-card-surface-color); stroke-width: 3px; stroke-linejoin: round; }
+.figure-wireframe .figure-length-label { font-size: calc(var(--app-font-size-base) * 0.875); }
+.figure-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: var(--app-space-2); font-size: calc(var(--app-font-size-base) * 0.875); }
 .pose-camera-mirror.mirrored { transform: scaleX(-1); }
 .pose-camera-mirror video { display: block; width: 100%; height: 100%; }
 .pose-camera-mirror svg {
@@ -3206,4 +3213,8 @@ strong, b { font-weight: var(--app-font-weight-bold); }
 .pose-camera-hand line { stroke-width: 2px; }
 @media (max-width: 767px), (any-pointer: coarse) {
     .skeleton-demo-controls .btn { min-height: max(44px, var(--app-button-height)); }
+}
+@media (max-height: 500px) and (min-aspect-ratio: 1/1) {
+    .skeleton-demo { gap: var(--app-space-1); }
+    .skeleton-demo-toolbar { padding: var(--app-space-1); gap: var(--app-space-1); }
 }

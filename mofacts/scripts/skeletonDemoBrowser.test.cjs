@@ -129,8 +129,10 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await page.goto('http://localhost:3200/__skeleton-fixture');
     await page.addStyleTag({ content: fs.readFileSync(path.join(app, 'client/views/home/home.css'), 'utf8') });
     await page.evaluate(() => window.fixture.mount());
-    await page.locator('.hand-cube-overlay canvas').waitFor();
-    assert.equal(await page.locator('.hand-cube-axis-label').allTextContents().then(labels => labels.join('')), 'XYZ');
+    await page.getByRole('button', { name: 'Cube', exact: true }).click();
+    await page.locator('.figure-wireframe').waitFor();
+    assert.equal(await page.locator('.figure-vertex-label').count(), 8);
+    assert.equal(await page.locator('.figure-tick').count(), 12);
     assert.equal(await page.getByRole('button', { name: 'Switch camera' }).count(), 0);
     await page.setViewportSize({ width: 390, height: 667 });
     async function checkMobileLayout() {
@@ -145,15 +147,15 @@ test('live demo runs real local inference and releases the camera on stop, exit 
       });
       const geometry = await page.evaluate(() => {
         const preview = document.querySelector('.pose-camera-mirror').getBoundingClientRect();
-        const cube = document.querySelector('.hand-cube-overlay canvas').getBoundingClientRect();
+        const cube = document.querySelector('.figure-overlay').getBoundingClientRect();
         const video = document.querySelector('video');
         const stage = document.querySelector('.pose-camera-preview').getBoundingClientRect();
         return { preview: { width: preview.width, height: preview.height },
           cube: { width: cube.width, height: cube.height, x: cube.x, y: cube.y },
           aligned: Math.abs(cube.x - preview.x) < 1 && Math.abs(cube.y - preview.y) < 1,
-          labelsInside: [...document.querySelectorAll('.hand-cube-axis-label')].every(label => {
+          labelsInside: [...document.querySelectorAll('.figure-vertex-label, .figure-length-label')].every(label => {
             const rect = label.getBoundingClientRect();
-            return rect.left >= cube.left && rect.right <= cube.right && rect.top >= cube.top && rect.bottom <= cube.bottom;
+            return rect.left >= cube.left - 1 && rect.right <= cube.right + 1 && rect.top >= cube.top - 1 && rect.bottom <= cube.bottom + 1;
           }),
           stage: { width: stage.width, height: stage.height },
           ratio: video.videoWidth ? video.videoWidth / video.videoHeight : Number(getComputedStyle(document.querySelector('.pose-camera-mirror')).getPropertyValue('--pose-aspect-ratio')),
@@ -168,8 +170,8 @@ test('live demo runs real local inference and releases the camera on stop, exit 
       });
       assert.ok(geometry.scrollWidth <= geometry.width, 'No horizontal scrolling');
       assert.ok(geometry.aligned && Math.abs(geometry.cube.width - geometry.preview.width) < 1
-        && Math.abs(geometry.cube.height - geometry.preview.height) < 1, '3D canvas aligns with the complete preview');
-      assert.ok(geometry.labelsInside, 'All axis labels fit inside the preview');
+        && Math.abs(geometry.cube.height - geometry.preview.height) < 1, 'Figure overlay aligns with the complete preview');
+      assert.ok(geometry.labelsInside, `Figure labels fit inside the preview: ${JSON.stringify(geometry)}`);
       assert.deepEqual(geometry.scrolling, [], `No page or nested container needs a scrollbar: ${JSON.stringify(geometry)}`);
       assert.ok(geometry.preview.height <= geometry.stage.height + 1 && geometry.preview.width <= geometry.stage.width + 1, 'Video fits available space');
       assert.ok(Math.abs(geometry.preview.width / geometry.preview.height - geometry.ratio) < 0.01, 'Overlay geometry matches uncropped video');
@@ -194,15 +196,15 @@ test('live demo runs real local inference and releases the camera on stop, exit 
         const stage = document.querySelector('.pose-camera-preview').getBoundingClientRect();
         return video.width > 0 && video.width <= stage.width && video.height <= stage.height;
       });
-      await checkMobileLayout();
       await page.screenshot({ path: path.join(app, `../tmp/skeleton-mobile-${viewport.width}.png`), fullPage: true });
+      await checkMobileLayout();
     }
     await page.setViewportSize({ width: 390, height: 667 });
     await page.getByRole('button', { name: 'Switch camera' }).click();
     await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
     assert.equal(await page.evaluate(() => window.cameraTest.selections.at(-1)), 'front');
     assert.equal(await page.locator('.pose-camera-mirror').evaluate(element => getComputedStyle(element).transform), 'matrix(-1, 0, 0, 1, 0, 0)');
-    assert.equal(await page.locator('.hand-cube-overlay').evaluate(element => getComputedStyle(element).transform), 'none', 'Axis labels must not mirror');
+    assert.equal(await page.locator('.figure-overlay').evaluate(element => getComputedStyle(element).transform), 'none', 'Figure text must not mirror');
     await page.evaluate(() => { window.cameraTest.unavailable = true; });
     await page.getByRole('button', { name: 'Switch camera' }).click();
     await page.getByRole('alert').filter({ hasText: 'selected camera is unavailable' }).waitFor();
@@ -215,13 +217,6 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'No body detected' }).waitFor();
-    // A lost graphics context must stop the camera and clearly disable control.
-    await page.locator('.hand-cube-overlay canvas').evaluate(canvas => {
-      canvas.getContext('webgl2').getExtension('WEBGL_lose_context').loseContext();
-    });
-    await page.getByRole('alert').filter({ hasText: '3D cube is unavailable' }).waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Start camera', exact: true }).isDisabled(), true);
-    assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     assert.equal(await page.evaluate(() => window.fixture.completions), 1);
     assert.equal(await page.evaluate(() => window.cameraTest.streams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true);
@@ -246,18 +241,17 @@ test('live demo runs real local inference and releases the camera on stop, exit 
   }
 });
 
-test('slow hand motion rotates immediately, fast motion is ignored, and the next slow frame resumes', { timeout: 60000 }, async () => {
+test('camera palette selection, full rotation and triple-pinch resize use the real display', { timeout: 60000 }, async () => {
   const directory = await buildFixture(true);
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage();
-  const errors = [];
+  const errors = []; let failRenderer = false;
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
     Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', { value: async () => [] });
     Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => {
-      const video = document.createElement('canvas'); video.width = 640; video.height = 480;
-      video.getContext('2d').fillRect(0, 0, 640, 480);
-      return video.captureStream(15);
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480;
+      canvas.getContext('2d').fillRect(0, 0, 640, 480); return canvas.captureStream(15);
     } });
   });
   await page.route('**/*', route => {
@@ -265,79 +259,127 @@ test('slow hand motion rotates immediately, fast motion is ignored, and the next
     if (url.origin !== 'http://localhost:3200') return route.abort();
     if (url.pathname === '/__skeleton-fixture') return route.fulfill({ contentType: 'text/html', body:
       `<!doctype html><html><head><meta charset="utf-8">${shellStylesheets}</head><body><div id="content-root" style="height:600px;width:800px"></div><script src="/__skeleton-fixture/fixture.js"></script></body></html>` });
-    if (url.pathname.startsWith('/__skeleton-fixture/')) return route.fulfill({ contentType: 'text/javascript',
-      body: fs.readFileSync(path.join(directory, path.basename(url.pathname))) });
+    if (url.pathname.startsWith('/__skeleton-fixture/')) {
+      if (failRenderer && url.pathname.includes('figureScene')) return route.abort();
+      return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(directory, path.basename(url.pathname))) });
+    }
     return route.continue();
   });
   try {
     await page.goto('http://localhost:3200/__skeleton-fixture');
     await page.evaluate(() => window.fixture.mount());
+    assert.equal(await page.locator('.figure-wireframe').count(), 0, 'No figure selected initially');
     await page.getByRole('button', { name: 'Start camera', exact: true }).click();
-    await page.getByRole('button', { name: 'Stop camera', exact: true }).waitFor();
     await page.getByRole('status').filter({ hasText: 'Looking for a person' }).waitFor();
-    // Isolate the transparent cube's pixels from the moving fingertip SVG below it.
-    await page.addStyleTag({ content: '.pose-camera-mirror { visibility: hidden; }' });
-    const canvas = page.locator('.hand-cube-overlay canvas');
-    async function emit(timestamp, degrees) {
-      await page.evaluate(({ timestamp, degrees }) => {
-        const angle = degrees * Math.PI / 180;
-        const world = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }));
-        for (const [i, x, y] of [[4, -0.03, 0.02], [8, 0, -0.04], [12, 0.03, 0.02]]) {
-          world[i] = { x: x * Math.cos(angle) - y * Math.sin(angle), y: x * Math.sin(angle) + y * Math.cos(angle), z: 0 };
+    let timestamp = 0;
+    async function emit(options = {}) {
+      await page.evaluate(({ timestamp, options }) => {
+        const { gesture = 'spread', angle = 0, tilt = 0, target = null, y = .5 } = options;
+        const host = document.querySelector('.figure-overlay').getBoundingClientRect();
+        let x = .7; let cy = y;
+        if (target) {
+          const button = [...document.querySelectorAll('.figure-palette-button')].find(b => b.textContent.trim() === target).getBoundingClientRect();
+          x = (button.x + button.width / 2 - host.x) / host.width;
+          cy = (button.y + button.height / 2 - host.y) / host.height;
         }
-        const image = world.map(p => ({ x: 0.5 + p.x, y: 0.5 + p.y, z: p.z }));
-        image[0] = { x: 0.5, y: 0.55, z: 0 };
-        image[5] = { x: 0.45, y: 0.475, z: 0 };
-        image[17] = { x: 0.55, y: 0.475, z: 0 };
-        window.handTest.emit({ landmarks: [], hands: [image], handWorldLandmarks: [world], handedness: ['Right'],
-          timestamp, width: 640, height: 480 });
-      }, { timestamp, degrees });
+        if (document.querySelector('.pose-camera-mirror').classList.contains('mirrored')) x = 1 - x;
+        const world = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }));
+        const positions = gesture === 'triple' ? [[-.003, 0], [.003, 0], [0, .004]]
+          : gesture === 'pinch' ? [[-.003, 0], [.003, 0], [.04, -.04]] : [[-.03, .02], [0, -.04], [.03, .02]];
+        [4, 8, 12].forEach((i, j) => {
+          const [px, py] = positions[j]; const a = angle * Math.PI / 180, t = tilt * Math.PI / 180;
+          const tx = px * Math.cos(a) - py * Math.sin(a), ty = px * Math.sin(a) + py * Math.cos(a);
+          world[i] = { x: tx, y: ty * Math.cos(t), z: ty * Math.sin(t) };
+        });
+        const image = world.map(p => ({ x: x + p.x, y: cy + p.y, z: p.z }));
+        image[0] = { x, y: cy + .05, z: 0 }; image[5] = { x: x - .05, y: cy - .025, z: 0 }; image[17] = { x: x + .05, y: cy - .025, z: 0 };
+        window.handTest.emit({ landmarks: [], hands: [image], handWorldLandmarks: [world], handedness: ['Right'], timestamp, width: 640, height: 480 });
+      }, { timestamp, options });
+      timestamp += 100;
     }
-    await emit(0, 0);
-    const original = await canvas.screenshot();
-    const axisLabels = () => page.locator('.hand-cube-axis-label').evaluateAll(labels => labels.map(label => [label.style.left, label.style.top]));
-    const initialLabels = await axisLabels();
-    await emit(67, 10);
-    await page.getByRole('status').filter({ hasText: 'Controlling cube' }).waitFor();
-    const turned = await canvas.screenshot();
-    assert.equal(turned.equals(original), false, 'An accepted rotation must change actual rendered pixels');
-    const turnedLabels = await axisLabels();
-    assert.notDeepEqual(turnedLabels, initialLabels, 'Axis labels follow the rotating coordinate frame');
-    await emit(134, 100);
-    await page.getByRole('status').filter({ hasText: 'Movement ignored' }).waitFor();
-    assert.equal((await canvas.screenshot()).equals(turned), true, 'Fast reset must not rotate the cube');
-    assert.deepEqual(await axisLabels(), turnedLabels, 'Reset freezes the axes too');
-    await emit(201, 105);
-    await page.getByRole('status').filter({ hasText: 'Controlling cube' }).waitFor();
-    assert.equal((await canvas.screenshot()).equals(turned), false, 'The very next slow observation must rotate, without a stillness period');
+    const geometry = () => page.locator('.figure-wireframe g[data-edge]').evaluateAll(edges => edges.map(edge => edge.outerHTML).join(''));
+    await emit({ target: 'Cube' }); await emit({ target: 'Cube', gesture: 'pinch' });
+    await page.locator('.figure-wireframe').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Cube', exact: true }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('.figure-tick').count(), 12);
+    assert.equal(await page.locator('.figure-vertex-label').allTextContents().then(labels => labels.sort().join('')), 'ABCDEFGH');
+    assert.equal(await page.locator('.figure-hidden-edge').first().evaluate(e => getComputedStyle(e).opacity), '0.3');
+    await emit(); await emit(); const original = await geometry();
+    await emit({ tilt: 15 }); assert.notEqual(await geometry(), original, 'Tilt itself rotates the figure');
+    const tilted = await geometry();
+    await emit({ tilt: 105 }); assert.equal(await geometry(), tilted, 'Fast full-plane rotation is ignored');
+    await emit({ tilt: 110 }); assert.notEqual(await geometry(), tilted, 'Next slower increment resumes immediately');
+    await emit({ gesture: 'triple', y: .85 }); await emit({ gesture: 'triple', y: .85 });
+    for (let i = 1; i <= 10; i++) await emit({ gesture: 'triple', y: .85 - i * .05 });
+    assert.equal(await page.locator('.figure-length-label').textContent(), 'AB = 4 units');
+    await emit({ gesture: 'triple', y: .4 });
+    const savedLength = await page.locator('.figure-length-label').textContent();
+    assert.notEqual(savedLength, 'AB = 4 units', 'Downward reversal responds immediately at the upper limit');
+    await emit({ target: 'Pyramid' }); await emit({ target: 'Pyramid' }); await emit({ target: 'Pyramid', gesture: 'pinch' });
+    assert.equal(await page.getByRole('button', { name: 'Pyramid', exact: true }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('.figure-vertex-label').count(), 5); assert.equal(await page.locator('.figure-tick').count(), 8);
+    assert.equal(await page.locator('.figure-length-label').textContent(), 'AB = 1 unit');
+    await page.getByRole('button', { name: 'Cube', exact: true }).focus(); await page.keyboard.press('Enter');
+    assert.equal(await page.locator('.figure-length-label').textContent(), savedLength, 'Keyboard selection restores saved size');
+    await page.evaluate(() => { window.visibilityTestStream = document.querySelector('video').srcObject; });
+    for (const [cameraVisible, wireframeVisible] of [[true, true], [true, false], [false, true], [false, false]]) {
+      for (const [name, visible] of [['Camera visibility', cameraVisible], ['Wireframe visibility', wireframeVisible]]) {
+        const button = page.getByRole('button', { name, exact: true });
+        if ((await button.getAttribute('aria-pressed')) !== String(visible)) await button.click();
+      }
+      assert.equal(await page.locator('.pose-camera-mirror > video').evaluate(e => getComputedStyle(e).visibility), cameraVisible ? 'visible' : 'hidden');
+      assert.equal(await page.locator('.pose-camera-mirror > svg').evaluate(e => getComputedStyle(e).visibility), wireframeVisible ? 'visible' : 'hidden');
+      assert.equal(await page.locator('.figure-wireframe').isVisible(), true, 'The geometric figure remains visible in every mode');
+      assert.equal(await page.evaluate(() => document.querySelector('video').srcObject === window.visibilityTestStream
+        && window.visibilityTestStream.getVideoTracks().every(t => t.readyState === 'live')), true, 'Visibility never replaces/stops capture');
+      await emit({ tilt: 10 }); const before = await geometry();
+      await emit({ tilt: 20 }); assert.notEqual(await geometry(), before, 'Gesture rotation works in all four visibility combinations');
+    }
+    for (const themeId of ['mofacts-default', 'dark-industrial']) {
+      const theme = JSON.parse(fs.readFileSync(path.join(app, `public/themes/${themeId}.json`), 'utf8'));
+      await page.evaluate(properties => {
+        for (const [name, value] of Object.entries(properties)) document.documentElement.style.setProperty(`--${name.replaceAll('_', '-')}`, String(value));
+      }, theme.properties);
+      await page.mouse.move(0, 0);
+      await page.waitForFunction(() => {
+        const probe = document.createElement('div'); probe.style.backgroundColor = 'var(--app-primary-action-surface-color)';
+        probe.style.color = 'var(--app-primary-action-text-color)'; document.body.append(probe);
+        const button = getComputedStyle(document.querySelector('.skeleton-demo-controls .btn-primary'));
+        const expected = getComputedStyle(probe);
+        const ready = button.backgroundColor === expected.backgroundColor && button.color === expected.color;
+        probe.remove(); return ready;
+      });
+      const themed = await page.evaluate(() => {
+        const probe = document.createElement('div'); probe.style.backgroundColor = 'var(--learning-card-surface-color)';
+        probe.style.borderRadius = 'var(--app-border-radius-lg)'; probe.style.color = 'var(--app-accent-color)'; document.body.append(probe);
+        const expected = getComputedStyle(probe);
+        const result = { cards: [...document.querySelectorAll('.skeleton-demo .card')].every(card =>
+          getComputedStyle(card).backgroundColor === expected.backgroundColor && getComputedStyle(card).borderRadius === expected.borderRadius),
+          edges: getComputedStyle(document.querySelector('.figure-wireframe line')).stroke === expected.color };
+        probe.remove(); return result;
+      });
+      assert.equal(themed.cards, true, `${themeId}: shared card colors and radius`);
+      assert.equal(themed.edges, true, `${themeId}: figure follows theme accent`);
+      await page.screenshot({ path: path.join(app, `../tmp/skeleton-demo-${themeId}.png`), fullPage: true });
+    }
+    const preserved = await geometry();
+    await page.getByRole('button', { name: 'Stop camera', exact: true }).click();
+    assert.equal(await geometry(), preserved, 'Stopping retains figure state');
+    await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Looking for a person' }).waitFor();
     await page.evaluate(() => {
-      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange'));
     });
     await page.getByRole('button', { name: 'Start camera', exact: true }).waitFor();
     assert.equal(await page.locator('video').evaluate(video => video.srcObject), null);
-    const stopped = await canvas.screenshot();
-    await emit(1100, 0);
-    assert.equal((await canvas.screenshot()).equals(stopped), true, 'Stopped tracking cannot rotate');
-    await page.evaluate(() => window.fixture.destroy());
-    assert.equal(await page.locator('.hand-cube-overlay canvas').count(), 0);
+    await emit({ tilt: 15 }); assert.equal(await geometry(), preserved, 'Hidden/stopped callbacks cannot change figures');
+    await page.evaluate(() => window.fixture.destroy()); assert.equal(await page.locator('.figure-overlay').count(), 0);
     assert.deepEqual(errors, []);
-
-    // Unsupported graphics is an explicit failure before any camera acquisition.
-    await page.addInitScript(() => {
-      const original = HTMLCanvasElement.prototype.getContext;
-      HTMLCanvasElement.prototype.getContext = function(type, ...args) {
-        return type.startsWith('webgl') ? null : original.call(this, type, ...args);
-      };
-    });
-    await page.reload();
-    await page.evaluate(() => window.fixture.mount());
-    await page.getByRole('alert').filter({ hasText: '3D cube is unavailable' }).waitFor();
+    failRenderer = true; await page.reload(); await page.evaluate(() => window.fixture.mount());
+    await page.getByRole('alert').filter({ hasText: '3D figures are unavailable' }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Start camera', exact: true }).isDisabled(), true);
     await page.evaluate(() => window.fixture.destroy());
   } finally {
-    await browser.close();
-    assert.equal(path.dirname(directory), path.resolve(app, '../tmp'));
-    fs.rmSync(directory, { recursive: true, force: true });
+    await browser.close(); assert.equal(path.dirname(directory), path.resolve(app, '../tmp')); fs.rmSync(directory, { recursive: true, force: true });
   }
 });
