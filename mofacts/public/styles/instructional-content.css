@@ -134,6 +134,7 @@
     border: 0;
     background: transparent;
     overflow-y: auto;
+    scrollbar-gutter: stable;
     overflow-anchor: none;
     box-sizing: border-box;
   }
@@ -144,6 +145,19 @@
     gap: inherit;
     flex: 0 0 auto;
     min-width: 0;
+  }
+
+  .sparc-restoring-dialogue { visibility: hidden; }
+  .sparc-restore-status {
+    position: absolute;
+    margin: 0;
+  }
+
+  .sparc-dialogue-turn-label {
+    margin: 0;
+    font-size: var(--app-font-size-base);
+    font-weight: var(--app-font-weight-semibold);
+    color: var(--app-secondary-text-color);
   }
 
   .sparc-auto-tutor-pending-turn {

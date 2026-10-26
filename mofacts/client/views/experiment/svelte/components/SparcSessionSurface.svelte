@@ -20,6 +20,7 @@
   import { readSparcResumeSnapshot } from '../services/sparcRuntimeState';
   import { isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
   import { projectSparcInstructionMessages } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';
+  import { SPARC_FEEDBACK_MOVE_DEFINITION } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
   import { commitSparcProductionRuleAction } from '../services/sparcProductionRuleActionCommit';
   import { buildSparcBoxedNodeGroups } from '../../../../../../learning-components/trial-displays/sparc/sparcBoxLayout';
   import {
@@ -111,6 +112,10 @@
   let dialogueInitialized = false;
   let checkedContentIds = new Set(), removedContentIds = new Set(), removalSignature = '', removalError = '';
   let figureReadyKeys = new Set();
+  let figureFailedKeys = new Set();
+  let initialPresentationComplete = false;
+  let restoringDialogue = false;
+  let restoreRevealPending = false;
   let readinessScope = '';
   let dialogueScroll;
 
@@ -119,6 +124,11 @@
       if (!mounted || scope !== dialogueScope) return;
       if (!savedDialogueMessages.some(node => node.id === figureId && node.figure?.assetId === assetId)) return;
       const key = JSON.stringify([scope, figureId, assetId]);
+      if (figureFailedKeys.has(key) !== (status === 'failed')) {
+        const failed = new Set(figureFailedKeys);
+        if (status === 'failed') failed.add(key); else failed.delete(key);
+        figureFailedKeys = failed;
+      }
       if (figureReadyKeys.has(key) === (status === 'ready')) return;
       const next = new Set(figureReadyKeys);
       if (status === 'ready') next.add(key); else next.delete(key);
@@ -129,6 +139,25 @@
   function componentReady(node, scope, readyKeys) {
     return node.administrativeRemoval || node.primitiveReference?.priorNodeId || !node.figure
       || readyKeys.has(JSON.stringify([scope, node.id, node.figure.assetId]));
+  }
+
+  async function revealInitialPresentation(scope) {
+    restoreRevealPending = true;
+    // Let the decoded figures, released questions, menus and scroll owner lay
+    // out before exposing a restored conversation. Do not remount its images.
+    await tick();
+    await new Promise(resolve => window.requestAnimationFrame(resolve));
+    if (!mounted || scope !== dialogueScope) return;
+    if (!initialPresentationSettled) {
+      restoreRevealPending = false;
+      return;
+    }
+    initialPresentationComplete = true;
+    restoringDialogue = false;
+    restoreRevealPending = false;
+    await tick();
+    const control = surfaceElement?.querySelector('.sparc-auto-tutor-input-bar textarea, .sparc-auto-tutor-input-bar input');
+    if (dialogueScroll?.isFollowing()) focusDialogueControl(control);
   }
   async function checkContentRemovals(ids, signature) {
     const unchecked = ids.filter(id => !checkedContentIds.has(id));
@@ -158,6 +187,9 @@
     dialogueSubmitErrorDetail = '';
     const timestamp = Date.now();
     try {
+      restoringDialogue = !initialPresentationComplete && readSparcResumeSnapshot({
+        userId, TDFId: tdfId, levelUnit, pageKey: currentDisplay.pageKey, display: currentDisplay,
+      }).retainedHistoryRecords.length > 0;
       const provider = createSparcDialogueOpenRouterProvider({ readingLevel: resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel), onActivity: activity => { if (mounted && dialogueScope === scope) reportDialogueActivity(activity); }, ...(isSparcCategorizedPolicy(currentDisplay.instructionalController?.policyId) ? { moveLibrary: sparcMoveLibraryClient } : {}), policyId: currentDisplay.instructionalController.policyId,
         tdfId, sessionId: openRouterSession.sessionIdForScope({ tdfId, attemptId, pageKey: currentDisplay.pageKey }) });
       await Promise.all([provider.prepareAssessment(currentDisplay), prepareSparcPracticeRetrieval(resolveSparcReadingLevel(engine.curUnit.sparcsession.readingLevel),
@@ -846,6 +878,21 @@
     ].join(':')).join('|');
   }
 
+  // Feedback closes the instructional turn; its response event also owns the
+  // next instruction, so event IDs alone are not learner-facing turn boundaries.
+  function dialogueTurnStarts(messages) {
+    const starts = new Map();
+    let number = 1;
+    let start = true;
+    for (const node of messages) {
+      if (node.groupType === 'button-group' && !node.children?.length) continue;
+      if (start) starts.set(node.id, number);
+      start = node.action === SPARC_FEEDBACK_MOVE_DEFINITION.moveId;
+      if (start) number++;
+    }
+    return starts;
+  }
+
   function focusTextResponse(element) {
     tick().then(() => {
       if (!element.isConnected || !dialogueScroll?.isFollowing()) return;
@@ -873,10 +920,9 @@
     const summary = viewport.parentElement.querySelector('.sparc-auto-tutor-progress-popout > summary');
     let clearance = 0;
     let observedRow;
-    let frame;
     const fit = () => {
-      frame = undefined;
-      const first = content.firstElementChild;
+      const first = content.firstElementChild?.matches('.sparc-dialogue-turn-label')
+        ? content.firstElementChild.nextElementSibling : content.firstElementChild;
       const row = first?.matches('.sparc-student-move-history') ? first.querySelector('.sparc-student-menu-size') : null;
       if (row !== observedRow) {
         if (observedRow) observer.unobserve(observedRow);
@@ -898,18 +944,16 @@
         content.style.paddingBlockStart = `${clearance}px`;
       }
     };
-    const schedule = () => { if (frame === undefined) frame = window.requestAnimationFrame(fit); };
-    const observer = new ResizeObserver(schedule);
+    const observer = new ResizeObserver(fit);
     observer.observe(content);
     observer.observe(viewport);
     observer.observe(summary);
-    const children = new MutationObserver(schedule);
+    const children = new MutationObserver(fit);
     children.observe(content, { childList: true });
-    schedule();
+    fit();
     return { destroy() {
       observer.disconnect();
       children.disconnect();
-      if (frame !== undefined) window.cancelAnimationFrame(frame);
     } };
   }
 
@@ -971,6 +1015,10 @@
   $: if (readinessScope !== dialogueScope) {
     readinessScope = dialogueScope;
     figureReadyKeys = new Set();
+    figureFailedKeys = new Set();
+    initialPresentationComplete = false;
+    restoringDialogue = false;
+    restoreRevealPending = false;
     checkedContentIds = new Set();
     removedContentIds = new Set();
     removalError = '';
@@ -984,6 +1032,15 @@
   $: savedDialogueMessages = autoTutorDialogueMode ? dialogueNodes(topLevelNodes).map((node) => dialogueSubmitPending
     ? { ...node, readOnly: true, children: (node.children || []).map((child) => ({ ...child, readOnly: true })) } : node) : [];
   $: contentReferenceIds = sparcContentReferenceIds(savedDialogueMessages);
+  $: initialPresentationSettled = !!(removalError || dialogueSubmitError
+      || (!dialogueSubmitPending && savedDialogueMessages.length > 0
+        && contentReferenceIds.every(id => checkedContentIds.has(id))
+        && projectSparcAdministrativeRemovals(savedDialogueMessages, removedContentIds)
+          .every(node => componentReady(node, dialogueScope, figureReadyKeys)
+            || figureFailedKeys.has(JSON.stringify([dialogueScope, node.id, node.figure?.assetId])))));
+  $: if (mounted && !initialPresentationComplete && !restoreRevealPending && initialPresentationSettled) {
+    revealInitialPresentation(dialogueScope);
+  }
   $: contentReferenceSignature = JSON.stringify([dialogueScope, contentReferenceIds]);
   $: if (mounted && contentReferenceSignature !== removalSignature) {
     removalSignature = contentReferenceSignature;
@@ -1000,6 +1057,7 @@
   $: currentQuestionVisible = !latestDialogueQuestion || autoTutorDialogueMessages.flatMap(node => node.children || [node])
     .some(node => node.id === latestDialogueQuestion.id && componentReady(node, dialogueScope, figureReadyKeys));
   $: autoTutorDialogueSignature = buildAutoTutorDialogueSignature(autoTutorDialogueMessages);
+  $: autoTutorTurnStarts = categorizedDialogue ? dialogueTurnStarts(autoTutorDialogueMessages) : new Map();
   $: if (
     autoTutorDialogueMode
     && autoTutorDialogueSignature !== observedAutoTutorDialogueSignature
@@ -1034,20 +1092,26 @@
       </div>
     </header>{/if}
     <SparcAutoTutorProgress snapshot={autoTutorProgressSnapshot} />
+    {#if restoringDialogue}<p class="sparc-restore-status" role="status">{platformText('common.loading')}</p>{/if}
 
     {#key dialogueScope}
     <section
       class="sparc-auto-tutor-chat"
+      class:sparc-restoring-dialogue={restoringDialogue}
+      inert={restoringDialogue}
       aria-label={platformText('autoTutor.conversation')}
-      aria-busy={dialogueSubmitPending}
+      aria-busy={dialogueSubmitPending || restoringDialogue}
       use:followDialogue
     >
       <div class="sparc-auto-tutor-content" use:keepHistoryClearOfProgress>
       {#if removalError}<p role="alert">{removalError}</p>{/if}
       {#each autoTutorDialogueMessages as node, index (node.id)}
+        {#if autoTutorTurnStarts.has(node.id)}
+          <h2 class="sparc-dialogue-turn-label">{platformText('autoTutor.turnLabel', { count: autoTutorTurnStarts.get(node.id) })}</h2>
+        {/if}
         <SparcNode
           {node}
-          showDialogueSpeaker={index === 0 || (node.speaker === 'learner') !== (autoTutorDialogueMessages[index - 1].speaker === 'learner')}
+          showDialogueSpeaker={autoTutorTurnStarts.has(node.id) || index === 0 || (node.speaker === 'learner') !== (autoTutorDialogueMessages[index - 1].speaker === 'learner')}
           {adminDiagnosticMode}
           {nodeValues}
           {learningProgressSnapshot}

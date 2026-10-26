@@ -70,6 +70,26 @@ it('groups speaker labels and shows zero-height-cost admin diagnostics on hover,
     await page.evaluate(() => window.fixture.update({ adminDiagnosticMode: false }));
     assert.equal(await page.locator('.sparc-production-marker').count(), 0);
     assert.deepEqual(errors, []);
+    await page.evaluate(async () => {
+      const message = (id, speaker, action) => ({ id, speaker, action,
+        nodeType: 'atomic', atomType: 'dialogue-utterance', value: id });
+      const nodes = [message('opening', 'tutor'), message('answer1', 'learner'),
+        message('feedback1', 'tutor', 'instruction.feedback'), message('next', 'tutor'),
+        message('answer2', 'learner'), message('feedback2', 'tutor', 'instruction.feedback')];
+      window.fixture.turnDisplay = { unitType: 'sparc-autotutor-dialogue', pageKey: 'turns',
+        instructionalController: { policyId: 'dynamic-instruction-agent-v2' }, nodes };
+      await window.fixture.mount({ display: window.fixture.turnDisplay });
+    });
+    assert.deepEqual(await page.locator('.sparc-dialogue-turn-label').allTextContents(), ['Turn 1', 'Turn 2']);
+    const order = await page.locator('.sparc-auto-tutor-content').evaluate(element =>
+      [...element.children].map(child => child.matches('h2') ? child.textContent : child.dataset.nodeId).filter(Boolean));
+    assert.deepEqual(order, ['Turn 1', 'opening', 'answer1', 'feedback1', 'Turn 2', 'next', 'answer2', 'feedback2']);
+    await page.evaluate(async () => {
+      await window.fixture.destroy();
+      await window.fixture.mount({ display: window.fixture.turnDisplay });
+    });
+    assert.deepEqual(await page.locator('.sparc-dialogue-turn-label').allTextContents(), ['Turn 1', 'Turn 2']);
+    assert.deepEqual(errors, []);
   } finally {
     await browser.close();
     fs.rmSync(fixture.directory, { recursive: true, force: true });

@@ -280,6 +280,23 @@ follow the bottom while the learner remains within 48 CSS pixels of it. Scrollin
 farther up preserves reading position and keyboard focus until the learner returns
 to the bottom. Resize observers and queued scroll updates are released on unmount.
 
+Categorized SPARC conversations display localized **Turn 1**, **Turn 2**, and later
+headings. Feedback ends the preceding turn; the next instruction or student choice
+starts the next turn. These headings are derived from the displayed sequence and
+do not change stored events or assessment counts. Completed feedback does not create
+an empty trailing turn. Scrollbar space is reserved to avoid width changes, and
+resize-driven following and Progress clearance are applied before paint rather than
+deferred to another animation frame.
+
+On resume, the retained-history snapshot marks the initial conversation as restoring.
+The surface mounts it hidden and inert while administrative content checks and saved
+image decoding settle, then reveals the same mounted nodes after layout. This avoids
+flashing unchecked answers and repeatedly expanding old figures. The existing loading
+status remains visible during preparation; check and initialization errors are exposed
+inline, and failed figures settle as inline errors without releasing their questions.
+This gate applies only to the initial restore, not progressive tutor output. Desktop
+and mobile delayed-check/image coverage is in `scripts/sparcRestoreLayoutBrowser.test.cjs`.
+
 Local regression commands from `mofacts/`: `node --test scripts/sparcDialogueScroll.test.cjs`,
 `node --conditions=browser --test scripts/sparcOutputLimitSurface.test.cjs`, and
 `node --test scripts/sparcReadingOrderBrowser.test.cjs`. The browser test requires the

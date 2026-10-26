@@ -23,7 +23,7 @@ async function buildFixture({ captureSubmissions = false } = {}) {
     };`);
   stub('sparcControllerDialogueOpenRouter', 'export const createSparcDialogueOpenRouterProvider = () => ({ prepareAssessment: async () => {} });');
   stub('sparcOpenRouterSession', "export const createSparcOpenRouterSession = () => ({ sessionIdForScope: () => 'synthetic' });");
-  stub('sparcRuntimeState', 'export const readSparcResumeSnapshot = () => ({ nodeValues: {} });');
+  stub('sparcRuntimeState', 'export const readSparcResumeSnapshot = () => ({ nodeValues: {}, retainedHistoryRecords: window.fixture.historyRecords || [] });');
   stub('sparcProductionRuleActionCommit', "export const commitSparcProductionRuleAction = () => { throw Error('Unexpected production action'); };");
   stub('sparcAutoTutorProgress', `export const buildSparcAutoTutorProgressSnapshot = () => ({ completed: false, turnCount: 0, coveredExpectations: 0,
     requiredExpectations: 1, misconceptionScore: 0, totalMisconceptions: 0 });

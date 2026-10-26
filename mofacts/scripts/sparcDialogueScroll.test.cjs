@@ -25,7 +25,8 @@ it('follows additions and resizes without redefining manual scroll intent, and r
   try {
     const scroll = createSparcDialogueScroll(viewport, {});
     flush(); assert.equal(top, 700);
-    viewport.scrollHeight += 200; resize(); flush(); assert.equal(top, 900);
+    viewport.scrollHeight += 200; resize(); assert.equal(top, 900, 'Resize follows before the next animation frame');
+    flush(); assert.equal(top, 900);
     viewport.scrollTop = 400; listeners.get('scroll')();
     assert.equal(scroll.isFollowing(), false);
     viewport.scrollHeight += 500; resize(); scroll.schedule(); flush(); assert.equal(top, 400);
