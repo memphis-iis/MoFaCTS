@@ -1,5 +1,4 @@
 import { modelPracticeHistorySelector } from '../common/historyEnvelope';
-import './lib/sparcRetrievalPublication';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
 import {

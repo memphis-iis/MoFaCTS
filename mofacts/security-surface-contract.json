@@ -100,12 +100,12 @@
     {
       "name": "callResolvedOpenRouterEmbeddings",
       "access": "role-checked",
-      "notes": "Existing authenticated secret-bearing embedding proxy. Releases the DDP method queue after authentication, quota, credential and model checks so independent browser calls can overlap. Query caches and similarity search stay in the browser."
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     },
     {
       "name": "callResolvedOpenRouterJson",
       "access": "role-checked",
-      "notes": "Competitive and student-selected AutoTutor policy requests additionally require the admin role; authorized requests release the DDP queue so feedback and instruction may overlap."
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     },
     {
       "name": "cancelPackageUpload",
@@ -239,13 +239,13 @@
     },
     {
       "name": "generateSparcPromptImage",
-      "access": "admin-only",
-      "notes": "Private incomplete supported-prompt images. Requires bounded display width and preserves per-user ownership. Complete teaching visuals use resolveSparcVisualSupport."
+      "access": "role-checked",
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     },
     {
       "name": "resolveSparcVisualSupport",
-      "access": "admin-only",
-      "notes": "Accepts one browser-selected image/video at shared 0.95 threshold or independently generates an image. Exact-ID resource access, durable decisions and secret-bearing provider calls only; no server search or practice locks."
+      "access": "role-checked",
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     },
     {
       "name": "getAccessableTDFSForUser",
@@ -448,8 +448,8 @@
     },
     {
       "name": "getSparcPromptImage",
-      "access": "admin-only",
-      "notes": "Reads owned historical assets or completed canonical shared teaching-library assets, including older versions for repository inspection and saved history. Generic downloads remain blocked; no library embeddings or learner decision records are returned."
+      "access": "role-checked",
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     },
     {
       "name": "listSparcLibraryImages",
@@ -997,13 +997,13 @@
     },
     {
       "name": "lookupSparcPrimitive",
-      "access": "admin-only",
-      "notes": "Persists the browser-selected maximum or its independent generation request; exact-ID content retrieval and category validation only, including complete matched instruction pairs. No server vector search, novelty checks, leases, or embedding API calls."
+      "access": "role-checked",
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     },
     {
       "name": "publishSparcPrimitive",
-      "access": "admin-only",
-      "notes": "Existing authorization and payload validation retained; the browser computes embeddings for publication without storing them in learner checkpoints."
+      "access": "role-checked",
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     },
     {
       "name": "reviseSparcPrimitive",
@@ -1031,8 +1031,8 @@
     },
     {
       "name": "getSparcAdministrativeRemovals",
-      "access": "admin-only",
-      "notes": "Admin authorization precedes at most 100 exact-ID receipt lookups; returns removed IDs only, never content or learner records."
+      "access": "role-checked",
+      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
     }
   ],
   "publications": [
@@ -1154,8 +1154,8 @@
     },
     {
       "name": "sparcRetrievalEmbeddings",
-      "access": "admin-only",
-      "notes": "Live browser-owned retrieval index. Authenticated admins only; category filters (including instruction support type) run in the database and publish IDs and embedding vectors only. No content, media, learner evidence, API keys, server ranking, or generated caches."
+      "access": "role-checked",
+      "notes": "Lesson-authorized ID/vector-only runtime cache; admin author testing retained. Requires current lesson identity for non-admin accounts. No instructional content, credentials or learner records."
     }
   ],
   "httpRoutes": [

@@ -9,7 +9,7 @@ import { sparcLibraryMinimumSimilarity } from '../../../../../../learning-compon
 
 export async function readSparcAdministrativeRemovals(ids: string[], tdfId: string | null): Promise<string[]> {
   try {
-    return await Meteor.callAsync('getSparcAdministrativeRemovals', ids);
+    return await Meteor.callAsync('getSparcAdministrativeRemovals', ids, tdfId);
   } catch (error) {
     const value = error && typeof error === 'object' ? error as Record<string, unknown> : {};
     const safe = (text: unknown, limit: number) => redactSparcDialogueDiagnosticText(String(text ?? '')).replace(/\s+/g, ' ').slice(0, limit);

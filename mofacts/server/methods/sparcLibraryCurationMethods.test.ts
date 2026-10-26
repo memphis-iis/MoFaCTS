@@ -8,9 +8,14 @@ describe('Instructional library deletion authorization', () => {
       remove: async () => { throw new Error('Storage must not be reached'); },
       removed: async () => { throw new Error('Storage must not be reached'); },
     });
-    for (const method of Object.values(methods)) for (const userId of [null, 'student']) {
-      await assert.rejects((method as (...args: unknown[]) => Promise<unknown>).call({ userId }), /Must be logged in|Permission denied/);
+    for (const userId of [null, 'student']) {
+      const denied = (error: unknown) => (error as { error?: unknown }).error === (userId ? 403 : 401);
+      await assert.rejects(methods.deleteSparcInstructionalComponent.call({ userId }, 'item'), denied);
+      await assert.rejects(methods.getSparcAdministrativeRemovals.call({ userId }, ['item'], 'private-lesson'), denied);
     }
+    // A missing execution scope is a distinct invalid request, still before storage.
+    await assert.rejects(methods.getSparcAdministrativeRemovals.call({ userId: 'student' }, ['item']),
+      (error: unknown) => (error as { error?: unknown }).error === 400);
   });
   it('accepts exact component IDs and bounds batched receipt reads', async () => {
     const removed: string[] = [];

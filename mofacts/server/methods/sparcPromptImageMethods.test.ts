@@ -108,7 +108,7 @@ describe('SPARC private supported Prompt image contracts', () => {
   it('checks authorization and raster signatures before revision', async () => {
     const library = sparcLibraryFixture(); const f = fixture(library.store);
     const upload = { assetId: 'missing', description: 'Corrected figure.', mediaType: 'image/png', base64: png };
-    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'student' }, upload), /Permission denied/);
+    await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'student' }, upload), /Permission denied|Reopen this lesson|do not have access/);
     await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, { ...upload, mediaType: 'image/svg+xml' }), /raster/);
     await assert.rejects(f.methods.replaceSparcLibraryImage.call({ userId: 'admin' }, upload), /not found/);
   });
@@ -139,7 +139,7 @@ describe('SPARC private supported Prompt image contracts', () => {
     assert.equal(last.images.length, 1); assert.equal(last.nextCursor, null);
     const raster = await f.methods.getSparcPromptImage.call({ userId: 'admin' }, first.images[0]!.assetId);
     assert.ok(raster.dataUrl!.startsWith('data:image/png;base64,'));
-    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'student' }), /Permission denied/);
+    await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'student' }), /Permission denied|Reopen this lesson|do not have access/);
     await assert.rejects(f.methods.listSparcLibraryImages.call({}), /logged in/);
     await assert.rejects(f.methods.listSparcLibraryImages.call({ userId: 'admin' }, { afterId: '$invalid' }), /Invalid image cursor/);
     assert.equal(f.providerCalls(), 0);
@@ -163,13 +163,13 @@ describe('SPARC private supported Prompt image contracts', () => {
     assert.equal(library.decisions.size, 2);
     const shared = await f.methods.getSparcPromptImage.call({ userId: 'otherAdmin' }, first.figure.assetId);
     assert.ok(shared.dataUrl!.startsWith('data:image/png;base64,'));
-    await assert.rejects(f.methods.getSparcPromptImage.call({ userId: 'student' }, first.figure.assetId), /Permission denied/);
-    await assert.rejects(f.methods.resolveSparcVisualSupport.call({ userId: 'student' }, teaching), /Permission denied/);
+    await assert.rejects(f.methods.getSparcPromptImage.call({ userId: 'student' }, first.figure.assetId), /Permission denied|Reopen this lesson|do not have access/);
+    await assert.rejects(f.methods.resolveSparcVisualSupport.call({ userId: 'student' }, teaching), /Permission denied|Reopen this lesson|do not have access/);
   });
 
   it('blocks unauthorized generation before calling the provider', async () => {
     const f = fixture();
-    await assert.rejects(f.methods.generateSparcPromptImage.call({ userId: 'student' }, request), /Permission denied/);
+    await assert.rejects(f.methods.generateSparcPromptImage.call({ userId: 'student' }, request), /Permission denied|Reopen this lesson|do not have access/);
     assert.equal(f.providerCalls(), 0);
     assert.equal(f.assets.size, 0);
     assert.equal(allowsGenericSparcImageDownload({ meta: { uploadPurpose: SPARC_PROMPT_IMAGE_PURPOSE } }), false);

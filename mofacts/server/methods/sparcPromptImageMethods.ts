@@ -1,3 +1,4 @@
+import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
 import { Meteor } from 'meteor/meteor';
 import { createHash, randomBytes } from 'crypto';
 import fs from 'fs/promises';
@@ -17,6 +18,7 @@ import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/
 
 type Asset = { _id: string; path?: string; type?: string; meta: Record<string, any> };
 type Deps = {
+  assertPublicDemoAiQuota?: (userId: string, clientAddress: string) => Promise<void>;
   getApiKeyResolutionDeps: () => ApiKeyResolutionDeps;
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
   DynamicAssets: {
@@ -33,7 +35,7 @@ type Deps = {
   isRemoved: (id: string) => Promise<boolean>;
   figureLibrary?: SparcFigureLibraryStore;
 };
-type Context = { userId?: string | null; unblock?: () => void };
+type Context = { userId?: string | null; unblock?: () => void; connection?: { clientAddress?: string | null } | null };
 type ImageRequest = { tdfId: string; sessionId: string; generationId: string; tutorMessage: string;
   imagePrompt: string; figureDescription: string; displayWidth: number; situation?: SparcInstructionalNeed; selection?: SparcRetrievalSelection; embedding?: number[]; language?: string };
 function bounded(value: unknown, label: string, max: number): string {
@@ -46,7 +48,7 @@ function instructionalText(value: unknown, label: string): string {
 }
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 
-/** Admin experiment only. Teaching-library assets are shared; other session assets retain ownership. */
+/** Lesson-authorized runtime; administrative inspection and revisions stay admin-only. */
 export function createSparcPromptImageMethods(deps: Deps) {
   const authorize = (context: Context) => requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId: context.userId, roles: ['admin'] });
   const findOwned = (assetId: string, userId: string) => deps.DynamicAssets.collection.findOneAsync({ _id: assetId, userId, 'meta.uploadPurpose': PURPOSE, 'meta.public': false });
@@ -93,7 +95,8 @@ export function createSparcPromptImageMethods(deps: Deps) {
     ...(!reused ? { usage: asset.meta.usage } : {}),
   });
   const generate = async (context: Context, params: ImageRequest, visual: boolean) => {
-      const userId = await authorize(context);
+      const userId = await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), context.userId, params?.tdfId);
+      await deps.assertPublicDemoAiQuota?.(userId, String(context.connection?.clientAddress || 'unknown'));
       context.unblock?.();
       if (visual && params?.situation === undefined) throw new Meteor.Error(400, 'Visual support requires the instructional need and visual brief');
       if (visual && !params.situation?.illustrationBrief) throw new Meteor.Error(400, 'Visual support requires a visual brief in its embedding input');
@@ -191,8 +194,8 @@ export function createSparcPromptImageMethods(deps: Deps) {
     async resolveSparcVisualSupport(this: Context, params: ImageRequest & { situation: SparcInstructionalNeed }) {
       return generate(this, params, true);
     },
-    async getSparcPromptImage(this: Context, assetIdValue: string) {
-      const userId = await authorize(this);
+    async getSparcPromptImage(this: Context, assetIdValue: string, tdfId?: string) {
+      const userId = await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), this.userId, tdfId);
       const assetId = bounded(assetIdValue, 'Image asset identity', 20);
       if (!/^[a-zA-Z0-9]+$/.test(assetId)) throw new Meteor.Error(400, 'Invalid image asset identity');
       if (await deps.isRemoved(assetId)) return { administrativeRemoval: true as const };

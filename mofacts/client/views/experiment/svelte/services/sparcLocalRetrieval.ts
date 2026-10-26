@@ -1,3 +1,4 @@
+import { Session } from 'meteor/session';
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
 import { Tracker } from 'meteor/tracker';
@@ -8,6 +9,7 @@ import type { SparcReadingLevel } from '../../../../../../learning-components/ru
 
 type RetrievalDependencies = {
   userId(): string | null;
+  tdfId?(): string | null;
   autorun(effect: () => void): unknown;
   subscribe(name: string, category: SparcRetrievalCategory, callbacks: { onReady(): void; onStop(error?: unknown): void }): { stop(): void };
   vectors: { find(selector: { _id: { $regex: string } }): { observeChanges(callbacks: {
@@ -22,11 +24,13 @@ export function createSparcLocalRetrieval(deps: RetrievalDependencies) {
   type CachedCategory = { index: SparcEmbeddingIndex; ready: Promise<void>; stop(): void; error?: unknown };
   const categories = new Map<string, CachedCategory>();
   let account: string | null = null;
+  let lesson: string | null = null;
   deps.autorun(() => {
     const current = deps.userId();
-    if (current !== account) {
+    const currentLesson = deps.tdfId?.() ?? null;
+    if (current !== account || currentLesson !== lesson) {
       for (const cache of categories.values()) { cache.stop(); cache.index.clear(); }
-      categories.clear(); account = current;
+      categories.clear(); account = current; lesson = currentLesson;
     }
   });
 
@@ -87,8 +91,8 @@ export function createSparcLocalRetrieval(deps: RetrievalDependencies) {
 let localRetrieval: ReturnType<typeof createSparcLocalRetrieval> | undefined;
 export async function prepareSparcLocalRetrieval(value: SparcRetrievalCategory): Promise<SparcEmbeddingIndex> {
   localRetrieval ??= createSparcLocalRetrieval({
-    userId: () => Meteor.userId(), autorun: effect => Tracker.autorun(effect),
-    subscribe: (name, category, callbacks) => Meteor.subscribe(name, category, callbacks),
+    userId: () => Meteor.userId(), tdfId: () => Session.get('currentTdfId') || null, autorun: effect => Tracker.autorun(effect),
+    subscribe: (name, category, callbacks) => Meteor.subscribe(name, category, Session.get('currentTdfId'), callbacks),
     vectors: new Mongo.Collection<{ _id: string; embedding: number[] }>(SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION),
   });
   return localRetrieval.prepareSparcLocalRetrieval(value);

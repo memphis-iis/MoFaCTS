@@ -59,3 +59,9 @@ Course Settings does not offer progress reset. The server also rejects a Practic
 ## Multiple-choice interaction
 
 Each new question starts with fresh answer buttons, so the previous answer's interaction highlight does not carry into the next question, even when the answer text repeats. Submitting an answer disables the current buttons without rebuilding or resizing them while the next question is prepared. The state machine's committed answer list owns this boundary; intermediate snapshots retain the active list. Hover highlighting applies only to hover-capable, fine pointers; touchscreen taps do not apply hover styling. Keyboard navigation and visible keyboard focus remain available.
+
+### Instructional policy execution
+
+Authorized learners may execute both dynamic-instruction policies without an administrator role. Runtime provider, retrieval, image and own-history boundaries verify lesson access using the existing enrollment/experiment resolver and durable assignment launch context. This does not grant administrative library access or access to other users' private assets or histories. Public demo accounts and directly provisioned participants in server-marked demo lessons expire after 24 hours and share the existing 60 AI calls/hour per-account and per-IP quota; ordinary enrolled learners are not classified as demos.
+
+Runtime failures end the loading overlay and show an inline retry message. The teacher-demo metadata repair is a separate dry-run-first operation in deploy/repair-teacher-demo-target.mongosh.js. The canonical package already has the launcher target; do not replace the installed lesson or its identity merely to repair this metadata.

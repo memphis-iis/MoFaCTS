@@ -1,4 +1,5 @@
-import { isSparcAdminPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
+import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
+import { isSparcAdminPolicy, isSparcCategorizedPolicy, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
 import {
@@ -639,8 +640,12 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
     callResolvedOpenRouterJson: async function(this: MethodContext, params: unknown) {
       const userId = requireAuthenticatedUser(this.userId, 'Must be logged in to call OpenRouter', 401);
       await deps.assertPublicDemoAiQuota(userId, String(this.connection?.clientAddress || 'unknown'));
-      if (isRecord(params) && isSparcAdminPolicy(params.policyId)) {
-        await requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId, roles: ['admin'], forbiddenMessage: 'Competitive and student-selected AutoTutor are restricted to admin accounts' });
+      if (isRecord(params) && (isSparcAdminPolicy(params.policyId) || params.policyId === SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID)) {
+        if (isSparcCategorizedPolicy(params.policyId) || params.policyId === SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID) {
+          await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), userId, params.tdfId);
+        } else {
+          await requireUserWithRoles(deps.getMethodAuthorizationDeps(), { userId, roles: ['admin'], forbiddenMessage: 'Retired instructional policies require administrator access' });
+        }
         // Independent feedback and instruction requests share one DDP connection.
         // Release its method queue only after the account/policy checks succeed.
         this.unblock?.();
@@ -684,6 +689,7 @@ export function createOpenRouterMethods(deps: OpenRouterMethodsDeps) {
       const data = params as UnknownRecord;
       const resolverDeps = deps.getApiKeyResolutionDeps();
       const tdfId = normalizeString(data.tdfId) || null;
+      await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), userId, tdfId);
       const keyResolution = await resolvePreferredApiKey(resolverDeps, {
         userId,
         tdfId,

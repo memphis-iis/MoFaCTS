@@ -40,15 +40,15 @@ function adminDeps(isAdmin = true, openRouterPrefixCachingEnabled?: boolean) {
 }
 
 describe('openRouterMethods Admin Tests configuration', function() {
-  it('rejects competitive AutoTutor provider requests before resolving a non-admin key', async function() {
+  it('rejects unauthorized dynamic instruction before resolving a lesson key', async function() {
     const methods = createOpenRouterMethods(adminDeps(false) as any);
     const unblock = sinon.spy();
     for (const policyId of ['dynamic-instruction-agent-v2', 'dynamic-instruction-student-v2']) {
       let error: any;
-      try { await methods.callResolvedOpenRouterJson.call({userId: 'learner', unblock}, {policyId}); }
+      try { await methods.callResolvedOpenRouterJson.call({userId: 'learner', unblock}, {policyId, tdfId: 'private-lesson'}); }
       catch (caught) { error = caught; }
       expect(error?.error).to.equal(403);
-      expect(error?.message).to.contain('admin');
+      expect(error?.message).to.contain('access');
     }
     expect(unblock.called).to.equal(false);
   });

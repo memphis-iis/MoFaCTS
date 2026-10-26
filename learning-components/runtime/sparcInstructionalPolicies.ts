@@ -16,12 +16,11 @@ export const SPARC_INSTRUCTIONAL_POLICY_IDS = [
   SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID,
 ] as const;
 
-/** Validate delivery access without substituting the authored instructional policy. */
-export function sparcPolicyForAccount(isAdmin: boolean, policyId: unknown): string {
+/** Preserve the authored policy. Authentication and lesson access are enforced by the app/server. */
+export function sparcPolicyForAccount(_isAdmin: boolean, policyId: unknown): string {
   if (!SPARC_INSTRUCTIONAL_POLICY_IDS.some((known) => known === policyId)) {
     throw new Error(`Unsupported AutoTutor instructional policy: ${policyId}`);
   }
-  if (!isAdmin && isSparcCategorizedPolicy(policyId)) throw new Error('Dynamic instruction requires an admin account');
   return policyId as string;
 }
 

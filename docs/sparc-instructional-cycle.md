@@ -123,7 +123,7 @@ structured publication-ticket contract together.
 This contract supersedes server candidate searches, question novelty rejection,
 video-first/image-second selection, and coordinated practice generation described below.
 The browser loads live category indexes before the first learner response. The
-authenticated admin-only `sparcRetrievalEmbeddings` publication projects only IDs and
+authenticated lesson-authorized `sparcRetrievalEmbeddings` publication projects only IDs and
 embedding vectors from indexed category selectors. These are DDP cache documents,
 not another stored library. Additions, vector changes and removals update the local
 index. Account changes stop subscriptions and clear their normalized vectors.
@@ -317,7 +317,7 @@ SPARC AutoTutor displays select one runtime-owned production set through
 | `dynamic-instruction-student-v2` | The same category-aware instructional alternatives with learner move selection. |
 
 Each session uses one effective policy. Legacy lessons retain their authored progressive
-policy for admins and non-admins. Categorized policies remain admin-only. Display
+policy for admins and non-admins. Categorized policies use server-verified lesson access for enrolled learners and demo participants. Administrative editing, curation, browsing and deletion remain admin-only. Display
 resolution and submission share the same access check without substituting a policy.
 Retired and unknown identifiers fail explicitly. Upload and runtime use the same
 supported-policy contract and `sparc-autotutor-v1` adapter, at policy version 1.
@@ -859,7 +859,7 @@ another search. The existing per-user decision ledger stores either the image id
 or a validated video snapshot (its segment ID occupies the existing assetId decision
 key). Interrupted image generation retains its original pending brief and vector. Private
 incomplete supported prompts continue using their separate image-only behavior.
-`resolveSparcVisualSupport` is admin-only and shares the bounded authenticated OpenRouter
+`resolveSparcVisualSupport` requires server-verified lesson access and shares the bounded authenticated OpenRouter
 rate limit. Live YouTube search, caption retrieval, segmentation, and visual analysis
 remain explicit catalog preparation work and never run during instruction.
 
@@ -910,7 +910,7 @@ The situation embedding includes the selected target type and authored target te
 
 The initial image experiment used 0.90. Feedback now uses 0.975; other text and images use 0.95. `SPARC_LIBRARY_SIMILARITY` owns these experimental operating cutoffs, which are not correctness probabilities. The separate Meteor settings overrides were removed. The shared input contract and representation identity are in `learning-components/runtime/sparcInstructionalNeed.ts`. Match scores and source (generated versus semantic reuse) are retained in the private decision ledger. Reuse incurs an embedding request, but no image-generation request; resuming the same decision incurs neither.
 
-The server-only sparc_figure_library collection stores originating situation embeddings and stable image IDs. sparc_figure_requests stores each account/TDF/session/production-event decision and temporary generation leases. DynamicAssets owns canonical image bytes and descriptions. No new TDF fields, learner controls, package changes, dependencies, or historical migration are required. Current SPARC admin-only access remains in force; generic asset routes still deny these images. Existing private assets retain their ownership and original pairing.
+The server-only sparc_figure_library collection stores originating situation embeddings and stable image IDs. sparc_figure_requests stores each account/TDF/session/production-event decision and temporary generation leases. DynamicAssets owns canonical image bytes and descriptions. No new TDF fields, learner controls, package changes, dependencies, or historical migration are required. SPARC runtime access requires lesson authorization; administrative controls remain admin-only and generic asset routes still deny these images. Existing private assets retain their ownership and original pairing.
 
 Nearest-neighbor search is exact cosine comparison across matching representation/image-model/embedding-model/dimension records, paged internally in batches of 100 with an index and bounded memory. Only candidate vector fields are read during search; the full library is never published to the client. Lookup cost grows with library size; this is not an approximate vector index or a capacity certification. Warm retrievals run concurrently. On a miss, a Mongo lease serializes discovery plus first generation across replicas and repeats the search before generating, so simultaneous close encounters can reuse the newly populated entry. Lease wait is bounded at 180 seconds; the lease expires after 15 minutes to recover from a stopped process and is released only by its owner.
 

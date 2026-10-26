@@ -7,8 +7,7 @@ describe('Supported SPARC policy contract', () => {
     assert.deepEqual(SPARC_INSTRUCTIONAL_POLICY_IDS, ['progressive-scaffolding-v1', 'dynamic-instruction-agent-v2', 'dynamic-instruction-student-v2']);
     for (const policyId of SPARC_INSTRUCTIONAL_POLICY_IDS) {
       assert.equal(sparcPolicyForAccount(true, policyId), policyId);
-      if (policyId === 'progressive-scaffolding-v1') assert.equal(sparcPolicyForAccount(false, policyId), policyId);
-      else assert.throws(() => sparcPolicyForAccount(false, policyId), /admin account/);
+      assert.equal(sparcPolicyForAccount(false, policyId), policyId);
       assertSparcInstructionalControllerConfig({ adapterId: 'sparc-autotutor-v1', policyId, policyVersion: 1 });
     }
   });

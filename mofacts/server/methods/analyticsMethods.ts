@@ -1,4 +1,5 @@
-import { isSparcAdminPolicy } from '../../../learning-components/runtime/sparcInstructionalPolicies';
+import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
+import { isSparcAdminPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../learning-components/runtime/sparcInstructionalPolicies';
 import { worksheetHistoryWriteId, sameWorksheetWrite } from '../lib/worksheetHistoryWrite';
 import { sparcHistoryWriteId } from '../lib/sparcHistoryWrite';
 import { sameHistoryWrite } from '../lib/historyWriteIdentity';
@@ -685,8 +686,11 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (authorizedScope && assessmentScope({ ...decompressedRecord, userId: actingUserId, TDFId: tdfId }) !== assessmentScope(authorizedScope)) {
       throw new Meteor.Error(400, 'SPARC assessment batch must have one authenticated lesson, attempt, response, and policy');
     }
-    if (!authorizedScope && requiresAdmin && !(await deps.getMethodAuthorizationDeps().userIsInRoleAsync(actingUserId, ['admin']))) {
-      throw new Meteor.Error(403, 'Competitive and student-selected AutoTutor are restricted to admin accounts');
+    if (!authorizedScope && requiresAdmin) {
+      const policyId = sparcTransition?.event?.payload?.policyId;
+      if (isSparcAdminPolicy(policyId) && !SPARC_INSTRUCTIONAL_POLICY_IDS.some(id => id === policyId)
+        && !(await deps.getMethodAuthorizationDeps().userIsInRoleAsync(actingUserId, ['admin']))) throw new Meteor.Error(403, 'Retired instructional policies require administrator access');
+      await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), actingUserId, tdfId);
     }
     if (!authorizedScope) await validateCourseAssignmentHistoryContext(decompressedRecord, tdfId, actingUserId);
     const sanitizeMs = elapsedMsSince(sanitizeStartTime);

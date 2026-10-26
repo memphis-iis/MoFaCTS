@@ -63,7 +63,7 @@ it('renders inline response controls through choice, text, reload, pending and c
       if (initializationFailure === 'assessment') throw new Error('Synthetic assessment initialization failure');
     } }; } },
     sparcOpenRouterSession: { createSparcOpenRouterSession: () => ({ sessionIdForScope: () => 'test' }) },
-    sparcRuntimeState: { readSparcResumeSnapshot: () => ({ nodeValues: {} }) },
+    sparcRuntimeState: { readSparcResumeSnapshot: () => ({ nodeValues: {}, retainedHistoryRecords: [] }) },
     sparcInstructionalPolicies: { isSparcCategorizedPolicy: () => true },
     sparcProductionRuleActionCommit: { commitSparcProductionRuleAction: async () => ({}) },
     sparcBoxLayout: { buildSparcBoxedNodeGroups: () => [] },

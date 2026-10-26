@@ -18,10 +18,11 @@ export type CallSparcVisualSupport = (params: Parameters<CallSparcPromptImage>[0
     libraryMatch?: { source: 'generated' | 'semantic' | 'resume'; similarity: number | null };
   }>;
 
-function call(name: string, value: unknown): Promise<unknown> {
+async function call(name: string, value: unknown): Promise<unknown> {
   const meteor = (globalThis as typeof globalThis & { Meteor?: { callAsync?: (name: string, ...args: unknown[]) => Promise<unknown> } }).Meteor;
   if (typeof meteor?.callAsync !== 'function') throw new Error('SPARC image access requires Meteor.callAsync');
-  return meteor.callAsync(name, value);
+  const { Session } = await import('meteor/session');
+  return meteor.callAsync(name, value, Session.get('currentTdfId'));
 }
 export const callSparcPromptImage: CallSparcPromptImage = params => call('generateSparcPromptImage', params) as ReturnType<CallSparcPromptImage>;
 export const callSparcVisualSupport: CallSparcVisualSupport = async params => {

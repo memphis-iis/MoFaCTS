@@ -23,6 +23,7 @@ const suites = [
   'sparcTrialDisplayControllerDialogueBridge',
 ];
 require('../common/lib/sparcFigureClustering.test.ts');
+require('../common/publicDemoContract.test.ts');
 // Meteor-dependent KC-chain integration is discovered by server-test-entry.js.
 require('../../learning-components/runtime/sparcInstructionalNeed.test.ts');
 require('../../learning-components/runtime/sparcReadingLevel.test.ts');
@@ -50,7 +51,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
   const originalLoad = Module._load;
   // Match module identity: injected method transports must be shared by all importers.
   const meteorModule = { Meteor: { Error: class MeteorError extends Error {
-    constructor(code, reason) { super(reason); this.error = code; this.reason = reason; }
+    constructor(code, reason, details) { super(reason); this.error = code; this.reason = reason; this.details = details; }
   }, callAsync: () => { throw new Error('Unexpected live Meteor call in isolated contracts'); } } };
   const dom = new JSDOM('');
   global.document = dom.window.document;
@@ -62,7 +63,7 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     if (request === 'meteor/tracker') return { Tracker: {} };
     if (request === 'meteor/mongo') return { Mongo: {} };
     if (request === 'meteor/session') return { Session: { get: () => undefined } };
-    if (request === 'meteor/check') return { check: () => {} };
+    if (request === 'meteor/check') return { check: () => {}, Match: { ObjectIncluding: value => value } };
     if (request === 'meteor/random') return { Random: { secret: () => require('node:crypto').randomBytes(32).toString('hex') } };
     return originalLoad.call(this, request, parent, isMain);
   };
@@ -84,6 +85,8 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     require('../server/lib/packageTdfIdentity.test.ts');
     require('../server/lib/tdfRuntimeLifecycle.test.ts');
     require('../server/lib/packageExport.test.ts');
+    require('../server/methods/openRouterMethods.test.ts');
+    require('../server/methods/sparcLibraryCurationMethods.test.ts');
     require('../server/methods/sparcPromptImageMethods.test.ts');
     require('../server/methods/sparcMoveLibraryMethods.test.ts');
     require('../server/methods/sparcInstructionalBrowseMethods.test.ts');

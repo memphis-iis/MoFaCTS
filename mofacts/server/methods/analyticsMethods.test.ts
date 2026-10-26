@@ -238,9 +238,15 @@ describe('analyticsMethods', function() {
     expect(await createAnalyticsMethods(deps as any).getExperimentState.call({ userId: 'learner-1' }, 'learner-1', 'deleted')).to.deep.equal({ id: null });
   });
 
-  it('requires admin authority for competitive policy and OET writes even with a forged policy label', async function() {
-    for (const admin of [false, true]) {
-      const { deps, insertedHistory } = createAnalyticsDeps({ getMethodAuthorizationDeps: () => ({ userIsInRoleAsync: async () => admin }) });
+  it('requires lesson authority for dynamic policy and OET writes even with a forged policy label', async function() {
+    for (const authority of ['denied', 'member', 'admin']) {
+      const allowed = authority !== 'denied';
+      const { deps, insertedHistory } = createAnalyticsDeps({ getMethodAuthorizationDeps: () => ({
+        userIsInRoleAsync: async () => authority === 'admin',
+        requireSparcLessonAccess: async (userId: string, tdfId: string) => {
+          if (!allowed || userId !== 'learner-1' || tdfId !== 'tdf-1') throw Object.assign(new Error('Lesson access denied'), { error: 403 });
+        },
+      }) });
       const methods = createAnalyticsMethods(deps as any);
       for (const policyId of ['dynamic-instruction-agent-v2', 'progressive-scaffolding-v1', 'dynamic-instruction-student-v2']) {
         const record = createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparcsession', sparc: { pageKey: 'p', stateTransition: {
@@ -249,9 +255,9 @@ describe('analyticsMethods', function() {
         } } });
         let error: any;
         try { await methods.insertHistory.call({userId: 'learner-1'}, record); } catch (caught) { error = caught; }
-        if (admin) expect(error).to.equal(undefined); else expect(error?.error).to.equal(403);
+        if (allowed) expect(error).to.equal(undefined); else expect(error?.error).to.equal(403);
       }
-      expect(insertedHistory.length).to.equal(admin ? 3 : 0);
+      expect(insertedHistory.length).to.equal(allowed ? 3 : 0);
     }
   });
 

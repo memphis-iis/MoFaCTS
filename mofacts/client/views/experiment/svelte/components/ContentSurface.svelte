@@ -1014,6 +1014,7 @@
     setState: (snapshot) => {
       state = snapshot;
     },
+    onRuntimeError: () => finishLaunchLoading('content-runtime-failed'),
     sendStartEvent: send,
     getStartEvent: () => ({
       type: 'START',
@@ -1194,7 +1195,12 @@
 
 </script>
 
-{#if testMode || initializedForRender}
+{#if state.matches('error')}
+  <section role="alert" class="alert alert-danger">
+    <p>{translatePlatformString(getActiveUiLocale(), 'lesson.runtimeLoadFailed')}</p>
+    <button type="button" class="btn btn-secondary" on:click={() => window.location.reload()}>{translatePlatformString(getActiveUiLocale(), 'common.tryAgain')}</button>
+  </section>
+{:else if testMode || initializedForRender}
 <div
   class="content-surface"
   class:video-mode={sessionSurfaceShell.contentSurfaceClasses.videoMode}

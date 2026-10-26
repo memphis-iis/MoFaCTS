@@ -1,4 +1,5 @@
 import type { SparcVideoSegment } from '../../../learning-components/runtime/sparcVideo';
+import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
 import { Meteor } from 'meteor/meteor';
 import { requireUserWithRoles, type MethodAuthorizationDeps } from '../lib/methodAuthorization';
 import { SPARC_FIGURE_LIBRARY_SETTINGS } from '../../common/lib/sparcFigureLibrary';
@@ -17,11 +18,11 @@ export function createSparcMoveLibraryMethods(deps: { store: MoveStore;
     verifyFigure: deps.verifyFigure });
   return {
     async lookupSparcPrimitive(this: Context, query: SparcPrimitiveQuery, selection: SparcRetrievalSelection, embedding: number[]) {
-      const userId = await auth(this); this.unblock?.();
+      const userId = await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), this.userId, query?.tdfId); this.unblock?.();
       return service().lookup(userId, query, selection, embedding);
     },
     async publishSparcPrimitive(this: Context, ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent) {
-      const userId = await auth(this); this.unblock?.(); return service().publish(userId, ticket, content);
+      const userId = await requireSparcLessonAccess(deps.getMethodAuthorizationDeps(), this.userId, ticket?.query?.tdfId); this.unblock?.(); return service().publish(userId, ticket, content);
     },
     async listSparcMoveLibrary(this: Context, kind: string | null = null, after = '') {
       await auth(this);

@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 
 export type MethodAuthorizationDeps = {
+  requireSparcLessonAccess?: (userId: string, tdfId: string) => Promise<void>;
   userIsInRoleAsync: (userId: string, roles: string[]) => Promise<boolean>;
 };
 

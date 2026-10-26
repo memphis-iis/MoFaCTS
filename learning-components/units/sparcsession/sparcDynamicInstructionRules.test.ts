@@ -595,14 +595,14 @@ describe('Dynamic instruction production cycles', () => {
       assert.equal(f.facts().find(fact => fact.factType === 'controller.completionState')!.slots!.completed, true);
     }
   });
-  it('rejects a missing category at runtime and preserves admin restrictions for the new family', async () => {
+  it('rejects a missing category at runtime and preserves authored policies for non-admins', async () => {
     const f = fixture('agent', false, 'fact');
     const targets = f.source.autoTutorTargets as { expectations: { category?: string }[] };
     delete targets.expectations[0]!.category;
     await assert.rejects(f.answer(), /requires category/);
     for (const id of [SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_CATEGORIZED_STUDENT_POLICY_ID]) {
       assert.equal(sparcPolicyForAccount(true, id), id);
-      assert.throws(() => sparcPolicyForAccount(false, id), /admin account/);
+      assert.equal(sparcPolicyForAccount(false, id), id);
     }
   });
   it('keeps next-KC navigation separate from instruction and evaluation', async () => {

@@ -1,11 +1,13 @@
 import { Meteor } from 'meteor/meteor';
-import { Roles } from 'meteor/alanning:roles';
+import { requireSparcLessonAccess } from './sparcLessonAccess';
+import type { MethodAuthorizationDeps } from './methodAuthorization';
 import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
 import { sparcRetrievalSelector } from './sparcRetrievalSelector';
 import { SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION, parseSparcRetrievalCategory, sparcRetrievalCategoryKey } from '../../common/lib/sparcRetrieval';
 
-Meteor.publish('sparcRetrievalEmbeddings', async function(value: unknown) {
-  if (!this.userId || !await Roles.userIsInRoleAsync(this.userId, 'admin')) throw new Meteor.Error(403, 'Only admins can access the SPARC retrieval cache');
+export function registerSparcRetrievalPublication(getAuthorization: () => MethodAuthorizationDeps) {
+Meteor.publish('sparcRetrievalEmbeddings', async function(value: unknown, tdfId?: string) {
+  await requireSparcLessonAccess(getAuthorization(), this.userId, tdfId);
   const category = parseSparcRetrievalCategory(value);
   const prefix = `${sparcRetrievalCategoryKey(category)}:`;
   let stopped = false;
@@ -20,3 +22,4 @@ Meteor.publish('sparcRetrievalEmbeddings', async function(value: unknown) {
   });
   if (stopped) await handle!.stop(); else this.ready();
 });
+}

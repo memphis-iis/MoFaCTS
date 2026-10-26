@@ -1,6 +1,6 @@
 import { SPARC_INSTRUCTIONAL_COMPETITION_MODULE } from '../../../../../../learning-components/units/sparcsession/sparcCompetitiveSelection';
 import { resolveSparcAccountPolicy } from './sparcController';
-import { SPARC_INSTRUCTIONAL_POLICY_IDS, isSparcCategorizedPolicy } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
+import { SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { currentSparcMenu } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalCycle';
 import { strict as assert } from 'node:assert';
 import { commitSparcAutoTutorSubmit, commitSparcAutoTutorDocumentLoad } from './sparcAutoTutorRuleCommit';
@@ -258,13 +258,12 @@ describe('SPARC app instructional commit', () => {
       const admin = resolveSparcAccountPolicy(display, true)!;
       assert.equal(admin.instructionalController?.policyId, policyId);
       assert.equal(resolveSparcAccountPolicy(admin, true)?.instructionalController?.policyId, admin.instructionalController?.policyId);
-      if (isSparcCategorizedPolicy(policyId)) assert.throws(() => resolveSparcAccountPolicy(display, false), /admin account/);
-      else assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, 'progressive-scaffolding-v1');
+      assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, policyId);
       assert.equal(display.instructionalController.policyId, policyId);
     }
   });
 
-  it('commits student menu choices and expectation progression through the admin app path', async () => {
+  it('commits non-admin student menu choices and restores own expectation progression', async () => {
     clearSparcRuntimeState();
     const display = resolveSparcAccountPolicy({ pageKey: 'student-cycle', schema: 'tutorscript-sparc/2.0', unitType: 'sparc-autotutor-dialogue',
       instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: 'dynamic-instruction-student-v2', policyVersion: 1 },
@@ -285,7 +284,7 @@ describe('SPARC app instructional commit', () => {
       tdfId: 'student-tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: ['a', 'b'].map((clusterKC) => ({ clusterKC, coverage: 0.2 })) }; },
       generateTutorUtterance: (request: SparcUtteranceRequest) => { requests.push(request); return request.action === 'instruction.feedback' ? 'Here is feedback.' : instructionFixture(request); },
-      deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
+      deps: { getUserId: () => 'u', getIsAdmin: () => false, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'student-tdf', levelUnit: 0, pageKey: 'student-cycle', display };
     const menu = () => currentSparcMenu(readSparcResumeSnapshot(scope).replayState)!;
@@ -313,7 +312,7 @@ describe('SPARC app instructional commit', () => {
     assert.equal(evaluations, 1);
     assert.equal(requests.at(-1)!.action, 'instruction.dynamic.question.text');
     assert.equal(requests.at(-1)!.targetId, selectedTarget);
-    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: { ...args.deps, getIsAdmin: () => false }, sparcResult: answer }), /admin account/);
+    assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, 'dynamic-instruction-student-v2');
     clearSparcRuntimeState();
   });
 
@@ -329,19 +328,19 @@ describe('SPARC app instructional commit', () => {
         { id: 'learner-response-submit', nodeType: 'atomic', atomType: 'button', label: 'Submit' }],
     };
     assert.equal(resolveSparcAccountPolicy(display, true)?.instructionalController?.policyId, 'dynamic-instruction-agent-v2');
-    assert.throws(() => resolveSparcAccountPolicy(display, false), /admin account/);
+    assert.equal(resolveSparcAccountPolicy(display, false)?.instructionalController?.policyId, 'dynamic-instruction-agent-v2');
     const rows: CanonicalHistoryRecord[] = [];
     let evaluations = 0; let fail = true;
     const args = { engine: { commitSparcTrialDisplayAutoTutorRules } as unknown as Parameters<typeof commitSparcAutoTutorSubmit>[0]['engine'], currentDisplay: display,
       tdfId: 'tdf', userId: 'u', attemptId: 'attempt', levelUnit: 0,
       scoreLearnerResponse: () => { evaluations++; return { learningTargetScores: [{ clusterKC: 'a', coverage: 0.2 }] }; },
       generateTutorUtterance: (request: SparcUtteranceRequest) => { if (request.action === 'instruction.feedback') return 'Feedback.'; if (fail) throw new Error('Synthetic provider failure'); return instructionFixture(request); },
-      deps: { getUserId: () => 'u', getIsAdmin: () => true, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
+      deps: { getUserId: () => 'u', getIsAdmin: () => false, writeHistory: async (row: CanonicalHistoryRecord) => { rows.push(row); }, writeHistoryBatch: async (records: readonly CanonicalHistoryRecord[]) => { rows.push(...records); } },
     };
     const scope = { userId: 'u', TDFId: 'tdf', levelUnit: 0, pageKey: display.pageKey, display };
     const choice = { submittedNodes: { 'learner-response-input': 'An answer.' }, timestamp: 10 };
     await assert.rejects(commitSparcAutoTutorSubmit({ ...args, sparcResult: choice }), /Synthetic provider failure/);
-    await assert.rejects(commitSparcAutoTutorSubmit({ ...args, deps: {...args.deps, getIsAdmin: () => false}, sparcResult: choice }), /admin account/);
+    assert.equal(evaluations, 1);
     const accepted = readSparcResumeSnapshot(scope);
     assert.ok(accepted.replayState.transitions.some((transition) => transition.transitionId.endsWith(':decision')));
     const acceptedRows = rows.slice();

@@ -9,7 +9,7 @@ describe('Shared move-library authorization', () => {
       verifyFigure: async () => {},
     });
     for (const method of Object.values(methods)) for (const userId of [null, 'learner']) {
-      await assert.rejects((method as (...args: unknown[]) => Promise<unknown>).call({ userId }), /Must be logged in|Permission denied/);
+      await assert.rejects((method as (...args: unknown[]) => Promise<unknown>).call({ userId }), /Must be logged in|Permission denied|Reopen this lesson/);
     }
   });
   it('returns bounded public content metadata without embeddings or private context', async () => {

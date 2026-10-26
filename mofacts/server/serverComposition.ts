@@ -101,6 +101,9 @@ import { createAuthSupport } from './lib/authSupport';
 import { createMediaReferenceHelpers } from './lib/mediaReferences';
 import { getMemphisSamlClientConfig } from './lib/memphisSaml';
 import { createTdfLookupHelpers } from './lib/tdfLookup';
+import { registerSparcRetrievalPublication } from './lib/sparcRetrievalPublication';
+import { createSparcDemoAccess } from './lib/sparcDemoAccess';
+import { createSparcLessonAuthorizer, requireSparcLessonAccess } from './lib/sparcLessonAccess';
 import {
   hasMeaningfulProgressSignal,
 } from './lib/mappingPolicyClassifier';
@@ -193,12 +196,28 @@ function getApiKeyResolutionDeps(): ApiKeyResolutionDeps {
   };
 }
 
+function getSparcApiKeyResolutionDeps(): ApiKeyResolutionDeps {
+  return { ...getApiKeyResolutionDeps(), authorizeTdfExecution: async (userId, tdfId) => {
+    await requireSparcLessonAccess(getMethodAuthorizationDeps(), userId, tdfId);
+  } };
+}
+
 function getApiKeyResolutionErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
 function getMethodAuthorizationDeps(): MethodAuthorizationDeps {
   return {
+    requireSparcLessonAccess: createSparcLessonAuthorizer({
+      async readAssignmentContext(userId, tdfId) {
+        const state = await GlobalExperimentStates.findOneAsync({ userId, $or: [
+          { TDFId: tdfId }, { 'experimentState.currentTdfId': tdfId }, { 'experimentState.conditionTdfId': tdfId },
+        ] }, { fields: { 'experimentState.courseAssignmentLaunchContext': 1 }, sort: { 'experimentState.lastActionTimeStamp': -1 } });
+        return state?.experimentState?.courseAssignmentLaunchContext ?? null;
+      },
+      readAuthorizedLesson: (userId, tdfId, courseAssignment) => getTdfById.call({ userId }, tdfId, { courseAssignment }),
+      assertDemoExpiry: assertSparcDemoExpiry,
+    }),
     userIsInRoleAsync: async (userId: string, roles: string[]) =>
       await Roles.userIsInRoleAsync(userId, roles),
   };
@@ -420,6 +439,8 @@ const {
   userCanManageTdf,
   assertUserOwnsTdfs,
 } = tdfLookupHelpers;
+
+registerSparcRetrievalPublication(getMethodAuthorizationDeps);
 
 const mediaReferenceHelpers = createMediaReferenceHelpers({
   DynamicAssets,
@@ -1000,6 +1021,17 @@ async function getStimDisplayTypeMapVersionPublic() {
   return await getStimDisplayTypeMapVersion();
 }
 
+const sparcDemoAccess = createSparcDemoAccess({
+  readUser: userId => MeteorAny.users.findOneAsync({ _id: userId }, { fields: { createdAt: 1, 'profile.createdBy': 1, 'profile.experimentTarget': 1, 'profile.demoExpiresAt': 1 } }),
+  async readDemoTutor(target) {
+    const tdf = await Tdfs.findOneAsync({ 'content.tdfs.tutor.setspec.experimentTarget': target }, { fields: { 'content.tdfs.tutor.setspec': 1 } });
+    return tdf?.content?.tdfs?.tutor;
+  },
+  rateLimit: (userId, address) => applyMethodRateLimit('public-demo-openrouter', address, userId, { ipLimit: 60, identifierLimit: 60, windowMs: 60 * 60 * 1000 }),
+});
+async function assertSparcDemoExpiry(userId: string): Promise<void> { await sparcDemoAccess.assertExpiry(userId); }
+async function assertPublicDemoAiQuota(userId: string, address: string): Promise<void> { await sparcDemoAccess.assertAiQuota(userId, address); }
+
 export const asyncMethods: Record<string, unknown> = {
   ...createTdfIdentityMigrationMethods({
     Tdfs,
@@ -1050,33 +1082,16 @@ export const asyncMethods: Record<string, unknown> = {
       labels: createSparcFigureClusterLabeler(getApiKeyResolutionDeps, openRouterModelCatalogService),
       progress: (stage, count) => serverConsole('[SPARC instructional grouping]', stage, count),
     } }),
-  ...createSparcPromptImageMethods({ getApiKeyResolutionDeps, getMethodAuthorizationDeps, DynamicAssets, storageBoundary,
+  ...createSparcPromptImageMethods({ getApiKeyResolutionDeps: getSparcApiKeyResolutionDeps, getMethodAuthorizationDeps, assertPublicDemoAiQuota, DynamicAssets, storageBoundary,
     isRemoved: isSparcAdministrativeRemoval,
     figureLibrary: createSparcFigureLibraryStore() }),
 
   ...createOpenRouterMethods({
     serverConsole,
-    getApiKeyResolutionDeps,
+    getApiKeyResolutionDeps: getSparcApiKeyResolutionDeps,
     getMethodAuthorizationDeps,
     openRouterModelCatalogService,
-    assertPublicDemoAiQuota: async (userId: string, clientAddress: string) => {
-      const user = await MeteorAny.users.findOneAsync(
-        { _id: userId },
-        { fields: { 'profile.createdBy': 1, 'profile.demoExpiresAt': 1 } },
-      );
-      if (user?.profile?.createdBy !== 'publicDemo') return;
-      const expiresAt = user?.profile?.demoExpiresAt instanceof Date
-        ? user.profile.demoExpiresAt
-        : new Date(user?.profile?.demoExpiresAt);
-      if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
-        throw new Meteor.Error('public-demo-expired', 'This public demonstration has expired');
-      }
-      await applyMethodRateLimit('public-demo-openrouter', clientAddress, userId, {
-        ipLimit: 60,
-        identifierLimit: 60,
-        windowMs: 60 * 60 * 1000,
-      });
-    },
+    assertPublicDemoAiQuota,
   }),
 
   ...createOpenRouterCatalogMethods(openRouterModelCatalogService),

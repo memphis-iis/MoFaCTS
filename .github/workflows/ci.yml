@@ -132,9 +132,13 @@ jobs:
         working-directory: ${{ steps.capture.outputs.test_app }}
         run: node --test scripts/prolific.test.cjs scripts/ignoredTdfFields.test.cjs
 
+      - name: SPARC lesson access contracts
+        working-directory: ${{ steps.capture.outputs.test_app }}
+        run: node --test scripts/sparcLessonAccess.test.cjs
+
       - name: SPARC rendered surface contracts
         working-directory: ${{ steps.capture.outputs.test_app }}
-        run: node --conditions=browser --test scripts/sparcOutputLimitSurface.test.cjs
+        run: node --conditions=browser --test scripts/sparcOutputLimitSurface.test.cjs scripts/contentRuntimeFailureSurface.test.cjs
 
       - name: Install CI browser
         working-directory: ${{ steps.capture.outputs.test_app }}

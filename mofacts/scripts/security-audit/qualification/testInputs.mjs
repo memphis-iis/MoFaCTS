@@ -14,6 +14,7 @@ export const TEST_INPUTS = Object.freeze([
   ['AGENTS.md', 'file'],
   ['examples', 'directory'], ['mofacts/tests', 'directory'],
   ['deploy/docker-compose.yml', 'file'],
+  ['deploy/repair-teacher-demo-target.mongosh.js', 'file'],
   ['deploy/docker-compose.local.yml', 'file'],
   ['deploy/docker-compose.change-streams-qualification.yml', 'file'],
   ['deploy/hotfix-local.ps1', 'file'],

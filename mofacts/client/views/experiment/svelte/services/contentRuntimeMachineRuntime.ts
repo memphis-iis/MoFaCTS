@@ -49,6 +49,7 @@ export function createContentRuntimeMachineRuntimeController({
   sendStartEvent,
   getStartEvent,
   log,
+  onRuntimeError,
 }: {
   machine: unknown;
   createActor: (machine: unknown) => ContentRuntimeMachineActor;
@@ -56,6 +57,7 @@ export function createContentRuntimeMachineRuntimeController({
   sendStartEvent: (event: unknown) => void;
   getStartEvent: () => unknown;
   log: (level: number, message: string, details?: unknown) => void;
+  onRuntimeError?: () => void;
 }): ContentRuntimeMachineRuntimeController {
   let actor: ContentRuntimeMachineActor | null = null;
   let subscription: { unsubscribe: () => void } | null = null;
@@ -72,6 +74,7 @@ export function createContentRuntimeMachineRuntimeController({
     if (!subscription && typeof actor.subscribe === 'function') {
       subscription = actor.subscribe((snapshot) => {
         setState(snapshot);
+        if (snapshot.matches('error')) onRuntimeError?.();
         if (!startDispatched && snapshot?.matches?.('idle.ready')) {
           startDispatched = true;
           sendStartEvent(getStartEvent());
