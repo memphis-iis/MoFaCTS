@@ -19,17 +19,16 @@ one demo unit and a stimulus file containing `"clusters": []`.
 ## Learner experience and data
 
 Choose Start camera and grant camera permission. The live preview shows
-visible body, hand, and finger landmarks and connecting lines; keep the head, shoulders, arms, and hands
-in view. A left-hand palette offers Cube and Pyramid as miniature labeled 3D
+hand and finger landmarks and connecting lines, without the full-body wireframe.
+Keep the fingertips used by the current gesture in view. A left-hand palette offers Cube and Pyramid as miniature labeled 3D
 wireframes, using the same exact geometry, projection, hidden edges, midpoint
-equality ticks, and AB annotation as the main display. Initially no figure is active. Position your camera-tracked thumb and
-index finger over an icon and pinch them together, keeping the middle finger
-apart. Aim the center between thumb and index at that button. Opening anywhere in the
-preview arms selection; closing just before reaching the button does not discard
-it. An accepted selection consumes the pinch; open again before another
-selection. Holding it does not repeatedly select. Brief tracking loss preserves
-whether the pinch was opened or consumed, while clearing motion references.
-The body/hand wireframe draws
+equality ticks, and AB annotation as the main display. Initially no figure is active. Place the midpoint of your thumb and index fingertips anywhere inside a figure
+button. Whenever those fingertips are pinched, that button selects immediately.
+No prior opening or closing motion is required. Keep the pinch held while moving
+between buttons to switch figures. Middle-finger position does not block selection;
+a three-finger pinch over a button also selects it. Tracking reacquisition accepts
+an already pinched hand immediately. Selection preserves each figure's size and rotation.
+The hand wireframe draws
 above the icons, while the camera image stays behind them. Buttons also support
 click, touch, and keyboard activation. The palette consumes gestures without
 rotating or resizing the figure.
@@ -48,9 +47,10 @@ solid centroid one-quarter of that height above the base. Both figures rotate
 and scale about their volume centroid, with a fixed orthographic view. Each
 remembers its own orientation and length when switching within this unit.
 
-Away from the palette, spread the thumb, index, and middle fingertips about an
-inch apart to rotate. The figure follows the triangle's full orientation: tilt
-and twist both rotate it. Bring all three tips together and move upward to grow
+Away from the palette, extend and spread the thumb, index, and middle fingers
+to rotate. The figure follows the full orientation of their fingertip triangle,
+with temporal smoothing.
+Bring all three tips together and move upward to grow
 the figure or downward to shrink it. This changes all edge lengths and the AB
 label, within 0.25-4 units. One-quarter of the preview height doubles/halves size.
 Each new gesture establishes a fresh reference, without requiring stillness.
@@ -60,8 +60,8 @@ visible without taking over rotation/resizing while the controlling hand is
 identifiable. Either valid hand can select a palette figure, even while the
 other controls rotation/resizing. An accepted selection transfers ownership and
 establishes a fresh movement reference. The existing status area explains
-selection blockers: missing/uncertain tracking, fingertips outside a common
-button, a pinch that needs reopening, or the middle finger too close.
+selection blockers: missing/uncertain tracking, the pinch midpoint outside a
+button, or thumb and index too far apart.
 
 The controls, demonstration canvas, and palette use the application's shared
 `card` styles. Surface colors, text, borders, rounding, buttons, and figure
@@ -98,7 +98,7 @@ stops the stream and inference. Returning requires Start camera again.
 
 No camera image, pose sample, score, trial history, recording, or local-storage
 record is saved or uploaded. The current pose, one previous gesture sample for
-the controlling hand, its timestamp, pinch recognition, and each figure's
+the controlling hand, its timestamp, and each figure's
 orientation/edge length are held only in browser memory. Stop/switch/hide clears
 gesture acquisition; figure state remains until the unit unmounts. Continue
 retains the existing lesson-position/completion persistence.
@@ -113,7 +113,7 @@ database fields, or data migration are needed. The demo's labels are English.
   only for the current capture; they are not logged or persisted.
 - `poseTracking.ts`: owns one pose model and one two-hand model with a single
   bounded frame loop. Both process the same video frame and timestamp.
-  Publishes current normalized body/hand landmarks, aligned hand-world landmarks
+  Publishes current normalized hand landmarks, aligned hand-world landmarks
   and confident handedness labels, dimensions, and monotonic inference
   timestamp to its consumer. No history buffer or global sample store exists.
 - `PoseCameraPreview.svelte`: renders video and visible landmarks together with
@@ -121,7 +121,7 @@ database fields, or data migration are needed. The demo's labels are English.
 - `SkeletonDemoUnit.svelte`: owns the registered unit's camera controls,
   initialization, status, teardown and completion.
 - `learning-components/units/skeleton-demo/figureGestures.ts`: one pure classifier
-  for palette selection, full-orientation rotation, triple-pinch resizing, and
+  for palette selection, smoothed three-fingertip rotation, triple-pinch resizing, and
   inactive movement. Explicit frame/context input includes actual palette bounds
   and the active figure; output supplies selection, axis/angle, or size factor.
 - `figureGeometry.ts` in the same directory: unit-edge cube and square-pyramid
@@ -142,34 +142,28 @@ actual speed depends on the learner's device.
 
 ## Gesture limits and coordinate contract
 
-The plane uses estimated 3D fingertips 4, 8, and 12. An ordered orthonormal basis
-describes each triangle; currentBasis * previousBasis^T supplies the full
-relative rotation. Mirroring is applied to gesture coordinates, not the text;
-camera-space rotation is mapped into the 3D view. Gain is 1:1. Hand identity uses handedness and image
-position, never detection-array order. Ambiguous/missing identity, invalid or
-out-of-frame fingertips, narrow triangles, and gaps over 250 ms require a fresh
-reference. The first valid observation establishes that reference; the next
-valid movement is evaluated immediately. There is no settling timer.
-
-`FIGURE_GESTURE_LIMITS` holds prototype defaults: full angular speed above
-720 degrees/s or translation above 6 palm widths/s causes that movement to be
-ignored. Every valid observation advances the reference, including ignored fast
-movement, so slowing down resumes control on the next observation. Direction
-changes have no separate acceleration threshold. Shape checks use
-normalized edge proportions (maximum change 0.12), and the
-triangle area ratio must be at least 0.08. Handedness confidence must be at least 0.7.
-Rotation enters when all pairwise distances reach 25.4 mm and exits when any
-falls below 20 mm, subject to triple-pinch priority. Both pinch gestures use
-distances divided by estimated 3D palm width, measured between the index and
-little-finger base landmarks. A pinch closes at 50% and opens at 70% of that
-width. Selection uses the thumb-index distance and requires the middle finger
-to remain more than 50% of palm width from both tips. Triple pinch uses the
-largest of all three distances and takes priority over selection and rotation.
-Fingertip landmarks need not touch. For a 60 mm estimated palm width, the
-thresholds are 30 mm and 42 mm. These are prototype values for physical testing.
+Rotation uses an ordered 3D triangle of thumb, index, and middle fingertips.
+All three fingers must be extended: each base-to-tip distance must be at least
+90% of its three-segment joint-chain length. This uses world coordinates, not
+screen direction. Rotation enters when every fingertip pair is at least 25.4 mm
+apart and exits below 20 mm. A triangle area ratio below 0.08 disables rotation;
+a normalized side-proportion change above 0.12 rejects that movement.
+The full relative orientation includes tilt and twist. A 100 ms time-constant
+spherical orientation filter reduces jitter while retaining slow movement.
+Resizing only requires the three tips together, with no finger-extension check.
+Outside the palette, triple pinch takes priority over rotation. Ambiguous directions, tracking gaps over 250 ms,
+mode/owner changes, and rejected motion establish a fresh smoothing reference.
+Angular speed above 720 degrees/s, translation above 6 palm widths/s, or apparent
+size change above 4.5/s is ignored without replaying that movement.
+Selection accepts a thumb-index gap up to 60% of estimated 3D palm width,
+independently of prior frames or middle-finger spacing. Triple pinch activates
+resizing immediately at 50% and remains active up to 70% to avoid mode jitter.
+Its first observation establishes the position from which up/down movement changes size;
+there is no arming step, opening requirement, or dwell timer. Palm width is measured between index
+and little-finger bases in 3D, so ratios do not directly use foreshortened 2D
+camera distances. For a 60 mm palm, selection accepts a 36 mm estimated gap. These are model estimates requiring physical testing.
 Finite palm landmarks may lie outside the preview when reaching toward an edge;
-the three fingertips must remain in view. Stop/switch/hide clears pinch latches
-as well as motion references; tracking gaps only clear motion references.
+only the fingertips used by the current gesture must remain in view. Stop/switch/hide and tracking gaps clear motion references.
 Distances are MediaPipe estimates, not calibrated physical measurements.
 
 Screen translation uses the palm center and width. Absolute log palm-size change
@@ -240,7 +234,7 @@ and Dark Industrial theme properties.
 Geometry tests verify all unit edges, tetrahedral-volume centroids, hidden edges,
 ticks, fixed orthographic scaling, size clamping and framing at varied rotations.
 Pure gesture tests cover thresholds/hysteresis, mutually exclusive modes,
-mirroring and target bounds, pinch latching, selection across hand ownership,
+mirroring and target bounds, immediate held-pinch selection, selection across hand ownership,
 selection-blocking hints, hand continuity and invalid data.
 The browser fixture requires the canonical
 localhost watcher. A person must still inspect tracking alignment and responsiveness
@@ -250,6 +244,27 @@ the fingers, and moving toward the camera. Check that the figure remains still
 during fast movements and resumes immediately on slower motion without a jump.
 No physical result is implied
 by a synthetic test passing.
-Also physically try both palette icons with thumb-index pinch, full-plane tilt,
-the approximate-inch spread gesture, and triple-pinch up/down resizing. Check
+Also physically try both palette icons with thumb-index pinch, three-finger tilt and twist,
+the extended three-finger gesture, and triple-pinch up/down resizing. Check
 comfortable targeting and that switching figures restores their individual state.
+
+
+### Partial hand visibility
+
+Fingertip validation is specific to each gesture: button selection requires thumb
+and index; rotation and resizing require thumb, index, and middle. Rotation also
+requires finite joint estimates for those three fingers to check extension.
+A missing middle fingertip does not block button selection. Missing ring or little
+fingertips do not block these gestures. Each gesture requires its own tips in view.
+Palm estimates and confident hand identity remain necessary for scale and motion
+continuity; the tracker must still detect a hand. Missing points are not fabricated.
+Losing a required point stops that gesture; reacquiring it establishes a fresh
+motion reference, so rotation or resizing does not jump. Button selection remains
+immediate. Synthetic tests cover missing/invalid points and all four frame edges;
+physical camera reliability still requires testing with the actual device.
+
+
+The **Wireframe** toggle shows or hides only hand landmark dots and connections.
+Body landmarks are not rendered. Camera visibility, figure visibility, and gesture
+controls keep their existing behavior. This display change does not change the
+tracking service's model loading or inference contract.

@@ -13,9 +13,8 @@
 
   let videoElement: HTMLVideoElement;
   let observation: PoseObservation | null = null;
-  let connections: readonly PoseConnection[] = [];
   let handConnections: readonly PoseConnection[] = [];
-  let status = 'Choose Start camera to see your skeleton.';
+  let status = 'Choose Start camera to see your hands.';
   let error = '';
   let active = false;
   let starting = false;
@@ -45,7 +44,6 @@
     figureSurface?.resetGestures();
     camera.stop();
     observation = null;
-    connections = [];
     handConnections = [];
     active = false;
     starting = false;
@@ -72,16 +70,15 @@
       currentCameraId = capture.deviceId;
       mirrored = capture.mirrored;
       status = 'Loading body and finger tracking…';
-      await tracking.start(videoElement, (frame, edges, handEdges) => {
+      await tracking.start(videoElement, (frame, _edges, handEdges) => {
         if (token !== generation) return;
         observation = frame;
-        connections = edges;
         handConnections = handEdges;
         const control = figureSurface.update(frame, mirrored);
         const detection = frame.landmarks.length ? 'Body detected' : 'No body detected';
         status = `${detection} · ${control.selection ? 'Figure selected.' : control.state === 'ignored' ? 'Fast movement ignored.'
           : control.selectionHint ? control.selectionHint
-          : control.mode === 'rotation' ? 'Rotate with three fingertips spread apart.'
+          : control.mode === 'rotation' ? 'Rotate with thumb, index, and middle fingers extended and apart.'
             : control.mode === 'scaling' ? 'Triple pinch: move up to enlarge, down to shrink.'
               : 'Pinch over a figure on the left to select it.'}`;
       }, fail);
@@ -143,7 +140,7 @@
 <section class="skeleton-demo" aria-label="Skeleton demo">
   <div class="card skeleton-demo-controls-card">
   <div class="card-body skeleton-demo-toolbar">
-  <p class="skeleton-demo-instructions">Pinch an icon to select. Spread three fingers to rotate; triple pinch and move up/down to resize.</p>
+  <p class="skeleton-demo-instructions">Pinch an icon to select. Extend and spread thumb, index, and middle fingers to rotate; triple pinch and move up/down to resize.</p>
   <div class="skeleton-demo-control-row">
   <div class="skeleton-demo-controls">
     {#if active || starting}
@@ -173,7 +170,7 @@
   </div>
   </div>
   </div>
-  <PoseCameraPreview bind:videoElement {observation} {connections} {handConnections} {mirrored} {cameraVisible} {wireframeVisible}>
+  <PoseCameraPreview bind:videoElement {observation} {handConnections} {mirrored} {cameraVisible} {wireframeVisible}>
     <FigureOverlay bind:this={figureSurface} onReady={() => { if (!figureFailed) figureReady = true; }} onError={figureUnavailable} />
   </PoseCameraPreview>
   <p class="skeleton-demo-privacy">Processed on this device. Nothing recorded or uploaded.</p>

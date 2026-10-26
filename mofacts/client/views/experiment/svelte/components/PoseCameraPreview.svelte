@@ -1,9 +1,8 @@
 <script lang="ts">
   import type { PoseConnection, PoseObservation } from '../services/poseTracking';
-  import { isVisiblePoseLandmark, isInFrameLandmark } from '../services/poseTracking';
+  import { isInFrameLandmark } from '../services/poseTracking';
   export let videoElement: HTMLVideoElement;
   export let observation: PoseObservation | null = null;
-  export let connections: readonly PoseConnection[] = [];
   export let handConnections: readonly PoseConnection[] = [];
   export let mirrored = true;
   export let cameraVisible = true;
@@ -17,7 +16,6 @@
       aspectRatio = videoElement.videoWidth / videoElement.videoHeight;
     }
   }
-  $: points = observation?.landmarks ?? [];
 </script>
 
 <div class="card pose-camera-preview" bind:clientWidth={availableWidth} bind:clientHeight={availableHeight}>
@@ -28,17 +26,6 @@
     <video class:pose-layer-hidden={!cameraVisible} aria-hidden={!cameraVisible} bind:this={videoElement} muted playsinline on:loadedmetadata={updateAspectRatio}
       on:resize={updateAspectRatio} aria-label="Live camera preview"></video>
     <svg class:pose-layer-hidden={!wireframeVisible} viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
-      {#each connections as connection}
-        {#if isVisiblePoseLandmark(points[connection.start]) && isVisiblePoseLandmark(points[connection.end])}
-          <line x1={points[connection.start].x} y1={points[connection.start].y}
-            x2={points[connection.end].x} y2={points[connection.end].y} />
-        {/if}
-      {/each}
-      {#each points as point}
-        {#if isVisiblePoseLandmark(point)}
-          <circle cx={point.x} cy={point.y} r="0.005" />
-        {/if}
-      {/each}
       {#each observation?.hands ?? [] as hand}
         <g class="pose-camera-hand">
           {#each handConnections as connection}

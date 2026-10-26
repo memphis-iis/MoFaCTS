@@ -25,7 +25,7 @@ async function buildFixture(syntheticTracking = false) {
     stub('poseTracking', `export { isInFrameLandmark, isVisiblePoseLandmark } from ${JSON.stringify(tracker)};
       export function createPoseTracking() {
         let callback = null;
-        window.handTest = { emit(frame) { callback?.(frame, [], [{ start: 4, end: 8 }]); } };
+        window.handTest = { emit(frame) { callback?.(frame, [{ start: 0, end: 1 }], [{ start: 4, end: 8 }]); } };
         return { async start(video, onFrame) { callback = onFrame; }, stop() { callback = null; } };
       }`);
   }
@@ -131,6 +131,7 @@ test('live demo runs real local inference and releases the camera on stop, exit 
     await page.evaluate(() => window.fixture.mount());
     await page.getByRole('button', { name: 'Cube', exact: true }).click();
     await page.locator('.figure-wireframe').waitFor();
+
     assert.equal(await page.locator('.figure-wireframe .figure-vertex-label').count(), 8);
     assert.equal(await page.locator('.figure-wireframe .figure-tick').count(), 12);
     assert.equal(await page.getByRole('button', { name: 'Switch camera' }).count(), 0);
@@ -305,19 +306,33 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
           const tx = px * Math.cos(a) - py * Math.sin(a), ty = px * Math.sin(a) + py * Math.cos(a);
           world[i] = { x: tx, y: ty * Math.cos(t), z: ty * Math.sin(t) };
         });
+        world[1] = { x: -.06, y: .06, z: 0 }; world[9] = { x: .015, y: .035, z: 0 };
+        for (const [base, joint1, joint2, tip] of [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]) {
+          for (const [joint, fraction] of [[joint1, 1 / 3], [joint2, 2 / 3]]) {
+            world[joint] = Object.fromEntries(['x', 'y', 'z'].map(axis => [axis, world[base][axis] + fraction * (world[tip][axis] - world[base][axis])]));
+          }
+        }
         const image = world.map(p => ({ x: x + p.x, y: cy + p.y, z: p.z }));
         image[0] = { x, y: cy + .05, z: 0 }; image[5] = { x: x - .05, y: cy - .025, z: 0 }; image[17] = { x: x + .05, y: cy - .025, z: 0 };
+        if (options.missingTip !== undefined) {
+          delete image[options.missingTip]; delete world[options.missingTip];
+        }
         if (rememberOwner) window.handTest.owner = { image, world };
         const owner = window.handTest.owner;
-        window.handTest.emit({ landmarks: [], hands: keepOwner ? [owner.image, image] : [image],
+        window.handTest.emit({ landmarks: [{ x: .4, y: .3, z: 0, visibility: 1 }, { x: .6, y: .7, z: 0, visibility: 1 }], hands: keepOwner ? [owner.image, image] : [image],
           handWorldLandmarks: keepOwner ? [owner.world, world] : [world], handedness: keepOwner ? ['Right', 'Left'] : ['Right'], timestamp, width: 640, height: 480 });
       }, { timestamp, options });
       timestamp += 100;
     }
     const geometry = () => page.locator('.figure-wireframe g[data-edge]').evaluateAll(edges => edges.map(edge => edge.outerHTML).join(''));
-    // Open away from the palette; close before arriving over the icon.
-    await emit({ x: .3 }); await emit({ x: .3, gesture: 'pinch' }); await emit({ target: 'Cube', gesture: 'pinch' });
+    // A pinch arriving with no middle fingertip selects immediately.
+    await emit({ target: 'Cube', gesture: 'pinch', missingTip: 12 });
     await page.locator('.figure-wireframe').waitFor();
+    assert.equal(await page.locator('.pose-camera-mirror > svg > line, .pose-camera-mirror > svg > circle').count(), 0,
+      'Visible body landmarks and connections do not render a body wireframe');
+    assert.ok(await page.locator('.pose-camera-hand circle').count() > 0, 'Hand landmarks remain visible');
+    assert.ok(await page.locator('.pose-camera-hand line').count() > 0, 'Hand connections remain visible');
+
     assert.equal(await page.getByRole('button', { name: 'Cube', exact: true }).getAttribute('aria-pressed'), 'true');
     for (const mirrored of [true, false]) {
       const layers = await page.evaluate(mirrored => {
@@ -342,7 +357,7 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
     assert.equal(await page.locator('.figure-wireframe .figure-vertex-label').allTextContents().then(labels => labels.sort().join('')), 'ABCDEFGH');
     assert.equal(await page.locator('.figure-hidden-edge').first().evaluate(e => getComputedStyle(e).opacity), '0.3');
     await emit(); await emit(); const original = await geometry();
-    await emit({ tilt: 15 }); assert.notEqual(await geometry(), original, 'Tilt itself rotates the figure');
+    await emit({ tilt: 15 }); assert.notEqual(await geometry(), original, 'Extended three-finger tilt rotates the figure');
     const tilted = await geometry();
     await emit({ tilt: 105 }); assert.equal(await geometry(), tilted, 'Fast full-plane rotation is ignored');
     await emit({ tilt: 110 }); assert.notEqual(await geometry(), tilted, 'Next slower increment resumes immediately');
