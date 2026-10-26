@@ -11,26 +11,30 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,
 }).outputText, { exports: exportsObject });
 const { createFigureGestureController } = exportsObject;
 const rad = Math.PI / 180;
+// Analytic first sample after a fresh reference, including velocity filtering.
+const firstSmoothedAngle = degrees => {
+  const speed = degrees * rad / .067 * (1 - Math.exp(-2 * Math.PI * .067));
+  const cutoff = Math.min(1 / (2 * Math.PI * .1), 1 / (2 * Math.PI * .225) + speed);
+  return degrees * rad * (1 - Math.exp(-2 * Math.PI * cutoff * .067));
+};
 const context = { preview: { left: 100, top: 50, width: 640, height: 480 }, palette: { left: 100, top: 50, width: 100, height: 480 },
   targets: [{ id: 'cube', bounds: { left: 100, top: 140, width: 100, height: 100 } },
     { id: 'pyramid', bounds: { left: 100, top: 280, width: 100, height: 100 } }], activeFigure: 'cube' };
 function hand({ angle = 0, tilt = 0, x = .65, y = .5, size = 1, label = 'Right', gesture = 'spread', spacing = 1 } = {}) {
   const world = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }));
+  world[0] = { x: 0, y: .06, z: 0 };
   world[5] = { x: -.03, y: 0, z: 0 };
   world[17] = { x: .03, y: 0, z: 0 };
   const positions = gesture === 'triple' ? [[-.003, 0], [.003, 0], [0, .004]]
     : gesture === 'pinch' ? [[-.003, 0], [.003, 0], [.04, -.04]] : [[-.03, .02], [0, -.04], [.03, .02]];
   [4, 8, 12].forEach((i, j) => {
     const [px, py] = positions[j].map(v => v * spacing);
-    const tx = px * Math.cos(angle * rad) - py * Math.sin(angle * rad);
-    const ty = px * Math.sin(angle * rad) + py * Math.cos(angle * rad);
-    world[i] = { x: tx, y: ty * Math.cos(tilt * rad), z: ty * Math.sin(tilt * rad) };
+    world[i] = { x: px, y: py, z: 0 };
   });
-  world[1] = { x: -.06, y: .06, z: 0 }; world[9] = { x: .015, y: .035, z: 0 };
-  for (const [base, joint1, joint2, tip] of [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]) {
-    for (const [joint, fraction] of [[joint1, 1 / 3], [joint2, 2 / 3]]) {
-      world[joint] = Object.fromEntries(['x', 'y', 'z'].map(axis => [axis, world[base][axis] + fraction * (world[tip][axis] - world[base][axis])]));
-    }
+  for (const p of world) {
+    const tx = p.x * Math.cos(angle * rad) - p.y * Math.sin(angle * rad);
+    const ty = p.x * Math.sin(angle * rad) + p.y * Math.cos(angle * rad);
+    p.x = tx; p.y = ty * Math.cos(tilt * rad); p.z = ty * Math.sin(tilt * rad);
   }
   const image = world.map(p => ({ x: x + p.x * size, y: y + p.y * size, z: p.z }));
   image[0] = { x, y: y + .05 * size, z: 0 };
@@ -45,32 +49,26 @@ function frame(timestamp, hands = [hand()]) {
 const near = (a, b, tolerance = 1e-8) => assert.ok(Math.abs(a - b) < tolerance, `${a} ~= ${b}`);
 const start = (controller, options = {}, ctx = context, mirrored = false) => controller.update(frame(0, [hand(options)]), mirrored, ctx);
 
-test('extended three-finger orientation turns immediately with temporal smoothing', () => {
+test('palm orientation turns immediately with temporal smoothing', () => {
   for (const motion of [{ angle: 15 }, { angle: -15 }, { tilt: 15 }]) {
     const c = createFigureGestureController();
     assert.equal(start(c).rotation, null);
     const result = c.update(frame(67, [hand(motion)]), false, context);
-    assert.equal(result.mode, 'rotation'); near(result.rotation.angle, 15 * rad * (1 - Math.exp(-.67)));
+    assert.equal(result.mode, 'rotation'); near(result.rotation.angle, firstSmoothedAngle(15));
   }
 });
 test('fast rotation is skipped and the next slow rotation resumes without replay', () => {
   const c = createFigureGestureController(); start(c);
-  near(c.update(frame(67, [hand({ angle: 5 })]), false, context).rotation.angle, 5 * rad * (1 - Math.exp(-.67)));
+  near(c.update(frame(67, [hand({ angle: 5 })]), false, context).rotation.angle, firstSmoothedAngle(5));
   assert.equal(c.update(frame(134, [hand({ angle: 65 })]), false, context).state, 'ignored');
-  near(c.update(frame(201, [hand({ angle: 70 })]), false, context).rotation.angle, 5 * rad * (1 - Math.exp(-.67)));
+  near(c.update(frame(201, [hand({ angle: 70 })]), false, context).rotation.angle, firstSmoothedAngle(5));
 });
-test('each rotation finger must be extended, with no extension requirement for selection or resizing', () => {
-  for (const joint of [2, 6, 10]) {
-    const c = createFigureGestureController(); start(c);
-    const bent = hand({ angle: 5 }); bent.world[joint].z += .07;
-    assert.equal(c.update(frame(67, [bent]), false, context).mode, 'inactive');
-    assert.equal(c.update(frame(134, [hand({ angle: 40 })]), false, context).rotation, null);
-    assert.ok(c.update(frame(201, [hand({ angle: 45 })]), false, context).rotation);
-    const selecting = hand({ x: .07, y: .3, gesture: 'pinch' }); selecting.world[joint].z += .07;
-    assert.equal(createFigureGestureController().update(frame(0, [selecting]), false, context).selection, 'cube');
-    const sizing = hand({ gesture: 'triple' }); sizing.world[joint].z += .07;
-    assert.equal(createFigureGestureController().update(frame(0, [sizing]), false, context).mode, 'scaling');
-  }
+test('finger bending and fingertip movement do not rotate a stationary palm', () => {
+  const c = createFigureGestureController(); start(c);
+  const h = hand();
+  for (const i of [2, 3, 4, 6, 7, 8, 10, 11, 12]) h.world[i].z += .04;
+  const r = c.update(frame(67, [h]), false, context);
+  assert.equal(r.mode, 'rotation'); near(r.rotation.angle, 0);
 });
 
 test('smoothing suppresses alternating jitter and converges to intentional motion', () => {
@@ -81,7 +79,7 @@ test('smoothing suppresses alternating jitter and converges to intentional motio
     assert.ok(r.angle < 1 * rad); total += r.angle * -r.axis[2];
   }
   assert.ok(Math.abs(total) < .5 * rad);
-  for (let i = 31; i <= 60; i++) {
+  for (let i = 31; i <= 90; i++) {
     const r = c.update(frame(i * 67, [hand({ angle: 15 })]), false, context).rotation;
     total += r.angle * -r.axis[2];
   }
@@ -110,14 +108,14 @@ test('selection accepts a finger-pad gap relative to hand size without requiring
       for (const p of h.world) { p.x *= scale; p.y *= scale; p.z *= scale; }
       return h;
     };
-    c.update(frame(0, [make(.051)]), mirrored, context);
-    assert.equal(c.update(frame(67, [make(.040)]), mirrored, context).selection, null, 'An open pinch must not select');
-    assert.equal(c.update(frame(134, [make(.034)]), mirrored, context).selection, 'cube', 'Separated landmarks can represent touching finger pads');
-    assert.equal(c.update(frame(201, [make(.034)]), mirrored, context).selection, 'cube', 'Holding remains valid');
-    c.update(frame(268, [make(.040)]), mirrored, context);
-    assert.equal(c.update(frame(335, [make(.034)]), mirrored, context).selection, 'cube', 'No reopening is required');
-    c.update(frame(402, [make(.051)]), mirrored, context);
-    assert.equal(c.update(frame(469, [make(.034)]), mirrored, context).selection, 'cube', 'Selection depends only on the current pinch');
+    c.update(frame(0, [make(.058)]), mirrored, context);
+    assert.equal(c.update(frame(67, [make(.052)]), mirrored, context).selection, null, 'An open pinch must not select');
+    assert.equal(c.update(frame(134, [make(.046)]), mirrored, context).selection, 'cube', 'A loose 46 mm estimated gap selects without fingertip contact');
+    assert.equal(c.update(frame(201, [make(.046)]), mirrored, context).selection, 'cube', 'Holding remains valid');
+    c.update(frame(268, [make(.052)]), mirrored, context);
+    assert.equal(c.update(frame(335, [make(.046)]), mirrored, context).selection, 'cube', 'No reopening is required');
+    c.update(frame(402, [make(.058)]), mirrored, context);
+    assert.equal(c.update(frame(469, [make(.046)]), mirrored, context).selection, 'cube', 'Selection depends only on the current pinch');
   }
 });
 
@@ -137,14 +135,14 @@ test('tracking dropouts allow immediate selection but never accumulated motion',
   c.update(frame(634, [hand()]), false, context);
   const reacquired = c.update(frame(1000, [hand({ angle: 70 })]), false, context);
   assert.equal(reacquired.rotation, null);
-  near(c.update(frame(1067, [hand({ angle: 75 })]), false, context).rotation.angle, 5 * rad * (1 - Math.exp(-.67)));
+  near(c.update(frame(1067, [hand({ angle: 75 })]), false, context).rotation.angle, firstSmoothedAngle(5));
 });
 
 test('triple pinch accepts non-touching landmarks across hand sizes and camera magnifications', () => {
   for (const worldScale of [.7, 1, 1.5]) for (const imageScale of [.7, 1.3]) {
     const c = createFigureGestureController();
     const make = y => {
-      const h = hand({ gesture: 'triple', spacing: 4, size: imageScale, y });
+      const h = hand({ gesture: 'triple', spacing: 7.5, size: imageScale, y });
       for (const p of h.world) { p.x *= worldScale; p.y *= worldScale; p.z *= worldScale; }
       return h;
     };
@@ -200,7 +198,7 @@ test('triple pinch up/down changes length proportionally; switching modes never 
   near(factor, 2);
   assert.ok(c.update(frame(700, [hand({ gesture: 'triple', y: .5 })]), false, context).scaleFactor < 1);
   assert.equal(c.update(frame(800, [hand({ angle: 40 })]), false, context).rotation, null);
-  near(c.update(frame(867, [hand({ angle: 45 })]), false, context).rotation.angle, 5 * rad * (1 - Math.exp(-.67)));
+  near(c.update(frame(867, [hand({ angle: 45 })]), false, context).rotation.angle, firstSmoothedAngle(5));
 });
 test('fast resizing is skipped and slowing down resumes on the next observation', () => {
   const c = createFigureGestureController(); start(c, { gesture: 'triple', y: .7 });
@@ -211,10 +209,10 @@ test('fast resizing is skipped and slowing down resumes on the next observation'
 });
 test('triple pinch has hand-relative hysteresis and opens into rotation without a jump', () => {
   const c = createFigureGestureController(); start(c, { gesture: 'triple' });
-  assert.equal(c.update(frame(67, [hand({ gesture: 'triple', spacing: 6, y: .48 })]), false, context).mode, 'scaling');
-  const exited = c.update(frame(134, [hand({ gesture: 'triple', spacing: 8, y: .46 })]), false, context);
+  assert.equal(c.update(frame(67, [hand({ gesture: 'triple', spacing: 9, y: .48 })]), false, context).mode, 'scaling');
+  const exited = c.update(frame(134, [hand({ gesture: 'triple', spacing: 10, y: .46 })]), false, context);
   assert.equal(exited.mode, 'rotation'); assert.equal(exited.scaleFactor, null); assert.equal(exited.rotation, null);
-  assert.equal(c.update(frame(201, [hand({ gesture: 'triple', spacing: 6, y: .44 })]), false, context).mode, 'rotation');
+  assert.equal(c.update(frame(201, [hand({ gesture: 'triple', spacing: 9, y: .44 })]), false, context).mode, 'rotation');
 });
 test('a relaxed hand does not claim control before another hand reaches a palette target', () => {
   const c = createFigureGestureController(); const ctx = { ...context, activeFigure: null };
@@ -249,12 +247,12 @@ test('the selecting hand establishes its own reference without replaying the old
   assert.equal(c.update(frame(134, [owner, hand({ label: 'Left', x: .07, y: .6, gesture: 'pinch' })]), false, context).selection, 'pyramid');
   const ctx = { ...context, activeFigure: 'pyramid' };
   assert.equal(c.update(frame(201, [owner, hand({ label: 'Left', x: .7, angle: 40 })]), false, ctx).rotation, null);
-  near(c.update(frame(268, [owner, hand({ label: 'Left', x: .7, angle: 45 })]), false, ctx).rotation.angle, 5 * rad * (1 - Math.exp(-.67)));
+  near(c.update(frame(268, [owner, hand({ label: 'Left', x: .7, angle: 45 })]), false, ctx).rotation.angle, firstSmoothedAngle(5));
 });
 
 test('selection reports target, pinch and tracking blockers', () => {
   const c = createFigureGestureController();
-  assert.match(start(c, { x: .07, y: .3 }).selectionHint, /Pinch thumb/);
+  assert.match(start(c, { x: .07, y: .3 }).selectionHint, /thumb and index/);
   assert.equal(c.update(frame(67, [hand({ x: .07, y: .3, gesture: 'triple' })]), false, context).selection, 'cube');
   assert.equal(c.update(frame(134, [hand({ x: .07, y: .3, gesture: 'pinch' })]), false, context).selection, 'cube');
   c.update(frame(201, [hand({ x: .07, y: .3 })]), false, context);
@@ -280,16 +278,16 @@ test('invalid or ambiguous second hands cannot select around a retained owner', 
 test('hand identity survives array reordering and changes require one fresh reference', () => {
   const c = createFigureGestureController(); start(c);
   const left = hand({ label: 'Left', x: .85 });
-  near(c.update(frame(67, [left, hand({ angle: 5 })]), false, context).rotation.angle, 5 * rad * (1 - Math.exp(-.67)));
+  near(c.update(frame(67, [left, hand({ angle: 5 })]), false, context).rotation.angle, firstSmoothedAngle(5));
   assert.equal(c.update(frame(134, [left]), false, context).rotation, null);
-  near(c.update(frame(201, [hand({ label: 'Left', x: .85, angle: 5 })]), false, context).rotation.angle, 5 * rad * (1 - Math.exp(-.67)));
+  near(c.update(frame(201, [hand({ label: 'Left', x: .85, angle: 5 })]), false, context).rotation.angle, firstSmoothedAngle(5));
 });
 test('gaps, duplicates, ambiguous identity, invalid data, layout and figure changes cannot jump', () => {
   for (const mutation of ['gap', 'duplicate', 'invalid', 'ambiguous', 'layout', 'figure']) {
     const c = createFigureGestureController(); start(c);
     let f = frame(mutation === 'gap' ? 400 : mutation === 'duplicate' ? 0 : 67, [hand({ angle: 20 })]);
     let ctx = context;
-    if (mutation === 'invalid') f.handWorldLandmarks[0][8].z = NaN;
+    if (mutation === 'invalid') f.handWorldLandmarks[0][0].z = NaN;
     if (mutation === 'ambiguous') f = frame(67, [hand(), hand({ x: .85 })]);
     if (mutation === 'layout') ctx = { ...context, preview: { ...context.preview, width: 600 } };
     if (mutation === 'figure') ctx = { ...context, activeFigure: 'pyramid' };
@@ -307,15 +305,15 @@ test('reflection reverses screen twist and camera reset clears only gesture refe
 });
 
 
-test('narrow or collapsed fingertip triangles disengage rotation', () => {
+test('collapsed palm geometry disengages rotation and reacquires without a jump', () => {
   const c = createFigureGestureController(); start(c);
-  const h = hand(); h.world[4] = { ...h.world[8] };
+  const h = hand(); h.world[0] = { x: 0, y: 0, z: 0 };
   assert.equal(c.update(frame(67, [h]), false, context).rotation, null);
   assert.equal(c.update(frame(134, [hand({ angle: 30 })]), false, context).rotation, null);
   assert.ok(c.update(frame(201, [hand({ angle: 35 })]), false, context).rotation);
 });
 
-test('depth tilt rotates the three-finger triangle and rigid 3D hand angles preserve pinch acceptance', () => {
+test('depth tilt rotates the palm plane and rigid 3D hand angles preserve pinch acceptance', () => {
   const c = createFigureGestureController(); start(c);
   const rotation = c.update(frame(67, [hand({ tilt: 15 })]), false, context).rotation;
   assert.ok(rotation.angle > 0); assert.ok(Math.abs(rotation.axis[0]) > .5);
@@ -357,15 +355,13 @@ function omitTip(h, tip, kind) {
   return h;
 }
 
-test('rotation requires all three fingertips but ignores ring and little fingertips', () => {
+test('palm rotation works with every fingertip missing or offscreen', () => {
   for (const kind of partialKinds) for (const mirrored of [false, true]) {
-    for (const tip of [4, 8, 12]) {
-      const c = createFigureGestureController(); start(c, {}, context, mirrored);
-      assert.equal(c.update(frame(67, [omitTip(hand({ angle: 5 }), tip, kind)]), mirrored, context).rotation, null);
-    }
     const c = createFigureGestureController(); start(c, {}, context, mirrored);
-    const h = omitTip(omitTip(hand({ angle: 5 }), 16, kind), 20, kind);
-    assert.ok(c.update(frame(67, [h]), mirrored, context).rotation);
+    const h = hand({ angle: 5 });
+    for (const tip of [4, 8, 12, 16, 20]) omitTip(h, tip, kind);
+    const r = c.update(frame(67, [h]), mirrored, context);
+    assert.equal(r.mode, 'rotation'); assert.ok(r.rotation.angle > 0);
   }
 });
 
@@ -385,7 +381,8 @@ test('missing required fingertips disable only the affected gesture and reacquir
       const h = omitTip(hand({ x: .07, y: .3, gesture: 'pinch' }), tip, kind);
       assert.equal(c.update(frame(0, [h]), false, context).selection, null);
     }
-    for (const tip of [4, 8, 12]) {
+    for (const tip of [0, 5, 17]) {
+      if (['left', 'right', 'top', 'bottom'].includes(kind)) continue;
       const c = createFigureGestureController(); start(c);
       assert.equal(c.update(frame(67, [omitTip(hand({ angle: 5 }), tip, kind)]), false, context).rotation, null);
       assert.equal(c.update(frame(134, [hand({ angle: 40 })]), false, context).rotation, null);
@@ -402,11 +399,103 @@ test('missing required fingertips disable only the affected gesture and reacquir
 });
 
 
-test('three-finger orientation follows a continuous depth turn past edge-on without reversing', () => {
+test('palm orientation follows a continuous depth turn past edge-on without reversing', () => {
   const c = createFigureGestureController(); start(c);
   for (let i = 1; i <= 36; i++) {
     const r = c.update(frame(i * 67, [hand({ tilt: i * 5 })]), false, context).rotation;
     assert.ok(r && r.angle > 0, `tilt ${i * 5}`);
-    assert.ok(r.axis[0] > .99, `same rotation direction at tilt ${i * 5}`);
+    assert.ok(r.axis[0] < -.99, `reversed wrist-tilt direction at tilt ${i * 5}`);
+  }
+});
+
+
+test('an edge-on projected knuckle row retains palm rotation', () => {
+  const c = createFigureGestureController();
+  const make = angle => {
+    const h = hand({ angle });
+    h.image[5] = { x: .65, y: .5, z: -.03 };
+    h.image[17] = { x: .65, y: .5, z: .03 };
+    return h;
+  };
+  c.update(frame(0, [make(0)]), false, context);
+  assert.ok(c.update(frame(67, [make(5)]), false, context).rotation);
+});
+
+
+test('only camera-horizontal wrist tilt reverses, preserving yaw and roll in both camera orientations', () => {
+  for (const mirrored of [false, true]) for (const axis of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1 / 3, 2 / 3, 2 / 3]]) {
+    for (const sign of [-1, 1]) {
+      const c = createFigureGestureController(); start(c, {}, context, mirrored);
+      const h = hand(); const angle = sign * 10 * rad;
+      for (const p of h.world) {
+        const v = [p.x, p.y, p.z];
+        const dot = axis.reduce((sum, value, i) => sum + value * v[i], 0);
+        const cross = [axis[1] * v[2] - axis[2] * v[1], axis[2] * v[0] - axis[0] * v[2], axis[0] * v[1] - axis[1] * v[0]];
+        [p.x, p.y, p.z] = v.map((value, i) => value * Math.cos(angle) + cross[i] * Math.sin(angle) + axis[i] * dot * (1 - Math.cos(angle)));
+      }
+      const r = c.update(frame(67, [h]), mirrored, context).rotation;
+      near(r.angle, firstSmoothedAngle(10));
+      const expected = [-axis[0], axis[1] * (mirrored ? 1 : -1), axis[2] * (mirrored ? 1 : -1)];
+      expected.forEach((value, i) => near(r.axis[i], sign * value));
+    }
+  }
+});
+
+
+test('smoothing bounds jitter and settling time across sample rates and wrist tilt', () => {
+  for (const mirrored of [false, true]) for (const motion of ['angle', 'tilt']) {
+    for (const intervals of [[1000 / 15], [1000 / 30], [1000 / 60], [25, 80, 80, 25]]) {
+      const c = createFigureGestureController(); start(c, {}, context, mirrored);
+      const component = motion === 'tilt' ? 0 : 2;
+      const direction = motion === 'tilt' || !mirrored ? -1 : 1;
+      let time = 0, position = 0, peak = 0;
+      for (let i = 0; time < 2000; i++) {
+        time += intervals[i % intervals.length];
+        const r = c.update(frame(time, [hand({ [motion]: i % 2 ? -1 : 1 })]), mirrored, context).rotation;
+        assert.ok(r);
+        position += r.angle * r.axis[component] * direction / rad;
+        if (time > 500) peak = Math.max(peak, Math.abs(position));
+      }
+      assert.ok(peak < .25, `One-degree jitter stays below a quarter degree: ${peak}`);
+      // A deliberate 15-degree turn reaches 90% within 550 ms and never overshoots.
+      let elapsed = 0;
+      for (let i = 0; elapsed < 550 - 1e-8; i++) {
+        const dt = Math.min(intervals[i % intervals.length], 550 - elapsed);
+        elapsed += dt; time += dt;
+        const r = c.update(frame(time, [hand({ [motion]: 15 * Math.min(1, elapsed / 50) })]), mirrored, context).rotation;
+        assert.ok(r);
+        position += r.angle * r.axis[component] * direction / rad;
+        assert.ok(position <= 15 + 1e-8);
+      }
+      assert.ok(position > 13.5, `Turn settles at least 90% within 550 ms: ${position}`);
+    }
+  }
+});
+
+
+test('adaptive smoothing is steadier than fixed 100 ms and follows turns faster than fixed 225 ms', () => {
+  for (const hz of [15, 30, 60]) {
+    const c = createFigureGestureController(); start(c);
+    const dt = 1000 / hz;
+    let position = 0, fixed100 = 0, fixed225 = 0;
+    let jitter = 0, fixedJitter = 0, returnedJitter = 0, returnedFixedJitter = 0;
+    let lag = 0, fixedLag = 0;
+    for (let i = 1; i <= 6 * hz; i++) {
+      const seconds = i / hz;
+      const target = seconds <= 2 ? (i % 2 ? 1 : -1)
+        : seconds <= 3 ? (seconds - 2) * 30
+          : seconds <= 4 ? 30 : 30 + (i % 2 ? 1 : -1);
+      const r = c.update(frame(i * dt, [hand({ angle: target })]), false, context).rotation;
+      assert.ok(r);
+      position += r.angle * -r.axis[2] / rad;
+      fixed100 += (target - fixed100) * (1 - Math.exp(-dt / 100));
+      fixed225 += (target - fixed225) * (1 - Math.exp(-dt / 225));
+      if (seconds > 1 && seconds <= 2) { jitter += position ** 2; fixedJitter += fixed100 ** 2; }
+      if (seconds > 2.5 && seconds <= 3) { lag += target - position; fixedLag += target - fixed225; }
+      if (seconds > 5) { returnedJitter += (position - 30) ** 2; returnedFixedJitter += (fixed100 - 30) ** 2; }
+    }
+    assert.ok(Math.sqrt(jitter / fixedJitter) < .7, 'At least 30% lower resting RMS jitter than fixed 100 ms');
+    assert.ok(lag / fixedLag < .75, 'At least 25% lower turning lag than fixed 225 ms');
+    assert.ok(Math.sqrt(returnedJitter / returnedFixedJitter) < .7, 'Strong smoothing returns after movement stops');
   }
 });

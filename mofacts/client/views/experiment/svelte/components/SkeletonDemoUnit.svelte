@@ -78,7 +78,7 @@
         const detection = frame.landmarks.length ? 'Body detected' : 'No body detected';
         status = `${detection} · ${control.selection ? 'Figure selected.' : control.state === 'ignored' ? 'Fast movement ignored.'
           : control.selectionHint ? control.selectionHint
-          : control.mode === 'rotation' ? 'Rotate with thumb, index, and middle fingers extended and apart.'
+          : control.mode === 'rotation' ? 'Turn your palm to rotate the figure.'
             : control.mode === 'scaling' ? 'Triple pinch: move up to enlarge, down to shrink.'
               : 'Pinch over a figure on the left to select it.'}`;
       }, fail);
@@ -140,7 +140,7 @@
 <section class="skeleton-demo" aria-label="Skeleton demo">
   <div class="card skeleton-demo-controls-card">
   <div class="card-body skeleton-demo-toolbar">
-  <p class="skeleton-demo-instructions">Pinch an icon to select. Extend and spread thumb, index, and middle fingers to rotate; triple pinch and move up/down to resize.</p>
+  <p class="skeleton-demo-instructions">Pinch an icon to select. Turn your palm to rotate; triple pinch and move up/down to resize.</p>
   <div class="skeleton-demo-control-row">
   <div class="skeleton-demo-controls">
     {#if active || starting}

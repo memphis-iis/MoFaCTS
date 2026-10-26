@@ -2,10 +2,18 @@
   import type { FigureProjection } from '../services/figureScene';
   export let projection: FigureProjection;
   export let miniature = false;
+  // Fit the thumbnail to its annotated drawing rather than the scene viewport.
+  // Reserve text extents so vertex letters and the measurement remain visible.
+  $: labelHalfWidth = projection.lengthLabel.text.length * 4;
+  $: left = Math.min(...projection.vertices.map(v => v.x - 8), projection.lengthLabel.x - labelHalfWidth) - 4;
+  $: right = Math.max(...projection.vertices.map(v => v.x + 8), projection.lengthLabel.x + labelHalfWidth) + 4;
+  $: top = Math.min(...projection.vertices.map(v => v.y - 8), projection.lengthLabel.y - 8) - 4;
+  $: bottom = Math.max(...projection.vertices.map(v => v.y + 8), projection.lengthLabel.y + 8) + 4;
+  $: miniatureViewBox = `${left} ${top} ${right - left} ${bottom - top}`;
 </script>
 
 <svg class="figure-vector" class:figure-wireframe={!miniature} class:figure-miniature={miniature}
-  width="100%" height="100%" viewBox={miniature ? '0 0 240 220' : undefined}
+  width="100%" height="100%" viewBox={miniature ? miniatureViewBox : undefined}
   role={miniature ? undefined : 'img'} aria-hidden={miniature ? true : undefined}
   aria-label={miniature ? undefined : `${projection.name}, ${projection.lengthLabel.text}`}>
   {#each [false, true] as visible}

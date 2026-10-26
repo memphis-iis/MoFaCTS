@@ -3182,9 +3182,14 @@ strong, b { font-weight: var(--app-font-weight-bold); }
     pointer-events: none;
     color: var(--app-text-color);
 }
-.figure-palette { display: flex; flex-direction: column; justify-content: center; align-self: center; gap: var(--app-space-1); padding: var(--app-space-1); margin: var(--app-space-1); min-width: 0; max-height: calc(100% - 2 * var(--app-space-1)); pointer-events: auto; }
-.figure-palette-button { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 44px; padding: var(--app-space-1); font-size: calc(var(--app-font-size-base) * 0.75); }
-.figure-palette-button .figure-miniature { display: block; width: 100%; max-width: 112px; height: auto; min-height: 0; flex: 0 1 auto; aspect-ratio: 240 / 220; }
+.figure-palette { background-color: transparent; border-color: transparent; justify-self: start; width: calc(100% - 2 * var(--app-space-1)); max-width: 108px; display: flex; flex-direction: column; justify-content: center; align-self: center; gap: var(--app-space-1); padding: calc(var(--app-space-1) / 2); margin: var(--app-space-1); min-width: 0; max-height: calc(100% - 2 * var(--app-space-1)); pointer-events: auto; }
+.figure-palette-button { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 44px; padding: calc(var(--app-space-1) / 2); font-size: calc(var(--app-font-size-base) * 0.75); }
+/* Translucent surfaces reveal the camera without fading icons, labels, or focus. */
+.figure-palette .figure-palette-button.btn-outline-secondary { background-color: color-mix(in srgb, var(--learning-card-surface-color) 60%, transparent); }
+.figure-palette .figure-palette-button.btn-primary { background-color: color-mix(in srgb, var(--app-primary-action-surface-color) 60%, transparent); }
+.figure-palette .figure-palette-button.btn-outline-secondary:hover { background-color: color-mix(in srgb, var(--btn-secondary-hover-bg) 70%, transparent); }
+.figure-palette .figure-palette-button.btn-primary:hover { background-color: color-mix(in srgb, var(--btn-hover-bg) 70%, transparent); }
+.figure-palette-button .figure-miniature { display: block; width: 100%; max-width: 112px; height: auto; min-height: 0; flex: 0 1 auto; }
 .figure-display { min-width: 0; min-height: 0; position: relative; }
 .figure-wireframe { display: block; overflow: hidden; }
 .figure-vector line { stroke: var(--app-accent-color); stroke-width: 2; stroke-linecap: round; }

@@ -23,7 +23,9 @@ hand and finger landmarks and connecting lines, without the full-body wireframe.
 Keep the fingertips used by the current gesture in view. A left-hand palette offers Cube and Pyramid as miniature labeled 3D
 wireframes, using the same exact geometry, projection, hidden edges, midpoint
 equality ticks, and AB annotation as the main display. Initially no figure is active. Place the midpoint of your thumb and index fingertips anywhere inside a figure
-button. Whenever those fingertips are pinched, that button selects immediately.
+button. The compact buttons use half-spacing padding and translucent theme-colored
+backgrounds so the camera remains visible behind fully opaque icons and labels.
+Whenever those fingertips are pinched, that button selects immediately.
 No prior opening or closing motion is required. Keep the pinch held while moving
 between buttons to switch figures. Middle-finger position does not block selection;
 a three-finger pinch over a button also selects it. Tracking reacquisition accepts
@@ -47,9 +49,8 @@ solid centroid one-quarter of that height above the base. Both figures rotate
 and scale about their volume centroid, with a fixed orthographic view. Each
 remembers its own orientation and length when switching within this unit.
 
-Away from the palette, extend and spread the thumb, index, and middle fingers
-to rotate. The figure follows the full orientation of their fingertip triangle,
-with temporal smoothing.
+Away from the palette, turn your palm to rotate. The figure follows the full
+orientation of the palm plane with temporal smoothing; no finger pose is required.
 Bring all three tips together and move upward to grow
 the figure or downward to shrink it. This changes all edge lengths and the AB
 label, within 0.25-4 units. One-quarter of the preview height doubles/halves size.
@@ -121,7 +122,7 @@ database fields, or data migration are needed. The demo's labels are English.
 - `SkeletonDemoUnit.svelte`: owns the registered unit's camera controls,
   initialization, status, teardown and completion.
 - `learning-components/units/skeleton-demo/figureGestures.ts`: one pure classifier
-  for palette selection, smoothed three-fingertip rotation, triple-pinch resizing, and
+  for palette selection, smoothed palm-plane rotation, triple-pinch resizing, and
   inactive movement. Explicit frame/context input includes actual palette bounds
   and the active figure; output supplies selection, axis/angle, or size factor.
 - `figureGeometry.ts` in the same directory: unit-edge cube and square-pyramid
@@ -142,31 +143,42 @@ actual speed depends on the learner's device.
 
 ## Gesture limits and coordinate contract
 
-Rotation uses an ordered 3D triangle of thumb, index, and middle fingertips.
-All three fingers must be extended: each base-to-tip distance must be at least
-90% of its three-segment joint-chain length. This uses world coordinates, not
-screen direction. Rotation enters when every fingertip pair is at least 25.4 mm
-apart and exits below 20 mm. A triangle area ratio below 0.08 disables rotation;
-a normalized side-proportion change above 0.12 rejects that movement.
-The full relative orientation includes tilt and twist. A 100 ms time-constant
-spherical orientation filter reduces jitter while retaining slow movement.
-Resizing only requires the three tips together, with no finger-extension check.
+Rotation uses the wrist and index/little-finger base landmarks (0, 5, 17) in
+estimated 3D world coordinates. These define a palm plane and an in-plane axis,
+independent of fingertip positions, finger extension, or fingertip overlap.
+A palm triangle area ratio below 0.08 disables rotation; a normalized side-proportion
+change above 0.12 rejects that movement. The full relative orientation includes
+tilt and twist. Forward/backward wrist tilt is reversed about the camera-horizontal
+axis; side-to-side turning and clockwise/counterclockwise rotation keep their
+existing directions. This mapping is applied after smoothing in both mirrored
+and unmirrored views. A One Euro-style adaptive spherical orientation filter uses a 225 ms resting
+time constant and reduces it toward 100 ms during deliberate turns. Signed 3D angular
+velocity is low-pass filtered at 1 Hz before its magnitude sets the orientation
+cutoff (base 0.707 Hz plus 1 Hz per rad/s, capped at 1.592 Hz). Filtering the velocity
+vector lets alternating jitter cancel instead of automatically accelerating the filter.
+Both filters use elapsed-time exponential integration; orientation follows the shortest
+3D rotation without Euler-angle averaging or a dead zone. This is an SO(3) adaptation
+of the [One Euro filter](https://gery.casiez.net/publications/CHI2012-casiez.pdf), with a
+bounded cutoff. It does not predict motion or interpolate display frames between observations.
+Resizing requires the three fingertips together and takes priority over palm rotation.
 Outside the palette, triple pinch takes priority over rotation. Ambiguous directions, tracking gaps over 250 ms,
-mode/owner changes, and rejected motion establish a fresh smoothing reference.
+mode/owner changes, and rejected motion establish a fresh smoothing reference and clear the angular-velocity estimate.
 Angular speed above 720 degrees/s, translation above 6 palm widths/s, or apparent
 size change above 4.5/s is ignored without replaying that movement.
-Selection accepts a thumb-index gap up to 60% of estimated 3D palm width,
+Selection accepts a thumb-index gap up to 80% of estimated 3D palm width,
 independently of prior frames or middle-finger spacing. Triple pinch activates
-resizing immediately at 50% and remains active up to 70% to avoid mode jitter.
+resizing immediately at 80% and remains active up to 95% to avoid mode jitter.
 Its first observation establishes the position from which up/down movement changes size;
 there is no arming step, opening requirement, or dwell timer. Palm width is measured between index
 and little-finger bases in 3D, so ratios do not directly use foreshortened 2D
-camera distances. For a 60 mm palm, selection accepts a 36 mm estimated gap. These are model estimates requiring physical testing.
+camera distances. For a 60 mm palm, both selection and resizing accept gaps up to 48 mm (all three pairs for resizing).
+Fingertips do not need to touch or press together. These are model estimates requiring physical testing.
 Finite palm landmarks may lie outside the preview when reaching toward an edge;
 only the fingertips used by the current gesture must remain in view. Stop/switch/hide and tracking gaps clear motion references.
 Distances are MediaPipe estimates, not calibrated physical measurements.
 
-Screen translation uses the palm center and width. Absolute log palm-size change
+Screen translation uses the palm center and largest projected wrist/knuckle span.
+This avoids rejecting the palm solely because its knuckle row is viewed edge-on. Absolute log palm-size change
 per second is a coarse depth-motion signal (ignore above 4.5).
 Hand-world coordinates are hand-centered and are never treated as absolute
 room position. These thresholds need physical-camera tuning; they are not
@@ -244,18 +256,18 @@ the fingers, and moving toward the camera. Check that the figure remains still
 during fast movements and resumes immediately on slower motion without a jump.
 No physical result is implied
 by a synthetic test passing.
-Also physically try both palette icons with thumb-index pinch, three-finger tilt and twist,
-the extended three-finger gesture, and triple-pinch up/down resizing. Check
+Also physically try both palette icons with thumb-index pinch, palm tilt and twist,
+the palm rotation, and triple-pinch up/down resizing. Check
 comfortable targeting and that switching figures restores their individual state.
 
 
 ### Partial hand visibility
 
-Fingertip validation is specific to each gesture: button selection requires thumb
-and index; rotation and resizing require thumb, index, and middle. Rotation also
-requires finite joint estimates for those three fingers to check extension.
-A missing middle fingertip does not block button selection. Missing ring or little
-fingertips do not block these gestures. Each gesture requires its own tips in view.
+Validation is specific to each gesture: button selection requires thumb and index
+tips; resizing requires thumb, index, and middle tips. Palm rotation needs no
+fingertips, only usable wrist and index/little-knuckle estimates. Missing, invalid,
+or off-screen fingertips do not block palm rotation. Missing middle fingertips
+do not block button selection. Pinches require their own fingertips in view.
 Palm estimates and confident hand identity remain necessary for scale and motion
 continuity; the tracker must still detect a hand. Missing points are not fabricated.
 Losing a required point stops that gesture; reacquiring it establishes a fresh

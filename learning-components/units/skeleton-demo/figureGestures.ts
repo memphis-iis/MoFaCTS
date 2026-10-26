@@ -26,13 +26,13 @@ export interface FigureGestureResult {
 }
 export const FIGURE_GESTURE_LIMITS = Object.freeze({
   maxGapMs: 250, maxAngularSpeed: 720 * Math.PI / 180, maxTranslationSpeed: 6,
-  maxScaleSpeed: 4.5, rotationSmoothingMs: 100, minFingerStraightness: 0.90,
+  maxScaleSpeed: 4.5, rotationSmoothingMs: 225, rotationMinSmoothingMs: 100,
+  rotationSpeedCutoffHz: 1, rotationSpeedCoefficient: 1,
   minTriangleArea: 0.08, maxShapeChange: 0.12,
   identityDistance: 3, minHandednessConfidence: 0.7,
-  spreadEnter: 0.0254, spreadExit: 0.020,
-  // Both pinch gestures permit separated landmarks when the finger pads meet.
+  // Both pinch gestures accept a loose cluster of fingertips without contact.
   // Ratios use 3D palm width (index MCP to little-finger MCP), not camera distance.
-  pinchEnter: 0.50, pinchExit: 0.70, selectionPinchEnter: 0.60, resizeDoublingHeight: 0.25,
+  pinchEnter: 0.80, pinchExit: 0.95, selectionPinchEnter: 0.80, resizeDoublingHeight: 0.25,
 });
 const add = (a: Vec, b: Vec): Vec => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a: Vec, b: Vec): Vec => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -45,13 +45,13 @@ const inside = (p: Vec, r: GestureRect) => p[0] >= r.left && p[0] <= r.left + r.
 interface Sample {
   center: Vec; palmSize: number; timestamp: number;
   pinch: { center: Vec; thumb: Vec; index: Vec; ratio: number } | null;
-  rotation: { basis: Vec[]; shape: number[]; separation: number; cursor: Vec } | null;
+  rotation: { basis: Vec[]; shape: number[]; cursor: Vec } | null;
   scaling: { cursor: Vec; ratio: number } | null;
 }
 function sample(frame: FigureGestureFrame, index: number, mirrored: boolean, preview: GestureRect): Sample | null {
   const image = frame.hands[index]; const world = frame.handWorldLandmarks[index];
   // Palm estimates supply hand scale and motion continuity. Each gesture below
-  // separately validates only its own fingertips; missing points are never filled in.
+  // separately validates its own landmarks; missing points are never filled in.
   if (!image || !world || ![0, 5, 17].every(i => finite(image[i]))
     || ![5, 17].every(i => finite(world[i]))) return null;
   const usable = (i: number) => finite(image[i]) && finite(world[i])
@@ -59,7 +59,10 @@ function sample(frame: FigureGestureFrame, index: number, mirrored: boolean, pre
   const screen = (i: number): Vec => [image[i]!.x * frame.width / frame.height, image[i]!.y, 0];
   const pixel = (i: number): Vec => [preview.left + (mirrored ? 1 - image[i]!.x : image[i]!.x) * preview.width, preview.top + image[i]!.y * preview.height, 0];
   const point = (i: number): Vec => [world[i]!.x * (mirrored ? -1 : 1), -world[i]!.y, -world[i]!.z];
-  const palmSize = length(sub(screen(5), screen(17)));
+  // Use the largest projected palm span so an edge-on knuckle row alone does
+  // not invalidate a still-visible palm or exaggerate the motion-speed checks.
+  const palmSize = Math.max(length(sub(screen(5), screen(17))),
+    length(sub(screen(0), screen(5))), length(sub(screen(0), screen(17))));
   if (palmSize < 0.01) return null;
   const worldPalmWidth = length(sub(point(5), point(17)));
   if (worldPalmWidth <= 1e-6) return null;
@@ -73,16 +76,9 @@ function sample(frame: FigureGestureFrame, index: number, mirrored: boolean, pre
     ratio: Math.max(pinch.ratio, length(sub(point(12), point(8))) / worldPalmWidth,
       length(sub(point(4), point(12))) / worldPalmWidth),
   } : null;
-  // Extension is measured along each finger in 3D, independently of camera angle.
-  const extended = (joints: number[]) => {
-    if (!joints.every(i => finite(world[i]))) return false;
-    const chain = joints.map(point);
-    const pathLength = chain.slice(1).reduce((sum, p, i) => sum + length(sub(p, chain[i]!)), 0);
-    return pathLength > 1e-6 && length(sub(chain[3]!, chain[0]!)) / pathLength >= FIGURE_GESTURE_LIMITS.minFingerStraightness;
-  };
   let rotation: Sample['rotation'] = null;
-  if (scaling && extended([1, 2, 3, 4]) && extended([5, 6, 7, 8]) && extended([9, 10, 11, 12])) {
-    const sides = [sub(point(8), point(4)), sub(point(12), point(8)), sub(point(4), point(12))];
+  if (finite(world[0])) {
+    const sides = [sub(point(17), point(5)), sub(point(0), point(17)), sub(point(5), point(0))];
     const distances = sides.map(length);
     const normal = cross(sides[0]!, scale(sides[2]!, -1));
     const longest = Math.max(...distances);
@@ -90,14 +86,15 @@ function sample(frame: FigureGestureFrame, index: number, mirrored: boolean, pre
       const x = unit(sides[0]!), z = unit(normal);
       const perimeter = distances.reduce((sum, d) => sum + d, 0);
       rotation = { basis: [x, cross(z, x), z], shape: distances.map(d => d / perimeter),
-        separation: Math.min(...distances), cursor: scaling.cursor };
+        cursor: scale(add(add(pixel(0), pixel(5)), pixel(17)), 1 / 3) };
     }
   }
   if (!pinch && !rotation && !scaling) return null;
   return { center: scale(add(add(screen(0), screen(5)), screen(17)), 1 / 3), palmSize,
     pinch, rotation, scaling, timestamp: frame.timestamp };
 }
-// An ordered fingertip triangle supplies all three axes of orientation.
+// Wrist and index/little knuckles define the palm plane and its in-plane axis.
+// Finger bending and fingertip overlap do not define this orientation.
 function orientationChange(previous: Vec[], current: Vec[]): { axis: Vec; angle: number } {
   const m = (r: number, c: number) => current.reduce((sum, v, i) => sum + v[r]! * previous[i]![c]!, 0);
   const m00 = m(0, 0), m11 = m(1, 1), m22 = m(2, 2), trace = m00 + m11 + m22;
@@ -127,6 +124,7 @@ function rotateBasis(basis: Vec[], axis: Vec, angle: number): Vec[] {
 export function createFigureGestureController() {
   let owner: string | null = null;
   let smoothedBasis: Vec[] | null = null;
+  let smoothedAngularVelocity: Vec = [0, 0, 0];
   let previous: Sample | null = null;
   let mode: Mode = 'inactive';
   let lastTimestamp: number | null = null;
@@ -134,7 +132,7 @@ export function createFigureGestureController() {
   let activeFigure: FigureId | null = null;
   let layoutKey = '';
   function resetReferences(): void {
-    owner = null; previous = null; smoothedBasis = null; mode = 'inactive'; lastTimestamp = null; lastMirrored = null; layoutKey = '';
+    owner = null; previous = null; smoothedBasis = null; smoothedAngularVelocity = [0, 0, 0]; mode = 'inactive'; lastTimestamp = null; lastMirrored = null; layoutKey = '';
   }
   function reset(): void { resetReferences(); }
   function update(frame: FigureGestureFrame, mirrored: boolean, context: FigureGestureContext): FigureGestureResult {
@@ -174,20 +172,20 @@ export function createFigureGestureController() {
       }
       const target = context.targets.find(t => inside(s.pinch!.center, t.bounds));
       const hint = !target ? 'Place the center of your thumb and index pinch over a figure button.'
-        : s.pinch.ratio > limits.selectionPinchEnter ? 'Pinch thumb and index together to select.' : undefined;
+        : s.pinch.ratio > limits.selectionPinchEnter ? 'Bring thumb and index loosely closer to select.' : undefined;
       if (!hint && target) {
         owner = label; previous = s; mode = 'palette';
         return out('controlling', { selection: target.id });
       }
       selectionHint ??= hint;
     }
-    if (!samples.size) selectionHint = frame.hands.length ? 'Hand tracking is incomplete or uncertain. Keep the fingertips used by the gesture in view.'
+    if (!samples.size) selectionHint = frame.hands.length ? 'Hand tracking is incomplete or uncertain. Keep the palm and the fingertips used by pinching in view.'
       : 'No hands detected. Bring a hand into view.';
-    if (owner !== null && !samples.has(owner)) { owner = null; previous = null; smoothedBasis = null; mode = 'inactive'; }
+    if (owner !== null && !samples.has(owner)) { owner = null; previous = null; smoothedBasis = null; smoothedAngularVelocity = [0, 0, 0]; mode = 'inactive'; }
     if (owner === null) {
       owner = [...samples].find(([, s]) => overPalette(s)
         || (activeFigure && (s.scaling && s.scaling.ratio <= FIGURE_GESTURE_LIMITS.pinchEnter
-          || (s.rotation && s.rotation.separation >= FIGURE_GESTURE_LIMITS.spreadEnter))))?.[0] ?? null;
+          || s.rotation)))?.[0] ?? null;
     }
     const current = owner === null ? null : samples.get(owner)!;
     const prior = previous; const priorMode = mode;
@@ -202,16 +200,16 @@ export function createFigureGestureController() {
       return out('waiting', { selectionHint });
     }
     mode = !activeFigure ? 'inactive' : triple ? 'scaling'
-      : current.rotation && current.rotation.separation >= (priorMode === 'rotation' ? limits.spreadExit : limits.spreadEnter) ? 'rotation' : 'inactive';
+      : current.rotation ? 'rotation' : 'inactive';
     if (!prior || mode === 'inactive' || mode !== priorMode) {
-      smoothedBasis = current.rotation?.basis ?? null;
+      smoothedBasis = current.rotation?.basis ?? null; smoothedAngularVelocity = [0, 0, 0];
       return out('waiting', { selectionHint });
     }
     const dt = (current.timestamp - prior.timestamp) / 1000;
     const translation = length(sub(current.center, prior.center)) / ((current.palmSize + prior.palmSize) / 2) / dt;
     const sizeSpeed = Math.abs(Math.log(current.palmSize / prior.palmSize)) / dt;
     if (translation > limits.maxTranslationSpeed || sizeSpeed > limits.maxScaleSpeed) {
-      smoothedBasis = current.rotation?.basis ?? null; return out('ignored');
+      smoothedBasis = current.rotation?.basis ?? null; smoothedAngularVelocity = [0, 0, 0]; return out('ignored');
     }
     if (mode === 'scaling') {
       if (!prior.scaling || !current.scaling) return out();
@@ -222,15 +220,27 @@ export function createFigureGestureController() {
     const rawRotation = orientationChange(prior.rotation.basis, current.rotation.basis);
     const shapeChange = Math.max(...current.rotation.shape.map((value, i) => Math.abs(value - prior.rotation!.shape[i]!)));
     if (rawRotation.angle / dt > limits.maxAngularSpeed || shapeChange > limits.maxShapeChange) {
-      smoothedBasis = current.rotation?.basis ?? null; return out('ignored');
+      smoothedBasis = current.rotation?.basis ?? null; smoothedAngularVelocity = [0, 0, 0]; return out('ignored');
     }
     const from = smoothedBasis ?? prior.rotation.basis;
     const remaining = orientationChange(from, current.rotation.basis);
-    // Time-based spherical low-pass filtering removes frame-to-frame jitter
-    // without discarding slow intentional motion. Reset on rejected motion.
-    const angle = remaining.angle * (1 - Math.exp(-dt * 1000 / limits.rotationSmoothingMs));
+    // One Euro-style speed-adaptive filtering on SO(3): smooth the signed
+    // camera-space angular velocity before taking its magnitude, so alternating
+    // noise cancels instead of being mistaken for deliberate fast movement.
+    // Cutoff is in Hz, velocity in rad/s, and the coefficient in Hz/(rad/s).
+    const velocityAlpha = 1 - Math.exp(-2 * Math.PI * limits.rotationSpeedCutoffHz * dt);
+    smoothedAngularVelocity = add(scale(smoothedAngularVelocity, 1 - velocityAlpha),
+      scale(rawRotation.axis, rawRotation.angle / dt * velocityAlpha));
+    const cutoff = Math.min(1000 / (2 * Math.PI * limits.rotationMinSmoothingMs),
+      1000 / (2 * Math.PI * limits.rotationSmoothingMs)
+        + limits.rotationSpeedCoefficient * length(smoothedAngularVelocity));
+    // Exponential time-step integration preserves the filter's time scale at
+    // variable inference rates. Interpolate orientation, never Euler angles.
+    const angle = remaining.angle * (1 - Math.exp(-2 * Math.PI * cutoff * dt));
     smoothedBasis = rotateBasis(from, remaining.axis, angle);
-    const rotation = { axis: remaining.axis, angle };
+    // Apply the requested wrist-tilt direction in camera space after smoothing.
+    // X is the screen-horizontal axis (forward/back tilt); leave yaw and roll alone.
+    const rotation = { axis: [-remaining.axis[0], remaining.axis[1], remaining.axis[2]] as Vec, angle };
     return out('controlling', { rotation, selectionHint });
   }
   return { update, reset };

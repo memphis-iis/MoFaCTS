@@ -298,19 +298,17 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
         }
         if (document.querySelector('.pose-camera-mirror').classList.contains('mirrored')) x = 1 - x;
         const world = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }));
+        world[0] = { x: 0, y: .06, z: 0 };
         world[5] = { x: -.03, y: 0, z: 0 }; world[17] = { x: .03, y: 0, z: 0 };
         const positions = gesture === 'triple' ? [[-.012, 0], [.012, 0], [0, .016]]
           : gesture === 'pinch' ? [[-.009, 0], [.009, 0], [.04, -.04]] : [[-.03, .02], [0, -.04], [.03, .02]];
         [4, 8, 12].forEach((i, j) => {
-          const [px, py] = positions[j]; const a = angle * Math.PI / 180, t = tilt * Math.PI / 180;
-          const tx = px * Math.cos(a) - py * Math.sin(a), ty = px * Math.sin(a) + py * Math.cos(a);
-          world[i] = { x: tx, y: ty * Math.cos(t), z: ty * Math.sin(t) };
+          const [px, py] = positions[j]; world[i] = { x: px, y: py, z: 0 };
         });
-        world[1] = { x: -.06, y: .06, z: 0 }; world[9] = { x: .015, y: .035, z: 0 };
-        for (const [base, joint1, joint2, tip] of [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]) {
-          for (const [joint, fraction] of [[joint1, 1 / 3], [joint2, 2 / 3]]) {
-            world[joint] = Object.fromEntries(['x', 'y', 'z'].map(axis => [axis, world[base][axis] + fraction * (world[tip][axis] - world[base][axis])]));
-          }
+        for (const p of world) {
+          const a = angle * Math.PI / 180, t = tilt * Math.PI / 180;
+          const tx = p.x * Math.cos(a) - p.y * Math.sin(a), ty = p.x * Math.sin(a) + p.y * Math.cos(a);
+          p.x = tx; p.y = ty * Math.cos(t); p.z = ty * Math.sin(t);
         }
         const image = world.map(p => ({ x: x + p.x, y: cy + p.y, z: p.z }));
         image[0] = { x, y: cy + .05, z: 0 }; image[5] = { x: x - .05, y: cy - .025, z: 0 }; image[17] = { x: x + .05, y: cy - .025, z: 0 };
@@ -357,7 +355,7 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
     assert.equal(await page.locator('.figure-wireframe .figure-vertex-label').allTextContents().then(labels => labels.sort().join('')), 'ABCDEFGH');
     assert.equal(await page.locator('.figure-hidden-edge').first().evaluate(e => getComputedStyle(e).opacity), '0.3');
     await emit(); await emit(); const original = await geometry();
-    await emit({ tilt: 15 }); assert.notEqual(await geometry(), original, 'Extended three-finger tilt rotates the figure');
+    await emit({ tilt: 15, missingTip: 4 }); assert.notEqual(await geometry(), original, 'Palm tilt rotates the figure without a thumb tip');
     const tilted = await geometry();
     await emit({ tilt: 105 }); assert.equal(await geometry(), tilted, 'Fast full-plane rotation is ignored');
     await emit({ tilt: 110 }); assert.notEqual(await geometry(), tilted, 'Next slower increment resumes immediately');
@@ -407,7 +405,7 @@ test('camera palette selection, full rotation and triple-pinch resize use the re
         probe.style.borderRadius = 'var(--app-border-radius-lg)'; probe.style.color = 'var(--app-accent-color)'; document.body.append(probe);
         const expected = getComputedStyle(probe);
         const result = { cards: [...document.querySelectorAll('.skeleton-demo .card')].every(card =>
-          getComputedStyle(card).backgroundColor === expected.backgroundColor && getComputedStyle(card).borderRadius === expected.borderRadius),
+          getComputedStyle(card).backgroundColor === (card.classList.contains('figure-palette') ? 'rgba(0, 0, 0, 0)' : expected.backgroundColor) && getComputedStyle(card).borderRadius === expected.borderRadius),
           edges: getComputedStyle(document.querySelector('.figure-wireframe line')).stroke === expected.color };
         probe.remove(); return result;
       });
