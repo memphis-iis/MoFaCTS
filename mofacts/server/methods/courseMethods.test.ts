@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { Meteor } from 'meteor/meteor';
 import { createCourseMethods } from './courseMethods';
+import { COURSE_SNAPSHOT_VERSION } from '../lib/courseLearnerSnapshotCache';
 
 function cursor(rows: any[] = []) {
   return {
@@ -24,7 +25,9 @@ function matchesSelector(row: any, selector: Record<string, any> = {}): boolean 
     if (expected === null) return actual === null || actual === undefined;
     if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
       if ('$in' in expected) {
-        return expected.$in.includes(actual);
+        return Array.isArray(actual)
+          ? actual.some((value) => expected.$in.includes(value))
+          : expected.$in.includes(actual);
       }
       return Object.entries(expected).every(([operator, value]) => {
         if (operator === '$ne') return actual !== value;
@@ -32,6 +35,7 @@ function matchesSelector(row: any, selector: Record<string, any> = {}): boolean 
         return false;
       });
     }
+    if (Array.isArray(actual)) return actual.includes(expected);
     return actual === expected;
   });
 }
@@ -116,6 +120,7 @@ function createDeps(overrides: Record<string, any> = {}) {
   };
   return {
     serverConsole: () => undefined,
+    Roles: { getUsersInRoleAsync: async () => cursor() },
     Courses: collection,
     Sections: collection,
     SectionUserMap: collection,
@@ -155,7 +160,147 @@ function createDeps(overrides: Record<string, any> = {}) {
   };
 }
 
+function progressiveMember(id: string, stimuliSetId: string) {
+  return {
+    _id: id,
+    ownerId: 'teacher-user',
+    stimuliSetId,
+    content: {
+      fileName: `${id}.json`,
+      tdfs: {
+        tutor: {
+          setspec: { lessonname: id },
+          unit: [
+            { unitname: 'Instructions', unitinstructions: '<p>Read</p>' },
+            { unitname: `${id} practice`, learningsession: { clusterlist: '0', maxTrials: 0 } },
+          ],
+        },
+      },
+    },
+    rawStimuliFile: {
+      setspec: {
+        clusters: [{
+          clusterKC: `${id}-cluster`,
+          stims: [{ stimulusKC: `${id}-stim`, response: { correctResponse: id } }],
+        }],
+      },
+    },
+    stimuli: [{
+      stimuliSetId,
+      clusterKC: `${id}-cluster`,
+      stimulusKC: `${id}-stim`,
+      correctResponse: id,
+    }],
+  };
+}
+
+function createCachedProgressiveLaunch(userId = 'student-user') {
+  const courses = createMemoryCollection([{
+    _id: 'course-progressive', courseName: 'Progressive Course', teacherUserId: 'teacher-user',
+    semester: 'current', visibility: 'private', timezone: 'America/Chicago',
+  }]);
+  const sections = createMemoryCollection([{ _id: 'section-current', courseId: 'course-progressive', sectionName: '001' }]);
+  const enrollments = createMemoryCollection([{ _id: 'enrollment-current', sectionId: 'section-current', userId }]);
+  const assignments = createMemoryCollection([{
+    _id: 'assignment-progressive', courseId: 'course-progressive', assignmentType: 'progressive',
+    title: 'Progressive Assignment', memberTdfIds: ['lesson-1', 'lesson-2'], releaseAt: null,
+  }]);
+  const snapshots = createMemoryCollection([{
+    userId, version: COURSE_SNAPSHOT_VERSION, invalidatedAt: null, generatedAt: new Date(),
+    assignedCourseIds: ['course-progressive'], assignmentIds: ['assignment-progressive'],
+    publicCourseIds: [],
+    snapshot: {
+      expiresAt: null,
+      assignedCourses: [{ courseId: 'course-progressive', assignments: [{
+        assignmentId: 'assignment-progressive', courseId: 'course-progressive',
+        assignmentType: 'progressive', availability: 'available',
+      }] }],
+      publicCourses: [],
+    },
+  }]);
+  const tdfs = createMemoryCollection([progressiveMember('lesson-1', 'set-1'), progressiveMember('lesson-2', 'set-2')]);
+  let memberReads = 0;
+  const methods = createCourseMethods(createDeps({
+    Courses: courses,
+    Sections: sections,
+    SectionUserMap: enrollments,
+    Assignments: assignments,
+    Tdfs: {
+      ...tdfs,
+      find(selector: Record<string, any>) {
+        memberReads += 1;
+        return tdfs.find(selector);
+      },
+    },
+    CourseLearnerSnapshotCache: snapshots,
+    UserDashboardCache: createMemoryCollection(),
+    getMethodAuthorizationDeps: () => ({
+      async userIsInRoleAsync(id: string, roles: string[]) {
+        return id === 'admin-user' && roles.includes('admin');
+      },
+    }),
+  }));
+  return { methods, courses, sections, enrollments, snapshots, memberReads: () => memberReads };
+}
+
 describe('course method operational errors', function() {
+  it('discovers teachers from current role assignments while ignoring obsolete user role fields', async function() {
+    const assignments = new Set<string>();
+    const users = [
+      { _id: 'current-teacher', username: 'Teacher', email_canonical: 'teacher@example.test', emails: [{ address: 'teacher@example.test', verified: true }], roles: [], privateSetting: 'private' },
+      { _id: 'former-teacher', username: 'Former teacher', email_canonical: 'former@example.test', emails: [], roles: ['teacher'] },
+    ];
+    const queries: Array<{ role: string; options: unknown }> = [];
+    const methods = createCourseMethods(createDeps({
+      Roles: {
+        async getUsersInRoleAsync(role: string, options: { queryOptions: { fields: Record<string, 1> } }) {
+          queries.push({ role, options });
+          return cursor(users.filter(user => assignments.has(user._id)).map(user => ({
+            _id: user._id,
+            username: user.username,
+            email_canonical: user.email_canonical,
+            emails: user.emails.map(email => ({ address: email.address })),
+          })));
+        },
+      },
+      usersCollection: {
+        find: () => { throw new Error('Teacher discovery must not query obsolete users.roles'); },
+        findOneAsync: async () => null,
+        updateAsync: async () => 0,
+      },
+      getUserDisplayIdentifier: (user: any) => user.email_canonical,
+    }));
+
+    expect(await methods.getAllTeachers.call({ userId: 'learner' })).to.deep.equal([]);
+    assignments.add('current-teacher');
+    expect(await methods.getAllTeachers.call({ userId: 'learner' })).to.deep.equal([{
+      _id: 'current-teacher', username: 'teacher@example.test', displayIdentifier: 'teacher@example.test',
+      email_canonical: 'teacher@example.test', emails: [{ address: 'teacher@example.test' }],
+    }]);
+    assignments.delete('current-teacher');
+    expect(await methods.getAllTeachers.call({ userId: 'learner' })).to.deep.equal([]);
+    expect(queries).to.have.length(3);
+    for (const query of queries) expect(query).to.deep.equal({
+      role: 'teacher',
+      options: { queryOptions: { fields: { _id: 1, username: 1, email_canonical: 1, 'emails.address': 1 } } },
+    });
+  });
+
+  it('rejects teacher discovery before reading role assignments for a signed-out caller', async function() {
+    let queries = 0;
+    const methods = createCourseMethods(createDeps({
+      Roles: { async getUsersInRoleAsync() { queries++; return cursor(); } },
+    }));
+    try {
+      await methods.getAllTeachers.call({ userId: null });
+      expect.fail('Expected teacher discovery to require login');
+    } catch (error) {
+      expect(error).to.be.instanceOf(Meteor.Error);
+      expect((error as Meteor.Error).error).to.equal(401);
+    }
+    expect(queries).to.equal(0);
+  });
+
   it('reads and removes exceptions by assignment without matching another course or old formats', async function() {
     const date = new Date('2026-09-10T12:00:00Z');
     const users = createMemoryCollection([{ _id: 'student', dueDateExceptions: [
@@ -315,6 +460,43 @@ describe('course assignment metadata methods', function() {
     expect(histories.rows).to.have.length(1);
   });
 
+  it('removes deleted section enrollments and invalidates former assigned viewers without changing history or assignments', async function() {
+    const courses = createMemoryCollection([{ _id: 'course-1', courseName: 'Intro Course', teacherUserId: 'teacher-user',
+      semester: 'current', visibility: 'private', timezone: 'America/Chicago' }]);
+    const sections = createMemoryCollection([
+      { _id: 'section-removed', courseId: 'course-1', sectionName: 'A' },
+      { _id: 'section-kept', courseId: 'course-1', sectionName: 'B' },
+      { _id: 'section-other', courseId: 'course-other', sectionName: 'A' },
+    ]);
+    const enrollments = createMemoryCollection([
+      { _id: 'enrollment-removed', sectionId: 'section-removed', userId: 'student-removed' },
+      { _id: 'enrollment-kept', sectionId: 'section-kept', userId: 'student-kept' },
+      { _id: 'enrollment-other', sectionId: 'section-other', userId: 'student-other' },
+    ]);
+    const snapshots = createMemoryCollection([
+      { userId: 'student-removed', version: COURSE_SNAPSHOT_VERSION, assignedCourseIds: ['course-1'], publicCourseIds: [], invalidatedAt: null },
+      { userId: 'student-kept', version: COURSE_SNAPSHOT_VERSION, assignedCourseIds: ['course-1'], publicCourseIds: [], invalidatedAt: null },
+      { userId: 'student-other', version: COURSE_SNAPSHOT_VERSION, assignedCourseIds: ['course-other'], publicCourseIds: [], invalidatedAt: null },
+    ]);
+    const assignments = createMemoryCollection([{ _id: 'assignment-1', courseId: 'course-1', assignmentType: 'lesson', TDFId: 'tdf-1' }]);
+    const histories = { async findOneAsync() { throw new Error('Course editing must not read or alter learner history'); } };
+    const methods = createCourseMethods(createDeps({
+      Courses: courses, Sections: sections, SectionUserMap: enrollments, Assignments: assignments,
+      CourseLearnerSnapshotCache: snapshots, UserDashboardCache: createMemoryCollection(), Histories: histories,
+    }));
+
+    await methods.editCourse.call({ userId: 'teacher-user' }, {
+      _id: 'course-1', courseName: 'Intro Course', sections: ['B'],
+    } as any);
+
+    expect(sections.rows.map((row) => row._id)).to.deep.equal(['section-kept', 'section-other']);
+    expect(enrollments.rows.map((row) => row._id)).to.deep.equal(['enrollment-kept', 'enrollment-other']);
+    expect(snapshots.rows[0].invalidatedAt).to.be.instanceOf(Date);
+    expect(snapshots.rows[1].invalidatedAt).to.be.instanceOf(Date);
+    expect(snapshots.rows[2].invalidatedAt).to.equal(null);
+    expect(assignments.rows).to.deep.equal([{ _id: 'assignment-1', courseId: 'course-1', assignmentType: 'lesson', TDFId: 'tdf-1' }]);
+  });
+
   it('rejects invalid course visibility values', async function() {
     const methods = createCourseMethods(createDeps({
       Courses: createMemoryCollection(),
@@ -461,37 +643,6 @@ describe('course assignment metadata methods', function() {
   });
 
   it('saves and launches the current ordered progressive prefix without creating aggregate progress', async function() {
-    const progressiveMember = (id: string, stimuliSetId: string) => ({
-      _id: id,
-      ownerId: 'teacher-user',
-      stimuliSetId,
-      content: {
-        fileName: `${id}.json`,
-        tdfs: {
-          tutor: {
-            setspec: { lessonname: id },
-            unit: [
-              { unitname: 'Instructions', unitinstructions: '<p>Read</p>' },
-              { unitname: `${id} practice`, learningsession: { clusterlist: '0', maxTrials: 0 } },
-            ],
-          },
-        },
-      },
-      rawStimuliFile: {
-        setspec: {
-          clusters: [{
-            clusterKC: `${id}-cluster`,
-            stims: [{ stimulusKC: `${id}-stim`, response: { correctResponse: id } }],
-          }],
-        },
-      },
-      stimuli: [{
-        stimuliSetId,
-        clusterKC: `${id}-cluster`,
-        stimulusKC: `${id}-stim`,
-        correctResponse: id,
-      }],
-    });
     const assignments = createMemoryCollection();
     const methods = createCourseMethods(createDeps({
       Courses: createMemoryCollection([{
@@ -532,7 +683,7 @@ describe('course assignment metadata methods', function() {
     expect((progressive as any).memberTdfIds).to.deep.equal(['lesson-1', 'lesson-2', 'lesson-3']);
     expect((progressive as any).progress).to.equal(undefined);
     const settingsSnapshot = await methods.getLearnerCoursesSnapshot.call({ userId: 'teacher-user' });
-    expect(settingsSnapshot.version).to.equal(4);
+    expect(settingsSnapshot.version).to.equal(COURSE_SNAPSHOT_VERSION);
     const settingsAssignment = settingsSnapshot.assignedCourses[0]?.assignments[0];
     expect(settingsAssignment?.assignmentType).to.equal('progressive');
     expect((settingsAssignment as any).members.map((member: any) => member.hasConfigurableSettings)).to.deep.equal([true, true, true]);
@@ -561,6 +712,50 @@ describe('course assignment metadata methods', function() {
     expect(fresh.memberTdfIds).to.deep.equal(['lesson-1', 'lesson-3', 'lesson-2']);
     expect(fresh.progressiveRevisionId).not.to.equal(launch.progressiveRevisionId);
   });
+
+  it('rejects progressive content reads when a cached learner no longer belongs to any current course section', async function() {
+    const fixture = createCachedProgressiveLaunch();
+    await fixture.sections.removeAsync({ _id: 'section-current' });
+    try {
+      await fixture.methods.getProgressiveAssignmentLaunch.call({ userId: 'student-user' }, 'assignment-progressive', 'lesson-2');
+      expect.fail('Expected stale course membership to be rejected');
+    } catch (error) {
+      expect(error).to.be.instanceOf(Meteor.Error);
+      expect((error as Meteor.Error).error).to.equal(403);
+      expect((error as Meteor.Error).reason).to.equal('User is not enrolled in this course');
+    }
+    expect(fixture.memberReads()).to.equal(0);
+  });
+
+  it('rejects cached progressive access when the current course date window has ended', async function() {
+    const fixture = createCachedProgressiveLaunch();
+    await fixture.courses.updateAsync({ _id: 'course-progressive' }, { $set: { endDate: new Date(Date.now() - 60000) } });
+    try {
+      await fixture.methods.getProgressiveAssignmentLaunch.call({ userId: 'student-user' }, 'assignment-progressive', 'lesson-2');
+      expect.fail('Expected an ended course to be rejected');
+    } catch (error) {
+      expect(error).to.be.instanceOf(Meteor.Error);
+      expect((error as Meteor.Error).error).to.equal(403);
+      expect((error as Meteor.Error).reason).to.equal('Course is not currently available');
+    }
+    expect(fixture.memberReads()).to.equal(0);
+  });
+
+  it('allows progressive content reads for a currently enrolled learner', async function() {
+    const fixture = createCachedProgressiveLaunch();
+    const launch = await fixture.methods.getProgressiveAssignmentLaunch.call({ userId: 'student-user' }, 'assignment-progressive', 'lesson-2');
+    expect(launch.tdfs.map((tdf: any) => tdf._id)).to.deep.equal(['lesson-1', 'lesson-2']);
+    expect(fixture.memberReads()).to.equal(1);
+  });
+
+  for (const userId of ['teacher-user', 'admin-user']) {
+    it(`preserves progressive course access for ${userId} without learner enrollment`, async function() {
+      const fixture = createCachedProgressiveLaunch(userId);
+      await fixture.enrollments.removeAsync({ userId });
+      const launch = await fixture.methods.getProgressiveAssignmentLaunch.call({ userId }, 'assignment-progressive', 'lesson-2');
+      expect(launch.tdfs.map((tdf: any) => tdf._id)).to.deep.equal(['lesson-1', 'lesson-2']);
+    });
+  }
 });
 
 

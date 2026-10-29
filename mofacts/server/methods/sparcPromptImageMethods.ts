@@ -15,6 +15,7 @@ import type { createStorageBoundary } from '../lib/storageBoundary';
 import type { SparcLibraryImagePage } from '../../common/lib/sparcFigureLibrary';
 import { parseSparcRaster } from '../lib/sparcRaster';
 import { SPARC_ADMINISTRATIVE_REMOVAL_TEXT } from '../../../learning-components/runtime/sparcAdministrativeRemoval';
+import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
 
 type Asset = { _id: string; path?: string; type?: string; meta: Record<string, any> };
 type Deps = {
@@ -185,7 +186,12 @@ export function createSparcPromptImageMethods(deps: Deps) {
         await completeStorage(asset);
         return envelope(asset, false);
       })();
-      return work;
+      try { return await work; }
+      catch (error) {
+        if (error instanceof SparcContentAlreadyUsedError) throw new Meteor.Error('sparc-content-already-used',
+          'The selected instructional content has already been used. This turn was not accepted.');
+        throw error;
+      }
   };
   return {
     async generateSparcPromptImage(this: Context, params: Omit<ImageRequest, 'situation'>) {

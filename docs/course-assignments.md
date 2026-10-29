@@ -26,6 +26,7 @@ Implementation should stay inside the active MoFaCTS app tree under `mofacts/`.
 - Practice snapshot methods live in `mofacts/server/methods/dashboardPracticeSnapshotMethods.ts`.
 - Dashboard progress projection helpers live in `mofacts/server/methods/dashboardCacheShared.ts`.
 - Dashboard progress contracts live in `mofacts/server/methods/dashboardCacheMethods.contracts.ts`.
+- Dashboard entry applies only newly committed history to affected lessons. Full reconstruction is limited to initialization and repair; see [the source/checkpoint contract](architecture.md#incremental-dashboard-progress).
 - Collections are declared in `mofacts/common/Collections.ts`; `Assignments` maps to Mongo collection `assessments`.
 - Current Class Management UI lives in `mofacts/client/views/experimentSetup/classEdit.*`.
 - Current Chapter Assignments UI lives in `mofacts/client/views/experimentSetup/tdfAssignmentEdit.*`.
@@ -42,6 +43,8 @@ Implementation should stay inside the active MoFaCTS app tree under `mofacts/`.
 - Preserve existing teacher/admin access checks for course management.
 - Preserve existing practice launch behavior and runtime route guards.
 - Public course browsing must not create section membership or enrollment records.
+- Progressive launch authorizes against the current course and section enrollment before returning member lesson content; a cached course snapshot cannot retain access after enrollment is removed. Current course owners and administrators retain their existing access.
+- Removing a course section also removes its enrollment references and invalidates snapshots that already reference the course, including learners no longer discoverable through its surviving sections.
 - Existing assignment rows containing only `courseId` and `TDFId` must remain readable during migration.
 - Course assignment context must be recorded into learner history when a learner launches from a course assignment.
 - Assignment `_id` is the durable assignment identity for history, reporting, due-date exceptions, cache entries, and client payloads.
@@ -174,14 +177,14 @@ Add a dedicated persisted cache collection for learner course browsing. Common c
 interface CourseLearnerSnapshotCacheDocument {
   _id: string;
   userId: string;
-  version: 4;
+  version: 5;
   generatedAt: Date;
   invalidatedAt: Date | null;
   assignedCourseIds: string[];
   publicCourseIds: string[];
   assignmentIds: string[];
   tdfIds: string[];
-  snapshot: LearnerCoursesSnapshot;
+  snapshot: Omit<LearnerCoursesSnapshot, 'serverNow'>;
   rebuildReason: 'missing' | 'invalidated' | 'version' | 'progress-updated' | 'manual';
 }
 ```
@@ -198,6 +201,10 @@ Rules:
 - Assigned/private course changes invalidate cache documents whose `assignedCourseIds` include the changed course id, plus enrolled learners who do not yet have a cache document.
 - Practice progress updates invalidate or refresh only the active learner's course snapshot cache.
 - Cache invalidation should set `invalidatedAt` rather than deleting documents silently.
+- Snapshot version 5 stores one `expiresAt: number | null` inside the snapshot payload. The deadline is the earliest relevant course start, course end plus one millisecond, assignment release, or due date plus one millisecond. Future courses hidden by their start date still contribute a deadline. A null deadline means no pending time transition.
+- Each response adds `serverNow`, which is not persisted. The browser schedules the server-relative interval with a monotonic clock, so browser wall-clock changes cannot cause repeated refresh requests.
+- Course end and due dates retain their inclusive timestamp semantics. Due-date expiry refreshes the overdue label and never locks practice. Owner/admin course-date and release-preview behavior is unchanged.
+- Earlier derived snapshot versions rebuild lazily. No learner history, assignment, or course-data migration is required.
 
 ### History Context
 
@@ -389,9 +396,11 @@ export interface LearnerCourseSnapshotAssignment extends CourseAssignmentSummary
 }
 
 export interface LearnerCoursesSnapshot {
-  version: 4;
+  version: 5;
   userId: string;
   generatedAt: number;
+  expiresAt: number | null;
+  serverNow: number;
   assignedCourses: LearnerCourseSnapshotCourse[];
   publicCourses: LearnerCourseSnapshotCourse[];
   invalidatedAt: Date | null;
@@ -409,8 +418,8 @@ Implement cache helpers in `mofacts/server/lib/courseLearnerSnapshotCache.ts`.
 
 Required helper behavior:
 
-- `ensureLearnerCoursesSnapshot(userId)` returns the current cache when version matches and `invalidatedAt` is null.
-- If no cache exists, version differs, or `invalidatedAt` is set, it rebuilds and upserts the cache.
+- `ensureLearnerCoursesSnapshot(userId)` returns the current cache only when its version and expiry metadata are valid, `invalidatedAt` is null, and the deadline has not passed.
+- If no cache exists, version differs, invalidation is set, or the deadline has passed, it rebuilds and upserts the cache. A boundary crossed during source reads triggers one consistency restart; another crossing fails clearly rather than returning expired data.
 - `invalidateCourseSnapshotsForCourse(courseId, reason)` invalidates learners enrolled in the course and any cached public-course snapshots affected by a public course.
 - `invalidateCourseSnapshotForUser(userId, reason)` invalidates one learner cache after practice progress changes.
 - `invalidateCourseSnapshotsForAssignment(assignmentId, reason)` invalidates cache documents whose `assignmentIds` include the changed assignment id.
@@ -537,9 +546,11 @@ Cache rebuild query strategy:
 
 Snapshot response:
 
-- `version: 4`
+- `version: 5`
 - `userId`
 - `generatedAt`
+- `expiresAt`, as epoch milliseconds or null when no time transition is pending.
+- `serverNow`, the server timestamp at this read, supplied only in the response.
 - `assignedCourses`, sorted above public courses when non-empty.
 - `publicCourses`, always present for signed-in users.
 - Hide the assigned-courses section in the UI when `assignedCourses.length === 0`.
@@ -561,6 +572,7 @@ Caching behavior:
 - Practice history changes that update `UserDashboardCache.tdfStats` must also invalidate or refresh the current learner's course snapshot cache so `/courses` reflects progress after restart.
 - Course snapshot cache rebuilds reuse the existing dashboard stats projection helpers instead of recomputing history.
 - Dashboard practice cache rebuild/update remains tied to practice history changes; course snapshot invalidation does not imply full practice-history recomputation.
+- The mounted Courses page schedules one refresh at the snapshot deadline and rechecks expiration when the page regains focus or visibility. It uses the existing loading/error presentation and cancels timers and listeners when destroyed; it does not poll.
 
 ### Assignment Launch Context
 
@@ -757,7 +769,7 @@ Assignment row fields:
 
 Launch behavior:
 
-- `loadLaunchReadyTdf` is the shared settings-loading boundary for Practice, Courses, direct routes, and resume. It refreshes only the requested learner/lesson settings through `getLearnerTdfConfig`; progressive composition applies the endpoint overrides before enforcing its open-ended session limits. The editor lives in `mofacts/client/views/shared/learnerTdfSettings.*`. Settings writes reuse the server's course-aware TDF lookup authorization. No learner-history migration is needed; course snapshot version 4 is rebuilt lazily to include settings availability.
+- `loadLaunchReadyTdf` is the shared settings-loading boundary for Practice, Courses, direct routes, and resume. It refreshes only the requested learner/lesson settings through `getLearnerTdfConfig`; progressive composition applies the endpoint overrides before enforcing its open-ended session limits. The editor lives in `mofacts/client/views/shared/learnerTdfSettings.*`. Settings writes reuse the server's course-aware TDF lookup authorization. No learner-history migration is needed; current course snapshots rebuild lazily to include settings availability and expiry metadata.
 
 - Use the same launch runner/path as the Practice page for the assignment's `TDFId`.
 - Pass `assignmentId` and `courseId` into launch context when launching from `/courses`.
@@ -808,31 +820,15 @@ Reporting query requirements:
 - Use assignment rows and field-limited TDF summaries.
 - Preserve existing instructor ownership checks.
 
-## Migration Plan
+## Startup Migration Contract
 
-1. Add shared contracts and validation helpers.
-2. Add read normalization helpers for course visibility and assignment metadata.
-3. Add duplicate detection/reporting for existing assignment rows.
-4. Add `CourseLearnerSnapshotCache` ownership and collection declarations.
-5. Add indexes after duplicate report passes.
-6. Add server methods, cache invalidation helpers, and tests.
-7. Update Class Management to persist visibility, dates, and timezone.
-8. Replace assignment editor with `saveCourseAssignments`.
-9. Add learner course snapshot cache method and `/courses` UI.
-10. Add course assignment launch context to runtime history insertion.
-11. Update reporting due-date precedence.
-12. Remove or narrow legacy assignment save path after all callers move to the new method.
+`mofacts/server/migrations/course_assignment_contract.ts` owns the restartable `migration.courseAssignmentContract.v2` transformation. Startup awaits successful completion; a failure propagates and prevents normal startup completion. Earlier v1 completion markers do not certify this contract. Readers, publications, course editing and learner snapshots use the transformed lesson/progressive assignment shape rather than hiding a failed migration with compatibility reads.
 
-Legacy normalization:
+The forward transformation preserves all historical assignments, including courses larger than the editor's 250-assignment submission limit. Missing course visibility becomes `private`; missing timezone becomes the explicit historical value `America/Chicago`. Missing assignment `required` becomes `true`, absent release/due dates become `null`, and missing creation/update timestamps receive the migration's recorded start time. An undiscriminated historical assignment becomes a `lesson` only when its canonical `TDFId` exists. Invalid identities, dates, discriminated shapes or progressive membership fail clearly; no assignment is deleted or substituted.
 
-- Course with missing `visibility` reads as `private`.
-- Course with missing timezone receives explicit migration value before it becomes editable through the new UI.
-- Assignment with missing `order` sorts by existing insertion order when available, then title, then `_id`.
-- Assignment with missing `required` reads as `true`.
-- Assignment with missing dates reads as `null`.
-- Assignment with missing timestamps reads as `null` in snapshots and gets real timestamps on next save.
+Historical ordering is retained exactly: valid nonnegative numeric order, then the previous string comparison of `createdAt`, then `_id`. A bounded external sort assigns contiguous order within each course. Before changing any assignment's ordering fields, the migration stages and validates a durable plan for every assignment. Projected `_id` pages contain at most 100 records. Each page of writes and its checkpoint commit atomically in a snapshot/majority transaction; a revision guard prevents competing startup instances from applying a stale phase. Source/result fingerprints detect changed data rather than overwriting it. Restart resumes the saved staging, application, validation, snapshot invalidation or cleanup phase without sorting partially renumbered records as original input.
 
-No migration may silently delete assignments or infer public visibility.
+Progress logs contain phase and aggregate counters, not course or learner records. Completion is recorded only after result validation, bounded learner-snapshot invalidation and removal of temporary assignment plan fields. On failure, correct the reported invariant or infrastructure failure and restart against the retained checkpoint; do not delete the checkpoint or plan to force success. Partially applied pages are not rolled back globally. Operators must retain the durable plan for forward recovery. No migration may silently delete assignments or infer public visibility.
 
 ## Test Plan
 

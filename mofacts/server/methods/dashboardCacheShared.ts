@@ -6,7 +6,7 @@ import type {
 } from './dashboardCacheMethods.contracts';
 
 export const DASHBOARD_LEVEL_UNIT_TYPES = ['model', 'schedule', 'autotutor', 'sparc'];
-export const DASHBOARD_CACHE_VERSION = 8;
+export const DASHBOARD_CACHE_VERSION = 9;
 export const PRACTICE_DASHBOARD_SNAPSHOT_VERSION = 4;
 
 export function normalizeOptionalString(value: unknown): string | null {

@@ -38,9 +38,11 @@ function assignment(overrides: any): LearnerCourseSnapshotAssignment {
 
 function snapshot(): LearnerCoursesSnapshot {
   return {
-    version: 4,
+    version: 5,
     userId: 'student-1',
     generatedAt: 1,
+    expiresAt: null,
+    serverNow: 1,
     invalidatedAt: null,
     source: 'rebuilt',
     assignedCourses: [

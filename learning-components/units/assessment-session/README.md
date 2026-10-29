@@ -7,6 +7,8 @@ This package owns the in-repo assessment schedule unit engine.
 - `manifest.ts`: declares the `schedule` unit type and required runtime capabilities.
 - `AssessmentUnitEngine.ts`: component-owned schedule engine lifecycle and schedule cursor behavior.
 - `assessmentSettings.ts` and `createAssessmentSchedule.ts`: authored assessment-session settings parsing and schedule construction.
+
+Final question ordering uses the common permutation implementation in `../../content/tdf/clusterMapping.ts`. Assessment-specific range splitting, random choices and schedule assembly remain here; do not add another shuffle/swap implementation.
 - `__fixtures__/`: package-owned assessment schedule fixtures used by compatibility tests.
 
 App-owned Meteor Session, persistence, learner state, UI alerts, routing, and authorization stay outside this package and enter through the manifest dependency adapter. This unit does not declare `server-methods`; schedule persistence is owned by the `assessment-state` capability. Missing runtime capabilities must fail during component registration rather than being recovered from globals.

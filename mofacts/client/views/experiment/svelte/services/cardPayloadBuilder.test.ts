@@ -166,4 +166,29 @@ describe('card payload builder helpers', function() {
       Session.set('testType', originalGet.testType);
     }
   });
+
+  it('propagates an invalid mapping before a prepared card payload can be built', function() {
+    const saved = {
+      currentTdfFile: Session.get('currentTdfFile'),
+      clusterMapping: Session.get('clusterMapping'),
+    };
+    Session.set('currentTdfFile', {
+      stimuliSetId: 'synthetic-set',
+      rawStimuliFile: { setspec: { clusters: [{ clusterKC: 'synthetic-cluster', stims: [
+        { stimulusKC: 'synthetic-item', response: { correctResponse: 'answer' } },
+      ] }] } },
+    });
+    Session.set('clusterMapping', [0, 0]);
+    const engine = { findCurrentCardInfo: () => ({ whichStim: 0, clusterIndex: 0 }) } satisfies UnitEngineLike;
+    try {
+      expect(() => getPreparedCardDataFromSelection(engine, {
+        clusterIndex: 0,
+        stimIndex: 0,
+        preparedState: { currentDisplay: {}, currentAnswer: 'answer', newExperimentState: {} },
+      }, 1)).to.throw('Invalid cluster mapping');
+    } finally {
+      Session.set('currentTdfFile', saved.currentTdfFile);
+      Session.set('clusterMapping', saved.clusterMapping);
+    }
+  });
 });

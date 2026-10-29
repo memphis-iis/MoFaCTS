@@ -14,6 +14,8 @@ The first contract types for that direction live in
 interface events, practice observations, replayable state transitions, SPARC
 history extension records, and runtime trace records.
 
+`sparcDialogueOpenRouterAdapter.ts` owns the current dialogue provider's assessment policy, evidence interpretation, target selection, prompts and instruction/checkpoint/question sequencing. Its required `SparcDialogueAdapterRuntime` supplies JSON transport, normalized authored-target embeddings, media resolution, primitive realization/persistence and safe diagnostics. The app's `sparcControllerDialogueOpenRouter.ts` factory retains Meteor, the browser vector cache, logging and persistence wiring. Domain tests run directly with injected dependencies, while the existing app provider tests cover the factory boundary.
+
 ## Direction
 
 SPARC content should be addressed by authored nodes only. Nodes can contain

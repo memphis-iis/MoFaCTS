@@ -1,6 +1,8 @@
 import { modelPracticeHistorySelector, operationalHistorySelector } from '../../common/historyEnvelope';
 import { expect } from 'chai';
 import { progressiveRevisionId } from '../lib/progressiveAssignmentRevision';
+import { HistoryCommitConflictError } from '../lib/historyCommitStorage';
+import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
 import { createAnalyticsMethods } from './analyticsMethods';
 
 function createMeteorErrorClass() {
@@ -100,6 +102,10 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
   const logEntries: unknown[][] = [];
   const deps = {
     writeConditionState: async () => null,
+    commitHistory: async (_userId: string, document: Record<string, unknown>): Promise<boolean> => {
+      await deps.Histories.insertAsync(document);
+      return true;
+    },
     serverConsole: (...args: unknown[]) => {
       logEntries.push(args);
     },
@@ -179,12 +185,6 @@ function createAnalyticsDeps(overrides: Record<string, unknown> = {}) {
       return nextEventId;
     },
     syncUsernameCaches: () => {},
-    createExperimentExport: async () => '',
-    createExperimentExportByTdfIds: async () => '',
-    createExperimentExportFromHistories: async () => '',
-    getTdfIdsByOwnerId: async () => [],
-    assertUserOwnsTdfs: async () => true,
-    canDownloadOwnedTdfData: () => false,
     getClassPerformanceByTdfWorkflow: async () => ({}),
     getStimuliSetById: async () => [],
     hasMeaningfulProgressSignal: () => false,
@@ -261,58 +261,84 @@ describe('analyticsMethods', function() {
     }
   });
 
-  it('accepts one SPARC decision under concurrent retries and rejects a competing option', async function() {
-    const stored = new Map<string, Record<string, unknown>>(); let updates = 0;
-    const base = createAnalyticsDeps();
+  it('delegates SPARC retry outcomes and maps commit conflicts after checking authorization', async function() {
+    const calls: Array<{ userId: string; record: Record<string, unknown> }> = [];
+    let outcome: 'inserted' | 'duplicate' | 'conflict' | 'used' = 'inserted';
     const { deps } = createAnalyticsDeps({
-      Histories: { ...base.deps.Histories,
-        insertAsync: async (record: Record<string, unknown>) => {
-          const key = String(record._id);
-          if (stored.has(key)) throw Object.assign(new Error('duplicate'), { code: 11000 });
-          stored.set(key, record); return key;
-        },
-        findOneAsync: async (selector: Record<string, unknown>) => stored.get(String(selector._id)),
+      commitHistory: async (userId: string, record: Record<string, unknown>) => {
+        calls.push({ userId, record });
+        if (outcome === 'conflict') throw new HistoryCommitConflictError();
+        if (outcome === 'used') throw new SparcContentAlreadyUsedError();
+        return outcome === 'inserted';
       },
-      onHistoryInserted: async () => { updates++; },
     });
     const methods = createAnalyticsMethods(deps as any);
     const choice = (optionId: string) => createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparc', outcome: 'unknown',
       input: '', responseValue: '', sparc: { pageKey: 'page', sourceAddress: { pageKey: 'page', nodeId: `menu:${optionId}` },
         stateTransition: { transitionId: 'menu:choice:decision', event: { eventId: 'menu:choice', type: 'choice-selected', time: 1710000000000,
           source: { pageKey: 'page', nodeId: `menu:${optionId}` }, payload: { optionId } }, writes: [] } } });
-    await Promise.all([methods.insertHistory.call({ userId: 'learner-1' }, choice('question')),
-      methods.insertHistory.call({ userId: 'learner-1' }, choice('question'))]);
-    expect(stored.size).to.equal(1); expect(updates).to.equal(0);
+    await methods.insertHistory.call({ userId: 'learner-1' }, choice('question'));
+    outcome = 'duplicate';
+    await methods.insertHistory.call({ userId: 'learner-1' }, choice('question'));
+    expect(calls).to.have.length(2);
+    expect(calls.every((call) => call.userId === 'learner-1')).to.equal(true);
+    expect(calls[0]?.record._id).to.equal(calls[1]?.record._id);
+    expect(String(calls[0]?.record._id)).to.match(/^sparc:/);
+    outcome = 'conflict';
     let conflict: any;
     try { await methods.insertHistory.call({ userId: 'learner-1' }, choice('next-target')); } catch (error) { conflict = error; }
-    expect(conflict?.error).to.equal('sparc-history-conflict'); expect(updates).to.equal(0);
+    expect(conflict?.error).to.equal('sparc-history-conflict');
+    outcome = 'used';
+    let used: any;
+    try { await methods.insertHistory.call({ userId: 'learner-1' }, choice('question')); } catch (error) { used = error; }
+    expect(used?.error).to.equal('sparc-content-already-used');
+    expect(used?.reason).to.match(/already been used/);
     let denied: any;
     try { await methods.insertHistory.call({ userId: 'learner-2' }, choice('question')); } catch (error) { denied = error; }
     expect(denied?.error).to.equal(403);
+    expect(calls).to.have.length(4);
   });
-  it('deduplicates worksheet transport retries and rejects conflicting writes', async function() {
-    const stored = new Map<string, Record<string, unknown>>(); let updates = 0;
-    const base = createAnalyticsDeps();
+  it('delegates worksheet retries with stable IDs and preserves the worksheet conflict error', async function() {
+    const calls: Record<string, unknown>[] = [];
+    let outcome: 'inserted' | 'duplicate' | 'conflict' = 'inserted';
     const { deps } = createAnalyticsDeps({
-      Histories: { ...base.deps.Histories,
-        insertAsync: async (record: Record<string, unknown>) => {
-          const key = String(record._id);
-          if (stored.has(key)) throw Object.assign(new Error('duplicate'), { code: 11000 });
-          stored.set(key, record); return key;
-        },
-        findOneAsync: async (selector: Record<string, unknown>) => stored.get(String(selector._id)),
+      commitHistory: async (_userId: string, record: Record<string, unknown>) => {
+        calls.push(record);
+        if (outcome === 'conflict') throw new HistoryCommitConflictError();
+        return outcome === 'inserted';
       },
-      onHistoryInserted: async () => { updates++; },
     });
     const methods = createAnalyticsMethods(deps as any);
     const record = createHistoryRecord({ eventType: 'sparc', levelUnitType: 'sparc', outcome: 'unknown',
       input: '', responseValue: '', sparc: { pageKey: 'worksheet', sourceAddress: {pageKey:'worksheet',nodeId:'root'},
         worksheet: { attemptId:'attempt', checkpointIndex:0, sequence:1, writeId:'write', kind:'start', order:['q'], deadline:2000 } } });
-    await Promise.all([methods.insertHistory.call({userId:'learner-1'},record), methods.insertHistory.call({userId:'learner-1'},record)]);
-    expect(stored.size).to.equal(1); expect(updates).to.equal(0);
+    await methods.insertHistory.call({ userId: 'learner-1' }, record);
+    outcome = 'duplicate';
+    await methods.insertHistory.call({ userId: 'learner-1' }, record);
+    expect(calls).to.have.length(2);
+    expect(calls[0]?._id).to.equal(calls[1]?._id);
+    expect(String(calls[0]?._id)).to.match(/^worksheet:/);
+    outcome = 'conflict';
     let conflict: any;
     try { await methods.insertHistory.call({userId:'learner-1'},{...record,time:1710000001000}); } catch(error) { conflict = error; }
-    expect(conflict?.error).to.equal('worksheet-history-conflict'); expect(stored.size).to.equal(1);
+    expect(conflict?.error).to.equal('worksheet-history-conflict');
+    expect(calls).to.have.length(3);
+  });
+
+  it('updates crowd statistics only when the history commit delegate reports a newly inserted row', async function() {
+    let newlyInserted = true;
+    let commits = 0;
+    let crowdUpdates = 0;
+    const { deps } = createAnalyticsDeps({
+      commitHistory: async () => { commits += 1; return newlyInserted; },
+      StimulusCrowdStats: { upsertAsync: async () => { crowdUpdates += 1; } },
+    });
+    const methods = createAnalyticsMethods(deps as any);
+    await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord());
+    newlyInserted = false;
+    await methods.insertHistory.call({ userId: 'learner-1' }, createHistoryRecord());
+    expect(commits).to.equal(2);
+    expect(crowdUpdates).to.equal(1);
   });
 
   it('bounds worksheet history and retains learner, lesson, unit and checkpoint scope', async function() {
@@ -523,10 +549,9 @@ describe('analyticsMethods', function() {
   });
 
   it('downloadOwnHistoryAcrossTdfs returns a streaming download URL without building the TSV payload', async function() {
-    let exportBuilderCalled = false;
     const { deps } = createAnalyticsDeps({
       Histories: {
-        find: () => ({ fetchAsync: async () => [], countAsync: async () => 0 }),
+        find: () => { throw new Error('Token issuance must not read complete histories'); },
         findOneAsync: async () => ({ _id: 'history-1' }),
         insertAsync: async () => 'history-id',
         rawCollection: () => ({ aggregate: () => ({ toArray: async () => [] }) }),
@@ -535,16 +560,11 @@ describe('analyticsMethods', function() {
         find: () => ({ fetchAsync: async () => [] }),
         findOneAsync: async () => ({ _id: 'learner-1', username: 'learner@example.edu' }),
       },
-      createExperimentExportFromHistories: async () => {
-        exportBuilderCalled = true;
-        return 'unexpected payload';
-      },
     });
     const methods = createAnalyticsMethods(deps as any) as Record<string, any>;
 
     const result = await methods.downloadOwnHistoryAcrossTdfs.call({ userId: 'learner-1' });
 
-    expect(exportBuilderCalled).to.equal(false);
     expect(result).to.include({
       fileName: 'learning-data_learner@example.edu_own-history_all-lessons.tsv',
       contentType: 'text/tab-separated-values',

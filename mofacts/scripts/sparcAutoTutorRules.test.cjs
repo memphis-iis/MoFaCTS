@@ -20,6 +20,7 @@ const suites = [
   'sparcProgressiveScaffoldingRules',
   'sparcAutoTutorAssessmentRules',
   'sparcAutoTutorRuleRuntime',
+  'sparcDialogueOpenRouterAdapter',
   'sparcTrialDisplayControllerDialogueBridge',
 ];
 require('../common/lib/sparcFigureClustering.test.ts');
@@ -31,8 +32,18 @@ require('../../learning-components/runtime/sparcEmbeddingIndex.test.ts');
 require('../server/lib/sparcInstructionalEmbeddingMigration.test.ts');
 require('../server/lib/sparcFigureBrowseService.test.ts');
 require('../server/lib/sparcHistoryBatchStorage.test.ts');
+require('../server/lib/historyCommitStorage.test.ts');
+require('../server/lib/sparcContentUse.test.ts');
+require('../server/lib/backup/dashboardHistoryRestore.test.ts');
+require('../server/lib/userDeletion.test.ts');
 require('../server/lib/sparcMoveLibraryService.test.ts');
 require('../server/lib/sparcRetrievalSelector.test.ts');
+require('../server/lib/sparcRetrievalPublicationState.test.ts');
+require('../server/lib/sparcRetrievalPublication.test.ts');
+require('../server/lib/boundedExternalSort.test.ts');
+require('../server/lib/sortedHistoryExport.test.ts');
+require('../server/lib/ownedHistoryDownloadHandler.test.ts');
+require('../server/migrations/course_assignment_contract.test.ts');
 require('../client/views/experimentSetup/sparc/sparcLibraryPreview.test.ts');
 require('../../learning-components/units/sparcsession/sparcEvidenceHistory.test.ts');
 if (process.argv.includes('--include-general-rules')) {
@@ -93,6 +104,11 @@ if (process.argv.includes('--include-client-contracts') || process.argv.includes
     require('../server/lib/sparcInstructionalLibraryMigration.test.ts');
     require('../server/lib/sparcFigureLibraryService.test.ts');
     require('../server/methods/dashboardCacheMethods.test.ts');
+    require('../server/lib/adminUserPagePublication.test.ts');
+    require('../server/lib/ownedHistoryDownloadScope.test.ts');
+    require('../server/methods/analyticsDownloadMethods.test.ts');
+    require('../server/lib/dashboardHistoryRefresh.test.ts');
+    require('../server/lib/dashboardHistoryArchive.test.ts');
     if (process.argv.includes('--include-history-contracts')) require('../server/methods/analyticsMethods.test.ts');
   } finally { Module._load = originalLoad; }
   tests.after(() => { dom.window.close(); delete global.document; delete global.window; delete global.HTMLElement; delete global.MutationObserver; });

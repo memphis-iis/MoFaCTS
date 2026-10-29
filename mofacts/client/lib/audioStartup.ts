@@ -3,7 +3,6 @@ import { Session } from 'meteor/session';
 import { audioManager } from './audioContextManager';
 import { canResolveExplicitTtsLanguageCode, resolveExplicitTtsLanguageCode } from './audioLanguage';
 import { evaluateSrAvailability } from './audioAvailability';
-import { getActiveUiLocale } from './interfaceLocaleState';
 import { resolveSpeechRecognitionLanguage } from './speechRecognitionConfig';
 import {
   getAudioRecorderInitialized,
@@ -33,7 +32,7 @@ type AudioStartupTdf = {
         textToSpeechLanguage?: string;
         audioPromptFeedbackVoice?: string;
         speechAPIKey?: string;
-        speechRecognitionLanguage?: string;
+        speechRecognitionLanguage?: string | string[];
         audioInputEnabled?: string;
       };
     };
@@ -177,7 +176,6 @@ async function warmupSrIfNeeded(
 
   const speechRecognitionLanguage = resolveSpeechRecognitionLanguage(
     currentTdfFile?.tdfs?.tutor?.setspec,
-    getActiveUiLocale()
   );
 
   const silentAudioBytes = new Uint8Array(3200).fill(0);
@@ -246,13 +244,15 @@ export function getAudioLaunchPreparationPlan(
   currentTdfFile: AudioStartupTdf | null | undefined,
   user: AudioStartupUser | null | undefined,
 ): AudioLaunchPreparationPlan {
-  const hasSrWarmupTarget = supportsSr(currentTdfFile, user);
   const srSupported = supportsSr(currentTdfFile, user);
+  if (srSupported) {
+    // Validate before launching concurrent warmup and microphone preparation.
+    resolveSpeechRecognitionLanguage(currentTdfFile?.tdfs?.tutor?.setspec);
+  }
 
   const ttsWarmup = supportsTts(currentTdfFile, user) && !getTtsWarmedUp();
-  const srWarmup = srSupported && hasSrWarmupTarget && !getSrWarmedUp();
+  const srWarmup = srSupported && !getSrWarmedUp();
   const recorderPreInitialization = srSupported &&
-    hasSrWarmupTarget &&
     !getAudioRecorderInitialized() &&
     !audioManager.getPreInitializedStream();
 

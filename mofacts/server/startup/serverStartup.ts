@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { MongoInternals } from 'meteor/mongo';
 import { Accounts } from 'meteor/accounts-base';
 import { Roles } from 'meteor/alanning:roles';
 import { ServiceConfiguration } from 'meteor/service-configuration';
@@ -20,11 +21,13 @@ import { backfillConditionTdfIds } from '../migrations/backfill_condition_tdf_id
 import { cleanExperimentStateDupesAndAddUniqueIndex } from '../migrations/clean_experiment_state_dupes';
 import { migrateLoggingSettings } from '../migrations/migrate_logging_settings';
 import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migrations';
+import type { CourseMigrationCollection } from '../migrations/course_assignment_contract';
 import { migrateSparcHistoryPageIdentity } from '../migrations/migrate_sparc_history_page_identity';
 import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_authored_page_identity';
 import { migrateDynamicAssetLocalPaths } from '../migrations/migrate_dynamic_asset_local_paths';
 import { repairContentMediaIdentity } from '../migrations/repair_content_media_identity';
 import { purgeLearnerUnitAnalyticsCache } from '../migrations/purge_learner_unit_analytics_cache';
+import { cleanupAbandonedExternalSortRuns } from '../lib/boundedExternalSort';
 import { getLocalStoragePaths, getStorageBackend } from '../lib/storageBoundary';
 import { bootstrapPrivateRepoContentIfNeeded } from './bootstrapPrivateRepoContent';
 import { startConfiguredMofactsCronJobs } from './mofactsCronRuntime';
@@ -51,20 +54,24 @@ type RunServerStartupDeps = {
   };
   serverConsole: Logger;
   DynamicSettings: {
+    rawCollection: () => unknown;
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord) => Promise<any>;
     removeAsync: (selector: UnknownRecord) => Promise<number>;
     upsertAsync: (selector: UnknownRecord, modifier: UnknownRecord) => Promise<unknown>;
   };
   Courses: {
+    rawCollection: () => unknown;
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<number>;
   };
   Assignments: {
+    rawCollection: () => unknown;
     find: (selector?: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<number>;
   };
   CourseLearnerSnapshotCache: {
+    rawCollection: () => unknown;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<number>;
   };
   usersCollection: {
@@ -341,6 +348,7 @@ function findExistingUserByCanonicalEmail(canonicalEmail: string) {
 }
 
 export async function runServerStartup(deps: RunServerStartupDeps) {
+  await cleanupAbandonedExternalSortRuns();
   const meteor35Mode = applyDdpContainment(
     (Meteor as unknown as { server?: { options: { disconnectGracePeriod?: number } } }).server,
     process.env,
@@ -388,9 +396,14 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   await ensurePublishedDeploymentBrandProfile();
   await runStartupCleanupMigrations({
     DynamicSettings: deps.DynamicSettings,
-    Courses: deps.Courses,
-    Assignments: deps.Assignments,
-    CourseLearnerSnapshotCache: deps.CourseLearnerSnapshotCache,
+    courseMigration: {
+      courses: deps.Courses.rawCollection() as CourseMigrationCollection,
+      assignments: deps.Assignments.rawCollection() as CourseMigrationCollection,
+      snapshots: deps.CourseLearnerSnapshotCache.rawCollection() as CourseMigrationCollection,
+      settings: deps.DynamicSettings.rawCollection() as CourseMigrationCollection,
+      startSession: () => MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession(),
+      serverConsole: deps.serverConsole,
+    },
     usersCollection: deps.usersCollection,
     serverConsole: deps.serverConsole,
     updateActiveThemeDocument: deps.updateActiveThemeDocument,

@@ -9,6 +9,7 @@ export type UserOwnedDataCollections = {
   UserMetrics: RemovableCollection;
   PasswordResetTokens: RemovableCollection;
   UserDashboardCache: RemovableCollection;
+  HistoryCommitState: RemovableCollection;
   UserUploadQuota: RemovableCollection;
   AuditLog?: RemovableCollection;
 };
@@ -26,6 +27,7 @@ export async function removeUserOwnedData(
     collections.UserMetrics.removeAsync({ _id: userId }),
     collections.PasswordResetTokens.removeAsync({ userId }),
     collections.UserDashboardCache.removeAsync({ userId }),
+    collections.HistoryCommitState.removeAsync({ _id: userId }),
     collections.UserUploadQuota.removeAsync({ userId }),
     ...(options.removeAuditLog && collections.AuditLog
       ? [

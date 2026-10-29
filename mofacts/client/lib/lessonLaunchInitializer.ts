@@ -14,6 +14,7 @@ import { getActiveUiLocale } from './interfaceLocaleState';
 import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
 import { initializeLessonLaunchEntry, resolveLessonLaunchEntryRoute, type LessonLaunchEntryRoute } from './lessonLaunchEntryRoute';
 import { prepareInstructionLaunchMapping } from './instructionLaunchMapping';
+import { clearRuntimeStimulusCache } from './runtimeStimuli';
 
 type LessonLaunchTimingLogger = (eventName: string, payload?: Record<string, unknown>) => void;
 type LessonLaunchMessageSetter = (message: string) => void;
@@ -38,6 +39,7 @@ type PreparedLessonLaunch = {
 };
 
 export async function prepareLessonLaunchContext(params: PrepareLessonLaunchParams): Promise<PreparedLessonLaunch> {
+  clearRuntimeStimulusCache();
   const {
     currentTdfId,
     currentStimuliSetId,

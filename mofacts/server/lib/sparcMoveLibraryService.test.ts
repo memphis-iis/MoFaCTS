@@ -8,8 +8,13 @@ function query(eventId = 'one', kind: SparcPrimitiveQuery['context']['kind'] = '
 }
 function fixture() {
     const entries = new Map<string, MoveEntry>(), requests = new Map<string, MoveRequest>(), removed = new Set<string>(), reads: string[] = [];
-    const store: MoveStore = { request: async (id) => requests.get(id), saveRequest: async (r) => { if (!requests.get(r._id)?.entryId)
-            requests.set(r._id, structuredClone(r)); return requests.get(r._id)!; }, entry: async (id) => { reads.push(id); return entries.get(id); }, saveEntry: async (e) => { entries.set(e._id, structuredClone(e)); }, list: async () => [...entries.values()], removed: async (id) => removed.has(id), revise: async (e) => { entries.set(e._id, e); } };
+    const store: MoveStore = { request: async (id) => requests.get(id), saveRequest: async (r) => {
+            if (requests.get(r._id)?.entryId) return requests.get(r._id)!;
+            if (r.entryId && [...requests.values()].some(previous => previous.userId === r.userId
+              && (previous.query.tdfId !== r.query.tdfId || previous.query.sessionId !== r.query.sessionId || previous.query.eventId !== r.query.eventId)
+              && previous.contentUseKeys?.some(key => r.contentUseKeys?.includes(key)))) throw new Error('SPARC content has already been used by this learner');
+            requests.set(r._id, structuredClone(r)); return requests.get(r._id)!;
+        }, entry: async (id) => { reads.push(id); return entries.get(id); }, saveEntry: async (e) => { entries.set(e._id, structuredClone(e)); }, list: async () => [...entries.values()], removed: async (id) => removed.has(id), revise: async (e) => { entries.set(e._id, e); } };
     return { entries, requests, removed, reads, service: createMoveLibraryService({ store, embeddingModel: 'fixture', videoReuseStatus: async videos => new Map(videos.map(video => [video.segmentId, true])), verifyFigure: async () => { } }) };
 }
 describe('Client-selected instructional persistence', () => {
@@ -74,6 +79,30 @@ describe('Client-selected instructional persistence', () => {
         assert.notEqual(saved[0]!.reference.entryId, saved[1]!.reference.entryId);
         assert.equal(f.entries.size, 2);
     });
+    it('rejects repeated explanation, question and feedback for the same learner across lessons while preserving same-event resume', async () => {
+        for (const kind of ['explanation', 'question', 'feedback'] as const) {
+            const f = fixture(), q = query('first', kind);
+            const saved = await f.service.publish('learner', { query: q, embedding: [1, 0] }, { text: `The accepted ${kind}.` });
+            const next = query('next', kind); next.tdfId = 'another-lesson'; next.sessionId = 'another-attempt';
+            await assert.rejects(f.service.lookup('learner', next, { entryId: saved.reference.entryId, similarity: 1 }, [1, 0]), /already been used/);
+            await assert.rejects(f.service.publish('learner', { query: next, embedding: [1, 0] }, { text: `The accepted ${kind}.` }), /already been used/);
+            assert.equal(f.requests.size, 1, 'Rejected reuse cannot create an accepted decision');
+            const resumed = await f.service.lookup('learner', q, null, [1, 0]);
+            assert.equal(resumed.status, 'hit');
+            if (resumed.status === 'hit') assert.deepEqual(resumed.content, saved.content);
+        }
+    });
+    it('rejects a matched instruction when either its explanation or written support was already used under another entry', async () => {
+        for (const component of ['explanation', 'support'] as const) {
+            const f = fixture(), q = query('first', 'instruction'); q.context.components = ['explanation', 'richContent', 'question']; q.context.supportKind = 'written';
+            await f.service.publish('learner', { query: q, embedding: [1, 0] }, { text: 'Original governing idea.', support: { text: 'Original teaching case.' } });
+            const next = query('next', 'instruction'); next.context.components = q.context.components; next.context.supportKind = 'written';
+            const content = { text: component === 'explanation' ? 'Original governing idea.' : 'A new governing explanation.',
+              support: { text: component === 'support' ? 'Original teaching case.' : 'A new teaching case.' } };
+            await assert.rejects(f.service.publish('learner', { query: next, embedding: [1, 0] }, content), /already been used/);
+            assert.equal(f.requests.size, 1);
+        }
+    });
     it('publishes a visual directly using the existing resource vector, without an empty-vector catalog entry', async () => {
         const f = fixture(), q = query('visual', 'richContent');
         q.context.supportKind = 'visual';
@@ -126,5 +155,26 @@ describe('Client-selected instructional persistence', () => {
         if (r.status !== 'hit')
             throw Error('Expected saved receipt');
         assert.equal(r.content.administrativeRemoval, true);
+    });
+    it('refuses to replace an accepted event with an administrator-revised payload, including changed choices', async () => {
+        for (const revise of ['text', 'choices'] as const) {
+            const f = fixture(), q = query('accepted-question', 'question'); q.context.responseFormat = 'multiple-choice';
+            const original = { text: 'Which meaning applies?', choices: [
+                { id: 'a', label: 'Original correct meaning.', correct: true },
+                { id: 'b', label: 'Original alternative.', correct: false },
+                { id: 'c', label: 'Another original alternative.', correct: false },
+            ] };
+            const ticket = { query: q, embedding: [1, 0] };
+            const accepted = await f.service.publish('learner', ticket, original);
+            const revised = structuredClone(original);
+            if (revise === 'text') revised.text = 'A new question replaces the previous one.';
+            else revised.choices[0]!.label = 'A substantially different correct meaning.';
+            await f.service.revise('admin', accepted.reference.entryId, revised);
+            await assert.rejects(f.service.lookup('learner', q, null, [1, 0]), /changed after acceptance/);
+            await assert.rejects(f.service.publish('learner', ticket, revised), /changed after acceptance/);
+            const other = await f.service.lookup('another-learner', query('new-event', 'question'), null, [1, 0]);
+            assert.equal(other.status, 'generate');
+            assert.equal(f.requests.size, 1);
+        }
     });
 });

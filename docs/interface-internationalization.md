@@ -43,7 +43,7 @@ Learner text inputs are Unicode-capable and may use the declared content languag
 
 Speech recognition remains opt-in through lesson and learner audio settings. Selecting a UI locale does not request microphone permission or imply speech recognition support for that language.
 
-When a lesson enables speech recognition, it must declare `speechRecognitionLanguage` explicitly. MoFaCTS should block SR warmup and transcription instead of assuming English when that language is missing.
+When a lesson enables speech recognition, it must declare `speechRecognitionLanguage` explicitly using a supported Google Speech-to-Text language code. Missing, blank or invalid values stop SR launch preparation, recorder initialization and transcription with a configuration error. The interface locale never supplies this value. A repeated authored value retains its first nonblank language selection; that selected value must be valid.
 
 Platform-owned prompt TTS uses the selected UI locale's explicit primary TTS code. Authored lesson TTS remains separate and follows the lesson/content TTS configuration supplied by the author.
 

@@ -6,7 +6,7 @@
     placeBlocksPiece,
     replenishBlocksAfterCorrectAnswer,
     resolveBlocksPlacement,
-  } from '../services/blocksGameEngine';
+  } from '../../../../../../learning-components/runtime/blocksGameEngine';
   import {
     loadBlocksPracticeGame,
     saveBlocksPracticeGame,

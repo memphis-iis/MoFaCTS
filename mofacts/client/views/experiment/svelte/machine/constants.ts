@@ -132,6 +132,7 @@ export const ERROR_SEVERITY_MAP = {
 
   // Hard errors - stop machine
   'selectNextCard': ERROR_SEVERITY.HARD,
+  'speechRecognitionConfiguration': ERROR_SEVERITY.HARD,
   'unknown': ERROR_SEVERITY.HARD,
 };
 

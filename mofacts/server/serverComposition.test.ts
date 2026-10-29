@@ -2263,6 +2263,7 @@ describe('condition count method authorization', function() {
 
   it('does not expose raw all-history TDF reads as a public method', function() {
     expect(asyncMethods.getHistoryByTDFID).to.equal(undefined);
+    expect(asyncMethods.getOutcomesForAdaptiveLearning).to.equal(undefined);
   });
 
   it('denies adaptive-learning outcomes for another user', async function() {
@@ -2277,7 +2278,7 @@ describe('condition count method authorization', function() {
     });
 
     try {
-      await (asyncMethods.getOutcomesForAdaptiveLearning as any).call({ userId: 'current-user' }, 'other-user', 'adaptive-root');
+      await (asyncMethods.getAdaptiveOutcomeRows as any).call({ userId: 'current-user' }, 'other-user', 'adaptive-root');
       expect.fail('Expected cross-user adaptive outcomes read to be denied');
     } catch (error: any) {
       expect(error.error).to.equal(403);

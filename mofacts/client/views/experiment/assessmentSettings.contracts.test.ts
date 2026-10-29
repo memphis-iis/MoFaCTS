@@ -1,4 +1,7 @@
 import { expect } from 'chai';
+// Keep component-owned permutation and schedule suites in Meteor's client discovery.
+import '../../../../learning-components/content/tdf/clusterMapping.test';
+import '../../../../learning-components/units/assessment-session/createAssessmentSchedule.test';
 import { createAssessmentSchedule } from '../../../../learning-components/units/assessment-session/createAssessmentSchedule';
 import { loadAssessmentSettings } from '../../../../learning-components/units/assessment-session/assessmentSettings';
 import {

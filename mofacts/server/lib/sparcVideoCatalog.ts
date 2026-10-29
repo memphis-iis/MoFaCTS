@@ -8,6 +8,7 @@ import { parseSparcVideoSegment, type SparcVideoSegment } from '../../../learnin
 import { searchSparcVideo, fetchSparcVideoCaptions } from './sparcVideoProviders';
 import { createSparcVideoCatalog, type VideoSource, type VideoTargetState, type VideoCatalogStore } from './sparcVideoCatalogService';
 import { isSparcAdministrativeRemoval, readSparcAdministrativeRemovals } from './sparcLibraryCurationStorage';
+import { sparcContentUseKeys } from './sparcContentUse';
 export { sparcVideoCatalogTargets } from './sparcVideoCatalogService';
 const Sources = new Mongo.Collection<VideoSource>(collectionMongoName('SparcVideoTranscripts'));
 const Targets = new Mongo.Collection<VideoTargetState>(collectionMongoName('SparcVideoCatalogTargets'));
@@ -25,7 +26,7 @@ export function createMongoSparcVideoCatalog(deps: Pick<Parameters<typeof create
     async insertSource(value) { await Sources.rawCollection().updateOne({ _id: value._id }, { $setOnInsert: value }, { upsert: true }); },
     async updateSource(id, value) { await Sources.updateAsync(id, { $set: value }); },
     async segmentIds(ids) { return ids.length ? [...(await SparcInstructionalLibrary.find({ _id: { $in: ids } }, { fields: { _id: 1 } }).fetchAsync()).map(row => row._id), ...await readSparcAdministrativeRemovals(ids)] : []; },
-    async insertSegments(entries) { if (entries.length) await SparcInstructionalLibrary.rawCollection().bulkWrite(entries.map(entry => ({ updateOne: { filter: { _id: entry._id }, update: { $setOnInsert: entry }, upsert: true } }))); },
+    async insertSegments(entries) { if (entries.length) await SparcInstructionalLibrary.rawCollection().bulkWrite(entries.map(entry => ({ updateOne: { filter: { _id: entry._id }, update: { $setOnInsert: { ...entry, contentUseKeys: sparcContentUseKeys(entry.content, entry._id) } }, upsert: true } }))); },
     async associate(ids, target) {
       if (ids.length) await SparcInstructionalLibrary.rawCollection().updateMany({ _id: { $in: ids } },
         { $addToSet: { origins: { tdfId: target.tdfId, pageId: target.pageId, targetId: target.targetId, targetKind: target.targetKind, text: target.text } } });

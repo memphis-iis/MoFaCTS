@@ -29,7 +29,7 @@ import {
   requireUserWithRoles,
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
-import { createCourseLearnerSnapshotCacheHelpers } from '../lib/courseLearnerSnapshotCache';
+import { courseIsDateVisible, createCourseLearnerSnapshotCacheHelpers } from '../lib/courseLearnerSnapshotCache';
 import { prepareStimuliSetForRuntime } from '../lib/stimulusLookup';
 
 type UnknownRecord = Record<string, unknown>;
@@ -59,6 +59,9 @@ type CollectionLike = {
 
 type CourseMethodsDeps = {
   serverConsole: Logger;
+  Roles: {
+    getUsersInRoleAsync: (roles: string, options: { queryOptions: { fields: Record<string, 1> } }) => Promise<Cursor>;
+  };
   Courses: CollectionLike;
   Sections: CollectionLike;
   SectionUserMap: CollectionLike;
@@ -1089,6 +1092,30 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
       { fields: { _id: 1, courseId: 1, assignmentType: 1, title: 1, memberTdfIds: 1, releaseAt: 1, progressiveRevisions: 1 } },
     );
     if (!assignment) throw new Meteor.Error(404, 'Progressive assignment no longer exists');
+    const [course, roleFlags] = await Promise.all([
+      deps.Courses.findOneAsync(
+        { _id: assignment.courseId },
+        { fields: { _id: 1, teacherUserId: 1, beginDate: 1, endDate: 1 } },
+      ),
+      getUserRoleFlags(deps.getMethodAuthorizationDeps(), userId, ['admin'] as const),
+    ]);
+    if (!course) throw new Meteor.Error(404, 'Course no longer exists');
+    if (!roleFlags.admin && String(course.teacherUserId || '') !== userId) {
+      if (!courseIsDateVisible(parseNullablePersistedDate, course)) {
+        throw new Meteor.Error(403, 'Course is not currently available');
+      }
+      const sectionRows = await deps.Sections.find(
+        { courseId: course._id },
+        { fields: { _id: 1 } },
+      ).fetchAsync();
+      const enrollment = sectionRows.length > 0
+        ? await deps.SectionUserMap.findOneAsync(
+          { userId, sectionId: { $in: sectionRows.map((section: any) => section._id) } },
+          { fields: { _id: 1 } },
+        )
+        : null;
+      if (!enrollment) throw new Meteor.Error(403, 'User is not enrolled in this course');
+    }
     const releaseAt = parseNullablePersistedDate(assignment.releaseAt);
     if (releaseAt && releaseAt.getTime() > Date.now()) {
       throw new Meteor.Error(403, 'Progressive assignment has not been released');
@@ -1308,7 +1335,7 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   async function getTdfIdsByOwnerId(ownerId: string) {
     deps.serverConsole('getTdfIdsByOwnerId', ownerId);
     try {
-      const tdfs = await deps.Tdfs.find({ ownerId }).fetchAsync();
+      const tdfs = await deps.Tdfs.find({ ownerId }, { fields: { _id: 1 } }).fetchAsync();
       const ownedTdfIds = tdfs.map((tdf: { _id: string }) => String(tdf._id));
       deps.serverConsole('ownedTdfIds count:', ownedTdfIds.length);
       return ownedTdfIds;
@@ -1318,19 +1345,21 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
   }
 
   async function getAllTeachers(this: MethodContext) {
-    const query = { roles: 'teacher' };
-    deps.serverConsole('getAllTeachers', query);
+    deps.serverConsole('getAllTeachers');
     if (!this.userId) {
       throw new Meteor.Error(401, 'Must be logged in');
     }
-    const allTeachers = await deps.usersCollection.find(query, {
-      fields: {
-        _id: 1,
-        username: 1,
-        email_canonical: 1,
-        'emails.address': 1,
+    const teacherCursor = await deps.Roles.getUsersInRoleAsync('teacher', {
+      queryOptions: {
+        fields: {
+          _id: 1,
+          username: 1,
+          email_canonical: 1,
+          'emails.address': 1,
+        },
       },
-    }).fetchAsync();
+    });
+    const allTeachers = await teacherCursor.fetchAsync();
 
     return allTeachers.map((teacher: any) => ({
       ...teacher,
@@ -1404,7 +1433,10 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     deps.serverConsole('editCourse:' + JSON.stringify(courseUpdate));
     await deps.Courses.updateAsync({ _id: targetCourseId }, courseUpdate);
     const newSections = normalizeCourseSections(mycourse.sections);
-    const curCourseSections = await deps.Sections.find({ courseId: targetCourseId }).fetchAsync();
+    const curCourseSections = await deps.Sections.find(
+      { courseId: targetCourseId },
+      { fields: { _id: 1, sectionName: 1 } },
+    ).fetchAsync();
     const oldSections = curCourseSections.map((section: { sectionName: string }) => section.sectionName);
     deps.serverConsole('old/new', oldSections, newSections);
 
@@ -1416,8 +1448,12 @@ export function createCourseMethods(deps: CourseMethodsDeps) {
     for (const sectionName of sectionsAdded) {
       await deps.Sections.insertAsync({ courseId: targetCourseId, sectionName });
     }
-    for (const sectionName of sectionsRemoved) {
-      await deps.Sections.removeAsync({ courseId: targetCourseId, sectionName });
+    const removedSectionIds = curCourseSections
+      .filter((section: any) => sectionsRemoved.includes(section.sectionName))
+      .map((section: any) => section._id);
+    if (removedSectionIds.length > 0) {
+      await deps.SectionUserMap.removeAsync({ sectionId: { $in: removedSectionIds } });
+      await deps.Sections.removeAsync({ _id: { $in: removedSectionIds } });
     }
 
     await invalidateCourseSnapshotsForCourse(String(targetCourseId), 'course-updated');

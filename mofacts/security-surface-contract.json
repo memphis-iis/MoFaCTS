@@ -159,7 +159,8 @@
     },
     {
       "name": "deleteAllFiles",
-      "access": "admin-only"
+      "access": "admin-only",
+      "notes": "Bulk uploaded-asset deletion uses the SPARC curation owner for teaching images, including uncataloged generated assets. Content-free receipts and dependent-content cleanup precede media removal; learner decisions, histories and model records are preserved."
     },
     {
       "name": "deleteCourse",
@@ -197,12 +198,12 @@
     {
       "name": "downloadDataById",
       "access": "authenticated-self",
-      "notes": "Existing owner authorization and condition-family validation retained; ordinary TSV exports exclude historical assessment copies."
+      "notes": "Owner and exact condition-family authorization issues a single-use download capability; the HTTP handler revalidates the same scope before reading and before streaming. Projected, bounded history reads exclude historical assessment copies."
     },
     {
       "name": "downloadDataByTeacher",
       "access": "authenticated-self",
-      "notes": "Existing teacher ownership checks retained; ordinary TSV exports exclude historical assessment copies."
+      "notes": "Authenticated self-only issuance for owned lessons; a single-use HTTP capability revalidates user existence and the exact owned scope before reading and before streaming. Histories use bounded projected reads and exclude historical assessment copies."
     },
     {
       "name": "downloadOwnHistoryAcrossTdfs",
@@ -215,7 +216,8 @@
     },
     {
       "name": "editCourse",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Course owner/admin authorization is retained. Removing sections removes their enrollment references and invalidates existing assigned/public course snapshots, including learners no longer found through live sections."
     },
     {
       "name": "editCourseAssignments",
@@ -223,7 +225,8 @@
     },
     {
       "name": "ensureDashboardCacheCurrent",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated-self only. Normal refresh reads only committed history after the saved source sequence. Initial or explicitly invalidated caches rebuild inside a Mongo snapshot; history and summary positions are never accepted from the client."
     },
     {
       "name": "exportDeploymentBrandProfile",
@@ -245,7 +248,7 @@
     {
       "name": "resolveSparcVisualSupport",
       "access": "role-checked",
-      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
+      "notes": "Server-verified lesson access and private-asset boundaries retained. A new visual decision cannot reserve media already used by the same user in another turn; same-event accepted decisions remain resumable. Acceptance shares the per-user transactional content-use guard with instruction and primitive decisions."
     },
     {
       "name": "getAccessableTDFSForUser",
@@ -302,7 +305,8 @@
     },
     {
       "name": "getAllTeachers",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Requires a signed-in caller; teacher discovery uses the canonical Roles assignment query and projects only existing teacher identity/display fields. Obsolete users.roles values do not grant listing membership."
     },
     {
       "name": "getAssessmentCompletedTrialCountFromHistory",
@@ -365,7 +369,8 @@
     },
     {
       "name": "getLearnerCoursesSnapshot",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated self-scoped version-5 derived snapshot. Its expiresAt deadline covers course visibility and assignment time transitions; expired or invalid expiry metadata triggers an owned rebuild. Launch authorization remains independently enforced."
     },
     {
       "name": "getLearnerProgressSignals",
@@ -397,11 +402,6 @@
       "access": "role-checked"
     },
     {
-      "name": "getOutcomesForAdaptiveLearning",
-      "access": "role-checked",
-      "notes": "Existing subject and lesson authorization retained; excludes historical assessment copies before projection."
-    },
-    {
       "name": "getOwnOpenRouterSettings",
       "access": "authenticated-self"
     },
@@ -427,7 +427,8 @@
     },
     {
       "name": "getProgressiveAssignmentLaunch",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Cached course availability is not authorization. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release."
     },
     {
       "name": "getResponseKCMapForTdf",
@@ -601,12 +602,13 @@
     },
     {
       "name": "initializeDashboardCache",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated-self or administrator for another existing user. Full reconstruction is an initialization/repair operation; projected source history and cache position share one snapshot transaction."
     },
     {
       "name": "insertHistory",
       "access": "role-checked",
-      "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet and SPARC transition identities are validated; server-derived record IDs deduplicate retries using Mongo uniqueness. Conflicting sequence or transition writes fail. Competitive and student-selected AutoTutor policies and model/OET facts require an admin account at the common history-write boundary. SPARC assessment arrays are admin-only, limited to 256 records and 1 MiB, share one authorized lesson/attempt/response/course/policy scope, contain score-change rows followed by completion, and persist atomically in a Mongo transaction."
+      "notes": "Authenticated-self and lesson/course write authorization retained. Assessment copies rejected. Worksheet and SPARC transition identities are validated; server-derived record IDs deduplicate retries using Mongo uniqueness. Conflicting sequence or transition writes fail. Competitive and student-selected AutoTutor policies and model/OET facts require an admin account at the common history-write boundary. SPARC assessment arrays are admin-only, limited to 256 records and 1 MiB, share one authorized lesson/attempt/response/course/policy scope, contain score-change rows followed by completion, and persist atomically in a Mongo transaction. All accepted single and batch history rows commit their server-owned per-user source sequence in the same transaction; duplicate durable writes allocate no new sequence, and practice saves never rebuild dashboard summaries. Actual SPARC tutor output also checks exact per-user content eligibility and records presentation-use metadata inside that same transaction; duplicate content rolls back both history and source position."
     },
     {
       "name": "insertNewUsers",
@@ -738,7 +740,8 @@
     },
     {
       "name": "resetOwnLessonProgress",
-      "access": "authenticated-self"
+      "access": "authenticated-self",
+      "notes": "Existing course reset restriction and canonical lesson-family scope retained. History deletion and its source repair revision commit together; no other learner's progress is reset."
     },
     {
       "name": "resetPasswordWithToken",
@@ -998,12 +1001,12 @@
     {
       "name": "lookupSparcPrimitive",
       "access": "role-checked",
-      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
+      "notes": "Server-verified lesson access and own request identity retained. Exact-ID lookup cannot accept a component already used by this user; matched instructions check explanation, support and media separately. Transactional acceptance rejects stale/concurrent repeated selections. Same-request accepted decisions resume without reselection."
     },
     {
       "name": "publishSparcPrimitive",
       "access": "role-checked",
-      "notes": "Authenticated SPARC execution requires server-verified lesson access (enrollment/experiment membership and demo expiry); administrators retain author testing. Own request/history identity and private-asset ownership remain enforced. Administrative listing, editing, curation and deletion remain admin-only."
+      "notes": "Server-verified lesson access, content validation and own request identity retained. Atomic accepted decisions reserve exact component identities for this user; generated instructions cannot include an already-used image or explanation. Historical usage initialization is bounded and derives original components from saved history, without publishing it."
     },
     {
       "name": "reviseSparcPrimitive",
@@ -1083,7 +1086,8 @@
     },
     {
       "name": "filteredUsers",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Admin-authorized, bounded user page; reactive role assignments are limited to that page's user IDs and projected to user._id and inheritedRoles._id."
     },
     {
       "name": "filteredUsersCount",
@@ -1143,11 +1147,6 @@
       "access": "authenticated-self"
     },
     {
-      "name": "userHistory",
-      "access": "authenticated-self",
-      "notes": "Existing authenticated-self publication retained with sparse fields; includes original assessment answers and excludes historical copies."
-    },
-    {
       "name": "contentUploadMetadata",
       "access": "role-checked",
       "notes": "Authenticated owner/shared metadata and referenced dependencies only; projected fields, credential presence flags, bounded dependency queries and asset-count aggregation. No full lessons, media or credentials. Client owns summaries and persistent cache."
@@ -1155,7 +1154,7 @@
     {
       "name": "sparcRetrievalEmbeddings",
       "access": "role-checked",
-      "notes": "Lesson-authorized ID/vector-only runtime cache; admin author testing retained. Requires current lesson identity for non-admin accounts. No instructional content, credentials or learner records."
+      "notes": "Lesson-authorized ID/vector-only runtime cache; admin author testing retained. Private own-user content-use metadata filters eligibility before publishing candidate vectors and updates it live. No content, credentials, learner answers, usage ledger or conversation history is published. Historical metadata initialization is bounded; missing required eligibility data fails clearly."
     }
   ],
   "httpRoutes": [
@@ -1175,6 +1174,11 @@
       "name": "/data-download/own-history",
       "access": "single-use-download",
       "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies."
+    },
+    {
+      "name": "/data-download/owned-history",
+      "access": "single-use-download",
+      "notes": "Expiring single-use capability binds the issuing user, exact owned lesson IDs, request and filename. Revalidates current authorization before reading and before headers; bounded projected history reads, private temporary sorting, no-store responses, abort cleanup."
     },
     {
       "name": "/dynamic-assets",
@@ -1200,6 +1204,10 @@
     },
     {
       "name": "http:/data-download/own-history",
+      "access": "single-use-download"
+    },
+    {
+      "name": "http:/data-download/owned-history",
       "access": "single-use-download"
     },
     {

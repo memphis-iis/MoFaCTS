@@ -16,7 +16,10 @@ describe('tdfRuntimeLifecycle', function() {
     });
     const helpers = createTdfRuntimeLifecycleHelpers({
       Assignments: { find: () => ({ fetchAsync: async () => [] }), removeAsync: async () => 0 },
-      Histories: collection(rows), GlobalExperimentStates: collection(states),
+      archiveHistory: async tdfId => {
+        await collection(rows).updateAsync({ TDFId: tdfId }, { $set: { tdfDeletedAt: new Date() } });
+      },
+      GlobalExperimentStates: collection(states),
       invalidateCourseSnapshotsForCourse: async () => {}, invalidateCourseSnapshotsForAssignment: async () => {},
     });
     await helpers.deleteTdfRuntimeData('deleted');
@@ -33,6 +36,7 @@ describe('tdfRuntimeLifecycle', function() {
   it('invalidates course snapshots when deleting assigned TDF runtime data', async function() {
     const removedSelectors: Array<{ collection: string; selector: Record<string, unknown> }> = [];
     const archived: Array<{ collection: string; selector: any; modifier: any; options: any }> = [];
+    const archivedHistoryIds: string[] = [];
     const invalidatedAssignments: Array<{ assignmentId: string; reason: string }> = [];
     const invalidatedCourses: Array<{ courseId: string; reason: string }> = [];
     const helpers = createTdfRuntimeLifecycleHelpers({
@@ -49,12 +53,7 @@ describe('tdfRuntimeLifecycle', function() {
           return 3;
         },
       },
-      Histories: {
-        updateAsync: async (selector, modifier, options) => {
-          archived.push({ collection: 'Histories', selector, modifier, options });
-          return 4;
-        },
-      },
+      archiveHistory: async tdfId => { archivedHistoryIds.push(tdfId); },
       GlobalExperimentStates: {
         updateAsync: async (selector, modifier, options) => {
           archived.push({ collection: 'GlobalExperimentStates', selector, modifier, options });
@@ -77,7 +76,8 @@ describe('tdfRuntimeLifecycle', function() {
         selector: { $or: [{ TDFId: 'tdf-1' }, { memberTdfIds: 'tdf-1' }] },
       },
     ]);
-    expect(archived.map(row => row.collection)).to.deep.equal(['Histories', 'GlobalExperimentStates']);
+    expect(archivedHistoryIds).to.deep.equal(['tdf-1']);
+    expect(archived.map(row => row.collection)).to.deep.equal(['GlobalExperimentStates']);
     for (const row of archived) {
       expect(row.selector).to.deep.equal({ TDFId: 'tdf-1', tdfDeletedAt: { $exists: false } });
       expect(row.modifier.$set.tdfDeletedAt).to.be.instanceOf(Date);
@@ -92,5 +92,22 @@ describe('tdfRuntimeLifecycle', function() {
       { courseId: 'course-a', reason: 'tdf-deleted' },
       { courseId: 'course-b', reason: 'tdf-deleted' },
     ]);
+  });
+
+  it('propagates required history archival failure before resume-state archival or snapshot invalidation', async function() {
+    let resumeStateWrites = 0;
+    let invalidations = 0;
+    const helpers = createTdfRuntimeLifecycleHelpers({
+      Assignments: { find: () => ({ fetchAsync: async () => [{ _id: 'assignment', courseId: 'course' }] }), removeAsync: async () => 1 },
+      archiveHistory: async () => { throw new Error('Injected archival failure'); },
+      GlobalExperimentStates: { updateAsync: async () => { resumeStateWrites += 1; } },
+      invalidateCourseSnapshotsForCourse: async () => { invalidations += 1; },
+      invalidateCourseSnapshotsForAssignment: async () => { invalidations += 1; },
+    });
+    let failure: unknown;
+    try { await helpers.deleteTdfRuntimeData('lesson'); } catch (error) { failure = error; }
+    expect(failure).to.be.instanceOf(Error);
+    expect(resumeStateWrites).to.equal(0);
+    expect(invalidations).to.equal(0);
   });
 });

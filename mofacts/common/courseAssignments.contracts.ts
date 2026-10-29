@@ -123,9 +123,13 @@ export interface LearnerCourseSnapshotCourse {
 }
 
 export interface LearnerCoursesSnapshot {
-  version: 4;
+  version: 5;
   userId: string;
   generatedAt: number;
+  /** Earliest server-owned time boundary; null means no pending time transition. */
+  expiresAt: number | null;
+  /** Response time, supplied on each read and never persisted in the cached snapshot. */
+  serverNow: number;
   assignedCourses: LearnerCourseSnapshotCourse[];
   publicCourses: LearnerCourseSnapshotCourse[];
   invalidatedAt: Date | null;

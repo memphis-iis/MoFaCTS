@@ -290,10 +290,10 @@ describe('audioStartup', function() {
     expect(plan.recorderPreInitialization).to.equal(true);
   });
 
-  it('prepares SR warmup from the UI locale when TDF speech language is missing', function() {
+  it('rejects missing explicit SR language before preparing warmup or microphone access', function() {
     Session.set('speechAPIKeyConfigured', true);
 
-    const plan = getAudioLaunchPreparationPlan(
+    expect(() => getAudioLaunchPreparationPlan(
       {
         tdfs: {
           tutor: {
@@ -309,12 +309,7 @@ describe('audioStartup', function() {
           audioInputMode: true,
         },
       },
-    );
-
-    expect(plan.requiresPreparation).to.equal(true);
-    expect(plan.ttsWarmup).to.equal(false);
-    expect(plan.srWarmup).to.equal(true);
-    expect(plan.recorderPreInitialization).to.equal(true);
+    )).to.throw('Speech recognition requires an explicit setspec.speechRecognitionLanguage.');
   });
 
   it('does not treat prerecorded audio assets as launch-time preparation work', function() {

@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { SpeechRecognitionConfigurationError } from './speechRecognitionConfig';
 import {
   classifySrInitFailure,
   evaluateSrAvailability,
@@ -52,7 +53,7 @@ describe('audioAvailability', function() {
     }).status).to.equal('available');
   });
 
-  it('allows speech input without a TDF speech language when key availability is satisfied', function() {
+  it('keeps SR requested when language is missing so configuration validation cannot silently select text input', function() {
     const result = evaluateSrAvailability({
       user: { audioSettings: { audioInputMode: true } },
       tdfFile: { tdfs: { tutor: { setspec: { audioInputEnabled: 'true', speechAPIKey: 'tdf-key' } } } },
@@ -101,6 +102,17 @@ describe('audioAvailability', function() {
     });
     expect(result.retryable).to.equal(false);
     expect(result.detail).to.equal('permission_denied');
+  });
+
+  it('does not retry explicit speech-language configuration failures', function() {
+    const result = classifySrInitFailure({
+      error: new SpeechRecognitionConfigurationError('Missing speech language'),
+      secureContext: true,
+      hasAnySpeechApiKey: true,
+      browserSupportsMediaDevices: true,
+    });
+    expect(result.retryable).to.equal(false);
+    expect(result.reason).to.equal('speech-language-configuration');
   });
 
   it('classifies interruption errors as retryable', function() {

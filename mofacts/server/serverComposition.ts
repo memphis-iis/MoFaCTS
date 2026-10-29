@@ -17,7 +17,6 @@ import {Roles} from 'meteor/alanning:roles';
 // import * as ElaboratedFeedback from './lib/CachedElaboratedFeedback';
 // import * as DefinitionalFeedback from '../server/lib/DefinitionalFeedback.js';
 // import * as ClozeAPI from '../server/lib/ClozeAPI.js';
-import {createExperimentExport, createExperimentExportByTdfIds, createExperimentExportFromHistories} from './experiment_times';
 import {getNewItemFormat} from './conversions/convert';
 import { legacyTrim } from '../common/underscoreCompat';
 import _ from 'underscore';
@@ -50,7 +49,6 @@ import { createStorageBoundary, getLocalStoragePaths } from './lib/storageBounda
 import { createRedisBoundary } from './lib/redisBoundary';
 import { registerServerRuntime } from './runtime/serverRuntime';
 import { getResponseKCAnswerKey } from '../common/lib/responseKCAnswerKey';
-import { computePracticeTimeMs } from '../lib/practiceTime';
 import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
@@ -58,7 +56,10 @@ import { createAccessMethods } from './methods/accessMethods';
 import { createAdminMethods } from './methods/adminMethods';
 import { createAnalyticsMethods } from './methods/analyticsMethods';
 import { insertSparcHistoryBatch } from './lib/sparcHistoryBatchStorage';
-import { MongoInternals } from 'meteor/mongo';
+import { Random } from 'meteor/random';
+import { HistoryCommitState, historyCommitStorage } from './lib/historyCommitMongo';
+import { refreshDashboardHistory } from './lib/dashboardHistoryMongo';
+import { archiveDashboardHistory } from './lib/dashboardHistoryArchive';
 import { writeConditionState } from './lib/conditionAllocationMongo';
 import { createAuthMethods } from './methods/authMethods';
 import { createContentMethods } from './methods/contentMethods';
@@ -81,7 +82,7 @@ import {
 import { createOpenRouterMethods } from './methods/openRouterMethods';
 import { createSparcPromptImageMethods } from './methods/sparcPromptImageMethods';
 import { createSparcFigureLibraryStore, ensureSparcFigureLibraryIndexes,
-  removeSparcFigureAssetMetadata, removeSparcFigureUserDecisions, withSparcFigureLibraryLock } from './lib/sparcFigureLibraryStorage';
+  removeSparcFigureUserDecisions, withSparcFigureLibraryLock } from './lib/sparcFigureLibraryStorage';
 import { createSparcFigureBrowseStore, ensureSparcFigureBrowseIndexes } from './lib/sparcFigureBrowseStorage';
 import { consolidateSparcInstructionalLibrary, SparcInstructionalLibrary } from './lib/sparcInstructionalLibraryStorage';
 import { createSparcFigureClusterLabeler } from './lib/sparcFigureClusterLabels';
@@ -109,7 +110,6 @@ import {
 } from './lib/mappingPolicyClassifier';
 import {
   canAccessContentUploadTdf,
-  canDownloadOwnedTdfData,
   canViewDashboardTdf,
   hasSharedTdfAccess,
   isTdfOwner,
@@ -372,6 +372,7 @@ const updateActiveThemeDocument = createUpdateActiveThemeDocument({
 });
 
 const courseMethods = createCourseMethods({
+  Roles,
   DynamicAssets,
   serverConsole,
   Courses,
@@ -398,7 +399,7 @@ const {
   invalidateCourseSnapshotForUser: _invalidateCourseSnapshotForUser,
   invalidateCourseSnapshotsForCourse: _invalidateCourseSnapshotsForCourse,
   invalidateCourseSnapshotsForAssignment: _invalidateCourseSnapshotsForAssignment,
-  getTdfIdsByOwnerId: getTdfIdsByOwnerIdMethod,
+  getTdfIdsByOwnerId: _getTdfIdsByOwnerId,
   getSourceSentences: _getSourceSentences,
   checkForTDFData: _checkForTDFData,
   ...publicCourseMethods
@@ -406,13 +407,16 @@ const {
 const resolveAssignedRootTdfIdsForUser = resolveAssignedRootTdfIdsForUserMethod as (userId: string) => Promise<string[]>;
 const invalidateCourseSnapshotsForCourse = _invalidateCourseSnapshotsForCourse as (courseId: string, reason: string) => Promise<unknown>;
 const invalidateCourseSnapshotsForAssignment = _invalidateCourseSnapshotsForAssignment as (assignmentId: string, reason: string) => Promise<unknown>;
-const getTdfIdsByOwnerId = getTdfIdsByOwnerIdMethod as (ownerId: string) => Promise<string[] | null>;
 
 const {
   deleteTdfRuntimeData,
 } = createTdfRuntimeLifecycleHelpers({
   Assignments,
-  Histories,
+  archiveHistory: tdfId => archiveDashboardHistory(tdfId, {
+    histories: Histories.rawCollection() as any,
+    mutate: historyCommitStorage.mutate,
+    reportProgress: progress => serverConsole('[Dashboard history archive]', progress),
+  }),
   GlobalExperimentStates,
   invalidateCourseSnapshotsForCourse,
   invalidateCourseSnapshotsForAssignment,
@@ -437,7 +441,6 @@ const tdfLookupHelpers = createTdfLookupHelpers({
 const {
   getTdfById,
   userCanManageTdf,
-  assertUserOwnsTdfs,
 } = tdfLookupHelpers;
 
 registerSparcRetrievalPublication(getMethodAuthorizationDeps);
@@ -517,7 +520,13 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   getAccessibleTdf: (userId, tdfId, options) => getTdfById.call({ userId }, tdfId, options),
   Meteor,
   Roles,
-  Histories,
+  refreshDashboardHistory: (userId, options) => refreshDashboardHistory(userId, options,
+    (mode, rows) => serverConsole(`[Dashboard] ${mode}: processed ${rows} history rows`)),
+  removeLessonHistory: async (userId, tdfIds) => {
+    const { result } = await historyCommitStorage.mutate(userId, async session =>
+      await Histories.rawCollection().deleteMany({ userId, TDFId: { $in: tdfIds } }, { session }));
+    return result.deletedCount;
+  },
   GlobalExperimentStates,
   Tdfs,
   Courses,
@@ -529,7 +538,6 @@ const dashboardCacheMethods = createDashboardCacheMethods({
   DynamicSettings,
   decryptData,
   serverConsole,
-  computePracticeTimeMs,
   canViewDashboardTdf,
   redisBoundary
 });
@@ -552,7 +560,12 @@ const analyticsMethods = createAnalyticsMethods({
   writeConditionState,
   serverConsole,
   Histories,
-  insertSparcHistoryBatch: records => insertSparcHistoryBatch(Histories.rawCollection(), records, () => MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession()),
+  commitHistory: async (userId, record) => {
+    const rows = await historyCommitStorage.insert(userId, [{ ...record,
+      _id: typeof record._id === 'string' ? record._id : Random.id(), userId }]);
+    return rows.length > 0;
+  },
+  insertSparcHistoryBatch: records => insertSparcHistoryBatch(historyCommitStorage, records),
   StimulusCrowdStats,
   GlobalExperimentStates,
   Tdfs,
@@ -572,12 +585,6 @@ const analyticsMethods = createAnalyticsMethods({
     return eventId;
   },
   syncUsernameCaches,
-  createExperimentExport,
-  createExperimentExportByTdfIds,
-  createExperimentExportFromHistories,
-  getTdfIdsByOwnerId,
-  assertUserOwnsTdfs,
-  canDownloadOwnedTdfData,
   getClassPerformanceByTdfWorkflow,
   getStimuliSetById,
   hasMeaningfulProgressSignal,
@@ -721,8 +728,15 @@ export const methods: any = {
   }),
 
   ...createAdminMethods({
-    removeSparcFigureAssetMetadata: async assetId => {
-      await removeSparcFigureAssetMetadata(assetId);
+    removeUploadedAsset: async assetId => {
+      const asset = await DynamicAssets.collection.findOneAsync({ _id: assetId }, { fields: { meta: 1 } });
+      if (!asset) return;
+      if (asset.meta?.uploadPurpose === SPARC_PROMPT_IMAGE_PURPOSE) {
+        if (asset.meta.public !== false) throw new Error('Administrative removal requires a private SPARC teaching asset');
+        await withSparcFigureLibraryLock(() => sparcLibraryCuration.removeImageAsset(assetId));
+      } else {
+        await DynamicAssets.removeAsync({ _id: assetId });
+      }
     },
     removeSparcFigureUserDecisions: async userId => { await removeSparcFigureUserDecisions(userId); await removeSparcMoveUserRecords(userId); },
     serverConsole,
@@ -739,6 +753,7 @@ export const methods: any = {
     UserMetrics,
     PasswordResetTokens,
     UserDashboardCache,
+    HistoryCommitState,
     UserUploadQuota,
     requireAdminUser,
     normalizeCanonicalEmail,
@@ -1164,6 +1179,7 @@ Meteor.startup(async function() {
     UserMetrics,
     PasswordResetTokens,
     UserDashboardCache,
+    HistoryCommitState,
     UserUploadQuota,
     AuditLog,
     syncUsernameCaches,

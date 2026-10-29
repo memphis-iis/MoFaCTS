@@ -1,11 +1,15 @@
-import { getPrimarySpeechRecognitionLanguageCode } from '../../common/lib/interfaceLocales';
+import { GOOGLE_STT_LANGUAGE_CODES } from '../../common/fieldRegistrySectionCore';
 
 const DEFAULT_IGNORE_OUT_OF_GRAMMAR_RESPONSES = true;
 const DEFAULT_FILTER_CLOSE_SPEECH_RESPONSES = true;
 
 type SetSpecWithSpeechLanguage = {
-  speechRecognitionLanguage?: string | string[] | null;
+  speechRecognitionLanguage?: unknown;
 };
+
+const supportedSpeechLanguages = new Set<string>(GOOGLE_STT_LANGUAGE_CODES);
+
+export class SpeechRecognitionConfigurationError extends Error {}
 
 type SetSpecWithSpeechGrammar = {
   speechIgnoreOutOfGrammarResponses?: unknown;
@@ -32,25 +36,23 @@ export function resolveUnitSpeechRecognitionEnabled(
 
 export function resolveSpeechRecognitionLanguage(
   setSpec: SetSpecWithSpeechLanguage | null | undefined,
-  uiLocale: string | null | undefined = 'en'
 ): string {
   const raw = setSpec?.speechRecognitionLanguage;
-
-  if (Array.isArray(raw)) {
-    const firstNonEmpty = raw
-      .map((value) => String(value || '').trim())
-      .find(Boolean);
-    if (firstNonEmpty) {
-      return firstNonEmpty;
-    }
-  } else {
-    const language = String(raw || '').trim();
-    if (language) {
-      return language;
-    }
+  if (raw != null && typeof raw !== 'string' && !Array.isArray(raw)
+    || Array.isArray(raw) && raw.some(value => typeof value !== 'string')) {
+    throw new SpeechRecognitionConfigurationError('setspec.speechRecognitionLanguage must contain a supported Google Speech-to-Text language code.');
   }
-
-  return getPrimarySpeechRecognitionLanguageCode(uiLocale);
+  // Repeated authored values retain their current first-nonblank selection contract.
+  const language = Array.isArray(raw)
+    ? raw.map(value => value.trim()).find(Boolean) ?? ''
+    : typeof raw === 'string' ? raw.trim() : '';
+  if (!language) {
+    throw new SpeechRecognitionConfigurationError('Speech recognition requires an explicit setspec.speechRecognitionLanguage.');
+  }
+  if (!supportedSpeechLanguages.has(language)) {
+    throw new SpeechRecognitionConfigurationError('setspec.speechRecognitionLanguage must contain a supported Google Speech-to-Text language code.');
+  }
+  return language;
 }
 
 export function resolveSpeechIgnoreOutOfGrammarResponses(

@@ -27,9 +27,9 @@ import { getAllCurrentStimAnswers } from '../../../../lib/runtimeStimuli';
 import {
   resolveSpeechIgnoreOutOfGrammarResponses,
   resolveSpeechFilterCloseResponses,
-  resolveSpeechRecognitionLanguage
+  resolveSpeechRecognitionLanguage,
+  SpeechRecognitionConfigurationError,
 } from '../../../../lib/speechRecognitionConfig';
-import { getActiveUiLocale } from '../../../../lib/interfaceLocaleState';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import {
   classifySrInitFailure,
@@ -150,7 +150,6 @@ type AdaptationPhraseSetBucket = {
 };
 
 type SpeechAdaptationSummary = {
-  currentAnswer: string | null;
   totalPhraseSets: number;
   totalPhrases: number;
   targetPhraseSetIndexes: number[];
@@ -163,7 +162,6 @@ type SpeechAdaptationSummary = {
     boost: number | null;
     phraseCount: number;
     containsCurrentAnswer: boolean;
-    samplePhrases: string[];
   }>;
 };
 
@@ -293,7 +291,7 @@ function buildSpeechAdaptation(
   return { phraseSets };
 }
 
-function summarizeSpeechAdaptation(
+export function summarizeSpeechAdaptation(
   adaptation: SpeechApiRequest['config']['adaptation'],
   currentAnswer: string | null
 ): SpeechAdaptationSummary {
@@ -307,9 +305,6 @@ function summarizeSpeechAdaptation(
       boost: typeof phraseSet.boost === 'number' ? phraseSet.boost : null,
       phraseCount: phraseSet.phrases.length,
       containsCurrentAnswer,
-      samplePhrases: phraseSet.phrases
-        .slice(0, containsCurrentAnswer ? 5 : 3)
-        .map((phrase) => phrase.value),
     };
   });
   const targetPhraseSets = phraseSets.filter((phraseSet) => phraseSet.containsCurrentAnswer);
@@ -317,7 +312,6 @@ function summarizeSpeechAdaptation(
   const targetPhraseSetBoosts = targetPhraseSets.map((phraseSet) => phraseSet.boost ?? 0);
 
   return {
-    currentAnswer,
     totalPhraseSets: adaptation.phraseSets.length,
     totalPhrases: adaptation.phraseSets.reduce((total, phraseSet) => total + phraseSet.phrases.length, 0),
     targetPhraseSetIndexes,
@@ -527,7 +521,7 @@ function parseSpeechHintExclusionList(value: unknown): string[] {
 }
 
 function requireSpeechRecognitionLanguage(setSpec: CurrentSetSpecLike | undefined): string {
-  return resolveSpeechRecognitionLanguage(setSpec, getActiveUiLocale());
+  return resolveSpeechRecognitionLanguage(setSpec);
 }
 
 function requireIgnoreOutOfGrammarResponses(setSpec: CurrentSetSpecLike | undefined): boolean {
@@ -541,8 +535,9 @@ function buildTranscriptionFailureResult(
   setWaitingForTranscription(false);
   if (srSend) {
     srSend({
-      type: 'TRANSCRIPTION_ERROR',
-      error,
+      type: error instanceof SpeechRecognitionConfigurationError ? 'ERROR' : 'TRANSCRIPTION_ERROR',
+      ...(error instanceof SpeechRecognitionConfigurationError ? { source: 'speechRecognitionConfiguration' } : {}),
+      error: error instanceof SpeechRecognitionConfigurationError ? error.message : error,
       ...(typeof options.transcript === 'string' ? { transcript: options.transcript } : {}),
       ...(options.silence === true ? { silence: true } : {}),
       ...(typeof options.feedback === 'string' && options.feedback.trim()
@@ -592,15 +587,15 @@ async function logMediaDeviceState() {
 
   try {
     await navigator.mediaDevices.enumerateDevices();
-  } catch (error: unknown) {
-    clientConsole(1, '[SR] enumerateDevices failed:', error);
+  } catch {
+    clientConsole(1, '[SR] enumerateDevices failed');
   }
 
   if (navigator.permissions?.query) {
     try {
       await navigator.permissions.query({ name: 'microphone' });
-    } catch (error: unknown) {
-      clientConsole(1, '[SR] permissions.query(microphone) failed:', error);
+    } catch {
+      clientConsole(1, '[SR] permissions.query(microphone) failed');
     }
   }
 }
@@ -627,7 +622,7 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
   }
 
   try {
-    
+    requireSpeechRecognitionLanguage(Session.get('currentTdfFile')?.tdfs?.tutor?.setspec);
     await logMediaDeviceState();
 
     if (typeof navigator.mediaDevices === 'undefined') {
@@ -692,7 +687,6 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
     const audioTrack = tracks[0] || null;
     const appliedTrackSettings = audioTrack?.getSettings?.() || null;
     clientConsole(2, '[SR] Applied track settings', {
-      deviceId: appliedTrackSettings?.deviceId,
       sampleRate: appliedTrackSettings?.sampleRate,
       channelCount: appliedTrackSettings?.channelCount,
       echoCancellation: appliedTrackSettings?.echoCancellation,
@@ -720,8 +714,8 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
 
     // Initialize recorder
     const audioRecorderConfig = {
-      errorCallback: function(x: unknown) {
-        clientConsole(1, '[SR] Recorder error:', x);
+      errorCallback: function() {
+        clientConsole(1, '[SR] Recorder error');
       }
     };
 
@@ -774,11 +768,8 @@ export async function initializeAudioRecorder(): Promise<SpeechRecognitionInitRe
       browserSupportsMediaDevices: supportsMediaDevicesApi(),
     });
     clientConsole(1, '[SR] initializeAudioRecorder failed', {
-      name: error instanceof Error ? error.name : 'UnknownError',
-      message: getErrorMessage(error),
       retryable: failureClass.retryable,
       detail: failureClass.detail,
-      reason: failureClass.reason,
       contextState: audioContext?.state,
       visibilityState: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
     });
@@ -820,7 +811,6 @@ async function initializeAudioRecorderWithRetry(
         maxAttempts,
         retryable: failureClass.retryable,
         detail: failureClass.detail,
-        reason: failureClass.reason,
       });
       if (!failureClass.retryable || attempt >= maxAttempts) {
         break;
@@ -917,12 +907,20 @@ export function startRecording(): void {
     return;
   }
 
-  if (recorder && !isRecordingLocked() && isSrEnabled()) {
+  if (!isSrEnabled()) return;
+  try {
+    requireSpeechRecognitionLanguage(Session.get('currentTdfFile')?.tdfs?.tutor?.setspec);
+  } catch (error) {
+    buildTranscriptionFailureResult(error);
+    return;
+  }
+
+  if (recorder && !isRecordingLocked()) {
     setRecording(true);
     recorder.record();
     
   } else {
-    if (!isRecordingLocked() && isSrEnabled()) {
+    if (!isRecordingLocked()) {
       void initializeAudioRecorderWithRetry('auto').then((result) => {
         if (!result || !recorder || isRecordingLocked()) {
           return;
@@ -930,12 +928,8 @@ export function startRecording(): void {
         setRecording(true);
         recorder.record();
       }).catch((error: unknown) => {
-        clientConsole(1, '[SR] startRecording initialization failed', {
-          error: getErrorMessage(error),
-        });
-        if (srSend) {
-          srSend({ type: 'TRANSCRIPTION_ERROR', error: getErrorMessage(error) });
-        }
+        clientConsole(1, '[SR] startRecording initialization failed');
+        buildTranscriptionFailureResult(error);
       });
     }
   }
@@ -1007,10 +1001,9 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     filterCloseSpeechResponses = resolveSpeechFilterCloseResponses(setSpec);
   } catch (error: unknown) {
     clientConsole(1, '[SR] Refusing to transcribe with missing SR configuration', {
-      error: getErrorMessage(error),
-      setSpec,
+      hasSetSpec: Boolean(setSpec),
     });
-    return buildTranscriptionFailureResult(getErrorMessage(error));
+    return buildTranscriptionFailureResult(error);
   }
   const phoneticMatchingStrategy = getPhoneticMatchingStrategy(speechRecognitionLanguage);
 
@@ -1041,8 +1034,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
 
     if (!requestCorrectAnswer) {
       clientConsole(1, '[SR] Missing current speech target for SR', {
-        rawCorrectAnswer,
-        experimentState,
+        hasExperimentState: Boolean(experimentState),
       });
       return buildTranscriptionFailureResult('sr-missing-current-answer');
     }
@@ -1050,8 +1042,9 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     const excludedCurrentTargets = configuredSpeechTargets.filter((target) => configuredExclusions.includes(target));
     if (excludedCurrentTargets.length > 0) {
       clientConsole(1, '[SR] Refusing to transcribe because the current answer is excluded by speechHintExclusionList', {
-        currentSpeechTargets: configuredSpeechTargets,
-        configuredExclusions,
+        currentSpeechTargetCount: configuredSpeechTargets.length,
+        configuredExclusionCount: configuredExclusions.length,
+        excludedCurrentTargetCount: excludedCurrentTargets.length,
       });
       return buildTranscriptionFailureResult('sr-current-answer-excluded');
     }
@@ -1117,9 +1110,9 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     estimatedDurationMs,
     phraseHintsCount: phraseHints.length,
     answerGrammarCount: answerGrammar.length,
-    correctAnswer: requestCorrectAnswer,
-    configuredSpeechTargets,
-    configuredExclusions,
+    hasCurrentAnswer: Boolean(requestCorrectAnswer),
+    configuredSpeechTargetCount: configuredSpeechTargets.length,
+    configuredExclusionCount: configuredExclusions.length,
     language: speechRecognitionLanguage,
     phoneticStrategy: phoneticMatchingStrategy,
     reusedPreInitializedStream: lastInitUsedPreInitializedStream,
@@ -1130,7 +1123,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     `[SR DEBUG] Audio request summary attempt=${speechTranscriptionAttempts} sampleRate=${sampleRate} ` +
     `audioBytes=${audioBytes} estimatedDurationMs=${String(estimatedDurationMs ?? 'n/a')} ` +
     `phraseHints=${phraseHints.length} answerGrammar=${answerGrammar.length} ` +
-    `language=${speechRecognitionLanguage} correctAnswer=${String(requestCorrectAnswer || '')} ` +
+    `language=${speechRecognitionLanguage} hasCurrentAnswer=${String(Boolean(requestCorrectAnswer))} ` +
     `reusedPreInit=${String(lastInitUsedPreInitializedStream)} ` +
     `targetBoosts=${speechAdaptationSummary.targetPhraseSetBoostsCsv || 'none'}`
   );
@@ -1150,7 +1143,7 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
       const retryRequest = buildCommandAndSearchRetryRequest(request);
       clientConsole(1, '[SR DEBUG] Retrying short Spanish target with command_and_search model', {
         attempt: speechTranscriptionAttempts,
-        correctAnswer: requestCorrectAnswer,
+        hasCurrentAnswer: Boolean(requestCorrectAnswer),
         originalModel: request.config.model,
         retryModel: retryRequest.config.model,
         originalApiElapsedMs: apiElapsedMs,
@@ -1162,31 +1155,20 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     }
     const resultCount = Array.isArray(typedResponse?.results) ? typedResponse.results.length : 0;
     const adaptationTimeout = Boolean(typedResponse?.speechAdaptationInfo?.adaptationTimeout);
-    const adaptationTimeoutMessage = typedResponse?.speechAdaptationInfo?.timeoutMessage || '';
     const alternativesPerResult = resultCount > 0
       ? typedResponse!.results!.map((res) => Array.isArray(res?.alternatives) ? res.alternatives.length : 0)
-      : [];
-    const topAlternatives = resultCount > 0
-      ? typedResponse!.results!
-        .flatMap((res) => Array.isArray(res?.alternatives) ? res.alternatives : [])
-        .map((alt) => String(alt?.transcript || '').trim())
-        .filter(Boolean)
-        .slice(0, 5)
       : [];
     clientConsole(1, '[SR DEBUG] Google SR response received', {
       attempt: speechTranscriptionAttempts,
       apiElapsedMs,
       resultCount,
       adaptationTimeout,
-      adaptationTimeoutMessage,
       alternativesPerResult,
-      topAlternatives,
     });
     clientConsole(
       1,
       `[SR DEBUG] Response summary attempt=${speechTranscriptionAttempts} apiElapsedMs=${apiElapsedMs} ` +
-      `resultCount=${resultCount} adaptationTimeout=${String(adaptationTimeout)} ` +
-      `topAlternatives=${topAlternatives.join(' | ') || 'none'}`
+      `resultCount=${resultCount} adaptationTimeout=${String(adaptationTimeout)}`
     );
     
     
@@ -1197,27 +1179,17 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
     // Parse result
     if (typedResponse && typedResponse.results && typedResponse.results.length > 0) {
       // Collect ALL alternatives from ALL results (Google spreads them across multiple)
-      const alternatives: Array<GoogleSpeechAlternative & { resultIndex: number; alternativeIndex: number }> = [];
-      typedResponse.results.forEach((res, resultIndex) => {
+      const alternatives: GoogleSpeechAlternative[] = [];
+      typedResponse.results.forEach((res) => {
         if (!res?.alternatives?.length) {
           return;
         }
-        res.alternatives.forEach((alt, alternativeIndex) => {
+        res.alternatives.forEach((alt) => {
           if (alt?.transcript) {
-            alternatives.push({
-              ...alt,
-              resultIndex,
-              alternativeIndex,
-            });
+            alternatives.push(alt);
           }
         });
       });
-      const rankedAlternatives = alternatives.map((alt) => ({
-        resultIndex: alt.resultIndex,
-        alternativeIndex: alt.alternativeIndex,
-        transcript: String(alt.transcript || '').trim(),
-        confidence: typeof alt.confidence === 'number' ? alt.confidence : null,
-      }));
 
       if (alternatives.length === 0) {
         clientConsole(1, '[SR DEBUG] Google SR returned no transcript alternatives', {
@@ -1227,7 +1199,6 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
           alternativesPerResult,
           audioBytes,
           estimatedDurationMs,
-          rankedAlternatives,
         });
 
         return buildTranscriptionFailureResult('no-results', { silence: true });
@@ -1345,14 +1316,13 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
       if (ignoreOutOfGrammarResponses && !foundGrammarMatch) {
         clientConsole(1, '[SR DEBUG] Transcript rejected as out-of-grammar', {
           attempt: speechTranscriptionAttempts,
-          transcript,
-          topAlternatives,
-          rankedAlternatives,
+          transcriptCharacters: transcript.length,
+          alternativeCount: alternatives.length,
           phraseHintsCount: phraseHints.length,
           answerGrammarCount: answerGrammar.length,
-          currentAnswer: requestCorrectAnswer,
-          configuredSpeechTargets,
-          configuredExclusions,
+          hasCurrentAnswer: Boolean(requestCorrectAnswer),
+          configuredSpeechTargetCount: configuredSpeechTargets.length,
+          configuredExclusionCount: configuredExclusions.length,
           reusedPreInitializedStream: lastInitUsedPreInitializedStream,
         });
 
@@ -1374,20 +1344,19 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
 
       clientConsole(1, '[SR DEBUG] Transcript accepted', {
         attempt: speechTranscriptionAttempts,
-        transcript,
-        phoneticMatch,
+        transcriptCharacters: transcript.length,
+        phoneticMatched: Boolean(phoneticMatch),
         foundGrammarMatch,
         acceptancePath,
-        currentAnswer: requestCorrectAnswer,
+        hasCurrentAnswer: Boolean(requestCorrectAnswer),
         currentAnswerPresentInAlternatives,
         currentAnswerPresentAsExactGrammarAlternative,
-        configuredSpeechTargets,
-        configuredExclusions,
+        configuredSpeechTargetCount: configuredSpeechTargets.length,
+        configuredExclusionCount: configuredExclusions.length,
         reusedPreInitializedStream: lastInitUsedPreInitializedStream,
-        exactGrammarAlternatives,
-        rawAlternatives: normalizedAlternatives,
-        rankedAlternatives,
-        answerGrammar,
+        exactGrammarAlternativeCount: exactGrammarAlternatives.length,
+        alternativeCount: alternatives.length,
+        answerGrammarCount: answerGrammar.length,
       });
 
       return {
@@ -1400,7 +1369,6 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
       clientConsole(1, '[SR DEBUG] Google SR returned empty results payload', {
         attempt: speechTranscriptionAttempts,
         apiElapsedMs,
-        responseKeys: response && typeof response === 'object' ? Object.keys(response) : [],
         audioBytes,
         estimatedDurationMs,
       });
@@ -1408,7 +1376,10 @@ async function processAudioData(audioData: ArrayBuffer | string): Promise<Speech
       return buildTranscriptionFailureResult('no-results', { silence: true });
     }
   } catch (error: unknown) {
-    clientConsole(1, '[SR] API error:', error);
+    clientConsole(1, '[SR] API request failed', {
+      attempt: speechTranscriptionAttempts,
+      apiElapsedMs: Math.round(performance.now() - apiCallStartedAt),
+    });
     setWaitingForTranscription(false);
     return buildTranscriptionFailureResult(error);
   }
@@ -1609,8 +1580,9 @@ export function speechRecognitionService(context: SpeechRecognitionServiceContex
     
     (async () => {
       try {
+        requireSpeechRecognitionLanguage(Session.get('currentTdfFile')?.tdfs?.tutor?.setspec);
         if (srHardFailureReason) {
-          clientConsole(1, '[SR] Hard failure lock active; skipping init', { reason: srHardFailureReason });
+          clientConsole(1, '[SR] Hard failure lock active; skipping init');
           send({ type: 'TRANSCRIPTION_ERROR', error: `SR unavailable (${srHardFailureReason})`, silence: true });
           return;
         }
@@ -1623,8 +1595,12 @@ export function speechRecognitionService(context: SpeechRecognitionServiceContex
 
         send({ type: 'RECORDING_STARTED' });
       } catch (error: unknown) {
-        clientConsole(1, '[SR] Service init failed', { error: getErrorMessage(error) });
-        send({ type: 'TRANSCRIPTION_ERROR', error: getErrorMessage(error), initFailure: true });
+        clientConsole(1, '[SR] Service init failed');
+        if (error instanceof SpeechRecognitionConfigurationError) {
+          buildTranscriptionFailureResult(error);
+        } else {
+          send({ type: 'TRANSCRIPTION_ERROR', error: getErrorMessage(error), initFailure: true });
+        }
       }
     })();
     receive((event: SpeechRecognitionServiceEvent) => {

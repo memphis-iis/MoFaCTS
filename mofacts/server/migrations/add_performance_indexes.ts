@@ -90,6 +90,19 @@ export async function createPerformanceIndexes() {
     );
     serverConsole('  Created: Histories.userId_TDFId_type_time');
     await Histories.rawCollection().createIndex(
+      { userId: 1, historySequence: 1 },
+      { name: 'dashboard_committed_history_sequence', unique: true,
+        partialFilterExpression: { historySequence: { $type: 'number' } }, background: true }
+    );
+    await Histories.rawCollection().createIndex(
+      { TDFId: 1, userId: 1, tdfDeletedAt: 1, _id: 1 },
+      { name: 'dashboard_history_archive_users', background: true }
+    );
+    await Histories.rawCollection().createIndex(
+      { userId: 1, _id: 1 },
+      { name: 'dashboard_history_initialization_cursor', background: true }
+    );
+    await Histories.rawCollection().createIndex(
       { userId: 1, TDFId: 1, levelUnit: 1, 'sparc.pageKey': 1, 'sparc.worksheet.checkpointIndex': 1, 'courseAssignment.courseId': 1, time: 1 },
       { name: 'worksheet_scoped_history', background: true }
     );

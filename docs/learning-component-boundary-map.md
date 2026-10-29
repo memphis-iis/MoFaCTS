@@ -55,6 +55,14 @@ instead of passing arbitrary Session keys through the component adapter.
 
 The adapter boundary should also be an efficiency boundary: move pure interpretation, normalization, scheduling, and scoring logic into component/shared code so the app stops duplicating parsing or calling the server for pure compute.
 
+Stimulus interpretation belongs to `learning-components/content/tdf/runtimeStimulusInterpretation.ts`. The app adapter `mofacts/client/lib/runtimeStimuli.ts` owns one transient interpreted-deck snapshot and separate permutation validation. Source or mapping changes invalidate those snapshots immediately, before a Tracker flush; launch preparation and full cleanup explicitly clear them. Lookups clone only the requested cluster, preserving caller mutation isolation without interpreting the whole deck again.
+
+`learning-components/content/tdf/clusterMapping.ts` is the single shuffle/swap owner for launch mapping and assessment final ordering. Assessment settings parsing and question assembly remain in `learning-components/units/assessment-session/`; their existing range splitting and random-draw order are retained.
+
+`learning-components/units/sparcsession/sparcDialogueOpenRouterAdapter.ts` owns dialogue assessment policy, evidence interpretation, target selection, prompts and checkpoint/question sequencing. Its required `SparcDialogueAdapterRuntime` supplies transport, normalized authored-target embeddings, media resolution, primitive persistence and safe diagnostics. The app factory in `sparcControllerDialogueOpenRouter.ts` supplies those dependencies and retains the browser vector cache.
+
+`learning-components/runtime/blocksGameEngine.ts` owns Blocks placement, scoring, question gates and replenishment through explicit game-state and random-source inputs. The app retains its session-state holder, machine integration and Svelte presentation. Blocks remains an intentional practice alternative; it does not introduce a new unit type.
+
 ## History Boundary
 
 Components do not call `insertHistory` or persistence methods directly.

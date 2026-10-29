@@ -93,6 +93,8 @@ Editor review returns `status: 'confirmation-required'`, lesson identification, 
 
 Learner execution does not compare content signatures. Existing signature fields remain stored and unused. Saved positions and mappings remain intact; a valid permutation is reused regardless of current shuffle/swap settings. Frozen generated adaptive sequences continue to restore their saved units and questions. Missing units, missing or invalid mappings, missing questions and missing/invalid/wrong-lesson adaptive sequences fail with the concrete reason, without resetting progress, regenerating progressed mappings or selecting another unit.
 
+Runtime cluster retrieval also validates the saved permutation against the loaded cluster count and rejects an invalid shuffled index or missing mapped cluster before engine selection or card construction. It never substitutes an empty cluster for a broken reference. An actual authored empty cluster remains distinct from a missing cluster.
+
 Fresh lessons that enter instructions directly save their initial question mapping before opening those instructions. The mapping uses the loaded lesson's canonical clusters and configured shuffle/swap ranges. A failed save prevents entry; valid saved mappings are reused on reload. This prevents introductory instruction completion from creating saved progress without a mapping. Existing affected attempts remain subject to the same strict resume checks and require separate review; this initialization repair does not reset them.
 
 ## Video participant controls

@@ -12,6 +12,7 @@ describe('publicDemoCleanup', function() {
       Histories: removable(), GlobalExperimentStates: removable(), SectionUserMap: removable(),
       UserTimesLog: removable(), UserMetrics: removable(), PasswordResetTokens: removable(),
       UserDashboardCache: removable(), UserUploadQuota: removable(),
+      HistoryCommitState: removable(),
       AuditLog: removable(),
     };
     const writeAuditLog = sinon.stub().resolves();
@@ -31,6 +32,7 @@ describe('publicDemoCleanup', function() {
     expect(await purgeExpiredPublicDemoUsers(deps, new Date('2026-08-26T12:00:00Z'))).to.equal(1);
     expect(collections.Histories.removeAsync.calledWith({ userId: 'demo-user' })).to.equal(true);
     expect(collections.UserMetrics.removeAsync.calledWith({ _id: 'demo-user' })).to.equal(true);
+    expect(collections.HistoryCommitState.removeAsync.calledWith({ _id: 'demo-user' })).to.equal(true);
     expect(collections.AuditLog.removeAsync.calledOnce).to.equal(true);
     expect(removeUser.calledWithMatch({ _id: 'demo-user', 'profile.createdBy': 'publicDemo' })).to.equal(true);
     expect(writeAuditLog.calledOnce).to.equal(true);
@@ -46,6 +48,7 @@ describe('publicDemoCleanup', function() {
       Histories: removable(), GlobalExperimentStates: removable(), SectionUserMap: removable(),
       UserTimesLog: removable(), UserMetrics: removable(), PasswordResetTokens: removable(),
       UserDashboardCache: removable(), UserUploadQuota: removable(),
+      HistoryCommitState: removable(),
       AuditLog: removable(),
       usersCollection: {
         find: () => ({ fetchAsync: async () => [] }),

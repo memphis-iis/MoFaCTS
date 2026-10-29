@@ -61,11 +61,13 @@ export type CourseLearnerSnapshotCacheDeps = {
   parseNullablePersistedDate: (value: unknown) => Date | null;
   normalizeAssignmentRow: CourseAssignmentSummaryNormalizer;
   getTdfSummariesByIds: (tdfIds: string[]) => Promise<Map<string, TdfSummary>>;
+  now?: () => number;
 };
 
-export const COURSE_SNAPSHOT_VERSION = 4 as const;
+export const COURSE_SNAPSHOT_VERSION = 5 as const;
+const MAX_SNAPSHOT_BUILD_ATTEMPTS = 2;
 
-function courseIsDateVisible(parseNullablePersistedDate: (value: unknown) => Date | null, course: any, now = new Date()) {
+export function courseIsDateVisible(parseNullablePersistedDate: (value: unknown) => Date | null, course: any, now = new Date()) {
   const beginDate = parseNullablePersistedDate(course?.beginDate);
   const endDate = parseNullablePersistedDate(course?.endDate);
   return (!beginDate || now.getTime() >= beginDate.getTime()) && (!endDate || now.getTime() <= endDate.getTime());
@@ -95,6 +97,8 @@ function assignmentLanguageMetadata(tdf: TdfSummary): { contentLanguage?: string
 }
 
 export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnapshotCacheDeps) {
+  const currentTime = deps.now ?? Date.now;
+
   async function invalidateCourseSnapshotForUser(userId: string, reason: string) {
     const result = await deps.CourseLearnerSnapshotCache.updateAsync(
       { userId, version: COURSE_SNAPSHOT_VERSION },
@@ -123,21 +127,21 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
         { multi: true }
       );
     }
-    const publicSelector = courseIsPublic
+    const viewerSelector = courseIsPublic
       ? { version: COURSE_SNAPSHOT_VERSION }
-      : { publicCourseIds: courseId, version: COURSE_SNAPSHOT_VERSION };
-    const publicResult = await deps.CourseLearnerSnapshotCache.updateAsync(
-      publicSelector,
+      : { $or: [{ assignedCourseIds: courseId }, { publicCourseIds: courseId }], version: COURSE_SNAPSHOT_VERSION };
+    const viewerResult = await deps.CourseLearnerSnapshotCache.updateAsync(
+      viewerSelector,
       { $set: { invalidatedAt: new Date(), rebuildReason: reason } },
       { multi: true }
     );
     deps.serverConsole('[CourseSnapshot] invalidated course snapshots', {
       courseId,
       reason,
-      publicScope: courseIsPublic ? 'all-current-public-course-viewers' : 'cached-course-viewers',
+      viewerScope: courseIsPublic ? 'all-current-public-course-viewers' : 'cached-course-viewers',
       enrolledCount: enrolledUserIds.length,
       enrolledResult: updateCount(enrolledResult),
-      publicResult: updateCount(publicResult),
+      viewerResult: updateCount(viewerResult),
     });
   }
 
@@ -165,7 +169,13 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
     return assignmentIds.every((assignmentId) => liveIds.has(assignmentId));
   }
 
-  async function rebuildLearnerCoursesSnapshot(userId: string, reason: string): Promise<LearnerCoursesSnapshot> {
+  async function rebuildLearnerCoursesSnapshot(userId: string, reason: string, attempt = 1): Promise<LearnerCoursesSnapshot> {
+    const now = new Date(currentTime());
+    let expiresAt: number | null = null;
+    const includeBoundary = (time: number) => {
+      if (time > now.getTime() && (expiresAt === null || time < expiresAt)) expiresAt = time;
+    };
+    deps.serverConsole('[CourseSnapshot] rebuilding derived snapshot', { reason });
     const roleFlags = await getUserRoleFlags(deps.getMethodAuthorizationDeps(), userId, ['admin', 'teacher'] as const);
     const enrollmentRows = await deps.SectionUserMap.find({ userId }, { fields: { sectionId: 1 } }).fetchAsync();
     const sectionIds = enrollmentRows.map((row: any) => normalizeOptionalString(row?.sectionId)).filter((id: string | null): id is string => !!id);
@@ -173,7 +183,6 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       ? await deps.Sections.find({ _id: { $in: sectionIds } }, { fields: { _id: 1, courseId: 1 } }).fetchAsync()
       : [];
     const enrolledCourseIds = [...new Set(sections.map((section: any) => normalizeOptionalString(section?.courseId)).filter((id: string | null): id is string => !!id))];
-    const now = new Date();
     const courseSelector: any = {
       $or: [
         { visibility: 'public' },
@@ -190,6 +199,15 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       courseSelector,
       { fields: { _id: 1, courseName: 1, visibility: 1, teacherUserId: 1, beginDate: 1, endDate: 1, timezone: 1 } }
     ).fetchAsync();
+    for (const course of rawCourses) {
+      if (roleFlags.admin || String(course.teacherUserId || '') === userId) continue;
+      const beginDate = deps.parseNullablePersistedDate(course.beginDate);
+      const endDate = deps.parseNullablePersistedDate(course.endDate);
+      if (beginDate) includeBoundary(beginDate.getTime());
+      // Courses remain visible through their end timestamp, so the first
+      // changed millisecond is one later. Include hidden future courses too.
+      if (endDate) includeBoundary(endDate.getTime() + 1);
+    }
     const visibleCourses = rawCourses.filter((course: any) => {
       const visibility = deps.normalizeCourseVisibility(course.visibility);
       if (roleFlags.admin || String(course.teacherUserId || '') === userId) return true;
@@ -241,6 +259,10 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       const availability: LearnerCourseSnapshotAssignment['availability'] = !canLaunchCourseAssignment
         ? 'unavailable'
         : releaseAt && releaseAt.getTime() > now.getTime() && ordinaryLearner ? 'scheduled' : 'available';
+      if (ordinaryLearner && canLaunchCourseAssignment && releaseAt) includeBoundary(releaseAt.getTime());
+      // Due dates change the overdue label after the timestamp; they do not
+      // change assignment availability or impose a submission lock.
+      if (summary.dueAt) includeBoundary(summary.dueAt.getTime() + 1);
       let enriched: LearnerCourseSnapshotAssignment;
       if (summary.assignmentType === 'progressive') {
         enriched = {
@@ -301,10 +323,11 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
         publicCourses.push(toSnapshotCourse(course, 'public'));
       }
     }
-    const snapshot: LearnerCoursesSnapshot = {
+    const snapshot: Omit<LearnerCoursesSnapshot, 'serverNow'> = {
       version: COURSE_SNAPSHOT_VERSION,
       userId,
-      generatedAt: Date.now(),
+      generatedAt: now.getTime(),
+      expiresAt,
       assignedCourses: assignedCourses.sort((a, b) => a.courseName.localeCompare(b.courseName)),
       publicCourses: publicCourses.sort((a, b) => a.courseName.localeCompare(b.courseName)),
       invalidatedAt: null,
@@ -328,12 +351,27 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       },
       { upsert: true }
     );
-    return snapshot;
+    const serverNow = currentTime();
+    if (snapshot.expiresAt !== null && serverNow >= snapshot.expiresAt) {
+      deps.serverConsole('[CourseSnapshot] boundary-crossed during derived snapshot rebuild', { attempt });
+      if (attempt >= MAX_SNAPSHOT_BUILD_ATTEMPTS) {
+        throw new Error('Course snapshot could not be read before its next time boundary. Try again.');
+      }
+      return await rebuildLearnerCoursesSnapshot(userId, 'boundary-crossed', attempt + 1);
+    }
+    return { ...snapshot, serverNow };
   }
 
   async function ensureLearnerCoursesSnapshot(userId: string): Promise<LearnerCoursesSnapshot> {
     const existing = await deps.CourseLearnerSnapshotCache.findOneAsync({ userId, version: COURSE_SNAPSHOT_VERSION });
     if (existing?.snapshot && existing.invalidatedAt === null && existing.version === COURSE_SNAPSHOT_VERSION) {
+      const expiresAt = existing.snapshot.expiresAt;
+      if (expiresAt !== null && (typeof expiresAt !== 'number' || !Number.isSafeInteger(expiresAt))) {
+        return await rebuildLearnerCoursesSnapshot(userId, 'invalid-expiry');
+      }
+      if (expiresAt !== null && currentTime() >= expiresAt) {
+        return await rebuildLearnerCoursesSnapshot(userId, 'expired');
+      }
       const dashboard = await deps.UserDashboardCache.findOneAsync({ userId }, { fields: { lastUpdated: 1 } });
       if (dashboard?.lastUpdated && new Date(dashboard.lastUpdated).getTime() > new Date(existing.generatedAt).getTime()) {
         return await rebuildLearnerCoursesSnapshot(userId, 'dashboard-updated');
@@ -341,8 +379,13 @@ export function createCourseLearnerSnapshotCacheHelpers(deps: CourseLearnerSnaps
       if (!await cachedSnapshotAssignmentsExist(existing)) {
         return await rebuildLearnerCoursesSnapshot(userId, 'stale-assignment-reference');
       }
+      const serverNow = currentTime();
+      if (expiresAt !== null && serverNow >= expiresAt) {
+        return await rebuildLearnerCoursesSnapshot(userId, 'expired');
+      }
       return {
-        ...(existing.snapshot as LearnerCoursesSnapshot),
+        ...(existing.snapshot as Omit<LearnerCoursesSnapshot, 'serverNow'>),
+        serverNow,
         source: 'cache',
         invalidatedAt: null,
       };

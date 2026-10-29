@@ -1,4 +1,3 @@
-import { modelPracticeHistorySelector } from '../common/historyEnvelope';
 import { Roles } from 'meteor/alanning:roles';
 import { Meteor } from 'meteor/meteor';
 import {
@@ -22,6 +21,7 @@ import { themeRegistry } from './lib/themeRegistry';
 import { ensurePublishedDeploymentBrandProfile } from './lib/deploymentBrandProfileRegistry';
 import { DEPLOYMENT_BRAND_PROFILE_KEY } from '../common/deploymentBrandProfile';
 import { assignmentMemberTdfIds } from '../common/progressiveAssignments';
+import { publishAdminUserPage } from './lib/adminUserPagePublication';
 
 // Use Meteor.roleAssignment — set unconditionally by alanning:roles v4 at
 // package load time. The named export RoleAssignmentCollection resolves to
@@ -93,8 +93,8 @@ export const TDF_RUNTIME_SECRET_EXCLUSION_FIELDS = {
 };
 
 // ===== Admin user-page snapshots =====
-// This is intentionally a non-reactive snapshot publication. Meteor Change
-// Streams cannot represent a moving skip/limit result window without polling.
+// User membership is a page snapshot: Change Streams cannot represent a moving
+// skip/limit window without polling. Role assignments stay live for those IDs.
 Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50) {
     // Security check - must be admin
     if (!this.userId) {
@@ -111,9 +111,6 @@ Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50
     if (!pageRequest) return this.ready();
     const query = buildFilteredUsersSelector(filter);
 
-    // For admins: also publish all role-assignment docs so the client
-    // roleUtils can correctly display and toggle roles for any user.
-    // There are only ever a small number of assigned roles so this is cheap.
     const pagedUsers = await (Meteor.users.find(query, {
         fields: { username: 1, email_canonical: 1, emails: 1 },
         sort: { username: 1 },
@@ -121,21 +118,7 @@ Meteor.publish('filteredUsers', async function(filter = '', page = 0, limit = 50
         limit: pageRequest.limit,
     }) as any).fetchAsync();
 
-    for (const user of pagedUsers) {
-        this.added('users', user._id, fieldsWithoutId(user));
-        this.added('filtered_user_page_ids', user._id, { userId: user._id });
-    }
-
-    const roleAssignments = await (getRoleAssignment().find({}) as any).fetchAsync();
-    const roleAssignmentCollectionName = getRoleAssignment()._name;
-    if (typeof roleAssignmentCollectionName !== 'string' || !roleAssignmentCollectionName) {
-        throw new Error('Role assignment collection name is unavailable for the admin snapshot publication');
-    }
-    for (const assignment of roleAssignments) {
-        this.added(roleAssignmentCollectionName, assignment._id, fieldsWithoutId(assignment));
-    }
-
-    this.ready();
+    return publishAdminUserPage(this, pagedUsers, getRoleAssignment());
 });
 
 // Publish total count for pagination UI
@@ -209,48 +192,6 @@ Meteor.publish('themeLibrary', function() {
 Meteor.publish('deploymentBrandProfile', async function() {
     await ensurePublishedDeploymentBrandProfile();
     return DynamicSettings.find({ key: DEPLOYMENT_BRAND_PROFILE_KEY });
-});
-
-// ===== PHASE 1.7: User History Publication =====
-// Publish user's practice history for dashboard statistics
-// Security: Only publishes user's own history with sparse fields
-// This eliminates N+1 query pattern in learning dashboard
-Meteor.publish('userHistory', function(tdfId: any) {
-    // Security check - must be authenticated
-    if (!this.userId) {
-        return this.ready();
-    }
-
-    // Query parameters - only user's own history
-    const query: any = {
-        userId: this.userId,
-        ...modelPracticeHistorySelector()
-    };
-
-    // If tdfId provided, filter by specific TDF
-    if (tdfId) {
-        query.TDFId = tdfId;
-    }
-
-    // Sparse fields - only what dashboard needs for stats calculation
-    // This reduces data transfer and client memory usage
-    const fields = {
-        userId: 1,
-        TDFId: 1,
-        outcome: 1,
-        levelUnitType: 1,
-        modelEvidenceSource: 1,
-        CFEndLatency: 1,
-        CFFeedbackLatency: 1,
-        stimuliSetId: 1,
-        stimulusKC: 1,
-        clusterKC: 1,
-        CFStimFileIndex: 1,
-        problemName: 1,
-        recordedServerTime: 1
-    };
-
-    return Histories.find(query, { fields });
 });
 
 // ===== PHASE 2: Dashboard Cache Publication =====

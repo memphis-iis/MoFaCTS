@@ -16,7 +16,7 @@ export interface DashboardHistoryRecord {
   clusterKC?: string | number | null;
   CFStimFileIndex?: string | number | null;
   problemName?: string | number | null;
-  recordedServerTime?: string | Date | null;
+  recordedServerTime?: number | string | Date | null;
   time?: number | string | Date | null;
   TDFId?: string;
   userId?: string;
@@ -85,7 +85,7 @@ export interface EnsureDashboardCacheCurrentResult {
   success: true;
   action: 'current' | 'refreshed';
   tdfCount: number;
-  reason?: 'missing' | 'version' | 'history-newer';
+  reason?: 'missing' | 'version' | 'missing-cursor' | 'repair' | 'invalid-stats' | 'history-newer' | 'requested';
 }
 
 export interface PracticeDashboardProgressStats {

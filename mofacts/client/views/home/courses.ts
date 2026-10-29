@@ -14,6 +14,8 @@ import { translatePlatformString } from '../../lib/interfaceI18n';
 import { DelayedLoadingVisibility } from '../../lib/delayedLoadingVisibility';
 import type { AsyncCommandState } from '../../lib/adminUi/asyncCommandState';
 import { createScopedAsyncCommandRegistry, type ScopedAsyncCommandRegistry } from '../../lib/adminUi/scopedAsyncCommandRegistry';
+import { createTemplateLifetime, type TemplateLifetime } from '../../lib/adminUi/templateLifetime';
+import { createCourseSnapshotRefresh } from './courseSnapshotRefresh';
 import type {
   LearnerCourseSnapshotCourse,
   LearnerCoursesSnapshot,
@@ -60,6 +62,10 @@ type CoursesTemplateInstance = Blaze.TemplateInstance & {
   commandRegistry: ScopedAsyncCommandRegistry<{ message: string }>;
   search: ReactiveVar<string>;
   sort: ReactiveVar<CourseTreeSort>;
+  lifetime: TemplateLifetime;
+  snapshotRefresh: ReturnType<typeof createCourseSnapshotRefresh>;
+  refreshOnFocus: () => void;
+  refreshOnVisibility: () => void;
 };
 
 function formatDate(value: unknown, timezone?: string | null) {
@@ -186,10 +192,33 @@ function currentCourseFromAssignment(instance: CoursesTemplateInstance, assignme
 }
 
 async function reloadCoursesSnapshot(instance: CoursesTemplateInstance) {
-  await meteorCallAsync('ensureDashboardCacheCurrent');
-  const snapshot = await meteorCallAsync('getLearnerCoursesSnapshot') as LearnerCoursesSnapshot;
-  instance.snapshot.set(snapshot);
-  return snapshot;
+  const generation = instance.lifetime.begin();
+  const userId = Meteor.userId();
+  const isCurrent = () => instance.lifetime.isCurrent(generation) && Meteor.userId() === userId;
+  instance.loading.set(true);
+  instance.loadingVisibility.setPending(true);
+  instance.loadError.set(null);
+  try {
+    await meteorCallAsync('ensureDashboardCacheCurrent');
+    if (!isCurrent()) return;
+    const snapshot = await meteorCallAsync('getLearnerCoursesSnapshot') as LearnerCoursesSnapshot;
+    if (!isCurrent()) return;
+    instance.snapshotRefresh.setExpiration(snapshot.expiresAt, snapshot.serverNow);
+    instance.snapshot.set(snapshot);
+    return snapshot;
+  } catch (error: unknown) {
+    if (isCurrent()) {
+      clientConsole(1, '[Courses] Failed to load learner course snapshot');
+      const failure = error as { reason?: string; message?: string };
+      instance.loadError.set(failure?.reason || failure?.message || String(error));
+    }
+    throw error;
+  } finally {
+    if (isCurrent()) {
+      instance.loading.set(false);
+      instance.loadingVisibility.setPending(false);
+    }
+  }
 }
 
 Template.courses.onCreated(function(this: CoursesTemplateInstance) {
@@ -215,6 +244,20 @@ Template.courses.onCreated(function(this: CoursesTemplateInstance) {
   });
   this.search = new ReactiveVar('');
   this.sort = new ReactiveVar('course');
+  this.lifetime = createTemplateLifetime();
+  this.snapshotRefresh = createCourseSnapshotRefresh(() => {
+    if (this.lifetime.isDestroyed()) return;
+    this.snapshot.set(null);
+    if (this.loading.get()) return;
+    // The loader owns the existing inline failure state; focus/reload can retry.
+    void reloadCoursesSnapshot(this).catch(() => undefined);
+  });
+  this.refreshOnFocus = () => this.snapshotRefresh.refreshIfExpired();
+  this.refreshOnVisibility = () => {
+    if (document.visibilityState === 'visible') this.snapshotRefresh.refreshIfExpired();
+  };
+  window.addEventListener('focus', this.refreshOnFocus);
+  document.addEventListener('visibilitychange', this.refreshOnVisibility);
   if (!Array.isArray(Session.get(EXPANDED_COURSES_SESSION_KEY))) {
     Session.set(EXPANDED_COURSES_SESSION_KEY, []);
   }
@@ -225,17 +268,8 @@ Template.courses.onCreated(function(this: CoursesTemplateInstance) {
 });
 
 Template.courses.onRendered(async function(this: CoursesTemplateInstance) {
-  this.loading.set(true);
-  this.loadError.set(null);
-  try {
-    await reloadCoursesSnapshot(this);
-  } catch (error: any) {
-    clientConsole(1, '[Courses] Failed to load learner course snapshot:', error);
-    this.loadError.set(error?.reason || error?.message || String(error));
-  } finally {
-    this.loading.set(false);
-    this.loadingVisibility.setPending(false);
-  }
+  // The loader publishes failures through the existing inline error state.
+  await reloadCoursesSnapshot(this).catch(() => undefined);
 });
 
 Template.courses.helpers({
@@ -277,6 +311,10 @@ Template.courses.helpers({
 });
 
 Template.courses.onDestroyed(function(this: CoursesTemplateInstance) {
+  this.lifetime.destroy();
+  this.snapshotRefresh.destroy();
+  window.removeEventListener('focus', this.refreshOnFocus);
+  document.removeEventListener('visibilitychange', this.refreshOnVisibility);
   destroyLearnerSettingsHost(this);
   this.loadingVisibility.destroy();
   this.commandRegistry.destroy();

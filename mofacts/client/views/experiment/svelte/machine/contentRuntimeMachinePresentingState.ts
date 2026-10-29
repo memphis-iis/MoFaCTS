@@ -138,7 +138,7 @@ export const contentRuntimeMachinePresentingState = {
           },
         ],
         onError: {
-          target: STATES.READY_PROMPT,
+          target: '#contentRuntimeMachine.error',
           actions: ['logError', 'logStateTransition'],
         },
       },

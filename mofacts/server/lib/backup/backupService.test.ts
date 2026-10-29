@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { collectionMongoName } from '../../../common/collectionOwnership';
 import { createBackupManifest } from './backupManifest';
 import { createTarGzArchive } from './tarArchive';
 import { deleteBackupJob, reconcileInterruptedBackupJobs, restoreBackupJob } from './backupService';
@@ -20,6 +21,13 @@ describe('backup restore service', function() {
       exportedAt: '2026-06-07T00:00:00.000Z',
       collections: {
         tdfs: [{ _id: 'tdf-1', name: 'Restored TDF' }],
+        [collectionMongoName('Histories')]: [{ _id: 'history-1', userId: 'learner', historySequence: 3 }],
+        [collectionMongoName('HistoryCommitState')]: [{ _id: 'learner', sequence: 1, repairRevision: 4 }],
+        [collectionMongoName('UserDashboardCache')]: [{
+          _id: 'cache-1', userId: 'learner', createdAt: '2026-06-01', learnerTdfConfigs: { lesson: { overrides: {} } },
+          tdfStats: { stale: {} }, summary: { stale: true }, usageSummary: { stale: true },
+          version: 9, lastUpdated: '2026-06-07', lastHistorySequence: 1, historyRepairRevision: 4,
+        }],
         backup_jobs: [{ _id: 'old-backup-job' }],
         auditLog: [{ _id: 'old-audit-log' }],
       },
@@ -114,10 +122,23 @@ describe('backup restore service', function() {
     const result = await restoreBackupJob(deps, { userId: 'admin-user', connection: null }, 'source-backup');
 
     expect(result.status).to.equal('complete');
-    expect(operations).to.deep.equal([
+    expect(operations.filter(operation => operation.collection === 'tdfs')).to.deep.equal([
       { collection: 'tdfs', operation: 'deleteMany' },
       { collection: 'tdfs', operation: 'insertMany', docs: [{ _id: 'tdf-1', name: 'Restored TDF' }] },
     ]);
+    expect(operations.some(operation => ['backup_jobs', 'auditLog'].includes(operation.collection))).to.equal(false);
+    const restoredDocuments = Object.fromEntries(operations
+      .filter(operation => operation.operation === 'insertMany')
+      .map(operation => [operation.collection, operation.docs]));
+    expect(restoredDocuments[collectionMongoName('Histories')]).to.deep.equal([
+      { _id: 'history-1', userId: 'learner', historySequence: 3 },
+    ]);
+    expect(restoredDocuments[collectionMongoName('HistoryCommitState')]).to.deep.equal([
+      { _id: 'learner', sequence: 3, repairRevision: 5 },
+    ]);
+    expect(restoredDocuments[collectionMongoName('UserDashboardCache')]).to.deep.equal([{
+      _id: 'cache-1', userId: 'learner', createdAt: '2026-06-01', learnerTdfConfigs: { lesson: { overrides: {} } },
+    }]);
   });
 
   it('deletes the local archive and marks the backup job deleted', async function() {

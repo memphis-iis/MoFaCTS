@@ -51,6 +51,7 @@ import {
 } from './sessionSurfaceMode';
 import { withStartupTimeout } from '../../../../lib/audioStartup';
 import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
+import { resolveSpeechRecognitionLanguage } from '../../../../lib/speechRecognitionConfig';
 import { markLaunchLoadingTiming, setLaunchLoadingMessage } from '../../../../lib/launchLoading';
 import {
   CARD_ENTRY_INTENT,
@@ -129,6 +130,7 @@ interface TdfFileLike extends UnknownRecord {
         audioPromptSpeakingRate?: string;
         audioInputEnabled?: string | boolean;
         speechAPIKey?: string;
+        speechRecognitionLanguage?: string | string[];
         tips?: unknown[];
         unitTemplate?: unknown;
         shuffleclusters?: string;
@@ -824,6 +826,7 @@ export async function initializeContentSurface(): Promise<ContentSurfaceInitResu
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   let audioInputEnabled = srAvailability.status === 'available';
+  if (audioInputEnabled) resolveSpeechRecognitionLanguage(tutor.setspec);
   setAudioInputModeEnabled(audioInputEnabled);
   clientConsole(2, '[Content Surface Init] canonical SR availability', srAvailability);
 

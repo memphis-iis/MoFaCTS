@@ -32,21 +32,27 @@ export function createSparcLibraryCuration(removeAsset: (id: string) => Promise<
       if (rows.length < 100) return;
     }
   };
-  const remove = async (id: string) => {
+  const removeContent = async (id: string, imageAsset: boolean) => {
     const entry = await SparcInstructionalLibrary.findOneAsync(id);
     const receipt = await SparcInstructionalRemovals.findOneAsync(id);
-    if (!entry && !receipt) throw new Error('Instructional component not found');
+    if (!entry && !receipt && !imageAsset) throw new Error('Instructional component not found');
+    if (imageAsset && ((entry && entry.kind !== 'image') || (receipt?.cleanupKind && receipt.cleanupKind !== 'image'))) {
+      throw new Error('SPARC image asset has a conflicting instructional content kind');
+    }
     const mongo = MongoInternals.defaultRemoteCollectionDriver().mongo;
     const transaction = async (work: (session: ClientSession) => Promise<void>) => {
       const session = mongo.client.startSession();
       try { await session.withTransaction(() => work(session), { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } }); }
       finally { await session.endSession(); }
     };
-    const kind = entry?.kind ?? receipt?.cleanupKind;
-    if (entry) await transaction(async session => {
-      await deleteSparcInstructionalEntries([id], session);
-      await SparcInstructionalRemovals.rawCollection().updateOne({ _id: id }, { $set: { cleanupKind: entry.kind } }, { session });
-    });
+    const kind = imageAsset ? 'image' : entry?.kind ?? receipt?.cleanupKind;
+    if (entry || imageAsset) {
+      if (kind === undefined) throw new Error('Instructional removal requires its content kind');
+      await transaction(async session => {
+        await deleteSparcInstructionalEntries([id], session);
+        await SparcInstructionalRemovals.rawCollection().updateOne({ _id: id }, { $set: { cleanupKind: kind } }, { session });
+      });
+    }
     const removeDependents = async (selector: Record<string, unknown>) => {
       for (;;) {
         let count = 0;
@@ -67,8 +73,11 @@ export function createSparcLibraryCuration(removeAsset: (id: string) => Promise<
     await cleanupAssets();
     await SparcInstructionalRemovals.updateAsync(id, { $unset: { cleanupKind: '' } });
   };
+  const remove = (id: string) => removeContent(id, false);
   return {
     remove,
+    /** The caller verified a private teaching-image asset; a catalog row is optional. */
+    removeImageAsset: (id: string) => removeContent(id, true),
     /** Forward migration: delete false, unset the retired flag on survivors. Restartable, bounded pages. */
     async migrateExclusions(progress: (deleted: number) => void) {
       const raw = SparcInstructionalLibrary.rawCollection();

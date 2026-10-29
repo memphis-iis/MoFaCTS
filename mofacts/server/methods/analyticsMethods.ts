@@ -1,8 +1,9 @@
 import { requireSparcLessonAccess } from '../lib/sparcLessonAccess';
 import { isSparcAdminPolicy, SPARC_INSTRUCTIONAL_POLICY_IDS } from '../../../learning-components/runtime/sparcInstructionalPolicies';
-import { worksheetHistoryWriteId, sameWorksheetWrite } from '../lib/worksheetHistoryWrite';
+import { worksheetHistoryWriteId } from '../lib/worksheetHistoryWrite';
 import { sparcHistoryWriteId } from '../lib/sparcHistoryWrite';
-import { sameHistoryWrite } from '../lib/historyWriteIdentity';
+import { HistoryCommitConflictError } from '../lib/historyCommitStorage';
+import { SparcContentAlreadyUsedError } from '../lib/sparcContentUse';
 import { Meteor } from 'meteor/meteor';
 import { progressiveRevisionPrefix } from '../lib/progressiveAssignmentRevision';
 import {
@@ -35,11 +36,11 @@ type MethodContext = {
 
 type AnalyticsMethodsDeps = {
   writeConditionState: (write: ConditionStateWrite) => Promise<UnknownRecord | null>;
+  commitHistory: (userId: string, record: UnknownRecord) => Promise<boolean>;
   serverConsole: Logger;
   Histories: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]>; countAsync: () => Promise<number> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
-    insertAsync: (document: UnknownRecord) => Promise<unknown>;
     rawCollection: () => { aggregate: (pipeline: unknown[]) => { toArray: () => Promise<any[]> } };
   };
   StimulusCrowdStats: StimulusCrowdStatsCollection;
@@ -78,12 +79,6 @@ type AnalyticsMethodsDeps = {
   resolveAssignedRootTdfIdsForUser: (userId: string) => Promise<string[]>;
   allocateNextEventId: () => number;
   syncUsernameCaches: (userId: string, nextUsername: string, previousUsername?: string) => void;
-  createExperimentExport: (keys: unknown[], userId: string) => Promise<string>;
-  createExperimentExportByTdfIds: (tdfIds: string[], userId: string) => Promise<string>;
-  createExperimentExportFromHistories: (histories: any[]) => Promise<string>;
-  getTdfIdsByOwnerId: (ownerId: string) => Promise<string[] | null>;
-  assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
-  canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
   getClassPerformanceByTdfWorkflow: (
     classId: string,
     tdfId: string,
@@ -93,7 +88,7 @@ type AnalyticsMethodsDeps = {
   ) => Promise<unknown>;
   getStimuliSetById: (stimuliSetId: string | number) => Promise<Array<{ clusterKC?: string | number; stimulusKC?: string | number }>>;
   hasMeaningfulProgressSignal: (experimentState: unknown) => boolean;
-  insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string })[]) => Promise<readonly UnknownRecord[]>;
+  insertSparcHistoryBatch?: (records: readonly (UnknownRecord & { _id: string; userId: string })[]) => Promise<readonly UnknownRecord[]>;
 };
 
 const INSERT_HISTORY_TIMING_ENABLED = process.env.MOFACTS_INSERT_HISTORY_TIMING === '1';
@@ -716,9 +711,9 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     if (!records.length || records.length > 256 || Buffer.byteLength(JSON.stringify(records), 'utf8') > 1024 * 1024) {
       throw new Meteor.Error(400, 'SPARC assessment batches require 1–256 bounded history records within 1 MiB');
     }
-    const prepared: (UnknownRecord & { _id: string })[] = [];
+    const prepared: (UnknownRecord & { _id: string; userId: string })[] = [];
     for (const [index, record] of records.entries()) {
-      const { sanitizedHistoryRecord: row } = await prepareHistoryRecord(context, record, prepared[0]);
+      const { sanitizedHistoryRecord: row, actingUserId } = await prepareHistoryRecord(context, record, prepared[0]);
       const transition = (row.sparc as { stateTransition?: { transitionId?: string; event?: { eventId?: string; payload?: { policyId?: string } }; writes?: { value?: { factType?: string } }[] } } | undefined)?.stateTransition;
       const eventId = transition?.event?.eventId;
       if (row.eventType !== 'sparc' || !eventId || !isSparcAdminPolicy(transition?.event?.payload?.policyId)
@@ -732,7 +727,7 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
       }
       const id = sparcHistoryWriteId(row);
       if (!id || prepared.some(previous => previous._id === id)) throw new Meteor.Error(400, 'SPARC assessment transition IDs must be unique');
-      prepared.push({ ...row, _id: id });
+      prepared.push({ ...row, _id: id, userId: actingUserId });
     }
     if (Buffer.byteLength(JSON.stringify(prepared), 'utf8') > 1024 * 1024) throw new Meteor.Error(400, 'SPARC assessment batch exceeds 1 MiB');
     if (!deps.insertSparcHistoryBatch) throw new Error('Atomic SPARC assessment history storage is not configured');
@@ -756,20 +751,17 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
     const worksheetId = worksheetHistoryWriteId(sanitizedHistoryRecord);
     const sparcId = sparcHistoryWriteId(sanitizedHistoryRecord);
     const durableId = worksheetId ?? sparcId;
-    if (durableId) {
-      Object.assign(sanitizedHistoryRecord, { _id: durableId });
-      try {
-        await deps.Histories.insertAsync(sanitizedHistoryRecord);
-      } catch (error) {
-        if ((error as { code?: number }).code !== 11000) throw error;
-        const existing = await deps.Histories.findOneAsync({ _id: durableId, userId: actingUserId });
-        if (!existing || !(worksheetId ? sameWorksheetWrite : sameHistoryWrite)(existing, sanitizedHistoryRecord)) {
-          throw new Meteor.Error(worksheetId ? 'worksheet-history-conflict' : 'sparc-history-conflict', 'History changed in another session. Reload before continuing.');
-        }
-        return;
+    if (durableId) Object.assign(sanitizedHistoryRecord, { _id: durableId });
+    try {
+      if (!(await deps.commitHistory(actingUserId, sanitizedHistoryRecord))) return;
+    } catch (error) {
+      if (error instanceof SparcContentAlreadyUsedError) {
+        throw new Meteor.Error('sparc-content-already-used', 'The selected instructional content has already been used. This turn was not accepted.');
       }
-    } else {
-      await deps.Histories.insertAsync(sanitizedHistoryRecord);
+      if (error instanceof HistoryCommitConflictError && durableId) {
+        throw new Meteor.Error(worksheetId ? 'worksheet-history-conflict' : 'sparc-history-conflict', 'History changed in another session. Reload before continuing.');
+      }
+      throw error;
     }
     const insertMs = elapsedMsSince(insertStartTime);
     const crowdStatsStartTime = Date.now();
@@ -1938,47 +1930,6 @@ export function createAnalyticsMethods(deps: AnalyticsMethodsDeps) {
         );
       }
       return await createExperimentState(curExperimentState, this.userId || null);
-    },
-
-    getOutcomesForAdaptiveLearning: async function(this: MethodContext, userId: string, TDFId: string) {
-      const actingUserId = requireAuthenticatedUser(this.userId, 'Must be logged in', 401);
-      const requestedUserId = deps.normalizeCanonicalId(userId) || actingUserId;
-      const normalizedTdfId = deps.normalizeCanonicalId(TDFId);
-      if (!normalizedTdfId) {
-        throw new Meteor.Error(400, 'Invalid TDF');
-      }
-      await requireUserMatchesOrHasRole(deps.getMethodAuthorizationDeps(), {
-        actingUserId,
-        subjectUserId: requestedUserId,
-        roles: ['admin'],
-        notLoggedInMessage: 'Must be logged in',
-        notLoggedInCode: 401,
-        forbiddenMessage: 'Can only read adaptive outcomes for the current user',
-        forbiddenCode: 403,
-      });
-      if (requestedUserId === actingUserId) {
-        await validateExperimentStateMutation(
-          actingUserId,
-          normalizedTdfId,
-          { currentTdfId: normalizedTdfId },
-          'methods.getOutcomesForAdaptiveLearning'
-        );
-      }
-      const history = await deps.Histories.find(
-        { userId: requestedUserId, TDFId: normalizedTdfId, ...operationalHistorySelector() },
-        {
-          fields: { _id: 0, stimulusKC: 1, outcome: 1, recordedServerTime: 1, time: 1 },
-          sort: { recordedServerTime: 1, time: 1 },
-        }
-      ).fetchAsync();
-      const outcomes: Record<string, boolean> = {};
-      for (const historyRow of history as Array<{ stimulusKC?: number; outcome?: string }>) {
-        if (historyRow.stimulusKC) {
-          outcomes[historyRow.stimulusKC % 1000] = historyRow.outcome === 'correct';
-        }
-      }
-
-      return outcomes;
     },
 
     ...downloadMethods,

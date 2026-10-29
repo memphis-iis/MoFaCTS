@@ -2,7 +2,7 @@
 
 This directory is the target home for contributor-facing pedagogical extension points.
 
-Current status: contributor-facing source root under active expansion. TypeScript, lint, and CI test bundling include this directory. Unit-engine code now runs here behind behavior-preserving import facades from legacy app paths.
+Current status: contributor-facing source root under active expansion. TypeScript, lint, and CI test bundling include this directory. Unit-engine code runs here through app dependency facades; component policy receives explicit app runtime dependencies.
 
 Start with `docs/learning-component-boundary-map.md` for the human/AI orientation map of component-owned code, app-owned services, manifest contracts, history flow, and current packages.
 
@@ -16,11 +16,14 @@ Current extension boundaries:
 - `defaultLearningComponentCatalog.ts`: default in-repo component package used by app bootstraps.
 - `samples/echo-unit/`: test-only sample component package that demonstrates the manifest, implementation, fixture, and README shape for future component bundles.
 - `runtime/TrialDisplayAdapterRegistry.ts`: display-owned trial adapter registry for interactive display extensions.
+- `runtime/blocksGameEngine.ts`: renderer-independent Blocks mechanics, scoring, question gates and replenishment; app state and presentation remain in `mofacts/`.
+- `content/tdf/runtimeStimulusInterpretation.ts`: the stimulus interpreter; `mofacts/client/lib/runtimeStimuli.ts` owns launch-scoped reactive snapshot reuse and invalidation.
+- `content/tdf/clusterMapping.ts`: the single cluster permutation owner, also used for assessment final ordering.
 - `units/UnitEngineRegistry.ts`: unit engine registration and creation.
 - `units/learning-session/`: model learning-session unit package, including learning/video session runtime-config interpretation and model-card selection behavior.
-- `units/sparcsession/`: SPARC session unit package; current wrapper over shared adaptive/logistic sequencing and target home for the reactive instructional document graph described in its README.
 - `units/assessment-session/`: assessment schedule unit package and authored schedule construction.
 - `units/sparcsession/`: SPARC unit engine, instructional adapters and productions, assessment, selection, persistence, and replay. AutoTutor dialogue uses this engine; the standalone AutoTutor runtime has been removed.
+- `units/sparcsession/sparcDialogueOpenRouterAdapter.ts`: dialogue assessment and generation policy behind explicit app runtime dependencies; no Meteor or browser-state access.
 - `units/instruction/`: instruction-only unit-engine package.
 - `units/video-session/`: minimal video-session unit package and adaptive video question helpers.
 

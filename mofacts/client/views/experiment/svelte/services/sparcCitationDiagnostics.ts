@@ -1,6 +1,4 @@
-import { redactSparcDialogueDiagnosticText } from '../../../../../common/lib/sparcDiagnosticText';
-
-// Keep source alignment separate from the text retained in browser diagnostics.
+// Browser diagnostics retain source alignment metadata without learner or tutor text.
 // Match locations are observations only: never use them to repair a citation.
 export function summarizeSparcCitation(
   citation: Readonly<Record<string, unknown>>,
@@ -48,35 +46,5 @@ export function summarizeSparcCitation(
     matchingTutorIndices,
     matchingTutorCount,
     quoteMatchesLatest: matches(learnerText),
-  };
-}
-
-export function describeSparcCitation(
-  citation: Readonly<Record<string, unknown>>,
-  dialogueHistory: readonly Readonly<Record<string, unknown>>[],
-  learnerText: string,
-) {
-  const summary = summarizeSparcCitation(citation, dialogueHistory, learnerText);
-  // Keep recent context plus the selected/matching entries, retaining original indices.
-  const indices = new Set([
-    ...dialogueHistory.slice(-32).map((_, index) => Math.max(0, dialogueHistory.length - 32) + index),
-    ...(typeof summary.index === 'number' && dialogueHistory[summary.index] ? [summary.index] : []),
-    ...summary.matchingStudentIndices,
-    ...summary.matchingTutorIndices,
-  ]);
-  const history = [...indices].sort((a, b) => a - b).map((index) => {
-    const entry = dialogueHistory[index]!;
-    return {
-      index,
-      role: entry.role === 'student' || entry.role === 'tutor' ? entry.role : 'invalid',
-      text: redactSparcDialogueDiagnosticText(typeof entry.text === 'string' ? entry.text : ''),
-    };
-  });
-  return {
-    summary,
-    quote: redactSparcDialogueDiagnosticText(typeof citation.quote === 'string' ? citation.quote : ''),
-    learnerText: redactSparcDialogueDiagnosticText(learnerText),
-    dialogueHistory: history,
-    omittedHistoryEntries: dialogueHistory.length - history.length,
   };
 }

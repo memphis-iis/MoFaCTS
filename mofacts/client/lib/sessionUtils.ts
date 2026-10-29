@@ -27,6 +27,7 @@ import {
   FULL_LAUNCH_SESSION_DEFAULTS,
 } from "./sessionCleanupRegistry";
 import { isLessonRoutePath } from "./lessonRoute";
+import { clearRuntimeStimulusCache } from "./runtimeStimuli";
 declare const Session: any;
 declare const Meteor: any;
 declare const GlobalExperimentStates: any;
@@ -139,6 +140,7 @@ function sessionCleanUp() {
   }
 
   resetSharedCardRuntimeState();
+  clearRuntimeStimulusCache();
   clearPracticeLaunchMode();
   clearBlocksPracticeGame();
   clearSparcReplayCachesForCleanup();

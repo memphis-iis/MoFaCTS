@@ -12,6 +12,6 @@ export function historyWriteDigest(value: unknown): string {
 
 export function sameHistoryWrite(saved: Record<string, unknown>, incoming: Record<string, unknown>): boolean {
   const payload = (record: Record<string, unknown>) => Object.fromEntries(Object.entries(record).filter(([key]) =>
-    !['_id', 'eventId', 'recordedServerTime', 'dynamicTagFields'].includes(key)));
+    !['_id', 'eventId', 'recordedServerTime', 'dynamicTagFields', 'historySequence'].includes(key)));
   return historyWriteDigest(payload(saved)) === historyWriteDigest(payload(incoming));
 }

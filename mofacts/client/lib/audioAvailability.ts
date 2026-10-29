@@ -1,4 +1,4 @@
-import { resolveUnitSpeechRecognitionEnabled } from './speechRecognitionConfig';
+import { resolveUnitSpeechRecognitionEnabled, SpeechRecognitionConfigurationError } from './speechRecognitionConfig';
 
 type SrAvailabilityStatus = 'available' | 'blocked' | 'pending' | 'failed';
 
@@ -108,6 +108,9 @@ export function evaluateSrAvailability(input: SrAvailabilityInput): SrAvailabili
 
 export function classifySrInitFailure(input: SrInitErrorInput): SrInitFailureClass {
   const { error, secureContext, hasAnySpeechApiKey, browserSupportsMediaDevices } = input;
+  if (error instanceof SpeechRecognitionConfigurationError) {
+    return { retryable: false, detail: 'init_error', reason: 'speech-language-configuration' };
+  }
   if (!browserSupportsMediaDevices) {
     return { retryable: false, detail: 'unsupported', reason: 'media-devices-unavailable' };
   }

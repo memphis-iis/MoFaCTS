@@ -17,9 +17,9 @@ describe('Browser retrieval cache lifecycle and independent embedding calls', ()
       subscribe(_name: string, _category: unknown, callbacks: { onReady(): void; onStop(error?: unknown): void }) {
         subscriptions++; queueMicrotask(() => subscriptionFailure ? callbacks.onStop(subscriptionFailure) : callbacks.onReady()); return { stop() { callbacks.onStop(); } };
       },
-      async callAsync(name: string, params: { input: string[] }) {
+      async callAsync(name: string, params: { input: string[] }, selection?: { entryId: string } | null) {
         methodCalls.push(name);
-        if (name === 'lookupSparcPrimitive') return { status: 'hit' };
+        if (name === 'lookupSparcPrimitive') return selection ? { status: 'hit' } : { status: 'generate' };
         assert.equal(name, 'callResolvedOpenRouterEmbeddings'); providerCalls++;
         return { embeddings: params.input.map(() => [2, 0]), costUsd: .01 };
       },
@@ -65,11 +65,12 @@ describe('Browser retrieval cache lifecycle and independent embedding calls', ()
       methodCalls.length = 0;
       const miss = await client.lookup(query);
       assert.equal(miss.status, 'generate');
-      assert.deepEqual(methodCalls, ['callResolvedOpenRouterEmbeddings'], 'A local miss sends no lookup or pending-record call');
+      assert.deepEqual(methodCalls, ['callResolvedOpenRouterEmbeddings', 'lookupSparcPrimitive'], 'A local miss checks the durable accepted event before generation');
       methodCalls.length = 0;
       const visual = await client.lookup({ ...query, context: { ...query.context, kind: 'richContent', supportKind: 'visual' } });
       assert.equal(visual.status, 'generate');
-      assert.deepEqual(methodCalls, [], 'Visual primitives neither embed nor call the server before generating their brief');
+      assert.deepEqual(methodCalls, ['lookupSparcPrimitive'], 'Visual primitives check durable resume without another embedding or visual search');
+      methodCalls.length = 0;
       observers[0]!.callbacks.added(id, { embedding: [1, 0] });
       assert.equal((await client.lookup(query)).status, 'hit');
       assert.deepEqual(methodCalls, ['lookupSparcPrimitive'], 'A hit fetches only the chosen content and reuses the completed query vector');

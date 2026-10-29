@@ -34,13 +34,13 @@ export function createSparcMoveLibraryClient(
   return {
     async lookup(query) {
       const { kind, readingLevel, responseFormat, supportKind } = query.context;
-      if (kind !== 'instruction' && supportKind === 'visual') return { status: 'generate', ticket: { query, embedding: [] }, previousQuestions: query.previousQuestions };
+      if (kind !== 'instruction' && supportKind === 'visual') return Meteor.callAsync('lookupSparcPrimitive', query, null, []);
       const [embedding] = await embedSparcTexts(query.tdfId, [query.queryText]);
       // Visual resources have one combined image/video index, searched once after the brief exists.
       const selection = (await prepare({ kind, responseFormat,
         ...(readingLevel ? { readingLevel } : {}), ...(supportKind ? { supportKind } : {}) }))
         .maximum(embedding!, sparcLibraryMinimumSimilarity(kind));
-      if (!selection) return { status: 'generate', ticket: { query, embedding: embedding! }, previousQuestions: query.previousQuestions };
+      // Accepted events stay resumable even after their content leaves this user's eligible index.
       return Meteor.callAsync('lookupSparcPrimitive', query, selection, embedding);
     },
     async publish({ query }, content) {

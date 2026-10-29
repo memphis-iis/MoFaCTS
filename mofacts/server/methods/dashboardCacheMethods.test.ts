@@ -15,6 +15,29 @@ const disabledRedisBoundary = {
   }
 };
 
+function createDashboardMethodsFixture(overrides: Partial<Parameters<typeof createDashboardCacheMethods>[0]> = {}) {
+  const collection = { find: () => ({ fetchAsync: async () => [] }), findOneAsync: async () => null,
+    updateAsync: async () => undefined, upsertAsync: async () => undefined };
+  return createDashboardCacheMethods({
+    Meteor: { Error: class MeteorError extends Error {
+      error: string;
+      constructor(error: string, reason?: string) { super(reason || error); this.error = error; }
+    } },
+    Roles: { userIsInRoleAsync: async () => false },
+    refreshDashboardHistory: async () => ({ success: true, action: 'current', tdfCount: 0 }),
+    removeLessonHistory: async () => { throw new Error('Unexpected history deletion in dashboard fixture'); },
+    Tdfs: collection,
+    UserDashboardCache: collection,
+    usersCollection: { findOneAsync: async () => ({ _id: 'synthetic-user' }) },
+    DynamicSettings: collection,
+    serverConsole: () => undefined,
+    canViewDashboardTdf: () => true,
+    getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard fixture'); },
+    redisBoundary: disabledRedisBoundary,
+    ...overrides,
+  });
+}
+
 describe('dashboardCacheMethods', function() {
   it('counts one assessed dialogue response across sparse checkpoints and bundled turns', function() {
     const event = { eventId: 'answer-1', type: 'response-submitted' };
@@ -105,7 +128,7 @@ describe('dashboardCacheMethods', function() {
       sectionsFind: 0,
       assignmentsFind: 0
     };
-    const methods = createDashboardCacheMethods({
+    const methods = createDashboardMethodsFixture({
       Meteor: {
         Error: class MeteorError extends Error {
           error: string;
@@ -116,11 +139,6 @@ describe('dashboardCacheMethods', function() {
         }
       },
       Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        find: () => ({ fetchAsync: async () => [] }),
-        findOneAsync: async () => null,
-        rawCollection: () => ({ distinct: async () => [] })
-      },
       Tdfs: {
         find: (_selector: any, options: any) => {
           queryCounts.tdfsFind++;
@@ -187,7 +205,6 @@ describe('dashboardCacheMethods', function() {
       },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => {},
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
       getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: disabledRedisBoundary
@@ -230,7 +247,7 @@ describe('dashboardCacheMethods', function() {
       tdfsFind: 2,
       usersFindOne: 1,
       usersFind: 1,
-      cacheFindOne: 2,
+      cacheFindOne: 1,
       sectionUserMapFind: 1,
       sectionsFind: 0,
       assignmentsFind: 0
@@ -263,7 +280,7 @@ describe('dashboardCacheMethods', function() {
           }
         }
       };
-      const methods = createDashboardCacheMethods({
+      const methods = createDashboardMethodsFixture({
         Meteor: {
           Error: class MeteorError extends Error {
             error: string;
@@ -274,11 +291,6 @@ describe('dashboardCacheMethods', function() {
           }
         },
         Roles: { userIsInRoleAsync: async () => false },
-        Histories: {
-          find: () => ({ fetchAsync: async () => [] }),
-          findOneAsync: async () => null,
-          rawCollection: () => ({ distinct: async () => [] })
-        },
         Tdfs: {
           find: () => ({ fetchAsync: async () => [lessonDoc] }),
           findOneAsync: async () => null
@@ -304,7 +316,6 @@ describe('dashboardCacheMethods', function() {
         },
         DynamicSettings: { findOneAsync: async () => null },
         serverConsole: () => {},
-        computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
         canViewDashboardTdf: () => true,
         getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
         redisBoundary: disabledRedisBoundary
@@ -407,7 +418,7 @@ describe('dashboardCacheMethods', function() {
       cacheFindOne: 0,
       dynamicSettingsFindOne: 0
     };
-    const methods = createDashboardCacheMethods({
+    const methods = createDashboardMethodsFixture({
       Meteor: {
         Error: class MeteorError extends Error {
           error: string;
@@ -418,11 +429,6 @@ describe('dashboardCacheMethods', function() {
         }
       },
       Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        find: () => ({ fetchAsync: async () => [] }),
-        findOneAsync: async () => null,
-        rawCollection: () => ({ distinct: async () => [] })
-      },
       Tdfs: {
         find: () => {
           queryCounts.tdfsFind++;
@@ -458,7 +464,6 @@ describe('dashboardCacheMethods', function() {
         }
       },
       serverConsole: () => {},
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
       getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: disabledRedisBoundary
@@ -492,7 +497,7 @@ describe('dashboardCacheMethods', function() {
     expect(queryCounts).to.deep.equal({
       tdfsFind: 2,
       usersFindOne: 1,
-      cacheFindOne: 2,
+      cacheFindOne: 1,
       dynamicSettingsFindOne: 1
     });
   });
@@ -799,354 +804,95 @@ describe('dashboardCacheMethods', function() {
     expect(incremental?.totalSessions).to.equal(1);
   });
 
-  it('ensureDashboardCacheCurrent does not rebuild when the cache is current', async function() {
+  it('delegates current and changed refreshes to the history owner under the shared user lock', async function() {
     const userId = 'learner-1';
-    const cacheDoc: any = {
-      userId,
-      version: DASHBOARD_CACHE_VERSION,
-      tdfStats: {
-        tdfA: {},
-        tdfB: {}
-      },
-      lastUpdated: new Date('2026-05-01T00:01:00.000Z')
-    };
     const lockKeys: string[] = [];
-
-    const methods = createDashboardCacheMethods({
-      Meteor: {
-        Error: class MeteorError extends Error {
-          error: string;
-          constructor(error: string, reason?: string) {
-            super(reason || error);
-            this.error = error;
-          }
-        }
+    const calls: Array<{ userId: string; options: unknown }> = [];
+    const result = { success: true as const, action: 'refreshed' as const, reason: 'history-newer' as const, tdfCount: 2 };
+    const methods = createDashboardMethodsFixture({
+      refreshDashboardHistory: async (targetUserId, options) => {
+        calls.push({ userId: targetUserId, options });
+        return result;
       },
-      Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        findOneAsync: async () => ({
-          recordedServerTime: new Date('2026-05-01T00:00:00.000Z')
-        }),
-        find: () => ({
-          fetchAsync: async () => {
-            throw new Error('current cache should not fetch history for rebuild');
-          }
-        }),
-        rawCollection: () => ({
-          distinct: async () => {
-            throw new Error('current cache should not scan attempted TDFs for rebuild');
-          }
-        })
-      },
-      Tdfs: {
-        findOneAsync: async () => null,
-        find: () => ({ fetchAsync: async () => [] })
-      },
-      UserDashboardCache: {
-        findOneAsync: async () => cacheDoc,
-        upsertAsync: async () => {
-          throw new Error('current cache should not be rewritten');
-        }
-      },
-      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
-      DynamicSettings: { findOneAsync: async () => null },
-      serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true,
-      getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: {
         enabled: true,
-        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
+        async withLock<T>(key: string, ttl: number, work: () => Promise<T>) {
+          expect(ttl).to.equal(120000);
           lockKeys.push(key);
           return await work();
-        }
-      }
+        },
+      },
     });
-
-    const result = await methods.ensureDashboardCacheCurrent.call({ userId });
-
-    expect(result).to.deep.equal({
-      success: true,
-      action: 'current',
-      tdfCount: 2
-    });
+    expect(await methods.ensureDashboardCacheCurrent.call({ userId })).to.equal(result);
+    expect(calls).to.deep.equal([{ userId, options: undefined }]);
     expect(lockKeys).to.deep.equal(['dashboard-cache:ensure:learner-1']);
   });
 
-  it('ensureDashboardCacheCurrent rebuilds when the cache is missing', async function() {
-    const userId = 'learner-1';
-    let cacheDoc: any = null;
-    const lockKeys: string[] = [];
-
-    const methods = createDashboardCacheMethods({
-      Meteor: {
-        Error: class MeteorError extends Error {
-          error: string;
-          constructor(error: string, reason?: string) {
-            super(reason || error);
-            this.error = error;
-          }
-        }
+  it('forces explicit initialization through the same lock after validating the target user', async function() {
+    const calls: unknown[] = [];
+    const methods = createDashboardMethodsFixture({
+      usersCollection: { findOneAsync: async (selector: any) => { calls.push(selector); return { _id: selector._id }; } },
+      refreshDashboardHistory: async (userId, options) => {
+        calls.push({ userId, options });
+        return { success: true, action: 'refreshed', reason: 'requested', tdfCount: 3 };
       },
-      Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        findOneAsync: async () => null,
-        find: () => ({ fetchAsync: async () => [] }),
-        rawCollection: () => ({ distinct: async () => [] })
-      },
-      Tdfs: {
-        findOneAsync: async () => null,
-        find: () => ({ fetchAsync: async () => [] })
-      },
-      UserDashboardCache: {
-        findOneAsync: async () => cacheDoc,
-        upsertAsync: async (_selector: any, modifier: any) => {
-          cacheDoc = {
-            ...(modifier.$set || {})
-          };
-        }
-      },
-      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
-      DynamicSettings: { findOneAsync: async () => null },
-      serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true,
-      getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: {
         enabled: true,
-        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
-          lockKeys.push(key);
-          return await work();
-        }
-      }
+        async withLock<T>(key: string, _ttl: number, work: () => Promise<T>) { calls.push(key); return await work(); },
+      },
     });
-
-    const result = await methods.ensureDashboardCacheCurrent.call({ userId });
-
-    expect(result).to.deep.include({
-      success: true,
-      action: 'refreshed',
-      reason: 'missing',
-      tdfCount: 0
-    });
-    expect(lockKeys).to.deep.equal([
-      'dashboard-cache:ensure:learner-1',
-      'dashboard-cache:initialize:learner-1'
+    expect(await methods.initializeDashboardCache.call({ userId: 'learner-1' })).to.deep.include({ success: true, tdfCount: 3 });
+    expect(calls).to.deep.equal([
+      { _id: 'learner-1' }, 'dashboard-cache:ensure:learner-1',
+      { userId: 'learner-1', options: { forceRebuild: true } },
     ]);
-    expect(cacheDoc.tdfStats).to.deep.equal({});
-    expect(cacheDoc.summary.totalTdfsAttempted).to.equal(0);
   });
 
-  it('ensureDashboardCacheCurrent rebuilds a current-version cache when newer history exists', async function() {
-    const userId = 'learner-1';
-    let cacheDoc: any = {
-      userId,
-      version: DASHBOARD_CACHE_VERSION,
-      tdfStats: {},
-      lastUpdated: new Date('2026-05-01T00:00:00.000Z')
-    };
-    const lockKeys: string[] = [];
-    const historyRows = [
-      {
-        _id: 'h1',
-        userId,
-        TDFId: 'tdfA',
-        outcome: 'correct',
-        CFEndLatency: 1000,
-        CFFeedbackLatency: 500,
-        stimuliSetId: 'set-a',
-        stimulusKC: 'stim-a',
-        clusterKC: 'cluster-a',
-        recordedServerTime: new Date('2026-05-01T00:01:00.000Z'),
-        levelUnitType: 'model'
-      }
-    ];
-
-    const methods = createDashboardCacheMethods({
-      Meteor: {
-        Error: class MeteorError extends Error {
-          error: string;
-          constructor(error: string, reason?: string) {
-            super(reason || error);
-            this.error = error;
-          }
-        }
-      },
+  it('rejects unauthorized or missing-user initialization before refreshing history', async function() {
+    let refreshes = 0;
+    const methods = createDashboardMethodsFixture({
       Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        findOneAsync: async () => historyRows[0],
-        find: () => ({
-          fetchAsync: async () => historyRows
-        }),
-        rawCollection: () => ({ distinct: async () => ['tdfA'] })
-      },
-      Tdfs: {
-        findOneAsync: async () => null,
-        find: (selector: any) => ({
-          fetchAsync: async () => {
-            if (selector?._id?.$in) {
-              return [{
-                _id: 'tdfA',
-                content: {
-                  fileName: 'tdf-a.json',
-                  tdfs: { tutor: { setspec: { lessonname: 'Lesson A' } } }
-                }
-              }];
-            }
-            return [];
-          }
-        })
-      },
-      UserDashboardCache: {
-        findOneAsync: async () => cacheDoc,
-        upsertAsync: async (_selector: any, modifier: any) => {
-          cacheDoc = {
-            ...cacheDoc,
-            ...(modifier.$set || {})
-          };
-        }
-      },
-      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
-      DynamicSettings: { findOneAsync: async () => null },
-      serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true,
-      getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
-      redisBoundary: {
-        enabled: true,
-        async withLock<T>(key: string, _ttlMs: number, work: () => Promise<T>) {
-          lockKeys.push(key);
-          return await work();
-        }
-      }
+      usersCollection: { findOneAsync: async () => null },
+      refreshDashboardHistory: async () => { refreshes++; return { success: true, action: 'current', tdfCount: 0 }; },
     });
-
-    const result = await methods.ensureDashboardCacheCurrent.call({ userId });
-
-    expect(result).to.deep.include({
-      success: true,
-      action: 'refreshed',
-      reason: 'history-newer',
-      tdfCount: 1
-    });
-    expect(lockKeys).to.deep.equal([
-      'dashboard-cache:ensure:learner-1',
-      'dashboard-cache:initialize:learner-1'
-    ]);
-    expect(cacheDoc.tdfStats.tdfA.totalTrials).to.equal(1);
-    expect(cacheDoc.summary.totalTrialsAllTime).to.equal(1);
+    for (const [context, target, expected] of [
+      [{ userId: null }, null, 'not-authorized'],
+      [{ userId: 'learner-1' }, 'other-user', 'not-authorized'],
+      [{ userId: 'learner-1' }, null, 'not-found'],
+    ] as const) {
+      try {
+        await methods.initializeDashboardCache.call(context, target);
+        expect.fail('Expected initialization boundary to reject the request');
+      } catch (error: any) { expect(error.error).to.equal(expected); }
+    }
+    try {
+      await methods.ensureDashboardCacheCurrent.call({ userId: null });
+      expect.fail('Expected current-cache reads to require login');
+    } catch (error: any) { expect(error.error).to.equal('not-authorized'); }
+    expect(refreshes).to.equal(0);
   });
 
-  it('initializeDashboardCache resolves condition roots with a targeted child-reference query', async function() {
-    const userId = 'learner-1';
-    const tdfFindSelectors: any[] = [];
-    let cacheDoc: any = null;
-    const childTdf = {
-      _id: 'child-tdf',
-      content: {
-        fileName: 'child.json',
-        tdfs: { tutor: { setspec: { lessonname: 'Child Lesson' } } }
-      }
-    };
-    const rootTdf = {
-      _id: 'root-tdf',
-      content: {
-        tdfs: {
-          tutor: {
-            setspec: {
-              lessonname: 'Root Lesson',
-              condition: ['child.json'],
-              conditionTdfIds: ['child-tdf']
-            }
-          }
-        }
-      }
-    };
-    const methods = createDashboardCacheMethods({
-      Meteor: {
-        Error: class MeteorError extends Error {
-          error: string;
-          constructor(error: string, reason?: string) {
-            super(reason || error);
-            this.error = error;
-          }
-        }
-      },
-      Roles: { userIsInRoleAsync: async () => false },
-      Histories: {
-        find: () => ({
-          fetchAsync: async () => [
-            {
-              _id: 'h1',
-              userId,
-              TDFId: 'child-tdf',
-              outcome: 'correct',
-              CFEndLatency: 1000,
-              CFFeedbackLatency: 500,
-              stimuliSetId: 'set-a',
-              stimulusKC: 'stim-a',
-              clusterKC: 'cluster-a',
-              recordedServerTime: new Date('2026-05-01T00:00:00.000Z'),
-              levelUnitType: 'model'
-            }
-          ]
-        }),
-        rawCollection: () => ({ distinct: async () => ['child-tdf'] })
-      },
-      Tdfs: {
-        findOneAsync: async () => null,
-        find: (selector: any) => {
-          tdfFindSelectors.push(selector);
-          return {
-            fetchAsync: async () => {
-              if (selector?._id?.$in?.includes('child-tdf')) {
-                return [childTdf];
-              }
-              if (selector?.['content.tdfs.tutor.setspec.conditionTdfIds']?.$in?.includes('child-tdf')) {
-                return [rootTdf];
-              }
-              return [];
-            }
-          };
-        }
-      },
-      UserDashboardCache: {
-        upsertAsync: async (_selector: any, modifier: any) => {
-          cacheDoc = {
-            ...(cacheDoc || {}),
-            ...(modifier.$set || {})
-          };
-        },
-        findOneAsync: async () => cacheDoc
-      },
-      usersCollection: { findOneAsync: async () => ({ _id: userId }) },
-      DynamicSettings: { findOneAsync: async () => null },
-      serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
-      canViewDashboardTdf: () => true,
-      getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
-      redisBoundary: disabledRedisBoundary
+  it('allows an administrator to initialize another existing user and propagates owner failure', async function() {
+    const requests: unknown[] = [];
+    const failure = new Error('Synthetic refresh failure');
+    const methods = createDashboardMethodsFixture({
+      Roles: { userIsInRoleAsync: async (userId: string, roles: string[]) => userId === 'admin-1' && roles.includes('admin') },
+      refreshDashboardHistory: async (userId, options) => { requests.push({ userId, options }); throw failure; },
     });
-
-    const result = await methods.initializeDashboardCache.call({ userId });
-
-    expect(result.tdfCount).to.equal(1);
-    expect(cacheDoc.tdfStats).to.have.property('root-tdf');
-    expect(cacheDoc.tdfStats).to.not.have.property('child-tdf');
-    expect(tdfFindSelectors[1]).to.deep.equal({
-      'content.tdfs.tutor.setspec.conditionTdfIds': { $in: ['child-tdf'] },
-    });
-    expect(tdfFindSelectors.some((selector) => selector?.['content.tdfs.tutor.setspec.condition']?.$exists === true)).to.equal(false);
+    try {
+      await methods.initializeDashboardCache.call({ userId: 'admin-1' }, 'learner-1');
+      expect.fail('Expected refresh owner failure to propagate');
+    } catch (error) { expect(error).to.equal(failure); }
+    expect(requests).to.deep.equal([{ userId: 'learner-1', options: { forceRebuild: true } }]);
   });
-
   it('refreshUserAdminUsageCaches refreshes users with bounded concurrency and progress logging', async function() {
     const adminId = 'admin-1';
     const userIds = Array.from({ length: 12 }, (_value, index) => `user-${index + 1}`);
     const logs: string[] = [];
-    let activeDistincts = 0;
-    let maxActiveDistincts = 0;
+    let activeRefreshes = 0;
+    let maxActiveRefreshes = 0;
 
-    const methods = createDashboardCacheMethods({
+    const methods = createDashboardMethodsFixture({
       Meteor: {
         Error: class MeteorError extends Error {
           error: string;
@@ -1157,17 +903,13 @@ describe('dashboardCacheMethods', function() {
         }
       },
       Roles: { userIsInRoleAsync: async () => true },
-      Histories: {
-        find: () => ({ fetchAsync: async () => [] }),
-        rawCollection: () => ({
-          distinct: async () => {
-            activeDistincts += 1;
-            maxActiveDistincts = Math.max(maxActiveDistincts, activeDistincts);
-            await new Promise((resolve) => setTimeout(resolve, 5));
-            activeDistincts -= 1;
-            return [];
-          }
-        })
+      refreshDashboardHistory: async (_userId, options) => {
+        expect(options).to.deep.equal({ forceRebuild: true });
+        activeRefreshes += 1;
+        maxActiveRefreshes = Math.max(maxActiveRefreshes, activeRefreshes);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        activeRefreshes -= 1;
+        return { success: true, action: 'refreshed', reason: 'requested', tdfCount: 0 };
       },
       Tdfs: {
         findOneAsync: async () => null,
@@ -1180,7 +922,6 @@ describe('dashboardCacheMethods', function() {
       usersCollection: { findOneAsync: async (_selector: any) => ({ _id: _selector._id }) },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: (...args: any[]) => { logs.push(args.join(' ')); },
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
       getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: disabledRedisBoundary
@@ -1191,14 +932,14 @@ describe('dashboardCacheMethods', function() {
     expect(result.success).to.equal(true);
     expect(result.refreshed).to.have.length(12);
     expect(result.failed).to.deep.equal([]);
-    expect(maxActiveDistincts).to.be.greaterThan(1);
-    expect(maxActiveDistincts).to.be.at.most(4);
+    expect(maxActiveRefreshes).to.be.greaterThan(1);
+    expect(maxActiveRefreshes).to.be.at.most(4);
     expect(logs.some((line) => line.includes('Refreshing 12 user dashboard caches with concurrency 4'))).to.equal(true);
     expect(logs.some((line) => line.includes('Refreshed 10/12 user dashboard caches'))).to.equal(true);
     expect(logs.some((line) => line.includes('Refreshed 12/12 user dashboard caches'))).to.equal(true);
   });
 
-  it('resetOwnLessonProgress clears the learner history, experiment state, and root cache stats for a condition family', async function() {
+  it('resetOwnLessonProgress deletes the condition family then delegates its cache repair to the history owner', async function() {
     const userId = 'learner-1';
     const docs = {
       root: {
@@ -1227,52 +968,10 @@ describe('dashboardCacheMethods', function() {
     };
     const removedSelectors: any[] = [];
     const stateRemovedSelectors: any[] = [];
-    let cacheDoc: any = {
-      _id: 'cache-1',
-      userId,
-      tdfStats: {
-        root: {
-          displayName: 'Root Lesson',
-          totalTrials: 3,
-          correctTrials: 2,
-          incorrectTrials: 1,
-          totalTimeMs: 1000,
-          totalTimeMinutes: 0.1,
-          itemsPracticedCount: 2,
-          totalSessions: 1,
-          overallAccuracy: 66.7,
-          firstPracticeDate: new Date('2026-05-01T00:00:00.000Z'),
-          lastPracticeDate: new Date('2026-05-01T00:00:00.000Z'),
-          lastPracticeTimestamp: new Date('2026-05-01T00:00:00.000Z').getTime(),
-          lastProcessedHistoryId: null,
-          lastProcessedTimestamp: null
-        },
-        other: {
-          displayName: 'Other Lesson',
-          totalTrials: 1,
-          correctTrials: 1,
-          incorrectTrials: 0,
-          totalTimeMs: 100,
-          totalTimeMinutes: 0.1,
-          itemsPracticedCount: 1,
-          totalSessions: 1,
-          overallAccuracy: 100,
-          firstPracticeDate: new Date('2026-05-02T00:00:00.000Z'),
-          lastPracticeDate: new Date('2026-05-02T00:00:00.000Z'),
-          lastPracticeTimestamp: new Date('2026-05-02T00:00:00.000Z').getTime(),
-          lastProcessedHistoryId: null,
-          lastProcessedTimestamp: null
-        }
-      },
-      learnerTdfConfigs: {
-        root: {
-          source: { tdfId: 'root', unitCount: 0, unitSignature: [] },
-          overrides: { setspec: { audioPromptMode: 'feedback' } }
-        }
-      }
-    };
+    const refreshCalls: unknown[] = [];
+    const operations: string[] = [];
 
-    const methods = createDashboardCacheMethods({
+    const methods = createDashboardMethodsFixture({
       Meteor: {
         Error: class MeteorError extends Error {
           error: string;
@@ -1283,16 +982,19 @@ describe('dashboardCacheMethods', function() {
         }
       },
       Roles: { userIsInRoleAsync: async () => true },
-      Histories: {
-        removeAsync: async (selector: any) => {
-          removedSelectors.push(selector);
-          return 2;
-        },
-        find: () => ({ fetchAsync: async () => [] }),
-        rawCollection: () => ({ distinct: async () => [] })
+      removeLessonHistory: async (targetUserId, tdfIds) => {
+        operations.push('history');
+        removedSelectors.push({ userId: targetUserId, TDFId: { $in: tdfIds } });
+        return 2;
+      },
+      refreshDashboardHistory: async (targetUserId, options) => {
+        operations.push('refresh');
+        refreshCalls.push({ userId: targetUserId, options });
+        return { success: true, action: 'refreshed', reason: 'repair', tdfCount: 1 };
       },
       GlobalExperimentStates: {
         removeAsync: async (selector: any) => {
+          operations.push('state');
           stateRemovedSelectors.push(selector);
           return 1;
         }
@@ -1317,19 +1019,12 @@ describe('dashboardCacheMethods', function() {
       Sections: { find: () => ({ fetchAsync: async () => [] }) },
       SectionUserMap: { find: () => ({ fetchAsync: async () => [] }) },
       UserDashboardCache: {
-        findOneAsync: async () => cacheDoc,
-        updateAsync: async (_selector: any, modifier: any) => {
-          cacheDoc = {
-            ...cacheDoc,
-            ...(modifier.$set || {})
-          };
-        },
-        upsertAsync: async () => undefined
+        findOneAsync: async () => { throw new Error('Reset must delegate cache repair without reading old aggregates'); },
+        updateAsync: async () => { throw new Error('Reset must delegate cache repair without pruning old aggregates'); },
       },
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
       getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: disabledRedisBoundary
@@ -1338,6 +1033,9 @@ describe('dashboardCacheMethods', function() {
     const result = await methods.resetOwnLessonProgress.call({ userId }, 'root');
 
     expect(result.success).to.equal(true);
+    expect(result.historyRemoved).to.equal(2);
+    expect(result.experimentStateRemoved).to.equal(1);
+    expect(result.cacheChanged).to.equal(true);
     expect(result.cacheTdfIds).to.deep.equal(['root']);
     expect(removedSelectors[0].TDFId.$in).to.include.members([
       'root',
@@ -1347,16 +1045,16 @@ describe('dashboardCacheMethods', function() {
       'condition-a.json',
     ]);
     expect(stateRemovedSelectors[0].$or).to.deep.include({ TDFId: { $in: removedSelectors[0].TDFId.$in } });
-    expect(cacheDoc.tdfStats).to.not.have.property('root');
-    expect(cacheDoc.tdfStats).to.have.property('other');
-    expect(cacheDoc.learnerTdfConfigs).to.have.property('root');
+    expect(removedSelectors[0].userId).to.equal(userId);
+    expect(refreshCalls).to.deep.equal([{ userId, options: { forceRebuild: true } }]);
+    expect(operations).to.deep.equal(['history', 'state', 'refresh']);
   });
 
   it('resetOwnLessonProgress fails before deleting history for the learner\'s course-assigned lessons', async function() {
     const userId = 'learner-1';
     let historyRemoveCalled = false;
     let experimentStateRemoveCalled = false;
-    const methods = createDashboardCacheMethods({
+    const methods = createDashboardMethodsFixture({
       Meteor: {
         Error: class MeteorError extends Error {
           error: string;
@@ -1367,13 +1065,9 @@ describe('dashboardCacheMethods', function() {
         }
       },
       Roles: { userIsInRoleAsync: async () => true },
-      Histories: {
-        removeAsync: async () => {
-          historyRemoveCalled = true;
-          return 0;
-        },
-        find: () => ({ fetchAsync: async () => [] }),
-        rawCollection: () => ({ distinct: async () => [] })
+      removeLessonHistory: async () => {
+        historyRemoveCalled = true;
+        return 0;
       },
       GlobalExperimentStates: {
         removeAsync: async () => {
@@ -1419,7 +1113,6 @@ describe('dashboardCacheMethods', function() {
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
       getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: disabledRedisBoundary
@@ -1436,10 +1129,27 @@ describe('dashboardCacheMethods', function() {
     expect(experimentStateRemoveCalled).to.equal(false);
   });
 
+  it('administrative cache pruning invalidates its source position so a later entry repairs the summary', async function() {
+    const stats = computeCacheStats([{ _id: 'old', levelUnitType: 'model', time: 1000, outcome: 'correct' }], 'Lesson', () => 0);
+    let modifier: any;
+    const methods = createDashboardMethodsFixture({
+      Roles: { userIsInRoleAsync: async () => true },
+      UserDashboardCache: {
+        find: () => ({ fetchAsync: async () => [{ _id: 'cache', tdfStats: { removed: stats, retained: stats } }] }),
+        updateAsync: async (_selector: unknown, update: unknown) => { modifier = update; },
+      },
+    });
+
+    expect(await methods.removeTdfFromCache.call({ userId: 'admin' }, 'removed')).to.deep.equal({ success: true, modified: 1 });
+    expect(modifier.$set.tdfStats).to.have.keys(['retained']);
+    expect(modifier.$set.summary.totalTrialsAllTime).to.equal(1);
+    expect(modifier.$unset).to.have.keys(['lastHistorySequence', 'historyRepairRevision', 'historyTdfTargets']);
+  });
+
   it('resetOwnLessonProgress remains available when the learner is not enrolled in the assigned course', async function() {
     const userId = 'learner-1';
     let historyRemoveCalled = false;
-    const methods = createDashboardCacheMethods({
+    const methods = createDashboardMethodsFixture({
       Meteor: {
         Error: class MeteorError extends Error {
           error: string;
@@ -1450,13 +1160,9 @@ describe('dashboardCacheMethods', function() {
         }
       },
       Roles: { userIsInRoleAsync: async () => true },
-      Histories: {
-        removeAsync: async () => {
-          historyRemoveCalled = true;
-          return 0;
-        },
-        find: () => ({ fetchAsync: async () => [] }),
-        rawCollection: () => ({ distinct: async () => [] })
+      removeLessonHistory: async () => {
+        historyRemoveCalled = true;
+        return 0;
       },
       GlobalExperimentStates: {
         removeAsync: async () => 0
@@ -1499,7 +1205,6 @@ describe('dashboardCacheMethods', function() {
       usersCollection: { findOneAsync: async () => ({ _id: userId }) },
       DynamicSettings: { findOneAsync: async () => null },
       serverConsole: () => undefined,
-      computePracticeTimeMs: (endLatency, feedbackLatency) => (endLatency ?? 0) + (feedbackLatency ?? 0),
       canViewDashboardTdf: () => true,
       getAccessibleTdf: async () => { throw new Error('Unexpected learner settings access in dashboard cache test'); },
       redisBoundary: disabledRedisBoundary

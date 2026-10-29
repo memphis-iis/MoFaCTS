@@ -678,7 +678,6 @@ export async function warmupGoogleSpeechRecognition() {
   const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(silentAudioBytes) as any));
   const speechRecognitionLanguage = resolveSpeechRecognitionLanguage(
     Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
-    getActiveUiLocale(),
   );
 
   const request = {

@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { describeSparcCitation, summarizeSparcCitation } from './sparcCitationDiagnostics.ts';
+import { summarizeSparcCitation } from './sparcCitationDiagnostics.ts';
 
 describe('SPARC citation diagnostics', function() {
   const history = [
@@ -64,43 +64,48 @@ describe('SPARC citation diagnostics', function() {
     expect(JSON.stringify(summary).toLowerCase()).not.to.contain('private');
   });
 
-  it('retains exact student wording and provider quotations in diagnostic context', function() {
+  it('retains citation alignment without learner, tutor, or provider wording', function() {
     const quote = '  Private learner explanation.  ';
     const latest = 'An answer\nwith punctuation—and spacing.';
-    const diagnostic = describeSparcCitation({
+    const diagnostic = summarizeSparcCitation({
       source: 'dialogueHistory', dialogueHistoryIndex: 1, quote,
     }, history, latest);
-    expect(diagnostic.quote).to.equal(quote);
-    expect(diagnostic.learnerText).to.equal(latest);
-    expect(diagnostic.dialogueHistory).to.deep.equal(history.map((entry, index) => ({ index, ...entry })));
-    expect(diagnostic.omittedHistoryEntries).to.equal(0);
+    expect(diagnostic.quoteCharacters).to.equal(quote.trim().length);
+    expect(diagnostic.referencedRole).to.equal('tutor');
+    expect(diagnostic.quoteMatchesReferenced).to.equal(false);
+    expect(diagnostic.matchingStudentIndices).to.deep.equal([0]);
+    const serialized = JSON.stringify(diagnostic);
+    for (const text of [quote, quote.trim(), latest, history[1]!.text]) {
+      expect(serialized).not.to.contain(text);
+    }
+    for (const field of ['quote', 'learnerText', 'dialogueHistory']) {
+      expect(diagnostic).not.to.have.property(field);
+    }
   });
 
-  it('redacts credentials while retaining the surrounding diagnostic wording', function() {
+  it('never retains credentials or surrounding wording supplied as citation text', function() {
     const text = 'Answer: Bearer private-token mongodb://private-host/db sk-or-v1-privateKey1234567890';
-    const diagnostic = describeSparcCitation({
+    const diagnostic = summarizeSparcCitation({
       source: 'learnerText', dialogueHistoryIndex: null, quote: text,
     }, [{ role: 'student', text }], text);
     const serialized = JSON.stringify(diagnostic);
-    expect(serialized).to.contain('Answer:');
-    for (const secret of ['private-token', 'private-host', 'privateKey1234567890']) {
+    expect(diagnostic.quoteMatchesReferenced).to.equal(true);
+    for (const secret of ['Answer:', 'private-token', 'private-host', 'privateKey1234567890']) {
       expect(serialized).not.to.contain(secret);
     }
   });
 
-  it('keeps an older selected and matching statement when recent context is bounded', function() {
+  it('locates older citations without retaining dialogue context', function() {
     const longHistory = Array.from({ length: 100 }, (_, index) => ({
       role: index % 2 ? 'tutor' : 'student', text: `Statement ${index}.`,
     }));
-    const diagnostic = describeSparcCitation({
+    const diagnostic = summarizeSparcCitation({
       source: 'dialogueHistory', dialogueHistoryIndex: 1, quote: 'Statement 0.',
     }, longHistory, 'Latest.');
-    expect(diagnostic.dialogueHistory.slice(0, 2)).to.deep.equal([
-      { index: 0, role: 'student', text: 'Statement 0.' },
-      { index: 1, role: 'tutor', text: 'Statement 1.' },
-    ]);
-    expect(diagnostic.dialogueHistory.at(-1)!.index).to.equal(99);
-    expect(diagnostic.dialogueHistory).to.have.length(34);
-    expect(diagnostic.omittedHistoryEntries).to.equal(66);
+    expect(diagnostic.index).to.equal(1);
+    expect(diagnostic.matchingStudentIndices).to.deep.equal([0]);
+    expect(diagnostic.historyEntries).to.equal(100);
+    expect(diagnostic.studentEntries).to.equal(50);
+    expect(JSON.stringify(diagnostic)).not.to.contain('Statement');
   });
 });

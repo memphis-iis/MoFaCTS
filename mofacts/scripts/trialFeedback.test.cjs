@@ -43,6 +43,8 @@ for (const filename of [
   '../client/lib/deliverySettingsResolver.test.ts',
   '../client/lib/instructionLaunchMapping.test.ts',
   '../client/views/experiment/assessmentPreparedInput.test.ts',
+  '../client/views/experiment/assessmentSettings.contracts.test.ts',
+  '../../learning-components/runtime/blocksGameEngine.test.ts',
 ]) require(path.resolve(__dirname, filename));
 
 const assert = require('node:assert/strict');

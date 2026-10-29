@@ -9,16 +9,19 @@ import { parseSparcQuestionChoices } from '../../../learning-components/runtime/
 import { SPARC_MOVE_LIBRARY_VERSION, stableMoveJson, type SparcPrimitiveContent,
   type SparcPrimitiveTicket, type SparcPrimitiveContext, type SparcPrimitiveLookup, type SparcPrimitiveQuery, type SparcPrimitiveReference } from '../../../learning-components/runtime/sparcMoveLibraryContract';
 import { SPARC_INSTRUCTIONAL_NEED_VERSION, sparcLibraryMinimumSimilarity, sparcInstructionalNeedText } from '../../../learning-components/runtime/sparcInstructionalNeed';
+import { sparcContentUseKeys } from './sparcContentUse';
 
 export const moveDigest = (value: unknown) => createHash('sha256').update(stableMoveJson(value)).digest('hex');
 export type MoveEntry = {
   _id: string; version: string; context: SparcPrimitiveContext; kind: string; embeddingModel: string;
   embedding: number[]; content: SparcPrimitiveContent;
   embeddingVersion?: string;
+  contentUseKeys?: string[];
   createdAt: Date; requirements: string; move: string; target: string;
 };
 export type MoveRequest = { _id: string; userId: string; query: SparcPrimitiveQuery; embedding: number[];
   embeddingVersion?: string;
+  contentUseKeys?: string[];
   entryId?: string; source?: 'retrieved' | 'generated'; similarity?: number | null };
 export interface MoveStore {
   request(id: string): Promise<MoveRequest | undefined>;
@@ -34,6 +37,10 @@ function bounded(value: unknown, label: string, max: number): asserts value is s
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`Invalid ${label}`);
 }
 
+export class SparcAcceptedContentChangedError extends Error {
+  constructor() { super('Saved instructional content changed after acceptance.'); this.name = 'SparcAcceptedContentChangedError'; }
+}
+
 export function createMoveLibraryService(deps: { store: MoveStore; embeddingModel: string;
   verifyFigure?(assetId: string): Promise<void>;
   videoReuseStatus?(videos: readonly SparcVideoSegment[]): Promise<Map<string, boolean>>;
@@ -42,6 +49,10 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
   const reference = (request: MoveRequest): SparcPrimitiveReference => ({ entryId: request.entryId!, version: SPARC_MOVE_LIBRARY_VERSION,
     source: request.source!, similarity: request.similarity ?? null });
   const assignedContent = (request: MoveRequest, content: SparcPrimitiveContent): SparcPrimitiveContent => {
+    const currentKeys = sparcContentUseKeys(content, request.entryId);
+    if (!Array.isArray(request.contentUseKeys) || currentKeys.some(key => !request.contentUseKeys!.includes(key))) {
+      throw new SparcAcceptedContentChangedError();
+    }
     if (!content.choices) return content;
     if (request.query.context.responseFormat === 'true-false') return { ...content, choices: parseSparcQuestionChoices(content.choices, 'true-false') };
     return { ...content, choices: parseSparcQuestionChoices(content.choices).map(choice => ({ choice, rank: moveDigest([request._id, choice.id]) }))
@@ -93,7 +104,11 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         || selection.similarity < sparcLibraryMinimumSimilarity(query.context.kind) || selection.similarity > 1)) throw new Error('Invalid local retrieval selection');
       const id = moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]);
       const saved = await store.request(id);
-      if (saved) { if (saved.userId !== userId) throw new Error('Primitive request ownership mismatch'); return existing(saved); }
+      if (saved) {
+        if (saved.userId !== userId || saved.query.tdfId !== query.tdfId || saved.query.sessionId !== query.sessionId
+          || saved.query.eventId !== query.eventId || saved.query.context.kind !== query.context.kind) throw new Error('Primitive request ownership mismatch');
+        return existing(saved);
+      }
       if (!selection) return { status: 'generate', ticket: { query, embedding }, previousQuestions: query.previousQuestions };
       let selected: MoveEntry | undefined;
       if (selection) {
@@ -109,7 +124,8 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
         selected = entry;
       }
       const request: MoveRequest = { _id: id, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION,
-        ...(selection ? { entryId: selection.entryId, source: 'retrieved', similarity: selection.similarity } : {}) };
+        ...(selection ? { entryId: selection.entryId, source: 'retrieved', similarity: selection.similarity,
+          contentUseKeys: sparcContentUseKeys(selected!.content, selection.entryId) } : {}) };
       return existing(await store.saveRequest(request), selected);
     },
     async publish(userId: string, ticket: SparcPrimitiveTicket, content: SparcPrimitiveContent) {
@@ -117,7 +133,8 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       validateQuery(query, embedding);
       const requestId = moveDigest([userId, query.tdfId, query.sessionId, query.eventId, query.context.kind]);
       const request = await store.request(requestId) ?? { _id: requestId, userId, query, embedding, embeddingVersion: SPARC_INSTRUCTIONAL_NEED_VERSION };
-      if (request.userId !== userId) throw new Error('Primitive request ownership mismatch');
+      if (request.userId !== userId || request.query.tdfId !== query.tdfId || request.query.sessionId !== query.sessionId
+        || request.query.eventId !== query.eventId || request.query.context.kind !== query.context.kind) throw new Error('Primitive request ownership mismatch');
       if (request.entryId) return { accepted: true as const, content: await acceptedContent(request), reference: reference(request) };
       if (request.query.context.supportKind !== 'visual' && request.embeddingVersion !== SPARC_INSTRUCTIONAL_NEED_VERSION) throw new Error('Pending primitive embedding requires reindexing');
       await verifyContent(content, request.query.context);
@@ -132,7 +149,7 @@ export function createMoveLibraryService(deps: { store: MoveStore; embeddingMode
       await store.saveEntry({ _id: id, version: SPARC_MOVE_LIBRARY_VERSION, context: request.query.context, kind: request.query.context.kind,
         embeddingModel: deps.embeddingModel, embeddingVersion: request.embeddingVersion!, embedding: request.embedding, content,
         requirements: request.query.context.requirements, target: request.query.context.target, move: request.query.context.move, createdAt: new Date() });
-      Object.assign(request, { entryId: id, source: 'generated', similarity: null });
+      Object.assign(request, { entryId: id, source: 'generated', similarity: null, contentUseKeys: sparcContentUseKeys(content, id) });
       const accepted = await store.saveRequest(request);
       return { accepted: true as const, content: accepted.entryId === id ? assignedContent(accepted, content) : await acceptedContent(accepted), reference: reference(accepted) };
     },

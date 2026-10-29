@@ -71,7 +71,7 @@ export const contentRuntimeMachineTransitionState = {
           actions: ['logStateTransition'],
         },
         onError: {
-          target: 'trackingPerformance',
+          target: `#contentRuntimeMachine.${STATES.ERROR}`,
           actions: ['logError', 'logStateTransition'],
         },
       },

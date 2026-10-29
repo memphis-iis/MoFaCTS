@@ -430,12 +430,7 @@ export function createServices() {
     try {
       return await serviceFn(context, event);
     } catch (error) {
-      clientConsole(1, LOG_PREFIXES.ERROR, `Service ${serviceFn.name || 'anonymous'} failed`, {
-        error,
-        context,
-        event,
-        input,
-      });
+      clientConsole(1, LOG_PREFIXES.ERROR, `Service ${serviceFn.name || 'anonymous'} failed`);
       throw error;
     }
   });

@@ -9,7 +9,6 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { ExperimentStateStore } from '../../../../lib/state/experimentStateStore';
-import { clientConsole } from '../../../../lib/clientLogger';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import type { ExperimentState } from '../../../../../common/types/experiment';
 import { assertIdInvariants, getCanonicalIdContext, logIdInvariantBreachOnce } from '../../../../lib/idContext';
@@ -172,33 +171,31 @@ export async function createExperimentState(
     stateToPersist,
     options,
   );
-  const nextState = persistedState || stateToPersist;
+  if (!persistedState || typeof persistedState !== 'object' || Array.isArray(persistedState)
+    || typeof persistedState.id !== 'string' || !persistedState.id.trim()) {
+    throw new Error('Required lesson state was not acknowledged as saved');
+  }
 
-  ExperimentStateStore.set(nextState);
-  return nextState.currentTdfId as string | undefined;
+  ExperimentStateStore.set(persistedState);
+  return persistedState.currentTdfId as string | undefined;
 }
 
 /**
  * XState service for initialization.
- * Only called once when the machine starts to ensure the shuffle is persisted.
+ * Existing resume state needs no write. Required initialization failures reject
+ * so the invoking machine must stop before accepting or advancing a trial.
  */
 export async function experimentStateService(
   _context: unknown,
   event: ExperimentStateServiceEvent
-): Promise<{ status: 'created' } | { status: 'error'; error: string }> {
-  try {
-    const initialState = event.stateUpdate || {};
-    // We only ever "create" if we don't have an ID yet. 
-    // If we have an ID, we're in resume mode and don't need to write anything.
-    const existing = ExperimentStateStore.get();
-    if (!existing || !existing.id) {
-      await createExperimentState(initialState);
-    }
-
-    return { status: 'created' };
-  } catch (error) {
-    clientConsole(1, '[Experiment State] Service error:', error);
-    const message = error instanceof Error ? error.message : String(error);
-    return { status: 'error', error: message };
+): Promise<{ status: 'created' }> {
+  const initialState = event.stateUpdate || {};
+  // We only ever "create" if we don't have an ID yet.
+  // If we have an ID, we're in resume mode and don't need to write anything.
+  const existing = ExperimentStateStore.get();
+  if (!existing || !existing.id) {
+    await createExperimentState(initialState);
   }
+
+  return { status: 'created' };
 }

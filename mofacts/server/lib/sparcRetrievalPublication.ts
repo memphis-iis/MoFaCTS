@@ -2,24 +2,20 @@ import { Meteor } from 'meteor/meteor';
 import { requireSparcLessonAccess } from './sparcLessonAccess';
 import type { MethodAuthorizationDeps } from './methodAuthorization';
 import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
-import { sparcRetrievalSelector } from './sparcRetrievalSelector';
-import { SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION, parseSparcRetrievalCategory, sparcRetrievalCategoryKey } from '../../common/lib/sparcRetrieval';
+import { ensureSparcContentUseCatalog } from './sparcContentUse';
+import type { SparcContentUseCollection } from './sparcContentUse';
+import { ensureSparcContentUseForUser, SparcMoveRequests } from './sparcMoveLibraryStorage';
+import { SparcFigureRequests } from './sparcFigureLibraryStorage';
+import { createSparcRetrievalPublicationHandler } from './sparcRetrievalPublicationHandler';
 
 export function registerSparcRetrievalPublication(getAuthorization: () => MethodAuthorizationDeps) {
-Meteor.publish('sparcRetrievalEmbeddings', async function(value: unknown, tdfId?: string) {
-  await requireSparcLessonAccess(getAuthorization(), this.userId, tdfId);
-  const category = parseSparcRetrievalCategory(value);
-  const prefix = `${sparcRetrievalCategoryKey(category)}:`;
-  let stopped = false;
-  let handle: { stop(): void | Promise<void> } | undefined;
-  this.onStop(() => { stopped = true; void handle?.stop(); });
-  // Intentional complete vector-only cache for this indexed category. Mongo batches transport;
-  // practice queries perform no database candidate paging, ranking, or content transfer.
-  handle = await SparcInstructionalLibrary.find(sparcRetrievalSelector(category), { fields: { embedding: 1 }, batchSize: 100 }).observeChanges({
-    added: (id: string, fields: { embedding?: number[] }) => { if (!stopped) this.added(SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION, prefix + id, fields); },
-    changed: (id: string, fields: { embedding?: number[] }) => { if (!stopped) this.changed(SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION, prefix + id, fields); },
-    removed: (id: string) => { if (!stopped) this.removed(SPARC_RETRIEVAL_EMBEDDINGS_COLLECTION, prefix + id); },
-  });
-  if (stopped) await handle!.stop(); else this.ready();
-});
+  Meteor.publish('sparcRetrievalEmbeddings', createSparcRetrievalPublicationHandler({
+    authorize: (userId, tdfId) => requireSparcLessonAccess(getAuthorization(), userId, tdfId),
+    initializeCatalog: () => ensureSparcContentUseCatalog(SparcInstructionalLibrary.rawCollection() as unknown as SparcContentUseCollection),
+    initializeUser: ensureSparcContentUseForUser,
+    observeMoves: async (selector, options, callbacks) => SparcMoveRequests.find(selector, options).observeChanges(callbacks),
+    observeVisuals: async (selector, options, callbacks) => SparcFigureRequests.find(selector, options).observeChanges(callbacks),
+    observeEntries: async (selector, options, callbacks) => SparcInstructionalLibrary.find(selector, options).observeChanges(callbacks),
+    unavailableError: () => new Meteor.Error('sparc-content-use-unavailable', 'Reopen this lesson: its content eligibility is unavailable.'),
+  }));
 }

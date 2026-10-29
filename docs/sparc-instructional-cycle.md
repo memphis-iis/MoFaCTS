@@ -1,5 +1,93 @@
 # SPARC instructional cycle
 
+## Approved same-user no-repeat requirement, October 28, 2026
+
+**Current source contract; production deployment is a separate operation.**
+This requirement addresses reuse of saved instructional content. It adds no
+paraphrase detector, semantic novelty evaluator or new similarity threshold.
+The sections below describe earlier implementations and do not override this rule.
+
+A new instructional turn must not deliver content already used for that user,
+across lessons and sessions. Shared library content can serve another user who
+has not received it. Reopening, retrying or restoring the same saved turn preserves
+its original accepted artifacts and is not a new instructional delivery. Existing
+history must not be rewritten to hide prior repetitions.
+
+This applies to every actual component: explanations; written examples, comparisons
+and tables; questions and answer choices; feedback; hints, pumps, assertions,
+summaries and other tutor utterances; images; and video segments. Repeated facts,
+the selected learning target and ordinary response-control labels are not themselves
+whole instructional components. The rule applies to complete content, including
+directly generated tutor output that bypasses the library.
+
+A matched instruction is eligible only when both its explanation and its support
+are eligible. A fresh instruction entry ID cannot make an old explanation or image
+new to the user. Exact component identities must be checked independently of the
+instruction's record identity. Changing
+multiple-choice option order or IDs does not make the same question new.
+
+Browser retrieval must choose the single maximum among eligible unseen candidates,
+using the existing category and similarity thresholds. If none qualifies, compose
+new material for the selected target, move and assistance level. The resulting
+material must pass the same no-repeat acceptance rule. Neither a link to earlier
+content nor a changed identifier satisfies it. Duplicate rejection must remain
+explicit; do not silently change the target, move, response format or media type,
+or add an automatic regeneration loop.
+
+The acceptance boundary enforces the rule while committing a content decision,
+so stale browser caches and simultaneous tabs cannot bypass it. Existing-user
+eligibility must include historical presentations; starting an empty cache is
+insufficient. A progress reset or content archival must not silently make used
+material unseen again. Account deletion must remove the user's no-repeat state.
+Initialization adds identity metadata in restartable pages of at most 100 records
+and keeps history immutable. Shared catalog records and accepted decisions carry
+`contentUseKeys`; exact component text/payload digests and media IDs are private
+metadata. The publication applies the authenticated user's eligibility before
+publishing candidate IDs and vectors. No usage ledger, answers or conversations
+are sent to the browser for this check.
+
+Existing accepted library and visual requests reserve their selected content for
+that user and turn. The same saved decision remains resumable, including when its
+presentation history has not yet committed. Canonical history owns the actual
+presented components under `sparc.stateTransition.writes[].value.node` and supplies
+original component snapshots for historical initialization. Composed/resolved drafts
+alone are not accepted delivery decisions. The retired exposure and manifest
+collections must not be revived as competing authorities. Eligibility metadata
+must have one explicit owner, indexed queries, atomic decision acceptance,
+bounded historical initialization, deletion/backup wiring and failure handling.
+
+`server/lib/sparcContentUse.ts` owns acceptance and metadata initialization through
+the existing request stores. Compact `presentation-use` receipts retain original
+component identities from actual saved output, including media inside matched
+instructions. Catalog revisions are not treated as proof of previously presented
+text. Existing decisions without an original saved snapshot retain their entry-ID
+exclusion; removed original data is not manufactured. Account deletion removes
+the records through the existing request owner. Restore clears the initialization
+checkpoint so actual restored decisions and history are reconciled again.
+
+Short snapshot/majority transactions serialize acceptance through an independent
+`contentUseRevision` on `HistoryCommitState`; they do not allocate practice sequence
+numbers or rebuild dashboard summaries. The history commit owner prepares metadata
+before an insertion and validates/persists presentation receipts within the same
+transaction as the output history. This also covers uncached hints, summaries and
+other directly generated messages. A rejection rolls back the receipt, history
+and sequence together. Provider calls are outside these transactions.
+
+An empty eligible browser index still calls the existing exact-event lookup before
+generation. An already accepted event returns its saved decision; an administrator
+revision cannot silently supply a changed payload in place of that decision. Actual
+saved conversations render their journaled nodes. Failed invariants remain explicit
+through the existing error UI; no reset requirement, deletion, semantic evaluator
+or automatic provider retry is added.
+
+Required acceptance coverage includes every component kind; new and retrieved
+material; any repeated part disqualifying a matched instruction; identical content
+under different IDs; unchanged questions with reordered choices; the same user
+across lessons, sessions, reset and archival; different-user eligibility;
+concurrent acceptance; failed writes; and idempotent saved-turn restoration.
+These checks concern actual saved content and exact component identities; no
+additional semantic judgment of newly generated wording is part of this change.
+
 ## Joint instruction composition and durable stages, October 24, 2026
 
 ### Assessment context and prompt-cache reuse
@@ -90,11 +178,12 @@ user-specific exposure records.
 
 ## Practice round-trip reduction, October 23, 2026
 
-A local cache miss returns its query and vector directly to generation without a
-server lookup or pending-request write. Publication validates this request under
-the authenticated account and saves its accepted decision. A hit still fetches
-and accepts the exact selected ID. Publication returns the already-held content
-when its decision wins; a concurrently accepted decision remains authoritative.
+A local cache miss asks the existing exact-event lookup whether a decision was
+already accepted before generating. It creates no pending-request write. Publication
+validates the generated request under the authenticated account and saves its
+accepted decision. A hit still fetches and accepts the exact selected ID.
+Publication returns the already-held content when its decision wins; a concurrently
+accepted decision remains authoritative.
 Persisted history restores presented components. If publication succeeded but
 history did not, a repeated generation may produce a draft; publication returns
 the existing accepted content before that content is journaled.
@@ -103,12 +192,13 @@ Canonical history is the sole record of presented components. Obsolete exposure
 and move-manifest projections and the separate `presentSparcPrimitive` method
 have been removed. Assessment batches retain atomic, idempotent persistence.
 Component persistence is still awaited and failures propagate. Excluding provider
-calls, a new generated component now uses publication plus history persistence
-(two calls rather than lookup, publication, history, presentation); a retrieved
-component uses selected-ID lookup plus history persistence (two rather than three).
+calls, a generated library component uses exact-event lookup, publication and
+history persistence; a retrieved component uses selected-ID lookup and history
+persistence. Exact-event lookup is necessary even when previously accepted content
+has been removed from the browser's eligible vectors.
 
-Visual primitives skip both primitive search and query embedding before their
-brief is generated. The later combined image/video search remains the only visual
+Visual primitives skip primitive search and query embedding before their brief
+is generated, while retaining exact-event decision lookup. The later combined image/video search remains the only visual
 search. When storing the visual component, the server reuses the selected media's
 existing vector for catalog browsing; it never stores an empty placeholder vector.
 Authored assessment target vectors, when more than four misconceptions require
@@ -129,9 +219,11 @@ not another stored library. Additions, vector changes and removals update the lo
 index. Account changes stop subscriptions and clear their normalized vectors.
 
 Each row is normalized once on cache insertion/update. Each lookup normalizes its
-query once, computes dot products in one pass, and returns exactly the maximum
-with deterministic ID ordering for ties. There is no candidate sorting, secondary
-evaluation, repetition rejection, or database paging during a practice search.
+query once, computes dot products in one pass over the user's eligible unseen
+candidates, and returns exactly the maximum with deterministic ID ordering for
+ties. There is no candidate sorting, semantic novelty evaluation or database
+paging during a practice search. Exact per-user use eligibility is enforced before
+vectors reach this search and again when content is accepted.
 Text component reuse uses 0.975 for feedback and 0.95 for other components, retaining
 the existing reading-level/question response-type categories. Images and matching-language videos compete in a single
 visual index with one query and a shared **0.95** threshold. An absent authored
@@ -951,7 +1043,7 @@ Provider comparison: one 16:9 confidence-interval figure per quality level, with
 
 Verification, October 12, 2026: all 227 isolated SPARC/rule/client/library contracts passed. Full-app typecheck passed. Lint passed with 28 existing ostrio-files warnings and no errors; the server dependency boundary, Meteor dependency manifest, and 312-surface security contract checks passed. The localhost admin student-selected lesson generated a new Medium Sunburst teaching figure, then reused its byte-identical image for a distinct E2 move after an intervening E3 move. The reused move generated a fresh explanation and isomorphic question from the saved figure. The new E3 question correctly tested definite containment of a fixed mean after an observed E2-target drift was repaired in the question prompt. Previous selected-choice markers remained visible. Cross-account authorization and reuse were verified by injected contracts, not a two-account browser walkthrough. Mongo-specific integration tests have been added but were not run; each full Meteor CI invocation requires fresh explicit authorization under AGENTS.md. No release, commit, or push is claimed.
 
-Asset lifecycle: the existing explicit admin asset-deletion path removes the matching library entry and per-learner decision metadata. Account deletion removes only that account's private figure decisions and preserves shared assets. These teardown callbacks are wired into the existing admin methods; no deletion was performed during this verification.
+Asset lifecycle: administrative asset deletion removes matching catalog content and media through the curation owner while preserving per-learner decisions. Account deletion removes only that account's private figure decisions and preserves shared assets. The original verification below predates the unified administrative-removal contract described later in this document.
 
 ## Authorized Meteor integration verification — October 12, 2026
 
@@ -1002,10 +1094,9 @@ validation, and matching live in `sparcMoveLibraryService.ts`,
   form the shared embedding input. Feedback adds the preceding question and learner
   answer; images add the illustration brief. Operational IDs and full prompt
   specifications are excluded.
-- The highest-similarity eligible candidate is reused. If that support already appeared
-  in this conversation, it becomes an accessible link and highlight of the original
-  support, with the prescribed move's unchanged assistance value. Saved decisions,
-  content validation, embedding-model consistency, and library exclusions remain enforced.
+- The highest-similarity eligible candidate is selected subject to the approved
+  same-user no-repeat requirement above. Earlier support does not become eligible
+  through a link or highlight. Historical saved decisions remain readable.
 - Written rich support uses primitive retrieval before generation and cannot reuse a
   video or image. New visual moves request a visual brief and resolve video, image,
   then generated image in that order, rather than reusing a complete cached rich
@@ -1317,6 +1408,8 @@ used manual reload. The current advisory size-warning contract is documented in 
 The instructional library has **Delete** and **Revise**, with no exclusion or deprecation state. Delete permanently removes the catalog entry. Image deletion removes its saved image and dependent support entries; video deletion removes dependent saved support. Completed-move manifests that reference deleted entries are removed because they are retrieval metadata, not learner history. Revision updates the current item in place. Text revisions replace its text and answer key as applicable; image revisions replace its raster and description. No parent links, predecessor records, old-version controls, or retained image revisions are supported.
 
 `server/lib/sparcLibraryCurationStorage.ts` owns deletion. Its content-free receipts contain only an ID, removal time, and transient cleanup markers while deletion is unfinished. They are outside the catalog and contain no text, embeddings, media, or learner data. Readers use these receipts to show **Administrative removal** in the original field rather than report an error or regenerate substitute content. An image field can be removed without erasing neighboring tutor text. Batched receipt lookup checks at most 100 exact IDs per request. A deleted multiple-choice question has no answer controls or replacement answer key. Unrelated missing/corrupt records and storage/network failures remain errors.
+
+The existing bulk uploaded-file deletion uses this same owner for SPARC teaching images, including generated image assets without a catalog entry. It records removal and cleans dependent catalog content before media deletion, preserving learner decisions, histories and model values. Its scope remains uploaded files and their dependent content; unrelated text and video library entries are not part of the bulk asset operation.
 
 The forward startup migration runs after collection consolidation. It removes existing `reusable: false` entries in pages of at most 100, records removal receipts, and unsets retired exclusion and predecessor fields on survivors. It also retires the old image-revision layout, keeping only the current image and deleting obsolete image assets and revision records. Catalog entries, shared manifests, and receipts change transactionally; image-file cleanup runs afterward and retains a retry marker until successful. A transient cleanup marker lets restart finish dependent and media deletion after the catalog item is removed. Restart repeats unfinished work safely, logs deletion counts and failures, and never edits learner histories, accepted decisions, exposures, or model state. Deletion is permanent: restoring content requires an operator backup, not a hidden archive or an Allow reuse control. The authorized existing-exclusion cleanup therefore has no in-app rollback.
 

@@ -3,14 +3,12 @@ import type {
   DashboardHistoryRecord,
   DashboardTdfStats,
 } from './dashboardCacheMethods.contracts';
-import { createStimulusKey, isBlankIdentityValue, isOperationalHistoryRecord, isModelPracticeHistoryRecord, operationalHistorySelector } from '../../common/historyEnvelope';
+import { createStimulusKey, isBlankIdentityValue, isOperationalHistoryRecord, isModelPracticeHistoryRecord } from '../../common/historyEnvelope';
 import { curSemester } from '../../common/Definitions';
+import type { DashboardHistoryRefreshResult } from '../lib/dashboardHistoryRefresh';
 import {
-  DASHBOARD_CACHE_VERSION,
-  DASHBOARD_LEVEL_UNIT_TYPES,
   computeSummaryStats,
   computeUsageSummary,
-  timestampValue,
 } from './dashboardCacheShared';
 import { createDashboardLearnerConfigMethods } from './dashboardLearnerConfigMethods';
 import { createDashboardPracticeSnapshotMethods } from './dashboardPracticeSnapshotMethods';
@@ -22,30 +20,12 @@ import {
 
 const DASHBOARD_ADMIN_REFRESH_CONCURRENCY = 4;
 const DASHBOARD_ADMIN_REFRESH_PROGRESS_INTERVAL = 10;
-const DASHBOARD_HISTORY_REBUILD_BATCH_SIZE = 1000;
-const DASHBOARD_HISTORY_REBUILD_PROGRESS_INTERVAL = 10000;
-const DASHBOARD_HISTORY_FIELDS = {
-  _id: 1,
-  outcome: 1,
-  CFEndLatency: 1,
-  CFFeedbackLatency: 1,
-  stimuliSetId: 1,
-  stimulusKC: 1,
-  recordedServerTime: 1,
-  time: 1,
-  TDFId: 1,
-  userId: 1,
-  levelUnitType: 1,
-  modelEvidenceSource: 1,
-  'sparc.stateTransition.transitionId': 1,
-  'sparc.stateTransition.event.eventId': 1,
-  'sparc.stateTransition.event.type': 1,
-};
 
 type DashboardCacheDeps = {
   Meteor: any;
   Roles: any;
-  Histories: any;
+  refreshDashboardHistory: (userId: string, options?: { forceRebuild?: boolean }) => Promise<DashboardHistoryRefreshResult>;
+  removeLessonHistory: (userId: string, tdfIds: string[]) => Promise<unknown>;
   GlobalExperimentStates?: any;
   Tdfs: any;
   Courses?: any;
@@ -57,7 +37,6 @@ type DashboardCacheDeps = {
   DynamicSettings: any;
   decryptData?: (value: string) => string;
   serverConsole: (...args: any[]) => void;
-  computePracticeTimeMs: ComputePracticeTimeMs;
   canViewDashboardTdf: (userId: unknown, tdf: any) => boolean;
   getAccessibleTdf: (userId: string, tdfId: string, options: any) => Promise<any>;
   redisBoundary: {
@@ -114,14 +93,6 @@ function getHistoryPracticeTimeMs(
   computePracticeTimeMs: ComputePracticeTimeMs
 ): number {
   return computePracticeTimeMs(record.CFEndLatency, record.CFFeedbackLatency);
-}
-
-function dashboardHistorySelector(extraSelector: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    ...extraSelector,
-    levelUnitType: { $in: DASHBOARD_LEVEL_UNIT_TYPES },
-    ...operationalHistorySelector(),
-  };
 }
 
 export function computeCacheStats(
@@ -289,7 +260,8 @@ export function createDashboardCacheMethods({
   getAccessibleTdf,
   Meteor,
   Roles,
-  Histories,
+  refreshDashboardHistory,
+  removeLessonHistory,
   GlobalExperimentStates,
   Tdfs,
   Courses,
@@ -301,7 +273,6 @@ export function createDashboardCacheMethods({
   DynamicSettings,
   decryptData,
   serverConsole,
-  computePracticeTimeMs,
   canViewDashboardTdf,
   redisBoundary
 }: DashboardCacheDeps) {
@@ -459,39 +430,6 @@ export function createDashboardCacheMethods({
     }
   }
 
-  async function removeLessonProgressFromCache(userId: string, cacheTdfIds: string[]) {
-    const cache = await UserDashboardCache.findOneAsync({ userId });
-    if (!cache?.tdfStats) {
-      return false;
-    }
-
-    const nextTdfStats = { ...(cache.tdfStats || {}) };
-    let changed = false;
-    for (const cacheTdfId of cacheTdfIds) {
-      if (Object.prototype.hasOwnProperty.call(nextTdfStats, cacheTdfId)) {
-        delete nextTdfStats[cacheTdfId];
-        changed = true;
-      }
-    }
-
-    if (!changed) {
-      return false;
-    }
-
-    await UserDashboardCache.updateAsync(
-      { _id: cache._id },
-      {
-        $set: {
-          tdfStats: nextTdfStats,
-          summary: computeSummaryStats(nextTdfStats),
-          usageSummary: computeUsageSummary(nextTdfStats),
-          lastUpdated: new Date()
-        }
-      }
-    );
-    return true;
-  }
-
   const practiceSnapshotMethods = createDashboardPracticeSnapshotMethods({
     Meteor,
     Tdfs,
@@ -519,229 +457,21 @@ export function createDashboardCacheMethods({
 
     initializeDashboardCache: async function(this: any, userId: string | null = null) {
       const targetUserId = userId || this.userId;
-      if (!targetUserId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in');
+      if (!targetUserId) throw new Meteor.Error('not-authorized', 'Must be logged in');
+      if (targetUserId !== this.userId && !(await Roles.userIsInRoleAsync(this.userId, ['admin']))) {
+        throw new Meteor.Error('not-authorized', 'Cannot initialize cache for other users');
       }
-
-      if (targetUserId !== this.userId) {
-        const isAdmin = await Roles.userIsInRoleAsync(this.userId, ['admin']);
-        if (!isAdmin) {
-          throw new Meteor.Error('not-authorized', 'Cannot initialize cache for other users');
-        }
-      }
-
-      return await redisBoundary.withLock(
-        `dashboard-cache:initialize:${targetUserId}`,
-        120000,
-        async () => {
-      serverConsole(`Initializing dashboard cache for user ${targetUserId}`);
-
-      const targetUser = await usersCollection.findOneAsync(
-        { _id: targetUserId },
-        { fields: { _id: 1 } }
-      );
-      if (!targetUser) {
+      if (!(await usersCollection.findOneAsync({ _id: targetUserId }, { fields: { _id: 1 } }))) {
         throw new Meteor.Error('not-found', 'Cannot initialize cache for missing user');
       }
-
-      const attemptedTdfIds = await Histories.rawCollection().distinct('TDFId', {
-        userId: targetUserId,
-        ...dashboardHistorySelector()
-      });
-
-      if (attemptedTdfIds.length === 0) {
-        await UserDashboardCache.upsertAsync(
-          { userId: targetUserId },
-          {
-            $set: {
-              userId: targetUserId,
-              tdfStats: {},
-              summary: {
-                totalTdfsAttempted: 0,
-                totalTrialsAllTime: 0,
-                totalTimeAllTime: 0,
-                overallAccuracyAllTime: 0,
-                lastActivityDate: null
-              },
-              usageSummary: computeUsageSummary({}),
-              lastUpdated: new Date(),
-              version: DASHBOARD_CACHE_VERSION
-            },
-            $setOnInsert: {
-              createdAt: new Date()
-            }
-          }
-        );
-        return { success: true, tdfCount: 0 };
-      }
-
-      const attemptedTdfs = await Tdfs.find({
-        _id: { $in: attemptedTdfIds }
-      }, {
-        fields: {
-          _id: 1,
-          'content.fileName': 1,
-          'content.tdfs.tutor.setspec.lessonname': 1
-        }
-      }).fetchAsync();
-
-      const rootTdfs = await lessonFamilies.findRootsForChildTdfs(attemptedTdfs as any[], {
-        _id: 1,
-        'content.tdfs.tutor.setspec.lessonname': 1,
-        'content.tdfs.tutor.setspec.condition': 1,
-        'content.tdfs.tutor.setspec.conditionTdfIds': 1
-      });
-
-      const childToRootMap = lessonFamilies.buildChildToRootMap(rootTdfs as any[], attemptedTdfs as any[]);
-      const rootTdfMap: Map<any, any> = new Map();
-      for (const rootTdf of rootTdfs as any[]) {
-        rootTdfMap.set(rootTdf._id, rootTdf);
-      }
-
-      const tdfMap: Map<any, any> = new Map((attemptedTdfs as any[]).map((t: any) => [t._id, t]));
-      const tdfStats: Record<string, any> = {};
-      let lastHistoryId: unknown = null;
-      let processedHistoryCount = 0;
-      while (true) {
-        const historySelector = {
-          userId: targetUserId,
-          TDFId: { $in: attemptedTdfIds },
-          ...dashboardHistorySelector(),
-          ...(lastHistoryId === null ? {} : { _id: { $gt: lastHistoryId } }),
-        };
-        const historyBatch: DashboardHistoryRecord[] = await Histories.find(historySelector, {
-          fields: DASHBOARD_HISTORY_FIELDS,
-          sort: { _id: 1 },
-          limit: DASHBOARD_HISTORY_REBUILD_BATCH_SIZE,
-        }).fetchAsync();
-        if (historyBatch.length === 0) {
-          break;
-        }
-
-        for (const record of historyBatch) {
-          const tdf = tdfMap.get(record.TDFId);
-          if (!tdf) continue;
-
-          const fileName = tdf.content?.fileName as string | undefined;
-          const rootTdfId =
-            (fileName ? childToRootMap.get(fileName) : undefined) ||
-            (record.TDFId ? childToRootMap.get(record.TDFId) : undefined);
-          const targetTdfId = rootTdfId || record.TDFId;
-          if (!targetTdfId) continue;
-
-          const rootTdf = rootTdfMap.get(targetTdfId);
-          const displayName = rootTdf?.content?.tdfs?.tutor?.setspec?.lessonname ||
-            tdfMap.get(targetTdfId)?.content?.tdfs?.tutor?.setspec?.lessonname ||
-            'Unnamed';
-          tdfStats[targetTdfId] = applyDashboardHistoryRecordToStats(
-            tdfStats[targetTdfId],
-            record,
-            displayName,
-            computePracticeTimeMs
-          );
-        }
-
-        processedHistoryCount += historyBatch.length;
-        lastHistoryId = historyBatch[historyBatch.length - 1]?._id ?? null;
-        if (lastHistoryId === null) {
-          throw new Error('Dashboard history rebuild encountered a row without an _id');
-        }
-        if (processedHistoryCount % DASHBOARD_HISTORY_REBUILD_PROGRESS_INTERVAL === 0) {
-          serverConsole(`[Cache] Processed ${processedHistoryCount} history rows for user ${targetUserId}`);
-        }
-        if (historyBatch.length < DASHBOARD_HISTORY_REBUILD_BATCH_SIZE) {
-          break;
-        }
-      }
-
-      const summary = computeSummaryStats(tdfStats);
-      const usageSummary = computeUsageSummary(tdfStats);
-
-      await UserDashboardCache.upsertAsync(
-        { userId: targetUserId },
-        {
-          $set: {
-            userId: targetUserId,
-            tdfStats,
-            summary,
-            usageSummary,
-            lastUpdated: new Date(),
-            version: DASHBOARD_CACHE_VERSION
-          },
-          $setOnInsert: {
-            createdAt: new Date()
-          }
-        }
-      );
-
-      serverConsole(`Cache initialized for user ${targetUserId}: ${Object.keys(tdfStats).length} TDFs`);
-      return { success: true, tdfCount: Object.keys(tdfStats).length };
-        }
-      );
+      return await redisBoundary.withLock(`dashboard-cache:ensure:${targetUserId}`, 120000,
+        async () => await refreshDashboardHistory(targetUserId, { forceRebuild: true }));
     },
 
     ensureDashboardCacheCurrent: async function(this: any) {
-      if (!this.userId) {
-        throw new Meteor.Error('not-authorized', 'Must be logged in');
-      }
-
-      const userId = this.userId;
-      return await redisBoundary.withLock(
-        `dashboard-cache:ensure:${userId}`,
-        120000,
-        async () => {
-          const cache = await UserDashboardCache.findOneAsync({ userId });
-          const cacheTdfCount = Object.keys(cache?.tdfStats || {}).length;
-          if (!cache) {
-            const result = await methods.initializeDashboardCache.call(this);
-            return {
-              success: true,
-              action: 'refreshed',
-              reason: 'missing',
-              tdfCount: result.tdfCount
-            };
-          }
-
-          const latestHistory = await Histories.findOneAsync(
-            {
-              userId,
-              ...dashboardHistorySelector()
-            },
-            {
-              fields: { recordedServerTime: 1, time: 1 },
-              sort: { recordedServerTime: -1, time: -1 }
-            }
-          );
-          const latestHistoryTimestamp = latestHistory ? historyRecordTimestamp(latestHistory) : 0;
-          const cacheUpdatedTimestamp = timestampValue(cache.lastUpdated);
-
-          if (latestHistoryTimestamp > cacheUpdatedTimestamp) {
-            const result = await methods.initializeDashboardCache.call(this);
-            return {
-              success: true,
-              action: 'refreshed',
-              reason: 'history-newer',
-              tdfCount: result.tdfCount
-            };
-          }
-
-          if (cache.version !== DASHBOARD_CACHE_VERSION) {
-            const result = await methods.initializeDashboardCache.call(this);
-            return {
-              success: true,
-              action: 'refreshed',
-              reason: 'version',
-              tdfCount: result.tdfCount
-            };
-          }
-
-          return {
-            success: true,
-            action: 'current',
-            tdfCount: cacheTdfCount
-          };
-        }
-      );
+      if (!this.userId) throw new Meteor.Error('not-authorized', 'Must be logged in');
+      return await redisBoundary.withLock(`dashboard-cache:ensure:${this.userId}`, 120000,
+        async () => await refreshDashboardHistory(this.userId));
     },
 
     refreshDashboardCache: async function(this: any) {
@@ -771,10 +501,7 @@ export function createDashboardCacheMethods({
       }
       await assertNoAssignedCourseReset(this.userId, scope);
 
-      const historyRemoved = await Histories.removeAsync({
-        userId: this.userId,
-        TDFId: { $in: scope.tdfKeys }
-      });
+      const historyRemoved = await removeLessonHistory(this.userId, scope.tdfKeys);
       const experimentStateRemoved = await GlobalExperimentStates.removeAsync({
         userId: this.userId,
         $or: [
@@ -784,7 +511,8 @@ export function createDashboardCacheMethods({
           { 'experimentState.conditionTdfId': { $in: scope.tdfKeys } }
         ]
       });
-      const cacheChanged = await removeLessonProgressFromCache(this.userId, scope.cacheTdfIds);
+      const repaired = await refreshDashboardHistory(this.userId, { forceRebuild: true });
+      const cacheChanged = repaired.action === 'refreshed';
 
       return {
         success: true,
@@ -874,6 +602,13 @@ export function createDashboardCacheMethods({
               summary,
               usageSummary,
               lastUpdated: new Date()
+            },
+            // Administrative pruning explicitly requests source reconstruction
+            // on the next dashboard entry; it cannot certify a processed prefix.
+            $unset: {
+              lastHistorySequence: '',
+              historyRepairRevision: '',
+              historyTdfTargets: '',
             }
           }
         );

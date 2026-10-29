@@ -1,4 +1,4 @@
-import { createBlocksGame, type BlocksGameState } from './blocksGameEngine';
+import { createBlocksGame, type BlocksGameState } from '../../../../../../learning-components/runtime/blocksGameEngine';
 
 let activeBlocksGame: BlocksGameState | null = null;
 

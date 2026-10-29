@@ -11,6 +11,7 @@ export type VideoSource = { _id: string; videoId: string; title: string; channel
   jobId?: string; ranges?: SparcVideoRange[]; complete?: boolean };
 export type VideoTargetState = CatalogTarget & { _id: string; sourceId?: string };
 export type VideoCatalogEntry = { _id: string; kind: 'video'; version: string; embeddingVersion: string; embeddingModel: string;
+  contentUseKeys?: string[];
   embedding: number[]; content: { text: string; video: import('../../../learning-components/runtime/sparcVideo').SparcVideoSegment };
   createdAt: Date; requirements: string; move: string; target: string };
 export interface VideoCatalogStore {

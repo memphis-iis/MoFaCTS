@@ -11,7 +11,7 @@ export const COLLECTION_OWNERSHIP = {
   SparcVideoTranscripts: { mongoName: 'sparc_video_transcripts', globalName: 'SparcVideoTranscripts', owner: 'sparc-video-catalog', purpose: 'Cached timestamped YouTube captions and resumable passage selection; no video bytes or learner data.' },
   SparcVideoCatalogTargets: { mongoName: 'sparc_video_catalog_targets', globalName: 'SparcVideoCatalogTargets', owner: 'sparc-video-catalog', purpose: 'Successful per-authored-target video selections and resumable preparation checkpoints.' },
   SparcInstructionalLibrary: { mongoName: 'sparc_instructional_library', globalName: 'SparcInstructionalLibrary', owner: 'sparc-instructional-library', purpose: 'Single shared repository of instructional components, including images, and their retrieval embeddings.' },
-  SparcMoveRequests: { mongoName: 'sparc_move_requests', globalName: 'SparcMoveRequests', owner: 'sparc-move-library', purpose: 'Private resumable primitive selection and generation requests.' },
+  SparcMoveRequests: { mongoName: 'sparc_move_requests', globalName: 'SparcMoveRequests', owner: 'sparc-move-library', purpose: 'Private resumable primitive decisions and compact historical-use receipts; accepted component identities enforce per-user no-repeat eligibility.' },
   SparcMoveExposures: { mongoName: 'sparc_move_exposures', globalName: 'SparcMoveExposures', owner: 'sparc-move-library', purpose: 'Retired exposure projection; only explicit user-data deletion accesses existing records.' },
   SparcMoveManifests: { mongoName: 'sparc_move_manifests', globalName: 'SparcMoveManifests', owner: 'sparc-move-library', purpose: 'Retired move manifests; no active readers or writers.' },
   SparcMoveLeases: { mongoName: 'sparc_move_leases', globalName: 'SparcMoveLeases', owner: 'sparc-move-library', purpose: 'Retired generation leases; retained for bounded cleanup only, not used during practice.' },
@@ -55,6 +55,13 @@ export const COLLECTION_OWNERSHIP = {
     globalName: 'Histories',
     owner: 'experiment-runtime',
     purpose: 'Trial history and learner response records.',
+  },
+  HistoryCommitState: {
+    mongoName: 'history_commit_state',
+    globalName: 'HistoryCommitState',
+    owner: 'experiment-runtime',
+    purpose: 'Per-user committed history sequence and repair revision, plus independent SPARC content-use serialization and initialization checkpoints.',
+    notes: 'Server-only. History sequences commit with history writes; contentUseRevision serializes content acceptance without advancing history sequence or dashboard repair state. Never publish or clear with a dashboard cache.',
   },
   StimulusCrowdStats: {
     mongoName: 'stimulus_crowd_stats',

@@ -1,5 +1,7 @@
 import { createSparcStateTransitionHistoryRecord } from '../../../../../../learning-components/units/sparcsession/sparcStateTransitionHistory';
 import { expect } from 'chai';
+// The domain suite is discovered through this app-owned Meteor test entry.
+import '../../../../../../learning-components/units/sparcsession/sparcDialogueOpenRouterAdapter.test';
 import type { SparcControllerDisplay } from './sparcController';
 import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
 import type { SparcInstructionComponents } from '../../../../../../learning-components/units/sparcsession/sparcInstructionalPrimitives';

@@ -10,6 +10,7 @@ import { createBackupManifest, sha256Hex } from './backupManifest';
 import { createLocalBackupStorage } from './backupStorage';
 import { createTarGzArchive, readTarGzArchive, type TarEntry } from './tarArchive';
 import { verifyBackupArchive } from './backupVerification';
+import { prepareDashboardHistoryRestore } from './dashboardHistoryRestore';
 import type { BackupComponentStatus, BackupJobDocument, BackupRegistry } from './backupTypes';
 
 type UnknownRecord = Record<string, unknown>;
@@ -270,10 +271,11 @@ async function restoreLocalDirectory(entries: TarEntry[], archivePrefix: string,
 }
 
 async function restoreMongoDatabase(deps: BackupServiceDeps, dump: { collections: Record<string, unknown[]> }) {
+  const restoredCollections = prepareDashboardHistoryRestore(dump.collections);
   const db = deps.rawDatabase();
   const existingCollections = await db.collections();
   const currentNames = new Set(existingCollections.map((collection) => collection.collectionName));
-  const dumpNames = new Set(Object.keys(dump.collections));
+  const dumpNames = new Set(Object.keys(restoredCollections));
   const targetNames = new Set([...currentNames, ...dumpNames]);
   for (const collectionName of targetNames) {
     if (collectionName.startsWith('system.') || CONTROL_PLANE_COLLECTIONS.has(collectionName)) {
@@ -281,7 +283,7 @@ async function restoreMongoDatabase(deps: BackupServiceDeps, dump: { collections
     }
     const collection = db.collection(collectionName);
     await collection.deleteMany({});
-    const docs = dump.collections[collectionName] || [];
+    const docs = restoredCollections[collectionName] || [];
     if (docs.length > 0) {
       await collection.insertMany(docs);
     }

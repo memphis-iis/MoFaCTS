@@ -10,6 +10,7 @@ export type SparcFigureLibraryEntry = {
   _id: string; kind?: 'image'; version: string; imageModel: string; embeddingModel: string; dimensions: number;
   situation: string; embedding: number[]; ready: boolean; createdAt: Date;
   embeddingVersion?: string;
+  contentUseKeys?: string[];
   generation?: { imagePrompt: string; tutorMessage: string; description: string; displayWidth: number };
 };
 export type SparcVisualDecision = {
@@ -17,6 +18,7 @@ export type SparcVisualDecision = {
   /** Existing image decision key; for video this holds the catalog segment identity. */
   assetId: string; source: 'generated' | 'semantic'; similarity: number | null; createdAt: Date;
   video?: SparcVideoSegment;
+  contentUseKeys?: string[];
 };
 export type SparcFigureLibraryStore = {
   inspectEntries: (assetIds: string[]) => Promise<SparcFigureInspection[]>;
@@ -45,7 +47,10 @@ export async function getOrGenerateSparcLibraryVisual(params: {
   const resume = (decision: SparcVisualDecision): SparcVisualLibraryResult => ({ assetId: decision.assetId, source: 'resume',
     similarity: decision.similarity, ...(decision.video ? { video: parseSparcVideoSegment(decision.video) } : {}) });
   const prior = await store.findDecision(params.identity, params.userId);
-  if (prior) return resume(prior);
+  if (prior) {
+    if (prior.userId !== params.userId || prior.tdfId !== params.tdfId || prior.sessionId !== params.sessionId) throw new Error('Visual decision ownership mismatch');
+    return resume(prior);
+  }
   if (params.selection) {
     if (!Number.isFinite(params.selection.similarity) || params.selection.similarity < SPARC_VISUAL_MINIMUM_SIMILARITY || params.selection.similarity > 1) throw new Error('Visual selection must meet the 0.95 threshold');
     const selected = await store.findVisual(params.selection.entryId, params.language);
@@ -53,6 +58,7 @@ export async function getOrGenerateSparcLibraryVisual(params: {
     const video = 'video' in selected ? parseSparcVideoSegment(selected.video) : undefined;
     await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId, tdfId: params.tdfId,
       sessionId: params.sessionId, assetId: params.selection.entryId, ...(video ? { video } : {}),
+      contentUseKeys: [video ? `video:${video.segmentId}` : `image:${params.selection.entryId}`],
       source: 'semantic', similarity: params.selection.similarity, createdAt: new Date() });
     const accepted = await store.findDecision(params.identity, params.userId);
     if (!accepted) throw new Error('Visual decision was not saved');
@@ -72,7 +78,8 @@ export async function getOrGenerateSparcLibraryVisual(params: {
   entry.ready = true; delete entry.generation;
   await store.saveEntry(entry);
   await store.saveDecision({ _id: params.identity, kind: 'decision', userId: params.userId, tdfId: params.tdfId,
-    sessionId: params.sessionId, assetId: entry._id, source: 'generated', similarity: null, createdAt: new Date() });
+    sessionId: params.sessionId, assetId: entry._id, source: 'generated', similarity: null, createdAt: new Date(),
+    contentUseKeys: [`image:${entry._id}`] });
   const accepted = await store.findDecision(params.identity, params.userId);
   if (!accepted) throw new Error('Generated visual decision was not saved');
   return { ...resume(accepted), source: accepted.assetId === entry._id ? 'generated' : 'resume', usage: generated.usage };

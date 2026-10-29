@@ -69,6 +69,7 @@ function createAdminDeps(
     UserMetrics: { removeAsync: async () => 0 },
     PasswordResetTokens: { removeAsync: async () => 0 },
     UserDashboardCache: { removeAsync: async () => 0 },
+    HistoryCommitState: { removeAsync: async () => 0 },
     UserUploadQuota: { removeAsync: async () => 0 },
     requireAdminUser: async () => undefined,
     normalizeCanonicalEmail: (rawEmail: unknown) => {
@@ -89,7 +90,7 @@ function createAdminDeps(
     getUserDisplayIdentifier: (user: any) => String(user?.username || user?._id || ''),
     syncUsernameCaches: () => undefined,
     deleteTdfRuntimeData: async () => undefined,
-    removeSparcFigureAssetMetadata: async () => undefined,
+    removeUploadedAsset: async () => undefined,
     removeSparcFigureUserDecisions: async () => undefined,
     clearStimDisplayTypeMap: () => undefined,
     encryptData: (value: string) => `encrypted:${value}`,
@@ -101,6 +102,24 @@ function createAdminDeps(
 }
 
 describe('adminMethods', function() {
+  it('delegates bulk asset removal to its owner without deleting learner decisions', async function() {
+    const removedAssets: string[] = [];
+    const deps = createAdminDeps();
+    const methods = createAdminMethods({
+      ...deps,
+      DynamicAssets: {
+        ...deps.DynamicAssets,
+        find: () => ({ countAsync: async () => 2, fetchAsync: async () => [{ _id: 'teaching-image' }, { _id: 'uploaded-file' }] }),
+        removeAsync: async () => { throw new Error('Bulk removal must use the asset owner'); },
+      },
+      removeUploadedAsset: async id => { removedAssets.push(id); },
+      removeSparcFigureUserDecisions: async () => { throw new Error('Bulk content removal must preserve learner decisions'); },
+    });
+
+    expect(await methods.deleteAllFiles.call({ userId: 'admin-user' })).to.equal(2);
+    expect(removedAssets).to.deep.equal(['teaching-image', 'uploaded-file']);
+  });
+
   it('lists only uploaded SPARC pages compatible with the compound-interest evaluation', async function() {
     const compatibleDisplay = {
       unitType: 'sparc-autotutor-dialogue',

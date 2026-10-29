@@ -3,6 +3,9 @@ import { expect } from 'chai';
 import type { SparcPrimitiveQuery, SparcPrimitiveTicket } from '../../../../../../learning-components/runtime/sparcMoveLibraryContract';
 import { Meteor } from 'meteor/meteor';
 import { createSparcMoveLibraryClient, readSparcAdministrativeRemovals } from './sparcMoveLibraryClient';
+import { SparcEmbeddingIndex } from '../../../../../../learning-components/runtime/sparcEmbeddingIndex';
+import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
+import { realizeSparcPrimitive } from './sparcPrimitiveRealization';
 
 describe('Content-removal lookup diagnostics', () => {
   it('returns successful removal reads without reporting a failure', async () => {
@@ -74,5 +77,49 @@ describe('Instruction publication embedding ownership', () => {
       expect(publications).to.equal(2);
       expect(checkpointTicket).not.to.have.property('embedding');
     } finally { Meteor.callAsync = originalCall; Meteor.userId = originalUser; }
+  });
+
+  it('restores an accepted event removed from the eligible index after an interrupted history write without generating again', async () => {
+    const originalCall = Meteor.callAsync, originalUser = Meteor.userId;
+    const calls: string[] = [];
+    const content = { text: 'The accepted explanation remains authoritative.' };
+    const reference = { entryId: 'already-used-entry', version: 'sparc-moves-v1', source: 'generated' as const, similarity: null };
+    Meteor.userId = () => 'lost-history-ack-user';
+    Meteor.callAsync = (async (name: string, _payload: unknown, selection: unknown) => {
+      calls.push(name);
+      if (name === 'callResolvedOpenRouterEmbeddings') return { embeddings: [[1, 0]] };
+      assert.equal(name, 'lookupSparcPrimitive'); assert.equal(selection, null);
+      return { status: 'hit', content, reference };
+    }) as typeof Meteor.callAsync;
+    try {
+      const request = { selectedAction: { snapshotId: 'accepted-event' }, targetId: 'species', action: 'explain',
+        contentTexts: ['Isolation'], targetContent: ['Isolation'], dialogueHistory: [], learnerText: '',
+        moveDefinition: { assistance: 1.55, responseFormat: 'text' } } as unknown as SparcUtteranceRequest;
+      const library = createSparcMoveLibraryClient(async () => new SparcEmbeddingIndex());
+      let generated = 0;
+      const params = { request, kind: 'explanation' as const, dependencies: null, tdfId: 'lost-history-ack-lesson', sessionId: 'attempt', library,
+        generate: async () => { generated++; throw new Error('Accepted content must not be generated again'); } };
+      await assert.rejects(realizeSparcPrimitive({ ...params, persist: async () => { throw new Error('Interrupted journal'); } }), /Interrupted journal/);
+      let restored: unknown;
+      await realizeSparcPrimitive({ ...params, persist: async (saved, savedReference) => { restored = { content: saved, reference: savedReference }; } });
+      assert.equal(generated, 0);
+      assert.deepEqual(restored, { content, reference });
+      assert.deepEqual(calls, ['callResolvedOpenRouterEmbeddings', 'lookupSparcPrimitive', 'lookupSparcPrimitive']);
+    } finally { Meteor.callAsync = originalCall; Meteor.userId = originalUser; }
+  });
+
+  it('checks a visual primitive accepted event before composing a new brief without embedding or searching twice', async () => {
+    const originalCall = Meteor.callAsync;
+    const accepted = { status: 'hit', content: { text: 'Saved figure support.' }, reference: { entryId: 'visual-entry' } };
+    let lookedUp = 0;
+    Meteor.callAsync = (async (name: string, _query: unknown, selection: unknown, embedding: unknown) => {
+      assert.equal(name, 'lookupSparcPrimitive'); assert.equal(selection, null); assert.deepEqual(embedding, []);
+      lookedUp++; return accepted;
+    }) as typeof Meteor.callAsync;
+    try {
+      const client = createSparcMoveLibraryClient(async () => { throw new Error('The visual resource search follows the brief, not primitive resume'); });
+      const result = await client.lookup({ context: { kind: 'richContent', supportKind: 'visual' } } as SparcPrimitiveQuery);
+      assert.deepEqual(result, accepted); assert.equal(lookedUp, 1);
+    } finally { Meteor.callAsync = originalCall; }
   });
 });

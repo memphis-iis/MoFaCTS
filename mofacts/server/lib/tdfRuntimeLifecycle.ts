@@ -9,9 +9,7 @@ type TdfRuntimeLifecycleDeps = {
     find: (selector: UnknownRecord, options?: UnknownRecord) => CollectionCursor<UnknownRecord>;
     removeAsync: (selector: UnknownRecord) => Promise<unknown>;
   };
-  Histories: {
-    updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options: UnknownRecord) => Promise<unknown>;
-  };
+  archiveHistory: (tdfId: string) => Promise<unknown>;
   GlobalExperimentStates: {
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options: UnknownRecord) => Promise<unknown>;
   };
@@ -50,7 +48,7 @@ export function createTdfRuntimeLifecycleHelpers(deps: TdfRuntimeLifecycleDeps) 
     // The selector makes retrying deletion preserve its original archive time.
     const selector = { TDFId: normalizedTdfId, tdfDeletedAt: { $exists: false } };
     const modifier = { $set: { tdfDeletedAt: new Date() } };
-    await deps.Histories.updateAsync(selector, modifier, { multi: true });
+    await deps.archiveHistory(normalizedTdfId);
     await deps.GlobalExperimentStates.updateAsync(selector, modifier, { multi: true });
 
     for (const assignmentId of affectedAssignmentIds) {

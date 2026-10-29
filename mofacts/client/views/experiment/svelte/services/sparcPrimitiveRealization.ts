@@ -1,18 +1,13 @@
-import { primitiveContext, instructionalNeed, previousSparcQuestions, type SparcMoveLibraryClient, type SparcPrimitiveKind, type SparcPrimitiveContent,
+import { primitiveContext, instructionalNeed, previousSparcQuestions, type SparcPrimitiveContent,
   type SparcPrimitiveReference, type SparcPrimitiveQuery } from '../../../../../../learning-components/units/sparcsession/sparcMoveLibrary';
-import type { SparcUtteranceRequest } from '../../../../../../learning-components/units/sparcsession/sparcUtteranceRequest';
+import type { SparcDialogueAdapterRuntime } from '../../../../../../learning-components/units/sparcsession/sparcDialogueOpenRouterAdapter';
 import { sparcInstructionalNeedText } from '../../../../../../learning-components/runtime/sparcInstructionalNeed';
 import { clientConsole } from '../../../../lib/clientLogger';
-import type { SparcReadingLevel } from '../../../../../../learning-components/runtime/sparcReadingLevel';
 
 /** Retrieval and generation share their context; the accepted content is journaled before exposure. */
-export async function realizeSparcPrimitive(params: {
-  request: SparcUtteranceRequest; kind: SparcPrimitiveKind; dependencies: unknown;
-  readingLevel?: SparcReadingLevel;
-  tdfId: string; sessionId: string; library: SparcMoveLibraryClient;
-  generate(previousQuestions?: SparcPrimitiveQuery['previousQuestions']): Promise<SparcPrimitiveContent>;
-  persist(content: SparcPrimitiveContent, reference: SparcPrimitiveReference): Promise<void>;
-}): Promise<SparcPrimitiveContent> {
+export async function realizeSparcPrimitive(
+  params: Parameters<SparcDialogueAdapterRuntime['realizePrimitive']>[0],
+): Promise<SparcPrimitiveContent> {
   const callStartedAtMs = Date.now();
   const callStartedAt = new Date(callStartedAtMs).toISOString();
   const callStartedAtMonotonic = performance.now();

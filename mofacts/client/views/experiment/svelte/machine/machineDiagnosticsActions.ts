@@ -36,7 +36,7 @@ export function logStateTransition({ context: _context, event, self }: ActionArg
   }
 }
 
-export function logError({ context, event }: ActionArgs) {
+export function logError({ event }: ActionArgs) {
   const rawType = typeof event?.type === 'string' ? event.type : '';
   const source = event?.source ||
     (rawType.startsWith('error.platform.') ? rawType.replace('error.platform.', '') : rawType) || 'unknown';
@@ -46,10 +46,7 @@ export function logError({ context, event }: ActionArgs) {
     return;
   }
 
-  clientConsole(1, LOG_PREFIXES.ERROR, `Error from ${source}:`, error);
-  if (!error) {
-    clientConsole(1, LOG_PREFIXES.ERROR, 'Error event details:', event, { context });
-  }
+  clientConsole(1, LOG_PREFIXES.ERROR, `Error from ${source}`);
 }
 
 export const errorActions = [

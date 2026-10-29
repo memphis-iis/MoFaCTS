@@ -1,7 +1,8 @@
 /*
  * Adapted from viliceq/10block (MIT), commit
  * 93dfa7eaf785043d038a4e5f20ba358d90f6edd9.  See docs/licenses/10block-MIT.txt.
- * This module intentionally contains only renderer-independent game mechanics.
+ * Owns renderer-independent placement, scoring, question gating and replenishment.
+ * The app supplies game state and, when needed, a random source returning [0, 1).
  */
 
 export const BLOCKS_BOARD_SIZE = 10;
@@ -92,16 +93,29 @@ export function blocksHasLegalPlacement(board: BlocksBoard, tray: readonly (Bloc
 export function createBlocksTray(random = Math.random): BlocksPiece[] {
   const families = Object.entries(WEIGHTS) as [BlocksPieceFamily, number][];
   const total = families.reduce((sum, [, weight]) => sum + weight, 0);
+  const draw = () => {
+    const value = random();
+    if (!Number.isFinite(value) || value < 0 || value >= 1) {
+      throw new Error('Blocks random source must return a finite value in [0, 1)');
+    }
+    return value;
+  };
+  const choose = (candidates: readonly BlocksPiece[]): BlocksPiece => {
+    const piece = candidates[Math.floor(draw() * candidates.length)];
+    if (!piece) throw new Error('Blocks piece selection requires a nonempty family');
+    return piece;
+  };
   const sample = () => {
-    let cursor = random() * total;
-    const family = families.find(([, weight]) => (cursor -= weight) < 0)?.[0] || 'single';
+    let cursor = draw() * total;
+    const family = families.find(([, weight]) => (cursor -= weight) < 0)?.[0];
+    if (!family) throw new Error('Blocks weighted selection did not resolve a piece family');
     const candidates = BLOCKS_PIECES.filter((piece) => piece.family === family);
-    return candidates[Math.floor(random() * candidates.length)] || BLOCKS_PIECES[0]!;
+    return choose(candidates);
   };
   const tray = [sample(), sample(), sample()];
   if (!tray.some((piece) => EASY_FAMILIES.has(piece.family))) {
     const easy = BLOCKS_PIECES.filter((piece) => EASY_FAMILIES.has(piece.family));
-    tray[0] = easy[Math.floor(random() * easy.length)] || tray[0]!;
+    tray[0] = choose(easy);
   }
   return tray;
 }

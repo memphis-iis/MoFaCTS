@@ -8,6 +8,8 @@ import type { SparcVisualDecision, SparcFigureLibraryEntry, SparcFigureLibrarySt
 import { invalidateSparcFigureBrowse } from './sparcFigureBrowseStorage';
 import { SparcInstructionalLibrary } from './sparcInstructionalLibraryStorage';
 import { isSparcAdministrativeRemoval } from './sparcLibraryCurationStorage';
+import { sparcCatalogUseKeys } from './sparcContentUse';
+import { getSparcContentUseStorage } from './sparcContentUseMongo';
 
 // Server-only. No embeddings, situation records, or learner decision ledger are published.
 // Typed image adapter; this does not create another collection or repository.
@@ -21,12 +23,6 @@ export async function ensureSparcFigureLibraryIndexes() {
   await SparcFigureLibrary.rawCollection().createIndex({ kind: 1, embeddingModel: 1, embeddingVersion: 1, ready: 1, _id: 1 });
   await SparcFigureRequests.rawCollection().createIndex({ kind: 1, userId: 1, assetId: 1 });
   await SparcFigureRequests.rawCollection().createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, partialFilterExpression: { kind: 'lease' } });
-}
-
-export async function removeSparcFigureAssetMetadata(assetId: string): Promise<void> {
-  const removed = await SparcFigureLibrary.removeAsync({ _id: assetId });
-  if (removed) await invalidateSparcFigureBrowse();
-  await SparcFigureRequests.removeAsync({ kind: 'decision', assetId });
 }
 
 export async function removeSparcFigureUserDecisions(userId: string): Promise<void> {
@@ -72,13 +68,11 @@ export function createSparcFigureLibraryStore(): SparcFigureLibraryStore {
       const decision = await SparcFigureRequests.findOneAsync({ _id: identity, kind: 'decision', userId });
       return decision?.kind === 'decision' ? decision : undefined;
     },
-    async saveDecision(decision) {
-      await SparcFigureRequests.rawCollection().updateOne({ _id: decision._id }, { $setOnInsert: decision }, { upsert: true });
-    },
+    saveDecision: decision => getSparcContentUseStorage().saveDecision(decision),
     async findEntry(assetId) { return await SparcFigureLibrary.findOneAsync(assetId) ?? undefined; },
     async saveEntry(entry) {
       if (await isSparcAdministrativeRemoval(entry._id)) throw new Error('Cannot restore administratively removed content');
-      await SparcFigureLibrary.rawCollection().replaceOne({ _id: entry._id }, { ...entry, kind: 'image' } as SparcFigureLibraryEntry, { upsert: true });
+      await SparcFigureLibrary.rawCollection().replaceOne({ _id: entry._id }, { ...entry, kind: 'image', contentUseKeys: sparcCatalogUseKeys({ ...entry, kind: 'image' }) } as SparcFigureLibraryEntry, { upsert: true });
       if (entry.ready) await invalidateSparcFigureBrowse();
     },
     async findVisual(id, language) {

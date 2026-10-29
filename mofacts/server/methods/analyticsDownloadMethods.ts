@@ -7,7 +7,8 @@ import {
   type MethodAuthorizationDeps,
 } from '../lib/methodAuthorization';
 import { createOwnHistoryDownloadToken } from '../lib/ownHistoryDownloadTokens';
-import { assertConditionFilenameIdAlignment, validateConditionFamilyTutor } from '../../common/lib/tdfIdentityContract';
+import { resolveOwnedHistoryDownloadScope } from '../lib/ownedHistoryDownloadScope';
+import { createOwnedHistoryDownloadToken } from '../lib/ownedHistoryDownloadTokens';
 
 type UnknownRecord = Record<string, unknown>;
 type MethodContext = {
@@ -27,12 +28,6 @@ type AnalyticsDownloadDeps = {
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
   };
   getMethodAuthorizationDeps: () => MethodAuthorizationDeps;
-  createExperimentExport: (keys: unknown[], userId: string) => Promise<string>;
-  createExperimentExportByTdfIds: (tdfIds: string[], userId: string) => Promise<string>;
-  createExperimentExportFromHistories: (histories: any[]) => Promise<string>;
-  getTdfIdsByOwnerId: (ownerId: string) => Promise<string[] | null>;
-  assertUserOwnsTdfs: (userId: string, keys: unknown[]) => Promise<unknown>;
-  canDownloadOwnedTdfData: (userId: string, tdf: any) => boolean;
 };
 
 function sanitizeFileNameSegment(value: unknown, defaultValue: string) {
@@ -56,16 +51,8 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
         forbiddenCode: 403,
       });
 
-      const ownedTdfs = await deps.getTdfIdsByOwnerId(targetUserId);
-      if (!ownedTdfs) {
-        throw new Meteor.Error(500, 'Failed to resolve owned TDFs for download');
-      }
-      const uniqueTdfs = ownedTdfs.filter((value: string, index: number, allValues: string[]) => allValues.indexOf(value) === index);
-
-      if (uniqueTdfs.length === 0) {
-        throw new Meteor.Error(404, 'No owned TDFs found for current user');
-      }
-      await deps.assertUserOwnsTdfs(targetUserId, uniqueTdfs);
+      const request = { kind: 'owned-lessons' } as const;
+      const { tdfIds } = await resolveOwnedHistoryDownloadScope(deps, targetUserId, request);
 
       const user = await deps.usersCollection.findOneAsync({ _id: targetUserId }, { fields: { username: 1, emails: 1 } });
       if (!user) {
@@ -74,8 +61,7 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
       const userName = sanitizeFileNameSegment(user.username || user.emails?.[0]?.address || targetUserId, targetUserId);
       const fileName = `learning-data_${userName}_all-lessons.tsv`;
 
-      const tsvContent = await deps.createExperimentExport(uniqueTdfs, targetUserId);
-      return { fileName, contentType: 'text/tab-separated-values', content: tsvContent };
+      return { fileName, contentType: 'text/tab-separated-values', downloadUrl: createOwnedHistoryDownloadToken(targetUserId, request, tdfIds, fileName).url };
     },
 
     downloadOwnHistoryAcrossTdfs: async function(this: MethodContext) {
@@ -117,48 +103,10 @@ export function createAnalyticsDownloadMethods(deps: AnalyticsDownloadDeps) {
         throw new Meteor.Error(401, 'Must be logged in');
       }
 
-      const tdf = await deps.Tdfs.findOneAsync({ _id: tdfId });
-      if (!tdf) {
-        throw new Meteor.Error(404, 'TDF not found');
-      }
-      if (!deps.canDownloadOwnedTdfData(this.userId, tdf)) {
-        throw new Meteor.Error(403, 'Not authorized to download data for this TDF');
-      }
-
-      const lessonName = tdf.content?.tdfs?.tutor?.setspec?.lessonname || `tdf-${tdfId}`;
+      const request = { kind: 'lesson', tdfId, includeConditions } as const;
+      const { tdfIds, lessonName } = await resolveOwnedHistoryDownloadScope(deps, this.userId, request);
       const fileName = `${sanitizeFileNameSegment(lessonName, `tdf-${tdfId}`)}-data.tsv`;
-
-      const exportTdfIds = new Set<string>([tdfId]);
-      if (includeConditions) {
-        const familyValidation = validateConditionFamilyTutor(tdf.content?.tdfs?.tutor, { requireCanonicalIds: true });
-        if (familyValidation.errors.length > 0) {
-          throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
-        }
-        const ownedConditionDocs = familyValidation.conditionTdfIds.length > 0
-          ? await deps.Tdfs.find(
-              { _id: { $in: familyValidation.conditionTdfIds }, ownerId: tdf.ownerId },
-              { fields: { _id: 1, 'content.fileName': 1 } }
-            ).fetchAsync()
-          : [];
-        const childFileNameById = new Map<string, string>(ownedConditionDocs.map((doc: any) => [
-          String(doc._id),
-          typeof doc?.content?.fileName === 'string' ? doc.content.fileName.trim() : '',
-        ]));
-        if (
-          ownedConditionDocs.length !== familyValidation.conditionTdfIds.length
-          || assertConditionFilenameIdAlignment(
-            familyValidation.conditionFileNames,
-            familyValidation.conditionTdfIds,
-            childFileNameById,
-          ).length > 0
-        ) {
-          throw new Meteor.Error('tdf-identity-repair-required', 'This lesson family requires an identity repair.');
-        }
-        for (const child of ownedConditionDocs) exportTdfIds.add(String(child._id));
-      }
-
-      const tsvContent = await deps.createExperimentExportByTdfIds([...exportTdfIds], this.userId);
-      return { fileName, contentType: 'text/tab-separated-values', content: tsvContent };
+      return { fileName, contentType: 'text/tab-separated-values', downloadUrl: createOwnedHistoryDownloadToken(this.userId, request, tdfIds, fileName).url };
     },
   };
 }

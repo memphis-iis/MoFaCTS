@@ -1,5 +1,5 @@
+import { createStimClusterMapping } from '../../content/tdf/clusterMapping';
 import {
-  createStimClusterMapping,
   legacyInt,
   loadAssessmentSettings,
   randomChoice,
