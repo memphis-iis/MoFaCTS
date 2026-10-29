@@ -14,8 +14,12 @@ test('Phase 0 manifest: reviewed brand and progressive surfaces retain explicit 
     'importDeploymentBrandProfileDraft', 'publishDeploymentBrandProfile', 'saveDeploymentBrandProfileDraft']) {
     assert.deepEqual(manifest.methods.filter((entry) => entry.name === name), [{ name, access: 'admin-only' }]);
   }
+  assert.deepEqual(manifest.methods.filter((entry) => entry.name === 'getProgressiveAssignmentLaunch'), [{
+    name: 'getProgressiveAssignmentLaunch',
+    access: 'authenticated-self',
+    notes: 'Cached course availability is not authorization. Before returning member lesson content, the server verifies the current course, current owner/admin status or live section enrollment, course dates and assignment release.',
+  }]);
   for (const [kind, name, access] of [
-    ['methods', 'getProgressiveAssignmentLaunch', 'authenticated-self'],
     ['publications', 'deploymentBrandProfile', 'public'],
     ['exports', 'method:exportDeploymentBrandProfile', 'admin-only'],
   ]) assert.deepEqual(manifest[kind].filter((entry) => entry.name === name), [{ name, access }]);
