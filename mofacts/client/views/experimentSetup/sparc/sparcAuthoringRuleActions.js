@@ -9,11 +9,11 @@ import {
   parseLooseValue,
   replaceObjectContents,
   updateAddressTemplateValue,
-} from './sparcAuthoringEditPrimitives';
+} from './sparcAuthoringEditPrimitives.js';
 import {
   ruleTypeFromCatalogEntry,
   scopedConditionForNode,
-} from './sparcAuthoringRuleModel';
+} from './sparcAuthoringRuleModel.js';
 
 export function createScopedProductionRule({ rules, nodeId, entryId }) {
   const rule = defaultProductionRule(rules.length);

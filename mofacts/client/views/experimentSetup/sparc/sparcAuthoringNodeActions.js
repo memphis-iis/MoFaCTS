@@ -4,8 +4,8 @@ import {
   nodeIsTopLevelFlow,
   normalizePlacementOrder,
   topLevelFlowUsesOrder,
-} from './sparcAuthoringDragDrop';
-import { flattenNodes } from './sparcAuthoringTargets';
+} from './sparcAuthoringDragDrop.js';
+import { flattenNodes } from './sparcAuthoringTargets.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 

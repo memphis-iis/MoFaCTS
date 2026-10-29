@@ -2,8 +2,8 @@ import {
   markerFromRect,
   nearestCandidate,
   targetLabel,
-} from './sparcAuthoringDragDrop';
-import { ensurePanelSelectorPanel } from './sparcAuthoringNodeActions';
+} from './sparcAuthoringDragDrop.js';
+import { ensurePanelSelectorPanel } from './sparcAuthoringNodeActions.js';
 
 function candidateElementEntries(surface, predicate, findNodeEntry) {
   return Array.from(surface.querySelectorAll('[data-node-id]'))

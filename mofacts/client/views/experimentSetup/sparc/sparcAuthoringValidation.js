@@ -5,7 +5,7 @@ import {
 import {
   flattenNodes,
   nodeClusterIndices,
-} from './sparcAuthoringTargets';
+} from './sparcAuthoringTargets.js';
 
 function validClusterIndicesForSave(clusters) {
   const valid = new Set();
