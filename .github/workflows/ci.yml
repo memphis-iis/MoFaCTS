@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24.15.0'
+          node-version: '24.22.1'
           cache: npm
           cache-dependency-path: mofacts/package-lock.json
 
@@ -52,25 +52,25 @@ jobs:
               `workspace=${result.workspace}\ntest_app=${path.join(result.workspace, "test-context", "mofacts")}\n`);
           '
 
-      - name: Install Meteor 3.5
+      - name: Install Meteor 3.5.4
         working-directory: ${{ steps.capture.outputs.test_app }}
-        run: curl https://install.meteor.com/?release=3.5 | sh
+        run: curl https://install.meteor.com/?release=3.5.4 | sh
 
       - name: Assert framework toolchain
         working-directory: ${{ steps.capture.outputs.test_app }}
         run: |
-          test "$(meteor --version)" = "Meteor 3.5"
-          test "$(meteor node --version)" = "v24.15.0"
-          test "$(meteor npm --version)" = "11.12.1"
-          test "$(node --version)" = "v24.15.0"
-          test "$(npm --version)" = "11.12.1"
+          test "$(meteor --version)" = "Meteor 3.5.4"
+          test "$(meteor node --version)" = "v24.22.1"
+          test "$(meteor npm --version)" = "11.19.1"
+          test "$(meteor node -p 'process.versions.undici')" = "7.30.1"
+          test "$(node --version)" = "v24.22.1"
+          test "$(npm --version)" = "11.19.1"
+          test "$(node -p 'process.versions.undici')" = "7.30.1"
 
-      - name: Install application and locked Meteor package dependencies
+      - name: Install application dependencies
         working-directory: ${{ steps.capture.outputs.test_app }}
         run: |
           npm ci
-          node --test scripts/installRspackPackageDependencies.test.cjs
-          node scripts/installRspackPackageDependencies.cjs
 
       - name: Compile Meteor plugins and verify captured inputs
         working-directory: ${{ steps.capture.outputs.test_app }}
@@ -84,8 +84,6 @@ jobs:
           const files = [
             'mofacts/package.json', 'mofacts/package-lock.json',
             'mofacts/.meteor/release', 'mofacts/.meteor/packages', 'mofacts/.meteor/versions',
-            'mofacts/packages/ddp-server/.npm/package/npm-shrinkwrap.json',
-            'mofacts/packages/rspack/.npm/devPackage/npm-shrinkwrap.json',
           ];
           for (const file of files) {
             const before = await fs.readFile(path.join(workspace, 'context', file));
@@ -100,15 +98,6 @@ jobs:
           NODE
           node "$GITHUB_WORKSPACE/mofacts/scripts/security-audit/qualification/captureBuildSource.mjs" \
             verify-tests --builder default --workspace '${{ steps.capture.outputs.workspace }}'
-
-      - name: Retain synchronized Rspack lockfile for failure diagnosis
-        if: failure() && steps.capture.outputs.test_app != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: synchronized-rspack-shrinkwrap
-          path: ${{ steps.capture.outputs.test_app }}/packages/rspack/.npm/devPackage/npm-shrinkwrap.json
-          include-hidden-files: true
-          retention-days: 3
 
       - name: Lint
         working-directory: ${{ steps.capture.outputs.test_app }}
@@ -146,7 +135,7 @@ jobs:
 
       - name: Verify test MongoDB readiness helpers
         working-directory: ${{ steps.capture.outputs.test_app }}
-        run: node --test scripts/ciMongoReadiness.test.cjs
+        run: node --test scripts/ciMongoReadiness.test.cjs scripts/mongoReadConcernRole.test.cjs
 
       - name: Start Change Streams test MongoDB
         working-directory: .
@@ -230,7 +219,7 @@ jobs:
       - name: Setup Node.js for CI helpers
         uses: actions/setup-node@v6
         with:
-          node-version: '24.15.0'
+          node-version: '24.22.1'
 
       - name: Verify CI MongoDB host compatibility
         run: node mofacts/scripts/ciMongoReadiness.cjs host
@@ -238,14 +227,14 @@ jobs:
       - name: Build amd64 application image
         run: |
           test "$(uname -m)" = "x86_64"
-          docker build --platform linux/amd64 --tag mofacts-ci:meteor-3.5-amd64 \
+          docker build --platform linux/amd64 --tag mofacts-ci:meteor-3.5.4-amd64 \
             --build-arg MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256='${{ needs.lint-and-test.outputs.source_digest }}' \
             --build-arg MOFACTS_SOURCE_REVISION='${{ needs.lint-and-test.outputs.source_commit }}' \
             --build-arg MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES='${{ needs.lint-and-test.outputs.source_dirty }}' .
 
       - name: Assert image source matches tested input identity
         run: |
-          docker run --rm --entrypoint node mofacts-ci:meteor-3.5-amd64 -e '
+          docker run --rm --entrypoint node mofacts-ci:meteor-3.5.4-amd64 -e '
             const observation = require("/opt/mofacts-source-observation.json");
             const identity = observation.identity;
             if (observation.schema !== "MoFaCTSImageSourceObservationV1"
@@ -261,8 +250,8 @@ jobs:
         run: |
           docker run --rm \
             --entrypoint /bin/sh \
-            mofacts-ci:meteor-3.5-amd64 \
-            -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.15.0 && test "$(node --version)" = v24.15.0 && ! command -v npm && ! command -v npx'
+            mofacts-ci:meteor-3.5.4-amd64 \
+            -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.22.1 && test "$(node --version)" = v24.22.1 && test "$(node -p process.versions.undici)" = 7.30.1 && ! command -v npm && ! command -v npx'
 
       - name: Reject standalone MongoDB topology
         run: |
@@ -285,7 +274,7 @@ jobs:
             --env MOFACTS_SELF_HOSTED=false \
             --env MOFACTS_REQUIRE_REDIS=false \
             --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
-            mofacts-ci:meteor-3.5-amd64
+            mofacts-ci:meteor-3.5.4-amd64
           for attempt in $(seq 1 60); do
             if test "$(docker inspect --format '{{.State.Status}}' "$app")" = exited; then
               docker logs "$app" | grep -F 'Change Streams require a replica set or sharded cluster'
@@ -321,7 +310,7 @@ jobs:
             --env MOFACTS_SELF_HOSTED=false \
             --env MOFACTS_REQUIRE_REDIS=false \
             --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
-            mofacts-ci:meteor-3.5-amd64
+            mofacts-ci:meteor-3.5.4-amd64
           for attempt in $(seq 1 60); do
             if docker exec "$app" node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
               echo "linux/amd64 application health check passed"

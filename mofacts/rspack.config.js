@@ -44,6 +44,7 @@ export default defineConfig((Meteor) => {
     ...(Meteor.isClient && {
       ...(!Meteor.isProduction && {
         devServer: {
+          host: "0.0.0.0",
           allowedHosts: getDevServerAllowedHosts(),
         },
       }),
@@ -86,6 +87,9 @@ export default defineConfig((Meteor) => {
         },
       },
     }),
+    // Docker Desktop bind mounts do not guarantee native file events.
+    // Rspack owns polling and incremental rebuilds for the local watcher.
+    ...(Meteor.isDevelopment && !Meteor.isTest && { watchOptions: { poll: 1000 } }),
     performance: Meteor.isClient
       ? {
           // Client bundles are downloaded by browsers — keep strict defaults

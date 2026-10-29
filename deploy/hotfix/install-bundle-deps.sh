@@ -16,9 +16,10 @@ if [ ! -f "$SERVER_DIR/package.json" ]; then
   exit 1
 fi
 
-test "$(cat "$OUTPUT_ROOT/bundle/.node_version.txt")" = "v24.15.0"
-test "$(node --version)" = "v24.15.0"
-test "$(npm --version)" = "11.12.1"
+test "$(cat "$OUTPUT_ROOT/bundle/.node_version.txt")" = "v24.22.1"
+test "$(node --version)" = "v24.22.1"
+test "$(npm --version)" = "11.19.1"
+test "$(node -p 'process.versions.undici')" = "7.30.1"
 
 cd "$SERVER_DIR"
 
@@ -28,7 +29,6 @@ echo "[hotfix] Installing native build dependencies for Meteor server packages..
 apk add --no-cache bash g++ make python3
 
 echo "[hotfix] Pinning runtime transitive dependencies..."
-npm pkg set "dependencies.@mapbox/node-pre-gyp=2.0.3"
 npm pkg set "dependencies.node-gyp=12.2.0"
 npm pkg set "dependencies.underscore=1.13.8"
 

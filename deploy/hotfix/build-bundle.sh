@@ -19,9 +19,10 @@ fi
 
 cd "$APP_DIR"
 
-test "$(meteor --version)" = "Meteor 3.5"
-test "$(meteor node --version)" = "v24.15.0"
-test "$(meteor npm --version)" = "11.12.1"
+test "$(meteor --version)" = "Meteor 3.5.4"
+test "$(meteor node --version)" = "v24.22.1"
+test "$(meteor npm --version)" = "11.19.1"
+test "$(meteor node -p 'process.versions.undici')" = "7.30.1"
 
 CURRENT_LOCK_HASH="$(sha256sum "$LOCKFILE" | awk '{print $1}')"
 INSTALLED_LOCK_HASH=""

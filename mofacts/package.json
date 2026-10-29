@@ -19,7 +19,7 @@
     "ip-address": "^10.7.3",
     "qs": "$qs",
     "socket.io-parser": "^4.2.7",
-    "undici": "^7.29.1",
+    "undici": "^7.30.1",
     "ws@^7.0.0": "7.5.11",
     "ws@^8.0.0": "8.21.0",
     "ajv": "^8.18.0",
@@ -97,7 +97,7 @@
     "jquery": "^3.7.1",
     "jszip": "^3.10.1",
     "marked": "^18.0.2",
-    "meteor-node-stubs": "1.2.29",
+    "meteor-node-stubs": "1.2.32",
     "plyr": "^3.8.4",
     "protobufjs": "^8.7.0",
     "qs": "6.16.0",
@@ -112,7 +112,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@meteorjs/rspack": "^2.0.1",
+    "@meteorjs/rspack": "2.2.0",
     "@rsdoctor/rspack-plugin": "^1.6.4",
     "@rspack/cli": "1.7.12",
     "@rspack/core": "1.7.12",
@@ -157,10 +157,10 @@
     ]
   },
   "engines": {
-    "node": "24.15.0",
-    "npm": "11.12.1"
+    "node": "24.22.1",
+    "npm": "11.19.1"
   },
-  "packageManager": "npm@11.12.1",
+  "packageManager": "npm@11.19.1",
   "scripts": {
     "test": "TEST_WATCH=1 meteor test --driver-package=meteortesting:mocha --port 3010 --settings settings.json",
     "test:ci": "npm run test:ci:harness && node scripts/runMeteorCiTest.cjs",
@@ -180,7 +180,7 @@
     "convert:config-delivery-settings": "node --experimental-strip-types scripts/convertConfigDeliverySettings.ts",
     "convert:sparc-autotutor-target-schema": "node --experimental-strip-types scripts/convertSparcAutoTutorTargetSchema.ts",
     "check:sparc-autotutor-runtime-cleanup": "node scripts/checkSparcAutoTutorRuntimeCleanup.cjs",
-    "postinstall": "node scripts/hardenBundledDependencies.cjs && node scripts/prepareWebGazerAssets.cjs && node scripts/prepareMediaPipeAssets.cjs",
+    "postinstall": "node scripts/prepareWebGazerAssets.cjs && node scripts/prepareMediaPipeAssets.cjs",
     "prepare": "node scripts/prepare-husky.cjs",
     "precommit:lint-staged": "lint-staged",
     "secret:scan:staged": "node scripts/scan-staged-secrets.cjs",

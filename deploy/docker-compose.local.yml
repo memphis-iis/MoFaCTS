@@ -1,6 +1,74 @@
 services:
-  # The canonical localhost app runs natively through hotfix-local.ps1 so
-  # Meteor and Rspack can watch the source tree. Docker owns only its services.
+  # Replace the production service completely: local development runs the
+  # Linux source watcher, never a generated production bundle or host Meteor.
+  mofacts: !override
+    container_name: mofacts
+    image: geoffreybooth/meteor-base:3.5@sha256:58b203caa2c3dc963774117cbf45534d4533ddd77b220e075107da3f3600a083
+    init: true
+    working_dir: /workspace/mofacts
+    command: ["bash", "/workspace/deploy/hotfix/watch-linux.sh"]
+    ports:
+      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:8082:8082"
+    volumes:
+      - ../:/workspace
+      - type: volume
+        source: hotfix-node-modules
+        target: /workspace/mofacts/node_modules
+        volume:
+          nocopy: true
+      - type: volume
+        source: hotfix-meteor-local
+        target: /workspace/mofacts/.meteor/local
+        volume:
+          nocopy: true
+      - hotfix-meteor-tools:/root/.meteor
+      - hotfix-rspack-build:/workspace/mofacts/_build
+      - hotfix-ostrio-npm:/workspace/mofacts/packages/ostrio-files/.npm
+      - hotfix-webgazer:/workspace/mofacts/public/webgazer
+      - hotfix-mediapipe:/workspace/mofacts/public/mediapipe/wasm
+      - ./local-data:/root
+      - type: bind
+        source: ${METEOR_SETTINGS_HOST_PATH:?METEOR_SETTINGS_HOST_PATH must identify the private local settings}
+        target: /run/mofacts/settings.json
+        read_only: true
+    tmpfs:
+      - /workspace/mofacts/public/build-chunks-test
+    environment:
+      METEOR_ALLOW_SUPERUSER: '1'
+      HUSKY: '0'
+      ROOT_URL: http://localhost:3200
+      PORT: '3200'
+      MONGO_URL: ${MONGO_URL:?MONGO_URL is required}
+      EXPECTED_MONGO_DB_NAME: ${EXPECTED_MONGO_DB_NAME:-MoFACT-meteor3}
+      MOFACTS_MONGO_REPLICA_SET_NAME: ${MOFACTS_MONGO_REPLICA_SET_NAME:-mofacts-rs}
+      METEOR_REACTIVITY_ORDER: changeStreams
+      DDP_TRANSPORT: sockjs
+      MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'false'
+      MOFACTS_SELF_HOSTED: 'false'
+      MOFACTS_REQUIRE_REDIS: 'false'
+      METEOR_WATCH_FORCE_POLLING: 'true'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongodb-replica-init:
+        condition: service_completed_successfully
+    networks:
+      - mofacts
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
   mongodb:
     ports:
       - "127.0.0.1:27017:27017"
+
+volumes:
+  hotfix-node-modules:
+  hotfix-meteor-local:
+  hotfix-meteor-tools:
+  hotfix-rspack-build:
+  hotfix-ostrio-npm:
+  hotfix-webgazer:
+  hotfix-mediapipe:

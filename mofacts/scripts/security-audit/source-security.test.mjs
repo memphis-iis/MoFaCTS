@@ -4,15 +4,11 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-const require = createRequire(import.meta.url);
-const { hardenMeteorNodeStubs } = require('../hardenBundledDependencies.cjs');
 import {
   canonicalJson,
   control,
@@ -334,42 +330,6 @@ test('development dependency findings exclude runtime packages without mutating 
   assert.deepEqual(all.map((finding) => finding.name), ['dev-only', 'runtime']);
 });
 
-test('bundled dependency hardening replaces Meteor qs with the reviewed direct version', (t) => {
-  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mofacts-bundled-hardening-'));
-  t.after(() => fs.rmSync(packageRoot, { recursive: true, force: true }));
-  const sourceDirectory = path.join(packageRoot, 'node_modules', 'qs');
-  const meteorNodeStubsDirectory = path.join(packageRoot, 'node_modules', 'meteor-node-stubs');
-  const targetDirectory = path.join(
-    meteorNodeStubsDirectory,
-    'node_modules',
-    'qs',
-  );
-  fs.mkdirSync(sourceDirectory, { recursive: true });
-  fs.mkdirSync(targetDirectory, { recursive: true });
-  fs.writeFileSync(path.join(sourceDirectory, 'package.json'), JSON.stringify({
-    name: 'qs',
-    version: '6.16.0',
-  }));
-  fs.writeFileSync(path.join(sourceDirectory, 'implementation.js'), 'reviewed');
-  fs.writeFileSync(path.join(meteorNodeStubsDirectory, 'package.json'), JSON.stringify({
-    name: 'meteor-node-stubs',
-    version: '1.2.29',
-  }));
-  fs.writeFileSync(path.join(targetDirectory, 'package.json'), JSON.stringify({
-    name: 'qs',
-    version: '6.15.2',
-  }));
-  fs.writeFileSync(path.join(targetDirectory, 'implementation.js'), 'upstream');
-
-  assert.equal(hardenMeteorNodeStubs(packageRoot), true);
-  assert.equal(
-    JSON.parse(fs.readFileSync(path.join(targetDirectory, 'package.json'), 'utf8')).version,
-    '6.16.0',
-  );
-  assert.equal(fs.readFileSync(path.join(targetDirectory, 'implementation.js'), 'utf8'), 'reviewed');
-  assert.equal(hardenMeteorNodeStubs(packageRoot), false);
-});
-
 test('development advisories are informational unless a reviewed build exposure matches exactly', () => {
   const findings = [{ name: '@rspack/cli', severity: 'moderate', direct: true, advisoryIds: ['1234567'] }];
   const emptyPolicy = { schema: 'DevelopmentDependencyExposurePolicyV1', confirmedBuildExposures: [] };
@@ -617,7 +577,10 @@ test('production hardening assets preserve reviewed findings and remove unnecess
   assert.match(dockerfile, /rm -rf \/docker\/node_modules \/docker\/package\.json \/docker\/package-lock\.json/);
   assert.match(dockerfile, /rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/bin\/npm \/usr\/local\/bin\/npx/);
   assert.match(dockerfile, /LABEL org\.opencontainers\.image\.revision=\$MOFACTS_SOURCE_REVISION/);
-  assert.match(runtimeNpmHardening, /bcrypt@6\.0\.0 argon2@0\.41\.1 node-gyp-build@4\.8\.4/);
+  assert.match(runtimeNpmHardening, /assert_package_version "\$ACCOUNTS_NPM_ROOT\/bcrypt\/package\.json" '6\.0\.0'/);
+  assert.match(runtimeNpmHardening, /assert_package_version "\$ACCOUNTS_NPM_ROOT\/argon2\/package\.json" '0\.44\.0'/);
+  assert.match(runtimeNpmHardening, /assert_package_version "\$ACCOUNTS_NPM_ROOT\/node-gyp-build\/package\.json" '4\.8\.4'/);
+  assert.doesNotMatch(runtimeNpmHardening, /rm -rf "\$ACCOUNTS_NPM_ROOT"/);
   assert.match(runtimeNpmHardening, /openpgp@5\.11\.3/);
   assert.match(runtimeNpmHardening, /tmp@0\.2\.7 postcss@8\.5\.18 nanoid@3\.3\.18 svgo@2\.8\.3 nodemailer@9\.0\.1/);
   assert.doesNotMatch(runtimeNpmHardening, /ostrio_files|lodash/);

@@ -4,96 +4,42 @@ This guide covers the public contributor baseline for MoFaCTS.
 
 ## Requirements
 
-- Node.js `24.15.0`
-- npm `11.12.1`
-- Meteor `3.5`
-- Docker Desktop for local Compose-backed workflows
-- Git
+- Git and PowerShell
+- Docker Desktop using Linux containers, with Docker Compose 2.24.4 or newer
 
-## Setup
-
-```bash
-git clone https://github.com/memphis-iis/mofacts.git
-cd mofacts/mofacts
-npm ci
-# Create private local settings before running the app.
-```
-
-Adjust local settings for your environment. Do not commit local settings or secrets.
-
-Docker Desktop must be running for MongoDB. The canonical localhost workflow
-runs one native Meteor/Rspack watcher and uses Docker only for supporting
-services. The pinned Meteor tool matching `mofacts/.meteor/release` must be
-installed locally.
+The container supplies Meteor `3.5.4`, Node `24.22.1` (Undici `7.30.1`) and
+npm `11.19.1`. Do not install or run Meteor on the Windows host for this workflow.
 
 ## First Local Run
 
-The only supported contributor server is the source-watching hotfix server at
-`http://localhost:3200`, managed by `deploy/hotfix-local.ps1`.
+1. From `deploy/`, create `.env.local` and its private settings file from the
+   supplied examples for a new installation. Preserve existing private files.
+2. Replace placeholder credentials. `MONGO_URL` must use the Compose MongoDB
+   service and configured replica set. The settings JSON must define `owner`.
+   Prepare the replica-set keyfile with `New-MongoReplicaSetKeyfile.ps1` when
+   setting up a new database; do not reinitialize existing data.
+3. Run `./hotfix-local.ps1 -Action start`. The manager validates Linux Docker and
+   Compose, checks MongoDB authentication and primary readiness, and starts the
+   sole source-watching Linux application at http://localhost:3200.
+4. The container selects the pinned runtime and installs locked npm dependencies
+   into a Linux volume. Source edits rebuild and reload automatically. Startup
+   returns after app health, browser bundle, HMR and Change Streams are ready.
 
-Startup requires four consecutive checks of MongoDB's configured writable
-replica-set primary and both authenticated users. A startup-only MongoDB pool
-loss is cleaned up, archived, and retried once; there is no recurring restart
-loop that can conceal a persistent database or host failure.
+Use the manager's `status`, `logs`, `restart` and `stop` actions. Docker owns
+processes and bounded logs; named volumes own dependencies and generated caches.
+Stopping the application does not delete database data. Local administrator
+credentials remain in ignored `deploy/local-hotfix/agent-secrets.env`.
 
-1. Install dependencies and run the baseline check:
+For static checks using the same Linux toolchain, run from `deploy/`:
 
-   ```powershell
-   cd mofacts
-   npm ci
-   npm run typecheck
-   ```
+```powershell
+docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml exec -T mofacts meteor npm run typecheck
+docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml exec -T mofacts meteor npm run lint
+```
 
-2. Prepare local deployment inputs:
-
-   ```powershell
-   cd ..\deploy
-   Copy-Item .env.local.example .env.local
-   Copy-Item settings.local.example.json settings.local.json
-   ```
-
-   Replace placeholder values in `.env.local` and its
-   `METEOR_SETTINGS_HOST_PATH` target. `MONGO_URL` is the Docker-network URI;
-   `MOFACTS_NATIVE_MONGO_URL` is the equivalent authenticated replica-set URI
-   through `127.0.0.1`. The settings JSON must define `owner` for local admin
-   bootstrap. Keep these files private.
-
-3. Confirm the local runtime prerequisites:
-
-   ```powershell
-   node --version
-   npm --version
-   docker version
-   docker compose version
-   ```
-
-4. Start the app:
-
-   ```powershell
-   .\hotfix-local.ps1
-   .\hotfix-local.ps1 logs
-   ```
-
-   The command returns after the supervised Meteor/Rspack process tree is ready.
-   Source edits then rebuild and reload automatically. `status` distinguishes
-   process ownership from app, bundle, HMR, and Change Stream readiness, while
-   previous run logs remain under ignored `deploy/local-hotfix/runs/`. Open:
-
-   ```text
-   http://localhost:3200
-   ```
-
-   The canonical hotfix manager creates or verifies a local admin account for the owner
-   configured in the settings JSON. Read the ignored local credentials with:
-
-   ```powershell
-   Get-Content .\local-hotfix\agent-secrets.env
-   ```
-
-   Use `MOFACTS_AGENT_ADMIN_EMAIL` and `MOFACTS_AGENT_ADMIN_PASSWORD` from that file to sign in.
-
-For status, logs, and stop commands, see `../deploy/README.md`. Do not start
-another Meteor or Compose application process on port 3200.
+The full integration suite requires a separate supported Linux test environment,
+an isolated test database and explicit authorization. Never point it at the
+localhost application database. See `deploy/hotfix/README.md` for ownership.
 
 ## First Admin And Content Pass
 
@@ -125,43 +71,44 @@ The full TypeScript check is the required TypeScript verification path for app c
 
 ## Tests
 
-### Locked Meteor package installation
+### Pinned Meteor toolchain and package installation
 
-After `npm ci`, run `node scripts/installRspackPackageDependencies.cjs` from
-`mofacts/` before compiling local Meteor plugins in a clean checkout. CI and the
-Docker builder use the same installer. The application lockfile owns application
-dependencies; `packages/rspack/.npm/devPackage/npm-shrinkwrap.json` owns the local
-Rspack package's exact transitive pins.
+Meteor `3.5.4` owns the official DDP and Rspack Meteor packages. Application
+dependencies, including `@meteorjs/rspack`, are installed from the application
+lockfile with `npm ci`; Meteor installs its own package dependencies when
+`meteor update --npm` compiles plugins. There are no local DDP or Rspack package
+copies or separate package-dependency installer to run.
 
-Meteor 3.5 stores a flat internal v4 shrinkwrap. A cold npm 11 reconstruction
-can select newer transitive versions even when that file is present. The installer
-uses npm's native lock format in a temporary directory, runs the pinned
-`meteor npm ci`, validates installed versions, sources and integrity values, and
-creates the normal Meteor installed-tree markers. It removes temporary inputs
-and leaves the committed shrinkwrap unchanged. It does not update dependencies
-or patch the Meteor tool/cache. Unsupported lock formats fail explicitly.
+CI installs Meteor `3.5.4` directly and asserts Meteor's Node, npm and built-in
+Undici versions alongside the host toolchain. Docker retains the digest-pinned
+Meteor `3.5` image only to bootstrap the official CLI: in the application
+directory the CLI selects `METEOR@3.5.4` from `.meteor/release`. The builder
+asserts the resulting `3.5.4` / `24.22.1` / `11.19.1` / `7.30.1` versions before
+installing dependencies, and uses that selected Node binary for compiler child
+processes. The dependency and runtime stages use the pinned Node `24.22.1`
+Alpine image. See [the build context notes](../deploy/README.md#build-context).
 
-CI installs application and locked package dependencies before `meteor update --npm`
-compiles plugins, then checks the entire captured input tree. Docker additionally
-checks both tracked Meteor package shrinkwrap files before and after compilation
-and after the final bundle build. These guards remain blocking. Dependency updates
-must be intentional source changes; do not suppress synchronization errors or
-exclude tracked shrinkwraps from source identity.
+After plugin compilation, CI checks the entire captured input tree. Docker
+additionally checks `.meteor/release`, `.meteor/packages`, `.meteor/versions`,
+`package.json` and `package-lock.json` before and after compilation and after the
+final bundle build. These guards remain blocking. Dependency updates must be
+intentional source changes; do not suppress synchronization errors or exclude
+source declarations and locks from source identity.
 
 Docker's acquisition boundary excludes the regenerated
 `packages/ostrio-files/.npm/` and `public/webgazer/` output trees. Ostrio's source
 package declaration pins its npm dependency; `prepareWebGazerAssets.cjs` copies
 MediaPipe assets from the locked WebGazer installation and source license files.
-Both outputs are regenerated before bundling. The tracked DDP and Rspack
-shrinkwraps remain source inputs. A Linux GitHub CI regression uses the actual
-Docker acquisition target to verify this distinction and reject a changed
-source-owned Rspack lock.
+Both outputs are regenerated before bundling. Source-owned package declarations
+and the application lockfile remain source inputs. A Linux GitHub CI regression
+uses the actual Docker acquisition target to verify this distinction and reject
+changes to captured dependency inputs.
 
 Rspack's `_build`, public/private `build-assets` and `build-chunks`, and `.rsdoctor`
 trees are compiler outputs too. Docker acquisition excludes them, including the
-standard `METEOR_LOCAL_DIR` suffix variants. The source compiler, configuration,
-package declarations and locks remain captured; the builder regenerates the
-outputs before bundling. The same regression covers these output families.
+standard `METEOR_LOCAL_DIR` suffix variants. The application configuration,
+package declarations and locks remain captured; the upstream compiler regenerates
+the outputs before bundling. The same regression covers these output families.
 
 The supplemental test-input contract includes the public qualification workflow,
 agent guide, local/qualification Compose recipes, hotfix manager and Change Streams
@@ -169,9 +116,6 @@ assertion scripts read by the Meteor CI harness. These supplement the captured
 build tree and are hashed separately. The Linux Docker regression also runs the
 harness inside its captured test workspace, so missing fixture inputs fail early.
 Private runtime settings, environment files and local service state stay excluded.
-
-The focused contract suite is
-`node --test scripts/installRspackPackageDependencies.test.cjs`.
 
 The repository defines test scripts in `mofacts/package.json`. Some local Meteor workflows may require additional environment setup. For release preparation, record any test limitations explicitly rather than treating a narrowed check as full release confidence.
 
@@ -188,7 +132,7 @@ invocation requires fresh maintainer authorization.
 as part of this Meteor server suite, not as a separate command. The pure SPARC
 Node runner excludes that Meteor-dependent module.
 The source-owned browser-test package makes that Playwright contract portable
-across the supported Linux CI job and an explicitly authorized Windows run.
+in the supported Linux CI job and explicitly authorized Linux test containers.
 Meteor resolves the dynamically selected test driver into `.meteor/versions`
 during a test run. The repository runner removes only those test-driver entries
 when it exits, while lint and the pre-commit hook reject any such entries left

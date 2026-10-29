@@ -5,6 +5,7 @@ const test = require('node:test');
 const {
   clientPassingCount,
   validateMeteorTestModules,
+  validateMeteorRuntimeContract,
 } = require('./meteorCiHarness.cjs');
 const {
   CLIENT_LIBRARY_NAME,
@@ -83,42 +84,34 @@ test('preserves unrelated Meteor version changes while cleaning test artifacts',
   );
 });
 
-test('pins the source-owned Rspack client-test bridge correction', () => {
-  const appRoot = path.resolve(__dirname, '..');
-  const directPackages = fs.readFileSync(path.join(appRoot, '.meteor/packages'), 'utf8');
-  const resolvedVersions = fs.readFileSync(path.join(appRoot, '.meteor/versions'), 'utf8');
-  const packageManifest = fs.readFileSync(path.join(appRoot, 'packages/rspack/package.js'), 'utf8');
-  const moduleImports = fs.readFileSync(path.join(appRoot, 'packages/rspack/lib/module-imports.js'), 'utf8');
-  const serverBridge = fs.readFileSync(path.join(appRoot, 'packages/rspack/rspack_server.js'), 'utf8');
-  const provenance = fs.readFileSync(path.join(appRoot, 'packages/rspack/MOFACTS-OVERRIDE.md'), 'utf8');
-
-  assert.match(directPackages, /^rspack@1\.1\.1$/m);
-  assert.match(resolvedVersions, /^rspack@1\.1\.1$/m);
-  assert.match(packageManifest, /version: '1\.1\.1'/);
-  assert.match(moduleImports, /served as a static resource and injected as a <script>/);
-  assert.doesNotMatch(moduleImports, /isMeteorBlazeProject/);
-  assert.match(serverBridge, /RSPACK_BUNDLE_REGEX/);
-  assert.match(provenance, /fa20c29abb4ae30fe78facab2819ce4f5c99e588/);
+test('qualifies the official security release without local package shadowing', () => {
+  validateMeteorRuntimeContract(path.resolve(__dirname, '..'));
 });
 
-test('pins the source-owned Meteor DDP session-removal correction', () => {
-  const appRoot = path.resolve(__dirname, '..');
-  const directPackages = fs.readFileSync(path.join(appRoot, '.meteor/packages'), 'utf8');
-  const resolvedVersions = fs.readFileSync(path.join(appRoot, '.meteor/versions'), 'utf8');
-  const packageManifest = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/package.js'), 'utf8');
-  const serverSource = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/livedata_server.js'), 'utf8');
-  const serverTests = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/livedata_server_tests.js'), 'utf8');
-  const provenance = fs.readFileSync(path.join(appRoot, 'packages/ddp-server/MOFACTS-OVERRIDE.md'), 'utf8');
+function runtimeFixture(changes = {}, localPackage = null) {
+  const inputs = {
+    release: 'METEOR@3.5.4\n',
+    packages: 'ddp-server@3.5.0\nrspack@1.3.1\n',
+    versions: 'ddp-server@3.5.0\nrspack@1.3.1\n',
+    ...changes,
+  };
+  return () => validateMeteorRuntimeContract('/app', file => inputs[path.basename(file)],
+    file => localPackage !== null && file === path.join('/app', 'packages', localPackage, 'package.js'));
+}
 
-  assert.match(directPackages, /^ddp-server@3\.3\.0$/m);
-  assert.match(resolvedVersions, /^ddp-server@3\.3\.0$/m);
-  assert.match(packageManifest, /version: '3\.3\.0'/);
-  assert.match(serverSource, /session\.messageQueue = null/);
-  assert.match(serverSource, /!existingSession\._expectingDisconnect/);
-  assert.doesNotMatch(serverSource, /Meteor\.defer\(\(\) => \{\s*messageQueue\.forEach/);
-  assert.match(serverTests, /send after session removal is a no-op/);
-  assert.match(provenance, /3f23e5e402cf9091a4515cb94130b6a0a9ced11e/);
-  assert.match(provenance, /14528/);
+test('accepts official packages and rejects an older release or resolution', () => {
+  assert.doesNotThrow(runtimeFixture());
+  assert.throws(runtimeFixture({ release: 'METEOR@3.5\n' }), /supported METEOR@3\.5\.4/);
+  for (const name of ['packages', 'versions']) {
+    assert.throws(runtimeFixture({ [name]: 'ddp-server@3.3.0\nrspack@1.3.1\n' }), /official ddp-server@3\.5\.0/);
+    assert.throws(runtimeFixture({ [name]: 'ddp-server@3.5.0\nrspack@1.1.1\n' }), /official rspack@1\.3\.1/);
+  }
+});
+
+test('rejects local package overrides even when official manifests are pinned', () => {
+  for (const name of ['ddp-server', 'rspack']) {
+    assert.throws(runtimeFixture({}, name), /shadows the supported official package/);
+  }
 });
 
 test('pins the source-owned cross-platform Playwright worker', () => {
@@ -254,101 +247,33 @@ test('qualifies production-shaped projections and the real non-reactive paged pu
   assert.doesNotMatch(publications, /pagedUsersCursor\.observeChanges/);
 });
 
-test('enforces one canonical hotfix server on localhost', () => {
-  const appRoot = path.resolve(__dirname, '..');
-  const repoRoot = path.resolve(appRoot, '..');
-  const deployRoot = path.join(repoRoot, 'deploy');
-  const baseCompose = fs.readFileSync(
-    path.join(deployRoot, 'docker-compose.yml'),
-    'utf8',
-  );
-  const localCompose = fs.readFileSync(
-    path.join(deployRoot, 'docker-compose.local.yml'),
-    'utf8',
-  );
-  const hotfixManager = fs.readFileSync(
-    path.join(deployRoot, 'hotfix-local.ps1'),
-    'utf8',
-  );
-  const rspackBuildContext = fs.readFileSync(
-    path.join(appRoot, 'packages/rspack/lib/build-context.js'),
-    'utf8',
-  );
-  const rspackConfig = fs.readFileSync(
-    path.join(appRoot, 'rspack.config.js'),
-    'utf8',
-  );
-  const qualificationCompose = fs.readFileSync(
-    path.join(deployRoot, 'docker-compose.change-streams-qualification.yml'),
-    'utf8',
-  );
-  const agentGuide = fs.readFileSync(path.join(repoRoot, 'AGENTS.md'), 'utf8');
-  const composeFilesPublishingLocalhost = fs
-    .readdirSync(deployRoot)
-    .filter((fileName) => /^docker-compose.*\.ya?ml$/.test(fileName))
-    .filter((fileName) =>
-      /["']3200:3000["']/.test(fs.readFileSync(path.join(deployRoot, fileName), 'utf8')),
-    );
-
-  assert.match(baseCompose, /MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'false'/);
-  assert.match(rspackConfig, /const acornRuntimePath = require\.resolve\("acorn"\)/);
-  assert.match(rspackConfig, /"acorn\$": acornRuntimePath/);
-  assert.match(baseCompose, /METEOR_REACTIVITY_ORDER: changeStreams/);
-  assert.doesNotMatch(localCompose, /^\s{2}mofacts:/m);
-  assert.deepEqual(composeFilesPublishingLocalhost, []);
-  assert.match(hotfixManager, /-f", "docker-compose\.yml"/);
-  assert.match(hotfixManager, /-f", "docker-compose\.local\.yml"/);
-  assert.match(hotfixManager, /config", "--quiet"/);
-  assert.match(hotfixManager, /@\("stop", "mofacts"\)/);
-  assert.match(hotfixManager, /@\("rm", "-f", "mofacts"\)/);
-  assert.match(hotfixManager, /Remove-Item Env:MOFACTS_CHANGE_STREAMS_ENABLED/);
-  assert.match(hotfixManager, /\$env:METEOR_REACTIVITY_ORDER = "changeStreams"/);
-  assert.match(hotfixManager, /-FilePath \$meteorTool\.NodeExe/);
-  assert.match(hotfixManager, /"--require=\$\(\$meteorTool\.WarningModule\)"/);
-  assert.match(hotfixManager, /\$meteorTool\.ToolEntry/);
-  assert.match(hotfixManager, /\$env:NODE_PATH = \$meteorTool\.NodePath/);
-  assert.match(hotfixManager, /\$env:BABEL_CACHE_DIR = \$meteorTool\.BabelCacheDir/);
-  assert.match(hotfixManager, /-Action", "__supervise"/);
-  assert.match(hotfixManager, /New-HotfixProcessJob/);
-  assert.match(hotfixManager, /JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/);
-  assert.match(hotfixManager, /AssignProcessToJobObject/);
-  assert.match(hotfixManager, /Test-TrackedProcess/);
-  assert.match(hotfixManager, /Stop-ObsoleteCommonJsGuardProcesses/);
-  assert.match(hotfixManager, /Archive-HotfixRunLogs/);
-  assert.match(hotfixManager, /Get-HotfixFailureSummary/);
-  assert.match(hotfixManager, /Ensure-CommonJsBoundary/);
-  assert.match(hotfixManager, /Reset-RspackDevContext/);
-  assert.match(hotfixManager, /Remove-Item -LiteralPath \$mainDevDir -Recurse -Force/);
-  assert.match(hotfixManager, /Refusing to reset Rspack development context outside \$buildRoot/);
-  assert.doesNotMatch(hotfixManager, /Get-CimInstance|LastWriteTime\s*=|Ensure-CommonJsBuildMarker|Remove-RspackDevBuild/);
-  assert.match(hotfixManager, /\$RequiredStableChecks = 4/);
-  assert.match(hotfixManager, /\$stableChecks \+= 1\s*if \(\$stableChecks -ge \$RequiredStableChecks\)/);
-  assert.match(hotfixManager, /\$startupError = \$_/);
-  assert.match(hotfixManager, /Set-HotfixRunStateStatus -Status "startup-failed"/);
-  assert.match(hotfixManager, /\$RecoveryAttempt -eq 0 -and \$failureSummary -eq "Meteor lost its MongoDB connection pool\."/);
-  assert.match(hotfixManager, /Start-HotfixDev -RecoveryAttempt 1/);
-  assert.match(hotfixManager, /throw \$startupError/);
-  assert.match(hotfixManager, /Get-HotfixDevClientBundleState/);
-  assert.match(hotfixManager, /__mofactsRspackClient/);
-  assert.match(hotfixManager, /module\\\.exports\\s\*=\\s\*__webpack_exports__/);
-  assert.match(hotfixManager, /assert-change-streams\.sh/);
-  assert.equal(fs.existsSync(path.join(deployRoot, 'hotfix/ensure-commonjs-build.ps1')), false);
-  assert.match(rspackBuildContext, /function writeFileAtomically/);
-  assert.match(rspackBuildContext, /shouldPreserveMainDevelopmentContext/);
-  assert.match(rspackBuildContext, /!shouldPreserveMainDevelopmentContext \? \[mainClientPath, mainServerPath\] : \[\]/);
-  assert.match(rspackConfig, /Meteor\.isDevelopment && !Meteor\.isTest && !Meteor\.isNative && Meteor\.setCache\("memory"\)/);
-  assert.equal(fs.existsSync(path.join(deployRoot, 'mongodb/assert-change-streams.js')), true);
-  assert.equal(fs.existsSync(path.join(deployRoot, 'mongodb/assert-change-streams.sh')), true);
-  assert.match(agentGuide, /There is exactly one localhost application server/);
-  for (const removedPath of [
-    'docker-compose.hotfix-local.yml',
-    'docker-compose.hotfix-native.yml',
-    'hotfix-dev.ps1',
-    'hotfix-dev',
-  ]) {
-    assert.equal(fs.existsSync(path.join(deployRoot, removedPath)), false, removedPath);
-  }
-  assert.doesNotMatch(qualificationCompose, /MOFACTS_CHANGE_STREAMS_ENABLED/);
-  assert.match(qualificationCompose, /MOFACTS_CHANGE_STREAMS_QUALIFICATION: 'true'/);
-  assert.match(qualificationCompose, /METEOR_REACTIVITY_ORDER: changeStreams/);
+test('enforces one Linux Docker source watcher on localhost', () => {
+  const repoRoot = path.resolve(__dirname, '../..');
+  const read = relative => fs.readFileSync(path.join(repoRoot, relative), 'utf8');
+  const manager = read('deploy/hotfix-local.ps1');
+  const compose = read('deploy/docker-compose.local.yml');
+  const watcher = read('deploy/hotfix/watch-linux.sh');
+  const rspack = read('mofacts/rspack.config.js');
+  assert.match(compose, /mofacts: !override/);
+  assert.match(compose, /127\.0\.0\.1:3200:3200/);
+  assert.match(compose, /127\.0\.0\.1:8082:8082/);
+  assert.match(compose, /target: \/workspace\/mofacts\/node_modules\s+volume:\s+nocopy: true/);
+  assert.match(compose, /target: \/workspace\/mofacts\/\.meteor\/local\s+volume:\s+nocopy: true/);
+  assert.match(compose, /METEOR_REACTIVITY_ORDER: changeStreams/);
+  assert.match(compose, /METEOR_WATCH_FORCE_POLLING: 'true'/);
+  assert.match(compose, /read_only: true/);
+  assert.doesNotMatch(compose, /^\s+build:|MOFACTS_NATIVE_MONGO_URL/m);
+  assert.match(manager, /\$composeArgs = .*docker-compose\.local\.yml/);
+  assert.match(manager, /"--no-build", "mofacts"/);
+  assert.match(manager, /\$RequiredStableChecks = 4/);
+  assert.match(manager, /assert-change-streams\.sh/);
+  assert.match(manager, /Get-HotfixDevClientBundleState/);
+  assert.doesNotMatch(manager, /JobObject|__supervise|mt-os\.windows|MOFACTS_NATIVE_MONGO_URL|Start-Process/);
+  assert.match(watcher, /test "\$\(meteor --version\)" = 'Meteor 3\.5\.4'/);
+  assert.match(watcher, /meteor npm ci/);
+  assert.match(watcher, /sha256sum package-lock\.json/);
+  assert.match(watcher, /exec meteor run --port 3200/);
+  assert.match(rspack, /host: "0\.0\.0\.0"/);
+  assert.match(rspack, /watchOptions: \{ poll: 1000 \}/);
+  assert.match(read('AGENTS.md'), /There is exactly one localhost application server/);
 });

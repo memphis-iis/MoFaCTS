@@ -25,9 +25,10 @@ if [ ! -f "$SETTINGS_PATH" ]; then
   exit 1
 fi
 
-test "$(cat "$BUNDLE_DIR/.node_version.txt")" = "v24.15.0"
-test "$(node --version)" = "v24.15.0"
-test "$(npm --version)" = "11.12.1"
+test "$(cat "$BUNDLE_DIR/.node_version.txt")" = "v24.22.1"
+test "$(node --version)" = "v24.22.1"
+test "$(npm --version)" = "11.19.1"
+test "$(node -p 'process.versions.undici')" = "7.30.1"
 
 if [ -z "${MONGO_URL:-}" ]; then
   echo "MONGO_URL is required." >&2

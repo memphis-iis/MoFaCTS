@@ -33,7 +33,7 @@ When instructions compete, use this order:
 - Do not add compatibility fallback paths unless explicitly requested.
 - Do not run Docker build, push, deploy, or production-affecting commands unless explicitly requested.
 - Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
-- In clean CI/Docker installs, run `mofacts/scripts/installRspackPackageDependencies.cjs` after application `npm ci` and before Meteor plugin compilation. Keep source-owned package shrinkwraps in capture/checksum verification.
+- Keep the Meteor release, Node/npm versions, CI assertions and Docker runtime pins aligned. Use the official DDP and Rspack packages selected by the release; superseded local package copies and dependency replacements must not shadow upstream security fixes.
 
 ## User Intent And Permissions
 
@@ -168,10 +168,10 @@ Run it from `mofacts/`. Do not substitute per-file checks or targeted `tsc` invo
 
 The local hotfix loop under `deploy/` is the fast source-watching application workflow. Helper ownership is documented in `deploy/hotfix/README.md`.
 
-- There is exactly one localhost application server: the native Meteor/Rspack watcher at `http://localhost:3200`, owned by `deploy/hotfix-local.ps1`.
-- Docker Compose owns MongoDB and its replica-set initialization for this workflow; it does not own a second localhost application container.
+- There is exactly one localhost application server: the Linux Docker Meteor/Rspack watcher at `http://localhost:3200`, owned by `deploy/hotfix-local.ps1` and `deploy/docker-compose.local.yml`.
+- Docker Compose owns the watcher, MongoDB and replica-set initialization. Do not run Meteor on the Windows host. Linux dependencies and generated caches live in Docker volumes, separate from host installations.
 - Source edits must rebuild and reload automatically. Do not replace the watcher with a manual generated-bundle loop or monkey-patch compiled output.
-- `deploy/hotfix-local.ps1` validates Compose and the pinned Meteor tool before starting, then manages start, restart, stop, status, and logs for the watcher.
+- `deploy/hotfix-local.ps1` validates Linux Docker and Compose, then manages start, restart, stop, status, and logs. The container validates the pinned Meteor/Node/npm toolchain before starting. Readiness requires app health, the browser bundle, HMR, and active Change Streams.
 - This fast loop is local verification, not release confidence, and must not replace the canonical Docker Compose image build.
 
 ## Server Method Design

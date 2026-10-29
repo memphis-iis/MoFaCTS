@@ -27,13 +27,10 @@ assert_package_version() {
   ' "$package_json" "$expected_version"
 }
 
-echo '[Function] Replace Meteor accounts-password native dependencies with pinned runtime releases'
-assert_package_version "$ACCOUNTS_NPM_ROOT/bcrypt/package.json" '5.0.1'
-npm install --prefix "$HARDENING_WORKDIR/accounts-password" \
-  --omit=dev --no-save --package-lock=false \
-  bcrypt@6.0.0 argon2@0.41.1 node-gyp-build@4.8.4
-rm -rf "$ACCOUNTS_NPM_ROOT"
-mv "$HARDENING_WORKDIR/accounts-password/node_modules" "$ACCOUNTS_NPM_ROOT"
+echo '[Function] Verify the upstream Meteor accounts-password native dependencies'
+assert_package_version "$ACCOUNTS_NPM_ROOT/bcrypt/package.json" '6.0.0'
+assert_package_version "$ACCOUNTS_NPM_ROOT/argon2/package.json" '0.44.0'
+assert_package_version "$ACCOUNTS_NPM_ROOT/node-gyp-build/package.json" '4.8.4'
 node -e '
   const bcrypt = require(process.argv[1]);
   const argon2 = require(process.argv[2]);

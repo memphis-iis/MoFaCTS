@@ -43,11 +43,7 @@ For contributor setup, see [docs/development.md](docs/development.md).
 Short version:
 
 ```powershell
-cd mofacts
-npm ci
-npm run typecheck
-
-cd ..\deploy
+cd deploy
 Copy-Item .env.local.example .env.local
 Copy-Item settings.local.example.json settings.local.json
 # Edit .env.local and settings.local.json for your local machine.
@@ -56,13 +52,13 @@ Copy-Item settings.local.example.json settings.local.json
 ```
 
 Open `http://localhost:3200`. This source-watching Meteor/Rspack hotfix server
-is the only supported localhost application. Docker supplies its MongoDB
+is the only supported localhost application. Docker runs the Linux watcher and its MongoDB
 replica set; the launcher reads private settings from `.env.local`, bootstraps
 the configured local admin, and stores ignored credentials under
 `deploy/local-hotfix/`. See [First Local
 Run](docs/development.md#first-local-run).
 
-The supported local runtime baseline is Node.js `24.15.0`, npm `11.12.1`, and Meteor `3.5`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
+The supported local runtime baseline is Node.js `24.22.1`, npm `11.19.1`, and Meteor `3.5.4`. See [SUPPORT.md](SUPPORT.md) for the current support policy.
 
 ## Documentation
 

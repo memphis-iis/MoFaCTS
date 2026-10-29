@@ -4,9 +4,9 @@ MoFaCTS is actively used and stable enough for evaluation, research collaboratio
 
 ## Runtime Baseline
 
-- Node.js: `22.x`
-- npm: `10.x`
-- Meteor: `3.4`
+- Node.js: `24.22.1` (bundled Undici `7.30.1`)
+- npm: `11.19.1`
+- Meteor: `3.5.4`
 
 These versions are the contributor and CI baseline.
 

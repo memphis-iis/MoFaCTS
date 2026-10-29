@@ -63,6 +63,7 @@ while (Date.now() < deadline) {
     if (!configResult.config.members.some((member) => member.host === memberHost)) {
       throw new Error(`Configured member ${memberHost} is not present in replica set ${setName}.`);
     }
+    load('/opt/mofacts-mongodb/ensure-app-read-concern-role.js');
     print(`Replica set ${setName} has a writable primary and includes configured member ${memberHost}.`);
     quit(0);
   }

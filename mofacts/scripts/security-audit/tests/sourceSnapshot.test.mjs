@@ -47,7 +47,7 @@ test('Linux CI Docker acquisition excludes regenerated outputs but still rejects
     await fs.writeFile(target, 'synthetic generated dependency output');
   }
   assert.equal((await verifyCapturedTestInputs(captured.workspace, 'default', dependencies)).state, 'test-inputs-verified-unqualified');
-  await fs.appendFile(path.join(derivative, 'mofacts/packages/rspack/.npm/devPackage/npm-shrinkwrap.json'), '\n');
+  await fs.appendFile(path.join(derivative, 'mofacts/package-lock.json'), '\n');
   await assert.rejects(verifyCapturedTestInputs(captured.workspace, 'default', dependencies), /validation failed/);
 });
 

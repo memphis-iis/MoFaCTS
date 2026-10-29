@@ -7,7 +7,7 @@ This folder contains executable deployment examples and scripts for MoFaCTS. Hum
 - `docker-compose.yml`: canonical Self-Hosted MoFaCTS app, authenticated MongoDB, and Redis runtime.
 - `docker-compose.local.yml`: local supporting-service overrides, including the
   MongoDB host port used by the source watcher.
-- `docker-compose.change-streams-qualification.yml`: test-only stable-3.5.0
+- `docker-compose.change-streams-qualification.yml`: test-only stable-3.5.4
   Change Streams recovery qualification override; it is not part of the
   production path.
 - `.env.self-hosted.example`: shareable self-hosted environment template. Copy it to ignored `.env.self-hosted`.
@@ -36,10 +36,27 @@ deployment does not execute it or copy learner records.
 
 Run Docker Compose from this folder.
 
-Source-owned Meteor package shrinkwraps use LF line endings, enforced by
-`.gitattributes`. Fresh Windows checkouts must preserve those bytes so Linux
-Meteor dependency synchronization does not change only the line endings and
-fail the Docker build's dependency checksums.
+The current toolchain is Meteor `3.5.4`, Node `24.22.1`, npm `11.19.1` and
+built-in Undici `7.30.1`. The Dockerfile keeps the existing digest-pinned
+`geoffreybooth/meteor-base:3.5` image only as a CLI bootstrap because that image
+does not provide a `3.5.4` tag. In the application directory the official CLI
+selects the project's exact `.meteor/release`, and the build asserts all four
+versions before compiling. Compiler child processes use that selected Meteor
+Node binary. Dependency and runtime stages use the digest-pinned
+`node:24.22.1-alpine` image.
+
+The official release owns DDP and Rspack; there are no local copies or separate
+Rspack dependency-installation step. Application manifests and Meteor's release,
+package and version files remain checksum-protected through compilation and
+bundle creation. The upstream accounts-password package now provides bcrypt
+`6.0.0` and argon2 `0.44.0`, so the image verifies those dependencies without
+replacing them. Meteor also supplies `@mapbox/node-pre-gyp` `2.0.3` directly;
+the remaining root bundle overrides are node-gyp `12.2.0` and underscore
+`1.13.8`. The remaining email, webapp and CSS dependency replacements are
+still explicit in `docker/harden-runtime-npm-dependencies.sh` because the target
+Meteor release retains their older upstream versions. A toolchain change still
+requires its normal authorized build and runtime verification; source pins alone
+do not establish release confidence.
 
 `docker-compose.yml` sets the build context to `../`, which resolves to the repository root that contains the application Dockerfile.
 
@@ -160,8 +177,8 @@ Compose command unless the qualification gate passes and the production change
 is separately authorized.
 
 The opt-in client/server regression matrix is exercised by the manually
-triggered `Meteor 3.5 Change Streams qualification` GitHub Actions workflow.
-That workflow installs stable Meteor 3.5, starts a disposable MongoDB 8
+triggered `Meteor 3.5.4 Change Streams qualification` GitHub Actions workflow.
+That workflow installs stable Meteor 3.5.4, starts a disposable MongoDB 8
 one-member replica set, selects the qualification overlay's exact environment
 contract, and runs the existing supported Linux Meteor/Playwright test path.
 It is intentionally separate from ordinary CI because its purpose is to
@@ -208,46 +225,44 @@ The readiness command must call the admin-only deployment readiness path for tha
 
 ## Canonical Local Hotfix Server
 
-There is exactly one supported local application server: the source-watching
-Meteor/Rspack hotfix server at `http://localhost:3200`. It is owned by
-`hotfix-local.ps1`. Docker Compose supplies MongoDB and replica-set
-initialization; it does not run another localhost application container. Do not
-add another port-3200 application path.
+`hotfix-local.ps1` owns the single Linux Docker Meteor/Rspack source watcher at
+http://localhost:3200. Compose runs the watcher, MongoDB and replica-set
+initialization. The local overlay completely replaces the production app service;
+it does not build a production image or run host Meteor.
 
-Prepare `.env.local` and the private settings file named by its
-`METEOR_SETTINGS_HOST_PATH`, then run:
-
-```powershell
-cd deploy
-.\hotfix-local.ps1
-```
-
-That command validates the pinned Meteor tool and Compose configuration before
-cleanup, starts the local MongoDB replica set, and launches one supervisor for
-the native Meteor/Rspack process tree. MongoDB must first pass four consecutive
-writable-primary and authenticated-access checks. A MongoDB pool loss during
-Meteor startup gets exactly one clean, archived retry; recurring failures stay
-visible. The manager then waits for the app and HMR endpoints
-and creates or verifies the local admin. Subsequent source edits rebuild and
-reload automatically; rerun the command only to restart the watcher itself.
-
-Its management actions are:
+Prepare `.env.local`, its private `METEOR_SETTINGS_HOST_PATH` file, and the
+MongoDB keyfile. Keep the configured database and existing data intact. Run:
 
 ```powershell
-.\hotfix-local.ps1 status
-.\hotfix-local.ps1 logs
-.\hotfix-local.ps1 stop
+.\hotfix-local.ps1 -Action start
+.\hotfix-local.ps1 -Action status
+.\hotfix-local.ps1 -Action logs
+.\hotfix-local.ps1 -Action restart
+.\hotfix-local.ps1 -Action stop
 ```
 
-`status` reports the supervisor and Meteor ownership, stale PID or obsolete
-helper state, app and bundle readiness, HMR, Change Streams, and a
-bounded summary of the last recognized failure. Previous run logs are retained
-under ignored `deploy/local-hotfix/runs/`. Local admin credentials are stored only in ignored
-`deploy/local-hotfix/agent-secrets.env`. This workflow is local verification,
-not release confidence; production remains a separately authorized path.
+The manager checks stable MongoDB primary/authentication readiness, app health,
+the browser bundle, HMR and active Change Streams. The container validates the
+pinned runtime and installs locked dependencies into Linux volumes. Source edits
+rebuild and reload automatically. Docker owns bounded logs and process lifetime;
+stop preserves data and caches. Credentials stay in ignored
+`deploy/local-hotfix/agent-secrets.env`. See `hotfix/README.md` for details.
+
+This workflow is local verification, not production release confidence.
 
 ## Security Notes
 
+- Meteor 3.5.4 reads MongoDB's default consistency settings. After primary
+  election, the replica-set initializer idempotently grants the configured app
+  user the admin-scoped `mofactsReadDefaultConcern` role. Its only privilege is
+  `getDefaultRWConcern` on the cluster resource; it has no inherited roles and
+  cannot change consistency settings or read additional collections. Existing
+  app roles are preserved. A conflicting role definition blocks initialization.
+  This runs for both new and existing databases. Upgrading an existing deployment
+  requires rerunning its replica-set initializer before starting the upgraded app.
+  Rollback, if reverting Meteor, is to revoke only this role from the configured
+  app user; leave its existing data roles intact. Do not delete a role still used
+  by another account. This procedure does not alter learner data or passwords.
 - Do not commit private keys, SAML certificates, database credentials, or production settings.
 - Keep MongoDB private to the deployment network.
 - Use HTTPS for exposed deployments.

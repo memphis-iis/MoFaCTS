@@ -4,6 +4,7 @@ const path = require('node:path');
 const {
   clientPassingCount,
   validateMeteorTestModules,
+  validateMeteorRuntimeContract,
 } = require('./meteorCiHarness.cjs');
 const {
   findMeteorTestVersionArtifacts,
@@ -16,6 +17,7 @@ const meteorVersionsPath = path.join(appRoot, '.meteor/versions');
 
 try {
   validateMeteorTestModules(packageJson, appRoot);
+  validateMeteorRuntimeContract(appRoot);
 } catch (error) {
   console.error(error.message);
   process.exit(1);
