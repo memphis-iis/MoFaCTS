@@ -11,6 +11,7 @@ const HISTORY_PROJECTION = {
   _id: 1, historySequence: 1, outcome: 1, CFEndLatency: 1, CFFeedbackLatency: 1,
   stimuliSetId: 1, stimulusKC: 1, recordedServerTime: 1, time: 1, TDFId: 1, userId: 1,
   levelUnitType: 1, modelEvidenceSource: 1,
+  'sparc.worksheet.kind': 1,
   'sparc.stateTransition.transitionId': 1,
   'sparc.stateTransition.event.eventId': 1,
   'sparc.stateTransition.event.type': 1,

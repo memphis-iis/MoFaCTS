@@ -279,8 +279,12 @@ export async function initVideoSessionData(curTdfUnit: VideoTdfUnitLike | null |
   }
   let worksheetResumeAnchor = null;
   if (worksheetMode && userId && typeof currentTdfId === 'string') {
+    // Worksheet surfaces persist against the launch-root identity in machine context,
+    // while ordinary video events belong to the resolved condition. Read the same scope.
+    const worksheetTdfId = Session.get('currentRootTdfId');
+    if (typeof worksheetTdfId !== 'string' || !worksheetTdfId.trim()) throw new Error('Worksheet resume requires the launch-root lesson identity');
     for (let index = 0; index < pageIds!.length; index++) {
-      const history = await loadWorksheetHistory(userId, currentTdfId, currentUnitNumber, pageIds![index]!, index);
+      const history = await loadWorksheetHistory(userId, worksheetTdfId, currentUnitNumber, pageIds![index]!, index);
       if (history.some((record) => worksheetEvent(record)?.kind === 'complete')) {
         completedCheckpointQuestionCount = index + 1;
       } else {

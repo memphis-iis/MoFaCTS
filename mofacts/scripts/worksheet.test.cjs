@@ -15,13 +15,13 @@ function fixture(overrides = {}) {
     now: () => time, random: () => 0, id: () => `synthetic-${++serial}`, write: async record => records.push(structuredClone(record)), ...overrides };
   return { deps, records, setTime: t => time = t, create: () => new SparcWorksheet(deps) };
 }
-test('answers are normal model-eligible records; blank questions and review never create answers', async () => {
+test('answers and omissions are model-eligible; review preserves blank selection', async () => {
   const f = fixture(), w = f.create(); await w.initialize([]);
   await w.answer('b0'); await w.answer('a0'); await w.finishWork();
-  assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 2);
+  assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 3);
   assert.equal(w.selection(w.questions[0]).value, 'a'); assert.equal(w.selection(w.questions[1]), undefined);
   assert.equal(f.records.filter(r => worksheetEvent(r).kind === 'answer')[0].responseValue, 'b');
-  await w.answer('b1'); assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 2);
+  await w.answer('b1'); assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 3);
 });
 test('feedback appearances log once per mount; reload creates a new exposure without changing answers or deadline', async () => {
   const f = fixture(), w = f.create(); await w.initialize([]); await w.answer('b0'); await w.finishWork();
@@ -29,14 +29,14 @@ test('feedback appearances log once per mount; reload creates a new exposure wit
   const reloaded = f.create(); await reloaded.initialize(f.records); await reloaded.feedbackAppeared();
   assert.equal(reloaded.deadline, deadline); assert.equal(reloaded.selection(reloaded.questions[0]).value, 'b');
   assert.equal(f.records.filter(r => worksheetEvent(r).kind === 'exposure').length, 2);
-  assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 1);
+  assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 2);
 });
 test('finish waits for pending writes and simultaneous completion triggers save once', async () => {
   let release; const gate = new Promise(resolve => release = resolve); const f = fixture();
   const write = f.deps.write; f.deps.write = async record => { if (worksheetEvent(record).kind === 'answer') await gate; await write(record); };
   const w = f.create(); await w.initialize([]); const answer = w.answer('a0'); const end = w.finishWork();
   assert.equal(w.phase, 'work'); release(); await Promise.all([answer, end]);
-  await Promise.all([w.complete(), w.complete()]); assert.deepEqual(f.records.map(r => worksheetEvent(r).kind), ['start', 'answer', 'review', 'complete']);
+  await Promise.all([w.complete(), w.complete()]); assert.deepEqual(f.records.map(r => worksheetEvent(r).kind), ['start', 'answer', 'answer', 'review', 'complete']);
 });
 test('failed answer write blocks feedback instead of presenting an incomplete replica', async () => {
   const f = fixture(), original = f.deps.write; f.deps.write = async r => { if (worksheetEvent(r).kind === 'answer') throw Error('failure'); await original(r); };
@@ -47,7 +47,7 @@ test('work deadline blocks late answers and resume preserves realized random ord
   const f = fixture(); f.deps.display.worksheet.randomizeQuestions = true; const w = f.create(); await w.initialize([]);
   assert.deepEqual(w.order, ['q1', 'q0']); f.setTime(w.deadline); await w.answer('a0');
   const restored = f.create(); await restored.initialize(f.records); assert.deepEqual(restored.order, w.order); assert.equal(restored.deadline, w.deadline);
-  await restored.finishWork(); assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 0);
+  await restored.finishWork(); assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 2);
 });
 test('checkpoint and learner scopes do not mix', async () => {
   const f = fixture(), w = f.create(); await w.initialize([]); await w.answer('a0');
@@ -97,4 +97,21 @@ test('server retry identity separates course assignments and rejects competing s
   assert.equal(sameWorksheetWrite(start,copy),false);
   assert.notEqual(worksheetHistoryWriteId({...start,courseAssignment:{courseId:'course',assignmentId:'a'}}),
     worksheetHistoryWriteId({...start,courseAssignment:{courseId:'course',assignmentId:'b'}}));
+});
+
+test('interrupted omission recording resumes without duplicating accepted blank outcomes', async () => {
+  const f = fixture(), original = f.deps.write;
+  let omissions = 0;
+  f.deps.write = async record => {
+    if (worksheetEvent(record).kind === 'answer' && ++omissions === 2) throw Error('interrupted');
+    await original(record);
+  };
+  const w = f.create(); await w.initialize([]); await assert.rejects(w.finishWork(), /interrupted/);
+  assert.equal(f.records.filter(isModelPracticeHistoryRecord).length, 1);
+  f.deps.write = original;
+  const restored = f.create(); await restored.initialize(f.records); await restored.finishWork();
+  const answers = f.records.filter(isModelPracticeHistoryRecord);
+  assert.equal(answers.length, 2); assert.ok(answers.every(record => record.outcome === 'incorrect' && record.responseValue === ''));
+  await f.create().initialize(f.records);
+  assert.equal(restored.selection(restored.questions[0]), undefined);
 });

@@ -1,7 +1,6 @@
 export interface IncomingTrialSlotSnapshot {
   readonly mounted: boolean;
   readonly readySent: boolean;
-  readonly transitionCompleteSent: boolean;
 }
 
 export interface IncomingTrialSlotControllerDependencies {
@@ -55,7 +54,6 @@ export function createIncomingTrialSlotController(
   let snapshot: IncomingTrialSlotSnapshot = {
     mounted: false,
     readySent: false,
-    transitionCompleteSent: false,
   };
 
   function publish() {
@@ -66,7 +64,6 @@ export function createIncomingTrialSlotController(
     snapshot = {
       mounted: false,
       readySent: false,
-      transitionCompleteSent: false,
     };
     publish();
   }
@@ -97,16 +94,6 @@ export function createIncomingTrialSlotController(
       snapshot = {
         ...snapshot,
         readySent: true,
-      };
-      publish();
-    },
-    markTransitionCompleteSent() {
-      if (snapshot.transitionCompleteSent) {
-        return;
-      }
-      snapshot = {
-        ...snapshot,
-        transitionCompleteSent: true,
       };
       publish();
     },

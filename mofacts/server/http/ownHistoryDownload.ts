@@ -1,4 +1,5 @@
 import { operationalHistorySelector } from '../../common/historyEnvelope';
+import { attachmentDisposition } from '../lib/attachmentDisposition';
 import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
 import type { IncomingMessage, ServerResponse } from 'http';
@@ -20,10 +21,6 @@ function writeText(res: ServerResponse, statusCode: number, text: string): void 
 function decodePathParts(req: IncomingMessage): string[] {
   const rawPath = String(req.url || '').split('?')[0] || '';
   return rawPath.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
-}
-
-function attachmentDisposition(fileName: string): string {
-  return `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
 async function writeUtf16Le(res: ServerResponse, chunk: string): Promise<void> {

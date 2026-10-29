@@ -178,6 +178,23 @@ export class SparcWorksheet {
     if (this.phase !== 'work' || this.closing) return this.queue;
     this.closing = true;
     return this.enqueue(async () => {
+      // Persist omissions before review, including after an interrupted close.
+      // Question-node addresses distinguish a blank from a selected choice.
+      const document = createSparcAuthoredDocumentFromTrialDisplay({ pageKey: this.display.pageKey!, display: this.display });
+      for (const question of this.questions) {
+        const recorded = this.records.some(record => worksheetEvent(record)?.kind === 'answer'
+          && [question.id, ...question.choices.map(choice => choice.id)].includes(
+            (record.sparc as { sourceAddress?: { nodeId?: string } })?.sourceAddress?.nodeId ?? ''));
+        if (recorded) continue;
+        const time = this.deps.now();
+        const address = { pageKey: this.display.pageKey!, nodeId: question.id };
+        const processed = processSparcResponseOutcome(this.deps.core, {
+          observationId: this.deps.id(), sourceAddress: address, time, problemStartTime: time,
+          outcome: 'incorrect', responseValue: '', input: '',
+          modelTarget: resolveSparcClusterTarget(document, Number(question.choices[0]!.clusterIndex), address),
+        });
+        await this.save('answer', {}, processed.historyRecord);
+      }
       const deadline = this.deps.now() + this.config.reviewDurationSeconds * 1000;
       await this.save('review', { deadline });
       this.deadline = deadline; this.phase = 'review'; this.closing = false;

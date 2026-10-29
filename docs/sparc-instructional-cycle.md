@@ -296,7 +296,9 @@ Instructional content uses descriptive summaries rather than those quotation spa
 
 ## Turn efficiency, October 20, 2026
 
-Assessment now evaluates at most four expectation KCs: the current KC and its three
+Evaluation follows the selected production rule set; these limits are not a
+framework-wide SPARC contract. The agent and student instructional-cycle rule sets
+evaluate at most four expectation KCs: the current KC and its three
 strongest graph neighbors, with deterministic identity ordering for tied strengths.
 It separately evaluates at most four misconceptions ranked by embedding similarity
 to the current KC, always retaining an active misconception within that four-item
@@ -305,6 +307,11 @@ and misconception texts and caches up to four target sets in memory, keyed by ac
 lesson, model, and exact authored text. These vectors contain no learner answers. Existing scores and
 evidence for unassessed targets carry forward. This deliberately trades detection of
 distant transfer on a given turn for a smaller assessment; it does not reset those KCs.
+
+AutoTutor's progressive-scaffolding production rules retain evaluation of the complete
+authored expectation and misconception rubric in one assessment request. They do not
+require a current KC, graph-neighbor selection, or assessment embeddings. The shared
+provider adapter follows the same runtime selection as the dialogue bridge.
 
 The agent condition starts feedback and instruction generation concurrently after
 durable assessment. Authorized SPARC provider methods release the connection's DDP

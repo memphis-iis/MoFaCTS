@@ -1,12 +1,12 @@
 import { validatePrimitiveContent } from '../../runtime/sparcPrimitiveContent';
 import { parseSparcVideoSegment } from '../../runtime/sparcVideo';
-import { SPARC_ASSESSMENT_TARGET_LIMIT, sparcAssessmentClusterKcs, sparcInstructionalAnchor } from './sparcInstructionalControl';
+import { SPARC_ASSESSMENT_TARGET_LIMIT, isSparcInstructionalCycle, sparcAssessmentClusterKcs, sparcInstructionalAnchor } from './sparcInstructionalControl';
 import { cosineSimilarityScore } from '../../runtime/vectorSimilarity';
 import { sparcInstructionalNeedText, type SparcInstructionalNeed } from '../../runtime/sparcInstructionalNeed';
 import { instructionalNeed, primitiveContext, selectedSparcEvidence, previousSparcQuestions,
   type SparcMoveLibraryClient, type SparcPrimitiveContent, type SparcPrimitiveReference,
   type SparcInstructionCheckpoint, type SparcPrimitiveKind, type SparcPrimitiveQuery } from './sparcMoveLibrary';
-import { parseSparcEvidenceSummary, sparcEvidenceContext, type SparcRetainedEvidence } from './sparcEvidenceHistory';
+import { parseSparcEvidenceSummary, sparcEvidenceContext, SPARC_EVIDENCE_REQUIREMENT_LIMIT, SPARC_EVIDENCE_REQUIREMENT_MAX_LENGTH, type SparcRetainedEvidence } from './sparcEvidenceHistory';
 import { parseSparcSupportedPrompt, parseSparcSupportedPromptBrief, parseSparcPromptFigure,
   SPARC_SUPPORTED_PROMPT_JSON_SCHEMA, SPARC_SUPPORTED_PROMPT_SCHEMA_ID, SPARC_SUPPORTED_PROMPT_COMPOSITION_POLICY,
   type SparcSupportedPrompt, type SparcSupportedPromptBrief } from './sparcSupportedPrompt';
@@ -222,13 +222,13 @@ function misconceptionSummaries(
     });
 }
 
-function buildSparcDialogueScoreJsonSchema(): OpenRouterJsonSchema {
+function buildSparcDialogueScoreJsonSchema(expectationLimit = SPARC_ASSESSMENT_TARGET_LIMIT, misconceptionLimit = SPARC_ASSESSMENT_TARGET_LIMIT): OpenRouterJsonSchema {
   // Keep the schema prefix identical across selected KCs. The evidence reducer validates
   // identities and uniqueness against the actual selected targets before accepting scores.
   const boundedEvidenceStrength = { type: 'number', minimum: 0, maximum: 1 };
   const summary = (keys: string[]) => ({ type: ['object', 'null'], additionalProperties: false, required: keys,
     properties: Object.fromEntries(keys.map(key => [key,
-      { type: 'array', maxItems: 6, items: { type: 'string', minLength: 1 } }])) });
+      { type: 'array', maxItems: SPARC_EVIDENCE_REQUIREMENT_LIMIT, items: { type: 'string', minLength: 1, maxLength: SPARC_EVIDENCE_REQUIREMENT_MAX_LENGTH } }])) });
   const learnerEvidence = {
     type: 'array',
     minItems: 1,
@@ -250,7 +250,7 @@ function buildSparcDialogueScoreJsonSchema(): OpenRouterJsonSchema {
       learningTargetEvaluations: {
         type: 'array',
         minItems: 0,
-        maxItems: SPARC_ASSESSMENT_TARGET_LIMIT,
+        maxItems: expectationLimit,
         items: {
           type: 'object',
           additionalProperties: false,
@@ -266,7 +266,7 @@ function buildSparcDialogueScoreJsonSchema(): OpenRouterJsonSchema {
       diagnosticMisconceptionEvaluations: {
         type: 'array',
         minItems: 0,
-        maxItems: SPARC_ASSESSMENT_TARGET_LIMIT,
+        maxItems: misconceptionLimit,
         items: {
           type: 'object',
           additionalProperties: false,
@@ -586,7 +586,8 @@ export function createSparcDialogueOpenRouterAdapter(
     return vectors;
   };
   const prepareAssessment = async (display: SparcTrialDisplay): Promise<void> => {
-    if (misconceptionSummaries(display).length > 4) await assessmentVectors(display);
+    if (isSparcInstructionalCycle(display.instructionalController)
+      && misconceptionSummaries(display).length > SPARC_ASSESSMENT_TARGET_LIMIT) await assessmentVectors(display);
   };
   const callGeneratedJson = (request: Parameters<CallResolvedOpenRouterJson>[0], operation: Parameters<SparcDialogueAdapterRuntime['callGeneratedJson']>[1]) =>
     runtime.callGeneratedJson(request, operation, result => {
@@ -816,10 +817,15 @@ export function createSparcDialogueOpenRouterAdapter(
     event,
   }: Parameters<SparcTrialDisplayDialogueTurnScorer>[0]): Promise<SparcDialogueLearnerResponseEvaluation> => {
     const runtimeFacts = buildSparcWorkingMemoryFacts({ document, replayState });
-    const assessedKcs = sparcAssessmentClusterKcs(runtimeFacts);
+    // Match the production-rule runtime selected by the dialogue bridge. The
+    // instructional-cycle rules use bounded assessment; AutoTutor rules assess
+    // the complete authored rubric. Neither rule is inherent to SPARC.
+    const instructionalCycleAssessment = isSparcInstructionalCycle(display.instructionalController);
+    const assessedKcs = instructionalCycleAssessment ? sparcAssessmentClusterKcs(runtimeFacts)
+      : new Set(targetSummaries(display).map(target => String(target.clusterKC)));
     const learningTargets = targetSummaries(display).filter(target => assessedKcs.has(String(target.clusterKC)));
     let misconceptions = misconceptionSummaries(display);
-    if (misconceptions.length > SPARC_ASSESSMENT_TARGET_LIMIT) {
+    if (instructionalCycleAssessment && misconceptions.length > SPARC_ASSESSMENT_TARGET_LIMIT) {
       const allTargets = targetSummaries(display);
       const anchor = sparcInstructionalAnchor(runtimeFacts);
       const anchorIndex = allTargets.findIndex(target => target.clusterKC === anchor);
@@ -865,7 +871,8 @@ export function createSparcDialogueOpenRouterAdapter(
         intent: {
           title: 'MoFaCTS SPARC Dialogue Scoring',
           schemaName: 'mofacts_sparc_dialogue_score',
-          schema: buildSparcDialogueScoreJsonSchema(),
+          schema: instructionalCycleAssessment ? buildSparcDialogueScoreJsonSchema()
+            : buildSparcDialogueScoreJsonSchema(learningTargets.length, misconceptions.length),
           missingContentMessage: 'OpenRouter SPARC dialogue scoring response did not include message content.',
           strictSchema: true,
         },

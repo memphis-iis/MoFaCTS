@@ -1,155 +1,144 @@
 import { expect } from 'chai';
 import { createTrialFadeTransitionController } from './trialFadeTransitionController';
-import type { ActiveTrialFadeContext } from './activeTrialRevealController';
 
-function createHarness(options: {
-  isFadingOut?: boolean;
-  isPreparedFadingOut?: boolean;
-  isTestMode?: boolean;
-  transitionCompleteSent?: boolean;
-} = {}) {
-  const logs: Array<{ level: number; message: string; details?: unknown }> = [];
-  const preparedHandoffs: Array<{ feedbackReady: boolean; stimulusReady: boolean }> = [];
-  let transitionMarked = false;
-  let transitionSends = 0;
-  const fadeContext: ActiveTrialFadeContext = {
-    key: 'trial-a',
-    subsetKind: 'question',
-    visibleSetAt: 1000,
-    configuredDurationMs: 160,
-  };
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+function harness() {
+  let opacity = '0';
+  let animations: Animation[] = [];
+  const element = { isConnected: true, getAnimations: () => animations } as unknown as Element;
+  let currentElement: Element | null = element;
+  let domUpdate: Promise<void> = Promise.resolve();
+  const handoffs: unknown[] = [];
+  const logs: unknown[] = [];
   const controller = createTrialFadeTransitionController({
-    getComputedOpacity: () => '0.5',
-    getFadeContext: () => fadeContext,
-    getRuntimeState: () => ({
-      feedbackReadyForPreparedHandoff: true,
-      isFadingOut: options.isFadingOut === true,
-      isPreparedFadingOut: options.isPreparedFadingOut === true,
-      isTestMode: options.isTestMode === true,
-      stimulusReadyForPreparedHandoff: false,
-      transitionCompleteSent: options.transitionCompleteSent === true,
-      trialContentVisible: true,
-    }),
-    log: (level, message, details) => {
-      const entry: { level: number; message: string; details?: unknown } = { level, message };
-      if (details !== undefined) {
-        entry.details = details;
-      }
-      logs.push(entry);
-    },
-    markPreparedHandoffOnNextReveal: (params) => {
-      preparedHandoffs.push(params);
-    },
-    markTransitionCompleteSent: () => {
-      transitionMarked = true;
-    },
-    now: () => 1125,
-    sendTransitionComplete: () => {
-      transitionSends += 1;
-    },
+    getFadeElement: () => currentElement,
+    getComputedOpacity: () => opacity,
+    getFadeContext: () => ({ key: 'trial-a', subsetKind: 'feedback', visibleSetAt: 1, configuredDurationMs: 200 }),
+    getRuntimeState: () => ({ isFadingOut: true, isPreparedFadingOut: true, isTestMode: false,
+      feedbackReadyForPreparedHandoff: true, stimulusReadyForPreparedHandoff: false, trialContentVisible: true }),
+    log: (...args) => { logs.push(args); },
+    markPreparedHandoffOnNextReveal: value => { handoffs.push(value); },
+    now: () => 10,
+    waitForDomUpdate: () => domUpdate,
   });
-
-  return {
-    controller,
-    logs,
-    preparedHandoffs,
-    get transitionMarked() {
-      return transitionMarked;
-    },
-    get transitionSends() {
-      return transitionSends;
-    },
+  return { controller, element, handoffs, logs,
+    setOpacity: (value: string) => { opacity = value; },
+    setElement: (value: Element | null) => { currentElement = value; },
+    setDomUpdate: (value: Promise<void>) => { domUpdate = value; },
+    setAnimations: (value: Animation[]) => { animations = value; },
+    animation: (finished: Promise<void>, target = element, property = 'opacity', pseudoElement: string | null = null) =>
+      ({ finished, transitionProperty: property, effect: { target, pseudoElement } }) as unknown as Animation,
   };
 }
 
+async function rejects(promise: Promise<void>, pattern: RegExp) {
+  let caught: unknown;
+  try { await promise; } catch (error) { caught = error; }
+  expect(caught).to.be.instanceOf(Error);
+  expect((caught as Error).message).to.match(pattern);
+}
+
 describe('trial fade transition controller', function() {
-  it('ignores events from other targets or non-opacity properties', function() {
-    const harness = createHarness();
-
-    expect(harness.controller.handleTransitionEvent({
-      eventType: 'transitionend',
-      isOwnTarget: false,
-      propertyName: 'opacity',
-    })).to.equal(false);
-    expect(harness.controller.handleTransitionEvent({
-      eventType: 'transitionend',
-      isOwnTarget: true,
-      propertyName: 'transform',
-    })).to.equal(false);
-
-    expect(harness.logs).to.deep.equal([]);
+  it('waits for the DOM update and actual outgoing opacity animation before preparing the handoff', async function() {
+    const h = harness();
+    const dom = deferred();
+    const fade = deferred();
+    h.setDomUpdate(dom.promise);
+    h.setAnimations([h.animation(fade.promise)]);
+    let complete = false;
+    const pending = h.controller.waitForFadeOut(new AbortController().signal).then(() => { complete = true; });
+    dom.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(complete).to.equal(false);
+    expect(h.handoffs).to.deep.equal([]);
+    fade.resolve();
+    await pending;
+    expect(complete).to.equal(true);
+    expect(h.handoffs).to.deep.equal([{ feedbackReady: true, stimulusReady: false }]);
   });
 
-  it('logs fade timing for opacity transition events without owning launch completion', function() {
-    const harness = createHarness();
-
-    expect(harness.controller.handleTransitionEvent({
-      eventType: 'transitionstart',
-      isOwnTarget: true,
-      propertyName: 'opacity',
-      pseudoElement: '',
-    })).to.equal(true);
-
-    expect(harness.logs[0]).to.deep.equal({
-      level: 2,
-      message: '[ContentSurface][FadeTiming]',
-      details: {
-        eventType: 'transitionstart',
-        key: 'trial-a',
-        subsetKind: 'question',
-        elapsedSinceRevealTriggerMs: 125,
-        configuredDurationMs: 160,
-        trialContentVisible: true,
-        isFadingOut: false,
-        opacity: '0.5',
-        pseudoElement: '',
-      },
-    });
+  it('completes an already-hidden zero-duration fade without a transition event', async function() {
+    const h = harness();
+    await h.controller.waitForFadeOut(new AbortController().signal);
+    expect(h.handoffs).to.have.length(1);
   });
 
-  it('sends transition complete once and preserves prepared handoff readiness', function() {
-    const harness = createHarness({
-      isFadingOut: true,
-      isPreparedFadingOut: true,
-    });
-
-    expect(harness.controller.handleTransitionEvent({
-      eventType: 'transitionend',
-      isOwnTarget: true,
-      propertyName: 'opacity',
-    })).to.equal(true);
-
-    expect(harness.preparedHandoffs).to.deep.equal([{
-      feedbackReady: true,
-      stimulusReady: false,
-    }]);
-    expect(harness.transitionMarked).to.equal(true);
-    expect(harness.transitionSends).to.equal(1);
+  it('does not wait for child, pseudo-element, or non-opacity animations', async function() {
+    const h = harness();
+    const unrelated = deferred();
+    h.setAnimations([h.animation(unrelated.promise, {} as Element),
+      h.animation(unrelated.promise, h.element, 'transform'), h.animation(unrelated.promise, h.element, 'opacity', '::before')]);
+    await h.controller.waitForFadeOut(new AbortController().signal);
+    expect(h.handoffs).to.have.length(1);
   });
 
-  it('does not complete transitions in test mode or after completion was already sent', function() {
-    const testModeHarness = createHarness({
-      isFadingOut: true,
-      isPreparedFadingOut: true,
-      isTestMode: true,
-    });
-    testModeHarness.controller.handleTransitionEvent({
-      eventType: 'transitionend',
-      isOwnTarget: true,
-      propertyName: 'opacity',
-    });
-    expect(testModeHarness.transitionSends).to.equal(0);
-    expect(testModeHarness.preparedHandoffs).to.deep.equal([]);
+  it('propagates unexpected animation cancellation without a successful handoff', async function() {
+    const h = harness();
+    const fade = deferred();
+    h.setAnimations([h.animation(fade.promise)]);
+    const pending = h.controller.waitForFadeOut(new AbortController().signal);
+    await Promise.resolve();
+    fade.reject(new Error('Animation cancelled'));
+    await rejects(pending, /Animation cancelled/);
+    expect(h.handoffs).to.deep.equal([]);
+  });
 
-    const alreadySentHarness = createHarness({
-      isFadingOut: true,
-      transitionCompleteSent: true,
-    });
-    alreadySentHarness.controller.handleTransitionEvent({
-      eventType: 'transitionend',
-      isOwnTarget: true,
-      propertyName: 'opacity',
-    });
-    expect(alreadySentHarness.transitionSends).to.equal(0);
+  it('aborts the wait when its state exits and ignores a late animation completion', async function() {
+    const h = harness();
+    const fade = deferred();
+    h.setAnimations([h.animation(fade.promise)]);
+    const abort = new AbortController();
+    const pending = h.controller.waitForFadeOut(abort.signal);
+    await Promise.resolve();
+    abort.abort(new Error('State exited'));
+    await rejects(pending, /State exited/);
+    fade.resolve();
+    await Promise.resolve();
+    expect(h.handoffs).to.deep.equal([]);
+  });
+
+  it('does not inspect or complete an abandoned DOM update', async function() {
+    const h = harness();
+    const dom = deferred();
+    h.setDomUpdate(dom.promise);
+    const abort = new AbortController();
+    const pending = h.controller.waitForFadeOut(abort.signal);
+    abort.abort(new Error('State exited'));
+    dom.resolve();
+    await rejects(pending, /State exited/);
+    expect(h.handoffs).to.deep.equal([]);
+  });
+
+  it('rejects missing, replaced, or still-visible outgoing elements', async function() {
+    const missing = harness();
+    missing.setElement(null);
+    await rejects(missing.controller.waitForFadeOut(new AbortController().signal), /connected outgoing card/);
+    const visible = harness();
+    visible.setOpacity('1');
+    await rejects(visible.controller.waitForFadeOut(new AbortController().signal), /without hiding/);
+    const replaced = harness();
+    const fade = deferred();
+    replaced.setAnimations([replaced.animation(fade.promise)]);
+    const pending = replaced.controller.waitForFadeOut(new AbortController().signal);
+    await Promise.resolve();
+    replaced.setElement({ isConnected: true } as Element);
+    fade.resolve();
+    await rejects(pending, /element changed/);
+  });
+
+  it('keeps transition events diagnostic and never completes a handoff from them', function() {
+    const h = harness();
+    expect(h.controller.logTransitionEvent({ isOwnTarget: false, propertyName: 'opacity' })).to.equal(false);
+    expect(h.controller.logTransitionEvent({ isOwnTarget: true, propertyName: 'transform' })).to.equal(false);
+    expect(h.controller.logTransitionEvent({ isOwnTarget: true, propertyName: 'opacity', eventType: 'transitionend' })).to.equal(true);
+    expect(h.logs).to.have.length(1);
+    expect(h.handoffs).to.deep.equal([]);
   });
 });

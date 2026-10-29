@@ -175,8 +175,6 @@ export const contentRuntimeMachineOptions = {
 
   delays: {
     FADE_IN_DURATION: () => getCssDuration('--app-transition-smooth'),
-    FADE_OUT_DURATION: () => getCssDuration('--app-transition-smooth'),
-    FADE_OUT_STALL_TIMEOUT: () => getCssDuration('--app-transition-smooth') + 1000,
     FORCE_CORRECT_TIMEOUT: ({ context }: MachineArgs) => resolveForceCorrectTimeout(context),
   },
 };

@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { EventEmitter } from 'node:events';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { validateHeaderValue } from 'node:http';
 import { createOwnedHistoryDownloadHandler } from './ownedHistoryDownloadHandler';
 import type { OwnedHistoryDownloadHandlerDeps } from './ownedHistoryDownloadHandler';
 import type { OwnedHistoryDownloadToken } from './ownedHistoryDownloadTokens';
@@ -19,7 +20,10 @@ describe('owned history HTTP download boundary', () => {
       writableEnded = false;
       headersSent = false;
       statusCode = 0;
-      writeHead(status: number, values: Record<string, string>) { this.statusCode = status; this.headersSent = true; Object.assign(headers, values); return this; }
+      writeHead(status: number, values: Record<string, string>) {
+        for (const [name, value] of Object.entries(values)) validateHeaderValue(name, value);
+        this.statusCode = status; this.headersSent = true; Object.assign(headers, values); return this;
+      }
       write(chunk: Buffer): boolean { chunks.push(chunk); return true; }
       end(chunk?: string) { if (chunk) chunks.push(Buffer.from(chunk)); this.writableEnded = true; }
       destroy() { this.destroyed = true; this.emit('close'); return this; }
@@ -46,6 +50,19 @@ describe('owned history HTTP download boundary', () => {
     return { record, req, res, chunks, headers, deps, counts: () => ({ consumed, authorized, opened, closed }),
       run: () => createOwnedHistoryDownloadHandler(deps)(req as unknown as IncomingMessage, res as unknown as ServerResponse) };
   }
+
+  it('streams Unicode lesson names using a valid HTTP attachment header', async () => {
+    const f = fixture();
+    f.record.fileName = 'SPARC — 中文-data.tsv';
+    f.req.url = `/synthetic-token/${encodeURIComponent(f.record.fileName)}`;
+    await f.run();
+    assert.equal(f.res.statusCode, 200);
+    const disposition = f.headers['Content-Disposition'];
+    assert.ok(disposition);
+    assert.doesNotThrow(() => validateHeaderValue('Content-Disposition', disposition));
+    assert.equal(decodeURIComponent(disposition.split("filename*=UTF-8''")[1]!), f.record.fileName);
+    assert.match(Buffer.concat(f.chunks).toString('utf16le'), /synthetic one/);
+  });
 
   it('authorizes before reading and after sorting, then writes a no-store UTF-16LE attachment', async () => {
     const f = fixture();

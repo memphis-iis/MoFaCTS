@@ -1,5 +1,8 @@
 import type { SparcWorkingMemoryFact } from './sparcSessionContracts';
 
+export const SPARC_EVIDENCE_REQUIREMENT_LIMIT = 6;
+export const SPARC_EVIDENCE_REQUIREMENT_MAX_LENGTH = 240;
+
 /** Descriptions of authored requirements, not new KCs or additional scores. */
 export type SparcEvidenceSummary = {
   demonstrated: string[]; incorrect: string[]; unresolved: string[];
@@ -20,7 +23,7 @@ export function parseSparcEvidenceSummary(value: unknown): SparcEvidenceSummary 
   const record = value as Record<string, unknown>;
   const read = (key: string) => {
     const items = record[key];
-    if (!Array.isArray(items) || items.length > 6 || items.some(x => typeof x !== 'string' || !x.trim() || x.length > 240)) {
+    if (!Array.isArray(items) || items.length > SPARC_EVIDENCE_REQUIREMENT_LIMIT || items.some(x => typeof x !== 'string' || !x.trim() || x.length > SPARC_EVIDENCE_REQUIREMENT_MAX_LENGTH)) {
       throw new Error(`Invalid assessment ${key} requirements`);
     }
     return [...new Set(items as string[])];

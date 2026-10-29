@@ -45,13 +45,45 @@ function scoreContext(): Parameters<SparcTrialDisplayDialogueTurnScorer>[0] {
   ];
   return { document: { id: 'synthetic-page', schemaVersion: 2, autoTutorTargets: { expectations, misconceptions }, workingMemoryFacts: facts,
       root: { id: 'root', kind: 'document' } },
-    display: { nodes: [], autoTutorTargets: { expectations, misconceptions } },
+    display: { nodes: [], instructionalController: { policyId: 'dynamic-instruction-agent-v2' }, autoTutorTargets: { expectations, misconceptions } },
     result: { submittedNodes: {}, timestamp: 1 },
     event: { eventId: 'synthetic-response', type: 'response-submitted', source: { pageKey: 'synthetic-page', nodeId: 'response' }, time: 1 },
     problemStatement: 'Synthetic assessment context', learnerText: 'Private learner contribution.', replayState: createEmptySparcReplayState() };
 }
 
 describe('SPARC dialogue domain adapter with explicit runtime dependencies', () => {
+  it('assesses the complete AutoTutor rubric without a current KC or assessment embeddings', async () => {
+    const base = scoreContext();
+    const { instructionalController: _controller, ...display } = base.display;
+    const context = { ...base, document: { ...base.document, workingMemoryFacts: [] }, display };
+    let calls = 0;
+    const adapter = createSparcDialogueOpenRouterAdapter({}, injectedRuntime({
+      async callResolvedJson(request) {
+        calls++;
+        const input = JSON.parse(request.messages[1]!.content as string);
+        assert.deepEqual(input.learningTargets.map((target: { clusterKC: string }) => target.clusterKC),
+          ['kc-0', 'kc-1', 'kc-2', 'kc-3', 'kc-4']);
+        assert.equal(input.misconceptions.length, 6);
+        const schema = JSON.parse(JSON.stringify(request.intent.schema));
+        assert.equal(schema.properties.learningTargetEvaluations.maxItems, 5);
+        assert.equal(schema.properties.diagnosticMisconceptionEvaluations.maxItems, 6);
+        const evidence = { evidenceDirection: 'supports', evidenceStrength: .5, summary: null,
+          learnerEvidence: [{ source: 'learnerText', dialogueHistoryIndex: null, quote: context.learnerText }] };
+        return { parsedContent: {
+          learningTargetEvaluations: input.learningTargets.map((target: { clusterKC: string }) => ({ clusterKC: target.clusterKC, ...evidence })),
+          diagnosticMisconceptionEvaluations: [{ id: 'mis-5', ...evidence }],
+          learnerContribution: { type: 'answer' },
+        } };
+      },
+    }));
+    // The default embedding dependency throws: broad AutoTutor must not call it.
+    await adapter.prepareAssessment(context.display);
+    const result = await adapter.scoreLearnerResponse(context);
+    assert.equal(result.learningTargetScores?.length, 5);
+    assert.equal(result.diagnosticMisconceptionScores?.length, 1);
+    assert.equal(calls, 1, 'Preserve the existing single assessment call');
+  });
+
   it('selects graph-neighbor KCs and closest misconceptions using only injected authored target vectors', async () => {
     const context = scoreContext();
     const embedded: string[][] = [];
@@ -61,6 +93,14 @@ describe('SPARC dialogue domain adapter with explicit runtime dependencies', () 
         return texts.map(text => normalizeEmbeddingVector(text.startsWith('Expectation') ? [1, 0] : [Number(text.at(-1)) + 1, 1]));
       },
       async callResolvedJson(request) {
+        const schema = JSON.parse(JSON.stringify(request.intent.schema));
+        for (const group of ['learningTargetEvaluations', 'diagnosticMisconceptionEvaluations']) {
+          const summaryFields = schema.properties[group].items.properties.summary.properties;
+          for (const field of Object.values(summaryFields) as { maxItems: number; items: { maxLength: number } }[]) {
+            assert.equal(field.maxItems, 6, 'Provider must respect retained evidence requirement count');
+            assert.equal(field.items.maxLength, 240, 'Provider must respect retained evidence text limit');
+          }
+        }
         const input = JSON.parse(request.messages[1]!.content as string);
         assert.deepEqual(input.learningTargets.map((target: { clusterKC: string }) => target.clusterKC), ['kc-0', 'kc-1', 'kc-2', 'kc-3']);
         assert.deepEqual(input.misconceptions.map((target: { id: string }) => target.id), ['mis-5', 'mis-4', 'mis-3', 'mis-2']);

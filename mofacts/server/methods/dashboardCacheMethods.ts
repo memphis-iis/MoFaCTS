@@ -65,6 +65,7 @@ function isAutoTutorRecord(record: DashboardHistoryRecord): boolean {
 
 function shouldCountDashboardHistoryRecord(record: DashboardHistoryRecord): boolean {
   if (!isOperationalHistoryRecord(record)) return false;
+  if (record.sparc?.worksheet) return record.sparc.worksheet.kind === 'answer';
   const transition = record.sparc?.stateTransition;
   // Non-dialogue SPARC trial records retain their existing trial semantics.
   if (record.levelUnitType !== 'sparc' || !transition) return true;

@@ -13,7 +13,6 @@ import {
   resumeVideoSessionAfterClearing,
   resumeVideoSessionAfterQuestion,
 } from './videoSessionMachine';
-import { setFadeOutStallError } from './machineErrorContext';
 import {
   toHistoryLoggingInput,
   toOutcomeHistoryStateInput,
@@ -188,8 +187,10 @@ export const contentRuntimeMachineTransitionState = {
     },
     fadingOut: {
       entry: ['logStateTransition'],
-      on: {
-        [EVENTS.TRANSITION_COMPLETE]: [
+      invoke: {
+        id: 'waitForTrialFadeOut',
+        src: 'waitForTrialFadeOut',
+        onDone: [
           {
             guard: 'shouldEnterBlocksBoardFromPreparedAdvance',
             target: `#contentRuntimeMachine.${STATES.PRESENTING}.${STATES.BLOCKS_BOARD}`,
@@ -229,11 +230,9 @@ export const contentRuntimeMachineTransitionState = {
             actions: ['logStateTransition'],
           },
         ],
-      },
-      after: {
-        FADE_OUT_STALL_TIMEOUT: {
+        onError: {
           target: `#contentRuntimeMachine.${STATES.ERROR}`,
-          actions: setFadeOutStallError,
+          actions: ['setErrorMessage', 'logError', 'logStateTransition'],
         },
       },
     },

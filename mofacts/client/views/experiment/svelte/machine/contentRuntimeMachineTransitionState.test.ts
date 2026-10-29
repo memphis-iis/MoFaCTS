@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { EVENTS, STATES } from './constants';
+import { STATES } from './constants';
 import { contentRuntimeMachineTransitionState } from './contentRuntimeMachineTransitionState';
 
 type Transition = {
@@ -78,7 +78,7 @@ describe('card machine transition state', function() {
   });
 
   it('commits prepared trials on transition completion before displaying', function() {
-    const transitions = contentRuntimeMachineTransitionState.states.fadingOut.on[EVENTS.TRANSITION_COMPLETE] as Transition[];
+    const transitions = contentRuntimeMachineTransitionState.states.fadingOut.invoke.onDone as Transition[];
 
     expect(transitions[0]!).to.deep.include({
       target: `#contentRuntimeMachine.${STATES.PRESENTING}.${STATES.BLOCKS_BOARD}`,

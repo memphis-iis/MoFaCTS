@@ -15,7 +15,7 @@ export const SPARC_AUTOTUTOR_ADAPTER_ID = 'sparc-autotutor-v1';
 export const SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_VERSION = 1;
 export const SPARC_ASSESSMENT_TARGET_LIMIT = 4;
 
-export function isSparcInstructionalCycle(config: SparcInstructionalControllerConfig | undefined): boolean {
+export function isSparcInstructionalCycle(config: { readonly policyId?: string } | undefined): boolean {
   return isSparcCompetitivePolicy(config?.policyId) || isSparcStudentPolicy(config?.policyId);
 }
 

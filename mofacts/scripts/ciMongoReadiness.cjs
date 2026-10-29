@@ -6,9 +6,10 @@ const MAX_ATTEMPTS = 60;
 const DIAGNOSTIC_FORMAT = 'status={{.State.Status}} exitCode={{.State.ExitCode}} oomKilled={{.State.OOMKilled}} error={{json .State.Error}} image={{.Config.Image}} imageId={{.Image}}';
 
 // MongoDB 8.0's allocator is incompatible with Linux 6.19 through 7.0.13.
+// WSL adds a numeric build component; compatibility uses major/minor/patch.
 // CI owns this host contract; never bypass the database's own startup check.
 function assertCiMongoKernel(kernelRelease) {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(kernelRelease);
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:\.\d+)?(?:[-+].*)?$/.exec(kernelRelease);
   if (!match) throw new Error('CI MongoDB requires a recognizable Linux kernel version.');
   const [major, minor, patch] = match.slice(1).map(Number);
   if ((major === 6 && minor >= 19) || (major === 7 && minor === 0 && patch < 14)) {

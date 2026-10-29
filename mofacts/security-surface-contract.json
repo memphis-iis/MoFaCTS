@@ -1173,12 +1173,12 @@
     {
       "name": "/data-download/own-history",
       "access": "single-use-download",
-      "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies."
+      "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies. Attachment headers use an ASCII quoted name and the complete RFC 5987 UTF-8 filename; control characters are rejected."
     },
     {
       "name": "/data-download/owned-history",
       "access": "single-use-download",
-      "notes": "Expiring single-use capability binds the issuing user, exact owned lesson IDs, request and filename. Revalidates current authorization before reading and before headers; bounded projected history reads, private temporary sorting, no-store responses, abort cleanup."
+      "notes": "Expiring single-use capability binds the issuing user, exact owned lesson IDs, request and filename. Revalidates current authorization before reading and before headers; bounded projected history reads, private temporary sorting, no-store responses, abort cleanup. Attachment headers preserve Unicode filenames using RFC 5987 with a valid ASCII quoted name; control characters are rejected."
     },
     {
       "name": "/dynamic-assets",

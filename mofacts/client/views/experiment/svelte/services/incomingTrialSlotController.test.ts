@@ -62,7 +62,6 @@ describe('incoming trial slot controller', function() {
     expect(snapshots).to.deep.equal([{
       mounted: false,
       readySent: false,
-      transitionCompleteSent: false,
     }]);
 
     domUpdate.resolve();
@@ -74,7 +73,6 @@ describe('incoming trial slot controller', function() {
     expect(snapshots[snapshots.length - 1]).to.deep.equal({
       mounted: true,
       readySent: false,
-      transitionCompleteSent: false,
     });
   });
 
@@ -95,13 +93,12 @@ describe('incoming trial slot controller', function() {
     await flushMicrotasks();
 
     expect(snapshots).to.deep.equal([
-      { mounted: false, readySent: false, transitionCompleteSent: false },
-      { mounted: false, readySent: false, transitionCompleteSent: false },
+      { mounted: false, readySent: false },
+      { mounted: false, readySent: false },
     ]);
     expect(controller.getSnapshot()).to.deep.equal({
       mounted: false,
       readySent: false,
-      transitionCompleteSent: false,
     });
   });
 
@@ -126,12 +123,12 @@ describe('incoming trial slot controller', function() {
     expect(domUpdateCalls).to.equal(1);
     expect(paintCalls).to.equal(1);
     expect(snapshots).to.deep.equal([
-      { mounted: false, readySent: false, transitionCompleteSent: false },
-      { mounted: true, readySent: false, transitionCompleteSent: false },
+      { mounted: false, readySent: false },
+      { mounted: true, readySent: false },
     ]);
   });
 
-  it('tracks one-shot incoming-ready and transition-complete flags', function() {
+  it('tracks incoming readiness once per prepared slot', function() {
     const snapshots: IncomingTrialSlotSnapshot[] = [];
     const controller = createIncomingTrialSlotController({
       onUpdate: (snapshot) => snapshots.push(snapshot),
@@ -141,12 +138,10 @@ describe('incoming trial slot controller', function() {
 
     controller.markReadySent();
     controller.markReadySent();
-    controller.markTransitionCompleteSent();
-    controller.markTransitionCompleteSent();
 
     expect(snapshots).to.deep.equal([
-      { mounted: false, readySent: true, transitionCompleteSent: false },
-      { mounted: false, readySent: true, transitionCompleteSent: true },
+      { mounted: false, readySent: true },
     ]);
   });
+
 });

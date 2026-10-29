@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { attachmentDisposition } from './attachmentDisposition';
 import type { OwnedHistoryDownloadToken } from './ownedHistoryDownloadTokens';
 
 type HistoryRecord = Record<string, unknown>;
@@ -62,7 +63,7 @@ export function createOwnedHistoryDownloadHandler(deps: OwnedHistoryDownloadHand
       controller.signal.throwIfAborted();
       res.writeHead(200, {
         'Content-Type': 'text/tab-separated-values; charset=utf-16le',
-        'Content-Disposition': `attachment; filename="${record.fileName}"; filename*=UTF-8''${encodeURIComponent(record.fileName)}`,
+        'Content-Disposition': attachmentDisposition(record.fileName),
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       });

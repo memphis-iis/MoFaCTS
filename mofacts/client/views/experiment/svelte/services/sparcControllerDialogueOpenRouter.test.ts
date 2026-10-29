@@ -8,6 +8,7 @@ import type { SparcInstructionComponents } from '../../../../../../learning-comp
 import { requireActiveSparcMoveDefinition } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import { SPARC_CATEGORIZED_MOVE_DEFINITIONS } from '../../../../../../learning-components/units/sparcsession/sparcMoveDefinitions';
 import { SPARC_TARGET_CATEGORIES } from '../../../../../../learning-components/runtime/sparcTargetCategories';
+import { SPARC_CATEGORIZED_AGENT_POLICY_ID, SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID } from '../../../../../../learning-components/runtime/sparcInstructionalPolicies';
 import { composeSparcCategoryInstructions } from '../../../../../../learning-components/units/sparcsession/sparcCategoryInstructions';
 import {
   createSparcDialogueOpenRouterProvider,
@@ -26,6 +27,7 @@ const problemStatement = 'Suppose $1,000 earns 5% interest and interest remains 
 function dialogueDisplay(): SparcControllerDisplay {
   return {
     pageKey: 'dialogue-doc',
+    instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: SPARC_PROGRESSIVE_SCAFFOLDING_POLICY_ID, policyVersion: 1 },
     nodes: [{
       id: 'dialogue-thread',
       nodeType: 'group',
@@ -730,6 +732,8 @@ describe('SPARC dialogue OpenRouter provider', function() {
     const misconceptions = Array.from({ length: 6 }, (_, i) => ({ id: `mis-${i}`, text: `Misconception ${i}` }));
     const targets = { expectations, misconceptions };
     const context = scorerContext(targets);
+    const display = { ...dialogueDisplay(), autoTutorTargets: targets,
+      instructionalController: { adapterId: 'sparc-autotutor-v1', policyId: SPARC_CATEGORIZED_AGENT_POLICY_ID, policyVersion: 1 } };
     (context.document.workingMemoryFacts as import('../../../../../../learning-components/units/sparcsession/sparcSessionContracts').SparcWorkingMemoryFact[]).push(
       { factType: 'instructional.activeCycle', slots: { targetKind: 'expectation', targetId: 'kc-0', status: 'active' } },
       ...expectations.slice(1).map((entry, i) => ({ factType: 'kcGraph.relationship', slots: {
@@ -751,10 +755,10 @@ describe('SPARC dialogue OpenRouter provider', function() {
         } };
       },
     });
-    await provider.prepareAssessment({ ...dialogueDisplay(), autoTutorTargets: targets });
+    await provider.prepareAssessment(display);
     expect(embeddings).to.equal(1);
     for (let i = 0; i < 2; i++) {
-      const score = await provider.scoreLearnerResponse({ display: { ...dialogueDisplay(), autoTutorTargets: targets }, learnerText: 'Okay.', ...context,
+      const score = await provider.scoreLearnerResponse({ display, learnerText: 'Okay.', ...context,
       } as Parameters<typeof provider.scoreLearnerResponse>[0]);
       expect(score.learningTargetScores).to.deep.equal([]);
       expect(score.diagnosticMisconceptionScores).to.equal(undefined);
@@ -993,7 +997,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
     expect(systemMessage?.content).to.not.contain('priorSupportStrength');
   });
 
-  it('keeps assessment instructions and schema stable while appending only assessment dialogue before changing KC context', async function() {
+  it('keeps assessment instructions stable and sizes the AutoTutor schema to the rubric while appending assessment dialogue', async function() {
     const calls: Array<Parameters<CallResolvedOpenRouterJson>[0]> = [];
     const provider = createSparcDialogueOpenRouterProvider({ async callResolvedOpenRouterJson(params) {
       calls.push(params);
@@ -1013,7 +1017,14 @@ describe('SPARC dialogue OpenRouter provider', function() {
       { speaker: 'tutor', component: 'question', responseId: 'question-two', targetId: 'new-kc', responseFormat: 'cloze', text: 'The new relation is _____.' },
     ]), display: { ...dialogueDisplay(), autoTutorTargets: changedTargets }, learnerText: 'The new relation.' } as Parameters<typeof provider.scoreLearnerResponse>[0]);
     expect(calls[1]!.messages[0]).to.deep.equal(calls[0]!.messages[0]);
-    expect(calls[1]!.intent.schema).to.deep.equal(calls[0]!.intent.schema);
+    const firstSchema = calls[0]!.intent.schema as { properties: Record<string, { maxItems?: number }> };
+    const secondSchema = calls[1]!.intent.schema as typeof firstSchema;
+    expect(firstSchema.properties.learningTargetEvaluations!.maxItems).to.equal(1);
+    expect(firstSchema.properties.diagnosticMisconceptionEvaluations!.maxItems).to.equal(1);
+    // Removing the misconception changes its budget, while the evidence contract stays identical.
+    expect(secondSchema).to.deep.equal({ ...firstSchema, properties: { ...firstSchema.properties,
+      diagnosticMisconceptionEvaluations: { ...firstSchema.properties.diagnosticMisconceptionEvaluations, maxItems: 0 },
+    } });
     const firstText = calls[0]!.messages[1]!.content as string;
     const secondText = calls[1]!.messages[1]!.content as string;
     const first = JSON.parse(firstText), second = JSON.parse(secondText);
@@ -1722,7 +1733,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.required).to.deep.equal([
           'clusterKC', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
-        expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 0, maxItems: 4 });
+        expect(scoreSchema.properties?.learningTargetEvaluations).to.include({ minItems: 0, maxItems: display.autoTutorTargets!.expectations!.length });
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.clusterKC)
           .to.deep.equal({ type: 'string', minLength: 1 });
         expect(scoreSchema.properties?.learningTargetEvaluations?.items?.properties?.evidenceStrength)
@@ -1733,7 +1744,7 @@ describe('SPARC dialogue OpenRouter provider', function() {
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.required).to.deep.equal([
           'id', 'evidenceDirection', 'evidenceStrength', 'learnerEvidence', 'summary',
         ]);
-        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 0, maxItems: 4 });
+        expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations).to.include({ minItems: 0, maxItems: display.autoTutorTargets!.misconceptions!.length });
         expect(scoreSchema.properties?.diagnosticMisconceptionEvaluations?.items?.properties?.id)
           .to.deep.equal({ type: 'string', minLength: 1 });
         return {

@@ -12,13 +12,13 @@ const container = 'mofacts-ci-mongodb';
 const result = (exitCode = 0, stdout = '', stderr = '') => ({ exitCode, stdout, stderr });
 
 test('CI MongoDB accepts compatible host kernels and rejects the allocator incompatibility range', () => {
-  for (const release of ['5.15.0-azure', '6.8.0-1064-azure', '6.18.99', '7.0.14', '7.1.0-azure', '8.0.0']) {
+  for (const release of ['5.15.0-azure', '5.15.153.1-microsoft-standard-WSL2', '6.6.87.2-microsoft-standard-WSL2', '7.0.14.1-microsoft-standard-WSL2', '6.8.0-1064-azure', '6.18.99', '7.0.14', '7.1.0-azure', '8.0.0']) {
     assert.doesNotThrow(() => assertCiMongoKernel(release));
   }
-  for (const release of ['6.19.0', '6.19.8', '6.20.0', '7.0.0-1017-azure', '7.0.13']) {
+  for (const release of ['6.19.0', '6.19.0.1-microsoft-standard-WSL2', '7.0.13.9-microsoft-standard-WSL2', '6.19.8', '6.20.0', '7.0.0-1017-azure', '7.0.13']) {
     assert.throws(() => assertCiMongoKernel(release), /cannot run on Linux/);
   }
-  for (const release of ['', 'unknown', '7.0']) {
+  for (const release of ['', 'unknown', '7.0', '5.15.153.x-microsoft-standard-WSL2', '5.15.153.1.2-microsoft-standard-WSL2']) {
     assert.throws(() => assertCiMongoKernel(release), /recognizable Linux kernel/);
   }
 });

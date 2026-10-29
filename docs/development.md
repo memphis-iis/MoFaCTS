@@ -37,6 +37,8 @@ docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.loc
 docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml exec -T mofacts meteor npm run lint
 ```
 
+The CI kernel preflight recognizes three-part Linux releases and four-part WSL2 releases. The optional fourth build component does not change the major/minor/patch compatibility check or modify the host.
+
 The full integration suite requires a separate supported Linux test environment,
 an isolated test database and explicit authorization. Never point it at the
 localhost application database. See `deploy/hotfix/README.md` for ownership.

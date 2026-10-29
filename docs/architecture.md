@@ -25,6 +25,8 @@ The central application theme owns presentation, including generated instruction
 
 The active learner card experience uses Svelte components and state-machine-oriented runtime logic. Existing Meteor client code still provides routing, data subscriptions, account context, administrative workflows, and integration points.
 
+During `transition.fadingOut`, the machine invokes a cancellable browser-side wait for the outgoing card's own opacity transition. `ContentSurface` supplies the DOM-bound implementation through the machine's actor interface; the machine's existing completion guards own card commitment and unit continuation. The central theme still owns the CSS fade. Browser rendering can be throttled, so elapsed wall-clock time is not an animation-failure criterion. Zero-duration fades complete only after the outgoing element is confirmed hidden. Unexpected animation cancellation, a missing/replaced element, or a visible final state fails explicitly. Leaving the state aborts the wait and prevents late handoffs. Transition events provide diagnostics and do not independently advance the machine.
+
 ## Learning Component Modularity
 
 Reusable unit behavior lives under `learning-components/`. Component registration and explicit runtime capabilities define unit/trial boundaries. SPARC owns current AutoTutor dialogue; the original standalone AutoTutor runtime is removed. See [the removal boundary](standalone-autotutor-removal.md). See `../docs-developer/modularity-extension-boundary-plan.md`.

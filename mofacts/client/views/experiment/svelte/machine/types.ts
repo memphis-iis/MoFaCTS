@@ -312,11 +312,6 @@
  */
 
 /**
- * @typedef {Object} TransitionCompleteEvent
- * @property {'TRANSITION_COMPLETE'} type
- */
-
-/**
  * @typedef {Object} FirstKeypressEvent
  * @property {'FIRST_KEYPRESS'} type
  * @property {number} timestamp - Keypress timestamp
@@ -369,7 +364,6 @@
  *   MaxAttemptsReachedEvent |
  *   ErrorEvent |
  *   TtsCompleteEvent |
- *   TransitionCompleteEvent |
  *   FirstKeypressEvent |
  *   InputActivityEvent |
  *   VideoCheckpointEvent |

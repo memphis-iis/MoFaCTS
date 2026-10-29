@@ -39,6 +39,18 @@ function createDashboardMethodsFixture(overrides: Partial<Parameters<typeof crea
 }
 
 describe('dashboardCacheMethods', function() {
+  it('counts worksheet answers and omissions but excludes lifecycle events', function() {
+    const rows = ['start', 'answer', 'answer', 'review', 'exposure', 'complete'].map((kind, index) => ({
+      _id: String(index), levelUnitType: kind === 'answer' ? 'model' : 'sparc', time: 1000,
+      outcome: kind === 'answer' ? (index === 1 ? 'correct' : 'incorrect') : 'unknown',
+      sparc: { worksheet: { kind } },
+    }));
+    const stats = computeCacheStats(rows, 'Worksheet', () => 0);
+    expect(stats.totalTrials).to.equal(2);
+    expect(stats.correctTrials).to.equal(1);
+    expect(stats.incorrectTrials).to.equal(1);
+  });
+
   it('counts one assessed dialogue response across sparse checkpoints and bundled turns', function() {
     const event = { eventId: 'answer-1', type: 'response-submitted' };
     const rows = ['submission', 'assessment:score:kc', 'assessment:evidence:kc', 'assessment', 'decision', 'feedback', 'primitive:richContent', 'primitive:explanation', 'primitive:question', 'cycle']

@@ -8,10 +8,6 @@ export const setUnsupportedTrialTypeError = assign({
   errorMessage: ({ context }: MachineArgs) => `Unsupported trial type: ${context.testType}`,
 });
 
-export const setFadeOutStallError = assign({
-  errorMessage: ({ context }: MachineArgs) => `transition.fadingOut stalled without TRANSITION_COMPLETE (preparedAdvanceMode=${String(context.preparedAdvanceMode || 'none')})`,
-});
-
 export const setInvalidVideoCheckpointError = assign({
   errorMessage: ({ event }: MachineArgs) => (
     `[ContentRuntimeMachine] Invalid video checkpoint event: checkpointIndex=${String(event.checkpointIndex)}, questionIndex=${String(event.questionIndex)}`

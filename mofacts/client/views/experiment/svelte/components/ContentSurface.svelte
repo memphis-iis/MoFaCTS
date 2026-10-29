@@ -11,7 +11,7 @@
     stopRecording as stopSrRecording
   } from '../services/speechRecognitionService';
   import { completeCleanup } from '../utils/lifecycleCleanup';
-  import { createActor } from 'xstate';
+  import { createActor, fromPromise } from 'xstate';
   import { Session } from 'meteor/session';
   import { Meteor } from 'meteor/meteor';
   import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
@@ -98,7 +98,6 @@
   import { createCardRuntimeWindowEventController } from '../services/cardRuntimeWindowEvents';
   import {
     getVideoCheckpoints,
-    getVideoResumeAnchor,
     resolveRuntimeEngine,
   } from '../services/cardRuntimeState';
   import {
@@ -324,13 +323,11 @@
   let activeSlotVisible = false;
   let incomingSlotMounted = false;
   let incomingReadySent = false;
-  let transitionCompleteSent = false;
   let incomingAllBlockingAssetsReady = true;
   const incomingTrialSlotController = createIncomingTrialSlotController({
     onUpdate: (snapshot) => {
       incomingSlotMounted = snapshot.mounted;
       incomingReadySent = snapshot.readySent;
-      transitionCompleteSent = snapshot.transitionCompleteSent;
     },
     waitForBrowserPaint,
     waitForDomUpdate: tick,
@@ -381,6 +378,7 @@
     waitForDomUpdate: tick,
   });
   const trialFadeTransitionController = createTrialFadeTransitionController({
+    getFadeElement: () => trialContentFadeElement,
     getComputedOpacity: () => trialContentFadeElement
       ? getComputedStyle(trialContentFadeElement).opacity
       : 'unknown',
@@ -391,16 +389,12 @@
       isPreparedFadingOut,
       isTestMode: testMode,
       stimulusReadyForPreparedHandoff: incomingBlockingAssetState.stimulusReady,
-      transitionCompleteSent,
       trialContentVisible,
     }),
     log: clientConsole,
     markPreparedHandoffOnNextReveal: activeTrialRevealController.markPreparedHandoffOnNextReveal,
-    markTransitionCompleteSent: incomingTrialSlotController.markTransitionCompleteSent,
     now: () => performance.now(),
-    sendTransitionComplete: () => {
-      send({ type: EVENTS.TRANSITION_COMPLETE, timestamp: Date.now() });
-    },
+    waitForDomUpdate: tick,
   });
   let videoEndOverlayMounted = false;
   let videoEndOverlayVisible = false;
@@ -876,7 +870,7 @@
 
   function logTrialFadeEvent(event) {
     const transitionEvent = event?.detail?.target ? event.detail : event;
-    trialFadeTransitionController.handleTransitionEvent({
+    trialFadeTransitionController.logTransitionEvent({
       eventType: event?.type,
       isOwnTarget: transitionEvent?.target === trialContentFadeElement,
       propertyName: transitionEvent?.propertyName,
@@ -1009,7 +1003,11 @@
   // Lifecycle: Start machine on mount
   let initializedForRender = false;
   contentRuntimeMachineRuntimeController = createContentRuntimeMachineRuntimeController({
-    machine: contentRuntimeMachine,
+    machine: contentRuntimeMachine.provide({
+      actors: {
+        waitForTrialFadeOut: fromPromise(({ signal }) => trialFadeTransitionController.waitForFadeOut(signal)),
+      },
+    }),
     createActor: (machine) => createActor(machine),
     setState: (snapshot) => {
       state = snapshot;
@@ -1036,6 +1034,9 @@
       },
       setUser: (nextUser) => {
         user = nextUser;
+      },
+      setVideoResumeAnchor: (anchor) => {
+        videoResumeAnchor = anchor;
       },
       setVideoCheckpoints: (nextVideoCheckpoints) => {
         videoCheckpoints = nextVideoCheckpoints;
@@ -1140,10 +1141,11 @@
   // Video player reference
   let videoPlayer;
   let videoCheckpoints = null;
+  let videoResumeAnchor = null;
   $: videoRuntimeSnapshot = buildVideoRuntimeSnapshot({
     currentState,
     currentTdfUnit,
-    getVideoResumeAnchor,
+    getVideoResumeAnchor: () => videoResumeAnchor,
     state,
     videoCheckpoints,
   });

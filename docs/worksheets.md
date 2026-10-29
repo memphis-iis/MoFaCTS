@@ -4,7 +4,7 @@ A worksheet presents a fixed set of active TutorScript multiple-choice questions
 then a read-only feedback replica. Each selection or changed answer writes a normal
 SPARC model-practice history record. These answers are available to subsequent model
 loading, but worksheet delivery does not update the adaptive model or select questions
-adaptively. An unanswered question produces no answer record.
+adaptively. At submission or the work deadline, each unanswered question writes an incorrect outcome with an empty response at its question-node address.
 
 ## Authoring
 
@@ -49,10 +49,9 @@ Timing and randomization belong to each page, not to a second video-level copy.
 ## Work, feedback and resume
 
 Work withholds visible correctness feedback. **Submit and Continue** or the work
-deadline waits for pending answer writes and opens review. It neither grades a batch
-nor generates another set of answer records. Review reconstructs the latest recorded
+deadline waits for pending answer writes and opens review. It preserves recorded selections and writes only missing omission outcomes before review. Review reconstructs the latest recorded
 selection for each question in the saved order and overlays its authored correct
-answer. Blanks remain blank and are indicated as incorrect visually only.
+answer. Blanks remain blank in review; their incorrect outcomes are also included in exports and dashboard accuracy. Interrupted omission recording resumes without duplicating accepted outcomes.
 
 **Continue** or the review deadline completes review. Video playback then resumes;
 when the checkpoint is at the end of the video, completion opens the normal video-end
@@ -68,7 +67,7 @@ ordinary model-eligible records with this metadata attached; there is no answer 
 Each mounted feedback appearance is logged after a browser paint, including reloads.
 Redraws reuse that appearance, and retries reuse the same server-derived record identity.
 Instruction events still record Continue as before. A completed worksheet scope remains
-completed on reload. Scope includes learner, lesson, unit, page, checkpoint and course
+completed on reload. The player applies its saved resume anchor after metadata and resume props are available, including when they arrive after player readiness. Worksheet history uses the launch-root lesson identity, including condition-based video lessons; resume reads the same scope. Player activity remains associated with the selected condition. Scope includes learner, lesson, unit, page, checkpoint and course
 assignment when present; merely reloading does not create a new attempt. Conflicting
 starts/sequences and orphaned histories fail explicitly instead of silently merging.
 
@@ -82,7 +81,7 @@ an interface language does not translate lesson content.
 write identities. An identical retry succeeds without another insert or dashboard update;
 a conflicting payload fails. Scoped reads retain authorization, project only required
 fields and reject more than 10,000 records rather than truncate reconstruction. The
-`worksheet_scoped_history` index supports the query prefix. No old histories are rewritten.
+`worksheet_scoped_history` index supports the query prefix. No old histories are rewritten; historical omissions without outcome records remain absent. Dashboard cache version 10 rebuilds prior aggregates to exclude worksheet lifecycle events. Each selection/change or omission counts as an answer observation; lifecycle events do not count as trials.
 
 Run `node --test scripts/worksheet.test.cjs` from `mofacts/` for pure lifecycle and
 write-identity coverage. `node --test scripts/interfaceI18n.test.cjs` checks interface

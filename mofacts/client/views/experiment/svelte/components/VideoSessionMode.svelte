@@ -85,6 +85,7 @@
   let youtubeInfo = null;
   let youtubeId = '';
   let appliedResumeAnchorKey = '';
+  let playerReady = false;
   let lastRejectedCheckpointKey = '';
   let machineResumeInProgress = false;
 
@@ -107,6 +108,26 @@
     updateParticipantPlayControls();
   }
 
+  // Resume props may arrive after ready; HTML5 seeking also requires metadata.
+  $: if (player && playerReady) {
+    resumeStartTime;
+    resumeCheckpointIndex;
+    applyResumeAnchor();
+  }
+
+  function applyResumeAnchor() {
+    if (!playerReady || !player || !(player.duration > 0)
+      || resumeStartTime === null || resumeCheckpointIndex === null) return;
+    const time = Number(resumeStartTime);
+    const index = Number(resumeCheckpointIndex);
+    if (!Number.isFinite(time) || time < 0 || !Number.isInteger(index) || index < 0) return;
+    const key = `${time}|${index}`;
+    if (key === appliedResumeAnchorKey) return;
+    nextCheckpointIndex = index;
+    setCurrentTime(time);
+    appliedResumeAnchorKey = key;
+  }
+
   function destroyPlayer() {
     if (youtubePositionObserver !== null) clearInterval(youtubePositionObserver);
     youtubePositionObserver = null;
@@ -122,6 +143,7 @@
     wasFullscreen = false;
     loggingSeek = false;
     appliedResumeAnchorKey = '';
+    playerReady = false;
     lastRejectedCheckpointKey = '';
     machineResumeInProgress = false;
   }
@@ -273,6 +295,7 @@
 
     onPlayer('loadedmetadata', () => {
       duration = player.duration;
+      applyResumeAnchor();
       dispatch('loadedmetadata', { duration: player.duration });
     });
 
@@ -284,20 +307,8 @@
       });
       lastVolume = player.volume;
       lastSpeed = player.speed;
-      const normalizedResumeTime = Number(resumeStartTime);
-      const normalizedResumeIndex = Number(resumeCheckpointIndex);
-      const resumeAnchorKey = `${normalizedResumeTime}|${normalizedResumeIndex}`;
-      if (
-        resumeAnchorKey !== appliedResumeAnchorKey &&
-        Number.isFinite(normalizedResumeTime) &&
-        normalizedResumeTime >= 0 &&
-        Number.isFinite(normalizedResumeIndex) &&
-        normalizedResumeIndex >= 0
-      ) {
-        nextCheckpointIndex = Math.floor(normalizedResumeIndex);
-        setCurrentTime(normalizedResumeTime);
-        appliedResumeAnchorKey = resumeAnchorKey;
-      }
+      playerReady = true;
+      applyResumeAnchor();
       if (preventScrubbing) {
         disableSeekUi();
       }

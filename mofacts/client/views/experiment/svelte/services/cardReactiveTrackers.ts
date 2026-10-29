@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { Tracker } from 'meteor/tracker';
-import { getVideoCheckpoints } from './cardRuntimeState';
+import { getVideoCheckpoints, getVideoResumeAnchor } from './cardRuntimeState';
 
 export interface ReactiveComputation {
   stop: () => void;
@@ -19,9 +19,11 @@ export function createCardReactiveTrackers(deps: {
   readonly getPerformance: () => unknown;
   readonly getUser: () => unknown;
   readonly getVideoCheckpoints: () => unknown;
+  readonly getVideoResumeAnchor: () => unknown;
   readonly setPerformanceData: (performance: unknown) => void;
   readonly setUser: (user: unknown) => void;
   readonly setVideoCheckpoints: (videoCheckpoints: unknown) => void;
+  readonly setVideoResumeAnchor: (anchor: unknown) => void;
 }): CardReactiveTrackers {
   let computations: ReactiveComputation[] = [];
 
@@ -44,6 +46,9 @@ export function createCardReactiveTrackers(deps: {
       deps.autorun(() => {
         deps.setVideoCheckpoints(deps.getVideoCheckpoints());
       }),
+      deps.autorun(() => {
+        deps.setVideoResumeAnchor(deps.getVideoResumeAnchor());
+      }),
     ];
   }
 
@@ -57,12 +62,14 @@ export function createMeteorCardReactiveTrackers(deps: {
   readonly setPerformanceData: (performance: unknown) => void;
   readonly setUser: (user: unknown) => void;
   readonly setVideoCheckpoints: (videoCheckpoints: unknown) => void;
+  readonly setVideoResumeAnchor: (anchor: unknown) => void;
 }): CardReactiveTrackers {
   return createCardReactiveTrackers({
     autorun: (callback) => Tracker.autorun(callback),
     getPerformance: () => Session.get('curStudentPerformance'),
     getUser: () => Meteor.user(),
     getVideoCheckpoints,
+    getVideoResumeAnchor,
     ...deps,
   });
 }
