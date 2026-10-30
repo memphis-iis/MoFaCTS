@@ -54,4 +54,31 @@ describe('assessment final cluster permutation', function() {
     assert.deepEqual(result.value.q, []);
     assert.equal(result.used, 0);
   });
+
+  function twoPracticeBlocks(secondOffset: number) {
+    return { assessmentsession: {
+      conditiontemplatesbygroup: { groupnames: 'A', clustersrepeated: '2', templatesrepeated: '10',
+        group: Array.from({ length: 10 }, () => `0,t,d,0 0,t,d,${secondOffset}`).join(' ') },
+      initialpositions: Array.from({ length: 2 }, () => Array.from({ length: 10 }, (_value, i) => `A_${i + 1}`).join(' ')).join(' '),
+      clusterlist: '0-9', permutefinalresult: '0-9 10-19', assignrandomclusters: 'false', randomizegroups: 'false',
+    } };
+  }
+
+  it('preserves one appearance of every word in each independently shuffled practice block', function() {
+    const schedule = createAssessmentSchedule({}, 0, twoPracticeBlocks(10), dependencies);
+    assert.equal(schedule.q.length, 20);
+    for (const block of [schedule.q.slice(0, 10), schedule.q.slice(10)]) {
+      assert.deepEqual(block.map((q: any) => q.clusterIndex).sort((a: number, b: number) => a - b), Array.from({ length: 10 }, (_value, i) => i));
+    }
+  });
+
+  it('rejects overlapping repeated templates before a sparse schedule can deliver duplicate last-item trials', function() {
+    assert.throws(() => createAssessmentSchedule({}, 0, twoPracticeBlocks(0), dependencies), /position 0 is assigned more than once/);
+  });
+
+  it('rejects a missing schedule position instead of compacting away the hole', function() {
+    const unit = { assessmentsession: { clusterlist: '0-0', initialpositions: 'A_1 A_1',
+      conditiontemplatesbygroup: { groupnames: 'A', clustersrepeated: '1', templatesrepeated: '1', group: '0,t,d,0' } } };
+    assert.throws(() => createAssessmentSchedule({}, 0, unit, dependencies), /position 1 is unassigned/);
+  });
 });

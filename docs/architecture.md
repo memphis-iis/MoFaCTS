@@ -41,6 +41,8 @@ For current contributor work, treat `learning-components/` as the source root fo
 
 The public package at `packages/unit-engine-api` is not the implementation entry point yet; it is a scaffold for a future stable contract. See [development.md](development.md#modify-or-add-a-unit-type) and [learning-component-contracts.md](learning-component-contracts.md) before adding or changing a unit type.
 
+Fixed assessment schedules are assembled by `learning-components/units/assessment-session/createAssessmentSchedule.ts`. Every output position must have exactly one question. Overlapping template location offsets and gaps fail before a schedule is accepted; the engine must not overwrite trials or compact missing positions. For two independently shuffled blocks of ten words, a word's repeated template entries use offsets `0` and `10`, followed by `permutefinalresult: "0-9 10-19"`. Resume continues to use the accepted schedule and committed history count.
+
 ## Server Runtime
 
 Server code handles persistence, authentication and authorization checks, content upload, external integrations, import/export workflows, and data access that cannot safely run on the client.

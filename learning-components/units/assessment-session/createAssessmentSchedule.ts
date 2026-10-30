@@ -20,9 +20,14 @@ export function createAssessmentSchedule(
   }
 
   const quests: any = [];
-  quests[settings.scheduleSize - 1] = {};
 
   const setQuest = function(qidx: any, type: any, clusterIndex: any, condition: any, whichStim: any, forceButtonTrial: any) {
+    if (!Number.isInteger(qidx) || qidx < 0) {
+      throw new Error(`Assessment schedule position ${String(qidx)} must be a nonnegative integer`);
+    }
+    if (quests[qidx] !== undefined) {
+      throw new Error(`Assessment schedule position ${qidx} is assigned more than once; check template location offsets`);
+    }
     quests[qidx] = {
       testType: type.toLowerCase(),
       clusterIndex: clusterIndex,
@@ -113,9 +118,12 @@ export function createAssessmentSchedule(
     }
   }
 
-  const finalQuests: any = [];
-  quests.forEach(function(obj: any) {
-    finalQuests.push(obj);
+  const finalQuests: any = Array.from({ length: Math.max(settings.scheduleSize, quests.length) }, (_unused, index) => {
+    const question = quests[index];
+    if (question === undefined) {
+      throw new Error(`Assessment schedule position ${index} is unassigned; check initialpositions and template location offsets`);
+    }
+    return question;
   });
 
   if (finalQuests.length > 0) {

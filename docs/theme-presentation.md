@@ -20,6 +20,10 @@ outline that can extend beyond the conversation's scroll boundary. The surface
 also measures the floating Progress header and reserves clearance only when it
 would cover the first history row at scrollTop zero. The progress card retains
 its floating behavior; no opaque header region or fixed-height spacer is added.
+The conversation is also the containing block for positioned descendants,
+including visually hidden accessibility text. Their overflow must remain inside
+the conversation scrollbar so focusing an answer cannot scroll the outer surface,
+hide Progress, or clip the usable conversation height.
 
 Question answer lists in tutor dialogue begin one prose line height below the
 question text, using the central font-size and relaxed-line-height properties.
@@ -71,6 +75,8 @@ The Content menu's instructional library uses `SparcNode` for saved text, suppor
 1. Read the saved image through `readSparcPromptImage`, retaining the server's authorization and the existing PNG/JPEG/WebP and size validation.
 2. Decode the validated data URL directly into image bytes and a browser `Blob`. Create its object URL only while the component is mounted and only for interactive full-size inspection. Do not fetch a data URL or broaden the Content Security Policy.
 3. Keep the existing full-size link, accessible label, theme renderer, and error display. Revoke the object URL when the component is destroyed. Thumbnail selection continues to use the validated image data without allocating a full-size object URL.
+
+Library entry selection is independent of image-file availability. While a thumbnail is loading or its authorized image read fails, keep its existing inspection control available alongside the loading/error state so administrators can reach normal revision and deletion controls. An administratively removed entry retains its removal notice.
 
 Verify that an existing image renders in inspection and opens at its original resolution under the normal security policy, including browser zoom. Switching or closing inspection must retain the existing cleanup behavior. This path changes neither stored assets nor learner histories and adds no public image endpoint.
 

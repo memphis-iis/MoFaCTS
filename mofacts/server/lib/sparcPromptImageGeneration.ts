@@ -6,12 +6,21 @@ export type GeneratedSparcPromptImage = Readonly<{ bytes: Buffer; mediaType: str
 
 /** Never log raw provider bodies. Return only bounded, redacted error fields. */
 export async function generateSparcPromptImage(apiKey: string, prompt: string, fetchImpl: typeof fetch = fetch): Promise<GeneratedSparcPromptImage> {
-  const response = await fetchImpl('https://openrouter.ai/api/v1/images', {
+  const response = await fetchImpl('https://openrouter.ai/api/v1/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'MoFaCTS SPARC Supported Prompt' },
     body: JSON.stringify({
-      model: SPARC_PROMPT_IMAGE_SETTINGS.model, prompt, n: 1,
-      resolution: SPARC_PROMPT_IMAGE_SETTINGS.resolution,
+      model: SPARC_PROMPT_IMAGE_SETTINGS.controllerModel,
+      input: prompt,
+      instructions: 'Generate exactly one teaching image from the supplied brief using the image generation tool. Preserve its exact labels and domain relationships. Do not replace the image with a text description.',
+      tools: [{ type: 'openrouter:image_generation', parameters: {
+        model: SPARC_PROMPT_IMAGE_SETTINGS.model,
+        quality: SPARC_PROMPT_IMAGE_SETTINGS.quality,
+        output_format: 'png',
+      } }],
+      tool_choice: 'required',
+      max_tool_calls: 1,
+      store: false,
       provider: { only: [SPARC_PROMPT_IMAGE_SETTINGS.provider], allow_fallbacks: false },
     }),
     signal: AbortSignal.timeout(180000),
@@ -36,11 +45,15 @@ export async function generateSparcPromptImage(apiKey: string, prompt: string, f
     throw new Error(`SPARC image provider failed (HTTP ${response.status})${details.length ? ': ' + details.join('; ') : ''}`);
   }
   const body = await response.json();
-  if (!Array.isArray(body?.data) || body.data.length !== 1) throw new Error('SPARC image provider must return exactly one image');
-  const image = body.data[0];
-  const { bytes, mediaType, extension } = parseSparcRaster(image?.media_type, image?.b64_json);
+  if (body?.status !== 'completed' || !Array.isArray(body.output)) throw new Error('SPARC image generation did not complete');
+  const images = body.output.filter((item: { type?: unknown }) => item?.type === 'openrouter:image_generation');
+  if (images.length !== 1 || images[0].status !== 'completed') throw new Error('SPARC image provider must return exactly one completed image');
+  const raster = typeof images[0].result === 'string'
+    ? /^data:(image\/(?:png|jpeg|webp));base64,([\s\S]+)$/.exec(images[0].result) : null;
+  if (!raster) throw new Error('SPARC image tool must return a raster data URL');
+  const { bytes, mediaType, extension } = parseSparcRaster(raster[1], raster[2]);
   const usage: { -readonly [K in keyof OpenRouterUsageSummary]: OpenRouterUsageSummary[K] } = {};
-  for (const [source, target] of [['prompt_tokens', 'promptTokens'], ['completion_tokens', 'completionTokens'], ['total_tokens', 'totalTokens'], ['cost', 'costUsd']] as const) {
+  for (const [source, target] of [['input_tokens', 'promptTokens'], ['output_tokens', 'completionTokens'], ['total_tokens', 'totalTokens'], ['cost', 'costUsd']] as const) {
     const value = body.usage?.[source];
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0) usage[target] = value;
   }

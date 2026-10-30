@@ -140,7 +140,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
                 meta: { public: false, uploadPurpose: PURPOSE, generationIdentity: identity, tdfId, sessionId,
                   tutorMessage: entry.generation.tutorMessage, description: entry.generation.description, displayWidth: entry.generation.displayWidth,
                   figureLibraryVersion: entry.version, fileName, model: SPARC_PROMPT_IMAGE_SETTINGS.model,
-                  resolution: SPARC_PROMPT_IMAGE_SETTINGS.resolution, usage: image.usage, ready: deps.storageBoundary.backend === 'local' } });
+                  quality: SPARC_PROMPT_IMAGE_SETTINGS.quality, usage: image.usage, ready: deps.storageBoundary.backend === 'local' } });
               if (file._id !== entry._id) throw new Meteor.Error(500, 'SPARC image storage changed the generation identity');
               const asset = await findOwned(entry._id, userId);
               if (!asset) throw new Meteor.Error(500, 'SPARC image storage did not persist its canonical asset');
@@ -179,7 +179,7 @@ export function createSparcPromptImageMethods(deps: Deps) {
         const file = await deps.DynamicAssets.writeAsync(image.bytes, { fileId: assetId, fileName, userId, type: image.mediaType,
           meta: { public: false, uploadPurpose: PURPOSE, generationIdentity: identity, tdfId, sessionId,
             tutorMessage, description, displayWidth, fileName, model: SPARC_PROMPT_IMAGE_SETTINGS.model,
-            resolution: SPARC_PROMPT_IMAGE_SETTINGS.resolution, usage: image.usage, ready: deps.storageBoundary.backend === 'local' } });
+            quality: SPARC_PROMPT_IMAGE_SETTINGS.quality, usage: image.usage, ready: deps.storageBoundary.backend === 'local' } });
         if (file._id !== assetId) throw new Meteor.Error(500, 'SPARC image storage changed the generation identity');
         asset = await findOwned(assetId, userId);
         if (!asset) throw new Meteor.Error(500, 'SPARC image storage did not persist its owned asset');

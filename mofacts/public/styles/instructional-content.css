@@ -125,6 +125,10 @@
   }
 
   .sparc-auto-tutor-chat {
+    /* Keep positioned accessibility text inside this scroll owner. Otherwise
+       its static position expands the surface and focus can scroll Progress
+       and part of the conversation out of the available viewport. */
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;

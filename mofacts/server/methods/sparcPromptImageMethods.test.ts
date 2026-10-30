@@ -207,29 +207,41 @@ describe('SPARC private supported Prompt image contracts', () => {
     assert.equal(Object.prototype.hasOwnProperty.call(asset.meta, 'displayWidth'), false);
     assert.equal(f.providerCalls(), 1);
   });
-  it('uses the pinned Nano Banana 2 resolution request and rejects active markup or a mislabeled raster response', async () => {
+  it('uses GPT-6.1 Sol with the pinned OpenAI image tool and rejects incomplete or invalid image output', async () => {
     const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
-    const fakeFetch = (result: unknown) => (async (_url: unknown, options: RequestInit) => {
+    const fakeFetch = (result: unknown) => (async (url: unknown, options: RequestInit) => {
       const body = JSON.parse(String(options.body));
-      assert.equal(body.model, 'google/gemini-3.1-flash-image-preview');
-      assert.equal(body.quality, undefined);
-      assert.equal(body.resolution, '1K');
-      assert.equal(body.aspect_ratio, undefined);
-      assert.equal(body.n, 1);
-      assert.deepEqual(body.provider, { only: ['google-ai-studio'], allow_fallbacks: false });
+      assert.equal(url, 'https://openrouter.ai/api/v1/responses');
+      assert.equal(body.model, 'openai/gpt-6.1-sol');
+      assert.equal(body.input, 'Brief');
+      assert.equal(body.resolution, undefined);
+      assert.equal(body.store, false);
+      assert.equal(body.tool_choice, 'required');
+      assert.equal(body.max_tool_calls, 1);
+      assert.deepEqual(body.tools, [{ type: 'openrouter:image_generation', parameters: {
+        model: 'openai/gpt-image-2.5-sunburst', quality: 'medium', output_format: 'png',
+      } }]);
+      assert.deepEqual(body.provider, { only: ['openai'], allow_fallbacks: false });
       return { ok: true, json: async () => result };
     }) as unknown as typeof fetch;
-    const image = await generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type: 'image/png', b64_json: png.toString('base64') }], usage: { cost: .0336 } }));
+    const completed = (result: unknown) => ({ status: 'completed', output: [{ type: 'openrouter:image_generation', status: 'completed', result }],
+      usage: { input_tokens: 20, output_tokens: 10, total_tokens: 30, cost: .0336 } });
+    const dataUrl = `data:image/png;base64,${png.toString('base64')}`;
+    const image = await generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch(completed(dataUrl)));
     assert.deepEqual(image.bytes, png);
     assert.equal(image.usage.costUsd, .0336);
-    const jpeg = Buffer.from([255, 216, 255, 224, 0]);
-    const seedreamImage = await generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type: 'image/jpeg', b64_json: jpeg.toString('base64') }], usage: { cost: .018 } }));
-    assert.deepEqual(seedreamImage.bytes, jpeg);
-    assert.equal(seedreamImage.mediaType, 'image/jpeg');
-    assert.equal(seedreamImage.extension, 'jpg');
-    assert.equal(seedreamImage.usage.costUsd, .018);
-    for (const media_type of ['image/svg+xml', 'image/jpeg']) {
-      await assert.rejects(generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch({ data: [{ media_type, b64_json: png.toString('base64') }] })));
+    assert.equal(image.usage.promptTokens, 20);
+    assert.equal(image.usage.completionTokens, 10);
+    for (const invalid of [
+      completed(`data:image/svg+xml;base64,${Buffer.from('<svg></svg>').toString('base64')}`),
+      completed(`data:image/jpeg;base64,${png.toString('base64')}`),
+      completed('https://example.invalid/untrusted-image.png'),
+      completed(png.toString('base64')),
+      { ...completed(dataUrl), status: 'incomplete' },
+      { status: 'completed', output: [] },
+      { status: 'completed', output: [...completed(dataUrl).output, ...completed(dataUrl).output] },
+    ]) {
+      await assert.rejects(generateSparcPromptImage('synthetic-api-key', 'Brief', fakeFetch(invalid)));
     }
   });
   it('retains the provider reason for a 429 without exposing keys or raw responses', async () => {

@@ -63,4 +63,9 @@
     <p role="alert">{error}</p>
     <button type="button" class="btn btn-outline-secondary" on:click={load}>Retry image</button>
   {:else}<p role="status">Loading image…</p>{/if}
+  {#if onSelect && !dataUrl && !removed}
+    <!-- Inspect the catalog entry independently of its image file, so curation
+         remains available while the file is loading or cannot be read. -->
+    <button type="button" class="btn btn-outline-primary" aria-pressed={selected} aria-controls={controlsId} on:click={onSelect}>{selectionLabel}</button>
+  {/if}
 </div>
