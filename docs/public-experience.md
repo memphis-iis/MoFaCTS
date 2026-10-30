@@ -34,6 +34,8 @@ Authentication remains a full-page route inside the same visual shell:
 - Explicit logout returns to `/`. An unexpected ordinary-account session loss returns to sign-in with the validated internal route preserved.
 - Experiment-participant entry remains compact and distinct at `/experiment/:target`.
 
+After successful experiment authentication, the launch transition keeps the participant form hidden until the lesson opens. Theme-ready updates and queued CSS-paint callbacks must respect the existing `isLoggingIn` state; a launch failure clears that state and restores the form with its error. The deterministic timing regression check is `node --test scripts/signInVisibility.test.cjs` from `mofacts/`.
+
 An explicit ordinary destination such as `/home` or `/auth/login` takes precedence over remembered experiment routing. Entering ordinary sign-in clears the experiment target, condition, login presentation, embedded-key mode, and remembered public-demo routing metadata. This leaves learner histories and saved progress intact. Experiment-routing cookies are shared across tabs, so this cleanup also clears remembered routing for other tabs; an explicit experiment URL can establish that context again.
 
 Shared `/content/:tdfId` and `/instructions/:tdfId` lesson routes retain experiment continuation when the current flow is an experiment or a fresh tab remembers experiment routing. A known ordinary password or provider login instead returns to ordinary sign-in with its lesson destination preserved. Authentication remains per tab; this change does not make a new tab inherit another tab's login.

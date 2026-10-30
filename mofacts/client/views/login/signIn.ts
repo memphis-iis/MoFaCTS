@@ -312,7 +312,9 @@ Template.signIn.onRendered(async function(this: any) {
 
   // Wait for theme to be ready, then fade in after CSS is painted
   // Store handle for cleanup
-  template._themeAutorunHandle = Tracker.autorun(() => {
+  template._themeAutorunHandle = Tracker.autorun((computation) => {
+    // Launch owns visibility until navigation succeeds or an error restores sign-in.
+    if (template.isLoggingIn.get()) return;
     if (!Session.get('themeReady')) return;
 
     const resolvedUser = Meteor.user() as any;
@@ -354,6 +356,8 @@ Template.signIn.onRendered(async function(this: any) {
       // Use requestAnimationFrame to ensure CSS is painted before making visible
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
+          // Authentication can start while the CSS-paint callbacks are queued.
+          if (computation.stopped || computation.invalidated || template.isLoggingIn.get()) return;
           const container = document.getElementById('signInContainer');
           if (container) {
             clientConsole(2, '[SIGNIN] CSS painted, fading in sign-in page');
