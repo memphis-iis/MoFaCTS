@@ -9,11 +9,27 @@ const path = require('node:path');
 const vm = require('node:vm');
 class MeteorError extends Error { constructor(error, reason) { super(reason); this.error=error; this.reason=reason; } }
 let publication, vectorReads=0;
+const publicationStorageCalls=[];
+let stoppedObservers=0;
+const observer=async()=>({stop(){stoppedObservers++;}});
 const originalLoad=Module._load;
 Module._load=function(request,parent,main){
  if(request==='meteor/meteor')return {Meteor:{Error:MeteorError,publish:(_name,handler)=>{publication=handler;}}};
  if(request==='meteor/check')return {check:()=>{},Match:{ObjectIncluding:x=>x}};
- if(request.endsWith('sparcInstructionalLibraryStorage'))return {SparcInstructionalLibrary:{find:()=>{vectorReads++;return {observeChanges:async()=>({stop(){}})};}}};
+ if(request.endsWith('sparcInstructionalLibraryStorage'))return {SparcInstructionalLibrary:{
+  rawCollection:()=>({
+   find:()=>{publicationStorageCalls.push('catalog');return {toArray:async()=>[]};},
+   findOne:async()=>null,
+  }),
+  find:()=>{vectorReads++;publicationStorageCalls.push('entries');return {observeChanges:observer};},
+ }};
+ if(request.endsWith('sparcMoveLibraryStorage'))return {
+  ensureSparcContentUseForUser:async userId=>{publicationStorageCalls.push(`initialize-user:${userId}`);},
+  SparcMoveRequests:{find:selector=>{publicationStorageCalls.push(`moves:${selector.userId}`);return {observeChanges:observer};}},
+ };
+ if(request.endsWith('sparcFigureLibraryStorage'))return {
+  SparcFigureRequests:{find:selector=>{publicationStorageCalls.push(`visuals:${selector.userId}`);return {observeChanges:observer};}},
+ };
  return originalLoad.call(this,request,parent,main);
 };
 const {requireSparcLessonAccess,createSparcLessonAuthorizer}=require('../server/lib/sparcLessonAccess.ts');
@@ -103,10 +119,14 @@ test('both dynamic provider paths accept members, deny outsiders before provider
  }finally{globalThis.fetch=oldFetch;}
 });
 test('runtime vector publication needs lesson membership; administrative browsing/curation remain admin-only',async()=>{
- const f=fixture();registerSparcRetrievalPublication(()=>f.auth);vectorReads=0;
- const ctx={userId:'intruder',onStop(){},ready(){},added(){},changed(){},removed(){}};
+ const f=fixture();registerSparcRetrievalPublication(()=>f.auth);vectorReads=0;publicationStorageCalls.length=0;stoppedObservers=0;
+ let stopPublication,readyCalls=0;
+ const ctx={userId:'intruder',onStop(handler){stopPublication=handler;},ready(){readyCalls++;},added(){},changed(){},removed(){},error(error){throw error;}};
  await assert.rejects(publication.call(ctx,{kind:'feedback',readingLevel:'unbiased',responseFormat:'text'},'agent'),/Not authorized/);assert.equal(vectorReads,0);
+ assert.deepEqual(publicationStorageCalls,[]);assert.equal(readyCalls,0);assert.equal(stopPublication,undefined);
  await publication.call({...ctx,userId:'student'},{kind:'feedback',readingLevel:'unbiased',responseFormat:'text'},'agent');assert.equal(vectorReads,1);
+ assert.deepEqual(publicationStorageCalls,['catalog','initialize-user:student','moves:student','visuals:student','entries']);
+ assert.equal(readyCalls,1);stopPublication();await new Promise(resolve=>setImmediate(resolve));assert.equal(stoppedObservers,3);
  const methods=createSparcMoveLibraryMethods({store:{},getMethodAuthorizationDeps:()=>f.auth,verifyFigure:async()=>{}});
  for(const name of ['listSparcMoveLibrary','reviseSparcPrimitive'])await assert.rejects(methods[name].call({userId:'student'}),/Permission denied/);
  const curation=createSparcLibraryCurationMethods({getMethodAuthorizationDeps:()=>f.auth,remove:async()=>{throw new Error('Must not delete');},removed:async()=>['removed']});
