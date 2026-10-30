@@ -18,7 +18,6 @@ type AccessMethodsDeps = {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
     findOneAsync: (selector: UnknownRecord, options?: UnknownRecord) => Promise<any>;
     updateAsync: (selector: UnknownRecord, modifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
-    upsertAsync: (selector: UnknownRecord, documentOrModifier: UnknownRecord, options?: UnknownRecord) => Promise<unknown>;
   };
   usersCollection: {
     find: (selector: UnknownRecord, options?: UnknownRecord) => { fetchAsync: () => Promise<any[]> };
@@ -30,6 +29,7 @@ type AccessMethodsDeps = {
   exactCaseInsensitiveRegex: (value: string) => RegExp;
   isValidEmailAddress: (value: string) => boolean;
   normalizeCanonicalId: (value: unknown) => string | null;
+  transferTdfOwnership: (tdfId: string, actingUserId: string, newOwnerId: string) => Promise<number>;
 };
 
 export function createAccessMethods(deps: AccessMethodsDeps) {
@@ -349,28 +349,14 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
         throw new Meteor.Error(401, 'Must be logged in');
       }
 
-      deps.serverConsole('transferDataOwnership', tdfId, newOwner);
-      const tdf = await deps.Tdfs.findOneAsync({ _id: tdfId });
-      if (!tdf) {
-        deps.serverConsole('TDF not found');
-        return 'TDF not found';
-      }
-      deps.serverConsole('TDF found', tdf._id, tdf.ownerId);
-
-      if (!deps.isTdfOwner(this.userId, tdf)) {
-        throw new Meteor.Error(403, 'Only current owner can transfer ownership');
-      }
+      if (typeof tdfId !== 'string' || !tdfId.trim()) throw new Meteor.Error(400, 'TDF id is required');
       const newOwnerId = typeof newOwner === 'string'
         ? deps.normalizeCanonicalId(newOwner)
         : deps.normalizeCanonicalId(newOwner?._id);
       if (!newOwnerId) {
         throw new Meteor.Error(400, 'New owner id is required');
       }
-      tdf.ownerId = newOwnerId;
-      tdf.tdfRevision = (Number.isInteger(tdf.tdfRevision) ? tdf.tdfRevision : 0) + 1;
-      await deps.Tdfs.upsertAsync({ _id: tdfId }, tdf);
-      deps.serverConsole(tdf);
-      deps.serverConsole('transfer ' + tdfId + 'to' + newOwnerId);
+      await deps.transferTdfOwnership(tdfId, this.userId, newOwnerId);
       return 'success';
     },
   };

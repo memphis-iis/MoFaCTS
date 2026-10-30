@@ -881,7 +881,8 @@
     },
     {
       "name": "transferDataOwnership",
-      "access": "admin-only"
+      "access": "authenticated-self",
+      "notes": "Only the current owner of every family member may transfer a TDF. The recipient must exist; root, conditions, identity checks and revision increments commit in one snapshot transaction."
     },
     {
       "name": "updateExperimentState",

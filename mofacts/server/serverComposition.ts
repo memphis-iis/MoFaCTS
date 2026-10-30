@@ -53,6 +53,7 @@ import { createServerUtilityHelpers } from './lib/serverUtilities';
 import { createTdfRuntimeLifecycleHelpers } from './lib/tdfRuntimeLifecycle';
 import { createStimulusLookupHelpers } from './lib/stimulusLookup';
 import { createAccessMethods } from './methods/accessMethods';
+import { transferTdfOwnership } from './lib/tdfOwnershipTransferMongo';
 import { createAdminMethods } from './methods/adminMethods';
 import { createAnalyticsMethods } from './methods/analyticsMethods';
 import { insertSparcHistoryBatch } from './lib/sparcHistoryBatchStorage';
@@ -716,6 +717,7 @@ export const methods: any = {
   ...publicExperimentMethods,
 
   ...createAccessMethods({
+    transferTdfOwnership,
     serverConsole,
     Tdfs,
     usersCollection: MeteorAny.users,

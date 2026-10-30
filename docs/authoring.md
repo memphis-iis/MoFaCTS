@@ -168,6 +168,12 @@ Mechanical Turk operations, credentials, bonuses, and reminders have been remove
 
 Experiment login defaults to the localized Participant ID label; an authored `experimentLoginText` still overrides it. Ordinary experiment entry and completion navigation remain supported. Prolific participation and researcher controls are described below. Run the field/editor and entry/Continue regressions from `mofacts/` with `node --test scripts/ignoredTdfFields.test.cjs`.
 
+## Experiment ownership transfer
+
+Transferring an experiment from Content moves its root and every referenced condition to the selected existing account in one MongoDB transaction. Selecting a condition transfers its root and siblings together. The current caller must own every member; missing conditions, invalid filename/ID mappings, mixed ownership, or conditions shared with another root reject the transfer without changing ownership. Standalone lessons remain individually transferable.
+
+The transfer preserves TDF IDs, experiment targets, condition assignments, stimuli/media references, access grants, and learner histories; each transferred TDF's revision increments. It neither restores deleted content nor repairs a previously split family. The supported replica-set runtime owns atomicity. Run the focused checks from `mofacts/` with `node --test scripts/tdfOwnershipTransfer.test.cjs`.
+
 ## Where Detailed Examples Belong
 
 Detailed course examples, content packages, sync workflows, and internal authoring notes belong in the configuration/content repository or the GitHub wiki, not in the public application README.
