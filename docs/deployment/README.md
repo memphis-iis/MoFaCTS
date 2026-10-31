@@ -11,6 +11,8 @@ Belongs here:
 
 The canonical deployment workflow lives under `deploy/`.
 
+The hosted production operator procedure is the existing private `deploy production.txt` in the canonical config repository. Execute its complete production block in PowerShell 7.4 or newer: command failures stop that operation, the published digest is pulled and matched against the running image, and authenticated readiness plus participant smoke checks require operator confirmation before a release record is written. `/health` alone is not application acceptance. The settings-only operation is a separate block and reuses the video-key preparation function.
+
 ## Self-Hosted MoFaCTS
 
 - `self-hosted-guide.md`: end-to-end operator guide.

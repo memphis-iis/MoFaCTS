@@ -1,5 +1,4 @@
 import { Meteor } from 'meteor/meteor';
-import { MongoInternals } from 'meteor/mongo';
 import { Accounts } from 'meteor/accounts-base';
 import { Roles } from 'meteor/alanning:roles';
 import { ServiceConfiguration } from 'meteor/service-configuration';
@@ -21,7 +20,6 @@ import { backfillConditionTdfIds } from '../migrations/backfill_condition_tdf_id
 import { cleanExperimentStateDupesAndAddUniqueIndex } from '../migrations/clean_experiment_state_dupes';
 import { migrateLoggingSettings } from '../migrations/migrate_logging_settings';
 import { runStartupCleanupMigrations } from '../migrations/startup_cleanup_migrations';
-import type { CourseMigrationCollection } from '../migrations/course_assignment_contract';
 import { migrateSparcHistoryPageIdentity } from '../migrations/migrate_sparc_history_page_identity';
 import { migrateSparcAuthoredPageIdentity } from '../migrations/migrate_sparc_authored_page_identity';
 import { migrateDynamicAssetLocalPaths } from '../migrations/migrate_dynamic_asset_local_paths';
@@ -396,14 +394,6 @@ export async function runServerStartup(deps: RunServerStartupDeps) {
   await ensurePublishedDeploymentBrandProfile();
   await runStartupCleanupMigrations({
     DynamicSettings: deps.DynamicSettings,
-    courseMigration: {
-      courses: deps.Courses.rawCollection() as CourseMigrationCollection,
-      assignments: deps.Assignments.rawCollection() as CourseMigrationCollection,
-      snapshots: deps.CourseLearnerSnapshotCache.rawCollection() as CourseMigrationCollection,
-      settings: deps.DynamicSettings.rawCollection() as CourseMigrationCollection,
-      startSession: () => MongoInternals.defaultRemoteCollectionDriver().mongo.client.startSession(),
-      serverConsole: deps.serverConsole,
-    },
     usersCollection: deps.usersCollection,
     serverConsole: deps.serverConsole,
     updateActiveThemeDocument: deps.updateActiveThemeDocument,

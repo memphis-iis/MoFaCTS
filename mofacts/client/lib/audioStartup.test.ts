@@ -290,10 +290,10 @@ describe('audioStartup', function() {
     expect(plan.recorderPreInitialization).to.equal(true);
   });
 
-  it('rejects missing explicit SR language before preparing warmup or microphone access', function() {
+  it('prepares SR warmup and microphone access with the default English language', function() {
     Session.set('speechAPIKeyConfigured', true);
 
-    expect(() => getAudioLaunchPreparationPlan(
+    const plan = getAudioLaunchPreparationPlan(
       {
         tdfs: {
           tutor: {
@@ -309,7 +309,10 @@ describe('audioStartup', function() {
           audioInputMode: true,
         },
       },
-    )).to.throw('Speech recognition requires an explicit setspec.speechRecognitionLanguage.');
+    );
+    expect(plan.requiresPreparation).to.equal(true);
+    expect(plan.srWarmup).to.equal(true);
+    expect(plan.recorderPreInitialization).to.equal(true);
   });
 
   it('does not treat prerecorded audio assets as launch-time preparation work', function() {

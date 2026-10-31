@@ -1,5 +1,3 @@
-import { migrateCourseAssignmentContract, type CourseAssignmentMigrationDeps } from './course_assignment_contract';
-
 type ThemeMutationShape = {
   help?: {
     enabled?: boolean;
@@ -20,7 +18,6 @@ type StartupCleanupMigrationDeps = {
     removeAsync: (selector: Record<string, unknown>) => Promise<number>;
     upsertAsync: (selector: Record<string, unknown>, modifier: Record<string, unknown>) => Promise<unknown>;
   };
-  courseMigration: CourseAssignmentMigrationDeps;
   usersCollection: {
     findOneAsync: (selector: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>;
     updateAsync: (selector: Record<string, unknown>, modifier: Record<string, unknown>, options?: Record<string, unknown>) => Promise<number>;
@@ -172,6 +169,4 @@ export async function runStartupCleanupMigrations(deps: StartupCleanupMigrationD
     deps.serverConsole('Warning: Failed secret-key cleanup migration:', message);
   }
 
-  // Course contracts are required by active readers. Failure rejects startup.
-  await migrateCourseAssignmentContract(deps.courseMigration);
 }

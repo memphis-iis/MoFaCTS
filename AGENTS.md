@@ -1,230 +1,182 @@
 # MoFaCTS Agent Guide
 
-This repository contains MoFaCTS, the Mobile Fact and Concept Training System. MoFaCTS is a web-based adaptive learning system. The executable application source tree lives under `mofacts/`.
+MoFaCTS (Mobile Fact and Concept Training System) is a web-based adaptive learning system. Its executable application lives in `mofacts/`.
 
-This file is intentionally root-level and self-contained for critical behavior. Longer operational procedures may live in the public documentation linked here; do not rely on nested agent files for critical rules unless the user explicitly asks to introduce them.
+Keep critical rules self-contained in this root guide. Link longer procedures in public docs; introduce nested agent files only when explicitly requested. Use [audit.md](audit.md) for focused audits of breakages, unused code, and redundancy within the user's authorized scope.
 
-Consult [CHATGPT_CONTEXT.md](CHATGPT_CONTEXT.md) when project background, requirements, design rationale, terminology, or historical decisions are relevant. It is the maintained context document; the original ChatGPT export is a preserved source, not authority for current implementation. Verify implementation claims against current repository evidence.
+Consult [CHATGPT_CONTEXT.md](CHATGPT_CONTEXT.md) for project background, requirements, terminology, and historical decisions. It is the maintained context; the preserved ChatGPT export is not authority for current implementation. Verify implementation claims against current code.
 
 ## Decision Priority
 
-When instructions compete, use this order:
+Resolve competing instructions in this order:
 
 1. The user's explicit scope, intent, and permissions.
 2. Data integrity, security, privacy, and repository invariants.
 3. Verified runtime behavior and clear architectural ownership.
-4. The narrowest coherent change that does not leave broken wiring.
-5. Required verification and honest reporting of its result.
+4. The narrowest coherent change that leaves no broken wiring.
+5. Required verification and honest reporting.
 6. Documentation, cleanup, and maintainability improvements within scope.
 
 ## Critical Invariants
 
-- For runtime behavior, UI rendering, themes, transitions, Svelte components, state machines, or application logic, work in this repository and prefer `mofacts/`.
-- For TDF/config content or sync scripts, use `C:\dev\mofacts_config`; inspect this repository only for compatibility checks.
-- `mofacts_config` is passive storage, not an active application component. Do not require manifests or run content validators/audits there for storage, conversion, commits, or pushes unless the user explicitly requests those checks. MoFaCTS owns upload-time content validation.
-- For product and developer documentation too long for public repo docs, use `C:\dev\MoFaCTS.wiki`.
-- `MOFACTS_CONFIG_REPO`, when present, must resolve to `C:\dev\mofacts_config`. If it points elsewhere, stop and report the mismatch. If it is missing, verify `C:\dev\mofacts_config` exists, use that path, and do not report missingness as a problem.
-- `MOFACTS_WIKI_REPO`, when present, must resolve to `C:\dev\MoFaCTS.wiki`. If it points elsewhere, stop and report the mismatch. If it is missing, verify `C:\dev\MoFaCTS.wiki` exists, use that path, and do not report missingness as a problem.
-- Treat the config/content repo and wiki repo as critical MoFaCTS project components. Do not clone, create, copy, or substitute replacements unless explicitly instructed.
-- If user-facing behavior changes in `mofacts/`, check whether the wiki needs an update.
-- If code changes alter required TDF fields, config names, structures, schemas, payloads, interfaces, or field names, verify compatibility with dependent repositories.
-- Do not silently substitute data, identity, repositories, configuration, runtime paths, or behavior when a required invariant fails. Fail clearly at the owning boundary.
-- Explicit, observable recovery behavior is allowed only when it has a named owner and contract and does not mask a broken invariant.
+- Runtime, UI, themes, transitions, state machines, and application logic belong here, primarily in `mofacts/`.
+- TDF/config content and sync scripts belong in `C:\dev\mofacts_config`; use this repository for compatibility checks. That repo is passive storage: do not require manifests or run content validators/audits for storage, conversion, commits, or pushes unless explicitly requested. MoFaCTS owns upload-time validation.
+- Product/developer documentation too long for public repo docs belongs in `C:\dev\MoFaCTS.wiki`.
+- If set, `MOFACTS_CONFIG_REPO` and `MOFACTS_WIKI_REPO` must resolve to those exact canonical paths. Stop and report mismatches. If unset, verify and use the canonical directories without treating missing variables as a problem.
+- The config and wiki repos are critical project components. Do not clone, create, copy, or substitute replacements without explicit instruction.
+- For user-facing app changes, check whether the wiki needs updating. For changes to required TDF fields, configuration names, structures, schemas, payloads, interfaces, or field names, verify dependent-repository compatibility.
+- Never silently substitute data, identity, repositories, configuration, runtime paths, or behavior when an invariant fails. Fail at its owning boundary. Recovery must be explicit and observable, have a named owner and contract, and preserve the invariant.
 - Do not add compatibility fallback paths unless explicitly requested.
-- Do not run Docker build, push, deploy, or production-affecting commands unless explicitly requested.
-- Do not use local Meteor CLI workflows as release-confidence substitutes for the supported Docker Compose workflow.
-- Keep the Meteor release, Node/npm versions, CI assertions and Docker runtime pins aligned. Use the official DDP and Rspack packages selected by the release; superseded local package copies and dependency replacements must not shadow upstream security fixes.
+- Docker builds, pushes, deployments, and production-affecting commands require explicit requests. Local Meteor CLI workflows cannot substitute for supported Docker Compose release verification.
+- Align Meteor, Node/npm, CI assertions, and Docker runtime pins. Use the release's official DDP/Rspack packages; superseded local copies or dependency replacements must not shadow upstream security fixes.
 
 ## User Intent And Permissions
 
-- When the user asks a conceptual question whose answer is already available from the prompt, answer it directly without workspace inspection.
-- A repository diagnosis, review, audit, or status question authorizes bounded inspection of the named workspace, including source searches, diffs, status checks, and non-mutating diagnostics, plus the localhost startup described below. It does not authorize source edits, production or staging service startup, tests with side effects, external actions, commits, or pushes.
-- "Service startup" requiring separate authorization means production or staging, not localhost. Start or restart the existing localhost application and its local dependencies when needed for diagnosis, testing, or restoring local access, without asking for separate permission. Use the canonical local workflow (`deploy/hotfix-local.ps1`); this permission does not authorize release builds, deployments, or changes to production or staging.
-- When a diagnosis depends on a runtime value that is not visible in the supplied evidence, such as the selected model, reasoning level, credential source, provider route, environment, or persisted setting, ask the user for that value before hypothesizing or patching. Do not substitute assumptions or external research for information the user can provide directly.
-- Do not add user-visible fields, controls, workflow stages, output types, or behavior outside the user-approved specification. If an apparently necessary product-surface addition is not already approved, stop and ask the user before implementing it.
-- If a change seems needed after a question, recommend it separately and wait for explicit approval.
-- When the user asks for a change, implement it end to end when feasible, then report what changed and what was verified.
-- Stay on the current branch unless the user explicitly asks to create or switch branches.
-- Do not create `codex/*` or other work branches automatically.
-- This repository normally expects agent commits to be made on `main` when the checkout is on `main`.
-- Never revert user or unrelated working-tree changes unless the user explicitly requests it.
-- Do not commit or push unless the user explicitly asks.
-- When committing, include only intentional files and mention verification performed.
-- For a direct commit-and-push request, use plain Git with the repository's existing remote credentials. Do not require the GitHub CLI or open a pull request unless the user explicitly requests a PR or another operation that requires `gh`.
+- Answer conceptual questions directly when the prompt already contains the answer; workspace inspection is unnecessary.
+- Diagnosis, review, audit, and status requests authorize bounded searches, diffs, status checks, and non-mutating diagnostics in the named workspace, plus canonical localhost startup. They do not authorize edits, tests with side effects, external actions, production/staging startup, commits, or pushes.
+- Start/restart localhost and its dependencies as needed for diagnosis, testing, or restoring access through `deploy/hotfix-local.ps1`, without separate permission. This excludes release builds and production/staging changes.
+- If diagnosis depends on an unsupplied runtime value (model, reasoning level, credential source, provider route, environment, or persisted setting), ask the user before hypothesizing or patching. Do not replace that information with assumptions or external research.
+- Ask before adding user-visible fields, controls, stages, output types, or behavior outside the approved specification. Recommend changes arising from a question separately and wait for explicit approval.
+- Implement requested changes end to end when feasible; report the result and verification.
+- Stay on the current branch unless explicitly asked to create/switch. Never create `codex/*` or other branches automatically. When on `main`, agent commits normally stay on `main`.
+- Never revert user or unrelated working changes without explicit instruction.
+- Commit/push only when explicitly requested; include intentional files only and state verification. For direct commit-and-push requests, use plain Git and existing credentials. Open a PR only when explicitly requested; require `gh` only for an explicitly requested PR or another operation that needs it.
 
 ## Common Commands
 
-- App directory: `cd mofacts`
-- Typecheck from `mofacts/`: `npm run typecheck`
-- Lint from `mofacts/`: `npm run lint`
-- Lint also checks the security surface contract. When server methods, publications, HTTP handlers, exports, or management routes change, review authorization and update `mofacts/security-surface-contract.json` in the same change; do not automatically classify discovered surfaces.
-- Generate schemas from `mofacts/`: `npm run generate:schemas`
+Run app commands from `mofacts/`:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run generate:schemas`
+
+Lint includes the security surface contract. Changes to server methods, publications, HTTP handlers, exports, or management routes require authorization review and a matching update to `mofacts/security-surface-contract.json`; never automatically classify discovered surfaces.
 
 ## Repo Map
 
 - `mofacts/`: application source.
-- `learning-components/`: pedagogical extension logic such as unit engines, trial behavior, adaptive model logic, TDF/stimulus interpretation, response normalization, and external learning adapters.
-- `deploy/`: canonical Docker Compose build and deploy workflow, plus local hotfix scripts.
-- `docs/`: concise public repository documentation.
-- `.github/`: GitHub workflow, issue, and pull request metadata.
-- Root `app/`, `tests/`, and `packages/` are architectural scaffolds unless local README and build/test wiring prove the relevant runner is active.
+- `learning-components/`: unit engines, trials, adaptive models, TDF/stimulus interpretation, response normalization, and external learning adapters.
+- `deploy/`: canonical Docker Compose deployment and local hotfix workflows.
+- `docs/`: concise public documentation.
+- `.github/`: workflows, issues, and PR metadata.
+- Root `app/`, `tests/`, and `packages/`: architectural scaffolds unless local README and build/test wiring establish an active implementation or runner.
 
 ## Architecture Boundaries
 
-- Put Meteor routing, collections, publications, server methods, app shell UI, persistence, logging, and migrations in `mofacts/`.
-- Put unit engines and pedagogical extension behavior in `learning-components/`.
-- New unit types should go through the unit-engine registry and expose explicit lifecycle methods.
-- Do not duplicate legacy behavior in `mofacts/client/views/experiment/unitEngine.ts`; keep that path as an app dependency facade.
-- Learning components should depend on explicit runtime context/dependency interfaces.
-- SPARC must not deliver previously used instructional content to the same user in a new turn, across lessons and sessions. Check every explanation, written support, question, feedback, other tutor utterance, image and video component, including generated output and components embedded in matched instructions. Restoring the same saved turn preserves its accepted output. See the approved no-repeat requirement and implementation status in `docs/sparc-instructional-cycle.md`; do not treat prior-content links or fresh library IDs as satisfying it.
-- SPARC practice retrieval and embedding caches belong to the browser. Search uses the single maximum cosine similarity among eligible unseen content in the requested category; image and video candidates compete in one local search at 0.95. Independent generation calls do not coordinate through locks, polling, or shared in-flight work. Server image/library services own content persistence, exact-ID reads, authorization and secret-bearing provider calls; see `docs/sparc-instructional-cycle.md`. Administrative deletion preserves learner decisions and model/history records, removes catalog content and media, and uses content-free removal receipts to display "Administrative removal" on reload.
-- Avoid reaching from `learning-components/` into deep Meteor client/server paths unless a temporary facade is already documented and behavior-preserving.
-- If an alternate runtime path is intentional, name it by the domain behavior it provides. Do not call a deliberate path a fallback.
-- Do not add recovery behavior that masks a broken invariant.
+- Keep Meteor routing, collections, publications, methods, app shell, persistence, logging, and migrations in `mofacts/`; unit engines and pedagogical extensions in `learning-components/`.
+- New unit types should use the unit-engine registry with explicit lifecycle methods. Keep `mofacts/client/views/experiment/unitEngine.ts` an app dependency facade, without duplicating legacy behavior.
+- Learning components use explicit runtime dependency/context interfaces. Avoid deep Meteor imports unless a documented, behavior-preserving temporary facade already exists.
+- SPARC must not deliver previously used instructional content to the same user in a new turn, across lessons/sessions. This covers every explanation, written support, question, feedback, other tutor utterance, image, and video, including generated output and components embedded in matched instructions. Restoring a saved turn preserves its accepted output. Prior-content links and fresh library IDs do not satisfy no-repeat. See `docs/sparc-instructional-cycle.md` for the approved requirement and implementation status.
+- SPARC retrieval and embedding caches belong to the browser. Search uses the single maximum cosine similarity among eligible unseen content in the requested category; images/videos compete in one local search at 0.95. Independent generation calls must not coordinate through locks, polling, or shared in-flight work.
+- Server image/library services own persistence, exact-ID reads, authorization, and secret-bearing provider calls. Administrative deletion preserves learner decisions and model/history records, removes catalog content/media, and leaves content-free receipts that render "Administrative removal" on reload. See `docs/sparc-instructional-cycle.md`.
+- Name intentional alternate runtime paths by their domain behavior; do not call them fallbacks. Recovery must obey Critical Invariants.
 
 ## Legacy And Alternative Paths
 
-- MoFaCTS does not yet have a large user base that requires preserving every historical behavior. Prefer maintainable, coherent code over keeping obsolete paths alive by default.
-- "Legacy" means code, configuration, data paths, or behavior kept only to support past approaches that are not intended for the final system.
-- Do not call something legacy merely because it is older, unfamiliar, or different from another path. If it is an intentional current alternative path, name the domain behavior it provides.
-- When the requested work would build on, change, delete, or add a compatibility layer around apparently unnecessary legacy code, pause and ask whether it is still needed. Describe what depends on it and recommend whether to remove, replace, or preserve it. Incidental legacy code that does not affect the task may be reported at handoff without interrupting the work.
-- Usually delete or collapse confirmed legacy paths instead of adding compatibility layers around them.
-- If preserving a legacy path is explicitly chosen, document the invariant, owner, expected lifetime, and verification needed to keep it from becoming hidden maintenance debt.
+- Prefer coherent, maintainable code over preserving obsolete behavior by default; MoFaCTS does not yet have a large user base requiring every historical path.
+- "Legacy" means retained solely for past approaches outside the intended final system. Age, unfamiliarity, or difference alone does not establish it; name current alternatives by their domain behavior.
+- Before building on, changing, deleting, or adding compatibility around apparently unnecessary legacy code, ask whether it is needed. Explain dependencies and recommend removal, replacement, or preservation. Incidental legacy code outside the task can wait for handoff.
+- Usually delete/collapse confirmed legacy paths. If preservation is explicitly chosen, document the invariant, owner, expected lifetime, and required verification.
 
 ## Change Discipline
 
-- Do not make patch fixes that leave broken wiring in place. When a subsystem boundary or flow is wrong, analyze the whole flow, name the invariants, and make the integration coherent.
-- Before editing, inspect the surrounding implementation and existing patterns; do not assume architecture from filenames alone.
-- Prefer existing local helpers, conventions, and abstractions over introducing new ones.
-- Keep edits scoped to the requested behavior and the owning module boundary.
-- If a task seems to require a broad refactor, explain why before expanding scope.
-- Before adding a new variable, field, id, schema property, fact slot, config key, or similarly named concept, search the relevant and adjacent modules for existing concepts to reuse, rename, or collapse.
-- For TDF fields, config keys, schema properties, and unit identifiers, search both `mofacts/` and `C:\dev\mofacts_config` before introducing or renaming concepts.
-- Redundancy is a top design risk. Do not create parallel names or representations for the same concept unless the distinction is explicit, necessary, and documented at the boundary.
-- If pre-existing redundancy appears while working, stop before building on it and inform the user. Describe the duplicate concepts, locations, and whether the current task depends on resolving them.
-- Preserve current intentional working paths, especially explicitly identified reference paths, unless the user asks to redesign them. Do not preserve obsolete legacy paths by default.
-- When a plan and its invariants make sense, make the smallest coherent move, verify whether it improved the system, and continue.
-- Do not add new npm, Meteor, Docker, or system dependencies without explicit approval.
-- Before adding a dependency, search for existing packages or helpers that already solve the problem.
-- If a dependency is necessary, explain why the existing stack is insufficient.
-- Prefer source files over generated, bundled, cached, or compiled files. If unsure whether a file is generated, check before editing.
+- Inspect surrounding code and existing patterns before editing; filenames alone do not establish architecture. Analyze the whole affected flow and its invariants so repairs leave coherent wiring.
+- Reuse existing helpers and conventions. Stay within the requested behavior and owning module; explain broad refactors before expanding scope.
+- Before adding variables, fields, IDs, schema properties, fact slots, config keys, or similar concepts, search relevant/adjacent modules for concepts to reuse, rename, or collapse. For TDF fields, config keys, schemas, and unit identifiers, search both `mofacts/` and `C:\dev\mofacts_config`.
+- Avoid parallel names/representations unless their distinction is necessary, explicit, and documented. If existing redundancy appears, stop before building on it; tell the user the concepts, locations, and whether resolution is needed for this task.
+- Preserve intentional working paths, especially identified reference implementations, unless redesign is requested. Do not preserve obsolete paths by default.
+- Make the smallest coherent change consistent with the plan and invariants, verify its effect, and continue.
+- New npm, Meteor, Docker, or system dependencies require explicit approval. First search existing packages/helpers and explain why they are insufficient.
+- Edit source rather than generated, bundled, cached, or compiled files; verify uncertain provenance before editing.
 
 ## Verification Matrix
 
-Use the verification path that matches the change. Say clearly when a check could not be run locally.
+Use the path matching the change:
 
 | Change type | Required verification |
 | --- | --- |
-| TypeScript-bearing app changes | Run `npm run typecheck` from `mofacts/`. |
-| Lintable TypeScript, JavaScript, or Svelte changes | Run `npm run lint` from `mofacts/`. |
-| TDF field registry or schema changes | Run `npm run generate:schemas` from `mofacts/` and inspect generated schema diffs. |
-| Meteor integration or client contract coverage | Use CI or another supported Meteor test environment. Do not run `npm run test:ci` routinely on local Windows. |
-| Docker build, push, deploy, or release confidence | Run only when explicitly requested. |
+| TypeScript-bearing app changes | Full `npm run typecheck` from `mofacts/`; never substitute per-file checks or targeted `tsc`. |
+| Lintable TypeScript, JavaScript, or Svelte | `npm run lint` from `mofacts/`. |
+| TDF field registry or schema | `npm run generate:schemas` from `mofacts/`; inspect generated diffs. |
+| Meteor integration or client contracts | CI or another supported Meteor environment; do not routinely run `npm run test:ci` on local Windows. |
+| Docker build, push, deploy, or release confidence | Only when explicitly requested. |
 
-Every invocation of `npm run test:ci` requires fresh, explicit user authorization. Authorization is single-use and does not carry forward to a later invocation, even within the same conversation or task.
+Every `npm run test:ci` invocation requires fresh, explicit, single-use user authorization, including repeated invocations in the same task.
 
-The CI runner owns cleanup of test-generated `meteortesting:*` resolutions in `.meteor/versions`. Treat those entries as transient test artifacts; lint and pre-commit verification must reject their persistence in the application dependency manifest.
+The CI runner cleans transient test-generated `meteortesting:*` resolutions from `.meteor/versions`. Lint and pre-commit checks must reject their persistence in the application manifest.
 
-For TypeScript-bearing app changes, the full app check is:
-
-```bash
-npm run typecheck
-```
-
-Run it from `mofacts/`. Do not substitute per-file checks or targeted `tsc` invocations for full-app TypeScript verification.
-
-- When a required check fails, report the failing command, the relevant error summary, and whether the failure appears related to the change.
-- When a required check cannot run locally, report the reason and the next-best supported verification path.
-- Required verification failures block staging, commit, and push. Proceed only if the user explicitly accepts the identified failure after being told its relevance and risk.
+- Report failed required commands, relevant errors, and whether they appear related to the change. If a check cannot run locally, explain why and name the next supported verification path.
+- Required verification failures block staging, commit, and push until the user explicitly accepts the identified failure and its relevance/risk.
 
 ## Persistence And Migration Safety
 
-- Treat learner histories, model state, course assignments, TDF content, and resume identity as durable data contracts.
-- Do not run destructive or irreversible data migrations without explicit approval.
-- Migration code must be restartable or idempotent, bounded for production-scale data, and observable through progress and failure logging.
-- Before implementing a migration, define the forward transformation, validation, failure recovery or rollback approach, and the readers and writers affected.
-- Do not reinterpret an existing stored field until all active writers, readers, indexes, publications, methods, analytics, and dependent repositories have been traced.
-- Verify migration logic against representative existing records as well as newly created data. Never treat a clean-install-only test as sufficient migration evidence.
+- Learner histories, model state, course assignments, TDF content, and resume identity are durable contracts.
+- Destructive/irreversible migrations require explicit approval. Migrations must be restartable or idempotent, bounded for production scale, and observable through progress/failure logs.
+- Before implementation, define the transformation, validation, recovery/rollback, and affected readers/writers. Before reinterpreting a stored field, trace all writers, readers, indexes, publications, methods, analytics, and dependent repos.
+- Verify representative existing records and newly created data; clean-install tests alone are insufficient.
 
 ## Security And Privacy
 
-- Never expose credentials, tokens, connection strings, local settings, learner data, or raw database records in logs, screenshots, generated artifacts, commits, or handoff text.
-- Treat learner history and exported usage data as sensitive. Minimize fields and record counts during diagnosis and redact identifiers from retained artifacts.
-- Enforce authentication and authorization at Meteor method, publication, route, and server boundaries. Client-side visibility controls are not authorization.
-- Do not copy production data locally or broaden database access without explicit approval. Prefer representative synthetic or minimized records when possible.
-- Keep secrets in approved ignored settings or environment mechanisms; never add them to source-controlled defaults or examples.
+- Never expose credentials, tokens, connection strings, local settings, learner data, or raw database records in logs, screenshots, artifacts, commits, or handoffs. Keep secrets in approved ignored settings/environment mechanisms, never tracked defaults/examples.
+- Learner histories and usage exports are sensitive. Minimize diagnostic fields/records and redact identifiers in retained evidence.
+- Enforce authentication/authorization at Meteor method, publication, route, and server boundaries; client visibility is not authorization.
+- Production-data copies and broader database access require explicit approval. Prefer synthetic or minimized records.
 
 ## UI, Logging, And Client Behavior
 
-- The central application theme owns appearance. Authored and LLM markup underlays that theme; SPARC must not introduce independent visual decisions. Reuse central theme properties and shared presentation rules, including table padding and figure/table rounding. See `docs/theme-presentation.md`.
-
-- Never add raw client `console.*` for routine logging; use `mofacts/client/lib/clientLogger.ts`.
-- Preserve admin-controlled client verbosity behavior.
-- Use inline UI patterns instead of modal popups unless explicitly requested.
-- Preserve keyboard operation, visible focus, semantic labels, screen-reader announcements, readable contrast, and reduced-motion behavior where applicable.
-- Keep interface locale, authored content language, learner response language, speech-recognition language, and text-to-speech language as distinct contracts. Do not infer one silently from another.
+- The central theme owns appearance, including authored/LLM markup and SPARC. Reuse shared theme properties/presentation rules, including table padding and figure/table rounding. See `docs/theme-presentation.md`.
+- For routine client logging, use `mofacts/client/lib/clientLogger.ts` instead of raw `console.*`. Preserve admin-controlled verbosity.
+- Use inline UI instead of modal popups unless explicitly requested.
+- Preserve keyboard operation, visible focus, semantic labels, screen-reader announcements, contrast, and reduced-motion support where applicable.
+- Keep interface locale, authored content language, learner response language, speech-recognition language, and text-to-speech language distinct; never silently infer one from another.
 
 ## Local Hotfix Watch Loop
 
-The local hotfix loop under `deploy/` is the fast source-watching application workflow. Helper ownership is documented in `deploy/hotfix/README.md`.
+Helper ownership is documented in `deploy/hotfix/README.md`.
 
-- There is exactly one localhost application server: the Linux Docker Meteor/Rspack watcher at `http://localhost:3200`, owned by `deploy/hotfix-local.ps1` and `deploy/docker-compose.local.yml`.
-- Docker Compose owns the watcher, MongoDB and replica-set initialization. Do not run Meteor on the Windows host. Linux dependencies and generated caches live in Docker volumes, separate from host installations.
-- Source edits must rebuild and reload automatically. Do not replace the watcher with a manual generated-bundle loop or monkey-patch compiled output.
-- `deploy/hotfix-local.ps1` validates Linux Docker and Compose, then manages start, restart, stop, status, and logs. The container validates the pinned Meteor/Node/npm toolchain before starting. Readiness requires app health, the browser bundle, HMR, and active Change Streams.
-- This fast loop is local verification, not release confidence, and must not replace the canonical Docker Compose image build.
+- Exactly one localhost app server is permitted: the Linux Docker Meteor/Rspack watcher at `http://localhost:3200`, owned by `deploy/hotfix-local.ps1` and `deploy/docker-compose.local.yml`.
+- Compose owns the watcher, MongoDB, and replica-set initialization. Never run Meteor on the Windows host. Linux dependencies/caches stay in Docker volumes, separate from host installations.
+- Source edits must rebuild/reload automatically. Do not substitute manual generated-bundle loops or patch compiled output.
+- `hotfix-local.ps1` validates Linux Docker/Compose and manages start, restart, stop, status, and logs; the container validates pinned Meteor/Node/npm. Readiness requires app health, browser bundle, HMR, and active Change Streams.
+- This loop verifies local behavior; canonical Docker Compose image builds establish release confidence.
 
 ## Server Method Design
 
-- Keep the server minimized; the client should do as much processor work as safely possible.
-- SPARC explanation and requested support are composed and retrieved as one matched instruction, subject to the user's no-repeat rule for every component. Persist composition before media resolution and accept both display nodes together before generating its question.
-- Practice history saves must not rebuild dashboard or course summaries. On dashboard entry, apply only newly committed history to changed lessons; reserve full dashboard reconstruction for initialization or explicit repair. Persist last-used unit and resume state during practice. See `docs/architecture.md` for the history commit and cache checkpoint contract.
-- The normal lint workflow enforces that production server modules cannot directly or transitively import learner-executable code under `learning-components/models/` or `learning-components/units/`; type-only server-interface imports are ignored.
-- Add server methods only for database access, authentication or authorization enforcement, encryption, secrets, or external API calls that cannot safely run on the client.
-- Do not add pure-compute methods to `mofacts/server/methods.ts`.
-- Minimize database round-trips. Prefer batched queries or aggregation pipelines over N+1 loops.
-- Do not return full collection scans to the client.
-- Avoid server-side reshaping that the client can do from data it already has.
-- Rate-limit public and unauthenticated methods.
-- Extract large helpers out of `methods.ts` into `server/lib/` or `common/`.
+- Minimize server work. Add methods only for database access, authentication/authorization, encryption, secrets, or external API calls unsafe for the client. Keep pure computation client-side where safe, and avoid server reshaping of data the client already holds.
+- SPARC explanation and requested support form one matched instruction under the no-repeat contract. Persist composition before media resolution; accept both display nodes before generating the question.
+- Practice history saves must not rebuild dashboard/course summaries. On dashboard entry, apply newly committed history to changed lessons; reconstruct fully only at initialization or explicit repair. Persist last-used unit and resume state during practice. See `docs/architecture.md`.
+- Lint enforces that production server modules cannot directly/transitively import learner-executable `learning-components/models/` or `learning-components/units/` code; type-only server-interface imports are excluded.
+- Keep pure-compute methods out of server method modules. Prefer batched queries/aggregations over N+1 round-trips. Do not return full collection scans. Rate-limit public/unauthenticated methods.
+- Extract large method helpers into `server/lib/` or `common/`; the active method modules are under `mofacts/server/methods/`.
 
 ## Scalability-Sensitive Surfaces
 
-- Do not publish broad full TDF documents reactively.
-- Keep listing publications field-limited and reserve full TDF content for exact-ID runtime, launch, or edit publications.
-- Avoid full collection scans, unbounded `find({})` publications, and full-document payloads on dashboard, admin, or learner startup paths.
-- Cache rebuilds, admin refreshes, and migration-style jobs must use supporting indexes, bounded concurrency, and progress logging when they can touch many users or history rows.
-- Prefer child-to-root or explicit reference indexes over scanning every TDF/root document to reconstruct lesson families.
-- When a broad or expensive path is intentionally retained for compatibility, document the invariant, expected lifetime, limit returned fields, and verify the relevant index or bound in the same change.
+- Do not reactively publish broad full TDF documents. Limit listing fields; reserve full content for exact-ID runtime, launch, or edit publications.
+- Avoid full scans, unbounded `find({})` publications, and full-document payloads on dashboard, admin, or learner startup paths.
+- Cache rebuilds, admin refreshes, and migration-style jobs touching many users/history rows require supporting indexes, bounded concurrency, and progress logs.
+- Prefer child-to-root or explicit reference indexes over scanning every TDF/root to reconstruct families.
+- If retaining a broad/expensive compatibility path, document its invariant and expected lifetime, limit returned fields, and verify its supporting index or bound in the same change.
 
 ## Generated Files And Public Repo Hygiene
 
-- Do not commit root `outputs/`, root `tmp/`, one-off inventory JSON, working-copy notes, generated slide decks, screenshots, local analysis dumps, or ad hoc artifacts.
-- Curated examples must live under an intentional public path such as `examples/`, `docs/`, or a documented asset folder, with enough provenance for license and source review.
-- If an artifact is only useful locally, keep it ignored rather than tracked. Update `.gitignore` when a repeatable tool produces new local output.
-- If public setup, local run, admin bootstrap, test, deployment, TDF schema, or unit-extension behavior changes, update concise public docs in the same change.
-- Do not update public docs for purely internal refactors unless behavior, setup, schema, workflow, or contributor expectations change.
-- If user-facing behavior changes but docs do not need updates, say why.
-- Do not leave private/local knowledge as the only working path.
-- Do not point contributors at scaffold packages as implementation entry points when an active source root exists.
-- For unit behavior, point to `learning-components/` unless the scaffold package has become the real contract.
-- Do not generate, edit, or keep side-by-side emitted `.js` files next to `.ts` source files in `mofacts/client/`, `mofacts/server/`, or `mofacts/common/`.
-- Treat untracked `.js` twins beside `.ts` files in `mofacts/` as build spill unless proven otherwise.
+- Never commit root `outputs/`, root `tmp/`, one-off inventories, working notes, generated decks, screenshots, local dumps, or ad hoc artifacts. Keep local-only artifacts ignored; update `.gitignore` for repeatable tools producing new local output.
+- Put curated examples in intentional public paths (`examples/`, `docs/`, or documented asset folders) with provenance sufficient for license/source review.
+- Update concise public docs with changes to setup, local run, admin bootstrap, testing, deployment, TDF schema, or unit extension. Purely internal refactors need docs only when behavior, setup, schema, workflow, or contributor expectations change.
+- Explain when user-facing changes need no docs update. Keep working procedures publicly documented rather than only in private/local knowledge.
+- Point contributors to active implementation roots, not scaffolds; unit behavior belongs in `learning-components/` unless a scaffold has become the active contract.
+- Do not generate, edit, or retain emitted `.js` twins beside `.ts` sources in `mofacts/client/`, `mofacts/server/`, or `mofacts/common/`. Treat untracked twins as build spill unless proven otherwise.
 
 ## Maintenance Rule
 
-- Treat this file as part of the codebase. When build, test, dev, deployment, documentation, architecture, or verification workflows change, update `AGENTS.md` or the appropriate public documentation in the same change.
-- Keep this file lean enough that critical instructions remain visible. Prefer root-level concise guidance over nested agent files when the rule is essential.
-- When a rule becomes long, procedural, or rare, move the detail to public docs and keep only the decision rule here.
+- Maintain this guide or appropriate public docs alongside changes to build, test, development, deployment, documentation, architecture, or verification workflows.
+- Keep essential decision rules visible here. Move long, procedural, or rare details to linked public docs without losing critical root-level guidance.
 
 ## Required Handoff
 
-At the end of repository work, report concisely:
+Report concisely:
 
-- What changed or what was concluded.
-- The evidence supporting the result.
-- Verification performed and its outcome.
-- Required verification not performed and why.
-- Any unrelated working-tree changes that were preserved.
-- Compatibility, migration, security, privacy, accessibility, localization, or documentation impact when relevant.
-- Remaining risks or decisions that require the user.
+- Changes/conclusions and supporting evidence.
+- Verification results, and required checks omitted with reasons.
+- Unrelated working changes preserved.
+- Relevant compatibility, migration, security, privacy, accessibility, localization, and documentation impact.
+- Remaining risks or user decisions.

@@ -1,6 +1,6 @@
 import { Random } from 'meteor/random';
 
-type OwnHistoryDownloadToken = {
+export type OwnHistoryDownloadToken = {
   userId: string;
   fileName: string;
   expiresAt: number;

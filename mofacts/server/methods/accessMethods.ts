@@ -70,13 +70,22 @@ export function createAccessMethods(deps: AccessMethodsDeps) {
       if (!this.userId) {
         throw new Meteor.Error(401, 'Must be logged in');
       }
+      if (typeof TDFId !== 'string' || !TDFId.trim()) {
+        throw new Meteor.Error(400, 'TDF id is required');
+      }
 
-      const tdf = await deps.Tdfs.findOneAsync({ _id: TDFId });
-      if (tdf && !deps.isTdfOwner(this.userId, tdf)) {
+      const tdf = await deps.Tdfs.findOneAsync({ _id: TDFId }, { fields: { ownerId: 1 } });
+      if (!tdf) {
+        throw new Meteor.Error(404, 'TDF not found');
+      }
+      if (!deps.isTdfOwner(this.userId, tdf)) {
         throw new Meteor.Error(403, 'Access denied');
       }
 
-      return await deps.usersCollection.find({ accessedTDFs: TDFId }).fetchAsync();
+      return await deps.usersCollection.find(
+        { accessedTDFs: TDFId },
+        { fields: { _id: 1, username: 1 } },
+      ).fetchAsync();
     },
 
     getAccessableTDFSForUser: async function(this: MethodContext, userId: string) {

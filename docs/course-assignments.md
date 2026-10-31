@@ -820,15 +820,11 @@ Reporting query requirements:
 - Use assignment rows and field-limited TDF summaries.
 - Preserve existing instructor ownership checks.
 
-## Startup Migration Contract
+## Assignment Creation and Retirement Contract
 
-`mofacts/server/migrations/course_assignment_contract.ts` owns the restartable `migration.courseAssignmentContract.v2` transformation. Startup awaits successful completion; a failure propagates and prevents normal startup completion. Earlier v1 completion markers do not certify this contract. Readers, publications, course editing and learner snapshots use the transformed lesson/progressive assignment shape rather than hiding a failed migration with compatibility reads.
+Course assignments use the current explicit `lesson` or `progressive` shape. The course assignment editor and `saveCourseAssignments` validate and persist that shape, including ordering, availability dates, required flags, and timestamps. Startup does not convert historical assignments or depend on a course-assignment migration checkpoint.
 
-The forward transformation preserves all historical assignments, including courses larger than the editor's 250-assignment submission limit. Missing course visibility becomes `private`; missing timezone becomes the explicit historical value `America/Chicago`. Missing assignment `required` becomes `true`, absent release/due dates become `null`, and missing creation/update timestamps receive the migration's recorded start time. An undiscriminated historical assignment becomes a `lesson` only when its canonical `TDFId` exists. Invalid identities, dates, discriminated shapes or progressive membership fail clearly; no assignment is deleted or substituted.
-
-Historical ordering is retained exactly: valid nonnegative numeric order, then the previous string comparison of `createdAt`, then `_id`. A bounded external sort assigns contiguous order within each course. Before changing any assignment's ordering fields, the migration stages and validates a durable plan for every assignment. Projected `_id` pages contain at most 100 records. Each page of writes and its checkpoint commit atomically in a snapshot/majority transaction; a revision guard prevents competing startup instances from applying a stale phase. Source/result fingerprints detect changed data rather than overwriting it. Restart resumes the saved staging, application, validation, snapshot invalidation or cleanup phase without sorting partially renumbered records as original input.
-
-Progress logs contain phase and aggregate counters, not course or learner records. Completion is recorded only after result validation, bounded learner-snapshot invalidation and removal of temporary assignment plan fields. On failure, correct the reported invariant or infrastructure failure and restart against the retained checkpoint; do not delete the checkpoint or plan to force success. Partially applied pages are not rolled back globally. Operators must retain the durable plan for forward recovery. No migration may silently delete assignments or infer public visibility.
+Historical assignments without a supported `assignmentType` are retired and must be recreated through the assignment editor. Readers do not infer a lesson assignment from an old `TDFId` field. Existing assignments in the current format remain usable. This is an intentional retirement decision, not a compatibility conversion. Lesson packages, learner histories, course memberships, and model state are not deleted by removing the conversion. Any retained `migration.courseAssignmentContract.v2` checkpoint and `courseAssignmentMigrationV2` plan fields are inert; startup neither reads nor resumes them. Normal assignment saves replace the selected course's assignment list and invalidate its learner snapshots.
 
 ## Test Plan
 
@@ -845,7 +841,7 @@ Server tests:
 - Assignment save rejects duplicate `TDFId`s in one course.
 - Assignment save normalizes required flags, dates, order, and timestamps.
 - Assignment save removes omitted rows and preserves included metadata.
-- Legacy assignment rows remain readable with normalized defaults.
+- Retired assignments without a supported assignment type do not grant lesson access or appear as current assignments; newly created lesson and progressive assignments remain usable.
 - Learner course snapshot returns public courses to signed-in ordinary learners.
 - Private courses appear only for enrolled learners, owning teachers, and admins.
 - Public course browsing does not insert `SectionUserMap` rows.

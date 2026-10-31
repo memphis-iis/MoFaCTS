@@ -47,7 +47,8 @@ export function resolveSpeechRecognitionLanguage(
     ? raw.map(value => value.trim()).find(Boolean) ?? ''
     : typeof raw === 'string' ? raw.trim() : '';
   if (!language) {
-    throw new SpeechRecognitionConfigurationError('Speech recognition requires an explicit setspec.speechRecognitionLanguage.');
+    // English is the platform default, including settings warmup outside a lesson.
+    return 'en-US';
   }
   if (!supportedSpeechLanguages.has(language)) {
     throw new SpeechRecognitionConfigurationError('setspec.speechRecognitionLanguage must contain a supported Google Speech-to-Text language code.');

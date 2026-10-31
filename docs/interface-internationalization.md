@@ -43,7 +43,7 @@ Learner text inputs are Unicode-capable and may use the declared content languag
 
 Speech recognition remains opt-in through lesson and learner audio settings. Selecting a UI locale does not request microphone permission or imply speech recognition support for that language.
 
-When a lesson enables speech recognition, it must declare `speechRecognitionLanguage` explicitly using a supported Google Speech-to-Text language code. Missing, blank or invalid values stop SR launch preparation, recorder initialization and transcription with a configuration error. The interface locale never supplies this value. A repeated authored value retains its first nonblank language selection; that selected value must be valid.
+Speech recognition defaults to English (`en-US`) when no language is specified, including missing lessons and missing, null, blank or empty repeated values. Existing lesson configurations do not need a language field added. An optional `speechRecognitionLanguage` override selects a supported Google Speech-to-Text code; repeated authored values retain their first nonblank selection. Explicit malformed or unsupported codes report a configuration error. Changing the interface locale does not change either the English default or an explicit recognition-language choice.
 
 Platform-owned prompt TTS uses the selected UI locale's explicit primary TTS code. Authored lesson TTS remains separate and follows the lesson/content TTS configuration supplied by the author.
 

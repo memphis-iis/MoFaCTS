@@ -98,7 +98,10 @@ unit progression. Leaving the unit, hiding the tab, or leaving the page also
 stops the stream and inference. Returning requires Start camera again.
 
 No camera image, pose sample, score, trial history, recording, or local-storage
-record is saved or uploaded. The current pose, one previous gesture sample for
+record is persisted or uploaded. The experimental comparison can hold a template,
+up to 45 segment-length calibration samples, and current scores in browser memory
+until Clear comparison or unmount (see the plan linked below).
+The current pose, one previous gesture sample for
 the controlling hand, its timestamp, and each figure's
 orientation/edge length are held only in browser memory. Stop/switch/hide clears
 gesture acquisition; figure state remains until the unit unmounts. Continue
@@ -280,3 +283,11 @@ The **Wireframe** toggle shows or hides only hand landmark dots and connections.
 Body landmarks are not rendered. Camera visibility, figure visibility, and gesture
 controls keep their existing behavior. This display change does not change the
 tracking service's model loading or inference contract.
+
+## Experimental pose comparison
+
+The expandable 3D pose matcher comparison panel uses the existing pose inference
+frames for simple and personally calibrated upper-body distance scores. See
+[the method and test plan](pose-matcher-plan.md) for calibration, topology,
+reflection semantics, limitations, and verification. Existing gestures remain active.
+No comparison samples or scores are saved or uploaded.

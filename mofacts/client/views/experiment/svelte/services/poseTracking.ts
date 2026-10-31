@@ -1,9 +1,10 @@
-import type { PoseLandmarker, HandLandmarker, NormalizedLandmark } from '@mediapipe/tasks-vision';
+import type { PoseLandmarker, HandLandmarker, NormalizedLandmark, Landmark } from '@mediapipe/tasks-vision';
 import { FIGURE_GESTURE_LIMITS } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
 import type { HandPoint } from '../../../../../../learning-components/units/skeleton-demo/figureGestures';
 
 export interface PoseObservation {
   readonly landmarks: readonly NormalizedLandmark[];
+  readonly worldLandmarks: readonly Landmark[];
   readonly hands: readonly (readonly NormalizedLandmark[])[];
   readonly handWorldLandmarks: readonly (readonly HandPoint[])[];
   readonly handedness: readonly string[];
@@ -84,7 +85,7 @@ export function createPoseTracking() {
         try {
           const result = created.detectForVideo(video, timestamp);
           const handResult = hands.detectForVideo(video, timestamp);
-          onFrame({ landmarks: result.landmarks[0] ?? [], hands: handResult.landmarks,
+          onFrame({ landmarks: result.landmarks[0] ?? [], worldLandmarks: result.worldLandmarks[0] ?? [], hands: handResult.landmarks,
             handWorldLandmarks: handResult.worldLandmarks,
             handedness: handResult.handedness.map(categories => {
               const hand = categories[0];

@@ -162,9 +162,10 @@ test('pose tracker bounds frames, clears inference on stop, and closes late mode
   } });
   const tracking = api.createPoseTracking();
   const video = { readyState: 2, currentTime: 0, videoWidth: 640, videoHeight: 480 };
-  const model = { close() { closed++; }, detectForVideo() { detections++; return { landmarks: [] }; } };
+  const model = { close() { closed++; }, detectForVideo() { detections++; return { landmarks: [], worldLandmarks: [[{ x: 1, y: 2, z: 3, visibility: 1 }]] }; } };
   const pending = tracking.start(video, observation => {
     samples++;
+    assert.equal(observation.worldLandmarks[0].z, 3, "Pose world coordinates reach the same frame consumer");
     assert.equal(observation.hands.length, 1);
     assert.equal(observation.hands[0].length, 21);
     assert.equal(observation.handWorldLandmarks[0][0].z, 0.03);

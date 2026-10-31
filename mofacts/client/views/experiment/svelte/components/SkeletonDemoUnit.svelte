@@ -3,6 +3,7 @@
   import { Session } from 'meteor/session';
   import PoseCameraPreview from './PoseCameraPreview.svelte';
   import FigureOverlay from './FigureOverlay.svelte';
+  import PoseMatcherComparison from './PoseMatcherComparison.svelte';
   import { createCameraCapture } from '../services/cameraCapture';
   import { createPoseTracking, type PoseObservation, type PoseConnection } from '../services/poseTracking';
   import { initializeEngine } from '../services/unitEngineService';
@@ -174,4 +175,5 @@
     <FigureOverlay bind:this={figureSurface} onReady={() => { if (!figureFailed) figureReady = true; }} onError={figureUnavailable} />
   </PoseCameraPreview>
   <p class="skeleton-demo-privacy">Processed on this device. Nothing recorded or uploaded.</p>
+  <PoseMatcherComparison {observation} />
 </section>

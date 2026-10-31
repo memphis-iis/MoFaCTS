@@ -43,7 +43,8 @@ require('../server/lib/sparcRetrievalPublication.test.ts');
 require('../server/lib/boundedExternalSort.test.ts');
 require('../server/lib/sortedHistoryExport.test.ts');
 require('../server/lib/ownedHistoryDownloadHandler.test.ts');
-require('../server/migrations/course_assignment_contract.test.ts');
+require('../server/migrations/startup_cleanup_migrations.test.ts');
+require('../client/lib/speechRecognitionConfig.test.ts');
 require('../client/views/experimentSetup/sparc/sparcLibraryPreview.test.ts');
 require('../../learning-components/units/sparcsession/sparcEvidenceHistory.test.ts');
 if (process.argv.includes('--include-general-rules')) {

@@ -275,5 +275,5 @@ test('enforces one Linux Docker source watcher on localhost', () => {
   assert.match(watcher, /exec meteor run --port 3200/);
   assert.match(rspack, /host: "0\.0\.0\.0"/);
   assert.match(rspack, /watchOptions: \{ poll: 1000 \}/);
-  assert.match(read('AGENTS.md'), /There is exactly one localhost application server/);
+  assert.match(read('AGENTS.md'), /Exactly one localhost app server is permitted/);
 });

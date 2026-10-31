@@ -256,7 +256,8 @@
     },
     {
       "name": "getAccessors",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Requires an authenticated caller and an existing TDF owned by that caller. Queries only the matching accessor user IDs and usernames; authentication services and other user fields are not returned."
     },
     {
       "name": "getAccessorsTDFID",
@@ -1174,7 +1175,7 @@
     {
       "name": "/data-download/own-history",
       "access": "single-use-download",
-      "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies. Attachment headers use an ASCII quoted name and the complete RFC 5987 UTF-8 filename; control characters are rejected."
+      "notes": "Existing single-use download token and user scope retained; cursor and TSV writer exclude historical assessment copies. Backpressure waits terminate on connection close, error or request abort; the cursor closes on completion, cancellation and failure. Attachment headers use an ASCII quoted name and the complete RFC 5987 UTF-8 filename; control characters are rejected."
     },
     {
       "name": "/data-download/owned-history",

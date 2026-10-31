@@ -126,11 +126,11 @@ describe('speechRecognitionConfig', function() {
       .to.equal('es-ES');
   });
 
-  it('rejects missing or blank speech-language configuration', function() {
+  it('defaults missing or blank speech-language configuration to English', function() {
     for (const setSpec of [undefined, null, {}, { speechRecognitionLanguage: null },
       { speechRecognitionLanguage: '' }, { speechRecognitionLanguage: '  ' },
       { speechRecognitionLanguage: [] }, { speechRecognitionLanguage: ['', ' '] }]) {
-      expect(() => resolveSpeechRecognitionLanguage(setSpec)).to.throw(SpeechRecognitionConfigurationError);
+      expect(resolveSpeechRecognitionLanguage(setSpec)).to.equal('en-US');
     }
   });
 
@@ -147,21 +147,21 @@ describe('speechRecognitionConfig', function() {
       for (const locale of TARGET_UI_LOCALES) {
         Session.set(UI_LOCALE_SESSION_KEY, locale);
         expect(resolveSpeechRecognitionLanguage({ speechRecognitionLanguage: 'es-ES' }), locale).to.equal('es-ES');
-        expect(() => resolveSpeechRecognitionLanguage({}), locale).to.throw(SpeechRecognitionConfigurationError);
+        expect(resolveSpeechRecognitionLanguage({}), locale).to.equal('en-US');
       }
     } finally { Session.set(UI_LOCALE_SESSION_KEY, previous); }
   });
 
-  it('reports missing live SR language as a hard configuration error before recording starts', function() {
+  it('reports an explicitly unsupported live SR language before recording starts', function() {
     const previous = Session.get('currentTdfFile');
     const events: Array<{ type: string; [key: string]: unknown }> = [];
     let cleanup: (() => void) | undefined;
     try {
-      Session.set('currentTdfFile', { tdfs: { tutor: { setspec: { audioInputEnabled: true } } } });
+      Session.set('currentTdfFile', { tdfs: { tutor: { setspec: { audioInputEnabled: true, speechRecognitionLanguage: 'unsupported-language' } } } });
       cleanup = speechRecognitionService({})(event => events.push(event), () => undefined);
       expect(events).to.have.length(1);
       expect(events[0]).to.include({ type: 'ERROR', source: 'speechRecognitionConfiguration' });
-      expect(events[0]?.error).to.contain('explicit setspec.speechRecognitionLanguage');
+      expect(events[0]?.error).to.contain('supported Google Speech-to-Text language code');
     } finally {
       cleanup?.();
       Session.set('currentTdfFile', previous);
