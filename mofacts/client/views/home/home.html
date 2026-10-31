@@ -121,7 +121,7 @@
 
 <template name="appAccountMenu">
   <div class="user-area" id="userAccountArea">
-    <button type="button" class="user-toggle" id="userToggle" aria-haspopup="true" aria-expanded="{{#if accountMenuOpen}}true{{else}}false{{/if}}" aria-controls="userDropdown">
+    <button type="button" class="user-toggle" id="userToggle" aria-label="{{userDisplayName}} {{userRoleLabel}}" aria-haspopup="true" aria-expanded="{{#if accountMenuOpen}}true{{else}}false{{/if}}" aria-controls="userDropdown">
       <span class="avatar {{userAvatarClass}}">
         {{#if userAvatarIsImage}}
           <img src="{{userAvatarImageData}}" alt="" aria-hidden="true">

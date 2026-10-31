@@ -71,6 +71,7 @@
 
   .video-instruction-panel {
     width: min(760px, 100%);
+    text-align: center;
     max-height: min(78vh, 720px);
     overflow: auto;
     padding: clamp(calc(18px * var(--app-density-scale)), 3vw, calc(32px * var(--app-density-scale)));
@@ -92,6 +93,7 @@
   }
 
   .video-instruction-continue {
+    display: block;
     width: min(420px, 100%);
     margin: var(--app-space-5-px) auto 0;
     border: 1px solid var(--app-secondary-surface-color);
