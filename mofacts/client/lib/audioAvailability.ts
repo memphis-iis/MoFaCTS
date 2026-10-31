@@ -1,4 +1,5 @@
 import { resolveUnitSpeechRecognitionEnabled, SpeechRecognitionConfigurationError } from './speechRecognitionConfig';
+import { hasExperimentTag } from './lessonAudioSettings';
 
 type SrAvailabilityStatus = 'available' | 'blocked' | 'pending' | 'failed';
 
@@ -21,6 +22,7 @@ type TdfLike = {
   tdfs?: {
     tutor?: {
       setspec?: {
+        tags?: unknown;
         audioInputEnabled?: string | boolean;
         speechAPIKey?: string;
         speechRecognitionLanguage?: string | string[] | null;
@@ -94,7 +96,7 @@ export function evaluateSrAvailability(input: SrAvailabilityInput): SrAvailabili
   if (input.requireTextTrial && input.isTextTrial !== true) {
     return { status: 'blocked', detail: 'not_text_trial', userAudioEnabled, tdfAudioEnabled, hasAnySpeechApiKey };
   }
-  if (!userAudioEnabled) {
+  if (!hasExperimentTag(input.tdfFile?.tdfs?.tutor?.setspec) && !userAudioEnabled) {
     return { status: 'blocked', detail: 'user_pref_disabled', userAudioEnabled, tdfAudioEnabled, hasAnySpeechApiKey };
   }
   if (!tdfAudioEnabled) {

@@ -13,6 +13,7 @@ import { createExperimentState, getExperimentState } from './experimentState';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { clientConsole } from '../../../../lib/userSessionHelpers';
 import { loadLaunchReadyTdf } from '../../../../lib/launchReadyTdf';
+import { applyExperimentAudioSettings } from '../../../../lib/experimentAudioRuntime';
 import { hasMeaningfulMappingProgress } from './mappingProgressPolicy';
 import {
   assertAssessmentScheduleArtifactForUnit,
@@ -716,6 +717,8 @@ export async function resumeFromExperimentState(_initialTdfFile: unknown): Promi
     if (!curTdf) {
       return handleResumeFailure('Unable to resolve the current lesson configuration.');
     }
+
+    applyExperimentAudioSettings(curTdf.content?.tdfs?.tutor?.setspec);
 
     ensureCurrentStimuliSetId(curTdf?.stimuliSetId || rootTDFBoxed?.stimuliSetId);
 

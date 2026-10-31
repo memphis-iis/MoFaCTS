@@ -8,6 +8,7 @@
  * - client/lib/audioContextManager.js (audioManager)
  */
 
+import { resolveLessonAudioPromptMode } from '../../../../lib/lessonAudioSettings';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { audioManager } from '../../../../lib/audioContextManager';
@@ -38,7 +39,6 @@ import { resolveExplicitTtsLanguageCode } from '../../../../lib/audioLanguage';
 import { resolvePlatformPromptTtsLanguage } from '../../../../../common/lib/interfaceLocales';
 import {
   audioPromptModeAllows,
-  resolveUnitAudioPromptMode,
 } from '../../../../../common/lib/audioPromptMode';
 import type {
   AudioPromptSource,
@@ -318,10 +318,11 @@ async function restartSrAfterTtsHandoff(): Promise<void> {
  */
 function getEffectiveAudioPromptMode(): string {
   const inheritedMode = getAudioPromptMode();
-  return resolveUnitAudioPromptMode(
+  return resolveLessonAudioPromptMode(
     Session.get('currentTdfUnit'),
+    Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
     inheritedMode,
-    Boolean(Session.get('experimentTarget')) || inheritedMode !== 'silent'
+    Boolean(Session.get('experimentTarget'))
   );
 }
 

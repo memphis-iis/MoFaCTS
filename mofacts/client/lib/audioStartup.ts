@@ -4,6 +4,7 @@ import { audioManager } from './audioContextManager';
 import { canResolveExplicitTtsLanguageCode, resolveExplicitTtsLanguageCode } from './audioLanguage';
 import { evaluateSrAvailability } from './audioAvailability';
 import { resolveSpeechRecognitionLanguage } from './speechRecognitionConfig';
+import { hasExperimentTag, resolveExperimentAudioSettings, resolveLessonAudioPromptMode, type LessonAudioSetSpec } from './lessonAudioSettings';
 import {
   getAudioRecorderInitialized,
   getSrWarmedUp,
@@ -27,7 +28,8 @@ type AudioStartupUser = {
 type AudioStartupTdf = {
   tdfs?: {
     tutor?: {
-      setspec?: {
+      unit?: Array<{ audioInputEnabled?: unknown; audioPromptMode?: unknown }>;
+      setspec?: LessonAudioSetSpec & {
         textToSpeechAPIKey?: string;
         textToSpeechLanguage?: string;
         audioPromptFeedbackVoice?: string;
@@ -67,18 +69,28 @@ function supportsSr(currentTdfFile: AudioStartupTdf | null | undefined, user: Au
   const availability = evaluateSrAvailability({
     user: user as any,
     tdfFile: currentTdfFile as any,
+    currentUnit: getLaunchAudioUnit(currentTdfFile) ?? null,
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
   return availability.status === 'available';
 }
 
+function getLaunchAudioUnit(currentTdfFile: AudioStartupTdf | null | undefined) {
+  return currentTdfFile?.tdfs?.tutor?.unit?.[Session.get('currentUnitNumber') ?? 0];
+}
+
+function getTtsWarmupVoice(currentTdfFile: AudioStartupTdf | null | undefined, user: AudioStartupUser | null | undefined) {
+  const setspec = currentTdfFile?.tdfs?.tutor?.setspec;
+  return hasExperimentTag(setspec)
+    ? resolveExperimentAudioSettings(setspec!).audioPromptFeedbackVoice
+    : setspec?.audioPromptFeedbackVoice || user?.audioSettings?.audioPromptFeedbackVoice || user?.audioSettings?.audioPromptVoice;
+}
+
 function supportsTts(currentTdfFile: AudioStartupTdf | null | undefined, user: AudioStartupUser | null | undefined) {
   const userAudioPromptMode = user?.audioSettings?.audioPromptMode;
   const setspec = currentTdfFile?.tdfs?.tutor?.setspec;
-  const requestedVoice = setspec?.audioPromptFeedbackVoice ||
-    user?.audioSettings?.audioPromptFeedbackVoice ||
-    user?.audioSettings?.audioPromptVoice;
+  const requestedVoice = getTtsWarmupVoice(currentTdfFile, user);
   const hasTtsKey = (
     typeof setspec?.textToSpeechAPIKey === 'string' &&
     setspec.textToSpeechAPIKey.trim().length > 0
@@ -87,7 +99,10 @@ function supportsTts(currentTdfFile: AudioStartupTdf | null | undefined, user: A
     user.ttsAPIKey.trim().length > 0
   ) || Session.get('ttsAPIKeyConfigured') === true;
 
-  return hasEnabledAudioPromptMode(userAudioPromptMode) &&
+  const promptMode = hasExperimentTag(setspec)
+    ? resolveLessonAudioPromptMode(getLaunchAudioUnit(currentTdfFile), setspec, userAudioPromptMode)
+    : userAudioPromptMode;
+  return hasEnabledAudioPromptMode(promptMode) &&
     hasTtsKey &&
     canResolveExplicitTtsLanguageCode({
       configuredLanguage: setspec?.textToSpeechLanguage,
@@ -141,9 +156,7 @@ async function warmupTtsIfNeeded(
     return;
   }
   const setspec = currentTdfFile?.tdfs?.tutor?.setspec;
-  const requestedVoice = setspec?.audioPromptFeedbackVoice ||
-    user?.audioSettings?.audioPromptFeedbackVoice ||
-    user?.audioSettings?.audioPromptVoice;
+  const requestedVoice = getTtsWarmupVoice(currentTdfFile, user);
   const ttsLanguage = resolveExplicitTtsLanguageCode({
     configuredLanguage: setspec?.textToSpeechLanguage,
     requestedVoice,

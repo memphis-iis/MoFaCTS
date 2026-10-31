@@ -24,6 +24,7 @@ import {
   setAudioPromptQuestionVolume, setAudioPromptFeedbackVolume
 } from '../../lib/state/audioState';
 import { getAudioLaunchPreparationPlan, prepareAudioForLaunchIfNeeded } from '../../lib/audioStartup';
+import { hasExperimentTag, resolveExperimentAudioSettings } from '../../lib/lessonAudioSettings';
 import { unlockAppleMobileAudioForUserGesture } from '../../lib/audioUnlock';
 import { shouldLockMultiTdfLaunchToCurrentUnit } from '../../lib/lessonLaunchLockPolicy';
 import { formatItemsPracticed } from './practiceMetrics';
@@ -375,6 +376,7 @@ function parseBooleanLike(value: unknown): boolean {
 }
 
 function getEffectiveSetSpecValue(tdf: any, key: 'audioInputEnabled' | 'audioPromptMode') {
+  if (hasExperimentTag(tdf)) return tdf?.[key];
   const override = getLearnerTdfConfig(String(tdf?.TDFId || ''))?.overrides?.setspec?.[key];
   return override !== undefined ? override : tdf?.[key];
 }
@@ -387,7 +389,7 @@ function getEffectiveTtsState(tdf: any) {
   const tdfId = String(tdf?.TDFId || '');
   const promptModeOverride = learnerConfigHasSetSpecAudioOverride(tdfId, 'audioPromptMode');
   const lessonPromptMode = getEffectiveSetSpecValue(tdf, 'audioPromptMode');
-  const runtimePromptMode = promptModeOverride
+  const runtimePromptMode = hasExperimentTag(tdf) || promptModeOverride
     ? lessonPromptMode
     : getUserAudioSettings().audioPromptMode;
   return resolvePracticeTtsIndicatorState({
@@ -400,7 +402,7 @@ function getEffectiveTtsState(tdf: any) {
 function getEffectiveSrState(tdf: any) {
   const tdfId = String(tdf?.TDFId || '');
   const tdfAudioEnabled = parseBooleanLike(getEffectiveSetSpecValue(tdf, 'audioInputEnabled'));
-  const userAudioEnabled = getUserAudioSettings().audioInputMode === true;
+  const userAudioEnabled = hasExperimentTag(tdf) || getUserAudioSettings().audioInputMode === true;
   const keyAvailable = tdf?.hasSpeechAPIKey === true;
   const supported = parseBooleanLike(tdf?.audioInputEnabled) ||
     learnerConfigHasSetSpecAudioOverride(tdfId, 'audioInputEnabled');
@@ -1074,6 +1076,7 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   }
 
   const curTdfContent = preparedLaunch.content;
+  setspec = curTdfContent.tdfs.tutor.setspec;
   const curTdfTips = curTdfContent.tdfs.tutor.setspec.tips;
   Session.set('curTdfTips', curTdfTips);
   const { launchProgress, unitCount } = preparedLaunch;
@@ -1104,16 +1107,12 @@ async function selectTdf(currentTdfId: any, lessonName: any, currentStimuliSetId
   const user = Meteor.user();
   const audioSettings = user?.audioSettings || {};
 
-  if (isExperiment) {
-    audioPromptMode = setspec.audioPromptMode || 'silent';
-    audioInputEnabled = setspec.audioInputEnabled || false;
-    audioPromptFeedbackSpeakingRate = setspec.audioPromptFeedbackSpeakingRate || 1;
-    audioPromptQuestionSpeakingRate = setspec.audioPromptQuestionSpeakingRate || 1;
-    audioPromptVoice = setspec.audioPromptVoice || 'en-US-Standard-A';
-    audioInputSensitivity = audioSettings.audioInputSensitivity;
-    audioPromptQuestionVolume = setspec.audioPromptQuestionVolume || 0;
-    audioPromptFeedbackVolume = setspec.audioPromptFeedbackVolume || 0;
-    audioPromptFeedbackVoice = setspec.audioPromptFeedbackVoice || 'en-US-Standard-A';
+  if (isExperiment || hasExperimentTag(setspec)) {
+    ({ audioPromptMode, audioInputMode: audioInputEnabled,
+      audioPromptFeedbackSpeakingRate, audioPromptQuestionSpeakingRate,
+      audioPromptVoice, audioInputSensitivity, audioPromptQuestionVolume,
+      audioPromptFeedbackVolume, audioPromptFeedbackVoice,
+    } = resolveExperimentAudioSettings(setspec));
   } else {
     // Load from user's audioSettings if available, otherwise use defaults
     audioPromptMode = learnerConfigHasSetSpecAudioOverride(String(currentTdfId), 'audioPromptMode')

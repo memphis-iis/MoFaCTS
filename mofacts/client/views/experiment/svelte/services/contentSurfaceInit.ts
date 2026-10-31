@@ -3,6 +3,8 @@
  *
  */
 
+import { resolveLessonAudioPromptMode } from '../../../../lib/lessonAudioSettings';
+import { applyExperimentAudioSettings } from '../../../../lib/experimentAudioRuntime';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { meteorCallAsync } from '../../../../index';
@@ -20,7 +22,7 @@ import {
   getAudioPromptSpeakingRate,
   setAudioPromptSpeakingRate
 } from '../../../../lib/state/audioState';
-import { isAudioPromptModeEnabled, resolveUnitAudioPromptMode } from '../../../../../common/lib/audioPromptMode';
+import { isAudioPromptModeEnabled } from '../../../../../common/lib/audioPromptMode';
 import { audioManager } from '../../../../lib/audioContextManager';
 import { setEngine } from '../../../../lib/engineManager';
 import { resolveUnitEngineTypeForUnit } from '../../engineConstructors';
@@ -818,6 +820,8 @@ export async function initializeContentSurface(): Promise<ContentSurfaceInitResu
   const currentUnit = Session.get('currentTdfUnit') ??
     (Number.isInteger(currentUnitNumber) ? tutor.unit?.[currentUnitNumber] : null);
 
+  applyExperimentAudioSettings(tutor.setspec);
+
   const srAvailability = evaluateSrAvailability({
     user: getMeteorUser() ?? null,
     tdfFile: (tdfFile as Parameters<typeof evaluateSrAvailability>[0]['tdfFile']) ?? null,
@@ -836,10 +840,11 @@ export async function initializeContentSurface(): Promise<ContentSurfaceInitResu
     }
   }
 
-  if (isAudioPromptModeEnabled(resolveUnitAudioPromptMode(
+  if (isAudioPromptModeEnabled(resolveLessonAudioPromptMode(
     currentUnit,
+    tutor.setspec,
     getAudioPromptMode(),
-    Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())
+    Boolean(Session.get('experimentTarget'))
   )) && !getAudioPromptSpeakingRate()) {
     const speakingRate = parseFloat(String(tutor.setspec?.audioPromptSpeakingRate ?? '')) || 1;
     setAudioPromptSpeakingRate(speakingRate);

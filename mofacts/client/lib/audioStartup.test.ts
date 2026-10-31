@@ -10,6 +10,7 @@ describe('audioStartup', function() {
     Session.set('speechAPIKey', null);
     Session.set('speechAPIKeyConfigured', false);
     Session.set('ttsAPIKeyConfigured', false);
+    Session.set('currentUnitNumber', 0);
     audioManager.setPreInitializedStream(null);
   });
 
@@ -18,6 +19,7 @@ describe('audioStartup', function() {
     Session.set('speechAPIKey', null);
     Session.set('speechAPIKeyConfigured', false);
     Session.set('ttsAPIKeyConfigured', false);
+    Session.set('currentUnitNumber', undefined);
     audioManager.setPreInitializedStream(null);
   });
 
@@ -29,6 +31,26 @@ describe('audioStartup', function() {
         autoGainControl: true,
       },
       video: false,
+    });
+  });
+
+  it('prepares tagged speaking/TTS units with a shared key and no profile configuration', function() {
+    Session.set('speechAPIKeyConfigured', true);
+    Session.set('ttsAPIKeyConfigured', true);
+    const condition = { tdfs: { tutor: {
+      setspec: { tags: ['Experiment'], audioInputEnabled: 'false', audioPromptMode: 'silent', textToSpeechLanguage: 'es-ES' },
+      unit: [
+        { audioInputEnabled: 'true', audioPromptMode: 'all' },
+        { audioInputEnabled: 'false', audioPromptMode: 'silent' },
+      ],
+    } } };
+    const user = { audioSettings: { audioInputMode: false, audioPromptMode: 'silent' } };
+    expect(getAudioLaunchPreparationPlan(condition, user)).to.deep.equal({
+      requiresPreparation: true, ttsWarmup: true, srWarmup: true, recorderPreInitialization: true,
+    });
+    Session.set('currentUnitNumber', 1);
+    expect(getAudioLaunchPreparationPlan(condition, user)).to.deep.equal({
+      requiresPreparation: false, ttsWarmup: false, srWarmup: false, recorderPreInitialization: false,
     });
   });
 

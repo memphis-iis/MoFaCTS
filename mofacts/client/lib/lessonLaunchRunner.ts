@@ -13,6 +13,7 @@ import { shouldLockMultiTdfLaunchToCurrentUnit } from './lessonLaunchLockPolicy'
 import { sessionCleanUp } from './sessionUtils';
 import { setCourseAssignmentLaunchContext } from './courseAssignmentLaunchContext';
 import { learnerConfigHasSetSpecAudioOverride } from './learnerSettings';
+import { hasExperimentTag, resolveExperimentAudioSettings } from './lessonAudioSettings';
 import type { CourseAssignmentHistoryContext } from '../../common/courseAssignments.contracts';
 import { translatePlatformString } from './interfaceI18n';
 import { getActiveUiLocale } from './interfaceLocaleState';
@@ -145,16 +146,12 @@ export async function selectTdf(
   let audioPromptFeedbackVolume;
   let audioPromptFeedbackVoice;
 
-  if (isExperiment) {
-    audioPromptMode = setspec.audioPromptMode || 'silent';
-    audioInputEnabled = setspec.audioInputEnabled || false;
-    audioPromptFeedbackSpeakingRate = setspec.audioPromptFeedbackSpeakingRate || 1;
-    audioPromptQuestionSpeakingRate = setspec.audioPromptQuestionSpeakingRate || 1;
-    audioPromptVoice = setspec.audioPromptVoice || 'en-US-Standard-A';
-    audioInputSensitivity = audioSettings.audioInputSensitivity;
-    audioPromptQuestionVolume = setspec.audioPromptQuestionVolume || 0;
-    audioPromptFeedbackVolume = setspec.audioPromptFeedbackVolume || 0;
-    audioPromptFeedbackVoice = setspec.audioPromptFeedbackVoice || 'en-US-Standard-A';
+  if (isExperiment || hasExperimentTag(setspec)) {
+    ({ audioPromptMode, audioInputMode: audioInputEnabled,
+      audioPromptFeedbackSpeakingRate, audioPromptQuestionSpeakingRate,
+      audioPromptVoice, audioInputSensitivity, audioPromptQuestionVolume,
+      audioPromptFeedbackVolume, audioPromptFeedbackVoice,
+    } = resolveExperimentAudioSettings(setspec));
   } else {
     audioPromptMode = learnerConfigHasSetSpecAudioOverride(String(currentTdfId), 'audioPromptMode')
       ? setspec.audioPromptMode : audioSettings.audioPromptMode || 'silent';

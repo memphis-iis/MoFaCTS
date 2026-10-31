@@ -29,7 +29,8 @@ import { setEnterKeyLock } from './svelte/services/trialReadinessState';
 import { getActiveUiLocale } from '../../lib/interfaceLocaleState';
 import { translatePlatformString } from '../../lib/interfaceI18n';
 import { getAudioPromptMode } from '../../lib/state/audioState';
-import { isAudioPromptModeEnabled, resolveUnitAudioPromptMode } from '../../../common/lib/audioPromptMode';
+import { isAudioPromptModeEnabled } from '../../../common/lib/audioPromptMode';
+import { hasExperimentTag, resolveLessonAudioPromptMode } from '../../lib/lessonAudioSettings';
 import { buildActiveLessonRouteLocation } from '../../lib/activeLessonRoute';
 import { isLessonRoutePath, type LessonRouteSurface } from '../../lib/lessonRoute';
 import { resolveUnitSpeechRecognitionEnabled } from '../../lib/speechRecognitionConfig';
@@ -77,12 +78,13 @@ let lockoutScopeKey: string | null = null;
 const INSTRUCTIONS_LEAVING_KEY = 'instructionsLeaving';
 
 function checkAudioInputMode() {
+  const setspec = Session.get('currentTdfFile')?.tdfs?.tutor?.setspec;
   const userAudioToggled = (Meteor.user() as any)?.audioSettings?.audioInputMode || false;
   const tdfAudioEnabled = resolveUnitSpeechRecognitionEnabled(
     Session.get('currentTdfUnit'),
-    Session.get('currentTdfFile')?.tdfs?.tutor?.setspec
+    setspec
   );
-  return userAudioToggled && tdfAudioEnabled;
+  return (hasExperimentTag(setspec) || userAudioToggled) && tdfAudioEnabled;
 }
 
 function trimText(value: any) {
@@ -889,10 +891,11 @@ function gatherInstructionLogRecord(trialEndTimeStamp: any, trialStartTimeStamp:
     'displayedStimulus': displayedStimulus,
     'eventType': 'instruct',
     'CFAudioInputEnabled': checkAudioInputMode(),
-    'CFAudioOutputEnabled': isAudioPromptModeEnabled(resolveUnitAudioPromptMode(
+    'CFAudioOutputEnabled': isAudioPromptModeEnabled(resolveLessonAudioPromptMode(
       Session.get('currentTdfUnit'),
+      Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
       getAudioPromptMode(),
-      Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())
+      Boolean(Session.get('experimentTarget'))
     )),
     'CFResponseTime': trialEndTimeStamp,
     'feedbackType': '',

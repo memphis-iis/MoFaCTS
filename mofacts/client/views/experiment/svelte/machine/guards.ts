@@ -3,6 +3,7 @@
  * Guards are boolean predicates that determine whether transitions should occur
  */
 
+import { resolveLessonAudioPromptMode } from '../../../../lib/lessonAudioSettings';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { TRIAL_TYPES, SUPPORTED_TRIAL_TYPES, THRESHOLDS, ERROR_SEVERITY_MAP, ERROR_SEVERITY } from './constants';
@@ -12,7 +13,6 @@ import { getAudioPromptMode } from '../../../../lib/state/audioState';
 import {
   audioPromptModeAllows,
   isAudioPromptModeEnabled,
-  resolveUnitAudioPromptMode,
 } from '../../../../../common/lib/audioPromptMode';
 import { resolveSessionSurfaceState } from '../services/sessionSurfaceMode';
 import {
@@ -285,7 +285,8 @@ export function attemptsExhausted(args: ContentRuntimeMachineActorArgs): boolean
  * @returns {boolean}
  */
 export function ttsEnabled(_args: ContentRuntimeMachineActorArgs): boolean {
-  return audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'question');
+  return audioPromptModeAllows(resolveLessonAudioPromptMode(Session.get('currentTdfUnit'), Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
+      getAudioPromptMode(), Boolean(Session.get('experimentTarget'))), 'question');
 }
 
 /**
@@ -294,7 +295,8 @@ export function ttsEnabled(_args: ContentRuntimeMachineActorArgs): boolean {
  * @returns {boolean}
  */
 export function ttsDisabled(_args: ContentRuntimeMachineActorArgs): boolean {
-  return !isAudioPromptModeEnabled(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())));
+  return !isAudioPromptModeEnabled(resolveLessonAudioPromptMode(Session.get('currentTdfUnit'), Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
+      getAudioPromptMode(), Boolean(Session.get('experimentTarget'))));
 }
 
 function feedbackContentReady({ context }: ContentRuntimeMachineActorArgs): boolean {
@@ -304,13 +306,15 @@ function feedbackContentReady({ context }: ContentRuntimeMachineActorArgs): bool
 export function feedbackReadyForTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
     feedbackContentReady(args) &&
-    audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'feedback');
+    audioPromptModeAllows(resolveLessonAudioPromptMode(Session.get('currentTdfUnit'), Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
+      getAudioPromptMode(), Boolean(Session.get('experimentTarget'))), 'feedback');
 }
 
 export function feedbackReadyWithoutTts(args: ContentRuntimeMachineActorArgs): boolean {
   return args.context.feedbackRevealStarted === true &&
     feedbackContentReady(args) &&
-    !audioPromptModeAllows(resolveUnitAudioPromptMode(Session.get('currentTdfUnit'), getAudioPromptMode(), Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())), 'feedback');
+    !audioPromptModeAllows(resolveLessonAudioPromptMode(Session.get('currentTdfUnit'), Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
+      getAudioPromptMode(), Boolean(Session.get('experimentTarget'))), 'feedback');
 }
 
 // =============================================================================

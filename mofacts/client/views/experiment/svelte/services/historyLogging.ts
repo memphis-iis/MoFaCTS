@@ -5,6 +5,7 @@
  *
  */
 
+import { resolveLessonAudioPromptMode } from '../../../../lib/lessonAudioSettings';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { _ as underscore } from 'meteor/underscore';
@@ -19,7 +20,7 @@ import { evaluateSrAvailability } from '../../../../lib/audioAvailability';
 import { clientConsole } from '../../../../lib/clientLogger';
 import { parseSchedItemCondition } from '../../../../lib/tdfUtils';
 import { SCHEDULE_UNIT } from '../../../../../common/Definitions';
-import { isAudioPromptModeEnabled, resolveUnitAudioPromptMode } from '../../../../../common/lib/audioPromptMode';
+import { isAudioPromptModeEnabled } from '../../../../../common/lib/audioPromptMode';
 import { meteorCallAsync } from '../../../../lib/meteorAsync';
 import { insertCompressedHistory } from '../../../../lib/historyWire';
 import { requireCurrentLearningAttemptId } from './attemptIdentity';
@@ -740,10 +741,11 @@ export function createHistoryRecord({
 
     // Custom fields (CF prefix)
     'CFAudioInputEnabled': checkAudioInputMode(),
-    'CFAudioOutputEnabled': isAudioPromptModeEnabled(resolveUnitAudioPromptMode(
+    'CFAudioOutputEnabled': isAudioPromptModeEnabled(resolveLessonAudioPromptMode(
       Session.get('currentTdfUnit'),
+      Session.get('currentTdfFile')?.tdfs?.tutor?.setspec,
       getAudioPromptMode(),
-      Boolean(Session.get('experimentTarget')) || isAudioPromptModeEnabled(getAudioPromptMode())
+      Boolean(Session.get('experimentTarget'))
     )),
     'CFDisplayOrder': displayOrder,
     'CFStimFileIndex': stimFileIndex,

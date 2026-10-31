@@ -7,6 +7,22 @@ import {
 } from './audioAvailability';
 
 describe('audioAvailability', function() {
+  it('uses Experiment-tagged unit speech settings without a personal voice-input preference', function() {
+    const base = {
+      tdfFile: { tdfs: { tutor: { setspec: { tags: ['Experiment'], audioInputEnabled: 'true' } } } },
+      serverSpeechConfigured: true,
+    };
+    for (const user of [null, {}, { audioSettings: { audioInputMode: false } }]) {
+      expect(evaluateSrAvailability({ ...base, user, currentUnit: { audioInputEnabled: 'true' } }).status).to.equal('available');
+      expect(evaluateSrAvailability({ ...base, user, currentUnit: { audioInputEnabled: 'false' } }).detail).to.equal('tdf_audio_disabled');
+    }
+    expect(evaluateSrAvailability({ ...base, serverSpeechConfigured: false }).detail).to.equal('missing_key');
+    expect(evaluateSrAvailability({ ...base, requireTextTrial: true, isTextTrial: false }).detail).to.equal('not_text_trial');
+    expect(evaluateSrAvailability({
+      ...base, tdfFile: { tdfs: { tutor: { setspec: { tags: ['Experimental'], audioInputEnabled: 'true' } } } },
+    }).detail).to.equal('user_pref_disabled');
+  });
+
   it('returns available when user pref, TDF audio input, and key availability are satisfied', function() {
     const result = evaluateSrAvailability({
       user: { audioSettings: { audioInputMode: true } },
