@@ -7,6 +7,18 @@ import {
 import { buildTrialSubset } from './trialDisplayState';
 
 describe('flashcard controller props adapter', function() {
+  it('starts correction input empty without replacing the original submitted answer', function() {
+    const input = {
+      defaultInputMode: 'text', deliverySettings: {}, formatAnswerText: (answer: string) => answer,
+      layoutMode: 'top',
+      slotState: { kind: 'forceCorrect' as const, isForceCorrecting: true, userAnswer: 'original wrong answer', inputEnabled: true },
+      trialLike: { currentAnswer: 'right answer', currentDisplay: { text: 'Prompt' } },
+    };
+    const result = buildFlashcardControllerProps(input);
+    expect(result.props.userAnswer).to.equal('');
+    expect(input.slotState.userAnswer).to.equal('original wrong answer');
+  });
+
   it('finds image answer sources from answer identity fields', function() {
     const buttonList = [
       { buttonName: '/wrong.png', buttonValue: 'wrong', isImage: true },

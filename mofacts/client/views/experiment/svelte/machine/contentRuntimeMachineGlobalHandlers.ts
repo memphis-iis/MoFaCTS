@@ -1,12 +1,13 @@
 import { EVENTS, STATES } from './constants';
 import * as contentRuntimeMachineActions from './contentRuntimeMachineActions';
-import { storeFeedbackContent } from './feedbackContextMachine';
+import { storeFeedbackContent, practiceNavigationTransitions } from './feedbackContextMachine';
 import {
   setExternalUnitFinishedMessage,
   setUnexpectedVideoCheckpointError,
 } from './machineErrorContext';
 
 export const contentRuntimeMachineGlobalHandlers = {
+  [EVENTS.LEAVE_REQUESTED]: practiceNavigationTransitions,
   FEEDBACK_CONTENT: {
     actions: storeFeedbackContent,
   },

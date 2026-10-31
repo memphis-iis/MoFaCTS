@@ -1,4 +1,6 @@
 import { EVENTS, STATES } from './constants';
+import { assign } from 'xstate';
+import type { UpdateEngineDoneArgs } from './contentRuntimeMachineTypes';
 import {
   markIncomingPreparationFailed,
   markIncomingReady,
@@ -83,6 +85,16 @@ export const contentRuntimeMachineTransitionState = {
         input: toUpdateEngineInput,
         onDone: [
           {
+            guard: ({ event }: { event: { output?: { status?: string } } }) => event.output?.status === 'error',
+            target: '#contentRuntimeMachine.error',
+            actions: [assign({ errorMessage: () => 'The trial engine update failed' }), 'logError'],
+          },
+          {
+            guard: ({ context }: { context: { navigationRequested?: boolean } }) => context.navigationRequested === true,
+            target: '#contentRuntimeMachine.navigationReady',
+            actions: [assign({ unitFinished: ({ event }: UpdateEngineDoneArgs) => event.output?.unitFinished === true }), 'logStateTransition'],
+          },
+          {
             guard: engineUpdateFinishedUnit,
             target: '#contentRuntimeMachine.transition.fadingOut',
             actions: [
@@ -113,8 +125,8 @@ export const contentRuntimeMachineTransitionState = {
           },
         ],
         onError: {
-          target: 'fadingOut',
-          actions: ['logError', 'incrementQuestionIndex'],
+          target: '#contentRuntimeMachine.error',
+          actions: ['setErrorMessage', 'logError'],
         },
       },
     },

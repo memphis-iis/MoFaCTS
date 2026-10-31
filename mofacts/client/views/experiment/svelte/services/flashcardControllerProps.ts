@@ -192,7 +192,7 @@ export function buildFlashcardControllerPropsFromSubset(
       inputMode: input.defaultInputMode,
       inputEnabled: Boolean(input.inputEnabled),
       responseVisible: input.subset.responseVisible,
-      userAnswer: input.userAnswer || '',
+      userAnswer: input.subset.isForceCorrecting ? '' : input.userAnswer || '',
       feedbackUserAnswer: input.feedbackUserAnswer || '',
       inputPlaceholder: input.deliverySettings.inputPlaceholderText,
       showButtons: true,

@@ -83,6 +83,12 @@ export const contentRuntimeMachine = createMachine(
 
       [STATES.TRANSITION]: contentRuntimeMachineTransitionState,
 
+      // A completed trial stays parked here while navigation/finalization is pending.
+      // No next card, timer or unit transition may start after this acknowledgement.
+      navigationReady: {
+        entry: ['disableInput', 'stopRecording', 'stopTTS'],
+      },
+
       ...contentRuntimeMachineVideoStates,
 
       /**

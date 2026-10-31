@@ -58,6 +58,7 @@ export interface PreparedAdvanceResult extends CardSelectionResult {
 }
 
 export interface ContentRuntimeMachineContext {
+  navigationRequested: boolean;
   currentDisplay: CurrentDisplay;
   questionDisplay: CurrentDisplay | undefined;
   currentAnswer: string;
@@ -166,6 +167,7 @@ export type PreparedAdvanceDoneArgs = {
 };
 
 export const initialContext: ContentRuntimeMachineContext = {
+  navigationRequested: false,
   currentDisplay: {},
   questionDisplay: undefined,
   currentAnswer: '',

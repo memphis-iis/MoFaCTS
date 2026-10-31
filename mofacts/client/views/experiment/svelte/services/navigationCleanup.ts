@@ -15,6 +15,7 @@ import { completeCleanup } from '../utils/lifecycleCleanup';
 import type { NavigationDestination } from '../../../../../common/types/svelteServices';
 import { buildActiveLessonRouteLocation } from '../../../../lib/activeLessonRoute';
 import { isLessonRoutePath, type LessonRouteSurface } from '../../../../lib/lessonRoute';
+import { prepareActiveContentRuntimeForNavigation } from './contentRuntimeMachineRuntime';
 
 const { FlowRouter } = require('meteor/ostrio:flow-router-extra') as {
   FlowRouter: { go(path: string, params?: Record<string, unknown>, queryParams?: Record<string, unknown>): void };
@@ -35,6 +36,11 @@ function stopCardAudioNow(): void {
  */
 export async function leavePage(dest: NavigationDestination, externalProlific = false): Promise<void> {
   if (externalProlific) prolificCompletionUrl(dest);
+  // Do not stop the actor or clear session identity while its accepted trial is saving.
+  // Internal unit transitions already run after their own commit pipeline.
+  if (dest !== '/content' && dest !== '/instructions') {
+    await prepareActiveContentRuntimeForNavigation();
+  }
   if (dest === '/home' && !externalProlific) {
     try { if (await finalizeProlificSession()) return; }
     catch { showParticipationSaveError(async () => { if (!await finalizeProlificSession()) await leavePage(dest); }); return; }

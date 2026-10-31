@@ -103,6 +103,7 @@
   import {
     createContentRuntimeMachineRuntimeController,
     getInitialContentRuntimeMachineSnapshot,
+    registerActiveContentRuntimeForNavigation,
   } from '../services/contentRuntimeMachineRuntime';
   import { createCardRuntimeLifecycleController } from '../services/cardRuntimeLifecycle';
   import { createContentSurfaceLifecycleRuntime } from '../services/contentSurfaceLifecycleRuntime';
@@ -1129,7 +1130,9 @@
   });
 
   onMount(() => {
+    const unregisterNavigation = registerActiveContentRuntimeForNavigation(contentRuntimeMachineRuntimeController);
     contentSurfaceLifecycleRuntime.mount();
+    return unregisterNavigation;
   });
 
   // Lifecycle: Cleanup on unmount

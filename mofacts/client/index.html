@@ -86,8 +86,8 @@
           <h1 class="page-title">{{appShellTitle}}</h1>
           <div class="header-right">
             {{#if isPracticeChrome}}
-              <button type="button" class="btn btn-primary practice-return-button" id="saveReturnPracticeMenuButton">
-                {{t 'practice.saveReturnToPracticeMenu'}}
+              <button type="button" class="btn btn-primary practice-return-button" id="saveReturnPracticeMenuButton" disabled={{practiceReturnBusy}} aria-busy={{practiceReturnBusy}}>
+                {{#if practiceReturnBusy}}{{t 'dashboard.saving'}}{{else}}{{t 'practice.saveReturnToPracticeMenu'}}{{/if}}
               </button>
             {{else}}
               {{> appAccountMenu}}

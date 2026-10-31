@@ -45,20 +45,26 @@ describe('card machine transition state', function() {
       src: 'updateEngineService',
     });
     expect(transitions[0]!).to.deep.include({
-      target: '#contentRuntimeMachine.transition.fadingOut',
+      target: '#contentRuntimeMachine.error',
     });
     expect(transitions[1]!).to.deep.include({
-      target: '#contentRuntimeMachine.videoWaiting',
-      guard: 'isVideoSession',
+      target: '#contentRuntimeMachine.navigationReady',
     });
     expect(transitions[2]!).to.deep.include({
       target: '#contentRuntimeMachine.transition.fadingOut',
-      guard: 'hasPreparedTrial',
     });
     expect(transitions[3]!).to.deep.include({
+      target: '#contentRuntimeMachine.videoWaiting',
+      guard: 'isVideoSession',
+    });
+    expect(transitions[4]!).to.deep.include({
+      target: '#contentRuntimeMachine.transition.fadingOut',
+      guard: 'hasPreparedTrial',
+    });
+    expect(transitions[5]!).to.deep.include({
       target: 'fadingOut',
     });
-    expect(transitions[3]!.actions).to.deep.equal(['incrementQuestionIndex', 'logStateTransition']);
+    expect(transitions[5]!.actions).to.deep.equal(['incrementQuestionIndex', 'logStateTransition']);
   });
 
   it('routes prepared incoming results by authored advance mode', function() {

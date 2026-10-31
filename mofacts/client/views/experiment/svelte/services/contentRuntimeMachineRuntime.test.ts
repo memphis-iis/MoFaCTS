@@ -3,6 +3,8 @@ import {
   createContentRuntimeMachineRuntimeController,
   getContentRuntimeMachineSnapshot,
   getInitialContentRuntimeMachineSnapshot,
+  prepareActiveContentRuntimeForNavigation,
+  registerActiveContentRuntimeForNavigation,
   type ContentRuntimeMachineActor,
   type ContentRuntimeMachineSnapshot,
 } from './contentRuntimeMachineRuntime';
@@ -11,7 +13,7 @@ function snapshot(value: unknown): ContentRuntimeMachineSnapshot {
   return {
     value,
     context: {},
-    matches: (state) => state === value,
+    matches: (state) => state === value || (typeof value === 'string' && value.startsWith(`${state}.`)),
   };
 }
 
@@ -19,9 +21,12 @@ class FakeActor implements ContentRuntimeMachineActor {
   starts = 0;
   stops = 0;
   unsubscribes = 0;
+  events: unknown[] = [];
   private readonly subscribers = new Set<(next: ContentRuntimeMachineSnapshot) => void>();
 
-  constructor(private readonly currentSnapshot: ContentRuntimeMachineSnapshot = snapshot('idle')) {}
+  constructor(private currentSnapshot: ContentRuntimeMachineSnapshot = snapshot('idle')) {}
+
+  send(event: unknown): void { this.events.push(event); }
 
   getSnapshot(): ContentRuntimeMachineSnapshot {
     return this.currentSnapshot;
@@ -46,6 +51,7 @@ class FakeActor implements ContentRuntimeMachineActor {
   }
 
   emit(next: ContentRuntimeMachineSnapshot): void {
+    this.currentSnapshot = next;
     for (const subscriber of this.subscribers) {
       subscriber(next);
     }
@@ -151,5 +157,75 @@ describe('card machine runtime controller', function() {
     expect(actor.stops).to.equal(1);
     expect(actor.subscriberCount()).to.equal(0);
     expect(controller.getActor()).to.equal(null);
+  });
+
+  function navigationHarness(initial: string) {
+    const actor = new FakeActor(snapshot(initial));
+    const controller = createContentRuntimeMachineRuntimeController({
+      machine: {}, createActor: () => actor, setState: () => undefined,
+      sendStartEvent: () => undefined, getStartEvent: () => ({ type: 'START' }), log: () => undefined,
+    });
+    controller.start();
+    return { actor, controller };
+  }
+
+  it('shares repeated leave requests and waits for the committed navigation checkpoint', async function() {
+    const { actor, controller } = navigationHarness('feedback.waiting');
+    try {
+      let navigated = false;
+      const pending = controller.prepareToLeave();
+      expect(controller.prepareToLeave()).to.equal(pending);
+      void pending.then(() => { navigated = true; });
+      for (const state of ['transition.logging', 'transition.updatingState', 'transition.trackingPerformance']) {
+        actor.emit(snapshot(state));
+        await Promise.resolve();
+        expect(navigated).to.equal(false);
+      }
+      expect(actor.events).to.deep.equal([{ type: 'LEAVE_REQUESTED' }]);
+      actor.emit(snapshot('navigationReady'));
+      await pending;
+      expect(navigated).to.equal(true);
+      expect(actor.subscriberCount()).to.equal(1);
+    } finally { controller.stop(); }
+  });
+
+  it('parks an untouched prompt without inventing an answer, and waits for evaluation of a submitted answer', async function() {
+    const { actor, controller } = navigationHarness('presenting.awaiting');
+    try {
+      const untouched = controller.prepareToLeave();
+      actor.emit(snapshot('navigationReady'));
+      await untouched;
+      expect(actor.events).to.deep.equal([{ type: 'LEAVE_REQUESTED' }]);
+      actor.emit(snapshot('presenting.validating'));
+      const pending = controller.prepareToLeave();
+      actor.emit(snapshot('feedback.waiting'));
+      actor.emit(snapshot('navigationReady'));
+      await pending;
+      expect(actor.events).to.deep.equal([{ type: 'LEAVE_REQUESTED' }, { type: 'LEAVE_REQUESTED' }]);
+    } finally { controller.stop(); }
+  });
+
+  it('keeps failed commits blocked without replaying the trial write', async function() {
+    const { actor, controller } = navigationHarness('transition.logging');
+    try {
+      const pending = controller.prepareToLeave();
+      actor.emit(snapshot('error'));
+      for (const result of [pending, controller.prepareToLeave()]) {
+        try { await result; throw new Error('Expected rejection'); }
+        catch (error) { expect((error as Error).message).to.equal('The accepted trial could not be saved'); }
+      }
+      expect(actor.events).to.have.length(1);
+    } finally { controller.stop(); }
+  });
+
+  it('unregisters the owner and rejects an interrupted pending save on cleanup', async function() {
+    const { controller } = navigationHarness('feedback.waiting');
+    const unregister = registerActiveContentRuntimeForNavigation(controller);
+    const pending = prepareActiveContentRuntimeForNavigation();
+    controller.stop();
+    unregister();
+    try { await pending; throw new Error('Expected rejection'); }
+    catch (error) { expect((error as Error).message).to.contain('stopped before its trial was saved'); }
+    await prepareActiveContentRuntimeForNavigation();
   });
 });

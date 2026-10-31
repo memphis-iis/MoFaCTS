@@ -767,7 +767,19 @@ Template.DefaultLayout.events({
   },
   'click #saveReturnPracticeMenuButton': async function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    await leavePracticeForHome();
+    if (Session.get('practiceReturnBusy')) return;
+    Session.set('practiceReturnBusy', true);
+    try {
+      await leavePracticeForHome();
+    } catch (error) {
+      clientConsole(1, '[Navigation] Accepted trial save failed; remaining in practice', error);
+      Session.set('uiMessage', {
+        variant: 'danger',
+        text: translatePlatformString(getActiveUiLocale(), 'practice.saveFailed'),
+      });
+    } finally {
+      Session.set('practiceReturnBusy', false);
+    }
   },
   'click #helpButton': function(event: JQuery.TriggeredEvent) {
     event.preventDefault();
@@ -1012,6 +1024,10 @@ Template.registerHelper('appLoading', function() {
 Template.registerHelper('appLoadingMessage', function() {
   return Session.get('appLoadingMessage') || translatePlatformString(getActiveUiLocale(), 'common.loading');
 });
+Template.registerHelper('practiceReturnBusy', function() {
+  return Session.get('practiceReturnBusy') === true;
+});
+
 Template.registerHelper('uiMessage', function() {
   const uiMessage = Session.get('uiMessage');
   if (!uiMessage) {

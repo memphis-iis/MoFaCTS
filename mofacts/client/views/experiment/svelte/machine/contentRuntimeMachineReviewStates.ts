@@ -7,6 +7,7 @@ import {
 import {
   markFeedbackRevealStarted,
   resetFeedbackRevealState,
+  requestPracticeNavigation,
 } from './feedbackContextMachine';
 import {
   toFeedbackTtsInput,
@@ -151,8 +152,16 @@ export const contentRuntimeMachineReviewStates = {
         },
       },
       forceCorrecting: {
-        entry: ['clearUserAnswer', 'logStateTransition'],
+        entry: ['logStateTransition'],
+        always: {
+          guard: ({ context }: { context: { navigationRequested?: boolean } }) => context.navigationRequested === true,
+          target: 'readyToFade',
+        },
         on: {
+          [EVENTS.LEAVE_REQUESTED]: {
+            target: 'readyToFade',
+            actions: [requestPracticeNavigation, 'logStateTransition'],
+          },
           [EVENTS.SUBMIT]: {
             target: 'waiting',
             guard: 'isCorrectForceCorrection',

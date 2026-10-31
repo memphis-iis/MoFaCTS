@@ -12,10 +12,6 @@ function getSparcSubmitResult(event?: ActionEvent): SparcControllerResult | null
   return event.sparcResult;
 }
 
-export const clearUserAnswer = assign({
-  userAnswer: () => '',
-});
-
 export const captureAnswer = assign({
   userAnswer: ({ event }: ActionArgs) => event?.userAnswer,
   source: ({ event, context }: ActionArgs) => event?.source || context.source || 'keyboard',

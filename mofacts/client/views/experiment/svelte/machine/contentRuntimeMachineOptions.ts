@@ -135,7 +135,6 @@ export const contentRuntimeMachineOptions = {
     validateAnswer: contentRuntimeMachineActions.validateAnswer,
     applyValidationResult: contentRuntimeMachineActions.applyValidationResult,
     applySparcActionResult: contentRuntimeMachineActions.applySparcActionResult,
-    clearUserAnswer: contentRuntimeMachineActions.clearUserAnswer,
     syncDeliverySettings: contentRuntimeMachineActions.syncDeliverySettings,
     syncActiveTrialChoiceState: contentRuntimeMachineActions.syncActiveTrialChoiceState,
     syncSessionIndices: contentRuntimeMachineActions.syncSessionIndices,

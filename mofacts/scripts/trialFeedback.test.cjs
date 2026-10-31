@@ -33,6 +33,7 @@ require.extensions['.ts'] = (module, filename) => {
 };
 for (const filename of [
   '../client/views/experiment/svelte/services/trialFeedbackHistory.test.ts',
+  '../client/views/experiment/svelte/services/contentRuntimeMachineRuntime.test.ts',
   '../client/views/experiment/svelte/services/activeTrialDisplayState.test.ts',
   '../client/views/experiment/svelte/services/incomingTrialSlotDisplay.test.ts',
   '../client/views/experiment/svelte/services/incomingTrialSlotController.test.ts',
@@ -56,6 +57,121 @@ const { contentRuntimeMachineTransitionState } = require('../client/views/experi
 const { buildTrialFeedbackHistory } = require('../client/views/experiment/svelte/services/trialFeedbackHistory.ts');
 const { createVideoMachineBridge } = require('../client/views/experiment/svelte/services/videoMachineBridge.ts');
 const { createTrialFadeTransitionController } = require('../client/views/experiment/svelte/services/trialFadeTransitionController.ts');
+const { contentRuntimeMachineReviewStates } = require('../client/views/experiment/svelte/machine/contentRuntimeMachineReviewStates.ts');
+const { practiceNavigationTransitions } = require('../client/views/experiment/svelte/machine/feedbackContextMachine.ts');
+const { createContentRuntimeMachineRuntimeController } = require('../client/views/experiment/svelte/services/contentRuntimeMachineRuntime.ts');
+
+function navigationHarness({ forceCorrection = false, failAt, lastTrial = false, initial = 'feedback', fading = false } = {}) {
+  let finishFeedback, finishHistory;
+  const feedback = new Promise(resolve => { finishFeedback = resolve; });
+  const history = new Promise(resolve => { finishHistory = resolve; });
+  const operations = [];
+  const records = [];
+  const machine = createMachine({
+    id: 'contentRuntimeMachine', initial,
+    context: { navigationRequested: false, userAnswer: 'synthetic original answer', isCorrect: !forceCorrection,
+      incomingPreparationComplete: false, preparedTrial: null, preparedAdvanceMode: 'none',
+      timestamps: { trialStart: 1, trialEnd: 2 }, questionIndex: 1 },
+    on: { LEAVE_REQUESTED: practiceNavigationTransitions },
+    states: {
+      feedback: { ...contentRuntimeMachineReviewStates.feedback, initial: forceCorrection ? 'forceCorrecting' : 'waiting' },
+      transition: fading ? { ...contentRuntimeMachineTransitionState, initial: 'fadingOut' } : contentRuntimeMachineTransitionState,
+      navigationReady: {}, error: {}, videoWaiting: {},
+      presenting: { initial: 'displaying', states: { displaying: {}, blocksBoard: {} } },
+    },
+  }).provide({
+    actors: {
+      prepareIncomingTrialService: fromPromise(async () => ({ preparedAdvanceMode: 'none' })),
+      feedbackTimeout: fromPromise(() => feedback),
+      historyLoggingService: fromPromise(async ({ input }) => {
+        operations.push('history:start');
+        await history;
+        if (failAt === 'history') throw new Error('Synthetic history rejection');
+        records.push({ answer: input.context.userAnswer, correct: input.context.isCorrect });
+        operations.push('history:committed');
+      }),
+      experimentStateService: fromPromise(async () => {
+        if (failAt === 'state') throw new Error('Synthetic state rejection');
+        operations.push('state');
+      }),
+      updateEngineService: fromPromise(async () => {
+        operations.push('engine');
+        return { status: failAt === 'engine' ? 'error' : 'updated', unitFinished: lastTrial };
+      }),
+      waitForTrialFadeOut: fromPromise(async ({ signal }) => {
+        if (!fading) { operations.push('next-card'); return; }
+        await new Promise(resolve => { signal.addEventListener('abort', () => { operations.push('fade:aborted'); resolve(); }); });
+      }),
+    },
+    guards: { needsForceCorrectPrompt: () => forceCorrection, isTimedPromptTrial: () => false,
+      isCorrectForceCorrection: () => false, isVideoSession: () => false, hasPreparedTrial: () => false },
+    delays: { FORCE_CORRECT_TIMEOUT: 2000 },
+    actions: Object.fromEntries(['markFeedbackEnd', 'markTrialEnd', 'logStateTransition', 'logError',
+      'setErrorMessage', 'incrementQuestionIndex'].map(name => [name, () => undefined])),
+  });
+  const controller = createContentRuntimeMachineRuntimeController({ machine, createActor,
+    setState: () => undefined, sendStartEvent: () => undefined, getStartEvent: () => ({ type: 'START' }), log: () => undefined });
+  controller.start();
+  return { controller, actor: controller.getActor(), finishFeedback, finishHistory, operations, records };
+}
+
+for (const forceCorrection of [false, true]) {
+  for (const lastTrial of [false, true]) {
+    nodeTest.test(`save during ${forceCorrection ? 'force correction' : 'feedback'} commits once and parks before another card (last=${lastTrial})`, async () => {
+      const h = navigationHarness({ forceCorrection, lastTrial });
+      try {
+        const pending = h.controller.prepareToLeave();
+        assert.equal(h.controller.prepareToLeave(), pending);
+        h.finishFeedback();
+        await waitFor(h.actor, s => s.matches('transition.logging'), { timeout: 1000 });
+        assert.deepEqual(h.records, []);
+        h.finishHistory();
+        await pending;
+        assert.deepEqual(h.records, [{ answer: 'synthetic original answer', correct: !forceCorrection }]);
+        assert.deepEqual(h.operations, ['history:start', 'history:committed', 'state', 'engine']);
+        assert.ok(h.actor.getSnapshot().matches('navigationReady'));
+        assert.equal(h.actor.getSnapshot().context.unitFinished, lastTrial);
+        await h.controller.prepareToLeave();
+        assert.equal(h.records.length, 1);
+      } finally { h.controller.stop(); }
+    });
+  }
+}
+
+for (const failAt of ['history', 'state', 'engine']) {
+  nodeTest.test(`save remains blocked on ${failAt} failure without advancing or duplicating history`, async () => {
+    const h = navigationHarness({ failAt });
+    try {
+      const pending = h.controller.prepareToLeave();
+      h.finishFeedback(); h.finishHistory();
+      await assert.rejects(pending, /could not be saved/);
+      await assert.rejects(h.controller.prepareToLeave(), /could not be saved/);
+      assert.ok(h.actor.getSnapshot().matches('error'));
+      assert.ok(!h.operations.includes('next-card'));
+      assert.equal(h.records.length, failAt === 'history' ? 0 : 1);
+    } finally { h.controller.stop(); }
+  });
+}
+
+nodeTest.test('leaving an unanswered prompt parks immediately without writing a trial', async () => {
+  const h = navigationHarness({ initial: 'presenting' });
+  try {
+    await h.controller.prepareToLeave();
+    assert.ok(h.actor.getSnapshot().matches('navigationReady'));
+    assert.deepEqual(h.operations, []);
+    assert.deepEqual(h.records, []);
+  } finally { h.controller.stop(); }
+});
+
+nodeTest.test('leaving after commit aborts the outgoing fade without starting or recording another trial', async () => {
+  const h = navigationHarness({ initial: 'transition', fading: true });
+  try {
+    await h.controller.prepareToLeave();
+    assert.ok(h.actor.getSnapshot().matches('navigationReady'));
+    assert.deepEqual(h.operations, ['fade:aborted']);
+    assert.deepEqual(h.records, []);
+  } finally { h.controller.stop(); }
+});
 
 function fadeMachineHarness() {
   let finish, fail, signal, actor;
@@ -81,7 +197,7 @@ function fadeMachineHarness() {
     states: {
       transition: { initial: 'fadingOut', states: {
         fadingOut: contentRuntimeMachineTransitionState.states.fadingOut, clearing: {} } },
-      presenting: { initial: 'displaying', states: { displaying: {}, blocksBoard: {} } }, error: {}, exited: {},
+      presenting: { initial: 'displaying', states: { displaying: {}, blocksBoard: {} } }, error: {}, exited: {}, navigationReady: {},
     },
   }, {
     actors: { waitForTrialFadeOut: fromPromise(({ signal: invocationSignal }) => {
@@ -170,7 +286,7 @@ for (const isCorrect of [true, false]) {
         },
         states: {
           transition: contentRuntimeMachineTransitionState,
-          videoWaiting: {}, error: {},
+          videoWaiting: {}, error: {}, navigationReady: {},
           presenting: { initial: 'displaying', states: { displaying: {}, blocksBoard: {} } },
         },
       }).provide({
