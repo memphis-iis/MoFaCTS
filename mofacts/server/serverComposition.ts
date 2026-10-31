@@ -197,6 +197,17 @@ function getApiKeyResolutionDeps(): ApiKeyResolutionDeps {
   };
 }
 
+function getAudioApiKeyResolutionDeps(): ApiKeyResolutionDeps {
+  return {
+    ...getApiKeyResolutionDeps(),
+    authorizeTdfExecution: async (userId, tdfId, hasDirectKeyAccess) => {
+      if (hasDirectKeyAccess) return;
+      const tdf = await getTdfById.call({ userId }, tdfId);
+      if (!tdf) throw new Meteor.Error(404, 'This lesson is unavailable.');
+    },
+  };
+}
+
 function getSparcApiKeyResolutionDeps(): ApiKeyResolutionDeps {
   return { ...getApiKeyResolutionDeps(), authorizeTdfExecution: async (userId, tdfId) => {
     await requireSparcLessonAccess(getMethodAuthorizationDeps(), userId, tdfId);
@@ -602,7 +613,7 @@ const getHistoryByTDFID = getHistoryByTDFIDMethod as (TDFId: string) => Promise<
 
 const speechMethods = createSpeechMethods({
   serverConsole,
-  getApiKeyResolutionDeps,
+  getApiKeyResolutionDeps: getAudioApiKeyResolutionDeps,
   getApiKeyResolutionErrorMessage,
 });
 
@@ -811,7 +822,7 @@ export const methods: any = {
     encryptData,
     getUserPersonalApiKey,
     getAccessibleTdfApiKey,
-    getApiKeyResolutionDeps,
+    getApiKeyResolutionDeps: getAudioApiKeyResolutionDeps,
     getPasswordHashRuntimeInfo,
   }),
 

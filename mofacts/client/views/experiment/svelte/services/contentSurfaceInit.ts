@@ -3,7 +3,7 @@
  *
  */
 
-import { resolveLessonAudioPromptMode } from '../../../../lib/lessonAudioSettings';
+import { hasExperimentTag, resolveLessonAudioPromptMode } from '../../../../lib/lessonAudioSettings';
 import { applyExperimentAudioSettings } from '../../../../lib/experimentAudioRuntime';
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
@@ -829,6 +829,9 @@ export async function initializeContentSurface(): Promise<ContentSurfaceInitResu
     sessionSpeechApiKey: Session.get('speechAPIKey'),
     serverSpeechConfigured: Session.get('speechAPIKeyConfigured'),
   });
+  if (hasExperimentTag(tutor.setspec) && srAvailability.tdfAudioEnabled && srAvailability.detail === 'missing_key') {
+    throw new Error(translatePlatformString(getActiveUiLocale(), 'dashboard.srNeedsApiKey'));
+  }
   let audioInputEnabled = srAvailability.status === 'available';
   if (audioInputEnabled) resolveSpeechRecognitionLanguage(tutor.setspec);
   setAudioInputModeEnabled(audioInputEnabled);

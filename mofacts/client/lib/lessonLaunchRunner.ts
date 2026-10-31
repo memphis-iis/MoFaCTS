@@ -197,7 +197,10 @@ export async function selectTdf(
     Session.set('speechAPIKeyConfigured', keyStatus?.hasSR === true);
     Session.set('ttsAPIKeyConfigured', keyStatus?.hasTTS === true);
   } catch (error) {
+    Session.set('speechAPIKeyConfigured', false);
+    Session.set('ttsAPIKeyConfigured', false);
     clientConsole(1, '[LessonLaunch] Could not determine resolved audio key availability:', error);
+    if (hasExperimentTag(setspec)) throw error;
   }
 
   if (!isRefresh) {

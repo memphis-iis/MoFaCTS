@@ -24,6 +24,22 @@ function createStateMatcher(matches: unknown[]) {
 }
 
 describe('card input SR state', function() {
+  it('shows speech for a fresh Experiment participant using the resolved shared key, without any profile setup', function() {
+    const tdfFile = { tdfs: { tutor: { setspec: {
+      tags: ['Experiment'], audioInputEnabled: 'true', speechRecognitionLanguage: 'en-US',
+    } } } };
+    const base = {
+      user: {}, tdfFile, sessionSpeechApiKey: null, serverSpeechConfigured: true,
+      buttonTrial: false, source: undefined, stateMatches: () => false,
+    };
+    const speaking = buildCardInputSrSnapshot({ ...base, currentUnit: { audioInputEnabled: 'true' } });
+    expect(speaking.inputMode).to.equal('sr');
+    expect(speaking.srAvailability.detail).to.equal('ok');
+    const typing = buildCardInputSrSnapshot({ ...base, currentUnit: { audioInputEnabled: 'false' } });
+    expect(typing.inputMode).to.equal('text');
+    expect(typing.srAvailability.detail).to.equal('tdf_audio_disabled');
+  });
+
   it('uses button input mode and blocks SR for button trials', function() {
     const snapshot = buildCardInputSrSnapshot({
       user: speechReadyUser,

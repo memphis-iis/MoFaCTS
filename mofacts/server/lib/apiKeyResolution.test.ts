@@ -46,6 +46,25 @@ function createDeps(overrides: Partial<ApiKeyResolutionDeps> = {}): ApiKeyResolu
 }
 
 describe('apiKeyResolution', function() {
+  it('passes existing key access to the runtime authorizer while retaining its denial boundary', async function() {
+    const directAccess: boolean[] = [];
+    const deps = createDeps({
+      authorizeTdfExecution: async (_userId, _tdfId, hasDirectKeyAccess) => {
+        directAccess.push(hasDirectKeyAccess);
+        if (!hasDirectKeyAccess) throw new Meteor.Error(403, 'Not authorized');
+      },
+    });
+    expect((await resolvePreferredApiKey(deps, { userId: 'learner', tdfId: 'tdf', kind: 'speech' })).source).to.equal('tdf');
+    deps.getTdfById = async () => ({ ownerId: 'other', content: { tdfs: { tutor: { setspec: { userselect: 'false' } } } } });
+    try {
+      await resolvePreferredApiKey(deps, { userId: 'learner', tdfId: 'tdf', kind: 'speech' });
+      expect.fail('Private lesson must remain inaccessible');
+    } catch (error) {
+      expect((error as Meteor.Error).error).to.equal(403);
+    }
+    expect(directAccess).to.deep.equal([true, false]);
+  });
+
   it('reads reasoning from the same TDF, user, and admin configuration shapes as their models', function() {
     expect(getTdfOpenRouterReasoningLevel({
       content: { tdfs: { tutor: { setspec: { openRouterReasoningLevel: 'high' } } } },

@@ -8,6 +8,7 @@ import { Random } from 'meteor/random';
 import { expect } from 'chai';
 import { compressHistoryRecord } from '../common/historyCompression';
 import { SERVER_VERBOSITY_SETTING } from '../common/loggingSettings';
+import { encryptData } from './lib/encryption';
 
 const MeteorAny = Meteor as any;
 const MeteorUsersAny = Meteor.users as any;
@@ -880,6 +881,76 @@ describe('public TDF and stimulus method authorization', function() {
 
     expect(stimuli).to.have.length(1);
     expect(stimuli[0].stimulusKC).to.equal(4);
+  });
+
+  it('resolves shared audio keys for a new experiment participant before any history or profile audio setup', async function() {
+    await TdfsAny.insertAsync({
+      _id: 'audio-root', ownerId: 'researcher', tdfAvailability: 'available',
+      content: { tdfs: { tutor: { setspec: {
+        lessonname: 'Audio experiment', experimentTarget: 'audio-fresh-id', userselect: 'false',
+        tags: ['Experiment'], condition: ['AudioCondition.json'], conditionTdfIds: ['audio-condition'],
+      } } } },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'audio-condition', ownerId: 'researcher', tdfAvailability: 'available',
+      content: { fileName: 'AudioCondition.json', tdfs: { tutor: {
+        setspec: { lessonname: 'Audio condition', userselect: 'false', tags: ['Experiment'], audioInputEnabled: 'true' },
+        unit: [{ unitname: 'Speaking', audioInputEnabled: 'true', assessmentsession: {} }],
+      } } },
+    });
+    await TdfsAny.insertAsync({
+      _id: 'unrelated-private-audio', ownerId: 'other-researcher', tdfAvailability: 'available',
+      content: { tdfs: { tutor: { setspec: { lessonname: 'Unrelated lesson', userselect: 'false' } } } },
+    });
+    const provisioned = await methods.provisionExperimentUser.call({}, 'audio-fresh-id', 'FRESH-AUDIO-PARTICIPANT');
+    expect(provisioned.userExists).to.equal(false);
+    const actor = { userId: provisioned.userId };
+    await MeteorUsersAny.updateAsync({ _id: actor.userId }, { $set: { loginParams: { loginMode: 'experiment' } } });
+    const previousKeys = await DynamicSettingsAny.findOneAsync({ key: 'apiKeyAlternatives' });
+    await DynamicSettingsAny.upsertAsync({ key: 'apiKeyAlternatives' }, { $set: { value: {
+      googleSpeech: { keyEncrypted: encryptData('synthetic-shared-speech') },
+      googleTts: { keyEncrypted: encryptData('synthetic-shared-tts') },
+    } } });
+    try {
+      const rootKeys = await methods.hasUserPersonalKeys.call(actor, 'audio-root');
+      expect(rootKeys).to.deep.equal({ hasSR: true, hasTTS: true, speechSource: 'admin', ttsSource: 'admin' });
+      await GlobalExperimentStatesAny.insertAsync({
+        userId: actor.userId, TDFId: 'audio-root', experimentState: {
+          currentRootTdfId: 'audio-root', currentTdfId: 'audio-condition', conditionTdfId: 'audio-condition',
+          experimentTarget: 'audio-fresh-id', currentUnitNumber: 0, lastActionTimeStamp: Date.now(),
+        },
+      });
+      expect(await methods.hasUserPersonalKeys.call(actor, 'audio-condition')).to.deep.equal(rootKeys);
+      expect(await HistoriesAny.find({ userId: actor.userId }).countAsync()).to.equal(0);
+      const user = await MeteorUsersAny.findOneAsync({ _id: actor.userId });
+      expect(user.audioSettings).to.equal(undefined);
+      expect(user.speechAPIKey).to.equal(undefined);
+      expect(JSON.stringify(rootKeys)).not.to.include('synthetic-shared');
+      const provider = sinon.stub(globalThis, 'fetch').callsFake(async () => new Response(JSON.stringify({
+        audioContent: 'synthetic-audio', results: [{ alternatives: [{ transcript: 'cat' }] }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      try {
+        const speech = asyncMethods.makeGoogleSpeechAPICall as (...args: any[]) => Promise<any>;
+        const tts = asyncMethods.makeGoogleTTSApiCall as (...args: any[]) => Promise<any>;
+        const recognized = await speech.call(actor, 'audio-condition', null, {
+          config: { languageCode: 'en-US' }, audio: { content: 'synthetic-audio' },
+        }, ['cat']);
+        expect(recognized[1].results[0].alternatives[0].transcript).to.equal('cat');
+        expect(await tts.call(actor, 'audio-condition', 'cat', 1, 0, 'en-US-Standard-A', 'en-US')).to.equal('synthetic-audio');
+        expect(provider.callCount).to.equal(2);
+      } finally {
+        provider.restore();
+      }
+      try {
+        await methods.hasUserPersonalKeys.call(actor, 'unrelated-private-audio');
+        expect.fail('Unrelated private lesson must remain inaccessible');
+      } catch (error) {
+        expect((error as Meteor.Error).error).to.equal(403);
+      }
+    } finally {
+      if (previousKeys) await DynamicSettingsAny.updateAsync({ _id: previousKeys._id }, { $set: { value: previousKeys.value } });
+      else await DynamicSettingsAny.removeAsync({ key: 'apiKeyAlternatives' });
+    }
   });
 
   it('keeps stimulus display map reads callable for the client sync path', async function() {

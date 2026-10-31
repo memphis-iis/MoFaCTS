@@ -49,6 +49,8 @@ Assessment schedule entries retain their authored input method on initial displa
 
 Lessons whose `tutor.setspec.tags` includes `Experiment` use the condition's audio settings automatically, including when launched from the dashboard. Tag matching ignores case and surrounding whitespace. Participants do not need to enable microphone input or TTS in their profile. `unit.audioInputEnabled` and `unit.audioPromptMode` override the condition settings, so typed units keep the microphone disabled and silent post-tests stay silent. Voices, rates, volume, and microphone sensitivity come from the condition with the existing audio defaults for omitted values; saved personal settings are not changed. Browser microphone permission and a working speech-recognition API key are still required. Untagged lessons retain their personal audio gates. See the wiki's [Audio and Speech Settings](https://github.com/memphis-iis/MoFaCTS/wiki/Audio-and-Speech-Settings) for field details.
 
+Audio-key availability and provider calls use the same lesson-execution authorization as experiment content. A new participant can use configured shared audio keys before their first answer, without a personal key or saved practice history. Failed key authorization blocks an Experiment-tagged launch, and a speaking unit with no available key reports the configuration error instead of accepting typed answers.
+
 - Keep item wording clear and concise.
 - Prefer explicit metadata over implicit naming conventions.
 - Verify media paths and file names before upload.

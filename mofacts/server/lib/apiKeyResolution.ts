@@ -43,7 +43,7 @@ type TdfApiKeyDoc = {
 
 export type ApiKeyResolutionDeps = {
   // Server runtime only. Raw credential-returning methods do not supply this capability.
-  authorizeTdfExecution?: (userId: string, tdfId: string) => Promise<void>;
+  authorizeTdfExecution?: (userId: string, tdfId: string, hasDirectKeyAccess: boolean) => Promise<void>;
   getUserById: (userId: string) => Promise<UserApiKeyDoc>;
   getTdfById: (tdfId: string) => Promise<TdfApiKeyDoc>;
   getAdminApiKeySettings?: () => Promise<AdminApiKeySettingsDoc>;
@@ -239,13 +239,16 @@ export async function getAccessibleTdfApiKey(
   }
 
   const normalizedUserId = normalizeString(params.userId);
-  if (deps.authorizeTdfExecution) await deps.authorizeTdfExecution(normalizedUserId, params.tdfId);
   const isOwner = normalizeString(tdf.ownerId) === normalizedUserId;
   const isAdminOrTeacher = await deps.userIsInRoleAsync(normalizedUserId, ['admin', 'teacher']);
   const isUserSelectTdf = normalizeString(tdf.content?.tdfs?.tutor?.setspec?.userselect).toLowerCase() === 'true';
   const hasHistory = Boolean(await deps.hasHistoryWithTdf(normalizedUserId, params.tdfId));
+  const hasDirectKeyAccess = isOwner || isAdminOrTeacher || isUserSelectTdf || hasHistory;
+  if (deps.authorizeTdfExecution) {
+    await deps.authorizeTdfExecution(normalizedUserId, params.tdfId, hasDirectKeyAccess);
+  }
 
-  if (!isOwner && !isAdminOrTeacher && !isUserSelectTdf && !hasHistory) {
+  if (!hasDirectKeyAccess) {
     if (!deps.authorizeTdfExecution) throw new Meteor.Error(403, 'Access denied to TDF API keys');
   }
 

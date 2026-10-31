@@ -533,11 +533,13 @@
     },
     {
       "name": "getTdfSpeechAPIKey",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated caller with canonical lesson execution access; returns configured status only, never the speech credential."
     },
     {
       "name": "getTdfTTSAPIKey",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated caller with canonical lesson execution access; returns configured status only, never the TTS credential."
     },
     {
       "name": "getTdfsAssignedToStudent",
@@ -578,7 +580,8 @@
     },
     {
       "name": "hasUserPersonalKeys",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated caller; audio-key status uses canonical lesson execution authorization, including experiment-root/condition access before the first history row. Returns availability and source labels only, never credentials."
     },
     {
       "name": "importDeploymentBrandProfileDraft",
@@ -641,11 +644,13 @@
     },
     {
       "name": "makeGoogleSpeechAPICall",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated caller with canonical lesson execution access, including experiment access before any learner history. Provider credentials remain on the server; unrelated private lessons remain denied."
     },
     {
       "name": "makeGoogleTTSApiCall",
-      "access": "role-checked"
+      "access": "role-checked",
+      "notes": "Authenticated caller with canonical lesson execution access, including experiment access before any learner history. Provider credentials remain on the server; unrelated private lessons remain denied."
     },
     {
       "name": "migrateFilenameTdfReferences",

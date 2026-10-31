@@ -999,6 +999,7 @@ async function checkAndWarmupAudioIfNeeded() {
     markLaunchLoadingTiming('hasUserPersonalKeys:complete', userPersonalKeys);
   } catch (error) {
     clientConsole(1, '[LearningDashboard] Could not determine personal audio key availability during launch prep:', error);
+    if (hasExperimentTag(currentTdfFile.tdfs?.tutor?.setspec)) throw error;
   }
 
   const audioStartupUser = {
