@@ -269,6 +269,29 @@ disposal remains responsible for interrupted job lifetime, not the local watcher
 
 ## Verification and remaining work
 
+### External CI image observation
+
+The workflow revision replaces the existing post-build source assertion
+with `observeCiImage.mjs`, executed from the verified captured test application
+so its pinned parser dependencies are available. It inspects the immutable
+Docker config ID and platform and reads the fixed embedded source record with
+no network and a read-only filesystem. The bounded external record references
+the SHA-256 of the exact pre-build Meteor evidence file; it is not embedded in
+the image and contains no claim about future smoke results.
+
+CI publishes a separate `image-observation-<run>-<attempt>` artifact only after
+the existing runtime/image and retained-protection checks succeed. Consumers
+must additionally establish successful completion of the exact run/attempt.
+The record remains `observed-unqualified`, lane `ci-test-image`. This unpublished
+runner-local image is separate from the workstation's built, registry and
+running images; a matching source digest cannot populate the workstation release
+tuple. That linkage, catalog closure and full qualification remain separate work.
+
+This Phase 0 draft has pure/injected collector checks and shared Node/Meteor
+parity tests. Consult the status record for the exact candidate and whether its
+real workflow hook and Meteor parity checks have executed; local checks alone
+do not establish those results.
+
 Local synthetic verification, from `mofacts/`:
 
 ```powershell

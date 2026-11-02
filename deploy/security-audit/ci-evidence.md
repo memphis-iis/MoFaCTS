@@ -76,6 +76,9 @@ work. Successful source acquisition cannot establish required-test coverage,
 protocol qualification, a built/registry/running image mapping or complete release
 qualification. The current source artifact is produced before image construction;
 external structured post-build proof remains required.
+The image-proof workflow supplies a separate CI image observation; this
+source-only acquisition command does not silently consume that artifact or
+promote it to workstation release proof. See [source capture](source-capture.md#external-ci-image-observation).
 
 ## Verification
 

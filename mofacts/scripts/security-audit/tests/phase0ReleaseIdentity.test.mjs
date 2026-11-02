@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 import fixture from '../../../common/securityAudit/fixtures/release-record.fixture.json' with { type: 'json' };
 import { observeBuildIdentity, parseBuildIdentity } from '../../../common/securityAudit/buildIdentity.ts';
+import { parseCiRunReference } from '../../../common/securityAudit/postBuildImageObservation.ts';
 import { canonicalJson } from '../../../common/securityAuditReport.ts';
 import {
   evaluateReleaseIdentity,
@@ -15,6 +16,16 @@ function changed(change) {
   change(value, value.qualification);
   return value;
 }
+
+test('CI run references reject line terminators instead of accepting a partial numeric match', () => {
+  const reference = { repository: 'memphis-iis/MoFaCTS', commit: fixture.baseCommit, runId: '101', runAttempt: '1' };
+  assert.deepEqual(parseCiRunReference(reference, fixture.baseCommit), reference);
+  for (const suffix of ['\n', '\r', '\u2028', '\u2029']) {
+    for (const field of ['runId', 'runAttempt']) {
+      assert.throws(() => parseCiRunReference({ ...reference, [field]: reference[field] + suffix }, fixture.baseCommit));
+    }
+  }
+});
 
 test('Phase 0: pinned Node imports the shared erasable TS and JSON contract without a generated twin', () => {
   assert.equal(process.version, 'v24.22.1');

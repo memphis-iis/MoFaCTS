@@ -10,7 +10,7 @@ export type CommandObservation =
   | { state: 'completed'; exitCode: number }
   | { state: 'unavailable'; reason: 'not-run' | 'spawn-failed' | 'timed-out' };
 
-type ImageObservation = { configDigest: string; platform: string };
+export type ImageObservation = { configDigest: string; platform: string };
 type PublishedImage = ImageObservation & (
   | { kind: 'manifest'; digest: string }
   | { kind: 'index'; digest: string; platformManifestDigest: string }
@@ -84,7 +84,7 @@ function parseSourceVerification(value: unknown): SourceVerification {
   };
 }
 
-function parseImage(value: unknown): ImageObservation {
+export function parseImageObservation(value: unknown): ImageObservation {
   const record = proofRecord(value, ['configDigest', 'platform']);
   return { configDigest: imageDigest(record.configDigest), platform: platform(record.platform) };
 }
@@ -119,7 +119,7 @@ export function parseReleaseQualification(value: unknown): ReleaseQualificationV
     schema: 'ReleaseQualificationV1',
     buildIdentity: parseBuildIdentity(record.buildIdentity),
     sourceVerification: parseSourceVerification(record.sourceVerification),
-    builtImage: parseImage(record.builtImage),
+    builtImage: parseImageObservation(record.builtImage),
     publishedImage,
     runningImage: { configDigest: imageDigest(running.configDigest), platform: platform(running.platform), baseCommit: sourceCommit(running.baseCommit) },
     commands,

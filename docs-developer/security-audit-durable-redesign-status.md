@@ -2,6 +2,14 @@
 
 Last baseline with passing integration/image checks: `0f8f1c30c9d98e0f8865025751510d9a5cf4d0de`.
 
+## Image observation publication — one fresh execution authorized (2026-11-02)
+
+Phil explicitly authorized committing/pushing the reviewed image-proof draft and
+one fresh Meteor integration run, then continuing until the next design decision.
+The existing local checks below remain distinct from hosted execution. The exact
+pushed candidate, new artifact and CI/Security outcomes will be recorded after
+execution. This is one invocation without an automatic retry or live deployment.
+
 ## Helper published and verified; image observation continued locally (2026-11-02)
 
 The authorized helper batch is committed/pushed as

@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import fixture from './fixtures/release-record.fixture.json' with { type: 'json' };
 import { observeBuildIdentity } from './buildIdentity.ts';
 import { evaluateReleaseIdentity, parseWorkstationReleaseRecord } from './releaseQualification.ts';
+import { parsePostBuildImageObservation } from './postBuildImageObservation.ts';
 import { canonicalJson } from '../securityAuditReport.ts';
 
 // The ordinary Meteor common-test discovery owns this parity check. Node tests
@@ -30,5 +31,49 @@ describe('Phase 0 release proof Node/Meteor contract parity', function() {
     dirty.includedUncommittedLocalChanges = true;
     dirty.qualification.buildIdentity.includedUncommittedLocalChanges = true;
     expect(evaluateReleaseIdentity(dirty)).to.deep.equal({ status: 'PASS' });
+  });
+});
+
+describe('Phase 0 external CI image observation parity', function() {
+  const imageObservation = {
+    schema: 'PostBuildImageObservationV1', state: 'observed-unqualified', lane: 'ci-test-image',
+    source: fixture.qualification.buildIdentity,
+    image: fixture.qualification.builtImage,
+    sourceEvidenceDigestSha256: 'e'.repeat(64),
+    ci: { repository: 'memphis-iis/MoFaCTS', commit: fixture.baseCommit, runId: '101', runAttempt: '1' },
+  };
+
+  it('preserves the shared source/image shapes and remains explicitly unqualified', function() {
+    expect(parsePostBuildImageObservation(imageObservation)).to.deep.equal(imageObservation);
+  });
+
+  it('rejects a different lane, successful qualification claim or extra evidence payload', function() {
+    for (const change of [{ lane: 'workstation-release' }, { state: 'PASS' }, { rawResponse: 'synthetic' }]) {
+      expect(() => parsePostBuildImageObservation({ ...imageObservation, ...change })).to.throw();
+    }
+  });
+
+  it('requires clean matching source and supported image platform', function() {
+    for (const change of [
+      { ci: { ...imageObservation.ci, commit: 'f'.repeat(40) } },
+      { source: { ...imageObservation.source, includedUncommittedLocalChanges: true } },
+      { image: { ...imageObservation.image, platform: 'linux/arm64' } },
+    ]) {
+      expect(() => parsePostBuildImageObservation({ ...imageObservation, ...change })).to.throw();
+    }
+  });
+
+  it('cannot substitute a CI smoke observation for workstation release qualification', function() {
+    expect(() => parseWorkstationReleaseRecord({ ...fixture, qualification: imageObservation })).to.throw();
+  });
+
+  it('rejects trailing line terminators in run and attempt identifiers', function() {
+    for (const suffix of ['\n', '\r', '\u2028', '\u2029']) {
+      for (const field of ['runId', 'runAttempt'] as const) {
+        expect(() => parsePostBuildImageObservation({ ...imageObservation,
+          ci: { ...imageObservation.ci, [field]: imageObservation.ci[field] + suffix },
+        })).to.throw();
+      }
+    }
   });
 });
