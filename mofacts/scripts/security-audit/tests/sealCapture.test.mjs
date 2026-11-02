@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { inspectSnapshotTree } from '../qualification/sourceSnapshot.mjs';
 import { main as captureMain } from '../qualification/captureBuildSource.mjs';
@@ -41,11 +42,18 @@ function kernelModel() {
     command: async args => {
       calls.push(args);
       if (args[0] === 'mount' && args[1] === '--bind') {
+        let propagation = ['shared'];
         if (args[2].endsWith(path.sep + 'test-context')) {
           const parent = entries.find(entry => entry.target === path.dirname(args[2]));
           assert.ok(parent?.options.includes('rw'), 'Create the writable child before protecting its parent');
+          assert.deepEqual(parent.propagation, [], 'Detach the parent from propagation peers before creating a child');
+          propagation = [];
         }
-        entries.push({ target: args[2], options: ['rw'] });
+        entries.push({ target: args[2], options: ['rw'], propagation });
+      } else if (args[0] === 'mount' && args[1] === '--make-private') {
+        const found = entries.find(entry => entry.target === args[2]);
+        assert.ok(found);
+        found.propagation = [];
       } else if (args[0] === 'mount') {
         const found = entries.find(entry => entry.target === args[3]);
         assert.ok(found);
@@ -64,7 +72,8 @@ function kernelModel() {
 
 test('mount state parser decodes kernel paths and rejects malformed or oversized input', () => {
   assert.deepEqual(parseMounts('10 1 0:2 / /tmp/with\\040space ro,relatime - ext4 /dev/test rw\n'),
-    [{ mountId: '10', parentId: '1', device: '0:2', root: '/', target: '/tmp/with space', options: ['ro', 'relatime'] }]);
+    [{ mountId: '10', parentId: '1', device: '0:2', root: '/', target: '/tmp/with space', options: ['ro', 'relatime'], propagation: [] }]);
+  assert.deepEqual(parseMounts('10 1 0:2 / /tmp rw shared:123 master:456 - ext4 /dev/test rw\n')[0].propagation, ['shared', 'master']);
   assert.throws(() => parseMounts('malformed'));
   assert.throws(() => parseMounts('x'.repeat(1024 * 1024 + 1)));
 });
@@ -72,7 +81,7 @@ test('mount state parser decodes kernel paths and rejects malformed or oversized
 test('mount observations retain visible/hidden parent relationships with no paths, device IDs or kernel IDs', () => {
   const loc = { repo: path.resolve('private-checkout'), root: path.resolve('private-capture'),
     derivative: path.resolve('private-capture', 'test-context') };
-  const base = { device: '88:99', root: '/private-backing', options: ['rw'] };
+  const base = { device: '88:99', root: '/private-backing', options: ['rw'], propagation: ['shared'] };
   const entries = [
     { ...base, root: '/checkout-backing', mountId: '90001', parentId: '1', target: loc.repo },
     { ...base, root: '/capture-backing', mountId: '90002', parentId: '1', target: loc.root, options: ['ro'] },
@@ -84,6 +93,7 @@ test('mount observations retain visible/hidden parent relationships with no path
   assert.equal(result.rows[3].parent, 3);
   assert.equal(result.rows[3].backing, 3);
   assert.equal(result.rows[1].ro, true);
+  assert.equal(result.rows[0].shared, true);
   assert.doesNotMatch(JSON.stringify(result), /private|backing\/|9000|88:99/);
   assert.equal(summarizeMountState(Array.from({ length: 20 }, (_, i) => ({ ...base,
     mountId: String(i + 1), target: loc.derivative })), loc).rows.length, 12);
@@ -100,13 +110,14 @@ test('failure summaries expose only registered operation/error categories, never
 
 test('mount-layout rejection distinguishes missing protection from incorrect flags without exposing paths', async t => {
   const { workspace, repository } = await fixture(t);
-  for (const kind of ['missing-checkout', 'incorrect-mode-capture']) {
+  for (const kind of ['missing-checkout', 'incorrect-mode-capture', 'non-private-checkout']) {
     const model = kernelModel();
     model.dependencies.mounts = async () => {
       const entries = structuredClone(model.entries);
       if (entries.length === 3) {
         if (kind === 'missing-checkout') return entries.filter(entry => entry.target !== repository);
-        entries.find(entry => entry.target === workspace).options = ['rw'];
+        if (kind === 'non-private-checkout') entries.find(entry => entry.target === repository).propagation = ['shared'];
+        else entries.find(entry => entry.target === workspace).options = ['rw'];
       }
       return entries;
     };
@@ -126,8 +137,8 @@ test('seal retains native bytes/modes and leaves exactly the test derivative wri
   const model = kernelModel();
   assert.equal((await sealCapture(workspace, repository, model.dependencies)).state, 'capture-sealed-unqualified');
   assert.deepEqual(model.entries, [
-    { target: repository, options: ['ro'] }, { target: workspace, options: ['ro'] },
-    { target: path.join(workspace, 'test-context'), options: ['rw'] },
+    { target: repository, options: ['ro'], propagation: [] }, { target: workspace, options: ['ro'], propagation: [] },
+    { target: path.join(workspace, 'test-context'), options: ['rw'], propagation: [] },
   ]);
   assert.deepEqual(await inspectSnapshotTree(path.join(workspace, 'context')), before);
   // Workspace cleanup refuses even before touching installed test output.
@@ -237,4 +248,38 @@ test('Linux CI seal rejects writes/chmod/replacement while test output stays wri
       assert.deepEqual(await inspectSnapshotTree(candidate), before);
     } finally { await unsealCapture(workspace, repository); }
     await fs.writeFile(path.join(candidate, 'Dockerfile'), 'explicitly unsealed');
+  });
+
+test('Linux CI shared parent does not propagate a second hidden test mount',
+  { skip: process.platform !== 'linux' || process.env.CI !== 'true' }, async t => {
+    const execute = promisify(execFile);
+    const parent = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()), 'mofacts-shared-parent-test-'));
+    const originalTemporary = process.env.TMPDIR;
+    let parentMounted = false;
+    let sharedFixture;
+    try {
+      await execute('sudo', ['-n', 'mount', '--bind', parent, parent]);
+      parentMounted = true;
+      await execute('sudo', ['-n', 'mount', '--make-private', parent]);
+      await execute('sudo', ['-n', 'mount', '--make-shared', parent]);
+      // Change only this test process's explicit temporary-root contract. The
+      // fixture mount is isolated from the host's original temporary mount.
+      process.env.TMPDIR = parent;
+      sharedFixture = await fixture(t);
+      await sealCapture(sharedFixture.workspace, sharedFixture.repository);
+      await assertCaptureSealed(sharedFixture.workspace, sharedFixture.repository);
+      const entries = parseMounts(await fs.readFile('/proc/self/mountinfo', 'utf8'));
+      const child = entries.filter(entry => entry.target === path.join(sharedFixture.workspace, 'test-context'));
+      assert.equal(child.length, 1);
+      assert.deepEqual(child[0].propagation, []);
+      await fs.writeFile(path.join(sharedFixture.workspace, 'test-context/output'), 'writable');
+    } finally {
+      try { if (sharedFixture) await unsealCapture(sharedFixture.workspace, sharedFixture.repository); }
+      finally {
+        if (originalTemporary === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = originalTemporary;
+        if (parentMounted) await execute('sudo', ['-n', 'umount', parent]);
+        await fs.rm(parent, { recursive: true, force: true });
+      }
+    }
   });

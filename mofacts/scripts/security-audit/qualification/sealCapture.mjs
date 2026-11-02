@@ -10,10 +10,10 @@ const schema = 'MoFaCTSCaptureSealV1';
 const failureTraces = new WeakMap();
 const stages = new Set(['runner-contract', 'unseal-cwd', 'locate-inputs', 'read-mount-table',
   'existing-mounts', 'write-seal-receipt', 'bind-checkout', 'protect-checkout',
-  'bind-capture', 'protect-capture', 'bind-test-derivative',
+  'bind-capture', 'protect-capture', 'bind-test-derivative', 'isolate-checkout', 'isolate-capture',
   'mount-topology', 'read-seal-receipt', 'probe-capture-receipt', 'probe-recipe', 'probe-compose', 'snapshot-mount-state']);
 const topologyReasons = new Set(['unexpected-mount', ...['checkout', 'capture', 'test-derivative']
-  .flatMap(role => ['missing-', 'duplicate-', 'incorrect-mode-'].map(prefix => prefix + role))]);
+  .flatMap(role => ['missing-', 'duplicate-', 'incorrect-mode-', 'non-private-'].map(prefix => prefix + role))]);
 const invalid = stage => {
   const error = new Error('Capture seal validation failed');
   if (stage) error.sealStage = stage;
@@ -54,8 +54,12 @@ export function parseMounts(text) {
     if (!path.isAbsolute(target)) invalid();
     if (!/^[1-9][0-9]*$/.test(fields[0])) invalid();
     if (!/^(?:0|[1-9][0-9]*)$/.test(fields[1]) || !/^[0-9]+:[0-9]+$/.test(fields[2])) invalid();
+    const separator = fields.indexOf('-', 6);
+    if (separator < 6) invalid();
+    const propagation = fields.slice(6, separator).filter(field => /^(?:shared:|master:|propagate_from:|unbindable$)/.test(field))
+      .map(field => field.split(':')[0]);
     return { mountId: fields[0], parentId: fields[1], device: fields[2], root: fields[3],
-      target, options: fields[5].split(',') };
+      target, options: fields[5].split(','), propagation };
   });
 }
 
@@ -99,6 +103,8 @@ export function summarizeMountState(entries, loc, visible = {}) {
     rows: selected.slice(0, 12).map((entry, index) => ({
       number: index + 1, role: role(entry.target), parent: ordinal(entry.parentId),
       ro: entry.options.includes('ro'), rw: entry.options.includes('rw'),
+      shared: entry.propagation?.includes('shared') === true,
+      slave: entry.propagation?.includes('master') === true || entry.propagation?.includes('propagate_from') === true,
       backing: typeof entry.root === 'string' && typeof entry.device === 'string'
         ? selected.findIndex(other => other.root === entry.root && other.device === entry.device) + 1 : 'unavailable',
     })) };
@@ -131,6 +137,7 @@ function checkMounts(entries, locations, complete) {
     if (seen.has(entry.target)) reject('duplicate-' + role(entry.target), entry.mountId && mountIds.has(entry.target)
       ? mountIds.get(entry.target) === entry.mountId ? 'same-kernel-id' : 'different-kernel-id' : undefined);
     if (complete && !entry.options.includes(mode)) reject('incorrect-mode-' + role(entry.target));
+    if (complete && (!Array.isArray(entry.propagation) || entry.propagation.length)) reject('non-private-' + role(entry.target));
     seen.add(entry.target);
     if (entry.mountId) mountIds.set(entry.target, entry.mountId);
   }
@@ -192,6 +199,12 @@ export async function sealCapture(workspace, repository, dependencies = {}) {
       mounted.push(target);
       await recordState(stage);
     };
+    const isolate = (target, stage) => atStage(stage, async () => {
+      // A bind inherits propagation from its source. Detach this new owned
+      // mount from peers before creating children; never alter the host parent.
+      await invoke(['mount', '--make-private', target]);
+      await recordState(stage);
+    });
     const protect = (target, stage) => {
       // Supply both operands: target-only remounts consult ambient mount tables
       // and differ across util-linux releases. This is one owned self-bind.
@@ -201,8 +214,10 @@ export async function sealCapture(workspace, repository, dependencies = {}) {
       });
     };
     await bind(loc.repo, 'bind-checkout');
+    await isolate(loc.repo, 'isolate-checkout');
     await protect(loc.repo, 'protect-checkout');
     await bind(loc.root, 'bind-capture');
+    await isolate(loc.root, 'isolate-capture');
     // Create the test mount from the still-writable parent. Making the parent
     // read-only afterward leaves this existing child mount writable, without
     // rebinding/remounting a child inherited from a read-only source.

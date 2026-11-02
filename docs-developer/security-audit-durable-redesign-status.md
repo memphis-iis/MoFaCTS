@@ -2,6 +2,36 @@
 
 Last baseline with passing integration/image checks: `18677291993b66b890a090e55d65f703b45ff653`.
 
+## Renewed authorization — attempt 1 and reproduced cause (2026-11-02)
+
+Commit `cffb3c2a3d5a32c475eca1377f56be5ea81b812f` published the per-operation
+observations. [CI 41463643345](https://github.com/memphis-iis/MoFaCTS/actions/runs/41463643345)
+stopped before Meteor; the trace shows binding the test child creates two
+distinct records with the same backing root. The visible record is a child of
+the captured parent; the hidden peer is outside it. This consumes the first of
+the renewed three attempts; two remain.
+
+The exact trace/failure was reproduced locally by making the disposable
+container's synthetic temporary parent a shared mount. It failed under both
+modern and classic APIs before the repair. Making only the helper-owned checkout
+and capture bind mounts private before creating descendants makes both native
+reproductions pass with strict three-mount validation, actual source write/chmod
+denial, writable test output and cleanup. Host parent propagation is not changed.
+This establishes shared propagation as the cause of the reproduced extra peer;
+the repaired hosted CI execution is still pending.
+
+The repair also validates private propagation, updates the command model to
+require isolation before child creation, and adds a real shared-parent Linux CI
+fixture. That fixture isolates its own synthetic parent bind before making that
+parent shared; it never changes propagation on the host's original temporary
+mount. No new package or executable dependency is introduced.
+Local capture now passes **94/98 with 4 CI-only skips**; full lint passes
+(323 surfaces). One new parser fixture initially omitted its options column;
+the fixture was corrected and the suite passed without weakening the parser.
+Both actual shared-parent native reproductions pass after the repair.
+[Security 41463643187](https://github.com/memphis-iis/MoFaCTS/actions/runs/41463643187)
+passed all four jobs for the first renewed attempt.
+
 ## Renewed three-attempt authorization (2026-11-02)
 
 The user explicitly authorized another three CI attempts after the previous

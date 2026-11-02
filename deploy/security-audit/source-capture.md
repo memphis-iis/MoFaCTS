@@ -15,6 +15,14 @@ It creates the `test-context/` child mount while its parent is still writable,
 then protects the parent; only the existing child remains writable. All setup
 finishes before dependency installation or tests. It reads kernel mount
 state and probes write/chmod denial; changing file modes alone is insufficient.
+Each new owned parent bind is made private before any child is mounted. This
+prevents shared-parent propagation from cloning a hidden peer at the test-copy
+path. Validation requires private propagation for all three owned mounts as
+well as the expected visibility/count and read/write flags. The host's parent
+mount and its propagation are left untouched.
+See the [kernel's shared-subtree semantics](https://docs.kernel.org/filesystems/sharedsubtree.html)
+for how a bind inherits a propagation peer group and how a private mount
+contains mount/unmount events.
 On failure it emits bounded per-operation observations using fixed roles and
 ordinal mount/parent/backing/visible relationships. Paths, filesystem roots,
 device identifiers, kernel IDs and file contents are omitted; validation is
