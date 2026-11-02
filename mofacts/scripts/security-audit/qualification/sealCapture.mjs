@@ -11,6 +11,8 @@ const stages = new Set(['runner-contract', 'unseal-cwd', 'locate-inputs', 'read-
   'existing-mounts', 'write-seal-receipt', 'bind-checkout', 'protect-checkout',
   'bind-capture', 'protect-capture', 'bind-test-derivative', 'enable-test-writes',
   'mount-topology', 'read-seal-receipt', 'probe-capture-receipt', 'probe-recipe', 'probe-compose']);
+const topologyReasons = new Set(['unexpected-mount', ...['checkout', 'capture', 'test-derivative']
+  .flatMap(role => ['missing-', 'duplicate-', 'incorrect-mode-'].map(prefix => prefix + role))]);
 const invalid = stage => {
   const error = new Error('Capture seal validation failed');
   if (stage) error.sealStage = stage;
@@ -30,7 +32,8 @@ export function sealFailureSummary(error) {
       ? 'native-exit-' + error.code : 'unclassified';
   // Classify known native messages, never copy stderr, arguments or paths.
   const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
-  const reason = /operation not permitted/i.test(stderr) ? 'operation-not-permitted'
+  const reason = topologyReasons.has(error?.sealReason) ? error.sealReason
+    : /operation not permitted/i.test(stderr) ? 'operation-not-permitted'
     : /permission denied/i.test(stderr) ? 'permission-denied'
       : /not a directory|mount point.*does not exist/i.test(stderr) ? 'invalid-mountpoint'
         : /target is busy|device or resource busy|mount point is busy/i.test(stderr) ? 'mountpoint-busy' : 'unspecified';
@@ -76,13 +79,21 @@ function relevant(entries, locations) {
 
 function checkMounts(entries, locations, complete) {
   const expected = new Map([[locations.repo, 'ro'], [locations.root, 'ro'], [locations.derivative, 'rw']]);
+  const role = target => target === locations.repo ? 'checkout' : target === locations.root ? 'capture' : 'test-derivative';
+  const reject = reason => {
+    const error = new Error('Capture seal validation failed');
+    error.sealReason = reason;
+    throw error;
+  };
   const seen = new Set();
   for (const entry of relevant(entries, locations)) {
     const mode = expected.get(entry.target);
-    if (!mode || seen.has(entry.target) || (complete && !entry.options.includes(mode))) invalid();
+    if (!mode) reject('unexpected-mount');
+    if (seen.has(entry.target)) reject('duplicate-' + role(entry.target));
+    if (complete && !entry.options.includes(mode)) reject('incorrect-mode-' + role(entry.target));
     seen.add(entry.target);
   }
-  if (complete && seen.size !== expected.size) invalid();
+  if (complete) for (const target of expected.keys()) if (!seen.has(target)) reject('missing-' + role(target));
   return seen;
 }
 

@@ -2,6 +2,36 @@
 
 Current reviewed baseline: `18677291993b66b890a090e55d65f703b45ff653`.
 
+## Diagnostic execution checkpoint — `f66aac03` (2026-11-02)
+
+The user authorized the diagnostic publication and fresh combined attempt.
+Commit `f66aac03bb919a59d9fca67aeb671483762c5dea` was pushed. Both pre-commit
+checks and [Security run 41452105014](https://github.com/memphis-iis/MoFaCTS/actions/runs/41452105014)
+passed. [CI run 41452104938](https://github.com/memphis-iis/MoFaCTS/actions/runs/41452104938)
+again stopped before Meteor/build, now with `stage=mount-topology`. All mount
+setup commands returned successfully; kernel mount-layout validation rejected
+the resulting state. No exact missing/duplicate/flag cause is established yet.
+Cleanup succeeded. No Meteor invocation, app compilation or deployment ran.
+
+An isolated local Linux reproduction used the existing pinned development image
+in a disposable container with network disabled, read-only source-module mounts,
+no Docker socket/credentials, and a temporary native filesystem. SYS_ADMIN was
+limited to that container's mount namespace for the synthetic fixture. The same
+bind/remount sequence, kernel checks, native write/chmod denial and unseal passed
+using direct root mount commands. It did not reproduce the hosted runner state
+or establish the runner's sudo/mount behavior. The container was removed.
+The disposable image reports Ubuntu 26.04/util-linux 2.41.3; the CI runner
+reports Ubuntu 22.04. This difference is not itself a confirmed cause.
+
+A further local diagnostic refinement distinguishes only fixed missing,
+duplicate, unexpected or incorrect-mode roles without exposing paths/mount
+inventories. Capture tests pass **93/96, 3 CI-only skips**. The protection policy
+is unchanged. This refinement and checkpoint have not been committed or rerun;
+Full lint and diff checks pass. The user subsequently explicitly authorized
+three further CI attempts, including narrow diagnostic/fix commits, Meteor and
+the Compose build if reached, with no deployment. Count these separately and
+stop on success, a new design decision or exhaustion of those three attempts.
+
 ## Published execution checkpoint — `ca49f3a7` (2026-11-02)
 
 The user explicitly authorized committing/pushing this audit batch and one

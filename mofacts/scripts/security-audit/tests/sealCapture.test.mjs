@@ -70,6 +70,28 @@ test('failure summaries expose only registered operation/error categories, never
     stderr: 'synthetic-private-value' }), /synthetic-private-value/);
 });
 
+test('mount-layout rejection distinguishes missing protection from incorrect flags without exposing paths', async t => {
+  const { workspace, repository } = await fixture(t);
+  for (const kind of ['missing-checkout', 'incorrect-mode-capture']) {
+    const model = kernelModel();
+    model.dependencies.mounts = async () => {
+      const entries = structuredClone(model.entries);
+      if (entries.length === 3) {
+        if (kind === 'missing-checkout') return entries.filter(entry => entry.target !== repository);
+        entries.find(entry => entry.target === workspace).options = ['rw'];
+      }
+      return entries;
+    };
+    await assert.rejects(sealCapture(workspace, repository, model.dependencies), error => {
+      assert.match(sealFailureSummary(error), new RegExp('reason=' + kind));
+      assert.ok(!sealFailureSummary(error).includes(workspace));
+      assert.ok(!sealFailureSummary(error).includes(repository));
+      return true;
+    });
+    assert.equal(model.entries.length, 0);
+  }
+});
+
 test('seal retains native bytes/modes and leaves exactly the test derivative writable', async t => {
   const { workspace, repository } = await fixture(t);
   const before = await inspectSnapshotTree(path.join(workspace, 'context'));
