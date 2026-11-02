@@ -80,6 +80,45 @@ The image-proof workflow supplies a separate CI image observation; this
 source-only acquisition command does not silently consume that artifact or
 promote it to workstation release proof. See [source capture](source-capture.md#external-ci-image-observation).
 
+## Optional CI image acquisition
+
+`deploy/collect-ci-image-evidence.ps1` explicitly acquires both source evidence
+and the separate image observation from the selected run. It uses the same
+required arguments and approved stored sign-in as the source-only command:
+
+```powershell
+.\deploy\collect-ci-image-evidence.ps1 `
+    -CiRunId $CiRunId -SecurityRunId $SecurityRunId `
+    -ExpectedSourceFile $VerifiedSourceObservationPath `
+    -TestAppRoot $CapturedTestAppRoot -OutputDirectory $EvidenceDirectory
+```
+
+The source bundle is preserved unchanged. A separate immutable image bundle
+contains its own `acquisition.json`, the exact `mofacts-ci-image-observation.json` and the
+original image `artifact.zip`. Its acquisition record links the source bundle's
+digest and the exact image-observation-byte digest. Neither command writes the
+authoritative release record.
+
+The image must come from the same canonical successful CI run/attempt and clean
+source identity, with a successful matching Security run. The helper matches its
+source-evidence reference to the hash of the exact retained
+`mofacts-meteor-test-evidence.json` bytes. Remote workflow, run, job and artifact
+metadata are rechecked before publication. Missing, expired, replaced or
+contradictory evidence fails; an already published source bundle remains valid
+when subsequent image acquisition fails.
+
+The native ZIP adapter's explicit `image` profile accepts exactly one regular
+`mofacts-ci-image-observation.json` file, at most 16 KiB, in an archive at most 64 KiB.
+Its default `source` profile and existing limits remain unchanged. Both profiles
+verify streamed length and CRC and reject links, paths and duplicate entries.
+The existing parser rejects duplicate JSON keys and unknown observation fields.
+
+This remains CI test-image evidence and **acquired-unqualified**. It does not
+establish the workstation's built, published or running image, required security
+catalog coverage, or release qualification. Connecting the returned references
+to a release-record candidate and installing protected host proof remain
+separate operations.
+
 ## Verification
 
 From `mofacts/`, `npm run security:test:phase0` includes pure validation and
@@ -90,7 +129,10 @@ fixtures run separately on the workstation:
 .\deploy\security-audit\test-ci-evidence-archive.ps1
 ```
 
-The recorded live acquisition of CI `41511591350` and Security `41511591390`
-validated existing synthetic results; it did not execute a new CI run or prove
-the current working tree matches that earlier candidate. See the
+The latest source/image acquisition check used successful CI `41537962904` and
+Security `41537962905`. It validated the actual published artifacts through the
+native decoder and retained them separately. This check used that run's saved
+source observation; it did not independently attest the current working tree,
+execute another CI run or establish a workstation release-image mapping. Native
+ZIP fixtures passed **31/31**. See the
 [audit record](../../docs-developer/security-audit-durable-redesign-status.md).

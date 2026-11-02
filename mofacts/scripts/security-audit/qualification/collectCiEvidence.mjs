@@ -12,7 +12,7 @@ const archiveReader = fileURLToPath(new URL('../../../../deploy/security-audit/r
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const invalid = () => { throw new Error('CI evidence acquisition failed; no qualification was issued.'); };
 const tokenOverrides = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'];
-function requireUnexpired(artifact, now) {
+export function requireUnexpired(artifact, now) {
   const expiry = typeof artifact.expires_at === 'string' ? Date.parse(artifact.expires_at) : NaN;
   if (artifact.expired !== false || !Number.isFinite(expiry) || expiry <= now) invalid();
 }
@@ -60,7 +60,7 @@ export function evidenceCommand(command, args, maximum, environment = process.en
   });
 }
 
-async function realDirectory(value) {
+export async function realDirectory(value) {
   const absolute = path.resolve(value);
   let current = path.parse(absolute).root;
   for (const part of absolute.slice(current.length).split(path.sep).filter(Boolean)) {
@@ -99,24 +99,24 @@ export async function readCiFile(file, maximum) {
   } finally { await handle.close(); }
 }
 
-async function writeNew(file, bytes) {
+export async function writeNew(file, bytes) {
   const handle = await fs.open(file, 'wx', 0o600);
   try { await handle.writeFile(bytes); await handle.sync(); }
   finally { await handle.close(); }
 }
 
-async function syncDirectory(directory) {
+export async function syncDirectory(directory) {
   if (process.platform === 'win32') return;
   const handle = await fs.open(directory, 'r');
   try { await handle.sync(); } finally { await handle.close(); }
 }
 
-function sameDirectory(a, b) {
+export function sameDirectory(a, b) {
   return a.ino === b.ino && a.dev === b.dev && b.isDirectory() && !b.isSymbolicLink();
 }
 
 // Only a fresh helper-created directory is eligible for partial-work cleanup.
-async function removeOwned(directory, parent, identity) {
+export async function removeOwned(directory, parent, identity) {
   if (path.dirname(directory) !== parent || !sameDirectory(identity, await fs.lstat(directory))) invalid();
   await fs.rm(directory, { recursive: true });
 }

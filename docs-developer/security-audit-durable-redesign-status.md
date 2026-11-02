@@ -1,6 +1,86 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing integration/image checks: `0f8f1c30c9d98e0f8865025751510d9a5cf4d0de`.
+Last baseline with passing CI, Security and image checks: `29394ded1d0a0d65876a6e78529063eb368bd0a9`.
+
+## Image evidence helper publication authorized (2026-11-02)
+
+Phil authorized committing/pushing the reviewed image evidence helper and one
+fresh Meteor integration execution, then continuation within the approved design
+until the next decision. This authorizes one invocation without an automatic
+retry. The committed candidate and exact CI/Security outcomes will be recorded
+after execution; no deployment or authoritative release-record write is implied.
+
+## Release-record V2 passed; CI image acquisition continued locally (2026-11-02)
+
+The accepted checksum correction and release-record draft are committed/pushed as
+`29394ded1d0a0d65876a6e78529063eb368bd0a9`. Manifest, lint-staged and staged-secret
+hooks passed. [CI 41537962904](https://github.com/memphis-iis/MoFaCTS/actions/runs/41537962904)
+and all four jobs in [Security 41537962905](https://github.com/memphis-iis/MoFaCTS/actions/runs/41537962905)
+passed. This used the single fresh Meteor authorization and one canonical Compose
+application compilation, with no retry or second invocation.
+
+Hosted results: **974 server passed / 15 pending**, **1,237 browser passed /
+7 pending**, including the three new V2 parity cases; harness **26/26**,
+Phase 0 **129/129**, capture **98/98**, zero hosted skips. Full application/vendor
+typechecks, lint, protected-source checks, image observation, ABI/runtime checks,
+standalone-Mongo rejection, replica-set readiness and cleanup passed. The old
+checksum false-positive run remains failed historical evidence; the exact
+correction now has its own passing hosted scan.
+
+Continuation adds the opt-in `deploy/collect-ci-image-evidence.ps1` wrapper and
+Node owner. They reuse the source acquisition policy and native ZIP reader,
+retain a separate immutable image bundle, match full source/run/attempt identity
+and the exact source-evidence bytes, and reobserve remote workflow/job/artifact
+metadata before publication. No release authority or workstation image is
+inferred. The closed native image profile accepts only the workflow's canonical
+`mofacts-ci-image-observation.json`, at most 16 KiB in a 64 KiB archive; the default
+source profile is unchanged.
+
+The first live check exposed a draft consumer filename mismatch: it guessed
+`image-observation.json`. It failed before image publication and preserved the
+valid source bundle. The consumer/profile now require the actual published name,
+with a workflow-path regression test and rejection of the guessed alias. The
+corrected real wrapper then successfully acquired both artifacts through the
+existing stored sign-in. Local-only evidence is under ignored
+`tmp/ci-image-evidence-41537962904`; no raw API payload or credential is retained.
+
+- Source artifact `13185470896`, ZIP digest
+  `5aafe5fa41add1df0ce323cfdbd56a5c2a919988ebd3abcec05055401de76a36`.
+- Image artifact `13186670126`, ZIP digest
+  `478a301b3c8c0dfff13d08f7c3ac8e9163381385c1e01548b5c65861bd1ce48d`.
+- Preserved source-acquisition record digest
+  `74803d78ae169e337041bde3052dc9bf3157526596dceeb80130b0f49a3453b7`;
+  image-acquisition record digest
+  `429ac5fb3c7a044a56f65452b1a80d59a81547d71472b76f73e9b8c6a3605777`.
+- Exact image-observation digest
+  `a902e86ebb6c0a474213bfef3b6bc7ff0560772796f40f817bbe1f25799e4c9d`;
+  joined source-evidence digest
+  `b59cd1313dc859ca473aa1606fdbd3dd6a1c6ebde25c748d871841f09dafbb29`.
+- CI image config ID
+  `sha256:ddca907e649ab39a513fcc91bcd79362bc6fe076ae3f9c6062e5cf9c8eb0de4c`,
+  source snapshot `942554ecaf8937af72b3717451a91514e197709bf1afc7934286721c30e030eb`.
+
+This live helper check used the hosted run's saved source observation and local
+module inventory. It did not independently capture/attest the current dirty
+workstation source or qualify a release. Success remains `acquired-unqualified`.
+Local checks: Phase 0 **137 passed / 1 hosted-only skip** (138 total), capture
+**94 passed / 4 hosted-only skips**, source-security **41/41**, native ZIP
+**31/31**. Independent review found no remaining binding/ownership blocker. The
+new workflow-path test initially failed full lint's regex-spacing rule; its
+equivalent counted-space expression and focused suite now pass. Final full lint
+passed, including the unchanged 323-surface contract. No TypeScript app source
+changed in this continuation; the pushed V2 app typechecks passed in CI above.
+
+The acquisition continuation remains uncommitted. Unrelated staging/Mongo/SPARC
+and wiki edits are preserved. No command-sheet edit, authoritative-record write,
+protected-host installation, registry publication or deployment ran. Bounded
+reader searches in the canonical config/wiki repos found the two existing
+command-sheet writers only; this does not prove absence of external readers.
+Next is publication/verification of this helper, then explicit release-reference
+binding and protected installation. No new architectural choice was established;
+fresh publication/CI authorization is required before another push triggers
+Meteor. Full catalog/authentication, workstation/registry/running-image proof,
+live receipt/recovery and remaining Phase 0 gates stay open.
 
 ## Release-record draft publication authorized (2026-11-02)
 

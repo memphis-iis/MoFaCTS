@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ArchivePath,
     [Parameter(Mandatory = $true)]
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [ValidateSet('source', 'image')]
+    [string]$Profile = 'source'
 )
 
 # The workstation acquisition owner authenticates the archive digest. This
@@ -13,6 +15,13 @@ $ErrorActionPreference = 'Stop'
 $archiveLimit = 8MB
 $fileLimit = 4MB
 $totalLimit = 12MB
+$entryNames = @('mofacts-source-observation.json', 'mofacts-meteor-test-run.json', 'mofacts-meteor-test-evidence.json')
+if ($Profile -eq 'image') {
+    $archiveLimit = 64KB
+    $fileLimit = 16KB
+    $totalLimit = 16KB
+    $entryNames = @('mofacts-ci-image-observation.json')
+}
 $createdFiles = [System.Collections.Generic.List[string]]::new()
 $archiveStream = $null
 $archive = $null
@@ -70,7 +79,7 @@ try {
     $archive = [System.IO.Compression.ZipArchive]::new($archiveStream,
         [System.IO.Compression.ZipArchiveMode]::Read, $true)
     $allowed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($name in @('mofacts-source-observation.json', 'mofacts-meteor-test-run.json', 'mofacts-meteor-test-evidence.json')) {
+    foreach ($name in $entryNames) {
         [void]$allowed.Add($name)
     }
     if ($archive.Entries.Count -ne $allowed.Count) { throw 'Invalid entry count' }
@@ -123,7 +132,7 @@ try {
             if ($null -ne $reader) { $reader.Dispose() }
         }
     }
-    [Console]::Out.WriteLine((@{ state = 'ci-evidence-archive-read'; files = 3; archiveDigestSha256 = $archiveDigest } | ConvertTo-Json -Compress))
+    [Console]::Out.WriteLine((@{ state = 'ci-evidence-archive-read'; files = $allowed.Count; archiveDigestSha256 = $archiveDigest } | ConvertTo-Json -Compress))
 } catch {
     # Delete only files exclusively created by this invocation. Re-check the
     # directory chain and exact regular file before every non-recursive deletion.

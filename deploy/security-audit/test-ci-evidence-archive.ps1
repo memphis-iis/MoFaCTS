@@ -29,13 +29,17 @@ function Write-TestArchive {
 }
 
 function Invoke-TestAdapter {
-    param([string]$ArchivePath, [string]$OutputDirectory)
+    param([string]$ArchivePath, [string]$OutputDirectory, [string]$Profile = '')
     $start = [System.Diagnostics.ProcessStartInfo]::new($powershell)
     $start.UseShellExecute = $false
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
     foreach ($argument in @('-NoProfile', '-NonInteractive', '-File', $scriptPath,
         '-ArchivePath', $ArchivePath, '-OutputDirectory', $OutputDirectory)) { $start.ArgumentList.Add($argument) }
+    if ($Profile) {
+        $start.ArgumentList.Add('-Profile')
+        $start.ArgumentList.Add($Profile)
+    }
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $start
     try {
@@ -54,8 +58,8 @@ function Assert-Case {
 }
 
 function Expect-Rejection {
-    param([string]$ArchivePath, [string]$OutputDirectory)
-    $result = Invoke-TestAdapter -ArchivePath $ArchivePath -OutputDirectory $OutputDirectory
+    param([string]$ArchivePath, [string]$OutputDirectory, [string]$Profile = '')
+    $result = Invoke-TestAdapter -ArchivePath $ArchivePath -OutputDirectory $OutputDirectory -Profile $Profile
     if ($result.Code -eq 0 -or $result.Output -or $result.Error.Trim() -cne 'CI evidence archive validation failed.') { throw 'Expected sanitized failure' }
 }
 
@@ -149,6 +153,86 @@ try {
         $out = Join-Path $testRoot 'oversized-output'
         [void][System.IO.Directory]::CreateDirectory($out)
         Expect-Rejection -ArchivePath $bad -OutputDirectory $out
+    }
+    $imageEntries = @(@{ Name = 'mofacts-ci-image-observation.json'; Bytes = [System.Text.Encoding]::UTF8.GetBytes('{"image":"synthetic"}') })
+    $imageArchive = Join-Path $testRoot 'image-valid.zip'
+    Write-TestArchive -Path $imageArchive -Entries $imageEntries
+    Assert-Case 'image bytes and digest' {
+        $out = Join-Path $testRoot 'image-valid-output'
+        [void][System.IO.Directory]::CreateDirectory($out)
+        $result = Invoke-TestAdapter -ArchivePath $imageArchive -OutputDirectory $out -Profile image
+        if ($result.Code -ne 0 -or $result.Error) { throw 'Valid image archive failed' }
+        $record = $result.Output | ConvertFrom-Json
+        $expectedDigest = (Get-FileHash -LiteralPath $imageArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($record.state -cne 'ci-evidence-archive-read' -or $record.files -ne 1 -or $record.archiveDigestSha256 -cne $expectedDigest) { throw 'Wrong image success record' }
+        if ([System.IO.File]::ReadAllText((Join-Path $out 'mofacts-ci-image-observation.json')) -cne '{"image":"synthetic"}') { throw 'Image bytes changed' }
+    }
+    $malformedImages = @{
+        'wrong-name' = @(@{ Name = 'other.json'; Bytes = [byte[]]@(1) });
+        'unpublished-short-name' = @(@{ Name = 'image-observation.json'; Bytes = [byte[]]@(1) });
+        'duplicate' = @($imageEntries[0], $imageEntries[0]);
+        'traversal' = @(@{ Name = '../mofacts-ci-image-observation.json'; Bytes = [byte[]]@(1) });
+        'nested' = @(@{ Name = 'nested/mofacts-ci-image-observation.json'; Bytes = [byte[]]@(1) });
+        'symlink' = @(@{ Name = 'mofacts-ci-image-observation.json'; Bytes = [byte[]]@(1); Attributes = [int]0xa1ff0000 });
+        'directory' = @(@{ Name = 'mofacts-ci-image-observation.json'; Bytes = [byte[]]@(1); Attributes = 0x10 });
+        'oversized-entry' = @(@{ Name = 'mofacts-ci-image-observation.json'; Bytes = [byte[]]::new(16KB + 1) });
+        'source-substitution' = $baseEntries;
+    }
+    foreach ($caseName in $malformedImages.Keys) {
+        $caseArchive = Join-Path $testRoot ('image-' + $caseName + '.zip')
+        Write-TestArchive -Path $caseArchive -Entries $malformedImages[$caseName]
+        $caseOutput = Join-Path $testRoot ('image-' + $caseName + '-output')
+        [void][System.IO.Directory]::CreateDirectory($caseOutput)
+        Assert-Case ('image-' + $caseName) {
+            Expect-Rejection -ArchivePath $caseArchive -OutputDirectory $caseOutput -Profile image
+            if ([System.IO.Directory]::EnumerateFileSystemEntries($caseOutput).GetEnumerator().MoveNext()) { throw 'Rejected image archive left output' }
+        }
+    }
+    Assert-Case 'image rejected by default source profile' {
+        $out = Join-Path $testRoot 'image-default-source-output'
+        [void][System.IO.Directory]::CreateDirectory($out)
+        Expect-Rejection -ArchivePath $imageArchive -OutputDirectory $out
+    }
+    Assert-Case 'explicit source profile unchanged' {
+        $out = Join-Path $testRoot 'explicit-source-output'
+        [void][System.IO.Directory]::CreateDirectory($out)
+        $result = Invoke-TestAdapter -ArchivePath $validArchive -OutputDirectory $out -Profile source
+        if ($result.Code -ne 0 -or $result.Error -or ($result.Output | ConvertFrom-Json).files -ne 3) { throw 'Explicit source failed' }
+    }
+    Assert-Case 'image CRC mismatch cleans partial output' {
+        $bad = Join-Path $testRoot 'image-crc-mismatch.zip'
+        $bytes = [System.IO.File]::ReadAllBytes($imageArchive)
+        $changed = $false
+        for ($index = 0; $index -lt $bytes.Length - 20; $index++) {
+            if ($bytes[$index] -eq 0x50 -and $bytes[$index + 1] -eq 0x4b -and
+                $bytes[$index + 2] -eq 0x01 -and $bytes[$index + 3] -eq 0x02) {
+                # Corrupt central-directory CRC while preserving entry content.
+                $bytes[$index + 16] = $bytes[$index + 16] -bxor 1
+                $changed = $true
+                break
+            }
+        }
+        if (-not $changed) { throw 'Synthetic ZIP mutation failed' }
+        [System.IO.File]::WriteAllBytes($bad, $bytes)
+        $out = Join-Path $testRoot 'image-crc-output'
+        [void][System.IO.Directory]::CreateDirectory($out)
+        Expect-Rejection -ArchivePath $bad -OutputDirectory $out -Profile image
+        if ([System.IO.Directory]::EnumerateFileSystemEntries($out).GetEnumerator().MoveNext()) { throw 'Partial image output remained' }
+    }
+    Assert-Case 'image malformed ZIP' {
+        $bad = Join-Path $testRoot 'image-invalid.zip'
+        [System.IO.File]::WriteAllText($bad, 'synthetic invalid image archive')
+        $out = Join-Path $testRoot 'image-invalid-output'
+        [void][System.IO.Directory]::CreateDirectory($out)
+        Expect-Rejection -ArchivePath $bad -OutputDirectory $out -Profile image
+    }
+    Assert-Case 'image oversized archive' {
+        $bad = Join-Path $testRoot 'image-oversized.zip'
+        $stream = [System.IO.FileStream]::new($bad, [System.IO.FileMode]::CreateNew)
+        try { $stream.SetLength(64KB + 1) } finally { $stream.Dispose() }
+        $out = Join-Path $testRoot 'image-oversized-output'
+        [void][System.IO.Directory]::CreateDirectory($out)
+        Expect-Rejection -ArchivePath $bad -OutputDirectory $out -Profile image
     }
     if ($IsWindows) {
         Assert-Case 'linked output ancestor' {

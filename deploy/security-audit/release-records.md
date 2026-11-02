@@ -18,7 +18,7 @@ publication. No credentials, command output, provider settings or learner data
 are accepted as extra fields. A valid tuple remains **consistent-unqualified**:
 the tuple checker cannot authenticate the evidence supplied to it.
 
-### Versioned evidence references (local draft)
+### Versioned evidence references
 
 `ReleaseQualificationV2` extends the same optional `qualification` field. It
 retains one build identity, a required source-acquisition digest and an optional
@@ -40,10 +40,11 @@ atomic latest-record replacement remain in use. Host projection still omits the
 qualification payload; its authoritative-record digest binds the extended bytes
 while its image ID continues to come from the explicit workstation record.
 
-This draft has pure/parser/storage and shared Meteor parity tests; its new
-Meteor cases have not run yet. It is not installed in the private production
-writer or the host. Reference acquisition/binding, external reader confirmation,
-fresh CI and protected installation remain separate integration gates. See the
+The parser/storage and three new shared Meteor parity cases passed in
+[CI at `29394ded`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41537962904).
+It is not installed in the private production writer or the host. Reference
+acquisition/binding, external reader confirmation and protected installation
+remain separate integration gates. See the
 [status record](../../docs-developer/security-audit-durable-redesign-status.md).
 
 The helper creates `<ProdReleaseRecordPath>.history` beside the latest record.
