@@ -1,6 +1,66 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing integration/image checks: `936a64aa3939fda466e4dc5091f8d29719b729cc`.
+Last baseline with passing integration/image checks: `5557ae4b6dd23bc4e874478c987325621e9bd987`.
+
+## Evidence publication and next acquisition boundary (2026-11-02)
+
+The structured-evidence batch is committed/pushed as
+`5557ae4b6dd23bc4e874478c987325621e9bd987`; its wiki update is `d02ed42`.
+[CI 41511591350](https://github.com/memphis-iis/MoFaCTS/actions/runs/41511591350)
+is the third and final attempt in the renewed three-attempt allowance.
+The entire CI job passed, including Meteor, evidence validation/publication,
+canonical Compose construction, source/image/runtime smoke and cleanup. All four jobs in exact-commit
+[Security 41511591390](https://github.com/memphis-iis/MoFaCTS/actions/runs/41511591390)
+passed. No further Meteor retry is authorized by that exhausted allowance.
+The pre-commit manifest, lint-staged and staged-secret checks passed. Only the
+intentional batch was published; unrelated app/configuration/wiki edits remain.
+
+Final hosted results: harness **26/26**, Phase 0 **88/88**, capture **98/98**,
+with zero hosted skips; lint, full application/vendor typechecks and the other
+required workflow checks passed. Exactly one Meteor invocation and one canonical
+Compose application compilation ran in this attempt. The built/tested Linux
+amd64 image **config** ID is
+`sha256:c114758fe210923e4eb71cd1c07cc07baa8bef7065c381b2db072f80cda65a14`.
+The embedded source identity, pinned Node/Undici and runtime-tool removal,
+standalone-Mongo rejection and replica-set readiness checks passed against that
+config ID. Retained-source protection held through image checks; cleanup passed.
+This is not a registry manifest/index digest, registry publication, deployment,
+staging2 acceptance or a completed Phase 0 qualification. No live host changed.
+
+The authenticated artifact inspection is complete: artifact `13173322371`
+(`source-observation-41511591350-1`) contains exactly the source observation,
+bounded raw Meteor run and joined evidence record. Its downloaded ZIP SHA-256
+matches GitHub's artifact metadata:
+`31416e7cacedd8d919a2549aef3404a7022d5c9424830ec275a6815fdf5e615e`.
+Independent local revalidation reproduced the joined record from its raw bytes
+and source observation. Source SHA-256 is
+`fbd7265f2a050032c23f35b7e762cf0188c780b294bbc1b1c176d78d0f9fd4f0`.
+Run `41511591350`, attempt `1`, clean source and the exact commit agree.
+Server: **151 modules, 966 passed / 15 pending**. Browser: **213 modules,
+1,237 passed / 7 pending**. Zero test or hook failures. The state correctly stays
+`completed-with-pending`, qualification `unqualified`. This is verified outcome
+provenance, not required-catalog closure or an authenticated release qualification.
+The existing 22 pending cases belong to the separately gated Change Streams
+qualification lane; this run does not establish those protocol/recovery cases.
+
+The next durable workstation acquisition helper must authenticate its GitHub
+artifact download. Using the existing GitHub CLI login for today's operational
+inspection is permitted; making `gh` a permanent prerequisite for the optional
+qualification helper is a new system dependency. AGENTS.md requires approval,
+and the approved helper design currently says not to add a dependency. Native
+REST would instead need an explicitly selected credential source; no new token
+or storage mechanism has been selected. Recommendation: narrowly approve the
+existing GitHub CLI sign-in as the optional helper's prerequisite, with no new
+GitHub permissions, tokens or application integration. No helper implementation
+or dependency change has been made at this boundary. Existing workstation
+release-record authority, protected host channel and unsigned/unqualified
+evidence scope remain selected; they are not reopened by this question.
+
+Work stops at that dependency/credential-source decision after completing the
+authorized CI review. This outcome-only documentation is committed with CI
+skipped so recording it does not launch an unauthorized fourth attempt. The
+tested code candidate remains the exact commit above; a later documentation
+commit is not relabeled as independently integration-tested.
 
 ## Structured Meteor test evidence — local implementation (2026-11-02)
 
