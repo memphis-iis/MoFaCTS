@@ -1,6 +1,41 @@
 # Security Audit Durable Redesign Status
 
-Current reviewed baseline: `18677291993b66b890a090e55d65f703b45ff653`.
+Last baseline with passing integration/image checks: `18677291993b66b890a090e55d65f703b45ff653`.
+
+## Final outcome of the three authorized attempts (2026-11-02)
+
+All three authorized attempts have been executed. None reached Meteor or image
+construction. All three passed their separate Security workflow; none passed
+the combined CI preparation gate. No additional retry is authorized or scheduled.
+
+| Attempt | Published source | CI | Security |
+| --- | --- | --- | --- |
+| 1 | `ef8875764bb473ee7925fb48b1a9235e642339aa` | [41456899578](https://github.com/memphis-iis/MoFaCTS/actions/runs/41456899578): failed source protection | [41456899480](https://github.com/memphis-iis/MoFaCTS/actions/runs/41456899480): passed |
+| 2 | `c0ca87e0b47f85927a460600ecb6751a2cbf9453` | [41458037001](https://github.com/memphis-iis/MoFaCTS/actions/runs/41458037001): failed source protection | [41458037098](https://github.com/memphis-iis/MoFaCTS/actions/runs/41458037098): passed |
+| 3 | `0cdfd81fa38c8984538f6c1606cdaa506bb7c65c` | [41459078479](https://github.com/memphis-iis/MoFaCTS/actions/runs/41459078479): failed source protection | [41459078330](https://github.com/memphis-iis/MoFaCTS/actions/runs/41459078330): passed |
+
+The confirmed runner observation is `duplicate-test-derivative`; attempts 2/3
+also distinguish `different-kernel-id`. Source capture and cleanup succeeded.
+Explicit remount operands and writable-child-before-parent protection did not
+resolve that runner observation. The published changes are not a confirmed
+repair. The strict mount and write-protection gates remain enforced.
+
+Local checks of the final candidate pass: full lint (323 surfaces), capture
+**93 passed / 3 CI-only skipped** (96 total), and actual kernel protection,
+writable test output and cleanup under both modern and forced classic mount(2)
+APIs in a disposable network-isolated container. These checks do not reproduce
+the hosted runner layout or establish CI acceptance. No application image was
+built/pushed/deployed, and no Meteor integration invocation ran in these attempts.
+Unrelated working changes were preserved.
+
+Next investigation should collect bounded role/permission/mount-parent relations
+after each privileged operation on the supported CI runner and establish exactly
+which operation creates or reveals the second derivative record. Do not ignore
+the record, relax validation, or try another command variation without that
+evidence. A further CI execution needs new user authorization. This final outcome
+is published as documentation only with CI skipped to avoid starting attempt 4;
+the failed code candidate remains explicitly identified above. Phase 0 and batch
+3 release qualification are still incomplete.
 
 ## Three-attempt authorization — attempt 2 and final candidate (2026-11-02)
 
