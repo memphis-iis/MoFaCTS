@@ -159,6 +159,10 @@ pending-test acceptance and final release/image proof remain separate gates.
 The reporter uses Mocha's [reporter constructor and completion interface](https://github.com/mochajs/mocha/blob/v10.2.0/lib/mocha.js)
 and [runner events](https://github.com/mochajs/mocha/blob/v10.2.0/lib/runner.js).
 
+The optional [workstation evidence helper](../deploy/security-audit/ci-evidence.md)
+uses the approved GitHub CLI sign-in to acquire and validate exact-run records.
+It preserves bounded unqualified evidence and never dispatches CI or deploys.
+
 The integration and image-smoke jobs use the explicit `ubuntu-22.04` runner and
 one workflow-owned MongoDB image pin (`CI_MONGO_IMAGE`, currently `mongo:8.0.34`).
 The runner's documented Linux 6.8 kernel is compatible with MongoDB 8.0.

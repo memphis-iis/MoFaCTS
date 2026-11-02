@@ -28,6 +28,7 @@ Resolve competing instructions in this order:
 - Never silently substitute data, identity, repositories, configuration, runtime paths, or behavior when an invariant fails. Fail at its owning boundary. Recovery must be explicit and observable, have a named owner and contract, and preserve the invariant.
 - Do not add compatibility fallback paths unless explicitly requested.
 - Docker builds, pushes, deployments, and production-affecting commands require explicit requests. Local Meteor CLI workflows cannot substitute for supported Docker Compose release verification.
+- The optional [CI evidence acquisition helper](deploy/security-audit/ci-evidence.md) may use the GitHub CLI and the operator's existing stored sign-in (explicitly approved). It requires the repository-pinned Node runtime and PowerShell 7; it performs read-only acquisition and cannot issue release qualification or run CI.
 - Align Meteor, Node/npm, CI assertions, and Docker runtime pins. Use the release's official DDP/Rspack packages; superseded local copies or dependency replacements must not shadow upstream security fixes.
 
 ## User Intent And Permissions

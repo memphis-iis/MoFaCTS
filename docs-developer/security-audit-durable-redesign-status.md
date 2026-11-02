@@ -2,6 +2,75 @@
 
 Last baseline with passing integration/image checks: `5557ae4b6dd23bc4e874478c987325621e9bd987`.
 
+## Helper publication — one fresh execution authorized (2026-11-02)
+
+Phil explicitly authorized committing/pushing the reviewed acquisition helper
+and one fresh Meteor integration invocation, followed by continued Phase 0 work
+until the next design decision. The prior local/live-read results below remain
+a separate checkpoint. The exact pushed commit and hosted result will be
+recorded after execution; this authorization includes no automatic Meteor retry
+and no live deployment.
+
+## Approved GitHub CLI acquisition — implemented locally (2026-11-02)
+
+Phil approved GitHub CLI and his existing stored sign-in as a prerequisite for
+the optional helper. This closes the dependency decision below. The local
+`deploy/collect-ci-evidence.ps1` now owns explicit read-only acquisition of the
+selected CI and Security runs. Node composes bounded, sanitized source-evidence
+references; PowerShell/.NET owns streaming ZIP validation. No new token, access
+permission, runtime installation, active application surface or release authority
+was introduced. Public helper/development guidance, AGENTS.md and the controlling
+plan record the narrow dependency exception.
+
+The helper validates exact commit/repository/workflow/attempt and successful job
+membership, ZIP size/digest/entry types and CRC, strict JSON including duplicate
+keys, caller-supplied expected producer observation and independent module-name
+inventory, then re-observes remote metadata before exclusive publication. It
+retains the validated ZIP/three payloads with a read-only, content-addressed small
+record. Existing identical evidence may be referenced after byte verification;
+collisions and changes are never overwritten. No automatic pruning occurs.
+Raw API/CLI output and sign-in credentials are never retained.
+
+Live GET-only acceptance against the previously completed CI `41511591350` and
+Security `41511591390` passed using stored CLI sign-in, pinned Node **24.22.1**
+from the existing Meteor tool bundle (the Meteor CLI was not run), and installed
+PowerShell **7.6.5/.NET 10.0.11**. It produced acquisition record SHA-256
+`c616f27348aaa138e2687cd4599bd34c928f1916b256c6721a096aeede8d85cd`,
+state `acquired-unqualified`, preserving the exact `5557ae4b` identity and recorded
+server/browser results. The demo used the previously retained expected observation;
+it does not prove the current working tree matches that earlier candidate or an
+independently captured release candidate. Local demo files remain ignored in tmp.
+
+Verification: **21 new Node checks** pass on pinned Linux; Windows process/file
+flows were also exercised with the pinned Node binary. Full Phase 0
+suite **108 passed / 1 hosted-only skip**; capture **94 passed / 4 hosted-only
+skips**; source-security **41/41**; full application typecheck and lint pass.
+Native PowerShell ZIP tests **16/16**, including a forged central-directory length
+which the standard reader initially accepted without explicit CRC verification.
+All three PowerShell scripts parse. Initial test-fixture wiring and an unused
+argument warning were corrected; final checks pass. The CRC concern did not
+require a new runtime decision: Microsoft's .NET Core 3.1 source already exposes
+the public checksum property, so the existing PowerShell 7 capability gate is
+sufficient. No custom ZIP parser or archive dependency was added.
+Final review also aligned the Linux output-directory owner/nonshared-write check
+with the existing release-record store; its adversarial mode-0777 regression passes.
+Cancellation now waits for child close before temporary cleanup, preventing a
+Windows file-handle race. A delayed-termination child fixture proves the ordering.
+
+No commit, push, Meteor invocation, new workflow execution, image build or
+deployment occurred for this working batch. Existing staging/Mongo/SPARC and
+wiki changes remain preserved. The authoritative release record and production
+command sheet are unchanged; Windows ACL/cloud durability, required-test catalog
+closure and independent image/release proof remain unproven.
+
+Next: publish/verify this helper, then retain structured external post-build image
+proof and link bounded source/image references into the existing optional release
+extension. Those owners are already selected; no further architecture choice was
+established here. The previous Meteor allowance is exhausted, so a push that
+starts CI needs a fresh explicit execution authorization before publication.
+This is the next operational gate; do not reopen the accepted GitHub CLI choice
+or weaken qualification to avoid it.
+
 ## Evidence publication and next acquisition boundary (2026-11-02)
 
 The structured-evidence batch is committed/pushed as
