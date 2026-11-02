@@ -11,6 +11,7 @@ import { captureRoots, contextOverride, assertContextOnlyChange, assertCapturedE
   prepareCapture, verifyCapture, buildCapturedSource, collectCapturedTestInputs,
   verifyCapturedTestInputs, prepareCapturedTestInputs, capturedSourceDifferences } from '../qualification/captureBuildSource.mjs';
 import { TEST_INPUTS } from '../qualification/testInputs.mjs';
+import { sealCapture, unsealCapture } from '../qualification/sealCapture.mjs';
 
 test('bounds changed-source diagnostics to validated relative paths without contents or digests', () => {
   const entry = (name, digest = 'private-content-digest') => [name, 'file', 0o644, digest];
@@ -337,6 +338,18 @@ test('test verification binds filtered build bytes and supplemental inputs witho
   assert.equal(result.supplementalDigestSha256, collected.supplementalDigestSha256);
   assert.ok(calls.at(-1).includes(path.join(captured.workspace, 'test-context')));
   assert.equal((await fs.readdir(captured.workspace)).some((name) => name.startsWith('test-round-trip-')), false);
+});
+
+test('Linux CI can verify captured inputs while the retained workspace stays read-only', {
+  skip: process.platform !== 'linux' || process.env.CI !== 'true',
+}, async t => {
+  const { captured, dependencies, repositoryRoot } = await syntheticTestCapture(t);
+  await collectCapturedTestInputs(captured.workspace, 'synthetic-builder', dependencies);
+  try {
+    await sealCapture(captured.workspace, repositoryRoot);
+    assert.equal((await verifyCapturedTestInputs(captured.workspace, 'synthetic-builder', dependencies)).state,
+      'test-inputs-verified-unqualified');
+  } finally { await unsealCapture(captured.workspace, repositoryRoot); }
 });
 
 test('test verification rejects edited supplemental source and never exports the altered derivative', async (t) => {

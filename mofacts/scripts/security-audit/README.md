@@ -2,17 +2,28 @@
 
 The active scanner and receiver still use `SecurityAuditReportV1`. Production setup is documented in [the operator guide](../../../docs/deployment/security-audit.md). Target architecture and progress are in [the plan](../../../docs-developer/security-audit-durable-redesign-plan.md) and [status record](../../../docs-developer/security-audit-durable-redesign-status.md).
 
-The opt-in build-source prototype is documented in [the capture guide](../../../deploy/security-audit/source-capture.md). Its isolated tests run with `npm run security:test:capture`; they use synthetic tar streams and injected Docker responses, not actual builds. It emits unqualified acquisition/build outcomes only and is not automatically called by any scanner or deployment workflow.
+The opt-in build-source tooling is documented in [the capture guide](../../../deploy/security-audit/source-capture.md). Its isolated tests run with `npm run security:test:capture`; local tests use synthetic tar streams and injected Docker responses, and hosted Linux CI additionally exercises actual source export and kernel write protection. CI retains the protected candidate through tests and canonical Compose construction. These remain unqualified observations, not release qualification.
 
-## Local-only Phase 0 tests
+The approved release-history and protected-receipt tooling is documented in
+[release records](../../../deploy/security-audit/release-records.md). It preserves
+the existing record owner and adds no automatic production hook. Its storage,
+parser and hosted Linux permission fixtures run under `security:test:phase0`.
 
-From `mofacts/`, using pinned Node 24.15.0:
+## Phase 0 contract tests
+
+From `mofacts/`, using pinned Node 24.22.1:
 
 ```powershell
 npm run security:test:phase0
 ```
 
 This runs synthetic characterization and draft proof-contract tests. It does not run a production scan, Docker build, Meteor server, browser, SSH command, uploader or deployment. The assembler tests create bounded temporary synthetic files and remove their own temporary directories. No production fixtures or private settings are read. This separate entry point is not automatically added to the active scheduled scanner.
+
+The release-store tests also exercise bounded filesystem writes and process-death
+recovery in owned temporary directories. A hosted Linux-only fixture uses sudo
+for root permissions inside its own temporary tree, with synthetic Docker
+observations. It requires the runner's existing jq and never writes host `/etc`
+or contacts a deployment. Local runs skip that fixture explicitly.
 
 - `tests/phase0CurrentScanner.test.mjs`: V1 membership, canonical fixture digest, and known-defect witnesses. **A passing WITNESS test confirms the defect still exists.** Replace it with the opposite regression assertion in its owning fix phase.
 - `tests/phase0RuntimeSemantics.test.mjs`: selected current policy/callback behavior using synthetic dependencies, including Brand Profile guard ordering, its public publication and progressive-launch early denials, plus the reviewed manifest entries; not a substitute for Meteor or HTTP-stack integration.

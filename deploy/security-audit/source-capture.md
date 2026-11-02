@@ -1,5 +1,56 @@
 # Opt-in build-source capture
 
+## Current status and canonical Compose CI
+
+Source acquisition, post-test verification and embedded image-source comparison
+have executed successfully in [CI for committed baseline `18677291`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41244691248).
+They remain unqualified observations, not full release proof. The dated
+implementation checkpoints below preserve history and are superseded by this
+status and the [audit record](../../docs-developer/security-audit-durable-redesign-status.md).
+
+The revised single `lint-test-and-image` CI job retains the captured candidate
+through testing and construction. Before dependency installation, `sealCapture.mjs`
+protects the checkout and capture workspace with Linux read-only bind mounts,
+then gives only `test-context/` its own writable bind mount. It reads kernel mount
+state and probes write/chmod denial; changing file modes alone is insufficient.
+This uses the existing hosted runner's `sudo`, `mount` and `umount`, with no
+installation or alternate path if protection fails. See the upstream
+[bind-mount semantics](https://man7.org/linux/man-pages/man8/mount.8.html#DESCRIPTION).
+
+The same job builds the retained candidate through the existing capture helper,
+canonical base Compose file and `compose.capture.json` override. The helper
+checks the resolved configuration permits only its context/provenance changes,
+then runs one `build --no-cache mofacts`. Existing source/runtime/topology checks
+consume that exact image config digest. Always-run teardown runs from
+`runner.temp`, outside the protected mounts, and releases them before owned
+workspace cleanup; an outstanding seal receipt blocks deletion. The unseal CLI
+rejects a current directory inside a mount it must remove.
+Verification exports use separately allocated temporary siblings so they do not
+need to write into the protected capture. No production command sheet or base
+Compose service changes. This revised job has not yet executed; only local
+unit/configuration checks have passed. No additional Meteor invocation is added.
+
+Protection begins before application dependencies/tests run and preserves native
+source bytes and modes. It prevents ordinary same-user file writes, chmod and
+path replacement through the protected tree. It does not protect against a
+privileged process remounting the files or authenticate a compromised runner.
+Complete test discovery/outcome authentication remains a separate qualification
+gate. An image-build retry normally repeats the combined suite and requires fresh
+single-use Meteor authorization. Only bounded observation metadata is uploaded;
+raw captured source, test workspaces and build profiles remain private/ephemeral.
+
+`qualification/ciComposeProfile.mjs` owns a short-lived build-only env profile,
+marker and generated replica-set keyfile outside the checkout. Existing public
+CI settings and fresh synthetic credentials satisfy required Compose
+interpolation; it reads no production/staging settings and starts no service.
+The profile has restrictive native permissions, a run/attempt-specific local
+image tag and fixed-child cleanup scheduled even when build/smoke fails. Only
+the app service is built; MongoDB/Redis are not started by Compose. The existing
+isolated Docker runtime topology tests remain separate consumers of that image.
+No profile contents or generated credentials are logged or uploaded.
+
+## Historical implementation checkpoints
+
 October 13 image-comparison implementation: the shared `source_inputs` stage now
 owns recipe/ignore metadata as well as the four source roots. `source_capture`
 remains a source-only export target. A new `source_observation` stage uses the
@@ -75,6 +126,8 @@ verification. Docker owns this filtering for both builds and CI round trips.
 | `mofacts/scripts/security-audit/qualification/captureBuildSource.mjs` | Acquisition, workspace lifecycle, recipe/input ownership checks, source round-trip comparison and build-only Compose integration |
 | `mofacts/scripts/security-audit/qualification/sourceSnapshot.mjs` | Bounded streaming tar extraction, path/type checks, canonical source digest and local tamper observations |
 | `mofacts/scripts/security-audit/qualification/localDockerBuilder.mjs` | Explicit local context/engine binding shared by capture and Compose; rejects unavailable, remote or non-context-backed builders |
+| `mofacts/scripts/security-audit/qualification/ciComposeProfile.mjs` | Temporary synthetic CI build-only interpolation profile and fixed-child cleanup; not a source capture or protected release record |
+| `mofacts/scripts/security-audit/qualification/sealCapture.mjs` | Linux CI mount/probe lifecycle for retained inputs, partial-failure teardown and explicit unseal before cleanup; no release qualification or privileged-runner attestation |
 | `mofacts/scripts/security-audit/qualification/testInputs.mjs` | Reviewed supplemental test readers, bounded collection and rejection of conflicting build-file bytes or modes |
 | `mofacts/common/securityAudit/buildIdentity.ts` | Existing shared source identity contract; not a second release record |
 

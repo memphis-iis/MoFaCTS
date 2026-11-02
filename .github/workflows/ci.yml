@@ -10,12 +10,8 @@ env:
   CI_MONGO_IMAGE: mongo:8.0.34
 
 jobs:
-  lint-and-test:
+  lint-test-and-image:
     runs-on: ubuntu-22.04
-    outputs:
-      source_digest: ${{ steps.source_observation.outputs.source_digest }}
-      source_commit: ${{ steps.source_observation.outputs.source_commit }}
-      source_dirty: ${{ steps.source_observation.outputs.source_dirty }}
     defaults:
       run:
         working-directory: mofacts
@@ -51,6 +47,12 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_OUTPUT,
               `workspace=${result.workspace}\ntest_app=${path.join(result.workspace, "test-context", "mofacts")}\n`);
           '
+
+      - name: Protect retained source and capture receipts
+        working-directory: .
+        run: |
+          node mofacts/scripts/security-audit/qualification/sealCapture.mjs seal \
+            '${{ steps.capture.outputs.workspace }}' "$GITHUB_WORKSPACE"
 
       - name: Install Meteor 3.5.4
         working-directory: ${{ steps.capture.outputs.test_app }}
@@ -177,6 +179,12 @@ jobs:
         working-directory: .
         run: docker rm -f mofacts-ci-mongodb 2>/dev/null || true
 
+      - name: Assert retained source is still protected after testing
+        working-directory: .
+        run: |
+          node mofacts/scripts/security-audit/qualification/sealCapture.mjs assert \
+            '${{ steps.capture.outputs.workspace }}' "$GITHUB_WORKSPACE"
+
       - name: Verify tested source and record digest observation
         id: source_observation
         working-directory: .
@@ -202,39 +210,37 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Clean up captured test workspace
-        if: always() && steps.capture.outputs.workspace != ''
+      - name: Create synthetic Compose build profile
         working-directory: .
+        id: compose_profile
         run: |
-          node mofacts/scripts/security-audit/qualification/captureBuildSource.mjs \
-            cleanup --workspace '${{ steps.capture.outputs.workspace }}'
+          node mofacts/scripts/security-audit/qualification/ciComposeProfile.mjs create "$GITHUB_WORKSPACE" \
+            '${{ steps.source_observation.outputs.source_commit }}' \
+            '${{ steps.source_observation.outputs.source_digest }}' \
+            '${{ steps.source_observation.outputs.source_dirty }}'
 
-  docker-amd64-smoke:
-    needs: lint-and-test
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js for CI helpers
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24.22.1'
-
-      - name: Verify CI MongoDB host compatibility
-        run: node mofacts/scripts/ciMongoReadiness.cjs host
-
-      - name: Build amd64 application image
+      - name: Build amd64 application image through canonical Compose
+        working-directory: .
+        id: image_build
+        env:
+          DOCKER_DEFAULT_PLATFORM: linux/amd64
         run: |
+          set -euo pipefail
           test "$(uname -m)" = "x86_64"
-          docker build --platform linux/amd64 --tag mofacts-ci:meteor-3.5.4-amd64 \
-            --build-arg MOFACTS_SOURCE_SNAPSHOT_DIGEST_SHA256='${{ needs.lint-and-test.outputs.source_digest }}' \
-            --build-arg MOFACTS_SOURCE_REVISION='${{ needs.lint-and-test.outputs.source_commit }}' \
-            --build-arg MOFACTS_SOURCE_INCLUDED_UNCOMMITTED_LOCAL_CHANGES='${{ needs.lint-and-test.outputs.source_dirty }}' .
+          node mofacts/scripts/security-audit/qualification/sealCapture.mjs assert \
+            '${{ steps.capture.outputs.workspace }}' "$GITHUB_WORKSPACE"
+          node mofacts/scripts/security-audit/qualification/captureBuildSource.mjs \
+            build --builder default --workspace '${{ steps.capture.outputs.workspace }}' \
+            --env-file '${{ steps.compose_profile.outputs.env_file }}'
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' '${{ steps.compose_profile.outputs.image }}')" = linux/amd64
+          config_digest=$(docker image inspect --format '{{.Id}}' '${{ steps.compose_profile.outputs.image }}')
+          [[ "$config_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf 'config_digest=%s\n' "$config_digest" >> "$GITHUB_OUTPUT"
 
       - name: Assert image source matches tested input identity
+        working-directory: .
         run: |
-          docker run --rm --entrypoint node mofacts-ci:meteor-3.5.4-amd64 -e '
+          docker run --rm --entrypoint node '${{ steps.image_build.outputs.config_digest }}' -e '
             const observation = require("/opt/mofacts-source-observation.json");
             const identity = observation.identity;
             if (observation.schema !== "MoFaCTSImageSourceObservationV1"
@@ -242,18 +248,20 @@ jobs:
               || identity?.sourceSnapshotDigestSha256 !== process.argv[1]
               || identity?.baseCommit !== process.argv[2]
               || String(identity?.includedUncommittedLocalChanges) !== process.argv[3]) process.exit(1);
-          ' '${{ needs.lint-and-test.outputs.source_digest }}' \
-            '${{ needs.lint-and-test.outputs.source_commit }}' \
-            '${{ needs.lint-and-test.outputs.source_dirty }}'
+          ' '${{ steps.source_observation.outputs.source_digest }}' \
+            '${{ steps.source_observation.outputs.source_commit }}' \
+            '${{ steps.source_observation.outputs.source_dirty }}'
 
       - name: Assert bundle ABI and runtime identity
+        working-directory: .
         run: |
           docker run --rm \
             --entrypoint /bin/sh \
-            mofacts-ci:meteor-3.5.4-amd64 \
+            '${{ steps.image_build.outputs.config_digest }}' \
             -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.22.1 && test "$(node --version)" = v24.22.1 && test "$(node -p process.versions.undici)" = 7.30.1 && ! command -v npm && ! command -v npx'
 
       - name: Reject standalone MongoDB topology
+        working-directory: .
         run: |
           network=mofacts-ci-standalone
           mongo=mofacts-ci-mongo-standalone
@@ -274,7 +282,7 @@ jobs:
             --env MOFACTS_SELF_HOSTED=false \
             --env MOFACTS_REQUIRE_REDIS=false \
             --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
-            mofacts-ci:meteor-3.5.4-amd64
+            '${{ steps.image_build.outputs.config_digest }}'
           for attempt in $(seq 1 60); do
             if test "$(docker inspect --format '{{.State.Status}}' "$app")" = exited; then
               docker logs "$app" | grep -F 'Change Streams require a replica set or sharded cluster'
@@ -286,6 +294,7 @@ jobs:
           exit 1
 
       - name: Boot and health-check Change Streams application image
+        working-directory: .
         run: |
           network=mofacts-ci-amd64
           mongo=mofacts-ci-mongo-amd64
@@ -310,7 +319,7 @@ jobs:
             --env MOFACTS_SELF_HOSTED=false \
             --env MOFACTS_REQUIRE_REDIS=false \
             --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
-            mofacts-ci:meteor-3.5.4-amd64
+            '${{ steps.image_build.outputs.config_digest }}'
           for attempt in $(seq 1 60); do
             if docker exec "$app" node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
               echo "linux/amd64 application health check passed"
@@ -322,6 +331,7 @@ jobs:
           exit 1
 
       - name: Record failed smoke container diagnostics
+        working-directory: .
         if: failure()
         run: |
           node mofacts/scripts/ciMongoReadiness.cjs diagnostics \
@@ -329,8 +339,36 @@ jobs:
             mofacts-ci-mongo-standalone mofacts-ci-app-standalone
 
       - name: Clean up smoke containers
+        working-directory: .
         if: always()
         run: |
           docker rm -f mofacts-ci-app-amd64 mofacts-ci-mongo-amd64 mofacts-ci-app-standalone mofacts-ci-mongo-standalone 2>/dev/null || true
           docker network rm mofacts-ci-amd64 2>/dev/null || true
           docker network rm mofacts-ci-standalone 2>/dev/null || true
+
+      - name: Clean up synthetic Compose build profile
+        working-directory: .
+        if: always() && steps.compose_profile.outputs.workspace != ''
+        run: |
+          node mofacts/scripts/security-audit/qualification/ciComposeProfile.mjs \
+            cleanup '${{ steps.compose_profile.outputs.workspace }}'
+
+      - name: Assert retained source remained protected through image checks
+        working-directory: .
+        run: |
+          node mofacts/scripts/security-audit/qualification/sealCapture.mjs assert \
+            '${{ steps.capture.outputs.workspace }}' "$GITHUB_WORKSPACE"
+
+      - name: Release capture protection
+        if: always() && steps.capture.outputs.workspace != ''
+        working-directory: ${{ runner.temp }}
+        run: |
+          node "$GITHUB_WORKSPACE/mofacts/scripts/security-audit/qualification/sealCapture.mjs" unseal \
+            '${{ steps.capture.outputs.workspace }}' "$GITHUB_WORKSPACE"
+
+      - name: Clean up captured test workspace
+        if: always() && steps.capture.outputs.workspace != ''
+        working-directory: .
+        run: |
+          node mofacts/scripts/security-audit/qualification/captureBuildSource.mjs \
+            cleanup --workspace '${{ steps.capture.outputs.workspace }}'

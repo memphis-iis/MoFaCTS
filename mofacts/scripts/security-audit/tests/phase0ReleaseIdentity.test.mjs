@@ -34,6 +34,33 @@ test('Phase 0: existing six-field release records remain readable and unqualifie
   assert.equal(parseWorkstationReleaseRecord(existing).deployedAtUtc, '2026-01-01T00:00:00.1234567Z');
 });
 
+test('Phase 0: current eight-field deployment record preserves image ID and operator acceptance without qualifying it', () => {
+  const { qualification, ...previous } = fixture;
+  const record = { ...previous, imageId: qualification.runningImage.configDigest,
+    acceptance: 'operator-confirmed readiness and participant smoke checks' };
+  assert.deepEqual(parseWorkstationReleaseRecord(record), record);
+  assert.deepEqual(evaluateReleaseIdentity(record), { status: 'ERROR', reason: 'proof-unavailable' });
+  assert.deepEqual(evaluateReleaseIdentity({ ...record, qualification }), { status: 'PASS' });
+  assert.deepEqual(evaluateReleaseIdentity({ ...record, qualification, imageId: `sha256:${'f'.repeat(64)}` }),
+    { status: 'ERROR', reason: 'image-mismatch' });
+});
+
+test('Phase 0: incomplete or malformed current record fields cannot manufacture acceptance or retain arbitrary text', () => {
+  const { qualification: _qualification, ...previous } = fixture;
+  const current = { ...previous, imageId: `sha256:${'c'.repeat(64)}`,
+    acceptance: 'operator-confirmed readiness and participant smoke checks' };
+  for (const fields of [
+    { imageId: current.imageId }, { acceptance: current.acceptance },
+    { imageId: 'unknown', acceptance: current.acceptance },
+    { imageId: current.imageId, acceptance: 'synthetic-forbidden-value' },
+  ]) {
+    assert.throws(() => parseWorkstationReleaseRecord({ ...previous, ...fields }), error => {
+      assert.doesNotMatch(error.message, /synthetic-forbidden-value/);
+      return true;
+    });
+  }
+});
+
 test('Phase 0: dirty builds use their actual snapshot, not a clean-base CI result', () => {
   const dirty = changed((record, proof) => {
     record.includedUncommittedLocalChanges = true;

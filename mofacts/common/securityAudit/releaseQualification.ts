@@ -2,7 +2,8 @@ import { parseBuildIdentity, type BuildIdentityV1 } from './buildIdentity.ts';
 import { contentDigest, imageDigest, proofBoolean, proofRecord, proofString, sourceCommit } from './proofFields.ts';
 
 // Draft extension of the existing workstation record, not a new release file.
-// Acquisition, transport, storage and runtime enforcement are deliberately absent.
+// Native proof acquisition and runtime enforcement remain separate. Opt-in
+// storage/projection tooling lives under scripts/security-audit/qualification.
 export const RELEASE_PROOF_COMMANDS = ['build', 'smoke', 'push', 'deploy', 'verify'] as const;
 type CommandName = typeof RELEASE_PROOF_COMMANDS[number];
 export type CommandObservation =
@@ -36,6 +37,9 @@ export type WorkstationReleaseRecord = {
   tag: string;
   // Keep the existing registry digest: it may identify an index or a manifest.
   digest: string;
+  // Current command-sheet fields; historical six-field records omit both.
+  imageId?: string;
+  acceptance?: 'operator-confirmed readiness and participant smoke checks';
   qualification?: ReleaseQualificationV1;
 };
 
@@ -125,7 +129,11 @@ export function parseReleaseQualification(value: unknown): ReleaseQualificationV
 export function parseWorkstationReleaseRecord(value: unknown): WorkstationReleaseRecord {
   const keys = ['deployedAtUtc', 'baseCommit', 'includedUncommittedLocalChanges', 'image', 'tag', 'digest'];
   const hasQualification = Boolean(value && typeof value === 'object' && Object.hasOwn(value, 'qualification'));
-  const record = proofRecord(value, hasQualification ? [...keys, 'qualification'] : keys);
+  const hasAcceptance = Boolean(value && typeof value === 'object'
+    && (Object.hasOwn(value, 'imageId') || Object.hasOwn(value, 'acceptance')));
+  if (hasAcceptance) keys.push('imageId', 'acceptance');
+  if (hasQualification) keys.push('qualification');
+  const record = proofRecord(value, keys);
   // PowerShell's existing DateTime.ToString('o') uses seven fractional digits.
   // Accept that exact current representation as well as JS's millisecond ISO.
   const deployedAtUtc = proofString(record.deployedAtUtc, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}(?:\d{4})?Z$/, 32);
@@ -142,6 +150,15 @@ export function parseWorkstationReleaseRecord(value: unknown): WorkstationReleas
     includedUncommittedLocalChanges: proofBoolean(record.includedUncommittedLocalChanges),
     image, tag, digest: imageDigest(record.digest),
   };
+  if (hasAcceptance) {
+    result.imageId = imageDigest(record.imageId);
+    if (record.acceptance !== 'operator-confirmed readiness and participant smoke checks') {
+      throw new Error('Invalid release acceptance observation');
+    }
+    // An operator assertion stays an assertion. It cannot create source tests,
+    // command outcomes or an authenticated independent running-image observation.
+    result.acceptance = record.acceptance;
+  }
   if (hasQualification) result.qualification = parseReleaseQualification(record.qualification);
   return result;
 }
@@ -170,6 +187,7 @@ export function evaluateReleaseIdentity(value: unknown): ReleaseIdentityResult {
     return { status: 'ERROR', reason: 'source-mismatch' };
   }
   if (record.digest !== proof.publishedImage.digest
+    || (record.imageId !== undefined && record.imageId !== proof.runningImage.configDigest)
     || proof.builtImage.configDigest !== proof.publishedImage.configDigest
     || proof.builtImage.configDigest !== proof.runningImage.configDigest
     || proof.builtImage.platform !== proof.publishedImage.platform

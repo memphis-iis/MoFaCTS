@@ -199,11 +199,23 @@ explicitly authorized check. Source-to-image proof binding is still unfinished;
 passing workflows alone do not close Phase 0. See the
 [source-test lane contract](../docs-developer/security-audit-phase0-contracts.md#23-supported-source-test-lane-and-evidence-binding).
 
-CI's source-acquisition implementation now runs its checks in an owned captured
-test derivative and verifies build/supplemental source digests afterward. The
-new path awaits its authorized Linux trial. Its retained metadata is explicitly
-unqualified until stronger sealing, complete outcome evidence and final image
-binding pass; see the [capture guide](security-audit/source-capture.md).
+CI runs source checks in an owned captured test derivative, verifies the inputs
+afterward and compares the embedded source identity in its image. Those checks
+have passed on the committed baseline. The revised combined CI job protects the
+retained snapshot/receipts read-only, tests a writable derivative, then uses
+canonical Compose and the capture override to build that same candidate once,
+without cache, using a temporary synthetic build profile. Runtime checks consume
+the immutable image config digest. Protection is released before workspace
+cleanup. This combined-job/protection revision awaits fresh authorized CI;
+complete outcome evidence and protected release/host proof remain open.
+Production commands are unchanged; see the
+[capture guide](security-audit/source-capture.md).
+
+Opt-in [release-record history and protected server receipts](security-audit/release-records.md)
+preserve the existing operator record and expose bounded identity observations
+over the existing forced-command audit connection. These helpers require
+separately authorized integration/installation; they are not yet hooked into
+the production procedure and do not issue release qualification.
 
 ## SPARC OpenRouter Prefix Caching
 

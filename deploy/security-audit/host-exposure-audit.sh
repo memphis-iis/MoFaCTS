@@ -6,6 +6,7 @@ set -u
 CONFIG_FILE=/etc/mofacts/security-audit.conf
 LISTENER_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
 FIREWALL_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-firewall-policy.awk
+RELEASE_RECEIPT_TOOL=/usr/local/libexec/mofacts-security-audit/release-receipt.sh
 controls='[]'
 
 add_control() {
@@ -331,6 +332,23 @@ fi
 
 status="$(jq -r 'if any(.[]; .status=="ERROR") then "ERROR" elif any(.[]; .status=="FAIL") then "FAIL" elif any(.[]; .status=="PASS") then "PASS" else "NOT_APPLICABLE" end' <<<"$controls")"
 production_image="$(docker inspect --format '{{.Image}}' "${MOFACTS_APP_CONTAINER:-}" 2>/dev/null || true)"
+release_receipt='{"state":"unavailable","reason":"reader-unavailable"}'
+receipt_tool_safe=true
+for directory in /usr /usr/local /usr/local/libexec /usr/local/libexec/mofacts-security-audit; do
+  if [[ ! -d "$directory" || -L "$directory" || "$(stat -c '%u:%g' "$directory" 2>/dev/null)" != 0:0 ]]; then
+    receipt_tool_safe=false
+    break
+  fi
+  mode="$(stat -c '%a' "$directory" 2>/dev/null)"
+  if [[ ! "$mode" =~ ^[0-7]{3,4}$ ]] || (( (8#$mode & 0022) != 0 )); then receipt_tool_safe=false; break; fi
+done
+if [[ "$receipt_tool_safe" == true && -f "$RELEASE_RECEIPT_TOOL" && ! -L "$RELEASE_RECEIPT_TOOL" \
+  && "$(stat -c '%u:%g:%a:%h' "$RELEASE_RECEIPT_TOOL" 2>/dev/null)" == 0:0:755:1 ]]; then
+  if ! release_receipt="$("$RELEASE_RECEIPT_TOOL" read 2>/dev/null)" \
+    || ! jq -e 'type == "object" and (.state == "observed" or .state == "unavailable")' <<<"$release_receipt" >/dev/null 2>&1; then
+    release_receipt='{"state":"unavailable","reason":"reader-failed"}'
+  fi
+fi
 tool_versions="$(jq -cn \
   --arg docker "$(docker --version 2>/dev/null | head -n1 || echo unavailable)" \
   --arg apache "$(apache2ctl -v 2>/dev/null | head -n1 || echo unavailable)" \
@@ -338,5 +356,5 @@ tool_versions="$(jq -cn \
   --arg redisCli "$(docker exec "${MOFACTS_REDIS_CONTAINER:-}" redis-cli --version 2>/dev/null | head -n1 || echo unavailable)" \
   '{docker:$docker,apache:$apache,mongosh:$mongosh,"redis-cli":$redisCli}')"
 printf '%s\n' "$(jq -cn --arg status "$status" --argjson controls "$controls" \
-  --arg productionImage "${production_image:-unknown}" --argjson toolVersions "$tool_versions" \
-  '{sectionId:"internal",status:$status,controls:$controls,productionImage:$productionImage,toolVersions:$toolVersions}')"
+  --arg productionImage "${production_image:-unknown}" --argjson toolVersions "$tool_versions" --argjson releaseReceipt "$release_receipt" \
+  '{sectionId:"internal",status:$status,controls:$controls,productionImage:$productionImage,toolVersions:$toolVersions,releaseReceipt:$releaseReceipt}')"

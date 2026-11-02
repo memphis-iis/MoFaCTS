@@ -174,7 +174,7 @@ async function exportSource(context, recipe, builder, destination, invoke = dock
     '--output', 'type=tar,dest=-', context], { input: recipe, consume: (stream) => extractSnapshot(stream, destination) });
 }
 
-async function requireWorkspace(workspace) {
+export async function requireWorkspace(workspace) {
   const resolved = path.resolve(workspace);
   const temporary = await fs.realpath(os.tmpdir());
   const stat = await fs.lstat(resolved);
@@ -206,6 +206,12 @@ async function removeOwnedTree(root) {
 
 async function removeWorkspace(workspace) {
   const root = await requireWorkspace(workspace);
+  // A seal owns mount teardown. Never partly delete a still-mounted derivative.
+  const sealed = await fs.lstat(path.join(root, 'seal.json')).then(() => true, error => {
+    if (error.code !== 'ENOENT') throw error;
+    return false;
+  });
+  if (sealed) throw new Error('Release the capture seal before workspace cleanup');
   // The writable test derivative owns installed dependency/cache links. Remove
   // those links themselves, never their targets; strict build-source cleanup
   // remains unchanged. This exact child is allocated only by this helper.
@@ -282,7 +288,9 @@ export async function verifyCapture(workspace, builder, dependencies = {}) {
   if (sha256(recipe) !== receipt.recipeDigestSha256) invalidSnapshot();
   const roots = captureRoots(recipe.toString('utf8'));
   // Every verification owns a new export; a prior successful export is not reused.
-  const roundTrip = await fs.mkdtemp(path.join(root, 'round-trip-'));
+  // Verification must also work while the retained workspace is mounted read-only.
+  // This exact temporary sibling is allocated here, never supplied by a receipt.
+  const roundTrip = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()), 'mofacts-source-round-trip-'));
   let sourceEntries;
   try {
     const observed = await exportSource(candidate, recipe, builder, roundTrip, dependencies.docker ?? docker);
@@ -293,7 +301,7 @@ export async function verifyCapture(workspace, builder, dependencies = {}) {
   } finally {
     // This exact child was allocated above, never taken from receipt metadata.
     await requireWorkspace(root);
-    if (path.dirname(roundTrip) !== root || !(await fs.lstat(roundTrip)).isDirectory()
+    if (path.dirname(roundTrip) !== await fs.realpath(os.tmpdir()) || !(await fs.lstat(roundTrip)).isDirectory()
       || (await fs.lstat(roundTrip)).isSymbolicLink()) invalidSnapshot();
     await removeOwnedTree(roundTrip);
   }
@@ -338,7 +346,7 @@ export async function verifyCapturedTestInputs(workspace, builder, dependencies 
     || await supplementalDigest(derivative) !== receipt.supplementalDigestSha256) invalidSnapshot();
   // Docker owns cache/output exclusions. Never invent a second ignore parser
   // or hash installed node_modules as if it were captured source.
-  const roundTrip = await fs.mkdtemp(path.join(checked.root, 'test-round-trip-'));
+  const roundTrip = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()), 'mofacts-test-round-trip-'));
   try {
     const observed = await exportSource(derivative, recipe, builder, roundTrip, dependencies.docker ?? docker);
     assertCapturedEntries(observed.entries, captureRoots(recipe.toString('utf8')));
@@ -356,6 +364,8 @@ export async function verifyCapturedTestInputs(workspace, builder, dependencies 
       || (await inspectSnapshotTree(checked.candidate)).digestSha256 !== checked.receipt.localTreeDigestSha256) invalidSnapshot();
   } finally {
     await requireWorkspace(checked.root);
+    if (path.dirname(roundTrip) !== await fs.realpath(os.tmpdir()) || !(await fs.lstat(roundTrip)).isDirectory()
+      || (await fs.lstat(roundTrip)).isSymbolicLink()) invalidSnapshot();
     await removeOwnedTree(roundTrip);
   }
   return { state: 'test-inputs-verified-unqualified', identity: checked.identity,

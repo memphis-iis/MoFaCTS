@@ -16,7 +16,26 @@ The operator identified `C:\dev\mofacts_config\deploy and build.txt` as the prod
 
 The current operator-facing behavior and protected-environment setup remain documented in [`docs/deployment/security-audit.md`](../docs/deployment/security-audit.md). That file is the operational source of truth. This plan owns target architecture, implementation sequencing, verification gates, and eventual cleanup; it must not duplicate secrets or environment-specific operator commands.
 
-Reading order for implementers: Sections 1–5 define the problem and invariants; Sections 6–11 define contracts, architecture, layout, and ownership; Section 12 is the work sequence; Sections 13–15 are the verification and deployment gates; Sections 16–21 cover extension, impact, decisions, completion, and source mapping.
+Reading order for every AI worker: first read and follow the repository [AGENTS.md](../AGENTS.md) and any applicable deeper AGENTS.md instructions. Then read Section 0 below, the current execution entry point in the [status record](security-audit-durable-redesign-status.md#current-execution-entry-point-2026-11-02), and the [Phase 0 contracts](security-audit-phase0-contracts.md). Sections 1-5 define the problem and invariants; Sections 6-11 define contracts, architecture, layout, and ownership; Section 12 is the work sequence; Sections 13-15 are verification and deployment gates; Sections 16-21 cover extension, impact, decisions, completion, and source mapping.
+
+## 0. Controlling decisions and worker entry point (2026-11-02)
+
+These decisions record Phil's explicit answers to the nine-question design review on 2026-11-02. They control current work wherever older recommendations or dated checkpoints differ. The later report-storage answer supersedes the earlier archive choice: no old-format report access or archive work is required. This register records design and bounded standing permission; it does not claim implementation or executed qualification.
+
+| Decision | Controlling instruction |
+| --- | --- |
+| 1. Release receipt - approved | Keep the workstation release record authoritative. Supply only a bounded, credential-free server projection through the existing restricted host-evidence channel; no second release authority or new service/credentials. Validate the protected destination, reader identity and access controls before installation. Current opt-in tooling uses root-owned mode-0600 `/etc/mofacts/release-receipt.json`; the status/contracts record implementation separately from unexecuted live installation. |
+| 2. Release metadata/rollback - approved | Retain all small accepted release-metadata records for now, with no automatic deletion. Preserve the previous usable rollback image and its matching evidence; this does not require retaining every Docker image indefinitely. Use immutable history under the existing record owner and atomic latest-record replacement, with collision, interruption and read-back checks. |
+| 3 and 7. Old reports/storage - settled by the later answer | Do not build or preserve old-format historical-report UI, downloads or an archive for this redesign. Choose the simplest new-report storage design that supports a safe application rollback, based on previous-image compatibility evidence. Existing records are not authorized for deletion or rewriting. Release metadata and rollback evidence in decision 2 are distinct and remain retained. Keep released catalog/evidence validators needed for report integrity; that is not a report-archive feature. |
+| 4. Secret recovery - AWS design selected | Phil selected AWS Secrets Manager and is the accountable recovery owner. One encrypted secret holds complete fixture/provider configurations as current and explicitly retained last-accepted rollback versions; GitHub secrets are deployment copies. See the [selected recovery design](#aws-secrets-manager-recovery-design-approved-2026-11-02). Account/MFA recovery, size fit and staging2 restoration of both versions must be verified; provisioning, permissions, upload, spending approval and setup remain pending. Do not reopen the selected design or claim the operational recovery gate passed. |
+| 5. Testing environment - approved bounded standing permission | Use staging2 as the default isolated environment with synthetic accounts/resources. For this security work, Phil permits taking staging2 offline, resetting it and rebuilding it as needed. Original staging and production are excluded. This does not authorize irreversible data deletion, new persistent access/security-sensitive permission changes, new spending, or a blanket override of fresh `npm run test:ci` authorization. |
+| 6. Scanner isolation - approved conditional design | Prefer inert V2 development with the active V1 path unchanged. If that is insufficient, use a reviewed immutable scanner checkout with tested selection, update and rollback procedures without reopening the design choice. Workflow publication, dispatch and disable/enable actions retain their operational authorization requirements. |
+| 8. Policy review - Phil | Prepare one consolidated list of genuinely ambiguous access classifications and proposed permission changes for Phil. Clear classifications that preserve established behavior may proceed without asking; retain traceable policy review and characterization evidence. Do not infer new permissions, waive required policy review, or automatically classify ambiguous surfaces. |
+| 9. Engineering discretion - approved within boundaries | Resolve routine implementation choices without asking when they follow the approved design and do not change scope, security boundaries, cost, ownership, retention or application behavior. Report failed acceptance checks; never waive them. For a new unavoidable design conflict, report the evidence and recommendation instead of silently deciding. |
+
+Start each continuation by reading AGENTS.md and checking the latest status evidence. Do not reopen settled decisions merely because older text calls them pending, and do not confuse incomplete technical proof with an undecided preference. Current implementation work remains the separately authorized three-batch continuation; this register does not itself authorize later-phase implementation or phase activation. Keep production secrets, learner data and raw sensitive evidence out of these documents.
+
+Execution boundaries remain explicit: each `npm run test:ci` invocation needs fresh, explicit, single-use authorization, including retries. Commit/push, workflow dispatch or state changes, production builds/pushes/deployment, protected-host installation and other restricted operations require the authorization applicable to the concrete action. The staging2 permission above is the scoped exception for its necessary offline/reset/rebuild lifecycle; it is not a production or general access grant. Required acceptance and rollback evidence still applies. No code, test, build, deployment, commit, push or host operation is authorized by this documentation update.
 
 ## 1. Goal
 
@@ -117,7 +136,7 @@ The existing release record fields are `deployedAtUtc`, `baseCommit`, `includedU
 
 The procedure is a pasteable command sheet, not a fail-fast process with a tested transaction boundary. Static inspection does not establish consistent native-command exit propagation for each Docker/SSH/SCP call, nor an app-image rollback procedure. Do not infer successful publication or Compose health solely from later variable values; the future helper must capture execution results for the qualification it owns and never write successful proof after an earlier failure. Preserve existing deployment checks and explicitly scope any broader command-runner/rollback changes before implementing them. The Apache-specific rollback is already present and must remain intact.
 
-The staging section explicitly marks that environment frozen until its owner unfreezes it. Do not reuse that server for redesign testing based merely on this plan. Select an authorized isolated non-production target or obtain explicit unfreeze authorization; do not copy production data/configuration. App and MCP sidecar deployments are separate sections and remain separate tasks.
+Original staging is frozen and is not authorized for this work. The 2026-11-02 decision selects staging2 and grants its bounded offline/reset/rebuild permission in Section 0; do not reopen target selection or infer permission for production, new environments or production data/configuration copies. App and MCP sidecar deployments remain separate tasks.
 
 The other tracked helpers are not called by this production sequence. `build-timed.ps1` only builds; `autobuild.sh` has mismatched metadata/tag paths and is not this release owner; `server-deploy-validate.sh` only waits for running state and has limited rollback before its optional readiness command. Their limitations must not be attributed to the confirmed command sheet or used to replace it. Leave them untouched in this redesign unless an independently approved integration actually needs them.
 
@@ -144,7 +163,7 @@ There is no implicit missing-proof recovery to a trusted build. Source builds wi
 - Source checks that prohibit bypassing the registration adapters.
 - Focused code organization, test decomposition, and maintainer documentation.
 - Local, CI, staging, and production cutover gates.
-- Explicit, time-bounded treatment of existing V1 history.
+- Safe handling of existing report records and application rollback without building old-format historical access or an archive (Section 0).
 
 ### Not part of P0 implementation
 
@@ -172,7 +191,7 @@ Those needs remain in the post-P0 roadmap in Section 17. A discovered vulnerabil
 9. **Stable identities.** Control and surface IDs are never reused for a different meaning. Semantic changes require a new catalog version; replacement concepts receive new IDs.
 10. **Fail at the owning boundary.** Producers validate their own output, assembly validates every section, and ingestion independently validates the complete signed report.
 11. **Bounded evidence only.** No credential, token, cookie, learner identifier, raw response, unrestricted source excerpt, or complete database record enters a report or retained artifact.
-12. **No dual current ingestion.** The cutover has one accepted version for new reports. V1 may remain a named, read-only historical format until expiry, but it is not an alternate current path.
+12. **No dual current ingestion.** The cutover has one accepted version for new reports. Existing V1 records are not a current path; Section 0 removes historical-access/archive work without authorizing deletion.
 13. **No new dependency by default.** Use the pinned Node runtime, TypeScript already present in the app, Node's test runner, and existing Meteor test infrastructure unless a dependency is separately justified and approved.
 14. **Behavior-preserving migration.** Preserve existing access decisions and transport/invocation semantics. A newly discovered vulnerability is reported separately, not silently fixed by moving a guard or selecting a stricter policy constructor.
 15. **Preserve the release owner.** The confirmed workstation script builds and pushes; Compose deploys. Shared qualification tooling interfaces with those owners. CI image evidence cannot substitute for exact workstation-image evidence.
@@ -230,7 +249,6 @@ mofacts/common/securityAudit/
   evidenceContracts.ts
   reportV2.ts
   canonicalReport.ts
-  historicalReportV1.ts
 ```
 
 Each immutable `control-catalog.vN.json` is the only source for its version's control metadata and report membership. `catalogRegistry.ts` imports every released version, maps each approved version to exactly one digest, and names exactly one `activeIngestionCatalog`. New reports must use the active catalog; historical reads select the immutable catalog named by the stored coordinates. Released catalog versions are append-only: never edit or delete them, because exported encrypted artifacts may outlive application TTL records.
@@ -423,16 +441,11 @@ Keep the stored document shape simple: the flat canonical report envelope plus s
 
 Fetch full evidence only for a specifically authorized single-report view or download. Strip server-owned storage fields, re-parse the exact report envelope with its retained catalog/evidence-contract pair, and compare its stored report digest before rendering. Corrupt or unknown records fail visibly. Broader at-rest integrity scanning remains a separately scoped follow-on control.
 
-Keep V1 reports immutable and read-only until their existing TTL expires. They may appear in history with an explicit historical/unverified-against-catalog label, but they must not become the current latest exposure/full report after V2 cutover. Do not rewrite V1 documents, overwrite their stored digests, or accept new V1 ingestion. The V1 reader recomputes and compares the existing V1 digest rules on a full read; it never interprets V1 against a V2 catalog.
+Per the controlling 2026-11-02 decision in Section 0, retire old-format report access at V2 cutover; do not implement a V1 historical reader, old-report UI/download support or archive. Existing V1 records must not become current exposure/full reports and must not be reinterpreted as V2. This does not authorize deleting records, rewriting their digests or changing existing TTL policy. Keep new-report parsing, authorized downloads and integrity checks intact.
 
-The V1 reader has:
+Choose the simplest storage model that passes the previous-production-image rollback qualification. Prefer the existing schema-discriminated collection if it is safe; choose version-separated storage if the evidence requires it. This choice is delegated within the approved scope and must be documented with its compatibility evidence before cutover. No destructive migration, dual current ingestion or historical-access feature is implied.
 
-- Owner: `mofacts/server/securityAudit/`.
-- Purpose: render and download pre-cutover evidence only.
-- Lifetime: until the last V1 TTL date plus a short documented operational buffer.
-- Removal gate: no V1 documents remain, V1 download evidence is no longer required, and the cleanup is separately reviewed.
-
-If preserving this temporary historical reader is not explicitly approved at implementation kickoff, the implementation must stop for that decision rather than introduce it implicitly.
+Previous-image list/latest/download checks must establish safe operation or explicit rejection of unsupported schemas with retained records present. They do not require the new application to expose old-format history or the previous image to interpret V2 as V1. Record the expected supported-schema behavior and rollback evidence for the selected storage model.
 
 ## 7. Exact Authorization Evidence — P0 Item 2
 
@@ -496,7 +509,7 @@ The Phase 3 qualification sequence extends the existing build/push/deploy bounda
 
 The **release receipt** means a bounded qualification projection of the existing `ProdReleaseRecordPath` record, not another authoritative release file or manually maintained catalog. Integrate its final write with the existing combined deployment verification at lines 302–322; preserve `baseCommit`, dirty flag, image/tag/digest and deployment timestamp meanings. Qualification status is separate from deployment success: an operational unqualified build can still have its truthful deployment record, never a fabricated successful proof. Do not overwrite the previous accepted rollback record without an explicit retained-history contract; the current single-file write alone does not provide that retention.
 
-Phase 0 must settle the versioned extension schema, existing-reader compatibility, bounded pre-build/test references, and protected delivery/read/rollback retention. Prefer the existing forced-command host-evidence channel for an owner-installed bounded projection; implementation must supply the install/read tooling and access-control tests. Do not assume it already distributes release records, create a second control plane, put registry-write credentials on scanners, or silently grant production access to CI artifacts. A digest is an integrity coordinate, not a cryptographic publisher attestation; stronger signing remains separately scoped.
+Phase 0 must finish the versioned extension schema, existing-reader compatibility and bounded pre-build/test references, and implement/qualify the approved protected delivery/read/rollback retention design in Section 0. Use the existing forced-command host-evidence channel for the owner-installed bounded projection with install/read tooling and access-control tests. Do not assume the channel already distributes receipts, create a second control plane, put registry-write credentials on scanners or silently grant production access to CI artifacts. A digest is an integrity coordinate, not a cryptographic publisher attestation; stronger signing remains separately scoped.
 
 Existing source builds without qualification stay operational and explicitly lack that proof. The application must not require GitHub access, a CI-produced bundle, a release receipt, or a new local mode flag to start. The inventory loader reports bounded qualification errors; it does not redefine `/health` or deployment readiness. Test fixtures and source-only CI results cannot become exact-image production evidence. Keep current startup/security checks intact.
 
@@ -512,7 +525,18 @@ Replace permissive nonempty-array checks with an exact, versioned protected fixt
 - Reset, expiry, lockout, passwordless, mailbox, and throttle identities.
 - A value for every alias required by active verification entries, with no unreferenced credential blocks.
 
-The approved secret manager—not the unreadable GitHub environment-secret copy—is the durable source of truth for each complete binding document. Store a non-secret version and digest alongside it, retain the immediately previous encrypted/access-controlled document through rollback qualification, and test restoration in staging before production replacement. If no approved recoverable secret store exists, implementation stops for that ownership decision; values never move into source control, artifacts, logs, or this plan.
+Section 0, decision 4 is now settled by Phil's explicit 2026-11-02 approval: AWS Secrets Manager is the selected authoritative recovery store and Phil is accountable for recovery. The [recovery design and operational gates](#aws-secrets-manager-recovery-design-approved-2026-11-02) below replace the earlier unresolved-store wording. Documented DPAPI staging credentials are a local mechanism, not evidence that the new recovery gate has passed. GitHub environment secrets remain deployment copies; no secret values enter source control, reports, artifacts, logs or this plan.
+
+#### AWS Secrets Manager recovery design (approved 2026-11-02)
+
+Phil's explicit option-A answer selects this design and recovery ownership; it does not authorize creation, permission changes, credential upload or spending. This later decision supersedes the earlier Q4 investigation/pending-owner wording. Design is selected; the operational recovery gate remains pending.
+
+- **Complete current and rollback documents:** use one encrypted AWS Secrets Manager secret with versions containing the complete test fixture/provider configuration. Keep current and the last accepted rollback document, their non-secret schema/version/digest metadata and exact version references. Attach a dedicated retained rollback staging label to the last accepted rollback version; do not rely solely on moving `AWSPREVIOUS` or on unlabelled version history. Preserve that accepted rollback reference through candidate writes and interrupted updates; advance it only under the documented acceptance/restore procedure. AWS documents that labeled versions are retained and unlabelled versions may be removed; see [secret version semantics](https://docs.aws.amazon.com/secretsmanager/latest/userguide/whats-in-a-secret.html).
+- **Account suitability and independent recovery:** before setup, confirm the intended AWS account/region, appropriate ownership and service/encryption access, and Phil's recovery responsibility. Verify that AWS account and MFA recovery remain possible after loss of the workstation or primary MFA device; recovery must not depend solely on credentials held on that same workstation or inside the secret being recovered. Do not claim workstation-independent recovery from cloud storage alone.
+- **Document-size fit:** measure each complete serialized current/rollback configuration against the documented 65,536-byte secret-value quota before upload, without emitting its contents. Confirm the service's input rules. Do not truncate, silently omit bindings or split the approved one-secret design if it does not fit; report the conflict with a recommendation. See [AWS Secrets Manager quotas](https://docs.aws.amazon.com/secretsmanager/latest/userguide/reference_limits.html).
+- **Authentication and permissions:** prefer existing approved operator authentication and least-privilege access to the selected secret and necessary encryption operations. This decision assumes no new static AWS credentials, new app/runtime AWS integration or automatic rotation. Any needed provisioning, policy changes, credential upload and setup approvals are pending; no access or secret has been created by recording the design. GitHub environment secrets remain deployment copies, not the recovery authority.
+- **Restore acceptance:** before declaring this gate satisfied or replacing production fixture bindings, perform an authorized staging2 restore of both the complete current version and the dedicated retained rollback version. Validate their versions/digests, binding coverage and operational recovery procedure without logging values; restore the intended accepted state afterward. Record bounded evidence and demonstrate the retained label survives intermediate candidate updates. Preserve all fresh per-run `npm run test:ci` and other applicable operational permissions; do not execute the rehearsal under this documentation task.
+- **Cost and setup permission:** the verified baseline is $0.40 per secret per month (about $4.80/year) plus $0.05 per 10,000 API calls; creating secret versions adds no version fee. Confirm the selected region and any additional service costs before setup. [AWS pricing](https://aws.amazon.com/secrets-manager/pricing/) was checked on 2026-11-02. This estimate and design selection do not constitute spending approval, and no billable resource is provisioned here.
 
 Fixture validation occurs once. The validated object is passed narrowly to the probes. Repository/image scanners must not inherit the complete fixture or synthetic credentials when they need only bounded canary values.
 
@@ -715,7 +739,7 @@ Static analysis remains useful as a bypass detector, not a policy inference engi
 
 Use the existing TypeScript compiler dependency for syntax analysis. Retain unintended duplicates and unresolved dynamic registrations as coverage errors. Recognize explicitly declared framework/package owners without requiring vendor internals to import application adapters. Do not infer access policy by scanning for guard-function names or treat a package allowlist alone as verification evidence.
 
-Every access-policy classification requires human review. Generated coverage proves that a descriptor exists and its authorizer runs; resource-level correctness still requires the actor/resource scenarios from item 2.
+Every access-policy classification requires traceable policy review and characterization evidence. Under Section 0, decision 8, clear mappings that preserve established behavior may proceed without individual questions; consolidate genuinely ambiguous classifications and proposed permission changes for Phil. Generated coverage proves that a descriptor exists and its authorizer runs; resource-level correctness still requires the actor/resource scenarios from item 2. Do not waive the review requirement or automatically classify ambiguous surfaces.
 
 ## 9. Target Source Organization
 
@@ -732,7 +756,6 @@ mofacts/common/securityAudit/
   releaseQualification.ts
   canonicalReport.ts
   reportV2.ts
-  historicalReportV1.ts
   authorizationOutcomes.ts
   verificationCatalog.ts
   verificationBundle.ts
@@ -853,7 +876,7 @@ Do not leave re-export facades solely to preserve old internal paths. The final 
 | Build verification-bundle generation/carriage | Workstation qualification helper under `deploy/`, shared proof composer, and immutable application image | Production secrets, remote-probe outcomes, or post-build proof embedded into an already-tested image |
 | Exact-image release receipt | Qualification extension of existing `ProdReleaseRecordPath`; shared contract/evaluator; protected host projection | A competing release record/catalog, registry-write credentials on audit runners, or application startup policy |
 | Verification-bundle loading/exposure | `mofacts/server/securitySurfaces/verificationBundle.ts` | Reclassifying executed outcomes, accepting unbound proof, or redefining health/login |
-| Protected fixture-binding source and rollback copy | Approved secret manager; GitHub environment secret is a deployment copy | Source control, logs, reports, or CI artifacts |
+| Protected fixture-binding source and rollback copy | Selected AWS Secrets Manager secret; Phil accountable for recovery; dedicated retained rollback version; GitHub environment secrets are deployment copies; setup/restore gates pending | Source control, logs, reports, CI artifacts, or an assumed DPAPI-only recovery path |
 | Authorization observations/evaluation | `mofacts/scripts/security-audit/authentication/` | Runtime authorization enforcement |
 | Runtime authorization | Colocated descriptor/adapter or explicit framework/collection owner | Separate manual inventory or unapproved policy tightening |
 | Final registry seal | Explicit final composition coordinator after declared registration completion | Assuming end of `serverComposition.ts` or last static import means complete startup |
@@ -890,16 +913,16 @@ Deliverables:
 - Define shared qualification integration points before build, after build, after push and at host identity observation; keep pre-build source proof separate from post-build exact-image proof.
 - Define the compatible versioned qualification extension of the existing release record, its bounded host projection and retained rollback history; do not create a competing record. Settle exact-snapshot proof for dirty source, native-command result capture, OCI index/platform/config mapping and protected install/read tooling without changing normal deploy defaults.
 - Record zero-access-drift and no-new-operational-lockout acceptance cases for source builds, missing proof, methods, publications, collection rules, HTTP stacks and framework-owned authentication.
-- Choose how active scheduled scanner source stays stable before any incompatible producer/contract edits reach the default branch (Section 15.1).
+- Apply the approved active-scanner isolation strategy and conditional immutable selection in Section 0 before incompatible producer/contract edits reach the default branch; verify Section 15.1 update/rollback tooling.
 - Freeze the current top-level control IDs that items 1 and 2 will continue to implement.
 - Inventory every repeated control definition and identify its deletion phase.
 - Record exact current V1 exposure/full control membership in test fixtures.
-- Decide and approve the bounded V1 historical-read policy.
+- Apply Section 0: no old-format historical reader or archive; preserve existing records and prove safe application rollback.
 - Define the one-collection backward-compatibility test using the previous production image; if that model fails Phase 1 qualification, stop and choose version-separated storage before cutover.
 - Define the catalog registry, evidence-contract registry, metadata fields, canonical digest algorithm, and append-only release rules.
 - Define and, when separately authorized, smoke-test `BuildIdentityV1` and missing/conflicting identity observations across native local, supported CI, ordinary self-hosted source builds and qualified workstation images; missing proof must not create a startup failure.
 - Define the authorization observation union, decision table, and source-controlled verification-catalog ownership.
-- Confirm the approved recoverable secret-manager owner for protected fixture bindings and test restoration with non-production values.
+- Apply the selected AWS Secrets Manager design with Phil accountable for recovery. Verify account/MFA recovery, complete-document size fit, least-privilege setup and staging2 restoration of current plus dedicated retained rollback versions before closing the recovery gate; obtain outstanding concrete setup/operation approvals.
 - Identify every direct runtime registration API and environment-specific source root.
 - Prove the shared TypeScript/JSON imports under the exact pinned Node command and supported Meteor server build.
 - Record the installed production host script hash/version and a recoverable previous version without copying protected configuration.
@@ -921,11 +944,11 @@ Deliverables:
 - Exact assembly and server validation.
 - V2-only new ingestion endpoint.
 - Summary projections, supporting indexes, and read-time integrity validation.
-- Explicit V1 historical reader, if approved.
+- Retire old-format report access at cutover without adding a historical reader/archive or deleting existing records.
 - Temporary update of `security-surface-contract.json` from the V1 ingestion route to the V2 route so existing surface checks remain truthful until Phase 3 deletes the manifest.
 - Deletion of duplicated control tables and V1 new-ingestion route.
 - Split catalog, assembly, ingestion, storage, and presentation tests.
-- Focused staging ingestion harness, preserved pre-cutover V1 staging record, and non-production Linux forced-command qualification.
+- Focused staging2 ingestion harness, existing-record exclusion/rollback cases using synthetic records where needed, and non-production Linux forced-command qualification.
 - Exact host-script install/rollback procedure with reviewed file hash and previous installed version.
 - Previous-production-image qualification against a database containing V2 records, including list, latest, and download behavior.
 - Updated operator documentation.
@@ -937,7 +960,7 @@ Exit gates:
 - The pinned Node scanner and supported Meteor runtime load the shared contract and match the fixed catalog digest.
 - Exposure and full reports contain their exact profiles.
 - Stored and downloaded report/catalog digests match.
-- V1 new ingestion is unavailable; approved V1 history remains unchanged.
+- V1 new ingestion and old-format access are unavailable after cutover; existing records are not rewritten/deleted and rollback remains safe.
 - The exact host observation producer passes non-production forced-command qualification and its production install/rollback hashes are recorded.
 - The chosen storage model has passed the previous-image rollback qualification.
 - Local checks, authorized CI, staging, and production cutover gates pass.
@@ -994,7 +1017,7 @@ Exit gates:
 - No migrated surface has a second independently maintained authorization rule.
 - Unintended duplicates, unresolved, late and unclassified registrations fail coverage qualification/tests. Deployed incomplete coverage is observable `ERROR`, not a new application startup/access lockout.
 - Before/after characterization proves allow/deny, invocation context, synchronous collection rules, publication readiness/lifecycle, middleware order/fallthrough and enabled login/provider behavior are preserved.
-- Every protected surface has human-reviewed policy metadata and required verification scenarios.
+- Every protected surface has documented policy review and required verification scenarios; Phil reviews the consolidated ambiguous/proposed-change list, while clear behavior-preserving mappings follow Section 0.
 - The remote runner proves it is testing the sealed registry from the deployed application revision rather than source checkout alone.
 - Full app typecheck, lint, authorized Meteor CI, staging, and a manual full production audit pass without registry or fixture `ERROR` results.
 
@@ -1028,9 +1051,9 @@ Exit gate: a new maintainer can locate the catalog, add a test-only example cont
 | Authorization compatibility | Before/after actor/resource/error/side-effect equality; Meteor `this`/arguments/connection/IP/unblock; synchronous collection rules; publication ready/throw/reactivity; HTTP stack/prefix/order/fallthrough; framework/provider login paths |
 | Signed ingestion | Valid HMAC V2 acceptance; stale/bad HMAC; report-duration/completion/upload bounds; nonce/report/digest replay; catalog/report mutations rejected |
 | Storage | Unique and TTL indexes; active-catalog query indexes; corrupt-record behavior; bounded projections; previous-image behavior with stored V2 records |
-| Presentation/download | Admin authorization; V1 historical label; V2 current selection; exact JSON/HTML bytes and digests; no evidence in summaries |
+| Presentation/download | Admin authorization; V1 excluded from current/old-format access; V2 current selection; exact new-report JSON/HTML bytes and digests; no evidence in summaries; no historical-access/archive feature |
 | Workflow | Minimal secret scope; exact expected producer artifacts; storage before execution assertion; encrypted artifact retained; active scanner isolation; actual checkout SHA distinct from workflow event SHA when pinned |
-| Staging contract | Immutable image digest/revision; HTTPS target/HMAC; preserved V1 record; valid synthetic-`ERROR` V2 uploads; rejection tests; Mongo/admin/download/artifact agreement |
+| Staging contract | Immutable image digest/revision; HTTPS target/HMAC; existing-record exclusion and safe rollback; valid synthetic-`ERROR` V2 uploads; rejection tests; Mongo/admin/download/artifact agreement |
 | Staging authentication/runtime | Staging-only accounts/mailbox/providers; real allow/deny probes; sealed deployed registry comparison; no production data/secrets |
 | Production | Exact receiver/workflow/host revisions, one exposure and one full report, matching application/artifact digests, zero pipeline `ERROR` |
 
@@ -1045,7 +1068,7 @@ npm run lint
 
 The security test command should be updated to execute the decomposed behavioral suites through one stable entry point. Do not substitute narrow per-file TypeScript checks for the full app typecheck.
 
-Meteor integration requires the supported CI environment. Every invocation of `npm run test:ci` requires fresh, single-use authorization. Docker builds, image pushes, workflow dispatches, workflow disable/enable state changes, staging changes, production deployment, and production audit runs each require explicit authorization appropriate to that action.
+Meteor integration requires the supported CI environment. Every invocation of `npm run test:ci` requires fresh, explicit, single-use authorization, including retries. Commit/push, Docker build/push, workflow dispatch or disable/enable, protected-host installation, production deployment and production audit runs retain their concrete authorization requirements. Apply the explicit staging2 offline/reset/rebuild permission in Section 0 for this security work; it does not authorize original staging/production, irreversible deletion, new persistent access/security-sensitive permissions, new spending or bypassing verification gates.
 
 Documentation-only changes require at least:
 
@@ -1061,7 +1084,7 @@ Local testing can prove catalog mechanics, assembly, pure evaluation, signed-par
 
 Do not weaken HTTPS/origin validation or create a second local application path for convenience.
 
-The existing staging section in the operator's command sheet is explicitly frozen. In this plan, a **staging lane** means an explicitly approved isolated non-production qualification environment, not permission to reuse that server. Local isolated Docker can qualify exact-image mechanics without replacing the watcher; an approved HTTPS target and isolated Linux host are needed for the remote contracts below. Select/provision those only with separate authorization, or obtain explicit owner unfreeze approval for the current server. The frozen environment is not a reason to test unqualified changes in production.
+Original staging remains frozen. Under Section 0, decision 5, staging2 is the default isolated qualification environment with synthetic accounts/resources and may be taken offline, reset and rebuilt as needed for this security work. Keep report-contract, Linux host and authentication/runtime lanes distinct. Validate actual HTTPS origin, host/fixture suitability and exact candidate identity; a selected environment does not prove any lane passed. New environments, paid services, expanded persistent access, security-sensitive permission changes and irreversible data deletion remain separately scoped/authorized. Never substitute production for missing non-production evidence or copy production data/credentials.
 
 ### 14.1 Report-contract harness
 
@@ -1070,7 +1093,7 @@ Add a protected, manual-only staging report-contract harness rather than copying
 - A staging-only GitHub environment and HMAC secret.
 - A fixed allowlisted staging HTTPS target.
 - The exact workstation-built/pushed candidate, identified by its resolved immutable platform digest and matching config/source evidence. Existing tag-based tooling may select it, but qualification verifies the actual digest; staging never rebuilds or relies on a mutable tag alone.
-- A valid V1 staging report created through the existing V1 receiver before candidate deployment and preserved unchanged through V2 qualification.
+- Synthetic existing-record cases needed to prove exclusion and safe application rollback; no V1 historical-access harness or report archive is required.
 - Synthetic catalog-generated exposure and full sections whose controls are explicitly `ERROR` with bounded `synthetic-contract-qualification` evidence; they must never claim security `PASS`.
 - The production assembler, uploader, encryption, and artifact code.
 - No production SSH key, Tailscale credential, mailbox, user fixture, or learner data.
@@ -1084,7 +1107,7 @@ Contract acceptance requires:
 3. Missing, duplicate, unexpected, wrong-section, wrong-profile, wrong-catalog, and replay submissions are rejected.
 4. Stored report, JSON/HTML download, and decrypted artifact digests agree.
 5. No raw evidence or secrets appear in workflow/application logs.
-6. Approved V1 history remains readable and new V1 ingestion is rejected.
+6. New V1 ingestion and old-format access are rejected; existing records are excluded from current selection and retained without rewriting/deletion; the selected storage supports the proven application rollback.
 
 This lane is report-contract qualification only. It does not claim that staging reproduces production network exposure, host state, authentication fixtures, or provider configuration.
 
@@ -1107,7 +1130,7 @@ During development, production remains on the last reviewed implementation. Unre
 Application-image isolation alone is insufficient: `.github/workflows/production-security-audit.yml` currently has scheduled triggers and no checkout `ref`, so active scanner changes on `main` may execute immediately against the older receiver. Before active producer edits, choose and record one explicit strategy:
 
 - Keep active V1 orchestration/producers and all their imported contracts unchanged while developing inert, uninvoked V2 modules; replace the active path atomically at the coordinated cutover. This is development isolation, not simultaneous V1/V2 ingestion or a runtime recovery path. Remove superseded active code at cutover.
-- If work must touch active imported modules before cutover, first obtain approval for a reviewed immutable scanner-release checkout integrated into the existing workflow. Supply and test explicit selection/update/rollback tooling; do not assume `workflow_dispatch`'s ref alone controls future scheduled runs. Do not add an environment-variable name or parallel version source before tracing current configuration ownership.
+- If work must touch active imported modules before cutover, the Section 0 conditional immutable scanner-release design is already approved. Implement a reviewed immutable checkout in the existing workflow with tested selection/update/rollback tooling; do not assume `workflow_dispatch` ref alone controls later scheduled runs. Trace current configuration ownership before adding a setting, and retain separate publication/activation/workflow-action permissions.
 
 The first strategy requires no new workflow setting and is preferred when feasible. Neither strategy requires an automatic branch switch, a new deployment system, weeks of disabled audits, or dual-schema ingestion. Publication/activation and any workflow-state change still need authorization. Record the actual scanner checkout commit in the report; the workflow definition/event revision is not a substitute when checkout is pinned.
 
@@ -1123,7 +1146,7 @@ Do not combine all three solely to reduce deployment count. That would enlarge t
 
 The current production workflow reads default-branch source independently from the deployed application image unless the explicit scanner-release selection in Section 15.1 has been implemented and verified. A V2 producer and V1 receiver, or a V1 producer and V2-only receiver, will fail ingestion. Use a short authorized mismatch window after existing runs have completed, away from the next configured trigger. The checked-in schedules currently use 06:00 UTC; verify actual workflow/run state at cutover rather than treating a timestamp as proof that no job is active. Disabling the workflow affects manual and scheduled runs together.
 
-1. Resolve Phase 0's helper interface at the confirmed command-sheet boundaries, existing release-record extension/projection, exact dirty-snapshot proof, available non-production target and active-scanner isolation decisions. Obtain separate permissions for the ensuing source publication/CI, workstation build/push, staging, host install, workflow state/dispatch and production actions. This plan does not execute or authorize them.
+1. Apply Section 0's settled receipt/history, staging2, scanner-isolation and storage decisions; finish the helper interface, exact-source proof and remaining technical verification. Secret recovery design/owner are selected; complete the AWS setup/account-recovery/size-fit and two-version restore gates in Section 7.2 before claiming operational recovery. Obtain the concrete permissions still required for publication/CI, workstation build/push, protected-host install, workflow state/dispatch and production actions. Do not re-request the bounded staging2 offline/reset/rebuild permission already granted; retain all explicit per-run integration and other excluded-action requirements.
 2. Review the complete candidate and rollback unit (receiver, scanner, catalog, host script and applicable receipt). Run required source checks; publish source only with the active scanner preserved by Section 15.1, or disable the production audit workflow before publishing any incompatible active change. Confirm no run is active/queued before a mismatch. Obtain fresh authorization for `npm run test:ci` before a publication that triggers it.
 3. Verify supported source outcomes for the exact candidate inputs, preserving base-commit/dirty-snapshot distinctions. Through the confirmed workstation procedure, build once, qualify that exact image and push it using Section 7.2's interface. CI does not supply a substitute image. Bind proof to the existing release-record identity and its qualification extension.
 4. Deploy that same image through existing tooling to staging; pass the applicable report, host, authorization and runtime qualification lanes and previous-image storage rollback tests. Do not rebuild after qualification. If the source/image changes, repeat the affected gates.
@@ -1131,7 +1154,7 @@ The current production workflow reads default-branch source independently from t
 6. Disable the production audit workflow if it was not already disabled; confirm no active/queued runs. Verify the candidate's resolved image identity and intended HMAC alignment without exposing configuration values.
 7. Install the qualified host producer and approved receipt-carriage tooling/data, verify hashes and retain the previous versions. Activate the reviewed scanner selection/code while dispatch remains disabled.
 8. Use the command sheet's established SSH/Compose route, preserving base+overlay, `--no-build --wait`, tag/revision checks and Apache/CSP verification. Tag selection and dirty builds remain supported, but acceptance must establish the actual running platform/config/source-snapshot mapping equals the qualified candidate. Do not substitute the generic running-state helper or assume automatic app-image rollback exists. Keep the existing release-record write coherent with deployment validation and the separate truthful qualification result.
-9. Validate ordinary health, readiness where explicitly selected, login/logout and enabled providers, learner practice, admin route, logs, application/image identity and approved V1 historical behavior.
+9. Validate ordinary health, readiness where explicitly selected, login/logout and enabled providers, learner practice, admin route, logs, application/image identity, new-report access and safe existing-record exclusion/rollback; no V1 historical-access feature is required.
 10. Re-enable the workflow and immediately dispatch `exposure` using the reviewed scanner selection. Check the actual checkout revision, catalog and receiver contract, not only the dispatch event's `GITHUB_SHA`.
 11. Verify HTTP 201 ingestion, exact catalog/report coordinates, current-card selection, downloads and encrypted artifact.
 12. Dispatch `full` from the same reviewed scanner selection and repeat the identity/evidence checks.
@@ -1162,7 +1185,7 @@ Do not delete or rewrite reports to simplify rollback. Any production record rem
 
 Later phases use the same exact-revision, authorized-CI, staging-first discipline:
 
-- **Phase 2:** if the protected fixture schema or values change, disable the production audit workflow; verify the approved secret manager contains the complete current and candidate binding documents, their non-secret versions/digests, and a staging-tested restore path. Publish and pass CI on the exact runner revision, apply the matching candidate as the GitHub environment-secret deployment copy, deploy any required server fixture support, then re-enable and run one manual `full` audit from that revision. Roll back runner, full binding document, and any server support as one unit. If the report/evidence contract changed, also repeat the Phase 1 catalog/receiver cutover.
+- **Phase 2:** if the protected fixture schema or values change, obtain applicable operational permissions and disable the production audit workflow. Verify the selected AWS Secrets Manager source contains complete current/candidate documents, their non-secret versions/digests, and a last accepted rollback version pinned by the dedicated retained label; moving `AWSPREVIOUS` alone is insufficient. Confirm account/MFA recovery and staging2-tested restoration of current and retained rollback versions. Publish and pass CI on the exact runner revision, apply the matching candidate as the GitHub environment-secret deployment copy, deploy any required server fixture support, then re-enable and run one authorized manual `full` audit from that revision. Phil remains accountable for recovery. Roll back runner, full binding document and any server support as one unit. If the report/evidence contract changed, repeat the Phase 1 catalog/receiver cutover. No new runtime integration, static credential or automatic rotation is implied.
 - **Phase 3:** retain active-scanner isolation while preparing/publishing the exact registry/runner revision, passing supported source CI, and using the workstation build-once qualification/push path. Keep dispatch disabled only during the incompatible activation window. Deploy the fully migrated image through the existing script; re-enable to fetch the sealed inventory/bundle and join it to the release receipt, actual scanner checkout, host image mapping and environment evidence in the manual `full` report. Rollback restores the previous matched image/runner/host/receipt contract, including a pre-bundle Phase 2 image when applicable. There is no bundle-based startup enforcement to add or remove. Never mix partial registration wiring or proof from another image.
 
 Neither phase may rely on a production run to discover basic fixture, import, registry, or contract incompatibility; those belong in the non-production lanes first.
@@ -1235,41 +1258,41 @@ Parallelization is an efficiency improvement, not an excuse to duplicate catalog
 - Public build/deployment docs must describe the reusable qualification helper when implemented; do not make the private command sheet the sole way another maintainer can use it. Keep private operator paths/hosts/settings out of public command examples.
 - `docs/deployment/security-audit.md` must be updated in the same implementation phase whenever endpoint version, catalog interpretation, staging/production setup, report history, or cutover procedure changes.
 - The wiki needs review only if user/operator behavior changes beyond the concise public deployment documentation.
-- If the admin page gains V1 historical labeling or catalog metadata, every new visible string must use the existing interface localization system and preserve keyboard operation, announcements, contrast, and screen-reader labeling.
+- No V1 historical UI/archive is required. Any approved new-report catalog metadata or other visible string must use the existing interface localization system and preserve keyboard operation, announcements, contrast and screen-reader labeling.
 - Reports and logs remain sanitized and must never contain protected fixture values, learner data, credentials, nonces, HMACs, download tokens, raw scanner responses, or decrypted artifacts.
 - Existing V1 data is never reinterpreted as V2 evidence.
 
-## 19. Decisions Required Before Implementation
+## 19. Decision register and remaining implementation gates
 
-The recommended defaults are stated below, but implementation must confirm them explicitly:
+Section 0 is the controlling 2026-11-02 decision register. Do not ask again for its settled choices. The architecture defaults below remain requirements for implementation and verification, not a list of new user questions. Secret recovery design and owner are selected, with setup and demonstrated recovery still pending; genuinely new scope/trust/ownership/cost/retention/behavior conflicts still require a recommendation and decision. Technical facts must be investigated and evidenced rather than presented as user preferences:
 
 | Decision | Recommended choice |
 | --- | --- |
 | Canonical catalog format | Checked-in JSON metadata with one runtime-neutral TypeScript contract imported directly by pinned Node and Meteor |
 | Production release owner (confirmed) | Workstation production app section of config repo `deploy and build.txt`; retain build/push/SSH-Compose route, dirty builds and existing checks; CI is evidence only |
 | Qualification integration | Repository-owned helper invoked at the inspected pre-build, post-build/pre-push, post-push and post-start boundaries; no replacement deploy route or default gate |
-| Release record (existing owner confirmed) | Extend/version `ProdReleaseRecordPath` and retain its current fields/meaning; bounded host receipt is its projection, not a competing release record; finalize schema/readers/retention in Phase 0 |
+| Release record (approved design) | Existing workstation authority plus bounded server projection through the existing restricted channel; retain all small accepted metadata records without automatic deletion and the previous usable rollback image/evidence; validate implementation/access contracts |
 | Source/image identity | Preserve base commit and dirty flag; qualify actual snapshot and local config ID, then resolve published index/platform/config mapping and compare running identity; do not ban dirty builds |
 | Native command results | Shared qualification helper records the actual result of every operation it owns; broader pasteable-command failure/rollback redesign requires explicit scope, not assumptions about the operator's shell |
 | Missing qualification | Structurally valid bounded error evidence remains recordable; no new app build/startup/health/login/deploy lockout |
 | Runtime compatibility | Zero unapproved access/transport drift; synchronous collection and framework ownership explicit; final seal after all declared registration completion |
-| Active scanner isolation | Preserve active V1 paths until atomic cutover where feasible; if not, approve and implement explicit immutable scanner selection in the existing workflow first |
+| Active scanner isolation | Active V1 unchanged where feasible; reviewed immutable scanner selection with tested update/rollback is an approved conditional design if required; operational activation permissions remain |
 | Versioning and history | Separate immutable report-schema and catalog versions; one active ingestion catalog plus append-only read-only historical catalogs/evidence validators |
 | Evidence proof shapes | One versioned runtime-neutral evidence-contract registry used at producer, assembly, and ingestion boundaries |
 | Public inconclusive status | Do not add one; map internal inconclusive evidence to `ERROR` |
 | Unscheduled sections | Empty control set with section `NOT_APPLICABLE`, as required by the profile |
 | Severity | Fixed catalog-owned failure severity |
 | New-report ingestion | V2 only after cutover; no dual-ingestion compatibility path |
-| V1 history | Immutable read-only display/download until TTL expiry, clearly marked historical |
-| Storage | Prefer one schema-discriminated collection only after the previous image passes list/latest/download tests with V2 records; otherwise choose version-separated storage before coding the cutover |
+| V1 history | Later 2026-11-02 answer removes historical UI/download/archive work; retire old-format access at cutover without deleting/rewriting existing records |
+| Storage | Choose simplest new-report storage with evidence-backed safe application rollback; schema-discriminated collection if safe, version separation if needed; no historical-access feature or destructive migration implied |
 | Item 1/2 IDs | Preserve stable top-level IDs unless the claimed security property changes |
 | Verification intent | Source-controlled verification catalog owns outcomes, proof requirements, and baselines; protected fixture owns only environment values |
-| Protected fixture storage | Approved recoverable secret manager is source of truth; GitHub environment secret is a versioned deployment copy |
-| Staging | Current server is marked frozen; select an authorized isolated target or obtain explicit unfreeze approval. Separate report-contract, Linux host and authentication/runtime lanes; never reuse production fixtures |
+| Protected fixture storage | AWS Secrets Manager selected; Phil accountable; complete current and dedicated-labeled last accepted rollback versions; GitHub deployment copies only; verify account/MFA recovery, size and staging2 restores; provisioning/access/upload/spending approvals pending (Section 7.2 [recovery design](#aws-secrets-manager-recovery-design-approved-2026-11-02)) |
+| Staging | Use staging2 with synthetic fixtures; offline/reset/rebuild permitted for this security work within Section 0; original staging/production and excluded operations remain outside that permission |
 | Host migration | Mandatory observation-contract qualification, exact install hash, and paired rollback in Phase 1 |
 | Implementation status | Separate companion status/evidence document created in Phase 0 and maintained throughout |
 
-Approvals remain separate: implementation, each `npm run test:ci`, commit, push, workflow dispatch, workflow disable/enable state change, Docker build/push, staging change, host install, and production deployment are not implied by approval of this plan.
+Execution permission is distinct from settled design: apply Section 0's bounded standing staging2 permission, but keep fresh explicit single-use authorization for each `npm run test:ci` and retain the applicable commit/push, workflow dispatch/state, production build/push/deploy, protected-host installation and other excluded-action approvals. This documentation update executes/authorizes none of them and does not waive failed checks. Routine engineering within the approved boundaries proceeds without another design question.
 
 ## 20. Definition of Complete
 
@@ -1284,7 +1307,7 @@ The durable P0 redesign is complete only when:
 - The sealed deployed registry, embedded source-proof bundle and release-record qualification projection close exactly against actual scanner checkout, base/dirty-source identity, platform/config mapping, verification catalog, environment-run evidence and protected bindings.
 - Existing workstation clean/dirty build/push/Compose deployment, self-hosted source builds, native watcher and ordinary authorization/functionality are preserved; no audit metadata creates an unapproved startup/access/deploy lockout.
 - The manual JSON surface contract and inference-based access checker are deleted.
-- V1 new ingestion is gone; approved historical handling has an owner and removal gate.
+- V1 new ingestion and old-format access are gone; no historical reader/archive is required; existing records remain untouched and the chosen storage has evidence-backed safe application rollback.
 - Local checks, authorized full CI, all three non-production qualification lanes, and production exposure/full verification have passed.
 - Receiver, workflow, catalog, and host producer have an evidence-backed paired rollback path.
 - Stored, downloaded, and encrypted-artifact digests agree.
@@ -1296,7 +1319,7 @@ The durable P0 redesign is complete only when:
 
 | Current path | Current responsibility | Planned treatment |
 | --- | --- | --- |
-| `mofacts/common/securityAuditReport.ts` | V1 types, parsing, canonicalization, counts, sanitization | Split into catalog-aware common contract modules; retain bounded V1 historical parser only if approved |
+| `mofacts/common/securityAuditReport.ts` | V1 types, parsing, canonicalization, counts, sanitization | Split into catalog-aware common contract modules; no V1 historical reader/archive; preserve existing records and safe rollback |
 | `mofacts/scripts/security-audit/audit-lib.mjs` | Control construction, sanitization, canonicalization, commands | Split pure report behavior from command acquisition; remove duplicated contract definitions |
 | `mofacts/scripts/security-audit/assemble-report.mjs` | Hand-maintained control inventory and report assembly | Replace with catalog-driven exact assembly |
 | `mofacts/scripts/security-audit/production-auth-audit.mjs` | Authentication acquisition, evaluation, and orchestration | Decompose by transport and scenario; leave a thin coordinator |
@@ -1306,7 +1329,7 @@ The durable P0 redesign is complete only when:
 | `mofacts/server/securityAudit/` | Ingestion helpers, storage, presentation, tokens | Retain ownership; consume catalog-aware common contracts and add read-time validation/projections |
 | `mofacts/server/http/securityAudits.ts` | V1 signed ingestion and download routes | Cut over to V2 ingestion; preserve hardened download behavior |
 | `mofacts/server/methods/securityAuditMethods.ts` | Admin list/get/download-token methods | Add projections, schema-aware current/history selection, and bounded inputs |
-| `mofacts/client/views/adminSecurityAudits*` | Admin summaries/history/download UI | Keep summary-only model; add localized historical/catalog context only if approved |
+| `mofacts/client/views/adminSecurityAudits*` | Admin summaries/history/download UI | Keep bounded new-report summaries/downloads; exclude V1 without building historical UI/archive; localize any approved catalog context |
 | `deploy/security-audit/` | Restricted host evidence acquisition | Keep acquisition-only role and add an explicit observation-contract version |
 | Config repo `deploy and build.txt`, production app section | Actual workstation build/push, SSH/Compose wait, runtime/CSP validation and existing release-record write | Preserve sequence, clean/dirty source paths and fields; call shared qualification helpers at the inspected boundaries in a separately authorized implementation |
 | Config repo `docker-compose.production-change-streams.yml` | Hosted runtime overlay used by command-sheet preflight/deployment | Preserve runtime-only ownership; no change to topology, proxy settings or image-build selection |
