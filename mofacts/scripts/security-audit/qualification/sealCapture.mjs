@@ -9,7 +9,7 @@ const execute = promisify(execFile);
 const schema = 'MoFaCTSCaptureSealV1';
 const stages = new Set(['runner-contract', 'unseal-cwd', 'locate-inputs', 'read-mount-table',
   'existing-mounts', 'write-seal-receipt', 'bind-checkout', 'protect-checkout',
-  'bind-capture', 'protect-capture', 'bind-test-derivative', 'enable-test-writes',
+  'bind-capture', 'protect-capture', 'bind-test-derivative',
   'mount-topology', 'read-seal-receipt', 'probe-capture-receipt', 'probe-recipe', 'probe-compose']);
 const topologyReasons = new Set(['unexpected-mount', ...['checkout', 'capture', 'test-derivative']
   .flatMap(role => ['missing-', 'duplicate-', 'incorrect-mode-'].map(prefix => prefix + role))]);
@@ -143,17 +143,23 @@ export async function sealCapture(workspace, repository, dependencies = {}) {
     workspace: loc.root, repository: loc.repo, ownerId: marker.id }), { flag: 'wx', mode: 0o600 }));
   const mounted = [];
   try {
-    for (const [target, mode, bindStage, protectStage] of [
-      [loc.repo, 'ro', 'bind-checkout', 'protect-checkout'],
-      [loc.root, 'ro', 'bind-capture', 'protect-capture'],
-      [loc.derivative, 'rw', 'bind-test-derivative', 'enable-test-writes'],
-    ]) {
-      await atStage(bindStage, () => invoke(['mount', '--bind', target, target]));
+    const bind = async (target, stage) => {
+      await atStage(stage, () => invoke(['mount', '--bind', target, target]));
       mounted.push(target);
+    };
+    const protect = (target, stage) => {
       // Supply both operands: target-only remounts consult ambient mount tables
       // and differ across util-linux releases. This is one owned self-bind.
-      await atStage(protectStage, () => invoke(['mount', '-o', `remount,bind,${mode}`, target, target]));
-    }
+      return atStage(stage, () => invoke(['mount', '-o', 'remount,bind,ro', target, target]));
+    };
+    await bind(loc.repo, 'bind-checkout');
+    await protect(loc.repo, 'protect-checkout');
+    await bind(loc.root, 'bind-capture');
+    // Create the test mount from the still-writable parent. Making the parent
+    // read-only afterward leaves this existing child mount writable, without
+    // rebinding/remounting a child inherited from a read-only source.
+    await bind(loc.derivative, 'bind-test-derivative');
+    await protect(loc.root, 'protect-capture');
     await atStage('mount-topology', async () => checkMounts(await observe(), loc, true));
     // Native probes remain mandatory in production code. Mock orchestration tests
     // verify commands; a separate Linux CI test exercises real kernel rejection.

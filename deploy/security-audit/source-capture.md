@@ -10,8 +10,10 @@ status and the [audit record](../../docs-developer/security-audit-durable-redesi
 
 The revised single `lint-test-and-image` CI job retains the captured candidate
 through testing and construction. Before dependency installation, `sealCapture.mjs`
-protects the checkout and capture workspace with Linux read-only bind mounts,
-then gives only `test-context/` its own writable bind mount. It reads kernel mount
+protects the checkout and capture workspace with Linux read-only bind mounts.
+It creates the `test-context/` child mount while its parent is still writable,
+then protects the parent; only the existing child remains writable. All setup
+finishes before dependency installation or tests. It reads kernel mount
 state and probes write/chmod denial; changing file modes alone is insufficient.
 Bind remounts supply both the owned source and target explicitly, following the
 classic util-linux interface rather than inferring a source from mount tables.

@@ -2,6 +2,28 @@
 
 Current reviewed baseline: `18677291993b66b890a090e55d65f703b45ff653`.
 
+## Three-attempt authorization — attempt 2 and final candidate (2026-11-02)
+
+Commit `c0ca87e0b47f85927a460600ecb6751a2cbf9453` was pushed. [CI 41458037001](https://github.com/memphis-iis/MoFaCTS/actions/runs/41458037001)
+again rejected `duplicate-test-derivative`, with `different-kernel-id` confirming
+two distinct mount records. Explicit remount operands alone did not resolve it.
+[Security 41458037098](https://github.com/memphis-iis/MoFaCTS/actions/runs/41458037098)
+passed. This consumes attempt 2 of 3. No Meteor invocation/build/deployment ran.
+
+The final candidate creates the writable test child while the capture parent is
+still writable, then makes the parent read-only. It removes the child rw-remount
+operation entirely. The same strict three-mount topology and write/chmod denial
+checks remain; no duplicate is ignored or accepted. Setup completes before any
+dependency/test code runs. The command model now rejects binding the child from
+an already-read-only parent, and failed-parent-protection cleanup is covered.
+
+Both old and new setup passed in the disposable local Linux fixture using the
+modern and explicitly forced classic mount(2) APIs. Thus those local tests
+establish final protection/writable-child/cleanup behavior, not reproduction of
+the hosted runner's extra layer. Only the authorized final CI attempt can verify
+this candidate on that runner. One authorized attempt remains before publishing
+this candidate; no fourth attempt is permitted without further instruction.
+
 ## Three-attempt authorization — attempt 1 (2026-11-02)
 
 Commit `ef8875764bb473ee7925fb48b1a9235e642339aa` published the refined layout

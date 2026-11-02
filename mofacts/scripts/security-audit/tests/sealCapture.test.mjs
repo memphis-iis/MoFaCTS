@@ -40,6 +40,10 @@ function kernelModel() {
     command: async args => {
       calls.push(args);
       if (args[0] === 'mount' && args[1] === '--bind') {
+        if (args[2].endsWith(path.sep + 'test-context')) {
+          const parent = entries.find(entry => entry.target === path.dirname(args[2]));
+          assert.ok(parent?.options.includes('rw'), 'Create the writable child before protecting its parent');
+        }
         entries.push({ target: args[2], options: ['rw'] });
       } else if (args[0] === 'mount') {
         const found = entries.find(entry => entry.target === args[3]);
@@ -122,7 +126,7 @@ test('failed remount releases only mounts this seal created and never leaves a s
   const model = kernelModel();
   const command = model.dependencies.command;
   model.dependencies.command = async args => {
-    if (args[2] === 'remount,bind,rw') throw new Error('Synthetic remount failure');
+    if (args[2] === 'remount,bind,ro' && args[3] === workspace) throw new Error('Synthetic remount failure');
     await command(args);
   };
   await assert.rejects(sealCapture(workspace, repository, model.dependencies), /Synthetic remount/);
