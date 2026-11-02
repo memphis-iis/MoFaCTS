@@ -29,6 +29,23 @@ export type ReleaseQualificationV1 = {
   commands: Record<CommandName, CommandObservation>;
 };
 
+// References retain acquired observations without inventing the still-missing
+// workstation image tuple. CI test-image observations remain a separate lane.
+export type ReleaseIdentityTuple = Omit<ReleaseQualificationV1, 'schema' | 'buildIdentity'>;
+export type ReleaseQualificationV2 = {
+  schema: 'ReleaseQualificationV2';
+  state: 'unqualified';
+  buildIdentity: BuildIdentityV1;
+  evidenceReferences: {
+    sourceAcquisitionDigestSha256: string;
+    ciImageObservationDigestSha256?: string;
+  };
+  releaseIdentity?: ReleaseIdentityTuple;
+};
+
+export type ReleaseQualification = ReleaseQualificationV1 | ReleaseQualificationV2;
+export type ReleaseRecordProofState = 'unavailable' | 'incomplete-unqualified' | 'consistent-unqualified';
+
 export type WorkstationReleaseRecord = {
   deployedAtUtc: string;
   baseCommit: string;
@@ -40,7 +57,7 @@ export type WorkstationReleaseRecord = {
   // Current command-sheet fields; historical six-field records omit both.
   imageId?: string;
   acceptance?: 'operator-confirmed readiness and participant smoke checks';
-  qualification?: ReleaseQualificationV1;
+  qualification?: ReleaseQualification;
 };
 
 export type ReleaseIdentityResult =
@@ -89,11 +106,8 @@ export function parseImageObservation(value: unknown): ImageObservation {
   return { configDigest: imageDigest(record.configDigest), platform: platform(record.platform) };
 }
 
-export function parseReleaseQualification(value: unknown): ReleaseQualificationV1 {
-  const record = proofRecord(value, [
-    'schema', 'buildIdentity', 'sourceVerification', 'builtImage', 'publishedImage', 'runningImage', 'commands',
-  ]);
-  if (record.schema !== 'ReleaseQualificationV1') throw new Error('Unsupported release qualification schema');
+function parseReleaseIdentityTuple(value: unknown): ReleaseIdentityTuple {
+  const record = proofRecord(value, ['sourceVerification', 'builtImage', 'publishedImage', 'runningImage', 'commands']);
   const published = record.publishedImage;
   const isIndex = Boolean(published && typeof published === 'object' && 'kind' in published && published.kind === 'index');
   const publishedRecord = proofRecord(published, isIndex
@@ -116,13 +130,43 @@ export function parseReleaseQualification(value: unknown): ReleaseQualificationV
     RELEASE_PROOF_COMMANDS.map((name) => [name, parseCommand(commandRecord[name])]),
   ) as Record<CommandName, CommandObservation>;
   return {
-    schema: 'ReleaseQualificationV1',
-    buildIdentity: parseBuildIdentity(record.buildIdentity),
     sourceVerification: parseSourceVerification(record.sourceVerification),
     builtImage: parseImageObservation(record.builtImage),
     publishedImage,
     runningImage: { configDigest: imageDigest(running.configDigest), platform: platform(running.platform), baseCommit: sourceCommit(running.baseCommit) },
     commands,
+  };
+}
+
+export function parseReleaseQualification(value: unknown): ReleaseQualification {
+  if (value && typeof value === 'object' && 'schema' in value && value.schema === 'ReleaseQualificationV2') {
+    const hasIdentity = Object.hasOwn(value, 'releaseIdentity');
+    const keys = ['schema', 'state', 'buildIdentity', 'evidenceReferences'];
+    if (hasIdentity) keys.push('releaseIdentity');
+    const record = proofRecord(value, keys);
+    if (record.state !== 'unqualified') throw new Error('Invalid release qualification state');
+    const referenceKeys = ['sourceAcquisitionDigestSha256'];
+    const hasCiImage = Boolean(record.evidenceReferences && typeof record.evidenceReferences === 'object'
+      && Object.hasOwn(record.evidenceReferences, 'ciImageObservationDigestSha256'));
+    if (hasCiImage) referenceKeys.push('ciImageObservationDigestSha256');
+    const references = proofRecord(record.evidenceReferences, referenceKeys);
+    const result: ReleaseQualificationV2 = {
+      schema: 'ReleaseQualificationV2', state: 'unqualified',
+      buildIdentity: parseBuildIdentity(record.buildIdentity),
+      evidenceReferences: { sourceAcquisitionDigestSha256: contentDigest(references.sourceAcquisitionDigestSha256) },
+    };
+    if (hasCiImage) result.evidenceReferences.ciImageObservationDigestSha256 = contentDigest(references.ciImageObservationDigestSha256);
+    if (hasIdentity) result.releaseIdentity = parseReleaseIdentityTuple(record.releaseIdentity);
+    return result;
+  }
+  const record = proofRecord(value, [
+    'schema', 'buildIdentity', 'sourceVerification', 'builtImage', 'publishedImage', 'runningImage', 'commands',
+  ]);
+  if (record.schema !== 'ReleaseQualificationV1') throw new Error('Unsupported release qualification schema');
+  const { schema: _schema, buildIdentity, ...tuple } = record;
+  return {
+    schema: 'ReleaseQualificationV1', buildIdentity: parseBuildIdentity(buildIdentity),
+    ...parseReleaseIdentityTuple(tuple),
   };
 }
 
@@ -159,7 +203,14 @@ export function parseWorkstationReleaseRecord(value: unknown): WorkstationReleas
     // command outcomes or an authenticated independent running-image observation.
     result.acceptance = record.acceptance;
   }
-  if (hasQualification) result.qualification = parseReleaseQualification(record.qualification);
+  if (hasQualification) {
+    result.qualification = parseReleaseQualification(record.qualification);
+    if (result.qualification.schema === 'ReleaseQualificationV2'
+      && (result.qualification.buildIdentity.baseCommit !== result.baseCommit
+        || result.qualification.buildIdentity.includedUncommittedLocalChanges !== result.includedUncommittedLocalChanges)) {
+      throw new Error('Release qualification source identity mismatch');
+    }
+  }
   return result;
 }
 
@@ -170,8 +221,15 @@ export function evaluateReleaseIdentity(value: unknown): ReleaseIdentityResult {
   let record: WorkstationReleaseRecord;
   try { record = parseWorkstationReleaseRecord(value); }
   catch { return { status: 'ERROR', reason: 'malformed-proof' }; }
-  const proof = record.qualification;
+  return evaluateParsedReleaseIdentity(record);
+}
+
+function evaluateParsedReleaseIdentity(record: WorkstationReleaseRecord): ReleaseIdentityResult {
+  const qualification = record.qualification;
+  if (!qualification) return { status: 'ERROR', reason: 'proof-unavailable' };
+  const proof = qualification.schema === 'ReleaseQualificationV2' ? qualification.releaseIdentity : qualification;
   if (!proof) return { status: 'ERROR', reason: 'proof-unavailable' };
+  const buildIdentity = qualification.buildIdentity;
   if (Object.values(proof.commands).some((result) => result.state === 'unavailable')) {
     return { status: 'ERROR', reason: 'command-unavailable' };
   }
@@ -181,9 +239,9 @@ export function evaluateReleaseIdentity(value: unknown): ReleaseIdentityResult {
   if (proof.sourceVerification.state !== 'observed' || proof.sourceVerification.result !== 'PASS') {
     return { status: 'ERROR', reason: 'source-unverified' };
   }
-  if (record.baseCommit !== proof.buildIdentity.baseCommit || record.baseCommit !== proof.runningImage.baseCommit
-    || record.includedUncommittedLocalChanges !== proof.buildIdentity.includedUncommittedLocalChanges
-    || proof.sourceVerification.sourceSnapshotDigestSha256 !== proof.buildIdentity.sourceSnapshotDigestSha256) {
+  if (record.baseCommit !== buildIdentity.baseCommit || record.baseCommit !== proof.runningImage.baseCommit
+    || record.includedUncommittedLocalChanges !== buildIdentity.includedUncommittedLocalChanges
+    || proof.sourceVerification.sourceSnapshotDigestSha256 !== buildIdentity.sourceSnapshotDigestSha256) {
     return { status: 'ERROR', reason: 'source-mismatch' };
   }
   if (record.digest !== proof.publishedImage.digest
@@ -195,4 +253,19 @@ export function evaluateReleaseIdentity(value: unknown): ReleaseIdentityResult {
     return { status: 'ERROR', reason: 'image-mismatch' };
   }
   return { status: 'PASS' };
+}
+
+// Storage admission is distinct from release qualification. Valid incomplete
+// observations may be retained, while any supplied actual tuple must agree.
+// Digest syntax does not prove that referenced bytes exist or are authentic;
+// acquisition/binding and complete qualification remain separate owners.
+export function classifyReleaseRecordProof(value: unknown): ReleaseRecordProofState {
+  const record = parseWorkstationReleaseRecord(value);
+  const proof = record.qualification;
+  if (!proof) return 'unavailable';
+  if (proof.schema === 'ReleaseQualificationV2' && !proof.releaseIdentity) return 'incomplete-unqualified';
+  if (evaluateParsedReleaseIdentity(record).status !== 'PASS') {
+    throw new Error('Release record proof is inconsistent');
+  }
+  return 'consistent-unqualified';
 }

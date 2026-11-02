@@ -7,3 +7,5 @@ f349bb93001acb5d93fcd9b7b31bdabff0e6bf4e:mofacts/client/views/turkWorkflowState.
 # Retired local-Compose encryption key, reviewed in docs/deployment/security-audit.md.
 403ea082da296f5d7e476cfa99786bfb99ec3015:mofacts/.deploy/settings.local.json:generic-api-key:4
 bbb9400da27cc4c74c3024c4d1597a31173a298c:mofacts/.deploy/settings.local.json:generic-api-key:4
+# Public GitHub artifact ZIP checksum, independently matched to artifact 13177217912.
+560063743c3d24fe3ca0dbfe290eaf83fe993986:docs-developer/security-audit-durable-redesign-status.md:generic-api-key:28

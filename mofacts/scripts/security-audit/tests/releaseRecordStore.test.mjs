@@ -52,6 +52,47 @@ test('record replacement preserves exact historical bytes, current fields, and b
   assert.equal((await fs.readdir(file + '.history')).length, 2);
 });
 
+test('incomplete V2 evidence is retained without inventing workstation proof or changing receipt identity', async t => {
+  const { file } = await setup(t);
+  const prior = encoded(record());
+  await fs.writeFile(file, prior);
+  const candidate = record();
+  candidate.qualification = {
+    schema: 'ReleaseQualificationV2', state: 'unqualified',
+    buildIdentity: structuredClone(fixture.qualification.buildIdentity),
+    evidenceReferences: { sourceAcquisitionDigestSha256: '1'.repeat(64), ciImageObservationDigestSha256: '2'.repeat(64) },
+  };
+  const result = await writeReleaseRecord(file, encoded(candidate));
+  assert.equal(result.proof, 'incomplete-unqualified');
+  const current = await readReleaseBytes(file);
+  assert.deepEqual(parseReleaseBytes(current), candidate);
+  assert.equal(Object.hasOwn(parseReleaseBytes(current).qualification, 'releaseIdentity'), false);
+  assert.deepEqual(await fs.readFile(path.join(file + '.history', digest(prior) + '.json')), prior);
+  const receipt = projectReleaseReceipt(current);
+  assert.equal(receipt.imageId, candidate.imageId);
+  assert.equal(receipt.recordDigestSha256, digest(current));
+  assert.equal(Object.hasOwn(receipt, 'qualification'), false);
+});
+
+test('malformed V2 and mismatched supplied tuples fail before allocating release-store files', async t => {
+  const { root, file } = await setup(t);
+  for (const mode of ['binding', 'tuple']) {
+    const candidate = record();
+    const { schema: _schema, buildIdentity, ...releaseIdentity } = candidate.qualification;
+    candidate.qualification = {
+      schema: 'ReleaseQualificationV2', state: 'unqualified', buildIdentity,
+      evidenceReferences: { sourceAcquisitionDigestSha256: '1'.repeat(64) },
+    };
+    if (mode === 'binding') candidate.qualification.buildIdentity.baseCommit = 'f'.repeat(40);
+    else {
+      candidate.qualification.releaseIdentity = releaseIdentity;
+      candidate.qualification.releaseIdentity.runningImage.configDigest = 'sha256:' + 'f'.repeat(64);
+    }
+    await assert.rejects(writeReleaseRecord(file, encoded(candidate)));
+    assert.deepEqual(await fs.readdir(root), []);
+  }
+});
+
 test('normal unqualified records remain writable and a receipt never infers a missing image ID', async t => {
   const { file } = await setup(t);
   const current = record();

@@ -18,6 +18,34 @@ publication. No credentials, command output, provider settings or learner data
 are accepted as extra fields. A valid tuple remains **consistent-unqualified**:
 the tuple checker cannot authenticate the evidence supplied to it.
 
+### Versioned evidence references (local draft)
+
+`ReleaseQualificationV2` extends the same optional `qualification` field. It
+retains one build identity, a required source-acquisition digest and an optional
+CI-image-observation digest. The actual workstation identity tuple is optional;
+missing image/command evidence is never filled from CI's smoke image or invented.
+The top-level commit and dirty-source flag must agree with the qualification's
+build identity, including when the actual tuple is absent.
+
+A valid incomplete V2 record may be preserved as `incomplete-unqualified`, while
+the identity evaluator returns `ERROR/proof-unavailable`. A supplied actual
+workstation tuple must pass the same consistency checks as V1 before storage;
+its storage label remains `consistent-unqualified`. Neither label is complete
+release qualification. Digest syntax alone does not establish that referenced
+bytes exist, are authentic, or satisfy the required verification catalog.
+
+Historical six-field, eight-field and V1 records retain their parsing and
+evaluation behavior and are not rewritten. The existing exact-byte history and
+atomic latest-record replacement remain in use. Host projection still omits the
+qualification payload; its authoritative-record digest binds the extended bytes
+while its image ID continues to come from the explicit workstation record.
+
+This draft has pure/parser/storage and shared Meteor parity tests; its new
+Meteor cases have not run yet. It is not installed in the private production
+writer or the host. Reference acquisition/binding, external reader confirmation,
+fresh CI and protected installation remain separate integration gates. See the
+[status record](../../docs-developer/security-audit-durable-redesign-status.md).
+
 The helper creates `<ProdReleaseRecordPath>.history` beside the latest record.
 Before replacing latest, it archives the exact previous bytes and the new
 record under their SHA-256 filenames, without rewriting dates or inferring

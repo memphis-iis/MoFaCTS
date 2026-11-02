@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { parseWorkstationReleaseRecord, evaluateReleaseIdentity } from '../../../common/securityAudit/releaseQualification.ts';
+import { parseWorkstationReleaseRecord, classifyReleaseRecordProof } from '../../../common/securityAudit/releaseQualification.ts';
 import { parseReleaseReceipt } from './releaseReceipt.mjs';
 
 const MAX_BYTES = 16384;
@@ -50,7 +50,7 @@ export async function readReleaseBytes(file) {
 export function parseReleaseBytes(bytes) {
   if (bytes.length > MAX_BYTES) invalid();
   const record = parseWorkstationReleaseRecord(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
-  if (record.qualification && evaluateReleaseIdentity(record).status !== 'PASS') invalid();
+  classifyReleaseRecordProof(record);
   return record;
 }
 
@@ -134,7 +134,7 @@ export async function writeReleaseRecord(file, candidate, dependencies = {}) {
     await syncDirectory(parent);
     if (!(await readReleaseBytes(target)).equals(bytes)) invalid();
     return { state: 'release-record-written', recordDigestSha256: hash(bytes),
-      proof: record.qualification ? 'consistent-unqualified' : 'unavailable' };
+      proof: classifyReleaseRecordProof(record) };
   } finally {
     if (allocated) await fs.unlink(temporary);
     await fs.unlink(lock);

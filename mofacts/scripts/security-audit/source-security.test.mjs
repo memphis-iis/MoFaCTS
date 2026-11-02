@@ -564,7 +564,10 @@ test('first-party runtime code and production CSP prohibit dynamic JavaScript ev
 test('production hardening assets preserve reviewed findings and remove unnecessary runtime tooling', () => {
   const ignore = fs.readFileSync(new URL('../../../.gitleaksignore', import.meta.url), 'utf8');
   const ignoredFingerprints = ignore.split(/\r?\n/).filter((line) => line && !line.startsWith('#'));
-  assert.equal(ignoredFingerprints.length, 7);
+  assert.equal(ignoredFingerprints.length, 8);
+  assert.deepEqual(ignoredFingerprints.filter((line) => line.includes('docs-developer/security-audit-durable-redesign-status.md')), [
+    '560063743c3d24fe3ca0dbfe290eaf83fe993986:docs-developer/security-audit-durable-redesign-status.md:generic-api-key:28',
+  ]);
   assert.deepEqual(ignoredFingerprints.filter((line) => line.includes('mofacts/.deploy/settings.local.json')), [
     '403ea082da296f5d7e476cfa99786bfb99ec3015:mofacts/.deploy/settings.local.json:generic-api-key:4',
     'bbb9400da27cc4c74c3024c4d1597a31173a298c:mofacts/.deploy/settings.local.json:generic-api-key:4',

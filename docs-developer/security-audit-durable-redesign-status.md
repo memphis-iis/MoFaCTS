@@ -2,6 +2,93 @@
 
 Last baseline with passing integration/image checks: `0f8f1c30c9d98e0f8865025751510d9a5cf4d0de`.
 
+## Release-record draft publication authorized (2026-11-02)
+
+Phil accepted the identified public-checksum false positive and authorized
+committing/pushing its exact correction with the release-record V2 draft below,
+followed by one fresh Meteor integration execution. The previous failed Security
+run remains historical evidence; a passing result for this new candidate is still
+required. This authorization permits one invocation, without an automatic retry,
+and continuation within the approved design until the next decision boundary.
+The exact candidate and hosted outcomes will be recorded after execution.
+
+## Image observer CI passed; Security checksum finding repaired locally (2026-11-02)
+
+The authorized image-proof batch is committed/pushed as
+`c58205128cd489b83d8bc821657a62236cf84a19`.
+[CI 41524323711](https://github.com/memphis-iis/MoFaCTS/actions/runs/41524323711)
+passed completely, including the first real collector/isolated image read and
+separate image-artifact publication. It used the one authorized Meteor invocation
+and one canonical Compose compilation; no retry or second invocation ran.
+Pre-commit manifest, lint-staged and secret checks passed.
+
+Hosted outcomes: **971 server passed / 15 pending**, **1,237 browser passed /
+7 pending**, harness **26/26**, Phase 0 **120/120**, capture **98/98**, zero hosted
+skips. Source/protection, application/vendor typechecks, lint, image ABI,
+standalone-Mongo rejection, replica-set health and cleanup passed.
+
+Both published artifacts were downloaded, checked against their reported digests
+and read with native ZIP integrity validation:
+
+- Source artifact `13178688049`, `source-observation-41524323711-1`, ZIP digest
+  `62a34a9a14ffd7deaa0bf9bbd7e5144477baebb620393a0ce2c3149dbdbcf917`.
+- Image artifact `13178359523`, `image-observation-41524323711-1`, ZIP digest
+  `561d1f3d1e243d241bb2ba0dbd71c9656cd309b835e149edde5a99933a9aba09`.
+
+The parsed image record remains `observed-unqualified`, lane `ci-test-image`.
+Its exact-file digest is
+`97cd7e46c3b32841a6df2346d1a2efee2acdbb6d5c8ae45415cbf2b2cfd43349`.
+Independent validation matched source identity, commit/run/attempt and the digest
+of the exact joined source-evidence bytes:
+`49bc1f2808be9f37b868140f6bc71d9cadbc4dc84f8c2ea11f8a58eb799b4948`.
+The source snapshot is
+`e0bc88c613d5b70392e96ac321375b7faee3ee69ac24685dd6fdfc3dc9c7d442`;
+the observed linux/amd64 config ID is
+`sha256:59da16c04448bfaa58b44533a9b580c4f9b6f4a0ac6cbdeacf6ec240bfc985c1`.
+No registry or workstation release-image identity is inferred from this record.
+
+[Security 41524324580](https://github.com/memphis-iis/MoFaCTS/actions/runs/41524324580)
+has three passing jobs and one failed gitleaks job. A read-only, fully redacted
+scan reproduced its sole finding at historical commit `56006374`, status-file
+line 28: the known public ZIP checksum of artifact `13177217912`, previously
+independently verified against GitHub. It is not a credential. The local repair
+adds only that exact historical fingerprint to `.gitleaksignore` and rewords the
+current checksum note; no detector or broad path is exempted. The paired source
+test now requires the exact reviewed membership. The pinned scanner's full local
+history scan passed: **785 commits, approximately 34.75 MB, zero findings**.
+The hosted failure remains recorded; it is not relabeled green or waived.
+
+Continuation implemented the next local contract/storage draft without changing
+the production writer or authoritative record:
+
+- `ReleaseQualificationV2` discriminates the same optional extension. It retains
+  one build identity and bounded source/image digest references, with the actual
+  workstation identity tuple absent until acquired. Historical six/eight-field
+  records and V1 parsing/evaluation/golden fixture remain unchanged.
+- Valid incomplete V2 observations may be preserved as `incomplete-unqualified`;
+  identity evaluation stays `ERROR/proof-unavailable`. Any supplied actual tuple
+  must pass the existing consistency checks. CI image references never supply
+  workstation built/published/running identity.
+- The existing exact-byte history, atomic replacement and credential-free receipt
+  projection remain in use. Synthetic tests verified prior-byte retention,
+  inconsistent-input rejection before allocation, and unchanged receipt identity.
+
+Local checks: Phase 0 **128 passed / 1 hosted-only skip** (129 total), capture
+**94 passed / 4 hosted-only skips**, source-security **41/41**, full application
+typecheck and lint passed. A first source-test run caught the old seven-entry
+fingerprint count; the reviewed eight-entry expectation was updated and the full
+suite rerun successfully. Three new V2 Meteor parity cases are prepared but have
+not executed. Independent review found no remaining V2 correctness blocker.
+
+This correction and V2 continuation remain uncommitted. No additional CI run,
+release-record write, production command-sheet edit, host installation, image
+publication or deployment occurred. The previous all-green baseline above stays
+unchanged. No new design choice was established; a fresh publication/execution
+approval is required to verify the corrected candidate before live integration.
+Do not bypass the failed hosted Security result or reuse the consumed Meteor
+authorization. Referenced-byte acquisition/binding, external reader confirmation,
+full catalog/authentication and protected release/recovery gates still remain.
+
 ## Image observation publication — one fresh execution authorized (2026-11-02)
 
 Phil explicitly authorized committing/pushing the reviewed image-proof draft and
@@ -33,7 +120,7 @@ This is a runner-local smoke image, not a registry manifest/index identity or a
 workstation-built/published/deployed image claim.
 
 The authenticated source artifact is `13177217912`,
-`source-observation-41520033283-1`. Downloaded ZIP SHA-256 matches API metadata:
+`source-observation-41520033283-1`. The downloaded ZIP checksum matches GitHub's reported digest:
 `1a6c0798d40f01677c653f3a17340a9fa930de8aa8fa6c71e54f3a0cf7ba53e8`.
 Native ZIP validation passed. The helper then successfully acquired and
 revalidated the exact CI/Security tuple and payloads, retaining acquisition

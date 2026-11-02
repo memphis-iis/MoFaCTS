@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import fixture from './fixtures/release-record.fixture.json' with { type: 'json' };
 import { observeBuildIdentity } from './buildIdentity.ts';
-import { evaluateReleaseIdentity, parseWorkstationReleaseRecord } from './releaseQualification.ts';
+import { classifyReleaseRecordProof, evaluateReleaseIdentity, parseWorkstationReleaseRecord } from './releaseQualification.ts';
 import { parsePostBuildImageObservation } from './postBuildImageObservation.ts';
 import { canonicalJson } from '../securityAuditReport.ts';
 
@@ -75,5 +75,36 @@ describe('Phase 0 external CI image observation parity', function() {
         })).to.throw();
       }
     }
+  });
+});
+
+describe('Phase 0 V2 release evidence parity', function() {
+  const { schema: _schema, buildIdentity, ...releaseIdentity } = fixture.qualification;
+  const incomplete = () => ({ ...structuredClone(fixture), qualification: {
+    schema: 'ReleaseQualificationV2', state: 'unqualified', buildIdentity: structuredClone(buildIdentity),
+    evidenceReferences: { sourceAcquisitionDigestSha256: '1'.repeat(64) },
+  } });
+
+  it('retains incomplete observations while identity proof remains unavailable', function() {
+    const record = incomplete();
+    expect(parseWorkstationReleaseRecord(record)).to.deep.equal(record);
+    expect(classifyReleaseRecordProof(record)).to.equal('incomplete-unqualified');
+    expect(evaluateReleaseIdentity(record)).to.deep.equal({ status: 'ERROR', reason: 'proof-unavailable' });
+    expect(Object.hasOwn(record.qualification, 'releaseIdentity')).to.equal(false);
+  });
+
+  it('binds versioned evidence to the existing commit and dirty distinction', function() {
+    const record = incomplete();
+    expect(() => parseWorkstationReleaseRecord({ ...record, baseCommit: 'f'.repeat(40) })).to.throw();
+    expect(() => parseWorkstationReleaseRecord({ ...record, includedUncommittedLocalChanges: true })).to.throw();
+  });
+
+  it('applies existing consistency checks to a supplied actual workstation tuple', function() {
+    const record = incomplete();
+    const complete = { ...record, qualification: { ...record.qualification, releaseIdentity: structuredClone(releaseIdentity) } };
+    expect(classifyReleaseRecordProof(complete)).to.equal('consistent-unqualified');
+    expect(evaluateReleaseIdentity(complete)).to.deep.equal({ status: 'PASS' });
+    complete.qualification.releaseIdentity.runningImage.configDigest = 'sha256:' + 'f'.repeat(64);
+    expect(() => classifyReleaseRecordProof(complete)).to.throw();
   });
 });
