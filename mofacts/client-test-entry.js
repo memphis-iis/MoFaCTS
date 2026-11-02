@@ -1,3 +1,10 @@
+import { mocha } from 'meteor/meteortesting:mocha-core';
+import { createMeteorTestLoader } from './tests/meteorEvidenceReporter.mjs';
+
+const loadTests = createMeteorTestLoader(mocha.constructor, mocha, 'client', report => {
+  globalThis.mofactsMeteorEvidence = report;
+}, Meteor.settings.public?.mochaRuntimeArgs?.mochaOptions?.clientReporter);
+
 function reportPreMochaClientError(reason) {
   const message = reason instanceof Error ? reason.stack || reason.message : String(reason);
   console.error(`[client-test-bootstrap] ${message}`);
@@ -40,4 +47,4 @@ describe('client test discovery', function() {
   });
 });
 
-clientTestKeys.forEach(clientTests);
+loadTests('client', clientTests);

@@ -16,3 +16,14 @@ package exposes only that driver instead of retaining unrelated historical
 drivers. Remove this override after an official `meteortesting:browser-tests`
 release uses a cross-platform module URL and the full Meteor CI suite passes
 against it.
+
+For the CI-only `mofacts-evidence` reporter, the worker also reads the completed
+browser outcome record after `testsDone` and flushes one bounded JSON frame
+before reporting completion to Meteor. The application test entry owns the
+reporter; this package adds no application endpoint or production surface.
+Worker start/exit failures report a failing result once, and the worker closes
+its IPC channel after delivering its result; missing evidence cannot hang as
+an apparently unfinished browser run until the harness timeout.
+When replacing this override, preserve that completion/flush contract (or move
+it to a supported upstream extension) and verify missing/incomplete browser
+evidence fails CI. See `docs/development.md` for evidence scope and limitations.

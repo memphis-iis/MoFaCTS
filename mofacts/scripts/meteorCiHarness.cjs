@@ -34,17 +34,7 @@ function validateMeteorRuntimeContract(appRoot, readText = file => readFileSync(
   }
 }
 
-function clientPassingCount(reporterOutput) {
-  const ansiPattern = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
-  const normalizedOutput = reporterOutput.replace(ansiPattern, '');
-  const clientSectionStart = normalizedOutput.lastIndexOf('----- RUNNING CLIENT TESTS -----');
-  if (clientSectionStart === -1) return null;
-  const match = normalizedOutput.slice(clientSectionStart).match(/\b(\d+) passing\b/);
-  return match ? Number(match[1]) : null;
-}
-
 module.exports = {
-  clientPassingCount,
   validateMeteorTestModules,
   validateMeteorRuntimeContract,
 };

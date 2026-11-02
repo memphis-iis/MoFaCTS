@@ -244,8 +244,11 @@ then use `test-context/mofacts`; test MongoDB helpers also come from that captur
 copy. Git diff is replaced by input verification after `meteor update --npm`,
 because the derivative deliberately has no Git directory. Docker's ignore policy
 owns installed dependency and cache exclusions; unexplained source/manifest edits
-still fail. Only the final bounded JSON observation is retained as a GitHub
-artifact, associated with the run/attempt, for 14 days. No source tree, raw source
+still fail. The final bounded JSON source observation and the bounded Meteor
+outcome/joined records are retained as a GitHub artifact, associated with the
+run/attempt, for 14 days. See [development verification](../../docs/development.md)
+for discovery, result validation, pending status and remaining qualification
+gates. No source tree, raw source
 inventory, private configuration or test logs are uploaded by this step. This
 temporary CI metadata is not authoritative protected release/host storage.
 

@@ -2,10 +2,10 @@ const { spawn } = require('node:child_process');
 const { existsSync, readFileSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 const {
-  clientPassingCount,
   validateMeteorTestModules,
   validateMeteorRuntimeContract,
 } = require('./meteorCiHarness.cjs');
+const { discoverTestModules, evidenceCollector } = require('./meteorTestEvidence.cjs');
 const {
   findMeteorTestVersionArtifacts,
   removeMeteorTestVersionArtifacts,
@@ -55,6 +55,27 @@ if (initialMeteorVersionArtifacts.length > 0) {
 }
 
 const meteorTestEnv = { ...process.env };
+const evidencePath = process.env.MOFACTS_TEST_EVIDENCE_FILE;
+if (!evidencePath || !path.isAbsolute(evidencePath) || existsSync(evidencePath)
+  || !path.relative(path.dirname(appRoot), evidencePath).startsWith(`..${path.sep}`)) {
+  console.error('MOFACTS_TEST_EVIDENCE_FILE must be a new absolute file outside the application source.');
+  process.exit(1);
+}
+const evidence = evidenceCollector(discoverTestModules(appRoot));
+// Refuse partial-suite selectors rather than allowing a green reduced run.
+for (const name of ['MOCHA_GREP', 'MOCHA_INVERT', 'TEST_WATCH', 'TEST_PARALLEL']) {
+  if (process.env[name]) {
+    console.error(`Meteor evidence does not permit ${name}.`);
+    process.exit(1);
+  }
+}
+meteorTestEnv.MOCHA_REPORTER = 'mofacts-evidence';
+meteorTestEnv.SERVER_TEST_REPORTER = 'mofacts-evidence';
+meteorTestEnv.CLIENT_TEST_REPORTER = 'mofacts-evidence';
+meteorTestEnv.TEST_SERVER = '1';
+meteorTestEnv.TEST_CLIENT = '1';
+delete meteorTestEnv.SERVER_MOCHA_OUTPUT;
+delete meteorTestEnv.CLIENT_MOCHA_OUTPUT;
 delete meteorTestEnv.FORCE_COLOR;
 delete meteorTestEnv.NO_COLOR;
 // Own the fixed Meteor test runtime contract here so every CI or explicitly
@@ -104,11 +125,10 @@ const child = spawn(
   },
 );
 
-const maxCapturedStdoutBytes = 2 * 1024 * 1024;
-let testStdoutTail = '';
+child.stdout.setEncoding('utf8');
 child.stdout.on('data', (chunk) => {
   process.stdout.write(chunk);
-  testStdoutTail = `${testStdoutTail}${chunk.toString()}`.slice(-maxCapturedStdoutBytes);
+  evidence.push(chunk);
 });
 child.stderr.on('data', (chunk) => {
   process.stderr.write(chunk);
@@ -206,7 +226,8 @@ child.once('error', (error) => {
   finish(1);
 });
 
-child.once('exit', (exitStatus, signal) => {
+// close waits for stdout drainage; exit alone can truncate the last evidence frame.
+child.once('close', (exitStatus, signal) => {
   if (timedOut) {
     finish(1);
     return;
@@ -218,13 +239,12 @@ child.once('exit', (exitStatus, signal) => {
     return;
   }
 
-  if (exitStatus === 0) {
-    const passingCount = clientPassingCount(testStdoutTail);
-    if (!passingCount) {
-      console.error('Meteor CI client tests did not report a nonzero passing count.');
-      finish(1);
-      return;
-    }
+  try {
+    writeFileSync(evidencePath, `${JSON.stringify(evidence.finish(exitStatus))}\n`, { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    console.error(error.message);
+    finish(1);
+    return;
   }
 
   finish(exitStatus ?? 1);

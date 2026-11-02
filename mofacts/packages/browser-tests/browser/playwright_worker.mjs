@@ -44,6 +44,12 @@ async function startPlaywright(done) {
   await page.goto(process.env.ROOT_URL);
   await page.waitForFunction(() => window.testsDone, [], { timeout: 0 });
   const testFailures = await page.evaluate('window.testFailures');
+  if (process.env.MOCHA_REPORTER === 'mofacts-evidence') {
+    const evidence = await page.evaluate(() => window.mofactsMeteorEvidence);
+    if (!evidence) throw new Error('Missing browser test evidence');
+    await new Promise((resolve, reject) => process.stdout.write(
+      `MOFACTS_METEOR_EVIDENCE_V1 ${JSON.stringify(evidence)}\n`, error => error ? reject(error) : resolve()));
+  }
 
   await page.close();
   await browser.close();
@@ -52,9 +58,14 @@ async function startPlaywright(done) {
 
 process.on('message', () => {
   startPlaywright((testFailures) => {
-    process.send({ kind: 'testsDone', data: { testFailures } });
+    process.send({ kind: 'testsDone', data: { testFailures } }, error => {
+      if (error) process.exitCode = 1;
+      process.disconnect();
+    });
   }).catch((error) => {
     console.error(error);
-    process.exitCode = 1;
+    // Notify the parent through exit; an open IPC channel must not turn a
+    // browser/bootstrap/evidence error into a twenty-minute timeout.
+    process.exit(1);
   });
 });

@@ -164,7 +164,7 @@
   "scripts": {
     "test": "TEST_WATCH=1 meteor test --driver-package=meteortesting:mocha --port 3010 --settings settings.json",
     "test:ci": "npm run test:ci:harness && node scripts/runMeteorCiTest.cjs",
-    "test:ci:harness": "node --test scripts/meteorCiHarness.test.cjs",
+    "test:ci:harness": "node --test scripts/meteorCiHarness.test.cjs scripts/meteorTestEvidence.test.cjs",
     "test:coverage": "c8 --reporter=text-summary --reporter=lcov --report-dir coverage meteor test --once --driver-package=meteortesting:mocha --port 3010 --settings settings.json",
     "docs:api": "node scripts/generateApiDocs.js",
     "generate:schemas": "node --experimental-strip-types scripts/generateSchemas.ts",

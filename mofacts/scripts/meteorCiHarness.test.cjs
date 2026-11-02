@@ -3,7 +3,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const {
-  clientPassingCount,
   validateMeteorTestModules,
   validateMeteorRuntimeContract,
 } = require('./meteorCiHarness.cjs');
@@ -34,20 +33,6 @@ test('rejects a missing configured test module', () => {
     () => validateMeteorTestModules(completePackage, '/app', (file) => !file.endsWith('client-test-entry.js')),
     /meteor\.testModule\.client does not identify an existing file/,
   );
-});
-
-test('rejects an absent client reporter section', () => {
-  assert.equal(clientPassingCount('564 passing\nAll tests finished!'), null);
-});
-
-test('recognizes an ANSI-formatted zero-test client result', () => {
-  const output = '----- RUNNING CLIENT TESTS -----\n\u001b[92m \u001b[0m\u001b[32m 0 passing\u001b[0m';
-  assert.equal(clientPassingCount(output), 0);
-});
-
-test('returns a nonzero client passing count', () => {
-  const output = '----- RUNNING CLIENT TESTS -----\n127 passing\nAll tests finished!';
-  assert.equal(clientPassingCount(output), 127);
 });
 
 test('removes only Meteor test-driver resolutions from the application version manifest', () => {

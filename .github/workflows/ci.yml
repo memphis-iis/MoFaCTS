@@ -161,6 +161,7 @@ jobs:
           PLAYWRIGHT_BROWSER: chromium
           TEST_RUN_TIMEOUT_MS: 1200000
           TEST_SETTINGS_FILE: settings.ci.json
+          MOFACTS_TEST_EVIDENCE_FILE: ${{ runner.temp }}/mofacts-meteor-test-run.json
           MONGO_URL: mongodb://127.0.0.1:27018/meteor?replicaSet=mofacts-ci-rs&directConnection=true
           EXPECTED_MONGO_DB_NAME: meteor
           MOFACTS_MONGO_REPLICA_SET_NAME: mofacts-ci-rs
@@ -202,11 +203,23 @@ jobs:
             `source_digest=${identity.sourceSnapshotDigestSha256}\nsource_commit=${identity.baseCommit}\nsource_dirty=${identity.includedUncommittedLocalChanges}\n`);
           NODE
 
-      - name: Retain source observation metadata
+      - name: Bind Meteor outcomes to verified source and CI run
+        working-directory: .
+        run: |
+          node mofacts/scripts/recordMeteorTestEvidence.mjs \
+            "$RUNNER_TEMP/mofacts-meteor-test-run.json" \
+            "$RUNNER_TEMP/mofacts-source-observation.json" \
+            "$RUNNER_TEMP/mofacts-meteor-test-evidence.json" \
+            '${{ steps.capture.outputs.test_app }}'
+
+      - name: Retain source observation and Meteor evidence metadata
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: source-observation-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/mofacts-source-observation.json
+          path: |
+            ${{ runner.temp }}/mofacts-source-observation.json
+            ${{ runner.temp }}/mofacts-meteor-test-run.json
+            ${{ runner.temp }}/mofacts-meteor-test-evidence.json
           if-no-files-found: error
           retention-days: 14
 

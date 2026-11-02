@@ -2,6 +2,60 @@
 
 Last baseline with passing integration/image checks: `936a64aa3939fda466e4dc5091f8d29719b729cc`.
 
+## Structured Meteor test evidence — local implementation (2026-11-02)
+
+The approved next slice is implemented locally. A test-entry-only Mocha reporter
+records each environment's discovered modules, hashed registered test IDs,
+passed/failed/pending outcomes and hook failures. The CI wrapper independently
+inventories the reviewed server/common/standalone/client discovery scopes,
+requires both environment reports, and rejects duplicate/malformed reports,
+filters, missing outcomes, failed hooks disguised as success and incomplete
+execution. Existing pending tests remain pending. It waits for child stdout to
+close before validating/writing a fresh bounded outcome file outside source.
+
+After existing source verification, CI binds those outcomes to the clean source
+identity, test-input contract and supplemental digests, and GitHub repository,
+commit/run/attempt. The existing 14-day source-observation artifact gains the raw
+bounded run and joined record. No titles, assertion payloads, fixture values or
+new application endpoint are introduced in those records. Browser worker startup
+and premature-exit failures now complete as failure rather than waiting for the
+wrapper timeout. Public development/capture and package-maintenance guidance and
+the canonical wiki developer guide describe the contract.
+
+Local verification on the canonical Linux watcher container:
+
+- Harness **26/26**, including negative reporter/discovery/result/source-binding
+  cases, real synthetic browser-worker processes and a synthetic executable
+  exercising the actual wrapper's stdout, evidence and manifest-cleanup path.
+- Full application typecheck and lint passed; source-security **41/41**.
+- Phase 0 **87 passed / 1 hosted-only skip**; capture **94 passed / 4 hosted-only
+  skips**. These local checks do not replace native hosted CI fixtures.
+- Small synthetic tests exercised the reporter constructor/completion/event
+  interfaces of the exact cached Mocha 10.2.0 server and browser implementations.
+  They did not start Meteor or a browser and are not Meteor integration evidence.
+- CI YAML parses and the diff has no whitespace errors. Unrelated staging/SPARC,
+  Mongo initialization, and companion-wiki edits are preserved.
+- Final review restricted evidence setup/enforcement to the explicitly selected
+  reporter. Interactive tests retain their ordinary focus/delay/dry-run policy;
+  the added regression passes. The stopped canonical localhost watcher was
+  restored through `hotfix-local.ps1`; its readiness checks passed before the
+  final harness/typecheck/lint verification.
+
+This working batch has not been committed, pushed, run through Meteor CI, built,
+published or deployed. The prior renewed authorization still has one unused
+attempt; this turn did not consume it. The last passing CI baseline above is
+unchanged. The new records explicitly remain **unqualified**: authentication,
+an independently reviewed required-test catalog (including allowed pending
+cases), independent Security-workflow evidence joining, and protected final
+release/image proof are subsequent gates. Runtime-registered test IDs alone do
+not prove that the required security cases are complete. Phase 0 remains open.
+
+Publication is now explicitly authorized for this batch, followed by the one
+remaining CI attempt and continued audit work until a design decision. The
+local-only results above remain a separate checkpoint; the exact pushed commit,
+hosted outcomes and artifact review must be recorded after execution. No live
+deployment is authorized by this publication step.
+
 ## Renewed authorization — successful second attempt (2026-11-02)
 
 The preparation blocker is repaired and verified on the supported GitHub runner.

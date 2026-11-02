@@ -141,6 +141,24 @@ when it exits, while lint and the pre-commit hook reject any such entries left
 in the application dependency manifest. Do not commit these `meteortesting:*`
 resolutions as application dependencies.
 
+The CI wrapper requires `MOFACTS_TEST_EVIDENCE_FILE`: a new absolute file outside
+the repository, normally under `RUNNER_TEMP`. Its Mocha reporter records server
+and browser module inventories, hashed test IDs, outcomes and hook failures.
+The wrapper compares discovery with an independent filesystem inventory and
+rejects missing environments, duplicate reports, partial execution and filters.
+Existing pending tests remain visible; they do not become passing results.
+`npm run test:ci:harness` checks this contract without starting Meteor.
+
+After source verification, CI joins the record to the captured build and
+supplemental-input digests and GitHub commit/run/attempt. The `source-observation-*`
+artifact retains the observation, raw bounded outcome record and joined record
+for 14 days. These files contain no test titles, assertion details or fixture
+values. Ordinary human-readable test logs are unchanged. This is an **unqualified
+observation**: authentication of evidence, a reviewed required-test catalog,
+pending-test acceptance and final release/image proof remain separate gates.
+The reporter uses Mocha's [reporter constructor and completion interface](https://github.com/mochajs/mocha/blob/v10.2.0/lib/mocha.js)
+and [runner events](https://github.com/mochajs/mocha/blob/v10.2.0/lib/runner.js).
+
 The integration and image-smoke jobs use the explicit `ubuntu-22.04` runner and
 one workflow-owned MongoDB image pin (`CI_MONGO_IMAGE`, currently `mongo:8.0.34`).
 The runner's documented Linux 6.8 kernel is compatible with MongoDB 8.0.
