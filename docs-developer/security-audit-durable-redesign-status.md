@@ -2,6 +2,22 @@
 
 Last baseline with passing integration/image checks: `18677291993b66b890a090e55d65f703b45ff653`.
 
+## Renewed three-attempt authorization (2026-11-02)
+
+The user explicitly authorized another three CI attempts after the previous
+three-attempt group below was exhausted. These include scoped diagnostic/fix
+commits, Meteor and Compose construction if reached, with no deployment. Count
+this renewed group independently; stop on success, a design decision or attempt 3.
+
+The first renewed candidate records bounded mount snapshots after each setup
+operation: fixed roles, ordinal parent/backing relationships, read/write flags
+and the visible mount selected by an opened directory's `mnt_id`. It omits raw
+paths, roots, devices, kernel IDs and file contents. Snapshot data is retained
+only internally and emitted on failure; native protection validation is unchanged.
+Mock tests explicitly inject visibility observation; Linux production observes
+the real kernel. Local capture **94 passed / 3 CI-only skipped** (97 total),
+including parent/hidden/visible mapping and diagnostic-redaction coverage.
+
 ## Final outcome of the three authorized attempts (2026-11-02)
 
 All three authorized attempts have been executed. None reached Meteor or image

@@ -7,10 +7,11 @@ import { readControl, requireWorkspace } from './captureBuildSource.mjs';
 
 const execute = promisify(execFile);
 const schema = 'MoFaCTSCaptureSealV1';
+const failureTraces = new WeakMap();
 const stages = new Set(['runner-contract', 'unseal-cwd', 'locate-inputs', 'read-mount-table',
   'existing-mounts', 'write-seal-receipt', 'bind-checkout', 'protect-checkout',
   'bind-capture', 'protect-capture', 'bind-test-derivative',
-  'mount-topology', 'read-seal-receipt', 'probe-capture-receipt', 'probe-recipe', 'probe-compose']);
+  'mount-topology', 'read-seal-receipt', 'probe-capture-receipt', 'probe-recipe', 'probe-compose', 'snapshot-mount-state']);
 const topologyReasons = new Set(['unexpected-mount', ...['checkout', 'capture', 'test-derivative']
   .flatMap(role => ['missing-', 'duplicate-', 'incorrect-mode-'].map(prefix => prefix + role))]);
 const invalid = stage => {
@@ -38,7 +39,9 @@ export function sealFailureSummary(error) {
       : /not a directory|mount point.*does not exist/i.test(stderr) ? 'invalid-mountpoint'
         : /target is busy|device or resource busy|mount point is busy/i.test(stderr) ? 'mountpoint-busy' : 'unspecified';
   const detail = ['same-kernel-id', 'different-kernel-id'].includes(error?.sealDetail) ? `, detail=${error.sealDetail}` : '';
-  return `Capture seal operation failed (stage=${stage}, code=${code}, reason=${reason}${detail}); no qualification was issued.\n`;
+  const trace = error && typeof error === 'object' ? failureTraces.get(error) : undefined;
+  return `Capture seal operation failed (stage=${stage}, code=${code}, reason=${reason}${detail}); no qualification was issued.\n`
+    + (trace ? 'Capture mount observations: ' + JSON.stringify(trace) + '\n' : '');
 }
 
 // The kernel owns mount state; the receipt alone never establishes protection.
@@ -50,7 +53,9 @@ export function parseMounts(text) {
     const target = fields[4].replace(/\\(040|011|012|134)/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
     if (!path.isAbsolute(target)) invalid();
     if (!/^[1-9][0-9]*$/.test(fields[0])) invalid();
-    return { mountId: fields[0], target, options: fields[5].split(',') };
+    if (!/^(?:0|[1-9][0-9]*)$/.test(fields[1]) || !/^[0-9]+:[0-9]+$/.test(fields[2])) invalid();
+    return { mountId: fields[0], parentId: fields[1], device: fields[2], root: fields[3],
+      target, options: fields[5].split(',') };
   });
 }
 
@@ -77,6 +82,36 @@ async function locations(workspace, repository) {
 
 function relevant(entries, locations) {
   return entries.filter(entry => inside(locations.root, entry.target) || inside(locations.repo, entry.target));
+}
+
+// Only ordinal relationships and fixed roles/flags leave this module. Kernel
+// identifiers, filesystem roots, devices and absolute paths are never emitted.
+export function summarizeMountState(entries, loc, visible = {}) {
+  const selected = relevant(entries, loc);
+  const ordinal = id => {
+    const index = typeof id === 'string' ? selected.findIndex(entry => entry.mountId === id) : -1;
+    return index >= 0 && index < 12 ? index + 1 : 'outside';
+  };
+  const role = target => target === loc.repo ? 'checkout' : target === loc.root ? 'capture'
+    : target === loc.derivative ? 'test-copy' : 'unexpected-child';
+  return { count: selected.length, truncated: selected.length > 12,
+    visible: Object.fromEntries(['checkout', 'capture', 'test-copy'].map(name => [name, ordinal(visible[name])])),
+    rows: selected.slice(0, 12).map((entry, index) => ({
+      number: index + 1, role: role(entry.target), parent: ordinal(entry.parentId),
+      ro: entry.options.includes('ro'), rw: entry.options.includes('rw'),
+      backing: typeof entry.root === 'string' && typeof entry.device === 'string'
+        ? selected.findIndex(other => other.root === entry.root && other.device === entry.device) + 1 : 'unavailable',
+    })) };
+}
+
+async function visibleMountId(target) {
+  const handle = await fs.open(target, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY);
+  try {
+    const info = await fs.readFile('/proc/self/fdinfo/' + handle.fd, 'utf8');
+    const id = /^mnt_id:\s*([0-9]+)\s*$/m.exec(info)?.[1];
+    if (!id) invalid();
+    return id;
+  } finally { await handle.close(); }
 }
 
 function checkMounts(entries, locations, complete) {
@@ -142,15 +177,28 @@ export async function sealCapture(workspace, repository, dependencies = {}) {
   await atStage('write-seal-receipt', () => fs.writeFile(loc.receipt, JSON.stringify({ schema,
     workspace: loc.root, repository: loc.repo, ownerId: marker.id }), { flag: 'wx', mode: 0o600 }));
   const mounted = [];
+  const trace = [];
   try {
+    const recordState = stage => atStage('snapshot-mount-state', async () => {
+      const visible = {};
+      for (const [role, target] of [['checkout', loc.repo], ['capture', loc.root], ['test-copy', loc.derivative]]) {
+        visible[role] = await (dependencies.visibleMountId ?? visibleMountId)(target);
+      }
+      trace.push({ stage, ...summarizeMountState(await observe(), loc, visible) });
+    });
+    await recordState('before-setup');
     const bind = async (target, stage) => {
       await atStage(stage, () => invoke(['mount', '--bind', target, target]));
       mounted.push(target);
+      await recordState(stage);
     };
     const protect = (target, stage) => {
       // Supply both operands: target-only remounts consult ambient mount tables
       // and differ across util-linux releases. This is one owned self-bind.
-      return atStage(stage, () => invoke(['mount', '-o', 'remount,bind,ro', target, target]));
+      return atStage(stage, async () => {
+        await invoke(['mount', '-o', 'remount,bind,ro', target, target]);
+        await recordState(stage);
+      });
     };
     await bind(loc.repo, 'bind-checkout');
     await protect(loc.repo, 'protect-checkout');
@@ -166,6 +214,7 @@ export async function sealCapture(workspace, repository, dependencies = {}) {
     await (dependencies.assertSealed ?? assertCaptureSealed)(workspace, repository);
     return { state: 'capture-sealed-unqualified' };
   } catch (error) {
+    failureTraces.set(error, trace);
     // Unmount only mounts successfully allocated above, in reverse order. Keep
     // the receipt on teardown failure so the always-run unseal can finish it.
     for (const target of mounted.reverse()) await invoke(['umount', target]);

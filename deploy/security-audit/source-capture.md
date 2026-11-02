@@ -15,6 +15,10 @@ It creates the `test-context/` child mount while its parent is still writable,
 then protects the parent; only the existing child remains writable. All setup
 finishes before dependency installation or tests. It reads kernel mount
 state and probes write/chmod denial; changing file modes alone is insufficient.
+On failure it emits bounded per-operation observations using fixed roles and
+ordinal mount/parent/backing/visible relationships. Paths, filesystem roots,
+device identifiers, kernel IDs and file contents are omitted; validation is
+unchanged and a failed observation cannot produce qualification.
 Bind remounts supply both the owned source and target explicitly, following the
 classic util-linux interface rather than inferring a source from mount tables.
 This uses the existing hosted runner's `sudo`, `mount` and `umount`, with no

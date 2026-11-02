@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inspectSnapshotTree } from '../qualification/sourceSnapshot.mjs';
 import { main as captureMain } from '../qualification/captureBuildSource.mjs';
-import { parseMounts, sealCapture, assertCaptureSealed, unsealCapture, sealFailureSummary } from '../qualification/sealCapture.mjs';
+import { parseMounts, sealCapture, assertCaptureSealed, unsealCapture, sealFailureSummary, summarizeMountState } from '../qualification/sealCapture.mjs';
 
 async function fixture(t) {
   const temporary = await fs.realpath(os.tmpdir());
@@ -36,6 +36,7 @@ function kernelModel() {
   const calls = [];
   return { entries, calls, dependencies: {
     mounts: async () => structuredClone(entries),
+    visibleMountId: async () => undefined,
     assertSealed: async () => {},
     command: async args => {
       calls.push(args);
@@ -63,9 +64,29 @@ function kernelModel() {
 
 test('mount state parser decodes kernel paths and rejects malformed or oversized input', () => {
   assert.deepEqual(parseMounts('10 1 0:2 / /tmp/with\\040space ro,relatime - ext4 /dev/test rw\n'),
-    [{ mountId: '10', target: '/tmp/with space', options: ['ro', 'relatime'] }]);
+    [{ mountId: '10', parentId: '1', device: '0:2', root: '/', target: '/tmp/with space', options: ['ro', 'relatime'] }]);
   assert.throws(() => parseMounts('malformed'));
   assert.throws(() => parseMounts('x'.repeat(1024 * 1024 + 1)));
+});
+
+test('mount observations retain visible/hidden parent relationships with no paths, device IDs or kernel IDs', () => {
+  const loc = { repo: path.resolve('private-checkout'), root: path.resolve('private-capture'),
+    derivative: path.resolve('private-capture', 'test-context') };
+  const base = { device: '88:99', root: '/private-backing', options: ['rw'] };
+  const entries = [
+    { ...base, root: '/checkout-backing', mountId: '90001', parentId: '1', target: loc.repo },
+    { ...base, root: '/capture-backing', mountId: '90002', parentId: '1', target: loc.root, options: ['ro'] },
+    { ...base, mountId: '90003', parentId: '90002', target: loc.derivative },
+    { ...base, mountId: '90004', parentId: '90003', target: loc.derivative },
+  ];
+  const result = summarizeMountState(entries, loc, { checkout: '90001', capture: '90002', 'test-copy': '90004' });
+  assert.deepEqual(result.visible, { checkout: 1, capture: 2, 'test-copy': 4 });
+  assert.equal(result.rows[3].parent, 3);
+  assert.equal(result.rows[3].backing, 3);
+  assert.equal(result.rows[1].ro, true);
+  assert.doesNotMatch(JSON.stringify(result), /private|backing\/|9000|88:99/);
+  assert.equal(summarizeMountState(Array.from({ length: 20 }, (_, i) => ({ ...base,
+    mountId: String(i + 1), target: loc.derivative })), loc).rows.length, 12);
 });
 
 test('failure summaries expose only registered operation/error categories, never native arguments or stderr', () => {
