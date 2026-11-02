@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inspectSnapshotTree } from '../qualification/sourceSnapshot.mjs';
 import { main as captureMain } from '../qualification/captureBuildSource.mjs';
-import { parseMounts, sealCapture, assertCaptureSealed, unsealCapture } from '../qualification/sealCapture.mjs';
+import { parseMounts, sealCapture, assertCaptureSealed, unsealCapture, sealFailureSummary } from '../qualification/sealCapture.mjs';
 
 async function fixture(t) {
   const temporary = await fs.realpath(os.tmpdir());
@@ -59,6 +59,15 @@ test('mount state parser decodes kernel paths and rejects malformed or oversized
     [{ target: '/tmp/with space', options: ['ro', 'relatime'] }]);
   assert.throws(() => parseMounts('malformed'));
   assert.throws(() => parseMounts('x'.repeat(1024 * 1024 + 1)));
+});
+
+test('failure summaries expose only registered operation/error categories, never native arguments or stderr', () => {
+  const result = sealFailureSummary({ sealStage: 'bind-checkout', code: 32,
+    stderr: 'mount synthetic-private-value: operation not permitted', message: 'synthetic-private-value' });
+  assert.match(result, /stage=bind-checkout, code=native-exit-32, reason=operation-not-permitted/);
+  assert.doesNotMatch(result, /synthetic-private-value/);
+  assert.doesNotMatch(sealFailureSummary({ sealStage: 'synthetic-private-value', code: 'synthetic-private-value',
+    stderr: 'synthetic-private-value' }), /synthetic-private-value/);
 });
 
 test('seal retains native bytes/modes and leaves exactly the test derivative writable', async t => {
@@ -154,7 +163,7 @@ test('unseal CLI refuses a cwd inside the protected repository before privileged
     });
     assert.equal(result.status, 1);
     assert.equal(result.stdout, '');
-    assert.match(result.stderr, /^Capture seal operation failed; no qualification was issued\.\n$/);
+    assert.match(result.stderr, /^Capture seal operation failed \(stage=unseal-cwd, code=unclassified, reason=unspecified\); no qualification was issued\.\n$/);
     assert.equal(await fs.readFile(path.join(workspace, 'capture.json'), 'utf8'), '{}');
   });
 

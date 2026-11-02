@@ -7,8 +7,35 @@ import { readControl, requireWorkspace } from './captureBuildSource.mjs';
 
 const execute = promisify(execFile);
 const schema = 'MoFaCTSCaptureSealV1';
-const invalid = () => { throw new Error('Capture seal validation failed'); };
+const stages = new Set(['runner-contract', 'unseal-cwd', 'locate-inputs', 'read-mount-table',
+  'existing-mounts', 'write-seal-receipt', 'bind-checkout', 'protect-checkout',
+  'bind-capture', 'protect-capture', 'bind-test-derivative', 'enable-test-writes',
+  'mount-topology', 'read-seal-receipt', 'probe-capture-receipt', 'probe-recipe', 'probe-compose']);
+const invalid = stage => {
+  const error = new Error('Capture seal validation failed');
+  if (stage) error.sealStage = stage;
+  throw error;
+};
 const inside = (parent, child) => child === parent || child.startsWith(parent + path.sep);
+
+async function atStage(stage, operation) {
+  try { return await operation(); }
+  catch (error) { if (!error.sealStage) error.sealStage = stage; throw error; }
+}
+
+export function sealFailureSummary(error) {
+  const stage = stages.has(error?.sealStage) ? error.sealStage : 'validation';
+  const code = ['EPERM', 'EACCES', 'EROFS', 'ENOENT', 'EEXIST', 'EBUSY', 'EINVAL', 'ETIMEDOUT'].includes(error?.code)
+    ? error.code : Number.isSafeInteger(error?.code) && error.code >= 0 && error.code <= 255
+      ? 'native-exit-' + error.code : 'unclassified';
+  // Classify known native messages, never copy stderr, arguments or paths.
+  const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+  const reason = /operation not permitted/i.test(stderr) ? 'operation-not-permitted'
+    : /permission denied/i.test(stderr) ? 'permission-denied'
+      : /not a directory|mount point.*does not exist/i.test(stderr) ? 'invalid-mountpoint'
+        : /target is busy|device or resource busy|mount point is busy/i.test(stderr) ? 'mountpoint-busy' : 'unspecified';
+  return `Capture seal operation failed (stage=${stage}, code=${code}, reason=${reason}); no qualification was issued.\n`;
+}
 
 // The kernel owns mount state; the receipt alone never establishes protection.
 export function parseMounts(text) {
@@ -79,31 +106,36 @@ async function requireReadOnly(target) {
 }
 
 export async function assertCaptureSealed(workspace, repository, dependencies = {}) {
-  const loc = await locations(workspace, repository);
-  await readReceipt(loc);
-  checkMounts(await (dependencies.mounts ?? mounts)(), loc, true);
-  await requireReadOnly(path.join(loc.root, 'capture.json'));
-  await requireReadOnly(path.join(loc.root, 'context', 'Dockerfile'));
-  await requireReadOnly(path.join(loc.repo, 'deploy', 'docker-compose.yml'));
+  const loc = await atStage('locate-inputs', () => locations(workspace, repository));
+  await atStage('read-seal-receipt', () => readReceipt(loc));
+  const observed = await atStage('read-mount-table', () => (dependencies.mounts ?? mounts)());
+  await atStage('mount-topology', () => checkMounts(observed, loc, true));
+  await atStage('probe-capture-receipt', () => requireReadOnly(path.join(loc.root, 'capture.json')));
+  await atStage('probe-recipe', () => requireReadOnly(path.join(loc.root, 'context', 'Dockerfile')));
+  await atStage('probe-compose', () => requireReadOnly(path.join(loc.repo, 'deploy', 'docker-compose.yml')));
   return { state: 'capture-sealed-unqualified' };
 }
 
 export async function sealCapture(workspace, repository, dependencies = {}) {
-  const loc = await locations(workspace, repository);
+  const loc = await atStage('locate-inputs', () => locations(workspace, repository));
   const observe = dependencies.mounts ?? mounts;
   const invoke = dependencies.command ?? command;
-  if (relevant(await observe(), loc).length) invalid();
+  if (relevant(await atStage('read-mount-table', observe), loc).length) invalid('existing-mounts');
   const marker = JSON.parse(await readControl(path.join(loc.root, 'owner.json')));
-  await fs.writeFile(loc.receipt, JSON.stringify({ schema, workspace: loc.root, repository: loc.repo,
-    ownerId: marker.id }), { flag: 'wx', mode: 0o600 });
+  await atStage('write-seal-receipt', () => fs.writeFile(loc.receipt, JSON.stringify({ schema,
+    workspace: loc.root, repository: loc.repo, ownerId: marker.id }), { flag: 'wx', mode: 0o600 }));
   const mounted = [];
   try {
-    for (const [target, mode] of [[loc.repo, 'ro'], [loc.root, 'ro'], [loc.derivative, 'rw']]) {
-      await invoke(['mount', '--bind', target, target]);
+    for (const [target, mode, bindStage, protectStage] of [
+      [loc.repo, 'ro', 'bind-checkout', 'protect-checkout'],
+      [loc.root, 'ro', 'bind-capture', 'protect-capture'],
+      [loc.derivative, 'rw', 'bind-test-derivative', 'enable-test-writes'],
+    ]) {
+      await atStage(bindStage, () => invoke(['mount', '--bind', target, target]));
       mounted.push(target);
-      await invoke(['mount', '-o', `remount,bind,${mode}`, target]);
+      await atStage(protectStage, () => invoke(['mount', '-o', `remount,bind,${mode}`, target]));
     }
-    checkMounts(await observe(), loc, true);
+    await atStage('mount-topology', async () => checkMounts(await observe(), loc, true));
     // Native probes remain mandatory in production code. Mock orchestration tests
     // verify commands; a separate Linux CI test exercises real kernel rejection.
     await (dependencies.assertSealed ?? assertCaptureSealed)(workspace, repository);
@@ -137,21 +169,21 @@ export async function unsealCapture(workspace, repository, dependencies = {}) {
 }
 
 export async function main(argv) {
-  if (process.platform !== 'linux' || process.env.CI !== 'true') invalid();
+  if (process.platform !== 'linux' || process.env.CI !== 'true') invalid('runner-contract');
   const [action, workspace, repository, ...extra] = argv;
   if (extra.length || !workspace || !repository
-    || path.resolve(repository) !== process.env.GITHUB_WORKSPACE) invalid();
+    || path.resolve(repository) !== process.env.GITHUB_WORKSPACE) invalid('runner-contract');
   const run = { seal: sealCapture, assert: assertCaptureSealed, unseal: unsealCapture }[action];
   if (!run) invalid();
   // An unsealing process must not hold its own cwd on a mount it will remove.
   if (action === 'unseal' && (inside(path.resolve(workspace), process.cwd())
-    || inside(path.resolve(repository), process.cwd()))) invalid();
+    || inside(path.resolve(repository), process.cwd()))) invalid('unseal-cwd');
   return run(workspace, repository);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main(process.argv.slice(2)).then(result => process.stdout.write(`${JSON.stringify(result)}\n`), () => {
-    process.stderr.write('Capture seal operation failed; no qualification was issued.\n');
+  main(process.argv.slice(2)).then(result => process.stdout.write(`${JSON.stringify(result)}\n`), error => {
+    process.stderr.write(sealFailureSummary(error));
     process.exitCode = 1;
   });
 }

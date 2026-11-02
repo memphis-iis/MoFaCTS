@@ -2,6 +2,40 @@
 
 Current reviewed baseline: `18677291993b66b890a090e55d65f703b45ff653`.
 
+## Published execution checkpoint — `ca49f3a7` (2026-11-02)
+
+The user explicitly authorized committing/pushing this audit batch and one
+combined CI execution, including a fresh Meteor invocation and Compose image
+build. Commit `ca49f3a7e8b5320bfd0c028389395f8b058fdac4` was pushed to `main`.
+Pre-commit manifest, staged lint and secret checks passed. The reviewed audit
+decision documents were included; unrelated staging and SPARC working changes
+were preserved outside the commit.
+
+[Security run 41447040939](https://github.com/memphis-iis/MoFaCTS/actions/runs/41447040939)
+passed all four jobs: secret scan, application dependency gate, Mongo sidecar
+dependency gate and source/scanner contracts. This does not mean no dependency
+alerts exist or that deferred development advisories were repaired.
+
+[CI run 41447041117](https://github.com/memphis-iis/MoFaCTS/actions/runs/41447041117)
+failed in **Protect retained source and capture receipts**, immediately after
+successful build/test-input capture. Meteor installation, integration tests,
+native protection/host receipt fixtures, Compose construction and image smoke
+were skipped. Release-protection cleanup reported seal absent; owned workspace
+cleanup succeeded. No image was built or deployed. This is a failed acceptance
+gate, not a successful integration run or permission to bypass protection.
+
+The helper emitted only a generic sanitized failure, so the exact failing
+operation/native cause is not established by retained logs. A local diagnostic
+correction now reports only registered stage names, allowlisted errno/native
+exit categories and fixed native-error classifications. It never emits raw
+stderr, arguments, paths or supplied exception text. Local capture tests pass
+**92/95 with 3 CI-only skips**; its added redaction/CLI regressions pass.
+The user subsequently authorized publishing this diagnostic correction and one
+fresh combined CI attempt. The protection remains enforced; no failure is waived.
+The outcome of that next execution must be recorded separately.
+All further Meteor invocations retain the fresh single-use authorization rule,
+even though this failed attempt did not reach Meteor itself.
+
 ## Current execution entry point (2026-11-02)
 
 Every AI worker must first read and follow [AGENTS.md](../AGENTS.md) and any applicable deeper AGENTS.md instructions, then the plan's [controlling decision register](security-audit-durable-redesign-plan.md#0-controlling-decisions-and-worker-entry-point-2026-11-02), this current status and the [Phase 0 contracts](security-audit-phase0-contracts.md). The dated checkpoints below remain evidence of what ran at those times; their older pending-design/permission statements do not override Phil's later explicit decisions.
