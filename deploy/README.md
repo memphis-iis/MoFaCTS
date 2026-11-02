@@ -206,8 +206,11 @@ retained snapshot/receipts read-only, tests a writable derivative, then uses
 canonical Compose and the capture override to build that same candidate once,
 without cache, using a temporary synthetic build profile. Runtime checks consume
 the immutable image config digest. Protection is released before workspace
-cleanup. This combined-job/protection revision awaits fresh authorized CI;
-complete outcome evidence and protected release/host proof remain open.
+cleanup. This combined-job/protection revision passed
+[CI at `936a64aa`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050),
+including Meteor integration, native shared-parent/receipt fixtures and the
+canonical image checks. Complete authenticated outcome evidence and protected
+release/host proof remain open.
 Production commands are unchanged; see the
 [capture guide](security-audit/source-capture.md).
 

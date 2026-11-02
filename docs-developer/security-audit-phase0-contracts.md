@@ -2,6 +2,14 @@
 
 Status: local contract/test foundation and opt-in source-capture prototype implemented; not a release qualification or completed Phase 0 exit gate. See the [status record](security-audit-durable-redesign-status.md) for executed results and the [redesign plan](security-audit-durable-redesign-plan.md) for architecture and permissions.
 
+The protected-source single-job CI lane is verified at `936a64aa` in
+[CI 41465187050](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050):
+native shared-parent isolation, complete Meteor integration, retained-candidate
+Compose construction, source/image/runtime smoke and cleanup passed. The
+protected-receipt synthetic fixtures also passed. Dated prototype statements
+below are historical; authenticated evidence/catalog and final release/host
+joining remain separate unfinished qualification gates.
+
 ## Controlling decisions and worker entry point (2026-11-02)
 
 Before any work, read and follow repository [AGENTS.md](../AGENTS.md) and applicable deeper AGENTS.md instructions, then the plan's [controlling decision register](security-audit-durable-redesign-plan.md#0-controlling-decisions-and-worker-entry-point-2026-11-02) and the status [current execution entry point](security-audit-durable-redesign-status.md#current-execution-entry-point-2026-11-02). Those later explicit user decisions supersede older pending-design recommendations below, without turning prototype contracts or local tests into executed release proof.

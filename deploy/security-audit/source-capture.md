@@ -3,7 +3,8 @@
 ## Current status and canonical Compose CI
 
 Source acquisition, post-test verification and embedded image-source comparison
-have executed successfully in [CI for committed baseline `18677291`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41244691248).
+have executed successfully with retained private mounts, Meteor integration and
+canonical Compose in [CI for committed baseline `936a64aa`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050).
 They remain unqualified observations, not full release proof. The dated
 implementation checkpoints below preserve history and are superseded by this
 status and the [audit record](../../docs-developer/security-audit-durable-redesign-status.md).
@@ -43,8 +44,11 @@ workspace cleanup; an outstanding seal receipt blocks deletion. The unseal CLI
 rejects a current directory inside a mount it must remove.
 Verification exports use separately allocated temporary siblings so they do not
 need to write into the protected capture. No production command sheet or base
-Compose service changes. This revised job has not yet executed; only local
-unit/configuration checks have passed. No additional Meteor invocation is added.
+Compose service changes. This job passed at `936a64aa`: 966 server and 1,237
+browser tests passed (15/7 pending), harness 17/17, Phase 0 88/88 and capture
+98/98 with no Linux skips. Native shared-parent and protected-receipt fixtures,
+source/image/runtime/topology/health assertions and cleanup passed. It ran one
+Meteor invocation and one application compilation. No deployment ran.
 
 Protection begins before application dependencies/tests run and preserves native
 source bytes and modes. It prevents ordinary same-user file writes, chmod and

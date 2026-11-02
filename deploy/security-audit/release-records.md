@@ -1,8 +1,9 @@
 # Release record history and protected host receipt
 
 This opt-in tooling implements the approved storage arrangement. It has local
-filesystem/parser tests and hosted Linux permission fixtures, but no live host
-installation or production command-sheet hook has run. It does not acquire or
+filesystem/parser tests and hosted Linux permission fixtures that passed in
+[CI at `936a64aa`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050).
+No live host installation or production command-sheet hook has run. It does not acquire or
 authenticate complete test evidence, prove OCI registry mappings, qualify a
 release, or close Phase 0. See the [audit status](../../docs-developer/security-audit-durable-redesign-status.md).
 

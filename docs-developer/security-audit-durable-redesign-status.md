@@ -1,6 +1,55 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing integration/image checks: `18677291993b66b890a090e55d65f703b45ff653`.
+Last baseline with passing integration/image checks: `936a64aa3939fda466e4dc5091f8d29719b729cc`.
+
+## Renewed authorization — successful second attempt (2026-11-02)
+
+The preparation blocker is repaired and verified on the supported GitHub runner.
+Commit `936a64aa3939fda466e4dc5091f8d29719b729cc` passed
+[CI 41465187050](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050)
+and all four jobs in [Security 41465187121](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187121).
+This uses **2 of the 3** renewed authorizations. One Meteor integration invocation
+and one canonical Compose application compilation ran in this successful attempt.
+The third authorization was not used; work stopped on success. Earlier failed
+checkpoints below remain historical evidence, not the current outcome.
+
+Exact executed outcomes:
+
+- Meteor server **966 passing / 15 pending**, browser **1,237 passing / 7 pending**,
+  harness **17/17**; zero failures. The pending counts match the recorded baseline.
+- Phase 0 contracts **88/88**, capture/private/shared-parent protection **98/98**,
+  with zero skips on Linux. The native protected-receipt shell/permission fixtures
+  and real shared-parent regression executed successfully.
+- Dependency installation/synchronization, lint, full application and vendor
+  typechecks, source verification before/after tests, and retained-protection
+  assertions passed.
+- The same protected candidate was built once through canonical Compose with
+  its capture override. Embedded source identity, runtime ABI/Node/Undici,
+  removal of npm/npx, standalone-Mongo rejection, replica-set startup/health and
+  exact-image smoke passed. The protected source stayed intact through image
+  checks. Profile/container/network/unseal/workspace cleanup and action cleanup
+  passed.
+
+Recorded identities (integrity coordinates, not authentication attestations):
+
+- Source snapshot SHA-256: `e82ff98816b8acae09a764bfb6c741b74b23b70a960111b5a87eccd7c8483e50`.
+- Built/tested Linux amd64 image **config** digest: `sha256:22557a736a7350405c36967c6b73017df7885a733e5ad5313b4f3fc2c4bd3c50`.
+- Base commit is the exact clean checkout above; dirty provenance is false.
+  This is not a registry manifest/index digest or a published/running-server claim.
+
+The confirmed mechanism was inherited shared propagation creating a hidden peer
+when binding the test child. Making each newly owned parent private before child
+creation contained it without altering host-parent propagation or weakening any
+gate. The old failure was reproduced locally before the fix, and the fixed path
+passed modern/classic native APIs and the actual CI regression.
+
+All implementation changes are committed/pushed; unrelated staging/SPARC edits
+remain preserved. This outcome-only documentation is committed with CI skipped,
+so no third attempt is launched merely to record results. No image was published
+to a registry or deployed; no protected host receipt was installed. Complete
+authenticated test/catalog evidence, published/running release-proof joining,
+live host acceptance and remaining Phase 0 redesign gates are still open. This
+success closes the CI preparation blocker, not Phase 0 or full release qualification.
 
 ## Renewed authorization — attempt 1 and reproduced cause (2026-11-02)
 
@@ -193,11 +242,11 @@ Settled: workstation release authority and protected credential-free server proj
 
 **Secret recovery design selected; setup/recovery verification pending (2026-11-02).** Phil approved AWS Secrets Manager and is the accountable recovery owner. Use one encrypted secret for complete current fixture/provider configuration and a dedicated-labeled retained last accepted rollback version; `AWSPREVIOUS` alone is insufficient. GitHub secrets remain deployment copies. Follow the plan's [controlling recovery decision and gates](security-audit-durable-redesign-plan.md#aws-secrets-manager-recovery-design-approved-2026-11-02): verify account suitability, independent account/MFA recovery, document-size fit and staging2 restoration of both versions. Provisioning, permissions, upload, spending approval and required setup remain pending; no secret/access change or successful recovery is claimed. Do not reopen the selected design; continue independent work while concrete operational gates are prepared.
 
-Batch 2 is implemented/locally checked with hosted Linux CI still pending. Batch 3's receipt/history design pause is resolved, and its opt-in storage tooling is implemented as recorded below; live installation, complete acquisition/proof joining and qualification remain pending. Preserve the active thread's concurrent edits and read the latest batch evidence before continuing. Only the previously authorized three-batch implementation scope is recorded here; later-phase implementation/activation requires its own scope and gates.
+Batch 2's protected-source/Compose path passed exact-commit CI at `936a64aa` as recorded above. Batch 3's receipt/history tooling and hosted Linux synthetic fixtures passed; live installation, complete acquisition/proof joining and qualification remain pending. Preserve the active thread's concurrent edits and read the latest batch evidence before continuing. Only the previously authorized three-batch implementation scope is recorded here; later-phase implementation/activation requires its own scope and gates.
 
 Each `npm run test:ci` invocation, including retries, still requires fresh, explicit, single-use authorization. Apply the standing staging2 offline/reset/rebuild permission only within its security-work scope; original staging/production, irreversible deletion, new persistent access/security-sensitive permissions and spending are excluded. Commit/push, workflow actions, protected-host installation and other operational restrictions remain as specified by AGENTS.md and plan Section 0. Failed acceptance is reported, never waived. This decision-record update ran no code/tests/build/deploy/host operation and grants no new execution permission.
 
-## Current reconciliation and pending canonical Compose CI build
+## Earlier reconciliation and canonical Compose implementation checkpoints
 
 The committed baseline has successful [CI run 41244691248](https://github.com/memphis-iis/MoFaCTS/actions/runs/41244691248)
 and [Security run 41244691001](https://github.com/memphis-iis/MoFaCTS/actions/runs/41244691001).
@@ -209,7 +258,7 @@ below are historical; statements that source acquisition or image-side compariso
 have never run are superseded by these linked executions. A green production
 audit workflow proves scanner execution, not absence of report findings.
 
-### Approved batch 1 — implemented, awaiting CI execution
+### Batch 1 initial implementation checkpoint — superseded by the successful run above
 
 Batch 1 first changed the existing `docker-amd64-smoke` job to build its one app image with the
 canonical base `deploy/docker-compose.yml`, `build --no-cache mofacts`, and the
@@ -251,14 +300,14 @@ remain open Phase 0 requirements.
 
 The user authorized continuing through these three implementation batches. Apply the plan Section 0 decisions and routine engineering discretion; stop for a new unavoidable design conflict or at completion, not for an already settled choice. This does not expand implementation to later phases. No commit/push, fresh Meteor integration invocation, production action or other excluded operation is implied. The separate bounded staging2 permission remains as recorded above.
 
-1. **Canonical Compose CI construction — implemented, locally checked.** Replace
+1. **Canonical Compose CI construction — implemented and CI verified at `936a64aa`.** Replace
    the direct build with canonical Compose and check its exact image config ID.
-2. **Retained, protected source — implemented, locally checked; CI pending.** The user approved combining tests
+2. **Retained, protected source — implemented and verified in CI at `936a64aa`.** The user approved combining tests
    and construction in one job. Retain the original captured candidate and
    receipts read-only, keep test outputs in a writable derivative, build through
    the existing capture override, and release mounts before owned cleanup.
-   Verify write rejection, lifecycle failures and workflow wiring. Actual Linux
-   CI execution remains pending fresh single-use Meteor authorization.
+   Write rejection, shared-parent isolation, lifecycle failures, workflow wiring
+   and exact-image checks passed in the successful execution recorded above.
 3. **Release evidence binding — compatibility and approved storage implemented; execution/proof joining pending.**
    Traced the current writer and corrected the draft reader for its eight fields
    while retaining historical six-field support. Join tested/built/published/running
@@ -1117,8 +1166,8 @@ V1 full membership is frozen as 52 test-fixture IDs; exposure retains 20 schedul
 ## Next Phase 0 work
 
 1. **Current reconciliation completed:** baseline `18677291` has passing CI/Security, Linux capture and embedded image-source checks. Preserve all dated results as historical evidence; they do not establish the deployed revision or qualify later working edits. The current toolchain is recorded at the top of this document.
-2. **Approve/execute the pending canonical Compose CI revision.** Local profile/configuration and source tests pass, but the changed image job still requires a fresh authorized workflow execution. Keep one app compilation and one full Meteor invocation; do not start another routine runner or change production commands.
-3. Strengthen pre-test source sealing and validate complete/authenticated test evidence, then join the canonical candidate's source/config identity to the final release proof. Retain recorded staging2 browser/security acceptance for its exact candidate/configuration; repeat only affected or otherwise unresolved acceptance with authorization. The helper still emits unqualified observations. Ordinary build/startup behavior remains available without qualification metadata; dirty-source qualification remains separately opt-in.
+2. **Preserve the verified canonical Compose CI path.** Exact-commit CI and Security passed on `936a64aa`, including one Meteor invocation, one application compilation and native protection/receipt fixtures. No routine rerun or production procedure change is required merely to resume planning.
+3. Validate complete/authenticated test evidence and join the protected candidate's source/config identity to final release proof. Pre-test sealing and the combined Compose lane now have passing CI evidence; qualification is still unqualified until remaining proof gates close. Retain recorded staging2 acceptance for its exact candidate/configuration; repeat only affected/unresolved acceptance with authorization. Ordinary build/startup behavior remains available without qualification metadata; dirty-source qualification stays separately opt-in.
 4. Confirm external release-record readers and finish integration of the approved existing-record authority, bounded protected projection and immutable small-metadata history. Preserve the opt-in tooling implementation recorded above; validate concrete reader/destination access controls and rollback-image/evidence availability before live operation. Live command-sheet/host integration and acquired proof remain pending; private staging checkpoints are not authoritative release extensions.
 5. Apply the settled no-historical-access/archive decision and qualify simplest safe new-report storage against the previous production image; do not delete/rewrite records. Secret recovery design/owner are selected as AWS Secrets Manager/Phil. Complete the [account/MFA recovery, size-fit, dedicated rollback retention and two-version staging2 restore gates](security-audit-durable-redesign-plan.md#aws-secrets-manager-recovery-design-approved-2026-11-02) under concrete setup/operation permissions before claiming recovery. GitHub copies and local DPAPI credentials do not establish those gates. Original staging remains frozen.
 6. Complete remaining invocation/HTTP/provider/composition compatibility and remote qualification. Use staging2 with synthetic accounts/resources under the bounded offline/reset/rebuild permission; inventory enabled providers before binding tests. Preserve fresh per-invocation Meteor authorization, workflow/protected-host/production approvals, and exclusions for irreversible deletion, new persistent access/security-sensitive permissions and spending. Phil reviews one consolidated ambiguous/proposed policy-change list; clear preservation work proceeds with documented evidence.
