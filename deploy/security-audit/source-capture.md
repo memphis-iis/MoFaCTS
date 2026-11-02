@@ -13,6 +13,8 @@ through testing and construction. Before dependency installation, `sealCapture.m
 protects the checkout and capture workspace with Linux read-only bind mounts,
 then gives only `test-context/` its own writable bind mount. It reads kernel mount
 state and probes write/chmod denial; changing file modes alone is insufficient.
+Bind remounts supply both the owned source and target explicitly, following the
+classic util-linux interface rather than inferring a source from mount tables.
 This uses the existing hosted runner's `sudo`, `mount` and `umount`, with no
 installation or alternate path if protection fails. See the upstream
 [bind-mount semantics](https://man7.org/linux/man-pages/man8/mount.8.html#DESCRIPTION).

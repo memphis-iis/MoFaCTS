@@ -2,6 +2,22 @@
 
 Current reviewed baseline: `18677291993b66b890a090e55d65f703b45ff653`.
 
+## Three-attempt authorization — attempt 1 (2026-11-02)
+
+Commit `ef8875764bb473ee7925fb48b1a9235e642339aa` published the refined layout
+diagnostics. [CI 41456899578](https://github.com/memphis-iis/MoFaCTS/actions/runs/41456899578)
+failed before Meteor with `duplicate-test-derivative`; [Security 41456899480](https://github.com/memphis-iis/MoFaCTS/actions/runs/41456899480)
+passed all jobs. This consumes the first of the user's three explicitly
+authorized attempts. Two remain; no Meteor invocation or image build ran.
+
+The next candidate supplies both source and destination to each bind remount,
+following the classic util-linux interface without ambient target-only lookup.
+The privileged-command regression now enforces those exact operands. Local
+capture checks and actual kernel protection/writable-derivative/unseal in the
+disposable isolated Linux fixture pass. CI compatibility of this change is
+unverified until attempt 2. Duplicate diagnostics additionally distinguish same
+versus different kernel mount IDs using fixed labels, never emitting IDs/paths.
+
 ## Diagnostic execution checkpoint — `f66aac03` (2026-11-02)
 
 The user authorized the diagnostic publication and fresh combined attempt.

@@ -44,6 +44,9 @@ function kernelModel() {
       } else if (args[0] === 'mount') {
         const found = entries.find(entry => entry.target === args[3]);
         assert.ok(found);
+        // The privileged boundary must bind both source and target, rather
+        // than infer a source from an ambient fstab/mount-table entry.
+        assert.deepEqual(args.slice(3), [found.target, found.target]);
         found.options = [args[2].split(',').at(-1)];
       } else if (args[0] === 'umount') {
         const index = entries.findIndex(entry => entry.target === args[1]);
@@ -56,7 +59,7 @@ function kernelModel() {
 
 test('mount state parser decodes kernel paths and rejects malformed or oversized input', () => {
   assert.deepEqual(parseMounts('10 1 0:2 / /tmp/with\\040space ro,relatime - ext4 /dev/test rw\n'),
-    [{ target: '/tmp/with space', options: ['ro', 'relatime'] }]);
+    [{ mountId: '10', target: '/tmp/with space', options: ['ro', 'relatime'] }]);
   assert.throws(() => parseMounts('malformed'));
   assert.throws(() => parseMounts('x'.repeat(1024 * 1024 + 1)));
 });

@@ -37,7 +37,8 @@ export function sealFailureSummary(error) {
     : /permission denied/i.test(stderr) ? 'permission-denied'
       : /not a directory|mount point.*does not exist/i.test(stderr) ? 'invalid-mountpoint'
         : /target is busy|device or resource busy|mount point is busy/i.test(stderr) ? 'mountpoint-busy' : 'unspecified';
-  return `Capture seal operation failed (stage=${stage}, code=${code}, reason=${reason}); no qualification was issued.\n`;
+  const detail = ['same-kernel-id', 'different-kernel-id'].includes(error?.sealDetail) ? `, detail=${error.sealDetail}` : '';
+  return `Capture seal operation failed (stage=${stage}, code=${code}, reason=${reason}${detail}); no qualification was issued.\n`;
 }
 
 // The kernel owns mount state; the receipt alone never establishes protection.
@@ -48,7 +49,8 @@ export function parseMounts(text) {
     if (fields.length < 10 || !fields.includes('-')) invalid();
     const target = fields[4].replace(/\\(040|011|012|134)/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
     if (!path.isAbsolute(target)) invalid();
-    return { target, options: fields[5].split(',') };
+    if (!/^[1-9][0-9]*$/.test(fields[0])) invalid();
+    return { mountId: fields[0], target, options: fields[5].split(',') };
   });
 }
 
@@ -80,18 +82,22 @@ function relevant(entries, locations) {
 function checkMounts(entries, locations, complete) {
   const expected = new Map([[locations.repo, 'ro'], [locations.root, 'ro'], [locations.derivative, 'rw']]);
   const role = target => target === locations.repo ? 'checkout' : target === locations.root ? 'capture' : 'test-derivative';
-  const reject = reason => {
+  const reject = (reason, detail) => {
     const error = new Error('Capture seal validation failed');
     error.sealReason = reason;
+    if (detail) error.sealDetail = detail;
     throw error;
   };
   const seen = new Set();
+  const mountIds = new Map();
   for (const entry of relevant(entries, locations)) {
     const mode = expected.get(entry.target);
     if (!mode) reject('unexpected-mount');
-    if (seen.has(entry.target)) reject('duplicate-' + role(entry.target));
+    if (seen.has(entry.target)) reject('duplicate-' + role(entry.target), entry.mountId && mountIds.has(entry.target)
+      ? mountIds.get(entry.target) === entry.mountId ? 'same-kernel-id' : 'different-kernel-id' : undefined);
     if (complete && !entry.options.includes(mode)) reject('incorrect-mode-' + role(entry.target));
     seen.add(entry.target);
+    if (entry.mountId) mountIds.set(entry.target, entry.mountId);
   }
   if (complete) for (const target of expected.keys()) if (!seen.has(target)) reject('missing-' + role(target));
   return seen;
@@ -144,7 +150,9 @@ export async function sealCapture(workspace, repository, dependencies = {}) {
     ]) {
       await atStage(bindStage, () => invoke(['mount', '--bind', target, target]));
       mounted.push(target);
-      await atStage(protectStage, () => invoke(['mount', '-o', `remount,bind,${mode}`, target]));
+      // Supply both operands: target-only remounts consult ambient mount tables
+      // and differ across util-linux releases. This is one owned self-bind.
+      await atStage(protectStage, () => invoke(['mount', '-o', `remount,bind,${mode}`, target, target]));
     }
     await atStage('mount-topology', async () => checkMounts(await observe(), loc, true));
     // Native probes remain mandatory in production code. Mock orchestration tests
