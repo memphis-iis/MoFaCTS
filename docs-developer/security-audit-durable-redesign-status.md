@@ -1,6 +1,75 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing integration/image checks: `5557ae4b6dd23bc4e874478c987325621e9bd987`.
+Last baseline with passing integration/image checks: `0f8f1c30c9d98e0f8865025751510d9a5cf4d0de`.
+
+## Helper published and verified; image observation continued locally (2026-11-02)
+
+The authorized helper batch is committed/pushed as
+`0f8f1c30c9d98e0f8865025751510d9a5cf4d0de`.
+[CI 41520033283](https://github.com/memphis-iis/MoFaCTS/actions/runs/41520033283)
+and all four jobs in exact-commit
+[Security 41520033398](https://github.com/memphis-iis/MoFaCTS/actions/runs/41520033398)
+passed. This consumed the one fresh Meteor authorization; no retry or second
+invocation was launched. Pre-commit manifest, lint-staged and secret checks passed.
+Unrelated staging/Mongo/SPARC and wiki edits remain preserved.
+
+Hosted outcomes: Meteor **966 server passed / 15 pending**, **1,237 browser
+passed / 7 pending**; harness **26/26**; Phase 0 **109/109**; capture **98/98**,
+with zero hosted skips. Dependency setup, full lint/application/vendor typechecks,
+pre/post source checks and protection assertions passed. One canonical Compose
+application compilation and the source/image/ABI/standalone-Mongo/replica-set
+runtime checks passed, followed by cleanup. Linux amd64 built/tested image
+**config** ID:
+`sha256:4eba2ae1e2df9c0b5c6464ea6520e73eb8ac3adf13f26b02ff26e88e082d9c60`.
+This is a runner-local smoke image, not a registry manifest/index identity or a
+workstation-built/published/deployed image claim.
+
+The authenticated source artifact is `13177217912`,
+`source-observation-41520033283-1`. Downloaded ZIP SHA-256 matches API metadata:
+`1a6c0798d40f01677c653f3a17340a9fa930de8aa8fa6c71e54f3a0cf7ba53e8`.
+Native ZIP validation passed. The helper then successfully acquired and
+revalidated the exact CI/Security tuple and payloads, retaining acquisition
+record SHA-256
+`ca62215317e78269b7f0f73fe30a5c8c8ef38e24ec581d8c3f1209f6ce4ea6ee`.
+Source snapshot is
+`b3a92b7245de790abb0845b71301c44c361aae62c1fd720ea8081a5f64f588ba`.
+The records remain `completed-with-pending` / `acquired-unqualified`. The live
+read used the retained expected observation and a module-name inventory; it is
+not independent proof that later working-tree edits equal this tested source.
+
+After Meteor passed, continuation implemented a separate local draft:
+
+- A strict shared `PostBuildImageObservationV1`, explicitly `ci-test-image` and
+  `observed-unqualified`, reusing the existing image shape/parser and referencing
+  the exact pre-build source-evidence digest and CI coordinates.
+- A collector which observes the actual immutable Docker config/platform and
+  fixed bounded embedded-source file, without network or writable filesystem.
+  Unique probe ownership is verified before failed/cancelled probe removal by
+  immutable ID; foreign ownership or cleanup uncertainty cannot produce proof.
+- A CI hook replacing the previous inline image-source assertion, executed from
+  the verified captured test application for its installed parser dependencies.
+  A distinct image artifact publishes after the existing smoke/protection checks.
+- Pure/injected regression tests and five additional common Meteor parity cases.
+  CI numeric IDs reject trailing line terminators rather than partial matches.
+
+The local Phase 0 suite is **119 passed / 1 hosted-only skip** (120 total),
+including ten new image-observer groups and the CI-reference regression. Capture
+checks remain **94 passed / 4 hosted-only skips**. Full application typecheck,
+lint, source-security **41/41**, diff checks and YAML/dependency/publication-order
+validation passed locally, separately from the passing helper CI. The
+new workflow hook and five Meteor parity cases have not executed in CI. No real
+image probe/build, image artifact publication, registry push or live deployment
+was performed for this continuation. No workstation release record changed.
+
+No new architecture choice was needed: the plan already separates CI smoke
+observations from actual workstation build/registry/running-image proof. The next
+required gate is fresh CI authorization for the changed workflow/shared contract
+before publishing this later draft. Do not reuse the helper's consumed permission
+or relabel its passing CI as verification of later edits. Catalog closure,
+production image linkage, protected receipts/recovery and Phase 0 remain open.
+This outcome-only status update is published with CI skipped; the image-proof
+code and workflow draft remain local and uncommitted. Recording results must not
+consume an unauthorized second Meteor execution.
 
 ## Helper publication — one fresh execution authorized (2026-11-02)
 
