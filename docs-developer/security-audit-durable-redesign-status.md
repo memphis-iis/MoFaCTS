@@ -2,6 +2,58 @@
 
 Last baseline with passing CI, Security and image checks: `d87eabc7647bb8e955429348d8a469b1862746d0`.
 
+## Hostname batch passed; staging2 enrollment pending operator handoff (2026-11-03)
+
+The approved hostname correction and audit notes were committed/pushed as
+`b5dc39c0b13347024accdd276e71cf7ac65542eb`. The exact commit's
+[CI 41649356781](https://github.com/memphis-iis/MoFaCTS/actions/runs/41649356781)
+and all four jobs in
+[Security 41649357129](https://github.com/memphis-iis/MoFaCTS/actions/runs/41649357129)
+passed on attempt 1. This consumed the single fresh Meteor authorization; no
+retry or second invocation occurred. Hosted results: **975 server passed / 15
+pending**, **1,237 browser passed / 7 pending**, harness **26/26**, Phase 0
+**145/145**, capture **98/98**, source-security **44/44**, zero native skips or
+failures, and **323** classified surfaces. Canonical Compose amd64 image
+construction, embedded/tested source matching, runtime/ABI checks, standalone
+Mongo rejection, Change Streams health, source protection and cleanup passed.
+These checks do not qualify or deploy a workstation/staging2 release image.
+
+After the shared policy save, actual private TCP 22 connectivity from the
+expected PC source to the existing production node succeeded over both IPv4 and
+IPv6. No production shell command, configuration or account change was made.
+The native policy assertions cover the retained CI path; no additional
+production audit workflow was dispatched. The node named **Elric** is this
+operator PC and remains necessary for the approved private management paths;
+it is not a retired server to remove.
+
+The official Tailscale Ubuntu Noble stable repository supplied staging2 package
+**1.104.5**. Repository/key files were absent before installation, protected
+recovery checksums passed, and the daemon is active. Its current backend is
+`NeedsLogin`: enrollment requested private name `mofacts-staging2`, only
+`tag:staging2`, ordinary OpenSSH, no accepted routes/DNS replacement or exit-node
+advertising. The one-time enrollment URL/output is retained only in protected
+server state and the designated OneDrive credential directory, never in this
+record. The browser enrollment flow requires operator authentication; its tab is
+handed back after Phil reported automation interfered with manual sign-in. No
+successful enrollment, actual node tag or private staging2 login is claimed.
+Public SSH, Caddy, UFW and the application were unchanged; HTTPS health is 200.
+
+Phil also explicitly approved Certbot and its Apache integration for certificate
+issuance/automatic renewal. That approval persists; installation has not yet
+occurred. A private Apache candidate preserves staging2's actual CSP/HSTS rather
+than dropping its existing instructional-resource origins through a different
+host's template. It has not been installed or syntax/runtime qualified.
+
+A further bounded source-compatibility observation is recorded before any app
+upgrade: existing staging2 has one scoped `readWrite` app role and no custom
+read-concern role. Current canonical provisioning adds the exact read-only
+`admin.mofactsReadDefaultConcern` role, while the old host audit requires exactly
+one app role. A modern release therefore needs a maintained role-contract
+correction before claiming full host acceptance; do not remove that required
+runtime permission to satisfy the old predicate. No database user/role was
+changed by the read-only prerequisite probe. Protected receipt installation and
+release/source/host proof remain incomplete; Phase 0 remains open.
+
 ## Tailnet partition and hostname publication authorized (2026-11-03)
 
 Phil approved saving the reviewed staging2 isolation policy, then continuing the
