@@ -54,6 +54,31 @@ test('valid incomplete V2 retains bounded references and cannot manufacture iden
   assert.equal(Object.hasOwn(parseWorkstationReleaseRecord(withCiImage).qualification, 'releaseIdentity'), false);
 });
 
+test('V2 image acquisition references locate retained provenance and require their exact observation reference', () => {
+  const value = v2Record();
+  value.qualification.evidenceReferences.ciImageObservationDigestSha256 = '2'.repeat(64);
+  // The previously accepted raw-observation-only form stays unchanged.
+  assert.deepEqual(parseWorkstationReleaseRecord(value), value);
+  const withAcquisition = structuredClone(value);
+  withAcquisition.qualification.evidenceReferences.ciImageAcquisitionDigestSha256 = '3'.repeat(64);
+  assert.deepEqual(parseWorkstationReleaseRecord(withAcquisition), withAcquisition);
+  assert.equal(classifyReleaseRecordProof(withAcquisition), 'incomplete-unqualified');
+  assert.deepEqual(evaluateReleaseIdentity(withAcquisition), { status: 'ERROR', reason: 'proof-unavailable' });
+
+  const missingObservation = structuredClone(withAcquisition);
+  delete missingObservation.qualification.evidenceReferences.ciImageObservationDigestSha256;
+  assert.throws(() => parseWorkstationReleaseRecord(missingObservation), /requires its observation reference/);
+  for (const invalidDigest of [undefined, null, '', '3'.repeat(65), 'A'.repeat(64), '3'.repeat(64) + '\n', 'private canary']) {
+    const malformed = structuredClone(withAcquisition);
+    malformed.qualification.evidenceReferences.ciImageAcquisitionDigestSha256 = invalidDigest;
+    assert.throws(() => classifyReleaseRecordProof(malformed), error => {
+      assert.doesNotMatch(error.message, /private canary/);
+      return true;
+    });
+    assert.deepEqual(evaluateReleaseIdentity(malformed), { status: 'ERROR', reason: 'malformed-proof' });
+  }
+});
+
 test('incomplete V2 binds the actual top-level commit and dirty distinction during parsing', () => {
   for (const mutate of [
     value => { value.baseCommit = 'f'.repeat(40); },

@@ -93,6 +93,30 @@ describe('Phase 0 V2 release evidence parity', function() {
     expect(Object.hasOwn(record.qualification, 'releaseIdentity')).to.equal(false);
   });
 
+  it('retains bounded image acquisition references without changing the earlier observation-only form', function() {
+    const record = incomplete();
+    const observationOnly = { ...record, qualification: { ...record.qualification,
+      evidenceReferences: { ...record.qualification.evidenceReferences, ciImageObservationDigestSha256: '2'.repeat(64) },
+    } };
+    expect(parseWorkstationReleaseRecord(observationOnly)).to.deep.equal(observationOnly);
+    const acquired = { ...observationOnly, qualification: { ...observationOnly.qualification,
+      evidenceReferences: { ...observationOnly.qualification.evidenceReferences, ciImageAcquisitionDigestSha256: '3'.repeat(64) },
+    } };
+    expect(parseWorkstationReleaseRecord(acquired)).to.deep.equal(acquired);
+    expect(classifyReleaseRecordProof(acquired)).to.equal('incomplete-unqualified');
+    expect(evaluateReleaseIdentity(acquired)).to.deep.equal({ status: 'ERROR', reason: 'proof-unavailable' });
+    for (const evidenceReferences of [
+      { sourceAcquisitionDigestSha256: '1'.repeat(64), ciImageAcquisitionDigestSha256: '3'.repeat(64) },
+      { ...acquired.qualification.evidenceReferences, ciImageAcquisitionDigestSha256: '3'.repeat(64) + '\n' },
+      { ...acquired.qualification.evidenceReferences, ciImageAcquisitionDigestSha256: null },
+      { ...acquired.qualification.evidenceReferences, unexpectedReference: '4'.repeat(64) },
+    ]) {
+      expect(() => parseWorkstationReleaseRecord({ ...acquired,
+        qualification: { ...acquired.qualification, evidenceReferences },
+      })).to.throw();
+    }
+  });
+
   it('binds versioned evidence to the existing commit and dirty distinction', function() {
     const record = incomplete();
     expect(() => parseWorkstationReleaseRecord({ ...record, baseCommit: 'f'.repeat(40) })).to.throw();

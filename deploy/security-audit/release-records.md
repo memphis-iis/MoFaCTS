@@ -27,6 +27,13 @@ missing image/command evidence is never filled from CI's smoke image or invented
 The top-level commit and dirty-source flag must agree with the qualification's
 build identity, including when the actual tuple is absent.
 
+The local linkage draft also permits `ciImageAcquisitionDigestSha256` when the
+observation digest is present. This locates the complete retained image bundle;
+the observation digest checks its exact statement bytes. The two identify
+different objects. Existing records without the bundle reference stay readable;
+new candidate preparation supplies both. Neither digest alone authenticates
+evidence. Immutable bundle names and retention remain unchanged.
+
 A valid incomplete V2 record may be preserved as `incomplete-unqualified`, while
 the identity evaluator returns `ERROR/proof-unavailable`. A supplied actual
 workstation tuple must pass the same consistency checks as V1 before storage;
@@ -47,7 +54,45 @@ acquisition/binding, external reader confirmation and protected installation
 remain separate integration gates. See the
 [status record](../../docs-developer/security-audit-durable-redesign-status.md).
 
-The helper creates `<ProdReleaseRecordPath>.history` beside the latest record.
+### Prepare a candidate without publishing it (local draft)
+
+`deploy/prepare-release-evidence.ps1` accepts a fresh six/eight-field candidate
+without a `qualification` field. It uses the same pinned Node, PowerShell 7 and
+approved GitHub sign-in as the acquisition helpers, with the same explicit run,
+expected-source, test-app and evidence-directory arguments, plus `-CandidateFile`.
+It acquires and verifies source/image evidence before emitting only the new JSON
+candidate on stdout. The input file and authoritative release record are not
+written. Existing qualification payloads are rejected explicitly; this operation
+does not migrate historical proof or replace an existing observation.
+
+The candidate's commit and dirty flag must match the expected and acquired full
+build identity. Input changes during acquisition fail before candidate output.
+The prepared V2 block remains `unqualified`, with both image references and no
+actual workstation tuple. All existing deployment fields, including an explicit
+workstation image ID, remain as supplied; CI's image cannot replace them.
+
+```powershell
+# Capture the emitted JSON; this does not publish a release record.
+$PreparedReleaseRecordJson = .\deploy\prepare-release-evidence.ps1 `
+    -CandidateFile $CandidateReleaseRecordPath `
+    -CiRunId $CiRunId -SecurityRunId $SecurityRunId `
+    -ExpectedSourceFile $VerifiedSourceObservationPath `
+    -TestAppRoot $CapturedTestAppRoot -OutputDirectory $EvidenceDirectory
+```
+
+Preserve the emitted JSON when saving a candidate. PowerShell JSON conversion
+can coerce timestamp strings to dates and change their required representation
+on reserialization; inspecting a converted object does not preserve its bytes.
+
+The expected source observation must come from the independently captured
+candidate when assessing a release. Echoing a hosted observation validates that
+run's internal linkage only. Publishing the prepared record remains owned by the
+existing storage helper after separately authorized release acceptance. This
+draft adds no production command-sheet hook, host installation or default gate.
+
+### Record history and replacement
+
+The storage helper creates `<ProdReleaseRecordPath>.history` beside the latest record.
 Before replacing latest, it archives the exact previous bytes and the new
 record under their SHA-256 filenames, without rewriting dates or inferring
 missing evidence. History publication is exclusive and never overwrites a

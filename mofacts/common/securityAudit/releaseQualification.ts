@@ -39,6 +39,9 @@ export type ReleaseQualificationV2 = {
   evidenceReferences: {
     sourceAcquisitionDigestSha256: string;
     ciImageObservationDigestSha256?: string;
+    // Acquisition bytes locate the retained provenance bundle; observation
+    // bytes identify its exact image statement. Neither digest authenticates it.
+    ciImageAcquisitionDigestSha256?: string;
   };
   releaseIdentity?: ReleaseIdentityTuple;
 };
@@ -148,7 +151,13 @@ export function parseReleaseQualification(value: unknown): ReleaseQualification 
     const referenceKeys = ['sourceAcquisitionDigestSha256'];
     const hasCiImage = Boolean(record.evidenceReferences && typeof record.evidenceReferences === 'object'
       && Object.hasOwn(record.evidenceReferences, 'ciImageObservationDigestSha256'));
+    const hasCiImageAcquisition = Boolean(record.evidenceReferences && typeof record.evidenceReferences === 'object'
+      && Object.hasOwn(record.evidenceReferences, 'ciImageAcquisitionDigestSha256'));
     if (hasCiImage) referenceKeys.push('ciImageObservationDigestSha256');
+    if (hasCiImageAcquisition) {
+      if (!hasCiImage) throw new Error('Image acquisition requires its observation reference');
+      referenceKeys.push('ciImageAcquisitionDigestSha256');
+    }
     const references = proofRecord(record.evidenceReferences, referenceKeys);
     const result: ReleaseQualificationV2 = {
       schema: 'ReleaseQualificationV2', state: 'unqualified',
@@ -156,6 +165,7 @@ export function parseReleaseQualification(value: unknown): ReleaseQualification 
       evidenceReferences: { sourceAcquisitionDigestSha256: contentDigest(references.sourceAcquisitionDigestSha256) },
     };
     if (hasCiImage) result.evidenceReferences.ciImageObservationDigestSha256 = contentDigest(references.ciImageObservationDigestSha256);
+    if (hasCiImageAcquisition) result.evidenceReferences.ciImageAcquisitionDigestSha256 = contentDigest(references.ciImageAcquisitionDigestSha256);
     if (hasIdentity) result.releaseIdentity = parseReleaseIdentityTuple(record.releaseIdentity);
     return result;
   }

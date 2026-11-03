@@ -1,6 +1,95 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `29394ded1d0a0d65876a6e78529063eb368bd0a9`.
+Last baseline with passing CI, Security and image checks: `39faaebef1cdc37613981b22ae4f16d2caf5c948`.
+
+## Candidate-preparation publication and one Meteor run authorized (2026-11-02)
+
+Phil explicitly confirmed committing/pushing the reviewed candidate-preparation
+batch and running CI. The single fresh Meteor authorization is available for the
+new candidate and is not an authorization to retry. Only this batch's intentional
+changes are included; unrelated working changes stay preserved. Exact committed
+identity and CI/Security outcomes will be recorded after execution. No release
+record write, protected installation, image publication or deployment is implied.
+
+## Image helper passed; release-evidence candidate preparation continued locally (2026-11-02)
+
+The authorized image helper is committed/pushed as
+`39faaebef1cdc37613981b22ae4f16d2caf5c948`. Manifest, lint-staged and staged-secret
+hooks passed. [CI 41541002426](https://github.com/memphis-iis/MoFaCTS/actions/runs/41541002426)
+and all four jobs in [Security 41541002444](https://github.com/memphis-iis/MoFaCTS/actions/runs/41541002444)
+passed. One Meteor invocation and one canonical Compose application compilation
+ran, without retry or another invocation.
+
+Hosted results: **974 server passed / 15 pending**, **1,237 browser passed /
+7 pending**, harness **26/26**, Phase 0 **138/138**, capture **98/98**, zero hosted
+skips. Full app/vendor typechecks, lint, source protection, image observation,
+ABI/runtime checks, standalone-Mongo rejection, replica-set health and cleanup
+passed. These results apply to the committed helper, not the continuation below.
+
+Continuation completes a local opt-in candidate-preparation draft, without
+changing the production writer or writing release authority:
+
+- A V2 image observation reference hashes exact statement bytes, while the
+  preserved image bundle is named by its acquisition-record hash. The raw
+  observation reference alone could not locate the bundle. A bounded optional
+  `ciImageAcquisitionDigestSha256` now supplies that locator; it requires the raw
+  observation reference. Both have explicit distinct roles, with no new index,
+  rekeying, storage owner or retention policy. Older V2 forms, six/eight-field
+  records and V1 parsing/goldens remain unchanged. Review treated this as routine
+  completion under controlling decision 9, not a new user policy choice.
+- `deploy/prepare-release-evidence.ps1` and its Node owner accept a fresh candidate
+  without existing qualification, acquire through the existing fresh collector,
+  bind full identity and exact source/image bytes, and emit only bounded candidate
+  JSON. Inputs remain unchanged. Existing proof is rejected, not migrated or
+  stripped. Actual deployment/image fields are preserved; no workstation tuple
+  is invented and no storage/project/install action is called.
+- Local tests: Phase 0 **144 passed / 1 hosted-only skip** (145 total), capture
+  **94 passed / 4 hosted-only skips**, source-security **41/41**, full app
+  typecheck and lint passed, with the unchanged 323-surface contract. Independent
+  review found no remaining correctness/security blocker. One new shared Meteor
+  parity case is prepared but has not run; no second invocation was authorized.
+
+The actual new artifacts were acquired and linked using the real PowerShell
+wrapper and existing stored sign-in. The input was an isolated synthetic
+eight-field candidate, with the hosted run's saved source observation and local
+module inventory. Independent assertions verified all eight fields unchanged,
+both bundle locators resolvable, no actual workstation tuple, proof classification
+`incomplete-unqualified` and identity evaluation `ERROR/proof-unavailable`.
+This does not independently capture/attest current dirty workstation source or
+establish release qualification. Evidence remains ignored under
+`tmp/ci-helper-evidence-41541002426`.
+
+- Source artifact `13185643183`, ZIP digest
+  `c9ffbb952dcec73bb0b5c514d9cd4d2ecd9ac34fcab20f23d8553a0e7413c1e7`.
+- Image artifact `13185867970`, ZIP digest
+  `dced56e91b4a232a1a931a2b66f2cb34ce0c2485bf928bcfe145b27a83b54a2f`.
+- Source-acquisition digest
+  `20353a18b2f774a00859cedcc3f3f004ea4c4de5ca47e4a775e8f5c89d659288`;
+  image-acquisition digest
+  `abca16d4f5d8df1159e4af4de3ed393e40c662aa5b893448a4e876639a28a514`;
+  exact image-observation digest
+  `2817b3f2874cd7b46a886e60a7866dd1ff97517c62d3f44230d87a715d0e7f0a`.
+- CI image config ID
+  `sha256:dd72f063aa3627895d1848b97c1ea32b36dfe0cb801ce39242ad01d948d67544`,
+  source snapshot `e43b9c56b42e28691ac6aaac171a03dc7fa9ce5dfe49e9f568f404a36d3db959`;
+  joined source-evidence digest
+  `953d70ef5cf4032f86dc2e4e59ac3dc41ab0e10f05e34068027af8c212ec5a07`.
+
+Two initial fixture-admission checks failed before acquisition: an untagged
+synthetic image and, after fixing that fixture through PowerShell conversion,
+a timestamp whose fractional representation was coerced away. Only the synthetic
+input was corrected; parser checks were not relaxed. Public preparation guidance
+now preserves emitted JSON rather than date-coercing/reencoding an inspected
+object. The corrected end-to-end wrapper check passed.
+
+The preparation/reference continuation remains uncommitted. Unrelated
+staging/Mongo/SPARC and wiki edits are preserved. No authoritative release record,
+command sheet, protected host, registry image or deployment changed. No new
+design choice remains in this slice; the next gate is fresh publication/Meteor
+authorization for this exact candidate before integrating the opt-in action into
+a release procedure. Actual workstation/registry/running-image proof, complete
+catalog/authentication, external reader confirmation, protected installation,
+secret-recovery acceptance and the remaining Phase 0 gates remain open.
 
 ## Image evidence helper publication authorized (2026-11-02)
 
