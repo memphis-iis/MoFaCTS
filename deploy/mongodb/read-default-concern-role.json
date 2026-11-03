@@ -1,0 +1,11 @@
+{
+  "db": "admin",
+  "role": "mofactsReadDefaultConcern",
+  "privileges": [
+    {
+      "resource": { "cluster": true },
+      "actions": ["getDefaultRWConcern"]
+    }
+  ],
+  "roles": []
+}

@@ -4,11 +4,20 @@ MOFACTS_MONGO_CONTAINER=mofacts-mongodb
 MOFACTS_REDIS_CONTAINER=mofacts-redis
 MOFACTS_MONGO_DB=MoFACT-meteor3
 MOFACTS_MONGO_REPLICA_SET=mofacts-rs
-MOFACTS_MONGO_ADMIN_USER=replace-with-audit-admin-user
-MOFACTS_MONGO_ADMIN_PASSWORD=replace-with-audit-admin-password
+# Historical ADMIN names: metadata observer, not MongoDB root. Minimum inspection
+# permissions: viewUser on MOFACTS_MONGO_DB and viewRole on admin; no collection
+# reads, user management or provisioning permissions are needed.
+MOFACTS_MONGO_ADMIN_USER=replace-with-audit-observer-user
+MOFACTS_MONGO_ADMIN_PASSWORD=replace-with-audit-observer-password
 MOFACTS_MONGO_APP_USER=replace-with-application-user
 MOFACTS_MONGO_APP_PASSWORD=replace-with-application-password
 MOFACTS_MONGO_APP_ROLE=readWrite
+# Required explicit policy: absent or configured; no default or environment inference.
+# This configured example requires a genuine helper's credentials and scoped role.
+# Staging2 selects absent: change the state and remove/empty the password and role.
+# Keep its reserved username distinct from application/audit users; do not create
+# an unused Sidecar account. The auditor checks that the reserved user is absent.
+MOFACTS_SIDECAR_EXPECTED_STATE=configured
 MOFACTS_MONGO_SIDECAR_USER=replace-with-sidecar-readonly-user
 MOFACTS_MONGO_SIDECAR_PASSWORD=replace-with-sidecar-readonly-password
 MOFACTS_MONGO_SIDECAR_ROLE=read

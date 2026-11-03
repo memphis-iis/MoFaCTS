@@ -2,6 +2,172 @@
 
 Last baseline with passing CI, Security and image checks: `b5dc39c0b13347024accdd276e71cf7ac65542eb`.
 
+## Explicit Sidecar absence implemented locally; publication and qualification pending (2026-11-03)
+
+Phil selected keeping the optional database-tooling Sidecar absent on staging2
+and explicitly auditing that condition. The controlling decision is recorded in
+the plan. This authorizes the absence contract; it does not establish successful
+host installation, actual absence, a current qualified release or a completed
+Phase 0 gate.
+
+The local correction requires `MOFACTS_SIDECAR_EXPECTED_STATE=absent|configured`
+in the protected configuration, without an inherited or inferred default. The
+existing Sidecar username remains required and distinct from app/audit users.
+Absent mode requires its password and role unset/empty and checks both the
+reserved principal and actual host/container evidence. It must reject known
+helper containers even if stopped or unpublished, reserved endpoint declarations
+or publications including host remapping, and relevant TCP/UDP listeners even
+on loopback. Configured mode retains genuine credential/scoped-role verification
+and the existing zero-or-two-loopback listener contract; it is not uptime proof.
+Metadata command/query failures and malformed or over-bound inventory remain
+`ERROR`. Observed unexpected presence or permissions remain `FAIL`; no omitted
+authentication receives a fabricated connectivity exit code or passing result.
+
+The modern app-role correction uses the single deployment-owned definition in
+`deploy/mongodb/read-default-concern-role.json`. It requires the exact app
+database role plus `admin.mofactsReadDefaultConcern`, and verifies the latter's
+one cluster `getDefaultRWConcern` action with no inherited roles. The observer
+does not invoke provisioning or mutate roles. Its historical `ADMIN_USER` setting
+needs only `viewUser` on the app database and `viewRole` on `admin`, without
+collection data or user-management permissions.
+
+Matching installation guidance now includes root-owned mode-0644
+`host-sidecar-policy.jq`, `host-mongo-roles.js` and the shared role-definition JSON,
+in addition to the existing policies and host command. All protected settings
+are cleared before reading the configuration. Configuration and executable
+policy files require exact ownership/mode, a single regular non-symlink file,
+and protected ancestors. Mongo reads have bounded execution times. Oversized,
+NUL-bearing, malformed or contradictory metadata cannot become passing evidence.
+
+Verification used pinned Node **24.22.1**:
+
+- Full application typecheck and lint passed; lint still covers **323** security
+  surfaces. Its first run found two new-test formatting errors; both were
+  corrected before the final passing run.
+- Final source-security suite: **61 passed / 6 platform skips / 0 failed**.
+  The skips are five standalone Linux jq cases and the hosted root-fixture
+  wrapper. The actual root Bash/jq fixture was separately executed on staging2:
+  **54 cases passed**, using synthetic commands under temporary root-only paths,
+  SHA-256-verified source transfer, and no installed-tooling or live-data changes.
+  Cases include absent/configured modes, stopped/unpublished/remapped helpers,
+  failed observations, exact role/exit interpretation, omitted absent-mode
+  authentication metrics, inherited settings, byte bounds, symlinks, hardlinks,
+  writable ancestors and policy-file permissions.
+- Phase 0 qualification tests: **138 passed / 7 existing platform skips**;
+  source-capture tests: **92 passed / 6 existing platform skips**. Runtime image
+  capture roots and Dockerfile wiring remain unchanged. The whole Mongo source
+  directory mount already includes the adjacent role JSON. The batch does not
+  import or depend on the unrelated untracked replica-init test.
+- A separate live read-only preflight inspected **4** containers, with **0**
+  helper containers, endpoint declarations/publications or port-8931/8932
+  listeners. The actual Mongo observer ran under mongosh using the existing
+  protected administrative connection for this preflight only. It returned
+  `sidecarUserAbsent:true` for reserved principal `mofacts_sidecar`, and
+  `appRolesExact:false`, `readConcernRoleExact:false` for the retained older app
+  installation. This is expected evidence that the modern role requirement is
+  still unmet, not a passing full host audit. No account or grant was created,
+  and no raw credentials, database records or container environments were retained.
+
+Publication is the next boundary: this batch and the accepted canonical staging2
+profile remain local/uncommitted. `AGENTS.md` requires explicit commit/push
+permission and one fresh authorization for the next Meteor integration run.
+After those checks pass, resume the protected-reader/receipt and current-release
+qualification gates. No protected host tooling, app release, UFW cutover or new
+Meteor execution occurred in this correction. Prior infrastructure edits and
+unrelated application/config/wiki working changes remain preserved. Phase 0 is
+still open.
+
+## Staging2 private access and Apache/Certbot setup verified (2026-11-03)
+
+After Phil completed enrollment and requested continuation, actual host/client
+observations confirmed the single `mofacts-staging2` node online with only
+`tag:staging2`. Its SSH host key matched the previously saved public-route pin.
+Fresh operator SSH succeeded through MagicDNS and through private IPv6, using
+that pin rather than trusting a newly scanned key. Tailscale SSH, accepted
+routes/DNS replacement and exit-node advertising remain disabled. Production and
+the older staging host were not changed.
+
+The approved Apache/Certbot operation is complete for the existing application
+image. Ubuntu packages are Apache **2.4.58-1ubuntu8.17**, Certbot **2.9.0-1**, and
+the matching Apache plugin. Apache owns public HTTPS with a valid staging2
+certificate; its packaged renewal timer is enabled and active, with a scheduled
+next trigger. The actual packaged command includes
+`--no-random-sleep-on-renew`; the legacy cron entry excludes systemd hosts, so no
+second renewal schedule was added. The native renewal dry-run succeeded through
+the Apache authenticator/installer. Both virtual-host files remained byte-for-byte
+unchanged through that test, and the certificate key is root-owned mode 0600.
+Caddy is stopped and disabled for boot; its prior configuration, TLS state,
+service unit/drop-ins and enabled/active state remain in protected recovery
+storage. The accepted new host configuration also has a root-only archive with
+successful checksum read-back. No Caddy private key was copied into Apache.
+
+Preflight identified that the existing app lacked `HTTP_FORWARDED_COUNT`. A
+staging2 runtime overlay now supplies the documented single trusted proxy hop.
+Before recreation, the resolved base Compose image and every declared app
+environment value matched the running container; comparison proved the overlay
+changed only that setting. Supported Compose recreated only the app with
+`--no-build --no-deps --wait`, preserving the exact image and existing data.
+The running image remains `a3155584`, config ID
+`sha256:5eadcf85e2ec98e9a2e7bf594f440896c45451315da223f5bd8dbb6b5d865c20`;
+no newer application candidate was built or deployed.
+
+The accepted canonical profile is in `C:\dev\mofacts_config\staging2`, with the
+matching runtime overlay installed alongside the existing hosted base Compose.
+The HTTPS site preserves staging2's actual CSP/HSTS values, including its existing
+instructional-resource origins. Apache's late response-header expression retains
+an application-owned stricter CSP, with exactly one header. An explicit HTTP Host
+guard rejects other hostnames before proxying. The existing WebSocket mappings
+precede `/`, and the ACME challenge exclusion remains owned by certificate
+renewal. Global hardening is maintained in the existing `security.conf` owner;
+the server-name file no longer duplicates those settings.
+
+Executed acceptance:
+
+- Six isolated native Apache cases passed: ordinary 200, strict-policy 200 and
+  404, upstream 502 without CSP, local 404, and wrong-Host 421. Each returned one
+  expected CSP, and the wrong Host/local error did not contact the synthetic
+  upstream. Both temporary loopback fixture listeners were removed.
+- External pinned-Node probes passed valid HTTPS health **200**, exact existing
+  CSP/HSTS, HTTP **301** to the intended HTTPS origin, and wrong HTTP Host with
+  correct TLS SNI **421**. Certificate validation remained enabled.
+- Both real public `/websocket` and SockJS WebSocket routes upgraded over valid
+  TLS. The server-side checks also verified their WebSocket accept digests.
+- Chrome rendered the sign-in page with semantic email/password fields and no
+  captured CSP or WebSocket errors. No credentials were entered. Authenticated
+  learner/media/provider behavior was not repeated in this infrastructure-only
+  operation and is not claimed as fresh acceptance.
+- Apache configuration tests, native renewal dry-run, package renewal lifecycle,
+  private management access and final app health passed. No Meteor invocation
+  was performed; its last single authorization remains consumed by the passing
+  `b5dc39c0` CI run recorded below.
+
+Preparation failures were retained rather than relabeled: an Apache package hook
+attempted to bind Caddy's occupied ports, leaving a stopped/disabled failed unit
+while Caddy continued returning 200; that state was reviewed and reset before
+activation. The isolated fixture initially raced its upstream startup and was
+corrected with bounded readiness. Verification assumptions about a hidden Certbot
+flag/package command and the external probe's TLS SNI were corrected against the
+actual version/behavior. An external version-header check found the packaged
+security file overrode an earlier duplicate; settings were moved to their owner
+and the duplicate removed. Final native/external checks passed with no relaxed
+policy, alternate runtime or disabled certificate validation.
+
+At this infrastructure checkpoint, the remaining decision was Sidecar policy.
+Staging2 had no genuine optional database-tooling Sidecar service/identity, while
+the auditor required its credentials even when the helper was absent. Phil
+subsequently approved explicit audited absence, as recorded above. No unused
+Sidecar credential was fabricated and no check was
+silently skipped. The modern application's exact read-concern role correction is
+also required before a new release/full host audit; the existing read-only
+permission must not be removed to satisfy the outdated one-role predicate.
+
+Protected host-reader credentials/configuration, receipt tooling, matching
+current release/source/host proof and the firewall cutover remain incomplete.
+UFW remains inactive and public maintenance access remains available until both
+private operator and restricted audit access have been proved. This does not
+close Phase 0. This operation's public notes and canonical staging2 profile are
+local/uncommitted; unrelated application, config and wiki edits remain preserved.
+
 ## Hostname batch passed; staging2 enrollment pending operator handoff (2026-11-03)
 
 The approved hostname correction and audit notes were committed/pushed as

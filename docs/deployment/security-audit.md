@@ -66,13 +66,52 @@ sudo install -d -o root -g root -m 0755 /usr/local/libexec/mofacts-security-audi
 sudo install -o root -g root -m 0644 deploy/security-audit/host-listener-policy.awk /usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
 sudo install -o root -g root -m 0644 deploy/security-audit/host-firewall-policy.awk /usr/local/libexec/mofacts-security-audit/host-firewall-policy.awk
 sudo install -o root -g root -m 0644 deploy/security-audit/host-apache-policy.awk /usr/local/libexec/mofacts-security-audit/host-apache-policy.awk
+sudo install -o root -g root -m 0644 deploy/security-audit/host-sidecar-policy.jq /usr/local/libexec/mofacts-security-audit/host-sidecar-policy.jq
+sudo install -o root -g root -m 0644 deploy/security-audit/host-mongo-roles.js /usr/local/libexec/mofacts-security-audit/host-mongo-roles.js
+sudo install -o root -g root -m 0644 deploy/mongodb/read-default-concern-role.json /usr/local/libexec/mofacts-security-audit/read-default-concern-role.json
 sudo install -o root -g root -m 0755 deploy/security-audit/host-exposure-audit.sh /usr/local/sbin/mofacts-host-exposure-audit
 sudo install -d -o root -g root -m 0700 /etc/mofacts
 sudo install -o root -g root -m 0600 deploy/security-audit/security-audit.conf.example /etc/mofacts/security-audit.conf
 sudoedit /etc/mofacts/security-audit.conf
 ```
 
-Replace every example value. Configure the private SSH management interface and tailnet ranges, current container names, the expected MongoDB replica set and database, scoped app/Sidecar MongoDB users, a MongoDB audit credential, the Redis audit password, and the active enabled Apache HTTPS site. Set the required `MOFACTS_PUBLIC_HOSTNAME` to the target's lowercase public DNS hostname (`mofacts.optimallearning.org` for production or `staging2.optimallearning.org` for staging2), without a scheme, port, wildcard or trailing dot. This is distinct from the private SSH MagicDNS hostname. There is no default or inference from the running server. Update the protected configuration before reinstalling this auditor version; a missing or invalid hostname produces an audit configuration error. Missing settings or tools produce audit errors.
+Replace every example value. Configure the private SSH management interface and tailnet ranges, current container names, the expected MongoDB replica set and database, scoped application credentials, the explicit Sidecar policy below, a MongoDB audit credential, the Redis audit password, and the active enabled Apache HTTPS site. Set the required `MOFACTS_PUBLIC_HOSTNAME` to the target's lowercase public DNS hostname (`mofacts.optimallearning.org` for production or `staging2.optimallearning.org` for staging2), without a scheme, port, wildcard or trailing dot. This is distinct from the private SSH MagicDNS hostname. There is no default or inference from the running server. Update the protected configuration before reinstalling this auditor version; a missing or invalid hostname produces an audit configuration error. Missing settings or tools produce audit errors.
+
+Set the required `MOFACTS_SIDECAR_EXPECTED_STATE` explicitly; it has no default
+and is not inferred from credentials, listeners or containers. The protected
+file must supply it rather than inheriting it from the invoking process.
+
+| State | Required configuration and observations |
+| --- | --- |
+| `absent` | Keep `MOFACTS_MONGO_SIDECAR_USER` as the reserved principal whose absence is checked. Leave `MOFACTS_MONGO_SIDECAR_PASSWORD` and `MOFACTS_MONGO_SIDECAR_ROLE` unset or empty. The principal must not exist, and no known helper container, reserved endpoint declaration/publication or TCP/UDP listener may be present, including loopback and stopped/unpublished helper containers. Selected for staging2; installation and live acceptance are recorded separately. |
+| `configured` | Supply the genuine Sidecar username, `MOFACTS_MONGO_SIDECAR_PASSWORD` and expected database-scoped `MOFACTS_MONGO_SIDECAR_ROLE`. Authentication and the exact one-role set are checked. The existing zero-or-two-loopback-listener rule remains; this mode does not assert service uptime. |
+
+The reserved Sidecar username is required in both modes and must differ from
+the application and audit usernames. Missing/invalid mode data, failed metadata
+queries and unavailable or malformed bounded Docker/socket observations produce
+`ERROR`; observed unexpected presence or permissions produce `FAIL`. Absent mode
+reports explicit absence observations and does not claim a successful Sidecar
+authentication or manufacture a connectivity exit code.
+
+The host command clears every protected setting before loading the configuration.
+It accepts only single-link regular root-owned files with the documented modes
+and non-writable, root-owned ancestor directories; symlinks and writable policy
+files are errors. Mongo reads are time-bounded, and a timeout is an observation
+error. Inventory and observer output retain raw byte bounds before JSON parsing,
+including trailing whitespace and NUL rejection.
+
+The modern application must have exactly its configured database-scoped role
+plus `admin.mofactsReadDefaultConcern`. Provisioning and auditing share the single
+definition in `deploy/mongodb/read-default-concern-role.json`: one cluster
+`getDefaultRWConcern` action and no inherited roles. The auditor checks the actual
+definition as well as the exact user role set; a matching role name alone is
+insufficient. It never loads the mutating provisioning helper or repairs roles.
+The historical `MOFACTS_MONGO_ADMIN_USER` setting names the metadata observer;
+it does not require MongoDB `root`. Its minimum inspection permissions are
+`viewUser` on the application database and `viewRole` on `admin`, without
+collection-reading or user-management powers. Update protected configuration
+and all matching support files from the reviewed commit before upgrading the
+auditor; missing inputs fail visibly instead of selecting an older role profile.
 
 Restrict the dedicated SSH public key to the forced command:
 
@@ -80,7 +119,7 @@ Restrict the dedicated SSH public key to the forced command:
 restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding,command="sudo -n /usr/local/sbin/mofacts-host-exposure-audit" ssh-ed25519 PUBLIC_KEY audit
 ```
 
-Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. The root-owned listener policy recognizes IPv4/IPv6 loopback infrastructure, a concrete-interface UDP 68 listener owned by `systemd-networkd`, and `tailscaled` UDP 41641 plus peer listeners bound to Tailscale's reserved IPv4/IPv6 ranges. Wildcard DHCP, non-Tailscale processes on UDP 41641, Tailscale-named listeners on public addresses, and internal-service listeners on tailnet addresses remain findings. The firewall policy reads UFW's canonical saved commands and requires exactly one SSH rule per configured tailnet range on the configured private interface, exactly one public TCP 80 rule and one public TCP 443 rule, active UFW, and default-deny inbound. The Apache policy validates the protected public hostname and compares it literally with the configured site's names and its active single-vhost `apache2ctl -S` entry. Reports identify unexpected listener endpoints and process labels plus stable firewall, MongoDB, and Redis sub-probe outcomes and exit categories. The script does not print container environments or credentials and does not change state. Reinstall the host command and all three root-owned policy files after scanner updates before relying on the new host evidence format.
+Test that the key cannot open a shell, request a PTY, forward a port, or run another command. The host script reads only whitelisted socket, Docker port/network, active Apache HTTPS virtual-host routing, UFW, MongoDB, Redis, running-image, and connectivity information. The root-owned listener policy recognizes IPv4/IPv6 loopback infrastructure, a concrete-interface UDP 68 listener owned by `systemd-networkd`, and `tailscaled` UDP 41641 plus peer listeners bound to Tailscale's reserved IPv4/IPv6 ranges. Wildcard DHCP, non-Tailscale processes on UDP 41641, Tailscale-named listeners on public addresses, and internal-service listeners on tailnet addresses remain findings. The firewall policy reads UFW's canonical saved commands and requires exactly one SSH rule per configured tailnet range on the configured private interface, exactly one public TCP 80 rule and one public TCP 443 rule, active UFW, and default-deny inbound. The Apache policy validates the protected public hostname and compares it literally with the configured site's names and its active single-vhost `apache2ctl -S` entry. Reports identify unexpected listener endpoints and process labels plus stable firewall, MongoDB, and Redis sub-probe outcomes and exit categories. The script does not print container environments or credentials and does not change state. Reinstall the host command and all matching root-owned policies, observer and role-definition data after scanner updates before relying on the new host evidence format.
 
 Production operator and audit SSH use Tailscale; the EC2 public address is not the management endpoint. Enroll the production host with a stable MagicDNS name and enroll the scheduled GitHub runner ephemerally as `tag:ci`. Tailnet grants must allow the operator identity and `tag:ci` to reach only production TCP 22. Before enabling UFW, prove an operator login and the forced audit command through the MagicDNS name while retaining an existing public SSH maintenance session. Stage UFW rules in this order: SSH on `tailscale0` from `100.64.0.0/10` and `fd7a:115c:a1e0::/48`, public TCP 80, and public TCP 443; then enable default-deny inbound. Only close the maintenance session after a second private operator login, a private forced-command audit, HTTPS/WSS checks, and an external port scan all pass.
 
@@ -92,7 +131,16 @@ The canonical production Apache policy is `C:\dev\mofacts_config\production\apac
 
 The safe-expression rollout is enforced. Author-provided `calculateProbability` formulas and `adaptiveLogic` rules are validated as bounded data at every write and runtime-load boundary, then executed only by the bounded interpreter. The admin Deployment Readiness `tdf.expressions` check scans live units and unit templates in bounded batches and reports only counts plus bounded TDF IDs/field paths—not formula text or learner data. Require that check to pass before every deployment. Invalid authored formulas fail explicitly: there is no JavaScript execution, legacy execution path, or default-model substitution. The production CSP therefore prohibits dynamic JavaScript evaluation and does not include `unsafe-eval`.
 
-The host must provide `bash`, `jq`, `ss`, Docker, UFW, Apache (`apache2ctl` and its systemd unit), and the active enabled HTTPS site configured by `APACHE_HTTPS_SITE_FILE`. MongoDB and Redis probes execute their clients inside the configured containers. Sidecar ports must be absent or exactly `127.0.0.1:8931` and `127.0.0.1:8932`.
+The host must provide `bash`, `jq`, `ss`, Docker, UFW, Apache (`apache2ctl` and its systemd unit), and the active enabled HTTPS site configured by `APACHE_HTTPS_SITE_FILE`. MongoDB and Redis probes execute their clients inside the configured containers. The explicit Sidecar policy above governs its expected principal, containers, publications and listeners; only `configured` permits the existing pair of `127.0.0.1:8931` and `127.0.0.1:8932` listeners.
+
+For the separately authorized staging2 audit target, use its own public hostname,
+private management identity and canonical configuration under
+`C:\dev\mofacts_config\staging2`. Its Apache/Certbot profile preserves
+application-owned CSP and tests real WebSocket upgrades; see the
+[reverse-proxy guidance](reverse-proxy.md). Proxy readiness does not establish
+protected host-reader, release-receipt, database-role or full security-audit
+acceptance. Retain public maintenance access until private operator and
+restricted audit access have both been proved before the firewall cutover.
 
 The workflow classifies a failure before valid host JSON is received as one of `tailnet-connection-failed`, `ssh-identity-configuration-failed`, `ssh-transport-failed`, `forced-command-rejected`, or `host-output-invalid`. Each category produces a complete sanitized internal section with `ERROR` controls; SSH diagnostics and raw host output are never copied into the report. If `tailnet-connection-failed` appears, first confirm that both `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` exist in the protected environment and that the OAuth client may create ephemeral `tag:ci` devices.
 

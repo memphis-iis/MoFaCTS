@@ -25,6 +25,38 @@ header Strict-Transport-Security "max-age=31536000"
 
 Validate and reload Caddy after changing the active host configuration. Do not add `includeSubDomains` or `preload` unless every subdomain is covered by permanent HTTPS and the operator has intentionally accepted those wider commitments.
 
+The production-like security-audit target on staging2 uses Apache with Certbot's
+Apache plugin. Its canonical configuration is under
+`C:\dev\mofacts_config\staging2`: the runtime Compose overlay retains
+`HTTP_FORWARDED_COUNT: '1'`, and the Apache profile owns hostname checks,
+WebSocket mappings and the unchanged reviewed CSP/HSTS values. Keep the overlay
+with the base Compose file when recreating that application; it represents one
+trusted same-host proxy. The proxy switch does not require rebuilding the image.
+
+Apache must preserve a stricter policy supplied by the application, including
+protected report/download responses. Set the reviewed site policy only when no
+response policy exists, using the late response-header condition:
+
+```apache
+Header always set Content-Security-Policy "<reviewed site CSP>" "expr=-z resp('Content-Security-Policy')"
+```
+
+Test ordinary and strict-policy responses across success/error statuses for
+exactly one appropriate CSP. A sole Apache vhost also needs an explicit HTTP Host
+check before proxying; `ServerName` alone does not reject another Host with valid
+TLS SNI. Keep WebSocket mappings before `/`, and retain the ACME challenge proxy
+exclusion for the certificate plugin. Verify HTTPS, wrong-Host denial, redirects
+and both Meteor/SockJS WebSocket upgrades after a cutover and renewal test.
+
+Certbot owns the certificate lineage and renewal parameters. Use the installed
+package's renewal timer and verify the Apache-authenticator renewal dry-run;
+do not add a second schedule or hand-edit renewal configuration. Keep the
+previous Caddy configuration, certificate state and service-unit state in
+protected recovery storage. Only one proxy should be enabled for boot. On a
+rollback to Caddy, stop/disable the new Apache renewal lifecycle before restoring
+Caddy. Production and the older staging target require their own authorization
+and verification; staging2 acceptance is specific to that target.
+
 Cases:
 
 - Local HTTP: `http://localhost:3200`, no public learners.

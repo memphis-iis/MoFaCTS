@@ -1,5 +1,9 @@
 import './tests/uploadBoundary.test.mjs';
 import './tests/checkCiDependencies.test.mjs';
+import './tests/hostMongoRoles.test.mjs';
+import './tests/hostSidecarPolicy.test.mjs';
+import './tests/hostExposure.test.mjs';
+import '../mongoReadConcernRole.test.cjs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -433,7 +437,6 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   assert.match(config, /^APACHE_HTTPS_SITE_FILE=\/etc\/apache2\/sites-enabled\/000-default-le-ssl\.conf$/m);
   assert.match(config, /^MOFACTS_PUBLIC_HOSTNAME=mofacts\.optimallearning\.org$/m);
   assert.match(source, /APACHE_HTTPS_SITE_FILE MOFACTS_PUBLIC_HOSTNAME/);
-  assert.match(source, /unset MOFACTS_PUBLIC_HOSTNAME[\s\S]*?source "\$CONFIG_FILE"/);
   assert.match(source, /host-apache-policy\.awk/);
   assert.doesNotMatch(source, /mofacts\\\.optimallearning\\\.org|"mofacts\.optimallearning\.org"/);
   assert.match(source, /systemctl is-active apache2/);

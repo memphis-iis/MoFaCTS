@@ -26,6 +26,7 @@ export const TEST_INPUTS = Object.freeze([
   ['deploy/mongodb/assert-change-streams.js', 'file'],
   ['deploy/mongodb/assert-change-streams.sh', 'file'],
   ['deploy/mongodb/ensure-app-read-concern-role.js', 'file'],
+  ['deploy/mongodb/read-default-concern-role.json', 'file'],
   ['deploy/Caddyfile.self-hosted.example', 'file'],
   ['deploy/security-audit/host-exposure-audit.sh', 'file'],
   ['deploy/security-audit/release-receipt.sh', 'file'],
@@ -33,6 +34,11 @@ export const TEST_INPUTS = Object.freeze([
   ['deploy/security-audit/host-listener-policy.awk', 'file'],
   ['deploy/security-audit/host-firewall-policy.awk', 'file'],
   ['deploy/security-audit/host-apache-policy.awk', 'file'],
+  ['deploy/security-audit/host-mongo-roles.js', 'file'],
+  ['deploy/security-audit/host-sidecar-policy.jq', 'file'],
+  ['mofacts-mcp-sidecar/docker-compose.yml', 'file'],
+  ['mofacts-mcp-sidecar/services/playwright-mcp/Dockerfile', 'file'],
+  ['mofacts-mcp-sidecar/services/mongo-mcp/Dockerfile', 'file'],
   ['deploy/maintenance/apache-mofacts-maintenance.conf', 'file'],
 ]);
 

@@ -2,11 +2,16 @@
 # Root-owned forced SSH command for the MoFaCTS observation-only host audit.
 # It accepts no arguments and emits sanitized JSON only. It never changes host state.
 set -u
+set -o pipefail
+export LC_ALL=C
 
 CONFIG_FILE=/etc/mofacts/security-audit.conf
 LISTENER_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
 FIREWALL_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-firewall-policy.awk
 APACHE_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-apache-policy.awk
+SIDECAR_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-sidecar-policy.jq
+MONGO_ROLE_PROBE_FILE=/usr/local/libexec/mofacts-security-audit/host-mongo-roles.js
+READ_CONCERN_ROLE_FILE=/usr/local/libexec/mofacts-security-audit/read-default-concern-role.json
 RELEASE_RECEIPT_TOOL=/usr/local/libexec/mofacts-security-audit/release-receipt.sh
 controls='[]'
 
@@ -28,6 +33,19 @@ error_control() {
   add_control "$1" "$2" ERROR HIGH "$3"
 }
 
+# Public policy is installed with the forced command, never read from the caller.
+protected_file_safe() {
+  local file="$1" expected_mode="$2" directory mode
+  [[ -f "$file" && ! -L "$file" && "$(stat -c '%u:%g:%a:%h' "$file" 2>/dev/null)" == "0:0:$expected_mode:1" ]] || return 1
+  directory="$(dirname "$file")"
+  while [[ "$directory" != / ]]; do
+    [[ -d "$directory" && ! -L "$directory" && "$(stat -c '%u:%g' "$directory" 2>/dev/null)" == 0:0 ]] || return 1
+    mode="$(stat -c '%a' "$directory" 2>/dev/null)"
+    [[ "$mode" =~ ^[0-7]{3,4}$ ]] && (( (8#$mode & 0022) == 0 )) || return 1
+    directory="$(dirname "$directory")"
+  done
+}
+
 if [[ $# -ne 0 ]] || [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
   printf '%s\n' '{"error":"arguments-are-not-accepted"}'
   exit 64
@@ -43,39 +61,53 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 69
 fi
 
-if [[ ! -f "$CONFIG_FILE" ]] || [[ "$(stat -c '%U:%G:%a' "$CONFIG_FILE" 2>/dev/null)" != "root:root:600" ]]; then
+if ! protected_file_safe "$CONFIG_FILE" 600; then
   error_control internal.audit-config 'Audit configuration is root-only and complete' 'The root-owned mode-0600 audit configuration is missing or has invalid ownership or permissions.'
   printf '%s\n' "$(jq -cn --argjson controls "$controls" '{sectionId:"internal",status:"ERROR",controls:$controls}')"
   exit 0
 fi
 
-# Public target identity must be supplied by this protected file, not inherited
-# from the invoking process.
-unset MOFACTS_PUBLIC_HOSTNAME
-# shellcheck disable=SC1090
-source "$CONFIG_FILE"
-
 required_vars=(
   MOFACTS_APP_CONTAINER MOFACTS_MONGO_CONTAINER MOFACTS_REDIS_CONTAINER
   MOFACTS_MONGO_DB MOFACTS_MONGO_REPLICA_SET MOFACTS_MONGO_ADMIN_USER MOFACTS_MONGO_ADMIN_PASSWORD
-  MOFACTS_MONGO_APP_USER MOFACTS_MONGO_APP_PASSWORD MOFACTS_MONGO_SIDECAR_USER MOFACTS_MONGO_SIDECAR_PASSWORD
-  MOFACTS_MONGO_APP_ROLE MOFACTS_MONGO_SIDECAR_ROLE
+  MOFACTS_MONGO_APP_USER MOFACTS_MONGO_APP_PASSWORD MOFACTS_MONGO_SIDECAR_USER
+  MOFACTS_MONGO_APP_ROLE MOFACTS_SIDECAR_EXPECTED_STATE
   MOFACTS_REDIS_PASSWORD
   MOFACTS_MANAGEMENT_CIDRS MOFACTS_SSH_MANAGEMENT_INTERFACE APACHE_HTTPS_SITE_FILE MOFACTS_PUBLIC_HOSTNAME
 )
+# Every protected setting must come from this file, never the invoking process.
+for name in "${required_vars[@]}" MOFACTS_MONGO_SIDECAR_PASSWORD MOFACTS_MONGO_SIDECAR_ROLE; do
+  unset "$name"
+done
+# shellcheck disable=SC1090
+source "$CONFIG_FILE"
+
 missing=0
 for name in "${required_vars[@]}"; do
   if [[ -z "${!name:-}" ]]; then missing=$((missing + 1)); fi
 done
-if [[ "$missing" -eq 0 ]] && { [[ ! "$MOFACTS_MONGO_APP_ROLE" =~ ^[A-Za-z0-9_-]+$ ]] || [[ ! "$MOFACTS_MONGO_SIDECAR_ROLE" =~ ^[A-Za-z0-9_-]+$ ]]; }; then
-  missing=$((missing + 1))
+if [[ "$missing" -eq 0 ]]; then
+  if [[ ! "$MOFACTS_MONGO_APP_ROLE" =~ ^[A-Za-z0-9_-]{1,128}$ \
+    || "$MOFACTS_MONGO_APP_USER" == "$MOFACTS_MONGO_SIDECAR_USER" \
+    || "$MOFACTS_MONGO_ADMIN_USER" == "$MOFACTS_MONGO_SIDECAR_USER" \
+    || "$MOFACTS_MONGO_ADMIN_USER" == "$MOFACTS_MONGO_APP_USER" ]]; then missing=$((missing + 1)); fi
+  case "$MOFACTS_SIDECAR_EXPECTED_STATE" in
+    absent)
+      if [[ -n "${MOFACTS_MONGO_SIDECAR_PASSWORD:-}" || -n "${MOFACTS_MONGO_SIDECAR_ROLE:-}" ]]; then missing=$((missing + 1)); fi
+      ;;
+    configured)
+      if [[ -z "${MOFACTS_MONGO_SIDECAR_PASSWORD:-}" || ! "${MOFACTS_MONGO_SIDECAR_ROLE:-}" =~ ^[A-Za-z0-9_-]{1,128}$ ]]; then missing=$((missing + 1)); fi
+      ;;
+    *) missing=$((missing + 1));;
+  esac
 fi
 # The protected configuration owns the expected public identity. Do not infer it
 # from Apache, the running application or the SSH management hostname.
 if [[ "$missing" -eq 0 ]]; then
   # ENVIRON preserves literal bytes; awk -v assignments decode backslash escapes.
   export MOFACTS_PUBLIC_HOSTNAME APACHE_HTTPS_SITE_FILE
-  if ! awk -v mode=validate -f "$APACHE_POLICY_FILE" </dev/null >/dev/null 2>&1; then
+  if ! protected_file_safe "$APACHE_POLICY_FILE" 644 \
+    || ! awk -v mode=validate -f "$APACHE_POLICY_FILE" </dev/null >/dev/null 2>&1; then
     missing=$((missing + 1))
   fi
 fi
@@ -96,13 +128,54 @@ else
   exit 0
 fi
 
-if command -v ss >/dev/null 2>&1; then
-  sockets="$(ss -H -lntup 2>/dev/null || true)"
+# Absence is measured across all containers, including stopped and unpublished
+# helpers. Only allowlisted non-secret metadata reaches the policy process.
+sidecar_inventory=''
+sidecar_inventory_ok=false
+if [[ "$MOFACTS_SIDECAR_EXPECTED_STATE" == absent ]] \
+  && command -v docker >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 \
+  && protected_file_safe "$SIDECAR_POLICY_FILE" 644; then
+  # Encode before command substitution so trailing whitespace and NUL cannot
+  # disappear before the raw byte bound and exact record validation.
+  container_capture="$(timeout 15 docker container ls --all --quiet --no-trunc --last 257 2>/dev/null | head -c 16707 | base64 -w0; printf '\n%d' "$?")"
+  inventory_exit="${container_capture##*$'\n'}"
+  container_encoded="${container_capture%$'\n'*}"
+  if [[ "$inventory_exit" -eq 0 ]]; then
+    if container_id_json="$(printf '%s' "$container_encoded" | base64 -d | jq -Rsc '
+      if utf8bytelength <= 16706 and (contains("\u0000") | not) then
+        split("\n") | map(select(length > 0)) |
+        if length <= 256 and all(.[]; test("^[0-9a-f]{64}$")) and (unique | length) == length then . else error("invalid-inventory") end
+      else error("invalid-inventory") end' 2>/dev/null)"; then
+      container_ids="$(jq -r '.[]' <<<"$container_id_json")"
+      inventory_encoded=''
+      inspect_format='{"id":{{json .Id}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"imageTitle":{{json (index .Config.Labels "org.opencontainers.image.title")}},"exposedPorts":{{json .Config.ExposedPorts}},"bindings":{{json .HostConfig.PortBindings}},"networkPorts":{{json .NetworkSettings.Ports}}}'
+      inventory_exit=0
+      if [[ -n "$container_ids" ]]; then
+        mapfile -t inventory_ids <<<"$container_ids"
+        inventory_capture="$(timeout 20 docker container inspect --format "$inspect_format" "${inventory_ids[@]}" 2>/dev/null | head -c 1048577 | base64 -w0; printf '\n%d' "$?")"
+        inventory_exit="${inventory_capture##*$'\n'}"
+        inventory_encoded="${inventory_capture%$'\n'*}"
+      fi
+      if [[ "$inventory_exit" -eq 0 ]]; then
+        if inventory_array="$(printf '%s' "$inventory_encoded" | base64 -d | jq -Rsc --argjson ids "$container_id_json" '
+          if utf8bytelength <= 1048576 and (contains("\u0000") | not) then
+            ("[" + (split("\n") | map(select(length > 0)) | join(",")) + "]" | fromjson) |
+            if length == ($ids | length) and (map(.id) | sort) == ($ids | sort) then . else error("incomplete-inventory") end
+          else error("incomplete-inventory") end' 2>/dev/null)" \
+          && sidecar_inventory="$(jq -e -c -f "$SIDECAR_POLICY_FILE" <<<"$inventory_array" 2>/dev/null)"; then
+          sidecar_inventory_ok=true
+        fi
+      fi
+    fi
+  fi
+fi
+
+if command -v ss >/dev/null 2>&1 && sockets="$(ss -H -lntup 2>/dev/null)"; then
   app_count="$(grep -Ec '127\.0\.0\.1:3000\b' <<<"$sockets" || true)"
   sidecar_bad="$(awk '$5 ~ /:(8931|8932)$/ && $5 !~ /^127\.0\.0\.1:/ {count++} END{print count+0}' <<<"$sockets")"
   sidecar_count="$(grep -Ec '127\.0\.0\.1:(8931|8932)\b' <<<"$sockets" || true)"
 
-  if [[ ! -r "$LISTENER_POLICY_FILE" ]]; then
+  if ! protected_file_safe "$LISTENER_POLICY_FILE" 644; then
     error_control internal.listening-sockets 'Host listening sockets match the approved exposure' 'The root-owned listener policy is unavailable.'
   else
     unexpected_socket_lines="$(awk -f "$LISTENER_POLICY_FILE" <<<"$sockets")"
@@ -127,15 +200,27 @@ if command -v ss >/dev/null 2>&1; then
   else
     add_control internal.app-loopback 'Application listens on loopback port 3000' FAIL HIGH 'The required 127.0.0.1:3000 listener is absent.'
   fi
-  if [[ "$sidecar_bad" -eq 0 && ( "$sidecar_count" -eq 0 || "$sidecar_count" -eq 2 ) ]]; then
+  if [[ "$MOFACTS_SIDECAR_EXPECTED_STATE" == absent ]]; then
+    if [[ "$sidecar_inventory_ok" != true ]]; then
+      error_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' 'Expected Sidecar absence could not be established from the complete bounded Docker inventory.'
+    else
+      sidecar_metrics="$(jq -c --argjson listenerCount "$((sidecar_bad + sidecar_count))" '. + {expectedState:"absent",listenerCount:$listenerCount}' <<<"$sidecar_inventory")"
+      if [[ "$sidecar_bad" -eq 0 && "$sidecar_count" -eq 0 ]] \
+        && jq -e '.helperContainerCount == 0 and .endpointDeclarationCount == 0 and .endpointPublicationCount == 0' <<<"$sidecar_inventory" >/dev/null; then
+        add_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' PASS CRITICAL 'The explicitly absent Sidecar has no host listeners, helper containers, endpoint declarations or publications.' '[]' "$sidecar_metrics"
+      else
+        add_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' FAIL CRITICAL 'A Sidecar listener, helper container, endpoint declaration or publication contradicts the required absence.' '[]' "$sidecar_metrics"
+      fi
+    fi
+  elif [[ "$sidecar_bad" -eq 0 && ( "$sidecar_count" -eq 0 || "$sidecar_count" -eq 2 ) ]]; then
     add_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' PASS CRITICAL 'Sidecar ports are absent or both bound only to 127.0.0.1.'
   else
     add_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' FAIL CRITICAL 'Sidecar port bindings do not match the absent-or-two-loopback-only contract.'
   fi
 else
-  error_control internal.listening-sockets 'Host listening sockets match the approved exposure' 'ss is unavailable.'
-  error_control internal.app-loopback 'Application listens on loopback port 3000' 'ss is unavailable.'
-  error_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' 'ss is unavailable.'
+  error_control internal.listening-sockets 'Host listening sockets match the approved exposure' 'ss is unavailable or its observation failed.'
+  error_control internal.app-loopback 'Application listens on loopback port 3000' 'ss is unavailable or its observation failed.'
+  error_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' 'ss is unavailable or its observation failed.'
 fi
 
 if command -v docker >/dev/null 2>&1 && [[ -n "${MOFACTS_APP_CONTAINER:-}" ]]; then
@@ -170,7 +255,7 @@ if command -v ufw >/dev/null 2>&1; then
   ufw_added="$(ufw show added 2>/dev/null || true)"
   active="$(grep -Eic '^Status:[[:space:]]+active$' <<<"$ufw_status" || true)"
   default_deny="$(grep -Eic 'Default: deny \(incoming\)' <<<"$ufw_status" || true)"
-  if [[ ! -r "$FIREWALL_POLICY_FILE" ]]; then
+  if ! protected_file_safe "$FIREWALL_POLICY_FILE" 644; then
     error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'The root-owned firewall policy is unavailable.'
   else
     firewall_violations="$(awk -v management_interface="$MOFACTS_SSH_MANAGEMENT_INTERFACE" \
@@ -213,7 +298,7 @@ else
 fi
 
 if command -v apache2ctl >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1 \
-  && [[ -f "${APACHE_HTTPS_SITE_FILE:-}" && -r "$APACHE_POLICY_FILE" ]]; then
+  && [[ -f "${APACHE_HTTPS_SITE_FILE:-}" ]] && protected_file_safe "$APACHE_POLICY_FILE" 644; then
   apache_active="$(systemctl is-active apache2 2>/dev/null || true)"
   apache_syntax="$(apache2ctl configtest 2>&1 || true)"
   apache_vhosts="$(apache2ctl -S 2>&1 || true)"
@@ -242,40 +327,113 @@ else
   error_control internal.reverse-proxy-routes 'The active reverse proxy routes only the configured host to the loopback app' 'Apache, its configured enabled HTTPS site or the root-owned Apache policy is unavailable.'
 fi
 
-mongo_exec=(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017)
-if command -v docker >/dev/null 2>&1 && [[ "$missing" -eq 0 ]]; then
-  unauth_mongo="$(${mongo_exec[@]} --eval "quit(db.getSiblingDB('$MOFACTS_MONGO_DB').runCommand({find:'tdfs',filter:{},limit:1}).ok ? 0 : 1)" >/dev/null 2>&1; echo $?)"
-  auth_mongo="$(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017 \
+if command -v docker >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 && [[ "$missing" -eq 0 ]]; then
+  mongo_connectivity_input="$(jq -cn --arg database "$MOFACTS_MONGO_DB" --arg replicaSet "$MOFACTS_MONGO_REPLICA_SET" \
+    '{database:$database,replicaSet:$replicaSet}')"
+  mongo_exec=(timeout 15 docker exec -e MOFACTS_AUDIT_MONGO_CONNECTIVITY="$mongo_connectivity_input" "$MOFACTS_MONGO_CONTAINER" \
+    mongosh --quiet --host 127.0.0.1 --port 27017)
+  unauth_mongo="$("${mongo_exec[@]}" --eval '
+    const input=JSON.parse(process.env.MOFACTS_AUDIT_MONGO_CONNECTIVITY);
+    let status;
+    try {
+      const result=db.getSiblingDB(input.database).runCommand({find:"tdfs",filter:{},limit:1});
+      status=result.ok ? 0 : (result.code===13 ? 1 : 2);
+    } catch (error) { status=error.code===13 ? 1 : 2; }
+    quit(status);
+  ' >/dev/null 2>&1; echo $?)"
+  auth_mongo="$("${mongo_exec[@]}" \
     --username "$MOFACTS_MONGO_ADMIN_USER" --password "$MOFACTS_MONGO_ADMIN_PASSWORD" --authenticationDatabase admin \
-    --eval "const h=db.hello(); quit(h.setName === '$MOFACTS_MONGO_REPLICA_SET' ? 0 : 2)" >/dev/null 2>&1; echo $?)"
-  role_mongo="$(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017 \
-    --username "$MOFACTS_MONGO_ADMIN_USER" --password "$MOFACTS_MONGO_ADMIN_PASSWORD" --authenticationDatabase admin \
-    --eval "const a=db.getSiblingDB('$MOFACTS_MONGO_DB'); const app=a.getUser('$MOFACTS_MONGO_APP_USER'); const sidecar=a.getUser('$MOFACTS_MONGO_SIDECAR_USER'); const exact=(u,role)=>u && u.roles.length===1 && u.roles[0].db==='$MOFACTS_MONGO_DB' && u.roles[0].role===role; quit(exact(app,'$MOFACTS_MONGO_APP_ROLE') && exact(sidecar,'$MOFACTS_MONGO_SIDECAR_ROLE') ? 0 : 3)" >/dev/null 2>&1; echo $?)"
-  app_mongo="$(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017 \
+    --eval 'const input=JSON.parse(process.env.MOFACTS_AUDIT_MONGO_CONNECTIVITY); quit(db.hello().setName===input.replicaSet ? 0 : 2)' \
+    >/dev/null 2>&1; echo $?)"
+
+  role_mongo=70
+  role_status=ERROR
+  role_observed=0
+  role_metrics='{}'
+  role_output=''
+  if protected_file_safe "$MONGO_ROLE_PROBE_FILE" 644 && protected_file_safe "$READ_CONCERN_ROLE_FILE" 644 \
+    && role_program_bytes="$(stat -c '%s' "$MONGO_ROLE_PROBE_FILE" 2>/dev/null)" \
+    && role_definition_bytes="$(stat -c '%s' "$READ_CONCERN_ROLE_FILE" 2>/dev/null)" \
+    && [[ "$role_program_bytes" =~ ^[0-9]+$ && "$role_definition_bytes" =~ ^[0-9]+$ \
+      && "$role_program_bytes" -le 32768 && "$role_definition_bytes" -le 4096 ]]; then
+    role_input="$(jq -cn --arg database "$MOFACTS_MONGO_DB" --arg appUser "$MOFACTS_MONGO_APP_USER" \
+      --arg appRole "$MOFACTS_MONGO_APP_ROLE" --arg sidecarUser "$MOFACTS_MONGO_SIDECAR_USER" \
+      --arg sidecarExpectedState "$MOFACTS_SIDECAR_EXPECTED_STATE" --arg sidecarRole "${MOFACTS_MONGO_SIDECAR_ROLE:-}" \
+      '{database:$database,appUser:$appUser,appRole:$appRole,sidecarUser:$sidecarUser,sidecarExpectedState:$sidecarExpectedState}
+      + (if $sidecarExpectedState=="configured" then {sidecarRole:$sidecarRole} else {} end)')"
+    role_definition="$(cat "$READ_CONCERN_ROLE_FILE")"
+    # Preserve capped stdout, including trailing whitespace and NUL bytes, until
+    # validation. Command substitution alone would silently discard those bytes.
+    role_capture="$(set -o pipefail
+      timeout 20 docker exec -i -e MOFACTS_AUDIT_MONGO_INPUT="$role_input" -e MOFACTS_AUDIT_READ_CONCERN_ROLE="$role_definition" \
+        "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017 \
+        --username "$MOFACTS_MONGO_ADMIN_USER" --password "$MOFACTS_MONGO_ADMIN_PASSWORD" --authenticationDatabase admin \
+        --file /dev/stdin < "$MONGO_ROLE_PROBE_FILE" 2>/dev/null | head -c 257 | base64 -w0
+      printf '\n%d' "$?")"
+    role_mongo="${role_capture##*$'\n'}"
+    role_output_encoded="${role_capture%$'\n'*}"
+    if printf '%s' "$role_output_encoded" | base64 -d | jq -Rse --arg mode "$MOFACTS_SIDECAR_EXPECTED_STATE" \
+      --argjson exitCode "$role_mongo" '
+      utf8bytelength<=256 and (contains("\u0000") | not) and (fromjson | type=="object" and
+        (if .state=="observed" then
+          (if $mode=="configured" then "sidecarRolesExact" else "sidecarUserAbsent" end) as $sidecarKey |
+          (keys==(["state","appRolesExact","readConcernRoleExact",$sidecarKey] | sort))
+          and ([.appRolesExact,.readConcernRoleExact,.[$sidecarKey]] | all(type=="boolean"))
+          and (([.appRolesExact,.readConcernRoleExact,.[$sidecarKey]] | all(.==true)) as $passed |
+            ($exitCode==0 and $passed) or ($exitCode==3 and ($passed | not)))
+        elif .state=="unavailable" then
+          keys==["reason","state"] and (($exitCode==64 and .reason=="invalid-input")
+            or ($exitCode==70 and .reason=="query-failed"))
+        else false end))
+    ' >/dev/null 2>&1; then
+      role_output="$(printf '%s' "$role_output_encoded" | base64 -d)"
+      if [[ "$(jq -r '.state' <<<"$role_output")" == observed ]]; then
+        role_observed=1
+        role_metrics="$(jq -c 'del(.state)' <<<"$role_output")"
+        if [[ "$role_mongo" -eq 0 ]]; then role_status=PASS; else role_status=FAIL; fi
+      fi
+    fi
+  fi
+
+  app_mongo="$("${mongo_exec[@]}" \
     --username "$MOFACTS_MONGO_APP_USER" --password "$MOFACTS_MONGO_APP_PASSWORD" --authenticationDatabase "$MOFACTS_MONGO_DB" \
-    --eval "quit(db.getSiblingDB('$MOFACTS_MONGO_DB').runCommand({find:'tdfs',filter:{},limit:1}).ok ? 0 : 4)" >/dev/null 2>&1; echo $?)"
-  sidecar_mongo="$(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017 \
-    --username "$MOFACTS_MONGO_SIDECAR_USER" --password "$MOFACTS_MONGO_SIDECAR_PASSWORD" --authenticationDatabase "$MOFACTS_MONGO_DB" \
-    --eval "quit(db.getSiblingDB('$MOFACTS_MONGO_DB').runCommand({find:'tdfs',filter:{},limit:1}).ok ? 0 : 5)" >/dev/null 2>&1; echo $?)"
+    --eval 'const input=JSON.parse(process.env.MOFACTS_AUDIT_MONGO_CONNECTIVITY); quit(db.getSiblingDB(input.database).runCommand({find:"tdfs",filter:{},limit:1}).ok ? 0 : 4)' \
+    >/dev/null 2>&1; echo $?)"
   mongo_observations="$(jq -cn \
-    --arg unauth "$([[ "$unauth_mongo" -ne 0 ]] && echo PASS || echo FAIL)" \
+    --arg unauth "$([[ "$unauth_mongo" -eq 1 ]] && echo PASS || { [[ "$unauth_mongo" -eq 0 ]] && echo FAIL || echo ERROR; })" \
     --arg replica "$([[ "$auth_mongo" -eq 0 ]] && echo PASS || echo ERROR)" \
-    --arg roles "$([[ "$role_mongo" -eq 0 ]] && echo PASS || { [[ "$role_mongo" -eq 3 ]] && echo FAIL || echo ERROR; })" \
+    --arg roles "$role_status" \
     --arg app "$([[ "$app_mongo" -eq 0 ]] && echo PASS || echo ERROR)" \
-    --arg sidecar "$([[ "$sidecar_mongo" -eq 0 ]] && echo PASS || echo ERROR)" \
-    '["mongodb.unauthenticated-denied: " + $unauth, "mongodb.replica-set-and-admin-auth: " + $replica, "mongodb.roles-scoped: " + $roles, "mongodb.app-authenticated-connectivity: " + $app, "mongodb.sidecar-authenticated-connectivity: " + $sidecar]')"
+    '["mongodb.unauthenticated-denied: " + $unauth, "mongodb.replica-set-and-admin-auth: " + $replica, "mongodb.roles-scoped: " + $roles, "mongodb.app-authenticated-connectivity: " + $app]')"
   mongo_metrics="$(jq -cn --argjson unauthExit "$unauth_mongo" --argjson adminReplicaExit "$auth_mongo" \
-    --argjson roleExit "$role_mongo" --argjson appExit "$app_mongo" --argjson sidecarExit "$sidecar_mongo" \
-    '{unauthenticatedProbeExit:$unauthExit,adminReplicaProbeExit:$adminReplicaExit,roleScopeProbeExit:$roleExit,appConnectivityProbeExit:$appExit,sidecarConnectivityProbeExit:$sidecarExit}')"
+    --argjson roleExit "$role_mongo" --argjson appExit "$app_mongo" --argjson roles "$role_metrics" \
+    '{unauthenticatedProbeExit:$unauthExit,adminReplicaProbeExit:$adminReplicaExit,roleScopeProbeExit:$roleExit,appConnectivityProbeExit:$appExit} + $roles')"
+  sidecar_connectivity_error=0
+  if [[ "$MOFACTS_SIDECAR_EXPECTED_STATE" == configured ]]; then
+    sidecar_mongo="$("${mongo_exec[@]}" \
+      --username "$MOFACTS_MONGO_SIDECAR_USER" --password "$MOFACTS_MONGO_SIDECAR_PASSWORD" --authenticationDatabase "$MOFACTS_MONGO_DB" \
+      --eval 'const input=JSON.parse(process.env.MOFACTS_AUDIT_MONGO_CONNECTIVITY); quit(db.getSiblingDB(input.database).runCommand({find:"tdfs",filter:{},limit:1}).ok ? 0 : 5)' \
+      >/dev/null 2>&1; echo $?)"
+    mongo_observations="$(jq -c --arg sidecar "$([[ "$sidecar_mongo" -eq 0 ]] && echo PASS || echo ERROR)" \
+      '. + ["mongodb.sidecar-authenticated-connectivity: " + $sidecar]' <<<"$mongo_observations")"
+    mongo_metrics="$(jq -c --argjson sidecarExit "$sidecar_mongo" '. + {sidecarConnectivityProbeExit:$sidecarExit}' <<<"$mongo_metrics")"
+    if [[ "$sidecar_mongo" -ne 0 ]]; then sidecar_connectivity_error=1; fi
+  else
+    sidecar_absence_status=ERROR
+    if [[ "$role_observed" -eq 1 ]]; then
+      if [[ "$(jq -r '.sidecarUserAbsent' <<<"$role_output")" == true ]]; then sidecar_absence_status=PASS; else sidecar_absence_status=FAIL; fi
+    fi
+    mongo_observations="$(jq -c --arg absent "$sidecar_absence_status" '. + ["mongodb.sidecar-user-absent: " + $absent]' <<<"$mongo_observations")"
+  fi
   if [[ "$unauth_mongo" -eq 0 ]]; then
     add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' FAIL CRITICAL 'MongoDB accepted an unauthenticated data query.' "$mongo_observations" "$mongo_metrics"
-  elif [[ "$role_mongo" -eq 3 ]]; then
-    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' FAIL HIGH 'MongoDB denied unauthenticated access, but configured application or Sidecar roles exceeded or differed from policy.' "$mongo_observations" "$mongo_metrics"
-  elif [[ "$auth_mongo" -ne 0 || "$role_mongo" -ne 0 || "$app_mongo" -ne 0 || "$sidecar_mongo" -ne 0 ]]; then
+  elif [[ "$role_status" == FAIL ]]; then
+    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' FAIL HIGH 'Application grants, the shared read-concern role or the expected Sidecar account state differed from policy.' "$mongo_observations" "$mongo_metrics"
+  elif [[ "$unauth_mongo" -ne 1 || "$auth_mongo" -ne 0 || "$role_status" != PASS || "$app_mongo" -ne 0 || "$sidecar_connectivity_error" -ne 0 ]]; then
     mongo_metrics="$(jq '. + {inconclusive:true}' <<<"$mongo_metrics")"
-    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' ERROR HIGH 'Unauthenticated access was denied, but one or more authenticated MongoDB probes were inconclusive.' "$mongo_observations" "$mongo_metrics"
+    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' ERROR HIGH 'One or more MongoDB access, connectivity or role observations could not be confirmed.' "$mongo_observations" "$mongo_metrics"
   else
-    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' PASS CRITICAL 'Unauthenticated access was denied; authenticated replica-set and scoped-role probes succeeded.' "$mongo_observations" "$mongo_metrics"
+    add_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' PASS CRITICAL 'Unauthenticated access was denied; authenticated connectivity, exact application grants, the shared read-concern role and the expected Sidecar account state matched policy.' "$mongo_observations" "$mongo_metrics"
   fi
 else
   error_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' 'Docker or protected MongoDB audit configuration is unavailable.'
