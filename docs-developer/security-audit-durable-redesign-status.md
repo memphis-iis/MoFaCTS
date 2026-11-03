@@ -1,6 +1,58 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `b5dc39c0b13347024accdd276e71cf7ac65542eb`.
+Last baseline with passing CI, Security and image checks: `630eabdb9f9a9ffe8d1f013f0d7eba112864ee07`.
+
+## Audit batch published; CI passed; Linux release-setup decision reached (2026-11-03)
+
+Phil authorized publication of the reviewed batch and canonical staging2 profile,
+one fresh Meteor integration run, and continuation to the next decision point.
+Published MoFaCTS `630eabdb9f9a9ffe8d1f013f0d7eba112864ee07` on `main` and
+config `9a35460cecf6b403e5ab7359d3d2a7a10574cc1d` on its existing `master` branch.
+Commit hooks passed. Unrelated working changes in both repositories were preserved.
+
+[CI 41702322064](https://github.com/memphis-iis/MoFaCTS/actions/runs/41702322064),
+attempt 1, job `126148511434`, passed. This consumed the single authorization;
+there was no rerun. Meteor outcomes were **975 server passed / 15 pending** and
+**1,237 browser passed / 7 pending**, with zero failures. Lint, application/vendor
+typechecks, Phase 0/capture/application contracts, source protection/binding,
+canonical Compose amd64 image construction, image source/runtime identity,
+standalone-Mongo rejection, Change Streams startup/health and cleanup passed.
+[Security 41702321872](https://github.com/memphis-iis/MoFaCTS/actions/runs/41702321872)
+passed all four jobs, including the native Linux host-auditor contracts.
+
+Artifact metadata observed: source `13263439675`, 177548 bytes, ZIP SHA-256
+`52f078dad7dd865b4cc7bbcd19cf8be639655a57a2c4bbd3461d12e856d2edcd`;
+image `13264052735`, 604 bytes, ZIP SHA-256
+`b007fa83df3243c8d968063bfe2f607617e52ec8dd1d4752f3c898a363e1d1df`.
+Both expire 2026-11-17. The source artifact was downloaded for bounded progress
+inspection; this is not accepted acquisition or release qualification.
+
+A separate source-only capture used a committed Git archive, excluding unrelated
+working changes, and passed the existing local capture/verify-tests checks.
+However its identity differs from CI: Windows snapshot
+`983dd741210c731022dccb04ca16c05934eaef38cfb598d01a1b4e4cafa571d3`,
+CI snapshot `cffa1f80f3c637fef52adcc12e6b3289cc9be860d18f451b2ed6c464481705fb`.
+The test-input contract digest agrees, while supplemental digests differ.
+Native Docker tar inspection confirms ordinary Windows-source files such as
+`Dockerfile` enter Docker as mode `0755`; Git records that file as `100644`.
+Windows filesystem inspection reports mode `0666`. Passing the Windows round trip
+does not establish a match with Linux CI. No digest was substituted, no acquisition
+was accepted against conflicting source, and no application candidate was deployed.
+
+The next decision is a Linux release/capture environment. Existing WSL distro
+`Ubuntu-JEDM` has Git and a Docker CLI, but no `node` executable and no Docker daemon
+connection (`/var/run/docker.sock` is absent). Recommended: approve the pinned Node
+runtime plus Docker Desktop integration for that existing distro, then run the
+existing capture workflow with Linux source modes. The earlier Node-only question
+was superseded by this complete prerequisite question. `AGENTS.md` requires explicit
+approval for the new runtime dependency. Neither prerequisite has been installed or
+enabled, and no source-digest rule has been changed.
+
+Repeated read-only staging2 preflight confirms the retained `a3155584` image/config
+ID, healthy HTTPS 200 and Node 24.15.0. Protected audit configuration, forced-command
+entry point, receipt and receipt tooling remain absent. The approved host setup and
+current-release/receipt qualification will resume after the Linux-source decision
+and matching evidence; production and older staging remain excluded. Phase 0 is open.
 
 ## Explicit Sidecar absence implemented locally; publication and qualification pending (2026-11-03)
 
