@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `d87eabc7647bb8e955429348d8a469b1862746d0`.
+Last baseline with passing CI, Security and image checks: `b5dc39c0b13347024accdd276e71cf7ac65542eb`.
 
 ## Hostname batch passed; staging2 enrollment pending operator handoff (2026-11-03)
 
@@ -17,6 +17,13 @@ failures, and **323** classified surfaces. Canonical Compose amd64 image
 construction, embedded/tested source matching, runtime/ABI checks, standalone
 Mongo rejection, Change Streams health, source protection and cleanup passed.
 These checks do not qualify or deploy a workstation/staging2 release image.
+
+Observed artifact metadata from that exact run/attempt (not downloaded or
+acquired as an evidence bundle): source artifact `13236283794`,
+`source-observation-41649356781-1`, ZIP digest
+`038f4efe08cf80c90cfca07bb9388203bed68bc48940878038a33639d51af0d5`;
+image artifact `13237766403`, `image-observation-41649356781-1`, ZIP digest
+`2cb66c83bc423417b21d06cc8edb83a2f7df3ec137124d781322ee2c9e2ebaf0`.
 
 After the shared policy save, actual private TCP 22 connectivity from the
 expected PC source to the existing production node succeeded over both IPv4 and
