@@ -1,6 +1,69 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `39faaebef1cdc37613981b22ae4f16d2caf5c948`.
+Last baseline with passing CI, Security and image checks: `d87eabc7647bb8e955429348d8a469b1862746d0`.
+
+## Candidate preparation published and verified; staging2 rehearsal ready for approval (2026-11-02)
+
+Phil confirmed commit/push and CI for the candidate-preparation batch. It is
+committed/pushed as `d87eabc7647bb8e955429348d8a469b1862746d0`; manifest,
+lint-staged and staged-secret hooks passed. The exact candidate's
+[CI 41553749307](https://github.com/memphis-iis/MoFaCTS/actions/runs/41553749307)
+and all four jobs in [Security 41553749287](https://github.com/memphis-iis/MoFaCTS/actions/runs/41553749287)
+passed. This consumed the single fresh Meteor authorization, with no retry or
+second invocation and one canonical Compose application compilation.
+
+Hosted results: **975 server passed / 15 pending**, **1,237 browser passed /
+7 pending**, harness **26/26**, Phase 0 **145/145**, capture **98/98**, zero hosted
+skips. The new Meteor parity case explicitly retained the image-acquisition
+locator while preserving the earlier observation-only form. Full app/vendor
+typechecks, lint, protected-source checks, image observation, ABI/runtime checks,
+standalone-Mongo rejection, replica-set health and cleanup passed.
+
+Published artifact metadata observed for that exact commit/run/attempt:
+
+- Source `13192614690`, `source-observation-41553749307-1`, ZIP digest
+  `6c813962c3fd641ec7c55502cd19128daea44636989afcc76a761159f8b817d3`.
+- Image `13194555561`, `image-observation-41553749307-1`, ZIP digest
+  `0c66d2b600a7cb27990bce96795d34c168c1338f5fa6c872269b1b8218dec798`.
+
+This turn did not repeat the prior live acquisition/preparation probe or capture
+an independent workstation release candidate. The passing hosted fixture suite
+and prior exact-byte live probe remain distinct evidence; neither qualifies a
+release or supplies staging2's actual image identity.
+
+Continuation prepared and independently reviewed the concrete
+[staging2 rehearsal plan](../deploy/security-audit/release-records.md#staging2-rehearsal-plan--execution-not-authorized).
+It reuses prepare/store/history/project/install/read owners and retains existing
+interruption/history fixtures instead of repeating their covered faults on the
+live host. Its actual-host acceptance focuses on real identity, protected file
+ownership, restricted-channel output, rejection without replacement and recovery.
+Preflight must identify suitable actual staging2 metadata and independent source
+evidence before writes; CI smoke images, production records and synthetic probe
+records cannot substitute. Unexpected customization or unsafe ownership stops
+execution. No new credential, permission, service or container selector is
+proposed. Only allowlisted identity/permission/hash summaries may be retained;
+prior receipt/tool bytes stay in owner-protected recovery storage.
+
+The proposed host tooling is pinned to reviewed source at `d87eabc7`:
+
+- `deploy/security-audit/release-receipt.sh`, 4,959 bytes, digest
+  `74643c30068d7d126bad6f510e2296d2f7c6ed871d0bb6559510d313a6fa840c`.
+- `mofacts/scripts/security-audit/qualification/releaseReceipt.mjs`, 2,700 bytes,
+  digest `bf1265cbe40573f7023ba06e2c50b8f4a259ddd6f83bc2fbf03c478eb6563199`.
+- `deploy/security-audit/host-exposure-audit.sh`, 28,057 bytes, digest
+  `d83daf7f8df05872209b2e45c6a3168cfa874a277d9ac54b8b2c8eb25c7c92e5`.
+
+No staging2 preflight, protected installation, command-sheet/authoritative-record
+write, registry publication or deployment ran. No new architectural choice was
+identified: the next boundary is explicit operational approval for staging2's
+protected preflight/install/read rehearsal, subject to its stop conditions. The
+standing staging2 lifecycle permission does not itself authorize protected-host
+installation. AWS recovery setup and Phase 1/catalog activation remain separate.
+Phase 0 remains open.
+
+These outcomes and the reviewed plan are a documentation-only follow-up to the
+tested code candidate; its commit skips CI to avoid an unauthorized additional
+Meteor invocation. Unrelated staging/Mongo/SPARC and wiki work stays preserved.
 
 ## Candidate-preparation publication and one Meteor run authorized (2026-11-02)
 

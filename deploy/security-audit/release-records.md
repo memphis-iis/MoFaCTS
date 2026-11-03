@@ -173,6 +173,57 @@ The current V1 report assembler does not yet consume/retain the extra receipt
 field or turn it into a control; that remains part of qualified evidence joining.
 Missing receipt tooling does not change application startup or learner access.
 
+## Staging2 rehearsal plan — execution not authorized
+
+The next integration gate uses the existing owners above. It is a protected-host
+installation operation requiring explicit authorization, separate from the
+standing permission to take staging2 offline/reset/rebuild. Production and the
+older staging installation are excluded. No new credential, SSH capability,
+firewall rule, storage owner or service is proposed.
+
+1. **Read-only preflight.** Confirm staging2's actual container, config ID,
+   revision label and existing protected container-selection setting. Inspect
+   owner/mode/link/ancestor safety and existing receipt/tool bytes. Select a
+   rehearsal workstation record and evidence directory isolated from production
+   authority. Missing actual identity, independent expected-source observation,
+   accepted release metadata or matching retained evidence halts before writes.
+   CI's smoke image and synthetic probe records cannot supply staging2 identity.
+   Retain only allowlisted identity, permission and hash summaries; never copy or
+   log protected configuration contents.
+2. **Workstation rehearsal.** Use the accepted staging2 candidate with prepare,
+   the existing storage/history owner and projection. Check that both evidence
+   locators resolve, prior record bytes remain in history, latest reads back and
+   the receipt omits qualification and operator assertions. A six-field record
+   without an actual image ID cannot be projected. Preserve the previous usable
+   rollback image and matching configuration/evidence if a staging2 build is
+   needed under its existing authorization.
+3. **Protected installation.** Preserve exact prior receipt/tool bytes and their
+   owners/modes in owner-protected recovery storage. Transfer only the reviewed committed
+   `release-receipt.sh`, standalone `releaseReceipt.mjs` and, if needed, the
+   matching `host-exposure-audit.sh` into their existing documented destinations.
+   Stop for unexpected host customization or unsafe ownership. Install through
+   the deployment owner; retain root-only receipt/config ownership and the
+   current read-only forced-command identity. Do not change the protected
+   container selector, SSH access or production command sheets.
+4. **Real-host acceptance.** Require an independent actual-container comparison,
+   `observed/MATCH` read-back and the bounded receipt through the existing
+   restricted channel. Reject a deliberately mismatched transfer without changing
+   the accepted receipt. Verify receipt/parser permissions and application health.
+   Use the existing hosted interruption/history fixtures for their covered cases;
+   the live rehearsal concentrates on actual host ownership, channel and identity.
+   A receipt match remains an identity observation, never release qualification.
+5. **Recovery and record.** If acceptance fails, restore only the saved receipt
+   and tooling state through their owner; an originally absent receipt returns to
+   absent. Retain workstation history and bounded evidence. If an application
+   candidate was separately deployed, use its existing image/configuration
+   rollback procedure. Record exact outcomes and remaining Phase 0 gates without
+   waiving an unsafe or unavailable observation.
+
+This is a reviewable plan, not a claim that a suitable live staging2 record or
+image has already been identified. The actual host preflight and installation
+have not run. AWS secret-recovery setup and Phase 1/catalog activation remain
+separate gates.
+
 ## Interruption and recovery ownership
 
 The operator owns workstation recovery; the root deployment owner owns host
