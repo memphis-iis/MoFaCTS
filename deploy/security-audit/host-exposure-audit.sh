@@ -6,6 +6,7 @@ set -u
 CONFIG_FILE=/etc/mofacts/security-audit.conf
 LISTENER_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-listener-policy.awk
 FIREWALL_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-firewall-policy.awk
+APACHE_POLICY_FILE=/usr/local/libexec/mofacts-security-audit/host-apache-policy.awk
 RELEASE_RECEIPT_TOOL=/usr/local/libexec/mofacts-security-audit/release-receipt.sh
 controls='[]'
 
@@ -48,6 +49,9 @@ if [[ ! -f "$CONFIG_FILE" ]] || [[ "$(stat -c '%U:%G:%a' "$CONFIG_FILE" 2>/dev/n
   exit 0
 fi
 
+# Public target identity must be supplied by this protected file, not inherited
+# from the invoking process.
+unset MOFACTS_PUBLIC_HOSTNAME
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
@@ -57,7 +61,7 @@ required_vars=(
   MOFACTS_MONGO_APP_USER MOFACTS_MONGO_APP_PASSWORD MOFACTS_MONGO_SIDECAR_USER MOFACTS_MONGO_SIDECAR_PASSWORD
   MOFACTS_MONGO_APP_ROLE MOFACTS_MONGO_SIDECAR_ROLE
   MOFACTS_REDIS_PASSWORD
-  MOFACTS_MANAGEMENT_CIDRS MOFACTS_SSH_MANAGEMENT_INTERFACE APACHE_HTTPS_SITE_FILE
+  MOFACTS_MANAGEMENT_CIDRS MOFACTS_SSH_MANAGEMENT_INTERFACE APACHE_HTTPS_SITE_FILE MOFACTS_PUBLIC_HOSTNAME
 )
 missing=0
 for name in "${required_vars[@]}"; do
@@ -65,6 +69,15 @@ for name in "${required_vars[@]}"; do
 done
 if [[ "$missing" -eq 0 ]] && { [[ ! "$MOFACTS_MONGO_APP_ROLE" =~ ^[A-Za-z0-9_-]+$ ]] || [[ ! "$MOFACTS_MONGO_SIDECAR_ROLE" =~ ^[A-Za-z0-9_-]+$ ]]; }; then
   missing=$((missing + 1))
+fi
+# The protected configuration owns the expected public identity. Do not infer it
+# from Apache, the running application or the SSH management hostname.
+if [[ "$missing" -eq 0 ]]; then
+  # ENVIRON preserves literal bytes; awk -v assignments decode backslash escapes.
+  export MOFACTS_PUBLIC_HOSTNAME APACHE_HTTPS_SITE_FILE
+  if ! awk -v mode=validate -f "$APACHE_POLICY_FILE" </dev/null >/dev/null 2>&1; then
+    missing=$((missing + 1))
+  fi
 fi
 if [[ "$missing" -eq 0 ]]; then
   add_control internal.audit-config 'Audit configuration is root-only and complete' PASS INFO 'Every required audit setting is present in the protected host configuration.'
@@ -75,7 +88,7 @@ else
   error_control internal.sidecar-loopback 'Sidecar ports are absent or loopback-only' 'Protected audit configuration is incomplete.'
   error_control internal.docker-ports 'Docker publishes only approved loopback ports' 'Protected audit configuration is incomplete.'
   error_control internal.firewall 'UFW is default-deny with scoped SSH and public web only' 'Protected audit configuration is incomplete.'
-  error_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' 'Protected audit configuration is incomplete.'
+  error_control internal.reverse-proxy-routes 'The active reverse proxy routes only the configured host to the loopback app' 'Protected audit configuration is incomplete.'
   error_control internal.mongodb-auth 'MongoDB authentication, replica set, and scoped roles are enforced' 'Protected audit configuration is incomplete.'
   error_control internal.redis-auth 'Redis requires authentication and remains private' 'Protected audit configuration is incomplete.'
   printf '%s\n' "$(jq -cn --argjson controls "$controls" \
@@ -200,20 +213,13 @@ else
 fi
 
 if command -v apache2ctl >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1 \
-  && [[ -f "${APACHE_HTTPS_SITE_FILE:-}" ]]; then
+  && [[ -f "${APACHE_HTTPS_SITE_FILE:-}" && -r "$APACHE_POLICY_FILE" ]]; then
   apache_active="$(systemctl is-active apache2 2>/dev/null || true)"
   apache_syntax="$(apache2ctl configtest 2>&1 || true)"
   apache_vhosts="$(apache2ctl -S 2>&1 || true)"
   configured_vhost_count="$(grep -Ec '^<VirtualHost[[:space:]]+\*:443>$' "$APACHE_HTTPS_SITE_FILE" || true)"
-  active_vhost_count="$(grep -E '^\*:443[[:space:]]+mofacts\.optimallearning\.org[[:space:]]+' <<<"$apache_vhosts" \
-    | grep -Fc "($APACHE_HTTPS_SITE_FILE:" || true)"
-  invalid_hosts="$(awk '
-    { directive=tolower($1) }
-    directive=="servername" || directive=="serveralias" {
-      for (i=2; i<=NF; i++) if ($i != "mofacts.optimallearning.org") invalid++
-    }
-    END { print invalid+0 }
-  ' "$APACHE_HTTPS_SITE_FILE")"
+  active_vhost_count="$(awk -v mode=active-vhosts -f "$APACHE_POLICY_FILE" <<<"$apache_vhosts")"
+  invalid_hosts="$(awk -v mode=configured-hosts -f "$APACHE_POLICY_FILE" "$APACHE_HTTPS_SITE_FILE")"
   proxy_targets="$(awk '
     { directive=tolower($1) }
     directive=="proxypass" || directive=="proxypassmatch" || directive=="proxypassreverse" {
@@ -227,13 +233,13 @@ if command -v apache2ctl >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1
   if [[ "$apache_active" == active && "$syntax_valid" -eq 1 \
     && "$configured_vhost_count" -eq 1 && "$active_vhost_count" -eq 1 \
     && "$invalid_hosts" -eq 0 && "$upstream_count" -ge 1 && "$invalid_upstreams" -eq 0 ]]; then
-    add_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' PASS CRITICAL 'The active Apache HTTPS virtual host routes every HTTP and WebSocket upstream to 127.0.0.1:3000.'
+    add_control internal.reverse-proxy-routes 'The active reverse proxy routes only the configured host to the loopback app' PASS CRITICAL 'The active Apache HTTPS virtual host matches the protected public hostname and routes every HTTP and WebSocket upstream to 127.0.0.1:3000.'
   else
-    add_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' FAIL CRITICAL \
-      "Apache route policy failed: active=$([[ "$apache_active" == active ]] && echo 1 || echo 0), syntaxValid=$syntax_valid, configuredHttpsVhosts=$configured_vhost_count, activeProductionVhosts=$active_vhost_count, invalidHosts=$invalid_hosts, upstreams=$upstream_count, invalidUpstreams=$invalid_upstreams."
+    add_control internal.reverse-proxy-routes 'The active reverse proxy routes only the configured host to the loopback app' FAIL CRITICAL \
+      "Apache route policy failed: active=$([[ "$apache_active" == active ]] && echo 1 || echo 0), syntaxValid=$syntax_valid, configuredHttpsVhosts=$configured_vhost_count, activeExpectedVhosts=$active_vhost_count, invalidHosts=$invalid_hosts, upstreams=$upstream_count, invalidUpstreams=$invalid_upstreams."
   fi
 else
-  error_control internal.reverse-proxy-routes 'The active reverse proxy routes only the production host to the loopback app' 'Apache or its configured enabled HTTPS site is unavailable.'
+  error_control internal.reverse-proxy-routes 'The active reverse proxy routes only the configured host to the loopback app' 'Apache, its configured enabled HTTPS site or the root-owned Apache policy is unavailable.'
 fi
 
 mongo_exec=(docker exec "$MOFACTS_MONGO_CONTAINER" mongosh --quiet --host 127.0.0.1 --port 27017)

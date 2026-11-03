@@ -173,13 +173,31 @@ The current V1 report assembler does not yet consume/retain the extra receipt
 field or turn it into a control; that remains part of qualified evidence joining.
 Missing receipt tooling does not change application startup or learner access.
 
-## Staging2 rehearsal plan — execution not authorized
+## Staging2 rehearsal prerequisites and procedure
 
-The next integration gate uses the existing owners above. It is a protected-host
-installation operation requiring explicit authorization, separate from the
-standing permission to take staging2 offline/reset/rebuild. Production and the
-older staging installation are excluded. No new credential, SSH capability,
-firewall rule, storage owner or service is proposed.
+The receipt integration gate uses the existing owners above. Protected-host
+installation requires explicit authorization, separate from the standing
+permission to take staging2 offline/reset/rebuild. Production and the older
+staging installation are excluded. The receipt projection adds no SSH capability,
+storage owner or service; missing host-audit prerequisites must be established
+through their own approved setup.
+
+The 2026-11-02 conditional preflight found no existing protected audit
+configuration, host-audit entry point or receipt tooling on staging2. It stopped
+before installation. The actual server uses Caddy without Apache or Tailscale;
+the production host-audit template's corresponding assumptions therefore need
+an explicit target-compatibility review. Provisioning the missing audit access
+and configuration is an expanded setup operation, not receipt installation under
+the prerequisites below. See the [current audit record](../../docs-developer/security-audit-durable-redesign-status.md).
+
+On 2026-11-03 Phil approved that expanded production-like staging2 setup and
+selected the PC's existing Tailscale network. It covers Apache/private management,
+dedicated restricted audit access, protected configuration, necessary scoped
+database audit access and a verified staging2 release, preserving the usable
+prior image/configuration. It does not waive the receipt gates below, authorize
+new spending or production changes, or establish enrollment, access-rule safety,
+release qualification or successful receipt installation. Recovery state has
+been preserved; browser account verification and the actual setup remain pending.
 
 1. **Read-only preflight.** Confirm staging2's actual container, config ID,
    revision label and existing protected container-selection setting. Inspect
@@ -200,7 +218,10 @@ firewall rule, storage owner or service is proposed.
 3. **Protected installation.** Preserve exact prior receipt/tool bytes and their
    owners/modes in owner-protected recovery storage. Transfer only the reviewed committed
    `release-receipt.sh`, standalone `releaseReceipt.mjs` and, if needed, the
-   matching `host-exposure-audit.sh` into their existing documented destinations.
+   matching `host-exposure-audit.sh` with all required root-owned policy files
+   into their existing documented destinations. The current auditor requires
+   `MOFACTS_PUBLIC_HOSTNAME` in protected configuration and its Apache policy;
+   complete those before installing the updated auditor.
    Stop for unexpected host customization or unsafe ownership. Install through
    the deployment owner; retain root-only receipt/config ownership and the
    current read-only forced-command identity. Do not change the protected
@@ -219,10 +240,10 @@ firewall rule, storage owner or service is proposed.
    rollback procedure. Record exact outcomes and remaining Phase 0 gates without
    waiving an unsafe or unavailable observation.
 
-This is a reviewable plan, not a claim that a suitable live staging2 record or
-image has already been identified. The actual host preflight and installation
-have not run. AWS secret-recovery setup and Phase 1/catalog activation remain
-separate gates.
+The initial host preflight ran and stopped before installation. Expanded setup
+is approved as recorded above; it has not established a suitable current release
+carrier or completed receipt acceptance. AWS secret-recovery setup and Phase
+1/catalog activation remain separate gates.
 
 ## Interruption and recovery ownership
 

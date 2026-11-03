@@ -431,6 +431,11 @@ test('host exposure audit inspects the active Apache HTTPS site rather than inac
   const source = fs.readFileSync(new URL('../../../deploy/security-audit/host-exposure-audit.sh', import.meta.url), 'utf8');
   const config = fs.readFileSync(new URL('../../../deploy/security-audit/security-audit.conf.example', import.meta.url), 'utf8');
   assert.match(config, /^APACHE_HTTPS_SITE_FILE=\/etc\/apache2\/sites-enabled\/000-default-le-ssl\.conf$/m);
+  assert.match(config, /^MOFACTS_PUBLIC_HOSTNAME=mofacts\.optimallearning\.org$/m);
+  assert.match(source, /APACHE_HTTPS_SITE_FILE MOFACTS_PUBLIC_HOSTNAME/);
+  assert.match(source, /unset MOFACTS_PUBLIC_HOSTNAME[\s\S]*?source "\$CONFIG_FILE"/);
+  assert.match(source, /host-apache-policy\.awk/);
+  assert.doesNotMatch(source, /mofacts\\\.optimallearning\\\.org|"mofacts\.optimallearning\.org"/);
   assert.match(source, /systemctl is-active apache2/);
   assert.match(source, /apache2ctl configtest/);
   assert.match(source, /internal\.reverse-proxy-routes/);
@@ -522,6 +527,61 @@ function classifyHostFirewallFixture(fixtureName) {
   const args = process.platform === 'win32' ? ['--exec', 'awk', ...policyArgs] : policyArgs;
   return execFileSync(executable, args, { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
 }
+
+function classifyHostApache(input, publicHostname, mode, expectedSite = '/etc/apache2/sites-enabled/000-default-le-ssl.conf') {
+  const policy = executablePath(new URL('../../../deploy/security-audit/host-apache-policy.awk', import.meta.url));
+  const executable = process.platform === 'win32' ? 'wsl.exe' : 'env';
+  const policyArgs = [`MOFACTS_PUBLIC_HOSTNAME=${publicHostname}`, `APACHE_HTTPS_SITE_FILE=${expectedSite}`,
+    'awk', '-v', `mode=${mode}`, '-f', policy];
+  const args = process.platform === 'win32' ? ['--exec', 'env', ...policyArgs] : policyArgs;
+  return execFileSync(executable, args, { encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+}
+
+test('host Apache policy requires a bounded explicit public DNS hostname', () => {
+  for (const hostname of ['mofacts.optimallearning.org', 'staging2.optimallearning.org',
+    'xn--caf-dma.example', ['a'.repeat(63), 'b'.repeat(63), 'c'.repeat(63), 'd'.repeat(61)].join('.')]) {
+    assert.equal(classifyHostApache('', hostname, 'validate'), '', hostname);
+  }
+  for (const hostname of ['', 'localhost', '127.0.0.1', 'Staging2.optimallearning.org',
+    'https://staging2.optimallearning.org', 'staging2.optimallearning.org:443', '*.optimallearning.org',
+    'staging2.optimallearning.org.', '.optimallearning.org', 'staging2..optimallearning.org',
+    '-staging2.optimallearning.org', 'staging2-.optimallearning.org', 'staging_2.optimallearning.org',
+    'a'.repeat(64) + '.example', ['a'.repeat(63), 'b'.repeat(63), 'c'.repeat(63), 'd'.repeat(62)].join('.'),
+    'staging2.optimallearning.org other.example', 'staging2.optimallearning.org\nother.example',
+    'staging2[.]optimallearning.org', 'staging2\\056optimallearning.org']) {
+    assert.throws(() => classifyHostApache('', hostname, 'validate'), { status: 2 }, hostname);
+  }
+});
+
+test('host Apache policy matches the configured target and enabled site literally in active single-vhost output', () => {
+  const site = '/etc/apache2/sites-enabled/000-default-le-ssl.conf';
+  const output = hostname => `VirtualHost configuration:\n*:443                  ${hostname} (${site}:1)\n`;
+  for (const hostname of ['mofacts.optimallearning.org', 'staging2.optimallearning.org']) {
+    assert.equal(classifyHostApache(output(hostname), hostname, 'active-vhosts'), '1');
+  }
+  const expected = 'staging2.optimallearning.org';
+  for (const hostname of ['mofacts.optimallearning.org', 'staging2XoptimallearningXorg',
+    'staging2.optimallearning.org.other.example', 'other.staging2.optimallearning.org']) {
+    assert.equal(classifyHostApache(output(hostname), expected, 'active-vhosts'), '0', hostname);
+  }
+  assert.equal(classifyHostApache(output(expected), expected, 'active-vhosts', site + '.other'), '0');
+  assert.equal(classifyHostApache(output(expected) + output(expected), expected, 'active-vhosts'), '2');
+  assert.equal(classifyHostApache(output(expected).replace(':1)', ':not-a-line)'), expected, 'active-vhosts'), '0');
+  // The existing single-vhost contract does not accept a NameVirtualHost group.
+  assert.equal(classifyHostApache(`*:443 is a NameVirtualHost\n  default server ${expected} (${site}:1)\n`
+    + `  port 443 namevhost ${expected} (${site}:1)\n`, expected, 'active-vhosts'), '0');
+});
+
+test('host Apache policy rejects other configured names and wildcard aliases for either target', () => {
+  for (const hostname of ['mofacts.optimallearning.org', 'staging2.optimallearning.org']) {
+    const config = `# ServerAlias ignored.example\n<VirtualHost *:443>\n  ServerName ${hostname}\n`
+      + `  serveralias ${hostname} ${hostname}\n</VirtualHost>\n`;
+    assert.equal(classifyHostApache(config, hostname, 'configured-hosts'), '0');
+    assert.equal(classifyHostApache(config + 'ServerAlias other.example\n', hostname, 'configured-hosts'), '1');
+    assert.equal(classifyHostApache(config + 'ServerAlias *.optimallearning.org\n', hostname, 'configured-hosts'), '1');
+    assert.equal(classifyHostApache(`ServerName ${hostname.replaceAll('.', 'X')}\n`, hostname, 'configured-hosts'), '1');
+  }
+});
 
 test('host listener policy accepts reviewed loopback, DHCP, Tailscale, web, and SSH fixtures', () => {
   assert.deepEqual(classifyHostListenerFixture('host-listeners-expected.fixture'), []);

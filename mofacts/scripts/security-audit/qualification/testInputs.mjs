@@ -32,6 +32,7 @@ export const TEST_INPUTS = Object.freeze([
   ['deploy/security-audit/security-audit.conf.example', 'file'],
   ['deploy/security-audit/host-listener-policy.awk', 'file'],
   ['deploy/security-audit/host-firewall-policy.awk', 'file'],
+  ['deploy/security-audit/host-apache-policy.awk', 'file'],
   ['deploy/maintenance/apache-mofacts-maintenance.conf', 'file'],
 ]);
 

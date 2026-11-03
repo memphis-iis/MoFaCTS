@@ -16,3 +16,5 @@ MOFACTS_REDIS_PASSWORD=replace-with-redis-password
 MOFACTS_MANAGEMENT_CIDRS=100.64.0.0/10,fd7a:115c:a1e0::/48
 MOFACTS_SSH_MANAGEMENT_INTERFACE=tailscale0
 APACHE_HTTPS_SITE_FILE=/etc/apache2/sites-enabled/000-default-le-ssl.conf
+# Required lowercase DNS hostname; no scheme, port, wildcard or trailing dot.
+MOFACTS_PUBLIC_HOSTNAME=mofacts.optimallearning.org

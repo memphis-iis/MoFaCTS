@@ -2,6 +2,213 @@
 
 Last baseline with passing CI, Security and image checks: `d87eabc7647bb8e955429348d8a469b1862746d0`.
 
+## Tailnet partition and hostname publication authorized (2026-11-03)
+
+Phil approved saving the reviewed staging2 isolation policy, then continuing the
+already authorized server setup. He also explicitly approved committing/pushing
+the hostname correction and audit notes and one fresh Meteor integration CI
+execution. This supersedes the pending-permission checkpoint below. The one CI
+authorization is reserved for the push-triggered combined workflow; no dispatch,
+retry or second Meteor invocation is included.
+
+The initial native Tailscale save rejected the draft's positive assertions that
+paired explicit IPv4 sources with IPv6 destinations and vice versa. Read-back
+confirmed the old policy remained active. The assertion correction tests each
+explicit address family separately and retains all 12 TCP/UDP cases, both
+address families, and tag-based cases. The two grants, SSH stanza and tag owners
+are unchanged from the approved proposal. The rejected original and corrected
+candidate are retained separately in the designated OneDrive directory. No
+rejected candidate was treated as applied or passing.
+
+The corrected policy was accepted and retained by Tailscale. A fresh server
+read-back, parsed after Tailscale's formatting, matched the entire corrected
+candidate including both grants, unchanged SSH rules/tag ownership and all
+12 assertions. The separate Tests view lists the retained corrected cases.
+Exact accepted policy text and a screenshot of that view were saved beside the
+original/candidates in the designated OneDrive directory. This is native policy
+acceptance, not staging2 enrollment or proof of its actual tag/SSH/firewall state.
+
+## Production-like staging2 setup approved; recovery state preserved (2026-11-03)
+
+Phil approved the expanded setup recommended after the failed conditional
+preflight below, and selected the existing Tailscale network already connected
+on this PC. The scope includes Apache/private management, dedicated restricted
+audit access and protected configuration, necessary scoped database audit access,
+and a verified staging2 release with retained evidence. Production, the older
+staging installation, new spending and unrelated access remain excluded; fresh
+single-use Meteor and explicit commit/push boundaries remain in force.
+
+Read-only reinspection confirmed Ubuntu 24.04/amd64, about 3.7 GiB RAM and
+65 GiB free disk. The app still runs the previously observed `a3155584` image,
+healthy, with HTTPS `/health` **200**. Compose project `staging2` uses
+`/opt/mofacts/deploy/docker-compose.yml`; the app publishes exactly
+`127.0.0.1:3000`, and MongoDB/Redis publish no host ports. UFW is inactive, and no
+dedicated MoFaCTS audit account was found. Apache, Tailscale and Certbot are not
+installed on the server. The PC's existing Tailscale connection is online with
+MagicDNS enabled; that does not establish server enrollment, plan entitlement or
+appropriate access rules.
+
+Before changing services, the deployment owner preserved the prior app image
+and host configuration in a root-owned mode-0700 recovery directory. Its image,
+configuration and identity archives are mode 0600; checksum read-back passed.
+Configuration includes the existing Caddy TLS state, private app inputs, Compose,
+SSH and UFW files. These bytes remain protected on staging2; no private values or
+database records were copied into local diagnostics. A bounded recovery index
+was saved in the designated personal OneDrive Desktop credential directory.
+This is preservation of the existing usable state, not a restore rehearsal or a
+qualification of the old release. The application/proxy/firewall remained
+unchanged and health stayed **200**.
+
+The maintained auditor hardcodes the production public hostname in its Apache
+check. A narrow local correction now requires `MOFACTS_PUBLIC_HOSTNAME` in the
+protected configuration and clears any inherited value before sourcing that
+file. One Apache policy follows the existing AWK policy-file pattern: it validates
+bounded lowercase DNS syntax and compares the hostname and enabled-site path
+literally. Environment carriage avoids AWK backslash decoding. Missing/invalid
+identity fails through the existing configuration `ERROR` path; there is no
+default. Control IDs and report field names are unchanged. Template, installation
+guidance, source-capture input selection and regression tests were updated.
+Existing hosts must set the explicit hostname and install the new policy before
+upgrading the auditor. No production file was changed.
+
+Independent source review found no blocking issue. This correction preserves the
+existing single-vhost Apache output contract; it does not add detection of every
+extra active HTTPS vhost elsewhere. The local checks do not establish actual
+Apache routing or full restricted-reader acceptance on staging2.
+
+Local verification under pinned Node 24.22.1/npm 11.19.1 passed: full application
+typecheck and lint (**323** classified surfaces), source-security **44/44** with
+zero skips, supplemental source-input tests **14 passed / 1 existing Linux-only
+skip**, Phase 0 **138 passed / 7 platform-specific skips / 0 failed**, host-script
+Bash syntax and diff whitespace checks. The pending supported CI run must cover
+the Linux-only cases; no fresh Meteor run is authorized by the setup approval.
+The correction and audit notes remain uncommitted. Publication requires explicit
+commit/push permission and fresh single-use Meteor authorization because a code
+push triggers the combined CI workflow. Only reviewed committed tooling may be
+installed; this local correction has not been transferred to staging2.
+
+Phil completed the Tailscale browser sign-in. The console shows the existing PC
+and production server, with their IPv4/IPv6 identities independently matched to
+the local client. Its current Personal plan displays 1/6 seats and 0/50 included
+tagged resources; no purchase or plan change was made. This is the observed
+account capacity, not an executed enrollment.
+
+The live policy contains a blanket `*` source / `*` destination / all-protocol
+grant. It would include a newly tagged staging2 host. A narrower grant alone
+would not restrict the blanket grant: Tailscale grants are additive. Enrolling
+staging2 in that state would undermine the selected isolation boundary. No
+enrollment, key creation or live policy save was performed.
+
+A concrete replacement is prepared as an **unsaved** console draft. It preserves
+all current connectivity among the verified PC and production IPv4/IPv6
+identities and the existing `tag:ci` runners, then permits only the PC's addresses
+to initiate TCP 22 to `tag:staging2`. There is no grant from staging2 to those
+existing identities or from production/CI to staging2. The existing SSH stanza
+and `tag:ci` ownership are preserved; the new tag has the same existing owner.
+This avoids silently narrowing production/CI behavior during staging2 setup.
+New identities outside those sets would require explicit grants.
+
+The complete previous policy text, candidate JSON and preview screenshot are
+saved in the designated OneDrive Desktop credential directory, outside the
+repository. The candidate contains 12 TCP/UDP assertion cases covering preserved
+IPv4/IPv6 paths, PC-to-staging2 SSH and denied private cross-target/service paths.
+Its editor read-back matched the saved draft exactly and the console displayed
+the changes preview. These assertions have **not** been reported as executed or
+passed by Tailscale; server acceptance and live reachability remain pending.
+
+Independent static review found no blocking issue in the complete candidate.
+Enrollment acceptance must verify staging2 has only `tag:staging2`: assigning it
+`tag:ci` would put it into the preserved production/CI group and violate the
+selected boundary. No additional node tag is approved by this proposal.
+
+This is the next decision point: approve the specific shared-tailnet partition
+before Save. It affects a policy also used by production, even though existing
+production paths are intended to remain unchanged. Retain the prior policy for
+recovery and prove existing production/CI connectivity plus new private operator
+access after any authorized cutover. Ordinary OpenSSH and its forced audit-key
+boundary remain the selected staging2 SSH path. Do not enable a separate
+Tailscale SSH authentication path as part of this setup.
+
+The console draft is left open for review. The earlier commit/push and fresh
+Meteor-run request is still pending; the sign-in reply did not authorize those
+actions. No server package, account, permission, audit configuration, receipt
+tooling or release candidate has yet been installed. Phase 0 remains open.
+
+## Authorized staging2 preflight stopped before installation (2026-11-02)
+
+Phil authorized staging2 preflight and receipt-tool installation/testing only if
+the documented prerequisites pass, with continuation to the next decision point.
+Read-only SSH used the existing deployment identity from the designated personal
+OneDrive Desktop folder and strict verification against its saved host key. No
+new credential, key, account, permission, host file or service was created.
+
+The actual application is healthy: HTTPS `/health` returned **200**; Docker
+reports the `mofacts` service in Compose project `staging2` running and healthy.
+Its image is `mofacts-local/mofacts-mini:staging2-a3155584`, Docker image ID
+`sha256:5eadcf85e2ec98e9a2e7bf594f440896c45451315da223f5bd8dbb6b5d865c20`,
+with revision `a3155584ca26bbd03b83a123f9852aeddaa29a50`, platform linux/amd64
+and Node **24.15.0**. This was discovery of the actual container, not a substitute
+for the missing protected selector and not an OCI/config-mapping qualification.
+
+The protected receipt prerequisites did **not** pass:
+
+- `/etc/mofacts` is root:root mode 0700, but
+  `/etc/mofacts/security-audit.conf` is absent. There is no existing protected
+  `MOFACTS_APP_CONTAINER` selection for this tooling.
+- `/etc/mofacts/release-receipt.json` and its lock are absent. Both receipt helper
+  files, their `/usr/local/libexec/mofacts-security-audit` directory and
+  `/usr/local/sbin/mofacts-host-exposure-audit` are absent.
+- Docker, jq, stat and SHA-256 tools are available. Caddy is active; Apache and
+  Tailscale are not installed. The reviewed full host-audit template expects an
+  Apache HTTPS site and private-management configuration, in addition to scoped
+  database/Redis settings. That compatibility cannot be silently assumed.
+- The desktop `mofacts-staging-deployment.json` identifies the **older staging**
+  hostname and is awaiting acceptance; it was excluded. The staging2-specific
+  `deployment-status.json` still identifies `e3029421`, not the running `a3155584`
+  image. Its a315 notes match the actual Docker image ID but do not supply the
+  current acquisition-record references. No accepted matching release carrier
+  with the independent source/evidence prerequisites was identified in these
+  designated records.
+- Exact-commit historical [CI 37917879685](https://github.com/memphis-iis/MoFaCTS/actions/runs/37917879685)
+  and [Security 37917879795](https://github.com/memphis-iis/MoFaCTS/actions/runs/37917879795)
+  passed on 2026-10-09. The CI artifact list now has **zero retained artifacts**;
+  that historical success does not supply the new source/image acquisition
+  bundles or an independent current workstation observation.
+
+Installation, receipt projection/publication, mismatch testing and recovery
+mutation were not attempted: their pre-write gates are unmet. No protected
+configuration contents, container environments, SSH keys or learner records were
+copied or logged. Read-only output was limited to allowlisted identity,
+ownership/mode/link/size/digest and tool/service/health summaries. No Meteor
+integration run, build, image publication or deployment occurred. Unrelated
+working changes remain preserved.
+
+The next decision is expanded staging2 audit setup, not permission to bypass a
+receipt check. The approved rehearsal assumed an existing protected audit
+boundary; creating one entails new persistent security configuration/access,
+and the actual Caddy/public-management environment needs an explicit compatibility
+decision before reusing production-specific host checks. Matching accepted
+release/source evidence also needs to be established for the actual test image.
+Do not install a minimal substitute configuration, fabricate old metadata, use a
+production record, or treat CI's smoke image as staging2 proof. Phase 0 remains
+open; the conditional installation authorization did not activate.
+
+Proposed next scope (not approved): make staging2 a production-like security
+test target, with the production proxy/private-management arrangement, dedicated
+restricted audit identity/key and sudo binding, root-only audit configuration,
+necessary scoped database audit access, and a current verifiable staging2 release
+while preserving the usable prior image/configuration. This keeps one maintained
+host-audit path. Account/access/cost prerequisites must be verified before their
+operations; no new spending is authorized by this recommendation.
+
+Keeping Caddy is an alternative design requiring explicitly scoped maintained
+Caddy-compatible host auditing. Apache/Tailscale are not requirements of the
+standalone receipt parser/installer; they are assumptions of the full host auditor
+used by the approved restricted-reader flow. That auditor returns before emitting
+`releaseReceipt` when its required configuration is incomplete. A new receipt-only
+SSH route or minimal selector-only config would be a different access contract,
+not successful execution of the approved rehearsal. No such route was created.
+
 ## Candidate preparation published and verified; staging2 rehearsal ready for approval (2026-11-02)
 
 Phil confirmed commit/push and CI for the candidate-preparation batch. It is
@@ -32,7 +239,7 @@ and prior exact-byte live probe remain distinct evidence; neither qualifies a
 release or supplies staging2's actual image identity.
 
 Continuation prepared and independently reviewed the concrete
-[staging2 rehearsal plan](../deploy/security-audit/release-records.md#staging2-rehearsal-plan--execution-not-authorized).
+[staging2 rehearsal plan](../deploy/security-audit/release-records.md#staging2-rehearsal-prerequisites-and-procedure).
 It reuses prepare/store/history/project/install/read owners and retains existing
 interruption/history fixtures instead of repeating their covered faults on the
 live host. Its actual-host acceptance focuses on real identity, protected file
