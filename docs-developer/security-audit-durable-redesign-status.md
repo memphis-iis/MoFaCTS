@@ -13,8 +13,8 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **3 invoked of 5; slot 4 reserved for the protected-transfer
-draft's normal push CI; 1 slot unallocated**. Count each allocated
+Current allowance: **3 invoked of 5; slot 4 reserved for queued CI `41877424659`
+on the protected-transfer draft; 1 slot unallocated**. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
 | Slot | Commit | CI run / attempt | Meteor invocation and outcome |
@@ -22,7 +22,7 @@ run conservatively against the cap until its actual invocation outcome is record
 | 1 | `65875553c4f0fd37adfc407774bd4e7ff998ccfc` | `41824718448` / 1 | Meteor integration and complete CI image/ABI/topology/startup/cleanup checks passed. Matching Security run `41824718440` passed all four jobs. |
 | 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
 | 3 | `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef` | `41844153544` / 1 | Meteor integration and complete canonical image/ABI/topology/startup/cleanup checks passed. Security `41844153368` passed all four jobs. No Meteor retry. |
-| 4 | Protected recovery-transfer review draft; commit/run recorded after publication | Pending normal push CI | Reserved; do not separately dispatch a duplicate. |
+| 4 | `d5e8f70524854cb20e9586d2816de3832847cd79` | `41877424659` / 1 | Queued at last read-back; no runner/Meteor start observed. Security `41877424480` likewise queued. Reserved; do not dispatch a duplicate. |
 | 5 | — | — | Unallocated. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
@@ -32,6 +32,18 @@ authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
 ### Protected GitHub recovery transfer prepared; execution decision pending (2026-11-04)
+
+Published the intentional review batch as
+`d5e8f70524854cb20e9586d2816de3832847cd79` on main. Pre-commit manifest,
+staged lint and secret checks passed. GitHub created normal push CI
+[`41877424659`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41877424659)
+and Security
+[`41877424480`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41877424480).
+Both remain queued at this handoff; all five jobs lack assigned runners. No
+pending environment deployment approval was reported for CI. This is a pending
+remote check, not a reported test failure or a passing exact-commit integration.
+Slot 4 remains reserved; verify these existing runs before considering another
+invocation or approved transfer activation. No duplicate dispatch was made.
 
 Phil approved the current protected GitHub configuration as the starting point
 and requested a concrete transfer for review, followed by continued work to the
@@ -71,8 +83,9 @@ full lint passed with **323 surfaces** unchanged. Final combined source-security
 and supplemental-capture regression run passed **90/97 with seven documented
 Windows platform skips**; final full lint passed. Three explicit supplemental
 inputs bind the draft workflow/policy bytes into the existing CI test capture.
-No TypeScript-bearing app edit was made; full CI supplies its ordinary typecheck
-and one reserved Meteor run. Its exact outcome will be appended after publication.
+No TypeScript-bearing app edit was made; queued full CI is intended to supply its
+ordinary typechecks and one reserved Meteor run. Its completed outcome remains
+pending and must be recorded after observation.
 Synthetic adapters do not prove
 live OIDC, IAM or Linux CLI/AWS behavior; real values and size remain unobserved.
 Final API review also established that `DescribeSecret` omits deprecated versions.
