@@ -1,9 +1,11 @@
 # One-time protected recovery transfer — execution review
 
 Status: **execution and approximately $0.40/month cost approved** by Phil on
-2026-11-04, conditional on required checks passing; not activated or executed.
-CI `41877424659` and Security `41877424480` were still queued at the approval
-preflight. Phil approved the current GitHub configuration as the starting point.
+2026-11-04, conditional on required checks passing. CI `41877424659` and Security
+`41877424480` subsequently passed on reviewed source `d5e8f705`. Approved empty
+secret/temporary role setup is read-back verified; one-time workflow activation
+is prepared. Transfer and cleanup results remain pending. Phil approved the
+current GitHub configuration as the starting point.
 This establishes
 a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.

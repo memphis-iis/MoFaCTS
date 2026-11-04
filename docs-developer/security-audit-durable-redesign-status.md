@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef`.
+Last baseline with passing CI, Security and image checks: `d5e8f70524854cb20e9586d2816de3832847cd79`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
@@ -13,8 +13,8 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **3 invoked of 5; slot 4 reserved for queued CI `41877424659`
-on the protected-transfer draft; 1 slot unallocated**. Count each allocated
+Current allowance: **4 invoked of 5; 1 slot unallocated**. CI `41877424659`
+completed successfully on the protected-transfer draft. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
 | Slot | Commit | CI run / attempt | Meteor invocation and outcome |
@@ -22,7 +22,7 @@ run conservatively against the cap until its actual invocation outcome is record
 | 1 | `65875553c4f0fd37adfc407774bd4e7ff998ccfc` | `41824718448` / 1 | Meteor integration and complete CI image/ABI/topology/startup/cleanup checks passed. Matching Security run `41824718440` passed all four jobs. |
 | 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
 | 3 | `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef` | `41844153544` / 1 | Meteor integration and complete canonical image/ABI/topology/startup/cleanup checks passed. Security `41844153368` passed all four jobs. No Meteor retry. |
-| 4 | `d5e8f70524854cb20e9586d2816de3832847cd79` | `41877424659` / 1 | Queued at last read-back; no runner/Meteor start observed. Security `41877424480` likewise queued. Reserved; do not dispatch a duplicate. |
+| 4 | `d5e8f70524854cb20e9586d2816de3832847cd79` | `41877424659` / 1 | Complete CI passed, including Meteor, both typechecks, capture/protection, canonical Compose image identity/ABI/topology/startup/cleanup. Security `41877424480` passed all four jobs. No retry. |
 | 5 | — | — | Unallocated. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
@@ -30,6 +30,39 @@ The continuation approves publication of the locally verified follow-up to the
 reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
+
+### CI/Security prerequisites passed; approved transfer setup verified (2026-11-04)
+
+The previously queued runs now report complete success on the reviewed source
+`d5e8f705`: CI `41877424659` passed every required application, Meteor and image
+step; Security `41877424480` passed all four jobs. Repository Actions are enabled,
+with no pending environment approval or reported billing restriction. The
+completed-job start/end timestamps conflict with the earlier queued observations,
+so delayed status reporting is a plausible explanation, not a demonstrated
+repository defect. No runner/configuration/budget change or retry was made.
+One existing upload-artifact action emitted a non-blocking Node 20 deprecation
+notice while executing under forced Node 24; no check failed.
+
+Under the recorded cost/access/transfer approval, opened CloudShell in the
+verified account/Ohio console and independently checked its actual STS account.
+Created the one empty `mofacts/security-audit/recovery` secret with managed
+encryption and no value, rotation, replica, tags or resource policy. Preserved
+the existing shared GitHub OIDC provider. Created the dedicated temporary role
+from the reviewed templates, with identical trust/data-access deadline
+`2026-11-04T19:54:28Z` and exactly four operations on the exact new secret ARN.
+Read-back proved exact trust and inline permissions, no other attached/inline
+policies, no resource policy and no versions, including deprecated versions.
+Private target/setup/source-inventory metadata is retained in the native
+`aws-recovery-transfer-20261104` evidence directory, without credential values.
+
+Prepared the authorized one-time active workflow by copying the reviewed YAML
+and replacing only its inactive-review comment. Parsed YAML comparison proves
+semantic identity with the tested draft. Publishing this workflow/documentation
+activation uses `[skip ci]`: application/helper/policy code is unchanged from the
+passing reviewed source; no fifth Meteor invocation is needed for this copy.
+Dispatch one manual transfer on its exact published commit, then verify result
+and remove permissions/trust/temporary role and active workflow on success or
+failure. Real credential transfer/read-back and cleanup are not yet claimed.
 
 ### Recovery transfer execution approved; prerequisite CI still queued (2026-11-04)
 
