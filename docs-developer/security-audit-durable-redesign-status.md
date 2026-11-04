@@ -29,6 +29,27 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### AWS account verified; backup-key type awaiting clarification (2026-11-04)
+
+Phil completed normal AWS sign-in and asked whether an existing OpenAI security
+key can also be used. Confirmed in the live console that this account contains
+the existing Ohio Lightsail instance with staging2's recorded static IP. The
+security-credentials page identifies the signed-in identity as **Root user** and
+shows **two existing Virtual MFA registrations**. Both remain unchanged; their
+independent availability has not been established.
+
+Current official AWS documentation explicitly permits using a compatible FIDO
+security key already used with other services; AWS creates a separate credential
+for its own registration. This does not establish that Phil's item is a physical
+FIDO device. Asked whether it is a physical USB/NFC key, an app-stored passkey or
+an API secret string, without requesting any secret value. The Assign MFA device
+screen is open at method selection; no name was entered, no enrollment was
+started and no credential/account setting changed. A physical key can be prepared
+for operator enrollment after confirmation; a passkey requires its actual
+independent-storage/recovery path to be checked, and an API key is not an MFA
+device. No purchase, AWS resource or Meteor invocation occurred; two Meteor
+authorizations remain unused.
+
 ### Independent AWS recovery missing; setup preflight started (2026-11-04)
 
 Phil answered **"No, we need to set that up"** when asked whether AWS sign-in

@@ -25,6 +25,12 @@ that remains available if both the workstation and primary phone are lost:
 - An existing compatible hardware security key stored separately, or
 - A separate phone/tablet with an appropriately protected authenticator.
 
+A compatible physical FIDO key already registered with another service can also
+be registered with AWS, which creates its own credential. Do not reset the key
+or remove its other registrations. An API secret is not an MFA device; an
+app-stored passkey still needs an independently accessible recovery path. See
+[AWS security-key enrollment](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable_fido.html).
+
 Confirm available equipment before selecting a method. Do not assume a spare
 device exists, install an authenticator, buy a key or create another paid service
 without the corresponding approval. A second authenticator on the same primary
