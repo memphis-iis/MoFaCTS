@@ -31,6 +31,57 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### First transfer stopped at source validation; access cleanup verified (2026-11-04)
+
+Published activation `7d9239da16d7ba742a22eca2b51335b321f0b103` and dispatched
+exactly one protected workflow:
+[`41893149595`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41893149595).
+It ran on a hosted runner and completed with the bounded failure category
+`ssh-key-format`. Dependency/tool preparation passed. This failure occurs in
+`prepareRecoveryBundle` before OIDC/STS or any AWS request from the transfer
+helper; it did not write a backup version. No automatic retry was issued and no
+input value, credential substring or raw upstream error was retained.
+
+Cleanup completed under the approved success-or-failure procedure: removed the
+sole data-access policy, replaced the allow trust with explicit deny, verified
+zero attached/inline policies and exact denied trust, and simulated all four
+secret operations as denied. This is IAM-simulator evidence, not a claim to have
+tested an issued GitHub AWS session. Deleted the temporary role and verified
+`NoSuchEntity`. Verified the shared GitHub provider/audience remains unchanged
+and the secret has **zero versions**, including deprecated versions. Removed
+only the three owned metadata-policy files under the checked temporary path and
+ended the CloudShell session. Disabled the active GitHub workflow and removed
+its tracked source; retained its reviewed inactive template and immutable run.
+
+The nine source secret names/update timestamps and sole public variable's
+metadata are unchanged from before the attempt. Minimized private target,
+setup, CI, run/failure and cleanup metadata is retained under native
+`C:\Users\ppavl\MoFaCTS-Release-Evidence\aws-recovery-transfer-20261104`.
+The credential-free console screenshot `empty-backup-status.png` visibly shows
+the selected Ohio secret with **No secret versions**. No credential file or
+plaintext backup was created. The approximately $0.40/month destination exists
+but is empty and does not yet protect the configuration; Phase 0 remains open.
+
+Source review found a concrete contract difference: production's existing
+workflow adds LF via `printf '%s\n'` while materializing its key file, whereas the
+new backup validator requires an LF-terminated, LF-only OpenSSH string in the
+stored binding. The single failure category cannot establish which format/line
+ending differs. Do not infer missing LF, declare the existing key invalid, alter
+the stored bytes or weaken validation speculatively.
+
+Prepared an inactive, single-binding, format-only diagnostic review: ten fixed
+boolean flags, no key content/length/fingerprint/artifact, no OIDC or AWS access,
+and main/manual/expected-commit gates. YAML permission/binding/output checks and
+eight synthetic cases passed locally without protected input. No diagnostic run
+or correction has been executed. Next review is one format-only diagnostic,
+correction for a confirmed consumer-contract mismatch preserving all source
+bytes, required verification and one new transfer attempt with fresh temporary
+access/cleanup. A credential change remains a separate decision if needed.
+This records failed operational input validation and removes temporary tooling;
+it does not publish a bypass or claim transfer acceptance. No application/helper
+code changed, so no new Meteor run was needed: **4 of 5 used, 1 remains**.
+Existing unrelated working changes are preserved.
+
 ### CI/Security prerequisites passed; approved transfer setup verified (2026-11-04)
 
 The previously queued runs now report complete success on the reviewed source

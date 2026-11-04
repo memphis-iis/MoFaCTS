@@ -1,0 +1,45 @@
+# REVIEW ONLY: inactive. Requires approval for one protected format-only run.
+name: One-time protected SSH binding format diagnostic
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Reviewed full main commit SHA
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: security-audit-recovery-transfer
+  cancel-in-progress: false
+jobs:
+  format:
+    if: github.repository == 'memphis-iis/MoFaCTS' && github.ref == 'refs/heads/main' && github.sha == inputs.expected_commit
+    runs-on: ubuntu-24.04
+    environment: production-security-audit
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+      - name: Emit fixed format flags only
+        env:
+          AUDIT_SSH_PRIVATE_KEY: ${{ secrets.AUDIT_SSH_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          if (process.env.RUNNER_DEBUG === '1' || process.env.ACTIONS_STEP_DEBUG === 'true'
+            || process.env.ACTIONS_RUNNER_DEBUG === 'true') throw new Error('Debug logging is not permitted');
+          const key = process.env.AUDIT_SSH_PRIVATE_KEY;
+          if (typeof key !== 'string' || !key.length) throw new Error('SSH binding is absent');
+          const frame = (verb, type) => `-----${verb} ${type}-----`;
+          const flags = { present: true };
+          for (const [name, type] of [['openssh', 'OPENSSH PRIVATE KEY'], ['rsaPem', 'RSA PRIVATE KEY'], ['pkcs8', 'PRIVATE KEY']]) {
+            flags[`${name}Header`] = key.startsWith(frame('BEGIN', type));
+            flags[`${name}Footer`] = key.includes(frame('END', type));
+          }
+          flags.endsWithLF = key.endsWith('\n');
+          flags.containsCR = key.includes('\r');
+          flags.containsEscapedLF = key.includes('\\n');
+          process.stdout.write(`${JSON.stringify(flags)}\n`);
+          NODE

@@ -2,10 +2,14 @@
 
 Status: **execution and approximately $0.40/month cost approved** by Phil on
 2026-11-04, conditional on required checks passing. CI `41877424659` and Security
-`41877424480` subsequently passed on reviewed source `d5e8f705`. Approved empty
-secret/temporary role setup is read-back verified; one-time workflow activation
-is prepared. Transfer and cleanup results remain pending. Phil approved the
-current GitHub configuration as the starting point.
+`41877424480` passed on reviewed source `d5e8f705`. The empty secret was created;
+the first transfer, `41893149595`, stopped at `ssh-key-format` validation before
+requesting AWS credentials or writing a version. Temporary data access was
+removed, trust denied, and the role deleted; the active workflow was disabled and
+removed. The shared provider and protected GitHub source were preserved. The
+destination remains **empty, not a usable credential backup**. A format-only
+diagnostic and another transfer attempt require the review below. Phil approved
+the current GitHub configuration as the starting point.
 This establishes
 a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.
@@ -174,3 +178,31 @@ accepted-rollback restoration and survival of the retained label through a later
 candidate update. Preserve accepted state afterward. That rehearsal and the
 broader Phase 0 gates remain open; baseline and accepted rollback labels have
 different meanings and must never be substituted for each other.
+
+## Next decision after the first attempt
+
+The stopped attempt proves that at least one of the validator's OpenSSH boundary,
+LF-only or terminal-LF checks did not match the protected source. It does not
+identify which check, establish that the key is unusable or justify changing the
+credential. The existing production workflow explicitly uses `printf '%s\n'`
+when materializing its SSH key file; the backup validator instead requires the
+stored string itself to end with LF. This is a source-contract difference and a
+possible false rejection, not proof that missing LF caused this particular run.
+
+Prepared [an inactive format-only diagnostic](ssh-format-diagnostic.yml.review)
+for one separately approved protected run. It binds only the existing SSH-key
+secret and emits ten fixed boolean flags: recognized OpenSSH/RSA-PEM/PKCS8
+boundaries and LF/CR/escaped-newline shape. It emits no value, key fragment, byte
+length, fingerprint or file/artifact, requests no OIDC permission and has no AWS
+access. Its YAML permission/binding checks and eight synthetic cases passed
+locally. It has not been activated or run against protected input.
+
+Recommended authorization: one format-only diagnostic; a correction only for a
+confirmed mismatch between backup validation and the existing consumer contract,
+preserving the original stored bytes; required checks for that correction; and
+one new transfer attempt with fresh temporary access and the same cleanup. Use
+the remaining Meteor slot only if the correction requires another integration
+run; it is not needed merely to prepare this inactive diagnostic. If the result
+instead requires changing or replacing the credential, stop for that distinct
+source-repair decision. Do not silently append/trim newlines, convert encodings,
+rotate a key or republish production bindings to get a passing backup.
