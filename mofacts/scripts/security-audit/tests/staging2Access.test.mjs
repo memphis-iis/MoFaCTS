@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { INTERNAL_CONTROL_DEFINITIONS } from '../internal-audit-contract.mjs';
-import { acceptHostObservation } from '../staging2-access-check.mjs';
+import { acceptHostObservation, sshFailureCategory } from '../staging2-access-check.mjs';
 
 const expected = 'a'.repeat(64);
 const observation = () => ({
@@ -54,4 +54,17 @@ test('staging2 workflow has a manual main-only isolated identity and no release 
   assert.match(text, /tags: tag:staging2-audit/);
   assert.match(text, /expected_record_digest:/);
   assert.doesNotMatch(text, /production-security-audit|tags: tag:ci|test:ci|docker build|schedule:|pull_request:/);
+});
+
+test('SSH failure categories expose only fixed labels, never diagnostic contents', () => {
+  const cases = [
+    ['Load key "/private/name": error in libcrypto', 'key-format'],
+    ['WARNING: UNPROTECTED PRIVATE KEY FILE!', 'key-permissions'],
+    ['Host key verification failed.', 'host-key'],
+    ['Permission denied (publickey).', 'authentication'],
+    ['Bad configuration option: invalid', 'ssh-config'],
+    ['Connection timed out', 'network'],
+    ['private diagnostic with credential-shaped content', 'unclassified'],
+  ];
+  for (const [input, expected] of cases) assert.equal(sshFailureCategory(input), expected);
 });

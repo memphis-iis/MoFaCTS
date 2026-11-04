@@ -14,6 +14,16 @@ const invalid = () => { throw new Error('Staging2 access acceptance failed'); };
 const digestPattern = /^[a-f0-9]{64}$/;
 const deniedPorts = [22, 53, 80, 443, 3000, 27017, 6379, 8931, 8932];
 
+export function sshFailureCategory(stderr) {
+  if (/invalid format|error in libcrypto|invalid key/i.test(stderr)) return 'key-format';
+  if (/bad permissions|UNPROTECTED PRIVATE KEY FILE/i.test(stderr)) return 'key-permissions';
+  if (/Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|No .* host key is known/i.test(stderr)) return 'host-key';
+  if (/Permission denied/i.test(stderr)) return 'authentication';
+  if (/Bad configuration option|unsupported option|hostname contains invalid/i.test(stderr)) return 'ssh-config';
+  if (/Connection refused|timed out|No route to host|Network is unreachable/i.test(stderr)) return 'network';
+  return 'unclassified';
+}
+
 // Return only fixed control IDs/statuses and the already public image identity.
 // Raw host output, tool diagnostics and connection coordinates are never retained.
 export function acceptHostObservation(value, expectedRecordDigest) {
@@ -102,7 +112,11 @@ export async function runStaging2AccessCheck(outputFile, expectedRecordDigest, e
     const target = `${env.AUDIT_SSH_USER}@${env.AUDIT_SSH_HOST}`;
     stage = 'host-and-receipt';
     const normal = await sshResult(args, ['-T', target]);
-    if (normal.code !== 0) invalid();
+    if (normal.code !== 0) {
+      stage = `host-ssh-${sshFailureCategory(normal.stderr)}`;
+      invalid();
+    }
+    stage = 'host-result-validation';
     const accepted = acceptHostObservation(JSON.parse(normal.stdout), expectedRecordDigest);
     stage = 'forced-command';
     const arbitrary = await sshResult(args, ['-T', target], ['printf __MOFACTS_SHELL_PROBE__']);

@@ -70,6 +70,16 @@ CI run; the separate manual access workflow itself invokes no Meteor. Actual
 runner access is not yet accepted. See the public
 [procedure and recovery owners](../deploy/security-audit/staging2-access.md).
 
+Published this batch as `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef`.
+Slot 3 CI `41844153544` and matching Security `41844153368` are in progress.
+Manual access run `41844189772` joined with the isolated identity and logged out
+successfully, but failed at the combined SSH/receipt boundary before artifact
+publication. Its raw diagnostics were withheld. A follow-up splits fixed SSH
+failure categories from host-result validation; no permission, receipt check or
+network requirement is relaxed. This observation-only follow-up skips automatic
+Meteor CI while its local regression/source checks and manual access test run;
+it does not consume another Meteor invocation or qualify the release.
+
 ### Completed staging2 rehearsal and prior access decision
 
 Both allocated runs passed without a retry: **2 of 5 invocations used, 3 remain**.
