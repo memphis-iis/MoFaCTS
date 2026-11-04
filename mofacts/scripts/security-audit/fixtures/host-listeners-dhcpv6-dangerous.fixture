@@ -1,0 +1,6 @@
+udp UNCONN 0 0 [::]:546 [::]:* users:(("systemd-network",pid=301,fd=30))
+udp UNCONN 0 0 [2001:db8::1]%ens5:546 [::]:* users:(("systemd-network",pid=302,fd=31))
+udp UNCONN 0 0 [fe80::1]:546 [::]:* users:(("systemd-network",pid=303,fd=32))
+udp UNCONN 0 0 [fe80::1]%ens5:546 [::]:* users:(("rogue-dhcp6",pid=304,fd=33))
+udp UNCONN 0 0 [fe80::1]%ens5:547 [::]:* users:(("systemd-network",pid=305,fd=34))
+tcp LISTEN 0 0 [fe80::1]%ens5:546 [::]:* users:(("systemd-network",pid=306,fd=35))

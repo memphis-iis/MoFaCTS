@@ -1,5 +1,7 @@
 udp UNCONN 0 0 127.0.0.54:53 0.0.0.0:* users:(("systemd-resolve",pid=100,fd=10))
 udp UNCONN 0 0 172.31.21.59%ens5:68 0.0.0.0:* users:(("systemd-network",pid=101,fd=11))
+udp UNCONN 0 0 [fe80::ff:deff:fe00:1234]%ens5:546 [::]:* users:(("systemd-network",pid=106,fd=21))
+udp UNCONN 0 0 fea1::1234%eth0:546 [::]:* users:(("systemd-networkd",pid=107,fd=22))
 udp UNCONN 0 0 0.0.0.0:41641 0.0.0.0:* users:(("tailscaled",pid=105,fd=17))
 udp UNCONN 0 0 [::]:41641 [::]:* users:(("tailscaled",pid=105,fd=18))
 tcp LISTEN 0 4096 127.0.0.54:53 0.0.0.0:* users:(("systemd-resolve",pid=100,fd=12))

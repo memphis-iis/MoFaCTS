@@ -601,6 +601,14 @@ test('host listener policy accepts reviewed loopback, DHCP, Tailscale, web, and 
   assert.ok(dangerous.some((line) => line.includes('100.69.46.68:27017')));
 });
 
+test('DHCPv6 classification rejects wildcard/global/unscoped listeners, other processes and wrong protocols or ports', () => {
+  const rejected = classifyHostListenerFixture('host-listeners-dhcpv6-dangerous.fixture');
+  assert.equal(rejected.length, 6);
+  for (const marker of ['[::]:546', '[2001:db8::1]', '[fe80::1]:546', 'rogue-dhcp6', ':547', 'listener.tcp']) {
+    assert.ok(rejected.some(line => line.includes(marker)), marker);
+  }
+});
+
 test('host firewall policy accepts only private-interface SSH and public web rules', () => {
   assert.deepEqual(classifyHostFirewallFixture('host-firewall-expected.fixture'), []);
 

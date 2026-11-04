@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `630eabdb9f9a9ffe8d1f013f0d7eba112864ee07`.
+Last baseline with passing CI, Security and image checks: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`.
 
 ## Integration authorization ledger and resumed execution (2026-11-04)
 
@@ -11,12 +11,87 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **0 invoked of 5; slot 1 reserved for the correction's push**.
-Update this ledger with exact commit/run/attempt and outcome as execution proceeds.
+Current allowance: **1 invoked of 5; slot 2 reserved; 3 slots unallocated**. Count each allocated
+run conservatively against the cap until its actual invocation outcome is recorded.
+
+| Slot | Commit | CI run / attempt | Meteor invocation and outcome |
+| --- | --- | --- | --- |
+| 1 | `65875553c4f0fd37adfc407774bd4e7ff998ccfc` | `41824718448` / 1 | Meteor integration and complete CI image/ABI/topology/startup/cleanup checks passed. Matching Security run `41824718440` passed all four jobs. |
+| 2 | Pending host policy correction | Pending push | Reserved for DHCPv6 classification and Unix policy packaging regression checks. |
+| 3-5 | — | — | Unallocated. |
+
+Update this ledger with actual invocation start/completion and outcome as execution proceeds.
 The continuation approves publication of the locally verified follow-up to the
 reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
+
+### Successful correction evidence and staging2 setup in progress
+
+The correction passed complete CI `41824718448` (attempt 1, job `126556407720`)
+and all four jobs of Security `41824718440`: server 975 passed/15 pending,
+browser 1,237 passed/7 pending, zero failures; image identity/ABI/topology/startup
+and cleanup passed. Independent clean Linux capture of `65875553` was verified:
+source `a6dca6e331f1b7cab5f319cd4541b95f42ab1d525df56866765255a63678649a`,
+test contract `2529596a73165daf8fe8d0935b034f0fa4d256b7caf9871bd8b0b201f30091d6`,
+supplemental `0c24ed19c4c40cb430edd8d888f088a4d2fa265fa96414f23676f85506e93dd3`.
+The supported GET-only helper accepted the actual CI artifacts against that
+independent observation and captured Linux test inventory. Retained under native
+`C:\Users\ppavl\MoFaCTS-Release-Evidence\staging2-65875553`: source-acquisition
+digest `9e6cb25709533a860ada4bde2b1d64cbc206963bfae0df182da00141df01fd3b`,
+image-acquisition `6f8d0b711209a025a6cbe2af39d04516bd1c6e1a323e7815782210924fc4affb`,
+image-observation `758aaf398adaab64b06b948487e88b88b2b1cfb9cc77eb4f266bfe067cc2ed06`.
+State is **acquired-unqualified**, separate from workstation release qualification.
+The exact captured-source canonical Compose workstation build is in progress;
+no new application candidate has yet been published or deployed.
+
+Installed the reviewed host files from the same commit through a hash-checked,
+root-owned source archive (SHA-256
+`46b6f270f79b108912a5e5115a17cab0239f37d34ccb27e375f3bf8db43f402c`). Support
+files are root-owned 0644 and scripts 0755. Created the root-only 0600 audit config
+using staging2's actual matching runtime database/replica/credentials, the accepted
+Apache site and explicit Sidecar-absent policy. Created the dedicated MongoDB
+metadata observer with only viewUser on the application database and viewRole on
+admin. Installed/executed the committed shared app-role helper and definition;
+its single getDefaultRWConcern privilege was verified. No learner data was read
+or migrated for this setup, and the optional Sidecar account remains absent.
+
+The dedicated SSH audit key and encrypted metadata-observer credential are in
+the approved Desktop credential directory. An initial Windows ACL-copy attempt
+required unavailable SeSecurityPrivilege; explicit protected DACLs were then
+applied and verified for operator/SYSTEM/Administrators only. No parent-folder
+permission was broadened. SSH audit account, private key restriction tests,
+firewall cutover, release-record publication and protected receipt acceptance
+remain pending; the first actual host observation is diagnostic, not acceptance.
+
+The selected application candidate remains the independently captured and fully
+CI-tested `65875553` source. Its workstation canonical Compose build completed
+successfully. Subsequent host-policy changes are a separately verified auditor
+revision; they must not substitute their CI smoke image/evidence for this selected
+application's source/image tuple.
+
+Actual host observation passed config, app loopback, Docker ports, Apache route,
+MongoDB roles/auth and Redis checks. It exposed an unclassified scoped link-local
+systemd-networkd DHCPv6 client (UDP 546), inactive UFW, and a Sidecar observation
+error. The Sidecar error was traced to Windows Git archive converting the valid
+LF committed jq policy to CRLF: the installed file had 123 CRLF lines, and jq 1.7
+refused compilation. This was a packaging error in the owner-operated transfer,
+not missing evidence of an actual helper. Re-exported the unchanged `65875553`
+host sources from the verified Linux checkout; hash
+`7c527365c261510bfb6f292592a02f3cdb87534b2d2ef51ba373e76680c23fe4` was checked
+on both sides before explicit reinstall, with prior bytes retained. Sidecar absence
+then passed against all four existing containers. No parser check was removed.
+
+Prepared a narrow DHCPv6 classification beside the existing DHCPv4 rule: only UDP
+546, a scoped IPv6 link-local address, and the systemd-networkd process signature.
+Positive and six negative fixtures preserve findings for wildcard/global/unscoped
+addresses, other processes, wrong protocols and server port 547. No network or
+firewall permission is added by this classification. Unix AWK/jq files now have
+explicit LF attributes, and public host-transfer guidance identifies the Linux
+archive owner. Local source-security tests passed 68 total/62 passed/6 platform
+skips. This routine preservation correction uses reserved integration slot 2;
+the new listener policy is not yet installed. Firewall and receipt acceptance
+remain unfinished and are not claimed passing.
 
 ## Compatibility batch published; Meteor passed, CI image collector failed (2026-11-03)
 

@@ -1,3 +1,5 @@
 *.sh text eol=lf
+*.awk text eol=lf
+*.jq text eol=lf
 Dockerfile text eol=lf
 mofacts/packages/**/npm-shrinkwrap.json text eol=lf

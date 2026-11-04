@@ -47,8 +47,17 @@ function is_expected_public_web_or_ssh(protocol, port) {
   return protocol == "tcp" && (port == "22" || port == "80" || port == "443")
 }
 
-function is_expected_dhcp_client(protocol, address, port, line) {
-  return protocol == "udp" && port == "68" && !is_wildcard(address) && line ~ /systemd-network(d)?/
+function is_expected_dhcp_client(protocol, address, port, line, unscoped) {
+  if (protocol != "udp") return 0
+  if (port == "68") return !is_wildcard(address) && line ~ /systemd-network(d)?/
+  # DHCPv6 clients use a link-local address and an explicit interface scope.
+  # Do not accept wildcard/global addresses, servers (547), or other processes.
+  unscoped = tolower(without_scope(address))
+  gsub(/^\[/, "", unscoped)
+  gsub(/\]$/, "", unscoped)
+  return port == "546" && address ~ /%[A-Za-z0-9_.-]+$/ && \
+    unscoped ~ /^fe[89ab][0-9a-f]:[0-9a-f:]+$/ && \
+    line ~ /users:\(\("systemd-network(d)?",/
 }
 
 function is_expected_tailscale_listener(protocol, address, port, line) {
