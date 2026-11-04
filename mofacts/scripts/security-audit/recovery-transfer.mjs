@@ -85,8 +85,13 @@ export function prepareRecoveryBundle(bindings, source) {
   if (bindings.AUDIT_REPORT_INGEST_SECRET.length < 32) stop('ingest-key');
   const sshKey = bindings.AUDIT_SSH_PRIVATE_KEY;
   const sshKeyType = 'OPENSSH PRIVATE KEY';
+  const sshFooter = `\n-----END ${sshKeyType}-----`;
+  // This archives the GitHub binding, not a materialized SSH key file. The
+  // production consumer owns its final LF via printf '%s\n'. Accept either
+  // stored representation and preserve its exact bytes in the recovery bundle.
   if (!sshKey.startsWith(`-----BEGIN ${sshKeyType}-----\n`)
-    || !sshKey.endsWith(`\n-----END ${sshKeyType}-----\n`) || sshKey.includes('\r')) stop('ssh-key-format');
+    || !(sshKey.endsWith(sshFooter) || sshKey.endsWith(`${sshFooter}\n`))
+    || sshKey.includes('\r')) stop('ssh-key-format');
   const pem = bindings[RECOVERY_PUBLIC_VARIABLE];
   if (!pem.trim().startsWith('-----BEGIN PUBLIC KEY-----') || pem.includes('PRIVATE KEY')) stop('report-public-key');
   try {

@@ -7,11 +7,13 @@ the first transfer, `41893149595`, stopped at `ssh-key-format` validation before
 requesting AWS credentials or writing a version. Temporary data access was
 removed, trust denied, and the role deleted; the active workflow was disabled and
 removed. The shared provider and protected GitHub source were preserved. The
-destination remains **empty, not a usable credential backup**. A format-only
-diagnostic and another transfer attempt require the review below. Phil approved
-the current GitHub configuration as the starting point.
-This establishes
-a new source baseline; no historical last-accepted configuration was located.
+destination remains **empty, not a usable credential backup**. Phil subsequently
+approved one format-only diagnostic, a confirmed validator correction preserving
+the stored key, and one transfer retry after verification. Diagnostic `41928332920`
+passed: the OpenSSH binding has no terminal LF, CR or escaped LF. The validator
+correction is in verification; the diagnostic workflow is disabled and removed.
+Phil approved the current GitHub configuration as the starting point. This
+establishes a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.
 
 ## Proposed operation
@@ -114,7 +116,9 @@ Sources: [GitHub OIDC and environment-subject rules](https://docs.github.com/en/
    paid synthesis or Meteor invocation is part of the transfer workflow.
 5. It validates all ten nonempty bindings, duplicate-free bounded fixture JSON,
    documented actors/probe groups/throttle identifiers/mailbox/canaries, basic
-   OpenSSH framing/final LF and the report's RSA public key. Preserve original
+   LF-only OpenSSH framing (with or without a stored terminal LF) and the report's
+   RSA public key. The production consumer owns its key file's final LF; the
+   backup never adds or removes one. Preserve original
    strings exactly. Measure the **complete serialized document** in UTF-8 against
    65,536 bytes; reject excess rather than truncating or splitting. Structural
    validation does not prove credentials work, SSH key authenticity, synthetic
@@ -197,7 +201,7 @@ length, fingerprint or file/artifact, requests no OIDC permission and has no AWS
 access. Its YAML permission/binding checks and eight synthetic cases passed
 locally. It has not been activated or run against protected input.
 
-Recommended authorization: one format-only diagnostic; a correction only for a
+Phil approved this continuation after reviewing the first attempt: one format-only diagnostic; a correction only for a
 confirmed mismatch between backup validation and the existing consumer contract,
 preserving the original stored bytes; required checks for that correction; and
 one new transfer attempt with fresh temporary access and the same cleanup. Use
@@ -206,3 +210,10 @@ run; it is not needed merely to prepare this inactive diagnostic. If the result
 instead requires changing or replacing the credential, stop for that distinct
 source-repair decision. Do not silently append/trim newlines, convert encodings,
 rotate a key or republish production bindings to get a passing backup.
+
+Diagnostic `41928332920` confirmed OpenSSH boundaries, absent terminal LF and no
+CR/escaped LF. The corrected validator accepts the exact stored representation,
+alongside the LF-terminated form, without changing either. Missing/corrupt framing,
+CRLF, literal escaped newlines and other trailing bytes remain errors. Regression
+tests verify the original string survives serialization, write and read-back with
+and without final LF. No protected source binding has been changed.

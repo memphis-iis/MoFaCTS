@@ -13,7 +13,8 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **4 invoked of 5; 1 slot unallocated**. CI `41877424659`
+Current allowance: **4 invoked of 5; slot 5 reserved for the SSH binding validator
+correction's normal push CI; no slots unallocated**. CI `41877424659`
 completed successfully on the protected-transfer draft. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
@@ -23,13 +24,45 @@ run conservatively against the cap until its actual invocation outcome is record
 | 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
 | 3 | `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef` | `41844153544` / 1 | Meteor integration and complete canonical image/ABI/topology/startup/cleanup checks passed. Security `41844153368` passed all four jobs. No Meteor retry. |
 | 4 | `d5e8f70524854cb20e9586d2816de3832847cd79` | `41877424659` / 1 | Complete CI passed, including Meteor, both typechecks, capture/protection, canonical Compose image identity/ABI/topology/startup/cleanup. Security `41877424480` passed all four jobs. No retry. |
-| 5 | — | — | Unallocated. |
+| 5 | SSH binding validator correction; commit/run recorded after publication | Pending normal push CI | Reserved; do not separately dispatch a duplicate. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
 The continuation approves publication of the locally verified follow-up to the
 reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
+
+### Format-only diagnosis confirmed terminal-LF mismatch; correction in verification (2026-11-04)
+
+Published diagnostic activation `1fb354a154496e05123eb64d8856ed3669b0ba19` and
+ran exactly one format-only workflow:
+[`41928332920`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41928332920),
+completed successfully. Its fixed flags report OpenSSH header/footer present,
+RSA-PEM/PKCS8 boundaries absent, terminal LF absent, and CR/escaped LF absent.
+Only those ten booleans were retained privately; no value, substring, length,
+fingerprint or key file was emitted. Disabled the diagnostic and removed its
+active workflow source; no AWS/OIDC access was granted to it.
+
+This confirms the stored GitHub binding lacks terminal LF, while the existing
+production consumer adds LF with `printf '%s\n'`. Corrected only the backup
+validator's stored-string boundary contract: accept the same LF-only OpenSSH
+binding with or without one terminal LF and preserve its exact original bytes.
+Missing/corrupt boundaries, CRLF, escaped newlines and trailing other bytes still
+fail. Added regression coverage for exact write/read-back preservation of both
+representations and negative malformed cases. No GitHub credential was edited,
+rotated, normalized or republished. No deployment/SSH materialization changed.
+Reserve the fifth authorized Meteor invocation for normal push CI on this
+locally verified correction; do not create AWS access or use the single approved
+transfer retry until its required checks pass.
+
+Local full lint passed, retaining **323 surfaces**. Full source-security suite
+passed **77/83 with six documented Windows-only platform skips**, including
+write/read-back preservation with and without final LF and malformed-input
+denials. No TypeScript-bearing app change was made; normal CI will run both
+ordinary full typechecks and the reserved Meteor/image checks. Public recovery
+guidance now names the GitHub binding's optional terminal LF and assigns key-file
+materialization to the existing production consumer. No TDF/config contract or
+user-facing behavior changed; dependent config/wiki edits are unnecessary.
 
 ### Format-only diagnostic and one corrected transfer retry approved (2026-11-04)
 

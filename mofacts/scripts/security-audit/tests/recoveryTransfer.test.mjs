@@ -95,6 +95,20 @@ test('recovery bundle preserves all binding bytes, nested JSON, extra fields and
   assert.equal(input.AUDIT_SSH_PRIVATE_KEY.endsWith('\n'), true);
 });
 
+test('recovery preserves the GitHub SSH binding with or without a terminal LF through write and read-back', async () => {
+  for (const terminalLf of [true, false]) {
+    const input = bindings();
+    if (!terminalLf) input.AUDIT_SSH_PRIVATE_KEY = input.AUDIT_SSH_PRIVATE_KEY.slice(0, -1);
+    const original = input.AUDIT_SSH_PRIVATE_KEY;
+    const mock = cloud();
+    await transferRecoveryBaseline({ bindings: input, source, target, aws: mock.aws });
+    const written = JSON.parse(mock.calls.find(call => call.operation === 'put-secret-value').request.SecretString);
+    assert.equal(written.secrets.AUDIT_SSH_PRIVATE_KEY, original);
+    assert.equal(written.secrets.AUDIT_SSH_PRIVATE_KEY.endsWith('\n'), terminalLf);
+    assert.equal(input.AUDIT_SSH_PRIVATE_KEY, original);
+  }
+});
+
 test('recovery rejects missing/extra bindings, malformed or duplicate JSON, bad keys and incomplete fixtures', () => {
   const cases = [
     [value => { delete value.TS_OAUTH_SECRET; }, 'binding-inventory'],
@@ -104,7 +118,10 @@ test('recovery rejects missing/extra bindings, malformed or duplicate JSON, bad 
     [value => { value.AUDIT_AUTH_FIXTURES_JSON = '{'; }, 'fixture-json'],
     [value => { value.AUDIT_AUTH_FIXTURES_JSON = '{}'; }, 'fixture-completeness'],
     [value => { value.AUDIT_REPORT_INGEST_SECRET = 'short'; }, 'ingest-key'],
-    [value => { value.AUDIT_SSH_PRIVATE_KEY = value.AUDIT_SSH_PRIVATE_KEY.trimEnd(); }, 'ssh-key-format'],
+    [value => { value.AUDIT_SSH_PRIVATE_KEY = value.AUDIT_SSH_PRIVATE_KEY.replace('END OPENSSH', 'END OTHER'); }, 'ssh-key-format'],
+    [value => { value.AUDIT_SSH_PRIVATE_KEY = value.AUDIT_SSH_PRIVATE_KEY.replaceAll('\n', '\r\n'); }, 'ssh-key-format'],
+    [value => { value.AUDIT_SSH_PRIVATE_KEY = value.AUDIT_SSH_PRIVATE_KEY.replaceAll('\n', '\\n'); }, 'ssh-key-format'],
+    [value => { value.AUDIT_SSH_PRIVATE_KEY += ' '; }, 'ssh-key-format'],
     [value => { value[RECOVERY_PUBLIC_VARIABLE] = publicKey.replaceAll('PUBLIC KEY', 'PRIVATE KEY'); }, 'report-public-key'],
   ];
   for (const [mutate, expected] of cases) {
