@@ -2,6 +2,232 @@
 
 Last baseline with passing CI, Security and image checks: `630eabdb9f9a9ffe8d1f013f0d7eba112864ee07`.
 
+## Docker image identity correction implemented locally; CI authorization boundary (2026-11-03)
+
+Phil approved the compatibility correction and continuation to the next decision
+point. Implemented one standalone, observation-only Docker-save metadata reader
+shared by the CI collector, workstation observation command and protected receipt
+reader. It hashes the actual config bytes and validates the selected OCI
+index/manifest/config links; classic stores explicitly require the raw engine ID
+to equal the config hash. Missing, tampered, ambiguous, unsafe or excessive archive
+evidence fails. Layers stream past without extraction or decompression. Limits:
+2 GiB export, 4,096 entries, 1 MiB per retained metadata entry, 32 MiB retained
+metadata, and a two-minute command timeout. No dependencies were added.
+
+The CI workflow now calls its raw Docker `.Id` an `image_reference`, passing it
+as an immutable engine handle. Only the shared reader emits `configDigest`.
+The protected receipt script validates the root-owned reader and uses the running
+application's Node to resolve that same config identity. Receipt `imageId`, proof
+coordinates and historical schemas remain unchanged; no stored observations or
+receipts were rewritten. The collector and host install procedures are updated in
+the public deployment guides. No user-facing application behavior, config-repo
+schema, learner persistence, access classification or wiki procedure changed.
+
+Read-only live evidence:
+
+- The workstation's Docker 29.7.2 containerd store resolves published candidate
+  engine reference `sha256:c1889f350a9cfe2bd2d8e74ece2e13db9e1f816a6afff6af5da793fab5f087b7`
+  to config `sha256:f3bef1d283b7885a7994060bb31eab3f859a2251b09d72128b252ca982840ef9`,
+  exactly matching the earlier independent registry manifest observation.
+- Staging2's Docker 29.8.2 also reports an OCI index. Its unchanged retained
+  `a3155584` application's engine reference
+  `sha256:5eadcf85e2ec98e9a2e7bf594f440896c45451315da223f5bd8dbb6b5d865c20`
+  resolves to config
+  `sha256:42930ed1249c3e21179a3f26b95f3edfe9bd1d2ea506957369675234c5c1447b`.
+  Earlier `.Id` observations of `5eadcf85` must be read as engine/index identity,
+  not configuration identity. The first probe's final assertion incorrectly
+  required a classic store and failed; correcting that probe assertion exposed
+  the successful parser result. No runtime workaround or host configuration
+  change was made. HTTPS `/health` remained 200.
+
+Verification with pinned Node 24.22.1:
+
+- Full application typecheck and lint passed; security-surface contract remains
+  323 surfaces.
+- Phase 0 suite: 154 tests, 147 passed, 7 existing platform skips, zero failures.
+- Capture suite: 98 tests, 92 passed, 6 platform skips, zero failures.
+- Source-security suite: 67 tests, 61 passed, 6 platform skips, zero failures.
+  An initial WSL connection timeout was followed by a successful read-only
+  connection probe and passing rerun; no JEDM configuration was changed.
+- Image-observer regression suite: 19/19 passed, covering classic/manifest/index
+  identity, altered or missing content, ambiguous platforms, limits, unsafe tar
+  entries and native-reference/config separation. Shell syntax check passed.
+- Extended the Linux protected-host fixture to exercise all three image formats,
+  protected parser permissions, malformed exports and actual config mismatch.
+  Native execution in Ubuntu-MoFaCTS stopped at its existing `jq` prerequisite;
+  that environment does not have jq. No dependency was installed and this fixture
+  is not claimed passing. The supported hosted Linux CI run remains required.
+
+The next boundary is explicit permission to commit/push this intentional batch
+and run one fresh Meteor integration/CI execution, which also exercises the Linux
+host fixture and changed workflow. No current single-use authorization remains.
+No commit, push, CI dispatch, application deployment, release-record publication
+or protected receipt installation was performed in this correction batch. Related
+setup/evidence documentation is also local; unrelated working changes remain
+preserved. Passing observations remain separate from release qualification.
+Phase 0 remains open.
+
+Phil subsequently approved committing/pushing this correction batch and one fresh
+Meteor integration run, with continuation to the next decision point. The push
+will trigger the canonical main CI and Security workflows; no duplicate dispatch
+or retry is authorized. The following execution checkpoint will record results.
+
+## Public staging2 image published; Docker identity compatibility decision reached (2026-11-03)
+
+Phil approved publishing the verified application candidate to a separate public
+Docker Hub repository `ppavlikmemphis/mofacts-staging2`, using the existing sign-in.
+The canonical Compose captured-source build completed successfully for `630eabdb`.
+The resulting image passed embedded-source comparison with the independent Linux
+and accepted CI observation, linux/amd64 and revision checks, Node 24.22.1/Undici
+7.30.1 ABI checks, and verification that npm/npx and private runtime environment
+fields are absent. The exact candidate also passed an isolated synthetic MongoDB
+replica-set startup and HTTP health check, using the existing CI startup contract.
+Its first preparation attempt was rejected by the readiness helper's required
+`mofacts-ci-*` container-name contract; owned fixtures were cleaned, the names were
+corrected, and the startup check then passed. No Meteor integration was invoked.
+
+Created the explicitly public repository using Docker Hub's documented namespace
+API and the existing Docker Desktop access token in memory only. Anonymous
+visibility read-back passed. Tagged and pushed the exact tested candidate as
+`ppavlikmemphis/mofacts-staging2:staging2-630eabdb`; push exited zero. The prior
+production repository's tags/configuration were not changed. No new token or
+credential was stored. Runtime secrets/settings remain in their existing private
+locations and were not included as build arguments or image environment fields.
+
+Independent registry inspection established this actual linux/amd64 mapping:
+
+- Published OCI index:
+  `sha256:c1889f350a9cfe2bd2d8e74ece2e13db9e1f816a6afff6af5da793fab5f087b7`.
+- Platform manifest:
+  `sha256:72ff37bb61b105b51c6b4eecb85aa3ecc668fecc620c0672159b2615ee67e660`.
+- Platform configuration:
+  `sha256:f3bef1d283b7885a7994060bb31eab3f859a2251b09d72128b252ca982840ef9`.
+
+The workstation uses Docker Engine 29.7.2 with the containerd snapshotter. Default
+`docker image inspect .Id` and `.Descriptor.digest` identify the **index** above;
+`--platform linux/amd64` identifies the **platform manifest**, also not its config.
+Earlier operational output called the default `.Id` a config ID; that label was
+incorrect. The publication/source/startup checks remain actual passing observations,
+but no release-proof tuple was issued from that mislabeled value. Registry index
+and manifest observations were retained under the native release-evidence folder.
+
+This exposes the next compatibility decision: the current draft collectors treat
+`.Id` as `configDigest`, including `observeCiImage.mjs`, and need a reviewed image
+identity observation owner that distinguishes classic and containerd stores and
+follows index -> selected platform manifest -> config without substituting any
+coordinate. Regression coverage must exercise both stores and missing/ambiguous
+mapping; historical proof/receipt semantics must remain explicit. Do not change the
+Docker backend, disable provenance or relabel the index to satisfy the proof.
+
+Stopped before deployment, release-record publication and protected receipt
+installation. Read-only staging2 preflight still showed the healthy retained
+`a3155584` application and HTTPS 200. Production and older staging were not deployed.
+No additional CI/Meteor authorization remains. The next proposed batch is the
+image-identity compatibility correction; Phase 0 remains open. These outcome and
+setup documentation changes are local/uncommitted; unrelated working changes are
+preserved.
+
+## Docker integration applied; Linux source and CI evidence matched (2026-11-03)
+
+Phil brought the Docker settings page onscreen and approved its actual
+**Apply & restart** action after being told it could interrupt the shared local
+JEDM/MoFaCTS engine. Applied only `Ubuntu-MoFaCTS` integration; default-distribution
+and `Ubuntu-JEDM` integration remained off. Linux Docker connected to the same
+observed engine identity as Windows. The restart returned some services automatically;
+the remaining previously running JEDM containers were explicitly started, and the
+MoFaCTS watcher was restored through `deploy/hotfix-local.ps1 -Action start`.
+All nine previously running containers returned; configured JEDM/Mongo health checks
+passed and the canonical localhost helper reported full watcher readiness. No
+previously stopped application was started for this recovery.
+
+The clean Linux `630eabdb` checkout passed `prepare-tests` and `verify-tests` with
+the existing helper, builder and source-digest rules. The complete independent
+observation equals CI's observation: source snapshot
+`cffa1f80f3c637fef52adcc12e6b3289cc9be860d18f451b2ed6c464481705fb`, test contract
+`2529596a73165daf8fe8d0935b034f0fa4d256b7caf9871bd8b0b201f30091d6`, supplemental
+`b5f9d7c2e8575454d37cb37623869fd7889b04e9d736e5ec8f34656ca7759814`.
+This resolves the independent Windows/Linux source mismatch without substituting
+a digest or weakening checks. The earlier archive-only comparisons were not accepted.
+
+The approved GET-only CI image acquisition helper then accepted CI `41702322064`
+and Security `41702321872`, using the independent Linux observation and captured
+test-module inventory. Retained source bundle digest:
+`ba887ed3dc7a895a86d312c64e5a6696fc845f910fd125a1b69358ec9f752f62`;
+image bundle digest `69bbe53fd54b712057238bbec64d57645499d4007f5ae1cd87de7e3c1a4b7967`;
+exact image-observation digest
+`6d2f9a623b86a4e7facd784a1f9a42399b67599d4f5ad4492851927fa563f494`.
+The state remains `acquired-unqualified`, not release qualification. Evidence is in
+the operator's native `C:\Users\ppavl\MoFaCTS-Release-Evidence\staging2-630eabdb`.
+OneDrive's reparse-point chain was rejected by the ZIP reader. LocalAppData also
+failed canonical-path checking because the desktop app redirects it into its
+package cache. The native user-home evidence folder passed unchanged path/ZIP
+checks. Credentials remain in the designated personal Desktop directory. Failed
+acquisitions produced no accepted proof; no path or ZIP checks were disabled.
+
+A separate staging2-only private build profile was prepared beside the existing
+Desktop profile, preserving its credentials/settings and changing only the image
+tag and source revision. The canonical captured-source Compose build was started
+for `mofacts-local/mofacts-mini:staging2-630eabdb`; its result is still pending at
+this checkpoint. No additional Meteor integration was invoked.
+
+The next decision is publication transport. Existing production instructions use
+Docker Hub `ppavlikmemphis/mofacts-mini`; staging2 has used local image archives.
+The approved release-proof shape requires a real published manifest/index and its
+config association. Phil was asked whether to use a separate public Docker Hub
+repository `ppavlikmemphis/mofacts-staging2` with the existing sign-in, or discuss
+private-registry storage first. No image was published or deployed, and no host
+receipt was installed. Phase 0 remains open. These follow-up notes remain local.
+
+## Docker integration selected; shared-engine restart decision pending (2026-11-03)
+
+Phil brought Docker Desktop's WSL Integration page onscreen. The visible page
+showed default-distribution integration disabled, `Ubuntu-JEDM` disabled, and
+`Ubuntu-MoFaCTS` disabled. Selected only `Ubuntu-MoFaCTS`; the page now presents
+**Apply & restart**. It has not been applied. Existing local JEDM containers and
+the MoFaCTS development stack share that engine, so the restart can interrupt
+their current work. Phil was asked to approve the actual restart or defer until
+local JEDM work is idle. No Docker restart or staging2 deployment occurred.
+
+Bounded pre-restart container/image identities and startup/health observations
+were saved in the already approved personal Desktop credential/recovery directory;
+no container environments or database records were retained. The dedicated Linux
+checkout's supplemental digest was rechecked and still matches CI. Full capture
+awaits the applied integration and verified Docker engine identity. Source-digest
+rules and existing verification gates remain unchanged.
+
+## Dedicated Linux environment created; Docker UI integration pending (2026-11-03)
+
+Phil approved a separate `Ubuntu-MoFaCTS` WSL environment after discussing the
+effect of adding release tools to `Ubuntu-JEDM`. WSL's installed version does not
+support `--install --name`; that invocation printed usage and made no installation.
+The documented WSL import route then created the named environment from Canonical's
+official Ubuntu 24.04 amd64 WSL root filesystem, with its published SHA-256 checked
+before import. Its storage is under the operator's LocalAppData MoFaCTS directory.
+`Ubuntu-JEDM` remains the default distribution and was not modified for this setup.
+
+Installed official Node 24.22.1 for Linux x64 under `/opt`, verified against the
+official SHA-256 `6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6`.
+Node 24.22.1 and npm 11.19.1 passed checks under the dedicated `mofacts` user.
+That user is the new environment's default; only the new distribution was
+terminated/restarted to verify this. No additional Meteor invocation occurred.
+
+A clean Linux Git checkout of tested revision `630eabdb` on branch `main`, under
+`/home/mofacts/releases/git-630eabdb`, has a clean working tree and supplemental
+digest `b5f9d7c2e8575454d37cb37623869fd7889b04e9d736e5ec8f34656ca7759814`,
+matching CI. The earlier Linux archive comparison differed and was not accepted.
+The source-capture guide now requires a clean Git checkout for this comparison.
+Full build-source capture and accepted CI acquisition remain pending Docker access.
+
+Docker Desktop's existing JEDM containers remained running with unchanged uptime.
+No Docker engine restart, integration setting change, JEDM package/configuration
+change, staging2 release or receipt installation was performed. Desktop automation
+could read Docker's accessibility controls but failed with `coordinate input
+geometry is unavailable`; reselect/activate/Raise did not recover a visible target.
+Phil was asked to bring Settings > Resources > WSL Integration onscreen and reply
+ready so only `Ubuntu-MoFaCTS` can be selected reliably. Integration remains pending;
+no unsupported settings-file edit or alternate Docker bridge was introduced.
+These setup notes are local/uncommitted. Unrelated working changes remain preserved.
+
 ## Audit batch published; CI passed; Linux release-setup decision reached (2026-11-03)
 
 Phil authorized publication of the reviewed batch and canonical staging2 profile,

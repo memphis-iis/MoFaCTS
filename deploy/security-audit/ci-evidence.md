@@ -26,6 +26,14 @@ attest that directory's source bytes or define the required security-test catalo
 
 Use an existing operator-owned output directory outside the test application:
 
+On Windows, use a native directory whose resolved path is unchanged and whose
+ancestor chain has no reparse points, for example an operator-owned release-evidence
+folder directly under the user profile. The archive reader rejects OneDrive's
+reparse-point directories. Desktop-app redirection of LocalAppData can also fail
+canonical-path checks. Do not relax those checks or silently redirect an accepted
+evidence locator. Keep credentials in their separately approved storage; the
+non-secret acquired evidence bundles need their own stable native directory.
+
 ```powershell
 .\deploy\collect-ci-evidence.ps1 `
     -CiRunId $CiRunId -SecurityRunId $SecurityRunId `
@@ -118,6 +126,18 @@ establish the workstation's built, published or running image, required security
 catalog coverage, or release qualification. Connecting the returned references
 to a release-record candidate and installing protected host proof remain
 separate operations.
+
+The November 3 workstation rehearsal exposed an image-identity limitation in the
+previous draft collector: it treated `docker image inspect .Id` as a config digest. On the
+observed Docker 29.7.2 containerd store, default inspection returned an OCI index
+digest, and platform-selected inspection returned a manifest digest. Neither was
+the config digest referenced by that manifest. Source/CI acquisition success must
+not waive this distinction or qualify a workstation tuple with the wrong coordinate.
+The local correction now resolves the configuration from the actual Docker-save
+content graph for both stores; see [identity collection](source-capture.md#external-ci-image-observation).
+Existing stored observations are not rewritten. Publication and real CI validation
+of the corrected producer/host reader remain required before the staging2
+release-record/receipt rehearsal can continue.
 
 ## Verification
 

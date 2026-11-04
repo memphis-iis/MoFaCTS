@@ -69,6 +69,31 @@ the app service is built; MongoDB/Redis are not started by Compose. The existing
 isolated Docker runtime topology tests remain separate consumers of that image.
 No profile contents or generated credentials are logged or uploaded.
 
+## Workstation Linux capture environment
+
+For a Linux-CI release comparison, use the dedicated `Ubuntu-MoFaCTS` WSL 2
+environment with the repository-pinned Node/npm runtime. Keep the source checkout
+in its Linux filesystem. Enable Docker Desktop integration specifically for this
+distribution through Settings > Resources > WSL Integration, then verify the
+Docker engine identity before invoking the existing capture helper.
+
+Use a clean Git checkout of the exact tested commit. A Git archive is not a
+replacement for checkout processing: the November 3 rehearsal's Linux archive
+had a different supplemental digest, while a clean Linux checkout of `630eabdb`
+matched CI's supplemental digest exactly. A Windows capture also passed its own
+round trip but differed from Linux CI, including Docker's incoming file modes.
+Preserve these mismatches as observations; never substitute CI's digest for the
+independent candidate's computed digest.
+
+Run the existing `prepare-tests` and `verify-tests` commands from that checkout
+with its exact revision, explicit builder and clean-source flag. These acquire
+source and test inputs; they do not invoke Meteor integration. Compare the full
+source, test-contract and supplemental identities before accepting CI evidence.
+The November 3 workstation setup verified Node 24.22.1/npm 11.19.1, Docker
+integration and engine identity, and the complete independent source/test-input
+comparison against CI for `630eabdb`. This establishes matched source observations;
+the built, published and running release-image proof remains a separate gate.
+
 ## Historical implementation checkpoints
 
 October 13 image-comparison implementation: the shared `source_inputs` stage now
@@ -273,8 +298,8 @@ disposal remains responsible for interrupted job lifetime, not the local watcher
 
 The workflow revision replaces the existing post-build source assertion
 with `observeCiImage.mjs`, executed from the verified captured test application
-so its pinned parser dependencies are available. It inspects the immutable
-Docker config ID and platform and reads the fixed embedded source record with
+so its pinned parser dependencies are available. It accepts an immutable Docker
+engine reference, resolves its actual config digest and platform, and reads the fixed embedded source record with
 no network and a read-only filesystem. The bounded external record references
 the SHA-256 of the exact pre-build Meteor evidence file; it is not embedded in
 the image and contains no claim about future smoke results.
@@ -286,6 +311,30 @@ The record remains `observed-unqualified`, lane `ci-test-image`. This unpublishe
 runner-local image is separate from the workstation's built, registry and
 running images; a matching source digest cannot populate the workstation release
 tuple. That linkage, catalog closure and full qualification remain separate work.
+
+`observeDockerImage.mjs` owns local identity collection for both classic and
+containerd image stores. Docker's raw `.Id` is an engine reference: containerd can
+return an index or manifest digest there. The helper inspects its descriptor and
+streams `docker image save` from that immutable reference. Classic config bytes
+must hash to their declared config ID. OCI index/manifest/config links must match
+their raw-byte digests and sizes, with exactly one `linux/amd64` candidate. The
+result's existing `configDigest` field always identifies configuration bytes.
+
+The standalone `imageArchiveIdentity.mjs` reader shares this resolution with the
+protected receipt tool. It never extracts files, decompresses layers, reads a
+registry or emits config contents. It bounds export time to two minutes, archive
+size to 2 GiB, entries to 4,096, each retained metadata file to 1 MiB and retained
+metadata to 32 MiB. Layer data is streamed past. Unsupported tar entries, links,
+duplicate paths/JSON keys, corrupt or incomplete graphs and ambiguous platforms
+fail explicitly. No new dependency, proof schema or historical-record migration
+is introduced. Real CI execution of this correction remains a separate gate.
+
+From `mofacts/`, an explicitly selected existing engine reference can be observed
+without rebuilding or publishing an image:
+
+```powershell
+node scripts/security-audit/qualification/observeDockerImage.mjs sha256:<engine-reference>
+```
 
 This Phase 0 draft has pure/injected collector checks and shared Node/Meteor
 parity tests. Consult the status record for the exact candidate and whether its

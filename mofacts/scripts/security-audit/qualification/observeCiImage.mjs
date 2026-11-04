@@ -10,12 +10,12 @@ import { parseImageObservation } from '../../../common/securityAudit/releaseQual
 import { evidenceCommand, readCiFile } from './collectCiEvidence.mjs';
 import { parseCiEvidenceJson, CI_EVIDENCE_LIMITS } from './ciEvidence.mjs';
 import { validateRun } from '../../meteorTestEvidence.cjs';
+import { observeDockerImage } from './observeDockerImage.mjs';
 
 const maximumObservationBytes = 16384;
 const repositoryRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const invalid = () => { throw new Error('CI image observation failed; no qualification was issued.'); };
-const inspectFormat = '{"configDigest":{{json .Id}},"platform":"{{.Os}}/{{.Architecture}}"}';
 const probeOwnerLabel = 'org.mofacts.ci-image-observation.owner';
 const probeListingFormat = '{"id":{{json .ID}},"name":{{json .Names}}}';
 const probeInspectFormat = `{"id":{{json .Id}},"owner":{{json (index .Config.Labels "${probeOwnerLabel}")}}}`;
@@ -81,21 +81,19 @@ async function removeFailedProbe(command, probe) {
 /** Actual immutable-image reads, never a caller-supplied successful command flag. */
 export async function observeCiImage(input, dependencies = {}) {
   try {
-    proofRecord(input, ['imageConfig', 'sourceObservationBytes', 'sourceEvidenceBytes', 'ci']);
-    const requestedConfig = imageDigest(input.imageConfig);
+    proofRecord(input, ['imageReference', 'sourceObservationBytes', 'sourceEvidenceBytes', 'ci']);
+    const requestedImage = imageDigest(input.imageReference);
     const source = validateSourceEvidence(input.sourceObservationBytes, input.sourceEvidenceBytes, input.ci);
     const command = dependencies.command || evidenceCommand;
-    const inspected = parseImageObservation(parseCiEvidenceJson(await command('docker', [
-      '--context', 'default', 'image', 'inspect', '--format', inspectFormat, requestedConfig,
-    ], maximumObservationBytes), maximumObservationBytes));
-    if (inspected.configDigest !== requestedConfig || inspected.platform !== 'linux/amd64') invalid();
+    const inspected = parseImageObservation(await observeDockerImage(requestedImage, dependencies));
+    if (inspected.platform !== 'linux/amd64') invalid();
     const owner = randomUUID();
     const probe = { name: `mofacts-ci-image-probe-${owner}`, owner };
     try {
       const embedded = parseCiEvidenceJson(await command('docker', [
         '--context', 'default', 'run', '--rm', '--name', probe.name, '--label', `${probeOwnerLabel}=${probe.owner}`,
         '--pull', 'never', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
-        '--security-opt', 'no-new-privileges:true', '--entrypoint', 'node', requestedConfig, '-e', embeddedRead,
+        '--security-opt', 'no-new-privileges:true', '--entrypoint', 'node', requestedImage, '-e', embeddedRead,
       ], maximumObservationBytes), maximumObservationBytes);
       proofRecord(embedded, ['schema', 'state', 'identity']);
       if (embedded.schema !== 'MoFaCTSImageSourceObservationV1' || embedded.state !== 'source-matched-unqualified'
@@ -116,7 +114,7 @@ export async function observeCiImage(input, dependencies = {}) {
   }
 }
 
-export async function writeCiImageObservation(imageConfig, sourceFile, evidenceFile, output, ci, dependencies = {}) {
+export async function writeCiImageObservation(imageReference, sourceFile, evidenceFile, output, ci, dependencies = {}) {
   try {
     const destination = path.resolve(output);
     const relative = path.relative(repositoryRoot, destination);
@@ -131,7 +129,7 @@ export async function writeCiImageObservation(imageConfig, sourceFile, evidenceF
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     const sourceObservationBytes = await readCiFile(sourceFile, maximumObservationBytes);
     const sourceEvidenceBytes = await readCiFile(evidenceFile, CI_EVIDENCE_LIMITS.jsonBytes);
-    const observation = await observeCiImage({ imageConfig, sourceObservationBytes, sourceEvidenceBytes, ci }, dependencies);
+    const observation = await observeCiImage({ imageReference, sourceObservationBytes, sourceEvidenceBytes, ci }, dependencies);
     const bytes = Buffer.from(`${JSON.stringify(observation)}\n`);
     if (bytes.length > maximumObservationBytes) invalid();
     const handle = await fs.open(destination, 'wx', 0o600);
@@ -145,10 +143,10 @@ export async function writeCiImageObservation(imageConfig, sourceFile, evidenceF
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [imageConfig, sourceFile, evidenceFile, output] = process.argv.slice(2);
+  const [imageReference, sourceFile, evidenceFile, output] = process.argv.slice(2);
   const environment = process.env;
-  const action = environment.CI && imageConfig && sourceFile && evidenceFile && output && process.argv.length === 6
-    ? writeCiImageObservation(imageConfig, sourceFile, evidenceFile, output, {
+  const action = environment.CI && imageReference && sourceFile && evidenceFile && output && process.argv.length === 6
+    ? writeCiImageObservation(imageReference, sourceFile, evidenceFile, output, {
       repository: environment.GITHUB_REPOSITORY, commit: environment.GITHUB_SHA,
       runId: environment.GITHUB_RUN_ID, runAttempt: environment.GITHUB_RUN_ATTEMPT,
     }) : Promise.reject();

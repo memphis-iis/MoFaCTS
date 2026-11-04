@@ -141,14 +141,25 @@ file with no additional hard links. The existing root-only
 `/etc/mofacts/security-audit.conf` owns the selected application container through
 `MOFACTS_APP_CONTAINER`. The helper takes no container override or new config key.
 
+The receipt's existing `imageId` means the image **configuration digest**. The
+host reader resolves the running container's immutable engine reference through
+the same standalone `imageArchiveIdentity.mjs` content-graph reader used by CI.
+It does not compare a containerd index/manifest ID as though it were a config ID.
+The running application's Node streams the export; no extra host Node package or
+registry access is required. Export and metadata limits are documented in
+[source capture](source-capture.md#external-ci-image-observation). Missing or
+untrusted support files and failed/ambiguous observations remain unavailable;
+existing receipt bytes are not rewritten to conceal a mismatch.
+
 After a separately authorized owner-controlled file transfer, install the source
-script and standalone parser from their reviewed commit. These examples assume
-the two reviewed files are in the current transfer directory on the host:
+script and both standalone parsers from their reviewed commit. These examples
+assume the three reviewed files are in the current transfer directory on the host:
 
 ```bash
 sudo install -d -o root -g root -m 0755 /usr/local/libexec/mofacts-security-audit
 sudo install -o root -g root -m 0755 release-receipt.sh /usr/local/libexec/mofacts-security-audit/release-receipt.sh
 sudo install -o root -g root -m 0644 releaseReceipt.mjs /usr/local/libexec/mofacts-security-audit/releaseReceipt.mjs
+sudo install -o root -g root -m 0644 imageArchiveIdentity.mjs /usr/local/libexec/mofacts-security-audit/imageArchiveIdentity.mjs
 sudo /usr/local/libexec/mofacts-security-audit/release-receipt.sh install < release-receipt-transfer.json
 sudo /usr/local/libexec/mofacts-security-audit/release-receipt.sh read
 ```

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './dockerImageIdentity.test.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,9 @@ import test from 'node:test';
 import { ciEvidenceFixture } from './helpers/ciEvidenceFixture.mjs';
 import { observeCiImage, writeCiImageObservation } from '../qualification/observeCiImage.mjs';
 import { parsePostBuildImageObservation } from '../../../common/securityAudit/postBuildImageObservation.ts';
+import { dockerImageFixture } from './helpers/dockerImageArchiveFixture.mjs';
+import { readDockerArchiveIdentity } from '../qualification/imageArchiveIdentity.mjs';
+import { Readable } from 'node:stream';
 
 const bytes = value => Buffer.from(JSON.stringify(value));
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -15,16 +19,16 @@ const failure = { message: 'CI image observation failed; no qualification was is
 
 function fixture(change = () => {}) {
   const source = ciEvidenceFixture();
-  const input = { imageConfig: `sha256:${'f'.repeat(64)}`,
+  const input = { imageReference: `sha256:${'f'.repeat(64)}`,
     sourceObservationBytes: source.files['mofacts-source-observation.json'],
     sourceEvidenceBytes: source.files['mofacts-meteor-test-evidence.json'],
     ci: { repository: 'memphis-iis/MoFaCTS', commit: source.expectedObservation.identity.baseCommit,
       runId: '101', runAttempt: '1' } };
-  const inspected = { configDigest: input.imageConfig, platform: 'linux/amd64' };
+  const inspected = { nativeId: input.imageReference, platform: 'linux/amd64', descriptor: null };
   const embedded = { schema: 'MoFaCTSImageSourceObservationV1', state: 'source-matched-unqualified',
     identity: structuredClone(source.expectedObservation.identity) };
   const calls = [];
-  const dependencies = { command: async (command, args, maximum) => {
+  const dependencies = { archive: async value => ({ configDigest: value.nativeId, platform: value.platform }), command: async (command, args, maximum) => {
     calls.push({ command, args, maximum });
     assert.equal(command, 'docker');
     if (args[2] === 'container') return Buffer.alloc(0); // ordinary --rm completed
@@ -40,7 +44,7 @@ test('actual inspect and isolated embedded read produce only a bounded CI image 
   assert.deepEqual(parsePostBuildImageObservation(result), result);
   assert.equal(result.state, 'observed-unqualified');
   assert.equal(result.lane, 'ci-test-image');
-  assert.equal(result.image.configDigest, input.imageConfig);
+  assert.equal(result.image.configDigest, input.imageReference);
   assert.equal(result.sourceEvidenceDigestSha256, hash(input.sourceEvidenceBytes));
   assert.equal(calls.length, 2);
   assert.ok(calls.every(call => call.maximum === 16384));
@@ -56,7 +60,7 @@ test('actual inspect and isolated embedded read produce only a bounded CI image 
   const probeLabel = args[args.indexOf('--label') + 1];
   assert.match(probeName, /^mofacts-ci-image-probe-[0-9a-f-]{36}$/);
   assert.equal(probeLabel, `org.mofacts.ci-image-observation.owner=${probeName.slice('mofacts-ci-image-probe-'.length)}`);
-  assert.ok(args.includes(input.imageConfig));
+  assert.ok(args.includes(input.imageReference));
   assert.ok(args.at(-1).includes("p='/opt/mofacts-source-observation.json'"));
   assert.doesNotMatch(JSON.stringify(result), /PASS|smoke|password|sensitive/);
 });
@@ -82,9 +86,30 @@ test('post-build contract rejects different lanes, dirty source, platform and CI
   }
 });
 
+test('CI observation uses resolved config identity while probing the immutable engine reference', async () => {
+  for (const kind of ['index', 'manifest']) {
+    const image = dockerImageFixture(kind);
+    const { input, embedded } = fixture();
+    input.imageReference = image.inspection.nativeId;
+    let probed = false;
+    const result = await observeCiImage(input, {
+      command: async (_command, args) => {
+        if (args[2] === 'image') return bytes(image.inspection);
+        assert.ok(args.includes(image.inspection.nativeId));
+        probed = true;
+        return bytes(embedded);
+      },
+      archive: inspected => readDockerArchiveIdentity(Readable.from([image.archive()]), inspected),
+    });
+    assert.equal(result.image.configDigest, image.configDigest);
+    assert.notEqual(result.image.configDigest, input.imageReference);
+    assert.equal(probed, true);
+  }
+});
+
 test('invalid expected source or joined evidence is rejected before any image command', async () => {
   const mutations = [
-    input => { input.imageConfig = 'latest'; },
+    input => { input.imageReference = 'latest'; },
     input => { input.ci.runId = '0'; }, input => { input.ci.commit = 'b'.repeat(40); },
     input => { input.ci.runAttempt = '2'; }, input => { input.ci.repository = 'untrusted/fork'; },
     input => { const source = JSON.parse(input.sourceObservationBytes); source.identity.includedUncommittedLocalChanges = true; input.sourceObservationBytes = bytes(source); },
@@ -109,7 +134,7 @@ test('actual image/config/source mismatches, malformed payloads and command erro
   for (const mode of ['image', 'platform', 'embedded', 'unavailable', 'private', 'json', 'duplicate', 'large', 'command']) {
     const { input, dependencies } = fixture(({ args, inspected, embedded }) => {
       if (args[2] === 'image') {
-        if (mode === 'image') inspected.configDigest = `sha256:${'0'.repeat(64)}`;
+        if (mode === 'image') inspected.nativeId = `sha256:${'0'.repeat(64)}`;
         if (mode === 'platform') inspected.platform = 'windows/amd64';
         if (mode === 'command') throw new Error('private command diagnostic');
       } else {
@@ -187,7 +212,7 @@ test('failed or cancelled probe reads verify ownership before removing their imm
       assert.deepEqual(args, ['--context', 'default', 'container', 'rm', '--force', id]);
       return Buffer.from(`${id}\n`);
     };
-    await assert.rejects(observeCiImage(input, { command }), failure);
+    await assert.rejects(observeCiImage(input, { command, archive: async value => ({ configDigest: value.nativeId, platform: value.platform }) }), failure);
     assert.equal(commands.length, 5);
   }
 });
@@ -218,7 +243,7 @@ test('failed probe cleanup refuses foreign labels and reports daemon/removal unc
       if (mode === 'remove-error') throw new Error('private daemon diagnostic');
       assert.fail('foreign container removal attempted');
     };
-    await assert.rejects(observeCiImage(input, { command }), {
+    await assert.rejects(observeCiImage(input, { command, archive: async value => ({ configDigest: value.nativeId, platform: value.platform }) }), {
       message: 'CI image observation probe cleanup failed; no qualification was issued.',
       code: 'CI_IMAGE_PROBE_CLEANUP_FAILED',
     });
@@ -258,11 +283,11 @@ async function filesystemFixture(t) {
 
 test('writer exclusively publishes bounded observation outside source and preserves existing bytes', async t => {
   const { input, dependencies, calls, sourceFile, evidenceFile, output } = await filesystemFixture(t);
-  const observed = await writeCiImageObservation(input.imageConfig, sourceFile, evidenceFile, output, input.ci, dependencies);
+  const observed = await writeCiImageObservation(input.imageReference, sourceFile, evidenceFile, output, input.ci, dependencies);
   assert.deepEqual(JSON.parse(await fs.readFile(output)), observed);
   assert.ok((await fs.stat(output)).size <= 16384);
   calls.length = 0;
-  await assert.rejects(writeCiImageObservation(input.imageConfig, sourceFile, evidenceFile, output, input.ci, dependencies), failure);
+  await assert.rejects(writeCiImageObservation(input.imageReference, sourceFile, evidenceFile, output, input.ci, dependencies), failure);
   assert.deepEqual(JSON.parse(await fs.readFile(output)), observed);
   assert.equal(calls.length, 0);
 });
@@ -270,12 +295,12 @@ test('writer exclusively publishes bounded observation outside source and preser
 test('writer rejects a source-tree destination, linked input and failed inspection without output', async t => {
   const { root, input, dependencies, sourceFile, evidenceFile, output } = await filesystemFixture(t);
   const insideSource = path.resolve('mofacts/scripts/security-audit/qualification/.image-observation-test-output');
-  await assert.rejects(writeCiImageObservation(input.imageConfig, sourceFile, evidenceFile, insideSource, input.ci, dependencies), failure);
+  await assert.rejects(writeCiImageObservation(input.imageReference, sourceFile, evidenceFile, insideSource, input.ci, dependencies), failure);
   const linked = path.join(root, 'linked.json');
   await fs.link(sourceFile, linked);
-  await assert.rejects(writeCiImageObservation(input.imageConfig, linked, evidenceFile, output, input.ci, dependencies), failure);
+  await assert.rejects(writeCiImageObservation(input.imageReference, linked, evidenceFile, output, input.ci, dependencies), failure);
   await fs.unlink(linked);
-  await assert.rejects(writeCiImageObservation(input.imageConfig, sourceFile, evidenceFile, output, input.ci,
+  await assert.rejects(writeCiImageObservation(input.imageReference, sourceFile, evidenceFile, output, input.ci,
     { command: async () => { throw new Error('private failure'); } }), failure);
   await assert.rejects(fs.lstat(output), { code: 'ENOENT' });
 });

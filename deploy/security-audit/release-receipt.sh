@@ -6,6 +6,7 @@ export LC_ALL=C
 CONFIG_FILE=/etc/mofacts/security-audit.conf
 RECEIPT_FILE=/etc/mofacts/release-receipt.json
 MODULE_FILE=/usr/local/libexec/mofacts-security-audit/releaseReceipt.mjs
+IMAGE_IDENTITY_MODULE=/usr/local/libexec/mofacts-security-audit/imageArchiveIdentity.mjs
 
 action="${1:-}"
 fail() {
@@ -35,17 +36,28 @@ secure_directory "$(dirname -- "$CONFIG_FILE")" || fail unsafe-directory
 secure_directory "$(dirname -- "$MODULE_FILE")" || fail unsafe-directory
 secure_file "$CONFIG_FILE" 600 || fail protected-config-unavailable
 secure_file "$MODULE_FILE" 644 || fail protected-parser-unavailable
+secure_directory "$(dirname -- "$IMAGE_IDENTITY_MODULE")" || fail unsafe-directory
+secure_file "$IMAGE_IDENTITY_MODULE" 644 || fail protected-parser-unavailable
+[[ "$(stat -c '%s' -- "$IMAGE_IDENTITY_MODULE")" -le 16384 ]] || fail protected-parser-unavailable
 [[ "$(stat -c '%s' -- "$MODULE_FILE")" -le 16384 ]] || fail protected-parser-unavailable
 command -v jq >/dev/null || fail jq-required
 # This existing root-only file owns the selected application container. No
 # credentials or other configuration values are passed to Node or its output.
+unset MOFACTS_APP_CONTAINER
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 [[ "${MOFACTS_APP_CONTAINER:-}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$ ]] || fail invalid-container
 identity="$(docker inspect --format '{{.Id}} {{.State.Running}} {{.Image}}' "$MOFACTS_APP_CONTAINER" 2>/dev/null)" || fail running-image-unavailable
-read -r container_id running image_id extra <<<"$identity"
-[[ "$container_id" =~ ^[a-f0-9]{64}$ && "$running" == true && "$image_id" =~ ^sha256:[a-f0-9]{64}$ && -z "$extra" ]] || fail running-image-unavailable
-revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image_id" 2>/dev/null)" || fail running-image-unavailable
+read -r container_id running engine_image_id extra <<<"$identity"
+[[ "$container_id" =~ ^[a-f0-9]{64}$ && "$running" == true && "$engine_image_id" =~ ^sha256:[a-f0-9]{64}$ && -z "$extra" ]] || fail running-image-unavailable
+command -v timeout >/dev/null || fail timeout-required
+image_inspection="$(docker image inspect --format '{"nativeId":{{json .Id}},"platform":"{{.Os}}/{{.Architecture}}","descriptor":{{json .Descriptor}}}' "$engine_image_id" 2>/dev/null)" || fail running-image-unavailable
+image_module="$(cat -- "$IMAGE_IDENTITY_MODULE")"
+image_observation="$(timeout 120 docker image save "$engine_image_id" 2>/dev/null | timeout 120 docker exec -i "$container_id" node --input-type=module \
+  -e "$image_module"$'\ntry { const inspection = JSON.parse(process.argv[1]); if (inspection.nativeId !== process.argv[2]) throw Error(); const value = await readDockerArchiveIdentity(process.stdin, inspection); process.stdout.write(JSON.stringify(value)); } catch { process.exitCode=1; }' \
+  "$image_inspection" "$engine_image_id" 2>/dev/null)" || fail running-image-unavailable
+image_id="$(jq -er 'select(keys == ["configDigest","platform"] and .platform == "linux/amd64") | .configDigest | select(test("^sha256:[a-f0-9]{64}$"))' <<<"$image_observation" 2>/dev/null)" || fail running-image-unavailable
+revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$engine_image_id" 2>/dev/null)" || fail running-image-unavailable
 [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || fail running-image-unavailable
 module_source="$(cat -- "$MODULE_FILE")"
 observe() {

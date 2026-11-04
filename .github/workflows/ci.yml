@@ -246,15 +246,15 @@ jobs:
             build --builder default --workspace '${{ steps.capture.outputs.workspace }}' \
             --env-file '${{ steps.compose_profile.outputs.env_file }}'
           test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' '${{ steps.compose_profile.outputs.image }}')" = linux/amd64
-          config_digest=$(docker image inspect --format '{{.Id}}' '${{ steps.compose_profile.outputs.image }}')
-          [[ "$config_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
-          printf 'config_digest=%s\n' "$config_digest" >> "$GITHUB_OUTPUT"
+          image_reference=$(docker image inspect --format '{{.Id}}' '${{ steps.compose_profile.outputs.image }}')
+          [[ "$image_reference" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf 'image_reference=%s\n' "$image_reference" >> "$GITHUB_OUTPUT"
 
       - name: Assert image source matches tested input identity
         working-directory: .
         run: |
           node '${{ steps.capture.outputs.test_app }}/scripts/security-audit/qualification/observeCiImage.mjs' \
-            '${{ steps.image_build.outputs.config_digest }}' \
+            '${{ steps.image_build.outputs.image_reference }}' \
             "$RUNNER_TEMP/mofacts-source-observation.json" \
             "$RUNNER_TEMP/mofacts-meteor-test-evidence.json" \
             "$RUNNER_TEMP/mofacts-ci-image-observation.json"
@@ -264,7 +264,7 @@ jobs:
         run: |
           docker run --rm \
             --entrypoint /bin/sh \
-            '${{ steps.image_build.outputs.config_digest }}' \
+            '${{ steps.image_build.outputs.image_reference }}' \
             -c 'test "$(cat /opt/bundle/bundle/.node_version.txt)" = v24.22.1 && test "$(node --version)" = v24.22.1 && test "$(node -p process.versions.undici)" = 7.30.1 && ! command -v npm && ! command -v npx'
 
       - name: Reject standalone MongoDB topology
@@ -289,7 +289,7 @@ jobs:
             --env MOFACTS_SELF_HOSTED=false \
             --env MOFACTS_REQUIRE_REDIS=false \
             --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
-            '${{ steps.image_build.outputs.config_digest }}'
+            '${{ steps.image_build.outputs.image_reference }}'
           for attempt in $(seq 1 60); do
             if test "$(docker inspect --format '{{.State.Status}}' "$app")" = exited; then
               docker logs "$app" | grep -F 'Change Streams require a replica set or sharded cluster'
@@ -326,7 +326,7 @@ jobs:
             --env MOFACTS_SELF_HOSTED=false \
             --env MOFACTS_REQUIRE_REDIS=false \
             --volume "$PWD/mofacts/settings.ci.json:/run/mofacts/settings.json:ro" \
-            '${{ steps.image_build.outputs.config_digest }}'
+            '${{ steps.image_build.outputs.image_reference }}'
           for attempt in $(seq 1 60); do
             if docker exec "$app" node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
               echo "linux/amd64 application health check passed"
