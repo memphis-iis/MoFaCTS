@@ -29,6 +29,32 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### Independent AWS recovery missing; setup preflight started (2026-11-04)
+
+Phil answered **"No, we need to set that up"** when asked whether AWS sign-in
+could be recovered after losing this PC and the primary MFA device. This is a
+confirmed missing prerequisite, not an established recovery capability.
+The selected AWS Secrets Manager design remains unchanged. No new AWS resource,
+permission, credential upload, paid service, password reset or MFA change ran.
+
+Rechecked current official AWS guidance: another registered MFA device can
+preserve access; root-account lost-MFA recovery also depends on the account email
+and primary contact telephone. The actual sign-in identity and independent
+availability of those channels still require verification. Opened the existing
+staging2 AWS console URL in Chrome; it reached an unsigned IAM sign-in page.
+That page does not establish which identity Phil normally uses. Requested normal
+operator sign-in and availability of an existing separate security key or spare
+phone/tablet, without asking for credential values. The signed-in account and
+hardware inventory must be known before selecting or changing an MFA method.
+
+Prepared the public [account-recovery readiness procedure](../deploy/security-audit/account-recovery.md):
+preserve the working factor, add an independent operator-held backup, verify a
+fresh sign-in and independent email/password recovery, and retain only nonsecret
+check results. Credential enrollment/physical interactions remain operator steps;
+no QR/seed, code or key capture is permitted. A local save or device-list entry
+will not be treated as successful recovery. No Meteor invocation was needed;
+**3 of 5 used, 2 remain**. Unrelated working changes remain preserved.
+
 ### Isolated staging2 GitHub access accepted (2026-11-04)
 
 Phil approved the separate GitHub staging2 audit identity. Fresh browser
@@ -126,7 +152,8 @@ has been issued; **3 of 5 used, 2 remain**. Unrelated working changes remain pre
 Secrets Manager design requires recovery even after loss of this workstation
 and the primary MFA device. Asked Phil whether a separately stored AWS recovery
 method already exists, needs setup, or is uncertain; no passwords/codes/keys are
-requested. This cannot be established from a working browser sign-in alone.
+requested. Phil subsequently confirmed it needs setup; see the current checkpoint
+above. This cannot be established from a working browser sign-in alone.
 Existing encrypted local and GitHub copies do not satisfy that gate. AWS secret
 creation, new IAM access, credential upload, recovery rehearsal and new spending
 have not been authorized by this staging2-identity approval and have not run.
