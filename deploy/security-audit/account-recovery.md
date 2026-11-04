@@ -31,6 +31,17 @@ or remove its other registrations. An API secret is not an MFA device; an
 app-stored passkey still needs an independently accessible recovery path. See
 [AWS security-key enrollment](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable_fido.html).
 
+AWS's combined **Passkey or security key** option can register a password-manager
+passkey as well as a hardware key. A browser password manager may handle the
+creation request. A device label such as "backup security key" and AWS's generic
+device type do not prove which authenticator holds the credential. Preserve any
+successfully registered factor while investigating. Identify the actual browser
+provider-selection controls with the operator, then verify physical-key use and
+a fresh sign-in before declaring hardware recovery ready. Do not disable MFA,
+reset the key or silently treat a password-manager registration as proof of the
+selected hardware path. A password-manager recovery path requires its own
+independent-access verification.
+
 Confirm available equipment before selecting a method. Do not assume a spare
 device exists, install an authenticator, buy a key or create another paid service
 without the corresponding approval. A second authenticator on the same primary

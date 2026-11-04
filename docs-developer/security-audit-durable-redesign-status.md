@@ -29,6 +29,35 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### Dashlane passkey registered; physical-key enrollment remains unverified (2026-11-04)
+
+Phil reported that the browser directed the enrollment into Dashlane rather
+than onto the physical USB/NFC key. Live AWS read-back shows **Passkey MFA device
+assigned** and **three MFA registrations**: the two original virtual factors
+plus the newly assigned passkey/security-key entry. AWS's generic type and the
+chosen device name do not prove physical-key storage. Dashlane storage is the
+operator's reported result; physical-key enrollment and independent recovery
+remain unverified. Preserved all three registrations; nothing was removed.
+
+Prepared a separate `root-backup-usb-key` attempt and advanced to AWS's setup
+step to inspect provider selection. The page exposes an otherwise empty
+`dashlane webcard` accessibility container and waits for browser instructions;
+it exposes no provider-selection controls. No Confirm, PIN, touch or completed
+credential registration was automated. This attempt is pending, not a fourth
+accepted MFA registration. The native authentication chooser remains an operator
+step. Asked for visible popup button/link labels only, without credentials, to
+identify the actual hardware-key path rather than guess at its controls.
+
+Current official AWS guidance supports both synced password-manager passkeys
+and hardware keys; Dashlane documents handling browser passkey-creation requests.
+This does not establish that AWS rejected the physical key or identify the exact
+browser/provider setting responsible. No extension, security protection or MFA
+factor was disabled. A Dashlane passkey could supply a recovery path only after
+its independent availability and a fresh sign-in are verified; it is not silently
+substituted for the selected physical-key plan. No paid service, application code
+change, deployment or Meteor invocation occurred. **Two Meteor authorizations
+remain unused**, and unrelated working changes remain preserved.
+
 ### Physical AWS backup key confirmed; operator enrollment handoff (2026-11-04)
 
 Phil confirmed the existing item is **a physical USB/NFC security key**. Prepared
