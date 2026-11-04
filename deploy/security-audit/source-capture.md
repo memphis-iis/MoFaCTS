@@ -9,6 +9,16 @@ They remain unqualified observations, not full release proof. The dated
 implementation checkpoints below preserve history and are superseded by this
 status and the [audit record](../../docs-developer/security-audit-durable-redesign-status.md).
 
+The selected staging2 candidate `65875553` subsequently passed the complete
+[canonical CI lane](https://github.com/memphis-iis/MoFaCTS/actions/runs/41824718448),
+including Meteor, identity/ABI/topology/startup and cleanup. Independent clean
+Linux capture matched that run before evidence acquisition and workstation
+Compose construction. The actual workstation, registry and staging2 config-byte
+identities were then joined in the separate release record, with a protected
+host MATCH. These results remain **consistent-unqualified**, not full catalog
+authentication or Phase 0 closure. The later `c7444b4e` host-policy run is separate
+from the selected application's source/image proof.
+
 The revised single `lint-test-and-image` CI job retains the captured candidate
 through testing and construction. Before dependency installation, `sealCapture.mjs`
 protects the checkout and capture workspace with Linux read-only bind mounts.
@@ -333,7 +343,8 @@ size to 2 GiB, entries to 4,096, each retained metadata file to 1 MiB and retain
 metadata to 32 MiB. Layer data is streamed past. Unsupported tar entries, links,
 duplicate paths/JSON keys, corrupt or incomplete graphs and ambiguous platforms
 fail explicitly. No new dependency, proof schema or historical-record migration
-is introduced. Real CI execution of this correction remains a separate gate.
+is introduced. The correction passed complete CI `41824718448` and the live
+staging2 protected receipt comparison; historical observations remain unchanged.
 
 From `mofacts/`, an explicitly selected existing engine reference can be observed
 without rebuilding or publishing an image:

@@ -1,6 +1,8 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`.
+Last baseline with passing CI, Security and image checks: `c7444b4ec6c33feed1156f8eafb95a21320170da`.
+Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
+auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
 ## Integration authorization ledger and resumed execution (2026-11-04)
 
@@ -11,13 +13,13 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **1 invoked of 5; slot 2 reserved; 3 slots unallocated**. Count each allocated
+Current allowance: **2 invoked of 5; 3 slots unallocated**. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
 | Slot | Commit | CI run / attempt | Meteor invocation and outcome |
 | --- | --- | --- | --- |
 | 1 | `65875553c4f0fd37adfc407774bd4e7ff998ccfc` | `41824718448` / 1 | Meteor integration and complete CI image/ABI/topology/startup/cleanup checks passed. Matching Security run `41824718440` passed all four jobs. |
-| 2 | Pending host policy correction | Pending push | Reserved for DHCPv6 classification and Unix policy packaging regression checks. |
+| 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
 | 3-5 | — | — | Unallocated. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
@@ -26,7 +28,108 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
-### Successful correction evidence and staging2 setup in progress
+### Completed staging2 rehearsal and next access decision
+
+Both allocated runs passed without a retry: **2 of 5 invocations used, 3 remain**.
+Run 1 tested the selected application/build-source correction; run 2 tested the
+scoped DHCPv6 classification and Unix policy line-ending correction. Full lint,
+both application/vendor typechecks, source-security, Phase 0/capture contracts,
+native permission fixtures and canonical Compose image checks passed in CI.
+The security surface remains 323 entries. No additional Meteor invocation was
+needed for the live staging2 acceptance below.
+
+The exact captured `65875553` application was built through canonical Compose,
+published to the approved separate staging2 repository, and deployed to staging2
+only. Actual server Docker-save config-byte identity matches
+`sha256:25f1e6396fe55c4f2191a668461e3603dd69cc95077a1084427ab3a46388c6b7`.
+Only the four nonsecret image/revision runtime keys changed; other environment
+bytes, Apache/CSP, MongoDB and Redis were preserved. The prior `a3155584` image
+tar, env/settings and Compose configuration remain root-protected, with an
+application-only rollback command. A bounded pre-switch metadata check found
+no SPARC library/version records or pending administrative cleanup to transform.
+No destructive learner migration or production-data copy was performed.
+
+Actual Chrome acceptance passed and is retained as minimized local JSON:
+
+- Login/reload/reconnect preserve enforced CSP and do not recreate `x_mtok`.
+- Owner upload, forged-owner rejection, duplicate-ID rejection, anonymous and
+  other-user/admin denial, owner reconnect/resume after a real same-image server
+  restart, completed-asset abort denial, pending abort and public/private delivery
+  passed. HTTP transport rejects explicitly and retired upload routes return 410
+  with or without a synthetic old cookie. Only disposable uploaded assets were
+  removed through guarded asset-management methods.
+- Direct Google voice samples actually played; replacing a preview stopped the
+  earlier audio, and a deliberately blocked sample produced inline failure text.
+- A disposable theme was copied through the visible UI; confirmation appeared,
+  Cancel/Escape preserved it with focus return, and Confirm removed only that
+  theme with appropriate focus. No backend cleanup supplied acceptance evidence.
+- Synthetic learner reload resumed the rendered trial; Anki analysis, normal
+  DDP content-media upload and image decoding, hosted-font loading and actual
+  YouTube playback in the existing synthetic lesson passed. No paid synthesis
+  or new lesson import was used; temporary synthetic TTS preferences were restored.
+
+The dedicated restricted audit key passed authentication, arbitrary-command
+isolation, PTY refusal and forwarding refusal after the firewall cutover and
+again after receipt installation. All **nine live host controls PASS**; Sidecar
+is absent as required. Private operator access, final application health and
+public HTTPS passed; UFW remains active and its temporary rollback timer is
+stopped. Public TCP 22 did not connect. The separate Lightsail cloud TCP 22 rule
+was not removed: a fresh browser check reached AWS sign-in, so no cloud change
+was attempted. Host firewall enforcement remains in place; cloud-rule cleanup
+can follow an operator AWS login.
+
+The staging2-only authoritative record is
+`C:\Users\ppavl\MoFaCTS-Release-Evidence\staging2-release-record.json`.
+The supported history writer published/read back its first immutable history
+entry, retaining exact source/image evidence references and the independently
+observed workstation/registry/host tuple. Authority/receipt record digest:
+`5090b3fa162cffe158cd5ec3dbb27de1a160875bbbe14c1ad22d1585b39552e6`.
+The old Desktop bootstrap status was preserved, not substituted for this record.
+Credentials remain in the separately approved Desktop credential folder.
+
+The root-owned 0600 receipt was installed through its supported owner and read
+back as **observed/MATCH**, including through the restricted audit channel.
+A valid-shaped transfer with the wrong image config was rejected without
+changing accepted receipt bytes; transient lock cleanup passed. The audit account
+was denied direct reads of both private audit configuration and receipt. Final
+bounded observations are retained under the native `staging2-65875553` evidence
+directory. A local acceptance assertion initially addressed the digest at the
+wrong JSON level; correcting it to the documented nested receipt field passed
+against the same observation, without changing the host or parser.
+
+The record remains **consistent-unqualified**. Receipt MATCH and nine passing
+host controls do not authenticate the complete verification catalog, integrate
+the receipt into the V1 report assembler, activate Phase 1, or close Phase 0.
+AWS secret-recovery provisioning/MFA recovery and production integration remain
+separate gates. Production and the older staging installation were untouched;
+unrelated staging/replica initialization, deployment docs and SPARC working
+changes remain outside this batch. No new application fields, dependencies,
+storage migration or user-facing behavior were introduced by this continuation;
+public deployment guidance owns its documentation, so no wiki edit is needed.
+
+**Next real decision: isolate GitHub's staging2 audit access.** Read-only GitHub
+inspection found only the `production-security-audit` environment. The saved
+accepted Tailscale policy permits the operator PC's staging2 SSH path; it has no
+`tag:ci` to `tag:staging2` grant and no staging2 audit-runner tag. This is a saved
+accepted-policy observation, not a fresh assertion about the live control plane.
+
+Recommend a separate `staging2-security-audit` GitHub environment and
+`tag:staging2-audit` ephemeral runner identity. A staging-only Tailscale OAuth
+client would issue that tag; a single grant would permit it to reach
+`tag:staging2` on TCP 22. Store only the dedicated forced-command key, pinned host
+identity and staging-only connection credentials in that protected environment.
+Retain production rules/credentials and test explicit denial of production and
+staging application/database ports. Reuse the existing host auditor; do not give
+the runner a general shell or Tailscale SSH. This creates a new persistent access
+and secret boundary, so stop before creating the tag/client/environment/secrets
+or dispatching its workflow. Re-read live policy before applying any approved
+change. Scope the client to writable `auth_keys` and the single staging audit tag,
+following [Tailscale's OAuth client contract](https://tailscale.com/docs/features/oauth-clients)
+and the existing pinned GitHub Action's pattern; no policy-write scope is needed.
+No new paid service is proposed; existing GitHub/Tailscale plan limits
+must be checked during that preflight.
+
+### Intermediate correction/setup checkpoints (superseded by completion above)
 
 The correction passed complete CI `41824718448` (attempt 1, job `126556407720`)
 and all four jobs of Security `41824718440`: server 975 passed/15 pending,
@@ -92,6 +195,35 @@ archive owner. Local source-security tests passed 68 total/62 passed/6 platform
 skips. This routine preservation correction uses reserved integration slot 2;
 the new listener policy is not yet installed. Firewall and receipt acceptance
 remain unfinished and are not claimed passing.
+
+The `65875553` workstation image passed embedded-source comparison, platform and
+revision checks, Node 24.22.1/Undici 7.30.1 ABI/tool-removal checks, absence of
+private runtime environment fields, and isolated synthetic Change Streams startup
+and health with owned-container/network cleanup. Published through the approved
+separate repository as `ppavlikmemphis/mofacts-staging2:staging2-65875553`:
+index `sha256:dd255300197b9d2bb52fd638749ea64cd70b51d7fe7d48d68d0fdf2c8e7eafa9`,
+amd64 manifest `sha256:5ae6a40c9116ad55b95fe8d854c56e162b3e623f22e1aac3bf0d00881b055da9`,
+config `sha256:25f1e6396fe55c4f2191a668461e3603dd69cc95077a1084427ab3a46388c6b7`.
+Independent registry inspection matches the actual config-byte observation.
+
+The dedicated locked `mofacts-audit` account now has a root-owned restricted key
+and only the exact no-argument host-audit sudo command. Private authentication,
+forced-command isolation, PTY denial and forwarding denial passed. Applied the
+approved active default-deny UFW policy: public TCP 80/443 and TCP 22 only on
+tailscale0 from the configured tailnet IPv4/IPv6 ranges. Prior UFW configuration
+was saved privately; a five-minute automatic disable guard was armed before
+activation. Fresh private operator/audit access and public HTTPS 200 passed, while
+public TCP 22 did not connect; the guard was then cancelled. UFW control now
+passes. The separate Lightsail network-firewall rule has not been changed here.
+
+Retained the prior `a3155584` image tar, runtime settings/env and Compose files in
+a protected server release directory. Pulled the new candidate by immutable index
+digest and verified its platform, source revision, embedded source digest and
+Node on staging2 without starting its application. A bounded metadata-only check
+found all three SPARC source/target libraries empty, with zero retired figure
+versions or pending administrative cleanup; no library migration was invoked by
+this check. The running app remains `a3155584` pending host-policy CI and the
+controlled application switch. No authoritative release record/receipt exists yet.
 
 ## Compatibility batch published; Meteor passed, CI image collector failed (2026-11-03)
 

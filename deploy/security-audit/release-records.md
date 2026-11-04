@@ -3,7 +3,8 @@
 This opt-in tooling implements the approved storage arrangement. It has local
 filesystem/parser tests and hosted Linux permission fixtures that passed in
 [CI at `936a64aa`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050).
-No live host installation or production command-sheet hook has run. It does not acquire or
+The staging2 live rehearsal completed on 2026-11-04 as described below; no
+production command-sheet hook has run. This storage/receipt tooling does not acquire or
 authenticate complete test evidence, prove OCI registry mappings, qualify a
 release, or close Phase 0. See the [audit status](../../docs-developer/security-audit-durable-redesign-status.md).
 
@@ -49,9 +50,10 @@ while its image ID continues to come from the explicit workstation record.
 
 The parser/storage and three new shared Meteor parity cases passed in
 [CI at `29394ded`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41537962904).
-It is not installed in the private production writer or the host. Reference
-acquisition/binding, external reader confirmation and protected installation
-remain separate integration gates. See the
+It is not installed in the private production writer. Staging2 now has retained
+source/image references, a separate workstation identity and a protected matching
+receipt. Full evidence authentication and production integration remain separate
+gates. See the
 [status record](../../docs-developer/security-audit-durable-redesign-status.md).
 
 ### Prepare a candidate without publishing it (local draft)
@@ -195,7 +197,7 @@ through their own approved setup.
 
 The 2026-11-02 conditional preflight found no existing protected audit
 configuration, host-audit entry point or receipt tooling on staging2. It stopped
-before installation. The actual server uses Caddy without Apache or Tailscale;
+before installation. At that checkpoint the server used Caddy without Apache or Tailscale;
 the production host-audit template's corresponding assumptions therefore need
 an explicit target-compatibility review. Provisioning the missing audit access
 and configuration is an expanded setup operation, not receipt installation under
@@ -208,7 +210,7 @@ database audit access and a verified staging2 release, preserving the usable
 prior image/configuration. It does not waive the receipt gates below, authorize
 new spending or production changes, or establish enrollment, access-rule safety,
 release qualification or successful receipt installation. Recovery state has
-been preserved; browser account verification and the actual setup remain pending.
+been preserved. The later completion checkpoint below supersedes this setup state.
 
 1. **Read-only preflight.** Confirm staging2's actual container, config ID,
    revision label and existing protected container-selection setting. Inspect
@@ -251,10 +253,40 @@ been preserved; browser account verification and the actual setup remain pending
    rollback procedure. Record exact outcomes and remaining Phase 0 gates without
    waiving an unsafe or unavailable observation.
 
-The initial host preflight ran and stopped before installation. Expanded setup
-is approved as recorded above; it has not established a suitable current release
-carrier or completed receipt acceptance. AWS secret-recovery setup and Phase
-1/catalog activation remain separate gates.
+### Completed staging2 rehearsal (2026-11-04)
+
+The selected application source `65875553` passed complete CI
+[`41824718448`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41824718448)
+and matching Security, independent Linux source capture, canonical workstation
+Compose construction and isolated image startup. Its separately published
+staging2 image was deployed and the actual running config bytes verified.
+The host listener policy at `c7444b4e` passed its separate complete CI run before
+installation; its CI smoke image did not replace the selected application's proof.
+
+The staging2-only authority is the native, operator-owned
+`C:\Users\ppavl\MoFaCTS-Release-Evidence\staging2-release-record.json`, isolated
+from production and from the old Desktop bootstrap status. The supported writer
+published/read back its first immutable history entry with retained source/image
+evidence references and the actual workstation/registry/host tuple. Its digest is
+`5090b3fa162cffe158cd5ec3dbb27de1a160875bbbe14c1ad22d1585b39552e6`.
+Credentials remain in their separately approved Desktop storage.
+
+The supported root owner installed the 0600 receipt. Independent actual-container
+comparison and restricted forced-command read-back both returned
+**observed/MATCH**. A deliberately wrong config transfer was rejected without
+changing accepted bytes; transient lock cleanup and direct private-file read
+denial passed. All nine host controls, restricted-key isolation/PTY/forwarding
+checks, application/HTTPS health and actual Chrome regression acceptance passed.
+The prior image, env/settings, Compose files and application-only rollback remain
+root-protected. Production and the older staging installation were untouched.
+
+This is **consistent-unqualified** identity/evidence linkage. Full verification
+catalog authentication, receipt integration into the V1 report, AWS secret-recovery
+provisioning and Phase 1 activation remain separate gates. GitHub staging2 audit
+access needs an explicit isolated-identity decision; the live private channel is
+currently operator-run. UFW blocks public SSH, while removing the separate
+Lightsail cloud SSH rule awaits an operator AWS login. See the
+[exact audit outcomes and next decision](../../docs-developer/security-audit-durable-redesign-status.md).
 
 ## Interruption and recovery ownership
 

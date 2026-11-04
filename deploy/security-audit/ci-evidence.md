@@ -135,9 +135,11 @@ the config digest referenced by that manifest. Source/CI acquisition success mus
 not waive this distinction or qualify a workstation tuple with the wrong coordinate.
 The local correction now resolves the configuration from the actual Docker-save
 content graph for both stores; see [identity collection](source-capture.md#external-ci-image-observation).
-Existing stored observations are not rewritten. Publication and real CI validation
-of the corrected producer/host reader remain required before the staging2
-release-record/receipt rehearsal can continue.
+Existing stored observations are not rewritten. The corrected producer and shared
+host reader passed complete [CI at `65875553`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41824718448).
+The corresponding staging2 release-record/receipt rehearsal completed with an
+independently observed workstation tuple and protected host MATCH; these remain
+unqualified observations. See [the receipt checkpoint](release-records.md#completed-staging2-rehearsal-2026-11-04).
 
 ## Verification
 
@@ -149,10 +151,15 @@ fixtures run separately on the workstation:
 .\deploy\security-audit\test-ci-evidence-archive.ps1
 ```
 
-The latest source/image acquisition check used successful CI `41537962904` and
-Security `41537962905`. It validated the actual published artifacts through the
-native decoder and retained them separately. This check used that run's saved
-source observation; it did not independently attest the current working tree,
-execute another CI run or establish a workstation release-image mapping. Native
-ZIP fixtures passed **31/31**. See the
+The current staging2 acquisition used successful CI `41824718448` and Security
+`41824718440`, for exact clean source `65875553`. The native decoder validated
+and retained the actual artifacts against an independent clean Linux capture
+and captured test inventory. Source acquisition digest:
+`9e6cb25709533a860ada4bde2b1d64cbc206963bfae0df182da00141df01fd3b`;
+image acquisition digest:
+`6f8d0b711209a025a6cbe2af39d04516bd1c6e1a323e7815782210924fc4affb`.
+The later host-policy CI `41828857886` is a separate source revision and did not
+supply the selected application's evidence. Acquisition itself did not run CI,
+build/deploy an image or qualify a release. Native ZIP fixtures previously passed
+**31/31**. See the
 [audit record](../../docs-developer/security-audit-durable-redesign-status.md).
