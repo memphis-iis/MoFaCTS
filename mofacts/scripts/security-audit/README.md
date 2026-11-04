@@ -9,6 +9,18 @@ The approved release-history and protected-receipt tooling is documented in
 the existing record owner and adds no automatic production hook. Its storage,
 parser and hosted Linux permission fixtures run under `security:test:phase0`.
 
+## Recovery transfer review draft
+
+The [protected-transfer review](../../../deploy/security-audit/recovery-transfer/README.md)
+documents the current-GitHub bootstrap, temporary expiring OIDC access and exact
+one-secret destination. Its workflow is inactive outside `.github/workflows`.
+`recovery-transfer.mjs` owns complete binding serialization/validation and the
+initial-version protocol; `transfer-recovery-baseline.mjs` owns the Linux
+hosted-runner/OIDC/AWS CLI boundary. Their synthetic tests run in
+`security:test:source`; they never retrieve real secrets or contact AWS. No cloud
+transfer, accepted rollback version or Phase 0 completion follows from these
+tests. Execute only under the review's explicit setup/access/spending permission.
+
 ## Phase 0 contract tests
 
 From `mofacts/`, using pinned Node 24.22.1:

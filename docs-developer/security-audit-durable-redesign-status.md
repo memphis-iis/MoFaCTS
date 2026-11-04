@@ -13,7 +13,8 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **3 invoked of 5; 2 slots unallocated**. Count each allocated
+Current allowance: **3 invoked of 5; slot 4 reserved for the protected-transfer
+draft's normal push CI; 1 slot unallocated**. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
 | Slot | Commit | CI run / attempt | Meteor invocation and outcome |
@@ -21,13 +22,78 @@ run conservatively against the cap until its actual invocation outcome is record
 | 1 | `65875553c4f0fd37adfc407774bd4e7ff998ccfc` | `41824718448` / 1 | Meteor integration and complete CI image/ABI/topology/startup/cleanup checks passed. Matching Security run `41824718440` passed all four jobs. |
 | 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
 | 3 | `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef` | `41844153544` / 1 | Meteor integration and complete canonical image/ABI/topology/startup/cleanup checks passed. Security `41844153368` passed all four jobs. No Meteor retry. |
-| 4-5 | — | — | Unallocated. |
+| 4 | Protected recovery-transfer review draft; commit/run recorded after publication | Pending normal push CI | Reserved; do not separately dispatch a duplicate. |
+| 5 | — | — | Unallocated. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
 The continuation approves publication of the locally verified follow-up to the
 reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
+
+### Protected GitHub recovery transfer prepared; execution decision pending (2026-11-04)
+
+Phil approved the current protected GitHub configuration as the starting point
+and requested a concrete transfer for review, followed by continued work to the
+next real decision. The source is explicitly a **new unqualified baseline**:
+the original complete document and historical accepted copy were not located.
+Do not fabricate a historical rollback by relabeling this source.
+
+Prepared the [execution review](../deploy/security-audit/recovery-transfer/README.md),
+an inactive workflow outside `.github/workflows`, temporary expiring OIDC trust
+and exact-secret permissions templates, complete binding serializer/validator,
+bootstrap-only transfer protocol and Linux AWS CLI/OIDC adapter. The proposal
+copies all nine current production-audit secrets and its public-key variable to
+the single reviewed Ohio secret, preserving their strings exactly. It measures
+the entire UTF-8 document, refuses existing versions, compares exact read-back,
+retains a distinctly named baseline label, logs only bounded result metadata and
+stops for reconciliation after any failure. No automatic retry, deletion,
+credential normalization or application/GitHub binding change is implemented.
+
+Read-only GitHub metadata was refreshed: the exact nine-secret/one-variable
+inventory remains present; default non-immutable OIDC subject prefix is
+`repo:memphis-iis/MoFaCTS`; the production audit environment's only deployment
+branch rule is `main`. Environment-subject trust is not workflow-specific IAM
+isolation. Both policy templates expire at the same approved UTC deadline,
+limited by procedure to one hour; the runner requests a 15-minute session.
+Immediate permission/trust removal remains required after the attempt. No
+existing workflow/environment protection, cloud resource, IAM policy or access
+credential was changed by these read-only checks.
+
+Initial synthetic checks passed: exact binding/JSON/PEM byte preservation,
+65,536-byte boundary, missing/extra or incomplete bindings, duplicate fixture
+keys, actor/probe/throttle completeness, wrong source/target/AWS identity,
+nonempty destination, unsafe encryption/replica/rotation metadata, altered
+read-back and ambiguous-write refusal, secret-free CLI arguments/child environment,
+hosted/manual/main/commit gates and inactive workflow/policy structure. Full
+source-security suite passed **76/82, six documented Windows platform skips**;
+full lint passed with **323 surfaces** unchanged. Final combined source-security
+and supplemental-capture regression run passed **90/97 with seven documented
+Windows platform skips**; final full lint passed. Three explicit supplemental
+inputs bind the draft workflow/policy bytes into the existing CI test capture.
+No TypeScript-bearing app edit was made; full CI supplies its ordinary typecheck
+and one reserved Meteor run. Its exact outcome will be appended after publication.
+Synthetic adapters do not prove
+live OIDC, IAM or Linux CLI/AWS behavior; real values and size remain unobserved.
+Final API review also established that `DescribeSecret` omits deprecated versions.
+The draft therefore uses a bounded `ListSecretVersionIds` call with
+`IncludeDeprecated: true` before and after writing; an extra version, missing
+version list or any next-page token fails. Its exact-secret policy includes that
+read-only action. Negative tests cover unlabelled data and an empty paginated
+page; neither may be treated as an empty destination.
+
+Next execution decision: approve the single paid destination (review baseline
+about $0.40/month plus API calls), temporary provider/role setup and one protected
+credential transfer with read-back and cleanup. No active export workflow, real
+secret retrieval, paid resource creation or cloud identity mutation has occurred.
+Proposed operator setup uses CloudShell from the verified console session with
+an explicit account-identity check, not the unverified local AWS CLI profile.
+The proposal also preserves a subsequent restore isolation gate: the full source
+contains production-audit access and cannot be injected wholesale into staging2.
+Operational baseline acceptance and current/accepted-rollback rehearsal remain
+open, as do broader Phase 0 gates. No app/runtime/config schema changed, so no
+dependent config or user-facing wiki change is needed; public procedures and the
+controlling plan are updated. Existing unrelated working changes are preserved.
 
 ### AWS account readiness accepted; recovery-source provenance pending (2026-11-04)
 

@@ -3,7 +3,9 @@
 Status: review draft, not provisioning permission or completed recovery. The
 selected design remains one encrypted AWS Secrets Manager secret containing
 complete current and explicitly retained last-accepted configuration versions.
-Account readiness is accepted; source-document provenance is the next gate.
+Account readiness is accepted. Phil approved using the current protected GitHub
+configuration as a new starting baseline on 2026-11-04; the concrete protected
+transfer is now [prepared for execution review](recovery-transfer/README.md).
 
 ## Completed account prerequisite
 
@@ -64,29 +66,33 @@ smaller working set; they cannot silently replace the full audit configuration.
 GitHub's normal secret APIs return metadata without secret values, so listing
 the environment is not a backup. See [GitHub environment-secret API](https://docs.github.com/en/rest/actions/secrets#get-an-environment-secret).
 
-First locate the original complete private source and last-accepted version.
-Record only paths/provenance and bounded completeness/size outcomes. Preserve
-exact credential bytes and validate both serialized documents against the
-65,536-byte limit before upload; do not infer fit from local file sizes.
+Phil selected the current GitHub configuration as the starting point after the
+originals could not be located. Preserve exact credential strings and validate
+the complete serialized new baseline against the 65,536-byte limit before upload;
+do not infer fit from local file sizes. No historical accepted rollback version
+is available from this choice. Do not manufacture one by relabeling current data.
 
-If an original cannot be located, stop for an explicit bootstrap decision. A
-possible one-time transfer from the protected GitHub deployment environment must
-be reviewed and authorized separately: exact destination, temporary scoped AWS
-access, no raw secrets in logs/artifacts, read-back validation and access removal.
-No such export workflow, IAM role or credential transfer has been created or run.
-Do not claim a historical last-accepted version can be recovered from GitHub's
-current secret metadata or manufacture it by relabeling a current copy.
+The [transfer review](recovery-transfer/README.md) contains tested source, an
+inactive workflow draft and narrowly scoped IAM policy templates. It proposes
+temporary OIDC access to one pre-created empty secret, in-memory transfer and
+read-back, retained baseline labeling and access removal. No active workflow,
+IAM role, AWS recovery resource or real credential transfer has been created or
+run. Destination setup, cost/access changes and execution require approval of
+that concrete proposal.
 
 ## Remaining execution gates
 
-After source provenance is settled, prepare the exact complete documents and
-least-privilege setup/restore operations for approval. Use only an explicitly
+Source provenance is now explicit: current protected GitHub values, unqualified
+as a new recovery baseline. Use only an explicitly
 approved credential source and verify its account identity before mutation. An
 installed AWS CLI/profile alone does not establish that source or account.
 
 Provision/upload only after concrete permissions, destination and cost approval.
-Then restore and validate both the complete current and dedicated retained
-rollback versions on staging2 under the applicable execution permissions, verify
+Then follow the transfer review's isolation gate before restore: the full source
+contains production audit access and must not be injected wholesale into staging2.
+Qualify the new baseline through authorized checks before naming any accepted
+rollback version. Restore and validate complete current and retained rollback
+versions under the applicable execution permissions, verify
 that the retained label survives candidate updates, and restore the accepted
-state afterward. Missing historical input or unverified restore remains an open
+state afterward. An unqualified baseline or unverified restore remains an open
 gate. Account readiness, cloud storage and a digest alone do not close Phase 0.

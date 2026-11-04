@@ -1,0 +1,9 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["secretsmanager:DescribeSecret", "secretsmanager:ListSecretVersionIds", "secretsmanager:PutSecretValue", "secretsmanager:GetSecretValue"],
+    "Resource": "<EXACT_PRECREATED_RECOVERY_SECRET_ARN>",
+    "Condition": { "DateLessThan": { "aws:CurrentTime": "<APPROVED_UTC_DEADLINE>" } }
+  }]
+}
