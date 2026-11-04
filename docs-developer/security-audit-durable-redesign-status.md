@@ -29,6 +29,45 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### AWS account readiness accepted; recovery-source provenance pending (2026-11-04)
+
+Phil confirmed the fresh physical USB-key sign-in passed and answered **Yes, all
+three are ready** for independent AWS password access, root-email access and
+separate hardware-key custody. Fresh browser inventory showed the prior signed-
+out page and a new authenticated Console Home tab in the expected account/Ohio
+region. Accepted the account-access prerequisite with explicit evidence bounds:
+key use and recovery arrangements are operator-confirmed; the authenticated
+console/account is directly observed. No automated PIN/touch or simulated device
+loss is claimed. Four MFA registrations and the new key's FIDO L2 certification
+were verified at enrollment; no factor was removed.
+
+Saved a separate minimized `account-readiness-accepted.json` in the native AWS
+preflight evidence directory, preserving the earlier pending enrollment
+observation. It includes no account/contact identifiers, device ARNs or credential
+values. The current and retained-version Secrets Manager recovery rehearsal is
+still not complete; accepting account access alone does not close Phase 0.
+
+Continued source/configuration preflight. Read-only GitHub metadata lists nine
+secrets and the report-encryption public-key variable in
+`production-security-audit`, matching its source-owned setup contract. Bounded
+filename and key-name searches in the approved private Desktop folder, canonical
+config repo and local audit work directories did not locate the complete original
+fixture/provider document or its last-accepted copy. The smaller staging2 working
+credential set is not a substitute. GitHub's normal secret APIs return metadata,
+not values; no secret export, production run, secret-value retrieval or credential
+rotation was attempted. Asked Phil for the original file/vault-item location or
+confirmation that it is unavailable/unknown, without requesting secret values.
+
+Prepared the public [recovery-store review](../deploy/security-audit/recovery-store-preflight.md):
+proposed one-secret Ohio destination, managed encryption, current/retained-version
+requirements, current name-only binding inventory, baseline cost and provenance
+gate. An alternative one-time transfer from protected GitHub deployment copies
+requires its own concrete data-transfer/access review if originals are unavailable;
+it is not authorized or implemented by this checkpoint. No paid resource, IAM
+role, static credential, upload or application behavior changed. AWS CLI identity
+has not been assumed from the browser session. No Meteor invocation was needed;
+**3 of 5 used, 2 remain**. Unrelated working changes remain preserved.
+
 ### AWS physical-key enrollment verified; recovery acceptance pending (2026-11-04)
 
 Phil reported completing the physical-key enrollment and requested continuation.

@@ -2,8 +2,12 @@
 
 This is the account-access prerequisite for the selected Secrets Manager recovery
 store. It creates no AWS resource and does not establish that recovery works.
-The operator confirmed on 2026-11-04 that an independent recovery path still
-needs setup. Secret provisioning, permissions, upload and spending remain separate.
+The account prerequisite was accepted on 2026-11-04: the operator reported a
+successful fresh physical-key sign-in and confirmed independent password/email
+access and separate key custody; the expected authenticated AWS console was
+verified afterward. This does not claim a simulated loss of both devices or
+complete Secrets Manager recovery. Secret provisioning, permissions, upload and
+spending remain separate; see the [recovery-store review](recovery-store-preflight.md).
 
 ## Preserve access and identify its owner
 

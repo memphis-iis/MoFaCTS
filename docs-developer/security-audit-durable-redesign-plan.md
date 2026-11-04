@@ -545,6 +545,14 @@ before provisioning: verify the actual account and available separate MFA device
 preserve existing access, and require an independent successful sign-in. This
 answer does not select a device, authorize a purchase or establish recovery.
 
+Later on 2026-11-04, after physical-key enrollment was verified in AWS, Phil
+reported a successful fresh USB-key sign-in and confirmed independent AWS
+password/root-email access and separate key custody. A fresh authenticated
+console in the expected account was observed. The account-access prerequisite
+is accepted with those operator/UI evidence bounds. Complete source-document
+provenance, size, provisioning and two-version restoration remain separate gates;
+see the [recovery-store review](../deploy/security-audit/recovery-store-preflight.md).
+
 - **Complete current and rollback documents:** use one encrypted AWS Secrets Manager secret with versions containing the complete test fixture/provider configuration. Keep current and the last accepted rollback document, their non-secret schema/version/digest metadata and exact version references. Attach a dedicated retained rollback staging label to the last accepted rollback version; do not rely solely on moving `AWSPREVIOUS` or on unlabelled version history. Preserve that accepted rollback reference through candidate writes and interrupted updates; advance it only under the documented acceptance/restore procedure. AWS documents that labeled versions are retained and unlabelled versions may be removed; see [secret version semantics](https://docs.aws.amazon.com/secretsmanager/latest/userguide/whats-in-a-secret.html).
 - **Account suitability and independent recovery:** before setup, confirm the intended AWS account/region, appropriate ownership and service/encryption access, and Phil's recovery responsibility. Verify that AWS account and MFA recovery remain possible after loss of the workstation or primary MFA device; recovery must not depend solely on credentials held on that same workstation or inside the secret being recovered. Do not claim workstation-independent recovery from cloud storage alone.
 - **Document-size fit:** measure each complete serialized current/rollback configuration against the documented 65,536-byte secret-value quota before upload, without emitting its contents. Confirm the service's input rules. Do not truncate, silently omit bindings or split the approved one-secret design if it does not fit; report the conflict with a recommendation. See [AWS Secrets Manager quotas](https://docs.aws.amazon.com/secretsmanager/latest/userguide/reference_limits.html).
