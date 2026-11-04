@@ -29,6 +29,25 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### Physical AWS backup key confirmed; operator enrollment handoff (2026-11-04)
+
+Phil confirmed the existing item is **a physical USB/NFC security key**. Prepared
+the root-account MFA selection form with device name `root-backup-security-key`
+and the existing selected **Passkey or security key** method. Stopped before
+Next/credential registration and handed enrollment to Phil for the browser's
+physical-key selection, touch and any private PIN prompts. No credential prompt,
+PIN, seed or code was captured. A nonsecret preparatory-form screenshot is stored
+only in the native private evidence directory, outside source control.
+
+At handoff, both original virtual MFA registrations were preserved; no new MFA
+registration or successful backup sign-in is claimed. Asked Phil to reply
+`registered` after completing AWS enrollment. Next acceptance must independently
+check the new device entry and require a fresh backup-key sign-in, then confirm
+independent email/password recovery and separate physical custody. Reusing this
+hardware does not require resetting its existing OpenAI registration. No purchase,
+AWS secret/resource creation or Meteor invocation occurred; **two authorized
+Meteor invocations remain**. Unrelated working changes remain preserved.
+
 ### AWS account verified; backup-key type awaiting clarification (2026-11-04)
 
 Phil completed normal AWS sign-in and asked whether an existing OpenAI security
