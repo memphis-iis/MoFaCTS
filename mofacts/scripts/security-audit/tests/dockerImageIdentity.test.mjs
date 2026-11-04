@@ -87,6 +87,22 @@ test('inspection and orchestration preserve engine-reference versus config ident
   await assert.rejects(observeDockerImage('sha256:'+'f'.repeat(64), {command:async()=>Buffer.from(JSON.stringify(fixture.inspection))}));
 });
 
+test('inspection and archive failures identify only their fixed stage without leaking raw diagnostics', async () => {
+  const fixture = dockerImageFixture();
+  for (const [stage, dependencies] of [
+    ['inspect', { command: async () => { throw new Error('synthetic-private-diagnostic'); } }],
+    ['archive', { command: async () => Buffer.from(JSON.stringify(fixture.inspection)),
+      archive: async () => { throw new Error('synthetic-private-diagnostic'); } }],
+  ]) {
+    await assert.rejects(observeDockerImage(fixture.inspection.nativeId, dependencies), error => {
+      assert.equal(error.code, 'DOCKER_IMAGE_OBSERVATION_FAILED');
+      assert.equal(error.stage, stage);
+      assert.doesNotMatch(error.message + JSON.stringify(error), /synthetic-private/);
+      return true;
+    });
+  }
+});
+
 test('config platform mismatches cannot borrow the inspected platform', async () => {
   const fixture = dockerImageFixture();
   const config = Buffer.from('{"os":"linux","architecture":"arm64"}');

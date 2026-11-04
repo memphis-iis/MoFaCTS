@@ -51,7 +51,7 @@ identity="$(docker inspect --format '{{.Id}} {{.State.Running}} {{.Image}}' "$MO
 read -r container_id running engine_image_id extra <<<"$identity"
 [[ "$container_id" =~ ^[a-f0-9]{64}$ && "$running" == true && "$engine_image_id" =~ ^sha256:[a-f0-9]{64}$ && -z "$extra" ]] || fail running-image-unavailable
 command -v timeout >/dev/null || fail timeout-required
-image_inspection="$(docker image inspect --format '{"nativeId":{{json .Id}},"platform":"{{.Os}}/{{.Architecture}}","descriptor":{{json .Descriptor}}}' "$engine_image_id" 2>/dev/null)" || fail running-image-unavailable
+image_inspection="$(docker image inspect --format '{"nativeId":{{json .Id}},"platform":"{{.Os}}/{{.Architecture}}","descriptor":{{json (index . "Descriptor")}}}' "$engine_image_id" 2>/dev/null)" || fail running-image-unavailable
 image_module="$(cat -- "$IMAGE_IDENTITY_MODULE")"
 image_observation="$(timeout 120 docker image save "$engine_image_id" 2>/dev/null | timeout 120 docker exec -i "$container_id" node --input-type=module \
   -e "$image_module"$'\ntry { const inspection = JSON.parse(process.argv[1]); if (inspection.nativeId !== process.argv[2]) throw Error(); const value = await readDockerArchiveIdentity(process.stdin, inspection); process.stdout.write(JSON.stringify(value)); } catch { process.exitCode=1; }' \

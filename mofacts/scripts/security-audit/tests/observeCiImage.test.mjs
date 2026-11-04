@@ -65,6 +65,18 @@ test('actual inspect and isolated embedded read produce only a bounded CI image 
   assert.doesNotMatch(JSON.stringify(result), /PASS|smoke|password|sensitive/);
 });
 
+test('CI observation preserves a bounded Docker failure stage and suppresses private command output', async () => {
+  const { input, dependencies } = fixture();
+  dependencies.command = async () => { throw new Error('synthetic-private-docker-error'); };
+  await assert.rejects(observeCiImage(input, dependencies), error => {
+    assert.equal(error.code, 'CI_IMAGE_IDENTITY_FAILED');
+    assert.equal(error.stage, 'inspect');
+    assert.equal(error.message, failure.message);
+    assert.doesNotMatch(JSON.stringify(error), /synthetic-private/);
+    return true;
+  });
+});
+
 test('post-build contract rejects different lanes, dirty source, platform and CI coordinate substitution', () => {
   const good = { schema: 'PostBuildImageObservationV1', state: 'observed-unqualified', lane: 'ci-test-image',
     source: ciEvidenceFixture().expectedObservation.identity,

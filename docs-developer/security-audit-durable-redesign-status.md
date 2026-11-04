@@ -2,6 +2,84 @@
 
 Last baseline with passing CI, Security and image checks: `630eabdb9f9a9ffe8d1f013f0d7eba112864ee07`.
 
+## Integration authorization ledger and resumed execution (2026-11-04)
+
+Phil explicitly authorized **up to five Meteor integration invocations** and asked
+for a written record and continued work until a real decision point. This bounded
+instruction supersedes the usual per-invocation approval rule for these five
+invocations only. Earlier runs, including `41768076041`, are outside this new
+allowance. Each actual invocation, including a failed invocation or retry, counts;
+reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
+
+Current allowance: **0 invoked of 5; slot 1 reserved for the correction's push**.
+Update this ledger with exact commit/run/attempt and outcome as execution proceeds.
+The continuation approves publication of the locally verified follow-up to the
+reported image-collector failure. It does not waive failed acceptance checks,
+authorize production/original-staging operations, new dependencies/spending or
+unrelated changes. Staging2 deployment remains gated on passing required checks.
+
+## Compatibility batch published; Meteor passed, CI image collector failed (2026-11-03)
+
+Committed and pushed the 14 intentional compatibility/setup documentation files
+as `4d4c265bde969a8f2b24ce74642199d84d05b136` on main. Pre-commit lint, manifest
+artifact rejection and staged-secret scanning passed. Unrelated staging/replica
+initialization and SPARC working changes remain outside the commit.
+
+The one authorized push-triggered [CI run 41768076041](https://github.com/memphis-iis/MoFaCTS/actions/runs/41768076041),
+attempt 1/job `126371060971`, completed with **failure**. Its Meteor integration
+passed: server **975 passed / 15 pending**, browser **1,237 passed / 7 pending**,
+zero failures. Lint, both typechecks, Phase 0/capture contracts including the native
+protected host receipt fixture, source/run binding and canonical Compose image
+construction passed. The next step, **Assert image source matches tested input
+identity**, failed with the collector's generic sanitized error. Image ABI,
+standalone-Mongo rejection and replica-set image startup checks were skipped;
+cleanup completed. This is not a passing release candidate or image qualification.
+The matching [Security run 41768075941](https://github.com/memphis-iis/MoFaCTS/actions/runs/41768075941)
+passed all four jobs. No retry or duplicate dispatch was issued.
+
+Independent clean Linux capture/verification of `4d4c265b` produced source
+`e85be40bb861e45f3cc3af5cf31b50f6e7f5dc67fbd348386b47e8758b4572f5`, test contract
+`2529596a73165daf8fe8d0935b034f0fa4d256b7caf9871bd8b0b201f30091d6`, and supplemental
+`79efc68773c22379c865106f8769a1546928e5dcbb66d4046e34382252dc215a`, matching CI's
+recorded observation. The source artifact `13293812032` (177,547 bytes; ZIP SHA-256
+`201e629b74b141002e63f7a33223c2d7011febb6c0e2cb1cd3aee8207d423f70`, expiry November 18)
+was read through the native bounded ZIP reader only for failure diagnosis. It is
+retained under the native evidence directory as **failed-ci-diagnostic-only**;
+the acquisition helper's successful-run requirement was not bypassed or relabeled.
+No CI image observation artifact exists for this run. Replaying the actual source
+and joined Meteor evidence reached the controlled Docker boundary, confirming
+that the collector's preceding source/run validation accepts those bytes.
+
+Reproduced a concrete inspection compatibility defect using Engine API 1.47 on
+the existing workstation: `{{json .Descriptor}}` fails because that optional key
+is omitted. `{{json (index . "Descriptor")}}` succeeds and emits explicit null.
+Corrected both the workstation/CI projection and protected receipt projection
+locally. Null still requires actual config bytes to hash to the native ID; no
+index or manifest is substituted. This defect is consistent with CI's immediate
+failure, but the original generic error does not prove it was the only cause.
+A fresh CI run remains necessary to confirm that boundary. Added fixed, bounded
+failure stages for the collector/CI CLI, without retaining raw Docker diagnostics,
+and two regression tests for stage propagation and privacy.
+
+Follow-up local verification: typecheck/lint passed (323 surfaces), image-observer
+suite **21/21**, Phase 0 **156 total / 149 passed / 7 platform skips**, source
+security **67 total / 61 passed / 6 platform skips**, zero failures; shell syntax
+and diff checks passed. The revised collector still resolves the live published
+`630eabdb` image to config `f3bef1d2...` correctly. The follow-up is uncommitted;
+the failed required CI check blocks publication/deployment until Phil accepts
+this identified failure for the correction and authorizes one fresh run.
+
+Staging2 private preflight remains healthy: HTTPS 200, sufficient disk, no host
+MongoDB/Redis publications, protected `/etc/mofacts` parent, and expected absent
+audit account/config/receipt/tooling. Its old application still has the original
+single scoped readWrite role; the approved modern read-concern grant remains
+unapplied. Prepared a private `4d4c265b` build-only profile beside the prior profile,
+without changing credentials; no local application build, image push, deployment,
+record publication, account/role/firewall change or receipt installation followed
+the CI failure. The previously published `630eabdb` image and retained `a3155584`
+staging2 application are unchanged. The one Meteor authorization is consumed.
+Phase 0 remains open.
+
 ## Docker image identity correction implemented locally; CI authorization boundary (2026-11-03)
 
 Phil approved the compatibility correction and continuation to the next decision

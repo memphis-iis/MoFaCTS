@@ -320,6 +320,12 @@ must hash to their declared config ID. OCI index/manifest/config links must matc
 their raw-byte digests and sizes, with exactly one `linux/amd64` candidate. The
 result's existing `configDigest` field always identifies configuration bytes.
 
+Older Engine APIs omit the optional `Descriptor` inspection key. The projection
+uses keyed lookup to emit explicit `null` without a template error; absence never
+waives the classic config-byte hash requirement. Fixed failure-stage labels
+(`input`, `inspect`, `archive`, `identity`) distinguish collector failures without
+printing Docker stderr, configuration contents or source evidence.
+
 The standalone `imageArchiveIdentity.mjs` reader shares this resolution with the
 protected receipt tool. It never extracts files, decompresses layers, reads a
 registry or emits config contents. It bounds export time to two minutes, archive

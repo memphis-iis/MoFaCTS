@@ -110,6 +110,13 @@ export async function observeCiImage(input, dependencies = {}) {
     });
   } catch (error) {
     if (error?.code === 'CI_IMAGE_PROBE_CLEANUP_FAILED') throw error;
+    if (error?.code === 'DOCKER_IMAGE_OBSERVATION_FAILED'
+      && ['input', 'inspect', 'archive', 'identity'].includes(error.stage)) {
+      const failed = new Error('CI image observation failed; no qualification was issued.');
+      failed.code = 'CI_IMAGE_IDENTITY_FAILED';
+      failed.stage = error.stage;
+      throw failed;
+    }
     invalid();
   }
 }
@@ -137,7 +144,7 @@ export async function writeCiImageObservation(imageReference, sourceFile, eviden
     finally { await handle.close(); }
     return observation;
   } catch (error) {
-    if (error?.code === 'CI_IMAGE_PROBE_CLEANUP_FAILED') throw error;
+    if (['CI_IMAGE_PROBE_CLEANUP_FAILED', 'CI_IMAGE_IDENTITY_FAILED'].includes(error?.code)) throw error;
     invalid();
   }
 }
@@ -151,8 +158,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       runId: environment.GITHUB_RUN_ID, runAttempt: environment.GITHUB_RUN_ATTEMPT,
     }) : Promise.reject();
   action.then(() => process.stdout.write('CI image observation retained; no qualification was issued.\n'), error => {
+    const stage = error?.code === 'CI_IMAGE_IDENTITY_FAILED'
+      && ['input', 'inspect', 'archive', 'identity'].includes(error.stage) ? ` at image ${error.stage}` : '';
     process.stderr.write(error?.code === 'CI_IMAGE_PROBE_CLEANUP_FAILED'
-      ? `${cleanupFailureMessage}\n` : 'CI image observation failed; no qualification was issued.\n');
+      ? `${cleanupFailureMessage}\n` : `CI image observation failed${stage}; no qualification was issued.\n`);
     process.exitCode = 1;
   });
 }
