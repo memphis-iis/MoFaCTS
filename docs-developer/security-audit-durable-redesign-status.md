@@ -31,6 +31,17 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### Format-only diagnostic and one corrected transfer retry approved (2026-11-04)
+
+Phil explicitly approved the prepared format-only diagnostic, correction of a
+confirmed validator mismatch **without changing the stored key**, and exactly
+one transfer retry after verification, then continuation to the next real
+decision. This does not authorize key rotation/normalization or another retry
+after that attempt. The original backup destination/cost and bounded temporary
+access/cleanup design remain approved. Meteor allowance is separate: four of
+five invocations used, one remains. Activate only the reviewed single-binding
+diagnostic, with no OIDC/AWS permission; remove it after its one run.
+
 ### First transfer stopped at source validation; access cleanup verified (2026-11-04)
 
 Published activation `7d9239da16d7ba742a22eca2b51335b321f0b103` and dispatched
