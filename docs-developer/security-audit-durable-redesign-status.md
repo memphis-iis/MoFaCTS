@@ -13,14 +13,16 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **2 invoked of 5; 3 slots unallocated**. Count each allocated
+Current allowance: **2 invoked of 5; slot 3 reserved for the isolated staging2
+access batch; 2 slots unallocated**. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
 | Slot | Commit | CI run / attempt | Meteor invocation and outcome |
 | --- | --- | --- | --- |
 | 1 | `65875553c4f0fd37adfc407774bd4e7ff998ccfc` | `41824718448` / 1 | Meteor integration and complete CI image/ABI/topology/startup/cleanup checks passed. Matching Security run `41824718440` passed all four jobs. |
 | 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
-| 3-5 | — | — | Unallocated. |
+| 3 | Isolated staging2 access batch | Awaiting publication | Reserved before push; no duplicate dispatch. |
+| 4-5 | — | — | Unallocated. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
 The continuation approves publication of the locally verified follow-up to the
@@ -28,7 +30,47 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
-### Completed staging2 rehearsal and next access decision
+### Isolated staging2 access approved and being verified (2026-11-04)
+
+Phil approved the separate GitHub staging2 audit identity. Fresh browser
+inspection found the expected signed-in tailnet, staging2/production/operator
+devices connected, and the live two-grant/12-test policy. Preserved exact prior
+bytes privately, added only `tag:staging2-audit` ownership, the single TCP 22 grant
+to `tag:staging2`, and three positive/negative policy test groups. The saved
+policy has three grants and 15 tests; prior grants, tests and SSH rules are
+preserved. Prior policy SHA-256
+`e1d1221202c4a9115721fb882d4b68130ec8fadb57fdc7e0856c1f441a2ea576`;
+accepted policy SHA-256
+`7815553ed1d1110d6fdaa7aa387069f12514a21ee166dd2e74832300d24b4cd5`.
+Both files and policy/scopes screenshots remain outside the repository.
+
+Created the separate OAuth client with only `auth_keys` and the audit tag; no
+device-management/policy-write privilege or production credential was added.
+Saved its local secret as a Windows DPAPI-encrypted credential with operator,
+SYSTEM and Administrators DACL and verified encrypted read-back before closing
+the one-time display. No secret screenshot or plaintext credential file was
+created. The browser process's initial GitHub CLI publication attempt failed;
+publication then succeeded using the existing authorized CLI sign-in from the
+operator shell. All six environment secrets were explicitly republished through
+exact-byte stdin to avoid shell-added line endings. Secret values were withheld.
+
+Created `staging2-security-audit` with an explicit `main`-branch restriction,
+six dedicated staging secrets and four explicit private IPv4/IPv6 denial targets.
+The production environment and existing production OAuth client were untouched.
+The manual workflow reuses the pinned Tailscale action and current host auditor;
+it has no schedule, deploy, report ingestion, application install or Meteor step.
+Its retained result is a minimized **unqualified** access/receipt observation.
+
+Local positive/negative validator cases, workflow parsing and the existing saved
+live nine-control/receipt observation pass. Source-security passed 70 total,
+64 passed/6 platform skips; full lint, boundary/manifest checks and all 323
+surface classifications passed. Workflow YAML parses without duplicate keys.
+Slot 3 is reserved for the normal push-triggered
+CI run; the separate manual access workflow itself invokes no Meteor. Actual
+runner access is not yet accepted. See the public
+[procedure and recovery owners](../deploy/security-audit/staging2-access.md).
+
+### Completed staging2 rehearsal and prior access decision
 
 Both allocated runs passed without a retry: **2 of 5 invocations used, 3 remain**.
 Run 1 tested the selected application/build-source correction; run 2 tested the

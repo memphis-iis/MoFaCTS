@@ -3,6 +3,7 @@ import './tests/checkCiDependencies.test.mjs';
 import './tests/hostMongoRoles.test.mjs';
 import './tests/hostSidecarPolicy.test.mjs';
 import './tests/hostExposure.test.mjs';
+import './tests/staging2Access.test.mjs';
 import '../mongoReadConcernRole.test.cjs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';

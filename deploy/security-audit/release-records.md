@@ -280,6 +280,10 @@ checks, application/HTTPS health and actual Chrome regression acceptance passed.
 The prior image, env/settings, Compose files and application-only rollback remain
 root-protected. Production and the older staging installation were untouched.
 
+The isolated GitHub access procedure is documented in
+[staging2 audit access](staging2-access.md); its manual acceptance is separate
+from installing or replacing a receipt.
+
 This is **consistent-unqualified** identity/evidence linkage. Full verification
 catalog authentication, receipt integration into the V1 report, AWS secret-recovery
 provisioning and Phase 1 activation remain separate gates. GitHub staging2 audit

@@ -1,0 +1,63 @@
+name: Staging2 restricted audit access
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_record_digest:
+        description: SHA-256 of the accepted staging2 workstation release record
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging2-audit-access
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: staging2-security-audit
+    timeout-minutes: 20
+    steps:
+      - name: Check out the reviewed main source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Use the repository-pinned Node runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+
+      - name: Join with only the staging2 audit identity
+        uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:staging2-audit
+          version: 1.102.3
+          # The ACL permits only TCP 22, so do not request ICMP ping readiness.
+          hostname: mofacts-staging2-audit-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Verify restricted host access and denied connections
+        env:
+          EXPECTED_RECORD_DIGEST: ${{ inputs.expected_record_digest }}
+          AUDIT_SSH_HOST: ${{ secrets.AUDIT_SSH_HOST }}
+          AUDIT_SSH_USER: ${{ secrets.AUDIT_SSH_USER }}
+          AUDIT_SSH_PRIVATE_KEY: ${{ secrets.AUDIT_SSH_PRIVATE_KEY }}
+          AUDIT_SSH_KNOWN_HOSTS: ${{ secrets.AUDIT_SSH_KNOWN_HOSTS }}
+          AUDIT_DENIED_PEERS_JSON: ${{ vars.AUDIT_DENIED_PEERS_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node mofacts/scripts/security-audit/staging2-access-check.mjs \
+            "$RUNNER_TEMP/staging2-access.json" "$EXPECTED_RECORD_DIGEST"
+
+      - name: Retain only the minimized acceptance result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging2-audit-access-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/staging2-access.json
+          if-no-files-found: error
+          retention-days: 14
