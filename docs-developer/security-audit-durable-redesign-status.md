@@ -29,6 +29,49 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### AWS physical-key enrollment verified; recovery acceptance pending (2026-11-04)
+
+Phil reported completing the physical-key enrollment and requested continuation.
+Live AWS read-back confirmed **Passkey MFA device assigned**, the expected
+`root-backup-usb-key` identifier, **four MFA registrations**, and **FIDO: L2**
+certification for the new entry. Both original virtual registrations and the
+earlier Dashlane passkey remain present. This verifies registration; it does not
+prove a fresh physical-key sign-in or workstation-independent account recovery.
+
+Retained only a minimized nonsecret `enrollment-observation.json` under native
+`C:\Users\ppavl\MoFaCTS-Release-Evidence\aws-recovery-preflight-20261104`.
+It contains counts, label/certification checks and explicit pending acceptance
+fields, without account/contact identifiers, device ARNs, PINs or credential
+material. No authentication prompt or private credential value was captured.
+
+Read-only recovery-store preflight used the same account and selected Ohio
+region: Secrets Manager explicitly displayed **No secrets**. No secret values
+were opened and no AWS resource, permission or paid service was created. The
+installed AWS CLI is **2.34.3**, with one configured profile; only version/profile
+metadata was checked. No credential value was read, no CLI cloud API was called,
+and no assumption was made that this profile matches the verified browser
+account or is the approved credential source for later setup.
+
+Refreshed the official service contract: a secret can hold up to 65,536 bytes;
+the AWS-managed `aws/secretsmanager` encryption key has no separate key cost;
+baseline storage is $0.40/secret/month plus $0.05/10,000 API calls. These are
+preflight facts, not spending/provisioning approval. Complete portable current
+and retained-rollback documents, exact size/binding validation and scoped
+setup/restore permissions are still pending. Do not infer portable-document
+fit from local file sizes or upload a partial credential set as complete proof.
+
+Opened the existing account's Sign out menu for the operator. Requested a fresh
+sign-out/sign-in using the physical USB key and confirmation that the AWS password
+and root-email inbox remain accessible without this PC/main phone, with the key
+kept separately. Authentication and physical custody are operator steps; no
+password/PIN/code is requested. These results are pending, so the Phase 0 account
+recovery gate remains open. No application code, deployment or Meteor test ran;
+**3 of 5 authorized Meteor invocations used, 2 remain**. Unrelated working changes
+remain preserved.
+
+References: [secret creation and managed-key cost](https://docs.aws.amazon.com/secretsmanager/latest/userguide/create_secret.html),
+[Secrets Manager pricing](https://aws.amazon.com/secrets-manager/pricing/).
+
 ### Dashlane passkey registered; physical-key enrollment remains unverified (2026-11-04)
 
 Phil reported that the browser directed the enrollment into Dashlane rather
