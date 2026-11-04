@@ -1,7 +1,10 @@
 # One-time protected recovery transfer — execution review
 
-Status: prepared for review, **not activated or executed**. Phil approved the
-current GitHub configuration as the starting point on 2026-11-04. This establishes
+Status: **execution and approximately $0.40/month cost approved** by Phil on
+2026-11-04, conditional on required checks passing; not activated or executed.
+CI `41877424659` and Security `41877424480` were still queued at the approval
+preflight. Phil approved the current GitHub configuration as the starting point.
+This establishes
 a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.
 
@@ -41,6 +44,9 @@ build inputs or changing source-digest rules.
 - Inspect the account's existing GitHub OIDC provider. If absent, create it for
   `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
   Do not replace an existing provider or change other roles using it.
+  The read-only approval preflight found the existing GitHub provider with its
+  sole audience `sts.amazonaws.com`; preserve it during setup and cleanup. The
+  account's complete eight-role list did not contain the proposed transfer role.
 - Create temporary role `mofacts-recovery-transfer` with the reviewed
   [trust policy](trust-policy.example.json) and only the four operations in the
   [permissions policy](permissions-policy.example.json), on the **exact** secret

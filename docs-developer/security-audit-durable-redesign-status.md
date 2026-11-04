@@ -31,6 +31,26 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### Recovery transfer execution approved; prerequisite CI still queued (2026-11-04)
+
+Phil approved the concrete one-secret paid backup, temporary AWS access and
+one-time transfer/read-back/cleanup, explicitly accepting approximately
+$0.40/month. This approves the previously reviewed operation after its required
+checks pass; do not ask for the same setup/cost/transfer approval again. It does
+not waive the pending CI/Security checks or authorize a credential-isolation
+change, production probes, automatic retry, ongoing access or Phase 0 closure.
+
+Refreshed the actual AWS console read-only: the expected account has an existing
+GitHub OIDC provider whose sole audience is `sts.amazonaws.com`. Preserve this
+shared provider; no new provider is needed. The complete eight-role page contains
+no `mofacts-recovery-transfer` role. Refreshed GitHub metadata confirms the same
+default, non-immutable subject prefix and the production audit environment's
+sole deployment branch rule `main`. Current repository workflows request no
+`id-token` permission, and no workflow was observed running. No AWS setup mutation
+or real credential retrieval has occurred. CI `41877424659` and all four jobs of
+Security `41877424480` remain queued without runner assignment at this preflight.
+Keep slot 4 reserved for that existing run; do not issue a duplicate.
+
 ### Protected GitHub recovery transfer prepared; execution decision pending (2026-11-04)
 
 Published the intentional review batch as
