@@ -286,9 +286,11 @@ from installing or replacing a receipt.
 
 This is **consistent-unqualified** identity/evidence linkage. Full verification
 catalog authentication, receipt integration into the V1 report, AWS secret-recovery
-provisioning and Phase 1 activation remain separate gates. GitHub staging2 audit
-access needs an explicit isolated-identity decision; the live private channel is
-currently operator-run. UFW blocks public SSH, while removing the separate
+provisioning and Phase 1 activation remain separate gates. The separately approved
+GitHub staging2 identity passed its manual private-channel acceptance in
+[run `41845349663`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41845349663),
+including nine controls, receipt MATCH and negative access probes. It is not yet
+a scheduled or ingested security report. UFW blocks public SSH, while removing the separate
 Lightsail cloud SSH rule awaits an operator AWS login. See the
 [exact audit outcomes and next decision](../../docs-developer/security-audit-durable-redesign-status.md).
 

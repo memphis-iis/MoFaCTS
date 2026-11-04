@@ -44,9 +44,18 @@ Populate only this environment, using the operator's existing GitHub sign-in:
 The environment variable `AUDIT_DENIED_PEERS_JSON` contains exactly four explicit
 private peer addresses: the existing production and operator devices, each IPv4
 and IPv6. These are denial-test targets, not additional permitted destinations.
-Missing or malformed targets fail before acceptance. Preserve exact credential
-bytes when writing stdin; do not introduce shell-added line endings into the
-client ID, secret, host or username.
+Missing or malformed targets fail before acceptance. Do not introduce
+shell-added line endings into the client ID, secret, host or username.
+
+The installed GitHub CLI trims trailing CR/LF from ordinary `secret set` stdin.
+For the OpenSSH private key, use its supported **in-memory dotenv input**
+(`gh secret set --env-file - --env staging2-security-audit`), with the key as a
+double-quoted value containing escaped `\n`, including its required terminal LF.
+Do not write a plaintext dotenv file. This selects the CLI's documented structured
+input rather than repairing keys in the runner. The local saved key and server
+authorization remain unchanged. A missing terminal newline fails in Linux's SSH
+parser; do not relax key or host validation. See the
+[installed CLI's input implementation](https://github.com/cli/cli/blob/v2.81.0/pkg/cmd/secret/set/set.go#L347-L400).
 
 Keep credentials in the operator's approved private storage. The local staging
 OAuth copy is a Windows DPAPI-encrypted `PSCredential` with a protected DACL for
@@ -90,6 +99,15 @@ and host identity rehearsal, not full report/catalog authentication, automated
 receipt integration into the V1 assembler, Phase 1 activation or Phase 0 closure.
 An updated deployed release requires its newly accepted workstation record
 digest on the next manual dispatch; missing or stale identity fails explicitly.
+
+The first accepted live run was
+[`41845349663`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41845349663)
+on `e745f4a8`, after correcting the private-key publication boundary above. It
+passed all nine controls, receipt matching, restricted SSH and 44 negative TCP
+probes; ephemeral logout passed and only the original three devices remained.
+The underlying source batch `c4276faf` separately passed complete CI/Meteor/image
+checks and matching Security. See the
+[exact evidence and authorization ledger](../../docs-developer/security-audit-durable-redesign-status.md).
 
 ## Revocation and recovery
 

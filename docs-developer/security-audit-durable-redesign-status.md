@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `c7444b4ec6c33feed1156f8eafb95a21320170da`.
+Last baseline with passing CI, Security and image checks: `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
@@ -13,15 +13,14 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **2 invoked of 5; slot 3 reserved for the isolated staging2
-access batch; 2 slots unallocated**. Count each allocated
+Current allowance: **3 invoked of 5; 2 slots unallocated**. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
 | Slot | Commit | CI run / attempt | Meteor invocation and outcome |
 | --- | --- | --- | --- |
 | 1 | `65875553c4f0fd37adfc407774bd4e7ff998ccfc` | `41824718448` / 1 | Meteor integration and complete CI image/ABI/topology/startup/cleanup checks passed. Matching Security run `41824718440` passed all four jobs. |
 | 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
-| 3 | Isolated staging2 access batch | Awaiting publication | Reserved before push; no duplicate dispatch. |
+| 3 | `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef` | `41844153544` / 1 | Meteor integration and complete canonical image/ABI/topology/startup/cleanup checks passed. Security `41844153368` passed all four jobs. No Meteor retry. |
 | 4-5 | — | — | Unallocated. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
@@ -30,7 +29,7 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
-### Isolated staging2 access approved and being verified (2026-11-04)
+### Isolated staging2 GitHub access accepted (2026-11-04)
 
 Phil approved the separate GitHub staging2 audit identity. Fresh browser
 inspection found the expected signed-in tailnet, staging2/production/operator
@@ -40,9 +39,13 @@ to `tag:staging2`, and three positive/negative policy test groups. The saved
 policy has three grants and 15 tests; prior grants, tests and SSH rules are
 preserved. Prior policy SHA-256
 `e1d1221202c4a9115721fb882d4b68130ec8fadb57fdc7e0856c1f441a2ea576`;
-accepted policy SHA-256
+submitted policy SHA-256
 `7815553ed1d1110d6fdaa7aa387069f12514a21ee166dd2e74832300d24b4cd5`.
-Both files and policy/scopes screenshots remain outside the repository.
+An independent saved-editor read-back matches the approved proposal exactly
+as JSON. Tailscale reformatted its whitespace; exact read-back bytes have SHA-256
+`d2ba5ce743f15c9618a865f0f0488c6b5cd36e9db54308929b5ef322215fe0c7`.
+Prior, submitted and saved-read-back files and policy/scopes screenshots remain
+outside the repository. No prior policy rule was silently rewritten.
 
 Created the separate OAuth client with only `auth_keys` and the audit tag; no
 device-management/policy-write privilege or production credential was added.
@@ -51,8 +54,9 @@ SYSTEM and Administrators DACL and verified encrypted read-back before closing
 the one-time display. No secret screenshot or plaintext credential file was
 created. The browser process's initial GitHub CLI publication attempt failed;
 publication then succeeded using the existing authorized CLI sign-in from the
-operator shell. All six environment secrets were explicitly republished through
-exact-byte stdin to avoid shell-added line endings. Secret values were withheld.
+operator shell. All six environment secrets were explicitly republished without
+shell-added line endings. The later key-format diagnosis below corrects the
+ordinary-stdin private-key transfer; secret values were withheld.
 
 Created `staging2-security-audit` with an explicit `main`-branch restriction,
 six dedicated staging secrets and four explicit private IPv4/IPv6 denial targets.
@@ -65,13 +69,16 @@ Local positive/negative validator cases, workflow parsing and the existing saved
 live nine-control/receipt observation pass. Source-security passed 70 total,
 64 passed/6 platform skips; full lint, boundary/manifest checks and all 323
 surface classifications passed. Workflow YAML parses without duplicate keys.
-Slot 3 is reserved for the normal push-triggered
-CI run; the separate manual access workflow itself invokes no Meteor. Actual
-runner access is not yet accepted. See the public
+Slot 3 was reserved before the normal push-triggered CI run; the separate manual
+access workflow itself invokes no Meteor. The completed acceptance follows below.
+See the public
 [procedure and recovery owners](../deploy/security-audit/staging2-access.md).
 
 Published this batch as `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef`.
-Slot 3 CI `41844153544` and matching Security `41844153368` are in progress.
+Slot 3 [CI `41844153544`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41844153544)
+and matching Security `41844153368` passed completely, including both typechecks,
+the Meteor integration, source/capture/native contracts and canonical Compose
+image identity, ABI, topology rejection, Change Streams startup and cleanup.
 Manual access run `41844189772` joined with the isolated identity and logged out
 successfully, but failed at the combined SSH/receipt boundary before artifact
 publication. Its raw diagnostics were withheld. A follow-up splits fixed SSH
@@ -79,6 +86,55 @@ failure categories from host-result validation; no permission, receipt check or
 network requirement is relaxed. This observation-only follow-up skips automatic
 Meteor CI while its local regression/source checks and manual access test run;
 it does not consume another Meteor invocation or qualify the release.
+
+The diagnostic correction `e745f4a8` passed three targeted validator/diagnostic
+tests and full lint (323 surfaces). Its manual run `41844927542` identified
+`host-ssh-key-format`; tailnet join/logout passed. Bounded server journal counts
+showed no accepted/failed audit-key authentication attempt during the first run,
+and staging2 remained healthy. The saved key itself has valid LF OpenSSH format
+and parses locally. Verified the installed GitHub CLI 2.81.0 source: ordinary
+`secret set` stdin calls `bytes.TrimRight(body, "\\r\\n")`, dropping the required
+terminal newline. Republished only the unchanged SSH key through supported
+in-memory dotenv input, which preserves its escaped terminal LF. No plaintext
+dotenv file, new key, host authorization change or runner repair path was added.
+A fresh manual access retry used the same diagnostic revision and accepted
+receipt digest. These manual runs invoke no Meteor.
+
+**Live acceptance passed:** manual run
+[`41845349663`](https://github.com/memphis-iis/MoFaCTS/actions/runs/41845349663),
+attempt 1, exact source `e745f4a8323a8d02167e60e9f148ec45a9d4fbb2`. All nine
+host controls PASS; the receipt matched the explicit workstation record digest.
+Forced-command isolation, PTY and forwarding refusal passed; all 44 TCP negative
+probes timed out. Only TCP setup was attempted against the existing production
+and operator peers, with no authentication or application requests. No production
+configuration or credential was changed. Ephemeral runner logout passed; fresh
+Machines-page inspection showed only the three original connected devices.
+
+Retained the minimized artifact under native
+`C:\Users\ppavl\MoFaCTS-Release-Evidence\staging2-audit-access-41845349663`;
+`staging2-access.json` SHA-256
+`511fc17fbbef41e90938d6d3498db1e20471725ee8ef4019539fc7d808776fcb`.
+Acquisition checked its 16 KiB bound, nine passing statuses, fixed tag, expected
+receipt and 44-probe count. Result is **staging2-access-accepted-unqualified**,
+not a production report, report-ingestion activation or release qualification.
+Full CI for `c4276faf` passed. The follow-up `e745f4a8` changes only bounded
+failure diagnostics and their targeted coverage, with full local lint and the
+real manual access acceptance passing on that revision. No fourth Meteor run
+has been issued; **3 of 5 used, 2 remain**. Unrelated working changes remain preserved.
+
+**Next real decision/input: independent AWS account recovery.** The selected
+Secrets Manager design requires recovery even after loss of this workstation
+and the primary MFA device. Asked Phil whether a separately stored AWS recovery
+method already exists, needs setup, or is uncertain; no passwords/codes/keys are
+requested. This cannot be established from a working browser sign-in alone.
+Existing encrypted local and GitHub copies do not satisfy that gate. AWS secret
+creation, new IAM access, credential upload, recovery rehearsal and new spending
+have not been authorized by this staging2-identity approval and have not run.
+The selected one-secret design remains unchanged. Official pricing/size limits
+were rechecked: baseline $0.40/secret/month plus $0.05/10,000 API calls, 65,536-byte
+value limit; account/region, complete-document fit, scoped permissions and final
+costs still need preflight before provisioning approval. No new paid service or
+application/learner/storage behavior was introduced in this batch.
 
 ### Completed staging2 rehearsal and prior access decision
 
