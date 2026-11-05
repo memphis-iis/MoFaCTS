@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `60dfd6f09057530d0b1049e76c37f8610675a7a2`.
+Last baseline with passing CI, Security and image checks: `bd9cdec6e01cea0f477c0c7aed6f3d4e8fca58f8`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
@@ -14,8 +14,8 @@ completed items and continuing until a real decision point. Source baseline:
 unrelated working-tree changes remain preserved. This request authorizes Phase 1
 source work; concrete commit/push, protected operation, build/deploy and production
 cutover permissions remain separate. The eight remaining conditional Meteor
-slots were available at entry; the publication approval below now reserves slot 3
-of 10, leaving seven unreserved. The actual run/result will be recorded separately.
+slots were available at entry. Conditional slot 3/10 subsequently passed on
+CI 42108870607, leaving seven available. The exact results are recorded below.
 
 Completed entry prerequisites:
 
@@ -36,11 +36,11 @@ No source implementation deliverable is marked complete by a prerequisite check.
 
 | ID | Deliverable | Status |
 | --- | --- | --- |
-| P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [ ] Candidate JSON/shared TypeScript implemented; Node digest/import checks pass on Windows/Linux. Supported Meteor parity remains the next gate. |
-| P1-02 | Active/append-only catalog and evidence-contract registries | [ ] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators implemented and locally tested; candidate is unreleased pending supported-runtime verification. |
-| P1-03 | Independently versioned SecurityAuditReportV2 | [ ] Shared strict V2 parser/digest/identity/timestamp/target contracts implemented with local mutation coverage; supported Meteor report parity is pending. |
+| P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
+| P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
+| P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
 | P1-04 | Integrated build identity/host-release comparison | [ ] Existing Phase 0 components retained; Phase 1 receiver wiring not implemented. |
-| P1-05 | Producer artifact contract and validation | [ ] Exact ownership/membership/evidence contract implemented and locally tested; Meteor parity and actual producer integration remain pending. |
+| P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository finding-tier evaluator implemented/tested. V2 host and composite acquisition/evaluation are not implemented; active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
@@ -48,7 +48,7 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 22 new Node tests cover catalog/evidence, assembly, signed authentication and report mutations. Meteor parity tests added but unexecuted; storage/presentation tests pending. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 22 new Node tests and four exact Meteor parity cases passed. Storage/presentation tests and real endpoint/host qualification remain pending. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
 | P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
@@ -135,17 +135,56 @@ Completed source/local subtasks, kept distinct from the phase's runtime gates:
   learner data or stored report was changed; config/wiki compatibility has no
   new interface to migrate. Unrelated working-tree changes remain preserved.
 
-Next gate: the plan explicitly requires the exact shared contracts and golden
-digest to work under supported Meteor, not just Node or full TypeScript checking.
-Phil explicitly approved committing/pushing the 21-file foundation batch and
-using one existing Meteor authorization. Conditional slot 3/10 is now RESERVED
-before publication, leaving seven unreserved. The push-triggered CI commit/run,
-actual Meteor execution and result remain to be recorded; no manual duplicate
-dispatch or automatic retry is authorized by this reservation. Keep later active
-route/host migration behind this gate; do not substitute transpiled parallel
-contracts if runtime parity fails. There is no production/staging operation,
-Docker publication or scanner cutover authorized by this source checkpoint.
-No Phase 1 deliverable with an outstanding required runtime gate is marked done.
+### Foundation CI/Meteor/image gate passed (2026-11-05)
+
+The approved 21-file foundation batch was committed/pushed as
+`bd9cdec6e01cea0f477c0c7aed6f3d4e8fca58f8`. Its required checks passed:
+[CI 42108870607](https://github.com/memphis-iis/MoFaCTS/actions/runs/42108870607)
+and [Security 42108870582](https://github.com/memphis-iis/MoFaCTS/actions/runs/42108870582).
+No required check is waived. Pre-commit staged lint/secret checks passed, and
+hash comparison confirmed the hook did not change the tested source.
+
+- Meteor ran once, 21:16:57Z-21:17:49Z, consuming conditional slot 3/10.
+  Server: 979 passed, 15 pending; client: 1,237 passed, seven pending;
+  zero failed tests or hooks. Seven conditional invocations remain.
+- Both new server-discovered modules were present. The exact four case IDs were
+  independently recomputed from their registered title paths and found PASSED:
+  JSON/TypeScript+golden digest, producer rejection, complete missing-identity
+  ERROR report, and the V1-compatible HMAC formula. These common cases did not
+  run in the client lane; no client parity is claimed for the server contracts.
+- Browser installation took about 11 minutes; Meteor itself took 52 seconds.
+  The CLI could not retrieve running-job logs and Chrome required separate
+  sign-in; no browser authentication, CI cancellation or duplicate run occurred.
+  The original live run progressed and passed normally.
+- Retained source artifact 13453687031 (177,890 bytes) was verified against its
+  GitHub archive SHA-256 `22da5b0baa79ed7baeef47663e5a9761477a8fb52d88b76dfd228cbd4cc1e848`.
+  The bounded reviewed ZIP reader extracted exactly three expected metadata
+  files. Strict JSON parsing, actual module discovery and recomputed Meteor/source
+  binding matched the stored evidence. Source snapshot:
+  `55629d61f62c3b72b56498617fce2dc67a4d1f34b620bfdcbf11fc93e492a669`.
+- Canonical Compose amd64 build, source-identity assertion, runtime/ABI checks,
+  standalone-Mongo rejection, replica-set smoke and retained-source protection
+  passed. Image artifact 13455287570 was verified/read through the bounded image
+  profile; archive SHA-256
+  `11d33472df8cfbedd441e7333493a18836b0fa8712cc511349571c55bbaf69a4`.
+  The parsed CI observation matches the same source snapshot and exact retained
+  Meteor evidence digest `7a0969d8b1793dfcf293e01daabbfb9f729e62dec404809130fb7d35765fb697`.
+  Its `linux/amd64` config is
+  `sha256:986c74208f863fed1abd650b3caaafbd8c6cc4a18ac9b5254ce1d1083e66189a`.
+  It remains `observed-unqualified`, lane `ci-test-image`: no registry publication,
+  workstation-image qualification, running staging candidate or deployment.
+
+Local retained evidence is under the native operator directory
+`MoFaCTS-Release-Evidence/phase1-20261105`. CI-reported source binding and downloaded
+archive checks are not an independent workstation source-capture qualification.
+The existing selected staging2 application/policy above are unchanged.
+
+The runtime interoperability gate is now satisfied. Continue with the remaining
+producer, identity-loader, receiver/storage/presentation and qualification work
+from this list. Source and execution permissions remain distinct; no production,
+staging deployment, new credential/access or scanner cutover occurred here.
+The result-only plan/status update belongs to the approved batch and uses
+`[skip ci]`, consuming no additional Meteor invocation.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 
