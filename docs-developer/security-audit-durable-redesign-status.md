@@ -4,6 +4,32 @@ Last baseline with passing CI, Security and image checks: `62ae8fe3226314f55f02a
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
+## SDK transfer preflight and activation (2026-11-05)
+
+Phil reported AWS ready and asked to continue the authorized transfer. Chrome
+reconnected to the expected account; CloudShell read-only preflight verified
+account identity, zero versions including deprecated versions, managed encryption,
+no resource policy/rotation/replicas, absent old role and preserved shared OIDC
+provider. GitHub source names/update timestamps still match the frozen inventory;
+main-only environment access and the default OIDC subject are unchanged. CI
+41962552310 and Security 41962552268 remain successful on 62ae8fe3; the reviewed
+transfer source/policies/workflow draft are byte-unchanged from that commit.
+
+Enabled the same one-secret temporary role with fixed trust/data deadline
+`2026-11-05T13:01:19Z`. The setup response parser stopped after successfully
+attaching the policy because that AWS CLI mutation has an empty success response.
+Did not repeat setup, extend access or dispatch a transfer blindly. Read-only
+reconciliation verified exact trust and inline policy, no other policies, and
+zero destination versions. The owned metadata-only policy directory is retained
+privately for cleanup. No secret values or AWS session credentials were read.
+
+Prepared the active workflow from the tested inactive review; parsed YAML is
+identical. This activation and record use `[skip ci]` and consume no additional
+Meteor invocation. The one SDK transfer is reserved for this activation; no
+transfer result is claimed yet. Always reconcile outcome and retire data access,
+trust, role and workflow after the single attempt. Unrelated edits stay outside
+this batch.
+
 ## Optional AWS SDK execution authorization (2026-11-05 UTC)
 
 Phil approved the two SDK clients **only in the optional operator tool**, one
