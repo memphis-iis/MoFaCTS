@@ -10,8 +10,12 @@ removed. The shared provider and protected GitHub source were preserved. The
 destination remains **empty, not a usable credential backup**. Phil subsequently
 approved one format-only diagnostic, a confirmed validator correction preserving
 the stored key, and one transfer retry after verification. Diagnostic `41928332920`
-passed: the OpenSSH binding has no terminal LF, CR or escaped LF. The validator
-correction is in verification; the diagnostic workflow is disabled and removed.
+passed: the OpenSSH binding has no terminal LF, CR or escaped LF. Correction
+`3d1008b0` passed complete CI `41928890309` (including Meteor/image checks) and
+Security `41928890286`. The diagnostic is disabled and removed. The renewed
+one-secret retry role is read-back verified; its fixed expiry is
+`2026-11-05T01:23:58Z`. The single corrected retry is being activated; its result
+and subsequent access cleanup remain pending.
 Phil approved the current GitHub configuration as the starting point. This
 establishes a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.
@@ -199,7 +203,8 @@ secret and emits ten fixed boolean flags: recognized OpenSSH/RSA-PEM/PKCS8
 boundaries and LF/CR/escaped-newline shape. It emits no value, key fragment, byte
 length, fingerprint or file/artifact, requests no OIDC permission and has no AWS
 access. Its YAML permission/binding checks and eight synthetic cases passed
-locally. It has not been activated or run against protected input.
+locally. Phil approved its activation and one protected run, `41928332920`, which
+completed successfully; the active diagnostic was then disabled and removed.
 
 Phil approved this continuation after reviewing the first attempt: one format-only diagnostic; a correction only for a
 confirmed mismatch between backup validation and the existing consumer contract,

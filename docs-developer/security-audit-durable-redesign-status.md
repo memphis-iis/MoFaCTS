@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `d5e8f70524854cb20e9586d2816de3832847cd79`.
+Last baseline with passing CI, Security and image checks: `3d1008b0a7081768ceda5119be311a16bfa1ca03`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
@@ -13,8 +13,9 @@ invocations only. Earlier runs, including `41768076041`, are outside this new
 allowance. Each actual invocation, including a failed invocation or retry, counts;
 reserve a slot before publishing/dispatching a run and avoid duplicate dispatches.
 
-Current allowance: **4 invoked of 5; slot 5 reserved for the SSH binding validator
-correction's normal push CI; no slots unallocated**. CI `41877424659`
+Current allowance: **5 invoked of 5; no slots remain**. Correction CI
+`41928890309` passed all Meteor/image checks; do not retry or dispatch
+another integration without new permission. CI `41877424659`
 completed successfully on the protected-transfer draft. Count each allocated
 run conservatively against the cap until its actual invocation outcome is recorded.
 
@@ -24,13 +25,80 @@ run conservatively against the cap until its actual invocation outcome is record
 | 2 | `c7444b4ec6c33feed1156f8eafb95a21320170da` | `41828857886` / 1 | Complete CI including Meteor/image checks passed. Matching Security run `41828857969` passed all four jobs. |
 | 3 | `c4276fafeb3ac1ffad3003f9d57f63b2ba6237ef` | `41844153544` / 1 | Meteor integration and complete canonical image/ABI/topology/startup/cleanup checks passed. Security `41844153368` passed all four jobs. No Meteor retry. |
 | 4 | `d5e8f70524854cb20e9586d2816de3832847cd79` | `41877424659` / 1 | Complete CI passed, including Meteor, both typechecks, capture/protection, canonical Compose image identity/ABI/topology/startup/cleanup. Security `41877424480` passed all four jobs. No retry. |
-| 5 | SSH binding validator correction; commit/run recorded after publication | Pending normal push CI | Reserved; do not separately dispatch a duplicate. |
+| 5 | `3d1008b0a7081768ceda5119be311a16bfa1ca03` | `41928890309` / 1 | Complete CI passed: Meteor, both typechecks, capture/protection and canonical Compose image identity/ABI/topology/startup/cleanup. Security `41928890286` passed all four jobs. No retry. |
 
 Update this ledger with actual invocation start/completion and outcome as execution proceeds.
 The continuation approves publication of the locally verified follow-up to the
 reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
+
+### CloudShell recovered; exact retry setup verified (2026-11-04)
+
+AWS's documented CloudShell restart restored its container-delivered credentials;
+STS again confirmed the expected account. A fresh CLI preflight proved the role
+absent and destination still empty before enabling any new access. The expired
+preparation had never created a role, so no existing grant was extended. Created
+the authorized retry role with a new fixed trust/data-access deadline
+`2026-11-05T01:23:58Z`. Read-back verified exact reviewed trust/permissions,
+no other policies, the exact managed-encryption empty destination and absence of
+resource policy, rotation and replicas. Source secret/public-variable names and
+update timestamps still match the frozen inventory. The shared provider is
+unchanged. Private retry setup receipts contain only these bounded facts.
+
+Prepared the same reviewed transfer workflow for the one authorized corrected
+retry; parsed YAML is semantically identical. Only its activation comment and
+operator records change on publication, so this activation uses `[skip ci]` and
+does not consume another Meteor invocation. Helper/policy code remains the fully
+verified `3d1008b0` implementation. No retry dispatch/result is claimed yet.
+
+### Correction fully verified; retry setup reconciliation (2026-11-04)
+
+Correction CI `41928890309` completed successfully, including all image,
+topology, startup and cleanup steps. Matching Security `41928890286` passed all
+four jobs. No further Meteor allowance remains. The stored GitHub key is
+unchanged; the corrected implementation has not yet used the single approved
+transfer retry.
+
+Prepared fresh temporary-policy metadata after CI passed, with a fixed expiry
+`2026-11-05T00:00:10Z`. Browser control interrupted the subsequent create/attach
+command, so it was not repeated blindly. A fresh console tab in the same account
+showed the complete eight-role inventory and an exact-name search returned
+**0 matches / No matches** for `mofacts-recovery-transfer`; the role was not
+created. The prepared expiry elapsed without an enabled grant. Do not renew an
+existing grant or infer that a transfer occurred. No active transfer workflow or
+AWS credential transfer has been dispatched for this retry.
+
+CloudShell's metadata commands then failed to obtain container-delivered
+credentials. Retained only fixed error-class flags (container-credential and
+metadata retrieval, without a key/token/error body); no profile, certificate or
+network error was indicated. AWS's signed-in IAM console still worked in the
+expected account. The documented CloudShell restart was initiated for the
+temporary Ohio environment after verifying that no role had been created.
+Recheck the resulting session/account and destination before any mutation;
+do not substitute the workstation's unverified CLI profile, create static
+credentials or repeat the data-transfer attempt while setup is unresolved.
+
+### Correction published; fifth Meteor passed, image checks pending (2026-11-04)
+
+Published the narrow validator correction as
+`3d1008b0a7081768ceda5119be311a16bfa1ca03`. Normal CI `41928890309` passed lint,
+both full typechecks, source/capture contracts and Meteor integration; its
+canonical Compose image build/checks remain in progress at this checkpoint.
+Security `41928890286` passed all four jobs. All five authorized Meteor
+invocations are now used; no duplicate or retry is permitted under that budget.
+
+Read-only retry preflight passed in the expected AWS account through the
+approved CloudShell session: existing destination still empty, managed
+encryption/no resource policy/rotation/replicas, temporary role absent, and shared
+provider preserved. Chrome's old connection was replaced by a freshly discovered
+connection to the same existing AWS tab/account. Its embedded CloudShell widget
+failed to load after reconnection; the service's full CloudShell page works and
+its actual STS account was verified. No credential source was substituted and no
+new temporary AWS access is enabled while image checks are pending. Refreshed
+GitHub subject and main-only environment rule are unchanged. Independently
+validated the existing public report key as RSA of at least 3072 bits, without
+logging its PEM or reading a private key.
 
 ### Format-only diagnosis confirmed terminal-LF mismatch; correction in verification (2026-11-04)
 
