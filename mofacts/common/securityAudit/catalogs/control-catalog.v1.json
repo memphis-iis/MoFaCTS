@@ -1,0 +1,750 @@
+{
+  "catalogSchema": "MoFaCTSSecurityAuditControlCatalogV1",
+  "catalogId": "mofacts-security-audit-controls",
+  "catalogVersion": 1,
+  "controls": [
+    {
+      "controlId": "external.dns-addresses",
+      "sectionId": "external",
+      "title": "Resolve every public address",
+      "failureSeverity": "HIGH",
+      "producerId": "external",
+      "evidenceContract": "address-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.public-tcp-ports.standard",
+      "sectionId": "external",
+      "title": "Only TCP 80 and 443 are public (other ports)",
+      "failureSeverity": "HIGH",
+      "producerId": "external",
+      "evidenceContract": "tcp-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.public-tcp-ports.sensitive",
+      "sectionId": "external",
+      "title": "Only TCP 80 and 443 are public (sensitive ports)",
+      "failureSeverity": "CRITICAL",
+      "producerId": "external",
+      "evidenceContract": "tcp-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.public-udp-ports",
+      "sectionId": "external",
+      "title": "Selected UDP ports are closed",
+      "failureSeverity": "HIGH",
+      "producerId": "composite-exposure",
+      "evidenceContract": "udp-exposure-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.http-redirect",
+      "sectionId": "external",
+      "title": "HTTP redirects to the same HTTPS host and path",
+      "failureSeverity": "HIGH",
+      "producerId": "external",
+      "evidenceContract": "http-redirect-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.tls-protocols",
+      "sectionId": "external",
+      "title": "Only TLS 1.2 and 1.3 are accepted",
+      "failureSeverity": "CRITICAL",
+      "producerId": "external",
+      "evidenceContract": "tls-protocols-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.certificate",
+      "sectionId": "external",
+      "title": "Certificate hostname, chain, and validity are acceptable",
+      "failureSeverity": "CRITICAL",
+      "producerId": "external",
+      "evidenceContract": "certificate-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.tls-ciphers",
+      "sectionId": "external",
+      "title": "No weak TLS cipher is accepted",
+      "failureSeverity": "HIGH",
+      "producerId": "external",
+      "evidenceContract": "tls-ciphers-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.websocket-tls",
+      "sectionId": "external",
+      "title": "WSS upgrades and insecure WebSockets do not",
+      "failureSeverity": "HIGH",
+      "producerId": "external",
+      "evidenceContract": "websocket-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.hsts",
+      "sectionId": "external",
+      "title": "HSTS is at least one year",
+      "failureSeverity": "HIGH",
+      "producerId": "external",
+      "evidenceContract": "header-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.csp",
+      "sectionId": "external",
+      "title": "CSP restricts frames, objects, base URLs, and forms",
+      "failureSeverity": "HIGH",
+      "producerId": "external",
+      "evidenceContract": "header-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "external.security-headers",
+      "sectionId": "external",
+      "title": "Frame, MIME, referrer, and permissions policies are approved",
+      "failureSeverity": "MEDIUM",
+      "producerId": "external",
+      "evidenceContract": "header-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.enumeration",
+      "sectionId": "authentication",
+      "title": "Login and reset responses resist account enumeration",
+      "failureSeverity": "HIGH",
+      "producerId": "authentication",
+      "evidenceContract": "enumeration-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.timing",
+      "sectionId": "authentication",
+      "title": "Authentication timing resists account enumeration",
+      "failureSeverity": "MEDIUM",
+      "producerId": "authentication",
+      "evidenceContract": "timing-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.reset-token.expired-rejected",
+      "sectionId": "authentication",
+      "title": "An expired reset token is rejected",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "reset-expiration-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.reset-token.current-single-use",
+      "sectionId": "authentication",
+      "title": "A current reset token works exactly once",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.reset-token.replay-rejected",
+      "sectionId": "authentication",
+      "title": "A used reset token cannot be replayed",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.session-revocation",
+      "sectionId": "authentication",
+      "title": "Logout and password reset revoke sessions",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.session-lifetime",
+      "sectionId": "authentication",
+      "title": "Sessions expire within 30 days",
+      "failureSeverity": "HIGH",
+      "producerId": "authentication",
+      "evidenceContract": "session-lifetime-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.material-leakage",
+      "sectionId": "authentication",
+      "title": "Authentication material does not enter client-observable channels",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.authorization",
+      "sectionId": "authentication",
+      "title": "Anonymous and cross-user authorization is enforced",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.resume-token-issued",
+      "sectionId": "authentication",
+      "title": "Anonymous sealed-link resume issues a login token",
+      "failureSeverity": "INFO",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.token-login",
+      "sectionId": "authentication",
+      "title": "The issued passwordless token establishes its participant session",
+      "failureSeverity": "HIGH",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.participant-identity",
+      "sectionId": "authentication",
+      "title": "The passwordless session retains the expected participant identity",
+      "failureSeverity": "HIGH",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.experiment-flag",
+      "sectionId": "authentication",
+      "title": "The passwordless session is marked as an experiment participant",
+      "failureSeverity": "MEDIUM",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.sealed-target-binding",
+      "sectionId": "authentication",
+      "title": "The passwordless session remains bound to its sealed experiment target",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.modified-target-rejected",
+      "sectionId": "authentication",
+      "title": "A passwordless participant cannot switch to a modified experiment target",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.admin-denied",
+      "sectionId": "authentication",
+      "title": "A passwordless participant cannot call an admin method",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.ordinary-account-denied",
+      "sectionId": "authentication",
+      "title": "A passwordless participant cannot call an ordinary-account settings method",
+      "failureSeverity": "MEDIUM",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.assigned-experiment-allowed",
+      "sectionId": "authentication",
+      "title": "A passwordless participant can access the assigned experiment",
+      "failureSeverity": "INFO",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.cross-user-method-denied",
+      "sectionId": "authentication",
+      "title": "A passwordless participant cannot call a cross-user method",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.cross-user-publication-contained",
+      "sectionId": "authentication",
+      "title": "A passwordless participant cannot observe another user publication payload",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.passwordless.token-not-leaked",
+      "sectionId": "authentication",
+      "title": "The issued passwordless token is absent from client-observable channels",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "authentication.throttling",
+      "sectionId": "authentication",
+      "title": "Login throttles cover connection, identifier, and IP",
+      "failureSeverity": "CRITICAL",
+      "producerId": "authentication",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.audit-config",
+      "sectionId": "internal",
+      "title": "Audit configuration is root-only and complete",
+      "failureSeverity": "HIGH",
+      "producerId": "internal",
+      "evidenceContract": "host-configuration-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.listening-sockets.standard",
+      "sectionId": "internal",
+      "title": "Host listening sockets match the approved exposure (other ports)",
+      "failureSeverity": "HIGH",
+      "producerId": "internal",
+      "evidenceContract": "host-listeners-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.listening-sockets.sensitive",
+      "sectionId": "internal",
+      "title": "Host listening sockets match the approved exposure (sensitive ports)",
+      "failureSeverity": "CRITICAL",
+      "producerId": "internal",
+      "evidenceContract": "host-listeners-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.app-loopback",
+      "sectionId": "internal",
+      "title": "Application listens on loopback port 3000",
+      "failureSeverity": "HIGH",
+      "producerId": "internal",
+      "evidenceContract": "application-listener-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.sidecar-loopback",
+      "sectionId": "internal",
+      "title": "Sidecar ports are absent or loopback-only",
+      "failureSeverity": "CRITICAL",
+      "producerId": "internal",
+      "evidenceContract": "sidecar-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.docker-ports",
+      "sectionId": "internal",
+      "title": "Docker publishes only approved loopback ports",
+      "failureSeverity": "CRITICAL",
+      "producerId": "internal",
+      "evidenceContract": "docker-publications-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.firewall",
+      "sectionId": "internal",
+      "title": "UFW is default-deny with scoped SSH and public web only",
+      "failureSeverity": "HIGH",
+      "producerId": "internal",
+      "evidenceContract": "firewall-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.reverse-proxy-routes",
+      "sectionId": "internal",
+      "title": "The active reverse proxy routes only the configured host to the loopback app",
+      "failureSeverity": "CRITICAL",
+      "producerId": "internal",
+      "evidenceContract": "reverse-proxy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.mongodb-auth.unauthenticated-access",
+      "sectionId": "internal",
+      "title": "MongoDB rejects unauthenticated data access",
+      "failureSeverity": "CRITICAL",
+      "producerId": "internal",
+      "evidenceContract": "mongodb-unauthenticated-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.mongodb-auth.scoped-roles",
+      "sectionId": "internal",
+      "title": "MongoDB connectivity, replica set and scoped roles match policy",
+      "failureSeverity": "HIGH",
+      "producerId": "internal",
+      "evidenceContract": "mongodb-scoped-roles-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "internal.redis-auth",
+      "sectionId": "internal",
+      "title": "Redis requires authentication and remains private",
+      "failureSeverity": "CRITICAL",
+      "producerId": "internal",
+      "evidenceContract": "redis-policy-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.git-history-secrets",
+      "sectionId": "repository",
+      "title": "Git history contains no detected secrets",
+      "failureSeverity": "CRITICAL",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-runtime.low",
+      "sectionId": "repository",
+      "title": "application runtime dependencies have no known vulnerable packages (low findings)",
+      "failureSeverity": "LOW",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-runtime.medium",
+      "sectionId": "repository",
+      "title": "application runtime dependencies have no known vulnerable packages (medium findings)",
+      "failureSeverity": "MEDIUM",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-runtime.high",
+      "sectionId": "repository",
+      "title": "application runtime dependencies have no known vulnerable packages (high findings)",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-runtime.critical",
+      "sectionId": "repository",
+      "title": "application runtime dependencies have no known vulnerable packages (critical findings)",
+      "failureSeverity": "CRITICAL",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-development.info",
+      "sectionId": "repository",
+      "title": "application development advisories have no confirmed production build exposure (info findings)",
+      "failureSeverity": "INFO",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-development.low",
+      "sectionId": "repository",
+      "title": "application development advisories have no confirmed production build exposure (low findings)",
+      "failureSeverity": "LOW",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-development.medium",
+      "sectionId": "repository",
+      "title": "application development advisories have no confirmed production build exposure (medium findings)",
+      "failureSeverity": "MEDIUM",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-development.high",
+      "sectionId": "repository",
+      "title": "application development advisories have no confirmed production build exposure (high findings)",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-application-development.critical",
+      "sectionId": "repository",
+      "title": "application development advisories have no confirmed production build exposure (critical findings)",
+      "failureSeverity": "CRITICAL",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-runtime.low",
+      "sectionId": "repository",
+      "title": "sidecar-mongo runtime dependencies have no known vulnerable packages (low findings)",
+      "failureSeverity": "LOW",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-runtime.medium",
+      "sectionId": "repository",
+      "title": "sidecar-mongo runtime dependencies have no known vulnerable packages (medium findings)",
+      "failureSeverity": "MEDIUM",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-runtime.high",
+      "sectionId": "repository",
+      "title": "sidecar-mongo runtime dependencies have no known vulnerable packages (high findings)",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-runtime.critical",
+      "sectionId": "repository",
+      "title": "sidecar-mongo runtime dependencies have no known vulnerable packages (critical findings)",
+      "failureSeverity": "CRITICAL",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-development.info",
+      "sectionId": "repository",
+      "title": "sidecar-mongo development advisories have no confirmed production build exposure (info findings)",
+      "failureSeverity": "INFO",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-development.low",
+      "sectionId": "repository",
+      "title": "sidecar-mongo development advisories have no confirmed production build exposure (low findings)",
+      "failureSeverity": "LOW",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-development.medium",
+      "sectionId": "repository",
+      "title": "sidecar-mongo development advisories have no confirmed production build exposure (medium findings)",
+      "failureSeverity": "MEDIUM",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-development.high",
+      "sectionId": "repository",
+      "title": "sidecar-mongo development advisories have no confirmed production build exposure (high findings)",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.dependencies-sidecar-mongo-development.critical",
+      "sectionId": "repository",
+      "title": "sidecar-mongo development advisories have no confirmed production build exposure (critical findings)",
+      "failureSeverity": "CRITICAL",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.security-surface-contract",
+      "sectionId": "repository",
+      "title": "Every server surface has an access classification",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.sensitive-logging",
+      "sectionId": "repository",
+      "title": "Potential credentials and personal identifiers are absent from log calls",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "finding-inventory-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.source-security-tests",
+      "sectionId": "repository",
+      "title": "Source security contract tests pass",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "verification-observations-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.runtime-image-vulnerabilities.high",
+      "sectionId": "repository",
+      "title": "Built runtime image has no high vulnerabilities",
+      "failureSeverity": "HIGH",
+      "producerId": "repository",
+      "evidenceContract": "image-findings-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.runtime-image-vulnerabilities.critical",
+      "sectionId": "repository",
+      "title": "Built runtime image has no critical vulnerabilities",
+      "failureSeverity": "CRITICAL",
+      "producerId": "repository",
+      "evidenceContract": "image-findings-v1",
+      "standardsReferences": []
+    },
+    {
+      "controlId": "repository.client-bundle-canaries",
+      "sectionId": "repository",
+      "title": "Synthetic canaries are absent from built client bundles",
+      "failureSeverity": "CRITICAL",
+      "producerId": "repository",
+      "evidenceContract": "image-findings-v1",
+      "standardsReferences": []
+    }
+  ],
+  "profiles": {
+    "exposure": {
+      "external": [
+        "external.dns-addresses",
+        "external.public-tcp-ports.standard",
+        "external.public-tcp-ports.sensitive",
+        "external.public-udp-ports",
+        "external.http-redirect",
+        "external.tls-protocols",
+        "external.certificate",
+        "external.tls-ciphers",
+        "external.websocket-tls",
+        "external.hsts",
+        "external.csp",
+        "external.security-headers"
+      ],
+      "authentication": [],
+      "internal": [
+        "internal.audit-config",
+        "internal.listening-sockets.standard",
+        "internal.listening-sockets.sensitive",
+        "internal.app-loopback",
+        "internal.sidecar-loopback",
+        "internal.docker-ports",
+        "internal.firewall",
+        "internal.reverse-proxy-routes",
+        "internal.mongodb-auth.unauthenticated-access",
+        "internal.mongodb-auth.scoped-roles",
+        "internal.redis-auth"
+      ],
+      "repository": []
+    },
+    "full": {
+      "external": [
+        "external.dns-addresses",
+        "external.public-tcp-ports.standard",
+        "external.public-tcp-ports.sensitive",
+        "external.public-udp-ports",
+        "external.http-redirect",
+        "external.tls-protocols",
+        "external.certificate",
+        "external.tls-ciphers",
+        "external.websocket-tls",
+        "external.hsts",
+        "external.csp",
+        "external.security-headers"
+      ],
+      "authentication": [
+        "authentication.enumeration",
+        "authentication.timing",
+        "authentication.reset-token.expired-rejected",
+        "authentication.reset-token.current-single-use",
+        "authentication.reset-token.replay-rejected",
+        "authentication.session-revocation",
+        "authentication.session-lifetime",
+        "authentication.material-leakage",
+        "authentication.authorization",
+        "authentication.passwordless.resume-token-issued",
+        "authentication.passwordless.token-login",
+        "authentication.passwordless.participant-identity",
+        "authentication.passwordless.experiment-flag",
+        "authentication.passwordless.sealed-target-binding",
+        "authentication.passwordless.modified-target-rejected",
+        "authentication.passwordless.admin-denied",
+        "authentication.passwordless.ordinary-account-denied",
+        "authentication.passwordless.assigned-experiment-allowed",
+        "authentication.passwordless.cross-user-method-denied",
+        "authentication.passwordless.cross-user-publication-contained",
+        "authentication.passwordless.token-not-leaked",
+        "authentication.throttling"
+      ],
+      "internal": [
+        "internal.audit-config",
+        "internal.listening-sockets.standard",
+        "internal.listening-sockets.sensitive",
+        "internal.app-loopback",
+        "internal.sidecar-loopback",
+        "internal.docker-ports",
+        "internal.firewall",
+        "internal.reverse-proxy-routes",
+        "internal.mongodb-auth.unauthenticated-access",
+        "internal.mongodb-auth.scoped-roles",
+        "internal.redis-auth"
+      ],
+      "repository": [
+        "repository.git-history-secrets",
+        "repository.dependencies-application-runtime.low",
+        "repository.dependencies-application-runtime.medium",
+        "repository.dependencies-application-runtime.high",
+        "repository.dependencies-application-runtime.critical",
+        "repository.dependencies-application-development.info",
+        "repository.dependencies-application-development.low",
+        "repository.dependencies-application-development.medium",
+        "repository.dependencies-application-development.high",
+        "repository.dependencies-application-development.critical",
+        "repository.dependencies-sidecar-mongo-runtime.low",
+        "repository.dependencies-sidecar-mongo-runtime.medium",
+        "repository.dependencies-sidecar-mongo-runtime.high",
+        "repository.dependencies-sidecar-mongo-runtime.critical",
+        "repository.dependencies-sidecar-mongo-development.info",
+        "repository.dependencies-sidecar-mongo-development.low",
+        "repository.dependencies-sidecar-mongo-development.medium",
+        "repository.dependencies-sidecar-mongo-development.high",
+        "repository.dependencies-sidecar-mongo-development.critical",
+        "repository.security-surface-contract",
+        "repository.sensitive-logging",
+        "repository.source-security-tests",
+        "repository.runtime-image-vulnerabilities.high",
+        "repository.runtime-image-vulnerabilities.critical",
+        "repository.client-bundle-canaries"
+      ]
+    }
+  }
+}

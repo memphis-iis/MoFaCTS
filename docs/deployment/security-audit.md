@@ -201,3 +201,24 @@ Do not start the first manual full run until the restricted SSH command works th
 The first strict report may be red. Passwordless experiment sessions are expected to receive anonymous resume tokens; the control tests that those sessions remain contained to the sealed experiment target and cannot reach ordinary-account, cross-user, or administrative surfaces. Other initial findings may include unauthenticated Redis or missing CSP. These are evidence for separately approved remediation; the audit does not change those behaviors.
 
 Treat an `ERROR` as missing authoritative evidence, never as a passing control. The application report history is the primary administrator view; the encrypted artifact is the independent recovery copy. Codex or an operator may interpret findings, but neither path remediates production automatically.
+## V2 contract development checkpoint
+
+The V2 catalog and shared validators are under `mofacts/common/securityAudit/`.
+The initial candidate has 70 full-profile controls and 23 exposure-profile
+controls. Eight mixed-impact V1 checks are split into fixed-impact checks;
+original V1 identities remain unchanged in the characterization fixture.
+Unconfirmed development advisories remain maintenance evidence, and the optional
+Sidecar is not installed or enabled by the catalog.
+
+`npm run security:test:source` now includes the inert V2 catalog, evidence,
+producer-artifact, assembly, signed-parser and report-mutation tests alongside
+the existing source-security suite. Run it from `mofacts/`, together with the
+full `npm run typecheck` and `npm run lint`. Supported Meteor tests additionally
+verify direct TypeScript/JSON imports, the fixed catalog digest, a complete ERROR
+report without identity metadata, and HMAC wire compatibility.
+
+This is a source-development checkpoint. The scheduled workflow still uses V1,
+and the application still exposes its existing V1 ingestion path. The V2 helper
+does not register a route or write reports. Receiver/producer/host cutover,
+staging ingestion, replay-index enforcement, previous-image storage qualification
+and production acceptance remain gates in the written redesign plan.

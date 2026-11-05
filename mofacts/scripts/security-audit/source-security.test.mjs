@@ -1,4 +1,8 @@
 import './tests/uploadBoundary.test.mjs';
+import './tests/catalogRegistry.test.mjs';
+import './tests/assemblyV2.test.mjs';
+import './tests/reportV2.test.mjs';
+import './tests/ingestionV2.test.mjs';
 import './tests/checkCiDependencies.test.mjs';
 import './tests/hostMongoRoles.test.mjs';
 import './tests/hostSidecarPolicy.test.mjs';

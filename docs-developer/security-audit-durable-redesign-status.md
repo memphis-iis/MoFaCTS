@@ -6,6 +6,147 @@ auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
 
 
+## Phase 1 worklist (started 2026-11-05)
+
+Phil explicitly requested Phase 1 implementation from the written plan, marking
+completed items and continuing until a real decision point. Source baseline:
+`63dff4c7ed9e6b793873212d6a3ab21f662f021b`, current branch `main`. The eight
+unrelated working-tree changes remain preserved. This request authorizes Phase 1
+source work; concrete commit/push, protected operation, build/deploy and production
+cutover permissions remain separate. The eight remaining conditional Meteor
+slots were available at entry; the publication approval below now reserves slot 3
+of 10, leaving seven unreserved. The actual run/result will be recorded separately.
+
+Completed entry prerequisites:
+
+- [x] Re-read the controlling decisions, all Phase 1 deliverables/exit gates,
+  catalog/producer/report/storage contracts and active-scanner isolation rule.
+- [x] Refresh the current producer/assembler/receiver inventory. V1 still has 52
+  full controls, 20 exposure controls and two not-applicable placeholders. The
+  current scheduled workflow and producers remain unchanged; inert V2 is still
+  the selected development strategy. No historical-reader/archive is introduced.
+- [x] Re-run the current Phase 0 behavioral/contract suite at entry with pinned
+  Node 24.22.1: 156 total, 149 passed, zero failed, seven Windows platform skips.
+  This is existing-behavior evidence, not V2 implementation or Meteor evidence.
+- [x] Consolidate the fixed-severity conflict before creating an immutable catalog;
+  the exact decision and source owners are recorded below. No catalog is released.
+
+The rows below map directly to the 17 Phase 1 deliverables in plan Section 12.
+No source implementation deliverable is marked complete by a prerequisite check.
+
+| ID | Deliverable | Status |
+| --- | --- | --- |
+| P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [ ] Candidate JSON/shared TypeScript implemented; Node digest/import checks pass on Windows/Linux. Supported Meteor parity remains the next gate. |
+| P1-02 | Active/append-only catalog and evidence-contract registries | [ ] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators implemented and locally tested; candidate is unreleased pending supported-runtime verification. |
+| P1-03 | Independently versioned SecurityAuditReportV2 | [ ] Shared strict V2 parser/digest/identity/timestamp/target contracts implemented with local mutation coverage; supported Meteor report parity is pending. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] Existing Phase 0 components retained; Phase 1 receiver wiring not implemented. |
+| P1-05 | Producer artifact contract and validation | [ ] Exact ownership/membership/evidence contract implemented and locally tested; Meteor parity and actual producer integration remain pending. |
+| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository finding-tier evaluator implemented/tested. V2 host and composite acquisition/evaluation are not implemented; active V1 remains unchanged. |
+| P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
+| P1-09 | Summary projections, indexes and read-time integrity | [ ] Not implemented. |
+| P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
+| P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
+| P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 22 new Node tests cover catalog/evidence, assembly, signed authentication and report mutations. Meteor parity tests added but unexecuted; storage/presentation tests pending. |
+| P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
+| P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
+| P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
+| P1-17 | Updated operator documentation | [ ] Public inert-development/testing checkpoint added; final cutover/operator procedure pending implementation and qualification. |
+
+### Decision P1-D1: fixed catalog impact versus mixed-impact V1 controls
+
+The refresh found eight current controls with materially different `FAIL`
+severity paths. This excludes differences that occur only on `PASS` or `ERROR`;
+those do not define the catalog's `failureSeverity`.
+
+| Current control family | Existing failure distinctions | Current source owner |
+| --- | --- | --- |
+| `external.public-tcp-ports` | HIGH for ordinary unexpected/missing ports; CRITICAL for exposed application/database/helper ports | `scripts/security-audit/external-audit.mjs`, conditional at line 99 |
+| `internal.listening-sockets` | HIGH for other unexpected listeners; CRITICAL for designated sensitive ports | `deploy/security-audit/host-exposure-audit.sh`, lines 192-194 |
+| `internal.mongodb-auth` | CRITICAL for unauthenticated data access; HIGH for grants/role/account-state mismatch | same host source, lines 429-431 |
+| Four `repository.dependencies-{application,sidecar-mongo}-{runtime,development}` controls | Runtime findings use highest advisory severity; confirmed development build exposure also derives its finding severity. No confirmed exposure is currently listed. | `scripts/security-audit/repository-audit.mjs`, lines 120-151; `dependency-posture.mjs` |
+| `repository.runtime-image-vulnerabilities` | HIGH or CRITICAL based on actual image findings | repository producer, lines 197-199 |
+
+Plan Section 6 requires immutable per-control `failureSeverity` and says materially
+different impacts belong to distinct controls. Phase 0 froze the current IDs and
+exact membership as the behavior-preservation baseline. Selecting a single fixed
+rating for these aggregate IDs would change some warning levels; splitting them
+requires an explicitly reviewed new catalog membership/ID mapping. This is a
+report-policy decision, not a transport problem or reason to edit permissions.
+
+Accepted recommendation (2026-11-05): preserve the actual impact distinctions by replacing
+the eight aggregate checks in the new catalog with distinct fixed-impact checks.
+Keep original IDs/fixtures as immutable V1 provenance; do not reuse an aggregate
+ID for a narrower meaning. Review the proposed replacement IDs, profile membership
+and evidence requirements before freezing the initial catalog/digest. Reports
+will have more rows, while failures retain the appropriate impact. Acquisition
+can still run once and classify the same observations into those rows.
+
+The alternative is to retain all 52 checks and approve one conservative fixed
+rating per aggregate check, preserving the finding-specific severity in bounded
+evidence. That is simpler but would label some lower-impact findings with the
+control's worst-case rating and needs an explicit exception to the distinct-impact
+rule. Do not silently choose either behavior or release a provisional catalog.
+
+Current decision state: APPROVED. Phil selected the split, and the candidate now
+implements 70 full-profile / 23 exposure-profile IDs without repurposing the
+original eight V1 aggregate IDs. The alternative conservative-rating exception
+was not selected. No new dependency or paid service is proposed.
+
+### Phase 1 foundation source checkpoint (2026-11-05)
+
+Completed source/local subtasks, kept distinct from the phase's runtime gates:
+
+- [x] Create the single language-neutral candidate catalog and direct erasable
+  TypeScript/JSON imports. Its independently recomputed golden SHA-256 is
+  `6a9cd0c985bdec14b0d78d2b731975005ed8cd69e76bb7597c8ada2564ba688d`.
+  Catalog controls/profiles are validated and deeply frozen; retained reads use
+  exact ID/version/digest coordinates. No historical V1 report reader is added.
+- [x] Create the append-only evidence registry with 26 proof shapes, closed keys,
+  bounded sanitized text, typed metrics and categorized ERROR evidence. Included
+  controls reject NOT_APPLICABLE. Known domain/transport/inconclusive verification
+  counts cannot establish PASS/FAIL; shape validation alone is not proof that a
+  producer classified an observation correctly.
+- [x] Create exact producer-artifact validation before ID maps. Duplicate,
+  unknown, wrong-owner/section/profile, missing and malformed results cannot
+  overwrite failures or disappear silently. Metadata remains catalog-owned.
+- [x] Create the named assembler recovery: missing/invalid raw output yields the
+  complete owning producer subset as ERROR; valid other producers remain intact.
+  The receiver rejects malformed assembled reports rather than recovering them.
+- [x] Create strict V2 report validation: canonical digest, exact ordered profile,
+  catalog metadata, counts/status, HTTPS origin, duration/completion/upload bounds,
+  typed observed/unavailable/conflicting identities and independent receiver
+  comparison. Missing provenance invalidates image-dependent proof, not startup.
+- [x] Create inert signed V2 authentication and fixed-impact repository evaluation.
+  HMAC/timestamp/nonce/body bounds are preserved. Authentication does not claim
+  nonce consumption; replay exclusion remains a storage/integration gate.
+- [x] Add the 22 behavioral/mutation tests to the stable source-security entry
+  point and add Meteor catalog/artifact/report/HMAC parity tests. Ordinary build
+  source captures these app-owned modules/tests; no supplemental input or new
+  dependency is needed. Neither active workflow nor registered V1 route changed.
+- [x] Run full typecheck and lint successfully after correcting the initial new
+  parser narrowing/control-regex errors. Source-security suite: 102 total,
+  96 passed, zero failed, six Windows platform skips. Existing Phase 0 suite:
+  156 total, 149 passed, zero failed, seven skips. All 22 new tests passed on the
+  dedicated Ubuntu-MoFaCTS Linux environment with Node 24.22.1 and no skips.
+- [x] Update public operator/contributor guidance with the inert checkpoint and
+  verification path. No product UI, access rule, account storage, TDF/config name,
+  learner data or stored report was changed; config/wiki compatibility has no
+  new interface to migrate. Unrelated working-tree changes remain preserved.
+
+Next gate: the plan explicitly requires the exact shared contracts and golden
+digest to work under supported Meteor, not just Node or full TypeScript checking.
+Phil explicitly approved committing/pushing the 21-file foundation batch and
+using one existing Meteor authorization. Conditional slot 3/10 is now RESERVED
+before publication, leaving seven unreserved. The push-triggered CI commit/run,
+actual Meteor execution and result remain to be recorded; no manual duplicate
+dispatch or automatic retry is authorized by this reservation. Keep later active
+route/host migration behind this gate; do not substitute transpiled parallel
+contracts if runtime parity fails. There is no production/staging operation,
+Docker publication or scanner cutover authorized by this source checkpoint.
+No Phase 1 deliverable with an outstanding required runtime gate is marked done.
+
 ## Phase 0 completion worklist (active 2026-11-05)
 
 Phil requested completion of every unfinished Phase 0 item, with each item
