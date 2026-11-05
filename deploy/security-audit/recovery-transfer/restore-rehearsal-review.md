@@ -4,7 +4,8 @@ Status: Phil approved the isolated read-only cold restore (steps 1–2), one fre
 Meteor integration invocation and, if necessary for this security project, up to
 ten additional invocations. Each invocation is reserved and counted in the
 status ledger. The baseline transfer succeeded in `42024117227`; its access and
-active workflow are retired. Cold-reader implementation/CI/execution are pending.
+active workflow are retired. Reader 2f054211 passed complete CI 42028678398 and Security 42028678501;
+protected execution is pending the verified activation.
 Candidate writes, label changes and operational rehearsals remain unapproved.
 
 ## Approved: one isolated read-only cold restore
@@ -68,6 +69,41 @@ stores need equivalent current/accepted-rollback restoration and credential
 isolation evidence. The application must not acquire an AWS dependency through
 this rehearsal.
 
+## Next decision after the approved cold read: retained-version rehearsal
+
+This later proposal is not authorized by the read-only approval. Recommend a
+single storage-only rehearsal in the same secret, using the **existing**
+`MOFACTS_RECOVERY_BASELINE` retention pin. Do not add a redundant verified-baseline
+label or call this an accepted operational rollback configuration before its
+separate operational checks.
+
+On an isolated runner with explicitly approved, temporary one-secret access:
+read the original exact version, create **one byte-identical complete copy** as a
+new AWS candidate version, move `AWSCURRENT` to that candidate and verify that
+the original baseline pin still references the original version. Recover both
+explicit versions and compare every byte. Restore `AWSCURRENT` to the original
+version and retire the test candidate's temporary label; preserve every original
+label/version and all GitHub deployment copies. No provider/application login.
+A candidate version may remain in AWS history after its test label is removed;
+do not promise immediate version deletion or hide it from complete inventory.
+
+This uses the same valid V1 document and truthful original provenance. Editing
+an invented rehearsal field or forging a new GitHub origin would be invalid.
+The future rehearsal reader must explicitly validate the two known version IDs
+and reviewed label states instead of weakening the current one-version cold
+reader or ignoring unexpected versions. The fresh writer would need only
+read/describe/list, `PutSecretValue` and `UpdateSecretVersionStage` on this secret;
+no secret deletion, IAM administration, other-secret access or static key.
+Implement and verify the restoration/cleanup failure contract before enabling
+any new write permission. Count any necessary new Meteor invocation against
+Phil's remaining conditional allowance.
+
+This proves storage retention and current-pointer recovery using an identical
+configuration. It does not prove rollback between different configurations,
+provider credential validity, report-private-key custody, historical recovery or
+Phase 0 completion. Accepted operational rollback labeling and the staging2
+consumer rehearsal remain later gates in the controlling plan.
+
 ## Why a decision is needed
 
 The complete backup contains production-audit credentials. Staging2 has its own
@@ -95,20 +131,13 @@ recovered, so it is a design decision, not permission inferred from transfer.
    including the whole-document digest; never retain individual-key fingerprints,
    raw values or plaintext artifacts. Do not join Tailscale, authenticate with
    recovered provider credentials, or contact application/provider targets.
-3. After that cold-restore result passes review, explicitly accept this **new**
-   storage baseline and retain it with a dedicated accepted-rollback label. It
-   does not become a recovered historical configuration or proof that every
-   provider credential works. Preserve the original baseline label and version.
-4. Under reviewed operator access, create one complete, clearly marked disposable
-   candidate version, changing only nonsecret rehearsal metadata and preserving
-   credential strings. Temporarily advance this recovery secret's current label.
-   Prove that the accepted-rollback label still references the original accepted
-   version, and cold-recover both versions by their explicit references. No live
-   application reads this secret, and GitHub deployment bindings stay unchanged.
-5. Restore the original current version and verify its exact identity/digest and
-   retained labels. Keep the accepted rollback reference through the candidate
-   write and restoration; do not rely on the automatically moving `AWSPREVIOUS`
-   label. Do not delete the original version or remove its retained labels.
+3. Review the storage-only retention proposal above. Keep the existing baseline
+   pin; accepting an operational rollback version remains a later decision.
+4. If separately approved, create one byte-identical complete candidate version,
+   temporarily move current to it, verify the original pin and recover both
+   exact versions. Use no new document field or falsified source identity.
+5. Restore original current and preserve the baseline pin. Retire only test-owned
+   labels and account explicitly for the candidate remaining in version history.
 6. Exercise the applicable staging2 recovery/consumer path with its own approved
    synthetic bindings. Record exactly which operational checks pass and which
    production-provider claims remain outside the test. Do not call a storage-only

@@ -1,8 +1,34 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `62ae8fe3226314f55f02a0da4d349228f1d1bbc2`.
+Last baseline with passing CI, Security and image checks: `2f05421196c2803e41363caf967637bf520c5a2a`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
+
+## Cold-reader preflight and single-run activation (2026-11-05)
+
+Reader commit 2f054211 passed complete CI 42028678398 and Security 42028678501.
+The primary new Meteor invocation passed; all ten conditional additional slots
+remain unused. Source/capture/ABI/topology/startup/cleanup and retained-source
+checks passed. The helper/policies/reviewed YAML are unchanged from that commit.
+
+AWS metadata preflight verified the same account/store, sole exact baseline and
+both original labels, managed encryption, no resource policy/rotation/replicas,
+absent old transfer/restore roles and preserved shared provider. Created the
+approved temporary GitHub environment with main-only branch policy and zero
+secrets/variables. The repository OIDC subject remains unchanged. Created the
+read-only role with fixed trust/data expiry 2026-11-05T13:34:58Z; read-back matches
+the exact reviewed policies with no other permissions. IAM simulation allowed
+all three reads and denied put/version-label update/deletion/rotation. These
+are permission-model observations, not a replay with issued session credentials.
+
+Prepared the active workflow from the verified inert review; parsed YAML is
+identical. Activation and these records use [skip ci]; no second Meteor run.
+The single protected cold read is reserved for this activation; no result yet.
+The complete document digest will be retained encrypted under the existing
+report public key, with no plaintext bundle/hash, deployment bindings, provider
+login, candidate write or label change. Always retire permissions/trust/role,
+workflow, empty environment and owned metadata-only policy files after outcome.
+The next retention proposal remains unapproved; unrelated edits are preserved.
 
 ## Cold-restore execution and new integration allowance (2026-11-05)
 
@@ -17,7 +43,7 @@ new dependencies/spending or an automatic second protected cold-read attempt.
 
 | Allowance | Reserved / used and evidence |
 | --- | --- |
-| Primary fresh Meteor invocation | 1 reserved for the reviewed reader commit's normal CI; 0 invoked at this checkpoint. Record full commit/run/attempt/start/result after publication. |
+| Primary fresh Meteor invocation | 1 invoked on 2f05421196c2803e41363caf967637bf520c5a2a, CI 42028678398 / attempt 1. Test passed at 2026-11-05T12:42:45Z (975 server/1,237 client passes, zero failures/hooks, 22 pending). Complete CI, including canonical image identity/ABI/topology/startup/cleanup and retained-source protection, passed. |
 | Up to 10 additional project invocations, only if needed | 0 reserved, 0 invoked of 10. Do not use merely to repeat passing checks. |
 | Isolated protected cold restore | 1 approved, unused; gated on complete CI/Security, explicit tool tests/audit, empty main-only GitHub environment and fresh AWS preflight/read-only-role verification. |
 
@@ -41,7 +67,10 @@ Local optional-tool tests passed all 16 cases and dependency audit reports zero
 vulnerabilities. Full lint passed. The first source-suite run failed in an existing
 WSL Apache-hostname subprocess assertion; targeted rerun passed without code/test
 changes. Full source re-run passed (72 passed/6 Windows skips); capture passed (92 passed/6 Windows skips). No source or test change was needed to resolve the transient WSL invocation failure.
-Unrelated working changes are preserved.
+Security 42028678501 passed all four jobs; complete CI 42028678398 passed on
+2f054211. Its separate source/image observations bind the clean reader commit.
+The CI image config digest is sha256:0239296f32baa589f57e7cd330b1fbfd37a9faebf5f0cc06e713f9fa8073fe43
+(linux/amd64). This remains a CI observation, not a published/deployed release. Unrelated changes are preserved.
 
 ## SDK baseline transfer verified and access retired (2026-11-05)
 
