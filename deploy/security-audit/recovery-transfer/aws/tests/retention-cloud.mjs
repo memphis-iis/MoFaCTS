@@ -3,7 +3,7 @@ import { target, credentials } from './sdk-fixtures.mjs';
 
 // An in-memory AWS service model behind the real SDK HTTP protocol. It models
 // version immutability, stage exclusivity and automatic AWSPREVIOUS movement.
-export function retentionCloud({ baseline, runId, fault = () => {}, mutate = () => {} }) {
+export function retentionCloud({ baseline, runId, sessionKind = 'retention', fault = () => {}, mutate = () => {} }) {
   const calls = [];
   const versions = new Map([[baseline.ClientRequestToken, { text: baseline.SecretString,
     labels: ['AWSCURRENT', 'MOFACTS_RECOVERY_BASELINE'] }]]);
@@ -22,7 +22,7 @@ export function retentionCloud({ baseline, runId, fault = () => {}, mutate = () 
         calls.push({ operation, input: Object.fromEntries(input) });
         const fields = operation === 'AssumeRoleWithWebIdentity'
           ? '<Credentials><AccessKeyId>synthetic-access</AccessKeyId><SecretAccessKey>synthetic-secret</SecretAccessKey><SessionToken>synthetic-session</SessionToken><Expiration>2100-01-01T00:00:00Z</Expiration></Credentials>'
-          : `<Account>${target.accountId}</Account><Arn>arn:aws:sts::${target.accountId}:assumed-role/mofacts-recovery-rehearsal/mofacts-retention-${runId}</Arn>`;
+          : `<Account>${target.accountId}</Account><Arn>arn:aws:sts::${target.accountId}:assumed-role/${sessionKind === 'confirm' ? 'mofacts-recovery-restore/mofacts-confirm' : 'mofacts-recovery-rehearsal/mofacts-retention'}-${runId}</Arn>`;
         return { response: { statusCode: 200, headers: { 'content-type': 'text/xml' },
           body: Buffer.from(`<${operation}Response><${operation}Result>${fields}</${operation}Result></${operation}Response>`) } };
       }

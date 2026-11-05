@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { RecoveryTransferError } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
-import { BASELINE_LABEL, checkDescription, validateRecoveryStoreTarget } from './store.mjs';
+import { BASELINE_LABEL, observeRecoveryPhases as observe, validateRecoveryStoreTarget } from './store.mjs';
 import { validateRestoreExpected } from './restore.mjs';
-import { exactLabels, validateRecoveredPayload, encryptedDocumentDigest } from './payload.mjs';
+import { validateRecoveredPayload, encryptedDocumentDigest } from './payload.mjs';
 const fail = category => { throw new RecoveryTransferError(category); };
 export const CANDIDATE_LABEL = 'MOFACTS_RECOVERY_CANDIDATE';
 export const validateRetentionTarget = target => validateRecoveryStoreTarget(target, 'mofacts-recovery-rehearsal');
@@ -24,27 +24,6 @@ function phases(baseline, candidate) {
   };
 }
 
-// Describe omits unlabelled versions; List includes them. Both must agree with
-// one exact, known phase. No pagination, extra versions or inferred ownership.
-async function observe(aws, target, states) {
-  const description = await aws('secretsmanager', 'describe-secret', { SecretId: target.secretArn });
-  checkDescription(description, target);
-  const list = await aws('secretsmanager', 'list-secret-version-ids', {
-    SecretId: target.secretArn, IncludeDeprecated: true, MaxResults: 3,
-  });
-  if (list?.ARN !== target.secretArn || list.Name !== 'mofacts/security-audit/recovery'
-    || !Array.isArray(list.Versions) || list.NextToken !== undefined) fail('secret-versions');
-  for (const [phase, versions] of Object.entries(states)) {
-    const labelled = Object.entries(versions).filter(([, labels]) => labels.length);
-    if (Object.keys(description.VersionIdsToStages ?? {}).length === labelled.length
-      && labelled.every(([id, labels]) => exactLabels(description.VersionIdsToStages[id], labels))
-      && list.Versions.length === Object.keys(versions).length
-      && new Set(list.Versions.map(version => version.VersionId)).size === list.Versions.length
-      && list.Versions.every(version => Object.hasOwn(versions, version.VersionId)
-        && exactLabels(version.VersionStages ?? [], versions[version.VersionId]))) return phase;
-  }
-  fail('version-labels');
-}
 
 async function requirePhase(aws, target, states, phase) {
   if (await observe(aws, target, states) !== phase) fail('version-labels');

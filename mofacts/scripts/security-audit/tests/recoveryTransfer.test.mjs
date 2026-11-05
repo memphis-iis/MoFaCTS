@@ -99,7 +99,8 @@ test('AWS recovery dependencies belong solely to the excluded optional tool with
   }
   for (const name of ['package.json', 'package-lock.json', 'run.mjs', 'sdk-client.mjs', 'transfer.mjs', 'tests/sdk.test.mjs', 'tests/transfer.test.mjs',
     'runner.mjs', 'store.mjs', 'restore.mjs', 'run-restore.mjs', 'tests/restore.test.mjs', 'tests/sdk-fixtures.mjs',
-    'payload.mjs', 'retention.mjs', 'run-retention.mjs', 'tests/retention.test.mjs', 'tests/retention-cloud.mjs']) {
+    'payload.mjs', 'retention.mjs', 'run-retention.mjs', 'tests/retention.test.mjs', 'tests/retention-cloud.mjs',
+    'confirm.mjs', 'run-confirm.mjs', 'tests/confirm.test.mjs']) {
     assert.equal(TEST_INPUTS.some(([entry, type]) => entry === `deploy/security-audit/recovery-transfer/aws/${name}` && type === 'file'), true);
   }
   assert.equal(fs.existsSync(new URL('mofacts/scripts/security-audit/transfer-recovery-baseline.mjs', root)), false);
@@ -168,4 +169,23 @@ test('retention workflow is inert and isolated; exact-secret stage grant exclude
   for (const name of ['retention-workflow.yml.review', 'retention-permissions-policy.example.json', 'retention-trust-policy.example.json']) {
     assert.equal(TEST_INPUTS.some(([entry, type]) => entry === `deploy/security-audit/recovery-transfer/${name}` && type === 'file'), true);
   }
+});
+
+
+test('existing-version confirmation has only manual isolated read access and a trusted explicit candidate input', () => {
+  const root = new URL('../../../../deploy/security-audit/recovery-transfer/', import.meta.url);
+  const workflow = yaml.load(fs.readFileSync(new URL('confirm-workflow.yml.review', root), 'utf8'));
+  assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
+  assert.equal(Object.keys(workflow.on.workflow_dispatch.inputs).length, 10);
+  assert.equal(workflow.on.workflow_dispatch.inputs.candidate_version_id.required, true);
+  assert.equal(workflow.jobs.confirm.environment, 'security-audit-recovery-rehearsal');
+  assert.deepEqual(workflow.jobs.confirm.permissions, { contents: 'read', 'id-token': 'write' });
+  assert.equal(/secrets\.|vars\.|production-security-audit|upload-artifact/.test(JSON.stringify(workflow)), false);
+  const step = workflow.jobs.confirm.steps.at(-1);
+  assert.equal(step.run, 'node deploy/security-audit/recovery-transfer/aws/run-confirm.mjs');
+  assert.equal(Object.keys(step.env).every(name => name.startsWith('RECOVERY_')), true);
+  assert.equal(step.env.RECOVERY_CANDIDATE_VERSION_ID, '${{ inputs.candidate_version_id }}');
+  assert.equal(TEST_INPUTS.some(([entry, type]) => entry === 'deploy/security-audit/recovery-transfer/confirm-workflow.yml.review' && type === 'file'), true);
+  const policy = JSON.parse(fs.readFileSync(new URL('restore-permissions-policy.example.json', root)));
+  assert.deepEqual(policy.Statement[0].Action, ['secretsmanager:DescribeSecret','secretsmanager:ListSecretVersionIds','secretsmanager:GetSecretValue']);
 });

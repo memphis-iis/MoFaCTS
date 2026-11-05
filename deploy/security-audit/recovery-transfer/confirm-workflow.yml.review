@@ -1,0 +1,96 @@
+# REVIEW ONLY: outside .github/workflows; cannot be dispatched here.
+# Install as .github/workflows/recovery-confirm.yml only after execution approval.
+name: Read-only existing recovery versions confirmation
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Reviewed full main commit SHA (must equal dispatch revision)
+        required: true
+        type: string
+      account_id:
+        description: Verified destination AWS account ID (not a credential)
+        required: true
+        type: string
+      role_arn:
+        description: Approved temporary mofacts-recovery-restore role ARN
+        required: true
+        type: string
+      secret_arn:
+        description: Exact existing recovery secret ARN
+        required: true
+        type: string
+      version_id:
+        description: Exact version from the successful transfer receipt
+        required: true
+        type: string
+      baseline_commit:
+        description: Source activation commit recorded in that baseline
+        required: true
+        type: string
+      baseline_run_id:
+        description: Successful baseline transfer run ID
+        required: true
+        type: string
+      baseline_run_attempt:
+        description: Successful baseline transfer run attempt
+        required: true
+        type: string
+      expected_bytes:
+        description: Complete UTF-8 byte count from transfer receipt
+        required: true
+        type: string
+      candidate_version_id:
+        description: Exact candidate version from the prior rehearsal receipt
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: security-audit-recovery-confirm
+  cancel-in-progress: false
+jobs:
+  confirm:
+    if: github.repository == 'memphis-iis/MoFaCTS' && github.ref == 'refs/heads/main' && github.sha == inputs.expected_commit
+    runs-on: ubuntu-24.04
+    environment: security-audit-recovery-rehearsal
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+      - name: Prepare shared validation dependencies before binding credentials
+        working-directory: mofacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+      - name: Prepare and verify the explicitly selected optional AWS tool
+        working-directory: deploy/security-audit/recovery-transfer/aws
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npm audit --audit-level=low
+          npm test
+          node ../../../../mofacts/node_modules/eslint/bin/eslint.js -c ../../../../eslint.config.mjs . --ignore-pattern 'node_modules/**'
+      - name: Confirm both existing versions without any mutation
+        env:
+          RECOVERY_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          RECOVERY_ACCOUNT_ID: ${{ inputs.account_id }}
+          RECOVERY_ROLE_ARN: ${{ inputs.role_arn }}
+          RECOVERY_SECRET_ARN: ${{ inputs.secret_arn }}
+          RECOVERY_VERSION_ID: ${{ inputs.version_id }}
+          RECOVERY_BASELINE_COMMIT: ${{ inputs.baseline_commit }}
+          RECOVERY_BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          RECOVERY_BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          RECOVERY_CANDIDATE_VERSION_ID: ${{ inputs.candidate_version_id }}
+          RECOVERY_EXPECTED_BYTES: ${{ inputs.expected_bytes }}
+        shell: bash
+        run: node deploy/security-audit/recovery-transfer/aws/run-confirm.mjs

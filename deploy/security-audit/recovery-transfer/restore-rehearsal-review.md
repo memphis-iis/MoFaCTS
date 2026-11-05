@@ -282,3 +282,13 @@ no version creation, stage edit, application/provider login or deployment. The
 new temporary access is limited to the three named reads, with a 15-minute
 session and fixed expiry within one hour. Verify implementation before enabling
 access and count any needed Meteor invocation against the nine remaining slots.
+
+
+The approved reader is `aws/run-confirm.mjs`; the
+[inactive confirmation workflow](confirm-workflow.yml.review) has ten explicit
+metadata inputs, including the prior candidate version ID. It reuses the
+read-only cold-reader role/trust/data policy and SDK capability. The exact final
+inventory is checked before and after both reads; canonical V1 validation and
+whole-document encrypted digest handling share the original helpers. No mutation
+or automatic retry is present. Conditional Meteor slot 2/10 is reserved for this
+implementation before protected access is enabled.

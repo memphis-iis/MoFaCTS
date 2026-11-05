@@ -311,3 +311,13 @@ retry occurred. See the [exact outcome and proposed read-only follow-up](restore
 Do not rerun the strict one-version writer against this two-version store or
 label the attempt a pass. AWS metadata visibility needs a bounded explicit
 verification contract before reusing mutation tooling.
+
+
+The approved read-only follow-up is implemented as `aws/run-confirm.mjs` with an
+[inactive manual workflow](confirm-workflow.yml.review), reusing the cold reader's
+[trust](restore-trust-policy.example.json) and [three-read data policy](restore-permissions-policy.example.json).
+Supply the original transfer receipt plus the prior rehearsal's exact candidate
+ID. It requires exactly the settled original-current/baseline and candidate-previous
+labels before and after reading, validates both canonical V1 payloads and compares
+every byte. Output is bounded metadata plus the encrypted complete-document digest.
+No version/label write, new dependency or application integration is involved.

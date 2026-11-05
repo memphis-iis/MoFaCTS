@@ -3762,3 +3762,24 @@ The active workflow equals the reviewed YAML semantically; only comments differ.
 One protected invocation is reserved; no protected retry is authorized. This
 activation changes no tested helper source and uses `[skip ci]` to avoid another
 Meteor invocation. Retire workflow/access/environment on either result.
+
+
+## 2026-11-05 — approved read-only confirmation; second conditional slot reserved
+
+Phil accepted publishing the failed observation and verified cleanup, and approved
+one read-only confirmation of the two existing versions. Cleanup was published
+as `fac7985a` with `[skip ci]`; failed protected run 42036927727 is preserved.
+The new reader uses the existing read-only role/capability and exact final labels,
+shared canonical V1 validation and encrypted digest receipt. It accepts no
+GitHub deployment-secret inputs and cannot create versions or change labels.
+The old one-version cold/bootstrap checks remain strict; shared input/inventory
+logic was extracted with their existing rejection tests preserved. No dependency,
+application manifest, deployment, TDF, credential or portable schema change.
+
+Reserve **conditional Meteor slot 2 of 10** before publication of the implementation.
+Slot 1 passed; eight remain unreserved. One new protected read-only confirmation
+is reserved after verification passes, with no automatic retry. Reuse the
+[inactive confirmation workflow](../deploy/security-audit/recovery-transfer/confirm-workflow.yml.review)
+and existing read-only trust/data policies. Retire temporary access, active
+workflow and empty environment on either result. The previous mutation verifier
+remains unqualified for reuse; this confirmation makes no mutation.

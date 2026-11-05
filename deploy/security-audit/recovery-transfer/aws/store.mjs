@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { exactLabels } from './payload.mjs';
 import { RecoveryTransferError } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
 
 export const BASELINE_LABEL = 'MOFACTS_RECOVERY_BASELINE';
@@ -43,4 +44,26 @@ export async function checkVersions(aws, target, versionId) {
 export function recoveryVersionId(source) {
   return crypto.createHash('sha256')
     .update(`memphis-iis/MoFaCTS\0${source.commit}\0${source.runId}\0${source.runAttempt}`).digest('hex');
+}
+
+// Describe omits unlabelled versions; List includes them. Both must agree with
+// one exact, known phase. No pagination, extra versions or inferred ownership.
+export async function observeRecoveryPhases(aws, target, states) {
+  const description = await aws('secretsmanager', 'describe-secret', { SecretId: target.secretArn });
+  checkDescription(description, target);
+  const list = await aws('secretsmanager', 'list-secret-version-ids', {
+    SecretId: target.secretArn, IncludeDeprecated: true, MaxResults: 3,
+  });
+  if (list?.ARN !== target.secretArn || list.Name !== 'mofacts/security-audit/recovery'
+    || !Array.isArray(list.Versions) || list.NextToken !== undefined) stop('secret-versions');
+  for (const [phase, versions] of Object.entries(states)) {
+    const labelled = Object.entries(versions).filter(([, labels]) => labels.length);
+    if (Object.keys(description.VersionIdsToStages ?? {}).length === labelled.length
+      && labelled.every(([id, labels]) => exactLabels(description.VersionIdsToStages[id], labels))
+      && list.Versions.length === Object.keys(versions).length
+      && new Set(list.Versions.map(version => version.VersionId)).size === list.Versions.length
+      && list.Versions.every(version => Object.hasOwn(versions, version.VersionId)
+        && exactLabels(version.VersionStages ?? [], versions[version.VersionId]))) return phase;
+  }
+  stop('version-labels');
 }
