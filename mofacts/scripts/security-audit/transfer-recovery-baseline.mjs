@@ -7,8 +7,9 @@ import {
 
 const fail = category => { throw new RecoveryTransferError(category); };
 
-// Linux hosted-runner adapter. Secrets travel through an anonymous stdin pipe;
-// no secret-bearing argv, disk file, inherited profile, endpoint or diagnostics.
+// Inactive CLI adapter: Linux Node child stdin is not a reopenable input file.
+// The protected workflows are retired pending the reviewed transport decision.
+// Never substitute secret-bearing argv or a plaintext file to activate it.
 export function makeAwsClient(credentials, env, spawn = spawnSync) {
   return async (service, operation, request) => {
     const allowed = {

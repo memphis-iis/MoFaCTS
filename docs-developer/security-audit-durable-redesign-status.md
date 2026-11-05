@@ -33,6 +33,39 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### Authorized retry stopped; transport decision required (2026-11-05 UTC)
+
+The single authorized corrected retry, [run 41941983320](https://github.com/memphis-iis/MoFaCTS/actions/runs/41941983320),
+on `da8bdb957cd0669b29dd113be75aae2ce1bcb707`, passed source validation and
+stopped at `aws-call`. No version was written. The corrected SSH validator and
+unchanged stored key are separate from this transport failure. Complete CI and
+Security on `3d1008b0` passed; all five Meteor invocations are spent.
+
+Synthetic-only reproduction under pinned Node 24.22.1 in Ubuntu-MoFaCTS showed
+that Node child stdin is a Unix socket and reopening `/dev/stdin` fails with
+ENXIO. A Bash anonymous-pipe prototype passed a substitute reader but failed the
+actual AWS CLI's offline skeleton validation in CloudShell (Node 20.20.2). AWS's
+CLI source has two input-file loading paths; a one-shot stream cannot satisfy
+both. The prototype and its tests were discarded. No credential files or raw
+upstream errors were retained. This diagnosis is not a successful AWS transfer.
+
+Removed the temporary data policy, read back denied trust, simulated denial for
+all four data operations, and deleted the role. `GetRole` confirmed absence;
+complete version listing including deprecated versions returned zero. Simulation
+is not a replay of an issued session. The shared provider is preserved. Disabled
+the workflow and removed its active file; removed the owned temporary policy
+files and ended CloudShell. The existing empty paid destination is preserved,
+but is **not a usable backup**. GitHub source metadata remains unchanged.
+
+The [transport review](../deploy/security-audit/recovery-transfer/transport-decision.md)
+recommends official STS and Secrets Manager JavaScript clients. Their two new
+development dependencies require approval before implementation; one fresh
+Meteor invocation and one further protected transfer also need authorization.
+No SDK dependency, third transfer or restore rehearsal was executed. Phase 0
+remains open. Cleanup/review publication uses `[skip ci]` and does not assert
+release qualification for a working transfer transport. Unrelated working edits
+remain outside this batch.
+
 ### CloudShell recovered; exact retry setup verified (2026-11-04)
 
 AWS's documented CloudShell restart restored its container-delivered credentials;

@@ -13,9 +13,15 @@ the stored key, and one transfer retry after verification. Diagnostic `419283329
 passed: the OpenSSH binding has no terminal LF, CR or escaped LF. Correction
 `3d1008b0` passed complete CI `41928890309` (including Meteor/image checks) and
 Security `41928890286`. The diagnostic is disabled and removed. The renewed
-one-secret retry role is read-back verified; its fixed expiry is
-`2026-11-05T01:23:58Z`. The single corrected retry is being activated; its result
-and subsequent access cleanup remain pending.
+one-secret retry role was read-back verified with fixed expiry
+`2026-11-05T01:23:58Z`. The single corrected retry, `41941983320` on `da8bdb95`,
+passed source validation but failed at `aws-call`: the CLI could not load its
+request from Node's child stdin. No secret version was written. Data permissions
+were removed, trust denied and the role deleted; read-back confirmed role absence
+and zero destination versions. The shared provider remains unchanged. The
+workflow is disabled and its active file removed. The authorized retry is spent;
+the [transport decision](transport-decision.md) is the next gate. No further
+protected attempt or Meteor integration invocation is authorized.
 Phil approved the current GitHub configuration as the starting point. This
 establishes a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.
@@ -164,10 +170,12 @@ changed source is a separate reviewed operation, not an overwrite retry.
 AWS documents [idempotent version writes and initial/current labels](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_PutSecretValue.html)
 and [complete version listing](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_ListSecretVersionIds.html),
 plus [CLI input files](https://docs.aws.amazon.com/cli/latest/userguide/cli-usage-parameters-file.html).
-The adapter feeds JSON through an anonymous Linux stdin pipe, captures responses
-in memory, disables CLI retries/profiles/metadata credentials and uses fixed
-regional HTTPS endpoints. Live hosted-runner CLI/OIDC behavior remains untested
-until an authorized execution; synthetic adapter tests do not establish it.
+The retired CLI adapter attempts to load JSON from `file:///dev/stdin`. Linux
+Node child stdin is a socket that the CLI cannot reopen as an input file. An
+anonymous-pipe prototype also failed an offline test with the real CLI and was
+discarded. Synthetic adapter tests did not establish CLI interoperability. Keep
+this adapter inactive pending the [reviewed transport decision](transport-decision.md);
+do not substitute plaintext files, secret-bearing arguments or another profile.
 
 ## Acceptance after transfer
 
