@@ -222,3 +222,11 @@ and the application still exposes its existing V1 ingestion path. The V2 helper
 does not register a route or write reports. Receiver/producer/host cutover,
 staging ingestion, replay-index enforcement, previous-image storage qualification
 and production acceptance remain gates in the written redesign plan.
+
+The receiver helper checkpoint adds projected V2 summaries, independent active
+latest queries, validation before store/read, and canonical JSON/escaped HTML
+exports preserving the no-script CSP. It does not select or create the production
+collection. Node storage tests use synthetic records; supported Meteor adds a
+fresh test-owned Mongo collection for unique-nonce and retained-V1 checks. A
+previous-image compatibility run is still required before the storage/cutover
+choice is accepted. These tests do not authorize production access or deployment.

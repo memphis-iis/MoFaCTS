@@ -13,9 +13,13 @@ completed items and continuing until a real decision point. Source baseline:
 `63dff4c7ed9e6b793873212d6a3ab21f662f021b`, current branch `main`. The eight
 unrelated working-tree changes remain preserved. This request authorizes Phase 1
 source work; concrete commit/push, protected operation, build/deploy and production
-cutover permissions remain separate. The eight remaining conditional Meteor
-slots were available at entry. Conditional slot 3/10 subsequently passed on
-CI 42108870607, leaving seven available. The exact results are recorded below.
+cutover permissions remain separate. Use the current counter immediately below;
+counts in dated execution records describe those checkpoints only.
+
+**Current Meteor allowance:** one primary plus ten conditional invocations were
+authorized. Conditional slots 1-3 passed. Slot 4/10 is RESERVED before the approved
+receiver publication; six conditional slots are unreserved. Its actual run/result
+will be recorded separately. No extra invocation is authorized by a stale count.
 
 Completed entry prerequisites:
 
@@ -44,7 +48,7 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository finding-tier evaluator implemented/tested. V2 host and composite acquisition/evaluation are not implemented; active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
-| P1-09 | Summary projections, indexes and read-time integrity | [ ] Not implemented. |
+| P1-09 | Summary projections, indexes and read-time integrity | [ ] Inert helpers and Node tests pass; real Mongo tests, chosen collection binding and old-image qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
@@ -185,6 +189,103 @@ from this list. Source and execution permissions remain distinct; no production,
 staging deployment, new credential/access or scanner cutover occurred here.
 The result-only plan/status update belongs to the approved batch and uses
 `[skip ci]`, consuming no additional Meteor invocation.
+
+
+### Receiver storage/presentation source checkpoint and next scope decision
+
+After the foundation CI passed, source work continued on the remaining receiver
+flow. The new helpers remain inert: no collection binding or live route is
+created by importing them.
+
+- [x] Implement bounded V2-only summary projections and independent exact-active
+  latest exposure/full queries. A current exposure older than the 200-row history
+  window is still selected correctly; list responses contain no control evidence
+  or nonce. Shared catalog validation is reused once per coordinate per request.
+- [x] Implement independent full-report validation before insert and before a
+  single-report read/download; keep the flat signed envelope and existing 90-day
+  TTL. Define unique ID/digest/nonce and schema/catalog query indexes. A duplicate
+  error propagates; no record is replaced or silently repaired.
+- [x] Implement canonical JSON and escaped HTML exports with the existing no-script
+  CSP, visible execution errors, both report/catalog digests and distinct identity
+  observations. The file checksum is separate from the signed report digest.
+- [x] Add four Node storage/presentation tests, including retained-V1 exclusion,
+  201 newer full reports versus an older latest exposure, corrupt-record rejection,
+  byte integrity and script-injection escaping. The current source suite passes
+  100 tests with zero failures and six Windows skips (106 total). Targeted storage
+  tests pass 4/4 after the final type-narrowing correction. Full typecheck and lint
+  pass; no required local check remains failing.
+- [ ] Two added real-Mongo Meteor cases have not run yet. They use a fresh test-only
+  collection, prove physical nonce uniqueness and retained-V1 byte preservation,
+  and remove only their own fixture IDs. Supported CI/publication is required.
+- [ ] P1-09 and storage-model/previous-image gates remain open: a helper's mocks or
+  new-candidate V1 exclusion cannot establish behavior of the actual rollback image.
+
+The canonical operator procedure resolves an existing production release record
+from 2026-10-31, clean source `bddd0895fad5f8aa0dbf2fab611f50d5f70fafbe`, locator
+`ppavlikmemphis/mofacts-mini:prod-bddd0895fad5` and immutable index
+`sha256:c0146b8954284741ca437b5db02a855a5a07fec0c66ffda34279ae6625fb7899`.
+The public registry still serves that exact index; its only executable platform is
+`linux/amd64`, manifest
+`sha256:07d902b8d5a4bd2a61efc35a1432e7a6186f830de71b885fa3a108ac2cc54db0`.
+The other entry is an unknown-platform attestation. The record's `imageId` equals
+the index; it is not assumed to be a configuration digest. No tag was substituted
+for the recorded immutable reference and no image was pulled, run or deployed.
+
+This is the local release owner's record, not a current production-container
+observation. The source at its recorded commit contains an unfiltered V1 history
+query and V1-only summary fields without explicit V2 rejection. That is a reason
+to exercise the actual previous image before selecting storage, not runtime
+compatibility proof or permission to patch an old image. Existing records must
+remain unchanged, and one-collection versus version-separated storage remains
+subject to the delegated qualification decision in the plan.
+
+Next scope decision: approve one bounded read-only production app-image metadata
+check so the recorded rollback baseline can be checked against the real app. The
+prepared command inspects only fixed container `mofacts` and its image reference,
+repository digests, OS/architecture and OCI revision label through the existing
+operator SSH/sudo route. It reads no env/settings, credentials or database, runs
+no application request/exec, and changes/restarts nothing. The prior single-use
+production permission covered auditor source metadata only and is already spent.
+The draft passes Linux shell syntax checking but has NOT been executed.
+
+The eight-file receiver helper/test/guidance batch is locally verified and remains
+uncommitted. Its publication needs explicit approval; one of the seven existing
+Meteor authorizations would then be used, with reservation before triggering.
+No additional invocation is reserved/consumed yet. The Phase 1 work continues
+without production or scanner cutover and without new dependencies or permissions.
+
+
+### Receiver publication approved; production baseline mismatch observed
+
+Phil approved publication of the eight-file receiver batch and one existing
+Meteor allowance, plus one separate read-only production app-image check.
+Conditional slot 4/10 is reserved before the push. Actual invocation and results
+remain pending; no retry is implicit in this reservation.
+
+The single metadata SSH command exited 0 on 2026-11-05. Fixed container `mofacts`
+is running and has the expected Compose service label. Its revision label is
+`18677291993b66b890a090e55d65f703b45ff653`, locator
+`ppavlikmemphis/mofacts-mini:prod-18677291993b`, native image reference and repository
+index digest `sha256:66e2314b927243e9912b48660d28287a149e0dadf06d9c6d35dc2bdf8c5c72c7`.
+Registry inspection confirms that immutable index is available, with one executable
+`linux/amd64` manifest,
+`sha256:f8784b4afe9a4875fd62c5ccb153bab26796381548d47ded54d9a65d5148cc05`,
+plus an unknown-platform attestation. The native image reference is the index;
+it is not mislabeled as the configuration digest.
+
+This differs from the canonical local release owner's older `bddd0895` / `c0146b89`
+record. The Git commit named by the observed label exists (2026-10-31, shared-audio
+participant authorization change). A label and immutable image availability do
+not prove source cleanliness, a complete build context, acceptance or the actual
+deployment timestamp. The older record was NOT overwritten or reinterpreted, and
+neither image is silently substituted into qualification. Preserve both results
+and reconcile the intended rollback baseline before claiming P1-16.
+
+No env/settings, credentials or database records were read; no app request, code
+execution inside the container, install, restart, permission change or production
+write occurred. The one-use production metadata permission is now spent. Local
+bounded metadata/comparison evidence is retained beside the other Phase 1 receipts.
+The source receiver CI is independent and may proceed under its existing approval.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 
