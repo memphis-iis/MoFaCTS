@@ -3783,3 +3783,32 @@ is reserved after verification passes, with no automatic retry. Reuse the
 and existing read-only trust/data policies. Retire temporary access, active
 workflow and empty environment on either result. The previous mutation verifier
 remains unqualified for reuse; this confirmation makes no mutation.
+
+
+## 2026-11-05 — confirmation reader verified; one-shot read-only activation
+
+Reader `60dfd6f09057530d0b1049e76c37f8610675a7a2` passed full CI
+[42048015246](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015246)
+and Security [42048015262](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015262).
+Conditional Meteor **2/10 used/passed; eight remain**. This invocation ran
+14:49:52Z–14:50:54Z, attempt 1, exit 0: server 975 passed/15 pending, client
+1,237 passed/7 pending, zero failures/hook failures. Full lint, both typechecks,
+source/capture/native checks, canonical Compose build, image/source equality,
+ABI, topology rejection, Change Streams startup, protection and cleanup passed.
+CI image config `sha256:233765e16a68a81cdfe7f6bab4b3eeaec9c830e7df583ce4f146b96580257d08`
+is an unqualified linux/amd64 CI observation, not a publication/deployment.
+Local optional tests: 29 passed; tool lint passed; optional dependency audit
+zero advisories. Local source tests: 74 passed/6 Linux-only skips; capture:
+92 passed/6 Linux-only skips, with supported CI's native checks passing.
+
+Before access setup, metadata preflight verified the two known final versions,
+unchanged original current/pin and candidate previous label, secret configuration,
+provider and temporary-role absence. CloudShell restarted before setup could be
+submitted; a fresh role-absence check proved no partial grant before resubmission.
+The empty GitHub environment is verified main-only, zero saved secrets/variables.
+The new temporary exact-secret role permits only three data reads; five writes
+and other-secret actions were simulated denied. Trust/data expiry is fixed,
+session duration 15 minutes. The active workflow is semantically equal to its
+reviewed draft; this metadata/activation-only commit uses `[skip ci]`, without
+another Meteor invocation. One protected confirmation is reserved, with no retry.
+No secret version, stage, source credential or application target has changed.
