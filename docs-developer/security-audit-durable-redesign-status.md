@@ -4,6 +4,45 @@ Last baseline with passing CI, Security and image checks: `62ae8fe3226314f55f02a
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
+## Cold-restore execution and new integration allowance (2026-11-05)
+
+Phil approved the isolated read-only cold restore, one fresh Meteor integration
+invocation and, if needed for this security project, **up to ten more**. This
+creates one primary slot plus ten conditional slots (11 maximum), separate from
+all exhausted earlier allowances. This explicit bounded authorization supersedes
+the usual fresh-per-invocation rule only within that cap/project. Reserve before
+publication/dispatch, count failed invocations too, and never silently renew it.
+It does not authorize production/provider logins, candidate writes, label changes,
+new dependencies/spending or an automatic second protected cold-read attempt.
+
+| Allowance | Reserved / used and evidence |
+| --- | --- |
+| Primary fresh Meteor invocation | 1 reserved for the reviewed reader commit's normal CI; 0 invoked at this checkpoint. Record full commit/run/attempt/start/result after publication. |
+| Up to 10 additional project invocations, only if needed | 0 reserved, 0 invoked of 10. Do not use merely to repeat passing checks. |
+| Isolated protected cold restore | 1 approved, unused; gated on complete CI/Security, explicit tool tests/audit, empty main-only GitHub environment and fresh AWS preflight/read-only-role verification. |
+
+Implemented the reader and kept it outside application dependencies/build context.
+Shared store checks and hosted-runner/OIDC exchange are reused by transfer and
+restore. The new SDK capability rejects writes before sending; the reviewed IAM
+policy independently grants only describe/list/get on one exact secret. The
+reader rejects audit/Tailscale deployment bindings and ambient credential inputs,
+checks the recorded immutable version/source/byte count, validates canonical V1
+serialization and original strings, and emits only an encrypted whole-document digest plus
+bounded counts/version/result. The digest is RSA-OAEP-SHA256 ciphertext under
+the recovered report public key; neither plaintext hash nor bundle is logged.
+Synthetic receipt decryption passed. Real report-private-key custody is separate. The fresh run has no production/provider/staging2
+login behavior. The digest is first observed from the immutable stored version;
+it is not a separately recorded original-source digest or a provider-authentication
+check. The initial transfer already established exact source/write/read-back.
+
+The inactive workflow/policies and new reader/shared helpers/tests are explicit
+supplemental capture inputs. Normal application CI still installs no AWS tool.
+Local optional-tool tests passed all 16 cases and dependency audit reports zero
+vulnerabilities. Full lint passed. The first source-suite run failed in an existing
+WSL Apache-hostname subprocess assertion; targeted rerun passed without code/test
+changes. Full source re-run passed (72 passed/6 Windows skips); capture passed (92 passed/6 Windows skips). No source or test change was needed to resolve the transient WSL invocation failure.
+Unrelated working changes are preserved.
+
 ## SDK baseline transfer verified and access retired (2026-11-05)
 
 The single authorized SDK attempt, [run 42024117227](https://github.com/memphis-iis/MoFaCTS/actions/runs/42024117227)
@@ -36,7 +75,7 @@ version table also shows the sole baseline version and both labels.
 
 Both single-use SDK execution allowances are now spent; no automatic transfer
 or Meteor retry is authorized. The next real decision is the
-[isolated cold-restore scope](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md#next-approval-one-isolated-read-only-cold-restore):
+[isolated cold-restore scope](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md#approved-one-isolated-read-only-cold-restore):
 recover this exact version on a fresh runner with no GitHub deployment-secret
 bindings, in-memory validation only, narrowly scoped temporary AWS read access,
 then cleanup. That proposal has not been implemented or executed. Candidate

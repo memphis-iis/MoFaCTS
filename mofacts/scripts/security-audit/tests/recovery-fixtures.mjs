@@ -4,8 +4,9 @@ export const source = {
   repository: 'memphis-iis/MoFaCTS', environment: 'production-security-audit',
   commit: 'a'.repeat(40), runId: '12345', runAttempt: '1',
 };
-export const publicKey = crypto.generateKeyPairSync('rsa', { modulusLength: 3072 }).publicKey
-  .export({ type: 'spki', format: 'pem' });
+const keyPair = crypto.generateKeyPairSync('rsa', { modulusLength: 3072 });
+export const privateKey = keyPair.privateKey;
+export const publicKey = keyPair.publicKey.export({ type: 'spki', format: 'pem' });
 export function bindings() {
   const sshKeyType = 'OPENSSH PRIVATE KEY';
   const actors = ['learnerA', 'learnerB', 'teacherA', 'teacherB', 'admin', 'reset', 'expiry', 'lockout'];

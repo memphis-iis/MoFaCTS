@@ -1,13 +1,15 @@
 # Recovery rehearsal: isolation decision
 
-Status: the baseline transfer succeeded in `42024117227`; temporary access and
-the active workflow are retired. This is the next unapproved design/execution
-decision. No rehearsal, candidate version, new GitHub environment or retained
-accepted-rollback label is authorized or created by this document.
+Status: Phil approved the isolated read-only cold restore (steps 1–2), one fresh
+Meteor integration invocation and, if necessary for this security project, up to
+ten additional invocations. Each invocation is reserved and counted in the
+status ledger. The baseline transfer succeeded in `42024117227`; its access and
+active workflow are retired. Cold-reader implementation/CI/execution are pending.
+Candidate writes, label changes and operational rehearsals remain unapproved.
 
-## Next approval: one isolated read-only cold restore
+## Approved: one isolated read-only cold restore
 
-Recommend approving only steps 1–2 below first. Use a temporary main-only
+The approved execution covers only steps 1–2 below first. Use a temporary main-only
 environment named `security-audit-recovery-rehearsal`, with no stored deployment
 secrets, and temporary role `mofacts-recovery-restore`. The role may only describe,
 list versions and read the exact existing secret in the already verified Ohio
@@ -20,16 +22,36 @@ Read only the explicit version retained privately for successful transfer
 optional SDK package and shared V1 validator. It accepts no GitHub `AUDIT_*` or
 Tailscale deployment bindings, Desktop credential file or production target as
 input. Keep the complete document in memory; retain only the bounded result,
-version, complete-document digest and cleanup evidence. No individual credential
+version, encrypted complete-document digest and cleanup evidence. No individual credential
 fingerprints, raw values, secret artifacts, Tailscale connection, provider login,
 application login or production/staging request belongs in this cold read.
 
-Implement and verify the reviewed reader before enabling its access. Publication
-and one fresh Meteor integration invocation are needed for normal complete CI;
-the preceding SDK implementation's single invocation is spent. Then dispatch
+The reader is implemented in the existing optional package as `aws/run-restore.mjs`.
+It reuses shared hosted-runner/OIDC and store checks and adds a read-only SDK
+capability. Its [inactive workflow](restore-workflow.yml.review),
+[trust policy](restore-trust-policy.example.json) and
+[data policy](restore-permissions-policy.example.json) are captured supplemental
+inputs. Keep the application manifest/lockfile and its normal dependency setup
+unchanged. Explicit tool tests exercise actual SDK serialization with synthetic
+responses before protected execution.
+
+Verify the committed reader before enabling its access. Publication and the
+newly authorized Meteor integration invocation provide normal complete CI;
+the preceding SDK implementation's invocation remains spent. Then dispatch
 one protected cold read after checks pass. Remove data permissions, deny trust,
 delete the temporary role, disable/remove the active workflow and remove the
 temporary empty GitHub environment on either outcome. No automatic retry.
+
+
+The result retains the digest as RSA-OAEP-SHA256 ciphertext under the report
+public key already contained in the recovered document. Only that 64-byte ASCII
+whole-document hash is encrypted; the bundle itself is never emitted or uploaded.
+State/version/byte/count metadata remain bounded. The existing report private key
+stays outside the runner and backup, and is required to decrypt that receipt
+later. Synthetic encryption/decryption is tested; this check does not establish
+real report-private-key custody or decryption availability. This preserves private
+digest retention despite public workflow logs without adding a credential source,
+dependency, artifact or general encryption subsystem.
 
 This establishes recoverability without GitHub deployment copies or this PC.
 It does not prove provider credentials work, accept a rollback version, change

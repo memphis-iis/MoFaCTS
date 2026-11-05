@@ -40,3 +40,12 @@ export function makeAwsClient(credentials, { requestHandler } = {}) {
     finally { client.destroy(); }
   };
 }
+
+// A separate capability for the cold reader; IAM independently denies writes.
+export function makeAwsReadClient(credentials, options) {
+  const aws = makeAwsClient(credentials, options);
+  return async (service, operation, request) => {
+    if (service === 'secretsmanager' && !['describe-secret', 'list-secret-version-ids', 'get-secret-value'].includes(operation)) fail('aws-operation');
+    return aws(service, operation, request);
+  };
+}

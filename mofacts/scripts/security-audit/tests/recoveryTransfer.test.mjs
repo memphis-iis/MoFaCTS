@@ -97,10 +97,29 @@ test('AWS recovery dependencies belong solely to the excluded optional tool with
   for (const workflow of ['ci.yml', 'security.yml']) {
     assert.equal(fs.readFileSync(new URL(`.github/workflows/${workflow}`, root), 'utf8').includes('working-directory: deploy/security-audit/recovery-transfer/aws'), false);
   }
-  for (const name of ['package.json', 'package-lock.json', 'run.mjs', 'sdk-client.mjs', 'transfer.mjs', 'tests/sdk.test.mjs', 'tests/transfer.test.mjs']) {
+  for (const name of ['package.json', 'package-lock.json', 'run.mjs', 'sdk-client.mjs', 'transfer.mjs', 'tests/sdk.test.mjs', 'tests/transfer.test.mjs',
+    'runner.mjs', 'store.mjs', 'restore.mjs', 'run-restore.mjs', 'tests/restore.test.mjs', 'tests/sdk-fixtures.mjs']) {
     assert.equal(TEST_INPUTS.some(([entry, type]) => entry === `deploy/security-audit/recovery-transfer/aws/${name}` && type === 'file'), true);
   }
   assert.equal(fs.existsSync(new URL('mofacts/scripts/security-audit/transfer-recovery-baseline.mjs', root)), false);
+});
+
+test('cold-restore workflow is inert, binds no deployment credentials and grants only exact-secret reads', () => {
+  const root = new URL('../../../../deploy/security-audit/recovery-transfer/', import.meta.url);
+  const workflow = yaml.load(fs.readFileSync(new URL('restore-workflow.yml.review', root), 'utf8'));
+  assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
+  assert.equal(workflow.jobs.restore.environment, 'security-audit-recovery-rehearsal');
+  assert.deepEqual(workflow.jobs.restore.permissions, { contents: 'read', 'id-token': 'write' });
+  assert.equal(/secrets\.|vars\.|production-security-audit|upload-artifact/.test(JSON.stringify(workflow)), false);
+  assert.equal(workflow.jobs.restore.steps.at(-1).run, 'node deploy/security-audit/recovery-transfer/aws/run-restore.mjs');
+  assert.equal(Object.keys(workflow.jobs.restore.steps.at(-1).env).every(name => name.startsWith('RECOVERY_')), true);
+  const policy = JSON.parse(fs.readFileSync(new URL('restore-permissions-policy.example.json', root)));
+  assert.deepEqual(policy.Statement[0].Action, ['secretsmanager:DescribeSecret', 'secretsmanager:ListSecretVersionIds', 'secretsmanager:GetSecretValue']);
+  assert.equal(policy.Statement[0].Resource, '<EXACT_PRECREATED_RECOVERY_SECRET_ARN>');
+  const trust = JSON.parse(fs.readFileSync(new URL('restore-trust-policy.example.json', root)));
+  assert.equal(trust.Statement[0].Condition.StringEquals['token.actions.githubusercontent.com:sub'],
+    'repo:memphis-iis/MoFaCTS:environment:security-audit-recovery-rehearsal');
+  assert.deepEqual(policy.Statement[0].Condition.DateLessThan, trust.Statement[0].Condition.DateLessThan);
 });
 
 test('review workflow remains inert and policies bind exact source environment and one secret', () => {

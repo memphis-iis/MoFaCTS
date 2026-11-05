@@ -14,8 +14,9 @@ operations simulated denied, and role absence verified after deletion. The
 shared provider is preserved. The active workflow is disabled and removed;
 owned policy files were removed and CloudShell ended. Simulation is not an
 actual replay of an issued session. The one protected SDK transfer is spent.
-The [isolated cold-restore review](restore-rehearsal-review.md) is the next gate;
-no cold restore, accepted rollback copy or Phase 0 closure is claimed.
+Phil approved the [isolated read-only cold restore](restore-rehearsal-review.md),
+with its reader/CI/execution tracked in the status ledger. Candidate writes and
+accepted rollback labels remain outside that approval; Phase 0 stays open.
 
 The following earlier-attempt history explains the corrected validator/transport:
 

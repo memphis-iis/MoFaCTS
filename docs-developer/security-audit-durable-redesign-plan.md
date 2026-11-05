@@ -537,6 +537,14 @@ Section 0, decision 4 is now settled by Phil's explicit 2026-11-02 approval: AWS
 
 #### AWS Secrets Manager recovery design (approved 2026-11-02)
 
+**Cold restore, approved 2026-11-05:** implement and perform the isolated read-only
+fresh-runner check in the [restore review](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md).
+The approved scope is steps 1–2 only, with no deployment-secret copies or provider
+logins and with access/workflow/environment cleanup. Phil authorized one fresh
+Meteor invocation plus up to ten additional project invocations if needed;
+reserve/count each in the status ledger. Accepted rollback labels, candidate
+versions and staging2 operational recovery still require later approval.
+
 **Provider boundary, subsequently approved:** AWS is Phil's selected optional
 operator recovery store, not a MoFaCTS application requirement. Preserve the
 portable `MoFactsRecoveryBundleV1` document and shared validation. Put AWS
