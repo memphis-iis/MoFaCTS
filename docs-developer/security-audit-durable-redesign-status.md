@@ -1,8 +1,62 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `2f05421196c2803e41363caf967637bf520c5a2a`.
+Last baseline with passing CI, Security and image checks: `a983d97eacc5f0afadea3683441e8a47dc1768cb`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
+
+
+## Retention attempt stopped at final observation; stored state reconciled (2026-11-05)
+
+Implementation `a983d97e` passed CI 42034704576 / Security 42034704430,
+including conditional Meteor **1/10 used/passed; nine remain**. The single
+protected retention run [42036927727](https://github.com/memphis-iis/MoFaCTS/actions/runs/42036927727)
+on activation `60dd1e5837f0f0697021c8c664299e7787e4f74b` **FAILED** its final
+metadata observation (`recovery-retention-reconciliation-required`). Do not
+promote it to PASS or treat the failed receipt's unverified restoration flags
+as a later observation of AWS state. No second protected run was dispatched.
+
+The pre-credential install/audit/23 tool tests/lint passed. The protected result
+verified both explicit versions against the original complete canonical V1
+payload (10,911 bytes) and compared every byte while the candidate was current.
+Its encrypted whole-document digest receipt is retained privately; no plaintext
+bundle, digest, individual-key fingerprint, secret file or artifact was retained.
+Artifact count was zero. No provider/application target was contacted.
+
+Independent approved-operator DescribeSecret plus complete ListSecretVersionIds
+observations subsequently agreed: exactly two known versions, original
+`AWSCURRENT` plus `MOFACTS_RECOVERY_BASELINE`, candidate only `AWSPREVIOUS`, no
+candidate marker or pagination. The original pin and current are restored; no
+operator repair write was required. A refreshed AWS Versions page also showed
+this exact final state. Bounded CloudTrail metadata showed all three expected
+label updates succeeded (13:35:06Z current forward/back; 13:35:07Z marker removal),
+without API errors. The exact mismatching immediate metadata response was not
+retained, so the precise response inconsistency remains unproven. The verifier
+assumed immediate cross-endpoint visibility; delayed visibility is consistent
+with AWS's [documented eventual consistency](https://docs.aws.amazon.com/secretsmanager/latest/userguide/troubleshoot.html).
+This is an inference, not a captured-response diagnosis.
+
+Temporary access is retired: removed policy, verified denied trust, simulated
+eight actions denied, deleted role and verified absence. Actual issued-session
+replay was not tested. Shared OIDC provider, secret configuration and original
+GitHub credential metadata are unchanged. The workflow is disabled remotely;
+the empty environment was ID-checked, deleted and original environments verified.
+Only the owned three policy files/directory were removed and absence verified;
+CloudShell exited. Cleanup required two operator-script corrections: AWS rejected
+the wildcard trust-denial form (unchanged trust verified before using the same
+federated provider), then a missing resume variable was corrected before remaining
+simulation/deletion. Both corrections restricted/removed access; no data write
+or protected-run retry occurred.
+
+Phil explicitly accepted publication of this cleanup and honest failure record,
+and approved one read-only confirmation of the two existing versions. The
+failed protected run stays failed; this acceptance does not qualify the writer. The existing one-version bootstrap/cold reader remains
+strict and must refuse this two-version store. Do not rerun the writer or ignore
+the retained candidate. Recommend a separately approved **read-only confirmation
+of the two already existing versions**, not another candidate or label change;
+see the [concrete next scope](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md#next-decision-read-only-confirmation-of-existing-versions).
+Storage acceptance, operational credential validity, staging2 recovery and full
+Phase 0 closure remain distinct. No deployment occurred; unrelated working
+changes are preserved.
 
 ## Isolated read-only cold restore verified and retired (2026-11-05)
 

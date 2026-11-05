@@ -302,3 +302,12 @@ reader. It copies the V1 document unchanged, restores original current, preserve
 the original baseline pin, and accounts for the candidate left in history. This
 is storage verification; operational rollback and staging2 consumer checks remain
 separate. The original one-version readers remain strict.
+
+
+Retention attempt **42036927727 failed** its immediate final metadata check,
+although later independent AWS inventories verified original current/pin restored
+and the candidate only at previous. All temporary access is retired; no protected
+retry occurred. See the [exact outcome and proposed read-only follow-up](restore-rehearsal-review.md#retention-execution-outcome--2026-11-05).
+Do not rerun the strict one-version writer against this two-version store or
+label the attempt a pass. AWS metadata visibility needs a bounded explicit
+verification contract before reusing mutation tooling.

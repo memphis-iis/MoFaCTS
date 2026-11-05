@@ -218,3 +218,67 @@ for the rehearsal, never weaken the old checks to ignore history.
 
 AWS documents [automatic previous-label movement and stage removal](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_UpdateSecretVersionStage.html)
 and the [stage condition supported for UpdateSecretVersionStage](https://docs.aws.amazon.com/service-authorization/latest/reference/list_secretsmanager.html).
+
+
+## Retention execution outcome — 2026-11-05
+
+The one authorized protected attempt, 42036927727 on activation 60dd1e58,
+failed final metadata observation after both versions were recovered and compared
+successfully. It remains FAILED. Subsequent independent operator inventories and
+the refreshed AWS Versions page verified the intended final state: original
+current/baseline pin, identical test version only at previous, no test marker.
+CloudTrail metadata records all three expected label changes successful; the
+precise immediately mismatching response was not captured. Eventual consistency
+is a supported explanation, not a proven raw-response diagnosis. No new repair
+write or protected retry was made. Temporary role/data/trust access, workflow,
+empty environment and owned policy files are retired; source credentials are
+unchanged. Full evidence and cleanup-script corrections are in the status ledger.
+CI/Security for a983d97e passed; conditional Meteor slot 1/10 passed, nine remain.
+The existing writer's final-observation behavior is not live-qualified for reuse.
+
+## Next decision: read-only confirmation of existing versions
+
+Recommendation: approve publication of the cleanup/results despite the identified
+failed required check, then prepare **one fresh AWS-only, read-only confirmation**
+of the two already present versions. Do not create another candidate or move any
+label. This preserves the failed run and avoids repeating successful mutations.
+
+Concrete scope for approval:
+
+1. Extend the optional tool with a separately named two-version read-only reader.
+   Its metadata inputs are the trusted original version/provenance/byte receipt
+   and this rehearsal's exact candidate ID; no credential values or deployment
+   bindings are inputs. Preserve the original one-version readers unchanged.
+2. Require exactly those two immutable versions and the observed final label
+   sets. Recover both explicit versions into memory, validate the original V1
+   shape/provenance/byte count, compare every byte, then re-observe the complete
+   inventories. Emit only bounded metadata and an encrypted whole-document
+   digest; no plaintext file, fingerprint or artifact.
+3. Verify synthetic success/rejection cases, read-only SDK enforcement and complete
+   source-capture wiring. Use the existing conditional Meteor allowance if needed,
+   reserving/counting before publication; no new dependency or application change.
+4. After checks pass, temporarily restore the same empty main-only GitHub
+   environment and a read-only role limited to DescribeSecret, ListSecretVersionIds
+   and GetSecretValue on the existing secret. Use a 15-minute OIDC session and
+   fixed trust/data deadline within one hour. No write/label/deletion permission.
+5. Dispatch **once**, remove temporary permissions/trust/role/workflow/environment
+   on either outcome, and record independent results alongside failed 42036927727.
+   A success does not rewrite that failed run or prove provider authentication,
+   operational rollback between different configurations or staging2 recovery.
+
+Future mutation tooling must account for AWS metadata visibility with bounded
+read-only settling, exact known transition states and sanitized phase diagnostics;
+never repeat an uncertain mutation or accept unexpected versions/pin movement.
+That is separate from this proposed confirmation, which performs no mutation.
+Do not activate new permissions or dispatch this follow-up until approved.
+
+
+## Read-only confirmation approved — 2026-11-05
+
+Phil approved cleanup/results publication despite the identified failed immediate
+metadata check, and one read-only confirmation under the concrete scope above.
+Preserve the failed run and its evidence. Use only the existing two versions;
+no version creation, stage edit, application/provider login or deployment. The
+new temporary access is limited to the three named reads, with a 15-minute
+session and fixed expiry within one hour. Verify implementation before enabling
+access and count any needed Meteor invocation against the nine remaining slots.
