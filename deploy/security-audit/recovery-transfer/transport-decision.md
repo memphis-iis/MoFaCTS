@@ -1,10 +1,10 @@
 # Recovery transfer transport decision
 
-Status: Phil approved revising the plan so AWS remains optional and separate
-from the application. The separation below is the selected direction; SDK
-installation, implementation and further protected execution remain pending.
-The destination remains empty. The one authorized retry and all five Meteor
-integration slots are spent.
+Status: Phil approved the two SDK clients solely in the optional tool, one fresh
+Meteor integration invocation and one protected transfer after verification.
+The split is implemented in source; full CI and cloud acceptance are pending.
+The destination was last verified empty. The prior five-run allowance and CLI
+retry are spent; the new authorization is separate and permits no automatic retry.
 
 ## Verified failure
 
@@ -138,10 +138,10 @@ the required recovery provider for other installations.
 ## Approval and verification gate
 
 [AGENTS.md](../../../AGENTS.md) requires: "New npm, Meteor, Docker, or system
-dependencies require explicit approval." Approve the two clients before
-installation or implementation. Also authorize one fresh Meteor integration
-invocation and one further protected transfer, conditional on passing checks.
-No transfer retry is implicit in approving the implementation.
+dependencies require explicit approval." Phil has now approved the two clients
+only in the optional tool and the two single-use executions stated above.
+Record the integration reservation and each actual execution/result in the
+status ledger. No transfer or integration retry is implicit in this approval.
 
 After approval, implement the split and sole SDK transport. Verify:
 

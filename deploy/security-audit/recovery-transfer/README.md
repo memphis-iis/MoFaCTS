@@ -20,8 +20,10 @@ request from Node's child stdin. No secret version was written. Data permissions
 were removed, trust denied and the role deleted; read-back confirmed role absence
 and zero destination versions. The shared provider remains unchanged. The
 workflow is disabled and its active file removed. The authorized retry is spent;
-the [transport decision](transport-decision.md) is the next gate. No further
-protected attempt or Meteor integration invocation is authorized.
+Phil subsequently approved the [optional SDK tool](transport-decision.md), one
+fresh Meteor integration invocation and one further protected transfer after
+verification passes. This allowance is separate from the spent five-run cap and
+CLI retry; reserve it in the status ledger before publication. No retry is implied.
 Phil approved the current GitHub configuration as the starting point. This
 establishes a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.
@@ -34,12 +36,20 @@ procedure; other MoFaCTS operators do not need an AWS account or this tool.
 The [revised separation plan](transport-decision.md#selected-separation-portable-bundle-optional-operator-tool)
 keeps the existing portable bundle/validation shared and puts AWS operations
 and their dependencies in an explicitly installed optional tool under
-`deploy/security-audit/recovery-transfer/aws/`. That directory/package is planned,
-not yet implemented. No new AWS clients go into the application manifest or
+`deploy/security-audit/recovery-transfer/aws/`. The split is implemented in source,
+pending complete CI and real transfer acceptance. No new AWS clients go into the application manifest or
 lockfile, normal application CI or runtime. The prior application-development-
 dependency proposal is superseded. Existing optional S3 asset storage is outside
-this repair. The current runner remains inactive pending dependency approval and
-verification of the split.
+this repair. The reviewed workflow remains inactive until checks pass and the
+approved time-bounded access is verified.
+
+The AWS tool is private operator tooling, not a published npm package. Ordinary
+application setup does not install it. To verify it explicitly, use pinned Node
+24.22.1/npm 11.19.1, prepare shared validation dependencies with
+`npm ci --ignore-scripts` in `mofacts/`, then run `npm ci --ignore-scripts`,
+`npm audit --audit-level=low` and `npm test` in this tool's directory. These commands
+use synthetic fixtures and do not transfer credentials. Only the separately
+approved, reviewed protected workflow may invoke `aws/run.mjs` for this operation.
 
 ## Proposed operation
 
@@ -62,11 +72,13 @@ runtime AWS integration is proposed.
 
 The [workflow draft](workflow.yml.review) is deliberately outside
 `.github/workflows`. The [core](../../../mofacts/scripts/security-audit/recovery-transfer.mjs)
-and [Linux runner](../../../mofacts/scripts/security-audit/transfer-recovery-baseline.mjs)
+and [Linux runner](aws/run.mjs)
 are reviewable source, not evidence of a successful cloud operation.
-The three policy/workflow inputs are included in the existing supplemental test
-capture contract so CI tests the reviewed bytes without adding them to runtime
-build inputs or changing source-digest rules.
+The policy/workflow and exact optional-tool source, manifests, lockfile and tests
+are included in the supplemental test capture. The optional tool is excluded
+from application build context. Normal source tests validate the shared bundle
+and separation contract without importing the SDK-dependent tests; tool tests
+run only through their explicit command. Capture/CI must verify these boundaries.
 
 ## Access to approve
 
@@ -135,10 +147,10 @@ Sources: [GitHub OIDC and environment-subject rules](https://docs.github.com/en/
    logging is off. Install the reviewed draft at the exact workflow path named
    above, publish the intentional change, and dispatch once on that full main
    commit with verified account/role/secret coordinates. No schedule is added.
-4. The revised runner will use pinned Node 24.22.1 and the optional tool's
-   separately locked SDK dependencies, after approval and implementation. The
-   current inactive workflow still describes the retired CLI implementation;
-   update and verify it before activation. Dependency preparation occurs before
+4. The revised runner uses pinned Node 24.22.1 and the optional tool's
+   separately locked SDK dependencies. The inactive workflow explicitly prepares,
+   audits, tests and lints this tool before exposing real bindings. Verify this
+   complete workflow before activation. Dependency preparation occurs before
    secret bindings are exposed to a step. No Tailscale connection, application
    login, scanner probe, paid synthesis or Meteor invocation belongs in the
    transfer workflow. Ordinary application setup never installs this tool.

@@ -1,52 +1,10 @@
-import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import {
-  RECOVERY_PUBLIC_VARIABLE, RECOVERY_SECRETS, RecoveryTransferError,
-  prepareRecoveryBundle, transferRecoveryBaseline, validateRecoveryTarget,
-} from './recovery-transfer.mjs';
-
+import { RECOVERY_PUBLIC_VARIABLE, RECOVERY_SECRETS, RecoveryTransferError, prepareRecoveryBundle } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
+import { transferRecoveryBaseline, validateRecoveryTarget } from './transfer.mjs';
+import { makeAwsClient } from './sdk-client.mjs';
 const fail = category => { throw new RecoveryTransferError(category); };
 
-// Inactive CLI adapter: Linux Node child stdin is not a reopenable input file.
-// The protected workflows are retired pending the reviewed transport decision.
-// Never substitute secret-bearing argv or a plaintext file to activate it.
-export function makeAwsClient(credentials, env, spawn = spawnSync) {
-  return async (service, operation, request) => {
-    const allowed = {
-      sts: ['assume-role-with-web-identity', 'get-caller-identity'],
-      secretsmanager: ['describe-secret', 'list-secret-version-ids', 'put-secret-value', 'get-secret-value'],
-    };
-    if (!allowed[service]?.includes(operation)) fail('aws-operation');
-    const childEnv = {
-      PATH: env.PATH, HOME: env.HOME, LANG: 'C.UTF-8',
-      AWS_CONFIG_FILE: '/dev/null', AWS_SHARED_CREDENTIALS_FILE: '/dev/null',
-      AWS_EC2_METADATA_DISABLED: 'true', AWS_MAX_ATTEMPTS: '1',
-      AWS_CLI_AUTO_PROMPT: 'off', AWS_PAGER: '',
-    };
-    if (credentials) Object.assign(childEnv, {
-      AWS_ACCESS_KEY_ID: credentials.AccessKeyId,
-      AWS_SECRET_ACCESS_KEY: credentials.SecretAccessKey,
-      AWS_SESSION_TOKEN: credentials.SessionToken,
-    });
-    else if (operation !== 'assume-role-with-web-identity') fail('aws-session');
-    let result;
-    try {
-      result = spawn('aws', [service, operation, '--region', 'us-east-2',
-        '--endpoint-url', `https://${service}.us-east-2.amazonaws.com`,
-        '--cli-input-json', 'file:///dev/stdin', '--output', 'json', '--no-cli-pager',
-        '--cli-connect-timeout', '10', '--cli-read-timeout', '20',
-        ...(operation === 'list-secret-version-ids' ? ['--no-paginate'] : []),
-        ...(credentials ? [] : ['--no-sign-request']),
-      ], { input: JSON.stringify(request), encoding: 'utf8', env: childEnv,
-        timeout: 45000, maxBuffer: 512 * 1024, windowsHide: true });
-    } catch { fail('aws-call'); }
-    if (result.error || result.status !== 0 || result.signal) fail('aws-call');
-    try { return JSON.parse(result.stdout); }
-    catch { fail('aws-response'); }
-  };
-}
-
-export async function runRecoveryTransfer(env, { fetchToken = fetch, spawn = spawnSync, platform = process.platform } = {}) {
+export async function runRecoveryTransfer(env, { fetchToken = fetch, client = makeAwsClient, platform = process.platform } = {}) {
   if (platform !== 'linux' || process.version !== 'v24.22.1' || env.GITHUB_ACTIONS !== 'true'
     || env.RUNNER_ENVIRONMENT !== 'github-hosted' || env.GITHUB_EVENT_NAME !== 'workflow_dispatch'
     || env.GITHUB_REPOSITORY !== 'memphis-iis/MoFaCTS' || env.GITHUB_REF !== 'refs/heads/main'
@@ -78,14 +36,14 @@ export async function runRecoveryTransfer(env, { fetchToken = fetch, spawn = spa
     token = JSON.parse(body).value;
     if (typeof token !== 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) fail('oidc');
   } catch { fail('oidc'); }
-  const assumed = await makeAwsClient(null, env, spawn)('sts', 'assume-role-with-web-identity', {
+  const assumed = await client(null)('sts', 'assume-role-with-web-identity', {
     RoleArn: target.roleArn, RoleSessionName: `mofacts-recovery-${source.runId}`,
     WebIdentityToken: token, DurationSeconds: 900,
   });
   const credentials = assumed?.Credentials;
   if (!credentials || !['AccessKeyId', 'SecretAccessKey', 'SessionToken'].every(key =>
     typeof credentials[key] === 'string' && credentials[key].length > 0)) fail('aws-session');
-  return transferRecoveryBaseline({ bindings, source, target, aws: makeAwsClient(credentials, env, spawn) });
+  return transferRecoveryBaseline({ bindings, source, target, aws: client(credentials) });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

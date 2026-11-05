@@ -4,6 +4,37 @@ Last baseline with passing CI, Security and image checks: `3d1008b0a7081768ceda5
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
+## Optional AWS SDK execution authorization (2026-11-05 UTC)
+
+Phil approved the two SDK clients **only in the optional operator tool**, one
+fresh Meteor integration invocation and one protected transfer after verification
+passes. This is a new single-use allowance, separate from the exhausted five-run
+ledger below. Reserve the integration before publication. Do not retry either
+execution automatically. Normal application setup/CI must not install the tool.
+
+| Execution | Reservation and outcome |
+| --- | --- |
+| Meteor integration, one invocation | Reserved for the optional SDK split commit on main; run/commit and actual invocation result pending publication. No second invocation authorized. |
+| Protected transfer, one attempt | Unused; gated on passing full CI/Security and explicit optional-tool tests/audit, frozen source inventory, fresh empty-destination and temporary access verification. |
+
+Implemented the shared portable bundle/AWS operations split. The optional private
+package pins STS and Secrets Manager clients to 3.1162.0, with its own lockfile;
+the application manifest and lockfile are unchanged. Removed the old CLI entry
+point. AWS requests use fixed regional HTTPS endpoints, explicit sessions,
+one SDK attempt and bounded timeouts. The shared validator can validate a
+recovered V1 document without AWS operations, preserving every credential string.
+
+Local checks: full lint passed; source suite 71 passed/6 Windows skips; capture
+suite 92 passed/6 Windows skips; optional tool 10 tests passed, including actual
+SDK serialization/signing against synthetic HTTP responses, OIDC exchange,
+environment poisoning, exact round-trip, fail-before-network and sanitized errors.
+Tool dependency audit reports zero vulnerabilities. No real credentials used in
+these tests. Full CI, actual Docker-context exclusion and cloud acceptance remain
+pending. The inactive workflow now explicitly installs/tests/audits/lints the
+tool before any protected binding step. Source/capture ownership includes its
+exact source/manifests/lockfile/tests as supplemental inputs. This does not add
+AWS installation to normal application CI. Unrelated working edits are preserved.
+
 ## Integration authorization ledger and resumed execution (2026-11-04)
 
 Phil explicitly authorized **up to five Meteor integration invocations** and asked

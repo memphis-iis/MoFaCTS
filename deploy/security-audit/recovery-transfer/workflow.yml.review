@@ -41,13 +41,21 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.22.1'
-      - name: Prepare existing dependencies before binding any credentials
+      - name: Prepare shared validation dependencies before binding credentials
         working-directory: mofacts
         shell: bash
         run: |
           set -euo pipefail
           npm ci --ignore-scripts
-          aws --version 2>&1 | grep -q '^aws-cli/2\.'
+      - name: Prepare and verify the explicitly selected optional AWS tool
+        working-directory: deploy/security-audit/recovery-transfer/aws
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npm audit --audit-level=low
+          npm test
+          node ../../../../mofacts/node_modules/eslint/bin/eslint.js -c ../../../../eslint.config.mjs . --ignore-pattern 'node_modules/**'
       - name: Validate, transfer once and compare read-back in memory
         env:
           RECOVERY_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
@@ -65,4 +73,4 @@ jobs:
           TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
           AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY: ${{ vars.AUDIT_REPORT_ENCRYPTION_PUBLIC_KEY }}
         shell: bash
-        run: node mofacts/scripts/security-audit/transfer-recovery-baseline.mjs
+        run: node deploy/security-audit/recovery-transfer/aws/run.mjs
