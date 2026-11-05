@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `bd9cdec6e01cea0f477c0c7aed6f3d4e8fca58f8`.
+Last baseline with passing CI, Security and image checks: `2dd0d7e779897df611529df463f90bbed9442706`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
@@ -17,9 +17,10 @@ cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
 **Current Meteor allowance:** one primary plus ten conditional invocations were
-authorized. Conditional slots 1-3 passed. Slot 4/10 is RESERVED before the approved
-receiver publication; six conditional slots are unreserved. Its actual run/result
-will be recorded separately. No extra invocation is authorized by a stale count.
+authorized. Conditional slots 1-4 passed. Slot 4 ran once in CI 42120224260 on
+receiver commit 2dd0d7e779897df611529df463f90bbed9442706. Six conditional slots
+remain; none is reserved. This is the sole current counter. Dated checkpoints
+retain their historical counts and never authorize a duplicate invocation.
 
 Completed entry prerequisites:
 
@@ -48,11 +49,11 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository finding-tier evaluator implemented/tested. V2 host and composite acquisition/evaluation are not implemented; active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
-| P1-09 | Summary projections, indexes and read-time integrity | [ ] Inert helpers and Node tests pass; real Mongo tests, chosen collection binding and old-image qualification remain pending. |
+| P1-09 | Summary projections, indexes and read-time integrity | [ ] Inert helpers, Node tests and both real-Mongo cases pass (CI 42120224260). Chosen collection binding and old-image qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 22 new Node tests and four exact Meteor parity cases passed. Storage/presentation tests and real endpoint/host qualification remain pending. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 26 new Node tests, four Meteor parity cases and two real-Mongo cases passed. Real endpoint/host and previous-image qualification remain pending. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
 | P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
@@ -191,7 +192,7 @@ The result-only plan/status update belongs to the approved batch and uses
 `[skip ci]`, consuming no additional Meteor invocation.
 
 
-### Receiver storage/presentation source checkpoint and next scope decision
+### Receiver storage/presentation source checkpoint (historical pre-approval)
 
 After the foundation CI passed, source work continued on the remaining receiver
 flow. The new helpers remain inert: no collection binding or live route is
@@ -214,9 +215,11 @@ created by importing them.
   100 tests with zero failures and six Windows skips (106 total). Targeted storage
   tests pass 4/4 after the final type-narrowing correction. Full typecheck and lint
   pass; no required local check remains failing.
-- [ ] Two added real-Mongo Meteor cases have not run yet. They use a fresh test-only
-  collection, prove physical nonce uniqueness and retained-V1 byte preservation,
-  and remove only their own fixture IDs. Supported CI/publication is required.
+- [x] Two added real-Mongo Meteor cases passed in CI 42120224260 on receiver
+  commit 2dd0d7e779897df611529df463f90bbed9442706. Their fresh test-only collection
+  proves physical nonce uniqueness and retained-V1 byte preservation; cleanup
+  removes only their own fixture IDs. Exact case outcomes and source binding were
+  verified from the retained artifact. This does not complete P1-09.
 - [ ] P1-09 and storage-model/previous-image gates remain open: a helper's mocks or
   new-candidate V1 exclusion cannot establish behavior of the actual rollback image.
 
@@ -239,7 +242,7 @@ compatibility proof or permission to patch an old image. Existing records must
 remain unchanged, and one-collection versus version-separated storage remains
 subject to the delegated qualification decision in the plan.
 
-Next scope decision: approve one bounded read-only production app-image metadata
+Historical scope request, now approved and executed below: one bounded read-only production app-image metadata
 check so the recorded rollback baseline can be checked against the real app. The
 prepared command inspects only fixed container `mofacts` and its image reference,
 repository digests, OS/architecture and OCI revision label through the existing
@@ -286,6 +289,66 @@ execution inside the container, install, restart, permission change or productio
 write occurred. The one-use production metadata permission is now spent. Local
 bounded metadata/comparison evidence is retained beside the other Phase 1 receipts.
 The source receiver CI is independent and may proceed under its existing approval.
+
+### Receiver CI verified; completion ledger updated (2026-11-05)
+
+The approved eight-file batch was committed/pushed as
+`2dd0d7e779897df611529df463f90bbed9442706`.
+[CI 42120224260](https://github.com/memphis-iis/MoFaCTS/actions/runs/42120224260)
+and [Security 42120224220](https://github.com/memphis-iis/MoFaCTS/actions/runs/42120224220)
+both completed successfully. No required check is waived.
+
+- [x] Meteor ran once, 22:21:05Z-22:21:49Z, consuming conditional slot 4/10.
+  Server: 981 passed, 15 pending; client: 1,237 passed, seven pending; zero failed
+  tests or hooks. The two exact new storage-case IDs independently recomputed
+  from registered title paths both have PASSED outcomes. These are audit-report
+  nonce/index and retained-V1 preservation checks, not upload-protocol tests.
+- [x] Source artifact 13458586018 (178,052 bytes) matches GitHub archive SHA-256
+  `2645b797d0c8aa6610d002c752f4e2f365cf7d4dc53d529646d80670946bd8ff`.
+  The bounded reader extracted exactly the three expected files; strict parsing,
+  module discovery and recomputed Meteor/source binding match retained evidence.
+  Source snapshot:
+  `ec7affbf5c322aed96e3419f7d97bd1413021b52ea9f71a5d6cacfcefaa1aec6`.
+- [x] Canonical Compose build, runtime/ABI, exact source assertion,
+  standalone-Mongo rejection, replica-set smoke and retained-source protection
+  passed. Image artifact 13458331812 matches archive SHA-256
+  `98570775b22061690b0c87d39e61a21ec1e7b5153f474010110fefc9c4dde6a6`.
+  Its strict observation binds the same source and exact Meteor evidence digest
+  `b6a36a602e40388456fb82eeeae82b2ec6b2d33dcb88998424fb896a62ec59b2`.
+  Linux/amd64 config:
+  `sha256:e4affb536b2fdcf23d740083286c762522e1fb96c7c77a17b17088ed17aaef84`.
+  State remains observed-unqualified / ci-test-image; no application image was
+  published or deployed. Existing staging2 selection is unchanged.
+- [x] Complete the approved single-use production metadata observation and retain
+  both it and the differing older release record without rewriting either.
+- [x] Update completed subitems and the sole current invocation counter above.
+  Keep unfinished integration/qualification rows open. Reuse these exact receipts
+  unless source changes, failed checks or a distinct acceptance boundary require
+  another run. Result-only notes use [skip ci] and consume no invocation.
+
+Retained receipts are in native operator directory
+`MoFaCTS-Release-Evidence/phase1-20261105`, including
+`receiver-ci-verification.json`. This verifies CI-reported source binding, not
+independent workstation release qualification. The eight unrelated working-tree
+changes remain preserved. No user-facing UI, TDF/config schema or learner-data
+migration changed, so no dependent config/wiki interface update is required.
+
+### Decision P1-D2: select the rollback-test baseline
+
+OPEN: plan Section 6.6 requires the actual previous production image from its
+authoritative release owner. The running production image is the later
+`18677291993b` release, while the canonical local release record describes
+`bddd0895fad5`. Both immutable registry references are available. Neither a
+label nor availability fills the later release's missing build/acceptance record.
+
+Recommendation for Phil's review: use the currently running `18677291993b`
+image as the isolated compatibility-test baseline, preserving the older release
+record and explicitly retaining unknown build cleanliness, acceptance and deployment
+time as unknown. This is a test-target selection, not release qualification,
+a production deployment or permission for additional production access. The
+alternative is to reconcile deployment history before selecting the baseline.
+No image pull/run or previous-image compatibility claim has occurred. P1-16 and
+the delegated storage-model decision remain open until actual qualification.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 
