@@ -4,6 +4,59 @@ Last baseline with passing CI, Security and image checks: `2f05421196c2803e41363
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
+## Isolated read-only cold restore verified and retired (2026-11-05)
+
+The single approved cold read, [run 42030958930](https://github.com/memphis-iis/MoFaCTS/actions/runs/42030958930),
+passed on activation `6075b745c55b79276c9c6b224da14d4c86fd2932`, using reader
+`2f054211` and its matching successful CI `42028678398` / Security `42028678501`.
+The pre-binding tool install/audit/16 tests/lint passed on the fresh hosted runner.
+The temporary environment contained zero saved secrets/variables and allowed
+only main. No audit/Tailscale deployment binding, Desktop credential file or
+provider/application target was a reader input.
+
+The runner obtained its own short-lived OIDC session and recovered the exact
+immutable baseline from AWS: **10,911 UTF-8 bytes, 9 secret bindings and 1 public
+variable**, with recorded source commit/run/attempt, original labels and complete
+canonical V1 validation. Before/after complete version inventories and metadata
+checks passed. It produced a bounded unqualified-cold-read result and an
+RSA-OAEP-SHA256 ciphertext of the whole-document digest under the recovered report
+public key. No plaintext bundle, hash, individual-key fingerprint, secret file or
+artifact was emitted/retained. The encrypted receipt is retained privately; actual
+report-private-key decryption/custody was not tested. Synthetic decryption passed.
+
+Removed the only reader policy, read back denied trust, simulated all seven
+read/write actions denied, deleted the role and verified absence. Simulation is
+not an actual replay of an issued session. AWS still lists the same sole original
+version with AWSCURRENT and MOFACTS_RECOVERY_BASELINE, and the shared provider is
+unchanged. Disabled/removed the active workflow. After checking its ID and zero
+secret/variable counts, deleted the owned temporary GitHub environment and
+verified only the original environments remain. Removed three owned metadata-only
+policy files and ended CloudShell. Source deployment-binding names/update times
+still match the frozen pre-transfer inventory; no source credential was changed.
+
+Private cold-read, CI/source/image, encrypted-receipt and cleanup records plus a
+non-secret successful-run screenshot live under the existing cold-restore-1
+release-evidence directory. The verified CI source digest is
+99ed01a543d12697ca83726d3ab35a14d29da8402e1ab833ff3f299293284df7, with CI image
+config digest sha256:0239296f32baa589f57e7cd330b1fbfd37a9faebf5f0cc06e713f9fa8073fe43
+(linux/amd64). These are CI observations, not an application release/deployment.
+
+**New allowance balance:** primary Meteor 1/1 invoked and passed; conditional
+additional Meteor 0/10 invoked, all ten still available if necessary for this
+project. Protected cold read 1/1 used and passed; no automatic cold-read retry.
+Outcome/documentation publication uses [skip ci] and consumes no extra invocation.
+Unrelated working changes remain preserved.
+
+The next real decision is the [storage-only retained-version rehearsal](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md#next-decision-after-the-approved-cold-read-retained-version-rehearsal):
+use the existing baseline pin, create one byte-identical candidate, exercise
+current-pointer movement and recovery of both explicit versions, restore original
+current, and retire test-owned labels/access. This requires new explicit approval
+for writes/label changes and a reviewed bounded two-version contract. It has not
+been implemented or executed. No redundant baseline label, forged provenance,
+accepted operational rollback label or production/provider login was introduced.
+Provider credential validity, report-key custody, changed-configuration rollback,
+staging2 consumer recovery and the remaining Phase 0 gates are still separate.
+
 ## Cold-reader preflight and single-run activation (2026-11-05)
 
 Reader commit 2f054211 passed complete CI 42028678398 and Security 42028678501.
@@ -45,7 +98,7 @@ new dependencies/spending or an automatic second protected cold-read attempt.
 | --- | --- |
 | Primary fresh Meteor invocation | 1 invoked on 2f05421196c2803e41363caf967637bf520c5a2a, CI 42028678398 / attempt 1. Test passed at 2026-11-05T12:42:45Z (975 server/1,237 client passes, zero failures/hooks, 22 pending). Complete CI, including canonical image identity/ABI/topology/startup/cleanup and retained-source protection, passed. |
 | Up to 10 additional project invocations, only if needed | 0 reserved, 0 invoked of 10. Do not use merely to repeat passing checks. |
-| Isolated protected cold restore | 1 approved, unused; gated on complete CI/Security, explicit tool tests/audit, empty main-only GitHub environment and fresh AWS preflight/read-only-role verification. |
+| Isolated protected cold restore | 1/1 used and passed: 42030958930, activation 6075b745. Exact version/canonical data recovered, encrypted digest retained, original state preserved and access/workflow/environment cleanup verified. No retry authorized. |
 
 Implemented the reader and kept it outside application dependencies/build context.
 Shared store checks and hosted-runner/OIDC exchange are reused by transfer and

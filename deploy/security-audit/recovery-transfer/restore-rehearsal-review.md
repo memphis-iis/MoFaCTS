@@ -4,8 +4,11 @@ Status: Phil approved the isolated read-only cold restore (steps 1–2), one fre
 Meteor integration invocation and, if necessary for this security project, up to
 ten additional invocations. Each invocation is reserved and counted in the
 status ledger. The baseline transfer succeeded in `42024117227`; its access and
-active workflow are retired. Reader 2f054211 passed complete CI 42028678398 and Security 42028678501;
-protected execution is pending the verified activation.
+active workflow are retired. Reader 2f054211 passed complete CI 42028678398 and Security 42028678501.
+The protected cold read 42030958930 passed on activation 6075b745: exact original
+version/10,911-byte V1 document recovered, encrypted digest receipt retained,
+original version/labels unchanged, and temporary access/workflow/environment
+removed. The primary Meteor slot is used/passed; ten conditional slots remain.
 Candidate writes, label changes and operational rehearsals remain unapproved.
 
 ## Approved: one isolated read-only cold restore

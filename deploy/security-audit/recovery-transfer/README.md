@@ -18,6 +18,17 @@ Phil approved the [isolated read-only cold restore](restore-rehearsal-review.md)
 with its reader/CI/execution tracked in the status ledger. Candidate writes and
 accepted rollback labels remain outside that approval; Phase 0 stays open.
 
+The isolated read-only cold restore subsequently passed in
+[42030958930](https://github.com/memphis-iis/MoFaCTS/actions/runs/42030958930), using
+reader 2f054211 (complete CI 42028678398 / Security 42028678501). A fresh runner
+recovered and validated the exact version without deployment-secret copies;
+retained only bounded metadata and an encrypted whole-document digest. Its
+permissions/trust/role, active workflow and empty temporary environment are
+retired; original version/labels and source bindings are unchanged. Provider
+logins and report-private-key recovery were outside this check. The next
+[retained-version rehearsal](restore-rehearsal-review.md#next-decision-after-the-approved-cold-read-retained-version-rehearsal)
+requires approval for writes/label changes; Phase 0 remains open.
+
 The following earlier-attempt history explains the corrected validator/transport:
 
 Status: **execution and approximately $0.40/month cost approved** by Phil on
