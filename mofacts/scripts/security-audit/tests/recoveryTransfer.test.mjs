@@ -98,7 +98,8 @@ test('AWS recovery dependencies belong solely to the excluded optional tool with
     assert.equal(fs.readFileSync(new URL(`.github/workflows/${workflow}`, root), 'utf8').includes('working-directory: deploy/security-audit/recovery-transfer/aws'), false);
   }
   for (const name of ['package.json', 'package-lock.json', 'run.mjs', 'sdk-client.mjs', 'transfer.mjs', 'tests/sdk.test.mjs', 'tests/transfer.test.mjs',
-    'runner.mjs', 'store.mjs', 'restore.mjs', 'run-restore.mjs', 'tests/restore.test.mjs', 'tests/sdk-fixtures.mjs']) {
+    'runner.mjs', 'store.mjs', 'restore.mjs', 'run-restore.mjs', 'tests/restore.test.mjs', 'tests/sdk-fixtures.mjs',
+    'payload.mjs', 'retention.mjs', 'run-retention.mjs', 'tests/retention.test.mjs', 'tests/retention-cloud.mjs']) {
     assert.equal(TEST_INPUTS.some(([entry, type]) => entry === `deploy/security-audit/recovery-transfer/aws/${name}` && type === 'file'), true);
   }
   assert.equal(fs.existsSync(new URL('mofacts/scripts/security-audit/transfer-recovery-baseline.mjs', root)), false);
@@ -141,4 +142,30 @@ test('review workflow remains inert and policies bind exact source environment a
     `repo:${source.repository}:environment:${source.environment}`);
   assert.equal(trust.Statement[0].Condition.DateLessThan['aws:CurrentTime'], '<APPROVED_UTC_DEADLINE>');
   assert.deepEqual(policy.Statement[0].Condition.DateLessThan, trust.Statement[0].Condition.DateLessThan);
+});
+
+
+test('retention workflow is inert and isolated; exact-secret stage grant excludes the baseline pin', () => {
+  const root = new URL('../../../../deploy/security-audit/recovery-transfer/', import.meta.url);
+  const workflow = yaml.load(fs.readFileSync(new URL('retention-workflow.yml.review', root), 'utf8'));
+  assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
+  assert.equal(workflow.jobs.retention.environment, 'security-audit-recovery-rehearsal');
+  assert.equal(/secrets\.|vars\.|production-security-audit|upload-artifact/.test(JSON.stringify(workflow)), false);
+  assert.equal(workflow.jobs.retention.steps.at(-1).run, 'node deploy/security-audit/recovery-transfer/aws/run-retention.mjs');
+  assert.equal(Object.keys(workflow.jobs.retention.steps.at(-1).env).every(name => name.startsWith('RECOVERY_')), true);
+  const policy = JSON.parse(fs.readFileSync(new URL('retention-permissions-policy.example.json', root)));
+  assert.deepEqual(policy.Statement[0].Action, ['secretsmanager:DescribeSecret', 'secretsmanager:ListSecretVersionIds',
+    'secretsmanager:GetSecretValue', 'secretsmanager:PutSecretValue']);
+  assert.deepEqual(policy.Statement[1].Action, ['secretsmanager:UpdateSecretVersionStage']);
+  assert.deepEqual(policy.Statement[1].Condition.StringEquals, {
+    'secretsmanager:VersionStage': ['AWSCURRENT', 'MOFACTS_RECOVERY_CANDIDATE'],
+  });
+  const trust = JSON.parse(fs.readFileSync(new URL('retention-trust-policy.example.json', root)));
+  for (const statement of policy.Statement) {
+    assert.equal(statement.Resource, '<EXACT_PRECREATED_RECOVERY_SECRET_ARN>');
+    assert.deepEqual(statement.Condition.DateLessThan, trust.Statement[0].Condition.DateLessThan);
+  }
+  for (const name of ['retention-workflow.yml.review', 'retention-permissions-policy.example.json', 'retention-trust-policy.example.json']) {
+    assert.equal(TEST_INPUTS.some(([entry, type]) => entry === `deploy/security-audit/recovery-transfer/${name}` && type === 'file'), true);
+  }
 });

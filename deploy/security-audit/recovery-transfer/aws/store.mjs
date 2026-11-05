@@ -9,7 +9,7 @@ const exactKeys = (value, keys) => object(value)
   && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
 
 export function validateRecoveryStoreTarget(target, roleName) {
-  if (!['mofacts-recovery-transfer', 'mofacts-recovery-restore'].includes(roleName)
+  if (!['mofacts-recovery-transfer', 'mofacts-recovery-restore', 'mofacts-recovery-rehearsal'].includes(roleName)
     || !exactKeys(target, ['accountId', 'roleArn', 'secretArn']) || !/^[0-9]{12}$/.test(target.accountId)
     || target.roleArn !== `arn:aws:iam::${target.accountId}:role/${roleName}`
     || !new RegExp(`^arn:aws:secretsmanager:${region}:${target.accountId}:secret:mofacts/security-audit/recovery-[A-Za-z0-9]{6}$`).test(target.secretArn)) stop('destination');

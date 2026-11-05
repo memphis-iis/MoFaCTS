@@ -9,7 +9,7 @@ The protected cold read 42030958930 passed on activation 6075b745: exact origina
 version/10,911-byte V1 document recovered, encrypted digest receipt retained,
 original version/labels unchanged, and temporary access/workflow/environment
 removed. The primary Meteor slot is used/passed; ten conditional slots remain.
-Candidate writes, label changes and operational rehearsals remain unapproved.
+Phil subsequently approved one bounded storage-retention rehearsal below. Operational rehearsals remain separate.
 
 ## Approved: one isolated read-only cold restore
 
@@ -173,3 +173,48 @@ and that [moving the current label also moves the previous label](https://docs.a
 Only the observed boundaries may be accepted. Full Phase 0 closure still requires
 the controlling plan's remaining gates; this proposal does not waive them or
 redefine a partial test as complete recovery.
+
+
+## Approved retention execution contract — 2026-11-05
+
+Phil approved the bounded byte-identical candidate and current-pointer rehearsal.
+Reserve conditional Meteor slot 1 of 10 for the committed implementation; one
+protected retention invocation is authorized after checks pass. No protected
+retry is inferred from the Meteor allowance. No application/provider logins,
+staging2 consumer test, accepted operational rollback designation or production
+change is authorized by this approval.
+
+Use `aws/run-retention.mjs`, the inactive [workflow](retention-workflow.yml.review),
+[trust](retention-trust-policy.example.json) and
+[data policy](retention-permissions-policy.example.json). The temporary role is
+`mofacts-recovery-rehearsal`, with the same empty main-only GitHub environment,
+15-minute sessions and fixed trust/data deadline within one hour. IAM permits
+stage edits only for `AWSCURRENT` and `MOFACTS_RECOVERY_CANDIDATE`, never the
+baseline pin. PutSecretValue has no supported stage condition; the reviewed SDK
+capability requires exactly the candidate label and a deterministic new version
+ID. No new dependency or resource is needed.
+
+The runner first verifies exactly the original version, pin, current label and
+canonical V1 bytes. It creates one identical version without changing document
+provenance, validates the candidate read-back, moves current once and recovers
+both explicit versions while verifying the original pin. Complete values remain
+in memory; the public receipt encrypts only the whole-document digest.
+
+The transaction owns compensating recovery: after any mutation attempt, observe
+both DescribeSecret and complete bounded ListSecretVersionIds inventories. Only
+exact known states may be reconciled. If candidate is current, move it back to
+the original once, observe the result, then remove only the test marker. Never
+repeat an uncertain mutation, infer a missing owner, edit the baseline label or
+ignore an extra version. A response failure remains a failed test even when
+metadata proves restoration. An unknown state or failed restoration stops with
+`reconciliation-required` for Phil; it is not a passing result. Retire access and
+record the observed state on either outcome.
+
+Successful final inventory has original `AWSCURRENT` plus baseline pin, and the
+identical test version at `AWSPREVIOUS` without the candidate marker. The test
+version remains in history. The original strict one-version bootstrap/cold reader
+still refuses this two-version inventory; use this explicitly reviewed reader
+for the rehearsal, never weaken the old checks to ignore history.
+
+AWS documents [automatic previous-label movement and stage removal](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_UpdateSecretVersionStage.html)
+and the [stage condition supported for UpdateSecretVersionStage](https://docs.aws.amazon.com/service-authorization/latest/reference/list_secretsmanager.html).

@@ -1,6 +1,6 @@
-import crypto from 'node:crypto';
-import { RECOVERY_PUBLIC_VARIABLE, RECOVERY_SECRETS, RecoveryTransferError, parseRecoveryBundle, prepareRecoveryBundle } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
+import { RECOVERY_SECRETS, RecoveryTransferError } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
 import { BASELINE_LABEL, checkDescription, checkVersions, recoveryVersionId, validateRecoveryStoreTarget } from './store.mjs';
+import { exactLabels as matchesLabels, validateRecoveredPayload, encryptedDocumentDigest } from './payload.mjs';
 const fail = category => { throw new RecoveryTransferError(category); };
 const labels = ['AWSCURRENT', BASELINE_LABEL];
 
@@ -16,9 +16,7 @@ export function validateRestoreExpected(expected) {
 
 export const validateRestoreTarget = target => validateRecoveryStoreTarget(target, 'mofacts-recovery-restore');
 
-function exactLabels(actual) {
-  return Array.isArray(actual) && actual.length === labels.length && labels.every(label => actual.includes(label));
-}
+const exactLabels = actual => matchesLabels(actual, labels);
 
 async function describeBaseline(aws, target, expected) {
   const description = await aws('secretsmanager', 'describe-secret', { SecretId: target.secretArn });
@@ -39,24 +37,9 @@ export async function restoreRecoveryBaseline({ target, expected, runId, aws }) 
   const read = await aws('secretsmanager', 'get-secret-value', {
     SecretId: target.secretArn, VersionId: expected.versionId, VersionStage: BASELINE_LABEL,
   });
-  if (read?.ARN !== target.secretArn || read.VersionId !== expected.versionId
-    || typeof read.SecretString !== 'string' || read.SecretBinary !== undefined
-    || !exactLabels(read.VersionStages) || Buffer.byteLength(read.SecretString, 'utf8') !== expected.bytes) fail('read-back');
-  const bundle = parseRecoveryBundle(read.SecretString);
-  for (const key of ['commit', 'runId', 'runAttempt']) {
-    if (bundle.provenance[key] !== expected[key]) fail('baseline-identity');
-  }
-  const { state: _state, historicalRollbackAvailable: _history, ...source } = bundle.provenance;
-  const original = prepareRecoveryBundle({ ...bundle.secrets, ...bundle.variables }, source);
-  if (original.serialized !== read.SecretString) fail('read-back');
+  const bundle = validateRecoveredPayload(read, target, expected, expected.versionId, labels);
   await describeBaseline(aws, target, expected);
-  // Public Actions logs may retain only an encrypted digest, never its plaintext.
-  // The 64-byte ASCII digest fits RSA-OAEP with the already validated >=3072-bit key.
-  const documentDigest = crypto.createHash('sha256').update(read.SecretString).digest('hex');
-  const documentDigestCiphertext = crypto.publicEncrypt({
-    key: bundle.variables[RECOVERY_PUBLIC_VARIABLE],
-    padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256',
-  }, Buffer.from(documentDigest, 'ascii')).toString('base64');
+  const documentDigestCiphertext = encryptedDocumentDigest(read.SecretString, bundle);
   return {
     state: 'recovery-baseline-cold-read-unqualified', versionId: expected.versionId,
     bytes: expected.bytes, digestEncryption: 'RSA-OAEP-SHA256', documentDigestCiphertext,

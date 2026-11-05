@@ -1,0 +1,38 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:ListSecretVersionIds",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue"
+      ],
+      "Resource": "<EXACT_PRECREATED_RECOVERY_SECRET_ARN>",
+      "Condition": {
+        "DateLessThan": {
+          "aws:CurrentTime": "<APPROVED_UTC_DEADLINE>"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:UpdateSecretVersionStage"
+      ],
+      "Resource": "<EXACT_PRECREATED_RECOVERY_SECRET_ARN>",
+      "Condition": {
+        "DateLessThan": {
+          "aws:CurrentTime": "<APPROVED_UTC_DEADLINE>"
+        },
+        "StringEquals": {
+          "secretsmanager:VersionStage": [
+            "AWSCURRENT",
+            "MOFACTS_RECOVERY_CANDIDATE"
+          ]
+        }
+      }
+    }
+  ]
+}

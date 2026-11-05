@@ -3666,3 +3666,17 @@ The Phase 0 foundation added pure shared modules, local tests, the phase0 test s
 An initial TypeScript syntax error in the new contract was caught by both Node and full typecheck, corrected, and both were rerun successfully. Final results are recorded above. No Meteor CI, Docker command, workflow action, host connection, build, push or deployment was run. The baseline surface-check failure was resolved through source-policy review and an explicit manifest/checker correction.
 
 Unrelated pre-existing app-repository CI/test-harness edits were preserved, including the existing package lint/test-artifact edits; the new phase0 and capture test script entries are scoped additions to that file. The config command sheet, production overlay, private settings and environment files were not edited. The public capture guide documents the new opt-in commands and their limitations. Existing production/wiki procedures remain unchanged until actual qualification and command-sheet integration.
+
+
+## 2026-11-05 — approved storage-retention rehearsal, verification reservation
+
+Phil approved one byte-identical candidate/current-pointer rehearsal in the
+existing optional AWS recovery store. Conditional Meteor slot **1 of 10 is
+reserved**, not yet invoked; nine remain unreserved. One protected retention
+attempt is authorized only after committed-source verification passes. The
+[execution contract](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md#approved-retention-execution-contract--2026-11-05)
+requires exact two-version inventory, pin preservation, explicit-version byte
+comparison, original-current restoration, marker retirement and temporary-access
+cleanup. No application/deployment/schema or source credential change is planned.
+Provider validity, accepted operational rollback and staging2 consumer recovery
+remain separate. Phase 0 remains open.

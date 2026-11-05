@@ -293,3 +293,12 @@ alongside the LF-terminated form, without changing either. Missing/corrupt frami
 CRLF, literal escaped newlines and other trailing bytes remain errors. Regression
 tests verify the original string survives serialization, write and read-back with
 and without final LF. No protected source binding has been changed.
+
+
+The bounded retained-version rehearsal is now approved under its
+[execution and compensating-recovery contract](restore-rehearsal-review.md#approved-retention-execution-contract--2026-11-05).
+Its inactive workflow and exact-secret policies are reviewable beside the cold
+reader. It copies the V1 document unchanged, restores original current, preserves
+the original baseline pin, and accounts for the candidate left in history. This
+is storage verification; operational rollback and staging2 consumer checks remain
+separate. The original one-version readers remain strict.
