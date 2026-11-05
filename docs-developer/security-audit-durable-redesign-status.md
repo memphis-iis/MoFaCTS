@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `3d1008b0a7081768ceda5119be311a16bfa1ca03`.
+Last baseline with passing CI, Security and image checks: `62ae8fe3226314f55f02a0da4d349228f1d1bbc2`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
@@ -14,7 +14,7 @@ execution automatically. Normal application setup/CI must not install the tool.
 
 | Execution | Reservation and outcome |
 | --- | --- |
-| Meteor integration, one invocation | Reserved for the optional SDK split commit on main; run/commit and actual invocation result pending publication. No second invocation authorized. |
+| Meteor integration, one invocation | Used on 62ae8fe3226314f55f02a0da4d349228f1d1bbc2, CI 41962552310 / attempt 1. Complete CI passed, including Test at 2026-11-05T03:39:29Z and canonical image identity/ABI/topology/startup/cleanup. Recorded Meteor run exitStatus is 0. No second invocation authorized. |
 | Protected transfer, one attempt | Unused; gated on passing full CI/Security and explicit optional-tool tests/audit, frozen source inventory, fresh empty-destination and temporary access verification. |
 
 Implemented the shared portable bundle/AWS operations split. The optional private
@@ -29,11 +29,40 @@ suite 92 passed/6 Windows skips; optional tool 10 tests passed, including actual
 SDK serialization/signing against synthetic HTTP responses, OIDC exchange,
 environment poisoning, exact round-trip, fail-before-network and sanitized errors.
 Tool dependency audit reports zero vulnerabilities. No real credentials used in
-these tests. Full CI, actual Docker-context exclusion and cloud acceptance remain
-pending. The inactive workflow now explicitly installs/tests/audits/lints the
-tool before any protected binding step. Source/capture ownership includes its
+these tests. Security 41962552268 passed all four jobs; CI 41962552310 passed both
+typechecks, source/capture/protection contracts and Meteor. Its source observation
+binds the clean SDK commit. Canonical Compose image identity/ABI/topology/
+startup/cleanup and retained-source protection passed. Docker capture used the committed ignore
+rule excluding the optional tool, while supplemental capture retained its exact
+reviewed source without installed dependencies. Neither new client is in the
+application lockfile. Cloud transfer acceptance remains pending. The inactive
+workflow now explicitly installs/tests/audits/lints the tool before any protected
+binding step. Source/capture ownership includes its
 exact source/manifests/lockfile/tests as supplemental inputs. This does not add
 AWS installation to normal application CI. Unrelated working edits are preserved.
+
+The AWS preflight is waiting for the approved Chrome/CloudShell connection.
+Browser inventory currently exposes only IAB and MCP Apps, with no Chrome
+connection (rechecked after CI started). Phil was asked to reconnect; no alternate
+profile or authentication source was substituted and the protected transfer remains unused.
+
+CI source observation and separate image observation both bind the clean SDK
+commit and source digest `a92a4df72db514a6a283001efa1f6a1a9eb6b47a8c42f7533a7174a943b1c106`.
+The CI image config digest is
+`sha256:35856311e95818520691e961f36101ade49860b71d182540c2e0b09619a8234c`
+(`linux/amd64`). This is a CI image observation, not a published or deployed
+release qualification. Meteor recorded server 975 passed/0 failed/15 pending and
+client 1,237 passed/0 failed/7 pending, with zero hook failures on both sides.
+Bounded evidence is retained privately under the existing release-evidence root.
+
+The source implementation is committed/pushed as `62ae8fe3`. This follow-up
+records outcomes with `[skip ci]`: no second Meteor invocation, active transfer
+workflow, AWS role, cloud mutation, credential copy or application deployment.
+The single protected transfer remains available under Phil's approval, subject
+to fresh AWS/source preflight once the approved Chrome/CloudShell connection is
+restored. Current credentials and the stored SSH key remain unchanged. The last
+verified AWS destination was empty; no current usable backup or accepted rollback
+copy is claimed. The later restore-rehearsal decision has not been reached.
 
 ## Integration authorization ledger and resumed execution (2026-11-04)
 

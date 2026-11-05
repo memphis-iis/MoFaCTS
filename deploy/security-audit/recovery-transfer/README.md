@@ -37,8 +37,10 @@ The [revised separation plan](transport-decision.md#selected-separation-portable
 keeps the existing portable bundle/validation shared and puts AWS operations
 and their dependencies in an explicitly installed optional tool under
 `deploy/security-audit/recovery-transfer/aws/`. The split is implemented in source,
-pending complete CI and real transfer acceptance. No new AWS clients go into the application manifest or
-lockfile, normal application CI or runtime. The prior application-development-
+with complete CI `41962552310` and Security `41962552268` passing on `62ae8fe3`.
+Real transfer acceptance remains pending the approved browser connection. No new
+AWS clients go into the application manifest or lockfile, normal application CI
+or runtime. The prior application-development-
 dependency proposal is superseded. Existing optional S3 asset storage is outside
 this repair. The reviewed workflow remains inactive until checks pass and the
 approved time-bounded access is verified.

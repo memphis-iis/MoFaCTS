@@ -2,7 +2,9 @@
 
 Status: Phil approved the two SDK clients solely in the optional tool, one fresh
 Meteor integration invocation and one protected transfer after verification.
-The split is implemented in source; full CI and cloud acceptance are pending.
+The split is committed as `62ae8fe3`; complete CI `41962552310` and Security
+`41962552268` passed. Cloud acceptance is pending the approved Chrome/CloudShell
+connection; the single protected transfer has not been used.
 The destination was last verified empty. The prior five-run allowance and CLI
 retry are spent; the new authorization is separate and permits no automatic retry.
 
