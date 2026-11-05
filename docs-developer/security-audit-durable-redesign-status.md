@@ -1,9 +1,63 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `a983d97eacc5f0afadea3683441e8a47dc1768cb`.
+Last baseline with passing CI, Security and image checks: `60dfd6f09057530d0b1049e76c37f8610675a7a2`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
+
+
+## Read-only two-version confirmation passed; temporary access retired (2026-11-05)
+
+The single approved confirmation,
+[42052500882](https://github.com/memphis-iis/MoFaCTS/actions/runs/42052500882),
+passed on activation `ab92fdcd88f006b109892ac3f7f1af1bc7a57d83`, using verified
+reader `60dfd6f0`. CI 42048015246 and Security 42048015262 passed for that reader,
+including conditional Meteor slot **2/10 passed; eight slots remain**. The
+confirmation's fresh runner also passed pre-credential installation, optional
+dependency audit, all 29 optional-tool tests and explicit tool lint.
+
+The environment was main-only with zero saved secrets/variables. The runner
+recovered **both exact existing immutable versions from AWS**, each a complete
+10,911-byte canonical V1 document with nine secret bindings and one public
+variable. Original provenance, inventory and byte counts matched the trusted
+transfer receipt; every byte matched between versions. Both complete metadata
+inventories before and after agreed on exactly those two versions, original
+`AWSCURRENT` plus `MOFACTS_RECOVERY_BASELINE`, candidate only `AWSPREVIOUS`.
+The read-only capability and exact-secret IAM grant allow no version or label
+mutation. No GitHub deployment binding, Desktop credential file or provider/
+application target supplied recovered data. No version or label changed.
+
+The bounded success receipt retains the whole-document digest only as
+RSA-OAEP-SHA256 ciphertext under the recovered report public key. No plaintext
+bundle/digest, individual-key fingerprint or secret artifact was emitted; the
+run has zero artifacts. The public green run-summary screenshot and bounded
+receipts are retained privately. Actual report-private-key custody/decryption
+and provider/application credential validity were not tested.
+
+Cleanup passed: removed the only data policy, read back denied same-provider
+trust, simulated eight actions denied, deleted the role and verified absence.
+Simulation is not an actual issued-session replay. Both other temporary recovery
+roles remain absent; the shared OIDC provider and secret configuration are
+preserved. The active workflow was disabled, the empty environment ID checked
+and deleted, original environments preserved, the owned three policy files and
+directory removed with absence checked, and CloudShell exited. Original GitHub
+secret/variable names and modification timestamps are unchanged. The activation
+workflow is removed from source in this cleanup; result/documentation publication
+uses `[skip ci]` without another Meteor invocation. Unrelated working edits remain
+preserved. No staging2, original staging or production deployment occurred.
+
+Failed mutation run **42036927727 stays FAILED**; its immediate final-observation
+problem is not reclassified or claimed repaired. Its successful byte reads and
+three successful stage events, later independent final-state inventories, and
+this fresh read-only success establish the recorded storage-retention/recovery
+evidence chain. The mutation tooling remains unqualified for reuse until its
+metadata-visibility contract is repaired and separately verified. Current
+storage proof does not make this unqualified starting configuration an accepted
+operational rollback. **Phase 0 remains open:** operational/staging2 recovery,
+accepted rollback qualification, report-private-key custody and the controlling
+plan's other exit gates remain separate. Use staging2's own synthetic credentials
+for any later operational rehearsal; do not load this production-audit bundle
+there. No additional protected execution is authorized by this result.
 
 ## Retention attempt stopped at final observation; stored state reconciled (2026-11-05)
 

@@ -292,3 +292,24 @@ inventory is checked before and after both reads; canonical V1 validation and
 whole-document encrypted digest handling share the original helpers. No mutation
 or automatic retry is present. Conditional Meteor slot 2/10 is reserved for this
 implementation before protected access is enabled.
+
+
+## Approved confirmation completed — 2026-11-05
+
+The single protected read-only run 42052500882 passed on activation ab92fdcd,
+with reader 60dfd6f0 and matching passing CI/Security 42048015246/42048015262.
+Both exact existing complete 10,911-byte V1 documents were recovered into memory,
+validated and compared byte for byte. Exact original current/baseline pin and
+candidate previous labels were verified in complete inventories before and after.
+No version or stage mutation occurred. The bounded receipt contains an encrypted
+whole-document digest, never plaintext; no artifact was uploaded. Real private-key
+custody/decryption and provider/application logins remain untested.
+
+Three-read exact-secret access, trust, role, active workflow, empty main-only
+environment and owned policy files were removed/absence checked; shared provider,
+original environments, source credential metadata, versions and labels are
+preserved. Conditional Meteor slot 2/10 passed; eight remain. Failed mutation run
+42036927727 stays failed; future mutation verification still needs its explicit
+visibility contract. This completes the approved read-only follow-up only.
+Operational rollback acceptance and staging2 consumer recovery are later gates;
+no production-audit credential may be loaded into staging2 under this scope.
