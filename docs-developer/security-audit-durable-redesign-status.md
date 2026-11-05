@@ -4,6 +4,50 @@ Last baseline with passing CI, Security and image checks: `62ae8fe3226314f55f02a
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
+## SDK baseline transfer verified and access retired (2026-11-05)
+
+The single authorized SDK attempt, [run 42024117227](https://github.com/memphis-iis/MoFaCTS/actions/runs/42024117227)
+on activation `7c0e126b34d8fc4753767f3d8a3b0b9e9efd3621`, completed successfully.
+The helper, policies and reviewed YAML are unchanged from the fully verified
+`62ae8fe3` implementation. Its pre-binding install/audit/tests/lint passed, then
+OIDC/session identity, destination configuration, complete input validation,
+write and exact read-back passed. The serialized document contains **10,911 UTF-8
+bytes**, **9 secret bindings** and **1 public variable**. It remains a new
+`github-current-unqualified` baseline with no historical rollback available.
+GitHub masked the JSON braces in its result log; retained only the complete
+bounded result fields and cross-checked the deterministic version against AWS
+metadata. No raw log or credential value was retained.
+
+Cleanup removed the only inline data policy, read back denied trust, simulated
+all four data operations as denied, deleted the role and verified `NoSuchEntity`.
+This is not an actual replay of an issued session. Complete AWS version listing
+including deprecated versions showed exactly one version with the exact expected
+ID and `AWSCURRENT` plus `MOFACTS_RECOVERY_BASELINE`. The shared provider remains
+unchanged. Disabled the workflow and removed its active source file; removed the
+three owned metadata-only policy files and ended CloudShell. No AWS resource
+other than the already approved recovery secret is left by this attempt.
+
+Before/after GitHub secret/public-variable names and update timestamps match the
+frozen source inventory. Credentials and the stored SSH key were not changed,
+normalized, displayed or written to a plaintext file/artifact. Retained version,
+byte/count, run, source, cleanup and non-secret version-table screenshot evidence
+privately under the existing `sdk-1` release-evidence directory. The browser's
+version table also shows the sole baseline version and both labels.
+
+Both single-use SDK execution allowances are now spent; no automatic transfer
+or Meteor retry is authorized. The next real decision is the
+[isolated cold-restore scope](../deploy/security-audit/recovery-transfer/restore-rehearsal-review.md#next-approval-one-isolated-read-only-cold-restore):
+recover this exact version on a fresh runner with no GitHub deployment-secret
+bindings, in-memory validation only, narrowly scoped temporary AWS read access,
+then cleanup. That proposal has not been implemented or executed. Candidate
+writes, accepted-rollback labels, production/provider logins and staging2
+operational rehearsal remain separate. Phase 0 remains open.
+
+This result/cleanup publication uses `[skip ci]`; the implementation retains the
+passing CI `41962552310` and Security `41962552268`. No extra Meteor invocation,
+application image publication or production/original-staging/staging2 deployment
+was performed. Unrelated working edits remain untouched.
+
 ## SDK transfer preflight and activation (2026-11-05)
 
 Phil reported AWS ready and asked to continue the authorized transfer. Chrome
@@ -41,7 +85,7 @@ execution automatically. Normal application setup/CI must not install the tool.
 | Execution | Reservation and outcome |
 | --- | --- |
 | Meteor integration, one invocation | Used on 62ae8fe3226314f55f02a0da4d349228f1d1bbc2, CI 41962552310 / attempt 1. Complete CI passed, including Test at 2026-11-05T03:39:29Z and canonical image identity/ABI/topology/startup/cleanup. Recorded Meteor run exitStatus is 0. No second invocation authorized. |
-| Protected transfer, one attempt | Unused; gated on passing full CI/Security and explicit optional-tool tests/audit, frozen source inventory, fresh empty-destination and temporary access verification. |
+| Protected transfer, one attempt | Used once: 42024117227 on activation 7c0e126b; successful exact transfer/read-back, one expected version/labels, and complete access/workflow cleanup verified. No retry authorized. |
 
 Implemented the shared portable bundle/AWS operations split. The optional private
 package pins STS and Secrets Manager clients to 3.1162.0, with its own lockfile;

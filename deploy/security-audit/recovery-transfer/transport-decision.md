@@ -3,10 +3,12 @@
 Status: Phil approved the two SDK clients solely in the optional tool, one fresh
 Meteor integration invocation and one protected transfer after verification.
 The split is committed as `62ae8fe3`; complete CI `41962552310` and Security
-`41962552268` passed. Cloud acceptance is pending the approved Chrome/CloudShell
-connection; the single protected transfer has not been used.
-The destination was last verified empty. The prior five-run allowance and CLI
-retry are spent; the new authorization is separate and permits no automatic retry.
+`41962552268` passed. The single protected SDK transfer `42024117227` succeeded:
+10,911 bytes and exact read-back, with one version and the two expected labels.
+Data access/trust/role and active workflow are retired; GitHub bindings and the
+stored key are unchanged. Both the new integration and transfer allowances are
+spent. The [isolated cold-restore review](restore-rehearsal-review.md) is the next
+unapproved gate. No accepted rollback copy or Phase 0 closure is claimed.
 
 ## Verified failure
 

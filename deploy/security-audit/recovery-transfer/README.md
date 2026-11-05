@@ -1,5 +1,24 @@
 # One-time protected recovery transfer — execution review
 
+Latest outcome (2026-11-05): **baseline copied and exact read-back verified** by
+[run 42024117227](https://github.com/memphis-iis/MoFaCTS/actions/runs/42024117227),
+activation `7c0e126b`, using the tested optional SDK implementation `62ae8fe3`.
+The complete document is 10,911 UTF-8 bytes, with nine secret bindings and one
+public-key variable. Exactly one version has `AWSCURRENT` and
+`MOFACTS_RECOVERY_BASELINE`. The private evidence records its exact version ID.
+The stored SSH key and GitHub source bindings are unchanged. No plaintext
+credential file or secret artifact was created.
+
+Temporary data permissions were removed, denied trust read back, all four data
+operations simulated denied, and role absence verified after deletion. The
+shared provider is preserved. The active workflow is disabled and removed;
+owned policy files were removed and CloudShell ended. Simulation is not an
+actual replay of an issued session. The one protected SDK transfer is spent.
+The [isolated cold-restore review](restore-rehearsal-review.md) is the next gate;
+no cold restore, accepted rollback copy or Phase 0 closure is claimed.
+
+The following earlier-attempt history explains the corrected validator/transport:
+
 Status: **execution and approximately $0.40/month cost approved** by Phil on
 2026-11-04, conditional on required checks passing. CI `41877424659` and Security
 `41877424480` passed on reviewed source `d5e8f705`. The empty secret was created;
@@ -38,7 +57,7 @@ keeps the existing portable bundle/validation shared and puts AWS operations
 and their dependencies in an explicitly installed optional tool under
 `deploy/security-audit/recovery-transfer/aws/`. The split is implemented in source,
 with complete CI `41962552310` and Security `41962552268` passing on `62ae8fe3`.
-Real transfer acceptance remains pending the approved browser connection. No new
+The real SDK transfer has now passed the acceptance described above. No new
 AWS clients go into the application manifest or lockfile, normal application CI
 or runtime. The prior application-development-
 dependency proposal is superseded. Existing optional S3 asset storage is outside
@@ -202,12 +221,12 @@ changed source is a separate reviewed operation, not an overwrite retry.
 AWS documents [idempotent version writes and initial/current labels](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_PutSecretValue.html)
 and [complete version listing](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_ListSecretVersionIds.html),
 plus [CLI input files](https://docs.aws.amazon.com/cli/latest/userguide/cli-usage-parameters-file.html).
-The retired CLI adapter attempts to load JSON from `file:///dev/stdin`. Linux
+The removed CLI adapter attempted to load JSON from `file:///dev/stdin`. Linux
 Node child stdin is a socket that the CLI cannot reopen as an input file. An
 anonymous-pipe prototype also failed an offline test with the real CLI and was
 discarded. Synthetic adapter tests did not establish CLI interoperability. Keep
-this adapter inactive pending the [reviewed transport decision](transport-decision.md);
-do not substitute plaintext files, secret-bearing arguments or another profile.
+the CLI implementation removed. The [optional SDK transport](transport-decision.md)
+replaces it; do not substitute plaintext files, secret-bearing arguments or another profile.
 
 ## Acceptance after transfer
 

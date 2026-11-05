@@ -1,8 +1,42 @@
 # Recovery rehearsal: isolation decision
 
-Status: proposal for the next decision after a verified baseline transfer and
-access cleanup. No rehearsal, candidate version, new GitHub environment or
-retained accepted-rollback label is authorized or created by this document.
+Status: the baseline transfer succeeded in `42024117227`; temporary access and
+the active workflow are retired. This is the next unapproved design/execution
+decision. No rehearsal, candidate version, new GitHub environment or retained
+accepted-rollback label is authorized or created by this document.
+
+## Next approval: one isolated read-only cold restore
+
+Recommend approving only steps 1–2 below first. Use a temporary main-only
+environment named `security-audit-recovery-rehearsal`, with no stored deployment
+secrets, and temporary role `mofacts-recovery-restore`. The role may only describe,
+list versions and read the exact existing secret in the already verified Ohio
+account, using a 15-minute OIDC session and fixed trust/data deadline at most one
+hour after enablement. It cannot write versions, change labels, access other
+secrets or administer IAM. Preserve the shared OIDC provider.
+
+Read only the explicit version retained privately for successful transfer
+`42024117227`; require both original labels. The new reader uses the existing
+optional SDK package and shared V1 validator. It accepts no GitHub `AUDIT_*` or
+Tailscale deployment bindings, Desktop credential file or production target as
+input. Keep the complete document in memory; retain only the bounded result,
+version, complete-document digest and cleanup evidence. No individual credential
+fingerprints, raw values, secret artifacts, Tailscale connection, provider login,
+application login or production/staging request belongs in this cold read.
+
+Implement and verify the reviewed reader before enabling its access. Publication
+and one fresh Meteor integration invocation are needed for normal complete CI;
+the preceding SDK implementation's single invocation is spent. Then dispatch
+one protected cold read after checks pass. Remove data permissions, deny trust,
+delete the temporary role, disable/remove the active workflow and remove the
+temporary empty GitHub environment on either outcome. No automatic retry.
+
+This establishes recoverability without GitHub deployment copies or this PC.
+It does not prove provider credentials work, accept a rollback version, change
+labels, create a candidate or perform the later staging2 operational rehearsal.
+Steps 3–6 remain a later proposal and need their own concrete review/approval.
+Any later candidate must satisfy the portable schema and truthful provenance;
+do not add an unrecognized rehearsal field or forge a GitHub source identity.
 
 This is the AWS rehearsal for Phil's selected operator store, not a mandatory
 AWS procedure for all MoFaCTS installations. The

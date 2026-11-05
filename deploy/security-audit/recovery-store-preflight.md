@@ -1,5 +1,14 @@
 # Recovery-store setup review
 
+Operator execution update (2026-11-05): the selected optional AWS store now holds
+one exact baseline copied by `42024117227` (10,911 bytes, nine secret bindings and
+one public variable), with temporary access/workflow retired. This is not an
+accepted rollback copy or tested cold restore. See the [transfer outcome](recovery-transfer/README.md)
+and [next read-only isolation decision](recovery-transfer/restore-rehearsal-review.md).
+The earlier preflight/resource/pricing observations below are historical review,
+not an instruction to provision another secret or a requirement that other
+MoFaCTS operators use AWS.
+
 Status: review draft, not provisioning permission or completed recovery. The
 selected design remains one encrypted AWS Secrets Manager secret containing
 complete current and explicitly retained last-accepted configuration versions.
