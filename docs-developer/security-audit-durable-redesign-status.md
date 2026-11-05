@@ -3680,3 +3680,31 @@ comparison, original-current restoration, marker retirement and temporary-access
 cleanup. No application/deployment/schema or source credential change is planned.
 Provider validity, accepted operational rollback and staging2 consumer recovery
 remain separate. Phase 0 remains open.
+
+
+## 2026-11-05 — retention reader verified; one-shot activation
+
+Implementation `a983d97eacc5f0afadea3683441e8a47dc1768cb` passed full CI
+[42034704576](https://github.com/memphis-iis/MoFaCTS/actions/runs/42034704576)
+and Security [42034704430](https://github.com/memphis-iis/MoFaCTS/actions/runs/42034704430).
+Meteor conditional slot **1/10 used/passed** (13:24:35Z–13:25:34Z, attempt 1,
+exit 0): server 975 passed/15 pending, client 1,237 passed/7 pending, zero
+failures/hook failures. Nine slots remain. Both full typechecks, lint, native
+source/capture checks, Compose build, exact source-to-image comparison, ABI,
+topology rejection, Change Streams startup and cleanup passed. The CI image is
+`sha256:f349ae7b57ddea777fa3c4ec7cebfc5cfe8988189d5db3c18fc3cb6c6b48461a`
+(linux/amd64), observed/unqualified; it is not a published/deployed candidate.
+Local optional-tool tests: 23 passed; audit: zero advisories; explicit tool lint
+passed. Local source tests: 73 passed/6 Linux-only skips; capture: 92 passed/6
+Linux-only skips, all addressed by supported CI's native checks.
+
+The AWS metadata preflight found exactly the original version and unchanged
+current/baseline labels, no secret configuration changes and no temporary roles.
+The temporary empty GitHub environment is verified main-only, zero saved
+secrets/variables. The approved exact-secret role has a fixed trust/data expiry,
+15-minute sessions, verified read/put/current/candidate permissions, denied
+baseline/previous stage edits and denied destructive/other-secret operations.
+The active workflow equals the reviewed YAML semantically; only comments differ.
+One protected invocation is reserved; no protected retry is authorized. This
+activation changes no tested helper source and uses `[skip ci]` to avoid another
+Meteor invocation. Retire workflow/access/environment on either result.
