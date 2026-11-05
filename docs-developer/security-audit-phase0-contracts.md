@@ -1,22 +1,34 @@
 # Security Audit Phase 0 Contracts and Characterization
 
-Status: local contract/test foundation and opt-in source-capture prototype implemented; not a release qualification or completed Phase 0 exit gate. See the [status record](security-audit-durable-redesign-status.md) for executed results and the [redesign plan](security-audit-durable-redesign-plan.md) for architecture and permissions.
+Status reconciled 2026-11-05: the contract/characterization foundation, protected
+source/Compose CI, staging2 source/image/evidence joining, protected receipt and
+metadata history, browser/restricted-host acceptance and two-version AWS storage
+recovery have executed results. The release remains explicitly unqualified for
+complete audit coverage. Use the [current checklist](security-audit-durable-redesign-status.md#reconciled-phase-0-checklist-2026-11-05)
+for completed boundaries and specific unverified/future gates; architecture and
+permissions remain in the [plan](security-audit-durable-redesign-plan.md).
 
-The protected-source single-job CI lane is verified at `936a64aa` in
-[CI 41465187050](https://github.com/memphis-iis/MoFaCTS/actions/runs/41465187050):
-native shared-parent isolation, complete Meteor integration, retained-candidate
-Compose construction, source/image/runtime smoke and cleanup passed. The
-protected-receipt synthetic fixtures also passed. Dated prototype statements
-below are historical; authenticated evidence/catalog and final release/host
-joining remain separate unfinished qualification gates.
+Dated prototype statements below record earlier development stages. Statements
+that capture, image comparison, shared Node/Meteor imports, staging2 installation
+or evidence joining have never run are superseded by the current checklist.
+Do not turn them back into implementation tasks.
 
 ## Controlling decisions and worker entry point (2026-11-02)
 
-Before any work, read and follow repository [AGENTS.md](../AGENTS.md) and applicable deeper AGENTS.md instructions, then the plan's [controlling decision register](security-audit-durable-redesign-plan.md#0-controlling-decisions-and-worker-entry-point-2026-11-02) and the status [current execution entry point](security-audit-durable-redesign-status.md#current-execution-entry-point-2026-11-02). Those later explicit user decisions supersede older pending-design recommendations below, without turning prototype contracts or local tests into executed release proof.
+Before any work, read and follow repository [AGENTS.md](../AGENTS.md) and applicable deeper AGENTS.md instructions, then the plan's [controlling decision register](security-audit-durable-redesign-plan.md#0-controlling-decisions-and-worker-entry-point-2026-11-02) and the status [current execution entry point](security-audit-durable-redesign-status.md#reconciled-phase-0-checklist-2026-11-05). Those later explicit user decisions supersede older pending-design recommendations below, without turning prototype contracts or local tests into executed release proof.
 
 Workstation release authority, restricted credential-free host projection, all-small-metadata retention with no automatic deletion, previous usable rollback image/evidence, staging2 offline/reset/rebuild permission for this security work, conditional scanner pinning, Phil's consolidated ambiguous/proposed-policy review and bounded routine engineering discretion are settled. No old-format historical-report UI/download/archive work is required; choose simplest new-report storage with proven safe application rollback and do not delete/rewrite existing records. Release metadata/rollback evidence is distinct from report history.
 
-Secret recovery design is selected (2026-11-02): AWS Secrets Manager is the authoritative recovery store and Phil is accountable for recovery. One encrypted secret holds complete current fixture/provider configuration and the last accepted rollback version under a dedicated retained label; moving `AWSPREVIOUS` alone is insufficient. GitHub environment secrets remain deployment copies. Follow the [controlling recovery design and operational gates](security-audit-durable-redesign-plan.md#aws-secrets-manager-recovery-design-approved-2026-11-02) for account suitability, independent account/MFA recovery, document-size fit and staging2 restoration of both versions. Provisioning, access changes, credential upload, spending approval and setup remain pending; selection is not a successful restore or permission to execute setup. Keep fresh single-use `npm run test:ci` authorization and all other restrictions except the bounded staging2 lifecycle permission. That permission excludes original staging/production, irreversible deletion, new persistent access/security-sensitive permission changes and spending. This documentation update performs no implementation, application tests, build, deployment, commit, push or host operation.
+Secret recovery design/owner remain AWS Secrets Manager/Phil, with AWS confined
+to the optional tool. Account/MFA readiness, transfer/size fit and isolated
+fresh-runner two-version recovery are recorded as completed, alongside the
+separate accepted staging2 access test. The source remains an unqualified
+operational baseline; provider validity and changed-configuration rollback are
+not inferred. The additional staging2 AWS-backup proposal was withdrawn. Follow
+the current checklist rather than earlier pending-setup wording. The current
+Meteor allowance has eight conditional invocations left; none is used by this
+documentation reconciliation. Existing production/original-staging, irreversible
+deletion, new-access and spending exclusions remain in force.
 
 ## 1. What is implemented
 
@@ -27,7 +39,7 @@ The shared contract modules have no filesystem, network, environment, database, 
 | `mofacts/common/securityAudit/buildIdentity.ts` | `BuildIdentityV1`, strict parsing, and explicit observed/unavailable identity observations |
 | `mofacts/common/securityAudit/releaseQualification.ts` | Existing six-field workstation release record with an optional versioned `qualification` extension; strict bounded proof parsing and pure identity-consistency evaluation |
 | `mofacts/common/securityAudit/proofFields.ts` | Shared exact-key/scalar proof validation, with value-independent errors |
-| `mofacts/common/securityAudit/fixtures/release-record.fixture.json` | Synthetic clean-build example, shared by Node and pending Meteor parity tests; not an actual deployment record |
+| `mofacts/common/securityAudit/fixtures/release-record.fixture.json` | Synthetic clean-build example, shared by Node and Meteor server parity tests (executed in CI); not an actual deployment record |
 | `mofacts/scripts/security-audit/tests/` | V1 membership fixture, current-defect witnesses, proof mutation tests and selected runtime behavior characterization |
 | `mofacts/scripts/security-audit/qualification/` and `deploy/capture-build-source.ps1` | Implemented bounded source-acquisition prototype, local integrity/round-trip checks, explicit cleanup and context-only Compose build action; emits unqualified outcomes only |
 
@@ -38,6 +50,11 @@ The optional `ReleaseQualificationV1` extension references the build identity, s
 The evaluator returns `PASS` only for this narrow identity-consistency property. Missing, malformed, failed, unverified or mismatched proof returns a bounded `ERROR` reason. This is not a public new report/control or permission to deploy. No caller connects it to startup, health, login, an existing scanner control or the operator's command sheet.
 
 ## 2. Source snapshot binding
+
+The dated October prototype narrative in this section is historical. Its
+capture/protection/image-comparison implementation and Linux execution are now
+recorded in the current checklist; a prototype's old "next gate" is not a new
+request to repeat those completed operations.
 
 October 13 continuation: image-side comparison is implemented but awaits Docker
 execution. The single shared input stage owns recipe/ignore bytes; the source-only
@@ -187,11 +204,16 @@ Capture native outcomes at each invocation boundary; do not assume ambient Power
 
 The old record's `digest` keeps its observed registry meaning. `publishedImage.kind` distinguishes a manifest from a multi-platform index. Index proof additionally names the selected platform manifest; its config digest is compared to the tested local config digest and the running config digest, with platform agreement. The base-commit label and dirty/source snapshot evidence are checked independently. No source SHA, tag, index digest or config ID is substituted for another coordinate.
 
-The producer must eventually derive these links from inspected manifest bytes and independent running-host observation. Phase 0 tests exercise synthetic consistent/mismatched tuples; the parser/evaluator cannot authenticate a forged mapping or prove an index actually contains a supplied manifest. This acquisition verification, trusted channel and full verification-catalog closure remain required before any real `PASS` can use the result.
+Acquisition from inspected manifest bytes and independent running-host
+observation was executed for staging2 `65875553`; its retained joined candidate
+records matching built/published/running identity and real command outcomes.
+Synthetic parser/evaluator tests alone cannot authenticate such a mapping.
+The completed staging2 acquisition is distinct from future catalog/evidence
+closure and complete audit qualification, which remain unqualified.
 
-The existing release record remains authoritative. The user approved its bounded host projection at `/etc/mofacts/release-receipt.json`, root:root mode 0600, through the existing protected forced-command channel. Opt-in projection/install/read tooling is implemented; live installation remains separately authorized and unexecuted. It is not a second editable release authority or a new service. It uses the existing protected container-selection setting, with no new config key. See the [public storage and recovery contract](../deploy/security-audit/release-records.md).
+The existing release record remains authoritative. The user approved its bounded host projection at `/etc/mofacts/release-receipt.json`, root:root mode 0600, through the existing protected forced-command channel. Opt-in projection/install/read tooling is implemented; staging2 installation and restricted-reader acceptance were executed. Production installation is not claimed by those results. It is not a second editable release authority or a new service. It uses the existing protected container-selection setting, with no new config key. See the [public storage and recovery contract](../deploy/security-audit/release-records.md).
 
-Retention preserves the exact prior record bytes and new record in the approved sibling `<record>.history` directory before atomic latest replacement. The opt-in helper implements exclusive hash-named history publication, read-only archives, file sync/read-back, explicit lock recovery and no automatic pruning. Linux additionally syncs directories; Windows ACL and cloud-durability limits are explicit. Historical six-field and current eight-field records remain readable; supplied qualification must be internally consistent but that does not authenticate it. No hook is installed in the current production writer, and no live rollback evidence is claimed. This does not create automatic app-image rollback or a distributed workstation/host transaction. The 2026-11-02 retention decision keeps all small accepted release-metadata records without automatic deletion and the previous usable rollback image with its matching evidence; it does not require retaining every Docker image indefinitely. This release history is distinct from the declined old-security-report access/archive feature.
+Retention preserves the exact prior record bytes and new record in the approved sibling `<record>.history` directory before atomic latest replacement. The opt-in helper implements exclusive hash-named history publication, read-only archives, file sync/read-back, explicit lock recovery and no automatic pruning. Linux additionally syncs directories; Windows ACL and cloud-durability limits are explicit. Historical six-field and current eight-field records remain readable; supplied qualification must be internally consistent but that does not authenticate it. The staging2 history/receipt was published and read back. No production-writer hook or executed previous-image/new-report rollback is claimed. This does not create automatic app-image rollback or a distributed workstation/host transaction. The 2026-11-02 retention decision keeps all small accepted release-metadata records without automatic deletion and the previous usable rollback image with its matching evidence; it does not require retaining every Docker image indefinitely. This release history is distinct from the declined old-security-report access/archive feature.
 
 ## 5. Characterization and regression ownership
 
@@ -214,14 +236,33 @@ V1 fixture membership is 11 external, 22 authentication, 9 internal and 10 repos
 
 Selected behavior guards cover publication `ready()` versus query, backup authorization/validation/unblock/context order, synchronous collection rules, intentional public/shared/owner distinctions, health method fallthrough, PWA early fallthrough, mounted asset URL handling and SAML 405 versus fallthrough. Exact source fragments are executed with synthetic dependencies, not copied into a new policy implementation. These tests **do not** prove the full Meteor invocation/reactivity lifecycle, middleware mounting by Connect, provider integration or final registry composition. Those remain runtime qualification gates.
 
-The shared JSON/erasable-TypeScript fixture imports and golden digest execute under pinned Node. Matching Meteor common-test parity cases are written and included by existing test discovery but have not been run. A local full typecheck is not Meteor build/runtime evidence.
+The shared JSON/erasable-TypeScript fixture imports and golden digest have
+pinned-Node and Meteor server parity coverage. Retained evidence for CI
+42048015246 includes `common/securityAudit/releaseQualification.test.ts` in the
+server discovery, with no server test or hook failures. This is supported CI
+execution, not an inference from local typecheck or a claim of browser discovery
+for that module.
 
 ## 6. Remaining Phase 0 closure gates
 
-- Completed locally: reviewed and added the eight missing V1 manifest entries. Five Brand Profile methods/export facet remain admin-only; progressive launch is caller-scoped; the published Brand Profile remains public. The source checker accepts `public` without asserting throttling. This metadata correction changes no application enforcement and does not close the runtime-discovery gap.
-- Implement/verify exact source snapshot acquisition and the supported source-test lane; freeze real catalog/evidence-contract validators in the owning phase rather than treating fixtures as released metadata.
-- Obtain fresh, explicit single-use authorization for every Meteor CI invocation; retain applicable Docker/workflow/protected-host/production approvals. Use staging2 under the bounded security-work offline/reset/rebuild permission in plan Section 0; original staging remains frozen and excluded operations still need approval.
-- Apply the selected AWS Secrets Manager design with Phil accountable for recovery; finish the [account/MFA recovery, complete-document size, dedicated retained rollback and two-version staging2 restore gates](security-audit-durable-redesign-plan.md#aws-secrets-manager-recovery-design-approved-2026-11-02) before closing Phase 0 recovery. Provisioning/permissions/upload/spending and applicable setup approvals remain pending. Never export values into documentation or treat DPAPI/GitHub copies as proof. Preserve the settled release-record/projection/history design and validate destination/reader controls before installation.
-- Do not build a V1 historical reader, old-report downloads/UI or archive. Qualify the simplest new-report storage for safe previous-image application rollback before V2 cutover, preserving existing records without authorized deletion/rewriting. Phil reviews consolidated ambiguous/proposed permission changes; clear preservation work proceeds with recorded review/characterization evidence.
+The [reconciled current checklist](security-audit-durable-redesign-status.md#reconciled-phase-0-checklist-2026-11-05)
+is the single task-status owner. It replaces this section's obsolete list calling
+source capture, recovery setup and protected installation unimplemented.
 
-Until these are resolved, Phase 0 remains incomplete and Phase 1/V2 activation is not authorized by a passing local fixture suite.
+Keep these distinctions when reading the contracts:
+
+- Completed V1 characterization/compatibility and staging2 acceptance remain
+  evidence for their exact source/configuration. They do not fix the P0 witnesses.
+- Previous-image testing with future-format reports has a bounded specification
+  in the plan. Execute it against the Phase 1 candidate before cutover; do not
+  label it an already failed or already executed test.
+- The successful AWS restore and separate staging2 access test are accepted within
+  their boundaries. They do not establish production-provider authentication,
+  real report-private-key custody or acceptance of an operational rollback copy.
+- The failed mutation verifier stays failed and needs its visibility contract
+  repaired before reuse. No retry/new protected access is implied.
+- Finish the Phase 0 exit-clause/evidence review and retain the separate Phase 1-3
+  scopes; passing local fixtures do not authorize V2 activation or production work.
+
+This reconciliation changes no application contract, permission or acceptance
+result, consumes no integration invocation and does not close Phase 0.

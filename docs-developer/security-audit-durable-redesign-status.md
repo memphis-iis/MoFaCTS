@@ -6,6 +6,69 @@ auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
 
 
+## Reconciled Phase 0 checklist (2026-11-05)
+
+This is the current execution entry point. It supersedes older task lists and
+pending statements below; dated execution records remain historical evidence.
+Reconciled at source `56d3c699`, using retained staging2 artifacts and recorded
+CI/Security/protected-run results. This review changes no runtime, deployment,
+permissions or acceptance result.
+
+### Completed evidence - preserve and reuse
+
+| Item | Accepted evidence and its boundary |
+| --- | --- |
+| V1 characterization and selected compatibility guards | Frozen 52-control membership, defect WITNESS tests and selected authorization/HTTP guards run in supported CI. Shared TypeScript/JSON and Meteor parity tests are covered there. Characterization does not fix the P0 defects or establish the future runtime registry. |
+| Protected source, canonical Compose and image comparison | Source `60dfd6f0` passed [CI 42048015246](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015246) and [Security 42048015262](https://github.com/memphis-iis/MoFaCTS/actions/runs/42048015262), including source protection, source-bound tests, image comparison, ABI/topology/startup and cleanup. CI's image is distinct from the deployed staging2 image. |
+| Staging2 release evidence joining | Retained `release-joined-candidate.json` for `65875553` records matching built/published/running config identity and successful build/smoke/push/deploy/verify outcomes. Overall qualification remains `unqualified`; acquisition and joining are not unimplemented tasks. |
+| Protected receipt and release-metadata history | Staging2's authoritative record/history was published and read back; the root-owned receipt was installed and restricted-reader access/receipt matching accepted. See [release-record ownership](../deploy/security-audit/release-records.md). This does not claim production command-sheet installation. |
+| Staging2 browser/security and restricted access | The `65875553` browser/upload/voice/theme/learner checks passed. [Access run 41845349663](https://github.com/memphis-iis/MoFaCTS/actions/runs/41845349663) passed nine host controls, receipt matching, restricted SSH and 44 negative TCP probes. The workflow/checker and repository import closure are unchanged since that run. Reuse acceptance for that exact candidate/configuration; repeat only affected or unresolved checks. |
+| AWS readiness, transfer and two-version storage recovery | Independent account/MFA readiness was accepted; the complete 10,911-byte transfer/read-back and [fresh confirmation 42052500882](https://github.com/memphis-iis/MoFaCTS/actions/runs/42052500882) passed. Both immutable versions/final labels were checked and temporary access retired. Storage recovery does not establish provider authentication or an accepted operational rollback configuration. |
+| Application rollback preparation | Previous staging2 image `a3155584`, matching environment/settings/Compose configuration and an application-only rollback command were retained before deploying `65875553`. Preparation is complete; execution against future-format reports is not established by it. |
+
+The passing staging2 access test and AWS storage restore are separate accepted
+results. They are not a combined restore using production credentials on staging2.
+The extra staging2 AWS-backup proposal was withdrawn: no second secret, new
+schema/profile, spending or repeat access test is required merely to preserve
+this evidence. Any later recovery test must name its consumer and missing
+property before proposing new infrastructure.
+
+### Unverified results and future-phase gates
+
+- **Previous-image safety with new-format reports:** no execution evidence was
+  found. Current storage is V1; V2 is planned for Phase 1. The
+  [bounded test specification](security-audit-durable-redesign-plan.md#previous-image-storage-qualification-contract)
+  is Phase 0 planning; execute it against a real candidate before Phase 1 cutover.
+  A missing future-format run does not invalidate the current V1 application or
+  require repeating completed staging2 acceptance.
+- **Operational credential/rollback acceptance:** the AWS document remains the
+  recorded `github-current-unqualified` starting configuration. Actual recovered
+  production-provider authentication, rollback between different configurations
+  and real report-private-key custody/decryption are unverified. Keep these
+  limits explicit; do not infer missing keys, rotate credentials or expand
+  access to obtain PASS. Staging2 restricted-access acceptance is already done.
+- **Failed optional mutation verifier:** **42036927727 remains FAILED**. Later
+  state observations/read-only success do not repair its immediate metadata
+  visibility handling. Repair and separately verify that contract before reuse;
+  no writer retry is pending or authorized, and successful mutations need no replay.
+- **Exit review and later implementation:** map each Phase 0 exit clause to its
+  source/test/evidence owner and name only specific missing contracts/observations.
+  Selected guards do not prove every invocation, middleware/provider or final
+  composition case. Cover affected paths in their owning phase: catalog/report
+  integrity, exact authorization and runtime registry belong to Phases 1, 2 and 3.
+  WITNESS passes prove defects, not fixes. Production integration/qualification
+  is outside the completed staging2 evidence and needs its own execution scope.
+
+Immediate continuation: finish the Phase 0 exit-contract review using this
+checklist and the previous-image test specification. Do not reopen settled
+choices or request another backup/access rehearsal because an older paragraph
+says "pending." This review does not close Phase 0 or authorize a cutover.
+
+**Execution allowance:** the primary fresh Meteor invocation and conditional
+slots 1-2 of 10 passed; **eight remain**. This reconciliation consumes none.
+Protected recovery invocation allowances are spent; no automatic retry or new
+protected execution is authorized. Preserve unrelated working changes.
+
 ## Read-only two-version confirmation passed; temporary access retired (2026-11-05)
 
 The single approved confirmation,
@@ -2809,7 +2872,13 @@ The outcome of that next execution must be recorded separately.
 All further Meteor invocations retain the fresh single-use authorization rule,
 even though this failed attempt did not reach Meteor itself.
 
-## Current execution entry point (2026-11-02)
+<a id="current-execution-entry-point-2026-11-02"></a>
+## Historical execution entry point (2026-11-02)
+
+**Superseded task status:** use the [reconciled checklist](#reconciled-phase-0-checklist-2026-11-05).
+The following records the November 2 position. Pending setup, receipt installation,
+acquisition and proof-joining statements here are not current tasks.
+
 
 Every AI worker must first read and follow [AGENTS.md](../AGENTS.md) and any applicable deeper AGENTS.md instructions, then the plan's [controlling decision register](security-audit-durable-redesign-plan.md#0-controlling-decisions-and-worker-entry-point-2026-11-02), this current status and the [Phase 0 contracts](security-audit-phase0-contracts.md). The dated checkpoints below remain evidence of what ran at those times; their older pending-design/permission statements do not override Phil's later explicit decisions.
 
@@ -2883,12 +2952,12 @@ The user authorized continuing through these three implementation batches. Apply
    the existing capture override, and release mounts before owned cleanup.
    Write rejection, shared-parent isolation, lifecycle failures, workflow wiring
    and exact-image checks passed in the successful execution recorded above.
-3. **Release evidence binding — compatibility and approved storage implemented; execution/proof joining pending.**
-   Traced the current writer and corrected the draft reader for its eight fields
-   while retaining historical six-field support. Join tested/built/published/running
-   identities only where evidence is actually acquired. The user approved the
-   protected host projection and accepted-record history described below. Source
-   matching alone remains unqualified; normal startup behavior is unchanged.
+3. **Release evidence binding - staging2 acquisition, joining and protected storage verified.**
+   Historical/current record parsing, CI acquisition, actual workstation/registry/
+   running-image joining, retained history and protected receipt were executed
+   for staging2 `65875553`. The release remains explicitly unqualified for complete
+   audit coverage. Production integration and future cutover qualification are
+   separate; normal startup behavior is unchanged.
 
 ## Batch 2 decision — approved: combine testing and construction
 
@@ -3740,13 +3809,11 @@ V1 full membership is frozen as 52 test-fixture IDs; exposure retains 20 schedul
 
 ## Next Phase 0 work
 
-1. **Current reconciliation completed:** baseline `18677291` has passing CI/Security, Linux capture and embedded image-source checks. Preserve all dated results as historical evidence; they do not establish the deployed revision or qualify later working edits. The current toolchain is recorded at the top of this document.
-2. **Preserve the verified canonical Compose CI path.** Exact-commit CI and Security passed on `936a64aa`, including one Meteor invocation, one application compilation and native protection/receipt fixtures. No routine rerun or production procedure change is required merely to resume planning.
-3. Validate complete/authenticated test evidence and join the protected candidate's source/config identity to final release proof. Pre-test sealing and the combined Compose lane now have passing CI evidence; qualification is still unqualified until remaining proof gates close. Retain recorded staging2 acceptance for its exact candidate/configuration; repeat only affected/unresolved acceptance with authorization. Ordinary build/startup behavior remains available without qualification metadata; dirty-source qualification stays separately opt-in.
-4. Confirm external release-record readers and finish integration of the approved existing-record authority, bounded protected projection and immutable small-metadata history. Preserve the opt-in tooling implementation recorded above; validate concrete reader/destination access controls and rollback-image/evidence availability before live operation. Live command-sheet/host integration and acquired proof remain pending; private staging checkpoints are not authoritative release extensions.
-5. Apply the settled no-historical-access/archive decision and qualify simplest safe new-report storage against the previous production image; do not delete/rewrite records. Secret recovery design/owner are selected as AWS Secrets Manager/Phil. Complete the [account/MFA recovery, size-fit, dedicated rollback retention and two-version staging2 restore gates](security-audit-durable-redesign-plan.md#aws-secrets-manager-recovery-design-approved-2026-11-02) under concrete setup/operation permissions before claiming recovery. GitHub copies and local DPAPI credentials do not establish those gates. Original staging remains frozen.
-6. Complete remaining invocation/HTTP/provider/composition compatibility and remote qualification. Use staging2 with synthetic accounts/resources under the bounded offline/reset/rebuild permission; inventory enabled providers before binding tests. Preserve fresh per-invocation Meteor authorization, workflow/protected-host/production approvals, and exclusions for irreversible deletion, new persistent access/security-sensitive permissions and spending. Phil reviews one consolidated ambiguous/proposed policy-change list; clear preservation work proceeds with documented evidence.
-7. Review the evidence against every Phase 0 exit requirement and close the gate before beginning Phase 1 / P0 item 3. Phase 1 remains independently deployable after its own qualification and coordinated cutover, without waiting for items 2 and 1. No passing health endpoint, native suite or local fixture suite alone closes Phase 0.
+Use the [reconciled current checklist](#reconciled-phase-0-checklist-2026-11-05).
+It replaces the old numbered list, which repeated completed capture, image
+comparison, receipt/history installation, evidence joining and AWS setup.
+Preserve dated execution records; propose further work only for the specific
+unverified property and its owning phase.
 
 ## Source references
 

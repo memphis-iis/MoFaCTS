@@ -1,10 +1,18 @@
 # One-time protected recovery transfer — execution review
 
-Latest outcome (2026-11-05): **baseline copied and exact read-back verified** by
+Current outcome (2026-11-05): both existing complete versions were recovered and
+matched in [confirmation 42052500882](https://github.com/memphis-iis/MoFaCTS/actions/runs/42052500882).
+There are two recorded versions: original current/baseline pin, candidate previous.
+All temporary access is retired. Failed mutation run 42036927727 remains failed;
+operational qualification is not inferred. Use the [reconciled checklist](../../../docs-developer/security-audit-durable-redesign-status.md#reconciled-phase-0-checklist-2026-11-05)
+for remaining work. No extra staging2 AWS backup or repeated access test is a
+prerequisite introduced by this result; that additional proposal was withdrawn.
+
+Initial transfer checkpoint (historical): **baseline copied and read-back verified** by
 [run 42024117227](https://github.com/memphis-iis/MoFaCTS/actions/runs/42024117227),
 activation `7c0e126b`, using the tested optional SDK implementation `62ae8fe3`.
 The complete document is 10,911 UTF-8 bytes, with nine secret bindings and one
-public-key variable. Exactly one version has `AWSCURRENT` and
+public-key variable. At that initial checkpoint, exactly one stored version had `AWSCURRENT` and
 `MOFACTS_RECOVERY_BASELINE`. The private evidence records its exact version ID.
 The stored SSH key and GitHub source bindings are unchanged. No plaintext
 credential file or secret artifact was created.
