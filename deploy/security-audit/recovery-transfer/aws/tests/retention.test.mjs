@@ -21,7 +21,7 @@ function setup(options = {}, terminalLf = true) {
     runId: rehearsalSource.runId, ...options });
   const aws = makeAwsRetentionClient(credentials, { requestHandler: cloud.handler });
   return { prepared, expected, cloud, invoke: () => rehearseRecoveryRetention({ target: rehearsalTarget,
-    expected, source: rehearsalSource, aws }) };
+    expected, source: rehearsalSource, aws, settlePause: async () => {} }) };
 }
 function restored(value) {
   assert.deepEqual(new Set(value.cloud.versions.get(value.expected.versionId).labels), new Set(['AWSCURRENT', 'MOFACTS_RECOVERY_BASELINE']));
@@ -54,7 +54,7 @@ test('retention uses real SDK serialization, recovers both immutable versions an
 });
 
 test('ambiguous mutation responses reconcile actual state without repeating a mutation or reporting success', async () => {
-  for (const point of ['put-before', 'put-after', 'move-before', 'move-after', 'restore-after', 'retire-after']) {
+  for (const point of ['put-after', 'move-after', 'restore-after', 'retire-after']) {
     let fired = false;
     const value = setup({ fault(when, operation, input) {
       const key = operation === 'PutSecretValue' ? `put-${when}`
@@ -144,4 +144,74 @@ test('isolated runner validates all metadata before OIDC and accepts no deployme
     client: session => makeAwsRetentionClient(session, { requestHandler: value.cloud.handler }),
     fetchToken: async () => ({ ok: true, text: async () => '{"value":"synthetic.oidc.token"}' }) });
   assert.equal(result.state, 'recovery-retention-verified-unqualified');
+});
+
+
+test('uncertain writes with only cached source state stay unresolved and never trigger a repeat or unsafe compensation', async () => {
+  for (const operation of ['PutSecretValue', 'UpdateSecretVersionStage']) {
+    const value = setup({ fault(when, op, input) {
+      if (when === 'before' && op === operation && (op === 'PutSecretValue'
+        || input.MoveToVersionId !== recoveryVersionId(source))) throw new Error('synthetic private detail');
+    } });
+    const result = await value.invoke();
+    assert.equal(result.state, 'recovery-retention-reconciliation-required');
+    assert.equal(result.failureCategory, 'aws-call');
+    assert.equal(result.reconciliationFailureCategory, 'metadata-not-settled');
+    assert.equal(value.cloud.calls.filter(c => c.operation === operation).length, 1);
+    assert.equal(value.cloud.calls.some(c => c.operation === 'UpdateSecretVersionStage'
+      && c.input.VersionStage === 'MOFACTS_RECOVERY_CANDIDATE'), false);
+  }
+});
+
+test('known delayed and disagreeing metadata views settle through every transition without repeating a mutation', async () => {
+  let snapshot, remaining = 0;
+  const value = setup({
+    fault(when, op, _input, { versions }) {
+      if (when === 'before' && ['PutSecretValue','UpdateSecretVersionStage'].includes(op)) {
+        snapshot = structuredClone([...versions]); remaining = 4;
+      }
+    },
+    mutate(op, response) {
+      if (remaining && ['DescribeSecret','ListSecretVersionIds'].includes(op)) {
+        // Alternate stale/fresh views, including disagreement in either direction.
+        if (remaining === 4 || remaining === 1) {
+          if (op === 'DescribeSecret') response.VersionIdsToStages = Object.fromEntries(snapshot
+            .filter(([,v]) => v.labels.length).map(([id,v]) => [id,[...v.labels]]));
+          else response.Versions = snapshot.map(([id,v]) => ({ VersionId: id, VersionStages: [...v.labels] }));
+        }
+        remaining--;
+      }
+    },
+  });
+  const result = await value.invoke();
+  assert.equal(result.state, 'recovery-retention-verified-unqualified');
+  assert.equal(result.lastVerifiedPhase, 'final');
+  assert.equal(result.reconciliationFailureCategory, null);
+  restored(value);
+  assert.equal(value.cloud.calls.filter(c => c.operation === 'PutSecretValue').length, 1);
+  assert.equal(value.cloud.calls.filter(c => c.operation === 'UpdateSecretVersionStage').length, 3);
+});
+
+
+test('permanently stale post-write metadata exhausts a finite read budget and leaves the write unresolved', async () => {
+  let stale;
+  const value = setup({
+    fault(when, op, _input, { versions }) {
+      if (when === 'before' && op === 'PutSecretValue') stale = structuredClone([...versions]);
+    },
+    mutate(op, response) {
+      if (!stale) return;
+      if (op === 'DescribeSecret') response.VersionIdsToStages = Object.fromEntries(stale.map(([id,v]) => [id,[...v.labels]]));
+      if (op === 'ListSecretVersionIds') response.Versions = stale.map(([id,v]) => ({ VersionId:id, VersionStages:[...v.labels] }));
+    },
+  });
+  const result = await value.invoke();
+  assert.equal(result.state, 'recovery-retention-reconciliation-required');
+  assert.equal(result.failureCategory, 'metadata-not-settled');
+  assert.equal(result.reconciliationFailureCategory, 'metadata-not-settled');
+  assert.equal(result.lastVerifiedPhase, 'initial');
+  assert.equal(result.candidateRetained, null);
+  assert.equal(value.cloud.calls.filter(c => c.operation === 'PutSecretValue').length, 1);
+  assert.equal(value.cloud.calls.some(c => c.operation === 'UpdateSecretVersionStage'), false);
+  assert.equal(value.cloud.calls.filter(c => c.operation === 'DescribeSecret').length <= 18, true);
 });

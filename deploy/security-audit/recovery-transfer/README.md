@@ -340,3 +340,10 @@ policy files are retired. Conditional Meteor usage is 2/10, eight remain.
 The failed writer run remains failed and unqualified for reuse. Provider validity,
 operational rollback, real report-private-key custody and staging2 recovery remain
 separate; this result does not close Phase 0 or authorize another execution.
+
+
+The optional writer's [metadata verification contract](restore-rehearsal-review.md#metadata-verification-repair-2026-11-05-source-verification-only)
+now uses bounded read-only settling between exact reviewed states, with no write
+retry and explicit uncertainty after an unconfirmed write. Its 32 synthetic SDK
+tests passed on Windows and Linux. This is source verification only: the failed
+historical protected run stays failed, and no new protected execution is enabled.

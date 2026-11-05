@@ -6,10 +6,121 @@ auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
 
 
+## Phase 0 completion worklist (active 2026-11-05)
+
+Phil requested completion of every unfinished Phase 0 item, with each item
+marked as it finishes. The numbered rows map one-to-one to the 19 deliverables
+in plan Section 12. A checked row means its **Phase 0** requirement is evidenced,
+not that the future catalog/authorization/registry migration has shipped.
+Existing completed evidence is reused; source baseline is `e09da4e7`, with
+unrelated working changes preserved. The 19 original Phase 0 deliverables are
+now evidenced. Phase 0 completion closes decisions/characterization only; it
+does not qualify production or implement the Phase 1-4 redesign.
+
+| ID | Phase 0 deliverable | Status and evidence |
+| --- | --- | --- |
+| P0-01 | Canonical release procedure binding | [x] `C:\dev\mofacts_config\deploy production.txt` verified present; plan/contract integration boundaries preserve existing writer ownership. The old filename is historical. |
+| P0-02 | Qualification integration points | [x] Plan Section 2.1 and contracts Section 3 define pre-build, built, published and running observations; implemented acquisition/preparation contracts and retained staging2 command outcomes prove the interface is testable. |
+| P0-03 | Record extension, snapshot, mapping, receipt/history ownership | [x] `ReleaseQualificationV1/V2`, source capture, bounded Docker identity mapping and store/receipt helpers have source, CI/native fixtures and actual `65875553` joining/install/read-back evidence. Overall qualification remains unqualified. |
+| P0-04 | No-access-drift/no-lockout acceptance cases | [x] Selected method/publication/collection/HTTP guards and missing-proof contracts are recorded and covered by the Phase 0 suite; future migrated boundaries still need their exact runtime cases. |
+| P0-05 | Active-scanner isolation strategy | [x] Section 15.1 selects inert V2 development; current active producer/receiver remain V1. No incompatible V2 producer or default-branch cutover is active. Conditional immutable selection is defined, not silently enabled. |
+| P0-06 | Frozen top-level control IDs | [x] `tests/fixtures/v1-membership.json`, its canonical digest and unchanged 52-control full membership are guarded by executed tests. |
+| P0-07 | Repeated-definition/deletion inventory | [x] Fresh source-owner/deletion-phase table is recorded in the plan's Phase 0 source inventory. No duplicate runtime owner was added or deleted during inventory. |
+| P0-08 | Exact V1 exposure/full fixtures | [x] Full 52 controls and exposure 20 plus two not-applicable placeholders pass current assembler/parser characterization. |
+| P0-09 | Existing-record/rollback storage decision | [x] No historical UI/archive and no destructive rewrite/deletion are settled; current V1 records/storage are unchanged. Rollback preparation is retained. New-format execution remains the separately identified Phase 1 gate. |
+| P0-10 | Previous-image compatibility test definition | [x] The bounded five-step test contract is defined in the plan, including immutable identity, synthetic data, old-image list/latest/download behavior and recovery. V2 execution is not claimed. |
+| P0-11 | Catalog/evidence registry contracts | [x] Plan Sections 5-6 define ownership, metadata, canonical digest and append-only releases. Implementation is Phase 1; fixtures are not misrepresented as a released catalog. |
+| P0-12 | BuildIdentity/missing-proof contract and supported smoke | [x] Node/Meteor parity, pure identity cases, supported CI image smoke and actual staging2 source/image observations exist; missing proof is an explicit unqualified/error observation, not a new application denial. |
+| P0-13 | Authorization union/table/catalog ownership | [x] Plan Sections 5 and 7 define the total outcome table and source-controlled intent versus protected values. Boolean-evaluator fixes belong to Phase 2. |
+| P0-14 | Account/backup recovery foundation | [x] Accepted account/MFA readiness, 10,911-byte transfer/read-back, two-version AWS-only confirmation and separate staging2 credential-use acceptance are retained. Operational provider/private-key limitations are preserved, not declared passing. |
+| P0-15 | Direct registration APIs and environment roots | [x] Fresh TypeScript syntax inventory and reviewed source-root/API table are recorded below the Phase 0 source-inventory heading in the plan. This is not a runtime completeness claim. |
+| P0-16 | Pinned Node/shared JSON/TypeScript/Meteor proof | [x] Current Node Phase 0 suite passed 149 tests with seven platform skips; retained CI includes the Meteor server parity module, no test/hook failures and full compiler/image verification. |
+| P0-17 | Installed production auditor fingerprint/recovery source | [x] The one approved read-only SSH check exited 0. Installed auditor SHA-256 `d6578ce200e70bba69b8c45cc8a451e666c0203776b23b045db820c9ebc4be3e` and both installed helper hashes match public Git source `ba6f3e0d40d4c460b57cd0fb324f95982b5a38d7`. Root ownership/modes and source-only recovery archives of this baseline and prior Git revision `c6d4ace61beac94c796c7cefec0085ba917cabfb` were verified; see the production evidence below. No protected configuration was read or copied. |
+| P0-18 | Separate source/local/CI/staging/production evidence | [x] This worklist and the reconciled checklist link evidence with explicit limits. Source-only work, synthetic tests, live staging2 and unexecuted production work remain distinct. |
+| P0-19 | Red reproducer/green-regression ownership for P0 defects | [x] Existing WITNESS cases execute the flawed behavior and name the opposite owning-phase assertion. Passing witnesses are not fixes. Current foundation suite has zero failures. |
+| P0-20 | Repair failed optional metadata verification contract | [x] Bounded metadata-only settling and conservative uncertain-write compensation passed 32 optional-tool SDK tests on both Windows and Linux, optional-tool ESLint, full app lint and source-security checks. Existing capture inputs cover all changed source. This optional-only source repair required no Meteor run or image build; live writer qualification is not claimed. Failed run 42036927727 stays failed; no cloud replay occurred. |
+| P0-21 | Final requirement-by-requirement completion audit | [x] All 19 original deliverables and the exit gate were reviewed against the plan, contracts, executed witnesses, current source inventory, retained CI/staging evidence and the approved production source observation. Every Phase 0 deliverable is evidenced; future-phase and operational qualification limits remain explicit. Publication is limited to the seven approved intentional files with `[skip ci]`. |
+
+**Current local evidence:** `npm run security:test:phase0`, pinned Node 24.22.1:
+156 total, 149 passed, zero failed, seven Windows platform skips. Hosted Linux
+permission/process coverage remains separately recorded in the accepted CI lane.
+This command did not invoke Meteor or contact a target. Eight conditional Meteor
+invocations remain; none has been consumed by this completion work yet.
+
+### Completion review evidence and remaining boundary
+
+- Current full `npm run lint`: PASS, including server algorithm boundary,
+  absence of test-driver manifest artifacts and 323 covered syntactic security
+  surfaces. This count does not establish runtime registry completeness.
+- Current `npm run security:test:source`: 80 total, 74 passed, zero failed,
+  six Windows platform skips. Current foundation suite: 156 total, 149 passed,
+  zero failed, seven platform skips. Accepted supported CI supplies the distinct
+  Linux/Meteor evidence; a Windows skip is never counted as a pass.
+- Optional recovery-tool ESLint and 32 SDK-fixture tests passed on Windows;
+  all 32 passed on dedicated Ubuntu-MoFaCTS with Node 24.22.1. No new dependency,
+  schema, protected binding, grant or runtime application path was introduced.
+- The original eight false-green witness cases map to their opposite regression
+  assertions and owning Phases 1-3 in contracts Section 5. Their passing witnesses
+  establish defects, not repaired production authorization or report integrity.
+- Phase 0's previous-image requirement is the bounded specification; actual V2
+  storage/old-image execution remains a mandatory Phase 1 pre-cutover gate.
+- No fresh Meteor run, Docker build/push/deployment or cloud mutation occurred.
+  One explicitly approved read-only production metadata connection succeeded.
+  Eight conditional Meteor slots remain. Typecheck is not required for these optional `.mjs`/documentation edits;
+  no TypeScript source in this batch changed. Unrelated working changes remain.
+- P0-17 is now evidenced by the single approved installed-host observation and
+  exact matching/recovery of public Git blobs. This completes the Phase 0
+  decisions/characterization gate. It does not prove a production rollback,
+  current production auditor qualification or later redesign cutover.
+
+### Installed production auditor and recoverable source (2026-11-05)
+
+Phil explicitly approved one read-only metadata check and publication of this
+seven-file batch. The operator SSH bindings were safely resolved from the
+canonical production procedure without executing its deployment commands. The
+single SSH command exited 0; only fixed public-source file paths were hashed and
+statted. No script/audit/application request, secret configuration read, file
+installation, service restart, privilege change or production mutation occurred.
+
+| Installed public source | Observed SHA-256 | Observed owner/mode | Recoverable source |
+| --- | --- | --- | --- |
+| `/usr/local/sbin/mofacts-host-exposure-audit` | `d6578ce200e70bba69b8c45cc8a451e666c0203776b23b045db820c9ebc4be3e` | root:root 0755; 26,919 bytes | `ba6f3e0d40d4c460b57cd0fb324f95982b5a38d7` |
+| `host-listener-policy.awk` under the installed libexec directory | `b16b905c6283af86272f1dae8ebcea76aba078366c11bce91233738a3a059a70` | root:root 0644; 2,201 bytes | same commit |
+| `host-firewall-policy.awk` under the installed libexec directory | `3c58967a7c2bfc87ad880d471b26d2381b7f55172a34a3454cb4fc7bcfb08c74` | root:root 0644; 1,725 bytes | same commit |
+
+All five traversed system/source directories are root:root 0755; no symlink was
+accepted. Production has the older bundle: Apache/Sidecar/Mongo-role/read-concern
+and receipt support files from the current staging2 bundle are absent. Their
+absence is recorded, not remediated or represented as current-policy acceptance.
+Any production auditor upgrade and its runtime qualification remain separate.
+
+Source-only recovery archives were constructed from Git objects, not host files,
+and every archived file was re-read and hash-verified. The installed pre-cutover
+baseline archive has SHA-256
+`584480a000345b80dab91036ac6578ae76203ee629a40540cfe464a72af86b18`.
+A prior source revision, `c6d4ace61beac94c796c7cefec0085ba917cabfb`, is also
+recoverable in Git and a verified archive, SHA-256
+`445a4ebd2f50466dcc27a9e5d6da5ed64f7a839dc30d0078c0e4af959330c862`.
+The prior revision's availability does not prove it was previously installed on
+production or that rollback was executed. The installed baseline and prior
+revision are both ancestors of the published source history. No `/etc/mofacts`
+configuration is in either archive. Local nonsecret evidence is retained under
+`MoFaCTS-Release-Evidence/phase0-completion-20261105` on the operator workstation;
+public source remains recoverable from the named commits independently of it.
+
+Phase 0 exit audit: the canonical qualification interface, proof carriage,
+non-production target, compatibility/storage boundaries, active V1 isolation,
+registration/metadata inventory and all eight defect witnesses/opposite owning
+regressions are defined and testable. Current local checks have no failures;
+retained supported CI and actual staging2 evidence remain separately identified.
+There is no V2 cutover, new credential authority, completed operational restore,
+production runtime-policy PASS or broad security-audit closure implied here.
+
 ## Reconciled Phase 0 checklist (2026-11-05)
 
-This is the current execution entry point. It supersedes older task lists and
-pending statements below; dated execution records remain historical evidence.
+The [active completion worklist](#phase-0-completion-worklist-active-2026-11-05)
+is the current execution entry point. This reconciled evidence remains its
+baseline; dated execution records below remain historical evidence.
 Reconciled at source `56d3c699`, using retained staging2 artifacts and recorded
 CI/Security/protected-run results. This review changes no runtime, deployment,
 permissions or acceptance result.
@@ -49,8 +160,9 @@ property before proposing new infrastructure.
   access to obtain PASS. Staging2 restricted-access acceptance is already done.
 - **Failed optional mutation verifier:** **42036927727 remains FAILED**. Later
   state observations/read-only success do not repair its immediate metadata
-  visibility handling. Repair and separately verify that contract before reuse;
-  no writer retry is pending or authorized, and successful mutations need no replay.
+  visibility handling. The source repair and 32-test Windows/Linux verification
+  are now recorded under P0-20; future live writer qualification remains separate.
+  No writer retry is pending or authorized, and successful mutations need no replay.
 - **Exit review and later implementation:** map each Phase 0 exit clause to its
   source/test/evidence owner and name only specific missing contracts/observations.
   Selected guards do not prove every invocation, middleware/provider or final
@@ -59,10 +171,11 @@ property before proposing new infrastructure.
   WITNESS passes prove defects, not fixes. Production integration/qualification
   is outside the completed staging2 evidence and needs its own execution scope.
 
-Immediate continuation: finish the Phase 0 exit-contract review using this
-checklist and the previous-image test specification. Do not reopen settled
-choices or request another backup/access rehearsal because an older paragraph
-says "pending." This review does not close Phase 0 or authorize a cutover.
+Immediate continuation after the Phase 0 completion record: begin the planned
+Phase 1 catalog/V2 report-integrity implementation when requested. Keep the
+previous-image execution gate before cutover. Do not reopen settled choices or
+repeat accepted backup/access checks because an older paragraph says "pending."
+Phase 0 completion does not authorize an incompatible scanner cutover.
 
 **Execution allowance:** the primary fresh Meteor invocation and conditional
 slots 1-2 of 10 passed; **eight remain**. This reconciliation consumes none.

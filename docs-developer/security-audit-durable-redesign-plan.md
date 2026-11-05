@@ -1,9 +1,13 @@
 # Security Audit Durable Redesign Plan
 
+Phase 0 decisions/characterization completed 2026-11-05, including the approved
+installed-production auditor source observation and recoverable source baseline.
+This completes Phase 0 only; operational qualification and Phases 1-4 remain.
+
 Status reconciled 2026-11-05: Phase 0 contracts/characterization, protected-source
 Compose CI, staging2 evidence joining and protected receipt/history installation,
 staging2 acceptance, and AWS two-version recovery have recorded results. Use the
-[current checklist](security-audit-durable-redesign-status.md#reconciled-phase-0-checklist-2026-11-05)
+[active completion worklist](security-audit-durable-redesign-status.md#phase-0-completion-worklist-active-2026-11-05)
 for exact boundaries and remaining work. Complete release/audit qualification
 is still unqualified; the Phase 1-4 redesign cutovers have not started.
 
@@ -1001,6 +1005,43 @@ Do not leave re-export facades solely to preserve old internal paths. The final 
 
 Responsibility roles are used until the repository has enough maintainers for meaningful path-level `CODEOWNERS`. Adding names to ownership configuration is an organizational decision, not an implementation shortcut.
 
+### Phase 0 source inventory (reviewed 2026-11-05)
+
+This is a reviewed migration inventory, not a second runtime catalog or an
+inferred access-policy assignment. It records the current owners and deletion
+phase required by Phase 0. Future source changes require affected-owner review.
+
+| Repeated concept | Current source owners | Migration/deletion owner |
+| --- | --- | --- |
+| V1 shape/status/count/canonical JSON/digest | `common/securityAuditReport.ts`; `scripts/security-audit/audit-lib.mjs` | Phase 1 shared runtime-neutral contracts replace duplicated production semantics atomically with V2 cutover. Preserve frozen V1 fixtures only for characterization. |
+| Control IDs, labels, severities and membership | `external-audit.mjs`, `repository-audit.mjs`, `production-auth-audit.mjs`, `internal-audit-contract.mjs`, `assemble-report.mjs`, and tracked `deploy/security-audit/host-exposure-audit.sh` | Phase 1 catalog/evidence/producer ownership removes independent metadata. The host emits observations rather than parsing/copying catalog metadata. |
+| Authorization proof intent and boolean evaluation | `production-auth-audit.mjs`, `authentication-probes.mjs`, protected fixture probe values | Phase 2 source-owned verification intent and explicit observation evaluation; protected configuration keeps environment values, not policy definitions. |
+| Surface policy/egress classification | `security-surface-contract.json`, inference checker, actual server guards/routes and package protocol owners | Phase 3 runtime descriptors own enforcement/egress facets; retire manifest/inference after complete migration and reviewed parity. Never automatically infer policy from this inventory. |
+| Fixture copies of V1 IDs and defect expectations | `scripts/security-audit/tests/fixtures/v1-membership.json` and WITNESS tests | Intentional Phase 0 characterization, not a runtime metadata owner. Replace witnesses with the opposite regressions in each owning fix; retain/remove fixtures during Phase 4 review according to remaining tests. |
+
+Current security-registration forms and owning roots:
+
+| API/family | Actual owner/root and required distinction |
+| --- | --- |
+| `Meteor.methods` | `server/serverComposition.ts` combines synchronous/async factory objects; maintained `packages/ostrio-files/server.js` registers computed upload methods. `*.test.ts` qualification fixtures are a separate test-discovery environment. |
+| `Meteor.publish` | `server/publications.ts` and composition registrations include named and distinct null/default publications. Do not collapse defaults or change ready-versus-error behavior. |
+| `WebApp.connectHandlers.use`, `rawConnectHandlers.use`, aliases `WebAppAny.handlers.use`/`WebAppCompat.connectHandlers.use` | HTTP modules, dynamic assets, SAML, startup and maintained file-package server stack. Preserve stack, mount stripping, ordering, method dispatch and fallthrough. |
+| Collection `allow`/`deny`, including `this.collection` wrappers | `common/Collections.ts` and maintained file package. Preserve synchronous direct-mutation authorization and actual collection ownership. |
+| `Accounts.onLogin`, `validateLoginAttempt`, `onCreateUser` | `server/startup/serverStartup.ts`; preserve framework login/context/role lifecycle. |
+| `OAuth.registerService`, `Accounts.oauth.registerService`, optional SAML service binding | Selected local Microsoft OAuth/accounts packages and `server/lib/memphisSaml.ts`; other account providers are framework/package owners pinned by `.meteor/packages`/`.meteor/versions`. No runtime monkey-patching or duplicate registration. |
+| Startup/composition lifecycle | `server/main.ts` imports common collections/SAML/composition and then separate publication/HTTP modules. End of composition alone is not final registry sealing. |
+
+Syntax review covered active `mofacts/server`, `mofacts/common` and the three
+selected maintained package roots (`ostrio-files`, `mofacts-microsoft-oauth`,
+`mofacts-accounts-microsoft`). Client route visibility remains separate from
+server authorization. Root `app/`, `tests/`, `packages/` scaffolds are not silently
+substituted for these executable roots; framework/vendor internals retain named
+owners. Test fixture calls (`deps.store.publish`, synthetic service methods) are
+not production registrations. The Change Streams `*.test.ts` fixture additionally
+requires its named qualification/reactivity flags; test-driver resolutions must
+not persist in the application version manifest. This inventory does not prove
+a deployed provider is enabled or that dynamic runtime coverage is complete.
+
 ## 12. Phased Implementation Plan
 
 At the 2026-09-06 foundation checkpoint, Phase 0 has pure draft contracts and locally executed characterization tests; application/scanner activation in Phases 1–4 has not started. Execution status belongs in the companion evidence document. This does not claim Phase 0's runtime/ownership exit gate is complete.
@@ -1019,7 +1060,7 @@ Use approximately 30 engineer-days as the baseline because Phase 0 and most Phas
 
 Deliverables:
 
-- Keep the verified binding to config repo `deploy and build.txt` current: preserve clean/dirty naming, no-cache/base build, runtime overlay, post-push environment update, Compose wait, source/CSP checks and release-record ownership. The static trace and reusable helper/contract tests are implemented; staging2 acquisition/joining and receipt/history executed. Production integration is not established by those staging2 results.
+- Keep the verified binding to canonical config repo `deploy production.txt` current: preserve clean/dirty naming, no-cache/base build, runtime overlay, post-push environment update, Compose wait, source/CSP checks and release-record ownership. The static trace and reusable helper/contract tests are implemented; staging2 acquisition/joining and receipt/history executed. Production integration is not established by those staging2 results.
 - Define shared qualification integration points before build, after build, after push and at host identity observation; keep pre-build source proof separate from post-build exact-image proof.
 - Define the compatible versioned qualification extension of the existing release record, its bounded host projection and retained rollback history; do not create a competing record. Settle exact-snapshot proof for dirty source, native-command result capture, OCI index/platform/config mapping and protected install/read tooling without changing normal deploy defaults.
 - Record zero-access-drift and no-new-operational-lockout acceptance cases for source builds, missing proof, methods, publications, collection rules, HTTP stacks and framework-owned authentication.

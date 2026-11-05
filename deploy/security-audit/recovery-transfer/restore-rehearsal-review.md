@@ -316,3 +316,37 @@ preserved. Conditional Meteor slot 2/10 passed; eight remain. Failed mutation ru
 visibility contract. This completes the approved read-only follow-up only.
 Operational rollback acceptance and staging2 consumer recovery are later gates;
 no production-audit credential may be loaded into staging2 under this scope.
+
+
+## Metadata verification repair (2026-11-05; source verification only)
+
+The optional retention transaction now waits for each reviewed metadata
+transition through bounded read-only observations. Each observation checks the
+complete DescribeSecret and ListSecretVersionIds maps independently, including
+all immutable version IDs and the original baseline pin. Only the exact source
+or intended target phase is accepted while waiting; unknown versions, labels,
+pagination or configuration changes fail immediately. Success requires both
+views to reach the target. There are at most eight paired observations with
+9.75 seconds of pauses per settling operation; no mutation or payload read is
+retried. The strict read-only confirmation keeps its immediate exact-state check.
+
+Compensation first proves the target of the last attempted write. Cached source
+metadata cannot establish that a write with a lost response never happened. An
+unconfirmed target exhausts the read budget and remains reconciliation-required;
+it does not trigger a repeated write or guessed cleanup. A failed write response
+still makes the rehearsal fail even when metadata later proves safe recovery.
+Bounded result metadata now preserves the original failure category, a separate
+reconciliation failure category and the last verified phase; it contains no
+secret values or raw SDK diagnostics.
+
+Verification: all 32 optional-tool tests passed on Windows and the dedicated
+Ubuntu-MoFaCTS Linux environment with pinned Node 24.22.1; optional-tool ESLint,
+full application lint and source-security tests passed. Synthetic SDK fixtures
+cover delayed/disagreeing views through every transition, permanently stale
+metadata, uncertain writes and at-most-once compensation. The existing explicit
+source-capture input list already includes every changed module/test.
+No Meteor invocation, cloud grant, protected execution, application image or
+provider call was needed. These checks repair the source verification contract;
+they do not live-qualify a future writer. Run 42036927727 remains FAILED. The
+successful separate read-only confirmation and retired-access evidence stand.
+Any future protected writer use needs its own reviewed authorization and baseline.

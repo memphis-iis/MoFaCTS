@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { setTimeout as pauseFor } from 'node:timers/promises';
 import { exactLabels } from './payload.mjs';
 import { RecoveryTransferError } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
 
@@ -46,24 +47,50 @@ export function recoveryVersionId(source) {
     .update(`memphis-iis/MoFaCTS\0${source.commit}\0${source.runId}\0${source.runAttempt}`).digest('hex');
 }
 
-// Describe omits unlabelled versions; List includes them. Both must agree with
-// one exact, known phase. No pagination, extra versions or inferred ownership.
-export async function observeRecoveryPhases(aws, target, states) {
+// Describe omits unlabelled versions; List includes them. Each response must
+// independently match a reviewed phase, including the original pin and every ID.
+// The two views can temporarily show different known phases after a mutation.
+async function phaseCandidates(aws, target, states) {
   const description = await aws('secretsmanager', 'describe-secret', { SecretId: target.secretArn });
   checkDescription(description, target);
   const list = await aws('secretsmanager', 'list-secret-version-ids', {
     SecretId: target.secretArn, IncludeDeprecated: true, MaxResults: 3,
   });
   if (list?.ARN !== target.secretArn || list.Name !== 'mofacts/security-audit/recovery'
-    || !Array.isArray(list.Versions) || list.NextToken !== undefined) stop('secret-versions');
+    || !Array.isArray(list.Versions) || list.NextToken !== undefined
+    || list.Versions.some(version => !object(version) || typeof version.VersionId !== 'string')
+    || new Set(list.Versions.map(version => version.VersionId)).size !== list.Versions.length) stop('secret-versions');
+  const descriptions = [], listings = [];
   for (const [phase, versions] of Object.entries(states)) {
     const labelled = Object.entries(versions).filter(([, labels]) => labels.length);
     if (Object.keys(description.VersionIdsToStages ?? {}).length === labelled.length
-      && labelled.every(([id, labels]) => exactLabels(description.VersionIdsToStages[id], labels))
-      && list.Versions.length === Object.keys(versions).length
-      && new Set(list.Versions.map(version => version.VersionId)).size === list.Versions.length
+      && labelled.every(([id, labels]) => exactLabels(description.VersionIdsToStages[id], labels))) descriptions.push(phase);
+    if (list.Versions.length === Object.keys(versions).length
       && list.Versions.every(version => Object.hasOwn(versions, version.VersionId)
-        && exactLabels(version.VersionStages ?? [], versions[version.VersionId]))) return phase;
+        && exactLabels(version.VersionStages ?? [], versions[version.VersionId]))) listings.push(phase);
   }
-  stop('version-labels');
+  if (!descriptions.length || !listings.length) stop('version-labels');
+  return { descriptions, listings };
+}
+
+export async function observeRecoveryPhases(aws, target, states) {
+  const observed = await phaseCandidates(aws, target, states);
+  const phase = observed.descriptions.find(value => observed.listings.includes(value));
+  if (!phase) stop('version-labels');
+  return phase;
+}
+
+// Only metadata is re-read, never a mutation or secret payload. Both views must
+// reach the exact intended target. A source-only timeout is unresolved even if
+// the write response was lost: cached source metadata cannot prove no write.
+export async function settleRecoveryPhase(aws, target, states, from, to, { pause = pauseFor } = {}) {
+  if (!Object.hasOwn(states, from) || !Object.hasOwn(states, to) || from === to) stop('version-labels');
+  const transition = { [from]: states[from], [to]: states[to] };
+  const delays = [250, 500, 1000, 2000, 2000, 2000, 2000];
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    const observed = await phaseCandidates(aws, target, transition);
+    if (observed.descriptions.includes(to) && observed.listings.includes(to)) return to;
+    if (attempt < delays.length) await pause(delays[attempt]);
+  }
+  stop('metadata-not-settled');
 }

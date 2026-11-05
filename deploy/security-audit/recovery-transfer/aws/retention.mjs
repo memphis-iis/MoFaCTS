@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { RecoveryTransferError } from '../../../../mofacts/scripts/security-audit/recovery-transfer.mjs';
-import { BASELINE_LABEL, observeRecoveryPhases as observe, validateRecoveryStoreTarget } from './store.mjs';
+import { BASELINE_LABEL, observeRecoveryPhases as observe, settleRecoveryPhase, validateRecoveryStoreTarget } from './store.mjs';
 import { validateRestoreExpected } from './restore.mjs';
 import { validateRecoveredPayload, encryptedDocumentDigest } from './payload.mjs';
 const fail = category => { throw new RecoveryTransferError(category); };
@@ -41,37 +41,35 @@ function checkUpdate(result, target) {
   if (result?.ARN !== target.secretArn || result.Name !== 'mofacts/security-audit/recovery') fail('write-back');
 }
 
-// Owner: this bounded transaction. Compensation observes the exact known phase,
-// restores current once if necessary, then removes only its own marker. An
-// ambiguous response is reconciled by metadata, never by repeating a mutation.
-async function restoreCurrent(aws, target, states, baselineId, candidateId) {
+// Owner: this bounded transaction. Settle the last attempted write's target
+// before choosing compensation. Source-only cached metadata never proves that
+// an uncertain write did not happen. Every compensation is attempted once.
+async function restoreCurrent(aws, target, baselineId, candidateId, requiredPhase, settle) {
   let failed = false;
-  let phase = await observe(aws, target, states);
-  if (phase === 'moved') {
+  let phase;
+  if (requiredPhase === 'moved') {
+    await settle('prepared', 'moved');
     try {
       checkUpdate(await aws('secretsmanager', 'update-secret-version-stage', {
         SecretId: target.secretArn, VersionStage: 'AWSCURRENT',
         MoveToVersionId: baselineId, RemoveFromVersionId: candidateId,
       }), target);
     } catch { failed = true; }
-    phase = await observe(aws, target, states);
-    if (phase !== 'restored') fail('reconciliation-required');
+    phase = await settle('moved', 'restored');
+  } else {
+    phase = await settle('initial', 'prepared');
   }
-  if (['prepared', 'restored'].includes(phase)) {
-    const finalPhase = phase === 'prepared' ? 'retired' : 'final';
-    try {
-      checkUpdate(await aws('secretsmanager', 'update-secret-version-stage', {
-        SecretId: target.secretArn, VersionStage: CANDIDATE_LABEL, RemoveFromVersionId: candidateId,
-      }), target);
-    } catch { failed = true; }
-    phase = await observe(aws, target, states);
-    if (phase !== finalPhase) fail('reconciliation-required');
-  }
-  if (!['initial', 'retired', 'final'].includes(phase)) fail('reconciliation-required');
-  return { failed, phase };
+  const finalPhase = phase === 'prepared' ? 'retired' : 'final';
+  try {
+    checkUpdate(await aws('secretsmanager', 'update-secret-version-stage', {
+      SecretId: target.secretArn, VersionStage: CANDIDATE_LABEL, RemoveFromVersionId: candidateId,
+    }), target);
+  } catch { failed = true; }
+  await settle(phase, finalPhase);
+  return { failed, phase: finalPhase };
 }
 
-export async function rehearseRecoveryRetention({ target, expected, source, aws }) {
+export async function rehearseRecoveryRetention({ target, expected, source, aws, settlePause }) {
   validateRetentionTarget(target); validateRestoreExpected(expected);
   const candidateId = retentionVersionId(source);
   if (candidateId === expected.versionId) fail('baseline-identity');
@@ -84,6 +82,13 @@ export async function rehearseRecoveryRetention({ target, expected, source, aws 
   const documentDigestCiphertext = encryptedDocumentDigest(original.serialized, original.bundle);
   await requirePhase(aws, target, states, 'initial');
   let failureCategory = null;
+  let reconciliationFailureCategory = null;
+  let lastVerifiedPhase = 'initial';
+  let requiredPhase = 'prepared';
+  const settle = async (from, to) => {
+    lastVerifiedPhase = await settleRecoveryPhase(aws, target, states, from, to, { pause: settlePause });
+    return lastVerifiedPhase;
+  };
   let recoveredBoth = false;
   try {
     const written = await aws('secretsmanager', 'put-secret-value', {
@@ -91,38 +96,42 @@ export async function rehearseRecoveryRetention({ target, expected, source, aws 
       SecretString: original.serialized, VersionStages: [CANDIDATE_LABEL],
     });
     if (written?.ARN !== target.secretArn || written.VersionId !== candidateId) fail('write-back');
-    await requirePhase(aws, target, states, 'prepared');
+    await settle('initial', 'prepared');
     const candidate = await readVersion(aws, target, expected, candidateId, states.prepared[candidateId], CANDIDATE_LABEL);
     if (candidate.serialized !== original.serialized) fail('read-back');
-    await requirePhase(aws, target, states, 'prepared');
+    await settle('initial', 'prepared');
+    requiredPhase = 'moved';
     checkUpdate(await aws('secretsmanager', 'update-secret-version-stage', {
       SecretId: target.secretArn, VersionStage: 'AWSCURRENT',
       MoveToVersionId: candidateId, RemoveFromVersionId: expected.versionId,
     }), target);
-    await requirePhase(aws, target, states, 'moved');
+    await settle('prepared', 'moved');
     for (const [id, stage] of [[expected.versionId, BASELINE_LABEL], [candidateId, 'AWSCURRENT']]) {
       const recovered = await readVersion(aws, target, expected, id, states.moved[id], stage);
       if (recovered.serialized !== original.serialized) fail('read-back');
     }
-    await requirePhase(aws, target, states, 'moved');
+    await settle('prepared', 'moved');
     recoveredBoth = true;
   } catch (error) {
     failureCategory = error instanceof RecoveryTransferError ? error.category : 'unexpected';
   }
   let reconciled;
   try {
-    reconciled = await restoreCurrent(aws, target, states, expected.versionId, candidateId);
+    reconciled = await restoreCurrent(aws, target, expected.versionId, candidateId, requiredPhase, settle);
     if (reconciled.failed) failureCategory ??= 'compensation-response';
-  } catch { failureCategory = 'reconciliation-required'; }
+  } catch (error) {
+    reconciliationFailureCategory = error instanceof RecoveryTransferError ? error.category : 'unexpected';
+    failureCategory ??= 'reconciliation-required';
+  }
   const restored = Boolean(reconciled);
   const success = restored && reconciled.phase === 'final' && recoveredBoth && !failureCategory;
   return {
     state: success ? 'recovery-retention-verified-unqualified'
       : restored ? 'recovery-retention-failed-restored' : 'recovery-retention-reconciliation-required',
-    failureCategory, baselineVersionId: expected.versionId, candidateVersionId: candidateId,
+    failureCategory, reconciliationFailureCategory, lastVerifiedPhase, baselineVersionId: expected.versionId, candidateVersionId: candidateId,
     bytes: expected.bytes, recoveredBoth, baselineCurrentRestored: restored,
     baselinePinPreserved: restored, candidateMarkerRetired: restored,
-    candidateRetained: restored ? reconciled.phase !== 'initial' : null,
+    candidateRetained: restored ? true : null,
     digestEncryption: 'RSA-OAEP-SHA256', documentDigestCiphertext,
     historicalRollbackAvailable: false,
   };
