@@ -4,6 +4,14 @@ Status: proposal for the next decision after a verified baseline transfer and
 access cleanup. No rehearsal, candidate version, new GitHub environment or
 retained accepted-rollback label is authorized or created by this document.
 
+This is the AWS rehearsal for Phil's selected operator store, not a mandatory
+AWS procedure for all MoFaCTS installations. The
+[approved separation direction](transport-decision.md#selected-separation-portable-bundle-optional-operator-tool)
+requires portable bundle validation and a separately installed AWS tool. Other
+stores need equivalent current/accepted-rollback restoration and credential
+isolation evidence. The application must not acquire an AWS dependency through
+this rehearsal.
+
 ## Why a decision is needed
 
 The complete backup contains production-audit credentials. Staging2 has its own

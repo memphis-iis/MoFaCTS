@@ -1,7 +1,10 @@
 # Recovery transfer transport decision
 
-Status: proposed, not approved or implemented. The destination remains empty.
-The one authorized retry and all five Meteor integration slots are spent.
+Status: Phil approved revising the plan so AWS remains optional and separate
+from the application. The separation below is the selected direction; SDK
+installation, implementation and further protected execution remain pending.
+The destination remains empty. The one authorized retry and all five Meteor
+integration slots are spent.
 
 ## Verified failure
 
@@ -34,7 +37,52 @@ not replay of an issued session. The shared provider and unchanged GitHub source
 were preserved. The active workflow is disabled and removed. The existing empty
 paid secret is preserved; no usable credential backup or restore is claimed.
 
-## Recommended implementation
+## Selected separation: portable bundle, optional operator tool
+
+AWS Secrets Manager is Phil's selected recovery store for this installation,
+not a requirement for MoFaCTS users. Ordinary application installation, tests,
+image builds, startup and deployment must work without the recovery tool, its
+AWS dependencies, an AWS account or AWS credentials. This decision does not
+remove the application's existing, separately configured S3 asset-storage option.
+
+Keep the existing `MoFactsRecoveryBundleV1` representation: schema, provenance,
+the complete named secret strings and the report-encryption public variable.
+Its JSON contains no AWS ARN, region, role, AWS version or staging label. These
+are storage coordinates and stay outside the portable document. Preserve the
+current provenance and unqualified-baseline meaning; portability does not make
+this installation's GitHub identity or fixture inventory universal defaults.
+Keep existing exact-string, duplicate-key, completeness, key-format and bounded
+size checks. Do not change schema or reinterpret an old bundle in this batch.
+
+Split the existing mixed recovery module by responsibility:
+
+| Owner | Responsibility | Dependency boundary |
+| --- | --- | --- |
+| Shared recovery validation under `mofacts/scripts/security-audit/` | Existing bundle construction, validation and exact serialization, reusable for non-AWS recovery | Existing repository validation dependencies; no AWS SDK, network, credential acquisition or provider import |
+| Optional tool under `deploy/security-audit/recovery-transfer/aws/` | AWS identity/target checks, storage operations and AWS-specific read-back/version/label verification | Its own private `package.json` and lockfile, installed explicitly from this directory |
+| Reviewed protected workflow | Explicitly selects Phil's AWS tool and supplies approved bindings | No application startup hook, default provider selection, schedule or automatic activation |
+
+The optional tool may import the shared repository validator. The shared
+validator and application must never import the AWS tool. Retain the existing
+parser and probe-ID validation rather than copying them or writing a second
+JSON parser. Current parser reuse goes through `ciEvidence.mjs`, which imports
+`acorn` and other repository modules: audit that import closure during the split.
+Do not claim a dependency-free or standalone bundle validator. Preparing existing
+repository validation dependencies for the optional operation is acceptable;
+installing the AWS tool through normal application dependency preparation is not.
+
+Other operators may store and recover the same validated document using their
+own protected store. They must preserve the complete document, exact credential
+strings, authenticated access, encryption, current/accepted rollback identities,
+retention and tested restoration. AWS labels implement those requirements only
+for this adapter. Document the provider-neutral contract; do not add a second
+backend, automatic provider selection or a new plugin framework in this batch.
+Portable JSON describes the content, not permission to save plaintext secret
+files, publish exports or inject production credentials into staging2. Authorized
+recovery validates the document before handing its strings to the named consumer;
+operational qualification remains separate from a byte-correct storage round trip.
+
+## Proposed optional AWS implementation
 
 Replace the CLI adapter with AWS's maintained JavaScript clients:
 
@@ -42,14 +90,27 @@ Replace the CLI adapter with AWS's maintained JavaScript clients:
 - `@aws-sdk/client-secrets-manager` for the existing describe, complete version
   list, put and exact-version get operations.
 
-MoFaCTS already declares `@aws-sdk/client-s3` in the canonical application
-manifest, but S3 does not own these APIs. Neither additional client is a direct
-dependency. Do not import incidental nested implementations or add a second
-manifest. Add these two audit-helper development dependencies through
-`mofacts/package.json` and its lockfile, after checking official versions,
-Node compatibility and dependency advisories. Scripts are excluded by the
-existing Meteor ignore rule; verify actual build impact before claiming the new
-clients are absent from the image.
+The earlier proposal to add these clients to `mofacts/package.json` is
+superseded. Leave the application manifest and lockfile unchanged. Declare the
+two clients only in the optional tool's private manifest and dedicated lockfile,
+after checking official versions, Node compatibility and dependency advisories.
+Use the repository-pinned Node/npm versions and an explicit tool-directory
+`npm ci --ignore-scripts`; no root npm workspace, automatic postinstall hook,
+dynamic download or incidental nested SDK imports. Existing S3 dependencies
+remain owned by the application and are not the tool's dependency source.
+
+Move the AWS-only target/transfer logic and runner into this tool, removing their
+old entry points and updating all callers/tests together. Keep one implementation
+of each validation rule. The known broken CLI adapter is replaced, not retained
+as an alternate transport. Review the inactive workflow for the explicit install
+and new runner path; it remains inactive until execution approval.
+
+Exclude the optional tool from the application Docker build context and verify
+that its SDK packages are not installed in the application image by this change.
+Keep its exact source, manifests, lockfile, tests and reviewed workflow in the
+supplemental audit-tool test capture, with installed `node_modules` excluded.
+Update capture readers and coverage intentionally; do not weaken source identity
+rules or infer isolation merely from a directory name or Meteor ignore rule.
 
 SDK clients serialize and sign requests directly in memory, removing the custom
 CLI input bridge. Keep the existing core validation and exact read-back contract:
@@ -70,8 +131,9 @@ CLI input bridge. Keep the existing core validation and exact read-back contract
 Official API ownership:
 [STS client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/sts/),
 [Secrets Manager client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/secrets-manager/).
-This changes the helper's dependencies and transport, not the selected store,
-monthly storage approval, production bindings or application runtime design.
+This changes only the optional helper's dependencies and transport. It preserves
+Phil's selected store/monthly approval and the production bindings. AWS is not
+the required recovery provider for other installations.
 
 ## Approval and verification gate
 
@@ -81,10 +143,22 @@ installation or implementation. Also authorize one fresh Meteor integration
 invocation and one further protected transfer, conditional on passing checks.
 No transfer retry is implicit in approving the implementation.
 
-After approval: implement the sole SDK transport, test actual SDK serialization
-and HTTP behavior with synthetic requests (including error redaction, explicit
-identity, bounded attempts/timeouts and exact string round-trip), run full lint
-and source contracts, publish intentional changes and pass supported full CI.
+After approval, implement the split and sole SDK transport. Verify:
+
+1. Shared bundle tests pass without installing the optional tool or either new
+   SDK client. Normal application setup and CI never install that tool. Test
+   portability with synthetic serialized bytes and no AWS coordinates or calls;
+   reject missing, duplicate, extra or corrupt data with sanitized errors.
+2. A separate explicit tool test command exercises actual SDK serialization and
+   synthetic HTTP responses, including error redaction, explicit identity,
+   bounded attempts/timeouts and exact string round-trip. Ordinary source tests
+   must not import an SDK-dependent test. Run tool dependency auditing explicitly;
+   normal application CI must not gain an AWS install requirement.
+3. Full lint/source contracts, capture closure and supported full CI pass on the
+   intentional committed source. Verify normal image construction excludes the
+   tool and its additional SDK dependencies; use only authorized image checks.
+   Run one newly authorized Meteor invocation, not a repeat under the spent cap.
+
 Recheck frozen source metadata and the empty destination before recreating only
 the reviewed time-bounded access and dispatching once. On either outcome remove
 data access, deny trust, delete the temporary role and retire the workflow again.

@@ -33,6 +33,34 @@ reported image-collector failure. It does not waive failed acceptance checks,
 authorize production/original-staging operations, new dependencies/spending or
 unrelated changes. Staging2 deployment remains gated on passing required checks.
 
+### AWS optionality accepted; separation plan revised (2026-11-05 UTC)
+
+Phil approved revising the plan so AWS remains optional and separate from the
+application. The [revised transport plan](../deploy/security-audit/recovery-transfer/transport-decision.md)
+now assigns AWS-only code and the two proposed SDK clients to a separately
+installed private operator-tool package under
+`deploy/security-audit/recovery-transfer/aws/`. The prior proposal to add the
+clients to `mofacts/package.json` is superseded. Normal application dependency
+installation, testing, builds and runtime must not install or require this tool.
+The existing optional S3 asset-storage feature is unchanged by this plan.
+
+Inspection confirmed `MoFactsRecoveryBundleV1` has no AWS location/version fields,
+but `recovery-transfer.mjs` mixes its validation with AWS storage logic. Validation
+also imports the existing CI JSON parser, whose import closure includes `acorn`
+and repository modules. The plan preserves shared validation and its existing
+dependencies rather than claiming a dependency-free core or copying a parser.
+AWS-only tests/installation will be explicit; shared bundle tests must run with
+the tool absent. Build-context exclusion and supplemental capture/test closure
+are acceptance checks, not properties inferred from the proposed folder layout.
+
+Only planning documents changed in this continuation. No new package, SDK
+dependency, workflow, credential access, CI invocation, AWS mutation or deployment
+was created. The last observed destination state remains empty; it was not
+re-queried during this documentation task. The next real decision is permission
+to add the two SDK clients solely to the optional tool and implement the revised
+split, together with fresh integration/transfer authorization before execution.
+The spent five-run allowance and single retry are not renewed by plan approval.
+
 ### Authorized retry stopped; transport decision required (2026-11-05 UTC)
 
 The single authorized corrected retry, [run 41941983320](https://github.com/memphis-iis/MoFaCTS/actions/runs/41941983320),

@@ -26,6 +26,21 @@ Phil approved the current GitHub configuration as the starting point. This
 establishes a new source baseline; no historical last-accepted configuration was located.
 Account recovery is accepted separately. This draft does not close Phase 0.
 
+## Optional operator integration
+
+Phil approved keeping AWS optional and separate from the application. The
+selected Secrets Manager destination belongs to this installation's recovery
+procedure; other MoFaCTS operators do not need an AWS account or this tool.
+The [revised separation plan](transport-decision.md#selected-separation-portable-bundle-optional-operator-tool)
+keeps the existing portable bundle/validation shared and puts AWS operations
+and their dependencies in an explicitly installed optional tool under
+`deploy/security-audit/recovery-transfer/aws/`. That directory/package is planned,
+not yet implemented. No new AWS clients go into the application manifest or
+lockfile, normal application CI or runtime. The prior application-development-
+dependency proposal is superseded. Existing optional S3 asset storage is outside
+this repair. The current runner remains inactive pending dependency approval and
+verification of the split.
+
 ## Proposed operation
 
 Transfer the nine existing `production-security-audit` secrets and its one
@@ -120,10 +135,13 @@ Sources: [GitHub OIDC and environment-subject rules](https://docs.github.com/en/
    logging is off. Install the reviewed draft at the exact workflow path named
    above, publish the intentional change, and dispatch once on that full main
    commit with verified account/role/secret coordinates. No schedule is added.
-4. The runner uses pinned Node 24.22.1, the existing lockfile/dependencies, and
-   existing AWS CLI v2. Dependency preparation occurs before secret bindings are
-   exposed to a step. No Tailscale connection, application login, scanner probe,
-   paid synthesis or Meteor invocation is part of the transfer workflow.
+4. The revised runner will use pinned Node 24.22.1 and the optional tool's
+   separately locked SDK dependencies, after approval and implementation. The
+   current inactive workflow still describes the retired CLI implementation;
+   update and verify it before activation. Dependency preparation occurs before
+   secret bindings are exposed to a step. No Tailscale connection, application
+   login, scanner probe, paid synthesis or Meteor invocation belongs in the
+   transfer workflow. Ordinary application setup never installs this tool.
 5. It validates all ten nonempty bindings, duplicate-free bounded fixture JSON,
    documented actors/probe groups/throttle identifiers/mailbox/canaries, basic
    LF-only OpenSSH framing (with or without a stored terminal LF) and the report's
