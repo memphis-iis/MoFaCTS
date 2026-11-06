@@ -1,6 +1,6 @@
 # Security Audit Durable Redesign Status
 
-Last baseline with passing CI, Security and image checks: `2dd0d7e779897df611529df463f90bbed9442706`.
+Last baseline with passing CI, Security and image checks: `5cc82b7bd6d6ab20eed9352e7d66b1398bb5061e`.
 Selected deployed staging2 application: `65875553c4f0fd37adfc407774bd4e7ff998ccfc`;
 auditor policy: `c7444b4e`. Their evidence and image identities remain separate.
 
@@ -17,10 +17,10 @@ cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
 **Current Meteor allowance:** one primary plus ten conditional invocations were
-authorized. Conditional slots 1-4 passed. Slot 5/10 is RESERVED before the approved
-receiver-identity publication; five conditional slots are unreserved. Its actual
-run/result will be recorded separately. This is the sole current counter. Dated
-checkpoints retain historical counts and never authorize a duplicate invocation.
+authorized. Conditional slots 1-5 passed their Meteor runs. Slot 5 ran once on
+receiver-identity commit 5cc82b7bd6d6ab20eed9352e7d66b1398bb5061e in CI 42150167781.
+Five conditional slots remain; none is reserved. CI, Security and image checks
+also passed. This is the sole current counter; dated checkpoints are historical.
 
 Completed entry prerequisites:
 
@@ -44,7 +44,7 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] One-time embedded identity reader and independent revision adapter pass local checks. New Meteor case, runtime composition and independent host/platform mapping remain open. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] One-time embedded identity reader and independent revision adapter pass local checks and actual Meteor parity (CI 42150167781). Runtime composition and independent host/platform mapping remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository finding-tier evaluator implemented/tested. V2 host and composite acquisition/evaluation are not implemented; active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
@@ -53,7 +53,7 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 26 new Node tests, four Meteor parity cases and two real-Mongo cases passed. Real endpoint/host and previous-image qualification remain pending. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 32 new Node tests, five Meteor parity cases and two real-Mongo cases passed. Real endpoint/host and previous-image qualification remain pending. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
 | P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
@@ -385,18 +385,20 @@ credential, collection, configuration name or external service is introduced.
   112 total, 105 passed, zero failed, seven Windows skips (including the new
   Linux-only link check). Full typecheck and final lint pass; surface count stays
   323 with no new registration.
-- [ ] Verify the new loader case in the supported Meteor runtime. It is added to
-  the existing server test module, not executed locally on Windows. Six conditional
-  Meteor invocations remain; none is reserved or consumed by this source work.
+- [x] Verify the new loader case in the supported Meteor runtime on committed
+  source 5cc82b7bd6d6ab20eed9352e7d66b1398bb5061e, CI 42150167781 attempt 1.
+  Exact registered-case ID ef34c996473c116ea13667fa3f185b53d78fdec4c8ee1e72da0aec7599a16d32
+  is PASSED in retained evidence, with its server module present. This is server
+  parity, not client execution or actual live receiver composition.
 - [ ] Wire identity acquisition into the actual V2 receiver at coordinated cutover
   and complete independent host/platform-image comparison. P1-04 stays open.
 
 Public guidance is updated. No user-facing UI, learner-data migration, TDF/config
 interface, existing permission or live security surface changed; canonical config
 and wiki paths remain verified. The eight unrelated changes are preserved. The
-new nine-file source/test/documentation batch is local pending publication approval;
-new Meteor verification requires that committed source in supported CI. Do not
-repeat the completed receiver storage CI or the one-use production metadata check.
+nine-file source/test/documentation batch was approved and published below; its
+new Meteor case passed in supported CI. Do not repeat the completed receiver
+storage CI or the one-use production metadata check.
 
 ### Receiver identity publication approved (2026-11-05)
 
@@ -406,6 +408,86 @@ before publication, leaving five unreserved. Supported CI will verify the new
 loader case; no result is presumed before it executes. Previous source checks,
 receiver-storage CI and production metadata observation are reused, not repeated.
 No retry, image publication, remote deployment or production access is implied.
+
+### Receiver identity CI/Meteor/image gate passed (2026-11-05 local)
+
+Approved commit `5cc82b7bd6d6ab20eed9352e7d66b1398bb5061e` was pushed on main.
+The pre-commit hooks passed and byte checks confirmed all nine reviewed files
+and eight unrelated files remained unchanged after the hooks.
+[Security 42150167666](https://github.com/memphis-iis/MoFaCTS/actions/runs/42150167666)
+and [CI 42150167781](https://github.com/memphis-iis/MoFaCTS/actions/runs/42150167781)
+both passed completely. No required check is waived. Meteor ran once from
+2026-11-06T02:30:32Z to 02:31:33Z (November 5 in the operator's local timezone).
+Server: 982 passed, 15 pending; client: 1,237 passed, seven pending; no failed
+tests or hooks. Conditional slot 5/10 is consumed; five remain.
+
+- [x] Download source artifact 13472207970 (178,120 bytes); validate its archive
+  SHA-256 `506b39034684a5ddd10255ae3040864a2a24da40556088e27877e6f126ec9c1b`
+  against GitHub metadata and extract exactly three bounded expected JSON files.
+- [x] Strictly parse and independently recompute Meteor/source/CI binding, module
+  inventory and the new exact registered case ID. Source snapshot:
+  `4f99269e096f34739729668011762a704f4e857443303be8e34c1a171f53b13f`;
+  retained Meteor evidence SHA-256:
+  `75bd267444e670c07f337f15a1447cc4d41fed9739444404b40ddbcb6cc352a2`.
+- [x] Complete the canonical Compose amd64 build, exact tested-source assertion,
+  ABI/runtime checks, standalone-Mongo rejection, replica-set startup smoke and
+  retained-source protection. All required steps passed.
+- [x] Verify image artifact 13472885897 (605 bytes), archive SHA-256
+  `08862549458e22b6fc595bfb4948ea4b7aa98dccdcb598f8297d70d23b631bf3`,
+  through the reviewed bounded image ZIP reader and strict observation parser.
+  Its source identity and exact Meteor evidence digest match the retained source
+  artifact above; CI commit/run/attempt also match. Linux/amd64 config:
+  `sha256:b0106cd92ef95e6434f26df90b2e1cb98a7db2d5819bd2bdf10619a8e22676f6`.
+  State remains observed-unqualified / ci-test-image; no registry publication or
+  deployment is claimed.
+- [x] Update the completed Meteor/image subitems and the sole current allowance
+  counter. The result-only completion/decision notes are part of the approved
+  batch and use [skip ci], consuming no additional integration invocation.
+
+Private completed receipt: `receiver-identity-ci-verification.json` under the
+existing native Phase 1 evidence directory (earlier Meteor-only receipt retained).
+This is CI-reported source binding, not independent workstation release
+qualification or staging deployment. Active V1 and the selected staging2
+image/policy remain unchanged. P1-04 stays open for live composition and host
+mapping; P1-16 stays open for actual previous-image qualification. Do not repeat
+completed storage/identity CI or production metadata acquisition without a new
+source change, failed check or distinct required acceptance boundary.
+
+### Decision P1-D3: conclusive UDP finding with missing host evidence
+
+OPEN reporting decision, reproduced with synthetic input while reviewing the
+next V2 producer work. This is not a newly detected public service or a real
+network probe. Do not repeat production access or change the active scanner.
+
+Existing `composite-exposure.mjs` preserves a confirmed external UDP FAIL even
+when host evidence is unavailable (the early FAIL return). Plan Section 6.4 says
+missing/conflicting composite inputs become ERROR. The unreleased V2
+`udp-exposure-v1` evidence validator currently requires every host metric even
+for FAIL; it cannot truthfully represent that independently conclusive external
+finding without host measurements. Filling missing counts/booleans with defaults
+would fabricate evidence and is forbidden.
+
+- [x] Reproduce both boundaries with the current functions and synthetic facts:
+  one confirmed external response plus missing host output remains FAIL in V1;
+  the same partial FAIL proof is rejected by V2, while evidence-incomplete ERROR
+  is accepted. Private witness: `composite-udp-policy-witness.json` beside the
+  existing Phase 1 receipts. No enduring test is added to require this conflict.
+- [ ] Obtain the reporting-policy choice before implementing the V2 composite.
+- [ ] Implement the selected evidence branch/evaluator and opposite regressions;
+  preserve ordinary no-response/absence checks' required host corroboration.
+
+Recommendation: preserve a confirmed external service response as HIGH FAIL,
+with missing host acquisition still reported by its own controls. Permit a
+strict positive-response proof branch for this one composite control; require
+complete external/host evidence before claiming absence/PASS. This is a narrow
+exception to the general missing-input rule, not permission to assume values,
+treat silence as closure, change network permissions or suppress other errors.
+
+Alternative: apply the plan's missing-input rule uniformly and report this
+composite as ERROR until host evidence is available, retaining the observed
+response only as bounded diagnostic text. That changes the existing confirmed
+finding into an incomplete-evidence outcome and needs an explicit acceptance.
+No contract, catalog, finding severity or active policy has been changed.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 
