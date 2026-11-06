@@ -17,10 +17,10 @@ cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
 **Current Meteor allowance:** one primary plus ten conditional invocations were
-authorized. Conditional slots 1-5 passed their Meteor runs. Slot 5 ran once on
-receiver-identity commit 5cc82b7bd6d6ab20eed9352e7d66b1398bb5061e in CI 42150167781.
-Five conditional slots remain; none is reserved. CI, Security and image checks
-also passed. This is the sole current counter; dated checkpoints are historical.
+authorized. Conditional slots 1-5 passed. Slot 6/10 is RESERVED before the approved
+UDP-composite publication, leaving four conditional slots unreserved. Actual
+invocation/result will be recorded separately. This is the sole current counter;
+dated checkpoints are historical and never authorize a duplicate invocation.
 
 Completed entry prerequisites:
 
@@ -46,14 +46,14 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
 | P1-04 | Integrated build identity/host-release comparison | [ ] One-time embedded identity reader and independent revision adapter pass local checks and actual Meteor parity (CI 42150167781). Runtime composition and independent host/platform mapping remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
-| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository finding-tier evaluator implemented/tested. V2 host and composite acquisition/evaluation are not implemented; active V1 remains unchanged. |
+| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository tier evaluator and V2 UDP composite implemented/tested locally. Host envelope/internal evaluator and actual composite acquisition remain open; UDP shared-runtime verification is pending. Active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
 | P1-09 | Summary projections, indexes and read-time integrity | [ ] Inert helpers, Node tests and both real-Mongo cases pass (CI 42120224260). Chosen collection binding and old-image qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 32 new Node tests, five Meteor parity cases and two real-Mongo cases passed. Real endpoint/host and previous-image qualification remain pending. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Prior 32 Node and existing Meteor evidence retained; seven new UDP Node cases pass locally. New UDP Meteor case and extended Mongo fixture await CI. Real endpoint/host and previous-image gates remain open. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
 | P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
@@ -453,16 +453,16 @@ mapping; P1-16 stays open for actual previous-image qualification. Do not repeat
 completed storage/identity CI or production metadata acquisition without a new
 source change, failed check or distinct required acceptance boundary.
 
-### Decision P1-D3: conclusive UDP finding with missing host evidence
+### Decision P1-D3: conclusive UDP finding preserved (approved 2026-11-05)
 
-OPEN reporting decision, reproduced with synthetic input while reviewing the
+APPROVED reporting decision, initially reproduced with synthetic input while reviewing the
 next V2 producer work. This is not a newly detected public service or a real
 network probe. Do not repeat production access or change the active scanner.
 
 Existing `composite-exposure.mjs` preserves a confirmed external UDP FAIL even
 when host evidence is unavailable (the early FAIL return). Plan Section 6.4 says
 missing/conflicting composite inputs become ERROR. The unreleased V2
-`udp-exposure-v1` evidence validator currently requires every host metric even
+`udp-exposure-v1` evidence validator at that checkpoint required every host metric even
 for FAIL; it cannot truthfully represent that independently conclusive external
 finding without host measurements. Filling missing counts/booleans with defaults
 would fabricate evidence and is forbidden.
@@ -472,22 +472,81 @@ would fabricate evidence and is forbidden.
   the same partial FAIL proof is rejected by V2, while evidence-incomplete ERROR
   is accepted. Private witness: `composite-udp-policy-witness.json` beside the
   existing Phase 1 receipts. No enduring test is added to require this conflict.
-- [ ] Obtain the reporting-policy choice before implementing the V2 composite.
-- [ ] Implement the selected evidence branch/evaluator and opposite regressions;
-  preserve ordinary no-response/absence checks' required host corroboration.
+- [x] Obtain the reporting-policy choice: Phil selected preserving the confirmed
+  failure, with missing host evidence reported separately.
+- [x] Implement the strict positive-only proof branch, inert composite evaluator
+  and seven behavioral/mutation regressions. Preserve complete evidence for PASS.
+- [ ] Verify the new shared-parser Meteor case and extended real-Mongo fixture in
+  supported CI; local typecheck/lint and Node checks do not complete this gate.
+- [ ] Connect actual external/host acquisition and qualify the composite remotely
+  during the coordinated V2 cutover.
 
-Recommendation: preserve a confirmed external service response as HIGH FAIL,
+Approved selection: preserve a confirmed external service response as HIGH FAIL,
 with missing host acquisition still reported by its own controls. Permit a
 strict positive-response proof branch for this one composite control; require
 complete external/host evidence before claiming absence/PASS. This is a narrow
 exception to the general missing-input rule, not permission to assume values,
 treat silence as closure, change network permissions or suppress other errors.
 
-Alternative: apply the plan's missing-input rule uniformly and report this
+Rejected alternative: apply the plan's missing-input rule uniformly and report this
 composite as ERROR until host evidence is available, retaining the observed
 response only as bounded diagnostic text. That changes the existing confirmed
 finding into an incomplete-evidence outcome and needs an explicit acceptance.
-No contract, catalog, finding severity or active policy has been changed.
+Only the unreleased V2 evidence validator and inert evaluator change in the source
+checkpoint below. Catalog bytes/IDs/digest/fixed severity and active V1 policy
+remain unchanged; released contracts retain the append-only rule.
+
+### UDP composite local source checkpoint (2026-11-05)
+
+This implements the accepted narrow P1-D3 reporting exception under P1-06.
+It does not activate a scanner, change firewall rules or claim remote exposure.
+
+- [x] Reuse existing external-count and host-policy field names. Add closed
+  three-count positive FAIL evidence alongside the complete eight-field proof;
+  no new field, setting, control ID or catalog digest is introduced. Only a
+  validated positive response admits the shorter shape. Missing or malformed
+  host data is never represented as zero/false or used to claim PASS.
+- [x] Reject impossible/coerced/extra measurements, partial host proof and
+  contradictory status claims. Complete PASS requires expected external coverage,
+  zero selected positive responses and the complete safe host policy. The shared
+  numeric/boolean validator is reused rather than copied for this branch.
+- [x] Implement the inert composite producer in
+  `scripts/security-audit/composite/udpExposure.mjs`. It consumes bounded raw
+  acquisition measurements, not V1 evaluated control statuses, and validates its
+  final artifact against the catalog. Missing/malformed nonconclusive inputs
+  become categorized ERROR at this owning evaluator; other producers remain intact.
+  Actual acquisition must establish a unique selected endpoint inventory before
+  supplying counts. Host envelope/version and acquisition wiring remain open.
+- [x] Seven UDP tests pass on pinned Windows and Linux Node 24.22.1. They cover
+  the decision table, malformed/contradictory proofs, exact full/exposure assembly,
+  HIGH failure plus all host ERRORs, signed ingestion/forged PASS rejection and
+  JSON/HTML byte integrity. Full source suite: 119 total, 112 passed, zero failed,
+  seven Windows platform skips. Full app typecheck and lint pass; 323 surfaces.
+  Initial new-test import naming error was corrected before these final checks.
+- [x] Add the new shared-contract Meteor case and extend the existing nonce-index
+  Mongo fixture to round-trip this mixed report and read its projected HIGH/error
+  counts. This is source coverage only; neither revised case has run in Meteor.
+- [ ] Complete supported Meteor verification before claiming runtime parity of
+  the new proof branch or Mongo fixture. Five project invocations remain, with
+  none reserved/consumed in this batch. Publication needs its explicit approval.
+- [x] Update the controlling plan and public operator guidance. Canonical config
+  and wiki searches found no dependent UDP contract/metric references. No UI,
+  learner-data migration, provider credential, dependency or live surface changed.
+
+The intentional nine-file batch is local and uncommitted. All eight unrelated
+working-tree changes remain preserved. Prior receiver/storage/source identity
+receipts remain valid for their exact earlier commits and are not repeated or
+silently treated as verification of this changed contract. P1-06/P1-13 and the
+remote runtime/cutover/storage qualification gates remain open.
+
+### UDP composite publication approved (2026-11-05)
+
+Phil approved committing/pushing the reviewed nine-file UDP batch and using one
+of five already-authorized Meteor invocations. Slot 6/10 is reserved before
+publication, leaving four unreserved. The new proof case and extended Mongo
+fixture require actual outcomes on the published source. No retry, registry
+publication, remote deployment or production access is implied. Earlier exact
+receipts remain retained rather than being rerun as this changed source's proof.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 

@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { Mongo } from 'meteor/mongo';
 import { auditDigest } from '../../common/securityAudit/canonicalReport.ts';
 import { AUDIT_SECTION_IDS } from '../../common/securityAudit/catalogRegistry.ts';
+import type { SecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
 import { canonicalJson, parseSecurityAuditReport } from '../../common/securityAuditReport';
 import membership from '../../scripts/security-audit/tests/fixtures/v1-membership.json' with { type: 'json' };
 import { errorReport, ingestionContext } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
@@ -17,9 +18,17 @@ const missing = { state: 'unavailable', reason: 'not-provided' } as const;
 const context = { ...ingestionContext, purpose: 'ingestion' as const, receiverRevision: missing, receiverImage: missing };
 let sequence = 0;
 async function fixture() {
-  const report = await errorReport();
+  const report: SecurityAuditReportV2 = await errorReport();
   report.reportId = `synthetic-mongo-v2-${++sequence}`;
   fixtureIds.push(report.reportId);
+  // Preserve a real finding with unavailable host evidence through the actual
+  // collection, projected summary and read-time validation; never add host facts.
+  const udp = report.sections.external.controls.find(row => row.controlId === 'external.public-udp-ports');
+  if (!udp) throw new Error('Missing synthetic UDP control');
+  udp.status = 'FAIL';
+  udp.evidence = { summary: 'A synthetic public UDP service response was confirmed.',
+    metrics: { observedResultCount: 1, expectedResultCount: 7, openSelectedUdpPortCount: 1 } };
+  report.counts.error--; report.counts.fail++; report.counts.high++;
   const { digestSha256: _old, ...payload } = report;
   report.digestSha256 = await auditDigest(payload);
   return report;
@@ -36,6 +45,10 @@ describe('V2 audit real Mongo storage contracts', function() {
     const first = await fixture();
     await store.store(first, 'synthetic-mongo-nonce-0001', context);
     expect(await store.get(first.reportId)).to.deep.equal(first);
+    const listed = (await store.list()).reports.find(row => row.reportId === first.reportId);
+    expect(listed?.counts.high).to.equal(1);
+    expect(listed?.counts.error).to.equal(69);
+    expect(listed?.sectionStatuses.internal).to.equal('ERROR');
     const second = await fixture();
     let rejected = false;
     try { await store.store(second, 'synthetic-mongo-nonce-0001', context); }

@@ -3,11 +3,24 @@ import fixture from './catalogs/control-catalog.v1.json' with { type: 'json' };
 import { ACTIVE_AUDIT_CATALOG, AUDIT_SECTION_IDS, profileControls, readAuditCatalog } from './catalogRegistry.ts';
 import { auditDigest } from './canonicalReport.ts';
 import { parseAuditProducerArtifact } from './producerArtifact.ts';
+import { parseAuditEvidence } from './evidenceContracts.ts';
 import { auditSectionStatus, finalizeAuditReport, parseSecurityAuditReportV2, type AuditReportSection } from './reportV2.ts';
 
 // Supported Meteor test discovery must exercise the exact Node-imported modules.
 // This test does not register a method/route or activate V2 report ingestion.
 describe('V2 catalog shared Node/Meteor parity', function() {
+  it('preserves confirmed UDP failure without inventing host measurements', async function() {
+    const catalog = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
+    const evidence = { summary: 'A synthetic public UDP service response was confirmed.',
+      metrics: { observedResultCount: 1, expectedResultCount: 7, openSelectedUdpPortCount: 1 } };
+    const artifact = parseAuditProducerArtifact({ artifactSchema: 'MoFaCTSSecurityAuditProducerArtifactV1',
+      producerId: 'composite-exposure', sectionId: 'external', controls: [{ controlId: 'external.public-udp-ports', status: 'FAIL', evidence }] },
+    catalog, 'full', 'composite-exposure');
+    expect(artifact.controls[0]!.evidence).to.deep.equal(evidence);
+    expect(() => parseAuditEvidence('udp-exposure-v1', 'PASS', evidence)).to.throw();
+    expect(() => parseAuditEvidence('udp-exposure-v1', 'FAIL', { ...evidence,
+      metrics: { ...evidence.metrics, openSelectedUdpPortCount: 0 } })).to.throw();
+  });
   it('loads JSON import attributes and matches the fixed catalog digest', async function() {
     const catalog = await readAuditCatalog(ACTIVE_AUDIT_CATALOG, 'ingestion');
     expect(await auditDigest(fixture)).to.equal('6a9cd0c985bdec14b0d78d2b731975005ed8cd69e76bb7597c8ada2564ba688d');

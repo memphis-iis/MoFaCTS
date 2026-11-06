@@ -242,3 +242,20 @@ live route is added. Runtime composition and independent host/platform-image
 comparison remain cutover work. Node tests cover acquisition and contradictory
 signed revision claims; supported Meteor must verify the new loader case before
 this source checkpoint is considered runtime-verified.
+
+The unreleased V2 UDP composite preserves a confirmed external service response
+as a HIGH failure even if host acquisition is unavailable. Its positive-only
+proof contains exactly the observed/expected/open external counts, with no
+invented host values. Missing host evidence remains visible in the independently
+owned host controls. PASS requires complete external coverage and all five host
+policy measurements; silence alone cannot establish it. The shared validator
+rejects contradictory counts, partial host facts and forged status claims.
+
+This is the approved narrow exception to missing-input composite ERROR handling.
+The candidate catalog membership, fixed severity and digest remain unchanged;
+its evidence validator is still unreleased. Released catalog/evidence contracts
+remain append-only. The pure evaluator is not connected to the scheduled V1
+scanner: external/host acquisition adapters, forced-command qualification and
+coordinated cutover remain required. Node tests cover signed ingestion and
+JSON/HTML integrity; the new Meteor proof case and extended real-Mongo fixture
+need supported CI before this checkpoint is runtime-verified.

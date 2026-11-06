@@ -17,12 +17,16 @@ export type AuditEvidence = {
 // Released entries are append-only. These are proof-shape requirements, not
 // acquisition or a claim that the producer classified the observations correctly.
 type Field = 'count' | 'number' | 'boolean';
+const udpExternalFields = { observedResultCount: 'count', expectedResultCount: 'count', openSelectedUdpPortCount: 'count' } as const;
+const udpHostFields = { unexpectedUdpListenerCount: 'count', unexpectedUdpAllowRuleCount: 'count', unexpectedUdpPublicationCount: 'count', firewallActive: 'boolean', defaultDenyInbound: 'boolean' } as const;
+export type UdpExternalMeasurements = { observedResultCount: number; expectedResultCount: number; openSelectedUdpPortCount: number };
+export type UdpHostMeasurements = { unexpectedUdpListenerCount: number; unexpectedUdpAllowRuleCount: number; unexpectedUdpPublicationCount: number; firewallActive: boolean; defaultDenyInbound: boolean };
 const contracts: Readonly<Record<string, Readonly<Record<string, Field>>>> = {
   'address-inventory-v1': { addressCount: 'count' },
   'finding-inventory-v1': { evaluatedCount: 'count', findingCount: 'count' },
   'image-findings-v1': { evaluatedCount: 'count', findingCount: 'count' },
   'tcp-policy-v1': { addressCount: 'count', testedEndpointCount: 'count', unexpectedPortCount: 'count', missingRequiredPortCount: 'count' },
-  'udp-exposure-v1': { observedResultCount: 'count', expectedResultCount: 'count', openSelectedUdpPortCount: 'count', unexpectedUdpListenerCount: 'count', unexpectedUdpAllowRuleCount: 'count', unexpectedUdpPublicationCount: 'count', firewallActive: 'boolean', defaultDenyInbound: 'boolean' },
+  'udp-exposure-v1': { ...udpExternalFields, ...udpHostFields },
   'http-redirect-v1': { testedPathCount: 'count', passingPathCount: 'count' },
   'tls-protocols-v1': { addressCount: 'count', testedProtocolCount: 'count', acceptedLegacyCount: 'count', rejectedModernCount: 'count' },
   'certificate-policy-v1': { addressCount: 'count', validatedCertificateCount: 'count', minimumValidityDays: 'number' },
@@ -50,6 +54,62 @@ export const AUDIT_EVIDENCE_CONTRACT_IDS = Object.freeze(Object.keys(contracts))
 export function hasEvidenceContract(id: string): boolean { return Object.hasOwn(contracts, id); }
 export function evidenceRequiresDeployedIdentity(id: string): boolean { return id === 'image-findings-v1'; }
 
+function auditMeasurements(value: unknown, fields: Readonly<Record<string, Field>>): Record<string, number | boolean> {
+  const raw = proofRecord(value, Object.keys(fields));
+  const metrics: Record<string, number | boolean> = {};
+  for (const [key, kind] of Object.entries(fields)) {
+    const metric = raw[key];
+    if (kind === 'boolean') {
+      if (typeof metric !== 'boolean') throw new Error('Invalid audit observation');
+      metrics[key] = metric;
+    } else {
+      if (typeof metric !== 'number' || !Number.isFinite(metric) || Math.abs(metric) > 1e12
+        || (kind === 'count' && (!Number.isSafeInteger(metric) || metric < 0))) throw new Error('Invalid audit measurement');
+      metrics[key] = metric;
+    }
+  }
+  return metrics;
+}
+
+// Bounded transient acquisition inputs, not V1 evaluated controls. Acquisition
+// must establish the unique selected endpoint inventory before deriving counts.
+export function parseUdpExternalMeasurements(value: unknown): UdpExternalMeasurements {
+  const metrics = auditMeasurements(value, udpExternalFields) as UdpExternalMeasurements;
+  if (metrics.expectedResultCount < 1 || metrics.observedResultCount > metrics.expectedResultCount
+    || metrics.openSelectedUdpPortCount > metrics.observedResultCount) throw new Error('Contradictory UDP measurements');
+  return metrics;
+}
+
+export function parseUdpHostMeasurements(value: unknown): UdpHostMeasurements {
+  return auditMeasurements(value, udpHostFields) as UdpHostMeasurements;
+}
+
+export function udpHostPolicySatisfied(metrics: UdpHostMeasurements): boolean {
+  return metrics.unexpectedUdpListenerCount === 0 && metrics.unexpectedUdpAllowRuleCount === 0
+    && metrics.unexpectedUdpPublicationCount === 0 && metrics.firewallActive && metrics.defaultDenyInbound;
+}
+
+function udpEvidenceMeasurements(status: AuditControlStatus, value: unknown): Record<string, number | boolean> {
+  // Approved P1-D3 exception in the unreleased candidate contract: a positive
+  // response is conclusive without host facts. Only its three real counts are
+  // retained; absent host values are never invented or made optional for PASS.
+  const positiveOnly = Boolean(value && typeof value === 'object' && Object.keys(value).length === 3);
+  const metrics = auditMeasurements(value, positiveOnly ? udpExternalFields : contracts['udp-exposure-v1']!);
+  const external = parseUdpExternalMeasurements(Object.fromEntries(Object.keys(udpExternalFields).map(key => [key, metrics[key]])));
+  if (positiveOnly) {
+    if (status !== 'FAIL' || external.openSelectedUdpPortCount < 1) throw new Error('UDP positive proof requires a confirmed failure');
+  } else {
+    const host = parseUdpHostMeasurements(Object.fromEntries(Object.keys(udpHostFields).map(key => [key, metrics[key]])));
+    if (external.openSelectedUdpPortCount > 0) {
+      if (status !== 'FAIL') throw new Error('Confirmed public UDP response cannot pass');
+    } else if (external.observedResultCount !== external.expectedResultCount
+      || status !== (udpHostPolicySatisfied(host) ? 'PASS' : 'FAIL')) {
+      throw new Error('UDP evidence cannot establish the claimed status');
+    }
+  }
+  return metrics;
+}
+
 export function auditText(value: unknown, limit: number): string {
   if (typeof value !== 'string' || value.length < 1 || value.length > limit
     || [...value].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
@@ -73,19 +133,7 @@ export function parseAuditEvidence(id: string, status: AuditControlStatus, value
   if (status !== 'PASS' && status !== 'FAIL') throw new Error('Invalid included-control status');
   const hasObservations = Boolean(value && typeof value === 'object' && Object.hasOwn(value, 'observations'));
   const record = proofRecord(value, hasObservations ? ['summary', 'metrics', 'observations'] : ['summary', 'metrics']);
-  const rawMetrics = proofRecord(record.metrics, Object.keys(fields));
-  const metrics: Record<string, number | boolean> = {};
-  for (const [key, kind] of Object.entries(fields)) {
-    const metric = rawMetrics[key];
-    if (kind === 'boolean') {
-      if (typeof metric !== 'boolean') throw new Error('Invalid audit observation');
-      metrics[key] = metric;
-    } else {
-      if (typeof metric !== 'number' || !Number.isFinite(metric) || Math.abs(metric) > 1e12
-        || (kind === 'count' && (!Number.isSafeInteger(metric) || metric < 0))) throw new Error('Invalid audit measurement');
-      metrics[key] = metric;
-    }
-  }
+  const metrics = id === 'udp-exposure-v1' ? udpEvidenceMeasurements(status, record.metrics) : auditMeasurements(record.metrics, fields);
   const result: AuditEvidence = { summary: auditText(record.summary, 500), metrics };
   if ((id === 'finding-inventory-v1' || id === 'image-findings-v1')
     && (Number(metrics.findingCount) > Number(metrics.evaluatedCount)
