@@ -17,10 +17,10 @@ cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
 **Current Meteor allowance:** one primary plus ten conditional invocations were
-authorized. Conditional slots 1-4 passed. Slot 4 ran once in CI 42120224260 on
-receiver commit 2dd0d7e779897df611529df463f90bbed9442706. Six conditional slots
-remain; none is reserved. This is the sole current counter. Dated checkpoints
-retain their historical counts and never authorize a duplicate invocation.
+authorized. Conditional slots 1-4 passed. Slot 5/10 is RESERVED before the approved
+receiver-identity publication; five conditional slots are unreserved. Its actual
+run/result will be recorded separately. This is the sole current counter. Dated
+checkpoints retain historical counts and never authorize a duplicate invocation.
 
 Completed entry prerequisites:
 
@@ -44,7 +44,7 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Existing Phase 0 components retained; Phase 1 receiver wiring not implemented. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] One-time embedded identity reader and independent revision adapter pass local checks. New Meteor case, runtime composition and independent host/platform mapping remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository finding-tier evaluator implemented/tested. V2 host and composite acquisition/evaluation are not implemented; active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
@@ -333,22 +333,79 @@ independent workstation release qualification. The eight unrelated working-tree
 changes remain preserved. No user-facing UI, TDF/config schema or learner-data
 migration changed, so no dependent config/wiki interface update is required.
 
-### Decision P1-D2: select the rollback-test baseline
+### Decision P1-D2: rollback-test baseline selected (approved 2026-11-05)
 
-OPEN: plan Section 6.6 requires the actual previous production image from its
+RESOLVED selection: plan Section 6.6 requires the actual previous production image from its
 authoritative release owner. The running production image is the later
 `18677291993b` release, while the canonical local release record describes
 `bddd0895fad5`. Both immutable registry references are available. Neither a
 label nor availability fills the later release's missing build/acceptance record.
 
-Recommendation for Phil's review: use the currently running `18677291993b`
-image as the isolated compatibility-test baseline, preserving the older release
-record and explicitly retaining unknown build cleanliness, acceptance and deployment
-time as unknown. This is a test-target selection, not release qualification,
-a production deployment or permission for additional production access. The
-alternative is to reconcile deployment history before selecting the baseline.
-No image pull/run or previous-image compatibility claim has occurred. P1-16 and
-the delegated storage-model decision remain open until actual qualification.
+Phil selected the image observed running in the approved 2026-11-05 production
+metadata check as the isolated compatibility-test baseline. Preserve that frozen
+observation and the older release record; retain unknown build cleanliness,
+acceptance and deployment time as unknown. No further production query is needed
+to repeat this selection. Exact selected Linux/amd64 platform reference:
+`ppavlikmemphis/mofacts-mini@sha256:f8784b4afe9a4875fd62c5ccb153bab26796381548d47ded54d9a65d5148cc05`.
+Its registry manifest identifies config
+`sha256:214793c9cf7534eb4568934fc83843328b202a23b99d108fc323ead2ceafb697`;
+this is distinct from the index/native engine reference recorded above.
+
+- [x] Select the immutable observed-production baseline with explicit owner approval.
+- [ ] Pull/run it in the disposable harness and establish actual V1 behavior.
+- [ ] Complete candidate/previous-image/candidate storage qualification.
+
+This selects a test target, not release qualification, a production deployment
+or permission for additional production access. No image pull/run or previous-image
+compatibility claim has occurred. P1-16 and the delegated storage-model decision
+remain open until actual qualification.
+
+### Receiver embedded identity source checkpoint (2026-11-05)
+
+Continued P1-04 source work under inert V2 development. Existing V1 workflow,
+route and receiver composition remain unchanged; no additional permission,
+credential, collection, configuration name or external service is introduced.
+
+- [x] Reuse the existing Docker source-observation file and BuildIdentityV1 shape;
+  add a shared reader for its exact envelope. Preserve dirty-source provenance
+  and the snapshot binding without promoting unqualified source to release PASS.
+- [x] Implement a bounded 8 KiB regular-file reader with opened-file comparison,
+  Linux no-follow/nonblocking acquisition, strict UTF-8, and closed-key metadata
+  validation. No environment/request path override or Docker/host-receipt access.
+- [x] Cache one observation, including missing/malformed/unreadable results, under
+  concurrent calls. Return isolated copies so a caller cannot mutate the cache.
+  Errors remain bounded unavailable observations; no startup hook is registered.
+- [x] Derive only the application base revision for independent V2 comparison.
+  A signed contradictory revision is rejected; a complete missing-proof ERROR
+  report remains recordable. This reader supplies no platform-image claim.
+- [x] Six Node cases pass on pinned Linux Node 24.22.1, including actual symlink,
+  hard-link, directory/size bounds and cache behavior. The existing image writer
+  output is checked against the shared reader. All 57 affected source-capture
+  and release-identity regression cases pass locally. Full source-security suite:
+  112 total, 105 passed, zero failed, seven Windows skips (including the new
+  Linux-only link check). Full typecheck and final lint pass; surface count stays
+  323 with no new registration.
+- [ ] Verify the new loader case in the supported Meteor runtime. It is added to
+  the existing server test module, not executed locally on Windows. Six conditional
+  Meteor invocations remain; none is reserved or consumed by this source work.
+- [ ] Wire identity acquisition into the actual V2 receiver at coordinated cutover
+  and complete independent host/platform-image comparison. P1-04 stays open.
+
+Public guidance is updated. No user-facing UI, learner-data migration, TDF/config
+interface, existing permission or live security surface changed; canonical config
+and wiki paths remain verified. The eight unrelated changes are preserved. The
+new nine-file source/test/documentation batch is local pending publication approval;
+new Meteor verification requires that committed source in supported CI. Do not
+repeat the completed receiver storage CI or the one-use production metadata check.
+
+### Receiver identity publication approved (2026-11-05)
+
+Phil approved committing/pushing the reviewed nine-file batch and using one of
+six already-authorized conditional Meteor invocations. Slot 5/10 is reserved
+before publication, leaving five unreserved. Supported CI will verify the new
+loader case; no result is presumed before it executes. Previous source checks,
+receiver-storage CI and production metadata observation are reused, not repeated.
+No retry, image publication, remote deployment or production access is implied.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 

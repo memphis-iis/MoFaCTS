@@ -4,6 +4,7 @@ import './tests/assemblyV2.test.mjs';
 import './tests/reportV2.test.mjs';
 import './tests/ingestionV2.test.mjs';
 import './tests/reportStorageV2.test.mjs';
+import './tests/receiverIdentity.test.mjs';
 import './tests/checkCiDependencies.test.mjs';
 import './tests/hostMongoRoles.test.mjs';
 import './tests/hostSidecarPolicy.test.mjs';

@@ -230,3 +230,15 @@ collection. Node storage tests use synthetic records; supported Meteor adds a
 fresh test-owned Mongo collection for unique-nonce and retained-V1 checks. A
 previous-image compatibility run is still required before the storage/cutover
 choice is accepted. These tests do not authorize production access or deployment.
+
+The inert receiver identity loader reads the existing image-owned
+`/opt/mofacts-source-observation.json` once, with an 8 KiB limit, regular-file and
+opened-file checks, strict UTF-8, and the shared build-identity validator. Missing
+or malformed metadata produces a cached unavailable observation rather than a
+startup failure. It preserves the exact snapshot and dirty-source distinction;
+it does not infer image identity from a tag, configuration digest or scanner
+revision. No path setting, host-receipt access, Docker socket, startup hook or
+live route is added. Runtime composition and independent host/platform-image
+comparison remain cutover work. Node tests cover acquisition and contradictory
+signed revision claims; supported Meteor must verify the new loader case before
+this source checkpoint is considered runtime-verified.

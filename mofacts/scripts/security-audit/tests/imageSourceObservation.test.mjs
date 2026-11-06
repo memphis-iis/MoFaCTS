@@ -6,6 +6,7 @@ import test from 'node:test';
 import { observeImageSource, writeImageSourceObservation } from '../qualification/imageSourceObservation.mjs';
 import { inspectSnapshotTree } from '../qualification/sourceSnapshot.mjs';
 import { contextOverride, assertSourceBoundBuildChange } from '../qualification/captureBuildSource.mjs';
+import { observeEmbeddedBuildIdentity } from '../../../common/securityAudit/buildIdentity.ts';
 
 async function fixture(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mofacts-image-observation-test-'));
@@ -31,6 +32,7 @@ test('binds exact source bytes and explicit dirty provenance without claiming te
   assert.equal(result.identity.includedUncommittedLocalChanges, true);
   assert.equal(result.identity.sourceSnapshotDigestSha256, digest);
   assert.deepEqual(JSON.parse(await fs.readFile(output)), result);
+  assert.deepEqual(observeEmbeddedBuildIdentity(result), { state: 'observed', identity: result.identity });
 });
 test('changed recipe bytes, removed directories and malformed provenance fail without output', async (t) => {
   const { root, output, digest } = await fixture(t);

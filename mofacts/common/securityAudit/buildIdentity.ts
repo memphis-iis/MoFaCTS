@@ -36,3 +36,27 @@ export function observeBuildIdentity(value: unknown): BuildIdentityObservation {
     return { state: 'unavailable', reason: 'malformed' };
   }
 }
+
+// The existing Docker source-observation carrier. A matched source snapshot is
+// provenance, never a claim that tests, publication or deployment were accepted.
+export function observeEmbeddedBuildIdentity(value: unknown): BuildIdentityObservation {
+  if (value === undefined) return { state: 'unavailable', reason: 'not-provided' };
+  try {
+    if (!value || typeof value !== 'object') throw new Error('Invalid source observation');
+    const state = (value as Record<string, unknown>).state;
+    if (state === 'unavailable') {
+      const row = proofRecord(value, ['schema', 'state', 'reason']);
+      if (row.schema !== 'MoFaCTSImageSourceObservationV1' || row.reason !== 'not-requested') {
+        throw new Error('Invalid source observation');
+      }
+      return { state: 'unavailable', reason: 'not-provided' };
+    }
+    const row = proofRecord(value, ['schema', 'state', 'identity']);
+    if (row.schema !== 'MoFaCTSImageSourceObservationV1' || state !== 'source-matched-unqualified') {
+      throw new Error('Invalid source observation');
+    }
+    return { state: 'observed', identity: parseBuildIdentity(row.identity) };
+  } catch {
+    return { state: 'unavailable', reason: 'malformed' };
+  }
+}
