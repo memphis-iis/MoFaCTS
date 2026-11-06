@@ -259,3 +259,28 @@ scanner: external/host acquisition adapters, forced-command qualification and
 coordinated cutover remain required. Node tests cover signed ingestion and
 JSON/HTML integrity; the new Meteor proof case and extended real-Mongo fixture
 need supported CI before this checkpoint is runtime-verified.
+
+The host observation contract and Node evaluator are also inert V2 source.
+`common/securityAudit/catalogs/host-measurements.v1.json` is the single field,
+group, unavailable-reason and byte-limit descriptor for Node, Meteor and the
+future protected host emitter. The envelope carries its schema/digest, acquisition
+timestamp and every declared fact as either an observed scalar or an explicit
+unavailable category. It carries no control title, severity, profile or outcome.
+The installed emitter and its serialization still require Linux qualification;
+the descriptor digest identifies the wire contract, not trusted running code.
+
+Valid current envelopes are evaluated against closed, per-control sufficient
+failure proofs. A partial FAIL must identify every unavailable measurement in
+the existing bounded observations field. Unknown keys and omitted/spoofed markers
+are rejected. PASS needs complete safe facts; failed authenticated-connectivity
+probes alone cannot establish a vulnerability. Invalid or stale envelopes become
+the complete internal ERROR subset, while valid per-fact unavailability affects
+only its dependent controls. The UDP join revalidates the envelope independently.
+
+Transport callers must use the bounded canonical-byte parser before interpreting
+host output: it rejects duplicate keys, invalid UTF-8, extra documents and wrong
+contract versions. Acquisition is accepted within the existing 15-minute upload
+window and five-minute future-skew bound. No protected host command, installed
+file, live scanner, receiver route or startup requirement is changed by these
+helpers. New shared-runtime and real-Mongo tests still need supported CI before
+this source checkpoint is runtime-verified.

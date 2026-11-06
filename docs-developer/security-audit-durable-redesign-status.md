@@ -17,10 +17,10 @@ cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
 **Current Meteor allowance:** one primary plus ten conditional invocations were
-authorized. Conditional slots 1-6 passed their Meteor runs. Slot 6 ran once on
-UDP-composite commit 251022369812dd07417cc4d248e91a1c1f1d8b6a in CI 42154492028.
-Four conditional slots remain; none is reserved. CI, Security and image checks
-also passed. This is the sole current counter; dated checkpoints are historical.
+authorized. Conditional slots 1-6 passed. Slot 7/10 is RESERVED before the approved
+host-contract publication, leaving three conditional slots unreserved. Its actual
+invocation/result will be recorded separately. This is the sole current counter;
+dated checkpoints are historical and never authorize another invocation.
 
 Completed entry prerequisites:
 
@@ -46,14 +46,14 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
 | P1-04 | Integrated build identity/host-release comparison | [ ] One-time embedded identity reader and independent revision adapter pass local checks and actual Meteor parity (CI 42150167781). Runtime composition and independent host/platform mapping remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
-| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository tier evaluator and V2 UDP composite pass Node/shared Meteor checks. Host envelope/internal evaluator and actual acquisition remain open, including P1-D4 reporting choice. Active V1 remains unchanged. |
+| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository/UDP evidence retained. Versioned host descriptor/parser, closed host proofs and internal evaluator pass local Node checks; new Meteor/Mongo cases and actual host acquisition remain open. P1-D4 is approved. Active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
-| P1-09 | Summary projections, indexes and read-time integrity | [ ] Inert helpers, Node tests and extended real-Mongo cases pass (CI 42154492028), including HIGH findings with missing-host errors. Chosen collection binding and old-image qualification remain pending. |
+| P1-09 | Summary projections, indexes and read-time integrity | [ ] Prior storage/Mongo evidence retained (CI 42154492028). New partial-host CRITICAL fixture awaits supported CI; chosen collection binding and old-image qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] 39 new Node tests, six Meteor parity cases and two real-Mongo cases pass, including the new UDP branch and extended stored fixture (CI 42154492028). Real endpoint/host and previous-image gates remain open. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Prior 39 Node/six Meteor cases and Mongo evidence retained. Eleven new host Node cases pass locally; two new shared-runtime cases and extended Mongo fixture await CI. Endpoint/host and previous-image gates remain open. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
 | P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
@@ -596,12 +596,12 @@ working-tree changes remain preserved. P1-06/P1-13 and remote/cutover gates rema
 open for the host rewrite, acquisition and actual deployed acceptance; completed
 source, shared-runtime and Mongo checks are not reopened by those distinct gates.
 
-### Decision P1-D4: one reporting rule for remaining host partial evidence
+### Decision P1-D4: remaining-host reporting rule approved (2026-11-05)
 
-OPEN broader reporting choice, found during preparation for the versioned host
+APPROVED broader reporting choice, found during preparation for the versioned host
 observations/internal evaluator. P1-D3 explicitly selected a narrow UDP exception;
-this proposal does not silently extend that contract decision to other checks.
-No host adapter, host policy, catalog or permission has changed in this review.
+Phil explicitly extended the rule to the remaining host checks. The source
+checkpoint below implements it; no host command or permission is changed.
 
 Two concrete current-source witnesses reproduce the same underlying conflict:
 
@@ -615,14 +615,17 @@ Two concrete current-source witnesses reproduce the same underlying conflict:
   failure severities and V2 partial-proof rejection using the shared parser.
   Private receipt: `host-partial-proof-policy-witness.json`. The full host script,
   Docker, SSH, databases and network probes were never invoked by this diagnostic.
-- [ ] Approve one remaining-host reporting rule before designing their observation
-  envelopes and conclusive-failure proof branches. This avoids one policy question
-  for every host control; it is not another execution/publication permission.
-- [ ] Implement closed per-control proof variants, preserve unavailable probe states
-  and add regressions under the chosen policy. Actual host transport/installation
-  and forced-command qualification remain separately tracked.
+- [x] Approve one remaining-host reporting rule: Phil selected the recommended
+  conclusive-failure/complete-PASS/otherwise-ERROR policy across the host checks.
+  This closes the policy choice rather than reopening it per control.
+- [x] Implement the shared descriptor, typed unavailable observations, closed
+  per-control sufficient failure proofs, Node evaluator and local regressions.
+- [ ] Complete supported Meteor verification of the new shared contracts and
+  extended Mongo fixture; local checks do not complete that runtime gate.
+- [ ] Implement/qualify actual host acquisition, protected installation and
+  forced-command execution. These remain distinct unchecked requirements.
 
-Recommendation for the remaining host controls: preserve a conclusive violation
+Approved rule for the remaining host controls: preserve a conclusive violation
 of an existing catalog requirement as its fixed-severity FAIL even if other
 measurements are unavailable; require all applicable safe facts for PASS; use
 ERROR when no violation is established and required evidence is missing. Retain
@@ -633,11 +636,78 @@ control's existing claim; arbitrary partial evidence must still be rejected.
 No new control IDs, changed failure definitions/severities, application access,
 service-account permission, runtime dependency or automatic remediation is proposed.
 
-Alternative: preserve the full-facts requirement for remaining host controls and
+Rejected alternative: preserve the full-facts requirement for remaining host controls and
 record ERROR until every fact is available, even when one observation already
 proves the control failed. That changes the established Redis/Mongo failure
-classification illustrated above and needs explicit acceptance. No option has
-been selected, and P1-06 remains open.
+classification illustrated above. Phil selected the recommended rule instead.
+P1-06 remains open for runtime verification and actual host acquisition.
+
+### Host observation/closed-proof local source checkpoint (2026-11-05)
+
+Accepted P1-D4 is implemented as inert V2 source. It changes neither registered
+methods/routes nor the active V1 scanner or independently installed host command.
+The canonical catalog stays 70/23 controls with unchanged IDs, claims, severities
+and catalog digest. The host wire has its own independently checked version.
+
+- [x] Extract the ten existing host measurement schemas into one portable source
+  JSON descriptor. Node/Meteor proof validation and the future Bash emitter share
+  its fields, group bindings, unavailable reasons and 64 KiB envelope bound.
+  Listener inventory records separate standard/sensitive counts for one acquisition;
+  Node projects them into the existing fixed-impact controls. It is an intentional
+  acquisition/proof distinction, not duplicated control metadata.
+- [x] Implement strict current-schema/digest/freshness and all-group/all-fact
+  validation. Each fact is an observed count/boolean or a bounded unavailable
+  reason; no secret-bearing raw output or fallback value is accepted. Canonical
+  bytes plus at most one final LF reject duplicate/overwritten keys, invalid UTF-8,
+  BOM, extra documents and unbounded data. Reuse the existing 15-minute age and
+  five-minute future-skew limits. Initial descriptor golden SHA-256:
+  `a49086834e0b4fa32885aa43117a58ddf5b9bcfd73e3f61b3931bbba7a1bdf28`.
+- [x] Define explicit sufficient violation predicates for each host proof family.
+  PASS requires complete safe facts; failed authenticated-connectivity probes or
+  incomplete coverage do not become FAIL/PASS. A partial FAIL uses only actual
+  known measurements and must enumerate every missing measurement in bounded
+  observations. Unknown/prototype keys, contradictory values and missing/spoofed
+  markers fail validation. Released contracts remain append-only; these initial
+  V2 validators/host descriptor are still unreleased.
+- [x] Implement the pure internal evaluator. Missing/malformed/old/stale envelopes
+  become the complete owning internal ERROR subset. Valid per-fact unavailability
+  affects only dependent controls; conclusive Redis/Mongo failures survive. The
+  UDP join independently revalidates the envelope and never fills absent counts.
+  A descriptor digest proves wire identity, not installed-source/runtime trust.
+- [x] Eleven host regressions pass on pinned Windows/Linux Node 24.22.1. They cover
+  all proof families, malformed/partial inputs, exact profiles, fixed listener
+  tiers, host/composite binding, signed ingestion and JSON/HTML integrity. Current
+  source suite: 130 total, 123 passed, zero failed, seven Windows skips. Full app
+  typecheck/lint pass; 323 existing surfaces. An initial new TypeScript narrowing
+  error in the failure guard was corrected before the final successful checks.
+- [x] Add two real shared Node/Meteor test cases and extend the existing nonce/
+  storage/summary fixture with a partial-host CRITICAL finding beside the UDP
+  HIGH finding. These are source additions; their actual Meteor execution is pending.
+- [ ] Complete the supported Meteor gate on the committed source before using
+  these shared contracts for the protected host implementation. Four existing
+  project invocations remain; none is reserved or consumed by this source batch.
+- [ ] Implement/qualify the actual Bash acquisition/emitter, installed descriptor
+  and helper hashes, JQ/canonical serialization, independent identity/receipt join,
+  protected forced-command execution and coordinated V2 cutover. No host install,
+  SSH/Docker/database probe, new system dependency, registry push or deploy occurred.
+- [x] Update plan/public testing guidance and check canonical config/wiki for
+  dependent protocol/metric names. None were found; no TDF/account/learner-data
+  migration, configuration rename, application access or UI change is introduced.
+
+The intentional 14-file batch is local and uncommitted pending explicit publication
+approval; the shared-runtime and real-Mongo checks require supported CI. All eight
+unrelated working changes remain preserved. Existing Phase 0 and prior exact CI
+receipts remain retained; new contract verification is separate, not a reason to
+repeat production metadata, AWS recovery or previously completed qualification.
+
+### Host contract publication approved (2026-11-06)
+
+Phil approved committing/pushing the reviewed 14-file host contract/evaluator
+batch and using one of four existing Meteor invocations. Reserve conditional
+slot 7/10 before publication, leaving three unreserved. Supported CI must execute
+the two new shared-runtime cases and extended Mongo fixture on this exact source.
+No retry, dependency installation, protected-host operation, registry publication
+or deployment is implied. Older exact receipts are retained rather than rerun.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 

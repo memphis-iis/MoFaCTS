@@ -24,3 +24,24 @@ export function proofBoolean(value: unknown): boolean {
 export const sourceCommit = (value: unknown): string => proofString(value, /^[a-f0-9]{40}$/, 40);
 export const contentDigest = (value: unknown): string => proofString(value, /^[a-f0-9]{64}$/, 64);
 export const imageDigest = (value: unknown): string => proofString(value, /^sha256:[a-f0-9]{64}$/, 71);
+
+export type ProofMeasurementKind = 'count' | 'number' | 'boolean';
+export function proofMeasurements(value: unknown, fields: Readonly<Record<string, ProofMeasurementKind>>,
+  partial = false): Record<string, number | boolean> {
+  const names = partial && value && typeof value === 'object' ? Object.keys(value) : Object.keys(fields);
+  const raw = proofRecord(value, names);
+  const metrics: Record<string, number | boolean> = {};
+  for (const key of names) {
+    const kind = fields[key], metric = raw[key];
+    if (!Object.hasOwn(fields, key) || !['count', 'number', 'boolean'].includes(String(kind))) throw new Error('Unknown audit measurement');
+    if (kind === 'boolean') {
+      if (typeof metric !== 'boolean') throw new Error('Invalid audit observation');
+      metrics[key] = metric;
+    } else {
+      if (typeof metric !== 'number' || !Number.isFinite(metric) || Math.abs(metric) > 1e12
+        || (kind === 'count' && (!Number.isSafeInteger(metric) || metric < 0))) throw new Error('Invalid audit measurement');
+      metrics[key] = metric;
+    }
+  }
+  return metrics;
+}

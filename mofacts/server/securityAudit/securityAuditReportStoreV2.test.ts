@@ -4,6 +4,7 @@ import { Mongo } from 'meteor/mongo';
 import { auditDigest } from '../../common/securityAudit/canonicalReport.ts';
 import { AUDIT_SECTION_IDS } from '../../common/securityAudit/catalogRegistry.ts';
 import type { SecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
+import { hostUnavailableObservations } from '../../common/securityAudit/hostAuditPolicy.ts';
 import { canonicalJson, parseSecurityAuditReport } from '../../common/securityAuditReport';
 import membership from '../../scripts/security-audit/tests/fixtures/v1-membership.json' with { type: 'json' };
 import { errorReport, ingestionContext } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
@@ -29,6 +30,13 @@ async function fixture() {
   udp.evidence = { summary: 'A synthetic public UDP service response was confirmed.',
     metrics: { observedResultCount: 1, expectedResultCount: 7, openSelectedUdpPortCount: 1 } };
   report.counts.error--; report.counts.fail++; report.counts.high++;
+  const redis = report.sections.internal.controls.find(row => row.controlId === 'internal.redis-auth');
+  if (!redis) throw new Error('Missing synthetic Redis control');
+  const redisMetrics = { unauthenticatedCommandAccepted: true };
+  redis.status = 'FAIL';
+  redis.evidence = { summary: 'A synthetic unauthenticated Redis command was accepted.', metrics: redisMetrics,
+    observations: hostUnavailableObservations('redis-policy-v1', redisMetrics) };
+  report.counts.error--; report.counts.fail++; report.counts.critical++;
   const { digestSha256: _old, ...payload } = report;
   report.digestSha256 = await auditDigest(payload);
   return report;
@@ -47,7 +55,8 @@ describe('V2 audit real Mongo storage contracts', function() {
     expect(await store.get(first.reportId)).to.deep.equal(first);
     const listed = (await store.list()).reports.find(row => row.reportId === first.reportId);
     expect(listed?.counts.high).to.equal(1);
-    expect(listed?.counts.error).to.equal(69);
+    expect(listed?.counts.error).to.equal(68);
+    expect(listed?.counts.critical).to.equal(1);
     expect(listed?.sectionStatuses.internal).to.equal('ERROR');
     const second = await fixture();
     let rejected = false;

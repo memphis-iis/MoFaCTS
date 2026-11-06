@@ -1,4 +1,5 @@
-import { proofRecord } from './proofFields.ts';
+import { proofMeasurements as auditMeasurements, proofRecord, type ProofMeasurementKind } from './proofFields.ts';
+import { HOST_EVIDENCE_FIELDS, hasHostEvidenceContract, parseHostEvidenceMeasurements } from './hostAuditPolicy.ts';
 
 export type AuditControlStatus = 'PASS' | 'FAIL' | 'ERROR';
 export const AUDIT_ERROR_CATEGORIES = Object.freeze([
@@ -16,7 +17,7 @@ export type AuditEvidence = {
 
 // Released entries are append-only. These are proof-shape requirements, not
 // acquisition or a claim that the producer classified the observations correctly.
-type Field = 'count' | 'number' | 'boolean';
+type Field = ProofMeasurementKind;
 const udpExternalFields = { observedResultCount: 'count', expectedResultCount: 'count', openSelectedUdpPortCount: 'count' } as const;
 const udpHostFields = { unexpectedUdpListenerCount: 'count', unexpectedUdpAllowRuleCount: 'count', unexpectedUdpPublicationCount: 'count', firewallActive: 'boolean', defaultDenyInbound: 'boolean' } as const;
 export type UdpExternalMeasurements = { observedResultCount: number; expectedResultCount: number; openSelectedUdpPortCount: number };
@@ -38,38 +39,12 @@ const contracts: Readonly<Record<string, Readonly<Record<string, Field>>>> = {
   'reset-expiration-v1': { ageMinutes: 'number', configuredLifetimeMinutes: 'number', accepted: 'boolean' },
   'session-lifetime-v1': { lifetimeDays: 'number', authenticated: 'boolean' },
   'verification-observations-v1': { expectedCaseCount: 'count', completedCaseCount: 'count', matchedCaseCount: 'count', domainRejectionCount: 'count', transportErrorCount: 'count', inconclusiveCaseCount: 'count' },
-  'host-configuration-v1': { requiredSettingCount: 'count', presentSettingCount: 'count', rootOwned: 'boolean', rootOnly: 'boolean' },
-  'host-listeners-v1': { inspectedListenerCount: 'count', unexpectedListenerCount: 'count', unexpectedUdpListenerCount: 'count' },
-  'application-listener-v1': { expectedListenerPresent: 'boolean' },
-  'sidecar-policy-v1': { absenceRequired: 'boolean', listenerCount: 'count', helperContainerCount: 'count', endpointDeclarationCount: 'count', publicationCount: 'count', loopbackOnly: 'boolean' },
-  'docker-publications-v1': { inspectedContainerCount: 'count', unexpectedPublicationCount: 'count', unexpectedUdpPublicationCount: 'count', privateNetworkModeCount: 'count' },
-  'firewall-policy-v1': { firewallActive: 'boolean', defaultDenyInbound: 'boolean', publicWebAllowed: 'boolean', scopedSshOnly: 'boolean', unexpectedAllowRuleCount: 'count', unexpectedUdpAllowRuleCount: 'count' },
-  'reverse-proxy-v1': { configuredHostMatched: 'boolean', httpLoopbackOnly: 'boolean', websocketLoopbackOnly: 'boolean', inspectedUpstreamCount: 'count' },
-  'mongodb-unauthenticated-v1': { unauthenticatedReadAccepted: 'boolean' },
-  'mongodb-scoped-roles-v1': { authenticatedConnectivity: 'boolean', replicaSetMatched: 'boolean', applicationGrantsMatched: 'boolean', readConcernRoleMatched: 'boolean', sidecarAccountStateMatched: 'boolean' },
-  'redis-policy-v1': { unauthenticatedCommandAccepted: 'boolean', auditConnectivity: 'boolean', applicationConnectivity: 'boolean', hostPublicationCount: 'count' },
+  ...HOST_EVIDENCE_FIELDS,
 };
 
 export const AUDIT_EVIDENCE_CONTRACT_IDS = Object.freeze(Object.keys(contracts));
 export function hasEvidenceContract(id: string): boolean { return Object.hasOwn(contracts, id); }
 export function evidenceRequiresDeployedIdentity(id: string): boolean { return id === 'image-findings-v1'; }
-
-function auditMeasurements(value: unknown, fields: Readonly<Record<string, Field>>): Record<string, number | boolean> {
-  const raw = proofRecord(value, Object.keys(fields));
-  const metrics: Record<string, number | boolean> = {};
-  for (const [key, kind] of Object.entries(fields)) {
-    const metric = raw[key];
-    if (kind === 'boolean') {
-      if (typeof metric !== 'boolean') throw new Error('Invalid audit observation');
-      metrics[key] = metric;
-    } else {
-      if (typeof metric !== 'number' || !Number.isFinite(metric) || Math.abs(metric) > 1e12
-        || (kind === 'count' && (!Number.isSafeInteger(metric) || metric < 0))) throw new Error('Invalid audit measurement');
-      metrics[key] = metric;
-    }
-  }
-  return metrics;
-}
 
 // Bounded transient acquisition inputs, not V1 evaluated controls. Acquisition
 // must establish the unique selected endpoint inventory before deriving counts.
@@ -133,7 +108,9 @@ export function parseAuditEvidence(id: string, status: AuditControlStatus, value
   if (status !== 'PASS' && status !== 'FAIL') throw new Error('Invalid included-control status');
   const hasObservations = Boolean(value && typeof value === 'object' && Object.hasOwn(value, 'observations'));
   const record = proofRecord(value, hasObservations ? ['summary', 'metrics', 'observations'] : ['summary', 'metrics']);
-  const metrics = id === 'udp-exposure-v1' ? udpEvidenceMeasurements(status, record.metrics) : auditMeasurements(record.metrics, fields);
+  const metrics = id === 'udp-exposure-v1' ? udpEvidenceMeasurements(status, record.metrics)
+    : hasHostEvidenceContract(id) ? parseHostEvidenceMeasurements(id, status, record.metrics, record.observations)
+      : auditMeasurements(record.metrics, fields);
   const result: AuditEvidence = { summary: auditText(record.summary, 500), metrics };
   if ((id === 'finding-inventory-v1' || id === 'image-findings-v1')
     && (Number(metrics.findingCount) > Number(metrics.evaluatedCount)
