@@ -6,6 +6,13 @@ This assessment intentionally excludes backup, restore, uptime, disk health, cap
 
 ## Schedule and result semantics
 
+The separately authorized [isolated Linux Meteor integration lane](../../deploy/meteor-integration/README.md)
+uses the existing suite without GitHub scheduling. Its local Linux checkpoint
+for commit `92d7d28b` passed 985 server and 1,237 Chromium client tests, zero failed,
+with 15/seven pending. The earlier staging2 attempts exhausted memory and remain
+failed. Native receipts remain unqualified and do not replace GitHub status,
+scheduled audit reports or release/image proof. See the [acceptance record](../../docs-developer/security-audit-durable-redesign-status.md#local-linux-full-suite-acceptance-2026-11-06).
+
 `.github/workflows/production-security-audit.yml` runs:
 
 - Daily at 06:00 UTC: external and host exposure controls.
@@ -257,8 +264,8 @@ its evidence validator is still unreleased. Released catalog/evidence contracts
 remain append-only. The pure evaluator is not connected to the scheduled V1
 scanner: external/host acquisition adapters, forced-command qualification and
 coordinated cutover remain required. Node tests cover signed ingestion and
-JSON/HTML integrity; the new Meteor proof case and extended real-Mongo fixture
-need supported CI before this checkpoint is runtime-verified.
+JSON/HTML integrity; the Meteor proof case and extended real-Mongo fixture pass
+the supported local Linux checkpoint above. Endpoint/host cutover remains open.
 
 The host observation contract and Node evaluator are also inert V2 source.
 `common/securityAudit/catalogs/host-measurements.v1.json` is the single field,
@@ -282,5 +289,6 @@ host output: it rejects duplicate keys, invalid UTF-8, extra documents and wrong
 contract versions. Acquisition is accepted within the existing 15-minute upload
 window and five-minute future-skew bound. No protected host command, installed
 file, live scanner, receiver route or startup requirement is changed by these
-helpers. New shared-runtime and real-Mongo tests still need supported CI before
-this source checkpoint is runtime-verified.
+helpers. The new shared-runtime cases and real-Mongo fixture pass the supported
+local Linux checkpoint above. This verifies those source contracts, not installed
+host acquisition, runtime binding or deployment.

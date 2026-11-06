@@ -17,10 +17,13 @@ cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
 **Current Meteor allowance:** one primary plus ten conditional invocations were
-authorized. Conditional slots 1-6 passed. Slot 7/10 is RESERVED before the approved
-host-contract publication, leaving three conditional slots unreserved. Its actual
-invocation/result will be recorded separately. This is the sole current counter;
-dated checkpoints are historical and never authorize another invocation.
+authorized. Conditional slots 1-6 passed. GitHub's billing-locked startup attempts
+consumed zero invocations. Native conditional slots 7 and 8 FAILED with container
+out-of-memory kills at 2 GiB and 2.5 GiB, respectively, on clean commit
+92d7d28b3409e1e865873c3c384505033fe66cb0. Conditional slot 9 PASSED on the
+explicitly authorized local Linux worker: 985 server and 1,237 client tests, zero
+failures. One conditional invocation remains unreserved. This is the sole current
+counter; dated checkpoints are historical.
 
 Completed entry prerequisites:
 
@@ -46,18 +49,266 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
 | P1-04 | Integrated build identity/host-release comparison | [ ] One-time embedded identity reader and independent revision adapter pass local checks and actual Meteor parity (CI 42150167781). Runtime composition and independent host/platform mapping remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
-| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository/UDP evidence retained. Versioned host descriptor/parser, closed host proofs and internal evaluator pass local Node checks; new Meteor/Mongo cases and actual host acquisition remain open. P1-D4 is approved. Active V1 remains unchanged. |
+| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository/UDP evidence retained. Versioned host descriptor/parser, closed host proofs and internal evaluator pass Node and supported local Linux Meteor/Mongo checks (slot 9). Actual host acquisition remains open. P1-D4 is approved. Active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
-| P1-09 | Summary projections, indexes and read-time integrity | [ ] Prior storage/Mongo evidence retained (CI 42154492028). New partial-host CRITICAL fixture awaits supported CI; chosen collection binding and old-image qualification remain pending. |
+| P1-09 | Summary projections, indexes and read-time integrity | [ ] Prior storage/Mongo evidence retained (CI 42154492028). New partial-host CRITICAL fixture passes real MongoDB in native slot 9; chosen collection binding and old-image qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Prior 39 Node/six Meteor cases and Mongo evidence retained. Eleven new host Node cases pass locally; two new shared-runtime cases and extended Mongo fixture await CI. Endpoint/host and previous-image gates remain open. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Prior 39 Node/six Meteor cases and Mongo evidence retained. Eleven new host Node cases pass locally; two new shared-runtime cases and extended real-Mongo fixture pass native slot 9. Endpoint/host and previous-image gates remain open. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
 | P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
 | P1-17 | Updated operator documentation | [ ] Public inert-development/testing checkpoint added; final cutover/operator procedure pending implementation and qualification. |
+
+### Native Meteor verification: capacity decision (2026-11-06)
+
+Phil approved a disposable staging2 tooling build and one existing integration
+allowance. The conditional retry used the remaining project authorization and
+Section 0 decision 5's standing staging2 offline permission. The native attempts
+introduced no new spending, production testing, persistent account/access grant
+or application deployment.
+
+- [x] Prepare the isolated tool image: official digest-pinned Playwright 1.60.0
+  Ubuntu 24.04, Meteor 3.5.4, Node 24.22.1, npm 11.19.1, Undici 7.30.1 and Docker
+  CLI 29.8.2. Setup corrected the ordinary bootstrap image's unsupported Ubuntu
+  26.04 browser platform, private-home traversal and root archive-ownership
+  behavior. Use image-local non-root UID 2000 with zero capabilities.
+- [x] Verify actual private read-only checkout/capture mounts, writable test copy,
+  four EROFS write/chmod refusals and no Docker socket. The trusted source-capture
+  coordinator is separate from the test processes. No permissions or CSP were
+  relaxed, and deployed settings/data were not mounted into tests.
+- [x] Capture/re-export clean source twice, using ordinary Linux Git modes. Both
+  preparations independently produced the same source/test-input identities.
+- [x] Verify the receipt writer: three rejection/round-trip tests pass on Windows
+  and final non-root Linux. Full app lint covers 323 surfaces; explicit new-tool
+  lint and both Bash syntax checks pass. No app TypeScript changed in this batch;
+  the committed host batch's full typecheck remains its retained source check.
+- [x] Classify setup dependency warnings through existing read-only full/runtime
+  policy on Windows and Linux: PASS, zero HIGH/CRITICAL runtime findings, three
+  moderate runtime advisory packages, 20 development advisory packages and zero
+  confirmed build exposures. No dependency/policy was changed. This does not mark
+  the separate GitHub Security, sidecar or secret-scan jobs passed.
+- [x] Execute and honestly retain two failed full-suite attempts (table below).
+  Both passed 26/26 harness checks and compiled the client, then received SIGKILL.
+  Docker OOMKilled=true confirms the resource failure. Neither produced complete
+  server/browser run evidence or a successful native receipt; post-test source
+  qualification did not complete. No new Meteor/Mongo acceptance is claimed.
+- [x] Verify cleanup: all job-labelled containers, cache volumes and networks
+  were removed. Slot 8 used the bounded staging2 offline window; the same three
+  original container IDs/images were restored running/healthy. Pause recorded
+  17:39:12Z; restoration recorded 17:41:16Z. The app required Docker's 30-second
+  stop timeout (exit 137, OOMKilled=false); MongoDB/Redis stopped cleanly. This is
+  liveness/identity restoration, not new learner-flow acceptance. No volume was
+  removed from the original application.
+- [x] Complete the full server/browser suite and post-test source verification
+  on the authorized local worker (slot 9 outcome below). Retain both failures.
+- [x] Select local Ubuntu-MoFaCTS for the bounded trial; staging2 stays the
+  security target. Future local use still requires applicable authorization.
+
+| Conditional invocation | UTC start / finish | Worker limit / environment | Result |
+| --- | --- | --- | --- |
+| 7 | 17:23:21 / 17:24:41 | 2 GiB; staging2 application running | FAIL: container OOM; no complete Meteor run evidence |
+| 8 | 17:39:32 / 17:40:34 | 2.5 GiB; original staging2 services paused | FAIL: container OOM; original services restored |
+
+Exact tested source: 92d7d28b3409e1e865873c3c384505033fe66cb0 (clean).
+Source snapshot: 76a9dfa03f878ba30204b50929d24ba41333aa7c265acb9bff484b4eca11c6d2.
+Supplemental digest: 11cb2d2c73e58ba41d590cc2ef2d29038031f527cede9238f27200f0ea38f585.
+Test-input contract: 242ba85496b5a17cacb3d262dda3f9aebcd6b278c0bec1bca4d49631de16d080.
+
+Private native release evidence is retained under
+MoFaCTS-Release-Evidence/phase1-20261105/native-staging2-slot7 and slot8. Bounded
+archives contain logs, source/limit/OOM metadata and the restoration witness;
+no source settings, credentials or database records were copied. Archive SHA-256:
+slot 7: 65d2a7e076cc9df55364c8cd8f7993b69bbfd0082a36c550a6a20bb569cca04c;
+slot 8: d0395c041761708a1412f99470bfad2d2c82a88114cc234d38629b0dbdf61d41.
+
+Phil then explicitly authorized the older staging server as an alternative for
+this isolated test task, overriding its freeze only within that scope. The
+canonical procedure's SSH target matched staging.optimallearning.org DNS, and
+existing host-key trust passed. Read-only preflight observed Ubuntu 24.04.3,
+Docker 28.5.1 / Compose 2.40.2, two CPUs, 3,834 MiB physical RAM, 2,734 MiB
+available, no swap and 18 GiB free disk. Its three services were healthy. It has
+the same memory constraint as staging2; no install, build, test, stop/restart,
+settings/data access or mutation was performed there. No invocation was spent.
+
+**Current compute authorization (updated 2026-11-06):** Phil has now explicitly
+authorized a bounded trial on his existing local Linux environment while the PC
+is not heavily used. This supersedes the earlier remote-only preference for this
+trial. Use Ubuntu-MoFaCTS and its existing Linux Docker engine; preserve JEDM and
+other local containers, impose a 4 GiB / two-CPU test limit, and use one of the
+two remaining conditional invocations. No Docker/WSL restart, new persistent host
+dependency, application deployment or publication is authorized. Older staging
+was previously explicitly authorized as an
+alternative, but its read-only preflight found the same 4 GB RAM class; no test
+was spent there. A separately, explicitly approved one-use production capacity
+check also reported 3,834 MiB RAM, 1,268 MiB available, two CPU threads and no
+swap. That inspection is spent and grants no production test/start/change access.
+Production is not a candidate test host.
+
+### Remote verification-method review (2026-11-06)
+
+Phil requested a review of the remote method and verification scope before
+committing more resources. This review ran no tests/builds/server commands,
+installed no dependency, changed no runtime/source configuration and consumed
+none of the two remaining conditional Meteor invocations.
+
+- [x] Re-read the Phase 1 gates and verification matrix. The current host-contract
+  batch still needs supported Meteor execution of its two new shared-runtime
+  cases and the changed real-Mongo storage fixture. Standalone Node success does
+  not prove those framework/persistence assertions.
+- [x] Trace the actual full-suite entry points. server-test-entry.js imports
+  server/main.ts and all registered server/common/top-level test modules;
+  client-test-entry.js imports client/index.ts and all client test modules. The
+  wrapper forces server and client execution, rejects partial-suite selectors,
+  and the evidence validator requires exact module membership on both sides.
+  Selecting fewer assertions is not a demonstrated way to avoid app compilation.
+- [x] Review the two failures. Both passed 26 harness checks and compiled the
+  client before SIGKILL/OOM. Neither produced complete Meteor outcome evidence.
+  Existing logs prove a container-limit failure, not which individual compiler
+  cache/process caused the peak or the exact RAM needed for a successful run.
+- [x] Review the affected source boundary. New host contracts/evaluator imports
+  and real-Mongo fixture are server/common tests; the direct client/component
+  search found no references to those new V2 modules. A smaller server-only
+  checkpoint could be proposed, but it is not the current full-suite contract.
+  A dedicated reduced harness/evidence format would require explicit review and
+  additional maintenance; it is not the first recommendation.
+- [x] Verify a supported memory-saving candidate. Meteor 3.5.4's installed
+  tools/fs/optimistic.js:90 reads METEOR_DISABLE_OPTIMISTIC_CACHING globally; its
+  makeCacheKey returns no cache key when disabled. Official 3.5.4 documentation
+  identifies this cache as a significant build-memory consumer. The current
+  native worker does not set that flag. The documented recommendation specifically
+  discusses build/deploy; savings for our Rspack meteor test --once invocation
+  remain UNMEASURED. This is a candidate, not a proven repair or capacity guarantee.
+- [x] Check other shortcuts. Existing app Rspack memory-cache customization is
+  explicitly excluded from Meteor.isTest, so do not modify the local watcher
+  path. Existing worker flags set memory-swap equal to memory (swap prohibited),
+  and the remote hosts reported no swap; adding swap would require both an
+  explicit host-lifecycle plan and bounded container swap configuration.
+
+**Recommendation, not yet executed:** retain the full server/browser gate for
+this runtime-contract batch. First propose a single remote staging2 trial with
+METEOR_DISABLE_OPTIMISTIC_CACHING=1 passed to the test process, retaining the
+existing source capture, exact test inventory, pinned runtime, private synthetic
+MongoDB, non-root/capability-free worker, fixed RAM/CPU limits and verified
+restoration window. Record the compiler setting with tool/source identity and
+accept only complete server/browser outcomes plus post-test source verification.
+Do not silently change client/server coverage, raise memory limits, add swap,
+claim genuine GitHub proof or waive the failed integration result.
+
+Use the already-built tooling; do not expand the native release-proof machinery
+or create a parallel minimal Meteor app for this trial. Reuse passed checks while
+their owning source is unchanged. Documentation/standalone operator-only edits
+that do not affect Meteor/client/test contracts should use their applicable
+verification-matrix checks rather than automatically consuming a full Meteor run.
+This does not defer required runtime proof for the current application batch.
+
+If the cache-setting trial still fails, preserve the last conditional invocation
+and prepare a separately reviewed temporary swap plan on the isolated remote
+host before discussing another server purchase. Swap has a performance cost;
+no host swap configuration or new resource/spending is authorized by this review.
+
+Primary references: https://docs.meteor.com/cli/environment-variables#meteor-disable-optimistic-caching
+and https://docs.docker.com/engine/containers/resource_constraints/#--memory-swap-details.
+The approved full-suite gate and all Phase 1 acceptance states remain unchanged.
+
+### Authorized local Linux trial preparation (2026-11-06)
+
+- [x] Confirm current capacity and installed tools without changing services:
+  dedicated Ubuntu-MoFaCTS user/runtime, Node 24.22.1, Docker 29.7.2, Compose
+  v5.4.0, Linux/amd64 engine, about 13 GiB VM memory available and ample disk.
+  Windows reported about 6.4 GiB available physical RAM at preflight. Existing
+  JEDM/local MongoDB containers remain running; their IDs/images/start times are
+  recorded before preparation for an exact post-run comparison.
+- [x] Reuse the same tooling recipe with a fresh clean Linux checkout of commit
+  92d7d28b3409e1e865873c3c384505033fe66cb0. Extend the explicit private job-root
+  contract to /var/tmp and use the existing pinned coordinator Node parser rather
+  than requiring an additional host jq installation. Keep source-mode protection,
+  non-root UID 2000, zero capabilities, no Docker socket in tests, private MongoDB
+  and complete server/client discovery. Test budget: 4 GiB, two CPUs, no container
+  swap; require at least 6 GiB available VM memory before invoking tests.
+- [x] Finish tool-image/dependency preparation and validate all three final
+  helper regression tests under Linux. The local source snapshot and supplemental
+  digest exactly match both earlier remote captures. Reserve conditional slot 9
+  immediately before this authorized invocation.
+- [x] Complete the full Meteor suite, source re-export and native evidence checks;
+  verify ownership-checked cleanup and unchanged pre-existing local containers.
+  Exact acceptance and pending outcomes are recorded below.
+
+This trial keeps canonical compiler settings; the optional build-cache change
+from the review remains an unexecuted candidate. It changes compute allocation,
+not test coverage or application permissions. This preparation checkpoint
+preceded slot 9; its completed outcome and the sole current counter supersede
+this historical reservation.
+
+The optional tooling and notes remain LOCAL and UNPUBLISHED. The application
+Meteor gate is now satisfied for the exact tested source; full Phase 1 items
+retain their other open requirements. Do not qualify/release an image, deploy an
+application or publish this batch without applicable gate resolution and explicit
+commit/push permission. Native evidence must not forge GitHub coordinates or
+substitute for consumers requiring genuine CI/image proof.
+
+### Local Linux full-suite acceptance (2026-11-06)
+
+- [x] Execute conditional slot 9 once on Ubuntu-MoFaCTS using the existing Linux
+  Docker engine, default compiler/cache settings and the complete canonical
+  npm run test:ci entry point. UTC start 22:44:43, finish 22:46:15 (92 seconds
+  for the suite lane; tooling/dependency preparation is separate). Worker capped
+  at 4 GiB/two CPUs; private MongoDB 384 MiB/0.25 CPUs, neither with swap allowance.
+  This establishes one successful capacity profile, not a measured peak/minimum.
+- [x] Validate exact complete module inventories: server 155 modules, 985 passed,
+  zero failed, 15 pending; client Chromium 213 modules, 1,237 passed, zero failed,
+  seven pending. Zero hook failures. Pending assertions remain pending.
+- [x] Inspect actual PASS outcomes for the two new host descriptor/policy cases,
+  extended signed-envelope/unique-nonce real-Mongo fixture, retained V1 bytes case
+  and earlier UDP partial-evidence case. P1-06/09/13 subchecks are updated above;
+  acquisition, endpoint binding and previous-image gates remain open.
+- [x] Compare source before/after: identical clean commit 92d7d28b and the same
+  snapshot/supplemental/test-input digests as both remote attempts. The unrelated
+  working-tree changes were excluded from the tested clean source and preserved.
+- [x] Verify UID 2000, zero effective capabilities, no test Docker socket, two
+  retained read-only mounts/four refused write operations, and a writable test
+  derivative. No settings, credentials, deployed volumes or learner data used.
+- [x] Verify successful non-OOM container exit and empty job-labelled container,
+  network and volume inventories. All eight pre-existing local containers retain
+  exactly their IDs, images, start times and running states. No global restart,
+  cache flush or application deployment performed. Source/tool image/logs retained.
+- [x] Retain 25 bounded evidence files with a SHA-256 manifest in the private
+  MoFaCTS-Release-Evidence/phase1-20261105/native-local-slot9 directory, plus an
+  independent acceptance-review.json checking hashes, cases and cleanup.
+
+- [x] Verify final tooling changes: all three receipt regressions pass on pinned
+  Linux Node 24.22.1, explicit operator-script lint and both Bash syntax checks
+  pass, and full npm run lint passes (323 security surfaces). No app TypeScript
+  changed; retain the committed batch's passing full typecheck rather than
+  repeating it for operator-only changes. All eight unrelated file hashes match
+  their initial values; canonical companion repository paths remain verified.
+
+Raw run SHA-256: f09aa4558cdb4abd5664023a0eb7f1678379094e4f0488eeea0403ebe7b2b7af.
+Retained manifest: 36397b0c3933055a0ba5bb748ffe32271a06f9d4a39afe83bda69ec94a63d233.
+Original native receipt: b4c01861bc0fc93b4e54347aaf8a1b5c3e0cf12dca9c9615bcc4cc5df5c9d24e.
+
+Receipt metadata correction: the original toolImageConfig/mongoImageConfig
+fields contain Docker native image IDs, not proven OCI config digests. On this
+Docker containerd store the tooling ID is an OCI index digest. Preserve the
+original receipt and its honest unqualified status; acceptance-review.json records
+the correction. The unpublished writer now names these fields toolImageId and
+mongoImageId; bounded regression tests verify the labels. This operator-only
+correction does not change the tested application or need another Meteor run.
+
+This passes the supported Meteor application gate for this exact committed
+source. GitHub billing-lock failures remain failures; separate GitHub Security,
+sidecar/secret-scan, Compose release and image qualification checks are not marked
+passed. Active V1, production and staging deployments remain unchanged. Phase 0
+stays completed; Phase 1 remains in progress.
+
+Next publication boundary: explicit approval to commit/push only the optional
+integration-tooling/documentation batch, preserving unrelated changes. No further
+Meteor invocation is proposed for documentation/receipt-label-only changes. After
+publication, continue P1-06 actual bounded host acquisition and its Linux
+qualification from the written plan; protected installation/cutover remain
+separate approval boundaries.
 
 ### Decision P1-D1: fixed catalog impact versus mixed-impact V1 controls
 
@@ -708,6 +959,36 @@ slot 7/10 before publication, leaving three unreserved. Supported CI must execut
 the two new shared-runtime cases and extended Mongo fixture on this exact source.
 No retry, dependency installation, protected-host operation, registry publication
 or deployment is implied. Older exact receipts are retained rather than rerun.
+
+### Host contract published; CI startup blocked by GitHub billing (2026-11-06)
+
+- [x] Commit/push only the reviewed 14-file batch as
+  `92d7d28b3409e1e865873c3c384505033fe66cb0`. Pre-commit lint/secret/manifest
+  checks passed. Hash comparison confirmed all reviewed and eight unrelated
+  working files unchanged after hooks. No new branch or source adjustment.
+- [x] Inspect the exact automatic workflow attempts:
+  [CI 42236226876](https://github.com/memphis-iis/MoFaCTS/actions/runs/42236226876)
+  and [Security 42236226849](https://github.com/memphis-iis/MoFaCTS/actions/runs/42236226849).
+  All five jobs are marked failed, with NO executed steps. Each reports:
+  "The job was not started because your account is locked due to a billing issue."
+  This is an account/runner-startup block, not a test or source-code failure.
+- [x] Release the slot-7 reservation unused; actual Meteor invocations: zero.
+  Four existing conditional invocations remain. The already-authorized fresh
+  run is still unspent; re-reserve before any supported retry after unblock.
+- [ ] Account owner resolves/reviews the GitHub billing lock; then resume the
+  same committed source's authorized checks. No plan/payment/budget change is
+  authorized here. Do not retry blindly or substitute another verification lane.
+- [ ] Run and retain actual shared-runtime, real-Mongo and image evidence. No
+  artifact, successful CI outcome, runtime parity or release qualification exists
+  for this commit yet. Local typecheck/lint/Node evidence remains separate.
+
+Private receipt: `host-observations-ci-startup-block.json` under the existing
+native Phase 1 evidence directory. No registry image, protected-host operation,
+new dependency, production access or deployment occurred. Further publication
+and protected execution remain blocked by the required-check rule until checks
+pass or Phil explicitly accepts the identified failure/risk. This failure record
+is saved locally, pending that publication gate; completed older receipts and
+Phase 0 work are not reopened. No extra Meteor invocation was consumed.
 
 ## Phase 0 completion worklist (active 2026-11-05)
 
