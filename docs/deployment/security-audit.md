@@ -292,3 +292,11 @@ file, live scanner, receiver route or startup requirement is changed by these
 helpers. The new shared-runtime cases and real-Mongo fixture pass the supported
 local Linux checkpoint above. This verifies those source contracts, not installed
 host acquisition, runtime binding or deployment.
+
+The separate [V2 host acquisition candidate](../../deploy/security-audit/host-observations.md)
+passes its 26 synthetic Linux fixture cases and the full local source-security
+gate. The approved draft-contract additions preserve the exact app publication
+and independent Apache active/configuration checks. Supported Meteor proof of
+the amended shared contract and protected forced-command installation/rollback
+qualification remain open. The active V1 host entry point is unchanged; this
+source checkpoint does not activate the new producer.

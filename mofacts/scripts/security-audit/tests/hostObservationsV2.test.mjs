@@ -29,7 +29,7 @@ test('host observation descriptor: one frozen measurement owner and no evaluated
   assert.throws(() => { hostGroupFields('redis').rawSecret = 'count'; });
   assert.throws(() => hostGroupFields('__proto__'));
   assert.equal(await hostObservationContractDigest(), await auditDigest(HOST_MEASUREMENT_DESCRIPTOR));
-  assert.equal(await hostObservationContractDigest(), 'a49086834e0b4fa32885aa43117a58ddf5b9bcfd73e3f61b3931bbba7a1bdf28');
+  assert.equal(await hostObservationContractDigest(), '4646d0cae686fe24499a554e27101fc95a8266d3e3f3308d7a3396d9c91696e0');
   for (const forbidden of ['controlId', 'failureSeverity', 'reportType', 'title', 'status']) {
     assert.equal(canonicalAuditJson(HOST_MEASUREMENT_DESCRIPTOR).includes(`"${forbidden}"`), false);
   }
@@ -145,6 +145,19 @@ test('host outcomes: connectivity/query failures and incomplete coverage never b
   ]) {
     assert.equal(hostMeasurementsOutcome(id, metrics), 'ERROR');
     for (const status of ['PASS', 'FAIL']) assert.throws(() => parseAuditEvidence(id, status, evidence(id, metrics)));
+  }
+});
+
+test('host publication and Apache proof: approved requirements are independent, complete and never inferred from missing evidence', () => {
+  for (const count of [0, 2]) {
+    assert.equal(hostMeasurementsOutcome('docker-publications-v1', { expectedApplicationPublicationCount: count }), 'FAIL');
+  }
+  const docker = { ...safeHostMeasurements.docker }; delete docker.expectedApplicationPublicationCount;
+  assert.equal(hostMeasurementsOutcome('docker-publications-v1', docker), 'ERROR');
+  for (const key of ['apacheActive', 'apacheConfigValid']) {
+    assert.equal(hostMeasurementsOutcome('reverse-proxy-v1', { [key]: false }), 'FAIL');
+    const proxy = { ...safeHostMeasurements.proxy }; delete proxy[key];
+    assert.equal(hostMeasurementsOutcome('reverse-proxy-v1', proxy), 'ERROR');
   }
 });
 

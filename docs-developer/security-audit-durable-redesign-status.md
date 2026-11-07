@@ -41,6 +41,10 @@ Completed entry prerequisites:
 
 The rows below map directly to the 17 Phase 1 deliverables in plan Section 12.
 No source implementation deliverable is marked complete by a prerequisite check.
+This 17-row table is the sole current work queue. Dated checkpoints below retain
+provenance; their old pending boxes do not independently authorize/restart work.
+The reconciliation below links completed proof and separates the changed source
+that actually needs another check.
 
 | ID | Deliverable | Status |
 | --- | --- | --- |
@@ -49,15 +53,15 @@ No source implementation deliverable is marked complete by a prerequisite check.
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
 | P1-04 | Integrated build identity/host-release comparison | [ ] One-time embedded identity reader and independent revision adapter pass local checks and actual Meteor parity (CI 42150167781). Runtime composition and independent host/platform mapping remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
-| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository/UDP evidence retained. Versioned host descriptor/parser, closed host proofs and internal evaluator pass Node and supported local Linux Meteor/Mongo checks (slot 9). Actual host acquisition remains open. P1-D4 is approved. Active V1 remains unchanged. |
+| P1-06 | Host observations, Node internal evaluator and composite evaluator | [ ] Repository/UDP evidence retained. Base host contracts retain slot 9 Meteor/Mongo proof. The approved P1-D5 extension and Bash emitter pass Node/native Linux fixtures; amended Meteor parity and protected forced-command qualification remain open. P1-D4/D5 are approved. Active V1 remains unchanged. |
 | P1-07 | Exact assembly and independent server validation | [ ] Pure assembler and inert signed V2 server authenticator implemented/tested. No registered route, persistence or independent runtime identity loader is wired yet. |
 | P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
 | P1-09 | Summary projections, indexes and read-time integrity | [ ] Prior storage/Mongo evidence retained (CI 42154492028). New partial-host CRITICAL fixture passes real MongoDB in native slot 9; chosen collection binding and old-image qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Prior 39 Node/six Meteor cases and Mongo evidence retained. Eleven new host Node cases pass locally; two new shared-runtime cases and extended real-Mongo fixture pass native slot 9. Endpoint/host and previous-image gates remain open. |
-| P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Not implemented or executed. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Prior 39 Node/six Meteor cases and Mongo evidence retained. Prior host/Mongo cases retain slot 9 proof. The amended contract/collector pass the 134-test source-security gate; one new Meteor case and changed descriptor parity still need supported execution. Endpoint/host and previous-image gates remain open. |
+| P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] The synthetic root-Linux emitter fixture passes 26 cases. Staging ingestion/rollback and actual SSH forced-command/install qualification remain open; fixtures do not complete them. |
 | P1-15 | Exact host install/rollback procedure and hashes | [ ] Phase 0 production baseline retained; V2 candidate not implemented. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Not executed; Phase 0 bounded specification remains controlling. |
 | P1-17 | Updated operator documentation | [ ] Public inert-development/testing checkpoint added; final cutover/operator procedure pending implementation and qualification. |
@@ -309,6 +313,136 @@ Meteor invocation is proposed for documentation/receipt-label-only changes. Afte
 publication, continue P1-06 actual bounded host acquisition and its Linux
 qualification from the written plan; protected installation/cutover remain
 separate approval boundaries.
+
+### Host collector draft and decision P1-D5 (2026-11-06)
+
+- [x] Publish the separately approved nine-file integration-tooling/notes batch:
+  commit 0572c26d, pushed to origin/main. Pre-commit manifest, staged lint and
+  secret checks passed. The skip-ci commit changes no application runtime code;
+  no further Meteor invocation was consumed. The slot 9 proof remains bound to
+  clean source 92d7d28b, not a newly qualified image or deployment.
+- [x] Trace the complete V1 host acquisition and current V2 descriptor/evaluator,
+  reusing existing listener/firewall/Apache/Sidecar/Mongo role helpers. Active V1
+  files, workflow selection, deployed hosts and protected configuration unchanged.
+- [x] Write an inert acquisition-only shell draft, read-only Mongo connectivity
+  probe and synthetic root-Linux fixture harness. No verdict/title/severity table
+  is added to Bash. This checks off source preparation only, not a completed or
+  qualified collector. No production or staging probe/installation was executed.
+- [x] Verify three standalone Mongo VM tests, including explicit access denial,
+  confirmed anonymous read, transport/query errors, replica mismatch, credentials
+  and absence of raw-record/secret output. The native fixture is explicitly
+  skipped when root Linux/jq is unavailable; a skip is not acceptance.
+- [x] Identify the actual Linux prerequisite: jq is absent both from dedicated
+  Ubuntu-MoFaCTS and the retained Meteor tooling image. No package was installed.
+  The attempted Linux source-security suite FAILED with spawnSync jq ENOENT in
+  existing Sidecar policy tests. This required failure blocks publication of the
+  new collector batch until corrected and reverified. No tests were weakened.
+- [x] Identify a source-grounded measurement gap before qualification. V1's
+  Docker check requires app_bind_count == 1 in addition to safe publications;
+  its proxy check independently requires active Apache and Syntax OK. The V2
+  docker-publications-v1 and reverse-proxy-v1 descriptors omit independent facts
+  for those requirements. Current complete "safe" values cannot encode every
+  required negative case. Do not silently weaken coverage or repurpose a field.
+- [x] Decision P1-D5 APPROVED: extend the still-unreleased descriptor/evidence
+  shapes with the expected application-publication count and independent Apache
+  active/config-test facts, preserving the existing check claims and severity.
+  Update the shared validator/fixtures and golden digest together. Prior exact
+  source evidence remains retained; new shared contracts require fresh runtime
+  proof. No application access policy, service account or released contract changes.
+- [x] Install the explicitly approved distribution jq package and its two normal
+  dependencies in dedicated Ubuntu-MoFaCTS; zero packages upgraded and no service
+  restart. The native fixture and formerly jq-blocked source-security gate now
+  pass. Exact versions/outcomes are in the completion checkpoint below.
+- [x] Complete the emitter under the approved contract and pass native fixtures.
+- [ ] Prepare protected Linux forced-command/install/rollback qualification.
+  No candidate installation or active scanner selection is authorized by this
+  source draft. P1-06/14/15 stay open. One conditional Meteor invocation remains.
+
+The draft and reviewable boundary are documented in
+deploy/security-audit/host-observations.md. New source and notes remain local and
+unpublished. No app TypeScript changed in this batch; its full typecheck is not
+repeated for Bash/JavaScript/test/documentation-only work.
+
+- [x] Final full npm run lint passed, covering 323 security surfaces. Explicit
+  standalone probe/fixture lint and Bash syntax passed. An initial probe lint
+  error (control-character regex) and redundant-global warning were corrected
+  and the final checks are clean. All eight unrelated file hashes still match
+  their entry values. No extra Meteor invocation, system installation or host
+  service change occurred. The separate jq-dependent source-security failure
+  and unexecuted native collector fixture remain open; publication is blocked.
+
+### Host collector completion and mini audit (2026-11-06)
+
+This is the current checkpoint after Phil approved both P1-D5 and jq installation.
+
+- [x] Install jq/libjq1 1.7.1-3ubuntu0.24.04.2 and libonig5 6.9.9-1build1 in
+  Ubuntu-MoFaCTS only. No package upgrade, Docker/JEDM restart or paid resource.
+- [x] Add expectedApplicationPublicationCount, apacheActive and apacheConfigValid
+  to the unreleased descriptor and shared sufficient-failure proofs. No field is
+  repurposed. Observed missing/duplicate required app publication, inactive Apache
+  or demonstrated syntax error gives FAIL; unavailable evidence cannot give PASS.
+  Golden descriptor digest is now
+  4646d0cae686fe24499a554e27101fc95a8266d3e3f3308d7a3396d9c91696e0.
+  The 70/23 catalog digest/membership and active V1 contracts are unchanged.
+- [x] Complete acquisition-only source and real Bash/jq/AWK synthetic fixtures.
+  All 26 scenarios pass, including the new three requirements, permission/argument
+  rejection, partial confirmed violations, malformed/oversized/NUL output and
+  explicit absence of helper authentication. The first run correctly rejected
+  copied files retaining non-root ownership; fixtures now explicitly establish
+  root ownership/modes on their private copies. No runtime guard was weakened.
+- [x] Full typecheck, full lint (323 surfaces), explicit probe/fixture lint and
+  Bash syntax checks pass. Full source-security: 135 total, 134 pass, zero fail,
+  one existing CI-only V1 fixture skipped. The previous jq ENOENT failure is
+  resolved. A separate native collector fixture did execute, not skip.
+- [x] Close the test-input acquisition wiring gap found in the mini audit: both
+  new deployment readers are now in the existing reviewed supplemental closure.
+  All 16 test-input regressions pass, including exact copying and a changed
+  reader changing its supplemental digest without changing build-source bytes.
+  This changes test-input identity; recapture the new source rather than patching
+  an accepted old snapshot. No broader capture implementation was rewritten.
+- [x] Final lint rerun after acquisition-list changes passed (323 surfaces).
+  All eight pre-existing local containers still match their retained IDs/images/
+  start times/running states; zero native fixture directories remain. The new
+  batch contains 17 intentional files and leaves eight unrelated files untouched.
+- [x] Preserve all eight unrelated file hashes and verify active V1 host script,
+  scheduled workflow, receiver route and application dependency manifests unchanged.
+  Canonical config/wiki protocol searches found no dependent measurement consumer;
+  no TDF, account, learner-history, access-policy, UI or localization change.
+- [x] Check retained slot 9 receipt hash/source/results rather than repeat Meteor:
+  source 92d7d28b, 985 server/1,237 client passed, zero fail/hooks, 15/seven pending.
+  It remains proof of that source only. No new Meteor invocation was consumed;
+  one conditional invocation remains unreserved.
+- [ ] Publish this new batch only with explicit approval, then execute supported
+  Meteor proof of the amended descriptor and added shared-runtime case on its
+  exact committed source. No current app release or image qualification is issued.
+- [ ] Continue protected installation/forced-SSH/paired rollback qualification,
+  independent identity composition and the remaining Phase 1 integration gates.
+
+#### Mini audit: closed work versus actual remaining gates
+
+| Area | Evidence and disposition | Next action |
+| --- | --- | --- |
+| Phase 0 | All 19 original plan rows, optional metadata repair P0-20 and final completion review P0-21 are checked. Reuse that completed review; 21 ledger entries are not 21 original deliverables. | Keep closed; do not repeat the final audit, recovery setup or characterization. |
+| Phase 1 foundations | P1-01/02/03/05 remain the four completed source deliverables; catalog/registry/report/artifact owners exist and their retained runtime proof remains accepted. | Reuse them. The host-specific extension is tracked in P1-06/13, not a restart of the foundation. |
+| Prior host and storage runtime proof | The retained native receipt and prior CI checkpoints establish their exact earlier sources. | Close the three stale historical Meteor pending actions; preserve actual GitHub failures/image limitations. |
+| Current collector | Source plus 26 Linux fixtures and required local checks pass; nothing is installed or activated on a protected host. | Exact new-source Meteor and later protected-channel qualification remain open. |
+| Remaining Phase 1 | Thirteen deliverable rows stay open, many partially implemented: identity/receiver wiring, host qualification, storage rollback, cutover and final operational docs. | Work only from those current rows; a source fixture does not close an operational gate. |
+| Duplicate implementations | Active V1 and inert V2 are the explicitly approved development isolation. Existing low-level helpers are shared. | Retire superseded V1 orchestration at coordinated cutover; no cleanup/removal now. |
+
+Confirmed progress-record defect: dated unchecked Meteor/startup actions still
+looked outstanding after slot 9 succeeded. They are now reconciled against that
+receipt, with the GitHub-only and new-source gates kept distinct. No unrelated
+unused-code claim or broad redesign was inferred. Historical statements describe
+their dates; the current 17-row table and sole allowance counter own ongoing work.
+A second confirmed wiring defect was the new deployment files missing from the
+supplemental test-input list; this is repaired and covered by the 16 passing
+acquisition tests. The earlier source-security run remains accepted for its
+unchanged owners; only the affected acquisition suite and required lint repeat.
+
+Next permission boundary: publish this reviewed collector/contract batch and
+prepare one exact-source integration run using the remaining Meteor allowance
+in the accepted local Linux Docker lane. Protected host installation, application
+build/push/deployment and production access remain separate scopes.
 
 ### Decision P1-D1: fixed catalog impact versus mixed-impact V1 controls
 
@@ -871,8 +1005,9 @@ Two concrete current-source witnesses reproduce the same underlying conflict:
   This closes the policy choice rather than reopening it per control.
 - [x] Implement the shared descriptor, typed unavailable observations, closed
   per-control sufficient failure proofs, Node evaluator and local regressions.
-- [ ] Complete supported Meteor verification of the new shared contracts and
-  extended Mongo fixture; local checks do not complete that runtime gate.
+- [x] Complete this original host-contract/Mongo Meteor gate in native slot 9
+  on exact committed source 92d7d28b. The later P1-D5 amendment has its own open
+  current runtime gate; it does not reopen or repeat the accepted older run.
 - [ ] Implement/qualify actual host acquisition, protected installation and
   forced-command execution. These remain distinct unchecked requirements.
 
@@ -934,9 +1069,9 @@ and catalog digest. The host wire has its own independently checked version.
 - [x] Add two real shared Node/Meteor test cases and extend the existing nonce/
   storage/summary fixture with a partial-host CRITICAL finding beside the UDP
   HIGH finding. These are source additions; their actual Meteor execution is pending.
-- [ ] Complete the supported Meteor gate on the committed source before using
-  these shared contracts for the protected host implementation. Four existing
-  project invocations remain; none is reserved or consumed by this source batch.
+- [x] Complete this source checkpoint's supported Meteor gate on committed
+  source 92d7d28b in native slot 9. This historical allowance statement is
+  superseded by the sole current counter; the amended P1-D5 contract is separate.
 - [ ] Implement/qualify the actual Bash acquisition/emitter, installed descriptor
   and helper hashes, JQ/canonical serialization, independent identity/receipt join,
   protected forced-command execution and coordinated V2 cutover. No host install,
@@ -975,12 +1110,12 @@ or deployment is implied. Older exact receipts are retained rather than rerun.
 - [x] Release the slot-7 reservation unused; actual Meteor invocations: zero.
   Four existing conditional invocations remain. The already-authorized fresh
   run is still unspent; re-reserve before any supported retry after unblock.
-- [ ] Account owner resolves/reviews the GitHub billing lock; then resume the
-  same committed source's authorized checks. No plan/payment/budget change is
-  authorized here. Do not retry blindly or substitute another verification lane.
-- [ ] Run and retain actual shared-runtime, real-Mongo and image evidence. No
-  artifact, successful CI outcome, runtime parity or release qualification exists
-  for this commit yet. Local typecheck/lint/Node evidence remains separate.
+- Historical GitHub alternative: the billing lock was not resolved by this work.
+  Phil subsequently approved the separate native Linux lane; billing setup is
+  not a current prerequisite for its supported application integration gate.
+- [x] Retain shared-runtime/real-Mongo proof for this source in native slot 9.
+  This closes the application test action only. GitHub check failures and missing
+  CI/image/release evidence remain distinct; no image qualification is inferred.
 
 Private receipt: `host-observations-ci-startup-block.json` under the existing
 native Phase 1 evidence directory. No registry image, protected-host operation,

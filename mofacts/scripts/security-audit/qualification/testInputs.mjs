@@ -29,6 +29,8 @@ export const TEST_INPUTS = Object.freeze([
   ['deploy/mongodb/read-default-concern-role.json', 'file'],
   ['deploy/Caddyfile.self-hosted.example', 'file'],
   ['deploy/security-audit/host-exposure-audit.sh', 'file'],
+  ['deploy/security-audit/host-observations.sh', 'file'],
+  ['deploy/security-audit/host-mongo-connectivity.js', 'file'],
   ['deploy/security-audit/release-receipt.sh', 'file'],
   ['deploy/security-audit/security-audit.conf.example', 'file'],
   ['deploy/security-audit/host-listener-policy.awk', 'file'],

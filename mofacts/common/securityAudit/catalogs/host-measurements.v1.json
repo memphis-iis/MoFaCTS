@@ -7,9 +7,9 @@
     "host-listeners-v1": { "inspectedListenerCount": "count", "unexpectedListenerCount": "count", "unexpectedUdpListenerCount": "count" },
     "application-listener-v1": { "expectedListenerPresent": "boolean" },
     "sidecar-policy-v1": { "absenceRequired": "boolean", "listenerCount": "count", "helperContainerCount": "count", "endpointDeclarationCount": "count", "publicationCount": "count", "loopbackOnly": "boolean" },
-    "docker-publications-v1": { "inspectedContainerCount": "count", "unexpectedPublicationCount": "count", "unexpectedUdpPublicationCount": "count", "privateNetworkModeCount": "count" },
+    "docker-publications-v1": { "inspectedContainerCount": "count", "expectedApplicationPublicationCount": "count", "unexpectedPublicationCount": "count", "unexpectedUdpPublicationCount": "count", "privateNetworkModeCount": "count" },
     "firewall-policy-v1": { "firewallActive": "boolean", "defaultDenyInbound": "boolean", "publicWebAllowed": "boolean", "scopedSshOnly": "boolean", "unexpectedAllowRuleCount": "count", "unexpectedUdpAllowRuleCount": "count" },
-    "reverse-proxy-v1": { "configuredHostMatched": "boolean", "httpLoopbackOnly": "boolean", "websocketLoopbackOnly": "boolean", "inspectedUpstreamCount": "count" },
+    "reverse-proxy-v1": { "configuredHostMatched": "boolean", "apacheActive": "boolean", "apacheConfigValid": "boolean", "httpLoopbackOnly": "boolean", "websocketLoopbackOnly": "boolean", "inspectedUpstreamCount": "count" },
     "mongodb-unauthenticated-v1": { "unauthenticatedReadAccepted": "boolean" },
     "mongodb-scoped-roles-v1": { "authenticatedConnectivity": "boolean", "replicaSetMatched": "boolean", "applicationGrantsMatched": "boolean", "readConcernRoleMatched": "boolean", "sidecarAccountStateMatched": "boolean" },
     "redis-policy-v1": { "unauthenticatedCommandAccepted": "boolean", "auditConnectivity": "boolean", "applicationConnectivity": "boolean", "hostPublicationCount": "count" }

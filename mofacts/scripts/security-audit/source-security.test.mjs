@@ -7,6 +7,7 @@ import './tests/reportStorageV2.test.mjs';
 import './tests/receiverIdentity.test.mjs';
 import './tests/udpExposureV2.test.mjs';
 import './tests/hostObservationsV2.test.mjs';
+import './tests/hostCollectorV2.test.mjs';
 import './tests/checkCiDependencies.test.mjs';
 import './tests/hostMongoRoles.test.mjs';
 import './tests/hostSidecarPolicy.test.mjs';

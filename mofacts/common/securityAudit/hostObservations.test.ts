@@ -9,7 +9,7 @@ import { hostFixture, hostNow, unavailableFact } from '../../scripts/security-au
 
 describe('V2 host observation shared Node/Meteor parity', function() {
   it('loads the fixed descriptor and keeps unavailable measurements explicit', async function() {
-    expect(await hostObservationContractDigest()).to.equal('a49086834e0b4fa32885aa43117a58ddf5b9bcfd73e3f61b3931bbba7a1bdf28');
+    expect(await hostObservationContractDigest()).to.equal('4646d0cae686fe24499a554e27101fc95a8266d3e3f3308d7a3396d9c91696e0');
     const fixture = await hostFixture();
     unavailableFact(fixture, 'redis', 'applicationConnectivity', 'timeout');
     expect(await parseHostObservationBytes(Buffer.from(canonicalAuditJson(fixture) + '\n'), hostNow)).to.deep.equal(fixture);
@@ -35,5 +35,20 @@ describe('V2 host observation shared Node/Meteor parity', function() {
     expect(() => parseAuditEvidence('redis-policy-v1', 'FAIL', {
       summary: 'Synthetic conclusive host failure.', metrics,
     })).to.throw();
+  });
+
+  it('requires the exact app publication and independent Apache active/configuration facts', async function() {
+    const fixture = await hostFixture();
+    expect(hostMeasurementsOutcome('docker-publications-v1', { expectedApplicationPublicationCount: 0 })).to.equal('FAIL');
+    expect(hostMeasurementsOutcome('docker-publications-v1', { expectedApplicationPublicationCount: 2 })).to.equal('FAIL');
+    const docker = Object.fromEntries(Object.entries(fixture.observations.docker!).filter(([key]) => key !== 'expectedApplicationPublicationCount')
+      .map(([key, fact]) => [key, fact.value]));
+    expect(hostMeasurementsOutcome('docker-publications-v1', docker)).to.equal('ERROR');
+    for (const key of ['apacheActive', 'apacheConfigValid']) {
+      expect(hostMeasurementsOutcome('reverse-proxy-v1', { [key]: false })).to.equal('FAIL');
+      const proxy = Object.fromEntries(Object.entries(fixture.observations.proxy!).filter(([name]) => name !== key)
+        .map(([name, fact]) => [name, fact.value]));
+      expect(hostMeasurementsOutcome('reverse-proxy-v1', proxy)).to.equal('ERROR');
+    }
   });
 });

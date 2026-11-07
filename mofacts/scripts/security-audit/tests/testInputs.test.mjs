@@ -40,6 +40,19 @@ test('combines reviewed supplemental inputs without changing build source or cla
   await assert.rejects(fs.stat(path.join(destination, 'settings.json')), { code: 'ENOENT' });
 });
 
+test('captures both V2 acquisition readers and binds changes to their supplemental digest', async (t) => {
+  const { candidate, repository, destination } = await fixture(t);
+  const names = ['deploy/security-audit/host-observations.sh', 'deploy/security-audit/host-mongo-connectivity.js'];
+  for (const name of names) await fs.writeFile(path.join(repository, name), 'first public acquisition source');
+  const before = await collectTestInputs(candidate, repository, destination);
+  for (const name of names) assert.equal(await fs.readFile(path.join(destination, name), 'utf8'), 'first public acquisition source');
+  await fs.writeFile(path.join(repository, names[1]), 'changed public acquisition source');
+  const changedDestination = destination + '-changed'; await fs.mkdir(changedDestination);
+  const after = await collectTestInputs(candidate, repository, changedDestination);
+  assert.notEqual(before.supplementalDigestSha256, after.supplementalDigestSha256);
+  assert.equal(before.buildLocalTreeDigestSha256, after.buildLocalTreeDigestSha256);
+});
+
 test('rejects a supplemental file that would replace captured build bytes', async (t) => {
   const { candidate, repository, destination } = await fixture(t);
   const before = await inspectSnapshotTree(candidate);

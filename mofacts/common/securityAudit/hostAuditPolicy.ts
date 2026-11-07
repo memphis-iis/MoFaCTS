@@ -58,10 +58,11 @@ export function hostFailureEstablished(id: string, m: Measurements): boolean {
     case 'sidecar-policy-v1': return no('loopbackOnly')
       || (yes('absenceRequired') && ['listenerCount', 'helperContainerCount', 'endpointDeclarationCount', 'publicationCount'].some(positive))
       || (typeof m.listenerCount === 'number' && m.listenerCount !== 0 && m.listenerCount !== 2);
-    case 'docker-publications-v1': return positive('unexpectedPublicationCount') || positive('unexpectedUdpPublicationCount') || positive('privateNetworkModeCount');
+    case 'docker-publications-v1': return positive('unexpectedPublicationCount') || positive('unexpectedUdpPublicationCount') || positive('privateNetworkModeCount')
+      || (typeof m.expectedApplicationPublicationCount === 'number' && m.expectedApplicationPublicationCount !== 1);
     case 'firewall-policy-v1': return ['firewallActive', 'defaultDenyInbound', 'publicWebAllowed', 'scopedSshOnly'].some(no)
       || positive('unexpectedAllowRuleCount') || positive('unexpectedUdpAllowRuleCount');
-    case 'reverse-proxy-v1': return ['configuredHostMatched', 'httpLoopbackOnly', 'websocketLoopbackOnly'].some(no);
+    case 'reverse-proxy-v1': return ['configuredHostMatched', 'apacheActive', 'apacheConfigValid', 'httpLoopbackOnly', 'websocketLoopbackOnly'].some(no);
     case 'mongodb-unauthenticated-v1': return yes('unauthenticatedReadAccepted');
     case 'mongodb-scoped-roles-v1': return ['replicaSetMatched', 'applicationGrantsMatched', 'readConcernRoleMatched', 'sidecarAccountStateMatched'].some(no);
     case 'redis-policy-v1': return yes('unauthenticatedCommandAccepted') || positive('hostPublicationCount');
