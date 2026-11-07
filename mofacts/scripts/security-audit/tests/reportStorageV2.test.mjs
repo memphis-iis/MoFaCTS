@@ -58,6 +58,20 @@ test('V2 storage: independently validate before insertion, preserve flat report 
   assert.equal(db.rows.length,1);
 });
 
+test('V2 summary reads use one exact schema/id lookup and never fetch controls or legacy rows', async () => {
+  const report = await errorReport(), db = database([stored(report), { schema: 'SecurityAuditReportV1', reportId: 'retained-v1' }]);
+  const result = await db.store.getSummary(report.reportId);
+  assert.equal(result.reportId, report.reportId);
+  assert.equal(Object.hasOwn(result, 'sections'), false);
+  assert.equal(Object.hasOwn(result, 'evidence'), false);
+  assert.equal(db.calls.length, 1);
+  assert.deepEqual(db.calls[0].selector, { schema: 'SecurityAuditReportV2', reportId: report.reportId });
+  assert.equal(db.calls[0].options.fields['sections.internal.status'], 1);
+  assert.equal(db.calls[0].options.fields['sections.internal.controls'], undefined);
+  assert.equal(await db.store.getSummary('retained-v1'), null);
+  await assert.rejects(db.store.getSummary(''));
+});
+
 test('V2 storage: bounded projected history excludes V1 while indexed active latest is independent of the 200-row window',async()=>{
   const template=await errorReport();const rows=[];
   for(let i=0;i<201;i++)rows.push(stored(await resign({...template,reportId:`synthetic-history-${i}`})));

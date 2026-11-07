@@ -1,0 +1,65 @@
+# Optional, disposable previous-image storage prequalification. No host ports,
+# Docker socket, existing volumes, deployed settings, learner or provider data.
+services:
+  mongo:
+    image: ${ROLLBACK_MONGO_IMAGE:?exact existing Mongo image required}
+    user: '999:999'
+    entrypoint: ['mongod']
+    command: ['--replSet', 'rollback-rs', '--bind_ip_all', '--wiredTigerCacheSizeGB', '0.25']
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.35
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    volumes:
+      - type: bind
+        source: ${ROLLBACK_JOB:?private job required}/mongo-data
+        target: /data/db
+    tmpfs:
+      - /tmp:rw,nosuid,noexec,size=64m,mode=1777
+    networks: [qualification]
+  redis:
+    image: ${ROLLBACK_REDIS_IMAGE:?exact existing Redis image required}
+    command: ['sh', '-c', 'exec redis-server --save "" --appendonly no --requirepass "$$(cat /qualification/redis.password)"']
+    mem_limit: 96m
+    memswap_limit: 96m
+    cpus: 0.1
+    pids_limit: 64
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    volumes:
+      - type: bind
+        source: ${ROLLBACK_JOB:?private job required}/redis.password
+        target: /qualification/redis.password
+        read_only: true
+    networks: [qualification]
+  app:
+    image: ${ROLLBACK_PREVIOUS_IMAGE:?approved immutable previous platform required}
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    environment:
+      ROOT_URL: http://app:3000
+      MONGO_URL: mongodb://mongo:27017/${ROLLBACK_NAMESPACE:?owned database required}?replicaSet=rollback-rs
+      EXPECTED_MONGO_DB_NAME: ${ROLLBACK_NAMESPACE:?owned database required}
+      MOFACTS_AUDIT_ROLLBACK_NAMESPACE: ${ROLLBACK_NAMESPACE:?owned database required}
+      MOFACTS_MONGO_REPLICA_SET_NAME: rollback-rs
+      METEOR_REACTIVITY_ORDER: changeStreams
+      DDP_TRANSPORT: sockjs
+      PORT: '3000'
+      METEOR_SETTINGS_FILE: /qualification/settings.json
+      MOFACTS_REQUIRE_REDIS: 'true'
+      REDIS_URL: ${ROLLBACK_REDIS_URL:?synthetic private Redis URL required}
+    volumes:
+      - type: bind
+        source: ${ROLLBACK_JOB:?private job required}
+        target: /qualification
+        read_only: true
+    networks: [qualification]
+networks:
+  qualification:
+    internal: true

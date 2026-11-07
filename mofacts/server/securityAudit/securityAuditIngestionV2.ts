@@ -6,16 +6,18 @@ import { parseSecurityAuditReportV2, type AuditReportReadContext, type SecurityA
 export const AUDIT_V2_MAX_BODY_BYTES = 2 * 1024 * 1024;
 export const AUDIT_V2_REQUEST_SKEW_MS = 5 * 60 * 1000;
 type AuditHeaders = Readonly<{ timestamp: unknown; nonce: unknown; signature: unknown }>;
+type AuditV2TransportInput = { body: Buffer; headers: AuditHeaders; secret: string; now: Date };
 
 export function signAuditRequestV2(secret: string, timestamp: string, nonce: string, body: Buffer): string {
   const digest = crypto.createHash('sha256').update(body).digest('hex');
   return crypto.createHmac('sha256', secret).update(`${timestamp}.${nonce}.${digest}`).digest('hex');
 }
 
-export async function authenticateAuditRequestV2(args: {
-  body: Buffer; headers: AuditHeaders; secret: string; now: Date;
-  receiver: Omit<Extract<AuditReportReadContext, { purpose: 'ingestion' }>, 'purpose' | 'authenticatedAt' | 'uploadedAt'>;
-}): Promise<{ report: SecurityAuditReportV2; nonce: string }> {
+// Shared transport verification runs before receiver metadata acquisition. It
+// returns untrusted JSON; report validation still belongs to the server/store.
+export function verifyAuditRequestV2(args: AuditV2TransportInput): {
+  value: unknown; nonce: string; authenticatedAt: string; uploadedAt: string;
+} {
   if (typeof args.secret !== 'string' || args.secret.length < 32 || !Buffer.isBuffer(args.body)
     || args.body.length > AUDIT_V2_MAX_BODY_BYTES) throw new Error('Audit V2 transport input is invalid');
   const timestamp = typeof args.headers.timestamp === 'string' ? args.headers.timestamp.trim() : '';
@@ -34,9 +36,16 @@ export async function authenticateAuditRequestV2(args: {
   let value: unknown;
   try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(args.body)); }
   catch { throw new Error('Audit V2 request body is invalid JSON'); }
-  const report = await parseSecurityAuditReportV2(value, { ...args.receiver, purpose: 'ingestion',
-    authenticatedAt: new Date(requestTime).toISOString(), uploadedAt: args.now.toISOString() });
+  return { value, nonce, authenticatedAt: new Date(requestTime).toISOString(), uploadedAt: args.now.toISOString() };
+}
+
+export async function authenticateAuditRequestV2(args: AuditV2TransportInput & {
+  receiver: Omit<Extract<AuditReportReadContext, { purpose: 'ingestion' }>, 'purpose' | 'authenticatedAt' | 'uploadedAt'>;
+}): Promise<{ report: SecurityAuditReportV2; nonce: string }> {
+  const verified = verifyAuditRequestV2(args);
+  const report = await parseSecurityAuditReportV2(verified.value, { ...args.receiver, purpose: 'ingestion',
+    authenticatedAt: verified.authenticatedAt, uploadedAt: verified.uploadedAt });
   // Storage owns replay exclusion through the existing unique nonce/report/digest
   // indexes. Authentication alone never claims a nonce has been consumed.
-  return { report, nonce };
+  return { report, nonce: verified.nonce };
 }

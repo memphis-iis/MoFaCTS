@@ -7,7 +7,7 @@ import type { AuditReportSummaryV2 } from '../../common/securityAudit/summaryTyp
 
 type Document = Record<string, unknown>;
 type QueryOptions = { fields?: Record<string, number>; sort?: Record<string, number>; limit?: number };
-type Reports = {
+export type AuditReportCollectionV2 = {
   find(selector: Document, options: QueryOptions): { fetchAsync(): Promise<Document[]> };
   findOneAsync(selector: Document, options?: QueryOptions): Promise<Document | null | undefined>;
   insertAsync(document: Document): Promise<unknown>;
@@ -79,7 +79,7 @@ function summary(record: Document, catalog: AuditCatalog): AuditReportSummaryV2 
 
 // No collection is created/imported here. Binding stays with the owning app
 // composition; the storage model still needs previous-image qualification.
-export function createAuditReportStoreV2(reports: Reports, now: () => Date) {
+export function createAuditReportStoreV2(reports: AuditReportCollectionV2, now: () => Date) {
   async function project(row: Document, catalogs: Map<string, Promise<AuditCatalog>>) {
     proofRecord(row, SUMMARY_KEYS);
     const coordinates: AuditCatalogCoordinates = {
@@ -129,6 +129,11 @@ export function createAuditReportStoreV2(reports: Reports, now: () => Date) {
       proofString(ingestNonce, /^[A-Za-z0-9_-]{22,128}(?![\s\S])/, 128);
       if (serverDate(expiresAt).getTime() < serverDate(ingestedAt).getTime()) invalid();
       return parseSecurityAuditReportV2(envelope, { purpose: 'retained' });
+    },
+    async getSummary(reportId: unknown): Promise<AuditReportSummaryV2 | null> {
+      const id = proofString(reportId, /^[A-Za-z0-9][A-Za-z0-9._-]*(?![\s\S])/, 160);
+      const row = await reports.findOneAsync({ schema: SCHEMA, reportId: id }, { fields: { ...SUMMARY_FIELDS } });
+      return row ? project(row, new Map()) : null;
     },
   };
 }

@@ -1,6 +1,6 @@
 # V2 host acquisition candidate
 
-**Local source and synthetic Linux fixtures verified; not installed or activated.** The active
+**Source, Linux fixtures, exact-source Meteor and staging2 protected-channel qualification verified; V1 restored and V2 inactive.** The active
 `host-exposure-audit.sh` and its scheduled V1 caller remain unchanged. Continue
 from the [written plan](../../docs-developer/security-audit-durable-redesign-plan.md)
 and [current checklist](../../docs-developer/security-audit-durable-redesign-status.md).
@@ -76,8 +76,12 @@ node --test mofacts/scripts/security-audit/tests/hostCollectorV2.test.mjs
 The native fixture passed all 26 cases on Ubuntu-MoFaCTS. The full source-security
 suite passed 134/135 tests, zero failed; the one existing V1 CI-only fixture was
 skipped. Full typecheck/lint, explicit probe/fixture lint and Bash syntax also
-passed. The new shared Meteor case and amended descriptor still need supported
-Meteor execution before this batch's runtime gate is satisfied.
+passed. Supported native Meteor slot 10 on commit `6a7acc1e` also passed:
+986 server and 1,237 Chromium cases, zero failed/hooks, 15/seven pending. The
+amended descriptor and new publication/Apache case have actual PASS outcomes.
+This satisfies the source runtime gate. The staging2 protected SSH/install/restore
+window also passed; its exact procedure and receipt are in
+[host qualification](host-qualification-review.md).
 
 Both acquisition files are reviewed supplemental inputs in the existing
 `qualification/testInputs.mjs` capture contract. Its 16 regression tests pass,
@@ -92,5 +96,7 @@ the real Bash/jq/AWK code and shared Node parser/evaluator. It assigns root
 ownership/modes explicitly to the disposable installed-file copies; source mount
 metadata must not weaken the protected-file guard. A skipped fixture or
 standalone Mongo VM success is not Linux emitter or forced-SSH qualification.
-Protected staging installation and real forced-command rejection remain later
-explicit approval/qualification boundaries under plan Section 14.2.
+The actual protected staging2 channel, command substitution, PTY/forwarding
+denials and exact V1 restoration passed on 2026-11-07 under the standing staging2
+permission. These outcomes qualify the pinned host cohort only; report ingestion,
+receiver activation and production installation remain unfinished gates.

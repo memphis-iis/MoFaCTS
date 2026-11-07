@@ -4,6 +4,14 @@ MoFaCTS has an observation-only security audit for `https://mofacts.optimallearn
 
 This assessment intentionally excludes backup, restore, uptime, disk health, capacity, and disaster recovery. The scanners remain independent of application deployment, but the application now receives their sanitized reports through one authenticated endpoint so administrators can review them at `/admin/security-audits`.
 
+The inert V2 collector passed its exact-source Meteor gate and the protected
+staging2 SSH/install/restoration window on 2026-11-07. V1 was restored, including
+its nine PASS controls; no V2 receiver/producer is activated. See the
+[host procedure and exact acceptance](../../deploy/security-audit/host-qualification-review.md).
+The optional [previous-image baseline](../../deploy/security-audit/rollback-runtime.md)
+prepares the separate storage rollback gate using only synthetic private services.
+It does not qualify a candidate image or change production.
+
 ## Schedule and result semantics
 
 The separately authorized [isolated Linux Meteor integration lane](../../deploy/meteor-integration/README.md)
@@ -297,6 +305,7 @@ The separate [V2 host acquisition candidate](../../deploy/security-audit/host-ob
 passes its 26 synthetic Linux fixture cases and the full local source-security
 gate. The approved draft-contract additions preserve the exact app publication
 and independent Apache active/configuration checks. Supported Meteor proof of
-the amended shared contract and protected forced-command installation/rollback
-qualification remain open. The active V1 host entry point is unchanged; this
+the amended contract also passes on `6a7acc1e`: 986 server and 1,237 Chromium
+cases, zero failed/hooks, 15/seven pending. Protected forced-command installation/
+rollback qualification remains open. The active V1 host entry point is unchanged; this
 source checkpoint does not activate the new producer.

@@ -191,6 +191,13 @@ export const COLLECTION_OWNERSHIP = {
     purpose: 'Private retained confidentiality and account-compromise audit reports.',
     notes: 'Server-only. Never publish this collection or add it to the legacy global bridge.',
   },
+  SecurityAuditReportsV2: {
+    mongoName: 'security_audit_reports_v2',
+    globalName: 'SecurityAuditReportsV2',
+    owner: 'security-audit',
+    purpose: 'Private V2 reports isolated from the retained V1 collection for previous-image rollback safety.',
+    notes: 'Server-only. Never publish or add to the legacy global bridge. The inert V2 composition creates it only at coordinated cutover.',
+  },
   TdfMutationJobs: {
     mongoName: 'tdf_mutation_jobs',
     globalName: 'TdfMutationJobs',
