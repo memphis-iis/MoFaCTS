@@ -403,6 +403,31 @@ The report parser must validate:
 - Exact canonical report digest.
 - Exact target origin matching the receiver's `ROOT_URL`.
 
+### 6.3.1 Receiver release projection access (P1-D7 approved 2026-11-07)
+
+The P1-04 receiver needs a platform identity independent of an incoming report.
+The existing protected V1 receipt omits the index/platform/config mapping and
+is readable only through the restricted host channel. Its registry digest cannot
+be presumed to identify a platform manifest. Reuse the workstation release record
+and published-image tuple; Phase 1 requires the image/receipt subset only.
+
+The proposed transport is one versioned credential-free projection in a dedicated
+root-owned metadata-only /etc/mofacts/release directory, shared with the receiver
+read-only at /run/mofacts/release through an optional audit Compose overlay. The
+protected host reader uses the same current projection; no second release record,
+new service/account, Docker socket, SSH credential or AWS app dependency is added.
+Mount the directory so atomic replacement is visible. Preserve root authority,
+minimum app-reader permissions, strict bounds, immutable rollback source and
+actual host image comparison. Missing proof affects audit qualification only.
+
+Phil explicitly approved this persistent application read access, the versioned
+host projection, implementation/testing, bounded staging2 verification after
+required checks, and publication of the plan/acceptance notes. This does not grant
+a fresh Meteor invocation or production access. First qualify identity/malformed/stale/permission/write and
+atomic-replacement tests, then staging2 install/restore of only the changed wrapper
+and receipt. Production/original staging remain excluded. The status record owns
+the exact acceptance evidence, pending decision and current invocation count.
+
 ### 6.4 Producer artifact contract
 
 Each control producer has acquisition adapters and a pure evaluator. Acquisition returns bounded observations; the evaluated producer emits one artifact containing only its catalog IDs, outcomes, and bounded evidence. More than one producer may contribute controls to the same final report section.
