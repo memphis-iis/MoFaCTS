@@ -21,6 +21,10 @@ function fixture(changes = () => {}) {
   })) };
   const records = { 'source-before.json': observation(), 'source-after.json': observation(),
     'meteor-run.json': run, 'test-state.json': { Running: false, OOMKilled: false, ExitCode: 0 },
+    'resource-limits.json': {
+      worker: { memoryBytes: 6144 * 1024 ** 2, memorySwapBytes: 6144 * 1024 ** 2, nanoCpus: 2e9 },
+      mongo: { memoryBytes: 384 * 1024 ** 2, memorySwapBytes: 384 * 1024 ** 2, nanoCpus: 0.25e9 },
+    },
     'isolation.json': { schema: 'NativeIntegrationIsolationV1', dockerSocketAbsent: true,
       workerUid: 2000, effectiveCapabilitiesZero: true, readOnlyMountsVerified: 2, readOnlyFileOperationsRefused: 4, testCopyWritable: true } };
   changes(records);
@@ -47,7 +51,21 @@ test('native receipt preserves pending outcomes and cannot overwrite evidence', 
   assert.equal(receipt.mongoImageId, 'sha256:' + '3'.repeat(64));
   assert.equal(Object.hasOwn(receipt, 'toolImageConfig'), false);
   assert.equal(Object.hasOwn(receipt, 'mongoImageConfig'), false);
+  assert.deepEqual(receipt.limits, { workerMemoryMiB: 6144, mongoMemoryMiB: 384, workerCpus: 2, mongoCpus: 0.25 });
   assert.notEqual(repeatedStatus, 0);
+});
+
+test('native receipt rejects missing, contradictory or excessive Docker resource limits', () => {
+  for (const mutate of [
+    records => { delete records['resource-limits.json']; },
+    records => { records['resource-limits.json'].worker.memoryBytes = 4096 * 1024 ** 2; },
+    records => { records['resource-limits.json'].worker.memorySwapBytes = 8192 * 1024 ** 2; },
+    records => { records['resource-limits.json'].worker.nanoCpus = 3e9; },
+    records => { records['resource-limits.json'].mongo.memoryBytes = 512 * 1024 ** 2; },
+  ]) {
+    const { result, receipt } = fixture(mutate);
+    assert.notEqual(result.status, 0); assert.equal(receipt, undefined);
+  }
 });
 test('native receipt rejects source changes, dirty identity and malformed source digests', () => {
   for (const mutate of [

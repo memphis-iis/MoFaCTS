@@ -40,6 +40,18 @@ const imageId = name => {
   if (!/^sha256:[0-9a-f]{64}$/.test(value)) throw Error('Invalid native image identity');
   return value;
 };
+// Limits are observations from Docker, not a repeated statement of intended
+// command-line values. Independently require the reviewed lane's exact caps.
+const resources = proofRecord(JSON.parse(read('resource-limits.json')), ['worker', 'mongo']);
+const resourceLimit = (value, memoryMiB, nanoCpus) => {
+  const row = proofRecord(value, ['memoryBytes', 'memorySwapBytes', 'nanoCpus']);
+  if (row.memoryBytes !== memoryMiB * 1024 ** 2 || row.memorySwapBytes !== row.memoryBytes || row.nanoCpus !== nanoCpus) {
+    throw Error('Native integration resource limits differ from the approved lane');
+  }
+  return { memoryMiB: row.memoryBytes / 1024 ** 2, cpus: row.nanoCpus / 1e9 };
+};
+const workerLimits = resourceLimit(resources.worker, 6144, 2e9);
+const mongoLimits = resourceLimit(resources.mongo, 384, 0.25e9);
 const receipt = {
   schema: 'NativeMeteorVerificationV1', qualification: 'unqualified', provider: 'operator-linux-docker',
   sourceObservation: after,
@@ -53,7 +65,8 @@ const receipt = {
   startedAt: read('started-at').toString('utf8').trim(),
   finishedAt: read('finished-at').toString('utf8').trim(),
   environments: run.environments.map(({ side, modules, counts, hookFailures }) => ({ side, moduleCount: modules.length, counts, hookFailures })),
-  limits: { workerMemoryMiB: 4096, mongoMemoryMiB: 384, workerCpus: 2, mongoCpus: 0.25 },
+  limits: { workerMemoryMiB: workerLimits.memoryMiB, mongoMemoryMiB: mongoLimits.memoryMiB,
+    workerCpus: workerLimits.cpus, mongoCpus: mongoLimits.cpus },
 };
 fs.writeFileSync(path.join(results, 'native-verification.json'), JSON.stringify(receipt) + '\n', { flag: 'wx', mode: 0o600 });
 console.log(JSON.stringify(receipt));

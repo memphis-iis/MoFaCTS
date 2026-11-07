@@ -59,9 +59,17 @@ ownership restoration. Only the disposable capture/results/cache belong to
 that UID; no host account or application-data ownership is changed.
 
 The complete suite uses a fresh MongoDB 8.0.34 replica set and synthetic CI
-settings. Setup is capped at 2 GiB. The test worker is capped at 4 GiB/two CPUs
+settings. Setup is capped at 2 GiB. The corrected test-worker cap is 6 GiB/two CPUs
 and MongoDB at 384 MiB/0.25 CPUs; there is no swap allowance beyond RAM.
-At least 6,144 MiB available host memory is required before starting. The initial
+At least 8,192 MiB available host memory is required before starting that profile.
+Phil approved publication and one fresh 6 GiB invocation on 2026-11-07; this
+is not standing retry permission. The 4 GiB run on
+7f373eff passed all 987 server tests, including the new receiver/Mongo case, then
+was OOM-killed during client testing. It remains a failed/incomplete full run;
+source/isolation/cleanup diagnostics and partial server evidence are retained.
+The corrected profile records actual Docker memory/swap/CPU settings and rejects
+missing or unexpected caps rather than printing fixed intended values. Earlier
+accepted receipts keep their original observed 4 GiB limits. The initial
 2 GiB and 2.5 GiB caps were exhausted during compilation on staging2. These caps do not promise the build fits. Capacity
 failure remains a failure; never increase limits, add swap, stop the application
 or retry without reviewing the result and existing authorization. Initial image

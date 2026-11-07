@@ -78,7 +78,7 @@ workspace=$(cat "$job/workspace")
 # Leave a host-memory reserve; compilation failure is a failure, never a reason
 # to lift the cap, add swap, restart the live application or retry implicitly.
 available_kib=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
-(( available_kib >= 6144 * 1024 ))
+(( available_kib >= 8192 * 1024 ))
 
 owned() { [[ "$(docker inspect "$1" --format '{{index .Config.Labels "org.mofacts.integration"}}')" == "$name" ]]; }
 cleanup() {
@@ -119,7 +119,7 @@ date -u +%FT%TZ > "$job/results/started-at"
 sha256sum "$job/control/"* > "$job/results/tool-source-run-sha256"
 docker create --init --name "$name-test" --label "$label" --network "$name" \
   --user 2000:2000 --env HOME=/home/mofacts-test \
-  --memory 4096m --memory-swap 4096m --cpus 2 --shm-size 256m \
+  --memory 6144m --memory-swap 6144m --cpus 2 --shm-size 256m \
   --security-opt no-new-privileges --cap-drop ALL \
   --mount "type=bind,src=$job/source,dst=/source,readonly" \
   --mount "type=bind,src=$workspace,dst=/capture,readonly" \
@@ -135,6 +135,10 @@ docker create --init --name "$name-test" --label "$label" --network "$name" \
   --env MOFACTS_MONGO_REPLICA_SET_NAME=mofacts-ci-rs \
   "$image" bash -euc 'node /control/probe-readonly.cjs "$1" "$2"; npm run test:ci' \
   integration /source /capture > /dev/null
+# Retain the actual applied caps, independently checked by the receipt writer.
+worker_limits=$(docker inspect "$name-test" --format '{"memoryBytes":{{json .HostConfig.Memory}},"memorySwapBytes":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}}}')
+mongo_limits=$(docker inspect "$name-mongodb" --format '{"memoryBytes":{{json .HostConfig.Memory}},"memorySwapBytes":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}}}')
+printf '{"worker":%s,"mongo":%s}\n' "$worker_limits" "$mongo_limits" > "$job/results/resource-limits.json"
 set +e
 timeout --signal TERM --kill-after 30s 25m docker start -a "$name-test" > "$job/results/meteor.log" 2>&1
 test_status=$?
