@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import fixture from '../../../../common/securityAudit/fixtures/release-record.fixture.json' with { type: 'json' };
 import { projectReleaseReceipt } from '../../qualification/releaseRecordStore.mjs';
 import { dockerImageFixture } from './dockerImageArchiveFixture.mjs';
@@ -16,6 +17,8 @@ const root = await fs.mkdtemp(path.join(temporary, 'mofacts-host-receipt-test-')
 await fs.chmod(root, 0o700);
 const config = path.join(root, 'security-audit.conf');
 const receipt = path.join(root, 'release-receipt.json');
+const v2Directory = path.join(root, 'release');
+const v2Receipt = path.join(v2Directory, 'release-receipt.json');
 const moduleFile = path.join(root, 'releaseReceipt.mjs');
 const imageModule = path.join(root, 'imageArchiveIdentity.mjs');
 const script = path.join(root, 'release-receipt.sh');
@@ -40,10 +43,11 @@ const source = await fs.readFile(new URL('../../../../../deploy/security-audit/r
 const shellQuote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 try {
   await fs.writeFile(config, 'MOFACTS_APP_CONTAINER=mofacts-app\n', { mode: 0o600 });
-  await fs.writeFile(moduleFile, await fs.readFile(new URL('../../qualification/releaseReceipt.mjs', import.meta.url)), { mode: 0o644 });
+  await fs.writeFile(moduleFile, await fs.readFile(new URL('../../../../common/securityAudit/releaseReceipt.mjs', import.meta.url)), { mode: 0o644 });
   await fs.writeFile(imageModule, await fs.readFile(new URL('../../qualification/imageArchiveIdentity.mjs', import.meta.url)), { mode: 0o644 });
   await fs.writeFile(script, source.replace('CONFIG_FILE=/etc/mofacts/security-audit.conf', 'CONFIG_FILE=' + shellQuote(config))
     .replace('RECEIPT_FILE=/etc/mofacts/release-receipt.json', 'RECEIPT_FILE=' + shellQuote(receipt))
+    .replace('V2_RECEIPT_FILE=/etc/mofacts/release/release-receipt.json', 'V2_RECEIPT_FILE=' + shellQuote(v2Receipt))
     .replace('MODULE_FILE=/usr/local/libexec/mofacts-security-audit/releaseReceipt.mjs', 'MODULE_FILE=' + shellQuote(moduleFile))
     .replace('IMAGE_IDENTITY_MODULE=/usr/local/libexec/mofacts-security-audit/imageArchiveIdentity.mjs', 'IMAGE_IDENTITY_MODULE=' + shellQuote(imageModule)), { mode: 0o755 });
   await imageState(initialImage);
@@ -122,7 +126,46 @@ esac
   await fs.rmdir(receipt + '.lock');
   assert.equal(run('install', input).status, 0);
   assert.deepEqual((await fs.readdir(root)).filter(name => name.startsWith('.release-receipt.')), []);
-  process.stdout.write('Protected host receipt fixtures passed.\n');
+  const publication = { ...fixture.qualification.publishedImage, configDigest: imageId };
+  const v2 = { ...JSON.parse(input), schema: 'MoFaCTSReleaseReceiptV2', publishedImage: publication };
+  // Hold the actual same private config inode: both protocol versions and reads must
+  // serialize before checking whether the other version's receipt exists.
+  const holder = spawn('flock', ['--exclusive', config, 'bash', '-c', 'printf "locked\\n"; read -r signal'], { stdio: ['pipe', 'pipe', 'pipe'] });
+  try {
+    const ready = await once(holder.stdout, 'data');
+    assert.equal(ready[0].toString(), 'locked\n');
+    for (const action of ['read', 'read-v2', 'install', 'install-v2']) {
+      assert.equal(JSON.parse(run(action, action.endsWith('v2') ? JSON.stringify(v2) : input).stdout).reason, 'receipt-writer-busy');
+    }
+  } finally {
+    const closed = once(holder, 'close'); holder.stdin.end('\n'); await closed;
+  }
+  assert.equal(JSON.parse(run('install-v2', JSON.stringify(v2)).stdout).reason, 'old-receipt-still-active');
+  const rollback = path.join(root, 'saved-v1.json');
+  await fs.rename(receipt, rollback);
+  await fs.mkdir(v2Directory, { mode: 0o700 });
+  assert.equal(run('install-v2', JSON.stringify(v2)).status, 0);
+  assert.equal(JSON.parse(run('read-v2').stdout).result, 'MATCH');
+  assert.equal(JSON.parse(run('read').stdout).reason, 'v2-receipt-is-active');
+  assert.equal(run('install', input).status, 1);
+  assert.equal((await fs.stat(v2Receipt)).mode & 0o777, 0o600);
+  const acceptedV2 = await fs.readFile(v2Receipt);
+  await fs.chmod(v2Directory, 0o755);
+  assert.equal(JSON.parse(run('read-v2').stdout).reason, 'unsafe-directory');
+  await fs.chmod(v2Directory, 0o700);
+  const wrong = { ...v2, publishedImage: { ...publication, configDigest: 'sha256:' + 'f'.repeat(64) } };
+  assert.equal(run('install-v2', JSON.stringify(wrong)).status, 1);
+  assert.deepEqual(await fs.readFile(v2Receipt), acceptedV2);
+  await imageState(dockerImageFixture('index', 'different-config'));
+  assert.equal(JSON.parse(run('read-v2').stdout).result, 'MISMATCH');
+  await imageState(initialImage);
+  const nextV2 = { ...v2, deployedAtUtc: '2026-02-01T00:00:00.000Z' };
+  assert.equal(run('install-v2', JSON.stringify(nextV2)).status, 0);
+  assert.equal(JSON.parse(run('read-v2').stdout).receipt.deployedAtUtc, nextV2.deployedAtUtc);
+  await fs.unlink(v2Receipt); await fs.rmdir(v2Directory); await fs.rename(rollback, receipt);
+  assert.equal(JSON.parse(run('read').stdout).result, 'MATCH');
+  assert.deepEqual(await fs.readFile(receipt), prior);
+  process.stdout.write('Protected V1/V2 host receipt and rollback fixtures passed.\n');
 } finally {
   assert.equal(path.dirname(root), temporary);
   assert.ok(path.basename(root).startsWith('mofacts-host-receipt-test-'));

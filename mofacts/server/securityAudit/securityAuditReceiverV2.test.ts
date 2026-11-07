@@ -6,6 +6,8 @@ import { auditDigest, canonicalAuditJson } from '../../common/securityAudit/cano
 import { errorReport } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { signAuditRequestV2 } from './securityAuditIngestionV2.ts';
 import { createSecurityAuditReceiverV2 } from './securityAuditReceiverV2.ts';
+import { createAuditReceiverPlatformIdentity } from './securityAuditReceiverRelease.ts';
+import releaseFixture from '../../common/securityAudit/fixtures/release-record.fixture.json';
 
 const reports = new Mongo.Collection<Record<string, unknown>>(collectionMongoName('SecurityAuditReportsV2'));
 const ownedIds: string[] = [];
@@ -28,6 +30,45 @@ const receiver = createSecurityAuditReceiverV2({
 describe('V2 isolated receiver composition on real MongoDB', function() {
   before(async function() { await receiver.initialize(); });
   after(async function() { await reports.removeAsync({ reportId: { $in: ownedIds } }); });
+
+  it('compares the shared protected receipt before real Mongo persistence and rejects a contradictory platform claim', async function() {
+    let reads = 0;
+    const build = async () => ({ state: 'observed' as const, identity: {
+      schema: 'BuildIdentityV1' as const, baseCommit: releaseFixture.baseCommit,
+      includedUncommittedLocalChanges: false, sourceSnapshotDigestSha256: 'b'.repeat(64),
+    } });
+    const receipt = { schema: 'MoFaCTSReleaseReceiptV2', recordDigestSha256: 'b'.repeat(64),
+      deployedAtUtc: releaseFixture.deployedAtUtc, baseCommit: releaseFixture.baseCommit,
+      includedUncommittedLocalChanges: false, image: releaseFixture.image, tag: releaseFixture.tag,
+      digest: releaseFixture.digest, imageId: releaseFixture.qualification.runningImage.configDigest,
+      publishedImage: releaseFixture.qualification.publishedImage };
+    const service = createSecurityAuditReceiverV2({ createReports: () => reports,
+      async requireAdminUser(userId) { if (userId !== 'synthetic-admin') throw new Error('Synthetic denial'); },
+      loadBuildIdentity: build, platformIdentity: createAuditReceiverPlatformIdentity(build,
+        async () => { reads++; return Buffer.from(JSON.stringify(receipt)); }, 'linux/amd64'),
+      targetOrigin: () => 'https://audit.example', ingestSecret: () => secret, now: () => new Date(clock) });
+    const report = await errorReport();
+    report.reportId = `synthetic-receipt-runtime-${crypto.randomBytes(8).toString('hex')}`; ownedIds.push(report.reportId);
+    report.deployedApplicationRevision = { state: 'observed', value: releaseFixture.baseCommit };
+    report.deployedImageDigest = { state: 'observed', value: 'registry.example.test/mofacts@' + releaseFixture.digest };
+    const encode = async () => { const { digestSha256: _prior, ...payload } = report; void _prior;
+      report.digestSha256 = await auditDigest(payload); return Buffer.from(canonicalAuditJson(report)); };
+    const signed = (body: Buffer) => { const timestamp = String(clock.getTime() / 1000), nonce = crypto.randomBytes(24).toString('base64url');
+      return { timestamp, nonce, signature: signAuditRequestV2(secret, timestamp, nonce, body) }; };
+    let body = await encode();
+    let denied = false;
+    try { await service.receive(body, { timestamp: undefined, nonce: undefined, signature: undefined }); } catch { denied = true; }
+    expect(denied).to.equal(true); expect(reads).to.equal(0);
+    await service.receive(body, signed(body));
+    expect(reads).to.equal(1); expect((await reports.findOneAsync({ reportId: report.reportId }))?.schema).to.equal('SecurityAuditReportV2');
+    report.reportId = `synthetic-receipt-reject-${crypto.randomBytes(8).toString('hex')}`; ownedIds.push(report.reportId);
+    report.deployedImageDigest = { state: 'observed', value: 'registry.example.test/mofacts@sha256:' + 'f'.repeat(64) };
+    body = await encode(); denied = false;
+    try { await service.receive(body, signed(body)); }
+    catch { denied = true; }
+    expect(denied).to.equal(true); expect(reads).to.equal(2);
+    expect(await reports.findOneAsync({ reportId: report.reportId })).to.equal(undefined);
+  });
 
   it('keeps the selected namespace, authenticates first, persists/errors/replays, projects summaries and consumes verified downloads', async function() {
     const report = await errorReport();

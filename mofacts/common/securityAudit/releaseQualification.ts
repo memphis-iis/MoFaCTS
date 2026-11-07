@@ -1,5 +1,6 @@
 import { parseBuildIdentity, type BuildIdentityV1 } from './buildIdentity.ts';
 import { contentDigest, imageDigest, proofBoolean, proofRecord, proofString, sourceCommit } from './proofFields.ts';
+import { parsePublishedImage } from './releaseReceipt.mjs';
 
 // Draft extension of the existing workstation record, not a new release file.
 // Native proof acquisition and runtime enforcement remain separate. Opt-in
@@ -11,10 +12,7 @@ export type CommandObservation =
   | { state: 'unavailable'; reason: 'not-run' | 'spawn-failed' | 'timed-out' };
 
 export type ImageObservation = { configDigest: string; platform: string };
-type PublishedImage = ImageObservation & (
-  | { kind: 'manifest'; digest: string }
-  | { kind: 'index'; digest: string; platformManifestDigest: string }
-);
+type PublishedImage = ReturnType<typeof parsePublishedImage>;
 type SourceVerification =
   | { state: 'observed'; sourceSnapshotDigestSha256: string; result: 'PASS' | 'FAIL' | 'ERROR' }
   | { state: 'unavailable' };
@@ -111,22 +109,7 @@ export function parseImageObservation(value: unknown): ImageObservation {
 
 function parseReleaseIdentityTuple(value: unknown): ReleaseIdentityTuple {
   const record = proofRecord(value, ['sourceVerification', 'builtImage', 'publishedImage', 'runningImage', 'commands']);
-  const published = record.publishedImage;
-  const isIndex = Boolean(published && typeof published === 'object' && 'kind' in published && published.kind === 'index');
-  const publishedRecord = proofRecord(published, isIndex
-    ? ['kind', 'digest', 'platformManifestDigest', 'configDigest', 'platform']
-    : ['kind', 'digest', 'configDigest', 'platform']);
-  if (publishedRecord.kind !== 'index' && publishedRecord.kind !== 'manifest') {
-    throw new Error('Invalid published image kind');
-  }
-  const publishedBase = {
-    digest: imageDigest(publishedRecord.digest),
-    configDigest: imageDigest(publishedRecord.configDigest),
-    platform: platform(publishedRecord.platform),
-  };
-  const publishedImage: PublishedImage = isIndex
-    ? { ...publishedBase, kind: 'index', platformManifestDigest: imageDigest(publishedRecord.platformManifestDigest) }
-    : { ...publishedBase, kind: 'manifest' };
+  const publishedImage = parsePublishedImage(record.publishedImage);
   const running = proofRecord(record.runningImage, ['configDigest', 'platform', 'baseCommit']);
   const commandRecord = proofRecord(record.commands, RELEASE_PROOF_COMMANDS);
   const commands = Object.fromEntries(

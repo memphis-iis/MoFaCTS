@@ -10,6 +10,78 @@ release, or close Phase 0. See the [audit status](../../docs-developer/security-
 
 ## Authority and stored data
 
+### Inert V2 receiver projection (P1-D7)
+
+The single standalone parser now lives at
+`mofacts/common/securityAudit/releaseReceipt.mjs`. Node, Meteor and the protected
+host reader use that source. The old source path under `qualification/` is removed;
+no forwarding module is retained. V1 wire bytes/actions remain unchanged until
+coordinated cutover. Installed V1 tooling is not silently upgraded by a source edit.
+
+The opt-in `project-v2` operation uses the existing authoritative record plus an
+explicit published-image tuple from the workstation's retained publication
+observation. Its shape is the existing `publishedImage` contract: manifest or
+index digest, config digest, platform, and an explicit platform-manifest digest
+for an index. The tuple must match the record's registry digest and image ID;
+any supplied qualification tuple must also agree. Missing mapping is an error,
+never a guessed tag/config/index substitution. Phase 3 proof is not required to
+project a valid ordinary eight-field record. Projection is an identity statement,
+not authenticated source/image/release qualification.
+
+```sh
+node mofacts/scripts/security-audit/qualification/releaseRecordStore.mjs \
+  project-v2 "$release_record" "$published_image_observation" > "$private_transfer"
+```
+
+The tuple input is a bounded JSON file containing only the existing published-image
+object, not an entire registry response, CI smoke tuple or new release authority.
+The resulting `MoFaCTSReleaseReceiptV2` contains only bounded public identity
+fields and the existing record's SHA-256; it contains no credentials or settings.
+
+At authorized cutover, the root deployment owner saves the current V1 receipt
+and tooling for explicit rollback, removes the old *active* receipt, provisions
+`/etc/mofacts/release` as root:root 0700, and uses `install-v2` on the protected
+receipt tool. It writes one root:root 0600 `release-receipt.json` atomically.
+`read-v2` checks that mapping against the actual running image config/revision
+and platform. V1 and V2 actions explicitly reject simultaneous active receipts;
+they never select another path on failure. A shared kernel lock on the existing
+root-private 0600 configuration inode serializes both generations' checks and
+writes; reads take that same lock in shared mode. Busy acquisition is explicit
+unavailability, and process exit releases the kernel lock. The existing per-file
+interruption marker remains visible for owner recovery. No lock file is created
+by a read. The deployment owner must leave that configuration inode unchanged
+through a receipt transition; the qualification window retains its fingerprint.
+The existing restricted host reader
+must be upgraded/tested in the same coordinated change to use `read-v2`.
+
+Add `deploy/security-audit/receiver-release.compose.yml` as the last optional
+Compose overlay only after provisioning the protected directory. It mounts only
+that directory read-only at `/run/mofacts/release`, with automatic path creation
+disabled. The current runtime UID is root; the reader requires root-owned 0700/
+0600 metadata. A different runtime UID requires an explicit reviewed reader
+permission contract, not automatic chmod or a startup retry. Never mount the
+parent `/etc/mofacts`, which contains private configuration. Directory mounting
+lets the app see atomic receipt replacement without recreating its container.
+
+`securityAuditReceiverRelease.ts` is inert: it reads only when invoked after
+ingestion authentication, bounds and validates the current file, checks the
+embedded revision/dirty flag and platform, and resolves a platform manifest
+instead of treating an index digest as one. It reopens the file per request.
+Missing/malformed/conflicting proof stays explicit audit unavailability/ERROR;
+ordinary startup, health, login and default Compose remain unchanged. The
+receiver factory still requires an explicitly supplied independent platform
+adapter; no route is activated by this implementation.
+
+Required acceptance before protected installation: full typecheck/lint,
+source-security and affected storage/capture tests, root installer/reader
+fixtures, actual read-only container write/chmod denial and atomic replacement/
+rollback, plus fresh supported Meteor parity/receiver proof. Staging2 verification
+is authorized after those checks; production/original staging remain excluded.
+If that verification fails, remove the V2 mount/active receipt and restore the
+exact saved V1 receipt/tooling through the deployment owner. Keep both version
+contracts only while their existing rollback/provenance consumers remain; no V1
+historical report UI or alternate active release authority is introduced.
+
 Keep the existing operator-selected `ProdReleaseRecordPath` authoritative. The
 Node helper `mofacts/scripts/security-audit/qualification/releaseRecordStore.mjs`
 accepts historical six-field records and current eight-field records, with the

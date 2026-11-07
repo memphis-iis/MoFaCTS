@@ -6,6 +6,7 @@ import './tests/ingestionV2.test.mjs';
 import './tests/reportStorageV2.test.mjs';
 import './tests/receiverIdentity.test.mjs';
 import './tests/receiverCompositionV2.test.mjs';
+import './tests/receiverRelease.test.mjs';
 import './tests/udpExposureV2.test.mjs';
 import './tests/hostObservationsV2.test.mjs';
 import './tests/hostCollectorV2.test.mjs';

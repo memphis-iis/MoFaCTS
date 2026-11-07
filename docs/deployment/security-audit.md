@@ -12,6 +12,11 @@ The optional [previous-image baseline](../../deploy/security-audit/rollback-runt
 prepares the separate storage rollback gate using only synthetic private services.
 It does not qualify a candidate image or change production.
 
+The approved P1-D7 source draft adds a shared versioned credential-free release
+projection and an optional read-only receiver directory. It does not activate a
+V2 route, install a host receipt or alter the default Compose setup. See the
+[projection, permissions and rollback contract](../../deploy/security-audit/release-records.md#inert-v2-receiver-projection-p1-d7).
+
 ## Schedule and result semantics
 
 The separately authorized [isolated Linux Meteor integration lane](../../deploy/meteor-integration/README.md)

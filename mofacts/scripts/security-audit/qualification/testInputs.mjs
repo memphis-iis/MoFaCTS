@@ -32,6 +32,7 @@ export const TEST_INPUTS = Object.freeze([
   ['deploy/security-audit/host-observations.sh', 'file'],
   ['deploy/security-audit/host-mongo-connectivity.js', 'file'],
   ['deploy/security-audit/release-receipt.sh', 'file'],
+  ['deploy/security-audit/receiver-release.compose.yml', 'file'],
   ['deploy/security-audit/security-audit.conf.example', 'file'],
   ['deploy/security-audit/host-listener-policy.awk', 'file'],
   ['deploy/security-audit/host-firewall-policy.awk', 'file'],

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { INTERNAL_CONTROL_DEFINITIONS } from './internal-audit-contract.mjs';
-import { parseReleaseReceipt } from './qualification/releaseReceipt.mjs';
+import { parseReleaseReceipt } from '../../common/securityAudit/releaseReceipt.mjs';
 
 const execute = promisify(execFile);
 const tag = 'tag:staging2-audit';

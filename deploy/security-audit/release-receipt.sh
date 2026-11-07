@@ -5,13 +5,14 @@ set -euo pipefail
 export LC_ALL=C
 CONFIG_FILE=/etc/mofacts/security-audit.conf
 RECEIPT_FILE=/etc/mofacts/release-receipt.json
+V2_RECEIPT_FILE=/etc/mofacts/release/release-receipt.json
 MODULE_FILE=/usr/local/libexec/mofacts-security-audit/releaseReceipt.mjs
 IMAGE_IDENTITY_MODULE=/usr/local/libexec/mofacts-security-audit/imageArchiveIdentity.mjs
 
 action="${1:-}"
 fail() {
   printf '{"state":"unavailable","reason":"%s"}\n' "$1"
-  if [[ "$action" == read ]]; then exit 0; else exit 1; fi
+  if [[ "$action" == read || "$action" == read-v2 ]]; then exit 0; else exit 1; fi
 }
 secure_file() {
   [[ -f "$1" && ! -L "$1" && "$(stat -c '%u:%g:%a:%h' -- "$1")" == "0:0:$2:1" ]]
@@ -29,9 +30,32 @@ secure_directory() {
     target="$(dirname -- "$target")"
   done
 }
-[[ $# -eq 1 && ( "$1" == read || "$1" == install ) ]] || fail invalid-action
+[[ $# -eq 1 && ( "$1" == read || "$1" == install || "$1" == read-v2 || "$1" == install-v2 ) ]] || fail invalid-action
 [[ "$(id -u)" == 0 ]] || fail root-required
+# Both schema generations share one kernel lock on the existing root-private
+# configuration inode. Version-specific lock paths cannot serialize their absence
+# checks. Other users cannot open the 0600 lock target; readers create no file.
+secure_directory "$(dirname -- "$CONFIG_FILE")" || fail unsafe-directory
+secure_file "$CONFIG_FILE" 600 || fail protected-config-unavailable
+command -v flock >/dev/null || fail flock-required
+exec {receipt_lock_fd}< "$CONFIG_FILE" || fail receipt-lock-unavailable
+if [[ "$action" == read || "$action" == read-v2 ]]; then
+  flock --shared --nonblock "$receipt_lock_fd" || fail receipt-writer-busy
+else
+  flock --exclusive --nonblock "$receipt_lock_fd" || fail receipt-writer-busy
+fi
+receipt_cli=runReceiptCli
+if [[ "$action" == read-v2 || "$action" == install-v2 ]]; then
+  [[ ! -e "$RECEIPT_FILE" && ! -L "$RECEIPT_FILE" ]] || fail old-receipt-still-active
+  RECEIPT_FILE=$V2_RECEIPT_FILE
+  receipt_cli=runReceiptV2Cli
+  [[ -d "$(dirname "$RECEIPT_FILE")" && ! -L "$(dirname "$RECEIPT_FILE")"
+    && "$(stat -c '%u:%g:%a' "$(dirname "$RECEIPT_FILE")")" == 0:0:700 ]] || fail unsafe-directory
+else
+  [[ ! -e "$V2_RECEIPT_FILE" && ! -L "$V2_RECEIPT_FILE" ]] || fail v2-receipt-is-active
+fi
 secure_directory /etc || fail unsafe-directory
+secure_directory "$(dirname -- "$RECEIPT_FILE")" || fail unsafe-directory
 secure_directory "$(dirname -- "$CONFIG_FILE")" || fail unsafe-directory
 secure_directory "$(dirname -- "$MODULE_FILE")" || fail unsafe-directory
 secure_file "$CONFIG_FILE" 600 || fail protected-config-unavailable
@@ -62,13 +86,15 @@ revision="$(docker image inspect --format '{{index .Config.Labels "org.openconta
 module_source="$(cat -- "$MODULE_FILE")"
 observe() {
   local result
+  local -a identity_args=("$image_id" "$revision")
+  if [[ "$receipt_cli" == runReceiptV2Cli ]]; then identity_args+=("linux/amd64"); fi
   result="$(docker exec -i "$container_id" node --input-type=module \
-    -e "$module_source"$'\nawait runReceiptCli(process.argv.slice(1));' \
-    "$image_id" "$revision" < "$1" 2>/dev/null)" || return 1
+    -e "$module_source"$'\nawait '"$receipt_cli"'(process.argv.slice(1));' \
+    "${identity_args[@]}" < "$1" 2>/dev/null)" || return 1
   [[ "$(docker inspect --format '{{.Id}}' "$MOFACTS_APP_CONTAINER" 2>/dev/null)" == "$container_id" ]] || return 1
   printf '%s\n' "$result"
 }
-if [[ "$1" == read ]]; then
+if [[ "$action" == read || "$action" == read-v2 ]]; then
   [[ -e "$RECEIPT_FILE" || -L "$RECEIPT_FILE" ]] || fail not-installed
   secure_file "$RECEIPT_FILE" 600 || fail unsafe-receipt
   [[ "$(stat -c '%s' -- "$RECEIPT_FILE")" -le 8192 ]] || fail invalid-receipt

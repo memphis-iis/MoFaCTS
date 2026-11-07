@@ -1,0 +1,11 @@
+# Opt-in audit identity transport. Never mount the parent containing secrets.
+# The root deployment owner must provision the directory/receipt before use.
+services:
+  mofacts:
+    volumes:
+      - type: bind
+        source: /etc/mofacts/release
+        target: /run/mofacts/release
+        read_only: true
+        bind:
+          create_host_path: false

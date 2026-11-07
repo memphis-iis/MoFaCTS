@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { parseWorkstationReleaseRecord, classifyReleaseRecordProof } from '../../../common/securityAudit/releaseQualification.ts';
-import { parseReleaseReceipt } from './releaseReceipt.mjs';
+import { parsePublishedImage, parseReleaseReceipt, parseReleaseReceiptV2 } from '../../../common/securityAudit/releaseReceipt.mjs';
 
 const MAX_BYTES = 16384;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -149,9 +149,25 @@ export function projectReleaseReceipt(bytes) {
     deployedAtUtc, baseCommit, includedUncommittedLocalChanges, image, tag, digest, imageId });
 }
 
+// The publication tuple is an explicit existing workstation observation. It is
+// never inferred from a tag, a CI image, a report body or a bare index digest.
+export function projectReleaseReceiptV2(bytes, publication) {
+  const base = projectReleaseReceipt(bytes);
+  const publishedImage = parsePublishedImage(publication);
+  const record = parseReleaseBytes(bytes);
+  const proof = record.qualification;
+  const supplied = proof?.schema === 'ReleaseQualificationV2' ? proof.releaseIdentity?.publishedImage : proof?.publishedImage;
+  if (supplied && JSON.stringify(parsePublishedImage(supplied)) !== JSON.stringify(publishedImage)) {
+    throw new Error('Publication tuple conflicts with the authoritative release record');
+  }
+  return parseReleaseReceiptV2({ ...base, schema: 'MoFaCTSReleaseReceiptV2', publishedImage });
+}
+
 export async function main(argv) {
   const [action, file, candidate, ...extra] = argv;
   if (!file || extra.length) invalid();
+  if (action === 'project-v2' && candidate) return projectReleaseReceiptV2(await readReleaseBytes(path.resolve(file)),
+    JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readReleaseBytes(path.resolve(candidate)))));
   if (action === 'write' && candidate) return writeReleaseRecord(file, await readReleaseBytes(path.resolve(candidate)));
   if (action === 'project' && !candidate) return projectReleaseReceipt(await readReleaseBytes(path.resolve(file)));
   invalid();

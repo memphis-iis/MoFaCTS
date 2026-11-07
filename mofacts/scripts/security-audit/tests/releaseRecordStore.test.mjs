@@ -8,7 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import fixture from '../../../common/securityAudit/fixtures/release-record.fixture.json' with { type: 'json' };
 import { writeReleaseRecord, readReleaseBytes, parseReleaseBytes, projectReleaseReceipt } from '../qualification/releaseRecordStore.mjs';
-import { parseReleaseReceipt, compareReleaseReceipt } from '../qualification/releaseReceipt.mjs';
+import { parseReleaseReceipt, compareReleaseReceipt } from '../../../common/securityAudit/releaseReceipt.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 const record = () => ({ ...structuredClone(fixture), imageId: fixture.qualification.runningImage.configDigest,
@@ -222,7 +222,7 @@ test('receipt projects only bounded identifiers and compares actual config/revis
 });
 
 test('standalone host parser bounds stdin and emits no raw rejected values', () => {
-  const module = new URL('../qualification/releaseReceipt.mjs', import.meta.url).href;
+  const module = new URL('../../../common/securityAudit/releaseReceipt.mjs', import.meta.url).href;
   const code = `const {runReceiptCli} = await import(${JSON.stringify(module)}); await runReceiptCli(process.argv.slice(1));`;
   const receipt = projectReleaseReceipt(encoded(record()));
   for (const [input, state] of [
