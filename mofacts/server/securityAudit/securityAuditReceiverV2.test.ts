@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import crypto from 'node:crypto';
-import { Mongo } from 'meteor/mongo';
+import { auditReportsV2Fixture as reports } from '../../tests/fixtures/securityAuditReportsV2.ts';
 import { collectionMongoName } from '../../common/collectionOwnership.ts';
 import { auditDigest, canonicalAuditJson } from '../../common/securityAudit/canonicalReport.ts';
 import { errorReport } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
@@ -9,7 +9,6 @@ import { createSecurityAuditReceiverV2 } from './securityAuditReceiverV2.ts';
 import { createAuditReceiverPlatformIdentity } from './securityAuditReceiverRelease.ts';
 import releaseFixture from '../../common/securityAudit/fixtures/release-record.fixture.json';
 
-const reports = new Mongo.Collection<Record<string, unknown>>(collectionMongoName('SecurityAuditReportsV2'));
 const ownedIds: string[] = [];
 const clock = new Date('2026-11-05T12:02:00.000Z');
 const unavailable = { state: 'unavailable', reason: 'not-provided' } as const;

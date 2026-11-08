@@ -1,17 +1,15 @@
 import { expect } from 'chai';
 import { Meteor } from 'meteor/meteor';
-import { Mongo } from 'meteor/mongo';
+import { auditReportsV2Fixture as reports } from '../../tests/fixtures/securityAuditReportsV2.ts';
 import http from 'node:http';
 import { once } from 'node:events';
 import crypto from 'node:crypto';
-import { collectionMongoName } from '../../common/collectionOwnership.ts';
 import { canonicalAuditJson, auditDigest } from '../../common/securityAudit/canonicalReport.ts';
 import { errorReport } from '../../scripts/security-audit/tests/fixtures/v2Fixtures.mjs';
 import { signAuditRequestV2 } from './securityAuditIngestionV2.ts';
 import { createSecurityAuditRuntimeV2 } from './securityAuditRuntimeV2.ts';
 
 describe('V2 inert HTTP/admin runtime on real MongoDB', function() {
-  const reports = new Mongo.Collection<Record<string, unknown>>(collectionMongoName('SecurityAuditReportsV2'));
   const owned: string[] = [], clock = new Date('2026-11-05T12:02:00.000Z'), secret = 'synthetic-runtime-http-signing-material';
   let authorized = true;
   const runtime = createSecurityAuditRuntimeV2({ createReports: () => reports,
