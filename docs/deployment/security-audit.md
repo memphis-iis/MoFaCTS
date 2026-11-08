@@ -12,10 +12,23 @@ The optional [previous-image baseline](../../deploy/security-audit/rollback-runt
 prepares the separate storage rollback gate using only synthetic private services.
 It does not qualify a candidate image or change production.
 
-The approved P1-D7 source draft adds a shared versioned credential-free release
-projection and an optional read-only receiver directory. It does not activate a
-V2 route, install a host receipt or alter the default Compose setup. See the
+The P1-D7 receipt source passed the complete Meteor suite on `831ef74b`: 989 server
+and 1,237 client tests, zero failures. A bounded staging2 window then verified the
+host reader, actual read-only app mount, atomic replacement and independent image
+adapter, and restored the original V1 receipt/tooling and Compose configuration.
+The restored restricted auditor passed all nine controls with receipt MATCH.
+No V2 route is active and the default Compose setup remains unchanged. See the
 [projection, permissions and rollback contract](../../deploy/security-audit/release-records.md#inert-v2-receiver-projection-p1-d7).
+
+The next inert source family composes the protected receiver with V2 HTTP and
+the existing three admin method IDs. It defines no automatic registration/index
+job: coordinated cutover must install only `/internal/security-audits/v2`, retire
+V1 new ingestion/access, update producers/client consumers and qualify rollback.
+The callbacks preserve HMAC/body/replay/target protection, bounded projected
+summaries, full-integrity downloads, one-use tokens, admin revalidation, no-store/
+nosniff and sandboxed download CSP. Typed failure categories select constant
+responses; internal error text is never returned. These new callbacks require
+their own Meteor proof and are not qualified by the earlier receipt-only run.
 
 ## Schedule and result semantics
 

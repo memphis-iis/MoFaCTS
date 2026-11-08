@@ -9,6 +9,13 @@ import { contentDigest, proofRecord, proofString, sourceCommit } from './proofFi
 export const AUDIT_MAX_DURATION_MS = 180 * 60 * 1000;
 export const AUDIT_MAX_COMPLETION_AHEAD_MS = 5 * 60 * 1000;
 export const AUDIT_MAX_UPLOAD_DELAY_MS = 15 * 60 * 1000;
+export class AuditReportIdError extends Error {
+  constructor() { super('Security audit report ID is invalid'); }
+}
+export function auditReportId(value: unknown): string {
+  try { return proofString(value, /^[A-Za-z0-9][A-Za-z0-9._-]*(?![\s\S])/, 160); }
+  catch { throw new AuditReportIdError(); }
+}
 export type AuditSectionStatus = AuditControlStatus | 'NOT_APPLICABLE';
 export type AuditReportControl = {
   controlId: string; title: string; failureSeverity: AuditFailureSeverity;
@@ -126,7 +133,7 @@ export async function parseSecurityAuditReportV2(value: unknown, context: AuditR
   const result: SecurityAuditReportV2 = {
     schema: 'SecurityAuditReportV2', catalogId: catalog.catalogId, catalogVersion: catalog.catalogVersion,
     catalogDigestSha256: contentDigest(record.catalogDigestSha256),
-    reportId: proofString(record.reportId, /^[A-Za-z0-9][A-Za-z0-9._-]*(?![\s\S])/, 160), reportType,
+    reportId: auditReportId(record.reportId), reportType,
     startedAt, completedAt, target, scannerSourceRevision: sourceCommit(record.scannerSourceRevision),
     deployedApplicationRevision: revision, deployedImageDigest: image, toolVersions, sections,
     executionErrors: [...record.executionErrors] as AuditErrorCategory[], counts, digestSha256: contentDigest(record.digestSha256),

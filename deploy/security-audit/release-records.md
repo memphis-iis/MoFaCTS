@@ -82,6 +82,43 @@ exact saved V1 receipt/tooling through the deployment owner. Keep both version
 contracts only while their existing rollback/provenance consumers remain; no V1
 historical report UI or alternate active release authority is introduced.
 
+### Bounded staging2 receipt verification
+
+`receiver-release-window.sh` is a root-operator test controller, never an audit
+account command or sudo grant. It requires a private
+`/var/tmp/mofacts-receiver-release.<12 alphanumeric characters>` packet, separate
+SHA-256 pins for the packet, baseline and controller, eight exact public source
+files, a successful native Meteor receipt bound to that source, and the reviewed
+credential-free transfer. The baseline pins existing protected file hashes and
+permissions, the app image/configuration hash and the absence of the V2 directory.
+
+The controller verifies the staging2 target and current Compose definition before
+mutation, saves the V1 receipt/tool/parser, installs the candidate, adds the
+optional mount to the *existing* image and verifies host MATCH, actual app
+EROFS write/chmod denial and atomic inode replacement visibility. An isolated
+256 MiB/no-network/no-extra-swap container using that same image checks the new
+independent adapter against the image's embedded source identity. It has only
+read-only public source/receipt mounts and receives no application settings,
+database volumes or Docker socket. No image is built, pulled or published.
+
+EXIT/TERM/INT restoration removes the mount by recreating only the app through
+the exact original Compose files, restores the exact V1 files and verifies their
+hashes/permissions and the original app image/configuration hash. Other project
+container IDs/images/start times/states must remain unchanged. Commands are
+bounded, and the outer operator uses a 900-second timeout with 300 seconds for
+termination cleanup. A separately retained root `restore` action recovers from
+untrappable termination. An unexpected file edit is retained and reported as a
+restoration failure instead of being overwritten. Only the exact ownership-labeled
+disposable proof container may be removed. Keep the private packet, original
+files and structured results for recovery; do not publish runtime logs/settings.
+
+The four Linux orchestration tests cover success/idempotent recovery, activation
+failure, foreign edits and preflight drift with explicit synthetic Docker/reader
+doubles. They do not establish kernel or deployed-reader behavior; the separate
+actual mount fixture and live staging2 results provide that evidence. The source
+controller is maintained alongside those tests; using it requires explicit
+staging2 execution permission and passing applicable source checks.
+
 Keep the existing operator-selected `ProdReleaseRecordPath` authoritative. The
 Node helper `mofacts/scripts/security-audit/qualification/releaseRecordStore.mjs`
 accepts historical six-field records and current eight-field records, with the

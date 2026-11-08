@@ -1,7 +1,7 @@
 import { ACTIVE_AUDIT_CATALOG, AUDIT_SECTION_IDS, readAuditCatalog, type AuditCatalog, type AuditCatalogCoordinates } from '../../common/securityAudit/catalogRegistry.ts';
 import { AUDIT_ERROR_CATEGORIES, evidenceRequiresDeployedIdentity, type AuditErrorCategory } from '../../common/securityAudit/evidenceContracts.ts';
 import { parseAuditIdentity } from '../../common/securityAudit/reportIdentity.ts';
-import { AUDIT_MAX_DURATION_MS, auditTargetOrigin, auditTimestamp, parseSecurityAuditReportV2, type AuditCounts, type AuditReportReadContext, type AuditSectionStatus, type SecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
+import { AUDIT_MAX_DURATION_MS, auditReportId, auditTargetOrigin, auditTimestamp, parseSecurityAuditReportV2, type AuditCounts, type AuditReportReadContext, type AuditSectionStatus, type SecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
 import { contentDigest, proofRecord, proofString, sourceCommit } from '../../common/securityAudit/proofFields.ts';
 import type { AuditReportSummaryV2 } from '../../common/securityAudit/summaryTypes.ts';
 
@@ -34,6 +34,8 @@ function serverDate(value: unknown): Date {
 function summary(record: Document, catalog: AuditCatalog): AuditReportSummaryV2 {
   const row = proofRecord(record, SUMMARY_KEYS);
   if (row.schema !== SCHEMA || (row.reportType !== 'exposure' && row.reportType !== 'full')) invalid();
+  let reportId;
+  try { reportId = auditReportId(row.reportId); } catch { invalid(); }
   const reportType = row.reportType;
   const rawCounts = proofRecord(row.counts, COUNT_KEYS);
   const counts = {} as AuditCounts;
@@ -69,7 +71,7 @@ function summary(record: Document, catalog: AuditCatalog): AuditReportSummaryV2 
   }
   return { schema: SCHEMA, catalogId: catalog.catalogId, catalogVersion: catalog.catalogVersion,
     catalogDigestSha256: contentDigest(row.catalogDigestSha256),
-    reportId: proofString(row.reportId, /^[A-Za-z0-9][A-Za-z0-9._-]*(?![\s\S])/, 160), reportType,
+    reportId, reportType,
     startedAt, completedAt, target: auditTargetOrigin(row.target), scannerSourceRevision: sourceCommit(row.scannerSourceRevision),
     deployedApplicationRevision: revision,
     deployedImageDigest: image, digestSha256: contentDigest(row.digestSha256),
@@ -121,7 +123,7 @@ export function createAuditReportStoreV2(reports: AuditReportCollectionV2, now: 
         latestFull: full ? await project(full, catalogs) : null };
     },
     async get(reportId: unknown): Promise<SecurityAuditReportV2 | null> {
-      const id = proofString(reportId, /^[A-Za-z0-9][A-Za-z0-9._-]*(?![\s\S])/, 160);
+      const id = auditReportId(reportId);
       const row = await reports.findOneAsync({ schema: SCHEMA, reportId: id });
       if (!row) return null;
       const { _id, ingestNonce, ingestedAt, expiresAt, ...envelope } = row;
@@ -131,7 +133,7 @@ export function createAuditReportStoreV2(reports: AuditReportCollectionV2, now: 
       return parseSecurityAuditReportV2(envelope, { purpose: 'retained' });
     },
     async getSummary(reportId: unknown): Promise<AuditReportSummaryV2 | null> {
-      const id = proofString(reportId, /^[A-Za-z0-9][A-Za-z0-9._-]*(?![\s\S])/, 160);
+      const id = auditReportId(reportId);
       const row = await reports.findOneAsync({ schema: SCHEMA, reportId: id }, { fields: { ...SUMMARY_FIELDS } });
       return row ? project(row, new Map()) : null;
     },

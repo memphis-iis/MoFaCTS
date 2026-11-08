@@ -2,11 +2,12 @@ import { collectionMongoName } from '../../common/collectionOwnership.ts';
 import { parseAuditIdentity, type AuditIdentityObservation } from '../../common/securityAudit/reportIdentity.ts';
 import type { BuildIdentityObservation } from '../../common/securityAudit/buildIdentity.ts';
 import { parseSecurityAuditReportV2 } from '../../common/securityAudit/reportV2.ts';
-import { verifyAuditRequestV2 } from './securityAuditIngestionV2.ts';
+import { AuditV2RequestError, verifyAuditRequestV2 } from './securityAuditIngestionV2.ts';
 import { createAuditReportStoreV2, type AuditReportCollectionV2 } from './securityAuditReportStoreV2.ts';
 import { auditDownloadBytesV2 } from './securityAuditPresentationV2.ts';
 import { consumeSecurityAuditDownloadToken, issueSecurityAuditDownloadToken } from './securityAuditDownloadTokens.ts';
 import { auditReceiverRevision, createAuditReceiverIdentityLoader } from './securityAuditReceiverIdentity.ts';
+import { createAuditReceiverPlatformIdentity } from './securityAuditReceiverRelease.ts';
 
 type UserId = string | null | undefined;
 type Headers = Parameters<typeof verifyAuditRequestV2>[0]['headers'];
@@ -48,7 +49,9 @@ export function createSecurityAuditReceiverV2(deps: {
         receiverImage: parseAuditIdentity(image, 'platform-image') };
       const context = { ...receiver, purpose: 'ingestion' as const,
         authenticatedAt: verified.authenticatedAt, uploadedAt: verified.uploadedAt };
-      const report = await parseSecurityAuditReportV2(verified.value, context);
+      let report;
+      try { report = await parseSecurityAuditReportV2(verified.value, context); }
+      catch { throw new AuditV2RequestError('report', 'Audit V2 report is invalid'); }
       await store.store(report, verified.nonce, context);
     },
     async list(userId: UserId) { await requireAdmin(userId); return store.list(); },
@@ -79,4 +82,14 @@ export function createSecurityAuditReceiverV2(deps: {
       return auditDownloadBytesV2(report, record.format);
     },
   };
+}
+
+// Production composition owns one embedded loader and an independent protected
+// receipt adapter. Construction reads neither file; only authenticated ingestion
+// invokes them. Activation/registration belongs to the coordinated cutover.
+export function createProtectedSecurityAuditReceiverV2(deps: Omit<Parameters<typeof createSecurityAuditReceiverV2>[0],
+  'platformIdentity' | 'loadBuildIdentity'>) {
+  const loadBuildIdentity = createAuditReceiverIdentityLoader();
+  return createSecurityAuditReceiverV2({ ...deps, loadBuildIdentity,
+    platformIdentity: createAuditReceiverPlatformIdentity(loadBuildIdentity) });
 }

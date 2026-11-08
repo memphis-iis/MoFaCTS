@@ -16,22 +16,23 @@ source work; concrete commit/push, protected operation, build/deploy and product
 cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
-**Current Meteor allowance (2026-11-07):** Phil explicitly approved publishing the
-reviewed 23-file receiver/host-qualification batch and ONE fresh Meteor invocation
-on the existing isolated local Linux Docker worker, including its disposable tool
-preparation. The new single-use invocation was CONSUMED on 7f373eff and FAILED from a
-container OOM kill after the server side completed. Zero invocations or retries
-remain authorized. Preserve that failure and its actual partial server evidence.
-Phil subsequently approved the five-file 6 GiB/two-CPU capacity correction and
-its honest failure record for commit/push, explicitly accepting the identified
-infrastructure failure, plus ONE fresh 6 GiB invocation. That invocation is now
-CONSUMED and PASSED on 070c693e: 987 server and 1,237 client cases, zero failed/hooks,
-15/seven pending. Zero invocations/retries remain. Actual limits, source identity,
-isolation, cleanup and unchanged original services passed. This is supported
-Meteor source proof, not release/image/deployment qualification.
-Phil has now authorized the reviewed 21-path receipt batch for commit/push and
-ONE fresh 6 GiB/two-CPU invocation. That new invocation is RESERVED, not executed;
-no retry is authorized. Continue approved staging2 verification only after PASS.
+**Current Meteor allowance (2026-11-07):** Phil approved the reviewed 21-path
+receipt batch for commit/push and ONE fresh 6 GiB/two-CPU invocation. Published
+source 831ef74b231f496d7f7d0e36c1e16b57c30542c2 PASSED that invocation: 989 server
+and 1,237 client cases, zero failures/hooks, 15/seven pending. The allowance is
+CONSUMED; zero invocations/retries remain. Source/limits/isolation/cleanup and
+unchanged original local services passed. This is native Meteor source proof,
+not GitHub, release/image or deployment qualification. The approved staging2
+receipt/mount verification and independent restoration are also complete and
+passed (including restored restricted V1 nine-PASS/receipt-MATCH acceptance).
+Do not repeat those unchanged subgates. The NEW 17-path HTTP/admin source batch
+is now explicitly approved for commit/push and ONE fresh 6 GiB/two-CPU Meteor
+invocation. Reserve that invocation before preparation; it is NOT executed yet
+and no retry is authorized. Production/original staging remain excluded.
+
+The previous authorized 070c693e 6 GiB run passed 987 server/1,237 client cases;
+the earlier 7f373eff 4 GiB run was OOM-killed after server completion. Preserve
+those distinct historical receipts; neither substitutes for this changed source.
 
 **Prior Meteor allowance (exhausted):** one primary plus ten conditional invocations were
 authorized. Conditional slots 1-6 passed. GitHub's billing-locked startup attempts
@@ -71,16 +72,16 @@ that actually needs another check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Retained embedded-loader/revision proof remains valid. Inert receiver now composes that loader after HMAC verification and requires an independent platform adapter. The protected receipt/platform adapter and optional read-only overlay are now implemented and locally tested under P1-D7. New Meteor parity, bounded staging2 receipt/mount verification and runtime activation remain open. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] Retained embedded-loader/revision proof remains valid. Inert receiver now composes that loader after HMAC verification and requires an independent platform adapter. The protected receipt/platform adapter and optional read-only overlay are now implemented and locally tested under P1-D7. New receipt parity and real-Mongo cases plus the full suite PASS on 831ef74b. Bounded staging2 receipt/mount installation, real-reader acceptance and exact restoration also passed. The protected production composition factory is now implemented locally and needs new Meteor proof. Coordinated activation and the permanent release hook remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
-| P1-07 | Exact assembly and independent server validation | [ ] Pure assembly/authentication and inert receiver/storage/identity composition pass Node checks. Signature verification precedes metadata; storage independently validates again. New real-Mongo case and complete server/client suite PASS on 070c693e; no route is registered and platform adapter wiring remains open. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] Not implemented; no route cutover. |
+| P1-07 | Exact assembly and independent server validation | [ ] Pure assembly/authentication and inert receiver/storage/identity composition pass Node checks. Signature verification precedes metadata; storage independently validates again. Receipt receiver/runtime proof PASS on 831ef74b is retained. New inert HTTP/admin composition, typed transport errors and shared ID validation pass local checks; their new real-Mongo HTTP/Meteor case is NOT RUN. No route is registered. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] Inert HTTP callbacks and one shared runtime/admin composition are implemented and pass local loopback tests. Supported Meteor proof and coordinated route/producer/client cutover remain open; active V1 is unchanged. |
 | P1-09 | Summary projections, indexes and read-time integrity | [ ] Version-separated namespace and inert composition source implemented from actual old-image evidence; exact-ID summary projection added. Prior real-Mongo proof retained; the receiver case and full Meteor suite passed on 070c693e. Runtime activation and complete candidate rollback qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Current source gate: 147 pass/zero fail/one existing CI-only skip; 19 operator regressions pass. Host source/Meteor and protected-channel proof, 26 emitter cases and prior 16 capture cases are retained. New receiver case and full server/client suite passed on 070c693e. Registered endpoint and complete candidate rollback gates remain open. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Current source gate: 153 pass/zero fail/one existing CI-only skip; 19 retained operator regressions plus four new window cases pass. Host source/Meteor and protected-channel proof, 26 emitter cases and prior 16 capture cases are retained. Receipt receiver suite passed on 831ef74b. The changed HTTP/admin runtime has a new unrun Meteor fixture. Registered endpoint and complete candidate rollback gates remain open. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Protected staging2 forced-command/install/restore qualification passed on 2026-11-07; canonical V2/eleven internal controls, PTY/forwarding denials and exact V1 restoration verified. Synthetic adverse branches retain their 26-case proof. Staging report ingestion/rollback remains open. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Actual selected-image V1/DDP/download baseline and mixed/separate storage prequalification passed 2026-11-07. One collection is unsafe; version separation selected. Full candidate/previous/candidate sequence remains open. |
@@ -869,7 +870,8 @@ Approved bounded design; local source implementation is recorded below and prote
   verification after required checks and publication of these two notes.
 - [x] Implement the shared source, projection, protected reader, optional overlay
   and meaningful local verification below. No host receipt/mount/permissions changed.
-- [ ] Complete fresh Meteor parity and the authorized staging2 verification.
+- [x] Complete fresh Meteor parity on 831ef74b and the authorized staging2
+  receipt/mount verification, followed by independent exact restoration below.
 
 Section 0 decision 5 expressly excludes new persistent access/security-sensitive
 permission changes; decision 1 currently grants the restricted host reader only.
@@ -935,8 +937,10 @@ require their own approval before protected rollout.
   ONE fresh Meteor invocation on the existing 6 GiB/two-CPU lane. Reserve exactly
   one invocation, with no retry. The shared module and new Mongo case require
   supported Meteor proof before protected installation under the written gate.
-- [ ] Publish exactly the approved batch, prepare its immutable source and run
-  once; retain complete outcomes, source/isolation/limit/cleanup evidence.
+- [x] Publish exactly 21 approved paths as 831ef74b231f496d7f7d0e36c1e16b57c30542c2.
+  Normal hooks passed; all reviewed source hashes and eight unrelated files were
+  preserved. Prepare immutable source and execute the sole new invocation once;
+  complete outcomes, source/isolation/limit/cleanup evidence PASS below.
 - [x] Prepare the authorized staging2 test inputs without installation. Read-only
   preflight confirms healthy linux/amd64 staging2 revision 65875553, its matching
   root:root 0600 V1 receipt, no V2 directory/mount and unchanged container identity.
@@ -952,11 +956,135 @@ require their own approval before protected rollout.
   phase1-20261105/receiver-release-preparation-a2a07873. Manifest SHA-256:
   2e77da2c43f3f3e020444654da71765379a9d27ddcedf638158ef71cb6ecdea4.
   These are preparation/identity observations, not V2 host or release acceptance.
-- [ ] After that proof, execute the already-authorized bounded staging2 receipt/
-  mount verification and exact restoration; retain current-image mapping and
-  root permissions without repeating the accepted host acquisition core tests.
+- [x] After that proof, execute the approved bounded staging2 receipt/mount
+  verification and exact restoration. Current-image mapping, root permissions
+  and restored restricted V1 access all pass. This was not a production change
+  or new application-source deployment; accepted acquisition core is unchanged.
 - [ ] Continue P1-04/receiver activation and the remaining eleven open Phase 1
   deliverables. Six remain completed; this source draft does not close Phase 1.
+
+### Receipt source published and fresh Meteor accepted (2026-11-07)
+
+- [x] Publish 831ef74b and complete exactly one 6 GiB invocation, 23:34:10Z-
+  23:35:41Z (91 seconds). Server: 989 passed/zero failed/15 pending; client:
+  1,237 passed/zero failed/seven pending; zero hook failures on both sides.
+- [x] Validate actual PASS outcomes for both new shared-runtime/real-Mongo receipt
+  cases and the retained original receiver case. No older result was substituted.
+- [x] Validate exact source before/after snapshot
+  a3935c35de3dd12a69bf5f37ebdfd89f1df15d8f13544c778f8a437673dca341,
+  test-input contract cd2a837955b46791ba4c0438ec645cefd4dbce09ec263da344e89182d5bf3e12,
+  and supplemental f58ead2430c7749aac2fe15a357d3210b293bdb5ad1ddc6897c077aba483220b.
+  Actual 6,144 MiB/two CPU worker, no extra swap, UID 2000/zero capabilities,
+  no test Docker socket and protected mounts all passed. No OOM; exit 0.
+- [x] Verify zero owned containers/networks/cache volumes and exact unchanged
+  original local service IDs/images/start times/states. Retain 27 private files
+  (812,652 bytes) under phase1-20261105/native-local-receipt-20261107.
+  Native receipt SHA-256: 5417e60266b35bb91345af2ff0b319d5690345961dce779350f66e10ae413a79.
+  Acceptance review SHA-256: d434fc421afbdcfba3e3e589cec3c5b4d6baf65bcd5a213c893bc58f33e9183f.
+  Retained manifest SHA-256: 9266191e2f14ddc922fa466b09f83b0189db8e2ee5672769a466ae7c561d35fa.
+- [x] Check staging2 Compose file-path labels and existing rendered service hash:
+  current files still match the running app's definition. Selected environment
+  and Compose files are fingerprinted without retaining secret values.
+- [x] Execute the approved bounded receipt/optional mount verification, preserve
+  the previous image/configuration and restore the exact original receipt/tooling.
+  Operator-verification source/checks are separately qualified below.
+- [ ] Continue P1-04 and the sole Phase 1 worklist after that acceptance.
+
+### Staging2 receiver receipt and mount acceptance/restoration (2026-11-07)
+
+- [x] Add the maintained root-only receiver-release-window.sh controller and four
+  synthetic Linux orchestration tests. Success/idempotent recovery, activation
+  failure, foreign-edit refusal and preflight drift cases pass; explicit lint
+  and Bash syntax pass. The tests use explicit Docker/reader doubles; live proof
+  below separately verifies kernel and actual deployed-reader behavior.
+- [x] Prepare eight exact public files from Meteor-tested 831ef74b, the original
+  authoritative record's projection and the successful native receipt. Pin the
+  immutable packet/baseline/controller hashes, transfer privately, and verify
+  all hashes before root installation. Controller SHA-256:
+  1fe3ff378c1e5b71e4ef68f6b4ebcfac7f23c103d85b405f0b042d66dd6f44ed.
+- [x] Actual root reader returns observed/MATCH against the existing staging2
+  image. Add the optional directory mount to that same existing image using its
+  unchanged Compose/environment files; no image build/pull/publication occurred.
+- [x] Actual app container verifies root-owned 0600 V2 bytes, public platform
+  mapping and kernel EROFS append/chmod denial. Reinstall the SAME authoritative
+  projection atomically and prove the changed inode is visible through the
+  directory mount without another app-container restart. No invented release
+  metadata or second authority is used for the replacement test.
+- [x] In a 256 MiB/no-network/read-only disposable copy of the same image, execute
+  the exact new adapter and existing embedded-source loader. They independently
+  agree on the current platform manifest. No environment/settings/database mount,
+  Docker socket or provider credential is supplied to that proof container.
+- [x] Automatic restoration returns operationExit=0/restorationExit=0. An
+  independent read-only check verifies all eight original file hashes and modes,
+  original app image/configuration hash and healthy status; V2 directory/mount
+  absent; other project container IDs/images/start times/states unchanged; zero
+  owned proof containers. Only the app was recreated to add/remove the mount.
+- [x] Independently call the restored existing restricted SSH auditor: nine of
+  nine controls PASS and the V1 release receipt MATCH. No PTY/forwarding/policy
+  reprobe or permission change was needed; their accepted source is unchanged.
+- [x] Retain ten bounded result/metadata files under
+  phase1-20261105/receiver-release-window-831ef74b, excluding runtime logs/settings.
+  Complete evidence manifest SHA-256:
+  d6cd9d368b0d5ab3bc62866d91a0877892e702f349ddde089e52aba99afa57d5.
+  Root-owned staging2 packet/backups remain available for explicit operator
+  recovery. These establish receipt transport/identity, not a candidate image,
+  V2 registered endpoint, report ingestion/rollback or production qualification.
+- [ ] Publish the separate operator controller/tests, public procedure and honest
+  acceptance record when the next intentional source batch is approved.
+- [x] Continue into P1-04 protected receiver composition and the P1-07/P1-08
+  HTTP/admin binding family below. The permanent hook and coordinated activation
+  remain open. Zero additional Meteor invocations are authorized.
+
+### Inert V2 HTTP/admin runtime implemented locally (2026-11-07)
+
+- [x] Read the current V1 HTTP/DDP/composition/UI ownership, planned V2 path,
+  HMAC/target/replay protections and active manifest before this family. V1
+  production routes/method wiring/workflow remain unchanged under Section 0.6.
+- [x] Add typed V2 transport failure categories with unchanged HMAC formula and
+  bounded constant diagnostics. Parser failures are distinct from auth and
+  unavailable configuration; storage errors remain internal, never message-
+  matched as authentication or printed to the caller.
+- [x] Add inert HTTP callbacks for exact mount-stripped paths, POST/JSON rules,
+  declared/chunked two-MiB limits, cancellation cleanup, 201/400/401/409/413/415/
+  503 responses and internal 500 errors. Downloads preserve validated bytes,
+  attachment/checksum headers, no-store/nosniff and no-script sandbox CSP.
+- [x] Add one protected production receiver composition and the existing three
+  admin method IDs/argument shapes. Every operation delegates to the existing
+  receiver admin guard; get/token ID trimming is retained, invalid IDs receive
+  the existing invalid-report-id code after authorization, and token use still
+  rechecks admin access and full stored integrity. No new permission is granted.
+- [x] Centralize the already-identical report-ID grammar for parsing/storage
+  reads, keeping JSON wire fields and grammar unchanged. Corrupt stored summary
+  metadata remains a storage failure, not a fabricated request-ID error.
+- [x] Reuse the existing collection double as one test helper. Six new real
+  loopback HTTP cases cover auth priority, complete storage/replay, V1/target
+  rejection, body bounds/abort, JSON/HTML checksums, token reuse, role revocation,
+  corruption and no diagnostic leaks. All six plus seven retained receiver
+  cases pass (13 targeted); the entire source gate is 154 total/153 PASS/zero
+  FAIL/one existing V1 CI-only skip.
+- [x] Add a supported Meteor fixture composing the actual runtime with real
+  MongoDB and private HTTP, exercising guarded DDP summaries/download tokens,
+  JSON transport, replay, bad-role priority and report-ID normalization. It is
+  NOT RUN. The earlier 989/1,237 PASS receipt does not qualify this new family.
+- [x] Full pinned typecheck/lint PASS. Active security-surface inventory remains
+  323: no route is registered, and the same three admin method IDs retain the
+  already-reviewed admin policy. Planned v2 ingress remains public HMAC-bound;
+  downloads retain the existing admin/capability/egress policy. The truthful
+  manifest change remains deferred to the actual coordinated route migration.
+- [x] Source capture already covers all new common/server/script test files.
+  No dependency, config/TDF field, learner-data/account storage, authentication
+  policy, active UI, CSP or locale changes. Public operator notes updated;
+  no UI wiki change required. Eight unrelated files remain byte-identical.
+- [x] Obtain explicit commit/push approval for the 17 intentional paths and
+  ONE fresh 6 GiB Meteor invocation. Reserve the new single-use invocation; no
+  retry is authorized. Prior 831ef74b execution remains consumed and unchanged.
+- [ ] Publish exactly the approved 17 paths, prepare immutable source and execute
+  the sole new invocation once; validate the new HTTP/Mongo case and full outcomes.
+- [ ] After publication/actual Meteor acceptance, continue the next producer/
+  uploader/target and coordinated cutover work from this sole checklist. Retain
+  accepted receipt/host/old-image evidence and do not replay those unchanged
+  subgates. Registered routes, permanent release hook, client/workflow migration
+  and complete candidate/previous/candidate qualification remain unfinished.
 
 ### Decision P1-D1: fixed catalog impact versus mixed-impact V1 controls
 

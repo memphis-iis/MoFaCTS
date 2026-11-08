@@ -2,53 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { collectionMongoName } from '../../../common/collectionOwnership.ts';
-import { createSecurityAuditReceiverV2 } from '../../../server/securityAudit/securityAuditReceiverV2.ts';
 import { signAuditRequestV2 } from '../../../server/securityAudit/securityAuditIngestionV2.ts';
 import { auditDigest, canonicalAuditJson } from '../../../common/securityAudit/canonicalReport.ts';
 import { errorReport } from './fixtures/v2Fixtures.mjs';
 
-const clock = new Date('2026-11-05T12:02:00.000Z');
-const absent = { state: 'unavailable', reason: 'not-provided' };
-const secret = 'synthetic-inert-receiver-signing-material';
-function fixture({ build = absent, image = absent } = {}) {
-  const rows = [], calls = [], names = [];
-  const db = {
-    find(selector, options) { calls.push({ kind: 'find', selector, options }); return { fetchAsync: async () => select(selector, options) }; },
-    async findOneAsync(selector, options) { calls.push({ kind: 'one', selector, options }); return select(selector, options)[0]; },
-    async insertAsync(row) {
-      if (rows.some(old => old.ingestNonce === row.ingestNonce || old.reportId === row.reportId || old.digestSha256 === row.digestSha256)) {
-        const error = new Error('Synthetic unique collision'); error.code = 11000; throw error;
-      }
-      rows.push(structuredClone(row));
-    },
-    rawCollection: () => ({ async createIndex() { calls.push({ kind: 'index' }); } }),
-  };
-  function select(selector, options = {}) {
-    let result = rows.filter(row => Object.entries(selector).every(([key, value]) => row[key] === value));
-    if (options.sort) result = [...result].sort((a, b) => b.completedAt.localeCompare(a.completedAt));
-    if (options.limit !== undefined) result = result.slice(0, options.limit);
-    return result.map(row => {
-      if (!options.fields) return structuredClone(row);
-      const value = {};
-      for (const [key, include] of Object.entries(options.fields)) {
-        if (!include) continue;
-        const parts = key.split('.'); let source = row, target = value;
-        for (const part of parts.slice(0, -1)) { source = source?.[part]; target[part] ??= {}; target = target[part]; }
-        target[parts.at(-1)] = structuredClone(source?.[parts.at(-1)]);
-      }
-      return value;
-    });
-  }
-  let isAdmin = true, identityCalls = 0;
-  const receiver = createSecurityAuditReceiverV2({
-    createReports(name) { names.push(name); return db; },
-    async requireAdminUser(userId) { if (userId !== 'synthetic-admin' || !isAdmin) throw new Error('Synthetic admin denial'); },
-    platformIdentity: async () => { identityCalls++; return image; },
-    loadBuildIdentity: async () => build,
-    targetOrigin: () => 'https://audit.example', ingestSecret: () => secret, now: () => new Date(clock),
-  });
-  return { receiver, rows, calls, names, revoke: () => { isAdmin = false; }, identityCalls: () => identityCalls };
-}
+import { receiverFixture as fixture, receiverClock as clock, receiverSecret as secret } from './helpers/receiverFixture.mjs';
+
 async function upload(value, report = undefined, nonce = 'synthetic-runtime-nonce-0001') {
   report ??= await errorReport();
   const body = Buffer.from(canonicalAuditJson(report)), timestamp = String(clock.getTime() / 1000);
