@@ -2,6 +2,60 @@
 
 The active scanner and receiver still use `SecurityAuditReportV1`. Production setup is documented in [the operator guide](../../../docs/deployment/security-audit.md). Target architecture and progress are in [the plan](../../../docs-developer/security-audit-durable-redesign-plan.md) and [status record](../../../docs-developer/security-audit-durable-redesign-status.md).
 
+## Inert V2 file pipeline
+
+The V2 HTTP/admin composition passes supported Meteor verification on
+`603c1233`: 990 server and 1,237 client cases passed, zero failures/hooks.
+That proves the tested source, including the shared test-only collection owner;
+it does not activate a route or qualify a release/deployment.
+
+`core/producerFilesV2.mjs` owns file carriage for the existing producer/report
+contracts. Producers call `writeAuditProducerFileV2` to validate their entire
+catalog-owned subset before creating a new mode-0600 canonical JSON file.
+Use a private per-run producer directory with exactly `<producerId>.json` names
+derived from the selected catalog profile. Keep raw host/UDP inputs and the
+assembled report outside that directory. Unknown or profile-excluded files fail
+the directory boundary; missing/invalid expected files receive the assembler's
+existing whole-producer `ERROR` recovery. No untrusted bytes enter diagnostics.
+Reads are bounded and reject symlinks, non-files, multiple links, changed files,
+invalid UTF-8, duplicate JSON keys and noncanonical encodings. Existing output
+files are never replaced.
+
+`assembleAuditReportFilesV2({ artifactDirectory, outputPath, envelope, env })`
+accepts the existing report envelope fields except `target` and derives that
+field exclusively from required `env.AUDIT_TARGET` (default `process.env`). The
+selected protected environment owns this fixed HTTPS origin. The future workflow
+must supply the actual scanner checkout revision in `scannerSourceRevision`;
+event metadata is not evidence of the checked-out scanner source. This module
+does not acquire release identity or assert authenticity of input observations.
+
+Two explicit, unscheduled Node entry points are available:
+
+```text
+node scripts/security-audit/emit-host-producers-v2.mjs <exposure|full> <host-observations.json> <udp-observations.json> <producer-directory>
+node scripts/security-audit/upload-report-v2.mjs <report.json>
+```
+
+The host emitter reads the current host envelope and the composite evaluator's
+existing three-count UDP observation input. It writes `internal.json` and
+`composite-exposure.json` through their shared validators. Missing/old/malformed
+host input produces explicit errors; an independently confirmed UDP response
+still preserves its approved HIGH failure. Emission success means files were
+written, not that their controls passed. It performs no SSH or host installation.
+
+The uploader requires the same `AUDIT_TARGET` plus the existing
+`AUDIT_REPORT_INGEST_SECRET`, validates canonical report bytes/digest and target/
+time constraints, and reuses the server's unchanged V2 HMAC implementation. It
+makes one 30-second-bounded POST to `/internal/security-audits/v2`, with redirects
+disabled, and accepts only HTTP 201. It neither reads nor prints response bodies.
+There is no alternate target, endpoint or retry. Tests use synthetic files and
+an injected request transport, never a real audit target.
+
+Run `node --test scripts/security-audit/tests/producerFilesV2.test.mjs` with the
+pinned Node runtime, or the full `npm run security:test:source`. The active V1
+workflow and its producers/uploader remain unchanged. V2 external/authentication/
+repository acquisition, full orchestration and coordinated cutover remain open.
+
 The opt-in build-source tooling is documented in [the capture guide](../../../deploy/security-audit/source-capture.md). Its isolated tests run with `npm run security:test:capture`; local tests use synthetic tar streams and injected Docker responses, and hosted Linux CI additionally exercises actual source export and kernel write protection. CI retains the protected candidate through tests and canonical Compose construction. These remain unqualified observations, not release qualification.
 
 The approved release-history and protected-receipt tooling is documented in

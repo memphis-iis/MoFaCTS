@@ -10,9 +10,9 @@ import { parseDockerImageInspection, readDockerArchiveIdentity } from './imageAr
 const format = '{"nativeId":{{json .Id}},"platform":"{{.Os}}/{{.Architecture}}","descriptor":{{json (index . "Descriptor")}}}';
 const invalid = () => { throw new Error('Docker image identity is unavailable'); };
 
-export async function streamDockerImageIdentity(inspection) {
-  const child = spawn('docker', ['--context', 'default', 'image', 'save', inspection.nativeId], {
-    stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+export async function streamDockerImageIdentity(inspection, environment = process.env, spawnProcess = spawn) {
+  const child = spawnProcess('docker', ['--context', 'default', 'image', 'save', inspection.nativeId], {
+    stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: environment,
   });
   let stderrBytes = 0;
   let killed = false;

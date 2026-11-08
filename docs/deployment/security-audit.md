@@ -324,6 +324,18 @@ passes its 26 synthetic Linux fixture cases and the full local source-security
 gate. The approved draft-contract additions preserve the exact app publication
 and independent Apache active/configuration checks. Supported Meteor proof of
 the amended contract also passes on `6a7acc1e`: 986 server and 1,237 Chromium
-cases, zero failed/hooks, 15/seven pending. Protected forced-command installation/
-rollback qualification remains open. The active V1 host entry point is unchanged; this
-source checkpoint does not activate the new producer.
+cases, zero failed/hooks, 15/seven pending. The later protected staging2 forced-
+command/install/restore and receipt/mount trials passed; exact V1 restoration
+was independently verified. Their hashes and acceptance remain in the
+[current status checklist](../../docs-developer/security-audit-durable-redesign-status.md).
+The active V1 host entry point is restored and unchanged; V2 report ingestion
+and coordinated rollout remain open.
+
+The corrected inert V2 HTTP/admin composition also passes exact-source native
+Meteor verification on `603c1233`: 990 server/1,237 client cases, zero failures/
+hooks, 15/seven pending. This is not GitHub, release-image or deployment proof.
+The [file-pipeline interfaces](../../mofacts/scripts/security-audit/README.md#inert-v2-file-pipeline)
+connect validated host/composite artifacts, exact assembly and a single-request
+V2 uploader without changing the scheduled V1 path. Assembly/upload require the
+same protected `AUDIT_TARGET`; the new Node entry points are unscheduled and
+must not be interpreted as a completed V2 producer/workflow cutover.

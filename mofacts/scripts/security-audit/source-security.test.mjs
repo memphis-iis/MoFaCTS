@@ -8,6 +8,7 @@ import './tests/receiverIdentity.test.mjs';
 import './tests/receiverCompositionV2.test.mjs';
 import './tests/receiverRelease.test.mjs';
 import './tests/httpV2.test.mjs';
+import './tests/producerFilesV2.test.mjs';
 import './tests/udpExposureV2.test.mjs';
 import './tests/hostObservationsV2.test.mjs';
 import './tests/hostCollectorV2.test.mjs';

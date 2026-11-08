@@ -16,7 +16,7 @@ source work; concrete commit/push, protected operation, build/deploy and product
 cutover permissions remain separate. Use the current counter immediately below;
 counts in dated execution records describe those checkpoints only.
 
-**Current Meteor allowance (2026-11-07):** Phil approved the reviewed 21-path
+**Current Meteor allowance (2026-11-08):** Phil approved the reviewed 21-path
 receipt batch for commit/push and ONE fresh 6 GiB/two-CPU invocation. Published
 source 831ef74b231f496d7f7d0e36c1e16b57c30542c2 PASSED that invocation: 989 server
 and 1,237 client cases, zero failures/hooks, 15/seven pending. The allowance is
@@ -33,8 +33,23 @@ Client structured evidence validates 1,237 passed/seven pending/zero failed hook
 The earlier allowance is exhausted. On 2026-11-08 Phil approved publishing the
 four-path fixture correction and honest failure record, accepting the identified
 failed gate, and ONE fresh 6 GiB/two-CPU Meteor invocation. That new invocation
-is RESERVED, not yet executed; no automatic retry is authorized. No new staging2
-operation occurred. Production/original staging remain excluded.
+is CONSUMED and PASSED on 603c12331cffbf08277a29607d7e0ff1d7097448:
+990 server/1,237 client passed, zero failures/hooks, 15/seven pending. The
+repaired HTTP/Mongo and three retained receiver/receipt cases all passed.
+Source/limits/isolation/cleanup and unchanged original services passed. Zero
+invocations/retries remain. No new staging2 operation occurred. Production/
+original staging remain excluded.
+
+**Current publication/sequence approval (2026-11-08):** Phil explicitly approved
+committing and pushing the reviewed 35-path Node/file/external/repository batch
+with [skip ci]. All 244 source cases and full lint pass; this approval grants no
+Meteor, live scanner, Docker, provider, remote or deployment invocation. Publication
+execution is being recorded against the exact reviewed cohort. The eight unrelated
+files remain excluded. Phil also approved bringing the minimum typed authentication
+capture and source-owned expected allowed/denied catalog into Phase 1. Application
+access rules stay unchanged and the remaining Phase 2 scope stays in Phase 2.
+Dated pending questions below are superseded by this approval. Meteor allowance
+remains zero; the accepted 603c1233 source proof is not a new invocation grant.
 
 The previous authorized 070c693e 6 GiB run passed 987 server/1,237 client cases;
 the earlier 7f373eff 4 GiB run was OOM-killed after server completion. Preserve
@@ -78,16 +93,16 @@ that actually needs another check.
 | P1-01 | Canonical JSON catalog and shared Node/Meteor TypeScript contracts | [x] Candidate 70/23 catalog and direct shared imports pass pinned Windows/Linux Node and actual Meteor server parity, including the fixed digest. This completes the source contract, not V2 cutover. |
 | P1-02 | Active/append-only catalog and evidence-contract registries | [x] Frozen candidate registry, exact retained coordinates and 26 versioned evidence validators pass mutation tests and shared-runtime checks. Initial catalog remains unreleased until coordinated cutover; released entries/validators are append-only. |
 | P1-03 | Independently versioned SecurityAuditReportV2 | [x] Strict V2 schema/digest/identity/time/target contracts pass local mutation tests and the actual Meteor complete-ERROR-report case. Live receiver/storage integration remains separately tracked. |
-| P1-04 | Integrated build identity/host-release comparison | [ ] Retained embedded-loader/revision proof remains valid. Inert receiver now composes that loader after HMAC verification and requires an independent platform adapter. The protected receipt/platform adapter and optional read-only overlay are now implemented and locally tested under P1-D7. New receipt parity and real-Mongo cases plus the full suite PASS on 831ef74b. Bounded staging2 receipt/mount installation, real-reader acceptance and exact restoration also passed. The protected production composition factory is now implemented locally and needs new Meteor proof. Coordinated activation and the permanent release hook remain open. |
+| P1-04 | Integrated build identity/host-release comparison | [ ] Retained embedded-loader/revision proof remains valid. Inert receiver now composes that loader after HMAC verification and requires an independent platform adapter. The protected receipt/platform adapter and optional read-only overlay are now implemented and locally tested under P1-D7. New receipt parity and real-Mongo cases plus the full suite PASS on 831ef74b. Bounded staging2 receipt/mount installation, real-reader acceptance and exact restoration also passed. The protected production composition factory now passes the real-Mongo HTTP/Meteor fixture and full suite on 603c1233. Coordinated activation and the permanent release hook remain open. |
 | P1-05 | Producer artifact contract and validation | [x] Exact ownership/membership/evidence validation passes Node behavioral tests and Meteor parser/rejection parity. Real producer adapters and their remote acceptance remain separate. |
 | P1-06 | Host observations, Node internal evaluator and composite evaluator | [x] Source/fixtures and exact-source Meteor slot 10 pass on 6a7acc1e. Protected staging2 SSH/install/restore also passed; P1-15 is complete. P1-14 remains open only for staging report ingestion/rollback. Active V1 is restored and unchanged. |
-| P1-07 | Exact assembly and independent server validation | [ ] Pure assembly/authentication and inert receiver/storage/identity composition pass Node checks. Signature verification precedes metadata; storage independently validates again. Receipt receiver/runtime proof PASS on 831ef74b is retained. New inert HTTP/admin composition, typed transport errors and shared ID validation pass local checks; their new real-Mongo HTTP/Meteor fixture failed during loading on e7803997; the duplicate collection-owner correction needs fresh supported proof. No route is registered. |
-| P1-08 | V2-only new-ingestion endpoint | [ ] Inert HTTP callbacks and one shared runtime/admin composition are implemented and pass local loopback tests. Supported Meteor proof and coordinated route/producer/client cutover remain open; active V1 is unchanged. |
+| P1-07 | Exact assembly and independent server validation | [ ] Pure assembly/authentication and inert receiver/storage/identity composition pass Node checks. Signature verification precedes metadata; storage independently validates again. Receipt receiver/runtime proof PASS on 831ef74b is retained. New inert HTTP/admin composition, typed transport errors and shared ID validation pass local checks; their real-Mongo HTTP/Meteor fixture and full suite PASS on corrected 603c1233; the earlier e7803997 fixture-loading failure remains historical. The new inert file/host/composite adapters and target-bound uploader pass 16 focused Node cases; orchestration and remaining acquisitions are open. No route is registered. |
+| P1-08 | V2-only new-ingestion endpoint | [ ] Inert HTTP callbacks and one shared runtime/admin composition are implemented and pass local loopback tests. Supported HTTP/Mongo Meteor proof PASS on 603c1233; coordinated route/producer/client cutover remains open; active V1 is unchanged. |
 | P1-09 | Summary projections, indexes and read-time integrity | [ ] Version-separated namespace and inert composition source implemented from actual old-image evidence; exact-ID summary projection added. Prior real-Mongo proof retained; the receiver case and full Meteor suite passed on 070c693e. Runtime activation and complete candidate rollback qualification remain pending. |
 | P1-10 | Retire old-format access without rewriting/deleting records | [ ] Deferred to coordinated cutover. |
 | P1-11 | Truthful temporary security-surface manifest update | [ ] Deferred until receiver route migration. |
 | P1-12 | Remove duplicate control tables and V1 ingestion | [ ] Deferred until complete V2 replacement/cutover. |
-| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Current source gate: 153 pass/zero fail/one existing CI-only skip; 19 retained operator regressions plus four new window cases pass. Host source/Meteor and protected-channel proof, 26 emitter cases and prior 16 capture cases are retained. Receipt receiver suite passed on 831ef74b. The changed HTTP/admin runtime failed its e7803997 Meteor gate; corrected fixture ownership needs a newly authorized run. Registered endpoint and complete candidate rollback gates remain open. |
+| P1-13 | Split catalog/assembly/ingestion/storage/presentation tests | [ ] Current unpublished V2 source gate: 244 total/244 pass/zero failures/skips through the actual source collector, including 24 external and 50 repository-candidate cases; 19 retained operator regressions plus four new window cases pass. Host source/Meteor and protected-channel proof, 26 emitter cases and prior 16 capture cases are retained. Receipt receiver suite passed on 831ef74b. The changed HTTP/admin runtime passes its corrected 603c1233 Meteor gate; the earlier e7803997 failure is retained. Registered endpoint and complete candidate rollback gates remain open. |
 | P1-14 | Staging2 ingestion/rollback harness and Linux forced-command qualification | [ ] Protected staging2 forced-command/install/restore qualification passed on 2026-11-07; canonical V2/eleven internal controls, PTY/forwarding denials and exact V1 restoration verified. Synthetic adverse branches retain their 26-case proof. Staging report ingestion/rollback remains open. |
 | P1-15 | Exact host install/rollback procedure and hashes | [x] Reviewed nine-file cohort, pinned source/controller/baseline hashes, bounded root controller and independent recovery documented/tested. Actual staging2 installation and exact restoration passed; Phase 0 production baseline is retained. No production installation is implied. |
 | P1-16 | Previous-production-image qualification with V2 records | [ ] Actual selected-image V1/DDP/download baseline and mixed/separate storage prequalification passed 2026-11-07. One collection is unsafe; version separation selected. Full candidate/previous/candidate sequence remains open. |
@@ -1135,11 +1150,382 @@ require their own approval before protected rollout.
 - [x] Obtain explicit correction/failure-record commit/push approval and ONE
   fresh 6 GiB/two-CPU Meteor invocation on 2026-11-08. Reserve that single-use
   invocation before preparation. No automatic retry is authorized.
-- [ ] Publish the four reviewed paths and execute/validate the one reserved run;
-  no staging deployment or route activation is authorized by this retry.
-- [ ] After actual Meteor acceptance, resume producer/uploader/target work.
-  Preserve the accepted 831ef74b receipt and staging2 restoration subgates.
-  This correction closes neither the HTTP/Mongo gate nor Phase 1.
+- [x] Publish the four reviewed paths as 603c12331cffbf08277a29607d7e0ff1d7097448
+  and consume the one reserved invocation: PASS, UTC 2026-11-08T13:43:58Z through
+  13:45:20Z (82 seconds). Complete structured evidence: 990 server/1,237 client
+  PASS, zero failures/hooks, 15/seven pending. All four required cases PASS.
+  Source unchanged; isolation/6 GiB limits/cleanup verified; original local
+  container IDs/images/start times/states unchanged. Retain 27 private files
+  (813,370 bytes) under native-local-http-admin-correction-20261107.
+  Native receipt SHA-256:
+  5500c6425ae8c9d48ac33d11894946c7b9d1aff93e11023210aba6bf7f0ff369.
+  Log SHA-256:
+  fe7b9e2014cae4bbcd79a45d8d30e2033176e7b88713af5dae9736aa69be4aa8.
+  This is exact-source native Meteor acceptance, not GitHub/release/deployment
+  qualification. No staging deployment or route activation occurred.
+- [x] Accept the corrected HTTP/Mongo gate and resume producer/uploader/target
+  work. Preserve the accepted 831ef74b receipt and staging2 restoration subgates.
+  Coordinated activation and the remaining Phase 1 exit gates remain open.
+
+### Inert V2 file/host/upload pipeline (2026-11-08)
+
+- [x] Retain and accept the exact-source 603c1233 Meteor receipt above, check off
+  the repaired HTTP/Mongo gate and exhaust its one-use allowance. No repeated
+  receipt/mount, host installation, old-image or staging2 acceptance operation.
+- [x] Add bounded canonical JSON file carriage to the existing artifact/assembly
+  contracts: derive profile-owned filenames from the catalog, validate producer
+  output before creating files, preserve existing output bytes with exclusive
+  writes and mode 0600, reject links/non-files/oversize/changed input, duplicate
+  JSON keys and invalid encodings. Missing/invalid expected files use the named
+  whole-producer ERROR recovery; unexpected directory entries fail explicitly.
+- [x] Connect the qualified host and composite evaluators to that file boundary.
+  Preserve host missing/malformed/version errors, partial conclusive Redis FAIL
+  and independent positive-only UDP FAIL without fabricated host facts. Emit
+  only the existing validated internal/composite producer artifacts. This does
+  not run SSH or install/change the independently qualified host collector.
+- [x] Derive report target exclusively from required protected AUDIT_TARGET;
+  reject metadata target overrides. Add an explicit unscheduled V2 uploader,
+  using the same exact target, full retained-report/digest/time validation and
+  unchanged shared HMAC. One 30-second-bounded request to the V2 endpoint;
+  no redirects, retries, alternate target/endpoint or raw response diagnostics.
+- [x] Add 16 synthetic Node cases covering exact full/exposure profiles, missing/
+  malformed/duplicate/wrong-owner/metadata files, symlinks/hard links/oversize,
+  immutable output, target/config failure priority, signed byte/receiver parity,
+  time/digest/target rejection, non-201/network failures, both CLI boundaries
+  and host/composite file propagation. All 16 PASS. An initial test looked up
+  an invented Redis control ID; corrected it to existing internal.redis-auth,
+  then reverified the actual failure branch. No implementation policy changed.
+- [x] Full pinned Linux source-security: 170 total/169 PASS/zero FAIL/one existing
+  CI-only skip. Earlier root source check with the first 12 new cases passed
+  165/166; final 169/170 covers all 16. Existing evidence-harness 12-PASS proof
+  is retained. No new Meteor invocation was needed or performed: this family
+  changes only Node .mjs files, docs and source-suite imports; shared TypeScript,
+  Meteor bindings and the passing 603c1233 integration fixture are unchanged.
+- [x] Final full pinned lint PASS, including 323 security surfaces; all six new
+  .mjs files also pass explicit lint. Intentional 10-path review and whitespace
+  checks pass. All eight unrelated files remain byte-identical; active V1
+  producers/orchestration/contracts and all shared app TypeScript are unchanged.
+- [x] Update public code/operator guidance with input ownership, protected target,
+  bounded error recovery, unscheduled entry points and remaining limitations.
+  Verify canonical config/wiki paths and absence of existing dependent callers;
+  no config/TDF fields, dependencies, account/learner storage, UI/locale, CSP,
+  permissions, registered route, active producer or scheduled workflow changed.
+- [ ] Obtain explicit publication permission. The earlier 10-path request has
+  not been answered; the combined 16-path request below supersedes it. The latest
+  permission published only the four-path correction. Zero remaining Meteor
+  invocations; no fresh Meteor run is proposed for unchanged app code.
+- [ ] Implement remaining external/authentication/repository acquisition and
+  complete orchestration, then coordinated route/client/workflow/host cutover
+  and full candidate/previous/candidate qualification. The file helpers do not
+  establish authentic source/release observations or close any Phase 1 exit gate.
+
+### Separate inert external acquisition and sequencing review (2026-11-08)
+
+- [x] Continue independent source work while the file-pipeline publication request
+  is pending; keep all ten reviewed paths unchanged during implementation.
+  Add six separate candidate files (acquisition, pure evaluator/XML reader,
+  file emitter, explicit CLI, tests and maintained code guide).
+- [x] Derive actual DNS/TCP/UDP/TLS/certificate/cipher/WebSocket/header metrics
+  instead of translating V1 statuses. Validate Nmap completion, one correct
+  IPv4/IPv6 address and the full port inventory; reject duplicates, changed
+  scope, XML entity/DTD input and malformed/truncated output. Reuse the already
+  declared XML dependency. Equivalent IPv6 representations share one identity.
+- [x] Preserve the approved fixed TCP tiers, complete required measurements and
+  independent positive UDP finding; missing or ambiguous evidence is ERROR.
+  Separate protocol acceptance from certificate validation. A credential-free,
+  per-probe legacy TLS context measures actual negotiation; normal HTTP/WSS
+  verification, global TLS settings and application CSP stay unchanged. Only an
+  explicit peer version alert proves rejection; timeouts/resets/local failures
+  do not. No arbitrary certificate expiry or host facts are invented.
+- [x] Emit only external.json and the composite owner's raw UDP counts when
+  their inventory is known. Preserve per-run output and reject stale evidence
+  before probing; unavailable UDP inventory stays absent/observable. Fixed web
+  policy scopes HTTPS to port 443. The hostname HTTP path/header scope retains
+  V1 behavior; address-specific probes cover the resolved bounded inventory.
+- [x] All 24 offline external cases PASS; final combined pinned Linux Node run:
+  194 total/193 PASS/zero FAIL/one existing CI-only skip. Tests inject I/O and
+  socket events; no Nmap command, live target, protected fixture/provider read,
+  Meteor invocation, workflow action or deployment occurred. Active V1 and
+  shared Meteor TypeScript remain unchanged; no dependency was added.
+- [x] Final full lint PASS, including server boundary, clean test-driver manifest
+  and all 323 security surfaces. Combined 16-path review and whitespace checks
+  PASS; eight unrelated files remain byte-identical. Retain existing full app
+  typecheck and 603c1233 Meteor proof for unchanged TypeScript/runtime bindings.
+- [ ] Obtain explicit combined 16-path publication permission with CI skipped;
+  this source-only request supersedes the unexecuted 10-path publication request,
+  not any consumed Meteor allowance. No additional Meteor run is proposed.
+- [x] Review and correct the independent socket resource boundary before
+  publication: fixed ten-second overall TLS/WebSocket budgets cannot be extended
+  by byte activity. Completion/early close share socket/timer disposal. Preserve
+  V1's sequential Nmap execution instead of multiplying full scans by address.
+  Three added offline regressions cover absolute budgets, single settlement and
+  one active Nmap operation; no live connection or scan was used.
+- [x] Correct a private verification-wrapper CRLF error: underlying commands
+  returned zero but its final exit received a carriage return. Retain original
+  logs, normalize the wrapper to LF and pass Bash syntax validation; repeat the
+  same required commands to obtain clean zero exits before publication. This
+  was an operator-wrapper failure, not an app/Meteor failure.
+- [x] Trace a real sequencing dependency before authentication adaptation:
+  production-auth-audit.mjs:438 accepts any method error as expected denial;
+  its publication branch similarly reduces outcomes to booleans. Retained
+  Phase 0 P0-2 witnesses characterize these false passes. V2 verification needs
+  actual complete/matched/domain/transport/inconclusive counts, and cutover
+  needs zero pipeline ERROR. Boolean-to-counter conversion would invent proof.
+- [ ] Phil's sequencing decision: recommend bringing only typed outcome capture
+  and exact expected-result/allowed-baseline declarations for the existing
+  selected authentication probes forward from Phase 2 into Phase 1, using the
+  single planned Section 7.2 verificationCatalog.ts contract. No temporary
+  second catalog, changed access permissions, new account/provider binding or
+  full Phase 2 coverage expansion is proposed. Keep ambiguous outcomes ERROR
+  and send genuinely ambiguous classifications to Phil under decision 8.
+  The rest of Phase 2 and Phase 3 retain their existing scope. This amendment
+  is NOT approved or implemented; the scope review is prepared privately.
+
+### Repository observations: separate unpublished follow-on (2026-11-08)
+
+- [x] Continue independent Phase 1 source work while the two decisions above are
+  pending. Keep the 16-path publication source separate; this four-path local
+  candidate is NOT included in that publication permission request. Only this
+  status note is added to the earlier batch's documentation.
+- [x] Reuse the existing finding-group map and derive its catalog ownership view
+  instead of copying bindings. Add strict raw npm/Gitleaks/Trivy adapters and a
+  complete 25-control repository evaluator; all metadata remains catalog-owned.
+  Exposure has no repository producer. Tool execution and workflow wiring are
+  still unimplemented; no complete live repository acquisition is claimed.
+- [x] Require npm actual per-severity counts and exit/result agreement, preserve
+  package/advisory identities without redaction-induced collisions, and keep
+  unconfirmed development advisories as maintenance observations. A reviewed
+  matching build exposure is required for development FAIL. Runtime tiers are
+  unchanged; invalid independent input does not discard valid runtime evidence.
+- [x] Reject missing/false-empty Trivy/Gitleaks inventories; bind reported Trivy
+  target to the selected immutable platform image and reject unknown severities.
+  All image controls require the existing deployed revision/platform observations
+  and matching selected image. Missing evidence stays ERROR; known identity
+  conflict remains visible. This validates supplied observations, not authenticity.
+- [x] Decode actual Node TAP completion with an exact unfiltered invocation and
+  explicit empty NODE_OPTIONS. The real disposable runner tests exposed inherited
+  worker IPC and filtered-plan false successes; the owned test fixture now uses
+  an explicit independent CLI context, and the observation adapter rejects
+  filters, skips, TODO/cancellation, empty files, crashes and missing coverage.
+  Only complete assertion failures become FAIL; raw diagnostics are discarded.
+- [x] All ten focused cases PASS, including full report assembly/parser parity.
+  Final combined pinned Linux Node checks: 204 total/203 PASS/zero FAIL/one
+  existing CI-only skip. Full lint PASS, including all 323 surfaces. Shared app
+  TypeScript and active V1 stay unchanged; no additional typecheck/Meteor run was
+  needed or invoked. All eight unrelated files remain byte-identical. Tests use
+  synthetic tool bytes and owned Node subprocesses; no live package audit,
+  Gitleaks, Trivy, Docker, provider, staging2 or production operation occurred.
+- [ ] Implement the actual repository acquisition/runner boundary, including
+  genuine static-surface coverage and client-canary observations, then wire the
+  existing artifact writer and full workflow. Do not replace missing evidence
+  with command booleans or invented zero counters. This local follow-on neither
+  closes P1-07 nor grants publication, execution or deployment permission.
+- [ ] Authentication sequencing and the preceding 16-path publication decisions
+  remain pending. No authentication catalog/permission change was made.
+
+### Repository acquisition and client-bundle source checkpoint (2026-11-08)
+
+This extends the separate unpublished repository candidate from four to ten
+paths. It does not add paths to the pending 16-path publication request. The
+preceding checkpoint remains historical; the open work is reconciled below.
+
+- [x] Add the explicit, unscheduled Gitleaks/npm/Trivy acquisition boundary.
+  Use private 0700 temporary reports, shared stable bounded reads, redacted
+  Gitleaks, both existing lockfile graphs and vulnerability-only immutable-image
+  Trivy scope. Preserve valid runtime evidence when the all-graph fails. Missing
+  directories/tools, malformed results and timeouts remain explicit errors.
+- [x] Add the Linux raw-byte command runner with an explicit narrow environment,
+  empty NODE_OPTIONS, no worker IPC/fixture variables, no shell, bounded output,
+  discarded diagnostics, absolute deadline and owned process-group termination.
+  Reject unsafe environments before a tool boundary is called. Actual disposable
+  Node tests verify raw bytes/finding exits, stdin, timeout, output bounds, missing
+  executables and a pipe-holding descendant's termination. No scanner was run.
+- [x] Implement the client-bundle scanner as one import-safe built-ins-only source
+  for the selected runtime image. Inspect both existing browser targets, detect
+  binary/chunk-boundary canaries and count matched files without emitting values
+  or paths. Reject missing/empty inventories, links/special files, changed metadata
+  and exceeded file/entry/directory/byte/depth limits. Its image/container bridge
+  is not implemented or accepted; synthetic filesystem proof is not image proof.
+- [x] Five acquisition, five command and eight bundle cases PASS. Together with
+  the earlier ten repository observation cases this is 28 focused cases. The
+  tool-boundary fixtures establish 21 of 25 repository rows; four unprovided
+  static/source/canary observations correctly remain ERROR. Do not claim all
+  repository controls ran or passed. One initial fixture used the wrong existing
+  policy-schema literal; it was corrected to the actual policy and all cases pass.
+- [x] Final pinned root-Linux combined Node verification: 222 total/221 PASS/zero
+  FAIL/one existing CI-only skip. The first regular-user invocation had two
+  additional protected-host fixture skips; the established root context executed
+  both successfully. Final full lint and its 323-surface contract pass. No app
+  TypeScript changed; its retained typecheck/Meteor evidence is not re-run or
+  relabeled as qualification of this unpublished whole source.
+- [x] All eight unrelated files remain byte-identical. Canonical companion paths,
+  active V1, workflows, app/shared contracts and dependency files stay unchanged.
+  This checkpoint invokes no live npm audit/Gitleaks/Trivy, Docker, Meteor,
+  provider, staging2 or production operation and publishes nothing.
+- [ ] Implement actual static-surface coverage and sensitive-log observations,
+  connect the source-suite runner, then implement and test the protected immutable
+  image/container bridge for canaries. Complete artifact/workflow wiring and
+  separately authorized live qualification remain open. P1-07/13 remain open.
+- [ ] The authentication-sequencing decision and the separate 16-path publication
+  approval remain pending. This ten-path follow-on has no publication approval.
+  Keep the whole Phase 1 goal active; no cutover or completion is claimed.
+
+### Source-observation collector and complete Node gate (2026-11-08)
+
+The separate unpublished repository candidate now has fourteen paths. This
+supersedes its ten-path checkpoint's remaining static/source acquisition boxes;
+that checkpoint remains historical. It is outside the pending 16-path request.
+
+- [x] Wire actual discovery/default-checker commands without importing or
+  changing the active inference checker. Validate its inventory and exact
+  completed-count protocol together: 323 expected/completed/matched facets.
+  Nonzero/unstructured failure stays ERROR, not an invented confirmed violation.
+  Existing labels/patterns are unchanged; runtime enforcement remains Phase 3.
+- [x] Acquire stable bounded UTF-8 server source and use the existing sensitive
+  logging classifier/selection. Actual current result: 199 inspected files,
+  zero files with policy findings. Emit counts only, no statement text or paths.
+  Empty, linked, changing, malformed or over-budget inventories cannot pass.
+- [x] Add an explicit inert-V2 source-suite entry point including current and
+  new external/repository cases. Its owned unfiltered Node runner returns actual
+  flat TAP completion; process success alone is insufficient. Five focused new
+  source cases pass, including real current-checker execution and failure cases.
+  The repository follow-on now has 33 focused cases in the complete source gate.
+- [x] Review the prior CI-only host-exposure harness: it uses a private root
+  temporary directory and synthetic commands, not live services. Replace its
+  GitHub-label-only eligibility with the same root-Linux/jq capability gate used
+  by the V2 host-collector fixture. Direct-root and hosted-sudo paths execute the
+  same harness; install no dependency and make no live service call. The actual
+  supported native fixture passes, removing the prior skip without suppressing it.
+- [x] The actual V2 source collector now observes all 227 cases completed and
+  matched with zero domain/transport/inconclusive counts: zero failures/skips.
+  Full lint passes with all 323 surfaces. An initial no-control-regex lint
+  rejection was repaired with the existing character-code validation pattern,
+  its regression assertion passes, and final lint/source acquisition rechecked.
+  This is Node/source proof, not Meteor, image or deployment qualification.
+- [x] All eight unrelated files are byte-identical; the 16-path pending source
+  cohort is unchanged except these added status notes. Active V1 producer,
+  workflow, policy checker, app/shared contracts and dependencies are unchanged.
+  The test eligibility change above is explicit. No Meteor run, live npm audit,
+  Gitleaks, Trivy, Docker, provider, staging2 or production operation occurred.
+- [ ] Implement/test the protected immutable-image canary container bridge,
+  then complete repository artifact and whole-pipeline/workflow wiring. Source
+  acquisition now owns its three previously missing observations; tool acquisition
+  remains separate and cannot supply them by implication. Live full-report
+  qualification and cutover remain unexecuted, so P1-07/13 remain open.
+- [ ] Publication/authentication-sequencing decisions remain pending. No source
+  catalog/permission change or publication approval is inferred here. Phase 1's
+  full goal remains active; accepted Meteor/staging2 proofs are not repeated.
+
+### Image-canary bridge source and cleanup proof (2026-11-08)
+
+The separate unpublished repository cohort now contains seventeen intentional
+paths; it remains outside the pending 16-path publication request. This closes
+its individual image-bridge implementation box, not operational acceptance.
+
+- [x] Implement explicit no-pull/no-build image-canary acquisition. Reuse the
+  existing bounded classic/containerd archive identity owner; resolve actual
+  selected/container config digests and platform before comparing. Extend that
+  shared optional helper only to accept an explicit tool environment and spawn
+  test boundary; prior default behavior is unchanged. Existing identity cases
+  retain their proof. No second OCI/config interpretation is introduced.
+- [x] Reuse one scanner-owned canary validator. Create/inspect the uniquely
+  owned container before start or stdin transfer. Require the selected image,
+  read-only root/sole scanner bind, no network/capabilities/new privileges,
+  nonroot UID/GID, disabled healthcheck/restart/logging, half a CPU, 128 MiB with
+  no swap and 64 PIDs. Canaries enter only bounded stdin, not argv/env/files.
+  The archive subprocess also receives the explicit narrow environment.
+- [x] Inspect exited/non-OOM/zero-exit daemon state, unchanged identity/restrictions
+  and scanner copy. Treat attached CLI success alone as insufficient. Bound the
+  attached start to five minutes; raw malformed/false-empty counts cannot pass.
+  Independently authenticated release/platform provenance remains the coordinator's
+  responsibility; matching local image graphs is not publisher qualification.
+- [x] Verify owned cleanup on every attempted-create branch, including success,
+  timeout and malformed output. Remove only a label-verified immutable container
+  ID and verify absence again. Never remove foreign ownership or replaced
+  workspaces. An unknown-ID cancelled create plus immediate absence cannot prove
+  the daemon request completed. Cleanup uncertainty raises the named recovery
+  exception with credential-free coordinates and blocks normal acceptance.
+- [x] Ten new image-bridge cases plus nine existing identity compatibility cases
+  PASS with synthetic OCI bytes, temporary source copies and injected Docker
+  boundaries. The source suite includes the new cases: 237 expected/completed/
+  matched, zero failures/skips, through the actual V2 Node collector. Full lint
+  PASS, including the unchanged 323-surface checker. Repository-focused count is
+  now 43. This is source/orchestration branch proof, not real container proof.
+- [x] All eight unrelated files remain byte-identical. Active V1 producer/workflow,
+  app/shared TypeScript and dependencies are unchanged. No real Docker, live
+  npm audit/Gitleaks/Trivy, Meteor, provider, staging2 or production operation,
+  publication, release qualification or deployment occurred.
+- [ ] Perform a separately approved real-image canary run to establish actual
+  isolation/resource fit/cleanup and image observations. No such permission is
+  inferred from source-work continuation or prior consumed Meteor authorizations.
+- [ ] Compose the repository artifact and whole pipeline/workflow from these
+  individual acquisition boundaries; finish remaining typed authentication work
+  only after the pending sequencing choice. Complete registered-runtime,
+  ingestion/rollback and actual release gates before Phase 1 completion.
+- [ ] Existing publication and authentication-sequencing decisions remain pending.
+  No new publication or Meteor permission is inferred. Keep accepted earlier
+  staging2/Meteor proofs checked off and the full Phase 1 goal active.
+
+### Complete repository artifact and combined publication review (2026-11-08)
+
+- [x] Compose tool/source/image observations through one explicit unscheduled
+  repository writer and the existing canonical artifact writer. Validate raw
+  component ownership before merging; source bindings stay with the source
+  collector and tier ownership with the existing group map. No duplicate
+  catalog titles/severities/membership table is introduced.
+- [x] Snapshot narrow context/environment/canary inputs before asynchronous work.
+  Reuse the image-availability policy owner to suppress Trivy/Docker on missing
+  or conflicting independently supplied image context. Other observations remain
+  independent. Missing canaries affect their control only; no full fixture or
+  signing credential is forwarded to a scanner/source subprocess.
+- [x] Read only the selected checkout's existing development-exposure policy,
+  through bounded stable JSON/file helpers. Preserve existing development ERROR
+  semantics for absent/invalid policy without discarding runtime observations.
+  Reject stale/excluded/unsafe output configuration before tools; write all
+  25 validated rows once with mode 0600. A competing artifact is never overwritten.
+  Cleanup recovery exceptions propagate unchanged before normal artifact output.
+- [x] Seven new cases PASS through raw tool parsing, actual disposable Node
+  two-case TAP, filesystem writing and independent full-report parsing. That
+  synthetic assembly has 25 repository PASS and 45 explicit ERROR rows; it is not
+  a live full audit. Ownership overlap, stale/competing files, input mutation,
+  image/canary gates and cleanup failures are tested.
+- [x] Final actual V2 source collector: 244 expected/completed/matched cases,
+  zero failures/skips. Full lint PASS, including 323 surface facets. There are
+  50 repository-focused and 24 external cases. The retained earlier real-image,
+  Meteor and staging2 boundaries remain distinct; none was repeated here.
+- [x] Reconcile publication scope: the original 16-path file/external cohort and
+  the now nineteen-path repository cohort form one reviewed 35-path source batch.
+  The repository writer depends on the first cohort's file helper, so publish
+  the coherent combined batch rather than leaving an imported helper absent.
+  Private review manifests retain exact file hashes, tests and the eight
+  byte-identical unrelated files. No commit/push is authorized or executed yet.
+- [ ] Obtain explicit publication permission for those 35 intentional paths with
+  [skip ci]; this replaces the earlier unanswered 16-path request. No Meteor,
+  live scanner, Docker, provider, remote or deployment execution is proposed.
+  App/shared TypeScript, V1 producer/workflow and dependencies are unchanged.
+- [ ] Resolve the existing authentication sequencing choice: Phase 1's strict
+  counters cannot truthfully be made from V1's any-error-means-denied booleans.
+  The proposed minimum typed capture/source-owned expected-result catalog remains
+  unimplemented pending that phase-boundary amendment. It changes no permissions.
+- [ ] Finish whole-pipeline/workflow wiring and separately authorized real-image,
+  registered receiver, ingestion/rollback and release acceptance. Do not check
+  P1-07/13 or Phase 1 complete from the synthetic artifact/source proof. The full
+  goal stays active; no new deployment or production/original-staging access.
+
+### Decision P1-D8: minimum authentication evidence sequencing (approved 2026-11-08)
+
+Phil explicitly approved the necessary sequencing amendment: bring minimum typed
+outcome capture, exact source-owned expected allowed/denied intent and positive
+allowed baselines for the existing selected probes into Phase 1. Reuse the one
+planned verificationCatalog.ts owner in Section 7.2; do not create a temporary
+second catalog or translate arbitrary V1 failure booleans into completed matches.
+Keep domain rejection, transport failure and missing evidence distinct from a
+policy denial. Application permission rules, actor/resource meanings and the
+remaining Phase 2 authorization coverage/review stay unchanged. Source work only:
+no protected fixture read/transfer, new account/access/dependency, live probe,
+Meteor invocation, deployment or production/original-staging access is granted.
+Update the written plan in the following source batch. The separate 35-path
+publication approval is recorded above; no further batch publication is implied.
 
 ### Decision P1-D1: fixed catalog impact versus mixed-impact V1 controls
 

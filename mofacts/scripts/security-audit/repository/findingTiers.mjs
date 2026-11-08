@@ -10,6 +10,14 @@ const GROUPS = new Map([
 ]);
 const SEVERITIES = { info: 'INFO', low: 'LOW', moderate: 'MEDIUM', high: 'HIGH', critical: 'CRITICAL' };
 
+// Expose a derived ownership view; GROUPS remains the one binding owner.
+export function repositoryFindingGroups(catalog, profile) {
+  const definitions = profileControls(catalog, profile);
+  return [...GROUPS].map(([group, prefix]) => ({ group, controls: definitions
+    .filter(row => row.producerId === 'repository' && row.controlId.startsWith(`${prefix}.`))
+    .map(row => row.controlId) }));
+}
+
 // Acquisition supplies reviewed build exposures only for development groups;
 // unconfirmed development advisories remain maintenance data, never FAIL inputs.
 export function evaluateFindingTiers(catalog, profile, group, findings) {
